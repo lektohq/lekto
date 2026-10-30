@@ -137,6 +137,7 @@ describe('step details', () => {
 		);
 		expect(neighbours[0]).toEqual({
 			title: m.signal_document({ number: 1 }),
+			id: 'd-1',
 			href: '/ui/documents/d-1',
 			parts: ['Jugendverein Muster e.V.', 'Lohnabrechnung'],
 			about: 'Jugendverein Muster e.V. · Lohnabrechnung',
