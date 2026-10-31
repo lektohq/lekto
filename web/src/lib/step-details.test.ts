@@ -152,7 +152,8 @@ describe('step details', () => {
 			{
 				named: [{ name: 'Muster Bäckerei' }, { name: 'N26' }],
 				identifiers: [{ kind: 'personnel_number', value: '12345', contact_id: BAKERY }],
-				unknown_identifiers: [{ kind: 'iban', value: 'DE89 3704 0044 0532 0130 00' }],
+				// As the API keeps it; shown as printed.
+				unknown_identifiers: [{ kind: 'iban', value: 'DE89370400440532013000' }],
 				persons: [{ user_id: ANNA, strength: 'weak' }]
 			},
 			lookup
