@@ -21,6 +21,7 @@
 	let {
 		chosen,
 		allChosen,
+		lookedAt,
 		loaded,
 		conflicts,
 		loading,
@@ -40,7 +41,9 @@
 		chosen: number;
 		/** Every loaded document without a conflict is chosen. */
 		allChosen: boolean;
-		/** Documents the dry run has loaded. */
+		/** Documents the dry run has looked at. */
+		lookedAt: number;
+		/** Of them, those the rule would change. */
 		loaded: number;
 		/** Of them, those with a conflict. */
 		conflicts: number;
@@ -98,6 +101,7 @@
 		<ChoiceBox
 			class={inset}
 			checked={allChosen}
+			disabled={loaded === 0}
 			aria-label={m.rule_preview_select_all()}
 			onchange={(event) => onchoose(event.currentTarget.checked)}
 		/>
@@ -121,9 +125,15 @@
 {#snippet hint()}
 	{#if !application}
 		{#if loading}
-			{m.rule_preview_loading({ documents: bulkDocuments(loaded) })}
+			{m.rule_preview_loading({
+				documents: bulkDocuments(lookedAt),
+				count: formatNumber(loaded)
+			})}
 		{:else if stopped}
-			{m.rule_preview_stopped({ documents: bulkDocuments(loaded) })}
+			{m.rule_preview_stopped({
+				documents: bulkDocuments(lookedAt),
+				count: formatNumber(loaded)
+			})}
 		{:else}
 			{m.rule_preview_total({ documents: bulkDocuments(loaded) })}{#if conflicts > 0}
 				· {m.rule_preview_conflicts({ count: formatNumber(conflicts) })}{/if}

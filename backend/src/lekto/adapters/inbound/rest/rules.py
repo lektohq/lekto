@@ -234,6 +234,7 @@ async def preview_apply(
             for item in preview.items
         ],
         next_cursor=None if preview.next_cursor is None else encode_cursor(preview.next_cursor),
+        looked_at=preview.looked_at,
     )
 
 

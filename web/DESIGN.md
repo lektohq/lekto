@@ -389,10 +389,11 @@ card row: the box at its start, the title (`BeamTitle`) and, on a desktop at the
 what the rule changes (on the phone below it); a chosen one has the chosen look. A document with
 a conflict has `TriangleAlert` (`lane-yellow-foreground`) in place of the box, the badge
 "Konflikt", a border of `lane-yellow-foreground/35` and its own "Regelwert trotzdem übernehmen",
-never chosen at first. The dry run loads page after page by itself. The bar (`RuleApplyBar` on
-`SelectionBar`) holds a box that chooses every document without a conflict, how many are chosen,
-how far it has loaded ("Probelauf läuft … bisher 20 Dokumente", "Anhalten" in `ghost`; stopped:
-"Weiter laden"; at the end the count and those with a conflict), and "Anwenden" (`default`), or,
+never chosen at first. The dry run loads page after page by itself, and a rule that hits few documents looks at many
+pages first, so the bar stands from its start. The bar (`RuleApplyBar` on `SelectionBar`) holds a
+box that chooses every document without a conflict, how many are chosen, how far it has come
+("Probelauf läuft: 1.200 Dokumente geprüft, 6 betroffen", "Anhalten" in `ghost`; stopped: "Weiter
+laden"; at the end the count and those with a conflict), and "Anwenden" (`default`), or,
 while the rule is paused and the reader may switch it on, "Anwenden" (`outline`) and "Aktivieren
 und anwenden" (`default`), held while the dry run loads. Once applied, the bar follows the
 application in place of all that, and the list stays pale and inert: waiting for the worker with

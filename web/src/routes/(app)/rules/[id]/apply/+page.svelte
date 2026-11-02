@@ -65,6 +65,10 @@
 	let version = $state<number | null>(null);
 	let cursor = $state<string | null>(null);
 	let complete = $state(false);
+	/** Documents the dry run has looked at so far, those without a change among them. */
+	let lookedAt = $state(0);
+	/** The dry run was started (coming back to an application shows none). */
+	let started = $state(false);
 	let loading = $state(false);
 	let loadingAll = $state(false);
 	let previewError = $state<string | null>(null);
@@ -92,7 +96,10 @@
 			? { jobs: ahead(summary), still: workersStill(summary) }
 			: null
 	);
-	const showBar = $derived(application !== null || items.length > 0);
+	// From the start of the dry run: rules that hit few documents look at many pages first.
+	const showBar = $derived(
+		application !== null || items.length > 0 || (started && !complete && !previewError)
+	);
 
 	$effect(() => {
 		const wanted = id;
@@ -116,6 +123,7 @@
 
 	/** The dry run from its start, every page of it. */
 	function start() {
+		started = true;
 		restart();
 		void all();
 	}
@@ -125,6 +133,7 @@
 		version = null;
 		cursor = null;
 		complete = false;
+		lookedAt = 0;
 		chosen.clear();
 		accepted.clear();
 	}
@@ -132,7 +141,7 @@
 	// The request in flight: a second call joins it instead of starting another.
 	let pending: Promise<void> | null = null;
 
-	/** The next page with at least one document, or the end. Pages may be empty midway. */
+	/** The next page. It may hold no document and still have a next one. */
 	function more(): Promise<void> {
 		pending ??= nextPage().finally(() => (pending = null));
 		return pending;
@@ -143,26 +152,24 @@
 		loading = true;
 		previewError = null;
 		try {
-			do {
-				const preview = await unwrap(
-					api.POST('/api/v1/rules/{id}/apply/preview', {
-						params: { path: { id } },
-						body: { cursor, limit: PAGE }
-					})
-				);
-				if (version !== null && preview.version !== version) {
-					// The rule changed between pages: what was loaded no longer holds.
-					restart();
-					toast.info(m.rule_preview_restarted());
-					continue;
-				}
-				version = preview.version;
-				items = [...items, ...preview.items];
-				for (const documentId of preselected(preview.items)) chosen.add(documentId);
-				cursor = preview.next_cursor;
-				complete = cursor === null;
-				if (preview.items.length > 0) break;
-			} while (!complete && !stop.signal.aborted);
+			const preview = await unwrap(
+				api.POST('/api/v1/rules/{id}/apply/preview', {
+					params: { path: { id } },
+					body: { cursor, limit: PAGE }
+				})
+			);
+			if (version !== null && preview.version !== version) {
+				// The rule changed between pages: what was loaded no longer holds.
+				restart();
+				toast.info(m.rule_preview_restarted());
+				return;
+			}
+			version = preview.version;
+			lookedAt += preview.looked_at;
+			items = [...items, ...preview.items];
+			for (const documentId of preselected(preview.items)) chosen.add(documentId);
+			cursor = preview.next_cursor;
+			complete = cursor === null;
 		} catch (error) {
 			previewError = describeError(error);
 		} finally {
@@ -310,6 +317,7 @@
 	<RuleApplyBar
 		chosen={count}
 		{allChosen}
+		{lookedAt}
 		loaded={items.length}
 		conflicts={items.length - plain.length}
 		loading={loadingAll}
