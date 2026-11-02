@@ -471,7 +471,7 @@
           "auth"
         ],
         "summary": "The caller",
-        "description": "Who is signed in and how; with a session also its CSRF token.",
+        "description": "Who is signed in and how; with a session also its CSRF token; the version of Lekto.",
         "operationId": "me_api_v1_auth_me_get",
         "responses": {
           "200": {
@@ -30904,6 +30904,11 @@
             },
             "type": "array",
             "title": "Linked Accounts"
+          },
+          "lekto_version": {
+            "type": "string",
+            "title": "Lekto Version",
+            "description": "The version of Lekto that answers (its release)."
           }
         },
         "type": "object",
@@ -30915,13 +30920,15 @@
           "token_scope",
           "has_password",
           "totp_enabled",
-          "linked_accounts"
+          "linked_accounts",
+          "lekto_version"
         ],
         "title": "Me",
         "examples": [
           {
             "authenticated_with": "token",
             "has_password": true,
+            "lekto_version": "0.8.0",
             "linked_accounts": [],
             "token_scope": "read",
             "totp_enabled": false,

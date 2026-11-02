@@ -294,6 +294,7 @@
 	"sign_out": "Sign out",
 	"api_docs": "API documentation",
 	"opens_in_new_tab": "opens in a new tab",
+	"lekto_version": "Lekto {version}",
 	"theme_label": "Appearance",
 	"theme_light": "Light",
 	"theme_dark": "Dark",
