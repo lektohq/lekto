@@ -271,6 +271,13 @@
 								<LogOut aria-hidden="true" />
 								{m.sign_out()}
 							</DropdownMenu.Item>
+							<!-- The version that runs, small at the end (Tobi, 02.11.2026). -->
+							{#if session.version}
+								<DropdownMenu.Separator />
+								<DropdownMenu.Label class="font-normal">
+									{m.lekto_version({ version: session.version })}
+								</DropdownMenu.Label>
+							{/if}
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>
 				{/if}
@@ -386,6 +393,12 @@
 									<LogOut class="size-4 text-muted-foreground" aria-hidden="true" />
 									{m.sign_out()}
 								</button>
+								{#if session.version}
+									<Separator class="mx-4 my-2 w-auto" />
+									<p class="px-4 text-xs text-muted-foreground">
+										{m.lekto_version({ version: session.version })}
+									</p>
+								{/if}
 							</div>
 						{/if}
 					</Sheet.Content>
