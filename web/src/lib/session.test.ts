@@ -11,7 +11,8 @@ function me(id: string, token: string): Response {
 			user: { id, username: id, role: 'user' },
 			method: 'password',
 			expires_at: '2026-10-09T12:00:00Z',
-			csrf_token: token
+			csrf_token: token,
+			lekto_version: '0.8.0'
 		}),
 		{ status: 200, headers: { 'content-type': 'application/json' } }
 	);
@@ -56,6 +57,14 @@ describe('loading the session', () => {
 		await session.load();
 		expect(session.user).not.toBe(first);
 		expect(session.user?.username).toBe('bob');
+	});
+
+	it('keeps the version of Lekto until the session ends', async () => {
+		fetchMock.mockResolvedValueOnce(me('alice', 'one'));
+		await session.load();
+		expect(session.version).toBe('0.8.0');
+		session.clear();
+		expect(session.version).toBeNull();
 	});
 });
 

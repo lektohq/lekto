@@ -279,4 +279,26 @@ describe('AppShell', () => {
 		expect(docs.getAttribute('target')).toBe('_blank');
 		expect(docs.getAttribute('rel')).toBe('noopener noreferrer');
 	});
+
+	it('names the version of Lekto at the end of the account menu', async () => {
+		signIn('user');
+		session.version = '0.8.0';
+		render(AppShell, { children });
+		const menu = await openAccountMenu();
+		const version = within(menu).getByText(m.lekto_version({ version: '0.8.0' }));
+		expect(menu.lastElementChild).toBe(version);
+		expect(version.getAttribute('role')).toBeNull(); // no item to choose
+	});
+
+	it('names the version of Lekto at the end of the sheet on a phone', async () => {
+		phone.override(true);
+		signIn('user');
+		session.version = '0.8.0';
+		render(AppShell, { children });
+		await fireEvent.click(screen.getByRole('button', { name: m.nav_open() }));
+		const sheet = await screen.findByRole('dialog');
+		const version = within(sheet).getByText(m.lekto_version({ version: '0.8.0' }));
+		const sign = within(sheet).getByRole('button', { name: m.sign_out() });
+		expect(sign.compareDocumentPosition(version) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+	});
 });

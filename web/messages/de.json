@@ -294,6 +294,7 @@
 	"sign_out": "Abmelden",
 	"api_docs": "API-Dokumentation",
 	"opens_in_new_tab": "öffnet in einem neuen Tab",
+	"lekto_version": "Lekto {version}",
 	"theme_label": "Darstellung",
 	"theme_light": "Hell",
 	"theme_dark": "Dunkel",
