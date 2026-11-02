@@ -2,8 +2,11 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import type { ProfileData } from '#lib/profile.ts';
 import { session } from '#lib/session.svelte.ts';
 import ProfileForm from './ProfileForm.svelte';
+
+vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
 
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
 const sent: { path: string; body: unknown }[] = [];
@@ -52,6 +55,8 @@ const contacts = [
 	{ id: 'insurer', name: 'Insurer', topic_ids: [] }
 ];
 
+const data = { profile: stored, contacts, topics: [] } as unknown as ProfileData;
+
 beforeEach(() => {
 	session.start({
 		user: { id: 'anna', username: 'anna', role: 'user' },
@@ -82,7 +87,7 @@ afterEach(() => {
 
 describe('ProfileForm', () => {
 	it('shows the own profile and saves what is in it', async () => {
-		render(ProfileForm);
+		render(ProfileForm, { data });
 		const name = await screen.findByLabelText(m.profile_display_name());
 		expect((name as HTMLInputElement).value).toBe('Anna Example');
 		expect(screen.getByText('Anna Sample')).toBeTruthy();
@@ -111,9 +116,9 @@ describe('ProfileForm', () => {
 	});
 
 	it('takes over a number found for the user and declines another as not theirs', async () => {
-		render(ProfileForm);
-		await screen.findByText('K2002');
-		expect(screen.getAllByText('Insurer')).toHaveLength(2);
+		render(ProfileForm, { data });
+		// One closed line per contact, with the kinds it holds.
+		await userEvent.click(screen.getByRole('button', { name: /Insurer/ }));
 		await userEvent.click(screen.getByRole('button', { name: /K2002/ }));
 		await userEvent.click(screen.getByRole('button', { name: m.identifier_keep() }));
 		await userEvent.click(screen.getByRole('button', { name: /K3003/ }));
@@ -130,9 +135,27 @@ describe('ProfileForm', () => {
 	});
 
 	it('edits another user’s profile for an admin', async () => {
-		render(ProfileForm, { userId: 'bob' });
+		render(ProfileForm, { data, userId: 'bob' });
 		await screen.findByLabelText(m.profile_display_name());
 		await userEvent.click(screen.getByRole('button', { name: m.save() }));
 		expect(sent.map((item) => item.path)).toEqual(['/api/v1/users/bob/profile']);
+	});
+
+	it('saves only the part it shows', async () => {
+		const { unmount } = render(ProfileForm, { data, part: 'person' });
+		expect(screen.queryByRole('button', { name: /Insurer/ })).toBeNull();
+		await userEvent.click(screen.getByRole('button', { name: m.save() }));
+		expect(Object.keys(sent[0].body as object).sort()).toEqual([
+			'aliases',
+			'birth_date',
+			'display_name',
+			'email',
+			'identifiers'
+		]);
+		unmount();
+		render(ProfileForm, { data, part: 'numbers' });
+		expect(screen.queryByLabelText(m.profile_display_name())).toBeNull();
+		await userEvent.click(screen.getByRole('button', { name: m.save() }));
+		expect(Object.keys(sent[1].body as object).sort()).toEqual(['declined_numbers', 'numbers']);
 	});
 });
