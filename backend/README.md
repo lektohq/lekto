@@ -1578,7 +1578,9 @@ The session cookie is `__Host-lekto_session`: HTTP-only, `Secure`, `SameSite=Lax
 - Pipeline steps go before index jobs: the search index lags behind a bulk ingest and catches
   up when no step is due (the document lists read the database, not the index).
 - Rule applications (`rules.apply`) and changes of many documents (`documents.bulk`) run 25
-  documents per job, then queue the next job, so pipeline nodes do not wait behind them.
+  documents per job, then queue the next job, so pipeline nodes do not wait behind them. They
+  go before index jobs as well: someone follows their progress, and the index jobs their
+  changes cause wait until they are done instead of holding them up after every 25 documents.
 - After a tag moved, `tags.normalise` leaves what carries it and a tag now above it the one
   below (after rule applications; see Tags); a row changed meanwhile fails the version check,
   and the job runs again (five tries, waiting from a minute, doubling).

@@ -135,28 +135,53 @@ async def test_documents_reach_the_search_index() -> None:
     assert job is not None
 
 
+def counted(calls: list[str], name: str, count: int) -> Callable[[], Awaitable[bool]]:
+    """A `run_next_job` that runs `count` jobs, each noted in `calls` by `name`."""
+
+    async def run_next_job() -> bool:
+        nonlocal count
+        if not count:
+            return False
+        count -= 1
+        calls.append(name)
+        return True
+
+    return run_next_job
+
+
 async def test_the_pipeline_goes_before_the_index(monkeypatch: pytest.MonkeyPatch) -> None:
     container = build_memory_container()
     services = build_services(container)
     assert services.indexing is not None
     calls: list[str] = []
-
-    def jobs(name: str, count: int) -> Callable[[], Awaitable[bool]]:
-        async def run_next_job() -> bool:
-            nonlocal count
-            if not count:
-                return False
-            count -= 1
-            calls.append(name)
-            return True
-
-        return run_next_job
-
-    monkeypatch.setattr(services.pipeline, "run_next_job", jobs("pipeline", 3))
-    monkeypatch.setattr(services.indexing, "run_next_job", jobs("index", 3))
+    monkeypatch.setattr(services.pipeline, "run_next_job", counted(calls, "pipeline", 3))
+    monkeypatch.setattr(services.indexing, "run_next_job", counted(calls, "index", 3))
     async with running(worker(container, services, indexing=services.indexing)):
         await until(lambda: len(calls) == 6)
     assert calls == ["pipeline"] * 3 + ["index"] * 3
+
+
+async def test_rule_applications_and_bulk_changes_go_before_the_index(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Someone follows their progress; the index jobs they cause wait until they are done.
+    container = build_memory_container()
+    services = build_services(container)
+    assert services.indexing is not None
+    calls: list[str] = []
+    monkeypatch.setattr(services.indexing, "run_next_job", counted(calls, "index", 3))
+    monkeypatch.setattr(services.rule_applications, "run_next_job", counted(calls, "rules", 3))
+    monkeypatch.setattr(services.bulk, "run_next_job", counted(calls, "bulk", 3))
+    service = worker(
+        container,
+        services,
+        indexing=services.indexing,
+        rules=services.rule_applications,
+        bulk=services.bulk,
+    )
+    async with running(service):
+        await until(lambda: len(calls) == 9)
+    assert calls == ["rules"] * 3 + ["bulk"] * 3 + ["index"] * 3
 
 
 async def test_a_moved_tag_is_normalised_at_its_documents() -> None:
