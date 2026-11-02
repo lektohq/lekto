@@ -1,6 +1,7 @@
 // The German texts follow `DESIGN.md` ("Texts"): they address the user with the polite "Du" with
-// a capital D, never with "Sie" and never with a lowercase "du", and a form is saved with
-// "Speichern", not "Sichern".
+// a capital D, never with "Sie" and never with a lowercase "du", a form is saved with
+// "Speichern", not "Sichern", and a value that tells who is a "Kennung", not a "Nummer"
+// ("Fakt, Kennung, Nummer").
 import { describe, expect, it } from 'vitest';
 import de from '../messages/de.json';
 
@@ -18,6 +19,11 @@ const FORMAL_ALLOWED = new Set([
 	'identifier_kind_your_reference',
 	'identifier_kind_letter_date'
 ]);
+
+// "Nummer" alone, not in a compound ("Kundennummer"): only for the numbers that mark the
+// document itself. This list may only shrink.
+const NUMBER = /\bNummer(n)?\b/;
+const NUMBER_ALLOWED = new Set(['facts_numbers', 'fact_role_own']);
 
 function keys(): string[] {
 	return Object.keys(catalogue).filter((key) => key !== '$schema');
@@ -47,6 +53,10 @@ describe('German texts', () => {
 		expect(needless).toEqual([]);
 	});
 
+	it('call a value that tells who a "Kennung", not a "Nummer"', () => {
+		expect(matching(NUMBER, NUMBER_ALLOWED)).toEqual([]);
+	});
+
 	it('notice a formal or lowercase address', () => {
 		expect(FORMAL.test('Melden Sie sich an.')).toBe(true);
 		expect(FORMAL.test('Ihr Konto ist verknüpft.')).toBe(true);
@@ -56,5 +66,7 @@ describe('German texts', () => {
 		expect(FORMAL.test('Die Dokumente ihres Eingangs')).toBe(false);
 		expect(SICHERN.test('Sichern')).toBe(true);
 		expect(SICHERN.test('Speichern')).toBe(false);
+		expect(NUMBER.test('Eigene Nummern')).toBe(true);
+		expect(NUMBER.test('Kunden- und Vertragsnummer')).toBe(false);
 	});
 });
