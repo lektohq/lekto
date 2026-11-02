@@ -3371,6 +3371,78 @@ class MigrationSuite:
         assert nodes[ids["waiting"]] == graphs["waiting"]
         assert jobs == [f"{waiting}:1:apply_rules"]
 
+    async def test_tax_numbers_name_nobody_after_revision_0055(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0055: a learned tax number names nobody and keeps its spaces; one a user
+        entered as theirs is dropped. Other numbers keep their user; the downgrade changes
+        nothing."""
+        await migrate(empty_database, "0054")
+        ids = {name: new_id() for name in ("anna", "contact", "space")}
+        number = {"contact_id": ids["contact"], "kind": "tax_number"}
+        await _insert(
+            empty_database,
+            [
+                (
+                    t.users,
+                    {"id": ids["anna"], "username": "a", "username_key": "a", "role": "user"},
+                ),
+                (t.contacts, {"id": ids["contact"], "name": "Insurer", "name_key": "insurer"}),
+                (
+                    t.contact_identifiers,
+                    number
+                    | {
+                        "value": "6420000010",
+                        "source": "learned",
+                        "user_id": ids["anna"],
+                        "learned_in": [str(ids["space"])],
+                    },
+                ),
+                (
+                    t.contact_identifiers,
+                    number | {"value": "03148103084", "source": "manual", "user_id": ids["anna"]},
+                ),
+                (t.contact_identifiers, number | {"value": "2713100040", "source": "manual"}),
+                (
+                    t.contact_identifiers,
+                    number
+                    | {
+                        "kind": "customer_number",
+                        "value": "K4711",
+                        "source": "learned",
+                        "user_id": ids["anna"],
+                    },
+                ),
+            ],
+        )
+
+        async def stored() -> list[tuple[Any, ...]]:
+            identifiers = t.contact_identifiers
+            async with empty_database.reading() as connection:
+                return sorted(
+                    await _read_all(
+                        connection,
+                        select(
+                            identifiers.c.value, identifiers.c.user_id, identifiers.c.learned_in
+                        ),
+                    ),
+                    key=str,
+                )
+
+        expected = sorted(
+            [
+                ("6420000010", None, [str(ids["space"])]),
+                ("2713100040", None, None),
+                ("K4711", ids["anna"], None),
+            ],
+            key=str,
+        )
+        await migrate(empty_database)
+        assert await stored() == expected
+
+        await downgrade(empty_database, "0054")
+        assert await stored() == expected
+
     async def test_migrations_match_the_table_definitions(
         self, empty_database: Database, model_database: Database
     ) -> None:
