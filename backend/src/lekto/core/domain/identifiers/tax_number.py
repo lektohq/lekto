@@ -1,6 +1,6 @@
-"""A tax number (Steuernummer): a contact's, which may name the user it belongs to: a company's
-on its letters, or the one the tax office gave a user (Anna's at the Finanzamt); found after its
-label ("Steuernummer", "St.-Nr."), compared as its digits (`123/456/78901` is `12345678901`). A
+"""A company's tax number (Steuernummer), on all its letters: it tells which contact a document
+comes from, never whose it is, so it names no user (Tobi, 02.11.2026). Found after its label
+("Steuernummer", "St.-Nr."), compared as its digits (`123/456/78901` is `12345678901`). A
 person's tax ID written after "Steuernummer" is none (`tax_id_valid`)."""
 
 import re
@@ -16,7 +16,6 @@ _FORM = re.compile(r"\d{10,13}")
 class TaxNumber(LabelledNumber):
     kind = IdentifierKind.TAX_NUMBER
     for_contacts = True
-    names_user = True
     labels = r"steuer[-\s]*(?:nummer|nr)|st[-.\s]*nr|tax[-\s]*number"
 
     def normalise(self, raw: str) -> str:

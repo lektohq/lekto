@@ -50,8 +50,7 @@ export const NAMING_KINDS: readonly IdentifierKind[] = [
 	'meter_number',
 	'loan_number',
 	'mandate_reference',
-	'license_plate',
-	'tax_number'
+	'license_plate'
 ];
 
 /** The kinds of a document's numbers that are no contact's or person's identifier. */
