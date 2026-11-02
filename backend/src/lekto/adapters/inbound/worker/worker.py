@@ -1,8 +1,9 @@
 """The worker service: runs background jobs, delivers events and keeps the cleanup scheduled.
 
 - `concurrency` job loops run due jobs (the cleanup when due, tasks whose deadline passed, then
-  search indexing, else pipeline nodes, rule applications, normalising tags after a move, logos
-  of contacts, and last the classifier's check and training), each until it finds nothing.
+  pipeline nodes, rule applications, changes of many documents, search indexing, normalising
+  tags after a move, logos of contacts, and last the classifier's check and training), each
+  until it finds nothing.
 - `webhook_concurrency` further loops deliver webhooks, apart from the job loops: a receiver that
   does not answer holds up deliveries, never the pipeline.
 - The loops do not poll. For each group a coordinator asks the queue once when the next job of
@@ -251,16 +252,18 @@ class Worker:
 
     async def _run_job(self) -> bool:
         # The cleanup first: it is due once per interval and would otherwise wait for a quiet
-        # moment, which a long bulk ingest never has. The pipeline before the index: people wait
-        # for the processing, while the index may lag (the document lists do not read it), and
-        # its jobs coalesce per document while they wait.
+        # moment, which a long bulk ingest never has. The pipeline, rule applications and
+        # changes of many documents before the index: people wait for them (an application and
+        # a bulk change show their progress), while the index may lag (the document lists do
+        # not read it), and its jobs coalesce per document while they wait. Behind the index,
+        # an application would wait after every 25 documents for the index jobs they caused.
         return (
             await self._maintenance.run_next_job()
             or (self._tasks is not None and await self._tasks.run_next_job())
             or await self._pipeline.run_next_job()
-            or (self._indexing is not None and await self._indexing.run_next_job())
             or (self._rules is not None and await self._rules.run_next_job())
             or (self._bulk is not None and await self._bulk.run_next_job())
+            or (self._indexing is not None and await self._indexing.run_next_job())
             or (self._master_data is not None and await self._master_data.run_next_job())
             or (self._logos is not None and await self._logos.run_next_job())
             # Training waits for a quiet moment: during a bulk ingest it would be outdated soon.
