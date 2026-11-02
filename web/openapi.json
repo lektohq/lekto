@@ -39259,7 +39259,7 @@
     "tax_number": {
       "contact": true,
       "person": false,
-      "names_user": true
+      "names_user": false
     },
     "contract_number": {
       "contact": true,
