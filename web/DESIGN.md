@@ -754,8 +754,19 @@ Every text a user reads is in `messages/en.json` and `messages/de.json` (`no-raw
 Product terms stay as they are in both languages: **Lens** (plural Lenses), **Space**, **Stream**.
 Other terms are translated: Posteingang (Inbox), Dokumente (Documents), Erwartet (Expected),
 Regeln (Rules), Stammdaten (Master data), Nutzer (Users), Kontakt, Dokumenttyp, Tag, Thema
-(Topic), Gruppe (Group), Feld (Field), Fakt (Fact), Bezug (Relation), Lane names Erledigt, Prüfen,
-Eingreifen, In Verarbeitung.
+(Topic), Gruppe (Group), Feld (Field), Fakt (Fact), Kennung (Identifier), Bezug (Relation), Lane
+names Erledigt, Prüfen, Eingreifen, In Verarbeitung.
+
+**Fakt, Kennung, Nummer** (Tobi, 02.11.2026): three words, each for one thing.
+
+- A **Fakt** (fact) is anything Lekto reads in one document: names, identifiers, numbers, dates.
+- A **Kennung** (identifier) is a value that tells who: which contact a document comes from, or
+  whose it is (IBAN, customer or contract number, e-mail address, domain, VAT ID). It is the
+  same word in the master data (a contact's, a person's own in the profile) and among a
+  document's facts, so the two meet.
+- **Nummer** (number) stands only in the name of a kind ("Kundennummer", "Rechnungsnummer") and
+  for the numbers that mark the document itself ("Nummern des Dokuments"); never as the word
+  for identifiers ("Eigene Kennungen", not "Eigene Nummern").
 
 ### Formats
 
@@ -812,7 +823,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
   - `src/lib/via-token.test.ts`: every file that has a person's API token (`via_token`, a
     confirmation or an actor of the log) and names a person names the token through `viaToken`
     ("Names of people");
-  - `tests/messages-tone.test.ts`: German texts without "Sie" and without a lowercase "du";
+  - `tests/messages-tone.test.ts`: German texts without "Sie" and without a lowercase "du", and
+    "Nummer" alone only for the numbers of the document ("Fakt, Kennung, Nummer");
   - `tests/no-raw-text.test.ts`: no raw text in markup; `tests/no-raw-choice.test.ts`: no raw
     checkbox or radio.
 
