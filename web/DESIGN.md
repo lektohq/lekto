@@ -298,13 +298,14 @@ the chosen events.
 
 Two components that **look different on purpose**:
 
-- **`TabBar`**: the tabs of a page (inbox lanes, document, master data, system). Links that change
+- **`TabBar`**: the tabs of a page (inbox lanes, document, master data, system, settings). Links that change
   the URL. **Underline tabs:** text in `muted-foreground`, the current tab in `foreground` with a
   2 px `brand` underline. A bottom border runs across the bar. It scrolls sideways on the phone
   with a fade at the cut edge. Counts and dots sit beside the label.
 - **`Segmented`**: a choice of how to show something (pages, grid/list/stream, text/pages,
-  form/facts, the period of the automation, language, appearance, the grouping of a lens), which
-  part of a list shows (the open identifiers by source, the tags by kind, the jobs by state, the
+  form/facts, the period of the automation, language, appearance, the grouping of a lens; the
+  parts of a long dialog under its title: a contact's, an account's), which
+  part of a list shows (the open identifiers by source, the identifiers at contacts by source, the tags by kind, the jobs by state, the
   deliveries by outcome; with counts), and in a form a choice among two or
   three short options that changes what follows (a webhook's trigger and body). A grey bar with
   the choice on a light pill that slides over (`motion-safe`, not on first show). Sizes: `md`
@@ -406,6 +407,17 @@ font-medium`) and below it what they are (`text-xs text-muted-foreground`); `ari
 rows inside look as elsewhere in the card, indented to the text of the button (`pl-6`). A whole
 card that folds is `FilterSection`.
 
+**Grouped by contact** (`IdentifiersEditor` with `contacts`: the identifiers at contacts, Tobi
+02.11.2026): where the rows of a list belong to different contacts, one line per contact, a
+`button` at least 56 px tall: a `ChevronRight` (`muted-foreground`) turned down when open, the
+`ContactAvatar`, the name (`text-sm font-medium`) and below it the kinds it holds (`text-xs
+text-muted-foreground`), the count at the right (`text-meta`, `tabular-nums`). Closed at first;
+a search opens every group it finds something in, and the open line keeps its group open. The
+rows inside look as elsewhere, indented to the name; one without a contact stands first, its
+avatar a dashed circle. Where all rows belong to one contact (the contact dialog), they stay
+grouped by kind. Above them the source (`Segmented`), then search, help and adding as one group
+that wraps as a whole under it where the row is narrow (a dialog), never the button alone.
+
 ### Tables
 
 `ui/table` only. The head is `text-xs font-medium text-muted-foreground`. Numbers align right with
@@ -432,6 +444,9 @@ the deliveries by outcome and event). The documents list pages the same way (see
 | Filters                                                      | sidebar                                     | sidebar                          | sheet from the bottom, title and close fixed on top, "Zurücksetzen" and "Ergebnisse anzeigen (N)" fixed at the bottom |
 | A document's pages without leaving the place                 | `Beam`                                      | sheet from the right, 640 px     | full screen                                                                                                           |
 
+- **Scrolling:** a dialog's body scrolls in an area as wide as the dialog, with its own padding,
+  so the scrollbar stands at the dialog's edge, never over a field; title, parts and footer stay
+  (`FormDialog`, `EditorShell`, the account dialog). A dialog with parts keeps one height.
 - **Widths** come from the `size` prop (`sm` 384 px, `md` 512 px, `lg` 672 px, `xl` 768 px).
   A `class="max-w-*"` on dialog content is not used.
 - **Phone editor bar:** "Abbrechen" · title · "Speichern", fixed on top. The body scrolls. The
@@ -615,6 +630,24 @@ the phone a full-screen editor carries the same two actions in its top bar.
 Delete, remove, revoke, leave and hand over **always** ask with `ConfirmDialog`. This includes
 removing a space member and a relation. The dialog names the object and the consequence.
 Destructive actions are in editors and on detail pages, not in list rows.
+
+### Settings
+
+The settings (Tobi, 02.11.2026): the account card (name, user name, role), then a `TabBar`
+Profil · Anmeldung · API-Tokens · Kennungen bei Kontakten (`?tab=`; without it the first, after
+linking an account came back with an error the sign-in), the last with its count.
+
+- **Profil:** display name, other names, birth date, e-mail, own identifiers.
+- **Anmeldung:** password, second factor, single sign-on, sessions.
+- **API-Tokens:** the tokens.
+- **Kennungen bei Kontakten:** the identifiers at contacts, grouped by contact ("Lists").
+
+A tab with a form saves only its own part, and guards it ("Saving and leaving").
+
+The account dialog of the user management has the same parts for one account, a `Segmented`
+under its title: Konto (role, active, password, second factor, single sign-on, delete) · Profil ·
+Kennungen bei Kontakten, the last with its count. Each part keeps what was typed while another
+shows.
 
 ### Navigation between list and detail
 
