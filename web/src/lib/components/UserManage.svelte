@@ -4,7 +4,6 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
-	import InfoHint from '#lib/components/InfoHint.svelte';
 	import ProfileForm from '#lib/components/ProfileForm.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import UserDeleteDialog from '#lib/components/UserDeleteDialog.svelte';
@@ -17,16 +16,19 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { session } from '#lib/session.svelte.ts';
 	import { Choice } from '#lib/components/ui/choice/index.ts';
-	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
+	import Segmented from '#lib/components/Segmented.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import Loading from '#lib/components/Loading.svelte';
-	import { loadProfile, type ProfileData } from '#lib/profile.ts';
+	import { loadProfile, type Profile, type ProfileData } from '#lib/profile.ts';
 
 	type Account = components['schemas']['AccountOut'];
 	type Role = components['schemas']['Role'];
 
 	// Everything an admin does with one account. Own account: no password reset, no removal of the
-	// second factor (the API refuses both; there are the settings for that).
+	// second factor (the API refuses both; there are the settings for that). In parts as the
+	// settings have them (Tobi, 02.11.2026): the account, the profile, the identifiers at
+	// contacts; each keeps what was typed while another shows, and the body scrolls across the
+	// dialog's width, its title and parts staying.
 	let {
 		open = $bindable(false),
 		userId,
@@ -43,6 +45,22 @@
 	let deleting = $state(false);
 	let profile = $state<ProfileData | null>(null);
 	let profileProblem = $state<string | null>(null);
+	let part = $state<'account' | 'profile' | 'identifiers'>('account');
+	let scroller = $state<HTMLElement | null>(null);
+	const parts = $derived([
+		{ value: 'account', label: m.user_tab_account() },
+		{ value: 'profile', label: m.profile_title(), hint: m.profile_hint() },
+		{
+			value: 'identifiers',
+			label: m.profile_numbers(),
+			count: profile ? profile.profile.numbers.length : undefined
+		}
+	]);
+
+	$effect(() => {
+		void part;
+		if (scroller) scroller.scrollTop = 0;
+	});
 
 	const own = $derived(account?.id === session.user?.id);
 
@@ -61,6 +79,11 @@
 		}
 	}
 
+	function profileSaved(changed: Profile) {
+		if (profile) profile.profile = changed;
+		onchanged();
+	}
+
 	async function loadProfileData() {
 		profileProblem = null;
 		try {
@@ -75,6 +98,7 @@
 			password = '';
 			revoke = false;
 			resetError = null;
+			part = 'account';
 			profile = null;
 			void load(true);
 			void loadProfileData();
@@ -150,97 +174,105 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content size="lg">
-		<Dialog.Header>
+	<Dialog.Content
+		size="lg"
+		class="flex h-[min(53.75rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0"
+	>
+		<Dialog.Header class="shrink-0 px-4 pt-4 pr-12 pb-3">
 			<Dialog.Title>{account ? userLabel(account) : m.loading()}</Dialog.Title>
 		</Dialog.Header>
 		{#if problem}
-			<LoadProblem {problem} onretry={() => load()} />
+			<div class="px-4 pb-4"><LoadProblem {problem} onretry={() => load()} /></div>
 		{:else if account}
-			<div class="flex max-h-[70vh] flex-col gap-5 overflow-auto">
-				<Field.Field>
-					<Field.Label for="user-role">{m.user_role()}</Field.Label>
-					<Select
-						id="user-role"
-						value={account.role ?? 'user'}
-						disabled={busy}
-						options={[
-							{ value: 'user', label: m.role_user() },
-							{ value: 'admin', label: m.role_admin() }
-						]}
-						onchange={setRole}
-					/>
-				</Field.Field>
-
-				<div class="flex items-center justify-between gap-3">
-					<span>{account.active ? m.user_active() : m.user_inactive()}</span>
-					<Button variant="outline" disabled={busy} onclick={() => setActive(!account!.active)}>
-						{account.active ? m.user_deactivate() : m.user_activate()}
-					</Button>
-				</div>
-
-				{#if !own}
-					<form class="flex flex-col gap-3 border-t pt-4" onsubmit={resetPassword} novalidate>
-						<Field.Field>
-							<Field.Label for="user-password">{m.user_password_reset()}</Field.Label>
-							<Input
-								id="user-password"
-								type="password"
-								autocomplete="new-password"
-								bind:value={password}
-								aria-invalid={resetError ? true : undefined}
-							/>
-							{#if resetError}<Field.Error>{resetError}</Field.Error>{:else}
-								<Field.Description>{m.password_rules()}</Field.Description>
-							{/if}
-						</Field.Field>
-						<Choice bind:checked={revoke}>{m.user_revoke_tokens()}</Choice>
-						<div>
-							<Button type="submit" disabled={busy || password === ''}
-								>{m.user_password_reset()}</Button
-							>
-						</div>
-					</form>
-				{/if}
-
-				<section class="flex flex-col gap-3 border-t pt-4" aria-labelledby="user-profile">
-					<div class="flex items-center gap-1">
-						<SectionTitle size="card" level={3} id="user-profile">{m.profile_title()}</SectionTitle>
-						<InfoHint text={m.profile_hint()} about={m.profile_title()} />
+			<div class="shrink-0 px-4 pb-3">
+				<Segmented bind:value={part} options={parts} label={userLabel(account)} />
+			</div>
+			<div
+				bind:this={scroller}
+				class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-4 pb-4"
+			>
+				<div class={['flex flex-col gap-5', part !== 'account' && 'hidden']}>
+					<Field.Field>
+						<Field.Label for="user-role">{m.user_role()}</Field.Label>
+						<Select
+							id="user-role"
+							value={account.role ?? 'user'}
+							disabled={busy}
+							options={[
+								{ value: 'user', label: m.role_user() },
+								{ value: 'admin', label: m.role_admin() }
+							]}
+							onchange={setRole}
+						/>
+					</Field.Field>
+					<div class="flex items-center justify-between gap-3">
+						<span>{account.active ? m.user_active() : m.user_inactive()}</span>
+						<Button variant="outline" disabled={busy} onclick={() => setActive(!account!.active)}>
+							{account.active ? m.user_deactivate() : m.user_activate()}
+						</Button>
 					</div>
-					{#if profileProblem}
-						<LoadProblem problem={profileProblem} onretry={loadProfileData} />
-					{:else if profile}
-						<ProfileForm data={profile} userId={account.id} onsaved={onchanged} />
-					{:else}
-						<Loading class="text-sm" />
+					{#if !own}
+						<form class="flex flex-col gap-3 border-t pt-4" onsubmit={resetPassword} novalidate>
+							<Field.Field>
+								<Field.Label for="user-password">{m.user_password_reset()}</Field.Label>
+								<Input
+									id="user-password"
+									type="password"
+									autocomplete="new-password"
+									bind:value={password}
+									aria-invalid={resetError ? true : undefined}
+								/>
+								{#if resetError}<Field.Error>{resetError}</Field.Error>{:else}
+									<Field.Description>{m.password_rules()}</Field.Description>
+								{/if}
+							</Field.Field>
+							<Choice bind:checked={revoke}>{m.user_revoke_tokens()}</Choice>
+							<div>
+								<Button type="submit" disabled={busy || password === ''}
+									>{m.user_password_reset()}</Button
+								>
+							</div>
+						</form>
 					{/if}
-				</section>
-
-				<div class="flex flex-col gap-2 border-t pt-4">
-					<p class="text-sm text-muted-foreground">
-						{account.totp_enabled ? m.user_totp_on() : m.user_totp_off()}
-						·
-						{account.linked_accounts.length > 0 ? m.user_oidc_on() : m.user_oidc_off()}
-					</p>
-					<div class="flex flex-wrap gap-2">
-						{#if account.totp_enabled && !own}
-							<Button variant="outline" disabled={busy} onclick={() => (confirm = 'totp')}>
-								{m.user_totp_remove()}
-							</Button>
-						{/if}
-						{#if account.linked_accounts.length > 0}
-							<Button variant="outline" disabled={busy} onclick={() => (confirm = 'oidc')}>
-								{m.user_oidc_remove()}
-							</Button>
-						{/if}
-						{#if !own}
-							<Button variant="destructive" disabled={busy} onclick={() => (deleting = true)}>
-								{m.user_delete()}
-							</Button>
-						{/if}
+					<div class="flex flex-col gap-2 border-t pt-4">
+						<p class="text-sm text-muted-foreground">
+							{account.totp_enabled ? m.user_totp_on() : m.user_totp_off()}
+							·
+							{account.linked_accounts.length > 0 ? m.user_oidc_on() : m.user_oidc_off()}
+						</p>
+						<div class="flex flex-wrap gap-2">
+							{#if account.totp_enabled && !own}
+								<Button variant="outline" disabled={busy} onclick={() => (confirm = 'totp')}>
+									{m.user_totp_remove()}
+								</Button>
+							{/if}
+							{#if account.linked_accounts.length > 0}
+								<Button variant="outline" disabled={busy} onclick={() => (confirm = 'oidc')}>
+									{m.user_oidc_remove()}
+								</Button>
+							{/if}
+							{#if !own}
+								<Button variant="destructive" disabled={busy} onclick={() => (deleting = true)}>
+									{m.user_delete()}
+								</Button>
+							{/if}
+						</div>
 					</div>
 				</div>
+				{#if profileProblem}
+					{#if part !== 'account'}
+						<LoadProblem problem={profileProblem} onretry={loadProfileData} />
+					{/if}
+				{:else if profile}
+					<div class={[part !== 'profile' && 'hidden']}>
+						<ProfileForm data={profile} userId={account.id} part="person" onsaved={profileSaved} />
+					</div>
+					<div class={[part !== 'identifiers' && 'hidden']}>
+						<ProfileForm data={profile} userId={account.id} part="numbers" onsaved={profileSaved} />
+					</div>
+				{:else if part !== 'account'}
+					<Loading class="text-sm" />
+				{/if}
 			</div>
 		{/if}
 	</Dialog.Content>
