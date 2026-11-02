@@ -16,8 +16,11 @@ into the index. A job is idempotent and may be repeated.
   them, and writes again if not (`_ROUNDS`). The state written last is then one that matched the
   database after the write.
 - Vectors are computed from sections of the text (`LEKTO_SEARCH_CHUNK_SIZE`, at most
-  `LEKTO_SEARCH_MAX_CHUNKS`) and only when the sections differ from those of the indexed
-  vectors: a change of lane, space or date costs no embedding.
+  `LEKTO_SEARCH_MAX_CHUNKS`) and only for sections that differ from those of the indexed
+  vectors: a change of lane, space or date costs no embedding, a new topic or title only the
+  first section's, which carries them. The vectors of the other sections are written back as
+  the index holds them. An entry from before sections had their digests (its stamp names none)
+  is embedded whole at its next change; nothing is queued for that.
 - Failed jobs are repeated with a growing delay (about three hours in all). If only the
   embedding fails, the document is written at once with the vectors it has (the words must not
   wait for the vectors), the job is repeated, and the last attempt writes without vectors; the
@@ -38,7 +41,7 @@ import asyncio
 import hashlib
 import logging
 import re
-from collections.abc import Awaitable, Callable, Collection
+from collections.abc import Awaitable, Callable, Collection, Mapping
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -424,23 +427,22 @@ class IndexingService:
             text = await self._read_text(id)
             state = await self._index.state(id)
             try:
-                entry = await self._compose(snapshot, text, state)
+                entry, sections = await self._compose(snapshot, text, state)
             except EmbeddingsError as error:
                 if not tolerate_embedding_failure:
                     # The words must not wait for the vectors: write what is known now (the
                     # vectors that are there stay), then let the job be repeated.
-                    await self._index.upsert(
-                        [await self._compose(snapshot, text, state, embed=False, keep=True)]
-                    )
+                    kept, _ = await self._compose(snapshot, text, state, embed=False, keep=True)
+                    await self._index.upsert([kept])
                     raise
                 log.warning(
                     "indexing without vectors, the embedding failed",
                     extra={"document_id": str(id), "error": str(error)},
                 )
-                entry = await self._compose(snapshot, text, state, embed=False)
+                entry, sections = await self._compose(snapshot, text, state, embed=False)
                 failed = True
             await self._index.upsert([entry])
-            embedded += len(entry.vectors or ())
+            embedded += sections
             after = await self._snapshot(id)
             if after is not None and after.key == snapshot.key:
                 return Indexed(embedded, failed)
@@ -471,33 +473,36 @@ class IndexingService:
         *,
         embed: bool = True,
         keep: bool = False,
-    ) -> IndexDocument:
-        """The index entry; `state` is what the index holds now (None: build for a new index).
-        Without `embed` the entry has no vectors, or with `keep` the ones the index holds."""
+    ) -> tuple[IndexDocument, int]:
+        """The index entry and how many sections it embedded; `state` is what the index holds
+        now (None: build for a new index). Without `embed` the entry has no vectors, or with
+        `keep` the ones the index holds."""
         document = snapshot.document
+        embedded = 0
         vectors: tuple[tuple[float, ...], ...] | None = ()
         stamp: EmbeddingStamp | None = None
         if not embed and keep and state is not None and state.embedding is not None:
             vectors = None
         if embed and self._embeddings is not None:
+            model = self._embeddings.model
             sections = self._sections(snapshot, text)
-            stamp = EmbeddingStamp(
-                self._embeddings.model, _digest(self._embeddings.model, sections)
-            )
+            digests = tuple(_digest(model, [section]) for section in sections)
+            stamp = EmbeddingStamp(model, _digest(model, sections), digests)
             if state is not None and state.embedding == stamp:
                 vectors, stamp = None, None  # the text did not change: keep the vectors
             else:
-                result = await self._embeddings.embed(sections)
-                if len(result.vectors) != len(sections):
-                    raise EmbeddingsError(f"expected {len(sections)} vectors")
-                wanted = self._policy.dimensions
-                if wanted is not None and any(len(vector) != wanted for vector in result.vectors):
-                    raise EmbeddingsError(
-                        f"the vectors of {self._embeddings.model} do not have the "
-                        f"{wanted} dimensions configured"
-                    )
-                vectors = tuple(tuple(vector) for vector in result.vectors)
-        return IndexDocument(
+                kept = await self._kept_vectors(document.id, digests, state)
+                missing = [
+                    section
+                    for section, digest in zip(sections, digests, strict=True)
+                    if digest not in kept
+                ]
+                computed = iter(await self._embed(missing))
+                vectors = tuple(
+                    kept[digest] if digest in kept else next(computed) for digest in digests
+                )
+                embedded = len(missing)
+        entry = IndexDocument(
             id=document.id,
             version=document.version,
             space_id=document.space_id,
@@ -539,6 +544,38 @@ class IndexingService:
             vectors=vectors,
             embedding=stamp,
         )
+        return entry, embedded
+
+    async def _kept_vectors(
+        self, id: DocumentId, digests: tuple[str, ...], state: IndexState | None
+    ) -> Mapping[str, tuple[float, ...]]:
+        """The vectors the index holds for sections among `digests`. It is asked only if it
+        holds some: the vectors are large, and most new texts share no section."""
+        held = () if state is None or state.embedding is None else state.embedding.sections
+        if set(held).isdisjoint(digests):
+            return {}
+        wanted = self._policy.dimensions
+        vectors = await self._index.section_vectors(id)
+        return {
+            digest: vector
+            for digest, vector in vectors.items()
+            if wanted is None or len(vector) == wanted
+        }
+
+    async def _embed(self, sections: list[str]) -> list[tuple[float, ...]]:
+        """One vector per section, checked."""
+        if not sections or self._embeddings is None:
+            return []
+        result = await self._embeddings.embed(sections)
+        if len(result.vectors) != len(sections):
+            raise EmbeddingsError(f"expected {len(sections)} vectors")
+        wanted = self._policy.dimensions
+        if wanted is not None and any(len(vector) != wanted for vector in result.vectors):
+            raise EmbeddingsError(
+                f"the vectors of {self._embeddings.model} do not have the "
+                f"{wanted} dimensions configured"
+            )
+        return [tuple(vector) for vector in result.vectors]
 
     def _sections(self, snapshot: _Snapshot, text: str) -> list[str]:
         """The texts that get a vector: the text in sections, the first one headed by what the
@@ -729,9 +766,8 @@ class IndexingService:
                     snapshot = await self._snapshot(id)
                     if snapshot is not None:  # deleted meanwhile
                         built[id] = snapshot.key
-                        entries.append(
-                            await self._compose(snapshot, await self._read_text(id), None)
-                        )
+                        entry, _ = await self._compose(snapshot, await self._read_text(id), None)
+                        entries.append(entry)
                 await build.add(entries)
                 added += len(entries)
                 if progress is not None:
