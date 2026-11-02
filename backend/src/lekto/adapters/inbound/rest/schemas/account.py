@@ -126,6 +126,7 @@ class Me(BaseModel):
                     "has_password": True,
                     "totp_enabled": False,
                     "linked_accounts": [],
+                    "lekto_version": "0.8.0",
                 }
             ]
         }
@@ -139,6 +140,7 @@ class Me(BaseModel):
     has_password: bool
     totp_enabled: bool
     linked_accounts: list[LinkOut]
+    lekto_version: str = Field(description="The version of Lekto that answers (its release).")
 
 
 class PasswordChange(BaseModel):
