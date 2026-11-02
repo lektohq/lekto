@@ -113,7 +113,7 @@ export interface paths {
 		};
 		/**
 		 * The caller
-		 * @description Who is signed in and how; with a session also its CSRF token.
+		 * @description Who is signed in and how; with a session also its CSRF token; the version of Lekto.
 		 */
 		get: operations['me_api_v1_auth_me_get'];
 		put?: never;
@@ -6814,6 +6814,7 @@ export interface components {
 		 * @example {
 		 *       "authenticated_with": "token",
 		 *       "has_password": true,
+		 *       "lekto_version": "0.8.0",
 		 *       "linked_accounts": [],
 		 *       "token_scope": "read",
 		 *       "totp_enabled": false,
@@ -6848,6 +6849,11 @@ export interface components {
 			totp_enabled: boolean;
 			/** Linked Accounts */
 			linked_accounts: components['schemas']['LinkOut'][];
+			/**
+			 * Lekto Version
+			 * @description The version of Lekto that answers (its release).
+			 */
+			lekto_version: string;
 		};
 		/** MemberDetails */
 		MemberDetails: {

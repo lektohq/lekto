@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import RedirectResponse
 
+from lekto import __version__
 from lekto.adapters.inbound.rest.auth import (
     PROTECTED,
     Authenticated,
@@ -132,7 +133,8 @@ async def logout(principal: SessionPrincipal, response: Response, context: Conte
 @router.get(
     "/me",
     summary="The caller",
-    description="Who is signed in and how; with a session also its CSRF token.",
+    description="Who is signed in and how; with a session also its CSRF token; the version of "
+    "Lekto.",
     response_model=Me,
     responses=problem_responses(401),
 )
@@ -149,6 +151,7 @@ async def me(principal: Authenticated, request: Request, context: Context) -> Me
         has_password=account.has_password,
         totp_enabled=account.totp_enabled,
         linked_accounts=[LinkOut.of(link) for link in account.external_identities],
+        lekto_version=__version__,
     )
 
 
