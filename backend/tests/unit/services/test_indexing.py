@@ -25,7 +25,7 @@ from lekto.core.domain.jobs import JobStatus
 from lekto.core.domain.master_data import TagScope
 from lekto.core.domain.periods import Period
 from lekto.core.domain.pipeline import Lane, Node, Outcome
-from lekto.core.domain.search import LAYOUT, IndexDocument
+from lekto.core.domain.search import LAYOUT, EmbeddingStamp, IndexDocument
 from lekto.core.domain.users import Role
 from lekto.core.services.classification.signals import FactsSignal
 from lekto.core.services.fact_decisions import FactAction, FactDecision
@@ -354,6 +354,88 @@ async def test_a_change_without_new_text_keeps_the_vectors(setup: Setup) -> None
     await setup.settle()
     assert len(setup.embeddings.calls) == calls + 1  # the title is part of the first section
     assert (await setup.index.state(document.id)).embedding != stamp  # type: ignore[union-attr]
+
+
+LONG_TEXT = "\n\n".join(word * 300 for word in ("eins ", "zwei ", "drei "))
+
+
+async def test_a_new_title_embeds_only_the_first_section(setup: Setup) -> None:
+    owner = await setup.world.user()
+    document = await setup.document(owner, LONG_TEXT)
+    assert isinstance(setup.embeddings, FakeEmbeddings)
+    before = setup.entry(document.id).vectors
+    assert before is not None and len(before) == 3
+
+    await setup.world.documents.update_metadata(
+        owner.id, document.id, DocumentChanges(title="Anderer Titel")
+    )
+    await setup.settle()
+
+    assert len(setup.embeddings.calls[-1]) == 1
+    assert setup.embeddings.calls[-1][0].startswith("Anderer Titel")
+    after = setup.entry(document.id).vectors
+    assert after is not None and len(after) == 3
+    assert after[0] != before[0]
+    assert after[1:] == before[1:]
+
+
+async def test_an_index_job_counts_the_sections_it_embedded(setup: Setup) -> None:
+    owner = await setup.world.user()
+    document = await setup.document(owner, LONG_TEXT)
+    await setup.world.documents.update_metadata(
+        owner.id, document.id, DocumentChanges(title="Anderer Titel")
+    )
+    assert (await setup.indexing.index_document(document.id)).sections == 1
+    assert (await setup.indexing.index_document(document.id)).sections == 0
+
+
+async def test_a_changed_text_embeds_only_its_changed_sections(setup: Setup) -> None:
+    owner = await setup.world.user()
+    document = await setup.document(owner, LONG_TEXT)
+    assert isinstance(setup.embeddings, FakeEmbeddings)
+    before = setup.entry(document.id).vectors
+    assert before is not None
+    calls = len(setup.embeddings.calls)
+
+    await setup.put_text(document.id, LONG_TEXT.replace("drei ", "vier "))
+    await setup.indexing.index_document(document.id)
+    after = setup.entry(document.id).vectors
+    assert after is not None
+    assert after[:2] == before[:2] and after[2] != before[2]
+    assert [len(call) for call in setup.embeddings.calls[calls:]] == [1]
+
+    # Fewer sections need no embedding at all.
+    await setup.put_text(document.id, LONG_TEXT.rsplit("\n\n", 1)[0])
+    await setup.indexing.index_document(document.id)
+    assert setup.entry(document.id).vectors == before[:2]
+    assert len(setup.embeddings.calls) == calls + 1
+
+
+async def test_an_entry_without_section_digests_is_embedded_whole_once(setup: Setup) -> None:
+    owner = await setup.world.user()
+    document = await setup.document(owner, LONG_TEXT)
+    entry = setup.entry(document.id)
+    assert entry.embedding is not None
+    old = EmbeddingStamp(entry.embedding.model, entry.embedding.digest)
+    await setup.index.upsert([replace(entry, embedding=old)])
+
+    # Unchanged, it stays as it is: nothing is embedded for the digests alone.
+    assert (await setup.indexing.index_document(document.id)).sections == 0
+    await setup.world.documents.update_metadata(
+        owner.id, document.id, DocumentChanges(title="Anderer Titel")
+    )
+    assert (await setup.indexing.index_document(document.id)).sections == 3
+    await setup.world.documents.update_metadata(
+        owner.id, document.id, DocumentChanges(title="Noch ein Titel")
+    )
+    assert (await setup.indexing.index_document(document.id)).sections == 1
+
+
+async def test_another_model_embeds_every_section(setup: Setup) -> None:
+    owner = await setup.world.user()
+    document = await setup.document(owner, LONG_TEXT)
+    setup.embeddings = FakeEmbeddings(model="fake-embeddings 2")
+    assert (await setup.indexing.index_document(document.id)).sections == 3
 
 
 async def test_without_embeddings_the_index_has_no_vectors(world: World) -> None:

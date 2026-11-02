@@ -5,7 +5,7 @@ behind them a little (updates run as jobs). Every search needs a `Visibility`; t
 checks every hit against the repository before showing it. First adapter: Meilisearch.
 """
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -131,6 +131,12 @@ class SearchIndex(Protocol):
         ...
 
     async def state(self, id: DocumentId) -> IndexState | None: ...
+
+    async def section_vectors(self, id: DocumentId) -> Mapping[str, tuple[float, ...]]:
+        """The vectors a document holds by the digest of their section
+        (`EmbeddingStamp.sections`), read at once with those digests; empty if it holds none
+        or the entry does not name its sections."""
+        ...
 
     def states(self) -> AsyncIterator[IndexState]:
         """All documents in the index, in no particular order."""

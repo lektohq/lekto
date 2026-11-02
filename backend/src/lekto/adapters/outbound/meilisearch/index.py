@@ -41,6 +41,7 @@ from lekto.core.domain.search import (
     Segment,
     Visibility,
     lane_value,
+    vectors_by_section,
 )
 from lekto.core.domain.sorting import sort_key
 from lekto.core.ports.repository import DocumentFilter, SortKey
@@ -99,7 +100,14 @@ SORTED_BY = {
     SortKey.DOCUMENT_DATE: "document_date",
     SortKey.TITLE: "title_key",
 }
-STATE_FIELDS = ["id", "version", "embedding_model", "embedding_digest", "layout"]
+STATE_FIELDS = [
+    "id",
+    "version",
+    "embedding_model",
+    "embedding_digest",
+    "embedding_sections",
+    "layout",
+]
 READY_FOR = 30.0  # seconds an index counts as set up before its settings are looked at again
 _UNORDERED = {"filterableAttributes", "sortableAttributes"}
 
@@ -163,6 +171,20 @@ class MeilisearchIndex:
         if response.status_code == 404:
             return None
         return _state_of(_json(_checked(response)))
+
+    async def section_vectors(self, id: DocumentId) -> Mapping[str, tuple[float, ...]]:
+        # One read, so that the digests belong to these vectors. Meilisearch gives them back in
+        # the order they were written (the contract test of the port holds it to that).
+        await self._ensure_ready()
+        response = await self._send(
+            "GET",
+            f"/indexes/{self._index}/documents/{id}",
+            params={"fields": ",".join([*STATE_FIELDS, "_vectors"]), "retrieveVectors": "true"},
+        )
+        if response.status_code == 404:
+            return {}
+        item = _json(_checked(response))
+        return vectors_by_section(_state_of(item).embedding, _vectors_of(item))
 
     async def states(self) -> AsyncIterator[IndexState]:
         await self._ensure_ready()
@@ -423,6 +445,9 @@ class MeilisearchIndex:
         if document.vectors is not None:
             payload["embedding_model"] = _stamp(document, "model")
             payload["embedding_digest"] = _stamp(document, "digest")
+            payload["embedding_sections"] = (
+                [] if document.embedding is None else list(document.embedding.sections)
+            )
             if self._dimensions is not None:
                 vectors = [list(vector) for vector in document.vectors]
                 payload["_vectors"] = {EMBEDDER: vectors or None}
@@ -620,11 +645,27 @@ def _state_of(item: Mapping[str, Any]) -> IndexState:
         return IndexState(
             id=DocumentId(_uuid(item["id"])),
             version=int(item["version"]),
-            embedding=EmbeddingStamp(str(model), str(digest)) if model and digest else None,
+            embedding=(
+                EmbeddingStamp(
+                    str(model),
+                    str(digest),
+                    tuple(str(section) for section in item.get("embedding_sections") or ()),
+                )
+                if model and digest
+                else None
+            ),
             layout=int(item.get("layout") or FIRST_LAYOUT),
         )
     except (KeyError, TypeError, ValueError):
         raise SearchIndexError("Meilisearch sent an unusable document") from None
+
+
+def _vectors_of(item: Mapping[str, Any]) -> tuple[tuple[float, ...], ...]:
+    try:
+        embeddings = (item.get("_vectors") or {}).get(EMBEDDER) or {}
+        return tuple(tuple(float(x) for x in vector) for vector in embeddings.get("embeddings", ()))
+    except (AttributeError, TypeError, ValueError):
+        raise SearchIndexError("Meilisearch sent unusable vectors") from None
 
 
 def _hit_of(item: Mapping[str, Any]) -> SearchHit:

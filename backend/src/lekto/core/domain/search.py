@@ -5,6 +5,7 @@ them. `Visibility.allows` is the reach rule of `permissions.py` in the form of a
 a test keeps both in line, and every search needs a `Visibility`.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
@@ -39,10 +40,25 @@ def lane_value(lane: Lane | None) -> str:
 @dataclass(frozen=True)
 class EmbeddingStamp:
     """Which model computed the vectors of a document, from which text: `digest` covers the
-    texts that were embedded. Vectors whose stamp differs from the current one are stale."""
+    texts that were embedded. Vectors whose stamp differs from the current one are stale.
+
+    `sections`: the digest of each section, in the order of the vectors, so that a change
+    embeds only the sections it touches. Empty on an entry written before they were kept; no
+    part of a comparison."""
 
     model: str
     digest: str
+    sections: tuple[str, ...] = field(default=(), compare=False)
+
+
+def vectors_by_section(
+    stamp: EmbeddingStamp | None, vectors: Sequence[tuple[float, ...]]
+) -> dict[str, tuple[float, ...]]:
+    """The vectors of an index entry by the digest of their section; none where the stamp does
+    not tell which vector is whose."""
+    if stamp is None or len(stamp.sections) != len(vectors):
+        return {}
+    return dict(zip(stamp.sections, vectors, strict=True))
 
 
 @dataclass(frozen=True, kw_only=True)

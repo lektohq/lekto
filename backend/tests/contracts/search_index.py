@@ -105,6 +105,57 @@ class SearchIndexContract:
         )
         assert by_meaning.hits[0].id == document.id
 
+    async def test_vectors_come_back_by_their_section(self, search_index: SearchIndex) -> None:
+        owner = SpaceId(new_id())
+        one, two, three = (1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)
+        stamp = EmbeddingStamp("test-model", "abc", ("first", "second", "third"))
+        document = index_document(
+            space_id=owner, vectors=(one, two, three), embedding=stamp, version=1
+        )
+        await search_index.upsert([document])
+        assert await search_index.section_vectors(document.id) == {
+            "first": one,
+            "second": two,
+            "third": three,
+        }
+
+        # A write in another order and with one vector new keeps its own order.
+        changed = EmbeddingStamp("test-model", "def", ("new", "third", "first"))
+        new = (0.6, 0.8, 0.0)
+        await search_index.upsert(
+            [
+                index_document(
+                    id=document.id,
+                    space_id=owner,
+                    vectors=(new, three, one),
+                    embedding=changed,
+                    version=2,
+                )
+            ]
+        )
+        held = await search_index.section_vectors(document.id)
+        assert set(held) == {"new", "third", "first"}
+        assert held["third"] == three
+        assert held["first"] == one
+        assert held["new"] == pytest.approx(new)
+        state = await search_index.state(document.id)
+        assert state is not None and state.embedding is not None
+        assert state.embedding.sections == ("new", "third", "first")
+
+        # Kept vectors keep their sections.
+        await search_index.upsert(
+            [index_document(id=document.id, space_id=owner, vectors=None, version=3)]
+        )
+        assert set(await search_index.section_vectors(document.id)) == {"new", "third", "first"}
+
+    async def test_vectors_without_named_sections_come_back_by_none(
+        self, search_index: SearchIndex
+    ) -> None:
+        document = index_document(vectors=((0.0, 1.0, 0.0),), embedding=STAMP, version=1)
+        await search_index.upsert([document])
+        assert await search_index.section_vectors(document.id) == {}
+        assert await search_index.section_vectors(DocumentId(new_id())) == {}
+
     async def test_vectors_can_be_dropped(self, search_index: SearchIndex) -> None:
         owner = SpaceId(new_id())
         document = index_document(

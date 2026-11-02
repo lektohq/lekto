@@ -1321,7 +1321,12 @@ and why by words alone where the meaning was to take part (`reason` with a code:
   about `LEKTO_SEARCH_CHUNK_SIZE` characters, at most `LEKTO_SEARCH_MAX_CHUNKS`; each gets a
   vector, and the first one starts with title, contact, type and the tags set (not their
   ancestors: nesting a tag elsewhere costs no embedding). `LEKTO_SEARCH_MAX_CHUNKS=1`
-  gives one vector per document. A vector is made again only when model or section texts change.
+  gives one vector per document. A vector is made again only when the model or the text of its
+  section changes: a new topic, tag or title costs the first section alone, and the index job
+  writes the other vectors back as the index holds them (`embedding_sections` in the index, one
+  digest per section; Meilisearch keeps a document's vectors in the order they were written).
+  An entry from before these digests is embedded whole at its next change, once; there is no
+  need to reindex.
 - **Embeddings.** The query is embedded at request time (`LEKTO_SEARCH_EMBED_TIMEOUT`); if the
   endpoint is down or slow, the search falls back to words (`mode: words` with its `reason`).
   A query too slow goes on being embedded in the background (at most eight at once): the answer
