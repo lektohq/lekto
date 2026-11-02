@@ -131,7 +131,7 @@
 			{#if rule && canApplyRule(rule, session.user, spaces)}
 				<a href="{BASE}/rules/{rule.id}/apply" class={cn(buttonVariants({ variant: 'outline' }))}>
 					<Play aria-hidden="true" />
-					{m.rule_apply()}
+					{m.rule_dry_run()}
 				</a>
 			{/if}
 			{#if rule && canChangeRule(rule, session.user, spaces)}

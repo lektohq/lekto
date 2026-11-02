@@ -9,40 +9,52 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import { BASE } from '#lib/base.ts';
+	import BulkSkipped from '#lib/components/BulkSkipped.svelte';
 	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
+	import RuleApplyBar from '#lib/components/rules/RuleApplyBar.svelte';
 	import RuleEffects from '#lib/components/rules/RuleEffects.svelte';
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
 	import { openBeam } from '#lib/beam.svelte.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import { Button } from '#lib/components/ui/button/index.ts';
-	import { Progress } from '#lib/components/ui/progress/index.ts';
+	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
+	import { workersStill, type JobsSummary } from '#lib/jobs.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { reasonsText } from '#lib/reasons.ts';
 	import { canApplyRule, canChangeRule } from '#lib/permissions.ts';
+	import { phone } from '#lib/phone.svelte.ts';
 	import {
+		ahead,
+		applicationResult,
 		applyRequest,
 		chainLines,
 		follow,
 		hasConflict,
+		isFinished,
 		preselected,
 		type Application,
 		type PreviewItem
 	} from '#lib/rules/apply.ts';
 	import { RuleLoader } from '#lib/rules/page.svelte.ts';
 	import { session } from '#lib/session.svelte.ts';
+	import { cn } from '#lib/utils.ts';
 	import { Choice, ChoiceBox } from '#lib/components/ui/choice/index.ts';
 	import PageHeader from '#lib/components/page/PageHeader.svelte';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import Loading from '#lib/components/Loading.svelte';
 
+	// A rule's dry run (web/DESIGN.md, "Choosing many"): what its current version would change on
+	// existing documents, loaded page by page until all are there or the reader stops it; the
+	// choice and the actions in the bar (`RuleApplyBar`), the rule's switch in the head. Applying
+	// runs in the background; the bar follows it, and the link keeps it (`?application=`), so that
+	// coming back shows it again.
 	type Rule = components['schemas']['RuleOut'];
 	const PAGE = 50;
+	/** How often a queued application asks what comes before it. */
+	const QUEUE_POLL = 5000;
 
 	const id = $derived(page.params.id ?? '');
-	/** Right after saving (decision E2): switch on, switch on and apply, or leave off. */
+	/** Right after saving (decision E2): saved switched off, to switch on here or leave off. */
 	const saved = $derived(page.url.searchParams.get('saved') === '1');
 
 	let rule = $state<Rule | null>(null);
@@ -60,18 +72,31 @@
 	const accepted = new SvelteSet<string>();
 	let busy = $state(false);
 	let application = $state<Application | null>(null);
+	let summary = $state<JobsSummary | null>(null);
+	let details = $state<Application | null>(null);
 	const stop = new AbortController();
 	onDestroy(() => stop.abort());
 
+	const spaces = $derived(lookup?.spaces ?? []);
+	const changeable = $derived(rule !== null && canChangeRule(rule, session.user, spaces));
 	const request = $derived(
 		version === null ? null : applyRequest(version, items, chosen, accepted)
 	);
 	const count = $derived(request?.document_ids.length ?? 0);
-	const titles = $derived(new Map(items.map((item) => [item.document_id, item.title])));
 	const plain = $derived(items.filter((item) => !hasConflict(item)));
+	const allChosen = $derived(
+		plain.length > 0 && plain.every((item) => chosen.has(item.document_id))
+	);
+	const waiting = $derived(
+		application?.status === 'queued' && summary
+			? { jobs: ahead(summary), still: workersStill(summary) }
+			: null
+	);
+	const showBar = $derived(application !== null || items.length > 0);
 
 	$effect(() => {
 		const wanted = id;
+		const following = untrack(() => page.url.searchParams.get('application'));
 		untrack(() =>
 			loader.load(
 				() => unwrap(api.GET('/api/v1/rules/{id}', { params: { path: { id: wanted } } })),
@@ -82,12 +107,18 @@
 						loader.problem = m.error_forbidden();
 						return;
 					}
-					restart();
-					void more();
+					if (following) void resume(following);
+					else start();
 				}
 			)
 		);
 	});
+
+	/** The dry run from its start, every page of it. */
+	function start() {
+		restart();
+		void all();
+	}
 
 	function restart() {
 		items = [];
@@ -139,6 +170,7 @@
 		}
 	}
 
+	/** Page after page until all are there, the reader stops it or a page fails. */
 	async function all() {
 		loadingAll = true;
 		while (loadingAll && !complete && !previewError && !stop.signal.aborted) await more();
@@ -151,6 +183,18 @@
 		);
 	}
 
+	async function switchRule(enabled: boolean) {
+		busy = true;
+		try {
+			await setEnabled(enabled);
+			toast.success(enabled ? m.rule_switched_on() : m.rule_switched_off());
+		} catch (error) {
+			reportError(error);
+		} finally {
+			busy = false;
+		}
+	}
+
 	async function apply(switchOn: boolean) {
 		if (!request) return;
 		busy = true;
@@ -159,8 +203,38 @@
 			const started = await unwrap(
 				api.POST('/api/v1/rules/{id}/apply', { params: { path: { id } }, body: request })
 			);
-			application = started;
-			application = await follow(
+			void goto(`?application=${started.id}`, { replace: true, reset: false });
+			busy = false;
+			await track(started);
+		} catch (error) {
+			reportError(error);
+		} finally {
+			busy = false;
+		}
+	}
+
+	/** Back on the page of an application started before: its progress, else a new dry run. */
+	async function resume(applicationId: string) {
+		try {
+			const found = await unwrap(
+				api.GET('/api/v1/rule-applications/{id}', { params: { path: { id: applicationId } } })
+			);
+			if (found.rule_id === id) {
+				await track(found);
+				return;
+			}
+		} catch (error) {
+			reportError(error);
+		}
+		start();
+	}
+
+	/** Follow `started` until it is finished; one that finishes meanwhile says so in a toast. */
+	async function track(started: Application) {
+		application = started;
+		void watchQueue();
+		try {
+			const last = await follow(
 				started,
 				(applicationId) =>
 					unwrap(
@@ -169,23 +243,35 @@
 				(current) => (application = current),
 				stop.signal
 			);
+			if (!isFinished(started) && isFinished(last) && !stop.signal.aborted) tell(last);
 		} catch (error) {
 			reportError(error);
-		} finally {
-			busy = false;
 		}
 	}
 
-	async function switchOnOnly() {
-		busy = true;
-		try {
-			await setEnabled(true);
-			toast.success(m.rule_switched_on());
-			await goto(`${BASE}/rules/${id}`);
-		} catch (error) {
-			reportError(error);
-		} finally {
-			busy = false;
+	/** While the application waits: what comes before it and whether a worker takes jobs. */
+	async function watchQueue() {
+		while (application?.status === 'queued' && !stop.signal.aborted) {
+			try {
+				summary = await unwrap(api.GET('/api/v1/jobs/summary'));
+			} catch {
+				// The bar says less until the next round.
+			}
+			await new Promise((resolve) => setTimeout(resolve, QUEUE_POLL));
+		}
+	}
+
+	function tell(last: Application) {
+		const result = applicationResult(last);
+		if (last.status === 'failed') {
+			toast.error(m.rule_apply_failed(), { description: last.error ?? result });
+		} else if (last.skipped.length > 0) {
+			toast.warning(m.rule_apply_done(), {
+				description: result,
+				action: { label: m.bulk_details(), onClick: () => (details = last) }
+			});
+		} else {
+			toast.success(m.rule_apply_done(), { description: result });
 		}
 	}
 
@@ -193,6 +279,14 @@
 		const set = hasConflict(item) ? accepted : chosen;
 		if (on) set.add(item.document_id);
 		else set.delete(item.document_id);
+	}
+
+	function chooseAll(on: boolean) {
+		if (on) for (const item of plain) chosen.add(item.document_id);
+		else {
+			chosen.clear();
+			accepted.clear();
+		}
 	}
 </script>
 
@@ -202,129 +296,110 @@
 	></svelte:head
 >
 
+{#snippet switcher()}
+	<Switch
+		bind:checked={() => rule?.enabled ?? false, switchRule}
+		disabled={busy}
+		aria-label={rule?.enabled
+			? m.rule_switch_off({ name: rule.name })
+			: m.rule_switch_on({ name: rule?.name ?? '' })}
+	/>
+{/snippet}
+
+{#snippet bar()}
+	<RuleApplyBar
+		chosen={count}
+		{allChosen}
+		loaded={items.length}
+		conflicts={items.length - plain.length}
+		loading={loadingAll}
+		{complete}
+		offerSwitchOn={changeable && rule?.enabled === false}
+		{busy}
+		{application}
+		{waiting}
+		rule={id}
+		onchoose={chooseAll}
+		onstop={() => (loadingAll = false)}
+		onmore={() => void all()}
+		onapply={(switchOn) => void apply(switchOn)}
+		ondetails={(finished) => (details = finished)}
+	/>
+{/snippet}
+
 <div class="flex flex-col gap-6">
 	<PageHeader
 		title={rule ? m.rule_apply_title({ name: rule.name }) : m.rule_apply_generic()}
 		back={{ href: `${BASE}/rules/${id}`, label: rule?.name ?? m.nav_rules() }}
+		actions={changeable ? switcher : undefined}
+		subtitle={saved ? m.rule_saved_hint() : m.rule_apply_hint()}
 	/>
 
 	{#if problem}
 		<LoadProblem {problem} onretry={() => loader.retry()} />
 	{:else if !rule}
 		<Loading />
-	{:else if application}
-		{@const finished = application.status === 'done' || application.status === 'failed'}
-		<Card.Root as="section" class="flex flex-col gap-4" aria-live="polite">
-			{#if !finished}
-				<p>{m.rule_apply_running({ done: application.done, total: application.total })}</p>
-				<Progress value={application.done} max={Math.max(application.total, 1)} />
-			{:else if application.status === 'failed'}
-				<p class="text-destructive" role="alert">
-					{m.rule_apply_failed({ error: application.error ?? '' })}
-				</p>
-			{:else}
-				<p>
-					{m.rule_apply_done({
-						applied: application.applied,
-						unchanged: application.unchanged,
-						skipped: application.skipped.length
-					})}
-				</p>
-			{/if}
-			{#if application.skipped.length > 0}
-				{@const skipped = application.skipped}
-				<div class="flex flex-col gap-1">
-					<SectionTitle size="card">{m.rule_apply_skipped()}</SectionTitle>
-					<ul class="flex flex-col gap-1 text-sm">
-						{#each application.skipped as skip (skip.document_id)}
-							<li>
-								<BeamTitle
-									title={titles.get(skip.document_id) ?? skip.document_id}
-									class="max-w-full align-middle"
-									onview={() =>
-										openBeam(
-											skipped.map((each) => each.document_id),
-											skip.document_id,
-											m.rule_apply_skipped()
-										)}
-								/>
-								<span class="text-muted-foreground">
-									{reasonsText(skip.reasons, skip.reason)}
-								</span>
-							</li>
-						{/each}
-					</ul>
-				</div>
-			{/if}
-			{#if finished}
-				<a href="{BASE}/rules/{id}" class="w-fit text-sm hover:underline">{rule.name}</a>
-			{/if}
-		</Card.Root>
 	{:else}
-		<p class="text-muted-foreground">{saved ? m.rule_saved_hint() : m.rule_apply_hint()}</p>
+		{#if showBar && !phone.current}{@render bar()}{/if}
 
 		{#if items.length > 0}
-			<div class="flex flex-wrap items-center gap-2 text-sm">
-				<span class="text-muted-foreground">
-					{complete
-						? m.rule_preview_complete({ count: items.length })
-						: m.rule_preview_loaded({ count: items.length })}
-				</span>
-				<Button
-					variant="ghost"
-					size="sm"
-					onclick={() => plain.forEach((item) => chosen.add(item.document_id))}
-				>
-					{m.rule_select_all()}
-				</Button>
-				<Button
-					variant="ghost"
-					size="sm"
-					onclick={() => {
-						chosen.clear();
-						accepted.clear();
-					}}
-				>
-					{m.rule_select_none()}
-				</Button>
-			</div>
-			<ul class="flex flex-col gap-2">
+			<ul
+				class={cn('flex flex-col gap-2', application && 'opacity-50')}
+				inert={application !== null}
+			>
 				{#each items as item (item.document_id)}
 					{@const conflict = hasConflict(item)}
-					<Card.Root as="li" size="row" class={['flex gap-3', conflict && 'border-lane-yellow']}>
+					{@const picked = (conflict ? accepted : chosen).has(item.document_id)}
+					<Card.Root
+						as="li"
+						size="row"
+						class={cn(
+							'flex gap-3',
+							picked && 'border-primary bg-panel',
+							conflict && !picked && 'border-lane-yellow-foreground/35'
+						)}
+					>
 						{#if !conflict}
 							<ChoiceBox
 								class="mt-1"
 								aria-label={m.rule_select_document({ title: item.title })}
-								checked={chosen.has(item.document_id)}
+								checked={picked}
 								onchange={(event) => choose(item, event.currentTarget.checked)}
 							/>
 						{:else}
-							<TriangleAlert class="mt-0.5 size-4 shrink-0 text-lane-yellow" aria-hidden="true" />
+							<TriangleAlert
+								class="mt-0.5 size-4 shrink-0 text-lane-yellow-foreground"
+								aria-hidden="true"
+							/>
 						{/if}
 						<div class="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-							<span class="flex flex-wrap items-center gap-2">
-								<!-- The title opens the Beam: where the rule's text conditions hit. -->
-								<BeamTitle
-									title={item.title}
-									class="text-base"
-									onview={() =>
-										openBeam(
-											items.map((entry) => entry.document_id),
-											item.document_id,
-											rule ? m.rule_apply_title({ name: rule.name }) : m.rule_apply_generic(),
-											{ source: { kind: 'rule', rule: id } }
-										)}
-								/>
-								{#if conflict}<Badge variant="yellow">{m.rule_conflict()}</Badge>{/if}
-							</span>
-							<RuleEffects
-								effects={item.changes}
-								notes={item.notes}
-								sends={item.sends}
-								refused={item.sends_refused}
-								{lookup}
-							/>
+							<!-- One line on a desktop: the title, and what the rule changes at its end. -->
+							<div class="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-start sm:gap-4">
+								<span class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+									<!-- The title opens the Beam: where the rule's text conditions hit. -->
+									<BeamTitle
+										title={item.title}
+										class="max-w-full text-base"
+										onview={() =>
+											openBeam(
+												items.map((entry) => entry.document_id),
+												item.document_id,
+												rule ? m.rule_apply_title({ name: rule.name }) : m.rule_apply_generic(),
+												{ source: { kind: 'rule', rule: id } }
+											)}
+									/>
+									{#if conflict}<Badge variant="yellow">{m.rule_conflict()}</Badge>{/if}
+								</span>
+								<div class="text-muted-foreground sm:max-w-1/2 sm:pt-0.5 sm:text-right">
+									<RuleEffects
+										effects={item.changes}
+										notes={item.notes}
+										sends={item.sends}
+										refused={item.sends_refused}
+										{lookup}
+									/>
+								</div>
+							</div>
 							{#if item.outcome.chain.length > 0}
 								<ul class="flex flex-col gap-0.5">
 									{#each chainLines(item.outcome, rule?.name ?? '', lookup, session.user?.id) as line, index (index)}
@@ -343,7 +418,7 @@
 									</ul>
 								{/if}
 								<Choice
-									checked={accepted.has(item.document_id)}
+									checked={picked}
 									onchange={(event) => choose(item, event.currentTarget.checked)}
 									class="font-medium"
 								>
@@ -359,45 +434,13 @@
 		{/if}
 
 		{#if previewError}
-			<LoadProblem problem={previewError} onretry={() => void more()} />
+			<LoadProblem problem={previewError} onretry={() => void all()} />
 		{:else if loading && items.length === 0}
 			<Loading />
 		{/if}
 
-		{#if !complete && !previewError}
-			<div class="flex flex-wrap justify-center gap-2">
-				<Button variant="outline" disabled={loading} onclick={() => void more()}>
-					{m.load_more()}
-				</Button>
-				{#if loadingAll}
-					<Button variant="ghost" onclick={() => (loadingAll = false)}>
-						{m.rule_preview_stop()}
-					</Button>
-				{:else}
-					<Button variant="outline" disabled={loading} onclick={() => void all()}>
-						{m.rule_preview_all()}
-					</Button>
-				{/if}
-			</div>
-		{/if}
-
-		<div class="flex flex-wrap gap-2 border-t pt-4">
-			{#if saved && canChangeRule(rule, session.user, lookup?.spaces ?? []) && !rule.enabled}
-				<Button disabled={busy} onclick={switchOnOnly}>{m.rule_switch_on_only()}</Button>
-				<Button variant="outline" disabled={busy || count === 0} onclick={() => apply(true)}>
-					{m.rule_switch_on_apply({ count })}
-				</Button>
-				<a
-					href="{BASE}/rules/{id}"
-					class="inline-flex h-9 items-center px-3 text-sm hover:underline"
-				>
-					{m.rule_leave_off()}
-				</a>
-			{:else}
-				<Button disabled={busy || count === 0} onclick={() => apply(false)}>
-					{m.rule_apply_selected({ count })}
-				</Button>
-			{/if}
-		</div>
+		{#if showBar && phone.current}{@render bar()}{/if}
 	{/if}
 </div>
+
+<BulkSkipped operation={details} onclose={() => (details = null)} />
