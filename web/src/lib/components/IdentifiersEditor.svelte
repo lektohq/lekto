@@ -456,18 +456,21 @@
 				class="max-sm:w-full"
 			/>
 		{/if}
-		<SearchField bind:value={query} label={m.identifier_search()} class="min-w-48 flex-1" />
-		{#if hint}<InfoHint text={hint} about={m.master_identifiers()} />{/if}
-		{#if phone.current}
-			<IconButton type="button" class="shrink-0" label={m.identifier_add()} onclick={add}>
-				<Plus class="size-5" aria-hidden="true" />
-			</IconButton>
-		{:else}
-			<Button type="button" variant="outline" class="h-10 shrink-0" onclick={add}>
-				<Plus aria-hidden="true" />
-				{m.identifier_add_short()}
-			</Button>
-		{/if}
+		<!-- Search, help and adding wrap as one, under the source where the row is narrow. -->
+		<div class="flex min-w-72 flex-1 items-center gap-2">
+			<SearchField bind:value={query} label={m.identifier_search()} class="flex-1" />
+			{#if hint}<InfoHint text={hint} about={m.master_identifiers()} />{/if}
+			{#if phone.current}
+				<IconButton type="button" class="shrink-0" label={m.identifier_add()} onclick={add}>
+					<Plus class="size-5" aria-hidden="true" />
+				</IconButton>
+			{:else}
+				<Button type="button" variant="outline" class="h-10 shrink-0" onclick={add}>
+					<Plus aria-hidden="true" />
+					{m.identifier_add_short()}
+				</Button>
+			{/if}
+		</div>
 	</div>
 
 	{#if rows.length === 0}
