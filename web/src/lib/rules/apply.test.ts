@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import {
+	ahead,
+	aheadText,
+	applicationResult,
 	applyRequest,
 	chainLines,
 	follow,
@@ -79,6 +82,44 @@ describe('applying a rule', () => {
 			async () => undefined
 		);
 		expect(last.done).toBe(2);
+	});
+
+	it('counts what a queued application waits for: the pipeline and the other applications', () => {
+		const kind = (name: string, running: number, due: number) => ({
+			kind: name,
+			running,
+			due,
+			planned: 5,
+			failed: 1,
+			done: 9
+		});
+		const kinds = [
+			kind('pipeline.node', 1, 2),
+			kind('pipeline.relate', 0, 3),
+			kind('rules.apply', 1, 2),
+			// The index and the classifier come after rule applications.
+			kind('search.index', 1, 40),
+			kind('classifier.check', 0, 1)
+		];
+		expect(ahead({ kinds })).toBe(8);
+		expect(ahead({ kinds: [kind('rules.apply', 0, 1), kind('search.index', 1, 9)] })).toBe(0);
+		expect([0, 1, 4].map(aheadText)).toEqual([
+			m.rule_apply_next(),
+			m.rule_apply_ahead_one(),
+			m.rule_apply_ahead({ count: '4' })
+		]);
+	});
+
+	it('says what a finished application did', () => {
+		const done = {
+			...application('done', 3),
+			applied: 2,
+			unchanged: 0,
+			skipped: [{ document_id: 'c', reason: 'gone', reasons: [] }]
+		};
+		expect(applicationResult(done)).toBe(
+			m.rule_apply_result({ applied: '2', unchanged: '0', skipped: '1' })
+		);
 	});
 });
 

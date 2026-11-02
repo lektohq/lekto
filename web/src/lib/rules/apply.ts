@@ -1,10 +1,13 @@
 /**
  * Applying a rule to existing documents: what the preview selects and what the request holds
  * (decision E3: documents with a conflict are only applied with their own consent, which
- * becomes `accept_conflicts`), and how often the progress is asked for.
+ * becomes `accept_conflicts`), how often the progress is asked for, what a queued application
+ * waits for and what a finished one did.
  */
 import type { components } from '#lib/api/schema.ts';
 import { describeValue, fieldLabel } from '#lib/describe.ts';
+import { formatNumber } from '#lib/i18n.ts';
+import type { JobsSummary } from '#lib/jobs.ts';
 import { spaceNameFor, type Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { labelled, outputReasonText, reasonsText } from '#lib/reasons.ts';
@@ -12,6 +15,9 @@ import { labelled, outputReasonText, reasonsText } from '#lib/reasons.ts';
 export type PreviewItem = components['schemas']['ApplyPreviewItemOut'];
 export type Application = components['schemas']['RuleApplicationOut'];
 export type ApplyRequest = components['schemas']['ApplyRequest'];
+
+/** The job kind of rule applications. */
+const APPLY_JOB = 'rules.apply';
 
 export function hasConflict(item: PreviewItem): boolean {
 	return item.conflicts.length > 0;
@@ -42,6 +48,35 @@ export function applyRequest(
 
 export function isFinished(application: Pick<Application, 'status'>): boolean {
 	return application.status === 'done' || application.status === 'failed';
+}
+
+/**
+ * The jobs a queued application waits for (`GET /jobs/summary`): the worker runs the pipeline's
+ * steps before rule applications (and the index after them), and the applications by when they
+ * are due; `own` of the applications is the one waiting.
+ */
+export function ahead(summary: Pick<JobsSummary, 'kinds'>, own = 1): number {
+	let jobs = 0;
+	for (const kind of summary.kinds) {
+		if (kind.kind.startsWith('pipeline.')) jobs += kind.running + kind.due;
+		else if (kind.kind === APPLY_JOB) jobs += Math.max(0, kind.running + kind.due - own);
+	}
+	return jobs;
+}
+
+/** What waits before the application, in words. */
+export function aheadText(jobs: number): string {
+	if (jobs === 0) return m.rule_apply_next();
+	return jobs === 1 ? m.rule_apply_ahead_one() : m.rule_apply_ahead({ count: formatNumber(jobs) });
+}
+
+/** What an application did: changed, unchanged, skipped. */
+export function applicationResult(application: Application): string {
+	return m.rule_apply_result({
+		applied: formatNumber(application.applied),
+		unchanged: formatNumber(application.unchanged),
+		skipped: formatNumber(application.skipped.length)
+	});
 }
 
 /** Every second at first, then every three. */
