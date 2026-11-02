@@ -182,6 +182,74 @@ def test_a_number_ends_with_its_line() -> None:
     assert identifiers_in("auf unser Konto DE89 3704 0044\n0532 0130 00.") == {(IBAN, THEIR_IBAN)}
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Kundennr.: 40012345 Tel.1: 06221 123456",
+        "Kundennr.: 40012345 Tel.1 06221 123456",
+        "Kundennr.: 40012345 Fax2: 06221 123457",
+    ],
+)
+def test_a_number_ends_before_the_next_label(text: str) -> None:
+    # A label with a digit beside the value is none of its words: an abbreviation, a word
+    # before a colon.
+    assert identifiers_in(text) == {(CUSTOMER, "40012345")}
+
+
+def test_digits_before_a_colon_still_belong_to_the_number() -> None:
+    text = "Steuernummer: 012 345 6789 0: USt-IdNr."
+    assert identifiers_in(text) == {(IdentifierKind.TAX_NUMBER, "01234567890")}
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # A table's header, the next line its first row: an address, not the value.
+        "Personal-Nr. Versicherungs-Nr.\nMusterstraße 12 12345 Musterstadt",
+        "Deine Kundennummer Rechnungsdatum R123456789",
+        "Kundennummer Seite 1",
+        "Zählernummer Stand 1",
+    ],
+)
+def test_a_word_of_the_text_is_no_value(text: str) -> None:
+    assert identifiers_in(text) == set()
+
+
+@pytest.mark.parametrize(
+    ("text", "kind", "value"),
+    [
+        (
+            "Vorgangs-Nr.: ABCD 00123456789 Übertrag:",
+            IdentifierKind.TICKET_NUMBER,
+            "ABCD00123456789",
+        ),
+        ("Unser Zeichen: SD-H/kr 2611", IdentifierKind.OUR_REFERENCE, "SDHKR2611"),
+        ("Kundennummer: K 4711", CUSTOMER, "K4711"),
+    ],
+)
+def test_a_value_may_begin_with_a_short_group_of_letters(
+    text: str, kind: IdentifierKind, value: str
+) -> None:
+    assert identifiers_in(text) == {(kind, value)}
+
+
+@pytest.mark.parametrize(
+    ("text", "kind", "value"),
+    [
+        (
+            "Ihre Schaden-Nummer lautet 12-34-567/890123-X.",
+            IdentifierKind.CLAIM_NUMBER,
+            "1234567890123X",
+        ),
+        ("Ihre Personalnummer lautet: 4711. Bitte", PERSONNEL, "4711"),
+        ("Die Vertragsnummer ist 12345.", IdentifierKind.CONTRACT_NUMBER, "12345"),
+        ("Your customer number is 4711.", CUSTOMER, "4711"),
+    ],
+)
+def test_a_value_in_a_sentence_after_its_verb(text: str, kind: IdentifierKind, value: str) -> None:
+    assert identifiers_in(text) == {(kind, value)}
+
+
 def test_no_personnel_number_without_label_or_value() -> None:
     assert identifiers_in("Supers Nr 4711, Nummer 12345") == set()
     assert identifiers_in("Personalnummer: siehe oben; Personalnummer 12") == set()
