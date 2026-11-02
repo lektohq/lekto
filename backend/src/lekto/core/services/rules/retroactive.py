@@ -161,6 +161,8 @@ class ApplyPreview:
     rule: Rule
     items: tuple[PreviewItem, ...]
     next_cursor: DocumentId | None
+    looked_at: int
+    """Documents the page looked at, those it holds among them."""
 
 
 class RuleApplicationService:
@@ -222,6 +224,7 @@ class RuleApplicationService:
         next_cursor = documents[-1].id if len(documents) == SCAN else None
         budget = PatternBudget(PREVIEW_BUDGET)
         last: DocumentId | None = None
+        looked_at = 0
         for document in documents:
             if len(items) == limit:
                 next_cursor = items[-1].document.id
@@ -230,6 +233,7 @@ class RuleApplicationService:
                 next_cursor = last
                 break
             last = document.id
+            looked_at += 1
             async with self._uow() as uow:
                 if not await _candidate(uow, user, rule, document):
                     continue
@@ -244,7 +248,7 @@ class RuleApplicationService:
             item = await self._preview_one(user, rule, document.id, prepared)
             if item is not None:
                 items.append(item)
-        return ApplyPreview(rule, tuple(items), next_cursor)
+        return ApplyPreview(rule, tuple(items), next_cursor, looked_at)
 
     async def _preview_one(
         self, user: User, rule: Rule, id: DocumentId, prepared: Prepared
