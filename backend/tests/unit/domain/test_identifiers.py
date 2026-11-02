@@ -328,6 +328,19 @@ def test_a_learned_number_belongs_to_whom_all_its_documents_surely_belong() -> N
         assert [item.user_id for item in learn(*whose)] == [None, None]
 
 
+def test_a_learned_tax_number_names_nobody() -> None:
+    """A company's tax number stands on all its letters: learned, it names nobody, even where
+    every document of it is surely one user's (Tobi, 02.11.2026)."""
+    insurer = ContactId(new_id())
+    anna = UserId(new_id())
+    own = SpaceId(new_id())
+    tax = (IdentifierKind.TAX_NUMBER, "6420000010")
+    documents = [Confirmed(insurer, None, frozenset({tax}), own, frozenset({anna}))] * 2
+    assert list(mine_identifiers(documents)[insurer]) == [
+        Identifier(*tax, IdentifierSource.LEARNED, learned_in=frozenset({own}))
+    ]
+
+
 def test_who_sees_a_contacts_identifier() -> None:
     anna, bob = UserId(new_id()), UserId(new_id())
     own, other = SpaceId(new_id()), SpaceId(new_id())
@@ -375,9 +388,10 @@ def test_every_kind_has_its_type_and_says_whose_it_is() -> None:
     }
     assert {IBAN, VAT, CUSTOMER, PERSONNEL, DOMAIN} | contracts | companies == CONTACT_KINDS
     assert {IBAN, TAX, SOCIAL, HEALTH, ADDRESS, IdentifierKind.CHILD_BENEFIT_NUMBER} == PERSON_KINDS
-    # A tax number may be the one the tax office gave a user.
-    assert {CUSTOMER, PERSONNEL, IdentifierKind.TAX_NUMBER} | contracts == NAMING_KINDS
+    # A company's tax number names nobody (Tobi, 02.11.2026).
+    assert {CUSTOMER, PERSONNEL} | contracts == NAMING_KINDS
     assert catalog()["customer_number"] == {"contact": True, "person": False, "names_user": True}
+    assert catalog()["tax_number"] == {"contact": True, "person": False, "names_user": False}
 
 
 def test_candidates_of_any_reader_are_checked_and_weighed() -> None:
