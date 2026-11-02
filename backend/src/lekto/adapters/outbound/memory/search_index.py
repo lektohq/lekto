@@ -6,14 +6,20 @@ roughly alike, but it knows no typos, stemming or compound words beyond substrin
 
 import math
 import re
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 from dataclasses import replace
 from datetime import date, datetime
 
 from lekto.adapters.outbound.memory.ordering import rank
 from lekto.core.domain.errors import SearchIndexError
 from lekto.core.domain.ids import DocumentId
-from lekto.core.domain.search import LAYOUT, IndexDocument, IndexState, Segment
+from lekto.core.domain.search import (
+    LAYOUT,
+    IndexDocument,
+    IndexState,
+    Segment,
+    vectors_by_section,
+)
 from lekto.core.domain.sorting import sort_key
 from lekto.core.ports.repository import DocumentFilter, DocumentOrder, FilterView, SortKey
 from lekto.core.ports.search_index import (
@@ -55,6 +61,12 @@ class MemorySearchIndex:
     async def state(self, id: DocumentId) -> IndexState | None:
         document = self._documents.get(id)
         return None if document is None else self._state(document)
+
+    async def section_vectors(self, id: DocumentId) -> Mapping[str, tuple[float, ...]]:
+        document = self._documents.get(id)
+        if document is None:
+            return {}
+        return vectors_by_section(document.embedding, document.vectors or ())
 
     async def states(self) -> AsyncIterator[IndexState]:
         for document in list(self._documents.values()):
