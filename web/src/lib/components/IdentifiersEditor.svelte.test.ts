@@ -134,6 +134,77 @@ describe('IdentifiersEditor', () => {
 	});
 });
 
+describe('IdentifiersEditor, a user’s identifiers at contacts', () => {
+	const contacts = [
+		{ id: 'insurer', name: 'Hanse Versicherung', topic_ids: [] },
+		{ id: 'utility', name: 'Stadtwerke', topic_ids: [] }
+	];
+	const numbers = () => [
+		row('customer_number', 'K1', 'manual', null, null, 'utility'),
+		row('meter_number', 'Z2', 'learned', null, null, 'utility'),
+		row('policy_number', 'P3', 'learned', null, null, 'insurer'),
+		row('customer_number', 'K4', 'rejected', null, null, 'insurer')
+	];
+	const group = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}`) });
+
+	it('groups them by contact, closed, with the kinds each holds', async () => {
+		const user = userEvent.setup();
+		editor(numbers(), { contacts, kinds: ['customer_number', 'policy_number', 'meter_number'] });
+		const insurer = group('Hanse Versicherung');
+		const utility = group('Stadtwerke');
+		// By name; each names its kinds in their order and how many there are.
+		expect(
+			insurer.compareDocumentPosition(utility) & Node.DOCUMENT_POSITION_FOLLOWING
+		).toBeTruthy();
+		expect(utility.textContent).toContain(
+			`${kindLabel('customer_number')}, ${kindLabel('meter_number')}`
+		);
+		expect(within(utility).getByText(m.master_identifiers_many({ count: 2 }))).toBeTruthy();
+		expect(utility.getAttribute('aria-expanded')).toBe('false');
+		expect(screen.queryByRole('button', { name: /K1/ })).toBeNull();
+		await user.click(utility);
+		expect(utility.getAttribute('aria-expanded')).toBe('true');
+		// A line names its kind, not its contact.
+		expect(
+			within(line(new RegExp(`^${kindLabel('customer_number')}\\s*K1`))).getByText(
+				kindLabel('customer_number')
+			)
+		).toBeTruthy();
+		await user.click(utility);
+		expect(screen.queryByRole('button', { name: /K1/ })).toBeNull();
+	});
+
+	it('opens every contact a search finds something at', async () => {
+		const user = userEvent.setup();
+		editor(numbers(), { contacts, kinds: ['customer_number', 'policy_number', 'meter_number'] });
+		await user.type(screen.getByLabelText(m.identifier_search()), 'P3');
+		expect(group('Hanse Versicherung').getAttribute('aria-expanded')).toBe('true');
+		expect(line(/P3/)).toBeTruthy();
+		expect(screen.queryByRole('button', { name: /^Stadtwerke/ })).toBeNull();
+	});
+
+	it('shows them by source, with how many each has', async () => {
+		const user = userEvent.setup();
+		editor(numbers(), { contacts, kinds: ['customer_number', 'policy_number', 'meter_number'] });
+		const sources = screen.getByRole('group', { name: m.numbers_source() });
+		const learned = within(sources).getByRole('button', { name: new RegExp(m.numbers_learned()) });
+		expect(learned.textContent).toContain('2');
+		await user.click(learned);
+		await user.click(group('Hanse Versicherung'));
+		expect(line(/P3/)).toBeTruthy();
+		expect(screen.queryByRole('button', { name: /K4/ })).toBeNull();
+	});
+
+	it('adds a new one without a contact, opened', async () => {
+		const user = userEvent.setup();
+		const props = editor(numbers(), { contacts, kinds: ['customer_number'] });
+		await user.click(screen.getByRole('button', { name: m.identifier_add_short() }));
+		expect(props.rows).toHaveLength(5);
+		expect(group(m.number_contact_none()).getAttribute('aria-expanded')).toBe('true');
+		expect(screen.getByLabelText(m.number_contact())).toBeTruthy();
+	});
+});
+
 describe('IdentifiersEditor, where a learned one stands', () => {
 	afterEach(() => {
 		vi.unstubAllGlobals();

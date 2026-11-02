@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
-	import type { components } from '#lib/api/schema.ts';
 	import ChipInput from '#lib/components/ChipInput.svelte';
 	import HintLabel from '#lib/components/HintLabel.svelte';
 	import IdentifiersEditor from '#lib/components/IdentifiersEditor.svelte';
+	import UnsavedGuard from '#lib/components/UnsavedGuard.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
@@ -18,24 +18,33 @@
 		PERSON_KINDS,
 		rowsOf
 	} from '#lib/identifiers.ts';
-	import type { Contact, Tag } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import Loading from '#lib/components/Loading.svelte';
-	import LoadProblem from '#lib/components/LoadProblem.svelte';
+	import type { Profile, ProfileData } from '#lib/profile.ts';
 	import DateInput from '#lib/components/DateInput.svelte';
 
 	// A user's profile (Tobi, 21.10.2026): the display name others see, and what only the user
-	// and admins see: other names, birth date, e-mail and the person's own numbers. Found in a
-	// document, they tell whose it is; none of it goes to the language model. With them the
-	// user's numbers at contacts (issue #82): private too, entered, taken over or declined here.
-	// `userId` null: the caller's own (settings); else an admin edits another user's (user
-	// management).
-	type Profile = components['schemas']['ProfileOut'];
-
-	let { userId = null, onsaved }: { userId?: string | null; onsaved?: () => void } = $props();
+	// and admins see: other names, birth date, e-mail and the person's own identifiers. Found in
+	// a document, they tell whose it is; none of it goes to the language model. With them the
+	// user's identifiers at contacts (issue #82): private too, entered, taken over or declined
+	// here. `userId` null: the caller's own (settings); else an admin edits another user's (user
+	// management). `part`: the person, their identifiers at contacts, or both; each saves only
+	// its own (the settings show them in two tabs, Tobi 02.11.2026). Changes not saved are
+	// guarded.
+	let {
+		data,
+		userId = null,
+		part = 'all',
+		onsaved
+	}: {
+		data: ProfileData;
+		userId?: string | null;
+		part?: 'person' | 'numbers' | 'all';
+		onsaved?: (profile: Profile) => void;
+	} = $props();
 
 	const uid = $props.id();
-	let profile = $state<Profile | null>(null);
+	const person = $derived(part !== 'numbers');
+	const atContacts = $derived(part !== 'person');
 	let displayName = $state('');
 	let aliases = $state<string[]>([]);
 	let birthDate = $state('');
@@ -44,73 +53,62 @@
 	let opened = $state<number | null>(null);
 	let numbers = $state<IdentifierRow[]>([]);
 	let openedNumber = $state<number | null>(null);
-	let contacts = $state<Contact[]>([]);
-	let topics = $state<Tag[]>([]);
+	let saved = $state('');
 	let problem = $state<string | null>(null);
 	let busy = $state(false);
 
 	function show(loaded: Profile) {
-		profile = loaded;
 		displayName = loaded.display_name ?? '';
 		aliases = [...loaded.aliases];
 		birthDate = loaded.birth_date ?? '';
 		email = loaded.email ?? '';
 		identifiers = rowsOf(loaded.identifiers);
 		numbers = rowsOf(loaded.numbers);
+		saved = JSON.stringify(body());
 	}
 
-	async function load() {
-		try {
-			const [loaded, contactList, tags] = await Promise.all([
-				unwrap(
-					userId === null
-						? api.GET('/api/v1/auth/me/profile')
-						: api.GET('/api/v1/users/{id}/profile', { params: { path: { id: userId } } })
-				),
-				unwrap(api.GET('/api/v1/contacts')),
-				unwrap(api.GET('/api/v1/tags'))
-			]);
-			contacts = contactList;
-			topics = tags.filter((tag) => tag.scope === 'topic');
-			show(loaded);
-		} catch (error) {
-			problem = describeError(error);
-		}
-	}
+	show(untrack(() => data.profile));
 
 	function topicsOf(contact: string): readonly string[] {
-		return contacts.find((item) => item.id === contact)?.topic_ids ?? [];
+		return data.contacts.find((item) => item.id === contact)?.topic_ids ?? [];
 	}
 
-	onMount(load);
+	/** What the form sends: its own part only. */
+	function body() {
+		return {
+			...(person
+				? {
+						display_name: displayName.trim() || null,
+						aliases,
+						birth_date: birthDate || null,
+						email: email.trim() || null,
+						identifiers: identifiers
+							.filter((item) => item.value.trim() !== '')
+							.map((item) => ({ kind: item.kind, value: item.value.trim() }))
+					}
+				: {}),
+			...(atContacts ? numbersOf(numbers, topicsOf) : {})
+		};
+	}
+
+	const dirty = $derived(JSON.stringify(body()) !== saved);
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
 		busy = true;
 		problem = null;
-		const body = {
-			display_name: displayName.trim() || null,
-			aliases,
-			birth_date: birthDate || null,
-			email: email.trim() || null,
-			identifiers: identifiers
-				.filter((item) => item.value.trim() !== '')
-				.map((item) => ({ kind: item.kind, value: item.value.trim() })),
-			...numbersOf(numbers, topicsOf)
-		};
 		try {
-			show(
-				await unwrap(
-					userId === null
-						? api.PATCH('/api/v1/auth/me/profile', { body })
-						: api.PATCH('/api/v1/users/{id}/profile', {
-								params: { path: { id: userId } },
-								body
-							})
-				)
+			const changed = await unwrap(
+				userId === null
+					? api.PATCH('/api/v1/auth/me/profile', { body: body() })
+					: api.PATCH('/api/v1/users/{id}/profile', {
+							params: { path: { id: userId } },
+							body: body()
+						})
 			);
-			toast.success(m.profile_saved());
-			onsaved?.();
+			show(changed);
+			toast.success(part === 'numbers' ? m.numbers_saved() : m.profile_saved());
+			onsaved?.(changed);
 		} catch (error) {
 			problem = describeError(error);
 		} finally {
@@ -119,14 +117,8 @@
 	}
 </script>
 
-{#if profile === null}
-	{#if problem}
-		<LoadProblem {problem} onretry={load} />
-	{:else}
-		<Loading class="text-sm" />
-	{/if}
-{:else}
-	<form class="flex flex-col gap-4" onsubmit={save}>
+<form class="flex flex-col gap-4" onsubmit={save}>
+	{#if person}
 		<Field.Field>
 			<HintLabel
 				for="{uid}-name"
@@ -176,22 +168,26 @@
 				hint={m.profile_identifiers_hint()}
 			/>
 		</Field.Field>
+	{/if}
+	{#if atContacts}
+		<!-- In the settings their tab names them. -->
 		<Field.Field>
-			<Field.Label>{m.profile_numbers()}</Field.Label>
+			{#if part === 'all'}<Field.Label>{m.profile_numbers()}</Field.Label>{/if}
 			<IdentifiersEditor
 				bind:rows={numbers}
 				bind:opened={openedNumber}
 				kinds={NAMING_KINDS}
-				{topics}
-				{contacts}
+				topics={data.topics}
+				contacts={data.contacts}
 				hint={m.profile_numbers_hint()}
 			/>
 		</Field.Field>
-		{#if problem}
-			<p class="text-sm text-destructive" role="alert">{problem}</p>
-		{/if}
-		<div>
-			<Button type="submit" disabled={busy}>{m.save()}</Button>
-		</div>
-	</form>
-{/if}
+	{/if}
+	{#if problem}
+		<p class="text-sm text-destructive" role="alert">{problem}</p>
+	{/if}
+	<div>
+		<Button type="submit" disabled={busy}>{m.save()}</Button>
+	</div>
+</form>
+<UnsavedGuard dirty={dirty && !busy} />
