@@ -9,14 +9,14 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { reasonText } from '#lib/reasons.ts';
 
-	// The documents an action on many left as they were, each with why ("Details" of its toast):
-	// the first `SHOWN` by title (one the caller no longer reads by its reason alone), the rest
-	// counted.
+	// The documents an action on many or a rule's application left as they were, each with why
+	// ("Details" of its toast): the first `SHOWN` by title (one the caller no longer reads by its
+	// reason alone), the rest counted.
 	let {
 		operation,
 		onclose
 	}: {
-		operation: components['schemas']['BulkOperationOut'] | null;
+		operation: { skipped: components['schemas']['SkippedOut'][] } | null;
 		onclose: () => void;
 	} = $props();
 
