@@ -50,7 +50,7 @@ Rechnung hat zehn Beträge), mit Beschriftung ist er ein Feld; Felder haben die 
 | kennzeichnet das Dokument | Rechnungs-, Gutschrift-, Bestell- oder Auftragsnummer | Ziel für Bezüge, Feld |
 | verbindet einen Strang | Aktenzeichen, „Unser Zeichen“, Schaden-, Ticketnummer | Abzweig im Stream |
 | verweist auf ein Dokument | „Ihre Rechnung Nr. …“, „Ihr Schreiben vom …“, „Ihr Zeichen“ | Bezug |
-| zeigt auf eine Person | Steuer-ID, Steuernummer, Kindergeldnummer (und die vorhandenen) | Personen, Space |
+| zeigt auf eine Person | Steuer-ID, Kindergeldnummer (und die vorhandenen) | Personen, Space |
 
 Beispiel zur Rolle: Die Rechnung vom 04.06. trägt „Rechnungsnummer 4711“, die Mahnung vom 20.07.
 schreibt „Ihre Rechnung Nr. 4711 ist noch offen“. Beide zeigen denselben Fakt; die Nummer gehört
