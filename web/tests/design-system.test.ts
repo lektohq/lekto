@@ -2,7 +2,8 @@
 // only (no arbitrary font sizes, radii, shadows or palette colours), one page title, one table,
 // tooltips instead of native titles on buttons, dialog widths by their size, icon buttons
 // through `IconButton`, one way to view a document (the Beam), toggle chips only where each
-// toggles on its own, one order on the master data tabs, tooltips through `ui/tooltip`. An exception needs its line in DESIGN.md ("Exceptions") and here; the
+// toggles on its own, one order on the master data tabs, tooltips through `ui/tooltip`, a run's
+// progress in the selection bar. An exception needs its line in DESIGN.md ("Exceptions") and here; the
 // lists of exceptions may only shrink.
 import { describe, expect, it } from 'vitest';
 
@@ -61,6 +62,13 @@ const TOGGLE_CHIPS = new Set([
 	'/src/routes/(app)/dev/components/+page.svelte'
 ]);
 
+/** Where a `Progress` stands (DESIGN.md, "Choosing many"): the selection bars of a run on many, and
+ * the summary of an upload. */
+const PROGRESS = new Set([
+	'/src/lib/components/DocumentsBulkBar.svelte',
+	'/src/lib/components/rules/RuleApplyBar.svelte',
+	'/src/lib/components/UploadSummary.svelte'
+]);
 /** The master data tabs and what each shows below its search (DESIGN.md, "Master data tabs"). */
 const MASTER_PAGE = '/src/routes/(app)/admin/master-data/+page.svelte';
 const MASTER_PANELS = ['MasterDataList', 'TagsPanel', 'FieldsPanel', 'IdentifiersPanel'];
@@ -223,6 +231,14 @@ describe('the design system (web/DESIGN.md)', () => {
 				if (path.includes('/components/ui/') || path.endsWith('/IconButton.svelte')) return null;
 				return tags(source, 'Button').find((tag) => /size="icon/.test(tag)) ?? null;
 			})
+		).toEqual([]);
+	});
+
+	it("shows a run's progress only in the selection bar of a run on many", () => {
+		expect(
+			offenders((source, path) =>
+				PROGRESS.has(path) || path.includes('/components/ui/') ? null : line(source, /<Progress\b/)
+			)
 		).toEqual([]);
 	});
 });
