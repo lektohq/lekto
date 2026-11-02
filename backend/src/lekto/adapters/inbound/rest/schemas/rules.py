@@ -741,6 +741,9 @@ class ApplyPreviewOut(BaseModel):
             "may hold fewer items than `limit` and still have a next one."
         )
     )
+    looked_at: int = Field(
+        description="Documents this page looked at, those in `items` among them; add them up."
+    )
 
 
 class ApplyRequest(BaseModel):

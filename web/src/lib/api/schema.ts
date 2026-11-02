@@ -2977,6 +2977,11 @@ export interface components {
 			 * @description Pass as `cursor` for the next page; null when all documents were looked at. A page may hold fewer items than `limit` and still have a next one.
 			 */
 			next_cursor: string | null;
+			/**
+			 * Looked At
+			 * @description Documents this page looked at, those in `items` among them; add them up.
+			 */
+			looked_at: number;
 		};
 		/**
 		 * ApplyPreviewRequest

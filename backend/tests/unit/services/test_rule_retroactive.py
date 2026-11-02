@@ -59,6 +59,8 @@ async def test_the_preview_lists_changes_and_the_job_applies_the_pinned_version(
     preview = await r.applications.preview(owner.id, rule.id)
 
     assert preview.next_cursor is None
+    assert preview.looked_at == 3
+    assert (await r.applications.preview(owner.id, rule.id, limit=1)).looked_at == 1
     items = {item.document.id: item for item in preview.items}
     assert set(items) == {first.id, second.id, third.id}
     assert [effect.field for effect in items[first.id].effects] == ["tags"]
