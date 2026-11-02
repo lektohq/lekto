@@ -1,6 +1,7 @@
 // The rule builder against a real API: a nested rule is built, checked before saving, saved
-// switched off, dry-run on an existing document, switched on and applied, changed, read in an
-// earlier version, opened and saved again unchanged (no new version), and deleted.
+// switched off, dry-run on an existing document, switched on and applied (the link keeps the
+// application), changed and left paused, read in an earlier version, opened and saved again
+// unchanged (no new version), and deleted.
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 
 const ADMIN = process.env.LEKTO_ADMIN_USERNAME ?? 'admin';
@@ -133,19 +134,27 @@ test('a rule is built, dry-run, applied, changed and deleted', async ({ page }) 
 	await expect(page.getByRole('link', { name: `${NAME}` }).first()).toBeVisible();
 	await expect(page.getByRole('checkbox', { name: `Apply to ${NAME}` })).toBeChecked();
 	expect(previews).toBe(1);
-	await page.getByRole('button', { name: /^Activate and apply to \d+ documents$/ }).click();
-	await expect(page.getByText(/^Done: 1 changed/)).toBeVisible({ timeout: 30_000 });
+	await page.getByRole('button', { name: 'Activate and apply', exact: true }).click();
+	// The bar follows the application; the link keeps it.
+	await expect(page.getByText('1 changed, 0 unchanged, 0 skipped.').first()).toBeVisible({
+		timeout: 30_000
+	});
+	await expect(page).toHaveURL(/\/apply\?application=[^&]+$/);
+	await page.reload();
+	await expect(page.getByText('1 changed, 0 unchanged, 0 skipped.')).toBeVisible();
 	const document = await (await api.get(`/api/v1/documents/${created.document}`)).json();
 	expect(document.tag_ids).toContain(created.tag);
 
 	// Switched on, version 1; a change makes version 2 and switches it off until decided.
 	await page.goto(ruleUrl);
 	await expect(page.getByRole('switch', { name: `Pause ${NAME}` })).toBeChecked();
+	await expect(page.getByRole('link', { name: 'Dry run', exact: true })).toBeVisible();
 	await page.getByRole('link', { name: 'Edit' }).click();
 	await page.getByRole('textbox', { name: 'Name', exact: true }).fill(`${NAME} v2`);
 	await page.getByRole('button', { name: 'Save and see what it does' }).click();
 	await page.waitForURL(/\/apply\?saved=1$/);
-	await page.getByRole('link', { name: 'Leave paused' }).click();
+	// Left paused: back to the rule without applying.
+	await page.getByRole('link', { name: `${NAME} v2`, exact: true }).click();
 	await expect(page.getByRole('switch', { name: `Activate ${NAME} v2` })).not.toBeChecked();
 	await expect(page.getByRole('link', { name: 'Version 2' })).toBeVisible();
 
