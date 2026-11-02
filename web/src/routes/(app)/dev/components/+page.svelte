@@ -14,6 +14,7 @@
 	import FoldedGroup from '#lib/components/FoldedGroup.svelte';
 	import FormDialog from '#lib/components/FormDialog.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
+	import IdentifiersEditor from '#lib/components/IdentifiersEditor.svelte';
 	import InfoTip from '#lib/components/InfoTip.svelte';
 	import LaneBadge from '#lib/components/LaneBadge.svelte';
 	import Loading from '#lib/components/Loading.svelte';
@@ -41,6 +42,7 @@
 	import * as Table from '#lib/components/ui/table/index.ts';
 	import { Textarea } from '#lib/components/ui/textarea/index.ts';
 	import { formatDate, formatMoney, formatNumber } from '#lib/i18n.ts';
+	import { type IdentifierRow, NAMING_KINDS, row } from '#lib/identifiers.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { Tone } from '#lib/tones.ts';
 
@@ -73,6 +75,17 @@
 	let view = $state('grid');
 	let contact = $state('c1');
 	let folded = $state(false);
+	// The identifiers at contacts, grouped by contact (web/DESIGN.md, "Lists").
+	const SAMPLE_CONTACTS = [
+		{ id: 'c1', name: 'Stadtwerke Musterstadt', topic_ids: [] },
+		{ id: 'c2', name: 'Hanse Versicherung', topic_ids: [] }
+	];
+	let sampleNumbers = $state<IdentifierRow[]>([
+		row('customer_number', '200445118', 'manual', null, null, 'c1'),
+		row('meter_number', '1ESY1160447122', 'learned', null, null, 'c1'),
+		row('policy_number', 'HV-30-4418720', 'learned', null, null, 'c2'),
+		row('mandate_reference', 'HV4418720', 'rejected', null, null, 'c2')
+	]);
 	let formOpen = $state(false);
 	const options = [
 		{ value: 'one', label: `${m.dev_sample_option()} 1` },
@@ -298,6 +311,13 @@
 				<p class="py-1 text-sm text-muted-foreground">{m.dev_sample_text()}</p>
 			</FoldedGroup>
 		</Card.Root>
+		<div class="max-w-3xl">
+			<IdentifiersEditor
+				bind:rows={sampleNumbers}
+				kinds={NAMING_KINDS}
+				contacts={SAMPLE_CONTACTS}
+			/>
+		</div>
 	</section>
 
 	<section class="flex flex-col gap-3" aria-labelledby="dev-selection">

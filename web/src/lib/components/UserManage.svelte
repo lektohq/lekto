@@ -19,6 +19,8 @@
 	import { Choice } from '#lib/components/ui/choice/index.ts';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
+	import Loading from '#lib/components/Loading.svelte';
+	import { loadProfile, type ProfileData } from '#lib/profile.ts';
 
 	type Account = components['schemas']['AccountOut'];
 	type Role = components['schemas']['Role'];
@@ -39,6 +41,8 @@
 	let resetError = $state<string | null>(null);
 	let confirm = $state<'totp' | 'oidc' | null>(null);
 	let deleting = $state(false);
+	let profile = $state<ProfileData | null>(null);
+	let profileProblem = $state<string | null>(null);
 
 	const own = $derived(account?.id === session.user?.id);
 
@@ -57,12 +61,23 @@
 		}
 	}
 
+	async function loadProfileData() {
+		profileProblem = null;
+		try {
+			profile = await loadProfile(userId);
+		} catch (error) {
+			profileProblem = describeError(error);
+		}
+	}
+
 	$effect(() => {
 		if (open) {
 			password = '';
 			revoke = false;
 			resetError = null;
+			profile = null;
 			void load(true);
+			void loadProfileData();
 		}
 	});
 
@@ -193,7 +208,13 @@
 						<SectionTitle size="card" level={3} id="user-profile">{m.profile_title()}</SectionTitle>
 						<InfoHint text={m.profile_hint()} about={m.profile_title()} />
 					</div>
-					<ProfileForm userId={account.id} onsaved={onchanged} />
+					{#if profileProblem}
+						<LoadProblem problem={profileProblem} onretry={loadProfileData} />
+					{:else if profile}
+						<ProfileForm data={profile} userId={account.id} onsaved={onchanged} />
+					{:else}
+						<Loading class="text-sm" />
+					{/if}
 				</section>
 
 				<div class="flex flex-col gap-2 border-t pt-4">

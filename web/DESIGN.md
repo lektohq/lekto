@@ -296,13 +296,13 @@ the chosen events.
 
 Two components that **look different on purpose**:
 
-- **`TabBar`**: the tabs of a page (inbox lanes, document, master data, system). Links that change
+- **`TabBar`**: the tabs of a page (inbox lanes, document, master data, system, settings). Links that change
   the URL. **Underline tabs:** text in `muted-foreground`, the current tab in `foreground` with a
   2 px `brand` underline. A bottom border runs across the bar. It scrolls sideways on the phone
   with a fade at the cut edge. Counts and dots sit beside the label.
 - **`Segmented`**: a choice of how to show something (pages, grid/list/stream, text/pages,
   form/facts, the period of the automation, language, appearance, the grouping of a lens), which
-  part of a list shows (the open identifiers by source, the tags by kind, the jobs by state, the
+  part of a list shows (the open identifiers by source, the identifiers at contacts by source, the tags by kind, the jobs by state, the
   deliveries by outcome; with counts), and in a form a choice among two or
   three short options that changes what follows (a webhook's trigger and body). A grey bar with
   the choice on a light pill that slides over (`motion-safe`, not on first show). Sizes: `md`
@@ -403,6 +403,16 @@ font-medium`) and below it what they are (`text-xs text-muted-foreground`); `ari
 `aria-controls`. Closed at first; opened, it stays open while the page shows the same thing. The
 rows inside look as elsewhere in the card, indented to the text of the button (`pl-6`). A whole
 card that folds is `FilterSection`.
+
+**Grouped by contact** (`IdentifiersEditor` with `contacts`: the identifiers at contacts, Tobi
+02.11.2026): where the rows of a list belong to different contacts, one line per contact, a
+`button` at least 56 px tall: a `ChevronRight` (`muted-foreground`) turned down when open, the
+`ContactAvatar`, the name (`text-sm font-medium`) and below it the kinds it holds (`text-xs
+text-muted-foreground`), the count at the right (`text-meta`, `tabular-nums`). Closed at first;
+a search opens every group it finds something in, and the open line keeps its group open. The
+rows inside look as elsewhere, indented to the name; one without a contact stands first, its
+avatar a dashed circle. Where all rows belong to one contact (the contact dialog), they stay
+grouped by kind.
 
 ### Tables
 
@@ -613,6 +623,19 @@ the phone a full-screen editor carries the same two actions in its top bar.
 Delete, remove, revoke, leave and hand over **always** ask with `ConfirmDialog`. This includes
 removing a space member and a relation. The dialog names the object and the consequence.
 Destructive actions are in editors and on detail pages, not in list rows.
+
+### Settings
+
+The settings (Tobi, 02.11.2026): the account card (name, user name, role), then a `TabBar`
+Profil · Anmeldung · API-Tokens · Kennungen bei Kontakten (`?tab=`; without it the first, after
+linking an account came back with an error the sign-in), the last with its count.
+
+- **Profil:** display name, other names, birth date, e-mail, own identifiers.
+- **Anmeldung:** password, second factor, single sign-on, sessions.
+- **API-Tokens:** the tokens.
+- **Kennungen bei Kontakten:** the identifiers at contacts, grouped by contact ("Lists").
+
+A tab with a form saves only its own part, and guards it ("Saving and leaving").
 
 ### Navigation between list and detail
 
