@@ -77,9 +77,23 @@ WRITTEN_SEPARATORS = r"[\s./\u00ad-]*"
 """Between the characters of a number as a text writes it: separators, also several (two
 spaces, a line break and its indent of an OCR text) and soft hyphens, or none."""
 
+_FIRST = (
+    r"(?:(?=[a-z./-]*\d)[a-z0-9][a-z0-9./-]*|[a-z]{1,4}(?:[./-][a-z]{1,4})*[./-]?(?![a-z0-9./-]))"
+)
+"""A value's first word: one with a digit, or short groups of letters (a prefix `DE`, `ABCD`,
+a reference's initials `SD-H/kr`), not a street or another word of the text (`Musterstraße 12
+12345` under "Versicherungs-Nr", `Rechnungsdatum` beside "Kundennummer")."""
+_FURTHER = r"(?![a-z]{2,}\.)(?=[a-z./-]*\d)(?!(?=[0-9./-]*[a-z])[a-z0-9./-]+:)[a-z0-9./-]+"
+"""A further word of a value: one with a digit that is no label of its own, neither an
+abbreviation (`Tel.1`) nor a word with letters before a colon (`Fax2:`); digits before a colon
+still count (`012 345 6789 0:` read off a tax number)."""
+_WORDS = rf"{_FIRST}(?: {_FURTHER})*"
+_BEFORE = r"\.?\s*[:.]?\s*(?:(?:lautet|lauten|ist|is)(?![a-z0-9])\s*:?\s*)?"
+"""Between a label and its value: a colon or a dot, and the verb of a sentence ("Ihre
+Schaden-Nummer lautet 12-34-567/890123-X", "Your customer number is 4711")."""
 # A label, then the value: its first word, and further words that hold a digit (`DE 123 456
-# 789`, `123 456`), not the words after it (`DE123456789 Steuernummer`).
-VALUE = r"\.?\s*[:.]?\s*([a-z0-9][a-z0-9./-]*(?: (?=[a-z./-]*\d)[a-z0-9./-]+)*)"
+# 789`, `123 456`), not the words after it (`DE123456789 Steuernummer`, `4711 Tel.1: 0621`).
+VALUE = rf"{_BEFORE}({_WORDS})"
 
 
 class IdentifierType:
@@ -128,14 +142,14 @@ _JOINING = r"(?:vom|von|und|bis|am|an|zum|zur|datum|date|dated|from|of|and|to|pe
 """Words that end a reference: what follows them is another value (a date, a second one)."""
 _DATE_PART = r"\d{1,2}\.\d{1,2}\.(?:\d{4}|\d{2})(?![a-z0-9])"
 REFERENCE_VALUE = (
-    rf"\.?\s*[:.]?\s*(?P<value>(?!{_JOINING}(?![a-z0-9]))[a-z0-9][a-z0-9./-]*"
+    rf"{_BEFORE}(?P<value>(?!{_JOINING}(?![a-z0-9])){_FIRST}"
     rf"(?:(?: [-/])? (?!{_JOINING}(?![a-z0-9]))(?!{_DATE_PART})"
-    r"(?:[a-z]{1,3} (?=[a-z./-]*\d))?(?=[a-z./-]*\d)[a-z0-9./-]+)*)"
+    rf"(?:[a-z]{{1,3}} (?=[a-z./-]*\d))?{_FURTHER})*)"
 )
 """A value after its label, as `VALUE`, where a short group of letters may stand between
 parts with digits (an Aktenzeichen `4 C 123/26`), and parts may be joined by a dash or a slash
 between spaces (`II 3 - 1234/26`); a joining word ("vom", "und", "Datum") or a date ends it."""
-NUMBER_VALUE = VALUE.replace("(", "(?P<value>", 1)
+NUMBER_VALUE = rf"{_BEFORE}(?P<value>{_WORDS})"
 """`VALUE` with its group named."""
 COMPOUND = r"[a-zäöüß]+"
 """Any word a label may end (`labelled`): "Bausparvertragsnummer", "Stromzählernummer"."""

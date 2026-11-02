@@ -416,6 +416,10 @@ to start and says so.
 The update that ends a value read for an identifier also at the end of its line (a mandate
 reference no longer runs on into the date of the next booking) asks the same: `lekto
 read-facts`, then `lekto relate`.
+The update that ends a value before the next label (a customer number no longer takes the
+`Tel.1` beside it) and takes no word of the text for one (a street under a table's header)
+asks the same, and then `lekto train` (or "Train now" on the system page): the identifiers
+training learned from the old readings stay at their contacts until the next training.
 The update to 0.3.0 renamed drawers to spaces in the API (`/api/v1/spaces`, `space_id`), in
 rules and in templates (`{{ space }}`); it needs no `reindex`. What to do after it is in
 [backend/README.md](../backend/README.md) ("After the update to 0.3").
