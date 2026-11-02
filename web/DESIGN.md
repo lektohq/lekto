@@ -382,6 +382,30 @@ action runs in the background, owned by the page (`BulkRun`), not by the bar: th
 and where documents were skipped, "Details" opens them with their reasons. The mode stays after
 an action and when the filters change (the choice is let go) until the person ends it.
 
+**A rule's dry run** (`/rules/{id}/apply`, Tobi 02.11.2026): what the rule's current version would
+change on existing documents, reached by "Probelauf" (`Play`, `outline`) on the rule's page and
+after saving a rule. The head carries the rule's `Switch` for who may change it. Each document is a
+card row: the box at its start, the title (`BeamTitle`) and, on a desktop at the end of its line,
+what the rule changes (on the phone below it); a chosen one has the chosen look. A document with
+a conflict has `TriangleAlert` (`lane-yellow-foreground`) in place of the box, the badge
+"Konflikt", a border of `lane-yellow-foreground/35` and its own "Regelwert trotzdem übernehmen",
+never chosen at first. The dry run loads page after page by itself. The bar (`RuleApplyBar` on
+`SelectionBar`) holds a box that chooses every document without a conflict, how many are chosen,
+how far it has loaded ("Probelauf läuft … bisher 20 Dokumente", "Anhalten" in `ghost`; stopped:
+"Weiter laden"; at the end the count and those with a conflict), and "Anwenden" (`default`), or,
+while the rule is paused and the reader may switch it on, "Anwenden" (`outline`) and "Aktivieren
+und anwenden" (`default`), held while the dry run loads. Once applied, the bar follows the
+application in place of all that, and the list stays pale and inert: waiting for the worker with
+a turning `LoaderCircle`, what comes before it (the pipeline's jobs and the other applications,
+from `GET /jobs/summary`) and "Jobs ansehen", or the yellow mark of the page "System" with "Kein
+Worker nimmt Jobs"; running, a `Progress` with "25 von 46 …"; at the end what it did,
+"Details" where documents were skipped, and "Zur Regel", with a toast. The link carries the
+application (`?application=`): coming back shows its progress, not a new dry run.
+
+**A run's progress has one place:** a `Progress` stands only in the selection bar of a run on many
+(`DocumentsBulkBar`, `RuleApplyBar`) and in the summary of an upload; a page does not draw a run's
+progress of its own.
+
 **Pages** (Tobi, 28.10.2026): the documents list pages as a table does, in its grid and its list,
 with `Pagination` and the page in the link (`?page=`); it offers 25, 50 and 100 to a page (50
 at first), remembered as a table's size is. A reconnect of the event stream loads the page
@@ -482,7 +506,7 @@ modal, over a dialog too.
   brand colour, medium weight, one line, cut (`BeamTitle`); a value that stands for documents
   (the identifier of a case of the holders' evaluation) does the same in mono. No title opens a
   document directly: into the document from the Beam ("Dokument öffnen"). So the Fundstellen of
-  an identifier, a relation, a rule's preview (Anwenden), the cases behind a number of the
+  an identifier, a relation, a rule's dry run (Probelauf), the cases behind a number of the
   holders' evaluation, the similar documents of the processing, the overview's expected
   documents, the jobs, a webhook's deliveries, the existing document of a duplicate upload and
   the documents a bulk action skipped. The Beam pages through what stands beside it.
@@ -852,7 +876,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     card of a list, the Beam and the navigation of the inbox ("Beam"); a toggled `Chip`
     (`pressed`) only where each toggles on its own ("Tabs and switches"); every master data tab
     in the order tabs, search, filter row, list, with no paragraph before the list ("Master data
-    tabs"); tooltips only through `ui/tooltip` ("Help and tooltips");
+    tabs"); tooltips only through `ui/tooltip` ("Help and tooltips"); `Progress` only in the
+    selection bars of runs on many and the upload summary ("Choosing many");
   - `src/lib/tips.test.ts`: one box of help at a time, the next without delay; a tooltip opens on
     a focus Tab brought, not on one handed back;
   - `src/lib/via-token.test.ts`: every file that has a person's API token (`via_token`, a

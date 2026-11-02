@@ -22,20 +22,10 @@ describe('the skipped documents of an action on many', () => {
 		const gone = reason('skip_not_available');
 		render(BulkSkipped, {
 			operation: {
-				id: 'op',
-				kind: 'change_tags',
-				status: 'done',
-				total: 3,
-				done: 3,
-				changed: 1,
-				unchanged: 0,
 				skipped: [
 					{ document_id: 'd1', reason: 'busy', reasons: [busy] },
 					{ document_id: 'd2', reason: 'gone', reasons: [gone] }
-				],
-				error: null,
-				created_at: '2026-10-29T12:00:00Z',
-				finished_at: '2026-10-29T12:00:05Z'
+				]
 			},
 			onclose: vi.fn()
 		});
@@ -59,17 +49,7 @@ describe('the skipped documents of an action on many', () => {
 		vi.stubGlobal('fetch', api);
 		render(BulkSkipped, {
 			operation: {
-				id: 'op',
-				kind: 'delete',
-				status: 'done',
-				total: 4,
-				done: 4,
-				changed: 0,
-				unchanged: 0,
-				skipped: ids.map((id) => ({ document_id: id, reason: 'busy', reasons: [] })),
-				error: null,
-				created_at: '2026-10-28T12:00:00Z',
-				finished_at: '2026-10-28T12:00:05Z'
+				skipped: ids.map((id) => ({ document_id: id, reason: 'busy', reasons: [] }))
 			},
 			onclose: vi.fn()
 		});
