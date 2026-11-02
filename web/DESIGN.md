@@ -170,8 +170,10 @@ phone the page scrolls.
   the header has room, `searchPlaces`: from `2xl`, for admins from 1720 px; otherwise the
   magnifier), user menu (avatar).
 - **User menu:** name and role, the admin switch "Alle Nutzer einbeziehen", language and appearance
-  (`LanguageChoices`, `ThemeChoices`, each a `Segmented`), settings, API documentation, sign out. On the phone (below `sm`) the sheet
-  holds all of it: the header shows only logo, magnifier and menu button.
+  (`LanguageChoices`, `ThemeChoices`, each a `Segmented`), settings, API documentation, sign out;
+  last, below a line, the version that runs ("Lekto 0.8.0", `text-xs`, muted, no item to
+  choose; `lekto_version` of `GET /auth/me`). On the phone (below `sm`) the sheet holds all of
+  it, the version at its end: the header shows only logo, magnifier and menu button.
 - **Inbox counter:** a badge on the menu entry, coloured by the worst lane it holds.
 
 ## Components

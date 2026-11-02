@@ -9,6 +9,7 @@ import httpx2
 import pytest
 from fastapi.routing import APIRoute, iter_route_contexts
 
+from lekto import __version__
 from lekto.adapters.inbound.rest import PREFIX
 from lekto.adapters.inbound.rest.auth import CSRF_HEADER
 from lekto.composition.container import build_memory_container, build_services
@@ -93,6 +94,7 @@ async def test_login_sets_a_secure_cookie(api: Api) -> None:
     me = await api.client.get(f"{PREFIX}/auth/me")
     assert me.json()["authenticated_with"] == "session"
     assert me.json()["csrf_token"] == body["csrf_token"]
+    assert me.json()["lekto_version"] == __version__
 
 
 async def test_insecure_cookies_only_when_configured() -> None:
