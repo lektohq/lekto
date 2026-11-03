@@ -391,12 +391,21 @@ an action and when the filters change (the choice is let go) until the person en
 
 **A rule's dry run** (`/rules/{id}/apply`, Tobi 02.11.2026): what the rule's current version would
 change on existing documents, reached by "Probelauf" (`Play`, `outline`) on the rule's page and
-after saving a rule. The head carries the rule's `Switch` for who may change it. Each document is a
-card row: the box at its start, the title (`BeamTitle`) and, on a desktop at the end of its line,
-what the rule changes (on the phone below it); a chosen one has the chosen look. A document with
-a conflict has `TriangleAlert` (`lane-yellow-foreground`) in place of the box, the badge
-"Konflikt", a border of `lane-yellow-foreground/35` and its own "Regelwert trotzdem übernehmen",
-never chosen at first. The dry run loads page after page by itself, and a rule that hits few documents looks at many
+after saving a rule. The head carries the rule's `Switch` for who may change it. The documents
+stand in groups by what the rule changes (Tobi, 03.11.2026, variant A of a mock): those it
+changes in the same fields share a card. Its head (`bg-muted/50`, a line below while open) holds a
+box that chooses the group, the changes alike on all of them said once (`RuleEffectChange`: the
+field, the old value struck through where it is the same on all, an arrow, the new value; a topic
+or tags as their chips, tags as "+" and "−"), how many documents, and an `IconButton` that folds
+the group ("Zuklappen", `ChevronDown`). Below, one row per document: its box, the picture of its
+first page (`DocumentThumb`, 36 × 48 px), the title (`BeamTitle`), contact, type and date
+(`NamesLine`), and only what differs from the head (a title the rule writes from a template, its
+notes, the chain); a chosen row is `bg-panel`. Groups stand in the order their first document
+came. Documents with a conflict come last, in their own card: `TriangleAlert`
+(`lane-yellow-foreground`) in place of the box, the head in `lane-yellow/40` with the badge
+"Konflikt" and the conflict where it reads the same on all, a border of
+`lane-yellow-foreground/35`, and in each row its own "Regelwert trotzdem übernehmen", never
+chosen at first. The dry run loads page after page by itself, and a rule that hits few documents looks at many
 pages first, so the bar stands from its start. The bar (`RuleApplyBar` on `SelectionBar`) holds a
 box that chooses every document without a conflict, how many are chosen, how far it has come
 (before the first page "Probelauf beginnt …", then "Probelauf läuft: 1.200 von 2.300 geprüft, 6

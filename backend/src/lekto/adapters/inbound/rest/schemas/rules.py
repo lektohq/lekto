@@ -4,7 +4,7 @@ Shape and types are checked here; operators by field and data type, values, patt
 actions a scope allows are checked by the core (`definition_from_json`), references by the
 rule service."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -708,6 +708,11 @@ class TextHitsOut(BaseModel):
 class ApplyPreviewItemOut(BaseModel):
     document_id: UUID
     title: str
+    contact_id: UUID | None = Field(description="The document's contact, as it is now.")
+    document_type_id: UUID | None = Field(description="Its document type, as it is now.")
+    document_date: date | None
+    created_at: datetime
+    page_count: int | None = Field(description="For the picture of its first page.")
     changes: list[RuleEffectOut] = Field(description="What the rule would change.")
     conflicts: list[RuleNoteOut] = Field(
         description=(

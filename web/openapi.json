@@ -22913,6 +22913,61 @@
             "type": "string",
             "title": "Title"
           },
+          "contact_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Id",
+            "description": "The document's contact, as it is now."
+          },
+          "document_type_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Type Id",
+            "description": "Its document type, as it is now."
+          },
+          "document_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Date"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "page_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Count",
+            "description": "For the picture of its first page."
+          },
           "changes": {
             "items": {
               "$ref": "#/components/schemas/RuleEffectOut"
@@ -22974,6 +23029,11 @@
         "required": [
           "document_id",
           "title",
+          "contact_id",
+          "document_type_id",
+          "document_date",
+          "created_at",
+          "page_count",
           "changes",
           "conflicts",
           "notes",

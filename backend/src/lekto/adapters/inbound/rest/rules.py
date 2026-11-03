@@ -224,6 +224,11 @@ async def preview_apply(
             ApplyPreviewItemOut(
                 document_id=item.document.id,
                 title=item.document.title,
+                contact_id=item.document.contact_id,
+                document_type_id=item.document.document_type_id,
+                document_date=item.document.document_date,
+                created_at=item.document.created_at,
+                page_count=item.document.page_count,
                 changes=[RuleEffectOut.of(effect) for effect in item.effects],
                 conflicts=[RuleNoteOut.of(note) for note in item.conflicts],
                 notes=[RuleNoteOut.of(note) for note in item.notes],

@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
+import { bulkDocuments } from '#lib/bulk.ts';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
@@ -29,6 +30,11 @@ const rule = {
 const row = (id: string): Preview['items'][number] => ({
 	document_id: id,
 	title: `Auszug ${id}`,
+	contact_id: null,
+	document_type_id: null,
+	document_date: '2026-09-30',
+	created_at: '2026-10-01T12:00:00Z',
+	page_count: 2,
 	changes: [{ field: 'title', old: 'alt', new: 'neu' }],
 	conflicts: [],
 	notes: [],
@@ -142,6 +148,31 @@ describe("a rule's dry run", () => {
 		expect(previews()).toBe(3);
 		// Nothing to choose: no bar.
 		expect(screen.queryByRole('button', { name: m.rule_apply_action() })).toBeNull();
+	});
+
+	it('shows documents changed alike in one card, chosen and folded as one', async () => {
+		const { release } = held([preview(['a', 'b'], null)]);
+		const user = userEvent.setup();
+		render(Page);
+		await release();
+
+		const group = await screen.findByRole('checkbox', {
+			name: m.rule_group_choose({ documents: bulkDocuments(2) })
+		});
+		const rows = ['a', 'b'].map((id) =>
+			screen.getByRole('checkbox', { name: m.rule_select_document({ title: `Auszug ${id}` }) })
+		);
+		expect(rows.every((row) => (row as HTMLInputElement).checked)).toBe(true);
+		await user.click(group);
+		expect(rows.some((row) => (row as HTMLInputElement).checked)).toBe(false);
+		await user.click(group);
+		expect(rows.every((row) => (row as HTMLInputElement).checked)).toBe(true);
+
+		await user.click(screen.getByRole('button', { name: m.rule_group_fold() }));
+		expect(
+			screen.queryByRole('checkbox', { name: m.rule_select_document({ title: 'Auszug a' }) })
+		).toBeNull();
+		expect(screen.getByRole('button', { name: m.rule_group_unfold() })).toBeTruthy();
 	});
 
 	it('keeps the application in the link and says what it waits for', async () => {
