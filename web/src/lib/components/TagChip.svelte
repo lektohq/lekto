@@ -45,7 +45,8 @@
 
 	// A tag as a chip: its icon and own name in its colour, the path as tooltip and, where
 	// `interactive`, on a tap (a phone has no hover); a group outlined, a topic with an edge;
-	// `onremove` adds a button that removes it. On a phone both take a finger's tap
+	// `onremove` adds a button that removes it; `onpick` makes the name a button that opens a
+	// choice (the one topic of a `TagPicker`). On a phone both take a finger's tap
 	// beyond their edges (44 pixels high; the button also to its right, never over the name).
 	let {
 		tag,
@@ -54,7 +55,10 @@
 		interactive = false,
 		size = 'md',
 		onremove,
-		removeLabel = ''
+		removeLabel = '',
+		onpick,
+		pickLabel = '',
+		expanded = false
 	}: {
 		tag: Pick<Tag, 'id' | 'name' | 'path'> & Partial<Pick<Tag, 'icon' | 'color'>>;
 		group?: boolean;
@@ -63,6 +67,10 @@
 		size?: 'sm' | 'md';
 		onremove?: () => void;
 		removeLabel?: string;
+		onpick?: () => void;
+		pickLabel?: string;
+		/** Whether the choice `onpick` opens is open. */
+		expanded?: boolean;
 	} = $props();
 
 	const path = $derived(pathLabel(tag));
@@ -83,7 +91,21 @@
 	{#if tag.icon}
 		<LucideIcon name={tag.icon} class={size === 'sm' ? 'size-3' : 'size-3.5'} />
 	{/if}
-	{#if interactive && nested}
+	{#if onpick}
+		<button
+			type="button"
+			class={cn(
+				'min-w-0 truncate rounded-full hover:underline',
+				size === 'sm' ? 'max-sm:-my-3.5 max-sm:py-3.5' : 'max-sm:-my-3 max-sm:py-3'
+			)}
+			aria-label={pickLabel}
+			aria-haspopup="dialog"
+			aria-expanded={expanded}
+			onclick={onpick}
+		>
+			{tag.name}
+		</button>
+	{:else if interactive && nested}
 		<Popover.Root>
 			<Popover.Trigger
 				class={cn(

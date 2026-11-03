@@ -14,7 +14,8 @@
 	// that may be chosen (`offered`) with a checkbox, nested as in its tree; while searching the
 	// matches with their paths, or all of them when none matches. `actions` stand between the
 	// search and the list (the offers to create a tag, which need the query). In a dialog or a
-	// popover (`TagPicker`).
+	// popover (`TagPicker`). `single`: one tag at most (a topic), a flat list of radios; a click
+	// on one tells `onpicked`, the keys only move the choice.
 	let {
 		title,
 		scope,
@@ -25,7 +26,9 @@
 		searchLabel = m.assignment_search(),
 		offered = () => true,
 		search = $bindable(null),
-		actions
+		actions,
+		single = false,
+		onpicked
 	}: {
 		/** The tags of the scope ("Contact groups"), for "all …" when nothing matches. */
 		title: string;
@@ -40,7 +43,12 @@
 		/** The search field, for the focus. */
 		search?: HTMLInputElement | null;
 		actions?: Snippet;
+		single?: boolean;
+		/** In `single`, a tag clicked: the choice is made. */
+		onpicked?: () => void;
 	} = $props();
+
+	const radios = $props.id();
 
 	const own = $derived(
 		ofScope(tags, scope).filter((tag) => selected.includes(tag.id) || offered(tag))
@@ -52,7 +60,15 @@
 	const isGroup = $derived(scope === 'contact' || scope === 'document_type');
 
 	function toggle(id: string, on: boolean) {
-		onchange(toggled(selected, id, on));
+		onchange(single ? (on ? [id] : []) : toggled(selected, id, on));
+	}
+
+	// A click by pointer (on the row too: its label passes it on), not the click the keys send
+	// to a radio they move to. It chooses before it closes: the change comes after the click.
+	function picked(event: MouseEvent, id: string) {
+		if (!single || event.detail === 0) return;
+		onchange([id]);
+		onpicked?.();
 	}
 </script>
 
@@ -70,7 +86,7 @@
 	{#if listed.length > 0}
 		<Card.Root as="ul" size="flush" class="shrink-0 divide-y overflow-hidden">
 			{#each listed as tag (tag.id)}
-				{@const nested = !searching || matches.length === 0}
+				{@const nested = !single && (!searching || matches.length === 0)}
 				<li>
 					<label
 						class="flex min-h-12 cursor-pointer items-center gap-3 py-1.5 pr-3.5 pl-[calc(0.875rem+var(--depth)*1.5rem)] hover:bg-secondary/60"
@@ -82,14 +98,17 @@
 								group={isGroup}
 								topic={scope === 'topic'}
 							/>
-							{#if !nested && tag.path.length > 1}
+							{#if !single && !nested && tag.path.length > 1}
 								<span class="text-xs text-muted-foreground">{pathLabel(tag)}</span>
 							{/if}
 						</span>
 						<ChoiceBox
-							aria-label={pathLabel(tag)}
+							type={single ? 'radio' : 'checkbox'}
+							name={single ? radios : undefined}
+							aria-label={single ? tag.name : pathLabel(tag)}
 							checked={selected.includes(tag.id)}
 							onchange={(event) => toggle(tag.id, event.currentTarget.checked)}
+							onclick={(event) => picked(event, tag.id)}
 						/>
 					</label>
 				</li>
