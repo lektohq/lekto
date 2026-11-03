@@ -254,6 +254,11 @@ divider.
   enables are several: the plain `TagPicker`; a topic's parent is chosen as every tag's.
   `design-system.test.ts` keeps the topic out of `Select` and `SearchSelect`.
 - **Free values as chips** (other spellings, other names): `ChipInput`.
+- **One height** (Tobi, 03.11.2026): every field is 44 px high (`FIELD_HEIGHT`), in a row of
+  fields too (a rule's conditions and actions, an identifier opened in its list, a space member's
+  role), and a `TagPicker` or `ChipInput` with one line of chips is as high. Only the narrow filter
+  panel and the lens editor beside it (`FilterPanel`, `FactFilter`, `LensEditor`) have fields of
+  36 px (`h-9`). `design-system.test.ts` allows no other height on a field.
 
 ### Checkboxes, radios, switches
 
@@ -892,6 +897,7 @@ Allowed outside the token rules, each for a stated reason:
 | `PageViewer`, `DocumentThumb`, `CodeThumb`, `ContactAvatar`, `TotpCard` | `bg-white`                             | Paper, logos and the QR code are drawn for white                     |
 | Overlays of `ui/dialog`, `ui/alert-dialog`, `ui/sheet`                  | `bg-black/*`                           | The dimmed page behind a dialog, as shadcn draws it                  |
 | The sign-in page                                                        | an arbitrary font size                 | The wordmark scales with its font size                               |
+| The sign-in page                                                        | taller fields                          | Alone on the page; the code to type in large digits                  |
 | `DocumentFiles`                                                         | `hsl()` from data                      | The fingerprint colour comes from the file's hash                    |
 | `PageViewer`, `ProcessingBand`, charts                                  | `style=` with computed sizes           | Sizes come from data (zoom, durations, bars)                         |
 | `lib/templates/codemirror.ts`                                           | its own theme                          | The editor sits in a shadow root that the page's styles do not reach |

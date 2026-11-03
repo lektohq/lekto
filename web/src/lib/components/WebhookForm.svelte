@@ -377,7 +377,6 @@
 						value={modelCall}
 						options={modelCalls}
 						onchange={(next) => (modelCall = next as ModelCall | '')}
-						class="h-10"
 					/>
 				</Field.Field>
 				{#if modelCall !== ''}

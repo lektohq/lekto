@@ -4,7 +4,8 @@
 // through `IconButton`, one way to view a document (the Beam), toggle chips only where each
 // toggles on its own, one order on the master data tabs, tooltips through `ui/tooltip`, a run's
 // progress in the selection bar, fields in the API's order, short lines under fields, a document's
-// pages through `DocumentPages`, a topic chosen through the tag picker. An exception needs its line in DESIGN.md ("Exceptions") and here; the
+// pages through `DocumentPages`, a topic chosen through the tag picker, one height for fields. An
+// exception needs its line in DESIGN.md ("Exceptions") and here; the
 // lists of exceptions may only shrink.
 import { describe, expect, it } from 'vitest';
 import de from '../messages/de.json';
@@ -30,6 +31,8 @@ const scripts = import.meta.glob<string>(
 const EXCEPTIONS = {
 	// The wordmark's size on the sign-in page: the logo scales with its font size.
 	fontSize: new Set(['/src/routes/login/+page.svelte']),
+	// The sign-in page's fields: larger, alone on the page, the code to type in large digits.
+	fieldHeight: new Set(['/src/routes/login/+page.svelte']),
 	// Paper, logos and the QR code are drawn for white; the overlays of shadcn's dialogs.
 	palette: new Set([
 		'/src/lib/components/document/CodeThumb.svelte',
@@ -73,6 +76,13 @@ const TOGGLE_CHIPS = new Set([
 	'/src/lib/components/PeriodFacet.svelte',
 	'/src/lib/components/system/AutomationTab.svelte',
 	'/src/routes/(app)/dev/components/+page.svelte'
+]);
+
+/** The narrow filter panel and the lens editor beside it: their fields are 36 pixels high. */
+const PANELS = new Set([
+	'/src/lib/components/FilterPanel.svelte',
+	'/src/lib/components/FactFilter.svelte',
+	'/src/lib/components/LensEditor.svelte'
 ]);
 
 /** Where a `Progress` stands (DESIGN.md, "Choosing many"): the selection bars of a run on many, and
@@ -297,6 +307,21 @@ describe('the design system (web/DESIGN.md)', () => {
 					const several = /title=\{m\.master_topics\(\)\}/.test(element);
 					const parent = /bind:value=\{parentId\}/.test(element);
 					if (topic && !one && !several && !parent) return element.split('\n')[0];
+				}
+				return null;
+			})
+		).toEqual([]);
+	});
+
+	it('keeps every field at one height, lower only in the narrow filter panel', () => {
+		const field = /<(?:Select|Input|SearchSelect|DateInput|Textarea)\b[\s\S]*?\/>/g;
+		expect(
+			offenders((source, path) => {
+				if (EXCEPTIONS.fieldHeight.has(path)) return null;
+				for (const [element] of source.matchAll(field)) {
+					const height = /class="[^"]*\b(h-\d+)\b/.exec(element)?.[1];
+					if (height !== undefined && !(height === 'h-9' && PANELS.has(path)))
+						return `${element.split('\n')[0]} (${height})`;
 				}
 				return null;
 			})

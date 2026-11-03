@@ -139,7 +139,7 @@
 							options={roles}
 							disabled={busy}
 							onchange={(value) => set(member.user_id, value as Role)}
-							class="h-10 w-40"
+							class="w-40"
 						/>
 						<IconButton
 							disabled={busy}

@@ -66,7 +66,7 @@
 	role="group"
 	aria-labelledby={labelledby}
 	aria-describedby={describedby}
-	class="flex min-w-0 flex-wrap items-center gap-2 rounded-xl border border-input bg-card p-2 dark:bg-input/30"
+	class="flex min-h-11 min-w-0 flex-wrap items-center gap-2 rounded-xl border border-input bg-card px-1.5 py-1 dark:bg-input/30"
 >
 	{#each values as value, index (index)}
 		<Chip

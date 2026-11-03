@@ -121,7 +121,6 @@
 					aria-invalid={invalid || undefined}
 					bind:value={action.space_id}
 					options={withChoice(targets, action.space_id, m.rule_space_unreachable())}
-					class="h-10"
 				/>
 				{#if unreachable}
 					<p class="text-sm text-muted-foreground">{m.rule_space_unreachable_hint()}</p>
@@ -132,7 +131,6 @@
 					aria-invalid={invalid || undefined}
 					bind:value={action.contact_id}
 					options={withChoice(namedOptions(lookup.contacts), action.contact_id)}
-					class="h-10"
 				/>
 			{:else if action.type === 'set_document_type'}
 				<Select
@@ -140,7 +138,6 @@
 					aria-invalid={invalid || undefined}
 					bind:value={action.document_type_id}
 					options={withChoice(namedOptions(lookup.documentTypes), action.document_type_id)}
-					class="h-10"
 				/>
 			{:else if action.type === 'set_topic'}
 				<!-- The one choice of a topic, as at a document. -->
@@ -191,7 +188,6 @@
 						action.value = (defaultValue('field', 'is', chosen) ?? '') as typeof action.value;
 						action.templated = undefined;
 					}}
-					class="h-10"
 				/>
 				{#if action.field_id}
 					<ValueInput
@@ -239,7 +235,6 @@
 							aria-invalid={(invalid && !action.webhook_id) || undefined}
 							bind:value={action.webhook_id}
 							options={withChoice(webhooks, action.webhook_id, m.rule_webhook_unknown())}
-							class="h-10"
 						/>
 					</Field.Field>
 					<Field.Field>
@@ -267,7 +262,6 @@
 							onchange={(next) => {
 								if (action.type === 'ask_webhook') action.missing = next as Missing;
 							}}
-							class="h-10"
 						/>
 					</Field.Field>
 				</div>
@@ -292,7 +286,6 @@
 					aria-invalid={invalid || undefined}
 					bind:value={action.webhook_id}
 					options={withChoice(webhooks, action.webhook_id, m.rule_webhook_unknown())}
-					class="h-10"
 				/>
 				<p class="text-sm text-muted-foreground">
 					{webhooks.length ? m.rule_send_webhook_hint() : m.rule_send_webhook_none()}
