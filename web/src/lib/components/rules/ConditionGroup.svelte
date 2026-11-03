@@ -82,7 +82,7 @@
 			value={group.mode}
 			options={modes}
 			onchange={(mode) => (group.mode = mode === 'any' ? 'any' : 'all')}
-			class="h-10 w-full sm:w-56"
+			class="w-full sm:w-56"
 		/>
 		<Choice bind:checked={group.negate}>{m.rule_negate()}</Choice>
 		{#if !root}
