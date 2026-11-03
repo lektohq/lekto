@@ -75,9 +75,11 @@ from lekto.core.services._access import (
     readable_document,
 )
 from lekto.core.services._jobs import LEASE, JobRunner, lost
+from lekto.core.services._tags import tag_tree
 from lekto.core.services.objects import load_layout, load_text
 from lekto.core.services.rules.changes import ArrivalStep, ChangeRules
 from lekto.core.services.rules.management import visible_rule
+from lekto.core.services.rules.prefilter import prefilter
 from lekto.core.services.rules.running import (
     SENDS,
     SENDS_REFUSED,
@@ -163,6 +165,9 @@ class ApplyPreview:
     next_cursor: DocumentId | None
     looked_at: int
     """Documents the page looked at, those it holds among them."""
+    total: int
+    """Documents the whole dry run looks at: those its conditions do not rule out
+    (`prefilter`), earlier pages included."""
 
 
 class RuleApplicationService:
@@ -207,19 +212,23 @@ class RuleApplicationService:
     ) -> ApplyPreview:
         """The documents the rule's current version would change, newest first, from the page
         ending at `before` on. A page looks at `SCAN` documents at most: it may hold fewer than
-        `limit` items while `next_cursor` says there are more to look at."""
+        `limit` items while `next_cursor` says there are more to look at. It looks only at the
+        documents the rule's conditions do not rule out (`prefilter`)."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             rule = await _applicable_rule(uow, user, id)
             following = await _following(uow, rule)
+            wanted = prefilter(rule.definition.conditions, await tag_tree(uow), _looked_at(rule))
+            if wanted is None:
+                return ApplyPreview(rule, (), None, 0, 0)
             if user.is_active_admin:
-                documents = await uow.documents.query(
-                    _WITH_LANE, after=_position(before), limit=SCAN
-                )
+                documents = await uow.documents.query(wanted, after=_position(before), limit=SCAN)
+                total = await uow.documents.count(wanted, None)
             else:
                 documents = await uow.documents.query_visible(
-                    actor, _WITH_LANE, after=_position(before), limit=SCAN
+                    actor, wanted, after=_position(before), limit=SCAN
                 )
+                total = await uow.documents.count(wanted, actor)
         items: list[PreviewItem] = []
         next_cursor = documents[-1].id if len(documents) == SCAN else None
         budget = PatternBudget(PREVIEW_BUDGET)
@@ -248,7 +257,7 @@ class RuleApplicationService:
             item = await self._preview_one(user, rule, document.id, prepared)
             if item is not None:
                 items.append(item)
-        return ApplyPreview(rule, tuple(items), next_cursor, looked_at)
+        return ApplyPreview(rule, tuple(items), next_cursor, looked_at, total)
 
     async def _preview_one(
         self, user: User, rule: Rule, id: DocumentId, prepared: Prepared
@@ -653,6 +662,14 @@ async def _candidate(uow: UnitOfWork, user: User, rule: Rule, document: Document
 async def _enqueue(uow: UnitOfWork, id: RuleApplicationId, now: datetime) -> None:
     payload: dict[str, JsonValue] = {"application_id": str(id)}
     await uow.jobs.enqueue(APPLY_JOB, payload, run_at=now, dedup_key=f"{APPLY_JOB}:{id}")
+
+
+def _looked_at(rule: Rule) -> DocumentFilter:
+    """The documents a dry run of `rule` looks at before its conditions: settled ones, of its
+    space for a space rule (as `_candidate` asks)."""
+    if rule.scope is RuleScope.SPACE and rule.space_id is not None:
+        return replace(_WITH_LANE, spaces=frozenset({rule.space_id}))
+    return _WITH_LANE
 
 
 def _position(before: DocumentId | None) -> DocumentPosition | None:

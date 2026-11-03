@@ -67,6 +67,8 @@
 	let complete = $state(false);
 	/** Documents the dry run has looked at so far, those without a change among them. */
 	let lookedAt = $state(0);
+	/** What the whole dry run looks at: the documents the rule's conditions leave. */
+	let total = $state<number | null>(null);
 	/** The dry run was started (coming back to an application shows none). */
 	let started = $state(false);
 	let loading = $state(false);
@@ -134,6 +136,7 @@
 		cursor = null;
 		complete = false;
 		lookedAt = 0;
+		total = null;
 		chosen.clear();
 		accepted.clear();
 	}
@@ -166,6 +169,7 @@
 			}
 			version = preview.version;
 			lookedAt += preview.looked_at;
+			total = preview.total;
 			items = [...items, ...preview.items];
 			for (const documentId of preselected(preview.items)) chosen.add(documentId);
 			cursor = preview.next_cursor;
@@ -318,6 +322,7 @@
 		chosen={count}
 		{allChosen}
 		{lookedAt}
+		{total}
 		loaded={items.length}
 		conflicts={items.length - plain.length}
 		loading={loadingAll}

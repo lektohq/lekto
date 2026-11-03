@@ -7,8 +7,17 @@ from lekto.core.domain.errors import NotFoundError, ValidationError
 from lekto.core.domain.ids import DocumentId, new_id
 from lekto.core.domain.pipeline import RULES_APPLY, Lane
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.domain.rules import ApplicationStatus, ForceReview, SetSpace, SetTitle
+from lekto.core.domain.rules import (
+    ApplicationStatus,
+    Condition,
+    ConditionField,
+    ForceReview,
+    Operator,
+    SetSpace,
+    SetTitle,
+)
 from lekto.core.domain.spaces import SpaceRole
+from lekto.core.services.rules import retroactive
 from lekto.core.services.rules.retroactive import BATCH
 from tests import builders
 from tests.unit.services.rules_support import (
@@ -16,6 +25,7 @@ from tests.unit.services.rules_support import (
     Classifies,
     RuleWorld,
     add_tags,
+    all_of,
     channel_api,
     contact_is,
     definition,
@@ -101,6 +111,61 @@ async def test_the_preview_lists_changes_and_the_job_applies_the_pinned_version(
         "application_id": str(application.id),
         "rules": [{"id": str(rule.id), "version": 1}],
     }
+
+
+async def test_the_dry_run_looks_only_at_documents_the_conditions_leave(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    r = await rule_world(world)
+    owner = await world.user()
+    acme, bank = await r.contact("ACME"), await r.contact("Bank")
+    depot = await r.tag("depot")
+    arrived = {}
+    for name, contact, text in (
+        ("a1", acme, "Securities account statement"),
+        ("a2", acme, "Current account statement"),
+        ("b1", bank, "Securities account statement"),
+        ("n1", None, "Securities account statement"),
+    ):
+        document = await r.arrive(owner, text=text, filename=f"{name}.pdf")
+        contact_id = None if contact is None else contact.id
+        await r.documents.change_metadata(
+            owner.id, document.id, DocumentChanges(contact_id=contact_id)
+        )
+        arrived[name] = document.id
+    securities = Condition(field=ConditionField.TEXT, op=Operator.CONTAINS, value="Securities")
+    rule = await r.personal_rule(
+        owner, definition("Depot", all_of(contact_is(acme.id), securities), add_tags(depot.id))
+    )
+
+    preview = await r.applications.preview(owner.id, rule.id)
+    assert (preview.total, preview.looked_at) == (2, 2)
+    assert [item.document.id for item in preview.items] == [arrived["a1"]]
+
+    # Without the filter the dry run looks at every document and finds the same.
+    monkeypatch.setattr(retroactive, "prefilter", lambda group, tree, base: base)
+    unfiltered = await r.applications.preview(owner.id, rule.id)
+    assert (unfiltered.total, unfiltered.looked_at) == (4, 4)
+    assert [item.document.id for item in unfiltered.items] == [arrived["a1"]]
+
+
+async def test_a_dry_run_whose_conditions_no_document_meets_looks_at_none(world: World) -> None:
+    r = await rule_world(world)
+    owner = await world.user()
+    acme, bank = await r.contact("ACME"), await r.contact("Bank")
+    seen = await r.tag("seen")
+    await r.arrive(owner)
+    rule = await r.personal_rule(
+        owner,
+        definition("Both", all_of(contact_is(acme.id), contact_is(bank.id)), add_tags(seen.id)),
+    )
+    preview = await r.applications.preview(owner.id, rule.id)
+    assert (preview.items, preview.next_cursor, preview.looked_at, preview.total) == (
+        (),
+        None,
+        0,
+        0,
+    )
 
 
 async def test_the_job_checks_the_rights_again_and_a_global_rule_moves_nothing(
