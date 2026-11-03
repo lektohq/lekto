@@ -68,7 +68,7 @@
 		</Eyebrow>
 	{/if}
 	{#if listed.length > 0}
-		<Card.Root as="ul" size="flush" class="divide-y overflow-hidden">
+		<Card.Root as="ul" size="flush" class="shrink-0 divide-y overflow-hidden">
 			{#each listed as tag (tag.id)}
 				{@const nested = !searching || matches.length === 0}
 				<li>
