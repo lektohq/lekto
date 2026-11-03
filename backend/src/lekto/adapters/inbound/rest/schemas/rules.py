@@ -744,6 +744,13 @@ class ApplyPreviewOut(BaseModel):
     looked_at: int = Field(
         description="Documents this page looked at, those in `items` among them; add them up."
     )
+    total: int = Field(
+        description=(
+            "Documents the whole dry run looks at: those the rule's conditions on contact, "
+            "document type, their groups, topic, tags and fields do not rule out; the "
+            "`looked_at` of all pages add up to it."
+        )
+    )
 
 
 class ApplyRequest(BaseModel):

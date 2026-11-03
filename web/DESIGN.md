@@ -399,8 +399,9 @@ a conflict has `TriangleAlert` (`lane-yellow-foreground`) in place of the box, t
 never chosen at first. The dry run loads page after page by itself, and a rule that hits few documents looks at many
 pages first, so the bar stands from its start. The bar (`RuleApplyBar` on `SelectionBar`) holds a
 box that chooses every document without a conflict, how many are chosen, how far it has come
-("Probelauf läuft: 1.200 Dokumente geprüft, 6 betroffen", "Anhalten" in `ghost`; stopped: "Weiter
-laden"; at the end the count and those with a conflict), and "Anwenden" (`default`), or,
+(before the first page "Probelauf beginnt …", then "Probelauf läuft: 1.200 von 2.300 geprüft, 6
+betroffen", out of the documents the rule's conditions leave, "Anhalten" in `ghost`; stopped:
+"Weiter laden"; at the end the count and those with a conflict), and "Anwenden" (`default`), or,
 while the rule is paused and the reader may switch it on, "Anwenden" (`outline`) and "Aktivieren
 und anwenden" (`default`), held while the dry run loads. Once applied, the bar follows the
 application in place of all that, and the list stays pale and inert: waiting for the worker with

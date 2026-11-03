@@ -205,7 +205,8 @@ WHO_APPLIES = (
         "change and the conflicts (a field that has another value). Each shows the chain as "
         "applying runs it: the rules of the spaces the rule files it into, and of the spaces "
         "those file it into (each at most once), and where it ends up; with conflicts also when "
-        "they are accepted. Nothing is stored. " + WHO_APPLIES
+        "they are accepted. Only documents the rule's conditions on contact, type, their groups, "
+        "topic, tags and fields do not rule out are looked at. Nothing is stored. " + WHO_APPLIES
     ),
     response_model=ApplyPreviewOut,
     responses=problem_responses(401, 403, 404, 422),
@@ -235,6 +236,7 @@ async def preview_apply(
         ],
         next_cursor=None if preview.next_cursor is None else encode_cursor(preview.next_cursor),
         looked_at=preview.looked_at,
+        total=preview.total,
     )
 
 
