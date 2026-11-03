@@ -20,8 +20,8 @@
 
 	type DataType = components['schemas']['FieldType'];
 
-	// Add a field definition (`initial` null) or change one: name, description, choices, the
-	// types it applies to and is required for; delete one. The data type is fixed once it
+	// Add a field definition (`initial` null) or change one: name, description, position, choices,
+	// the types it applies to and is required for; delete one. The data type is fixed once it
 	// exists; the key templates use is shown.
 	let {
 		open = $bindable(false),
@@ -47,6 +47,8 @@
 	let description = $state('');
 	// Set by hand only: the language model is never asked for it (issue #52).
 	let manual = $state(false);
+	// Where it stands among the fields: smaller first, the same by name (empty: 0).
+	let position = $state<number | null>(0);
 	// The types it applies to stand in a tab of their own (Tobi, 20.10.2026).
 	let tab = $state('general');
 	const tabs = $derived([
@@ -70,6 +72,7 @@
 		choices = initial ? initial.choices.join('\n') : '';
 		description = initial?.description ?? '';
 		manual = initial?.assignment === 'manual';
+		position = initial?.position ?? 0;
 	});
 
 	const isChoice = $derived((initial?.data_type ?? dataType) === 'choice');
@@ -93,6 +96,7 @@
 						data_type: dataType,
 						description: description.trim() || null,
 						assignment,
+						position: position ?? 0,
 						document_type_ids,
 						...requirement,
 						...(dataType === 'choice' ? { choices: list } : {})
@@ -107,6 +111,7 @@
 						name: name.trim(),
 						description: description.trim() || null,
 						assignment,
+						position: position ?? 0,
 						document_type_ids,
 						...requirement,
 						...(initial.data_type === 'choice' ? { choices: list } : {})
@@ -180,6 +185,23 @@
 				maxlength={300}
 				aria-describedby="field-def-description-hint"
 			/>
+		</Field.Field>
+		<Field.Field>
+			<HintLabel
+				for="field-def-position"
+				label={m.field_def_position()}
+				hint={m.field_def_position_hint()}
+			/>
+			<Input
+				id="field-def-position"
+				type="number"
+				min={-9999}
+				max={9999}
+				step={1}
+				bind:value={position}
+				class="w-32"
+			/>
+			<Field.Description>{m.field_def_position_rule()}</Field.Description>
 		</Field.Field>
 		<!-- Set by hand: a switch at the end of its line, as the required ones of the types. -->
 		<div class="flex items-center gap-3">

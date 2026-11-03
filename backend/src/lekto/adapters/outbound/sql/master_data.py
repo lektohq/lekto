@@ -247,6 +247,7 @@ class SqlFieldRepository(SqlNamedRepository[FieldId, FieldDefinition]):
                 ),
                 description=row.description,
                 assignment=Assignment(row.assignment),
+                position=row.position,
                 created_at=row.created_at,
                 version=row.version,
             )
@@ -262,6 +263,7 @@ class SqlFieldRepository(SqlNamedRepository[FieldId, FieldDefinition]):
             "choices": list(entity.choices),
             "description": entity.description,
             "assignment": entity.assignment.value,
+            "position": entity.position,
         }
 
     async def _write_children(self, entity: FieldDefinition) -> None:

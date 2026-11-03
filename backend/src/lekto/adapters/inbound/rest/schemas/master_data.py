@@ -542,6 +542,14 @@ Required = Annotated[
         "or entered by hand for a field set by hand)."
     ),
 ]
+Position = Annotated[
+    int,
+    Field(
+        ge=-9999,
+        le=9999,
+        description="Where the field stands among the fields: smaller first, the same by name.",
+    ),
+]
 RequiredTypes = Annotated[
     list[UUID],
     Field(
@@ -585,6 +593,7 @@ class FieldCreate(BaseModel):
         description="`auto`: the language model reads it; `manual`: set by hand only, never "
         "asked of the model (a required one keeps the document open until a person sets it).",
     )
+    position: Position = 0
 
 
 class FieldPatch(BaseModel):
@@ -619,6 +628,7 @@ class FieldPatch(BaseModel):
         description="`auto`: the language model reads it; `manual`: set by hand only, never "
         "asked of the model (a required one keeps the document open until a person sets it).",
     )
+    position: Position | None = None
 
 
 class FieldOut(BaseModel):
@@ -636,6 +646,7 @@ class FieldOut(BaseModel):
                     "required_document_type_ids": [],
                     "description": "Gesamtbrutto des Monats, nicht das Grundgehalt",
                     "assignment": "auto",
+                    "position": 0,
                     "created_at": "2026-01-10T09:00:00Z",
                 }
             ]
@@ -658,6 +669,7 @@ class FieldOut(BaseModel):
         description="`auto`: the language model reads it; `manual`: set by hand only, never "
         "asked of the model (a required one keeps the document open until a person sets it).",
     )
+    position: Position
     created_at: datetime
     document_count: int | None = Field(
         default=None,
@@ -682,6 +694,7 @@ class FieldOut(BaseModel):
             required_document_type_ids=sorted(item.required_types),
             description=item.description,
             assignment=item.assignment,
+            position=item.position,
             created_at=item.created_at,
         )
 

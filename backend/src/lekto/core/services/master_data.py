@@ -10,7 +10,7 @@ from lekto.core.domain.errors import (
     NotFoundError,
     ValidationError,
 )
-from lekto.core.domain.fields import FieldDefinition, FieldType
+from lekto.core.domain.fields import FieldDefinition, FieldType, field_order
 from lekto.core.domain.identifiers import Identifier, IdentifierSource, Key
 from lekto.core.domain.ids import ContactId, DocumentId, DocumentTypeId, FieldId, TagId, UserId
 from lekto.core.domain.jobs import Job, RetryPolicy
@@ -512,11 +512,12 @@ class MasterDataService:
         required_document_type_ids: Collection[DocumentTypeId] = (),
         description: str | None = None,
         assignment: Assignment = Assignment.AUTO,
+        position: int = 0,
     ) -> FieldDefinition:
         """`document_type_ids=None` creates a global field; `required` makes it required
         (global), `required_document_type_ids` for those of its types (typed); `description`
         tells the language model what belongs in it; `assignment` whether the model reads it
-        or only a person or a rule sets it."""
+        or only a person or a rule sets it; `position` where it stands among the fields."""
         definition = FieldDefinition.create(
             name=name,
             data_type=data_type,
@@ -527,6 +528,7 @@ class MasterDataService:
             required_types=required_document_type_ids,
             description=description,
             assignment=assignment,
+            position=position,
         )
 
         async def check(uow: UnitOfWork) -> None:
@@ -548,9 +550,11 @@ class MasterDataService:
         required_document_type_ids: Collection[DocumentTypeId] | None = None,
         description: str | Unset | None = UNSET,
         assignment: Assignment | None = None,
+        position: int | None = None,
     ) -> FieldDefinition:
         """Admins only. Description (None or empty removes it; UNSET leaves it); whether the
-        model reads it (`assignment`; None leaves it); name (title
+        model reads it (`assignment`; None leaves it); where it stands (`position`; None leaves
+        it); name (title
         patterns that use it follow); choices (adding is free,
         removing only what no document uses); scope (`None`: global; widening is free,
         narrowing only while no document outside the new scope has a value; the types it is
@@ -600,6 +604,8 @@ class MasterDataService:
                 definition.describe(description)
             if assignment is not None:
                 definition.assignment = assignment
+            if position is not None:
+                definition.place(position)
 
         async def after(uow: UnitOfWork, definition: FieldDefinition) -> None:
             if choices is not None:
@@ -708,7 +714,8 @@ class MasterDataService:
         return [tag for tag in tags if scope is None or tag.scope is scope]
 
     async def list_fields(self, actor: UserId) -> list[FieldDefinition]:
-        return await self._list(actor, _fields)
+        """By position, the same by name (`field_order`)."""
+        return sorted(await self._list(actor, _fields), key=field_order)
 
     async def tag_members(self, actor: UserId) -> TagMembers:
         """What the groups and topics hold, as their filters find it (`TagTree.holders`):

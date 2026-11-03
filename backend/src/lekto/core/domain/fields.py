@@ -27,7 +27,7 @@ from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.master_data import Assignment, MasterData, checked_description
 from lekto.core.domain.periods import Period
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.domain.sorting import strip_accents
+from lekto.core.domain.sorting import sort_key, strip_accents
 from lekto.core.domain.validation import require_name
 
 _CURRENCY = re.compile(r"[A-Z]{3}")
@@ -113,6 +113,9 @@ class FieldDefinition(MasterData):
 
     `assignment`: a `manual` field is never asked of the language model; a person or a rule
     sets it. Required, it keeps the document open until a person has set it (issue #52).
+
+    `position`: where it stands among the fields (Tobi, 03.11.2026): smaller first, the same
+    by name (`field_order`).
     """
 
     id: FieldId
@@ -123,9 +126,12 @@ class FieldDefinition(MasterData):
     required_types: frozenset[DocumentTypeId] = frozenset()
     description: str | None = None
     assignment: Assignment = Assignment.AUTO
+    position: int = 0
 
     def __post_init__(self) -> None:
         super().__post_init__()
+        if not isinstance(self.position, int) or isinstance(self.position, bool):
+            raise ValidationError(f"position must be an int, got {self.position!r}")
         self.required_types = frozenset(self.required_types)
         self.description = checked_description(self.description)
         if self.document_type_ids is None:
@@ -159,6 +165,7 @@ class FieldDefinition(MasterData):
         required_types: Collection[DocumentTypeId] = (),
         description: str | None = None,
         assignment: Assignment = Assignment.AUTO,
+        position: int = 0,
     ) -> Self:
         return cls(
             id=FieldId(new_id()),
@@ -170,8 +177,13 @@ class FieldDefinition(MasterData):
             required_types=frozenset(required_types),
             description=description,
             assignment=assignment,
+            position=position,
             created_at=now,
         )
+
+    def place(self, position: int) -> None:
+        """Where it stands among the fields (`field_order`)."""
+        self.position = replace(self, position=position).position
 
     def describe(self, description: str | None) -> None:
         """What belongs in the field, for the language model; None or empty removes it."""
@@ -270,6 +282,11 @@ class FieldDefinition(MasterData):
         return ValidationError(
             f"field '{self.name}' ({self.data_type}) does not accept {value!r:.100}"
         )
+
+
+def field_order(field: FieldDefinition) -> tuple[int, str]:
+    """How fields are listed: by `position`, the same by name."""
+    return field.position, sort_key(field.name)
 
 
 # --- values as JSON ----------------------------------------------------------------------
