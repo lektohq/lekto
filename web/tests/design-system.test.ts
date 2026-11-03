@@ -3,7 +3,8 @@
 // tooltips instead of native titles on buttons, dialog widths by their size, icon buttons
 // through `IconButton`, one way to view a document (the Beam), toggle chips only where each
 // toggles on its own, one order on the master data tabs, tooltips through `ui/tooltip`, a run's
-// progress in the selection bar, fields in the API's order, short lines under fields. An exception needs its line in DESIGN.md ("Exceptions") and here; the
+// progress in the selection bar, fields in the API's order, short lines under fields, a document's
+// pages through `DocumentPages`. An exception needs its line in DESIGN.md ("Exceptions") and here; the
 // lists of exceptions may only shrink.
 import { describe, expect, it } from 'vitest';
 import de from '../messages/de.json';
@@ -268,6 +269,15 @@ describe('the design system (web/DESIGN.md)', () => {
 			return null;
 		});
 		expect(found).toEqual([]);
+	});
+
+	it("shows a document's pages one way, in the document view and the Beam alike", () => {
+		const viewers = /<(PdfViewer|PageImages)\b/;
+		expect(
+			offenders((source, path) =>
+				path.endsWith('/DocumentPages.svelte') ? null : line(source, viewers)
+			)
+		).toEqual([]);
 	});
 
 	it("shows a run's progress only in the selection bar of a run on many", () => {

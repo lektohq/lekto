@@ -19,8 +19,7 @@
 	import DocumentHeader from '#lib/components/document/DocumentHeader.svelte';
 	import DocumentProcessing from '#lib/components/document/DocumentProcessing.svelte';
 	import DocumentText from '#lib/components/document/DocumentText.svelte';
-	import PageImages from '#lib/components/document/PageImages.svelte';
-	import PdfViewer from '#lib/components/PdfViewer.svelte';
+	import DocumentPages from '#lib/components/document/DocumentPages.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
 	import TabBar from '#lib/components/TabBar.svelte';
 	import ToTop from '#lib/components/ToTop.svelte';
@@ -46,7 +45,6 @@
 		type Tab,
 		type View,
 		hasArchive,
-		viewerSources,
 		viewHref,
 		viewOf
 	} from '#lib/document-view.ts';
@@ -114,7 +112,7 @@
 	let textAt = $state({ current: 0, total: 0 });
 	const leftAt = $derived(view.left === 'pages' ? pagesAt : textAt);
 	let panes = $state<HTMLDivElement | null>(null);
-	let viewer = $state<PdfViewer | null>(null);
+	let viewer = $state<DocumentPages | null>(null);
 	let textPane = $state<DocumentText | null>(null);
 	let header = $state<DocumentHeader | null>(null);
 
@@ -541,29 +539,14 @@
 				>
 					{#if view.left === 'pages' || opened.has('pages')}
 						<div class="flex min-h-0 flex-1 flex-col" hidden={view.left !== 'pages'}>
-							<!-- Anew once the archive exists: the marks belong to it, not to the original. -->
-							{#key `${id}:${archive}`}
-								{#if archive || !document.page_count}
-									<PdfViewer
-										bind:this={viewer}
-										sources={viewerSources(document, archive)}
-										label={document.title}
-										marks={archive
-											? [...(view.right === 'form' ? marks : factMarks), ...codeMarks]
-											: []}
-										end={paneSwitch(leftSwitch)}
-										onpage={(current, total) => (pagesAt = { current, total })}
-									/>
-								{:else}
-									<PageImages
-										documentId={id}
-										pageCount={document.page_count}
-										label={document.title}
-										end={paneSwitch(leftSwitch)}
-										onpage={(current, total) => (pagesAt = { current, total })}
-									/>
-								{/if}
-							{/key}
+							<DocumentPages
+								bind:this={viewer}
+								{document}
+								label={document.title}
+								marks={[...(view.right === 'form' ? marks : factMarks), ...codeMarks]}
+								end={paneSwitch(leftSwitch)}
+								onpage={(current, total) => (pagesAt = { current, total })}
+							/>
 						</div>
 					{/if}
 					{#if view.left === 'text' || opened.has('text')}
