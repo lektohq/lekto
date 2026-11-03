@@ -302,6 +302,13 @@ async def test_a_rule_is_applied_to_existing_documents(api: Api) -> None:
     assert [change["field"] for change in items[first]["changes"]] == ["tags"]
     assert [conflict["field"] for conflict in items[first]["conflicts"]] == ["title"]
     assert [change["field"] for change in items[second]["changes"]] == ["tags", "title"]
+    # What the dry run shows of each document beside the change.
+    assert {key: items[first][key] for key in ("contact_id", "document_type_id")} == {
+        "contact_id": None,
+        "document_type_id": None,
+    }
+    assert items[first]["page_count"] == 1 and items[first]["created_at"]
+    assert preview["total"] == 2
 
     response = await api.client.post(
         f"{PREFIX}/rules/{rule['id']}/apply",

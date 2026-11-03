@@ -2929,6 +2929,28 @@ export interface components {
 			/** Title */
 			title: string;
 			/**
+			 * Contact Id
+			 * @description The document's contact, as it is now.
+			 */
+			contact_id: string | null;
+			/**
+			 * Document Type Id
+			 * @description Its document type, as it is now.
+			 */
+			document_type_id: string | null;
+			/** Document Date */
+			document_date: string | null;
+			/**
+			 * Created At
+			 * Format: date-time
+			 */
+			created_at: string;
+			/**
+			 * Page Count
+			 * @description For the picture of its first page.
+			 */
+			page_count: number | null;
+			/**
 			 * Changes
 			 * @description What the rule would change.
 			 */
