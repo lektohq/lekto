@@ -144,7 +144,7 @@ def add_master_data_tools(tools: Tools, context: ApiContext) -> None:
                         name=item.name,
                         description=item.description,
                         groups=_paths(names, item.group_ids),
-                        fields=sorted(field.name for field in fields if field.applies_to(item.id)),
+                        fields=[field.name for field in fields if field.applies_to(item.id)],
                         relation_target=item.relation_target or None,
                         documents=counts.get(item.id, 0),
                     )
@@ -155,7 +155,7 @@ def add_master_data_tools(tools: Tools, context: ApiContext) -> None:
 
     @tools.read(
         "fields_list",
-        "The custom fields by name with their type (text, number, amount, date, boolean, "
+        "The custom fields in their order with their type (text, number, amount, date, boolean, "
         "choice, link, period), choices, the document types they apply to (none: every type).",
     )
     async def fields_list(ctx: Context) -> str:
@@ -180,7 +180,7 @@ def add_master_data_tools(tools: Tools, context: ApiContext) -> None:
                         ),
                         required=item.required or None,
                     )
-                    for item in sorted(names.fields.values(), key=lambda item: item.name)
+                    for item in names.fields.values()
                 ]
             )
         )
