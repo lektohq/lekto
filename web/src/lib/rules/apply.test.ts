@@ -8,6 +8,8 @@ import {
 	applyRequest,
 	chainLines,
 	follow,
+	groupPreview,
+	ownEffects,
 	pollDelay,
 	preselected,
 	type Application,
@@ -17,6 +19,11 @@ import {
 const item = (id: string, conflict = false): PreviewItem => ({
 	document_id: id,
 	title: id,
+	contact_id: null,
+	document_type_id: null,
+	document_date: null,
+	created_at: '2026-10-08T10:00:00Z',
+	page_count: 1,
 	changes: [{ field: 'tags', old: [], new: ['t'] }],
 	conflicts: conflict
 		? [{ field: 'contact', kind: 'conflict', reason: 'has another contact', reasons: [] }]
@@ -227,5 +234,39 @@ describe('the chain of a rule applied to a document', () => {
 		]);
 		const hidden = chainLines({ space_id: 'elsewhere', chain: [] }, 'Versorger', lookup, 'u1');
 		expect(hidden).toEqual([m.rule_chain_into({ space: m.space_unseen(), rule: 'Versorger' })]);
+	});
+});
+
+describe('the groups of a dry run', () => {
+	const changing = (id: string, changes: PreviewItem['changes'], conflict = false) => ({
+		...item(id, conflict),
+		changes
+	});
+	const topic = { field: 'topic', old: null, new: 'savings' };
+
+	it('puts documents the rule changes in the same fields together and says once what is alike', () => {
+		const groups = groupPreview([
+			changing('a', [topic, { field: 'title', old: 'x', new: 'A 2026' }]),
+			changing('b', [topic]),
+			changing('c', [
+				{ ...topic, old: 'giro' },
+				{ field: 'title', old: 'y', new: 'C 2026' }
+			]),
+			changing('d', [topic], true)
+		]);
+		expect(groups.map((group) => group.items.map((entry) => entry.document_id))).toEqual([
+			['a', 'c'],
+			['b'],
+			['d']
+		]);
+		// The same new topic, from different ones: the head leaves the old one out.
+		expect(groups[0].shared).toEqual([{ field: 'topic', new: 'savings' }]);
+		expect(ownEffects(groups[0].items[1], groups[0])).toEqual([
+			{ field: 'title', old: 'y', new: 'C 2026' }
+		]);
+		expect(groups[1].shared).toEqual([topic]);
+		// Those with a conflict come last, the conflict said once where it reads the same.
+		expect(groups[2].conflict).toBe(true);
+		expect(groups[2].conflicts.map((note) => note.field)).toEqual(['contact']);
 	});
 });

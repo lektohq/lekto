@@ -46,6 +46,72 @@ export function applyRequest(
 	};
 }
 
+export type Effect = components['schemas']['RuleEffectOut'];
+
+/** What a rule changes on every document of a group alike: the field and its new value, the old
+ * one where it is the same on all of them (else undefined). */
+export interface SharedEffect {
+	field: string;
+	old?: unknown;
+	new: unknown;
+}
+
+/** Documents of a dry run the rule changes in the same fields (and, with a conflict, in the
+ * same conflicting fields): one card, its changes said once in the head. */
+export interface PreviewGroup {
+	key: string;
+	conflict: boolean;
+	items: PreviewItem[];
+	shared: SharedEffect[];
+	/** The conflicts, where they read the same on every document. */
+	conflicts: PreviewItem['conflicts'];
+}
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+/** The dry run's documents by what the rule changes on them, in the order the first of each
+ * came; those with a conflict last. */
+export function groupPreview(items: readonly PreviewItem[]): PreviewGroup[] {
+	const groups = new Map<string, PreviewItem[]>();
+	for (const item of items) {
+		const names = (list: readonly { field: string }[]) => list.map((entry) => entry.field);
+		const key = JSON.stringify([names(item.changes).toSorted(), names(item.conflicts).toSorted()]);
+		const members = groups.get(key);
+		if (members) members.push(item);
+		else groups.set(key, [item]);
+	}
+	const found = [...groups].map(([key, members]): PreviewGroup => {
+		const [first, ...rest] = members;
+		return {
+			key,
+			conflict: hasConflict(first),
+			items: members,
+			shared: sharedEffects(first, rest),
+			conflicts: rest.every((item) => same(item.conflicts, first.conflicts)) ? first.conflicts : []
+		};
+	});
+	return [...found.filter((group) => !group.conflict), ...found.filter((group) => group.conflict)];
+}
+
+function sharedEffects(first: PreviewItem, rest: readonly PreviewItem[]): SharedEffect[] {
+	const of = (item: PreviewItem, field: string) =>
+		item.changes.find((effect) => effect.field === field);
+	return first.changes
+		.filter((effect) => rest.every((item) => same(of(item, effect.field)?.new, effect.new)))
+		.map((effect) =>
+			rest.every((item) => same(of(item, effect.field)?.old, effect.old))
+				? { field: effect.field, old: effect.old, new: effect.new }
+				: { field: effect.field, new: effect.new }
+		);
+}
+
+/** The changes of `item` its group's head does not say. */
+export function ownEffects(item: PreviewItem, group: PreviewGroup): Effect[] {
+	return item.changes.filter(
+		(effect) => !group.shared.some((shared) => shared.field === effect.field)
+	);
+}
+
 export function isFinished(application: Pick<Application, 'status'>): boolean {
 	return application.status === 'done' || application.status === 'failed';
 }
