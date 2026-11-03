@@ -3,6 +3,7 @@
 	import ActionRow from '#lib/components/rules/ActionRow.svelte';
 	import ConditionGroup from '#lib/components/rules/ConditionGroup.svelte';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
+	import HintLabel from '#lib/components/HintLabel.svelte';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import type { Lookup } from '#lib/masterdata.svelte.ts';
@@ -48,7 +49,7 @@
 		/** The places to choose from; fewer than two: no choice. */
 		places?: readonly { value: string; label: string }[];
 		onplace?: (place: string) => void;
-		/** Said under the choice of the place besides what a place is (editing: who moves it). */
+		/** Told in the help of the place besides what a place is (editing: who moves it). */
 		placeHint?: string;
 		lookup: Lookup;
 		/** Where the rule may file documents (spaces, hand-overs). */
@@ -119,15 +120,17 @@
 
 	{#if places.length > 1}
 		<Field.Field>
-			<Field.Label for="rule-scope">{m.rule_scope()}</Field.Label>
+			<HintLabel
+				for="rule-scope"
+				label={m.rule_scope()}
+				hint={placeHint ? `${m.rule_scope_hint()} ${placeHint}` : m.rule_scope_hint()}
+			/>
 			<Select
 				id="rule-scope"
 				value={place}
 				options={places}
 				onchange={(value) => onplace?.(value)}
 			/>
-			<Field.Description>{m.rule_scope_hint()}</Field.Description>
-			{#if placeHint}<Field.Description>{placeHint}</Field.Description>{/if}
 		</Field.Field>
 	{/if}
 

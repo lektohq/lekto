@@ -550,7 +550,7 @@ fields = APIRouter(prefix="/fields", tags=["master data"], dependencies=PROTECTE
 @fields.get(
     "",
     summary="List field definitions",
-    description=COUNTS,
+    description="By `position`, the same by name. " + COUNTS,
     response_model=list[FieldOut],
     responses=problem_responses(401, 403, 422),
 )
@@ -591,6 +591,7 @@ async def create_field(body: FieldCreate, user: CurrentUser, context: Context) -
         required_document_type_ids=[DocumentTypeId(id) for id in body.required_document_type_ids],
         description=body.description,
         assignment=body.assignment,
+        position=body.position,
     )
     return FieldOut.of(item)
 
@@ -609,10 +610,9 @@ async def get_field(id: UUID, user: CurrentUser, context: Context) -> FieldOut:
     "/{id}",
     summary="Change a field definition",
     description=(
-        ADMINS_ONLY + " Name, description, choices and scope; the data type stays. Values "
-        "documents use are "
-        "never changed: removing a used choice or narrowing the scope past documents with "
-        "values is a conflict (409)."
+        ADMINS_ONLY + " Name, description, choices, scope and position; the data type "
+        "stays. Values documents use are never changed: removing a used choice or narrowing "
+        "the scope past documents with values is a conflict (409)."
     ),
     response_model=FieldOut,
     responses=problem_responses(401, 403, 404, 409, 422),
@@ -638,6 +638,7 @@ async def change_field(id: UUID, body: FieldPatch, user: CurrentUser, context: C
         ),
         description=body.description if "description" in body.model_fields_set else UNSET,
         assignment=body.assignment,
+        position=body.position,
     )
     return FieldOut.of(item)
 

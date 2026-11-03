@@ -303,6 +303,8 @@ field_definitions = Table(
     Column("description", Text, nullable=True),
     # `auto` (the language model reads it) or `manual` (set by hand only, `Assignment`).
     Column("assignment", Text, nullable=False, server_default=Assignment.AUTO.value),
+    # Where it stands among the fields: smaller first, the same by name.
+    Column("position", Integer, nullable=False, server_default="0"),
     Column("created_at", UtcDateTime, nullable=False),
     Column("version", Integer, nullable=False),
 )
