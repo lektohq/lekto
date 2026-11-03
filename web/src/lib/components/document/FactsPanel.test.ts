@@ -234,6 +234,46 @@ describe('FactsPanel', () => {
 		expect(await request.json()).toEqual({ kind: 'customer_number', value: '20047718' });
 	});
 
+	it("attaches an identifier with a topic of the contact, the document's at first", async () => {
+		const topic = (id: string, name: string) => ({
+			id,
+			name,
+			path: [name],
+			parent_id: null,
+			scope: 'topic',
+			icon: null,
+			color: null
+		});
+		const withTopics = {
+			...lookup,
+			contacts: [{ ...lookup.contacts[0], topic_ids: ['p1', 'p2'] }, lookup.contacts[1]],
+			tags: [topic('p1', 'Arbeit'), topic('p2', 'Kranken'), topic('p3', 'Recht')]
+		} as unknown as Lookup;
+		render(FactsPanel, props({ lookup: withTopics, topicId: 'p1' }));
+		const user = userEvent.setup();
+		await user.click(screen.getAllByRole('button', { name: /^Pin .* as an identifier$/ })[0]);
+		// The topic is the tag picker with one choice: the document's is chosen.
+		const field = screen.getByRole('group', { name: m.facts_attach_topic() });
+		await user.click(
+			within(field).getByRole('button', { name: m.picker_change({ name: 'Arbeit' }) })
+		);
+		const radios = () => [...document.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
+		const offered = () =>
+			radios()
+				.filter((radio) => radio.name !== 'attach-target')
+				.map((radio) => radio.ariaLabel);
+		await waitFor(() => expect(offered()).toEqual(['Arbeit', 'Kranken']));
+		await user.click(radios().find((radio) => radio.ariaLabel === 'Kranken')!);
+		await waitFor(() => expect(offered()).toEqual([]));
+		await user.click(screen.getByRole('button', { name: m.facts_attach() }));
+		const [request] = fetchMock.mock.calls[0];
+		expect(await request.json()).toEqual({
+			kind: 'customer_number',
+			value: '20047718',
+			topic_id: 'p2'
+		});
+	});
+
 	it('lets an editor correct, reject and add a fact (#145)', async () => {
 		const onchanged = vi.fn();
 		const number = {

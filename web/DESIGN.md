@@ -246,13 +246,13 @@ divider.
   `<input type="date">`, which follows the browser language. `PeriodInput` handles periods.
 - **Tags of every kind:** `TagPicker`. One field with the chosen chips and a dashed "+ …" chip. The
   choice opens as a popover on desktop and as a sheet from the bottom on the phone.
-- **A topic as a value** (of a document, in a rule's action, on many documents): the `TagPicker`
-  with one choice (`single`; Tobi, 03.11.2026). Without a topic the dashed "+ Thema" chip; with one
-  its chip alone, no "+": the × clears it, its name opens the choice to change it. The choice is a
-  flat list of radios, without the topics above a topic; a click chooses and closes it (no
-  "Fertig"; the keys only move the choice, Escape closes). The topics a contact enables are
-  several: the plain `TagPicker`. `design-system.test.ts` keeps the topic out of `Select` and
-  `SearchSelect`.
+- **A topic as a value** (of a document, in a rule's action, on many documents, of an identifier):
+  the `TagPicker` with one choice (`single`; Tobi, 03.11.2026). Without a topic the dashed
+  "+ Thema" chip; with one its chip alone, no "+": the × clears it, its name opens the choice to
+  change it. The choice is a flat list of radios, without the topics above a topic; a click chooses
+  and closes it (no "Fertig"; the keys only move the choice, Escape closes). The topics a contact
+  enables are several: the plain `TagPicker`; a topic's parent is chosen as every tag's.
+  `design-system.test.ts` keeps the topic out of `Select` and `SearchSelect`.
 - **Free values as chips** (other spellings, other names): `ChipInput`.
 
 ### Checkboxes, radios, switches

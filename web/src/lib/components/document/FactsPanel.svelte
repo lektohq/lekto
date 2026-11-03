@@ -20,6 +20,7 @@
 	import FactDecide from '#lib/components/document/FactDecide.svelte';
 	import SourceChip from '#lib/components/document/SourceChip.svelte';
 	import Select from '#lib/components/Select.svelte';
+	import TagPicker from '#lib/components/TagPicker.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { reportError } from '#lib/errors.ts';
 	import {
@@ -49,7 +50,7 @@
 	import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { phone } from '#lib/phone.svelte.ts';
-	import { pathLabel, tagOptions } from '#lib/tags.ts';
+	import { ofScope, pathLabel } from '#lib/tags.ts';
 	import { cn } from '#lib/utils.ts';
 	import { Choice } from '#lib/components/ui/choice/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
@@ -121,15 +122,13 @@
 	const attachContact = $derived(target === 'document' ? facts.contact_id : other);
 	const attachTopics = $derived.by(() => {
 		const enabled = contacts.find((contact) => contact.id === attachContact)?.topic_ids ?? [];
-		return tagOptions(lookup?.tags ?? [], 'topic').filter((option) =>
-			enabled.includes(option.value)
-		);
+		return ofScope(lookup?.tags ?? [], 'topic').filter((tag) => enabled.includes(tag.id));
 	});
 	$effect(() => {
-		const options = attachTopics;
+		const topics = attachTopics;
 		untrack(() => {
-			if (options.some((option) => option.value === attachTopic)) return;
-			const own = options.some((option) => option.value === topicId);
+			if (topics.some((tag) => tag.id === attachTopic)) return;
+			const own = topics.some((tag) => tag.id === topicId);
 			attachTopic = own && topicId ? topicId : '';
 		});
 	});
@@ -488,14 +487,24 @@
 					/>
 				{/if}
 				{#if attachTopics.length > 0}
-					<label class="flex flex-col gap-1 text-sm">
-						<span class="text-xs text-muted-foreground">{m.facts_attach_topic()}</span>
-						<Select
-							bind:value={attachTopic}
-							aria-label={m.facts_attach_topic()}
-							options={[{ value: '', label: m.topic_none() }, ...attachTopics]}
+					<div class="flex flex-col gap-1 text-sm">
+						<span id="facts-attach-topic-label" class="text-xs text-muted-foreground">
+							{m.facts_attach_topic()}
+						</span>
+						<TagPicker
+							id="facts-attach-topic"
+							label={m.facts_attach_topic()}
+							labelledby="facts-attach-topic-label"
+							title={m.picker_title_topic()}
+							scope="topic"
+							tags={lookup?.tags ?? []}
+							selected={attachTopic === '' ? [] : [attachTopic]}
+							onchange={(next) => (attachTopic = next[0] ?? '')}
+							offered={(tag) => attachTopics.some((own) => own.id === tag.id)}
+							creating={false}
+							single
 						/>
-					</label>
+					</div>
 				{/if}
 				<span class="text-xs text-muted-foreground">{m.facts_attach_hint()}</span>
 				<div class="flex justify-end gap-2">

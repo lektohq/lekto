@@ -286,11 +286,17 @@ describe('the design system (web/DESIGN.md)', () => {
 				for (const [element] of source.matchAll(
 					/<(?:TagPicker|SearchSelect|Select)\b[\s\S]*?\/>/g
 				)) {
-					const topic = /picker_title_topic|scope="topic"|tagOptions\([^)]*'topic'\)/.test(element);
+					// A select of anything about topics: its label, its options or the variables
+					// that hold them name the topic.
+					const topic = element.startsWith('<TagPicker')
+						? /scope="topic"/.test(element)
+						: /topic/i.test(element);
 					const one = element.startsWith('<TagPicker') && /\bsingle\b/.test(element);
-					// The topics a contact enables are several, chosen in the master data.
+					// The topics a contact enables are several, chosen in the master data; a topic's
+					// place in its tree is chosen as every tag's.
 					const several = /title=\{m\.master_topics\(\)\}/.test(element);
-					if (topic && !one && !several) return element.split('\n')[0];
+					const parent = /bind:value=\{parentId\}/.test(element);
+					if (topic && !one && !several && !parent) return element.split('\n')[0];
 				}
 				return null;
 			})

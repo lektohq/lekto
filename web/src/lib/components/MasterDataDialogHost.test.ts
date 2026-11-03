@@ -337,9 +337,20 @@ describe('a contact’s topics', () => {
 		await openTab(m.master_identifiers());
 		// Each identifier is a line that opens.
 		await userEvent.click(screen.getByRole('button', { name: /^4711/ }));
-		let topic = screen.getByLabelText(m.identifier_topic());
-		expect(selectedValue(topic)).toBe('p1');
-		expect((await optionsOf(topic)).map((option) => option.value)).toEqual(['', 'p1']);
+		// Its topic is the tag picker with one choice; its chip's name opens the choice.
+		const topic = () => screen.getByRole('group', { name: m.identifier_topic() });
+		const radios = () => [...document.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
+		const topicChoices = async (chosen: string) => {
+			await userEvent.click(
+				within(topic()).getByRole('button', { name: m.picker_change({ name: chosen }) })
+			);
+			await waitFor(() => expect(radios().length).toBeGreaterThan(0));
+			return radios().map((radio) => radio.getAttribute('aria-label'));
+		};
+		expect(await topicChoices('Arbeit')).toEqual(['Arbeit']);
+		// The chosen one clicked again closes the choice.
+		await userEvent.click(radios()[0]);
+		await waitFor(() => expect(radios()).toEqual([]));
 		// Enabling another (in the picker over the dialog) offers it to the identifiers.
 		await openTab(m.master_tab_general());
 		const chips = screen.getByRole('group', { name: m.master_topics() });
@@ -351,9 +362,10 @@ describe('a contact’s topics', () => {
 		expect(within(chips).getByText('Krankenversicherung')).toBeTruthy();
 		// Back in its tab, the line is still open.
 		await openTab(m.master_identifiers());
-		topic = screen.getByLabelText(m.identifier_topic());
-		expect((await optionsOf(topic)).map((option) => option.value)).toEqual(['', 'p1', 'p2']);
-		await choose(userEvent.setup(), topic, 'p2');
+		expect(await topicChoices('Arbeit')).toEqual(['Arbeit', 'Krankenversicherung']);
+		await userEvent.click(radios()[1]);
+		await waitFor(() => expect(radios()).toEqual([]));
+		expect(within(topic()).getByText('Krankenversicherung')).toBeTruthy();
 		await userEvent.click(screen.getByRole('button', { name: m.save() }));
 		const patch = fetchMock.mock.calls
 			.map((call) => call[0])
