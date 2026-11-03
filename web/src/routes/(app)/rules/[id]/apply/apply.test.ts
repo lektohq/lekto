@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
 import type { components } from '#lib/api/schema.ts';
-import { bulkDocuments } from '#lib/bulk.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import { calls, fakeApi, json } from '#lib/testing/documents.ts';
@@ -44,7 +43,8 @@ const preview = (ids: string[], next: string | null): Preview => ({
 	version: 1,
 	items: ids.map(row),
 	next_cursor: next,
-	looked_at: 200
+	looked_at: 200,
+	total: 800
 });
 
 const application = (status: Application['status']): Application => ({
@@ -83,8 +83,8 @@ function held(pages: Preview[], routes: Parameters<typeof fakeApi>[0] = {}) {
 	return { api, previews, release };
 }
 
-const looked = (documents: number, count: string) =>
-	m.rule_preview_loading({ documents: bulkDocuments(documents), count });
+const looked = (checked: string, count: string) =>
+	m.rule_preview_loading({ checked, total: '800', count });
 
 beforeEach(() => {
 	goTo('/ui/rules/r1/apply', { id: 'r1' });
@@ -107,13 +107,13 @@ describe("a rule's dry run", () => {
 		]);
 		render(Page);
 
-		expect(await screen.findByText(looked(0, '0'))).toBeTruthy();
+		expect(await screen.findByText(m.rule_preview_starting())).toBeTruthy();
 		await release();
-		expect(await screen.findByText(looked(200, '0'))).toBeTruthy();
+		expect(await screen.findByText(looked('200', '0'))).toBeTruthy();
 		await release();
-		expect(await screen.findByText(looked(400, '0'))).toBeTruthy();
+		expect(await screen.findByText(looked('400', '0'))).toBeTruthy();
 		await release();
-		expect(await screen.findByText(looked(600, '1'))).toBeTruthy();
+		expect(await screen.findByText(looked('600', '1'))).toBeTruthy();
 		expect(
 			screen.getByRole('checkbox', { name: m.rule_select_document({ title: 'Auszug a' }) })
 		).toBeTruthy();

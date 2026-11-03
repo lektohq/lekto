@@ -1228,7 +1228,9 @@ where it is and edits where it goes (global: admins); every version names its sp
   `POST /documents/{id}/dry-run` shows the same without storing anything.
 - **Retroactively.** `POST /rules/{id}/apply/preview` lists the documents the current version
   would change, newest first, with changes and conflicts (a page looks at 200 documents at
-  most). It plays the rule as applying does, in a unit of work it never commits: `outcome` holds
+  most). It looks only at the documents the rule's conditions leave (`rules/prefilter.py`):
+  what must hold on contact, type, their groups, topic, tags or a field's value becomes a
+  filter the database answers before a text is read; `total` says how many that are. It plays the rule as applying does, in a unit of work it never commits: `outcome` holds
   the chain (the rules of each space the rule files the document into, and of the spaces those
   file it into, each at most once: what they do, `moved_to`, `looped_to` where the chain stops)
   and the space it ends up in; `accepted` the same with the conflicts accepted. `POST /rules/{id}/apply` pins a version and applies it to the selected documents (at
