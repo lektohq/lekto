@@ -3,9 +3,11 @@
 // tooltips instead of native titles on buttons, dialog widths by their size, icon buttons
 // through `IconButton`, one way to view a document (the Beam), toggle chips only where each
 // toggles on its own, one order on the master data tabs, tooltips through `ui/tooltip`, a run's
-// progress in the selection bar, fields in the API's order. An exception needs its line in DESIGN.md ("Exceptions") and here; the
+// progress in the selection bar, fields in the API's order, short lines under fields. An exception needs its line in DESIGN.md ("Exceptions") and here; the
 // lists of exceptions may only shrink.
 import { describe, expect, it } from 'vitest';
+import de from '../messages/de.json';
+import en from '../messages/en.json';
 
 const sources = import.meta.glob<string>('/src/**/*.svelte', {
 	query: '?raw',
@@ -251,6 +253,20 @@ describe('the design system (web/DESIGN.md)', () => {
 			const hit = line(source, sorted);
 			if (hit !== null) found.push(`${path}: ${hit.trim().slice(0, 120)}`);
 		}
+		expect(found).toEqual([]);
+	});
+
+	it('keeps the line under a field short; what explains goes into the HintLabel', () => {
+		const own = (text: string) => text.replace(/\{[^}]*\}/g, '').trim().length;
+		const found = offenders((source) => {
+			for (const match of source.matchAll(/<Field\.Description\b[^>]*>\s*([^<]*)/g)) {
+				const key = /^\{m\.(\w+)\(/.exec(match[1])?.[1];
+				if (key === undefined) return `${match[0]} (not a message)`;
+				const texts = [de, en].map((messages) => (messages as Record<string, string>)[key]);
+				if (texts.some((text) => own(text) > 60)) return `${key} (over 60 characters)`;
+			}
+			return null;
+		});
 		expect(found).toEqual([]);
 	});
 

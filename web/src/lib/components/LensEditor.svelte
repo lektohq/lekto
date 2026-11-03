@@ -27,6 +27,7 @@
 	import EditorShell from '#lib/components/EditorShell.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
 	import Select from '#lib/components/Select.svelte';
+	import HintLabel from '#lib/components/HintLabel.svelte';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { fieldTypeLabel } from '#lib/fields.ts';
@@ -241,9 +242,8 @@
 					<Select id="lens-sort" bind:value={sort} options={sortOptions} />
 				</Field.Field>
 				<Field.Field>
-					<Field.Label for="lens-due">{m.lens_due()}</Field.Label>
+					<HintLabel for="lens-due" label={m.lens_due()} hint={m.lens_due_hint()} />
 					<Select id="lens-due" bind:value={dueId} options={dueOptions} />
-					<Field.Description>{m.lens_due_hint()}</Field.Description>
 				</Field.Field>
 			</div>
 
