@@ -23,7 +23,6 @@
 		type RuleModel
 	} from '#lib/rules/model.ts';
 	import { session } from '#lib/session.svelte.ts';
-	import { tagOptions } from '#lib/tags.ts';
 	import TagPicker from '#lib/components/TagPicker.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 
@@ -144,12 +143,18 @@
 					class="h-10"
 				/>
 			{:else if action.type === 'set_topic'}
-				<Select
-					aria-label={label}
-					aria-invalid={invalid || undefined}
-					bind:value={action.topic_id}
-					options={withChoice(tagOptions(lookup.tags, 'topic'), action.topic_id)}
-					class="h-10"
+				<!-- The one choice of a topic, as at a document. -->
+				<TagPicker
+					id="topic-{action.key}"
+					{label}
+					title={m.picker_title_topic()}
+					scope="topic"
+					tags={lookup.tags}
+					selected={action.topic_id ? [action.topic_id] : []}
+					onchange={(next) => {
+						if (action.type === 'set_topic') action.topic_id = next[0] ?? '';
+					}}
+					single
 				/>
 			{:else if action.type === 'set_title'}
 				<TemplateInput

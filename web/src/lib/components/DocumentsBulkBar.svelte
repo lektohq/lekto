@@ -24,7 +24,6 @@
 	import { phone } from '#lib/phone.svelte.ts';
 	import { descendants, pipeline, type GraphNode } from '#lib/pipeline.ts';
 	import { session } from '#lib/session.svelte.ts';
-	import { tagOptions } from '#lib/tags.ts';
 	import { bulkDocuments, MODEL_CALLS, WARN_ABOVE } from '#lib/bulk.ts';
 	import {
 		type BulkAction,
@@ -353,14 +352,17 @@
 		action={() => start({ kind: 'set_topic', topic_id: topic || null })}
 	>
 		<Field.Field>
-			<Field.Label for="bulk-topic">{m.field_topic()}</Field.Label>
-			<SearchSelect
+			<Field.Label id="bulk-topic-label">{m.field_topic()}</Field.Label>
+			<TagPicker
 				id="bulk-topic"
+				label={m.field_topic()}
+				labelledby="bulk-topic-label"
 				title={m.picker_title_topic()}
-				bind:value={topic}
-				options={tagOptions(lookup.tags, 'topic')}
-				placeholder={m.value_unset()}
-				noneLabel={m.value_unset()}
+				scope="topic"
+				tags={lookup.tags}
+				selected={topic === '' ? [] : [topic]}
+				onchange={(next) => (topic = next[0] ?? '')}
+				single
 			/>
 		</Field.Field>
 	</FormDialog>
