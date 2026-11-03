@@ -367,7 +367,6 @@
 						},
 						...parents
 					]}
-					class="h-10"
 				/>
 			</Field.Field>
 			{@render iconField()}

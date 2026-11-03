@@ -164,7 +164,7 @@
 			value={condition.field}
 			options={conditionFieldOptions}
 			onchange={(field) => changeConditionField(condition, field as ConditionField, lookup.fields)}
-			class="h-10 w-full sm:w-44"
+			class="w-full sm:w-44"
 		/>
 		{#if condition.field === 'step'}
 			<Input
@@ -174,7 +174,7 @@
 				title={m.rule_step_path_hint()}
 				value={condition.path ?? ''}
 				oninput={(event) => (condition.path = event.currentTarget.value.trim())}
-				class="h-10 w-full font-mono sm:w-44"
+				class="w-full font-mono sm:w-44"
 			/>
 		{/if}
 		{#if condition.field === 'fact'}
@@ -184,14 +184,14 @@
 				value={condition.factKind ?? ''}
 				options={factKindOptions}
 				onchange={(kind) => (condition.factKind = kind)}
-				class="h-10 w-full sm:w-44"
+				class="w-full sm:w-44"
 			/>
 			<Select
 				aria-label={m.facts_decide_role()}
 				value={condition.factRole ?? ''}
 				options={factRoleOptions}
 				onchange={(role) => (condition.factRole = role || null)}
-				class="h-10 w-full sm:w-44"
+				class="w-full sm:w-44"
 			/>
 		{/if}
 		{#if condition.field === 'field'}
@@ -201,7 +201,7 @@
 				value={condition.fieldId ?? ''}
 				options={fieldOptions}
 				onchange={(id) => id && changeField(condition, id, lookup.fields)}
-				class="h-10 w-full sm:w-44"
+				class="w-full sm:w-44"
 			/>
 		{/if}
 		<Select
@@ -209,7 +209,7 @@
 			value={condition.op}
 			options={operatorOptions}
 			onchange={(op) => changeOperator(condition, op as Operator, lookup.fields)}
-			class="h-10 w-full sm:w-48"
+			class="w-full sm:w-48"
 		/>
 		<div class="min-w-0 flex-1 basis-56">
 			{#if takesNoValue(condition.op)}
@@ -259,7 +259,6 @@
 					value={single}
 					options={withChoice(choices, single)}
 					onchange={(next) => (condition.value = next)}
-					class="h-10"
 				/>
 			{:else if condition.field === 'step'}
 				<div class="flex gap-1">
@@ -269,7 +268,7 @@
 							value={kind}
 							options={kinds}
 							onchange={setKind}
-							class="h-10 w-28 shrink-0"
+							class="w-28 shrink-0"
 						/>
 					{/if}
 					{#if kind === 'number' || kind === 'text' || kind === 'date'}
