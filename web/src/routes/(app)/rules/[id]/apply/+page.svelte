@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import { onDestroy, untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -13,7 +14,13 @@
 	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import RuleApplyBar from '#lib/components/rules/RuleApplyBar.svelte';
+	import RuleEffectChange from '#lib/components/rules/RuleEffectChange.svelte';
 	import RuleEffects from '#lib/components/rules/RuleEffects.svelte';
+	import DocumentThumb from '#lib/components/DocumentThumb.svelte';
+	import IconButton from '#lib/components/IconButton.svelte';
+	import NamesLine from '#lib/components/NamesLine.svelte';
+	import { bulkDocuments } from '#lib/bulk.ts';
+	import { formatDate } from '#lib/i18n.ts';
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
 	import { openBeam } from '#lib/beam.svelte.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -29,7 +36,9 @@
 		applyRequest,
 		chainLines,
 		follow,
+		groupPreview,
 		hasConflict,
+		ownEffects,
 		isFinished,
 		preselected,
 		type Application,
@@ -90,6 +99,10 @@
 	);
 	const count = $derived(request?.document_ids.length ?? 0);
 	const plain = $derived(items.filter((item) => !hasConflict(item)));
+	/** The documents by what the rule changes on them (web/DESIGN.md, "A rule's dry run"). */
+	const groups = $derived(groupPreview(items));
+	/** The groups folded away, by key. */
+	const folded = new SvelteSet<string>();
 	const allChosen = $derived(
 		plain.length > 0 && plain.every((item) => chosen.has(item.document_id))
 	);
@@ -292,6 +305,19 @@
 		else set.delete(item.document_id);
 	}
 
+	/** Every document of a group without a conflict, or none of them. */
+	function chooseGroup(members: readonly PreviewItem[], on: boolean) {
+		for (const item of members) {
+			if (on) chosen.add(item.document_id);
+			else chosen.delete(item.document_id);
+		}
+	}
+
+	function fold(key: string) {
+		if (folded.has(key)) folded.delete(key);
+		else folded.add(key);
+	}
+
 	function chooseAll(on: boolean) {
 		if (on) for (const item of plain) chosen.add(item.document_id);
 		else {
@@ -356,92 +382,169 @@
 		{#if showBar && !phone.current}{@render bar()}{/if}
 
 		{#if items.length > 0}
-			<ul
-				class={cn('flex flex-col gap-2', application && 'opacity-50')}
+			<div
+				class={cn('flex flex-col gap-4', application && 'opacity-50')}
 				inert={application !== null}
 			>
-				{#each items as item (item.document_id)}
-					{@const conflict = hasConflict(item)}
-					{@const picked = (conflict ? accepted : chosen).has(item.document_id)}
+				{#each groups as group (group.key)}
+					{@const open = !folded.has(group.key)}
+					{@const choosable = group.items.filter((item) => !hasConflict(item))}
 					<Card.Root
-						as="li"
-						size="row"
-						class={cn(
-							'flex gap-3',
-							picked && 'border-primary bg-panel',
-							conflict && !picked && 'border-lane-yellow-foreground/35'
-						)}
+						as="section"
+						size="flush"
+						class={cn('overflow-hidden', group.conflict && 'border-lane-yellow-foreground/35')}
+						aria-label={bulkDocuments(group.items.length)}
 					>
-						{#if !conflict}
-							<ChoiceBox
-								class="mt-1"
-								aria-label={m.rule_select_document({ title: item.title })}
-								checked={picked}
-								onchange={(event) => choose(item, event.currentTarget.checked)}
-							/>
-						{:else}
-							<TriangleAlert
-								class="mt-0.5 size-4 shrink-0 text-lane-yellow-foreground"
-								aria-hidden="true"
-							/>
-						{/if}
-						<div class="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-							<!-- One line on a desktop: the title, and what the rule changes at its end. -->
-							<div class="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-start sm:gap-4">
-								<span class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-									<!-- The title opens the Beam: where the rule's text conditions hit. -->
-									<BeamTitle
-										title={item.title}
-										class="max-w-full text-base"
-										onview={() =>
-											openBeam(
-												items.map((entry) => entry.document_id),
-												item.document_id,
-												rule ? m.rule_apply_title({ name: rule.name }) : m.rule_apply_generic(),
-												{ source: { kind: 'rule', rule: id } }
-											)}
-									/>
-									{#if conflict}<Badge variant="yellow">{m.rule_conflict()}</Badge>{/if}
-								</span>
-								<div class="text-muted-foreground sm:max-w-1/2 sm:pt-0.5 sm:text-right">
-									<RuleEffects
-										effects={item.changes}
-										notes={item.notes}
-										sends={item.sends}
-										refused={item.sends_refused}
+						<!-- The head: what the rule changes on all of them, said once. -->
+						<div
+							class={cn(
+								'flex items-center gap-3 px-4 py-3',
+								open && 'border-b',
+								group.conflict ? 'bg-lane-yellow/40' : 'bg-muted/50'
+							)}
+						>
+							{#if group.conflict}
+								<TriangleAlert
+									class="size-4 shrink-0 text-lane-yellow-foreground"
+									aria-hidden="true"
+								/>
+							{:else}
+								<ChoiceBox
+									aria-label={m.rule_group_choose({
+										documents: bulkDocuments(group.items.length)
+									})}
+									checked={choosable.every((item) => chosen.has(item.document_id))}
+									onchange={(event) => chooseGroup(choosable, event.currentTarget.checked)}
+								/>
+							{/if}
+							<div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-5 gap-y-1.5">
+								{#each group.shared as effect (effect.field)}
+									<RuleEffectChange
+										field={effect.field}
+										old={'old' in effect ? effect.old : undefined}
+										next={effect.new}
 										{lookup}
 									/>
-								</div>
-							</div>
-							{#if item.outcome.chain.length > 0}
-								<ul class="flex flex-col gap-0.5">
-									{#each chainLines(item.outcome, rule?.name ?? '', lookup, session.user?.id) as line, index (index)}
-										<li>{line}</li>
-									{/each}
-								</ul>
-							{/if}
-							{#if conflict}
-								<RuleEffects effects={[]} notes={item.conflicts} {lookup} />
-								{#if item.accepted && (item.accepted.chain.length > 0 || item.accepted.space_id !== item.outcome.space_id)}
-									<p class="font-medium">{m.rule_chain_accepted()}</p>
-									<ul class="flex flex-col gap-0.5">
-										{#each chainLines(item.accepted, rule?.name ?? '', lookup, session.user?.id) as line, index (index)}
-											<li>{line}</li>
-										{/each}
-									</ul>
+								{/each}
+								{#if group.conflict}
+									<Badge variant="yellow">{m.rule_conflict()}</Badge>
+									{#if group.conflicts.length > 0}
+										<div class="text-sm text-muted-foreground">
+											<RuleEffects effects={[]} notes={group.conflicts} {lookup} />
+										</div>
+									{/if}
 								{/if}
-								<Choice
-									checked={picked}
-									onchange={(event) => choose(item, event.currentTarget.checked)}
-									class="font-medium"
-								>
-									{m.rule_accept_conflict()}
-								</Choice>
-							{/if}
+							</div>
+							<span class="shrink-0 text-sm text-muted-foreground"
+								>{bulkDocuments(group.items.length)}</span
+							>
+							<IconButton
+								size="sm"
+								label={open ? m.rule_group_fold() : m.rule_group_unfold()}
+								aria-expanded={open}
+								onclick={() => fold(group.key)}
+							>
+								<ChevronDown
+									class={cn(
+										'transition-transform motion-reduce:transition-none',
+										open && 'rotate-180'
+									)}
+									aria-hidden="true"
+								/>
+							</IconButton>
 						</div>
+						{#if open}
+							<ul class="divide-y">
+								{#each group.items as item (item.document_id)}
+									{@const conflict = hasConflict(item)}
+									{@const picked = (conflict ? accepted : chosen).has(item.document_id)}
+									{@const own = ownEffects(item, group)}
+									{@const contact = lookup?.contacts.find((entry) => entry.id === item.contact_id)}
+									{@const kind = lookup?.documentTypes.find(
+										(entry) => entry.id === item.document_type_id
+									)}
+									<li class={cn('flex items-start gap-3 px-4 py-2.5', picked && 'bg-panel')}>
+										{#if !conflict}
+											<ChoiceBox
+												class="mt-4"
+												aria-label={m.rule_select_document({ title: item.title })}
+												checked={picked}
+												onchange={(event) => choose(item, event.currentTarget.checked)}
+											/>
+										{/if}
+										<DocumentThumb
+											id={item.document_id}
+											pages={item.page_count}
+											class="h-12 w-9 shrink-0 rounded-md border"
+										/>
+										<div class="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+											<!-- The title opens the Beam: where the rule's text conditions hit. -->
+											<BeamTitle
+												title={item.title}
+												class="max-w-full text-base"
+												onview={() =>
+													openBeam(
+														items.map((entry) => entry.document_id),
+														item.document_id,
+														rule ? m.rule_apply_title({ name: rule.name }) : m.rule_apply_generic(),
+														{ source: { kind: 'rule', rule: id } }
+													)}
+											/>
+											<NamesLine
+												parts={[
+													{ name: contact?.name, groupIds: contact?.group_ids, avatar: contact },
+													{ name: kind?.name, groupIds: kind?.group_ids, icon: kind?.icon }
+												]}
+												date={formatDate(item.document_date ?? item.created_at)}
+												tags={lookup?.tags ?? []}
+												class="text-muted-foreground"
+											/>
+											{#if own.length > 0 || item.notes.length > 0 || (item.sends?.length ?? 0) > 0 || (item.sends_refused?.length ?? 0) > 0}
+												<div class="text-muted-foreground">
+													<RuleEffects
+														effects={own}
+														notes={item.notes}
+														sends={item.sends}
+														refused={item.sends_refused}
+														{lookup}
+													/>
+												</div>
+											{/if}
+											{#if item.outcome.chain.length > 0}
+												<ul class="flex flex-col gap-0.5">
+													{#each chainLines(item.outcome, rule?.name ?? '', lookup, session.user?.id) as line, index (index)}
+														<li>{line}</li>
+													{/each}
+												</ul>
+											{/if}
+											{#if conflict}
+												{#if group.conflicts.length === 0}
+													<RuleEffects effects={[]} notes={item.conflicts} {lookup} />
+												{/if}
+												{#if item.accepted && (item.accepted.chain.length > 0 || item.accepted.space_id !== item.outcome.space_id)}
+													<p class="font-medium">{m.rule_chain_accepted()}</p>
+													<ul class="flex flex-col gap-0.5">
+														{#each chainLines(item.accepted, rule?.name ?? '', lookup, session.user?.id) as line, index (index)}
+															<li>{line}</li>
+														{/each}
+													</ul>
+												{/if}
+												<Choice
+													checked={picked}
+													onchange={(event) => choose(item, event.currentTarget.checked)}
+													class="font-medium"
+												>
+													{m.rule_accept_conflict()}
+												</Choice>
+											{/if}
+										</div>
+									</li>
+								{/each}
+							</ul>
+						{/if}
 					</Card.Root>
 				{/each}
-			</ul>
+			</div>
 		{:else if complete}
 			<EmptyNote>{m.rule_preview_nothing()}</EmptyNote>
 		{/if}
