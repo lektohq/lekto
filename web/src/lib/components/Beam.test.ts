@@ -6,11 +6,17 @@ import { goto } from '$app/navigation';
 import { fieldLabel } from '#lib/describe.ts';
 import { kindLabel } from '#lib/identifiers.ts';
 import { m } from '#lib/paraglide/messages.js';
-import { documentOf, fakeApi } from '#lib/testing/documents.ts';
+import { calls, documentOf, fakeApi, processingOf } from '#lib/testing/documents.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Beam from './Beam.svelte';
 
 vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
+// pdf.js needs a worker and a canvas: the archive opens and never answers.
+vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
+	getDocument: () => ({ promise: new Promise(() => {}), destroy: async () => {} }),
+	GlobalWorkerOptions: { workerSrc: '' }
+}));
+vi.mock('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url', () => ({ default: 'worker.js' }));
 vi.mock('$app/state', async () => ({
 	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
 }));
@@ -18,6 +24,8 @@ vi.mock('$app/state', async () => ({
 const LIST = '/ui/documents?tag=t1';
 const BOX = { x: 0.1, y: 0.2, width: 0.3, height: 0.02 };
 const beam = (index: number) => ({ ids: ['a', 'b'], index, from: 'Dokumente' });
+/** Still being read: no archive yet, so the Beam shows the page images. */
+const READING = { ...processingOf(), nodes: processingOf().nodes.slice(0, 1) };
 
 beforeEach(() => {
 	vi.mocked(goto).mockClear();
@@ -39,7 +47,8 @@ beforeEach(() => {
 					contact_id: 'c1',
 					document_type_id: 't1',
 					document_date: '2026-03-31',
-					page_count: 2
+					page_count: 2,
+					processing: READING
 				}),
 			'GET /api/v1/documents/b': () => new Response(null, { status: 404 }),
 			'GET /api/v1/contacts/c1': () => ({ id: 'c1', name: 'Stadtwerke' }),
@@ -114,6 +123,20 @@ describe('Beam', () => {
 		goTo(LIST);
 		render(Beam);
 		expect(screen.queryByRole('dialog')).toBeNull();
+	});
+
+	it('shows the archive PDF as the document view does, once it exists', async () => {
+		const api = fakeApi({
+			'GET /api/v1/documents/a': () =>
+				documentOf({ id: 'a', title: 'Stromrechnung März', page_count: 2 }),
+			'GET /api/v1/documents/a/archive': () => new Response(new Uint8Array([37, 80, 68, 70]))
+		});
+		vi.stubGlobal('fetch', api);
+		goTo(LIST, {}, { beam: beam(0) });
+		render(Beam);
+		await screen.findByRole('dialog', { name: 'Stromrechnung März' });
+		await waitFor(() => expect(calls(api)).toContain('GET /api/v1/documents/a/archive'));
+		expect(screen.queryAllByRole('img')).toEqual([]);
 	});
 
 	it('shows the pages of the document with its head, and pages through the documents', async () => {
