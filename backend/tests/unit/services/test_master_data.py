@@ -305,6 +305,29 @@ async def test_everyone_reads_master_data_sorted(world: World) -> None:
         await world.master_data.get_contact(user.id, ContactId(new_id()))
 
 
+async def test_fields_are_listed_by_position_then_by_name(world: World) -> None:
+    admin, user = await world.user(role=Role.ADMIN), await world.user()
+    service = world.master_data
+    for name in ("net", "Gross"):
+        await service.create_field(admin.id, name, FieldType.AMOUNT)
+    period = await service.create_field(admin.id, "Period", FieldType.PERIOD, position=5)
+    payout = await service.create_field(admin.id, "Payout", FieldType.AMOUNT)
+    assert [f.name for f in await service.list_fields(user.id)] == [
+        "Gross",
+        "net",
+        "Payout",
+        "Period",
+    ]
+    await service.change_field(admin.id, payout.id, position=-1)
+    await service.change_field(admin.id, period.id, name="Service period")
+    assert [f.name for f in await service.list_fields(user.id)] == [
+        "Payout",
+        "Gross",
+        "net",
+        "Service period",
+    ]
+
+
 async def test_only_unused_master_data_is_deleted_by_admins(world: World) -> None:
     admin, owner = await world.user(role=Role.ADMIN), await world.user()
     contact = await world.master_data.create_contact(admin.id, "ACME")

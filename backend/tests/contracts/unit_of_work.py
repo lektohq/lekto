@@ -855,6 +855,20 @@ class UnitOfWorkContract:
         async with uow_factory() as uow:
             assert (await uow.fields.get(asn.id)).is_read
 
+    async def test_a_field_keeps_its_position(self, uow_factory: UnitOfWorkFactory) -> None:
+        net = FieldDefinition.create(name="Net", data_type=FieldType.AMOUNT, now=NOW, position=-3)
+        async with uow_factory() as uow:
+            await uow.fields.add(net)
+            await uow.commit()
+        async with uow_factory() as uow:
+            stored = await uow.fields.get(net.id)
+            assert stored.position == -3
+            stored.place(20)
+            await uow.fields.update(stored)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert (await uow.fields.get(net.id)).position == 20
+
     # --- documents ------------------------------------------------------------------------------
 
     async def test_document_round_trip_with_all_fields(

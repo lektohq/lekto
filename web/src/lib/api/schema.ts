@@ -756,7 +756,7 @@ export interface paths {
 		};
 		/**
 		 * List field definitions
-		 * @description Everyone reads them. With `document_counts`, each comes with how many documents within the caller's reach have it (a field: a value for it), counted in one query; admins count every document with `all_users` (others: 403).
+		 * @description By `position`, the same by name. Everyone reads them. With `document_counts`, each comes with how many documents within the caller's reach have it (a field: a value for it), counted in one query; admins count every document with `all_users` (others: 403).
 		 */
 		get: operations['list_fields_api_v1_fields_get'];
 		put?: never;
@@ -791,7 +791,7 @@ export interface paths {
 		head?: never;
 		/**
 		 * Change a field definition
-		 * @description Admins only. Name, description, choices and scope; the data type stays. Values documents use are never changed: removing a used choice or narrowing the scope past documents with values is a conflict (409).
+		 * @description Admins only. Name, description, choices, scope and position; the data type stays. Values documents use are never changed: removing a used choice or narrowing the scope past documents with values is a conflict (409).
 		 */
 		patch: operations['change_field_api_v1_fields__id__patch'];
 		trace?: never;
@@ -5227,6 +5227,12 @@ export interface components {
 			 * @default auto
 			 */
 			assignment: components['schemas']['Assignment'];
+			/**
+			 * Position
+			 * @description Where the field stands among the fields: smaller first, the same by name.
+			 * @default 0
+			 */
+			position: number;
 		};
 		/**
 		 * FieldOut
@@ -5239,6 +5245,7 @@ export interface components {
 		 *       "id": "01999d5e-4444-7c1e-b6a3-2f4d5e6f7a8b",
 		 *       "key": "amount",
 		 *       "name": "Amount",
+		 *       "position": 0,
 		 *       "required": false,
 		 *       "required_document_type_ids": []
 		 *     }
@@ -5275,6 +5282,11 @@ export interface components {
 			description: string | null;
 			/** @description `auto`: the language model reads it; `manual`: set by hand only, never asked of the model (a required one keeps the document open until a person sets it). */
 			assignment: components['schemas']['Assignment'];
+			/**
+			 * Position
+			 * @description Where the field stands among the fields: smaller first, the same by name.
+			 */
+			position: number;
 			/**
 			 * Created At
 			 * Format: date-time
@@ -5320,6 +5332,8 @@ export interface components {
 			description?: string | null;
 			/** @description `auto`: the language model reads it; `manual`: set by hand only, never asked of the model (a required one keeps the document open until a person sets it). */
 			assignment?: components['schemas']['Assignment'] | null;
+			/** Position */
+			position?: number | null;
 		};
 		/**
 		 * FieldType

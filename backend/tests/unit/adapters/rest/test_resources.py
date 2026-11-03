@@ -802,6 +802,25 @@ async def test_a_field_is_set_by_hand(api: Api) -> None:
     assert kept.json()["assignment"] == "auto"
 
 
+async def test_fields_stand_in_their_position(api: Api) -> None:
+    a = auth(await api.admin())
+    net = await post(api, "/fields", {"name": "Net", "data_type": "amount"}, a)
+    gross = await post(api, "/fields", {"name": "Gross", "data_type": "amount", "position": 2}, a)
+    assert (net["position"], gross["position"]) == (0, 2)
+    moved = await api.client.patch(
+        f"{PREFIX}/fields/{gross['id']}", json={"position": -1}, headers=a
+    )
+    assert moved.json()["position"] == -1
+    listed = (await api.client.get(f"{PREFIX}/fields", headers=a)).json()
+    assert [field["name"] for field in listed] == ["Gross", "Net"]
+    kept = await api.client.patch(f"{PREFIX}/fields/{gross['id']}", json={"name": "G"}, headers=a)
+    assert kept.json()["position"] == -1
+    far = await api.client.patch(
+        f"{PREFIX}/fields/{gross['id']}", json={"position": 10_000}, headers=a
+    )
+    assert far.status_code == 422
+
+
 async def test_required_fields_and_title_patterns(api: Api) -> None:
     a = auth(await api.admin())
     payslip = await post(
