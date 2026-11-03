@@ -1723,8 +1723,6 @@
 	"identifier_kind": "Art der Kennung",
 	"identifier_value": "Kennung",
 	"identifier_topic": "Thema der Kennung",
-	"topic_none": "Kein Thema",
-	"topic_not_enabled": "Thema nicht freigeschaltet",
 	"topic_no_contact": "Erst einen Kontakt wählen",
 	"topic_enables_hint": "Der Kontakt führt dieses Thema noch nicht: Speichern schaltet es am Kontakt frei.",
 	"identifier_kind_iban": "IBAN",

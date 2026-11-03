@@ -16,6 +16,7 @@
 	import Segmented from '#lib/components/Segmented.svelte';
 	import SearchField from '#lib/components/SearchField.svelte';
 	import Select from '#lib/components/Select.svelte';
+	import TagPicker from '#lib/components/TagPicker.svelte';
 	import TagChip from '#lib/components/TagChip.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -39,7 +40,6 @@
 	} from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { phone } from '#lib/phone.svelte.ts';
-	import { pathLabel } from '#lib/tags.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import Eyebrow from '#lib/components/page/Eyebrow.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
@@ -169,17 +169,6 @@
 		if (!contacts) return topics;
 		const enabled = contactOf(item)?.topic_ids ?? [];
 		return topics.filter((topic) => enabled.includes(topic.id));
-	}
-
-	function topicChoices(item: IdentifierRow) {
-		const own = topicsFor(item);
-		const options = [
-			{ value: '', label: m.topic_none() },
-			...own.map((topic) => ({ value: topic.id, label: pathLabel(topic) }))
-		];
-		return item.topic_id === '' || own.some((topic) => topic.id === item.topic_id)
-			? options
-			: [...options, { value: item.topic_id, label: m.topic_not_enabled() }];
 	}
 
 	function indexOf(item: IdentifierRow): number {
@@ -351,7 +340,7 @@
 						class={[
 							'grid gap-2',
 							ownTopics.length > 0 || item.topic_id !== ''
-								? 'sm:grid-cols-[12.5rem_minmax(0,1fr)_9.5rem]'
+								? 'sm:grid-cols-[12.5rem_minmax(0,1fr)_minmax(0,12rem)]'
 								: 'sm:grid-cols-[12.5rem_minmax(0,1fr)]'
 						]}
 					>
@@ -371,11 +360,19 @@
 							onkeydown={closeOnEnter}
 						/>
 						{#if ownTopics.length > 0 || item.topic_id !== ''}
-							<Select
-								bind:value={rows[index].topic_id}
-								options={topicChoices(item)}
-								aria-label={m.identifier_topic()}
-								class="h-10"
+							<!-- The one choice of a topic, as at a document; one the contact no longer
+							     enables stays as its chip, to be removed. -->
+							<TagPicker
+								id="{uid}-{item.key}-topic"
+								label={m.identifier_topic()}
+								title={m.picker_title_topic()}
+								scope="topic"
+								tags={topics}
+								selected={item.topic_id === '' ? [] : [item.topic_id]}
+								onchange={(next) => (rows[index].topic_id = next[0] ?? '')}
+								offered={(tag) => ownTopics.some((own) => own.id === tag.id)}
+								creating={false}
+								single
 							/>
 						{/if}
 					</div>

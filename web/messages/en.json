@@ -1723,8 +1723,6 @@
 	"identifier_kind": "Kind of identifier",
 	"identifier_value": "Identifier",
 	"identifier_topic": "Topic of the identifier",
-	"topic_none": "No topic",
-	"topic_not_enabled": "Topic not enabled",
 	"topic_no_contact": "Choose a contact first",
 	"topic_enables_hint": "The contact does not have this topic yet: saving enables it at the contact.",
 	"identifier_kind_iban": "IBAN",
