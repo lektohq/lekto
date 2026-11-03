@@ -515,9 +515,13 @@ app shell, on `ui/sheet` with `side="right"`: 640 px on a desktop, the whole scr
 modal, over a dialog too.
 
 - **It only shows:** the eyebrow "Beam", the title, a line with contact · type · date; then,
-  with more than one document, the arrows and "Dokument 2 von 24" (keys ← →); the pages in the
-  document view's `PageViewer` (one page to a row at the start; buttons, Ctrl/⌘ with the wheel,
-  pinch, double click, + − 0); at the bottom "Dokument öffnen", on a phone across the width.
+  with more than one document, the arrows and "Dokument 2 von 24" (keys ← →); the pages exactly as the
+  document view shows them, only in another window (Tobi, 03.11.2026): one component for both,
+  `DocumentPages` (the archive PDF once it exists, the page images until then, the original PDF
+  before those; marks on the archive only; before, its page images re-rastered every page at
+  each step of a zoom), one page to a row at the start; buttons, Ctrl/⌘ with the wheel, pinch,
+  double click, + − 0; `design-system.test.ts` keeps `PdfViewer` and `PageImages` inside
+  `DocumentPages`; at the bottom "Dokument öffnen", on a phone across the width.
   Editing happens in the document view.
 - **Opening it: one way everywhere** (Tobi, 31.10.2026). Wherever Lekto names a document, its
   title opens it in the Beam: the eye (`scan-eye`) before the title, both one button in the
