@@ -12,6 +12,7 @@
 	import { BASE } from '#lib/base.ts';
 	import PageViewer from '#lib/components/PageViewer.svelte';
 	import type { Mark, Place } from '#lib/document-view.ts';
+	import type { Layout } from '#lib/viewer/zoom.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { m } from '#lib/paraglide/messages.js';
 
@@ -23,6 +24,7 @@
 		sources,
 		label,
 		marks = [],
+		start = null,
 		end,
 		onsource,
 		onpage
@@ -30,6 +32,8 @@
 		sources: readonly string[];
 		label: string;
 		marks?: readonly Mark[];
+		/** How the viewer starts (`PageViewer`). */
+		start?: Layout | null;
 		/** At the end of the toolbar (the switch of a pane). */
 		end?: Snippet;
 		onsource?: (source: string) => void;
@@ -180,6 +184,7 @@
 	{sizes}
 	{label}
 	{marks}
+	{start}
 	{loading}
 	{problem}
 	{end}

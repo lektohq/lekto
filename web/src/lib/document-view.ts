@@ -131,6 +131,16 @@ export function pageHref(url: Address, number: number | null): string {
 
 type Viewed = Pick<components['schemas']['DocumentDetails'], 'id' | 'media_type' | 'page_count'>;
 
+/** Whether the archive PDF exists: once the text is recognised. Until then the page images stand
+ * in, or, before they are rendered, the original PDF. */
+export function hasArchive(
+	document: Pick<components['schemas']['DocumentDetails'], 'processing'>
+): boolean {
+	return document.processing.nodes.some(
+		(state) => state.node === 'ocr' && state.status === 'done' && state.outcome !== 'failed'
+	);
+}
+
 /**
  * What the PDF viewer shows of a document: the archive PDF once it exists; before, while no
  * page images stand in, the original if it is a PDF, else nothing (an image is shown once its

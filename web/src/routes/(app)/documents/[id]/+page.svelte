@@ -45,6 +45,7 @@
 		type Review,
 		type Tab,
 		type View,
+		hasArchive,
 		viewerSources,
 		viewHref,
 		viewOf
@@ -119,13 +120,7 @@
 
 	const user = $derived(session.user);
 	const editable = $derived(document !== null && canEdit(document, user));
-	// The archive exists once the text is recognised; until then the page images stand in, or,
-	// before they are rendered, the original PDF.
-	const archive = $derived(
-		document?.processing.nodes.some(
-			(state) => state.node === 'ocr' && state.status === 'done' && state.outcome !== 'failed'
-		) ?? false
-	);
+	const archive = $derived(document ? hasArchive(document) : false);
 	const inbox = $derived(
 		fromInbox && inboxPlaces
 			? neighbours(

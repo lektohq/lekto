@@ -5,9 +5,9 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import type { Layout } from '#lib/viewer/zoom.ts';
 
-	// The page images (WebP from the original): in the document view until the archive PDF
-	// exists (they come early, while the text is still being recognised), and in the Beam, with
-	// the places it marks (`marks`, `reveal`). The same viewer as the PDF's: side by side, zoomed
+	// The page images (WebP from the original): in the document view and the Beam until the
+	// archive PDF exists (they come early, while the text is still being recognised), with the
+	// places they mark (`marks`, `reveal`). The same viewer as the PDF's: side by side, zoomed
 	// by gesture.
 	let {
 		documentId,
