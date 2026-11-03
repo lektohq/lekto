@@ -331,7 +331,6 @@
 								bind:value={rows[index].contact_id}
 								options={contactOptions}
 								aria-label={m.number_contact()}
-								class="h-10"
 							/>
 						</div>
 					{/if}
@@ -348,7 +347,6 @@
 							bind:value={rows[index].kind}
 							options={kinds}
 							aria-label={m.identifier_kind()}
-							class="h-10"
 						/>
 						<Input
 							id="{uid}-{item.key}-value"
@@ -356,7 +354,7 @@
 							aria-label={m.identifier_value()}
 							aria-invalid={errors[item.key] ? true : undefined}
 							maxlength={100}
-							class="h-10 font-mono"
+							class="font-mono"
 							onkeydown={closeOnEnter}
 						/>
 						{#if ownTopics.length > 0 || item.topic_id !== ''}
@@ -383,7 +381,6 @@
 								bind:value={rows[index].user_id}
 								options={userOptions}
 								aria-label={m.identifier_user()}
-								class="h-10"
 							/>
 						</div>
 					{/if}
