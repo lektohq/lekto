@@ -1708,6 +1708,7 @@
 	"picker_add_topic": "Thema",
 	"picker_add_group_label": "Gruppe hinzufügen",
 	"picker_add_topic_label": "Thema hinzufügen",
+	"picker_change": "„{name}“ ändern",
 	"picker_done": "Fertig",
 	"picker_title_contact": "Kontakt wählen",
 	"picker_title_type": "Dokumenttyp wählen",

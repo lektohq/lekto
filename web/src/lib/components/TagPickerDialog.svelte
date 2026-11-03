@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import X from '@lucide/svelte/icons/x';
+	import IconButton from '#lib/components/IconButton.svelte';
 	import PhoneSheet from '#lib/components/PhoneSheet.svelte';
 	import TagPickerList from '#lib/components/TagPickerList.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -9,7 +11,8 @@
 	import { phone } from '#lib/phone.svelte.ts';
 
 	// Several tags of one scope, chosen in a dialog over the page or editor it is opened from (on
-	// a phone a sheet from the bottom, `PhoneSheet`), the list of `TagPickerList`.
+	// a phone a sheet from the bottom, `PhoneSheet`), the list of `TagPickerList`. `single`: one
+	// at most, a click chooses and closes; a close button instead of "Fertig".
 	let {
 		open = $bindable(false),
 		title,
@@ -20,7 +23,8 @@
 		query = $bindable(''),
 		searchLabel = m.assignment_search(),
 		offered,
-		actions
+		actions,
+		single = false
 	}: {
 		open?: boolean;
 		title: string;
@@ -32,6 +36,7 @@
 		searchLabel?: string;
 		offered?: (tag: Tag) => boolean;
 		actions?: Snippet;
+		single?: boolean;
 	} = $props();
 
 	let search = $state<HTMLInputElement | null>(null);
@@ -40,16 +45,28 @@
 <!-- However it closes, the next time it opens with an empty search: bits-ui reports only its own
      closes (Escape, outside), "Fertig" clears it itself. -->
 {#snippet done()}
-	<Button
-		variant="ghost"
-		class="h-11 px-3 text-base font-semibold text-brand"
-		onclick={() => {
-			query = '';
-			open = false;
-		}}
-	>
-		{m.picker_done()}
-	</Button>
+	{#if single}
+		<IconButton
+			label={m.close()}
+			onclick={() => {
+				query = '';
+				open = false;
+			}}
+		>
+			<X aria-hidden="true" />
+		</IconButton>
+	{:else}
+		<Button
+			variant="ghost"
+			class="h-11 px-3 text-base font-semibold text-brand"
+			onclick={() => {
+				query = '';
+				open = false;
+			}}
+		>
+			{m.picker_done()}
+		</Button>
+	{/if}
 {/snippet}
 
 {#snippet list()}
@@ -64,6 +81,11 @@
 		bind:query
 		bind:search
 		{actions}
+		{single}
+		onpicked={() => {
+			query = '';
+			open = false;
+		}}
 	/>
 {/snippet}
 

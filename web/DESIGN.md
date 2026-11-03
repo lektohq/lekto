@@ -235,7 +235,7 @@ divider.
 - **Errors:** `Field.Error` under the field, tied to it with `aria-describedby`.
 - **`Select`**: a short, fixed list. On desktop a list in the style of the other pickers, on the
   phone the system's native picker.
-- **`SearchSelect`** (one of many by searching: contact, document type, topic), looking like a
+- **`SearchSelect`** (one of many by searching: contact, document type), looking like a
   `Select`. A popover on desktop; on the phone a sheet from the bottom (`PhoneSheet`) named by
   its `title` ("Kontakt wählen"), with a close button and rows of 48 px; a choice closes it
   (Tobi, 28.10.2026). Admins can create from the search (`CreateOffer`).
@@ -246,6 +246,13 @@ divider.
   `<input type="date">`, which follows the browser language. `PeriodInput` handles periods.
 - **Tags of every kind:** `TagPicker`. One field with the chosen chips and a dashed "+ …" chip. The
   choice opens as a popover on desktop and as a sheet from the bottom on the phone.
+- **A topic as a value** (of a document, in a rule's action, on many documents): the `TagPicker`
+  with one choice (`single`; Tobi, 03.11.2026). Without a topic the dashed "+ Thema" chip; with one
+  its chip alone, no "+": the × clears it, its name opens the choice to change it. The choice is a
+  flat list of radios, without the topics above a topic; a click chooses and closes it (no
+  "Fertig"; the keys only move the choice, Escape closes). The topics a contact enables are
+  several: the plain `TagPicker`. `design-system.test.ts` keeps the topic out of `Select` and
+  `SearchSelect`.
 - **Free values as chips** (other spellings, other names): `ChipInput`.
 
 ### Checkboxes, radios, switches
@@ -482,7 +489,7 @@ the deliveries by outcome and event). The documents list pages the same way (see
 | A short form (space, token, code, move, reprocess, new user) | `FormDialog`                                | centred, `size` `sm`/`md`/`lg`   | full screen with the editor bar                                                                                       |
 | An editor of master data, lenses                             | `EditorShell`                               | dialog with sticky head and foot | full screen with the editor bar                                                                                       |
 | A secret shown once                                          | `SecretDialog`                              | centred, `size="md"`             | centred with gutter                                                                                                   |
-| A choice from many (tags, facets; contact, type, topic)      | popover / `TagPickerDialog`, `SearchSelect` | popover or dialog                | sheet from the bottom (`PhoneSheet`; `SearchSelect`: see [Fields](#fields))                                           |
+| A choice from many (tags, facets, topic; contact, type)      | popover / `TagPickerDialog`, `SearchSelect` | popover or dialog                | sheet from the bottom (`PhoneSheet`; `SearchSelect`: see [Fields](#fields))                                           |
 | Filters                                                      | sidebar                                     | sidebar                          | sheet from the bottom, title and close fixed on top, "Zurücksetzen" and "Ergebnisse anzeigen (N)" fixed at the bottom |
 | A document's pages without leaving the place                 | `Beam`                                      | sheet from the right, 640 px     | full screen                                                                                                           |
 

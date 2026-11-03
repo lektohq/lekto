@@ -4,7 +4,7 @@
 // through `IconButton`, one way to view a document (the Beam), toggle chips only where each
 // toggles on its own, one order on the master data tabs, tooltips through `ui/tooltip`, a run's
 // progress in the selection bar, fields in the API's order, short lines under fields, a document's
-// pages through `DocumentPages`. An exception needs its line in DESIGN.md ("Exceptions") and here; the
+// pages through `DocumentPages`, a topic chosen through the tag picker. An exception needs its line in DESIGN.md ("Exceptions") and here; the
 // lists of exceptions may only shrink.
 import { describe, expect, it } from 'vitest';
 import de from '../messages/de.json';
@@ -277,6 +277,23 @@ describe('the design system (web/DESIGN.md)', () => {
 			offenders((source, path) =>
 				path.endsWith('/DocumentPages.svelte') ? null : line(source, viewers)
 			)
+		).toEqual([]);
+	});
+
+	it('chooses a topic as a value one way, the tag picker with one choice', () => {
+		expect(
+			offenders((source) => {
+				for (const [element] of source.matchAll(
+					/<(?:TagPicker|SearchSelect|Select)\b[\s\S]*?\/>/g
+				)) {
+					const topic = /picker_title_topic|scope="topic"|tagOptions\([^)]*'topic'\)/.test(element);
+					const one = element.startsWith('<TagPicker') && /\bsingle\b/.test(element);
+					// The topics a contact enables are several, chosen in the master data.
+					const several = /title=\{m\.master_topics\(\)\}/.test(element);
+					if (topic && !one && !several) return element.split('\n')[0];
+				}
+				return null;
+			})
 		).toEqual([]);
 	});
 
