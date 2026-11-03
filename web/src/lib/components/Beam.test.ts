@@ -6,11 +6,23 @@ import { goto } from '$app/navigation';
 import { fieldLabel } from '#lib/describe.ts';
 import { kindLabel } from '#lib/identifiers.ts';
 import { m } from '#lib/paraglide/messages.js';
-import { documentOf, fakeApi } from '#lib/testing/documents.ts';
+import { calls, documentOf, fakeApi, processingOf } from '#lib/testing/documents.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Beam from './Beam.svelte';
 
 vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
+// pdf.js needs a worker and a canvas: the archive opens as two A4 pages that are never drawn.
+vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
+	getDocument: () => ({
+		promise: Promise.resolve({
+			numPages: 2,
+			getPage: async () => ({ getViewport: () => ({ width: 595, height: 842 }) })
+		}),
+		destroy: async () => {}
+	}),
+	GlobalWorkerOptions: { workerSrc: '' }
+}));
+vi.mock('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url', () => ({ default: 'worker.js' }));
 vi.mock('$app/state', async () => ({
 	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
 }));
@@ -18,6 +30,9 @@ vi.mock('$app/state', async () => ({
 const LIST = '/ui/documents?tag=t1';
 const BOX = { x: 0.1, y: 0.2, width: 0.3, height: 0.02 };
 const beam = (index: number) => ({ ids: ['a', 'b'], index, from: 'Dokumente' });
+/** Still being read: no archive yet, so the Beam shows the page images. */
+const READING = { ...processingOf(), nodes: processingOf().nodes.slice(0, 1) };
+let processing = processingOf();
 
 beforeEach(() => {
 	vi.mocked(goto).mockClear();
@@ -39,8 +54,10 @@ beforeEach(() => {
 					contact_id: 'c1',
 					document_type_id: 't1',
 					document_date: '2026-03-31',
-					page_count: 2
+					page_count: 2,
+					processing
 				}),
+			'GET /api/v1/documents/a/archive': () => new Response(new Uint8Array([37, 80, 68, 70])),
 			'GET /api/v1/documents/b': () => new Response(null, { status: 404 }),
 			'GET /api/v1/contacts/c1': () => ({ id: 'c1', name: 'Stadtwerke' }),
 			'GET /api/v1/documents/a/review': () => ({
@@ -106,6 +123,7 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
+	processing = processingOf();
 	goTo('/ui/inbox');
 });
 
@@ -116,7 +134,23 @@ describe('Beam', () => {
 		expect(screen.queryByRole('dialog')).toBeNull();
 	});
 
+	it('shows the archive PDF as the document view does, once it exists', async () => {
+		const api = fakeApi({
+			'GET /api/v1/documents/a': () =>
+				documentOf({ id: 'a', title: 'Stromrechnung März', page_count: 2 }),
+			'GET /api/v1/documents/a/archive': () => new Response(new Uint8Array([37, 80, 68, 70]))
+		});
+		vi.stubGlobal('fetch', api);
+		goTo(LIST, {}, { beam: beam(0) });
+		render(Beam);
+		await screen.findByRole('dialog', { name: 'Stromrechnung März' });
+		await waitFor(() => expect(calls(api)).toContain('GET /api/v1/documents/a/archive'));
+		expect(screen.queryAllByRole('img')).toEqual([]);
+	});
+
 	it('shows the pages of the document with its head, and pages through the documents', async () => {
+		// Still being read: the page images stand in for the archive.
+		processing = READING;
 		goTo(LIST, {}, { words: 'Strom', beam: beam(0) });
 		render(Beam);
 		const sheet = await screen.findByRole('dialog', { name: 'Stromrechnung März' });
@@ -217,6 +251,21 @@ describe('Beam', () => {
 		expect(sheet.querySelectorAll('.shadow-pinned')).toHaveLength(1);
 		// It pages through the documents, not through places.
 		expect(sheet.textContent).toContain(m.beam_position({ current: 1, total: 2 }));
+	});
+
+	it('marks nothing on the page images: the places belong to the archive', async () => {
+		processing = READING;
+		goTo(
+			'/ui/inbox',
+			{},
+			{
+				beam: { ...beam(0), from: 'Eingang', inbox: true, source: { kind: 'review' } }
+			}
+		);
+		render(Beam);
+		const sheet = await screen.findByRole('dialog', { name: 'Stromrechnung März' });
+		expect(await screen.findAllByRole('img')).toHaveLength(2);
+		expect(sheet.querySelectorAll('.ring-primary')).toHaveLength(0);
 	});
 
 	it('marks a value in each document it pages through', async () => {

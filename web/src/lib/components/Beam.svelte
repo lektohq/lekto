@@ -13,7 +13,7 @@
 	import IconButton from '#lib/components/IconButton.svelte';
 	import Loading from '#lib/components/Loading.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
-	import PageImages from '#lib/components/document/PageImages.svelte';
+	import DocumentPages from '#lib/components/document/DocumentPages.svelte';
 	import Eyebrow from '#lib/components/page/Eyebrow.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
@@ -31,8 +31,9 @@
 	// The Beam (web/DESIGN.md, "Beam"): a document's pages in a sheet from the right, 640 px on
 	// a desktop and the whole screen on a phone, over the place it was opened from, a dialog
 	// included. It only shows: a head with the title, contact, type and date, the documents to
-	// page through (arrows, ← →), the pages zoomed as in the document view, and "Dokument
-	// öffnen", which jumps there with the way back to here. Its state is the history entry's
+	// page through (arrows, ← →), the pages as the document view shows them (the archive PDF, the
+	// page images until it exists) and zoomed alike, and "Dokument öffnen", which jumps there
+	// with the way back to here. Its state is the history entry's
 	// (`beam.svelte.ts`): the back button closes it, a reload brings it back. A document that is
 	// gone or out of reach closes it, and a toast says why. With a `source` it marks each place
 	// the value stands, the fact's own with a halo and its kind, and scrolls there; it pages
@@ -55,7 +56,8 @@
 	});
 	let problem = $state<string | null>(null);
 	let sheet = $state<HTMLElement | null>(null);
-	let images = $state<PageImages | null>(null);
+	// The pages, shown as the document view shows them.
+	let images = $state<DocumentPages | null>(null);
 	// The places of the source, by document, and which source they are of.
 	let places = $state<{ key: string; byDocument: Map<string, PlaceOut> } | null>(null);
 	const begin = latest();
@@ -374,20 +376,14 @@
 				<LoadProblem {problem} onretry={() => id && load(id)} />
 			{:else if !document}
 				<Loading class="py-16 text-center" />
-			{:else if !document.page_count}
-				<p class="py-16 text-center text-sm text-muted-foreground">{m.beam_no_pages()}</p>
 			{:else}
-				{#key document.id}
-					<PageImages
-						bind:this={images}
-						{marks}
-						documentId={document.id}
-						pageCount={document.page_count}
-						label={m.beam_pages({ title: document.title })}
-						note={null}
-						start="one"
-					/>
-				{/key}
+				<DocumentPages
+					bind:this={images}
+					{document}
+					{marks}
+					label={m.beam_pages({ title: document.title })}
+					start="one"
+				/>
 			{/if}
 		</div>
 		<div
