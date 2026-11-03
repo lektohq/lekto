@@ -959,17 +959,33 @@ describe('the topic', () => {
 		topic_id: HEALTH
 	} as Document;
 	const select = (label: string) => screen.getByRole('combobox', { name: label });
-	// The topic is a search in a popover: its button carries the chosen topic.
-	const topicField = () =>
-		screen.getByRole('combobox', { name: m.field_topic() }) as HTMLButtonElement;
-	const topicValue = () => topicField().dataset.value;
-	// The popover is placed by measuring, which jsdom does not: its options are found as elements.
-	const options = () => [...globalThis.document.querySelectorAll<HTMLElement>('[role="option"]')];
-	const chooseTopic = async (name: string) => {
-		await userEvent.click(topicField());
-		await waitFor(() => expect(options().length).toBeGreaterThan(0));
-		await userEvent.click(options().find((option) => option.textContent?.trim() === name)!);
+	// The topic is the tag picker with one choice: the chosen topic's chip, whose name opens the
+	// choice, or the "+" chip.
+	const topicField = () => globalThis.document.getElementById('doc-topic');
+	const topicOpener = () =>
+		topicField()!.querySelector<HTMLButtonElement>('button[aria-haspopup]')!;
+	const topicName = () => {
+		const opener = topicOpener();
+		return opener.getAttribute('aria-label') === m.picker_add_topic_label()
+			? ''
+			: opener.textContent?.trim();
 	};
+	// The field's card, around the picker (named alike).
+	const topicCard = () => screen.getAllByRole('group', { name: m.field_topic() })[0];
+	// The popover is placed by measuring, which jsdom does not: its radios are found as elements.
+	const options = () => [
+		...globalThis.document.querySelectorAll<HTMLInputElement>('input[type="radio"]')
+	];
+	const chooseTopic = async (name: string) => {
+		await userEvent.click(topicOpener());
+		await waitFor(() => expect(options().length).toBeGreaterThan(0));
+		await userEvent.click(options().find((option) => option.getAttribute('aria-label') === name)!);
+		await waitFor(() => expect(options()).toEqual([]));
+	};
+	const clearTopic = (name: string) =>
+		userEvent.click(
+			within(topicField()!).getByRole('button', { name: m.rule_remove_value({ name }) })
+		);
 	// A closed dialog gives the page its pointer back a moment later.
 	const closed = () =>
 		waitFor(() => {
@@ -977,9 +993,9 @@ describe('the topic', () => {
 			expect(globalThis.document.body.style.pointerEvents).not.toBe('none');
 		});
 	const topicChoices = async () => {
-		await userEvent.click(topicField());
+		await userEvent.click(topicOpener());
 		await waitFor(() => expect(options().length).toBeGreaterThan(0));
-		const names = options().map((option) => option.textContent?.trim());
+		const names = options().map((option) => option.getAttribute('aria-label'));
 		await userEvent.keyboard('{Escape}');
 		await waitFor(() => expect(options()).toEqual([]));
 		return names;
@@ -993,10 +1009,10 @@ describe('the topic', () => {
 			})
 		);
 		render(DocumentForm, props({ document: filed, lookup: topics, review: null }));
-		expect(topicValue()).toBe(HEALTH);
-		expect(await topicChoices()).toEqual([m.topic_none(), 'Arbeit', 'Krankenversicherung']);
+		expect(topicName()).toBe('Krankenversicherung');
+		expect(await topicChoices()).toEqual(['Arbeit', 'Krankenversicherung']);
 		await choose(userEvent, select(m.field_contact()), BANK);
-		expect(topicValue()).toBe('');
+		expect(topicName()).toBe('');
 		await chooseTopic('Arbeit');
 		await userEvent.click(screen.getByRole('button', { name: m.edit_review() }));
 		// Another topic chosen with another contact is sent with it.
@@ -1004,9 +1020,9 @@ describe('the topic', () => {
 		await userEvent.click(await screen.findByRole('button', { name: m.cancel() }));
 		await closed();
 		await choose(userEvent, select(m.field_contact()), BANK);
-		expect(await topicChoices()).toEqual([m.topic_none(), 'Arbeit']);
+		expect(await topicChoices()).toEqual(['Arbeit']);
 		await choose(userEvent, select(m.field_contact()), m.value_unset());
-		expect(screen.queryByRole('combobox', { name: m.field_topic() })).toBeNull();
+		expect(topicField()).toBeNull();
 	});
 
 	it('has the field only for a contact with topics, and keeps a topic the document has', async () => {
@@ -1015,7 +1031,7 @@ describe('the topic', () => {
 			...topics,
 			contacts: [...topics.contacts, named(PLAIN, 'Ohne Themen')]
 		} as unknown as Lookup;
-		const field = () => screen.queryByRole('combobox', { name: m.field_topic() });
+		const field = topicField;
 		const unknown = { ...filed, contact_id: null, topic_id: null } as Document;
 		const view = render(DocumentForm, props({ document: unknown, lookup: plain, review: null }));
 		expect(field()).toBeNull();
@@ -1027,7 +1043,7 @@ describe('the topic', () => {
 		// A topic its contact no longer has stays in view, to be removed.
 		const left = { ...filed, contact_id: PLAIN, topic_id: WORK } as Document;
 		render(DocumentForm, props({ document: left, lookup: plain, review: null }));
-		expect(topicValue()).toBe(WORK);
+		expect(topicName()).toBe('Arbeit');
 	});
 
 	it('offers an admin, too, only the topics of the chosen contact', async () => {
@@ -1039,13 +1055,13 @@ describe('the topic', () => {
 		});
 		const bank = { ...filed, contact_id: BANK, topic_id: null } as Document;
 		const view = render(DocumentForm, props({ document: bank, lookup: topics, review: null }));
-		expect(await topicChoices()).toEqual([m.topic_none(), 'Arbeit']);
+		expect(await topicChoices()).toEqual(['Arbeit']);
 		view.unmount();
 		// The stored topic is not offered again once another contact without it is chosen.
 		render(DocumentForm, props({ document: filed, lookup: topics, review: null }));
 		await choose(userEvent, select(m.field_contact()), BANK);
-		expect(topicValue()).toBe('');
-		expect(await topicChoices()).toEqual([m.topic_none(), 'Arbeit']);
+		expect(topicName()).toBe('');
+		expect(await topicChoices()).toEqual(['Arbeit']);
 	});
 
 	it('shows a topic Lekto only suggests as a card; a click takes it', async () => {
@@ -1079,18 +1095,14 @@ describe('the topic', () => {
 		} as unknown as Review;
 		const empty = { ...filed, topic_id: null } as Document;
 		render(DocumentForm, props({ document: empty, lookup: topics, review: suggested }));
-		const card = screen.getByRole('group', { name: m.field_topic() });
+		const card = topicCard();
 		expect(within(card).getByText('only one signal names it')).toBeTruthy();
 		await userEvent.click(
 			within(card).getByRole('button', { name: m.candidate_pick({ name: 'Arbeit' }) })
 		);
-		expect(topicValue()).toBe(WORK);
+		expect(topicName()).toBe('Arbeit');
 		// Taken, it is no suggestion any more.
-		expect(
-			within(screen.getByRole('group', { name: m.field_topic() })).queryByText(
-				'only one signal names it'
-			)
-		).toBeNull();
+		expect(within(topicCard()).queryByText('only one signal names it')).toBeNull();
 	});
 
 	const json = (body: unknown) =>
@@ -1113,7 +1125,7 @@ describe('the topic', () => {
 		fetchMock.mockImplementation(async () => json(PREVIEW));
 		render(DocumentForm, props({ document: filed, lookup: topics, review: null }));
 		await choose(userEvent, select(m.field_contact()), BANK);
-		expect(topicValue()).toBe('');
+		expect(topicName()).toBe('');
 		// Cleared by the contact, not by the person: no decision on the topic is sent.
 		expect(await sentPatch()).toEqual({ contact_id: BANK });
 	});
@@ -1123,9 +1135,9 @@ describe('the topic', () => {
 		const working = { ...filed, topic_id: WORK } as Document;
 		render(DocumentForm, props({ document: working, lookup: topics, review: null }));
 		await choose(userEvent, select(m.field_contact()), BANK);
-		expect(topicValue()).toBe(WORK);
+		expect(topicName()).toBe('Arbeit');
 		expect(await sentPatch()).toEqual({ contact_id: BANK });
-		await chooseTopic(m.topic_none());
+		await clearTopic('Arbeit');
 		expect(await sentPatch()).toEqual({ contact_id: BANK, topic_id: null });
 	});
 
@@ -1143,14 +1155,13 @@ describe('the topic', () => {
 		);
 		const onenabled = vi.fn();
 		render(DocumentForm, props({ document: bank, lookup: topics, review: null, onenabled }));
-		await userEvent.click(topicField());
+		await userEvent.click(topicOpener());
 		await typeInSearch(m.picker_search_create(), 'Zahnzusatz');
 		await userEvent.click(await screen.findByText(m.create_named({ name: 'Zahnzusatz' })));
 		// The topic dialog takes over (the layout hosts it), the name filled in.
 		expect(masterDataDialogs.nested).toMatchObject([{ kind: 'topics', name: 'Zahnzusatz' }]);
 		masterDataDialogs.finish(topic(DENTAL, 'Zahnzusatz') as unknown as Item);
-		await waitFor(() => expect(topicValue()).toBe(DENTAL));
-		expect(topicField().textContent?.trim()).toBe('Zahnzusatz');
+		await waitFor(() => expect(topicName()).toBe('Zahnzusatz'));
 		expect(screen.getByText(m.topic_enables_hint())).toBeTruthy();
 		expect(await sentPatch()).toEqual({ topic_id: DENTAL });
 		// Saved, the master data load again: the contact enables it now.
@@ -1191,7 +1202,7 @@ describe('the topic', () => {
 
 	it('offers others no topic to create', async () => {
 		render(DocumentForm, props({ document: filed, lookup: topics, review: null }));
-		await userEvent.click(topicField());
+		await userEvent.click(topicOpener());
 		await typeInSearch(m.assignment_search(), 'Zahnzusatz');
 		expect(screen.queryByText(m.create_named({ name: 'Zahnzusatz' }))).toBeNull();
 	});
@@ -1219,11 +1230,11 @@ describe('the topic', () => {
 		} as unknown as Review;
 		const waiting = { ...documentOf('review'), contact_id: CONTACT, topic_id: null } as Document;
 		render(DocumentForm, props({ document: waiting, lookup: topics, review: conflict }));
-		const card = screen.getByRole('group', { name: m.field_topic() });
+		const card = topicCard();
 		expect(within(card).getByText('rules set different values')).toBeTruthy();
 		expect(within(card).queryByText(m.source_none())).toBeNull();
-		expect(topicValue()).toBe(WORK);
-		await chooseTopic(m.topic_none());
+		expect(topicName()).toBe('Arbeit');
+		await clearTopic('Arbeit');
 		await userEvent.click(screen.getByRole('button', { name: m.review_confirm() }));
 		expect(await fetchMock.mock.calls[0][0].json()).toEqual({
 			changes: { topic_id: null },

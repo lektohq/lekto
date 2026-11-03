@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
@@ -265,5 +265,120 @@ describe('TagPicker wider than a phone', () => {
 		expect(
 			screen.queryByRole('button', { name: m.rule_remove_value({ name: 'Paid' }) })
 		).toBeNull();
+	});
+});
+
+// A document's topic: one at most, chosen with a click (Tobi, 03.11.2026).
+describe('TagPicker with one choice', () => {
+	const hidden = { hidden: true };
+	const TOPICS = [
+		tag('p1', ['Work'], null, 'topic'),
+		tag('p2', ['Work', 'Pension'], 'p1', 'topic'),
+		tag('p3', ['Health'], null, 'topic')
+	];
+
+	function single(selected: string[] = [], creating = true) {
+		const props = $state({
+			id: 'topic',
+			label: m.field_topic(),
+			title: m.picker_title_topic(),
+			scope: 'topic' as const,
+			tags: TOPICS,
+			selected,
+			onchange: (next: string[]) => {
+				props.selected = next;
+			},
+			single: true,
+			creating
+		});
+		render(TagPicker, props);
+		return props;
+	}
+	const radios = () => [...document.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
+	const field = () => screen.getByRole('group', { name: m.field_topic() });
+
+	it('chooses with a click, then shows the chip alone; its name changes it, × clears it', async () => {
+		const user = userEvent.setup();
+		const props = single();
+		await user.click(screen.getByRole('button', { name: m.picker_add_topic_label() }));
+		await screen.findByRole('dialog', hidden);
+		// A flat list of names, no tree.
+		expect(radios().map((radio) => radio.getAttribute('aria-label'))).toEqual([
+			'Work',
+			'Pension',
+			'Health'
+		]);
+		expect(radios().map((radio) => radio.closest('label')!.getAttribute('style'))).toEqual([
+			'--depth: 0;',
+			'--depth: 0;',
+			'--depth: 0;'
+		]);
+		await user.click(radios()[2]);
+		expect(props.selected).toEqual(['p3']);
+		await waitFor(() => expect(screen.queryByRole('dialog', hidden)).toBeNull());
+		expect(within(field()).queryByRole('button', { name: m.picker_add_topic_label() })).toBeNull();
+		await user.click(
+			within(field()).getByRole('button', { name: m.picker_change({ name: 'Health' }) })
+		);
+		await screen.findByRole('dialog', hidden);
+		expect(radios().map((radio) => radio.checked)).toEqual([false, false, true]);
+		await user.click(radios()[0]);
+		expect(props.selected).toEqual(['p1']);
+		await waitFor(() => expect(screen.queryByRole('dialog', hidden)).toBeNull());
+		await user.click(
+			within(field()).getByRole('button', { name: m.rule_remove_value({ name: 'Work' }) })
+		);
+		expect(props.selected).toEqual([]);
+		expect(within(field()).getByRole('button', { name: m.picker_add_topic_label() })).toBeTruthy();
+	});
+
+	it('closes when the chosen one is clicked again, and stays open while the keys move', async () => {
+		const user = userEvent.setup();
+		const props = single(['p1']);
+		const change = within(field()).getByRole('button', { name: m.picker_change({ name: 'Work' }) });
+		await user.click(change);
+		await screen.findByRole('dialog', hidden);
+		// The keys move the choice with a click of no count (jsdom does not move it itself).
+		await fireEvent.click(radios()[1], { detail: 0 });
+		expect(props.selected).toEqual(['p2']);
+		expect(screen.queryByRole('dialog', hidden)).not.toBeNull();
+		await user.click(radios()[1]);
+		await waitFor(() => expect(screen.queryByRole('dialog', hidden)).toBeNull());
+		expect(props.selected).toEqual(['p2']);
+	});
+
+	it('chooses in a sheet on a phone, closed by its button, not by "Fertig"', async () => {
+		phone.override(true);
+		const user = userEvent.setup();
+		const props = single();
+		await user.click(screen.getByRole('button', { name: m.picker_add_topic_label() }));
+		const sheet = await screen.findByRole('dialog', { name: m.picker_title_topic() });
+		expect(within(sheet).queryByRole('button', { name: m.picker_done() })).toBeNull();
+		await user.click(within(sheet).getByRole('radio', { name: 'Health' }));
+		expect(props.selected).toEqual(['p3']);
+		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+	});
+
+	it('offers an admin no creating where it is not to', async () => {
+		signIn('admin');
+		const user = userEvent.setup();
+		single(['p1'], false);
+		await user.click(screen.getByRole('button', { name: m.picker_change({ name: 'Work' }) }));
+		const popover = await screen.findByRole('dialog', hidden);
+		await user.type(within(popover).getByRole('searchbox', hidden), 'Dental');
+		expect(screen.queryByText(m.create_named({ name: 'Dental' }))).toBeNull();
+	});
+
+	it('takes the topic it creates as the one choice', async () => {
+		signIn('admin');
+		const user = userEvent.setup();
+		const props = single(['p1']);
+		await user.click(screen.getByRole('button', { name: m.picker_change({ name: 'Work' }) }));
+		const popover = await screen.findByRole('dialog', hidden);
+		await user.type(within(popover).getByRole('searchbox', hidden), 'Dental');
+		await user.click(screen.getByText(m.create_named({ name: 'Dental' })));
+		expect(masterDataDialogs.nested).toMatchObject([{ kind: 'topics', name: 'Dental' }]);
+		masterDataDialogs.finish(tag('p9', ['Dental'], null, 'topic'));
+		await waitFor(() => expect(props.selected).toEqual(['p9']));
 	});
 });

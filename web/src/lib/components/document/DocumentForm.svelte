@@ -20,7 +20,6 @@
 	import FieldShell from '#lib/components/document/FieldShell.svelte';
 	import FilingBox from '#lib/components/document/FilingBox.svelte';
 	import PaneHead from '#lib/components/document/PaneHead.svelte';
-	import TopicInput from '#lib/components/document/TopicInput.svelte';
 	import SearchSelect, { type SearchOption } from '#lib/components/SearchSelect.svelte';
 	import GroupChips from '#lib/components/GroupChips.svelte';
 	import FieldValueInput from '#lib/components/FieldValueInput.svelte';
@@ -825,16 +824,22 @@
 				>
 					<!-- An admin creates a topic here, too; saving enables it at the contact. One the
 					     contact does not enable is offered to nobody. -->
-					<TopicInput
+					<TagPicker
 						id="doc-topic"
-						bind:value={topic}
-						topics={topicChoices}
-						all={lookup.tags}
+						label={m.field_topic()}
+						labelledby="doc-topic-label"
+						title={m.picker_title_topic()}
+						scope="topic"
+						tags={lookup.tags}
+						selected={topic === '' ? [] : [topic]}
+						onchange={(next) => (topic = next[0] ?? '')}
+						offered={(tag) => topicChoices.some((choice) => choice.id === tag.id)}
 						disabled={!editable ||
 							contact === '' ||
 							(topicChoices.length === 0 && !session.isAdmin)}
 						placeholder={contact === '' ? m.topic_no_contact() : m.value_unset()}
-						creating={session.isAdmin && contact !== ''}
+						creating={contact !== ''}
+						single
 					/>
 					{#if enablesTopic && session.isAdmin}
 						<p class="mt-1 text-xs text-muted-foreground">{m.topic_enables_hint()}</p>
