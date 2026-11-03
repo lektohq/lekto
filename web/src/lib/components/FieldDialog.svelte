@@ -187,7 +187,11 @@
 			/>
 		</Field.Field>
 		<Field.Field>
-			<Field.Label for="field-def-position">{m.field_def_position()}</Field.Label>
+			<HintLabel
+				for="field-def-position"
+				label={m.field_def_position()}
+				hint={m.field_def_position_hint()}
+			/>
 			<Input
 				id="field-def-position"
 				type="number"
@@ -197,7 +201,7 @@
 				bind:value={position}
 				class="w-32"
 			/>
-			<Field.Description>{m.field_def_position_hint()}</Field.Description>
+			<Field.Description>{m.field_def_position_rule()}</Field.Description>
 		</Field.Field>
 		<!-- Set by hand: a switch at the end of its line, as the required ones of the types. -->
 		<div class="flex items-center gap-3">
