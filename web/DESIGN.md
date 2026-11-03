@@ -709,6 +709,12 @@ The lists are rows in one card (`MasterRow`), the tags one card per kind; the op
 table on a desktop (see [Lists](#lists)). Their rows on a phone are `MasterRow`s or built as they
 are.
 
+Fields stand in one order everywhere (Tobi, 03.11.2026): by their position, the same by name, as
+`GET /fields` lists them. The field dialog sets the position ("Reihenfolge", a number); the Felder
+tab, each group of the document view and every choice of fields keep the API's order and never
+sort by name again. A row in the Felder tab shows a position other than 0 as a small chip
+("Position 5") beside the data type.
+
 ### No plain data in addresses
 
 What a person types or what comes from a document (the words of a search, an IBAN, an invoice

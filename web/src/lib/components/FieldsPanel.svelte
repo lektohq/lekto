@@ -6,6 +6,7 @@
 	import PanelState from '#lib/components/PanelState.svelte';
 	import { describeError } from '#lib/errors.ts';
 	import { fieldTypeLabel } from '#lib/fields.ts';
+	import { formatNumber } from '#lib/i18n.ts';
 	import { latest } from '#lib/latest.ts';
 	import { fieldMatches } from '#lib/master-search.ts';
 	import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
@@ -15,9 +16,10 @@
 	import { scope } from '#lib/scope.svelte.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 
-	// The field definitions, found by the search of the page: name, data type, set by hand only,
-	// the types they apply to and whether they are required there, what belongs in them. The
-	// key templates use stands in the editor (and here, where there is room).
+	// The field definitions in their order (by position, the same by name), found by the search of
+	// the page: name, data type, set by hand only, a position other than 0, the types they apply
+	// to and whether they are required there, what belongs in them. The key templates use stands
+	// in the editor (and here, where there is room).
 	let { query = '' }: { query?: string } = $props();
 
 	let fields = $state<FieldDefinition[] | null>(null);
@@ -100,6 +102,11 @@
 							class="rounded-md bg-(--tag-orange) px-1.5 text-xs leading-5 text-(--tag-orange-foreground)"
 						>
 							{m.field_def_manual_short()}
+						</span>
+					{/if}
+					{#if field.position !== 0}
+						<span class="rounded-md bg-secondary px-1.5 text-xs leading-5 text-muted-foreground">
+							{m.field_def_position_short({ position: formatNumber(field.position) })}
 						</span>
 					{/if}
 					{#if !phone.current}
