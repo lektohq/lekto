@@ -22,6 +22,7 @@
 		chosen,
 		allChosen,
 		lookedAt,
+		total,
 		loaded,
 		conflicts,
 		loading,
@@ -43,6 +44,9 @@
 		allChosen: boolean;
 		/** Documents the dry run has looked at. */
 		lookedAt: number;
+		/** Documents it looks at in all (those the rule's conditions leave); null before the
+		 * first page. */
+		total: number | null;
 		/** Of them, those the rule would change. */
 		loaded: number;
 		/** Of them, those with a conflict. */
@@ -124,14 +128,18 @@
 
 {#snippet hint()}
 	{#if !application}
-		{#if loading}
+		{#if loading && total === null}
+			{m.rule_preview_starting()}
+		{:else if loading}
 			{m.rule_preview_loading({
-				documents: bulkDocuments(lookedAt),
+				checked: formatNumber(lookedAt),
+				total: formatNumber(total ?? 0),
 				count: formatNumber(loaded)
 			})}
 		{:else if stopped}
 			{m.rule_preview_stopped({
-				documents: bulkDocuments(lookedAt),
+				checked: formatNumber(lookedAt),
+				total: formatNumber(total ?? 0),
 				count: formatNumber(loaded)
 			})}
 		{:else}

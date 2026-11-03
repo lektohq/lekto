@@ -10241,7 +10241,7 @@
           "rules"
         ],
         "summary": "Preview applying a rule to existing documents",
-        "description": "The documents the rule's current version would change, newest first, with what would change and the conflicts (a field that has another value). Each shows the chain as applying runs it: the rules of the spaces the rule files it into, and of the spaces those file it into (each at most once), and where it ends up; with conflicts also when they are accepted. Nothing is stored. A space rule: the editors of its space and admins, on the documents in its space. A global rule: anyone, on the documents they may edit (admins: every document). Documents in processing are left out.",
+        "description": "The documents the rule's current version would change, newest first, with what would change and the conflicts (a field that has another value). Each shows the chain as applying runs it: the rules of the spaces the rule files it into, and of the spaces those file it into (each at most once), and where it ends up; with conflicts also when they are accepted. Only documents the rule's conditions on contact, type, their groups, topic, tags and fields do not rule out are looked at. Nothing is stored. A space rule: the editors of its space and admins, on the documents in its space. A global rule: anyone, on the documents they may edit (admins: every document). Documents in processing are left out.",
         "operationId": "preview_apply_api_v1_rules__id__apply_preview_post",
         "parameters": [
           {
@@ -23017,6 +23017,11 @@
             "type": "integer",
             "title": "Looked At",
             "description": "Documents this page looked at, those in `items` among them; add them up."
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Documents the whole dry run looks at: those the rule's conditions on contact, document type, their groups, topic, tags and fields do not rule out; the `looked_at` of all pages add up to it."
           }
         },
         "type": "object",
@@ -23025,7 +23030,8 @@
           "version",
           "items",
           "next_cursor",
-          "looked_at"
+          "looked_at",
+          "total"
         ],
         "title": "ApplyPreviewOut"
       },
