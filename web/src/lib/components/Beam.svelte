@@ -13,20 +13,13 @@
 	import IconButton from '#lib/components/IconButton.svelte';
 	import Loading from '#lib/components/Loading.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
-	import PageImages from '#lib/components/document/PageImages.svelte';
-	import PdfViewer from '#lib/components/PdfViewer.svelte';
+	import DocumentPages from '#lib/components/document/DocumentPages.svelte';
 	import Eyebrow from '#lib/components/page/Eyebrow.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
 	import { documentHref } from '#lib/candidates.ts';
 	import { fieldLabel } from '#lib/describe.ts';
-	import {
-		hasArchive,
-		inboxDocument,
-		marksOf,
-		viewerSources,
-		type Mark
-	} from '#lib/document-view.ts';
+	import { inboxDocument, marksOf, type Mark } from '#lib/document-view.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { formatDate } from '#lib/i18n.ts';
 	import { kindLabel } from '#lib/identifiers.ts';
@@ -63,8 +56,8 @@
 	});
 	let problem = $state<string | null>(null);
 	let sheet = $state<HTMLElement | null>(null);
-	// The pages: the archive PDF as in the document view, the page images until it exists.
-	let images = $state<PdfViewer | PageImages | null>(null);
+	// The pages, shown as the document view shows them.
+	let images = $state<DocumentPages | null>(null);
 	// The places of the source, by document, and which source they are of.
 	let places = $state<{ key: string; byDocument: Map<string, PlaceOut> } | null>(null);
 	const begin = latest();
@@ -383,30 +376,14 @@
 				<LoadProblem {problem} onretry={() => id && load(id)} />
 			{:else if !document}
 				<Loading class="py-16 text-center" />
-			{:else if !document.page_count}
-				<p class="py-16 text-center text-sm text-muted-foreground">{m.beam_no_pages()}</p>
 			{:else}
-				{#key `${document.id}:${hasArchive(document)}`}
-					{#if hasArchive(document)}
-						<PdfViewer
-							bind:this={images}
-							sources={viewerSources(document, true)}
-							{marks}
-							label={m.beam_pages({ title: document.title })}
-							start="one"
-						/>
-					{:else}
-						<PageImages
-							bind:this={images}
-							{marks}
-							documentId={document.id}
-							pageCount={document.page_count}
-							label={m.beam_pages({ title: document.title })}
-							note={null}
-							start="one"
-						/>
-					{/if}
-				{/key}
+				<DocumentPages
+					bind:this={images}
+					{document}
+					{marks}
+					label={m.beam_pages({ title: document.title })}
+					start="one"
+				/>
 			{/if}
 		</div>
 		<div
