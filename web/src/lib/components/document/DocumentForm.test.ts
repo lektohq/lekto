@@ -206,6 +206,16 @@ describe('DocumentForm', () => {
 		expect(within(global).getByLabelText('Notiz', { selector: 'input' })).toBeTruthy();
 	});
 
+	it('shows the fields in the order the API lists them (by position), not by name', () => {
+		const amount = { ...lookup.fields[0], id: 'f-amount', name: 'Betrag', description: null };
+		render(DocumentForm, props({ lookup: { ...lookup, fields: [...lookup.fields, amount] } }));
+		const typed = screen.getByRole('region', { name: m.group_type({ type: 'Rechnung' }) });
+		const labels = within(typed)
+			.getAllByRole('textbox')
+			.map((input) => input.id);
+		expect(labels).toEqual([`field-${NUMBER}`, 'field-f-amount']);
+	});
+
 	it('links from the contact to the facts of the document, when there are any', () => {
 		const counts = { evidence: 2, unknown: 0, codes: 1 };
 		render(DocumentForm, props({ factCounts: counts, factsHref: '/documents/d/content' }));

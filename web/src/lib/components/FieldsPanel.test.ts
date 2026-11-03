@@ -43,6 +43,20 @@ beforeEach(() => {
 					required: false,
 					required_document_type_ids: [INVOICE],
 					description: 'Die Nummer, unter der die Rechnung geführt wird',
+					position: 0,
+					created_at: '2026-10-13T12:00:00Z'
+				},
+				{
+					id: 'f2',
+					name: 'Betrag',
+					key: 'betrag',
+					data_type: 'amount',
+					document_type_ids: [INVOICE],
+					choices: [],
+					required: false,
+					required_document_type_ids: [],
+					description: null,
+					position: 5,
 					created_at: '2026-10-13T12:00:00Z'
 				}
 			]);
@@ -75,6 +89,34 @@ describe('FieldsPanel', () => {
 		expect(await screen.findByText((text) => text.includes(required))).toBeTruthy();
 	});
 
+	it('lists the fields as the API orders them and shows a position other than 0', async () => {
+		render(FieldsPanel);
+		const list = await screen.findByRole('list', { name: m.master_fields() });
+		const rows = within(list).getAllByRole('listitem');
+		expect(rows.map((row) => row.textContent)).toEqual([
+			expect.stringContaining('Rechnungsnummer'),
+			expect.stringContaining('Betrag')
+		]);
+		expect(within(rows[0]).queryByText(/Position/)).toBeNull();
+		expect(within(rows[1]).getByText(m.field_def_position_short({ position: '5' }))).toBeTruthy();
+	});
+
+	it('moves a field by its position', async () => {
+		render(WithDialogs, { component: FieldsPanel });
+		await userEvent.click(
+			await screen.findByRole('button', { name: m.master_edit({ name: 'Betrag' }) })
+		);
+		const position = await screen.findByLabelText(m.field_def_position());
+		expect((position as HTMLInputElement).value).toBe('5');
+		await userEvent.clear(position);
+		await userEvent.type(position, '-2');
+		await userEvent.click(screen.getByRole('button', { name: m.save() }));
+		const patch = fetchMock.mock.calls
+			.map((call) => call[0])
+			.find((call) => call.method === 'PATCH');
+		expect(await patch?.json()).toMatchObject({ position: -2 });
+	});
+
 	// Dialog, tab, search and popover one after another: the longest of these under load.
 	it('makes a field required for one of its types', async () => {
 		render(WithDialogs, { component: FieldsPanel });
@@ -104,6 +146,7 @@ describe('FieldsPanel', () => {
 			data_type: 'text',
 			description: null,
 			assignment: 'auto',
+			position: 0,
 			document_type_ids: [REMINDER],
 			required: false,
 			required_document_type_ids: [REMINDER]
