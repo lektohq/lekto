@@ -39,6 +39,9 @@ class SqlMailRecordRepository:
                 rule=record.rule,
                 documents=record.documents,
                 fetched_at=record.fetched_at,
+                senders=list(record.senders),
+                recipients=list(record.recipients),
+                attachments=list(record.attachments),
                 version=record.version,
             )
         )
@@ -87,6 +90,9 @@ def _record(row: Row[Any]) -> MailRecord:
         rule=row.rule,
         documents=row.documents,
         fetched_at=row.fetched_at,
+        senders=tuple(row.senders),
+        recipients=tuple(row.recipients),
+        attachments=tuple(row.attachments),
         version=row.version,
     )
 
