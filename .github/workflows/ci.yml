@@ -226,8 +226,8 @@ jobs:
         run: pnpm gen:api && git diff --exit-code src/lib/api/schema.ts
       - run: pnpm build
 
-  # The integration tests against the devcontainer's services (Postgres, Garage, Meilisearch)
-  # and the OCR programs, on the runner. No test may skip.
+  # The integration tests against the devcontainer's services (Postgres, Garage, Meilisearch,
+  # GreenMail) and the OCR programs, on the runner. No test may skip.
   integration:
     needs: changes
     if: needs.changes.outputs.integration == 'true'
@@ -241,7 +241,7 @@ jobs:
         run: |
           $COMPOSE config --format json \
             | jq -r '.services.dev.environment | to_entries[] | "\(.key)=\(.value)"' \
-            | sed -E 's#^LEKTO_DB_HOST=.*#LEKTO_DB_HOST=localhost#; s#//(garage|meilisearch):#//localhost:#' \
+            | sed -E 's#^LEKTO_DB_HOST=.*#LEKTO_DB_HOST=localhost#; s#//(garage|meilisearch|greenmail):#//localhost:#' \
             >> "$GITHUB_ENV"
       - name: Start the services and install the OCR programs, in parallel
         run: |
@@ -251,7 +251,7 @@ jobs:
               ghostscript pngquant qpdf tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng unpaper
           ) > "$RUNNER_TEMP/apt.log" 2>&1 &
           apt=$!
-          $COMPOSE up -d --wait postgres meilisearch garage
+          $COMPOSE up -d --wait postgres meilisearch garage greenmail
           $COMPOSE run --rm garage-init
           wait $apt || { cat "$RUNNER_TEMP/apt.log"; exit 1; }
       - uses: astral-sh/setup-uv@v7
