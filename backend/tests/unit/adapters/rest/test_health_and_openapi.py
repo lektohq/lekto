@@ -296,7 +296,7 @@ async def test_the_upload_body_is_multipart(api: Api) -> None:
     assert form["properties"]["file"] == {
         "type": "string",
         "format": "binary",
-        "description": "PDF, JPEG, PNG or TIFF; recognised by content.",
+        "description": "PDF, JPEG, PNG, TIFF or a mail (`.eml`); recognised by content.",
     }
     assert form["properties"]["space_id"]["format"] == "uuid"
 

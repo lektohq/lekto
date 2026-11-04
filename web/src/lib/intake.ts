@@ -1,6 +1,6 @@
 /**
  * What becomes of files someone chose or dropped to upload: the ones the API takes (PDF, JPEG,
- * PNG, TIFF, as `POST /documents` reads them), and the ones skipped, with the reason. A drop may
+ * PNG, TIFF, mails as `.eml`, as `POST /documents` reads them), and the ones skipped, with the reason. A drop may
  * hold folders: they are read through the browser's entries (`webkitGetAsEntry`), in full and
  * recursively; their structure is not kept. Hidden files and folders (a name starting with a
  * dot, such as `.DS_Store`) are skipped.
@@ -11,11 +11,13 @@ const ACCEPTED: Record<string, readonly string[]> = {
 	'application/pdf': ['pdf'],
 	'image/jpeg': ['jpg', 'jpeg'],
 	'image/png': ['png'],
-	'image/tiff': ['tif', 'tiff']
+	'image/tiff': ['tif', 'tiff'],
+	'message/rfc822': ['eml']
 };
 
-/** For the `accept` of a file input. */
-export const ACCEPT = Object.keys(ACCEPTED).join(',');
+/** For the `accept` of a file input: the types, and the mail's ending, which not every system
+ * gives a type. */
+export const ACCEPT = [...Object.keys(ACCEPTED), '.eml'].join(',');
 
 /** Why a file is not uploaded: another type, hidden, larger than the API takes (413), or the
  * browser could not read it (a folder without permission, a file gone meanwhile). */

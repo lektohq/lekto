@@ -54,7 +54,9 @@ describe('what is skipped', () => {
 		expect(skipReason('notes.txt', 'text/plain')).toBe('type');
 		expect(skipReason('photo.heic', 'image/heic')).toBe('type');
 		expect(skipReason('README', '')).toBe('type');
-		expect(ACCEPT).toBe('application/pdf,image/jpeg,image/png,image/tiff');
+		expect(ACCEPT).toBe('application/pdf,image/jpeg,image/png,image/tiff,message/rfc822,.eml');
+		expect(skipReason('Rechnung.eml', '')).toBeNull();
+		expect(skipReason('Rechnung.eml', 'message/rfc822')).toBeNull();
 	});
 
 	it('skips hidden files', () => {

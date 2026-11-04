@@ -117,7 +117,8 @@
 	const SOURCES: Record<Source, () => string> = {
 		info: m.files_source_info,
 		xmp: m.files_source_xmp,
-		exif: m.files_source_exif
+		exif: m.files_source_exif,
+		mail: m.files_source_mail
 	};
 	const SAID: Record<SaidKey, () => string> = {
 		title: m.files_said_title,
@@ -152,7 +153,7 @@
 	);
 	// The sources either file has, the same for both: switching keeps the controls in place.
 	const sources = $derived(
-		(['info', 'xmp', 'exif'] as const).filter((kind) =>
+		(['info', 'xmp', 'exif', 'mail'] as const).filter((kind) =>
 			[files?.original, files?.archive].some((file) =>
 				file?.metadata?.entries.some((entry) => entry.source === kind)
 			)

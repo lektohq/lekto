@@ -12,6 +12,7 @@ from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.ports.metadata import MetadataSource
 from tests.builders import SAMPLES
 from tests.contracts.processing import MetadataReaderContract
+from tests.mails import rich_mail
 
 
 @pytest.fixture
@@ -86,3 +87,19 @@ async def test_every_page_of_a_tiff(metadata_reader: FileMetadataReader) -> None
     metadata = await metadata_reader.read_metadata((SAMPLES / "pages.tiff").read_bytes())
     assert (metadata.format, metadata.pages) == ("TIFF", 2)
     assert not {entry.key for entry in metadata.entries} & {"StripOffsets", "Compression"}
+
+
+async def test_a_mail_with_the_header_lines_a_person_reads(
+    metadata_reader: FileMetadataReader,
+) -> None:
+    metadata = await metadata_reader.read_metadata(rich_mail())
+    assert metadata.format == "E-Mail"
+    assert [(entry.source, entry.key) for entry in metadata.entries] == [
+        (MetadataSource.MAIL, "From"),
+        (MetadataSource.MAIL, "To"),
+        (MetadataSource.MAIL, "Cc"),
+        (MetadataSource.MAIL, "Date"),
+        (MetadataSource.MAIL, "Message-ID"),
+        (MetadataSource.MAIL, "Subject"),
+    ]
+    assert metadata.entries[-1].value == "Ihre Rechnung über 123,45 €"
