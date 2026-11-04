@@ -1,0 +1,1150 @@
+{
+ "description": "Search queries on the example documents (made with generate.py --search-set). `expected`: the documents (keys of manifest.json) that answer the query; the first one found in the results counts, R-precision counts them all. `kind`: exact (words of the document), number (identifiers), compound (a compound the documents spell otherwise), part (one part of a compound of the document), inflected (another form of a word of the document), synonym (another word for the same thing, not in the document), field (the contact, type or title of the documents, which many others name in their text), ending (a word Meilisearch splits into its stem and a short ending, \"Weihnachten\" into \"weihnacht\" and \"en\", \"Quittungen\" into \"quittung\" and \"en\"), typo, paraphrase, english (query in English, documents in German), confusable (the right one among documents alike), question (asked as a person asks), purpose (what a document is for, in none of its words).",
+ "queries": [
+  {
+   "query": "Klassenfahrt Schullandheim",
+   "kind": "exact",
+   "expected": [
+    "schule-klassenfahrt"
+   ]
+  },
+  {
+   "query": "Hauptuntersuchung",
+   "kind": "exact",
+   "expected": [
+    "hu-2026"
+   ]
+  },
+  {
+   "query": "Krankengymnastik",
+   "kind": "exact",
+   "expected": [
+    "physio"
+   ]
+  },
+  {
+   "query": "Ibuprofen",
+   "kind": "exact",
+   "expected": [
+    "apotheke-0",
+    "apotheke-1",
+    "apotheke-2"
+   ]
+  },
+  {
+   "query": "Grundsteuer",
+   "kind": "exact",
+   "expected": [
+    "nebenkosten-2024",
+    "nebenkosten-2025"
+   ]
+  },
+  {
+   "query": "Zwischenzeugnis",
+   "kind": "exact",
+   "expected": [
+    "zwischenzeugnis-max"
+   ]
+  },
+  {
+   "query": "Freistellungsauftrag",
+   "kind": "exact",
+   "expected": [
+    "freistellungsauftrag",
+    "sparkasse-steuer-2025"
+   ]
+  },
+  {
+   "query": "Urlaubsgeld",
+   "kind": "exact",
+   "expected": [
+    "lohn-max-2024-06",
+    "lohn-max-2025-06",
+    "lohn-max-2026-06"
+   ]
+  },
+  {
+   "query": "Weihnachtsgeld",
+   "kind": "exact",
+   "expected": [
+    "lohn-max-2024-11",
+    "lohn-max-2025-11"
+   ]
+  },
+  {
+   "query": "Tilgung",
+   "kind": "exact",
+   "expected": [
+    "darlehen-vertrag"
+   ]
+  },
+  {
+   "query": "Akku",
+   "kind": "exact",
+   "expected": [
+    "bon-hardware-18"
+   ]
+  },
+  {
+   "query": "Schrauben",
+   "kind": "exact",
+   "expected": [
+    "bon-hardware-17",
+    "bon-hardware-18",
+    "bon-hardware-19"
+   ]
+  },
+  {
+   "query": "RG-2026-118842",
+   "kind": "number",
+   "expected": [
+    "bergmann-gutschrift",
+    "bergmann-mahnung-1",
+    "bergmann-mahnung-2",
+    "bergmann-rechnung"
+   ]
+  },
+  {
+   "query": "WF-25-07-0419",
+   "kind": "number",
+   "expected": [
+    "moebel-auftrag",
+    "moebel-lieferschein",
+    "moebel-quittung",
+    "moebel-rechnung"
+   ]
+  },
+  {
+   "query": "SNX4QK",
+   "kind": "number",
+   "expected": [
+    "flug-bordkarte",
+    "flug-buchung"
+   ]
+  },
+  {
+   "query": "AF-24-0203318",
+   "kind": "number",
+   "expected": [
+    "darlehen-2024",
+    "darlehen-2025",
+    "darlehen-vertrag"
+   ]
+  },
+  {
+   "query": "2004 7718",
+   "kind": "number",
+   "expected": [
+    "strom-2024",
+    "strom-2025",
+    "strom-2025-scan",
+    "strom-2026",
+    "strom-ablesung",
+    "strom-korrektur",
+    "strom-preis",
+    "strom-schluss",
+    "strom-vertrag"
+   ]
+  },
+  {
+   "query": "LS-8820311",
+   "kind": "number",
+   "expected": [
+    "bergmann-lieferschein"
+   ]
+  },
+  {
+   "query": "BS 4471 1984 00",
+   "kind": "number",
+   "expected": [
+    "bauspar-2024",
+    "bauspar-2025",
+    "bauspar-vertrag"
+   ]
+  },
+  {
+   "query": "Stromrechnung",
+   "kind": "compound",
+   "expected": [
+    "strom-2024",
+    "strom-2025",
+    "strom-2025-scan",
+    "strom-2026",
+    "strom-korrektur",
+    "strom-schluss"
+   ]
+  },
+  {
+   "query": "Hundesteuerbescheid",
+   "kind": "compound",
+   "expected": [
+    "hundesteuer-2025",
+    "hundesteuer-2026"
+   ]
+  },
+  {
+   "query": "Fahrradversicherung",
+   "kind": "compound",
+   "expected": [
+    "hausrat-police",
+    "schaden-anzeige",
+    "schaden-eingang",
+    "schaden-regulierung"
+   ]
+  },
+  {
+   "query": "Kfz-Versicherung",
+   "kind": "compound",
+   "expected": [
+    "kfz-beitrag-2026",
+    "kfz-police",
+    "kfz-sf"
+   ]
+  },
+  {
+   "query": "Zahnarztrechnung",
+   "kind": "compound",
+   "expected": [
+    "zahnarzt-rechnung"
+   ]
+  },
+  {
+   "query": "Musikschulvertrag",
+   "kind": "compound",
+   "expected": [
+    "musikschule-vertrag"
+   ]
+  },
+  {
+   "query": "Gymnastik",
+   "kind": "part",
+   "expected": [
+    "physio"
+   ]
+  },
+  {
+   "query": "Diebstahl",
+   "kind": "part",
+   "expected": [
+    "schaden-anzeige",
+    "schaden-eingang",
+    "schaden-regulierung"
+   ]
+  },
+  {
+   "query": "Zähler",
+   "kind": "part",
+   "expected": [
+    "strom-ablesung"
+   ]
+  },
+  {
+   "query": "Zeugnis",
+   "kind": "part",
+   "expected": [
+    "zeugnis-erika",
+    "zwischenzeugnis-max"
+   ]
+  },
+  {
+   "query": "Installation",
+   "kind": "part",
+   "expected": [
+    "krause-angebot",
+    "krause-rechnung"
+   ]
+  },
+  {
+   "query": "Abend",
+   "kind": "part",
+   "expected": [
+    "schule-elternabend"
+   ]
+  },
+  {
+   "query": "Verträge",
+   "kind": "inflected",
+   "expected": [
+    "arbeitsvertrag-erika",
+    "arbeitsvertrag-erika-foto",
+    "bauspar-vertrag",
+    "darlehen-vertrag",
+    "fahrrad-kaufvertrag",
+    "mietvertrag",
+    "moebel-auftrag",
+    "musikschule-vertrag",
+    "strom-vertrag"
+   ]
+  },
+  {
+   "query": "Mahnungen",
+   "kind": "inflected",
+   "expected": [
+    "bergmann-mahnung-1",
+    "bergmann-mahnung-2",
+    "krause-mahnung"
+   ]
+  },
+  {
+   "query": "Spenden",
+   "kind": "inflected",
+   "expected": [
+    "spende-2024",
+    "spende-2025",
+    "ueberweisung-tierheim"
+   ]
+  },
+  {
+   "query": "Lieferscheine",
+   "kind": "inflected",
+   "expected": [
+    "bergmann-lieferschein",
+    "moebel-lieferschein"
+   ]
+  },
+  {
+   "query": "Zeugnisse",
+   "kind": "inflected",
+   "expected": [
+    "zeugnis-erika",
+    "zwischenzeugnis-max"
+   ]
+  },
+  {
+   "query": "Zins",
+   "kind": "inflected",
+   "expected": [
+    "bauspar-2024",
+    "bauspar-2025",
+    "bauspar-vertrag",
+    "darlehen-2024",
+    "darlehen-2025",
+    "darlehen-vertrag"
+   ]
+  },
+  {
+   "query": "Steuerbescheide",
+   "kind": "inflected",
+   "expected": [
+    "kfz-steuer",
+    "kfz-steuer-aenderung",
+    "steuer-2024",
+    "steuer-2025"
+   ]
+  },
+  {
+   "query": "13. Gehalt",
+   "kind": "synonym",
+   "expected": [
+    "lohn-max-2024-11",
+    "lohn-max-2025-11"
+   ]
+  },
+  {
+   "query": "Weihnachtsgratifikation",
+   "kind": "synonym",
+   "expected": [
+    "lohn-max-2024-11",
+    "lohn-max-2025-11"
+   ]
+  },
+  {
+   "query": "Nebenkostenabrechnung",
+   "kind": "synonym",
+   "expected": [
+    "nebenkosten-2024",
+    "nebenkosten-2025"
+   ]
+  },
+  {
+   "query": "Krankmeldung",
+   "kind": "synonym",
+   "expected": [
+    "au-max"
+   ]
+  },
+  {
+   "query": "TÜV",
+   "kind": "synonym",
+   "expected": [
+    "hu-2026"
+   ]
+  },
+  {
+   "query": "Strafzettel",
+   "kind": "synonym",
+   "expected": [
+    "bussgeld-anhoerung",
+    "bussgeld-bescheid"
+   ]
+  },
+  {
+   "query": "Lohnzettel",
+   "kind": "synonym",
+   "expected": [
+    "lohn-erika-2025-03",
+    "lohn-erika-2025-04",
+    "lohn-erika-2025-06",
+    "lohn-erika-2025-07",
+    "lohn-erika-2025-09",
+    "lohn-erika-2025-10",
+    "lohn-erika-2025-12",
+    "lohn-erika-2026-01",
+    "lohn-erika-2026-03",
+    "lohn-erika-2026-04",
+    "lohn-erika-2026-06",
+    "lohn-erika-2026-07",
+    "lohn-erika-2026-09",
+    "lohn-max-2024-01",
+    "lohn-max-2024-02",
+    "lohn-max-2024-03",
+    "lohn-max-2024-04",
+    "lohn-max-2024-05",
+    "lohn-max-2024-06",
+    "lohn-max-2024-07",
+    "lohn-max-2024-08",
+    "lohn-max-2024-09",
+    "lohn-max-2024-10",
+    "lohn-max-2024-11",
+    "lohn-max-2024-12",
+    "lohn-max-2025-01",
+    "lohn-max-2025-02",
+    "lohn-max-2025-03",
+    "lohn-max-2025-04",
+    "lohn-max-2025-05",
+    "lohn-max-2025-06",
+    "lohn-max-2025-07",
+    "lohn-max-2025-08",
+    "lohn-max-2025-09",
+    "lohn-max-2025-10",
+    "lohn-max-2025-11",
+    "lohn-max-2025-12",
+    "lohn-max-2026-01",
+    "lohn-max-2026-02",
+    "lohn-max-2026-03",
+    "lohn-max-2026-04",
+    "lohn-max-2026-05",
+    "lohn-max-2026-06",
+    "lohn-max-2026-07",
+    "lohn-max-2026-08",
+    "lohn-max-2026-09"
+   ]
+  },
+  {
+   "query": "Wohnsitzanmeldung",
+   "kind": "synonym",
+   "expected": [
+    "meldebestaetigung"
+   ]
+  },
+  {
+   "query": "Handyrechnung",
+   "kind": "synonym",
+   "expected": [
+    "fernnetz-2024-01",
+    "fernnetz-2024-02",
+    "fernnetz-2024-03",
+    "fernnetz-2024-04",
+    "fernnetz-2024-05",
+    "fernnetz-2024-06",
+    "fernnetz-2024-07",
+    "fernnetz-2024-08",
+    "fernnetz-2024-09",
+    "fernnetz-2024-10",
+    "fernnetz-2024-11",
+    "fernnetz-2024-12",
+    "fernnetz-2025-01",
+    "fernnetz-2025-02",
+    "fernnetz-2025-03",
+    "fernnetz-2025-04",
+    "fernnetz-2025-05",
+    "fernnetz-2025-06",
+    "fernnetz-2025-07",
+    "fernnetz-2025-08",
+    "fernnetz-2025-09",
+    "fernnetz-2025-10",
+    "fernnetz-2025-11",
+    "fernnetz-2025-12",
+    "fernnetz-2026-01",
+    "fernnetz-2026-02",
+    "fernnetz-2026-03",
+    "fernnetz-2026-04",
+    "fernnetz-2026-05",
+    "fernnetz-2026-06",
+    "fernnetz-2026-07",
+    "fernnetz-2026-08",
+    "fernnetz-2026-09"
+   ]
+  },
+  {
+   "query": "Mietsicherheit",
+   "kind": "synonym",
+   "expected": [
+    "anwalt-1",
+    "anwalt-2",
+    "kaution"
+   ]
+  },
+  {
+   "query": "Stadtwerke",
+   "kind": "field",
+   "expected": [
+    "strom-2024",
+    "strom-2025",
+    "strom-2025-scan",
+    "strom-2026",
+    "strom-ablesung",
+    "strom-korrektur",
+    "strom-preis",
+    "strom-schluss",
+    "strom-vertrag"
+   ]
+  },
+  {
+   "query": "FernNetz",
+   "kind": "field",
+   "expected": [
+    "fernnetz-2024-01",
+    "fernnetz-2024-02",
+    "fernnetz-2024-03",
+    "fernnetz-2024-04",
+    "fernnetz-2024-05",
+    "fernnetz-2024-06",
+    "fernnetz-2024-07",
+    "fernnetz-2024-08",
+    "fernnetz-2024-09",
+    "fernnetz-2024-10",
+    "fernnetz-2024-11",
+    "fernnetz-2024-12",
+    "fernnetz-2025-01",
+    "fernnetz-2025-02",
+    "fernnetz-2025-03",
+    "fernnetz-2025-04",
+    "fernnetz-2025-05",
+    "fernnetz-2025-06",
+    "fernnetz-2025-07",
+    "fernnetz-2025-08",
+    "fernnetz-2025-09",
+    "fernnetz-2025-10",
+    "fernnetz-2025-11",
+    "fernnetz-2025-12",
+    "fernnetz-2026-01",
+    "fernnetz-2026-02",
+    "fernnetz-2026-03",
+    "fernnetz-2026-04",
+    "fernnetz-2026-05",
+    "fernnetz-2026-06",
+    "fernnetz-2026-07",
+    "fernnetz-2026-08",
+    "fernnetz-2026-09"
+   ]
+  },
+  {
+   "query": "Kindergeld",
+   "kind": "field",
+   "expected": [
+    "kindergeld-2025",
+    "kindergeld-2026"
+   ]
+  },
+  {
+   "query": "Gesundkasse",
+   "kind": "field",
+   "expected": [
+    "kasse-familie",
+    "kasse-mitglied",
+    "kasse-zusatzbeitrag"
+   ]
+  },
+  {
+   "query": "Bausparkasse",
+   "kind": "field",
+   "expected": [
+    "bauspar-2024",
+    "bauspar-2025",
+    "bauspar-vertrag"
+   ]
+  },
+  {
+   "query": "Familienkasse",
+   "kind": "field",
+   "expected": [
+    "kindergeld-2025",
+    "kindergeld-2026"
+   ]
+  },
+  {
+   "query": "Hansebank",
+   "kind": "field",
+   "expected": [
+    "kreditkarte-2025-10",
+    "kreditkarte-2025-11",
+    "kreditkarte-2025-12",
+    "kreditkarte-2026-01",
+    "kreditkarte-2026-02",
+    "kreditkarte-2026-03",
+    "kreditkarte-2026-04",
+    "kreditkarte-2026-05",
+    "kreditkarte-2026-06",
+    "kreditkarte-2026-07",
+    "kreditkarte-2026-08",
+    "kreditkarte-2026-09"
+   ]
+  },
+  {
+   "query": "Hanse Versicherung",
+   "kind": "field",
+   "expected": [
+    "haftpflicht-anpassung",
+    "haftpflicht-police",
+    "hanse-beitrag-2025",
+    "hanse-beitrag-2026",
+    "hausrat-police",
+    "schaden-anzeige",
+    "schaden-eingang",
+    "schaden-regulierung"
+   ]
+  },
+  {
+   "query": "Tankstelle",
+   "kind": "field",
+   "expected": [
+    "tanken-0",
+    "tanken-1",
+    "tanken-2",
+    "tanken-3",
+    "tanken-4",
+    "tanken-5"
+   ]
+  },
+  {
+   "query": "Gehaltsanpassung",
+   "kind": "field",
+   "expected": [
+    "gehalt-2025",
+    "gehalt-2026"
+   ]
+  },
+  {
+   "query": "Weihnachten",
+   "kind": "ending",
+   "expected": [
+    "bahn-weihnachten",
+    "lohn-max-2024-11",
+    "lohn-max-2025-11"
+   ]
+  },
+  {
+   "query": "Kündigungen",
+   "kind": "ending",
+   "expected": [
+    "kuendigung-birkenweg",
+    "kuendigung-erika"
+   ]
+  },
+  {
+   "query": "Behandlungen",
+   "kind": "ending",
+   "expected": [
+    "physio"
+   ]
+  },
+  {
+   "query": "Zinsen",
+   "kind": "ending",
+   "expected": [
+    "bauspar-2024",
+    "bauspar-2025",
+    "darlehen-2024",
+    "darlehen-2025",
+    "kaution",
+    "sparkasse-entgelte"
+   ]
+  },
+  {
+   "query": "Bescheide",
+   "kind": "ending",
+   "expected": [
+    "bussgeld-bescheid",
+    "hundesteuer-2025",
+    "hundesteuer-2026",
+    "kfz-steuer",
+    "kfz-steuer-aenderung",
+    "steuer-2024",
+    "steuer-2025"
+   ]
+  },
+  {
+   "query": "Erstattungen",
+   "kind": "ending",
+   "expected": [
+    "steuer-2024",
+    "steuer-2025"
+   ]
+  },
+  {
+   "query": "Quittungen",
+   "kind": "ending",
+   "expected": [
+    "fahrrad-quittung",
+    "maler-quittung",
+    "moebel-quittung"
+   ]
+  },
+  {
+   "query": "Hundesteur",
+   "kind": "typo",
+   "expected": [
+    "hundesteuer-2025",
+    "hundesteuer-2026"
+   ]
+  },
+  {
+   "query": "Betriebskostenabrechnug",
+   "kind": "typo",
+   "expected": [
+    "nebenkosten-2024",
+    "nebenkosten-2025"
+   ]
+  },
+  {
+   "query": "Krankengymnastk",
+   "kind": "typo",
+   "expected": [
+    "physio"
+   ]
+  },
+  {
+   "query": "Zwischenzeugniss",
+   "kind": "typo",
+   "expected": [
+    "zwischenzeugnis-max"
+   ]
+  },
+  {
+   "query": "Geld für den Hund an die Stadt",
+   "kind": "paraphrase",
+   "expected": [
+    "hundesteuer-2025",
+    "hundesteuer-2026"
+   ]
+  },
+  {
+   "query": "Rechnung für das neue Sofa",
+   "kind": "paraphrase",
+   "expected": [
+    "moebel-auftrag",
+    "moebel-rechnung"
+   ]
+  },
+  {
+   "query": "Kosten für den Umzug in die neue Wohnung",
+   "kind": "paraphrase",
+   "expected": [
+    "umzug-angebot",
+    "umzug-rechnung"
+   ]
+  },
+  {
+   "query": "Fahrrad wurde gestohlen",
+   "kind": "paraphrase",
+   "expected": [
+    "schaden-anzeige",
+    "schaden-eingang",
+    "schaden-regulierung"
+   ]
+  },
+  {
+   "query": "zu schnell gefahren",
+   "kind": "paraphrase",
+   "expected": [
+    "bussgeld-anhoerung",
+    "bussgeld-bescheid"
+   ]
+  },
+  {
+   "query": "Blutwerte vom Hausarzt",
+   "kind": "paraphrase",
+   "expected": [
+    "befund-max"
+   ]
+  },
+  {
+   "query": "Lena war im Krankenhaus",
+   "kind": "paraphrase",
+   "expected": [
+    "klinik-lena"
+   ]
+  },
+  {
+   "query": "Sprachkurs",
+   "kind": "paraphrase",
+   "expected": [
+    "vhs-spanisch"
+   ]
+  },
+  {
+   "query": "Zählerstand abgelesen",
+   "kind": "paraphrase",
+   "expected": [
+    "strom-ablesung"
+   ]
+  },
+  {
+   "query": "Garantie für den Laptop",
+   "kind": "paraphrase",
+   "expected": [
+    "technik-garantie"
+   ]
+  },
+  {
+   "query": "Beitrag für den Sportverein",
+   "kind": "paraphrase",
+   "expected": [
+    "sepa-tsv",
+    "tsv-beitrag-2026",
+    "tsv-mitglied"
+   ]
+  },
+  {
+   "query": "Bescheinigung des Vermieters für das Bürgeramt",
+   "kind": "paraphrase",
+   "expected": [
+    "wohnungsgeber"
+   ]
+  },
+  {
+   "query": "dog tax",
+   "kind": "english",
+   "expected": [
+    "hundesteuer-2025",
+    "hundesteuer-2026"
+   ]
+  },
+  {
+   "query": "child benefit",
+   "kind": "english",
+   "expected": [
+    "kindergeld-2025",
+    "kindergeld-2026"
+   ]
+  },
+  {
+   "query": "electricity meter reading",
+   "kind": "english",
+   "expected": [
+    "strom-ablesung"
+   ]
+  },
+  {
+   "query": "speeding fine",
+   "kind": "english",
+   "expected": [
+    "bussgeld-anhoerung",
+    "bussgeld-bescheid"
+   ]
+  },
+  {
+   "query": "car loan",
+   "kind": "english",
+   "expected": [
+    "darlehen-2024",
+    "darlehen-2025",
+    "darlehen-vertrag"
+   ]
+  },
+  {
+   "query": "donation receipt",
+   "kind": "english",
+   "expected": [
+    "spende-2024",
+    "spende-2025"
+   ]
+  },
+  {
+   "query": "rent increase",
+   "kind": "english",
+   "expected": [
+    "mieterhoehung"
+   ]
+  },
+  {
+   "query": "sick note",
+   "kind": "english",
+   "expected": [
+    "au-max"
+   ]
+  },
+  {
+   "query": "bicycle theft",
+   "kind": "english",
+   "expected": [
+    "schaden-anzeige",
+    "schaden-eingang",
+    "schaden-regulierung"
+   ]
+  },
+  {
+   "query": "holiday pay",
+   "kind": "english",
+   "expected": [
+    "lohn-max-2024-06",
+    "lohn-max-2025-06",
+    "lohn-max-2026-06"
+   ]
+  },
+  {
+   "query": "Telefonrechnung März 2025",
+   "kind": "confusable",
+   "expected": [
+    "fernnetz-2025-03"
+   ]
+  },
+  {
+   "query": "Kontoauszug Dezember 2024",
+   "kind": "confusable",
+   "expected": [
+    "konto-2024-12"
+   ]
+  },
+  {
+   "query": "Kreditkartenabrechnung Januar 2026",
+   "kind": "confusable",
+   "expected": [
+    "kreditkarte-2026-01"
+   ]
+  },
+  {
+   "query": "Stromrechnung beim Auszug",
+   "kind": "confusable",
+   "expected": [
+    "strom-schluss"
+   ]
+  },
+  {
+   "query": "korrigierte Stromrechnung",
+   "kind": "confusable",
+   "expected": [
+    "strom-korrektur"
+   ]
+  },
+  {
+   "query": "zweite Mahnung vom Versandhaus",
+   "kind": "confusable",
+   "expected": [
+    "bergmann-mahnung-2"
+   ]
+  },
+  {
+   "query": "Hosting Rechnung Oktober 2025",
+   "kind": "confusable",
+   "expected": [
+    "cloudberry-2025-10"
+   ]
+  },
+  {
+   "query": "Zeitnachweis März 2026",
+   "kind": "confusable",
+   "expected": [
+    "zeitnachweis-2026-03"
+   ]
+  },
+  {
+   "query": "Lohnsteuerbescheinigung von Erika",
+   "kind": "confusable",
+   "expected": [
+    "lstb-erika-2025"
+   ]
+  },
+  {
+   "query": "Renteninformation von Erika",
+   "kind": "confusable",
+   "expected": [
+    "rente-erika-2026"
+   ]
+  },
+  {
+   "query": "Einkommensteuerbescheid 2024",
+   "kind": "confusable",
+   "expected": [
+    "steuer-2024"
+   ]
+  },
+  {
+   "query": "Beitragsrechnung der Autoversicherung",
+   "kind": "confusable",
+   "expected": [
+    "kfz-beitrag-2026"
+   ]
+  },
+  {
+   "query": "Angebot vom Elektriker",
+   "kind": "confusable",
+   "expected": [
+    "krause-angebot"
+   ]
+  },
+  {
+   "query": "Gehaltsabrechnung mit Urlaubsgeld 2025",
+   "kind": "confusable",
+   "expected": [
+    "lohn-max-2025-06"
+   ]
+  },
+  {
+   "query": "Wie viel Hundesteuer zahle ich?",
+   "kind": "question",
+   "expected": [
+    "hundesteuer-2025",
+    "hundesteuer-2026"
+   ]
+  },
+  {
+   "query": "Wann muss das Auto wieder zur HU?",
+   "kind": "question",
+   "expected": [
+    "hu-2026"
+   ]
+  },
+  {
+   "query": "Wie hoch war die Kaution am Birkenweg?",
+   "kind": "question",
+   "expected": [
+    "anwalt-1",
+    "anwalt-2",
+    "kaution",
+    "kuendigung-birkenweg"
+   ]
+  },
+  {
+   "query": "Wann ist der Elternabend?",
+   "kind": "question",
+   "expected": [
+    "schule-elternabend"
+   ]
+  },
+  {
+   "query": "Was kostet die Musikschule im Monat?",
+   "kind": "question",
+   "expected": [
+    "musikschule-gebuehr",
+    "musikschule-vertrag"
+   ]
+  },
+  {
+   "query": "Was zahlt die Versicherung für das gestohlene Fahrrad?",
+   "kind": "question",
+   "expected": [
+    "schaden-regulierung"
+   ]
+  },
+  {
+   "query": "Wie hoch ist die Miete in der Lindenallee?",
+   "kind": "question",
+   "expected": [
+    "mieterhoehung",
+    "mietvertrag"
+   ]
+  },
+  {
+   "query": "In welcher Schadenfreiheitsklasse ist das Auto?",
+   "kind": "question",
+   "expected": [
+    "kfz-police",
+    "kfz-sf"
+   ]
+  },
+  {
+   "query": "Wie viel Kindergeld bekommen wir?",
+   "kind": "question",
+   "expected": [
+    "kindergeld-2025",
+    "kindergeld-2026"
+   ]
+  },
+  {
+   "query": "Wann beginnt der Spanischkurs?",
+   "kind": "question",
+   "expected": [
+    "vhs-spanisch"
+   ]
+  },
+  {
+   "query": "Handwerkerleistungen für die Steuererklärung",
+   "kind": "purpose",
+   "expected": [
+    "krause-rechnung",
+    "maler-quittung",
+    "maler-rechnung",
+    "umzug-rechnung"
+   ]
+  },
+  {
+   "query": "Nachweis für den Arbeitgeber, dass ich krank war",
+   "kind": "purpose",
+   "expected": [
+    "au-max"
+   ]
+  },
+  {
+   "query": "Unterlagen zur Altersvorsorge",
+   "kind": "purpose",
+   "expected": [
+    "rente-erika-2026",
+    "rente-max-2025",
+    "rente-max-2026",
+    "rentenversicherung-erika"
+   ]
+  },
+  {
+   "query": "Bons vom Wocheneinkauf",
+   "kind": "purpose",
+   "expected": [
+    "bon-grocery-00",
+    "bon-grocery-01",
+    "bon-grocery-02",
+    "bon-grocery-03",
+    "bon-grocery-04",
+    "bon-grocery-05",
+    "bon-grocery-06",
+    "bon-grocery-07",
+    "bon-grocery-08",
+    "bon-grocery-09",
+    "bon-grocery-10",
+    "bon-grocery-11",
+    "bon-grocery-12",
+    "bon-grocery-13",
+    "bon-grocery-14",
+    "bon-grocery-15"
+   ]
+  },
+  {
+   "query": "Belege fürs Tanken",
+   "kind": "purpose",
+   "expected": [
+    "tanken-0",
+    "tanken-1",
+    "tanken-2",
+    "tanken-3",
+    "tanken-4",
+    "tanken-5"
+   ]
+  },
+  {
+   "query": "Werbung im Briefkasten",
+   "kind": "purpose",
+   "expected": [
+    "werbung-gewinn",
+    "werbung-solar"
+   ]
+  },
+  {
+   "query": "Spendennachweis für das Finanzamt",
+   "kind": "purpose",
+   "expected": [
+    "spende-2024",
+    "spende-2025"
+   ]
+  }
+ ]
+}

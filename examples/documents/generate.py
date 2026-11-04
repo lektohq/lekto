@@ -4,10 +4,12 @@ the URW fonts of Ghostscript):
 
     uv run python ../examples/documents/generate.py            # everything
     uv run python ../examples/documents/generate.py --check    # only check the layouts
+    uv run python ../examples/documents/generate.py --search-set DIR
 
 The output is deterministic: the same code gives the same bytes. `--check` lays every document
 out and checks that each identifier of the manifest is found in its text by Lekto's own
-patterns (where it has any) and that no text runs off its page.
+patterns (where it has any) and that no text runs off its page. `--search-set` writes the
+documents as an evaluation set for `lekto evaluate-search` to DIR (see `README.md`).
 """
 
 import argparse
@@ -249,6 +251,55 @@ def manifest_entry(
     }
 
 
+def search_set(documents: list[tuple[Entry, Doc]], directory: Path) -> None:
+    """The documents as an evaluation set of `lekto evaluate-search`: per document its text and
+    a fixed answer of the language model with its contact, type, date and title, which the
+    simulated person confirms; `search/queries.json` beside them."""
+    contacts = sorted({document.contact for _, document in documents if document.contact})
+    types = sorted({document.document_type for _, document in documents if document.document_type})
+    cases = directory / "cases"
+    if cases.exists():
+        shutil.rmtree(cases)
+    cases.mkdir(parents=True)
+    master = {"contacts": contacts, "document_types": types, "tags": [], "fields": []}
+    (directory / "master_data.json").write_text(_json(master), encoding="utf-8")
+    for entry, document in documents:
+        text = text_of(document)
+        date = document.date.isoformat() if document.date else None
+        contact = document.contact or None
+        expected = {
+            "lane": "green",
+            "contact": contact,
+            "document_type": document.document_type or None,
+            "tags": [],
+            "document_date": date,
+        }
+        classification = {
+            "contact": None if contact is None else {"value": contact, "evidence": contact},
+            "document_type": document.document_type or None,
+            "new_document_type": None,
+            "tags": [],
+            "new_tags": [],
+            "document_date": None if date is None else {"value": date, "evidence": None},
+            "title": document.title or None,
+            "language": document.language,
+        }
+        case = {
+            "description": document.title,
+            "expected": expected,
+            "fake": {"classification": classification},
+        }
+        (cases / f"{entry.key}.md").write_text(text + "\n", encoding="utf-8")
+        (cases / f"{entry.key}.json").write_text(_json(case), encoding="utf-8")
+    search = directory / "search"
+    search.mkdir(exist_ok=True)
+    shutil.copyfile(HERE / "search" / "queries.json", search / "queries.json")
+
+
+def _json(value: object) -> str:
+    return json.dumps(value, ensure_ascii=False, indent=1) + "\n"
+
+
 def statistics(records: list[dict[str, object]], sizes: int) -> str:
     stages = Counter(str(record["quality"]) for record in records)
     classes = Counter(str(record["class"]) for record in records)
@@ -293,6 +344,12 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--check", action="store_true", help="only lay out and check")
+    parser.add_argument(
+        "--search-set",
+        type=Path,
+        metavar="DIR",
+        help="write the documents as an evaluation set of lekto evaluate-search to DIR",
+    )
     arguments = parser.parse_args()
     _ENTRIES.extend(entries())
     documents = [(entry, entry.make()) for entry in _ENTRIES]
@@ -300,6 +357,10 @@ def main() -> None:
     duplicated = [key for key, count in keys.items() if count > 1]
     if duplicated:
         raise SystemExit(f"keys twice: {duplicated}")
+    if arguments.search_set is not None:
+        search_set(documents, arguments.search_set)
+        print(f"{len(documents)} documents written as a search evaluation set")
+        return
     findings = check(documents)
     print(f"{len(documents)} documents laid out, {findings} findings")
     if arguments.check or findings:

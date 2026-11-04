@@ -24,12 +24,13 @@ meant.
   training the classifier on it), or only the runs given, and write a Markdown report. Exits
   with status 1 if a document came out green that should not have or with a wrong value, or a
   field changed without a passed check.
-- `evaluate-search [--fake] [--models A,B] [--ratios 0,0.5,1] [--queries FILE] [--cases DIR]
-  [--output FILE]`: index the documents of the evaluation set with each embedding model (default
-  `LEKTO_EMBEDDING_MODEL`) in a temporary Meilisearch index, run the queries (default
-  `<cases>/search/queries.json`) at each semantic ratio and write a Markdown report. With
-  `--fake`, bag-of-words vectors and the in-memory index stand in for both. Needs
-  `LEKTO_MEILISEARCH_URL` and `LEKTO_EMBEDDING_BASE_URL`, and `LEKTO_EMBEDDING_DIMENSIONS` (any
+- `evaluate-search [--fake] [--words-only] [--models A,B] [--ratios 0,0.5,1] [--queries FILE]
+  [--cases DIR] [--output FILE]`: index the documents of the evaluation set with each embedding
+  model (default `LEKTO_EMBEDDING_MODEL`) in a temporary Meilisearch index, run the queries
+  (default `<cases>/search/queries.json`) at each semantic ratio and write a Markdown report. With
+  `--fake`, bag-of-words vectors and the in-memory index stand in for both; with `--words-only`,
+  the index has no embeddings and the queries run by words alone. Needs `LEKTO_MEILISEARCH_URL`
+  and, without `--words-only`, `LEKTO_EMBEDDING_BASE_URL` and `LEKTO_EMBEDDING_DIMENSIONS` (any
   value; the real length is measured) as the configuration is checked first.
 - `reindex`: rebuild the search index from the database and the object store, in the foreground,
   with progress. The search keeps working meanwhile. Needs `LEKTO_MEILISEARCH_URL`.
@@ -209,6 +210,9 @@ def _parser() -> argparse.ArgumentParser:
         help="cold, trained or both (default), comma separated",
     )
     evaluate_search.add_argument("--fake", action="store_true", help="fake embeddings and index")
+    evaluate_search.add_argument(
+        "--words-only", action="store_true", help="no embeddings, words alone"
+    )
     evaluate_search.add_argument("--models", help="embedding models, comma separated")
     evaluate_search.add_argument("--ratios", help="semantic ratios (default: 0,0.5,1)")
     evaluate_search.add_argument("--queries", type=Path, help="the queries file")
@@ -369,6 +373,7 @@ def _evaluate_search(settings: Settings, arguments: argparse.Namespace) -> int:
             cases=arguments.cases or Path("evaluation"),
             queries=arguments.queries,
             fake=arguments.fake,
+            words_only=arguments.words_only,
             models=_names(arguments.models),
             ratios=parse_ratios(arguments.ratios) if arguments.ratios else DEFAULT_RATIOS,
             output=arguments.output,

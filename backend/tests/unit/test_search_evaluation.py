@@ -16,6 +16,7 @@ from lekto.composition.search_evaluation import parse_ratios, run_search_evaluat
 from lekto.composition.settings import Settings
 
 SET = Path(__file__).parents[2] / "evaluation"
+EXAMPLES = Path(__file__).parents[3] / "examples" / "documents"
 
 
 def write_queries(path: Path, *queries: Mapping[str, object]) -> Path:
@@ -42,7 +43,13 @@ async def test_the_fake_run_finds_by_words_and_writes_a_report(tmp_path: Path) -
     assert all(outcome.semantic for outcome in model.ratios[1].outcomes)
 
     text = report.read_text(encoding="utf-8")
-    for heading in ("## Results", "## Hit@3 by kind of query", "## Cost of indexing", "## Misses"):
+    for heading in (
+        "## Results",
+        "## Hit@3 by kind of query",
+        "## R-precision by kind of query",
+        "## Cost of indexing",
+        "## Misses",
+    ):
         assert heading in text
     assert "Fake run" in text
 
@@ -64,6 +71,23 @@ async def test_a_document_is_not_found_by_the_name_of_its_case(tmp_path: Path) -
     by_name, by_number = result.models[0].ratios[0].outcomes
     assert by_name.rank is None  # the name of the case is not in the index
     assert by_number.rank == 1  # the title is a number instead
+
+
+async def test_words_only_runs_without_embeddings(tmp_path: Path) -> None:
+    result = await run_search_evaluation(
+        Settings.model_construct(), cases=SET, fake=True, words_only=True, output=tmp_path / "r.md"
+    )
+    (model,) = result.models
+    assert model.name == "words"
+    assert model.dimensions is None
+    assert [ratio.ratio for ratio in model.ratios] == [0.0]
+    assert model.ratios[0].rate(3, "exact") == 1.0
+
+
+def test_the_queries_of_the_example_documents_name_documents_of_the_manifest() -> None:
+    manifest = json.loads((EXAMPLES / "manifest.json").read_text(encoding="utf-8"))
+    known = frozenset(item["key"] for item in manifest["documents"])
+    assert load_queries(EXAMPLES / "search" / "queries.json", known).cases
 
 
 def test_the_queries_are_checked(tmp_path: Path) -> None:
@@ -107,6 +131,33 @@ def test_the_measures() -> None:
     assert RatioResult(0.0).p95_ms == 0.0
 
 
+def test_r_precision_and_ties() -> None:
+    def outcome(got: str, scores: tuple[float | None, ...] = ()) -> QueryOutcome:
+        case = SearchCase("q", "exact", frozenset({"a", "b"}))
+        return QueryOutcome(case, None, tuple(got), 0.1, False, scores)
+
+    # Of the first two (as many as expected), the share expected.
+    assert outcome("ab").precision == 1.0
+    assert outcome("axb").precision == 0.5
+    assert outcome("xy").precision == 0.0
+    assert (
+        QueryOutcome(SearchCase("q", "exact", frozenset("a")), 1, ("a",), 0.1, False).precision
+        == 1.0
+    )
+    # Tied when an expected and another hit share the first score.
+    assert outcome("ax", (0.9, 0.9)).tied
+    assert outcome("xa", (0.9, 0.9)).tied
+    assert not outcome("ab", (0.9, 0.9)).tied  # either answers
+    assert not outcome("ax", (0.9, 0.8)).tied
+    assert not outcome("xy", (0.9, 0.9)).tied  # chance does not decide: neither answers
+    assert not outcome("ax", (None, None)).tied
+    assert not outcome("ax").tied
+    result = RatioResult(0.0, [outcome("ab"), outcome("ax", (0.5, 0.5))])
+    assert result.precision() == pytest.approx(0.75)
+    assert result.ties() == 1
+    assert result.precision("typo") == 0.0
+
+
 def test_ratios() -> None:
     assert parse_ratios("0, 0.5,1,0.5") == (0.0, 0.5, 1.0)
     for bad in ("", "a", "0,2", "-0.1"):
@@ -128,6 +179,11 @@ async def test_a_real_run_needs_meilisearch_embeddings_and_a_model(tmp_path: Pat
         await run(settings)
     with pytest.raises(ConfigurationError, match="does not go with --fake"):
         await run(settings, fake=True, models=["x"])
+    with pytest.raises(ConfigurationError, match="does not go with --words-only"):
+        await run(settings, words_only=True, models=["x"])
+    # Words alone need Meilisearch, no embeddings.
+    with pytest.raises(ConfigurationError, match="LEKTO_MEILISEARCH_URL"):
+        await run(Settings.model_construct(), words_only=True)
 
 
 async def test_a_query_for_an_unknown_case_stops_the_run(tmp_path: Path) -> None:
@@ -148,6 +204,8 @@ def test_the_command(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None
     assert main([*arguments, "--ratios", "0,1"]) == 0
     assert report.exists()
     assert "queries at ratio 1" in capsys.readouterr().out
+    assert main([*arguments, "--words-only"]) == 0
+    assert "words: 103 queries at ratio 0" in capsys.readouterr().out
     assert main([*arguments, "--ratios", "2"]) == 1
     assert main([*arguments, "--models", "x"]) == 1
     assert main(["evaluate-search", "--cases", str(tmp_path)]) == 1
