@@ -2543,6 +2543,41 @@ Admins sehen wie in der Web-UI ihre Spaces; `all_users` entspricht dem Schalter 
 11. Budget 20.000 statt 16.000 Zeichen? Ja. Rechnen auch in REST (`POST /documents/aggregate`)? Nein, ohne Anwendungsfall.
 12. Bezüge über MCP setzen, gegen `bezuege.md`, Entscheidung 19 (beim Bau von PR 1 gefunden; mit der Herkunft aus PR 2 trüge ein solcher Bezug den Token)? Nein, die alte Entscheidung bleibt erstmal.
 
+### Suche: deutsche Wörter, Ranking, Bedeutung, Treffer im Beam (Issue #192)
+
+Stand: freigegeben (Tobi, 04.11.2026).
+
+**Anlass:** Die Suche findet zu wenig und ordnet schlecht (Befund aus „Rückmeldung der Suche“, 24.10.2026): „Weihnachten“ gibt 39 gleich bewertete Treffer; Entgeltbescheinigungen nennen das Weihnachtsgeld „Einmalzahlung“ oder „13. Gehalt“ und fehlen; in Produktion kam die Bedeutung zu spät. Dazu der Nachtrag vom 30.10.2026: Ein Suchtreffer öffnet den Beam, die Seiten zeigen, wo die Wörter stehen.
+
+**Befund (Claude, 04.11.2026, Wegwerf-Index auf der Test-Meilisearch v1.54.3, erfundene Texte):**
+- Die Zerlegung der Komposita wirkt: „Geld“ findet „Weihnachtsgeld“, „Kranken“ findet „Krankenversicherung“.
+- Der Gleichstand hat eine Ursache: „Weihnachten“ wird zu „weihnacht“ + „en“; das letzte Wort einer Anfrage sucht Meilisearch als Wortanfang, also trifft „en“ jedes Wort, das mit „en“ beginnt („**En**tgeltabrechnung“). Mit einem Leerzeichen am Ende der Anfrage fällt das weg; `prefixSearch: disabled` auch, dann findet „Rechn“ aber nichts mehr. Die Web-UI sucht beim Abschicken, nicht beim Tippen.
+- Kein Stemming für Deutsch: „Rechnungen“ findet „Rechnung“ nur über Wortanfang und Bruchstück, „Verträge“ findet „Vertrag“ nicht. Das fängt die Bedeutung ab.
+- `showMatchesPosition` liefert je Treffer und Feld Start und Länge in Bytes (UTF-8). Die Annahme im Issue („nur hervorgehobener Text“) stimmt nicht; für den Beam muss Lekto die Wörter nicht selbst suchen.
+- v1.54 kennt die Ranking-Regeln `attributeRank` und `wordPosition` (statt `attribute`).
+
+**Entscheidungen (Tobi, 04.11.2026):**
+1. **Meilisearch bleibt.** Die Alternativen abgewogen: OpenSearch hat die beste deutsche Sprachverarbeitung, ist aber für ein Homelab zu schwer (JVM, 1–2 GB); Postgres-Volltext ginge nicht mit SQLite; Typesense bringt nichts Neues; Tantivy passt nicht zu verteilten Workern. Bleiben die Zahlen nach PR 2 und 3 schlecht, ist OpenSearch der nächste Kandidat, als weiterer Adapter des Ports.
+2. **Keine Synonyme pflegen** (Tobi: „Ich will keine Synonyme pflegen müssen“). Andere Wörter für dasselbe findet die Bedeutung. Zeigt PR 1, dass sie es nicht schafft, wird neu entschieden (etwa eine kleine feste Liste, die mit Lekto kommt).
+3. **Gemessen wird im Repo nur auf erfundenen Dokumenten.** Ein Lauf auf Tobis Dokumenten nur mit Anfragen und erwarteten Dokumenten von Tobi; davon kommt nichts ins Repo.
+4. **Die Treffer im Beam gehören in diesen Plan** (PR 4).
+
+**PRs:**
+1. `maintenance/search-evaluation` (`maintenance`): `evaluate-search` mit härterem Satz: neue Arten von Anfragen (Komposita und ihre Teile, gebeugte Formen, andere Wörter für dasselbe wie „Weihnachtsgeld“ ↔ „Einmalzahlung“, Felder vor Text: der Kontakt oder Typ gesucht, das Wort steht auch im Text anderer Dokumente). Dazu die Beispieldokumente aus `examples/documents` als zweiter Satz (321 Dokumente eines Haushalts, viele ähnliche, also Gleichstände wie in echt; der Text kommt vom Generator, nicht aus OCR). Der Bericht nennt je Art Hit@1 und MRR, Gleichstände auf Platz 1, und Wörter allein (`semantic_ratio` 0) neben hybrid. Ausgangswert im Bericht; dieser Abschnitt des Plans geht mit diesem PR ins Repo.
+2. `enhancement/search-compounds` (`enhancement`): das Bruchstück „en“ beheben. Kandidaten, gemessen gegen PR 1: Leerzeichen am Ende der Anfrage beim Abschicken (die Web-UI und MCP schicken ganze Wörter), Wortanfang nur bei einem `*` am Ende, oder eine Einstellung der Lokalisierung. Gewählt wird nach den Zahlen; die Wahl steht im PR.
+3. `enhancement/search-ranking` (`enhancement`): Felder vor Fließtext (`attributeRank` vor `typo` und `proximity`, die Reihenfolge in `SEARCHABLE` geprüft), gemessen gegen PR 2. Ändert sich die Einstellung des Index, baut Meilisearch selbst neu; ob ein Neuaufbau durch Lekto nötig ist, steht im PR, gestartet wird er nur auf Tobis Wort.
+4. `feature/beam-search-hits` (`new-feature`): Ein Suchtreffer in der Dokumentliste (Karte, Zeile) öffnet den Beam mit den Stellen der Wörter, alle markiert, die beste zuerst. Beim Öffnen fragt der Beam `POST /documents/{id}/search-places` mit den Wörtern im Body; Lekto sucht im Index nur dieses Dokument mit `showMatchesPosition`, rechnet Bytes in Zeichen um und mit `TextPlaces` auf Seite und Boxen (`locations` wie bei den anderen Orten). Die Wörter stehen nie in einer Adresse. Vorher ein Mock (hell, dunkel, Handy). DESIGN.md: der Ort im Beam-Muster.
+
+**Ausgangswert (PR 1, 04.11.2026, Qwen3-Embedding 4B, Ratio 0 / 0,5 / 1):** Bewertungssatz (47 Dokumente, 103 Anfragen) Hit@1 48 / 96 / 88 %, R-Precision 47 / 94 / 86 %, Gleichstände 11 / 3 / 0. Beispieldokumente (321, 122 Anfragen) Hit@1 61 / 91 / 83 %, R-Precision 61 / 88 / 81 %, Gleichstände 3 / 0 / 0; 581 ms je hybrider Anfrage (fast alles Embedding), 2,9 s je Abschnitt beim Indexieren. Befunde:
+- Nur Wörter: Englisch 0 %, Fragen 0 % (Hit@3). Lange Anfragen verlieren das letzte, oft entscheidende Wort („Rechnung für das neue Sofa“ findet das Sofa nicht: `matchingStrategy` `last` lässt die Wörter vom Ende weg), Fragen finden nichts („Wie viel Hundesteuer zahle ich?“: keine Stoppwörter). Fast jede deutsche Pluralform wird zerlegt („Mahnungen“ in „mahn“ + „un“ + „gen“, „Erstattung“ in vier Stücke). Kandidaten für PR 2.
+- Felder vor Text wirkt schon (R-Precision `field` 100 %): Einwort-Anfragen sind bei `words`, `typo` und `proximity` gleich, dann entscheidet `attribute`. PR 3 prüft Anfragen mit mehreren Wörtern, bevor er etwas ändert.
+- Hybrid schadet einzelnen Wörtern in langen Dokumenten: „Urlaubsgeld“ steht nur mit Wörtern auf Platz 1, hybrid auf Platz 6 (die Zeile ist ein kleiner Teil der Abrechnung).
+- **Andere Wörter für dasselbe findet die Bedeutung nicht zuverlässig:** „13. Gehalt“ findet keine der beiden Abrechnungen mit „Weihnachtsgeld“ (auch hybrid nicht), „Weihnachtsgratifikation“ erst auf Platz 8, „holiday pay“ nicht das Urlaubsgeld. `synonym` Hit@3 80 %, R-Precision 67 %. Nach Entscheidung 2 neu zu entscheiden (Tobi).
+
+**Danach (keine PR):** Bedeutung als Standard: Ende-zu-Ende-Messung in Produktion auf Tobis Wort; `semantic_ratio` und Modell aus PR 1; Timeout und Ollama in Tobis Ansible.
+
+**Offen:** keine. Beantwortet (Tobi, 04.11.2026): Der Beam holt die Stellen eines Treffers beim Öffnen über `POST /documents/{id}/search-places` mit den Wörtern im Body, nur für das geöffnete Dokument (b), nicht mit jeder Suchantwort für alle Treffer der Seite (a, das Layout jedes Treffers bei jeder Suche). Die Sorge im Nachtrag galt der Adresse; seit #217 stehen die Wörter im Body.
+
 ### M16 – Lesen
 
 - `PageRenderer` statt `PreviewRenderer`: alle Seiten als WebP-Derivate; Endpunkt `GET /documents/{id}/pages/{n}`.
