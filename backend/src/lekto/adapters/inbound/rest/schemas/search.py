@@ -5,10 +5,11 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.rest.schemas.documents import ListedDocument
+from lekto.adapters.inbound.rest.schemas.open_identifiers import OccurrenceOut
 from lekto.adapters.inbound.schemas import ReasonOut
 from lekto.core.ports.search_index import MAX_HITS
 from lekto.core.services.indexing import IndexCheck, IndexStatus, JobTimes
-from lekto.core.services.search import SearchMode
+from lekto.core.services.search import SearchMode, SearchPlaces
 
 
 class SearchIn(BaseModel):
@@ -17,6 +18,31 @@ class SearchIn(BaseModel):
     )
 
     q: str = Field(min_length=1, max_length=500, description="What to look for.")
+
+
+class SearchPlacesOut(BaseModel):
+    """Where the words of a search stand in a document."""
+
+    matched: int = Field(
+        description=(
+            "Places of the words in the document's text; 0: found by the meaning alone, or "
+            "not at all."
+        )
+    )
+    occurrences: list[OccurrenceOut] = Field(
+        description=(
+            "Where its pages show them, in the order of the text; `own` marks the best, the "
+            "first place in the line with the most of the words. Empty without the words of its "
+            "pages."
+        )
+    )
+
+    @classmethod
+    def of(cls, places: SearchPlaces) -> "SearchPlacesOut":
+        return cls(
+            matched=places.matched,
+            occurrences=[OccurrenceOut.of(item) for item in places.occurrences],
+        )
 
 
 class SnippetSegment(BaseModel):

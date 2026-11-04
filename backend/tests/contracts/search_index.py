@@ -258,6 +258,31 @@ class SearchIndexContract:
         shown = "".join(segment.text for segment in hit.snippet).strip("…")
         assert shown in text or text in shown or "Zahlung" in shown
 
+    async def test_matches_name_where_the_words_stand_in_the_text(
+        self, search_index: SearchIndex
+    ) -> None:
+        owner = SpaceId(new_id())
+        # Letters of two bytes before the word: the places count characters.
+        text = "Größe über alles: der Mietvertrag gilt. Mietvertrag Nr. 7"
+        document = index_document(space_id=owner, title="Brief", text=text)
+        other = index_document(space_id=owner, title="Brief", text="Mietvertrag")
+        await search_index.upsert([document, other])
+        found = await search_index.matches(document.id, "Mietvertrag", visibility(owner))
+        assert [text[match.start : match.end] for match in found] == ["Mietvertrag"] * 2
+        assert [match.start for match in found] == sorted(match.start for match in found)
+
+    async def test_no_matches_where_nothing_matches_or_may_be_seen(
+        self, search_index: SearchIndex
+    ) -> None:
+        owner = SpaceId(new_id())
+        document = index_document(space_id=owner, title="Brief", text="Der Mietvertrag")
+        await search_index.upsert([document])
+        assert await search_index.matches(document.id, "Zahnarzt", visibility(owner)) == []
+        stranger = visibility(SpaceId(new_id()))
+        assert await search_index.matches(document.id, "Mietvertrag", stranger) == []
+        missing = DocumentId(new_id())
+        assert await search_index.matches(missing, "Mietvertrag", visibility(owner)) == []
+
     async def test_the_snippet_is_plain_text(self, search_index: SearchIndex) -> None:
         owner = SpaceId(new_id())
         text = "Vorsicht <script>alert(1)</script> bei Rechnung & Co"
