@@ -133,7 +133,11 @@ page image use `.mark-glass`; a pinned page of the viewer uses `shadow-pinned`. 
 - **Back link** (optional, detail pages): `BackLink`, above the title. It leads to the list the
   page came from, with that list's state: lens, filters, search and sort.
 - **Title**: `PageTitle`, the `<h1>` in `text-title`, optionally followed by a count or a badge
-  (lane). A long word breaks with a hyphen; one that cannot (a file name) breaks anywhere.
+  (lane). A long word breaks with a hyphen; one that cannot (a file name) breaks anywhere. A
+  search counts what its words find: with the meaning, which ranks every document, the rest are
+  "ähnliche nach Bedeutung", never part of the number ("Treffer: etwa 15, dazu ähnliche nach
+  Bedeutung"; nothing for the words: "Keine Treffer für die Wörter, ähnliche nach Bedeutung";
+  Tobi, 04.11.2026).
 - **Subtitle** (optional): one line in `text-sm text-muted-foreground` under the title.
 - **Actions**: right of the title, at its height. The primary action of the page is last
   (rightmost). On the phone, a page action may become an icon button. It keeps its label as
