@@ -115,6 +115,18 @@ beforeEach(() => {
 					}
 				]
 			}),
+			'POST /api/v1/documents/a/search-places': async (request: Request) => {
+				const { q } = (await request.json()) as { q: string };
+				return q === 'Zahnarzt'
+					? { matched: 0, occurrences: [] }
+					: {
+							matched: 2,
+							occurrences: [
+								{ own: false, locations: [{ page: 1, boxes: [BOX] }] },
+								{ own: true, locations: [{ page: 2, boxes: [BOX] }] }
+							]
+						};
+			},
 			'GET /api/v1/document-types/t1': () => ({ id: 't1', name: 'Rechnung' })
 		})
 	);
@@ -284,6 +296,27 @@ describe('Beam', () => {
 		await waitFor(() => expect(sheet.querySelectorAll('.shadow-pinned')).toHaveLength(1));
 		expect(sheet.textContent).toContain(kindLabel('invoice_number'));
 		expect(sheet.textContent).toContain(m.beam_position({ current: 1, total: 2 }));
+	});
+
+	it('marks where the words of a search stand, the best with a halo, the words in the body', async () => {
+		const source = { kind: 'search', words: 'Strom Rechnung' } as const;
+		goTo(LIST, {}, { beam: { ...beam(0), source } });
+		render(Beam);
+		const sheet = await screen.findByRole('dialog', { name: 'Stromrechnung März' });
+		await waitFor(() => expect(sheet.querySelectorAll('.ring-primary')).toHaveLength(2));
+		expect(sheet.querySelectorAll('.shadow-pinned')).toHaveLength(1);
+		expect(sheet.textContent).not.toContain(m.beam_meaning_only());
+		const sent = calls(vi.mocked(fetch) as ReturnType<typeof fakeApi>);
+		expect(sent).toContain('POST /api/v1/documents/a/search-places');
+		expect(sent.join(' ')).not.toContain('Strom');
+	});
+
+	it('says that the meaning alone found a hit whose words are not in its text', async () => {
+		goTo(LIST, {}, { beam: { ...beam(0), source: { kind: 'search', words: 'Zahnarzt' } } });
+		render(Beam);
+		const sheet = await screen.findByRole('dialog', { name: 'Stromrechnung März' });
+		expect(await screen.findByText(m.beam_meaning_only())).toBeTruthy();
+		expect(sheet.querySelectorAll('.ring-primary')).toHaveLength(0);
 	});
 
 	it('marks where the text conditions of a rule hit, each labelled once', async () => {
