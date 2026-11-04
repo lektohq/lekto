@@ -1,15 +1,18 @@
 from datetime import date
 from decimal import Decimal
+from uuid import UUID
 
 import pytest
 
 from lekto.core.domain.documents import Channel
+from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.evidence import DocumentText
 from lekto.core.domain.fields import FieldDefinition, Money, Url
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.periods import Period
 from lekto.core.domain.rule_conditions import (
     Facts,
+    MailOf,
     Match,
     Truth,
     evaluate,
@@ -479,3 +482,38 @@ def test_a_topic_condition_matches_the_topics_below_it_and_is_unknown_unconfirme
     filing = rule(SetSpace(SHARED), when=all_(cond(ConditionField.TOPIC, Operator.IS, health)))
     (match,) = matches([filing], unconfirmed, {})
     assert (match.trusted, match.distrusted) == (False, ("topic",))
+
+
+MAIL = MailOf(
+    mailbox_id=UUID("01a1a7fc-702c-736e-a661-ff59645bdc52"),
+    senders=("rechnung@stadtwerke.example", "Stadtwerke"),
+    recipients=("anna@example.test", "Anna"),
+    subject="Ihre Rechnung Oktober",
+)
+
+
+@pytest.mark.parametrize(
+    ("condition", "holds", "without"),
+    [
+        (cond(ConditionField.MAIL_MAILBOX, Operator.IS, str(MAIL.mailbox_id)), True, False),
+        (cond(ConditionField.MAIL_MAILBOX, Operator.PRESENT), True, False),
+        (cond(ConditionField.MAIL_MAILBOX, Operator.MISSING), False, True),
+        (cond(ConditionField.MAIL_SENDER, Operator.ENDS_WITH, "@Stadtwerke.example"), True, False),
+        (cond(ConditionField.MAIL_SENDER, Operator.STARTS_WITH, "info@"), False, False),
+        (cond(ConditionField.MAIL_RECIPIENT, Operator.IS, "anna@example.test"), True, False),
+        (cond(ConditionField.MAIL_SUBJECT, Operator.CONTAINS, "rechnung"), True, False),
+    ],
+)
+def test_conditions_on_the_mail_a_document_came_with(
+    condition: Condition, holds: bool, without: bool
+) -> None:
+    document = doc()
+    assert evaluate(all_(condition), Facts.of(document, mail=MAIL), {}) is holds
+    assert evaluate(all_(condition), Facts.of(document), {}) is without
+
+
+def test_text_operators_only_for_the_mail() -> None:
+    with pytest.raises(ValidationError):
+        cond(ConditionField.TEXT, Operator.ENDS_WITH, "x")
+    with pytest.raises(ValidationError):
+        cond(ConditionField.MAIL_MAILBOX, Operator.IS, "not an id")
