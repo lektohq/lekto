@@ -3,13 +3,22 @@ make a new account for a test, and an address where nobody listens."""
 
 from collections.abc import Sequence
 from dataclasses import replace
+from datetime import UTC, date, datetime
 from typing import Protocol
 
 import pytest
 
 from lekto.core.domain.mail import MailLogin, MailSecurity
 from lekto.core.domain.reasons import ReasonCode
-from lekto.core.ports.mail_server import MailServer, MailServerError
+from lekto.core.ports.mail_server import MailSearch, MailServer, MailServerError
+from tests.mails import plain_mail
+
+EARLY = datetime(2026, 11, 1, 8, 0, tzinfo=UTC)
+LATE = datetime(2026, 11, 4, 9, 30, tzinfo=UTC)
+
+
+def _lines(data: bytes | None) -> bytes | None:
+    return None if data is None else data.replace(b"\r\n", b"\n")
 
 
 class MailWorld(Protocol):
@@ -19,6 +28,18 @@ class MailWorld(Protocol):
 
     def unreachable(self) -> MailLogin:
         """A login for an address where nobody listens."""
+        ...
+
+    def deliver(
+        self,
+        login: MailLogin,
+        folder: str,
+        data: bytes,
+        *,
+        arrived_at: datetime,
+        seen: bool = False,
+    ) -> None:
+        """Put a mail into the account's `folder`."""
         ...
 
 
@@ -75,3 +96,62 @@ class MailServerContract:
         with pytest.raises(MailServerError) as caught:
             await server.folders(login)
         assert caught.value.reason.code is ReasonCode.MAIL_TLS_FAILED
+
+    async def test_a_session_finds_reads_and_leaves_mails_unread(
+        self, server: MailServer, world: MailWorld
+    ) -> None:
+        login = world.account(["Rechnungen"])
+        first, second = plain_mail("Erste"), plain_mail("Zweite")
+        world.deliver(login, "INBOX", first, arrived_at=EARLY)
+        world.deliver(login, "INBOX", second, arrived_at=LATE)
+        world.deliver(login, "INBOX", plain_mail("Gelesen"), arrived_at=LATE, seen=True)
+        async with server.session(login) as session:
+            found = await session.search("INBOX", MailSearch())
+            assert len(found.uids) == 3 and list(found.uids) == sorted(found.uids)
+            assert found.uidvalidity > 0
+            one, two, _ = found.uids
+            infos = await session.info("INBOX", [two, one])
+            assert [info.uid for info in infos] == [two, one]
+            assert infos[1].arrived_at == EARLY and infos[1].size >= len(first)
+            assert _lines(await session.fetch("INBOX", one)) == _lines(first)
+            unseen = await session.search("INBOX", MailSearch(unseen=True))
+            assert unseen.uids == (one, two)  # fetching marked nothing
+            since = await session.search("INBOX", MailSearch(since=date(2026, 11, 3)))
+            assert since.uids == (two, found.uids[2])
+            await session.mark_read("INBOX", one)
+            assert (await session.search("INBOX", MailSearch(unseen=True))).uids == (two,)
+            assert (await session.search("Rechnungen", MailSearch())).uids == ()
+
+    async def test_a_session_moves_and_throws_away(
+        self, server: MailServer, world: MailWorld
+    ) -> None:
+        login = world.account(["Archiv"])
+        world.deliver(login, "INBOX", plain_mail("Eins"), arrived_at=EARLY)
+        world.deliver(login, "INBOX", plain_mail("Zwei"), arrived_at=EARLY)
+        async with server.session(login) as session:
+            one, two = (await session.search("INBOX", MailSearch())).uids
+            await session.move("INBOX", one, "Archiv")
+            assert len((await session.search("Archiv", MailSearch())).uids) == 1
+            with pytest.raises(MailServerError) as caught:
+                await session.move("INBOX", two, "Nirgends")
+            assert caught.value.reason.code is ReasonCode.MAIL_FOLDER_MISSING
+            await session.trash("INBOX", two)
+            assert (await session.search("INBOX", MailSearch())).uids == ()
+            assert await session.fetch("INBOX", two) is None
+
+    async def test_a_missing_folder(self, server: MailServer, world: MailWorld) -> None:
+        login = world.account()
+        async with server.session(login) as session:
+            with pytest.raises(MailServerError) as caught:
+                await session.search("Nirgends", MailSearch())
+        assert caught.value.reason.code is ReasonCode.MAIL_FOLDER_MISSING
+        assert caught.value.reason.params == {"folder": "Nirgends"}
+
+    async def test_a_session_with_a_wrong_password(
+        self, server: MailServer, world: MailWorld
+    ) -> None:
+        login = replace(world.account(), password="wrong")
+        with pytest.raises(MailServerError) as caught:
+            async with server.session(login):
+                pass
+        assert caught.value.reason.code is ReasonCode.MAIL_LOGIN_FAILED

@@ -6,6 +6,7 @@ import json
 import secrets
 import urllib.request
 from collections.abc import Sequence
+from datetime import datetime
 
 import pytest
 
@@ -48,6 +49,25 @@ class _GreenMail:
                     status, answer = imap._simple_command("CREATE", quoted(folder).decode())
                     assert status == "OK", answer
         return login
+
+    def deliver(
+        self,
+        login: MailLogin,
+        folder: str,
+        data: bytes,
+        *,
+        arrived_at: datetime,
+        seen: bool = False,
+    ) -> None:
+        with imaplib.IMAP4(self._host, self._port, timeout=probes.TIMEOUT) as imap:
+            imap.login(login.username, login.password)
+            status, answer = imap.append(
+                quoted(folder).decode(),
+                "(\\Seen)" if seen else "",
+                imaplib.Time2Internaldate(arrived_at),
+                data,
+            )
+            assert status == "OK", answer
 
     def unreachable(self) -> MailLogin:
         return MailLogin(

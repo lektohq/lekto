@@ -2,6 +2,7 @@
 
 import secrets
 from collections.abc import Sequence
+from datetime import datetime
 
 import pytest
 
@@ -23,8 +24,20 @@ class _World:
             username=f"user-{secrets.token_hex(4)}",
             password=password,
         )
-        self._server.add_account(login).folders.extend(folders)
+        self._server.add_account(login).add_folders(*folders)
         return login
+
+    def deliver(
+        self,
+        login: MailLogin,
+        folder: str,
+        data: bytes,
+        *,
+        arrived_at: datetime,
+        seen: bool = False,
+    ) -> None:
+        account = self._server.servers[(login.host, login.port)][login.username]
+        account.deliver(folder, data, arrived_at=arrived_at, seen=seen)
 
     def unreachable(self) -> MailLogin:
         return MailLogin(
