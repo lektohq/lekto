@@ -465,6 +465,24 @@ async def test_the_matches_of_a_document_ask_the_query_and_each_word_alone() -> 
     assert all(body["attributesToSearchOn"] == ["text"] for body in bodies)
 
 
+async def test_a_query_of_stop_words_alone_finds_nothing_without_asking() -> None:
+    """Meilisearch would answer it with every document, as if nothing were asked."""
+    sim = SimulatedMeilisearch()
+    sim.settings = wanted_settings(sim)
+    visible = Visibility(frozenset({SpaceId(uid(100))}))
+    for text in ("und", "Wie viel ich?", "Für ", "* (("):
+        result = await sim.index(locales=["deu"]).search(search_query(text, visible))
+        assert (result.hits, result.estimated_total) == ([], 0), text
+        assert await sim.index().matches(DocumentId(uid(1)), text, visible) == [], text
+    assert sim.calls("POST", "/search") == []
+    await sim.index(locales=["deu"]).search(search_query("und Strom", visible))
+    assert {sim.body(call)["q"] for call in sim.calls("POST", "/search")} == {"und Strom"}
+    # Without the language's stop words they are words like any other.
+    sim.requests.clear()
+    await sim.index(locales=["eng"]).search(search_query("und", visible))
+    assert {sim.body(call)["q"] for call in sim.calls("POST", "/search")} == {"und"}
+
+
 async def test_the_search_request_and_its_answer() -> None:
     sim = SimulatedMeilisearch()
     sim.settings = wanted_settings(sim, dimensions=2)
