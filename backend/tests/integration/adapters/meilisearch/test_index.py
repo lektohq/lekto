@@ -5,7 +5,7 @@ import secrets
 import httpx2
 
 from lekto.adapters.outbound.meilisearch import MeilisearchIndex
-from lekto.adapters.outbound.meilisearch.synonyms import GERMAN
+from lekto.adapters.outbound.meilisearch.languages import synonym_groups
 from lekto.composition.settings import Settings
 from lekto.core.domain.ids import SpaceId, new_id
 from lekto.core.domain.search import IndexDocument, Visibility
@@ -54,16 +54,17 @@ async def test_every_word_of_a_synonym_group_finds_the_others(
 ) -> None:
     """The list is only worth what works: each word, as a query, finds a document in each of
     the group's words, also where the splitting of compounds is in the way."""
+    groups = synonym_groups("deu")
     documents: dict[str, IndexDocument] = {}
     spaces = []
-    for group in GERMAN:
+    for group in groups:
         space = SpaceId(new_id())
         spaces.append(space)
         for word in group:
             documents[word] = index_document(space_id=space, title="Brief", text=f"Ihr {word}")
     await search_index.upsert(list(documents.values()))
     missed = []
-    for space, group in zip(spaces, GERMAN, strict=True):
+    for space, group in zip(spaces, groups, strict=True):
         visible = Visibility(frozenset({space}))
         for word in group:
             result = await search_index.search(search_query(word, visible, limit=20))

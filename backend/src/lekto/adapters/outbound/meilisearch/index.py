@@ -4,9 +4,9 @@
   vectors are only named when the document brings new ones). Meilisearch
   processes writes as tasks; every write here waits for its task, so a change is searchable when
   the call returns and a failed task raises `SearchIndexError` instead of getting lost.
-- Settings (searchable, filterable and sortable attributes, languages, stop words, synonyms, the
-  embedder) are applied by the adapter itself, on first use and only when they differ from what
-  the index has, so that a restart does not index again.
+- Settings (searchable, filterable and sortable attributes, languages, the stop words and
+  synonyms of `languages/`, the embedder) are applied by the adapter itself, on first use and
+  only when they differ from what the index has, so that a restart does not index again.
 - Vectors are computed by Lekto and handed over (embedder `userProvided`, named `default`); a
   document may have several, one per section. A document without vectors opts out with `null`.
 - The rights filter is part of every search and built from `Visibility`. Values in filters are
@@ -31,8 +31,7 @@ from uuid import UUID
 import httpx2
 
 from lekto.adapters.outbound.http_client import excerpt
-from lekto.adapters.outbound.meilisearch.stop_words import stop_words
-from lekto.adapters.outbound.meilisearch.synonyms import synonyms
+from lekto.adapters.outbound.meilisearch.languages import stop_words, synonyms
 from lekto.core.domain.errors import SearchIndexError, SearchUnavailableError
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.pipeline import Lane
