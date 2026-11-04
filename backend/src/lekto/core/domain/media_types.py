@@ -1,5 +1,6 @@
 """File types Lekto accepts, recognised by their content, not by name or declared type."""
 
+import re
 from dataclasses import dataclass
 
 PDF = "application/pdf"
@@ -10,9 +11,10 @@ WEBP = "image/webp"
 ICO = "image/x-icon"
 TEXT = "text/plain; charset=utf-8"
 JSON = "application/json"
+EML = "message/rfc822"
 
-SUPPORTED: tuple[str, ...] = (PDF, JPEG, PNG, TIFF)
-"""PDFs and photos or scans as images. Office files and e-mails are not supported yet."""
+SUPPORTED: tuple[str, ...] = (PDF, JPEG, PNG, TIFF, EML)
+"""PDFs, photos or scans as images, and mails (`.eml`). Office files are not supported."""
 
 SNIFF_SIZE = 1024
 """Bytes from the start of a file that `detect` needs."""
@@ -72,12 +74,58 @@ def icon_entries(data: bytes, limit: int) -> list[IconEntry] | None:
     return entries
 
 
+_HEADER = re.compile(rb"([!-9;-~]+):")
+_CONTINUED = (b" ", b"\t")
+_MAIL_HEADERS = frozenset(
+    {
+        b"from",
+        b"to",
+        b"cc",
+        b"date",
+        b"subject",
+        b"message-id",
+        b"mime-version",
+        b"received",
+        b"return-path",
+        b"delivered-to",
+        b"reply-to",
+        b"content-type",
+        b"dkim-signature",
+        b"arc-seal",
+        b"authentication-results",
+        b"x-mailer",
+    }
+)
+
+
+def _is_mail(head: bytes) -> bool:
+    """Whether `head` starts like a mail: header lines (or their continuations) only, as far
+    as it goes, two of them names a mail has, and the first one a header."""
+    lines = head.replace(b"\r\n", b"\n").split(b"\n")
+    if len(lines) > 1:
+        lines = lines[:-1]  # the last may be cut off
+    names: set[bytes] = set()
+    for number, line in enumerate(lines):
+        if line == b"":
+            break  # the end of the header
+        if line.startswith(_CONTINUED) and number > 0:
+            continue
+        match = _HEADER.match(line)
+        if match is None:
+            return False
+        names.add(match[1].lower())
+    return len(names & _MAIL_HEADERS) >= 2
+
+
 def detect(head: bytes) -> str | None:
     """The supported media type of a file starting with `head` (its first `SNIFF_SIZE`
-    bytes), or None. PDF readers accept the `%PDF-` header anywhere in the first kilobyte."""
+    bytes), or None. PDF readers accept the `%PDF-` header anywhere in the first kilobyte; a
+    mail is recognised by its header lines."""
     for signature, media_type in _SIGNATURES:
         if head.startswith(signature):
             return media_type
     if b"%PDF-" in head[:SNIFF_SIZE]:
         return PDF
+    if _is_mail(head[:SNIFF_SIZE]):
+        return EML
     return None
