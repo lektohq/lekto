@@ -41,8 +41,13 @@ _LABELS = {
     },
 }
 
-_STYLE = """
+_BASE = """
 @page { size: A4; margin: 16mm 15mm 18mm; }
+body { font: 10pt/1.45 "Nimbus Sans", "DejaVu Sans", sans-serif; color: #1b1a17; }
+"""
+"""The page and a plain font, before the mail's own styles: they may change it."""
+
+_STYLE = """
 .lekto-head { font: 9.5pt/1.4 "Nimbus Sans", "DejaVu Sans", sans-serif !important;
   color: #1b1a17 !important; background: #fff !important; margin: 0 0 6mm !important;
   padding: 0 0 3mm !important; border-bottom: 0.6pt solid #b9b5ad !important; }
@@ -91,7 +96,7 @@ class WeasyPrintMailRenderer:
         styles, body = _content(message)
         return (
             '<!doctype html><html><head><meta charset="utf-8">'
-            f"{styles}<style>{_STYLE}</style></head><body>"
+            f"<style>{_BASE}</style>{styles}<style>{_STYLE}</style></head><body>"
             f"{self._head(message)}{body}</body></html>"
         )
 
