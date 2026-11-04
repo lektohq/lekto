@@ -1,5 +1,5 @@
 {
-  "description": "Search queries on the synthetic documents of the evaluation set. `expected`: the cases that answer the query; the first one found in the results counts. `kind`: exact (words of the document), number (identifiers and amounts), compound (compound words), typo, paraphrase (other words for the same thing), english (query in English, document in German), late (only in the back part of the long statement 26), confusable (the right one among documents alike: pay slips, the electrician's, the mail-order house's, statements, the insurer's), question (asked as a person asks), purpose (what a document is for, in none of its words).",
+  "description": "Search queries on the synthetic documents of the evaluation set. `expected`: the cases that answer the query; the first one found in the results counts. `kind`: exact (words of the document), number (identifiers and amounts), compound (compound words), typo, paraphrase (other words for the same thing), english (query in English, document in German), late (only in the back part of the long statement 26), confusable (the right one among documents alike: pay slips, the electrician's, the mail-order house's, statements, the insurer's), question (asked as a person asks), purpose (what a document is for, in none of its words), part (one part of a compound of the document), inflected (another form of a word of the document), synonym (another word for the same thing, not in the document), field (the contact or type of the documents, which others name in their text), ending (a word Meilisearch splits into its stem and a short ending, \"Kündigungen\" into \"kündigung\" and \"en\").",
   "queries": [
     {
       "query": "Probezeit sechs Monate",
@@ -669,6 +669,119 @@
     {
       "query": "refund for returned shoes",
       "kind": "english",
+      "expected": [
+        "18-gutschrift"
+      ]
+    },
+    {
+      "query": "Kranken",
+      "kind": "part",
+      "expected": [
+        "14-beitragsanpassung-krankenversicherung",
+        "40-krankenversicherung-versicherungsschein",
+        "41-kennungen-zweier-themen",
+        "42-gelber-kontakt-thema"
+      ]
+    },
+    {
+      "query": "Zähler",
+      "kind": "part",
+      "expected": [
+        "48-rechnungskorrektur"
+      ]
+    },
+    {
+      "query": "Lohnabrechnungen",
+      "kind": "inflected",
+      "expected": [
+        "15-lohnabrechnung",
+        "29-lohnabrechnung-angestellte",
+        "34-betraege-ohne-waehrung",
+        "35-lohnabrechnung-gesamtbrutto",
+        "39-lohnabrechnung-versicherung",
+        "43-lohnabrechnung-falsche-zeile"
+      ]
+    },
+    {
+      "query": "Gehaltszettel",
+      "kind": "synonym",
+      "expected": [
+        "15-lohnabrechnung",
+        "29-lohnabrechnung-angestellte",
+        "34-betraege-ohne-waehrung",
+        "35-lohnabrechnung-gesamtbrutto",
+        "39-lohnabrechnung-versicherung",
+        "43-lohnabrechnung-falsche-zeile"
+      ]
+    },
+    {
+      "query": "Nebenkosten",
+      "kind": "synonym",
+      "expected": [
+        "06-mietvertrag"
+      ]
+    },
+    {
+      "query": "Stadtwerke",
+      "kind": "field",
+      "expected": [
+        "01-stromrechnung",
+        "21-kontakt-tippfehler",
+        "48-rechnungskorrektur"
+      ]
+    },
+    {
+      "query": "Nordlicht",
+      "kind": "field",
+      "expected": [
+        "07-arbeitsvertrag",
+        "15-lohnabrechnung",
+        "29-lohnabrechnung-angestellte",
+        "34-betraege-ohne-waehrung",
+        "35-lohnabrechnung-gesamtbrutto",
+        "36-zeitnachweis-monat",
+        "37-zeitnachweis-woche",
+        "43-lohnabrechnung-falsche-zeile"
+      ]
+    },
+    {
+      "query": "FernNetz",
+      "kind": "field",
+      "expected": [
+        "02-telefonrechnung",
+        "16-kuendigungsbestaetigung",
+        "33-optionales-feld-unsinn"
+      ]
+    },
+    {
+      "query": "Versandhaus",
+      "kind": "field",
+      "expected": [
+        "17-mahnung",
+        "18-gutschrift",
+        "23-ohne-datum",
+        "27-anweisungen-zusatzfelder",
+        "28-anweisungen-werte",
+        "31-absender-nur-kennung"
+      ]
+    },
+    {
+      "query": "Kündigungen",
+      "kind": "ending",
+      "expected": [
+        "16-kuendigungsbestaetigung"
+      ]
+    },
+    {
+      "query": "Mahnungen",
+      "kind": "ending",
+      "expected": [
+        "17-mahnung"
+      ]
+    },
+    {
+      "query": "Gutschriften",
+      "kind": "ending",
       "expected": [
         "18-gutschrift"
       ]

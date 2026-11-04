@@ -2,8 +2,8 @@
 embedding models and measure which queries find which documents; write a Markdown report."""
 
 import secrets
-from collections.abc import AsyncIterator, Sequence
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Callable, Sequence
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -41,6 +41,7 @@ from lekto.core.services.indexing import IndexingService
 from lekto.core.services.search import SearchService
 
 DEFAULT_RATIOS = (0.0, 0.5, 1.0)
+WORDS = "words"  # the backend's name without embeddings
 QUERY_TIMEOUT = timedelta(minutes=2)  # a model may be loaded into memory on the first query
 
 
@@ -70,6 +71,7 @@ async def run_search_evaluation(
     cases: Path,
     queries: Path | None = None,
     fake: bool = False,
+    words_only: bool = False,
     models: Sequence[str] = (),
     ratios: Sequence[float] = DEFAULT_RATIOS,
     output: Path | None = None,
@@ -81,7 +83,8 @@ async def run_search_evaluation(
 
     Without `fake`, LEKTO_MEILISEARCH_URL and LEKTO_EMBEDDING_BASE_URL are required; every model
     gets a temporary Meilisearch index, removed afterwards. With `fake`, bag-of-words vectors and
-    the in-memory index take their place.
+    the in-memory index take their place. With `words_only`, the index has no embeddings and the
+    queries run by words alone, on Meilisearch without LEKTO_EMBEDDING_BASE_URL.
     """
     evaluation = load_set(cases)
     query_set = load_queries(
@@ -90,7 +93,9 @@ async def run_search_evaluation(
     )
     if fake and models:
         raise ConfigurationError("--models does not go with --fake")
-    backends, endpoint, index = _backends(settings, fake=fake, models=models)
+    if words_only and models:
+        raise ConfigurationError("--models does not go with --words-only")
+    backends, endpoint, index = _backends(settings, fake=fake, words_only=words_only, models=models)
 
     def model_for(case: Case) -> LanguageModel | None:
         # The documents are classified with the fixed answers: the metadata is not what is
@@ -139,6 +144,7 @@ async def run_search_evaluation(
             "search_max_chunks",
             "search_max_text",
             "search_semantic_ratio",
+            "search_locales",
             "embedding_document_prefix",
             "embedding_query_prefix",
         ),
@@ -153,19 +159,26 @@ async def run_search_evaluation(
 
 
 def _backends(
-    settings: Settings, *, fake: bool, models: Sequence[str]
+    settings: Settings, *, fake: bool, words_only: bool, models: Sequence[str]
 ) -> tuple[list[Backend], str, str]:
     """The backends, the endpoint and the kind of index for the report."""
     if fake:
-        embeddings = BagOfWordsEmbeddings()
+        embeddings = None if words_only else BagOfWordsEmbeddings()
 
         @asynccontextmanager
         async def memory(dimensions: int | None) -> AsyncIterator[SearchIndex]:
             yield MemorySearchIndex(dimensions=dimensions)
 
-        return [Backend(embeddings.model, embeddings, memory)], "memory", "in memory"
+        name = WORDS if embeddings is None else embeddings.model
+        return [Backend(name, embeddings, memory)], "memory", "in memory"
     if settings.meilisearch_url is None:
         raise ConfigurationError("LEKTO_MEILISEARCH_URL is not set; use --fake or configure it")
+    if words_only:
+        return (
+            [Backend(WORDS, None, _meilisearch(settings))],
+            "none",
+            f"Meilisearch at {endpoint_of(str(settings.meilisearch_url))}, a temporary index",
+        )
     if settings.embedding_base_url is None:
         raise ConfigurationError("LEKTO_EMBEDDING_BASE_URL is not set; use --fake or configure it")
     names = list(
@@ -173,6 +186,26 @@ def _backends(
     )
     if not names:
         raise ConfigurationError("no model: pass --models or set LEKTO_EMBEDDING_MODEL")
+    meilisearch = _meilisearch(settings)
+    backends = [
+        Backend(
+            name,
+            openai_embeddings(settings.model_copy(update={"embedding_model": name})),
+            meilisearch,
+        )
+        for name in names
+    ]
+    return (
+        backends,
+        endpoint_of(str(settings.embedding_base_url)),
+        f"Meilisearch at {endpoint_of(str(settings.meilisearch_url))}, a temporary index per model",
+    )
+
+
+def _meilisearch(
+    settings: Settings,
+) -> Callable[[int | None], AbstractAsyncContextManager[SearchIndex]]:
+    """A fresh temporary Meilisearch index for each call, removed on leaving."""
 
     @asynccontextmanager
     async def meilisearch(dimensions: int | None) -> AsyncIterator[SearchIndex]:
@@ -196,16 +229,4 @@ def _backends(
             finally:
                 await index.aclose()
 
-    backends = [
-        Backend(
-            name,
-            openai_embeddings(settings.model_copy(update={"embedding_model": name})),
-            meilisearch,
-        )
-        for name in names
-    ]
-    return (
-        backends,
-        endpoint_of(str(settings.embedding_base_url)),
-        f"Meilisearch at {endpoint_of(str(settings.meilisearch_url))}, a temporary index per model",
-    )
+    return meilisearch

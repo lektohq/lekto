@@ -99,6 +99,27 @@ Upload the files in `files/` through the web UI (several at once) or `POST /api/
 All of them make several hundred jobs, among them OCR for about 150 files: try a handful first.
 There is no master data for them yet; Lekto proposes contacts and types itself.
 
+## Measuring the search
+
+`search/queries.json` holds 122 queries on these documents for `lekto evaluate-search`, by kind:
+words, numbers, compounds and their parts, other forms and other words for the same thing,
+contact or title against the many documents that name it in their text, words Meilisearch splits
+into a stem and a short ending, typos, paraphrases, English, the right one among documents
+alike (33 pay slips, 33 phone bills, 33 statements), questions and purposes. `expected` names the
+documents by `key`. The generator writes the documents as an evaluation set (the text of each
+and a fixed answer with its contact, type, date and title), and the search evaluation of the
+backend indexes and queries them; run both in the devcontainer from `backend/`:
+
+```sh
+uv run python ../examples/documents/generate.py --search-set /tmp/search-set
+uv run lekto evaluate-search --words-only --cases /tmp/search-set   # Meilisearch, words alone
+uv run lekto evaluate-search --cases /tmp/search-set --output ../examples/documents/search/reports/<date>-<model>.md
+```
+
+The text is the generator's, not what OCR reads from the files: the evaluation measures the
+search, not the reading. The reports in `search/reports/` record the runs; what the measures
+mean is in [`backend/evaluation/README.md`](../../backend/evaluation/README.md#search).
+
 ## Generating them again
 
 The generator is `generate.py` with the package `synth/`. It uses only the backend's
