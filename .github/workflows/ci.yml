@@ -248,7 +248,8 @@ jobs:
           (
             sudo apt-get update -q
             sudo apt-get install --no-install-recommends -y -q \
-              ghostscript pngquant qpdf tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng unpaper
+              ghostscript pngquant qpdf tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng unpaper \
+              libharfbuzz-subset0 libpango-1.0-0 libpangoft2-1.0-0
           ) > "$RUNNER_TEMP/apt.log" 2>&1 &
           apt=$!
           $COMPOSE up -d --wait postgres meilisearch garage greenmail

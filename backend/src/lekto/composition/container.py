@@ -31,6 +31,7 @@ from lekto.adapters.outbound.memory import (
     FakeClassifier,
     FakeCodeReader,
     FakeImageNormaliser,
+    FakeMailRenderer,
     FakeMetadataReader,
     FakeOcr,
     FakePageRenderer,
@@ -60,6 +61,7 @@ from lekto.adapters.outbound.s3 import S3ObjectStore
 from lekto.adapters.outbound.sklearn import SklearnClassifier
 from lekto.adapters.outbound.sql import SqlEventBus, SqlUnitOfWorkFactory, SqlWakeup
 from lekto.adapters.outbound.system import SystemClock
+from lekto.adapters.outbound.weasyprint import WeasyPrintMailRenderer
 from lekto.adapters.outbound.webhooks import HttpWebhookSender
 from lekto.adapters.outbound.zxing import ZxingCodeReader
 from lekto.composition.database import open_database
@@ -84,6 +86,7 @@ from lekto.core.ports.images import ImageNormaliser
 from lekto.core.ports.llm import LanguageModel
 from lekto.core.ports.locator import TextLocator
 from lekto.core.ports.logos import LogoFetcher
+from lekto.core.ports.mail_renderer import MailRenderer
 from lekto.core.ports.mail_server import MailServer
 from lekto.core.ports.metadata import MetadataReader
 from lekto.core.ports.object_store import ObjectStore
@@ -384,6 +387,7 @@ class Container:
     refs: RefCipher
     webhook_sender: WebhookSender
     mail_server: MailServer
+    mail_renderer: MailRenderer
     totp: Totp
     patterns: PatternMatcher
     templates: TemplateRenderer
@@ -453,6 +457,7 @@ def build_container(settings: Settings) -> Container:
         refs=ref_cipher(settings),
         webhook_sender=HttpWebhookSender(user_agent=USER_AGENT),
         mail_server=ImapMailServer(),
+        mail_renderer=WeasyPrintMailRenderer(settings.template_locale),
         totp=PyotpTotp(),
         patterns=RegexPatternMatcher(settings.rules_pattern_timeout.total_seconds()),
         templates=LiquidTemplateRenderer(
@@ -503,6 +508,7 @@ def build_memory_container(
         refs=FakeRefCipher(),
         webhook_sender=FakeWebhookSender(),
         mail_server=MemoryMailServer(),
+        mail_renderer=FakeMailRenderer(),
         totp=FakeTotp(),
         patterns=RegexPatternMatcher(settings.rules_pattern_timeout.total_seconds()),
         templates=LiquidTemplateRenderer(
@@ -736,8 +742,8 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
     public_url = None if settings.public_url is None else str(settings.public_url)
     desk = TaskDesk(container.cipher, container.templates, link_base=public_url)
     executors: dict[Node, NodeExecutor] = {
-        Node.OCR: OcrNode(store, container.ocr),
-        Node.PAGES: PagesNode(store, container.pages),
+        Node.OCR: OcrNode(store, container.ocr, container.mail_renderer),
+        Node.PAGES: PagesNode(store, container.pages, container.mail_renderer),
         Node.PARSE: ParseNode(store, container.parser),
         **classification_nodes(
             container,
