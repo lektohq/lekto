@@ -7,6 +7,7 @@ class MetadataSource(StrEnum):
     INFO = "info"  # a PDF's document information dictionary
     XMP = "xmp"  # a PDF's XMP packet: `prefix:name`
     EXIF = "exif"  # an image's EXIF tags
+    MAIL = "mail"  # a mail's header lines
 
 
 @dataclass(frozen=True)
@@ -19,9 +20,10 @@ class MetadataEntry:
 @dataclass(frozen=True, kw_only=True)
 class FileMetadata:
     """What a file says about itself: a PDF its version, PDF/A level and pages; an image its
-    format, size and resolution; both their metadata entries, in the file's order."""
+    format, size and resolution; a mail its header lines; all their metadata entries, in the
+    file's order."""
 
-    format: str  # "PDF", "JPEG", "PNG", "TIFF", ...
+    format: str  # "PDF", "JPEG", "PNG", "TIFF", "E-Mail", ...
     pdf_version: str | None = None
     pdfa: str | None = None  # PDF/A part and conformance, e.g. "2B"
     pages: int | None = None

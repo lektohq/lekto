@@ -22,6 +22,7 @@ from lekto.core.domain.locations import Box, Location
 from lekto.core.domain.reading import PageReading, PageWords
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.codes import CodeReading
+from lekto.core.ports.mail_renderer import RenderedMail
 from lekto.core.ports.metadata import FileMetadata, MetadataEntry, MetadataSource
 from lekto.core.ports.ocr import OcrResult, VisionModel, VisionReading
 from lekto.core.ports.pages import PREVIEW_FILE, RenderedPages
@@ -107,6 +108,21 @@ FAKE_GIRO_CODE = Code(
 )
 
 
+class FakeMailRenderer:
+    """Sets any mail as the fake archive of one page."""
+
+    def __init__(self) -> None:
+        self.calls: list[Path] = []
+
+    async def render(self, mail: Path, target: Path) -> RenderedMail:
+        self.calls.append(mail)
+        data = await asyncio.to_thread(mail.read_bytes)
+        if media_types.detect(data[: media_types.SNIFF_SIZE]) != media_types.EML:
+            raise UnprocessableDocumentError(because(ReasonCode.FILE_DAMAGED))
+        await asyncio.to_thread(target.write_bytes, FAKE_PDF)
+        return RenderedMail(pages=1, renderer="fake-mail 1", pdfa=True)
+
+
 class FakeCodeReader:
     """Finds `codes` on every PDF it can read (none unless given)."""
 
@@ -130,6 +146,8 @@ class FakeMetadataReader:
         if kind == media_types.PDF:
             producer = MetadataEntry(MetadataSource.INFO, "Producer", "fake-metadata 1")
             return FileMetadata(format="PDF", pdf_version="1.7", pages=1, entries=(producer,))
+        if kind == media_types.EML:
+            return FileMetadata(format="E-Mail")
         name = {media_types.JPEG: "JPEG", media_types.PNG: "PNG", media_types.TIFF: "TIFF"}
         return FileMetadata(format=name.get(kind or "", "image"), pages=1, width=1, height=1)
 

@@ -8,6 +8,8 @@ are in. A file that cannot be read, or an encrypted PDF, is unprocessable.
 """
 
 import asyncio
+import email
+import email.policy
 import io
 import re
 
@@ -46,6 +48,8 @@ def _read(data: bytes) -> FileMetadata:
         return _pdf(data)
     if kind in (media_types.JPEG, media_types.PNG, media_types.TIFF):
         return _image(data)
+    if kind == media_types.EML:
+        return _mail(data)
     raise UnprocessableDocumentError(because(ReasonCode.FILE_NOT_PDF_OR_IMAGE))
 
 
@@ -114,3 +118,35 @@ def _image(data: bytes) -> FileMetadata:
             )
     except (UnidentifiedImageError, OSError, ValueError):
         raise UnprocessableDocumentError(because(ReasonCode.IMAGE_UNREADABLE)) from None
+
+
+_MAIL_HEADERS = frozenset(
+    {
+        "from",
+        "sender",
+        "to",
+        "cc",
+        "reply-to",
+        "date",
+        "subject",
+        "message-id",
+        "user-agent",
+        "x-mailer",
+    }
+)
+"""The header lines of a mail its file information shows; the routing ones stay out."""
+
+
+def _mail(data: bytes) -> FileMetadata:
+    message = email.message_from_bytes(data, policy=email.policy.default)
+    entries = []
+    for name, value in message.items():
+        if name.lower() not in _MAIL_HEADERS:
+            continue
+        try:
+            text = _text(str(value))
+        except (LookupError, UnicodeError, ValueError):
+            text = None
+        if text is not None:
+            entries.append(MetadataEntry(MetadataSource.MAIL, name, text))
+    return FileMetadata(format="E-Mail", entries=tuple(entries))

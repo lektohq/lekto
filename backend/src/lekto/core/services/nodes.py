@@ -18,11 +18,13 @@ from pathlib import Path
 
 from lekto.core.domain import media_types
 from lekto.core.domain.documents import Document
+from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.exchanges import tokens_of
 from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.pipeline import Node, NodeResult, Outcome
 from lekto.core.domain.reading import OcrOutput, reading_to_json
 from lekto.core.domain.reasons import Reason, ReasonCode, because, text_of
+from lekto.core.ports.mail_renderer import MailRenderer
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.ocr import Ocr, VisionReading
 from lekto.core.ports.pages import PAGE_MEDIA_TYPE, PREVIEW_FILE, PageRenderer
@@ -58,13 +60,19 @@ class OcrNode:
     In a run a person asked to read with the vision language model (`Processing.vision`), the
     model reads every page: the log names it, its prompt and its tokens (`vision`), and what
     was sent is kept beside the document (`exchanges_key`). Without a model configured, the
-    node fails."""
+    node fails.
 
-    def __init__(self, store: ObjectStore, ocr: Ocr) -> None:
+    A mail is set, not read: `mail` makes its archive from the mail's own text (no OCR, no
+    vision), and its words are none."""
+
+    def __init__(self, store: ObjectStore, ocr: Ocr, mail: MailRenderer | None = None) -> None:
         self._store = store
         self._ocr = ocr
+        self._mail = mail
 
     async def run(self, document: Document) -> NodeResult:
+        if document.media_type == media_types.EML:
+            return await self._set_mail(document)
         vision = document.processing.vision
         input: JsonObject = {"original": original_key(document.sha256)}
         if vision:
@@ -127,6 +135,34 @@ class OcrNode:
             output=output.to_json(),
         )
 
+    async def _set_mail(self, document: Document) -> NodeResult:
+        async with work_directory() as work:
+            original, archive = work / ORIGINAL_FILE, work / ARCHIVE_FILE
+            await self._store.download(original_key(document.sha256), original)
+            rendered = await _mail_renderer(self._mail).render(original, archive)
+            await self._store.upload(
+                archive_key(document.id), archive, content_type=media_types.PDF
+            )
+        await self._store.delete(codes_key(document.id))
+        await self._store.delete(reading_key(document.id))
+        output = OcrOutput(
+            archive=archive_key(document.id), pages=rendered.pages, pdfa=rendered.pdfa
+        )
+        return NodeResult(
+            outcome=Outcome.OK if rendered.pdfa else Outcome.UNCERTAIN,
+            reasons=() if rendered.pdfa else (because(ReasonCode.ARCHIVE_NOT_PDFA),),
+            model_version=rendered.renderer,
+            input={"original": original_key(document.sha256)},
+            output=output.to_json(),
+        )
+
+
+def _mail_renderer(renderer: MailRenderer | None) -> MailRenderer:
+    """The renderer of mails; a set-up without one cannot take them."""
+    if renderer is None:
+        raise UnprocessableDocumentError(because(ReasonCode.FILE_NOT_PDF_OR_IMAGE))
+    return renderer
+
 
 def read_by(vision: VisionReading) -> Reason:
     return because(ReasonCode.VISION_READ, model=vision.model, endpoint=vision.endpoint)
@@ -144,19 +180,27 @@ def _vision_output(vision: VisionReading) -> JsonObject:
 class PagesNode:
     """Images of every page of the original, and the preview of the first: what the web UI
     shows (and later, what grounding and vision models look at). Runs beside OCR, so it reads
-    the original, not the archive. A file that cannot be read fails at once."""
+    the original, not the archive; a mail it sets as OCR does (`mail`) and shows those pages.
+    A file that cannot be read fails at once."""
 
-    def __init__(self, store: ObjectStore, renderer: PageRenderer) -> None:
+    def __init__(
+        self, store: ObjectStore, renderer: PageRenderer, mail: MailRenderer | None = None
+    ) -> None:
         self._store = store
         self._renderer = renderer
+        self._mail = mail
 
     async def run(self, document: Document) -> "PagesResult":
         async with work_directory() as work:
             original, pages = work / ORIGINAL_FILE, work / "pages"
             pages.mkdir()
             await self._store.download(original_key(document.sha256), original)
+            source, media_type = original, document.media_type
+            if media_type == media_types.EML:
+                source, media_type = work / ARCHIVE_FILE, media_types.PDF
+                await _mail_renderer(self._mail).render(original, source)
             rendered = await self._renderer.render_pages(
-                original, media_type=document.media_type, target=pages
+                source, media_type=media_type, target=pages
             )
             for number in range(1, rendered.pages + 1):
                 await self._store.upload(

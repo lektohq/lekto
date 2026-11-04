@@ -20,6 +20,7 @@
                   analysis finds no text on it either
 - codes.pdf       scan.pdf's page with a GiroCode (a QR code of a credit transfer), a Code 128
                   and a Data Matrix code
+- mail.eml        a mail with a plain and an HTML part (umlauts, quoted-printable)
 - damaged.pdf     a PDF header followed by garbage
 - unsupported.docx  an Office file (a ZIP archive), not supported
 """
@@ -28,6 +29,7 @@ import io
 import random
 import zipfile
 import zlib
+from email.message import EmailMessage
 from pathlib import Path
 
 import numpy
@@ -272,6 +274,21 @@ def serialized(objects: list[str]) -> bytes:
     return out.getvalue()
 
 
+def mail() -> bytes:
+    message = EmailMessage()
+    message["From"] = "Lekto Test GmbH <rechnung@lekto-test.example>"
+    message["To"] = "Anna Beispiel <anna@example.test>"
+    message["Date"] = "Tue, 04 Nov 2026 10:00:00 +0100"
+    message["Message-ID"] = "<rechnung-4711@lekto-test.example>"
+    message["Subject"] = "Ihre Rechnung Nummer 4711"
+    text = "\n".join(["Hallo Anna,", "", *LINES, "", "Viele Grüße"])
+    message.set_content(text)
+    html = "".join(f"<p>{line}</p>" for line in ["Hallo Anna,", *LINES, "Viele Grüße"])
+    message.add_alternative(f"<html><body>{html}</body></html>", subtype="html")
+    message.set_boundary("lekto-sample-boundary")
+    return bytes(message)
+
+
 def main() -> None:
     page(LINES).save(HERE / "scan.pdf", resolution=150)
     (HERE / "text.pdf").write_bytes(text_pdf(LINES))
@@ -302,6 +319,7 @@ def main() -> None:
     with_codes(page(LINES)).save(HERE / "codes.pdf", resolution=150)
     poor_scan(INVOICE).save(HERE / "poor-scan.pdf", resolution=100, quality=20)
     receipt_photo(RECEIPT).save(HERE / "receipt-photo.jpg", quality=70)
+    (HERE / "mail.eml").write_bytes(mail())
     (HERE / "damaged.pdf").write_bytes(b"%PDF-1.7\n" + random.Random(4711).randbytes(2000))
     archive = io.BytesIO()
     with zipfile.ZipFile(archive, "w") as docx:

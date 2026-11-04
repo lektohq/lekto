@@ -129,7 +129,7 @@ class DocumentListSort(StrEnum):
 
 
 _UPLOAD_BODY = upload_body(
-    "PDF, JPEG, PNG or TIFF; recognised by content.", **UploadFields.form_schema()
+    "PDF, JPEG, PNG, TIFF or a mail (`.eml`); recognised by content.", **UploadFields.form_schema()
 )
 
 
