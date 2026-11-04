@@ -1,6 +1,7 @@
 """Fetching mail: a job per mailbox, what each mail brings in by the mailbox's fallback, what is
 not fetched twice, and what shows at the mailbox."""
 
+from dataclasses import replace
 from datetime import timedelta
 from email.message import EmailMessage
 from typing import Any
@@ -37,6 +38,7 @@ from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.services.classification.signals import FactsResult, FactsSignal, sender_line
 from lekto.core.services.mail_intake import FETCH_JOB, MailIntakeService, fetch_key
+from lekto.core.services.mail_rules import Decider
 from lekto.core.services.objects import text_key
 from lekto.core.services.relating import relate
 from lekto.core.services.rules.nodes import ApplyRulesNode
@@ -417,3 +419,44 @@ async def test_the_mail_text_gets_the_type_of_its_rule(world: World) -> None:
     }
     assert documents["message/rfc822"].document_type_id == letter.id
     assert documents["application/pdf"].document_type_id is None  # an attachment: not the text
+
+
+async def test_a_dry_run_over_the_latest_mails(world: World) -> None:
+    admin, person, mailbox = await _setup(world, everything=False)
+    other = await _rule(
+        world,
+        admin,
+        mailbox,
+        name="Newsletter",
+        priority=1,
+        conditions=(MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Newsletter"),),
+        parts=MailParts.NOTHING,
+    )
+    _deliver(world, mails.plain_mail("Unser Newsletter"))
+    _deliver(world, mails.rich_mail())
+    _deliver(world, mails.plain_mail("Etwas anderes"))
+    await _fetch(world, world.mail_intake())
+    draft = MailRuleChanges(
+        name="Mit Anhängen",
+        priority=2,
+        conditions=(MailCondition(MailField.ATTACHMENTS, MailOperator.PRESENT),),
+        user_id=person.id,
+    )
+    found = await world.mail_rules.dry_run(admin.id, mailbox.id, draft)
+    by_subject = {item.record.subject: item for item in found}
+    assert len(found) == 3
+    assert (by_subject["Unser Newsletter"].decider, by_subject["Unser Newsletter"].rule) == (
+        Decider.OTHER,
+        "Newsletter",
+    )
+    rich = by_subject["Ihre Rechnung über 123,45 €"]
+    assert (rich.matches, rich.decider) == (True, Decider.RULE)
+    assert rich.record.attachments == ("Rechnung 4711.pdf",)
+    assert by_subject["Etwas anderes"].decider is Decider.NOTHING
+    # Editing the stored rule: the draft stands in its place.
+    edited = await world.mail_rules.dry_run(
+        admin.id, mailbox.id, replace(draft, priority=0), rule=other.id
+    )
+    assert {item.decider for item in edited} == {Decider.RULE, Decider.NOTHING}
+    with pytest.raises(PermissionDeniedError):
+        await world.mail_rules.dry_run(person.id, mailbox.id, draft)

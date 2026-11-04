@@ -22014,6 +22014,146 @@
         ]
       }
     },
+    "/api/v1/mail-rules/dry-run": {
+      "post": {
+        "tags": [
+          "mail rules"
+        ],
+        "summary": "Dry run of a mail rule",
+        "description": "What a rule (saved or not; with `rule_id` in place of the stored one) would do with the mailbox's latest 50 mails, as Lekto recorded them when it fetched them: whether its conditions hold and who would decide each, this rule, another before it, or the mailbox's fallback. Reads only; the mail server is not asked. Only admins (403).",
+        "operationId": "dry_run_mail_rule_api_v1_mail_rules_dry_run_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MailRuleDryRun"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DryRunMailOut"
+                  },
+                  "type": "array",
+                  "title": "Response Dry Run Mail Rule Api V1 Mail Rules Dry Run Post"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unauthorized",
+                  "status": 401,
+                  "detail": "authentication is required"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Forbidden",
+                  "status": 403,
+                  "detail": "only editors and admins control the processing of this document"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Not Found",
+                  "status": 404,
+                  "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": "from_node: Input should be 'ocr', 'parse', ..."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Internal Server Error",
+                  "status": 500,
+                  "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Content Too Large",
+                  "status": 413,
+                  "detail": "the request body is larger than 1048576 bytes"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "token": []
+          }
+        ]
+      }
+    },
     "/api/v1/mail-rules/{id}": {
       "get": {
         "tags": [
@@ -26767,6 +26907,17 @@
           }
         ]
       },
+      "Decider": {
+        "type": "string",
+        "enum": [
+          "rule",
+          "other",
+          "fallback",
+          "nothing"
+        ],
+        "title": "Decider",
+        "description": "Who would decide a mail now."
+      },
       "DeliveryDocumentOut": {
         "properties": {
           "id": {
@@ -28474,6 +28625,86 @@
             "description": "Entgeltbescheinigung"
           }
         ]
+      },
+      "DryRunMailOut": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "sender": {
+            "type": "string",
+            "title": "Sender"
+          },
+          "folder": {
+            "type": "string",
+            "title": "Folder"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "arrived_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Arrived At"
+          },
+          "attachments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Attachments",
+            "description": "The names of the attachments Lekto takes (empty for one without a name)."
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/MailOutcome",
+            "description": "What became of it when it came."
+          },
+          "matches": {
+            "type": "boolean",
+            "title": "Matches",
+            "description": "Whether the rule's conditions hold."
+          },
+          "decider": {
+            "$ref": "#/components/schemas/Decider",
+            "description": "Who would decide it now: `rule` (this one), `other` (another rule before it, named in `rule`), `fallback` (the mailbox takes everything), `nothing` (no rule, the mailbox takes nothing)."
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject",
+          "sender",
+          "folder",
+          "sent_at",
+          "arrived_at",
+          "attachments",
+          "outcome",
+          "matches",
+          "decider",
+          "rule"
+        ],
+        "title": "DryRunMailOut",
+        "description": "A mail fetched lately, and what would become of it with the rule."
       },
       "EventBody": {
         "properties": {
@@ -33025,6 +33256,19 @@
         "title": "MailOriginOut",
         "description": "The mail a document came with, as it was then (a mailbox renamed or deleted since keeps\nits name here)."
       },
+      "MailOutcome": {
+        "type": "string",
+        "enum": [
+          "taken",
+          "no_rule",
+          "nothing",
+          "known",
+          "too_large",
+          "failed"
+        ],
+        "title": "MailOutcome",
+        "description": "What became of a fetched mail."
+      },
       "MailParts": {
         "type": "string",
         "enum": [
@@ -33185,6 +33429,184 @@
         ],
         "title": "MailRuleCreate",
         "description": "A new mail rule of a mailbox; what is left out gets the default (priority 100, all\nconditions, takes the attachments and the text, leaves the mail, active).",
+        "examples": [
+          {
+            "after": "read",
+            "conditions": [
+              {
+                "field": "sender",
+                "op": "ends_with",
+                "value": "@stadtwerke.example"
+              }
+            ],
+            "mailbox_id": "01a1a7fc-702c-736e-a661-ff59645bdc52",
+            "name": "Bills of the utilities",
+            "user_id": "01a1a7fc-7013-741e-ae72-58401e634e5d"
+          }
+        ]
+      },
+      "MailRuleDryRun": {
+        "properties": {
+          "priority": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority",
+            "description": "Smaller first."
+          },
+          "any": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Any",
+            "description": "Any condition (or); else all (and)."
+          },
+          "conditions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MailConditionBody"
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conditions",
+            "description": "Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). None: every mail."
+          },
+          "parts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MailParts"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What it takes: `all` (the attachments and the text), `attachments`, `text`, `nothing`."
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id",
+            "description": "Whom it takes the mail for."
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Id",
+            "description": "A space the person files into; null: their personal one."
+          },
+          "text_type_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Type Id",
+            "description": "The document type of the mail's text; null: Lekto decides."
+          },
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MailAction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What becomes of the mail on the server: `nothing`, `read` (marked as read), `move` (to `move_to`), `trash`."
+          },
+          "move_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Move To"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "mailbox_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mailbox Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "rule_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Id",
+            "description": "The rule being edited: the dry run puts this one in its place."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "mailbox_id",
+          "name"
+        ],
+        "title": "MailRuleDryRun",
+        "description": "A rule as the editor holds it, saved or not; `rule_id`: the stored one it stands for.",
         "examples": [
           {
             "after": "read",
