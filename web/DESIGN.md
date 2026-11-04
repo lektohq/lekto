@@ -330,7 +330,8 @@ Two components that **look different on purpose**:
   parts of a long dialog under its title: a contact's, an account's), which
   part of a list shows (the open identifiers by source, the identifiers at contacts by source, the tags by kind, the jobs by state, the
   deliveries by outcome; with counts), and in a form a choice among two or
-  three short options that changes what follows (a webhook's trigger and body). A grey bar with
+  three short options that changes what follows (a webhook's trigger and body, which mails a
+  mailbox takes). A grey bar with
   the choice on a light pill that slides over (`motion-safe`, not on first show). Sizes: `md`
   40 px, `sm` 32 px; 44 px on the phone. With icons only (`names="hidden"`) every option has a label for its tooltip.
   Where it is wider than the room (a phone, five options with counts), it scrolls sideways as the
@@ -354,8 +355,8 @@ change it) in `text-md`. `Card.Description` is `text-sm text-muted-foreground`. 
 
 ### Lists
 
-Lists of items (rules, webhooks, spaces, users, master data) are rows in one card, or cards in a
-column. Each row has:
+Lists of items (rules, webhooks, spaces, users, master data, mailboxes) are rows in one card, or
+cards in a column. Each row has:
 
 1. **Leading** (optional): avatar, icon or thumbnail.
 2. **Title**: a link to the detail page, or the opener of the editor where there is no detail page.
@@ -505,8 +506,9 @@ the deliveries by outcome and event). The documents list pages the same way (see
 - **Scrolling:** a dialog's body scrolls in an area as wide as the dialog, with its own padding,
   so the scrollbar stands at the dialog's edge, never over a field; title, parts and footer stay
   (`FormDialog`, `EditorShell`, the account dialog). A dialog with parts keeps one height.
-- **Widths** come from the `size` prop (`sm` 384 px, `md` 512 px, `lg` 672 px, `xl` 768 px).
-  A `class="max-w-*"` on dialog content is not used.
+- **Widths** come from the `size` prop (`sm` 384 px, `md` 512 px, `lg` 672 px, `xl` 768 px), a
+  `FormDialog`'s too (`md` unless a form needs fields side by side: a mailbox, `lg`). A
+  `class="max-w-*"` on dialog content is not used.
 - **Phone editor bar:** "Abbrechen" · title · "Speichern", fixed on top. The body scrolls. The
   action is a short verb there: a longer label of the desktop ("Ins Profil von Anna") becomes its
   verb ("Übernehmen"), and the body names the rest (Tobi 29.10.2026).
@@ -717,6 +719,25 @@ under its title: Konto (role, active, password, second factor, single sign-on, d
 Kennungen bei Kontakten, the last with its count. Each part keeps what was typed while another
 shows.
 
+### Intake channels
+
+The page "System" has a tab "Eingangskanäle" for admins only (Tobi, 04.11.2026); other users do
+not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Postfach anlegen"
+(`default`) at its end, then the mailboxes as cards in a column (see [Lists](#lists)):
+
+- **The row of a mailbox:** its name opens its dialog (there is no detail page), beside it the
+  state of its fetches as a `Badge`: "Abruf in Ordnung" (`green`, `CircleCheck`), "Abruf gestört"
+  (`red`, `OctagonX`) or "Noch nicht abgerufen" (`muted`, no icon). Below: server · folders ·
+  interval · the last fetch · counts, and the reason of a failure as a line in `destructive`.
+  Trailing: the `Switch` (Aktiv / Pausiert, no badge for it) and the `EditButton`.
+- **The dialog** (`FormDialog`, `lg`): name; server, port and encryption in one row; user and
+  password (empty keeps the stored one; it is never shown); "Verbindung testen" (`outline`)
+  with what it found in a line beside it (`role="status"`); the folders as a `MultiPicker` of
+  what the test found and what is chosen; how often (`Select`) and what a mail without a rule
+  brings in (`Select`: "Nichts übernehmen" or "Alles für" a person) side by side; which mails
+  as a `Segmented` of three with a `DateInput` for "Ab Datum" and a line under it; the type of
+  the mail text (`SearchSelect`). Deleting is in the footer.
+
 ### Navigation between list and detail
 
 - A list's state (lens, filters, sort, layout) lives in its URL, its words in the history entry
@@ -922,7 +943,7 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
   - `tests/design-system.test.ts`: font sizes, radii, shadows and colours from the tokens only
     (no arbitrary values, no Tailwind palette) outside the exceptions; `<h1>` only in
     `PageTitle`; `<table>` only in `ui/table`; no `title=` on `Button`, `IconButton` or a menu
-    trigger; no `max-w-*` on dialog content; icon buttons only through `IconButton`; the eye
+    trigger; no `max-w-*` on dialog content or a `FormDialog`; icon buttons only through `IconButton`; the eye
     `scan-eye` only where it shows a document in the Beam, a link to one document only from a
     card of a list, the Beam and the navigation of the inbox ("Beam"); a toggled `Chip`
     (`pressed`) only where each toggles on its own ("Tabs and switches"); every master data tab

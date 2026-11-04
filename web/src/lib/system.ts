@@ -1,12 +1,28 @@
 import { formatDate } from '#lib/i18n.ts';
 
 /** The tabs of the page "System"; the first is shown without `?tab=` and for an unknown one. */
-export const SYSTEM_TABS = ['automation', 'classifier', 'search', 'jobs', 'maintenance'] as const;
+export const SYSTEM_TABS = [
+	'automation',
+	'classifier',
+	'search',
+	'jobs',
+	'intake',
+	'maintenance'
+] as const;
 export type SystemTab = (typeof SYSTEM_TABS)[number];
 
-export function systemTab(params: Pick<URLSearchParams, 'get'>): SystemTab {
+/** Tabs only admins see: the intake channels (Tobi, 04.11.2026). */
+const ADMIN_TABS: readonly SystemTab[] = ['intake'];
+
+/** The tabs a person sees. */
+export function systemTabs(admin: boolean): readonly SystemTab[] {
+	return admin ? SYSTEM_TABS : SYSTEM_TABS.filter((tab) => !ADMIN_TABS.includes(tab));
+}
+
+export function systemTab(params: Pick<URLSearchParams, 'get'>, admin = true): SystemTab {
 	const tab = params.get('tab') ?? '';
-	return (SYSTEM_TABS as readonly string[]).includes(tab) ? (tab as SystemTab) : SYSTEM_TABS[0];
+	const tabs = systemTabs(admin);
+	return (tabs as readonly string[]).includes(tab) ? (tab as SystemTab) : tabs[0];
 }
 
 /**

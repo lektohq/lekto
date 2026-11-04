@@ -14,6 +14,7 @@ from lekto.adapters.outbound.memory import (
     FakeWebhookSender,
     ManualClock,
     MemoryDatabase,
+    MemoryMailServer,
     MemoryObjectStore,
     MemoryUnitOfWorkFactory,
 )
@@ -29,6 +30,7 @@ from lekto.core.services.documents import DocumentService
 from lekto.core.services.inbox import InboxService
 from lekto.core.services.lenses import LensService
 from lekto.core.services.logos import LogoService
+from lekto.core.services.mailboxes import MailboxService
 from lekto.core.services.master_data import NORMALISE_BATCH, MasterDataService
 from lekto.core.services.oidc import OidcService
 from lekto.core.services.open_identifiers import OpenIdentifierService
@@ -76,6 +78,7 @@ class World:
     totp: FakeTotp = field(default_factory=FakeTotp)
     idp: FakeOidcProvider = field(default_factory=FakeOidcProvider)
     sender: FakeWebhookSender = field(default_factory=FakeWebhookSender)
+    mail_server: MemoryMailServer = field(default_factory=MemoryMailServer)
     images: FakeImageNormaliser = field(default_factory=FakeImageNormaliser)
     normalise_batch: int = NORMALISE_BATCH
 
@@ -160,6 +163,10 @@ class World:
     @property
     def lenses(self) -> LensService:
         return LensService(self.uow, self.clock)
+
+    @property
+    def mailboxes(self) -> MailboxService:
+        return MailboxService(self.uow, self.clock, self.cipher, self.mail_server)
 
     def webhook_delivery(self, policy: WebhookPolicy | None = None) -> WebhookDeliveryService:
         return WebhookDeliveryService(

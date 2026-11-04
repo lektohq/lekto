@@ -12,6 +12,7 @@ search index. Nothing here is reachable from outside the machine; Lekto speaks p
 | `postgres` | Databases `lekto_dev` (the development instance) and `lekto_test_*` (integration tests, created and dropped per test); `lekto` is only the server's first database |
 | `garage` | S3 object store; `garage-init` creates the key and the buckets `lekto-dev` (the development instance) and `lekto` (tests, below `tests/`) at every start |
 | `meilisearch` | Search; indexes `lekto-dev-documents` (the development instance) and `lekto-test-*` (tests) |
+| `greenmail` | A mail server that keeps nothing (IMAP on 3143, its API on 8080): the tests make an account per test; `lekto` (password in `compose.yml`) is one to try a mailbox by hand |
 
 The credentials of the services are fixed development values in `compose.yml`
 (`x-test-environment`, also the environment of the `dev` container) and never leave the machine.

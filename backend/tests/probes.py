@@ -56,6 +56,15 @@ def meilisearch_health(url: str) -> str | None:
     return status if isinstance(status, str) else None
 
 
+def imap_greeting(host: str, port: int) -> bool:
+    """True if an IMAP server greets on host:port (`* OK ...`)."""
+    try:
+        with socket.create_connection((host, port), timeout=TIMEOUT) as connection:
+            return connection.recv(64).startswith(b"* OK")
+    except OSError:
+        return False
+
+
 def ocr_programs_installed() -> bool:
     """True if Tesseract and Ghostscript, which OCRmyPDF calls, are on the path."""
     return all(shutil.which(program) for program in ("tesseract", "gs"))

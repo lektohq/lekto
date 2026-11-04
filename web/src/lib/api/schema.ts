@@ -2431,6 +2431,78 @@ export interface paths {
 		patch: operations['update_lens_api_v1_lenses__id__patch'];
 		trace?: never;
 	};
+	'/api/v1/mailboxes': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/**
+		 * List mailboxes
+		 * @description All mailboxes by name, with the status of their fetches. Only admins (403).
+		 */
+		get: operations['list_mailboxes_api_v1_mailboxes_get'];
+		put?: never;
+		/**
+		 * Create a mailbox
+		 * @description The password is stored encrypted and never shown again. The person of the fallback must be an active user, the type of the mail text a document type; a day with `since_date`, a person with `everything` (422). 409: a mailbox has that name (regardless of case). Only admins (403).
+		 */
+		post: operations['create_mailbox_api_v1_mailboxes_post'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/v1/mailboxes/test': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/**
+		 * Test a connection
+		 * @description Signs in and lists the account's folders (`INBOX` first), for picking them. A failure is an answer too (`ok` false, `error` says why: unreachable, no secure connection, user name or password refused, the server's error). Without `password`, the stored one of `mailbox_id` (422 if neither is given). Only admins (403).
+		 */
+		post: operations['test_connection_api_v1_mailboxes_test_post'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/v1/mailboxes/{id}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/**
+		 * A mailbox
+		 * @description Only admins (403).
+		 */
+		get: operations['get_mailbox_api_v1_mailboxes__id__get'];
+		put?: never;
+		post?: never;
+		/**
+		 * Delete a mailbox
+		 * @description What it brought in stays. Only admins (403).
+		 */
+		delete: operations['delete_mailbox_api_v1_mailboxes__id__delete'];
+		options?: never;
+		head?: never;
+		/**
+		 * Change a mailbox
+		 * @description Checks as when creating; without `password` the stored one stays. Only admins (403).
+		 */
+		patch: operations['update_mailbox_api_v1_mailboxes__id__patch'];
+		trace?: never;
+	};
 	'/api/v1/documents/{id}/relations': {
 		parameters: {
 			query?: never;
@@ -3807,6 +3879,45 @@ export interface components {
 			space_id?: string | null;
 		};
 		/**
+		 * ConnectionTestBody
+		 * @description Where and as whom to sign in. Without `password`, the stored one of `mailbox_id`.
+		 * @example {
+		 *       "host": "imap.example.org",
+		 *       "password": "app-password",
+		 *       "port": 993,
+		 *       "security": "tls",
+		 *       "username": "household@example.org"
+		 *     }
+		 */
+		ConnectionTestBody: {
+			/** Host */
+			host: string;
+			/** Port */
+			port: number;
+			/** @description `tls`: TLS from the start (IMAPS, usually port 993); `starttls`: TLS after the greeting (usually 143); `none`: no encryption, for a server in one's own network. */
+			security: components['schemas']['MailSecurity'];
+			/** Username */
+			username: string;
+			/** Password */
+			password?: string | null;
+			/**
+			 * Mailbox Id
+			 * @description The mailbox being changed, for its stored password.
+			 */
+			mailbox_id?: string | null;
+		};
+		/**
+		 * ConnectionTestOut
+		 * @description The folders the account has (`INBOX` first), or why signing in failed.
+		 */
+		ConnectionTestOut: {
+			/** Ok */
+			ok: boolean;
+			/** Folders */
+			folders: string[];
+			error: components['schemas']['ReasonOut'] | null;
+		};
+		/**
 		 * ContactCreate
 		 * @example {
 		 *       "aliases": [
@@ -5107,6 +5218,19 @@ export interface components {
 			persons?: components['schemas']['FoundPersonOut'][] | null;
 		};
 		/**
+		 * Fallback
+		 * @description What a mail no rule takes brings in: nothing, or everything (for `fallback_user_id`).
+		 * @enum {string}
+		 */
+		Fallback: 'nothing' | 'everything';
+		/**
+		 * FetchStart
+		 * @description Which mails a mailbox takes: those that came after it was set up, those from a day on,
+		 *     or the unread ones (whenever they came).
+		 * @enum {string}
+		 */
+		FetchStart: 'since_setup' | 'since_date' | 'unread';
+		/**
 		 * FieldAssignmentIn
 		 * @description A field of a document type, from the type.
 		 */
@@ -5457,6 +5581,7 @@ export interface components {
 			/** Count */
 			count: number;
 		};
+		FolderName: string;
 		/** ForceReviewAction */
 		ForceReviewAction: {
 			/**
@@ -6875,6 +7000,207 @@ export interface components {
 		 * @enum {string}
 		 */
 		LogoSource: 'uploaded' | 'fetched';
+		/**
+		 * MailSecurity
+		 * @description How the connection is secured: TLS from the start (IMAPS, port 993), TLS after the
+		 *     greeting (STARTTLS, port 143), or none (a server in one's own network).
+		 * @enum {string}
+		 */
+		MailSecurity: 'tls' | 'starttls' | 'none';
+		/**
+		 * MailboxCreate
+		 * @description A new mailbox; what is left out gets the default (folder `INBOX`, every 5 minutes, since
+		 *     it was set up, nothing without a rule, no type for the mail text, enabled).
+		 * @example {
+		 *       "folders": [
+		 *         "INBOX",
+		 *         "Rechnungen"
+		 *       ],
+		 *       "host": "imap.example.org",
+		 *       "name": "Household",
+		 *       "password": "app-password",
+		 *       "port": 993,
+		 *       "security": "tls",
+		 *       "username": "household@example.org"
+		 *     }
+		 */
+		MailboxCreate: {
+			/**
+			 * Folders
+			 * @description The folders to look in, by their full names as `/mailboxes/test` lists them.
+			 */
+			folders?: components['schemas']['FolderName'][] | null;
+			/**
+			 * Interval Minutes
+			 * @description Minutes between two fetches.
+			 */
+			interval_minutes?: number | null;
+			/** @description Which mails the mailbox takes: `since_setup`, those that came after it was set up; `since_date`, those from the day `since` on; `unread`, the unread ones. */
+			start?: components['schemas']['FetchStart'] | null;
+			/**
+			 * Since
+			 * @description With `start: since_date`.
+			 */
+			since?: string | null;
+			/** @description What a mail no mail rule takes brings in: `nothing`, or `everything` for the person `fallback_user_id`. */
+			fallback?: components['schemas']['Fallback'] | null;
+			/**
+			 * Fallback User Id
+			 * @description With `fallback: everything`.
+			 */
+			fallback_user_id?: string | null;
+			/**
+			 * Body Type Id
+			 * @description The document type of a mail's text where a rule does not set one; none: open.
+			 */
+			body_type_id?: string | null;
+			/**
+			 * Enabled
+			 * @description Whether Lekto fetches from it.
+			 */
+			enabled?: boolean | null;
+			/** Name */
+			name: string;
+			/** Host */
+			host: string;
+			/** Port */
+			port: number;
+			/** @description `tls`: TLS from the start (IMAPS, usually port 993); `starttls`: TLS after the greeting (usually 143); `none`: no encryption, for a server in one's own network. */
+			security: components['schemas']['MailSecurity'];
+			/** Username */
+			username: string;
+			/**
+			 * Password
+			 * @description Stored encrypted, never shown again.
+			 */
+			password: string;
+		};
+		/**
+		 * MailboxOut
+		 * @description A mailbox, without its password.
+		 */
+		MailboxOut: {
+			/**
+			 * Id
+			 * Format: uuid
+			 */
+			id: string;
+			/** Name */
+			name: string;
+			/** Host */
+			host: string;
+			/** Port */
+			port: number;
+			security: components['schemas']['MailSecurity'];
+			/** Username */
+			username: string;
+			/** Folders */
+			folders: string[];
+			/** Interval Minutes */
+			interval_minutes: number;
+			start: components['schemas']['FetchStart'];
+			/** Since */
+			since: string | null;
+			fallback: components['schemas']['Fallback'];
+			/** Fallback User Id */
+			fallback_user_id: string | null;
+			/** Body Type Id */
+			body_type_id: string | null;
+			/** Enabled */
+			enabled: boolean;
+			status: components['schemas']['MailboxStatusOut'];
+			/**
+			 * Created At
+			 * Format: date-time
+			 */
+			created_at: string;
+			/**
+			 * Updated At
+			 * Format: date-time
+			 */
+			updated_at: string;
+		};
+		/**
+		 * MailboxPatch
+		 * @description What changes; what is left out stays. `since`, `fallback_user_id` and `body_type_id`
+		 *     given as null clear it.
+		 * @example {
+		 *       "enabled": false
+		 *     }
+		 */
+		MailboxPatch: {
+			/**
+			 * Folders
+			 * @description The folders to look in, by their full names as `/mailboxes/test` lists them.
+			 */
+			folders?: components['schemas']['FolderName'][] | null;
+			/**
+			 * Interval Minutes
+			 * @description Minutes between two fetches.
+			 */
+			interval_minutes?: number | null;
+			/** @description Which mails the mailbox takes: `since_setup`, those that came after it was set up; `since_date`, those from the day `since` on; `unread`, the unread ones. */
+			start?: components['schemas']['FetchStart'] | null;
+			/**
+			 * Since
+			 * @description With `start: since_date`.
+			 */
+			since?: string | null;
+			/** @description What a mail no mail rule takes brings in: `nothing`, or `everything` for the person `fallback_user_id`. */
+			fallback?: components['schemas']['Fallback'] | null;
+			/**
+			 * Fallback User Id
+			 * @description With `fallback: everything`.
+			 */
+			fallback_user_id?: string | null;
+			/**
+			 * Body Type Id
+			 * @description The document type of a mail's text where a rule does not set one; none: open.
+			 */
+			body_type_id?: string | null;
+			/**
+			 * Enabled
+			 * @description Whether Lekto fetches from it.
+			 */
+			enabled?: boolean | null;
+			/** Name */
+			name?: string | null;
+			/** Host */
+			host?: string | null;
+			/** Port */
+			port?: number | null;
+			/** @description `tls`: TLS from the start (IMAPS, usually port 993); `starttls`: TLS after the greeting (usually 143); `none`: no encryption, for a server in one's own network. */
+			security?: components['schemas']['MailSecurity'] | null;
+			/** Username */
+			username?: string | null;
+			/**
+			 * Password
+			 * @description A new password; left out, the stored one stays.
+			 */
+			password?: string | null;
+		};
+		/**
+		 * MailboxStatusOut
+		 * @description What the fetches found.
+		 */
+		MailboxStatusOut: {
+			/** Last Attempt At */
+			last_attempt_at: string | null;
+			/** Last Success At */
+			last_success_at: string | null;
+			/** @description Why the last attempt failed; none after a success. */
+			error: components['schemas']['ReasonOut'] | null;
+			/**
+			 * Mails
+			 * @description Mails taken in.
+			 */
+			mails: number;
+			/**
+			 * Documents
+			 * @description Documents made from them.
+			 */
+			documents: number;
+		};
 		/**
 		 * Me
 		 * @example {
@@ -8323,7 +8649,13 @@ export interface components {
 			| 'search_embed_failed'
 			| 'search_embed_dimensions'
 			| 'search_index_unavailable'
-			| 'search_not_configured';
+			| 'search_not_configured'
+			| 'mail_unreachable'
+			| 'mail_tls_failed'
+			| 'mail_login_failed'
+			| 'mail_folder_missing'
+			| 'mail_server_error'
+			| 'mail_password_unreadable';
 		/**
 		 * ReasonOut
 		 * @description A reason with its code: a client translates `code` with `params`; the English text
@@ -27477,6 +27809,686 @@ export interface operations {
 				};
 				content: {
 					'application/json': components['schemas']['LensOut'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Conflict */
+			409: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Conflict",
+					 *       "status": 409,
+					 *       "detail": "duplicate of document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Content Too Large */
+			413: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Content Too Large",
+					 *       "status": 413,
+					 *       "detail": "the request body is larger than 1048576 bytes"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	list_mailboxes_api_v1_mailboxes_get: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['MailboxOut'][];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	create_mailbox_api_v1_mailboxes_post: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['MailboxCreate'];
+			};
+		};
+		responses: {
+			/** @description Successful Response */
+			201: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['MailboxOut'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Conflict */
+			409: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Conflict",
+					 *       "status": 409,
+					 *       "detail": "duplicate of document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Content Too Large */
+			413: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Content Too Large",
+					 *       "status": 413,
+					 *       "detail": "the request body is larger than 1048576 bytes"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	test_connection_api_v1_mailboxes_test_post: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['ConnectionTestBody'];
+			};
+		};
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['ConnectionTestOut'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Content Too Large */
+			413: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Content Too Large",
+					 *       "status": 413,
+					 *       "detail": "the request body is larger than 1048576 bytes"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	get_mailbox_api_v1_mailboxes__id__get: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['MailboxOut'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	delete_mailbox_api_v1_mailboxes__id__delete: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			204: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	update_mailbox_api_v1_mailboxes__id__patch: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['MailboxPatch'];
+			};
+		};
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['MailboxOut'];
 				};
 			};
 			/** @description Unauthorized */

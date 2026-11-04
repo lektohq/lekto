@@ -2589,6 +2589,61 @@ Stand: freigegeben (Tobi, 04.11.2026).
 
 **Offen:** keine. Beantwortet (Tobi, 04.11.2026): Der Beam holt die Stellen eines Treffers beim Öffnen über `POST /documents/{id}/search-places` mit den Wörtern im Body, nur für das geöffnete Dokument (b), nicht mit jeder Suchantwort für alle Treffer der Seite (a, das Layout jedes Treffers bei jeder Suche). Die Sorge im Nachtrag galt der Adresse; seit #217 stehen die Wörter im Body.
 
+### Eingangskanal Mail
+
+Stand: freigegeben (Frage- und Antwortrunde mit Tobi, 04.11.2026). Mock: Leinwand „Mail als Begleitschreiben“ (https://claude.ai/artifact/TMFyyhhCo9atGf3AA6cv18): A die HTML-Mail mit WeasyPrint gesetzt, B nur Text, C das Begleitschreiben in Lekto mit Herkunft und Bezug, D Regeln › Mails, E eine Mail-Regel, F System › Eingangskanäle › Mail, G eine Dokument-Regel mit Mail-Bedingung (D–G gegen DESIGN.md geprüft und angepasst).
+
+**Anlass (Tobi):** Heute kommen Dokumente über die Web-UI, die API und die Übernahme aus Paperless. Viele kommen per Mail (Rechnungen, Bescheide, Bestellungen), auch aus Genius Scan und vom Scanner am Mac. Lekto soll Postfächer abholen, je Postfach mit Regeln, was übernommen wird und wohin.
+
+**Befund (Claude, 04.11.2026):**
+- `Channel` kennt `web`, `api`, `migration` („Further connectors (mail, folder) follow“); jeder Eingang läuft über `PipelineService.receive` (Original, Dubletten über die ganze Installation, persönlicher Space oder ein Space, in dem man bearbeitet, `ImportedMetadata`).
+- Geheimnisse in der Datenbank gibt es schon: Webhooks speichern Signatur-Geheimnis und Header verschlüsselt (`SecretCipher`, Schlüssel aus `LEKTO_SECRET_KEY`).
+- Die Regeln kennen den Kanal schon als Bedingung (`ConditionField.CHANNEL`), die Auslöser `ingest` und `change`, Priorität und Probelauf (#253).
+- Bezüge haben keine eigene Art; die Typen an beiden Enden geben ihren Sinn (`relations.py`).
+- Der Worker arbeitet mit einer Job-Warteschlange mit Leases; Abholen nach Takt passt hinein, ein dauerhafter Push (IMAP IDLE) nicht.
+- iCloud braucht ein App-Passwort, Gmail ein App-Passwort (Labels als Ordner), Outlook privat nur OAuth2.
+- Safari kann eine Web-App nicht als Teilen-Ziel anbieten (kein Web Share Target).
+
+**Entscheidungen (Tobi, 04.11.2026):**
+1. **Mail zuerst;** kein WebDAV, keine eigene App, kein Eingangsordner vorerst. Der Kurzbefehl am iPhone und Mac bleibt der Weg zum Teilen.
+2. **Mehrere Postfächer,** eigene Lekto-Postfächer oder die echten einer Person: Lekto muss mit ganzen Postfächern umgehen können. Einrichten **nur Admins**, unter **System › Eingangskanäle › Mail**; Nutzer tragen keine eigenen Zugänge ein. Zugangsdaten in der UI, das Passwort **verschlüsselt** wie bei den Webhooks.
+3. **Kein OAuth2,** nur Passwort und App-Passwort (iCloud, Gmail, Standard-IMAP). Keine Abhängigkeit von Plus-Adressen.
+4. **Abholen nach Takt,** einstellbar je Postfach, dazu „Jetzt abrufen“; **kein Push** (IDLE).
+5. **Welche Mails:** je Postfach „ab Einrichten“, „ab Datum“ oder „nur ungelesene“, eine Wahl. Lekto merkt sich, was es geholt hat; was danach mit der Mail geschieht, legt die Regel fest (nichts, gelesen, in einen Ordner verschieben, in den Papierkorb).
+6. **Der Mailtext wird ein eigenes Dokument** (Begleitschreiben), mit **Bezug** zu den Dokumenten aus den Anhängen; die Anhänge bleiben unverändert (ihre Prüfsumme erkennt Dubletten). Je Regel einstellbar: Anhänge und Text, nur Anhänge, nur Text, nichts. Der Kopf der gesetzten Seite sagt nur „E-Mail“.
+7. **Original des Begleitschreibens ist die Mail (`.eml`);** ihr Archiv-PDF setzt **WeasyPrint** aus dem HTML (neue Abhängigkeit, im selben Image; kein eigener Dienst wie Gotenberg, kein eigenes Mail-Image). Ohne HTML oder ohne WeasyPrint: der Text der Mail, schlicht gesetzt. Bilder aus dem Netz werden nicht geladen.
+8. **Typ des Mailtexts** je Regel: fest (ein vorhandener Typ, als Standard am Postfach, z. B. „E-Mail“) oder automatisch (die Klassifizierung bestimmt ihn, wenn die Mail selbst das Dokument ist, etwa eine Rechnung im Text). Vorschlag für neue Regeln: mit Anhängen fest, ohne automatisch. Sonst durchläuft das Begleitschreiben die normale Verarbeitung.
+9. **Ein Anhang, den Lekto schon hat** (Dublette): kein neues Dokument; das Begleitschreiben bekommt einen Bezug zum vorhandenen, wo der Ziel-Nutzer es liest.
+10. **Weiterleitungen:** Eine Mail, die nur eine angehängte Mail einhüllt, wird ausgepackt, Schicht um Schicht bis zur innersten (höchstens 5 Ebenen); die Herkunft nennt die Kette der Weiterleitenden. Mehrere angehängte Mails: je eine ein Begleitschreiben mit ihren Anhängen; die äußere nur mit eigenem Text, dann mit Bezügen. Weiterleitungen im Text bleiben, wie sie sind.
+11. **Nicht lesbare Anhänge** (Word, ZIP, Kalender) werden übersprungen und im Kopf des Begleitschreibens unter „Nicht übernommen“ genannt; kleine Bilder (Logos, Signaturen; unter etwa 20 KB oder 300 Pixel) ebenso, ohne Nennung. Keine Office-Formate.
+12. **Regeln in zwei Stufen, in einer Regel-UI:** ein neuer Auslöser **„Wenn eine Mail ankommt“** (Mail-Regeln: Bedingungen an die Mail, Aktionen: übernehmen, für wen, Space, Typ des Mailtexts, Mail danach; global, nur Admins, je Postfach die **erste passende nach Priorität**, ohne passende der **Rückfall des Postfachs**: nichts übernehmen oder alles für eine Person), und **Mail-Bedingungen in Dokument-Regeln** (Postfach, Absender, Empfänger, Betreff der Mail, aus der ein Dokument stammt). Die Regel-Liste zeigt „Dokumente | Mails“.
+13. **Ziel:** jede Mail-Regel nennt eine Person („Für“), optional einen Space, in dem sie bearbeitet; ohne Space ihr persönlicher.
+14. **Probelauf** auch für Mail-Regeln: die letzten 50 Mails eines Postfachs, nur lesend.
+15. **Fehler** (Anmeldung abgelehnt, Server nicht erreichbar) zeigt nur das Postfach; Benachrichtigungen später.
+16. **Die Absenderadresse** wird ein Fakt der Dokumente einer Mail, damit die Kontakterkennung bekannte E-Mail-Kennungen nutzt (Tobi: „probieren wir mal aus“).
+
+**Technische Festlegungen (Claude, ohne Gegenrede):**
+- **Nichts doppelt:** je Ordner `UIDVALIDITY` und UID, dazu die `Message-ID`; eine Mail in zwei Ordnern oder Postfächern wird einmal geholt. Abruf und Probelauf lesen mit `BODY.PEEK` (nichts wird gelesen markiert, außer durch die Aktion).
+- **Grenzen:** Anhänge wie Uploads (`LEKTO_REQUEST_MAX_SIZE`); eine Mail über 50 MB wird nicht verarbeitet, eine Meldung am Postfach sagt es.
+- **Rechte:** „Für“ muss im Ziel-Space bearbeiten; geprüft beim Speichern; verliert die Person das Recht oder wird gelöscht, pausiert die Regel mit Grund, wie Dokument-Regeln heute.
+- **Passwort:** `SecretCipher`, Kontext die ID des Postfachs; die API gibt es nie zurück; „leer“ lässt das gespeicherte.
+- **Kanal** `mail`; die Herkunft (Postfach, Regel, Absender, Empfänger, Betreff, Empfangszeit, Kette der Weiterleitungen, Message-ID) hängt am Dokument und erscheint in der Dokumentansicht als Karte „Herkunft“ (Mock C).
+- **Bezug** Begleitschreiben ↔ Anhang: gesetzt, Herkunft `lekto` mit der Message-ID als Beleg; die UI nennt ihn nach dem Typ („Begleitschreiben zu“ bei Typ E-Mail).
+- **Architektur:** ein eingehender Adapter `adapters/inbound/mail` (Abholen im Worker, Job je Postfach, der sich nach dem Takt neu einplant; Lease: ein Worker je Postfach), ein ausgehender Port `MailServer` (IMAP: Ordner, UIDs, Nachricht lesen, Flags, verschieben; Speicher-Adapter und Vertragstests; Adapter mit `imaplib` im Thread, keine neue Abhängigkeit) und ein Port `MailRenderer` (`.eml` → PDF; WeasyPrint-Adapter, Text-Adapter als Rückfall). Parsen der Mail mit `email` der Standardbibliothek, im Kern.
+- **Medientyp** `message/rfc822` neu unter den unterstützten Typen; für ihn setzt der Knoten der Seiten statt OCR das Archiv-PDF mit `MailRenderer` (echter Text, keine OCR), danach wie jedes Dokument.
+
+**PRs** (je mit Tests, OpenAPI und `gen:api` wo die API sich ändert, DESIGN.md wo die UI neu ist):
+1. `feature/mail-accounts` (`new-feature`): Postfächer (Tabelle, Migration, Passwort verschlüsselt), Port `MailServer` mit Speicher-Adapter, Vertragstests und IMAP-Adapter; Admin-API (anlegen, ändern, löschen, Verbindung testen, Ordner auflisten); System › Eingangskanäle › Mail (Liste, `FormDialog`, Status). Noch kein Abholen. DESIGN.md: die Zeile eines Postfachs, der Reiter.
+2. `feature/mail-render` (`new-feature`): `message/rfc822` als Medientyp, Port `MailRenderer` (WeasyPrint, Text), der Knoten der Seiten für Mails, Pakete im Dockerfile; ein `.eml`-Upload wird ein Dokument (auch über Web und API).
+3. `feature/mail-intake` (`new-feature`): Abholen (Job je Postfach, Takt, „Jetzt abrufen“, Startpunkt, UIDs und Message-ID), Zerlegen (Weiterleitungen, Anhänge, kleine Bilder, nicht lesbare), Rückfall des Postfachs als einzige Regel, `Channel.MAIL`, Herkunft, Bezüge, Dubletten, Absender als Fakt, Mail danach, Karte „Herkunft“ in der Dokumentansicht. Ab hier nutzbar.
+4. `feature/mail-rules` (`new-feature`): Auslöser „Wenn eine Mail ankommt“: Bedingungen, Aktionen, erste passende je Postfach, Rechte, Pausieren mit Grund; Regel-Liste „Dokumente | Mails“ mit Abschnitten je Postfach und der Zeile des Rückfalls; Editor wie Mock E. DESIGN.md: Liste, `Badge` „Mail“.
+5. `feature/mail-rules-dry-run` (`new-feature`): Probelauf einer Mail-Regel über die letzten 50 Mails, nur lesend.
+6. `feature/mail-conditions` (`new-feature`): Mail-Bedingungen in Dokument-Regeln (Postfach, Absender, Empfänger, Betreff), auch im Probelauf der Dokument-Regeln.
+
+**Fragen zur Freigabe, beantwortet (Tobi, 04.11.2026):**
+1. Testdienst für IMAP: **GreenMail** als Compose-Dienst im Devcontainer und in der CI, nur für Tests.
+2. Reihenfolge wie oben; **veröffentlicht wird erst, wenn alle PRs fertig sind** („Du kannst komplett durchbauen“).
+
 ### M16 – Lesen
 
 - `PageRenderer` statt `PreviewRenderer`: alle Seiten als WebP-Derivate; Endpunkt `GET /documents/{id}/pages/{n}`.
