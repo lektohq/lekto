@@ -14,7 +14,7 @@ only way in.
 | `deploy/` | Runtime image files (s6-overlay services, `image/rootfs`), `test-image.sh`, `README.md` (operation, backup) |
 | `examples/` | `model-calls/`: an example consumer of model calls through a webhook (Python, standard library only, Ollama) and a Compose extension to try it; `documents/`: 321 synthetic documents of one household in every quality stage, `manifest.json` with what Lekto should find, search queries for `evaluate-search` (`search/`), their generator (`generate.py`, see its `README.md`); `mcp-eval/`: questions about those documents asked through Claude Code with Lekto's MCP server, hits and tokens (`seed.py`, `tasks.py`, `run.py`, see its `README.md`) |
 | `docker/` | Compose examples with the published images (`ghcr.io/tb1337/lekto:latest`): SQLite, Postgres, extensions (workers, S3, Ollama, Caddy, Traefik, nginx), migration; settings in `.env` (`.env.example`) |
-| `.devcontainer/` | Devcontainer: Compose services (Postgres, Garage, Meilisearch), the fixed credentials for tests and CI (in `compose.yml`), the development instance (`README.md`, `dev.local.env.example`, `dev-setup.sh`) |
+| `.devcontainer/` | Devcontainer: Compose services (Postgres, Garage, Meilisearch, GreenMail), the fixed credentials for tests and CI (in `compose.yml`), the development instance (`README.md`, `dev.local.env.example`, `dev-setup.sh`) |
 | `.vscode/tasks.json` | VS Code tasks that run the development instance from the devcontainer (start, stop, migrate, UI, reindex, render-pages, read-facts, relate, migration) |
 | `Dockerfile` | Stages `base`, `deps`, `app`, `s6`, `web` (UI build), `dev` (devcontainer) and `runtime` (production image); `migration/Dockerfile` builds `lekto-migration` |
 | `.idea/` | Design documents in German: `architektur.md` (binding), `umsetzungsplan.md` |
@@ -30,7 +30,7 @@ uv run mypy
 uv run lint-imports
 uv run pytest                    # all tests; integration tests skip if a service is unreachable
 uv run pytest -m unit            # no external services
-uv run pytest -m integration     # needs Postgres, Garage, Meilisearch, OCR programs
+uv run pytest -m integration     # needs Postgres, Garage, Meilisearch, GreenMail, OCR programs
 uv run pytest -n auto            # in parallel (pytest-xdist), as CI does
 uv run lekto                     # validate LEKTO_ configuration (= python -m lekto.composition)
 uv run lekto migrate             # bring the configured database to the newest schema

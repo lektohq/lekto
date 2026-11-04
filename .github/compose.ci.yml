@@ -10,3 +10,7 @@ services:
   meilisearch:
     ports:
       - 7700:7700
+  greenmail:
+    ports:
+      - 3143:3143
+      - 8080:8080
