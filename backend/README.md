@@ -1263,7 +1263,14 @@ does, a score and a snippet whose matches are marked. The answer tells how it se
 (`mode`: `hybrid`, or `words`, the fallback that always stays; `semantic` is `mode` as a flag),
 and why by words alone where the meaning was to take part (`reason` with a code:
 `search_no_embeddings`, `search_embed_timeout`, `search_embed_failed`,
-`search_embed_dimensions`; none for `semantic_ratio=0`). An unreachable index is `503` with
+`search_embed_dimensions`; none for `semantic_ratio=0`). With the meaning, `word_total` counts
+what the words find: the meaning ranks every document, also for a word that names none, so
+`estimated_total` alone says little. A query of a single word (stop words aside) shows the
+documents that hold it first: Meilisearch scores a word in a long German text so low that
+documents of a similar meaning came before it. A document found by the meaning alone is left out
+below `LEKTO_SEARCH_MEANING_MIN_SCORE`; the floor depends on the model, and `lekto
+evaluate-search` measures it ("The floor of the meaning": for Qwen3-Embedding 4B at the ratio 0.5,
+0.72 keeps every expected document and leaves every nonsense query empty). An unreachable index is `503` with
 `search_index_unavailable` (the list without words works on), a missing one
 `search_not_configured`; what went wrong stays in the log.
 
@@ -2024,6 +2031,7 @@ Durations are seconds (`30`, `1.5`) or ISO 8601 (`PT1H`, `P7D`).
 | `LEKTO_SEARCH_LOCALES` | both | `deu+eng` | Languages of the documents, ISO 639-3 codes joined by `+` (index settings) |
 | `LEKTO_SEARCH_SEMANTIC_RATIO` | API | `0.5` | Weight of the meaning against the words when a request does not say |
 | `LEKTO_SEARCH_EMBED_TIMEOUT` | API | `5` | Seconds to wait for the embedding of a query, then words only |
+| `LEKTO_SEARCH_MEANING_MIN_SCORE` | API | – | A document found by the meaning alone is left out below this score (0 to 1; depends on the model, see `evaluate-search`) |
 | `LEKTO_SEARCH_MAX_TEXT` | Worker | `200000` | Characters of text per document in the index |
 | `LEKTO_SEARCH_CHUNK_SIZE` | Worker | `1500` | Characters per section with a vector |
 | `LEKTO_SEARCH_MAX_CHUNKS` | Worker | `8` | Sections with a vector per document |

@@ -47,6 +47,7 @@ async def test_the_fake_run_finds_by_words_and_writes_a_report(tmp_path: Path) -
         "## Results",
         "## Hit@3 by kind of query",
         "## R-precision by kind of query",
+        "## The floor of the meaning",
         "## Cost of indexing",
         "## Misses",
     ):
@@ -153,6 +154,7 @@ def test_r_precision_and_ties() -> None:
     assert not outcome("ax", (None, None)).tied
     assert not outcome("ax").tied
     result = RatioResult(0.0, [outcome("ab"), outcome("ax", (0.5, 0.5))])
+    assert result.floor(0.5) == (0.0, 0.0)  # nothing found, no nonsense asked
     assert result.precision() == pytest.approx(0.75)
     assert result.ties() == 1
     assert result.precision("typo") == 0.0
@@ -218,3 +220,16 @@ def test_the_command(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None
             main([other, "--queries", "q.json"])
     with pytest.raises(SystemExit):
         main(["check", "--fake"])
+
+
+def test_the_floor_keeps_what_a_word_or_the_meaning_finds() -> None:
+    def outcome(scores: tuple[float, ...], marked: tuple[bool, ...]) -> QueryOutcome:
+        case = SearchCase("q", "exact", frozenset({"a"}))
+        return QueryOutcome(case, 2, ("x", "a"), 0.1, True, scores, marked)
+
+    by_word = outcome((0.9, 0.3), (False, True))  # a word shows: stays whatever its score
+    by_meaning = outcome((0.9, 0.75), (False, False))
+    result = RatioResult(0.5, [by_word, by_meaning], nonsense=[0.66, 0.71])
+    assert by_word.kept(0.8) and by_meaning.kept(0.74) and not by_meaning.kept(0.76)
+    assert result.floor(0.70) == (1.0, 0.5)
+    assert result.floor(0.76) == (0.5, 1.0)

@@ -440,6 +440,23 @@ async def test_the_index_never_sees_a_query_without_the_callers_rights(scene: Sc
 def test_policy_ratio_is_checked() -> None:
     with pytest.raises(ValueError):
         replace(builders.SEARCH, semantic_ratio=2)
+    with pytest.raises(ValueError):
+        replace(builders.SEARCH, meaning_min_score=1.5)
+
+
+async def test_the_floor_of_the_meaning_goes_to_the_index(scene: Scene) -> None:
+    seen: list[SearchQuery] = []
+
+    class Spy:
+        async def search(self, query: SearchQuery) -> SearchResult:
+            seen.append(query)
+            return SearchResult(hits=[], estimated_total=7, semantic=False, word_total=3)
+
+    index: Any = Spy()
+    policy = replace(builders.SEARCH, meaning_min_score=0.7)
+    page = await SearchService(scene.setup.world.uow, index, policy).search(scene.owner.id, "x")
+    assert seen[0].meaning_min_score == 0.7
+    assert page.word_total == 3
 
 
 async def test_admins_search_their_reach_or_everything(scene: Scene) -> None:

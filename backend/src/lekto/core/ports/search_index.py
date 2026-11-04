@@ -41,6 +41,12 @@ class SearchQuery:
     `semantic_ratio` (0 to 1) weighs the vectors against the words (the service takes it from
     the request or the setting). `order`: sorted by it
     instead of by relevance (ties by relevance); documents without a date come last.
+    `meaning_min_score`: a document found by the meaning alone, not by a word, is left out below
+    it (the meaning ranks every document, what is asked or not).
+
+    With the meaning, a query of a single word (stop words aside) shows the documents that hold
+    it first: Meilisearch scores a word in a long German text so low that documents of a
+    similar meaning come before it ("Urlaubsgeld").
     """
 
     text: str
@@ -51,9 +57,12 @@ class SearchQuery:
     order: DocumentOrder | None = None
     offset: int = 0
     limit: int = SEARCH_PAGE
+    meaning_min_score: float | None = None
 
     def __post_init__(self) -> None:
         check_search(self.text, self.semantic_ratio, self.offset, self.limit)
+        if self.meaning_min_score is not None and not 0 <= self.meaning_min_score <= 1:
+            raise ValidationError("meaning_min_score must be between 0 and 1")
         if self.offset + self.limit > MAX_HITS:
             raise ValidationError(f"offset + limit may not exceed {MAX_HITS}")
 
@@ -96,8 +105,9 @@ class SearchHit:
 @dataclass(frozen=True, kw_only=True)
 class SearchResult:
     hits: list[SearchHit]  # best first
-    estimated_total: int  # of the hits of the words (all with meaning); not exact
+    estimated_total: int  # of the hits; not exact
     semantic: bool  # whether vectors took part
+    word_total: int | None = None  # of the hits of the words alone, where the meaning took part
 
 
 @dataclass(frozen=True, kw_only=True)

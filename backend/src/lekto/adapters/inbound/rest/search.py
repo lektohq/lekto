@@ -88,6 +88,7 @@ async def search_documents(
             for item in page.items
         ],
         estimated_total=page.estimated_total,
+        word_total=page.word_total,
         next_offset=page.next_offset,
         semantic=page.semantic,
         mode=page.mode,
