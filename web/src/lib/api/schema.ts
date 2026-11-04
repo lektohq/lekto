@@ -2475,6 +2475,26 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/v1/mailboxes/{id}/fetch': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/**
+		 * Fetch a mailbox now
+		 * @description Brings the mailbox's next fetch forward to now; a worker does it. A fetch running already plans the next itself. 422 if the mailbox is paused. Only admins (403).
+		 */
+		post: operations['fetch_mailbox_api_v1_mailboxes__id__fetch_post'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/v1/mailboxes/{id}': {
 		parameters: {
 			query?: never;
@@ -2501,6 +2521,26 @@ export interface paths {
 		 * @description Checks as when creating; without `password` the stored one stays. Only admins (403).
 		 */
 		patch: operations['update_mailbox_api_v1_mailboxes__id__patch'];
+		trace?: never;
+	};
+	'/api/v1/documents/{id}/origin': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/**
+		 * Where a document came from
+		 * @description Needs read access. For a document a mail brought: the mailbox, the rule, sender, recipients, subject, its dates and who forwarded it; `mail` is null for any other.
+		 */
+		get: operations['origin_api_v1_documents__id__origin_get'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
 		trace?: never;
 	};
 	'/api/v1/documents/{id}/relations': {
@@ -2920,6 +2960,16 @@ export interface components {
 			type: 'add_tags';
 			/** Tag Ids */
 			tag_ids: string[];
+		};
+		/** AddressOut */
+		AddressOut: {
+			/**
+			 * Name
+			 * @description The display name; empty where the mail gives none.
+			 */
+			name: string;
+			/** Address */
+			address: string;
 		};
 		/**
 		 * AllGroup
@@ -3555,10 +3605,10 @@ export interface components {
 		};
 		/**
 		 * Channel
-		 * @description How a document came in (its intake channel). Further connectors (mail, folder) follow.
+		 * @description How a document came in (its intake channel).
 		 * @enum {string}
 		 */
-		Channel: 'web' | 'api' | 'migration';
+		Channel: 'web' | 'api' | 'migration' | 'mail';
 		/** ClassesOut */
 		ClassesOut: {
 			/**
@@ -4276,7 +4326,7 @@ export interface components {
 			 * @example application/pdf
 			 */
 			media_type: string;
-			/** @description How the document arrived: `web` (web UI), `api`, `migration`. */
+			/** @description How the document arrived: `web` (web UI), `api`, `migration`, `mail`. */
 			channel: components['schemas']['Channel'];
 			/**
 			 * Sha256
@@ -4431,7 +4481,7 @@ export interface components {
 			 * @example application/pdf
 			 */
 			media_type: string;
-			/** @description How the document arrived: `web` (web UI), `api`, `migration`. */
+			/** @description How the document arrived: `web` (web UI), `api`, `migration`, `mail`. */
 			channel: components['schemas']['Channel'];
 			/**
 			 * Sha256
@@ -6730,7 +6780,7 @@ export interface components {
 			 * @example application/pdf
 			 */
 			media_type: string;
-			/** @description How the document arrived: `web` (web UI), `api`, `migration`. */
+			/** @description How the document arrived: `web` (web UI), `api`, `migration`, `mail`. */
 			channel: components['schemas']['Channel'];
 			/**
 			 * Sha256
@@ -7000,6 +7050,53 @@ export interface components {
 		 * @enum {string}
 		 */
 		LogoSource: 'uploaded' | 'fetched';
+		/**
+		 * MailOriginOut
+		 * @description The mail a document came with, as it was then (a mailbox renamed or deleted since keeps
+		 *     its name here).
+		 */
+		MailOriginOut: {
+			/**
+			 * Mailbox
+			 * @description The mailbox's name.
+			 */
+			mailbox: string;
+			/**
+			 * Rule
+			 * @description The mail rule that took it; null: the fallback.
+			 */
+			rule: string | null;
+			/** @description `cover`: the mail's text; `attachment`: one of its files. */
+			role: components['schemas']['OriginRole'];
+			/** Filename */
+			filename: string | null;
+			/** Subject */
+			subject: string;
+			/** Sender */
+			sender: components['schemas']['AddressOut'][];
+			/** To */
+			to: components['schemas']['AddressOut'][];
+			/** Cc */
+			cc: components['schemas']['AddressOut'][];
+			/**
+			 * Sent At
+			 * @description The mail's own date.
+			 */
+			sent_at: string | null;
+			/**
+			 * Arrived At
+			 * Format: date-time
+			 * @description When it arrived at the mailbox.
+			 */
+			arrived_at: string;
+			/**
+			 * Forwarded By
+			 * @description Who forwarded the mail that held it, outermost first.
+			 */
+			forwarded_by: components['schemas']['AddressOut'][];
+			/** Message Id */
+			message_id: string | null;
+		};
 		/**
 		 * MailSecurity
 		 * @description How the connection is secured: TLS from the start (IMAPS, port 993), TLS after the
@@ -7846,6 +7943,18 @@ export interface components {
 		Operator:
 			'is' | 'in' | 'contains' | 'matches' | 'gt' | 'lt' | 'overlaps' | 'present' | 'missing';
 		/**
+		 * OriginOut
+		 * @description Where a document came from; `mail` for one a mail brought, else null.
+		 */
+		OriginOut: {
+			mail: components['schemas']['MailOriginOut'] | null;
+		};
+		/**
+		 * OriginRole
+		 * @enum {string}
+		 */
+		OriginRole: 'cover' | 'attachment';
+		/**
 		 * Outcome
 		 * @enum {string}
 		 */
@@ -8655,7 +8764,8 @@ export interface components {
 			| 'mail_login_failed'
 			| 'mail_folder_missing'
 			| 'mail_server_error'
-			| 'mail_password_unreadable';
+			| 'mail_password_unreadable'
+			| 'mailbox_paused';
 		/**
 		 * ReasonOut
 		 * @description A reason with its code: a client translates `code` with `params`; the English text
@@ -28255,6 +28365,113 @@ export interface operations {
 			};
 		};
 	};
+	fetch_mailbox_api_v1_mailboxes__id__fetch_post: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			202: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': unknown;
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
 	get_mailbox_api_v1_mailboxes__id__get: {
 		parameters: {
 			query?: never;
@@ -28571,6 +28788,96 @@ export interface operations {
 					 *       "title": "Content Too Large",
 					 *       "status": 413,
 					 *       "detail": "the request body is larger than 1048576 bytes"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	origin_api_v1_documents__id__origin_get: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['OriginOut'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
 					 *     }
 					 */
 					'application/problem+json': components['schemas']['Problem'];

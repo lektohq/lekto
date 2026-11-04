@@ -47,7 +47,7 @@ async def seed(api: Api) -> None:
         await uow.commit()
 
 
-async def test_every_user_sees_the_automation_of_the_web_and_the_api(api: Api) -> None:
+async def test_every_user_sees_the_automation_of_the_web_the_api_and_mail(api: Api) -> None:
     await seed(api)
     user = await api.user()
 
@@ -55,7 +55,7 @@ async def test_every_user_sees_the_automation_of_the_web_and_the_api(api: Api) -
 
     assert response.status_code == 200
     body = response.json()
-    assert (body["channels"], body["period"]) == (["api", "web"], "12m")
+    assert (body["channels"], body["period"]) == (["api", "mail", "web"], "12m")
     assert body["lanes"] == {"green": 1, "yellow": 0, "red": 0}
     assert body["flow"] == [{"first_lane": "green", "lane": "green", "count": 1}]
     assert (body["decided"], body["untouched"]) == (1, 0)

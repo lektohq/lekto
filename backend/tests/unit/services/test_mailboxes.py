@@ -135,7 +135,7 @@ async def test_settings_are_checked(world: World) -> None:
 
 async def test_testing_a_connection_lists_the_folders_or_says_why_not(world: World) -> None:
     admin = await _admin(world)
-    world.mail_server.add_account(SERVER).folders.append("Rechnungen")
+    world.mail_server.add_account(SERVER).add_folders("Rechnungen")
     found = await world.mailboxes.test_connection(
         admin.id,
         host=SERVER.host,

@@ -163,7 +163,7 @@ class DocumentDetails(BaseModel):
     original_filename: str
     media_type: str = Field(examples=["application/pdf"])
     channel: Channel = Field(
-        description="How the document arrived: `web` (web UI), `api`, `migration`."
+        description="How the document arrived: `web` (web UI), `api`, `migration`, `mail`."
     )
     sha256: str = Field(
         description="SHA-256 of the original file, in lower-case hex.",

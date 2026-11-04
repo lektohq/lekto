@@ -31,6 +31,8 @@ from lekto.adapters.outbound.memory.database import (
     FIELDS,
     LENSES,
     LOGIN_FAILURES,
+    MAIL_ORIGINS,
+    MAIL_RECORDS,
     MAILBOXES,
     PROFILES,
     RULE_APPLICATIONS,
@@ -57,6 +59,10 @@ from lekto.adapters.outbound.memory.identity import (
 )
 from lekto.adapters.outbound.memory.inbox import MemoryInboxRepository, SeenKey
 from lekto.adapters.outbound.memory.lenses import MemoryLensRepository
+from lekto.adapters.outbound.memory.mail_records import (
+    MemoryMailOriginRepository,
+    MemoryMailRecordRepository,
+)
 from lekto.adapters.outbound.memory.mailboxes import MemoryMailboxRepository
 from lekto.adapters.outbound.memory.ordering import Rank, rank
 from lekto.adapters.outbound.memory.processing_facts import MemoryProcessingFacts, VerdictKey
@@ -166,6 +172,8 @@ class MemoryUnitOfWork:
         self.tasks = MemoryTaskRepository(self, TASKS)
         self.lenses = MemoryLensRepository(self, LENSES)
         self.mailboxes = MemoryMailboxRepository(self, MAILBOXES)
+        self.mail_records = MemoryMailRecordRepository(self, MAIL_RECORDS)
+        self.mail_origins = MemoryMailOriginRepository(self, MAIL_ORIGINS)
         self.outbox = MemoryOutbox(self)
         self.jobs = MemoryJobQueue(self)
         self.credentials = MemoryCredentialRepository(self, CREDENTIALS)
@@ -831,6 +839,19 @@ class MemoryJobQueue:
         )
         self._write(job, queued=True)
         return job.id
+
+    async def hasten(self, dedup_key: str, *, run_at: datetime) -> bool:
+        queued = [
+            job
+            for job in self._all()
+            if job.dedup_key == dedup_key and job.status is JobStatus.QUEUED
+        ]
+        if not queued:
+            return False
+        (job,) = queued
+        if job.run_at > require_utc(run_at, "run_at"):
+            self._write(dataclasses.replace(job, run_at=run_at), queued=True)
+        return True
 
     async def claim(
         self, *, now: datetime, lease: timedelta, kinds: Collection[str] | None = None

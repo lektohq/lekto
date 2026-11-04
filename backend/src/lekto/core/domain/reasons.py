@@ -427,6 +427,7 @@ class ReasonCode(StrEnum):
     MAIL_FOLDER_MISSING = "mail_folder_missing"
     MAIL_SERVER_ERROR = "mail_server_error"
     MAIL_PASSWORD_UNREADABLE = "mail_password_unreadable"
+    MAILBOX_PAUSED = "mailbox_paused"
 
 
 TEMPLATES: Mapping[ReasonCode, str] = {
@@ -959,6 +960,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.MAIL_PASSWORD_UNREADABLE: (
         "the stored password cannot be read (was the secret key changed?); enter it again"
     ),
+    ReasonCode.MAILBOX_PAUSED: "the mailbox is paused; activate it to fetch",
 }
 
 

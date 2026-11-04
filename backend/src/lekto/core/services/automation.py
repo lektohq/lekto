@@ -1,9 +1,9 @@
 """The numbers of the page "System" about the automation (Tobi, 24. and 25.10.2026): how the
 documents went through their first run, what became of them, how long it took, and how people
 judged what the automation set at their first decision on a field, overall and per signal
-(`domain.first_runs`). For the channels and the period the viewer chooses (by default the web
-and the API, 12 months: migrated documents bring the metadata of the source system); the numbers
-are the whole system's, every user sees them, and they name no document.
+(`domain.first_runs`). For the channels and the period the viewer chooses (by default the web,
+the API and mail, 12 months: migrated documents bring the metadata of the source system); the
+numbers are the whole system's, every user sees them, and they name no document.
 
 Counted live in the database (`ProcessingFacts`) and kept for a minute: over a long period with
 many documents, reading the times of every first run takes most of a second.
@@ -31,7 +31,7 @@ from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from lekto.core.services._access import load_actor, require_admin
 from lekto.core.services._kept import Kept
 
-DEFAULT_CHANNELS = frozenset({Channel.WEB, Channel.API})
+DEFAULT_CHANNELS = frozenset({Channel.WEB, Channel.API, Channel.MAIL})
 HISTORY_MONTHS = 12
 MAX_CASES = 100
 """Cases behind one number of the holders' evaluation at most."""

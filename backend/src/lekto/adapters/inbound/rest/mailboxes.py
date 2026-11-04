@@ -86,6 +86,20 @@ async def test_connection(
     return ConnectionTestOut.of(test)
 
 
+@router.post(
+    "/{id}/fetch",
+    status_code=202,
+    summary="Fetch a mailbox now",
+    description=(
+        "Brings the mailbox's next fetch forward to now; a worker does it. A fetch running "
+        f"already plans the next itself. 422 if the mailbox is paused. {WHO}"
+    ),
+    responses=problem_responses(401, 403, 404, 422),
+)
+async def fetch_mailbox(id: UUID, user: CurrentUser, context: Context) -> None:
+    await context.mail_intake.fetch_now(user, MailboxId(id))
+
+
 @router.get(
     "/{id}",
     summary="A mailbox",

@@ -32,6 +32,11 @@ class JobQueue(Protocol):
         keys (ValueError)."""
         ...
 
+    async def hasten(self, dedup_key: str, *, run_at: datetime) -> bool:
+        """Bring the queued job with `dedup_key` forward to `run_at` (one due earlier stays);
+        False if no job with that key is queued (a running one is not changed)."""
+        ...
+
     async def claim(
         self, *, now: datetime, lease: timedelta, kinds: Collection[str] | None = None
     ) -> Job | None:

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import PlugZap from '@lucide/svelte/icons/plug-zap';
+	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import DateInput from '#lib/components/DateInput.svelte';
@@ -12,7 +14,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
-	import { describeError } from '#lib/errors.ts';
+	import { describeError, reportError } from '#lib/errors.ts';
 	import { formatDate } from '#lib/i18n.ts';
 	import {
 		complete,
@@ -146,6 +148,24 @@
 			(form.password !== '' || !creating)
 	);
 
+	let fetching = $state(false);
+
+	/** The next fetch at once (a stored mailbox that is not paused). */
+	async function fetchNow() {
+		if (!mailbox) return;
+		fetching = true;
+		try {
+			await unwrap(
+				api.POST('/api/v1/mailboxes/{id}/fetch', { params: { path: { id: mailbox.id } } })
+			);
+			toast.success(m.mailbox_fetch_queued());
+		} catch (error) {
+			reportError(error);
+		} finally {
+			fetching = false;
+		}
+	}
+
 	async function save() {
 		if (mailbox) {
 			await unwrap(
@@ -248,6 +268,12 @@
 				<PlugZap aria-hidden="true" />
 				{m.mail_test()}
 			</Button>
+			{#if mailbox?.enabled}
+				<Button type="button" variant="outline" disabled={fetching} onclick={fetchNow}>
+					<RefreshCw aria-hidden="true" />
+					{m.mailbox_fetch()}
+				</Button>
+			{/if}
 			<p role="status" class="text-sm">
 				{#if testing}
 					<span class="text-muted-foreground">{m.mail_testing()}</span>

@@ -43,6 +43,7 @@ from lekto.core.domain.ids import (
     FieldId,
     LensId,
     MailboxId,
+    MailRecordId,
     RuleApplicationId,
     RuleId,
     SpaceId,
@@ -55,6 +56,7 @@ from lekto.core.domain.ids import (
 from lekto.core.domain.inbox import Confirmation, InboxTab
 from lekto.core.domain.lenses import Lens
 from lekto.core.domain.mail import Mailbox
+from lekto.core.domain.mail_intake import MailOrigin, MailRecord
 from lekto.core.domain.master_data import Contact, DocumentType, Tag, TagScope
 from lekto.core.domain.open_identifiers import Sighting
 from lekto.core.domain.periods import Period
@@ -889,6 +891,40 @@ class MailboxRepository(Protocol):
 
     async def list_all(self) -> list[Mailbox]:
         """All mailboxes by name."""
+        ...
+
+
+class MailRecordRepository(Protocol):
+    """The mails Lekto fetched (`domain.mail_intake.MailRecord`)."""
+
+    async def add(self, record: MailRecord) -> None:
+        """ConflictError if the mailbox's folder has a record of that UIDVALIDITY and UID."""
+        ...
+
+    async def known_uids(self, mailbox: MailboxId, folder: str, uidvalidity: int) -> set[int]:
+        """The UIDs fetched from the folder while it had `uidvalidity`."""
+        ...
+
+    async def has_message(self, message_id: str) -> bool:
+        """Whether a mail with that Message-ID was fetched, from any folder or mailbox."""
+        ...
+
+    async def recent(self, mailbox: MailboxId, *, limit: int) -> list[MailRecord]:
+        """The mailbox's latest records, the latest first."""
+        ...
+
+
+class MailOriginRepository(Protocol):
+    """Where documents came from that a mail brought (`domain.mail_intake.MailOrigin`)."""
+
+    async def add(self, origin: MailOrigin) -> None: ...
+
+    async def find(self, document: DocumentId) -> MailOrigin | None:
+        """None if the document came by no mail (or is gone)."""
+        ...
+
+    async def of_record(self, record: MailRecordId) -> list[MailOrigin]:
+        """The origins of the documents one mail brought, by letter, the cover letter first."""
         ...
 
 
