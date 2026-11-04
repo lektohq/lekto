@@ -1,0 +1,29 @@
+From: Lekto Test GmbH <rechnung@lekto-test.example>
+To: Anna Beispiel <anna@example.test>
+Date: Wed, 04 Nov 2026 10:00:00 +0100
+Message-ID: <rechnung-4711@lekto-test.example>
+Subject: Ihre Rechnung Nummer 4711
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="lekto-sample-boundary"
+
+--lekto-sample-boundary
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+Hallo Anna,
+
+Rechnung Nummer 4711
+Lekto Testdokument
+Betrag 123,45 EUR
+
+Viele Grüße
+
+--lekto-sample-boundary
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+MIME-Version: 1.0
+
+<html><body><p>Hallo Anna,</p><p>Rechnung Nummer 4711</p><p>Lekto Testdokumen=
+t</p><p>Betrag 123,45 EUR</p><p>Viele Gr=C3=BC=C3=9Fe</p></body></html>
+
+--lekto-sample-boundary--
