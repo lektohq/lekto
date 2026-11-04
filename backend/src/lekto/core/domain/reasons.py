@@ -420,6 +420,13 @@ class ReasonCode(StrEnum):
     SEARCH_EMBED_DIMENSIONS = "search_embed_dimensions"
     SEARCH_INDEX_UNAVAILABLE = "search_index_unavailable"
     SEARCH_NOT_CONFIGURED = "search_not_configured"
+    # why a mailbox could not be reached or read
+    MAIL_UNREACHABLE = "mail_unreachable"
+    MAIL_TLS_FAILED = "mail_tls_failed"
+    MAIL_LOGIN_FAILED = "mail_login_failed"
+    MAIL_FOLDER_MISSING = "mail_folder_missing"
+    MAIL_SERVER_ERROR = "mail_server_error"
+    MAIL_PASSWORD_UNREADABLE = "mail_password_unreadable"
 
 
 TEMPLATES: Mapping[ReasonCode, str] = {
@@ -944,6 +951,14 @@ TEMPLATES: Mapping[ReasonCode, str] = {
         "the full-text search cannot be reached; the list and its filters work without it"
     ),
     ReasonCode.SEARCH_NOT_CONFIGURED: "this installation has no search index",
+    ReasonCode.MAIL_UNREACHABLE: "the mail server {host} cannot be reached",
+    ReasonCode.MAIL_TLS_FAILED: "no secure connection to the mail server {host}",
+    ReasonCode.MAIL_LOGIN_FAILED: "the mail server refused the user name or the password",
+    ReasonCode.MAIL_FOLDER_MISSING: "the mailbox has no folder '{folder}'",
+    ReasonCode.MAIL_SERVER_ERROR: "the mail server answered with an error: {detail}",
+    ReasonCode.MAIL_PASSWORD_UNREADABLE: (
+        "the stored password cannot be read (was the secret key changed?); enter it again"
+    ),
 }
 
 
@@ -982,6 +997,7 @@ class Action(StrEnum):
     DELETE_DOCUMENT = "delete_document"
     RESET_OWN_PASSWORD = "reset_own_password"
     TURN_OFF_OWN_TOTP = "turn_off_own_totp"
+    MANAGE_MAILBOXES = "manage_mailboxes"
 
 
 ACTIONS: Mapping[Action, str] = {
@@ -1016,6 +1032,7 @@ ACTIONS: Mapping[Action, str] = {
     Action.DELETE_DOCUMENT: "delete this document",
     Action.RESET_OWN_PASSWORD: "reset their own password here",
     Action.TURN_OFF_OWN_TOTP: "turn off their own TOTP here",
+    Action.MANAGE_MAILBOXES: "manage the mailboxes Lekto fetches from",
 }
 
 
