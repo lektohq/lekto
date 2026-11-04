@@ -27,7 +27,7 @@ class SqlMailRuleRepository(SqlRepository[MailRuleId, MailRule]):
     async def _ordered(self, where: Any) -> list[MailRule]:
         table = self.table
         query = select(table).order_by(
-            table.c.mailbox_id, table.c.priority, func.lower(table.c.name), table.c.id
+            table.c.mailbox_id, table.c.priority.desc(), func.lower(table.c.name), table.c.id
         )
         if where is not None:
             query = query.where(where)

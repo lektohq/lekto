@@ -24,6 +24,8 @@ from lekto.core.domain.evidence import DocumentText, contains, normalise, withou
 from lekto.core.domain.fields import FieldDefinition, FieldType, FieldValue, Money, Url
 from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, TagId, UserId
 from lekto.core.domain.json_value import JsonValue, require_date
+from lekto.core.domain.mail_intake import MailOrigin
+from lekto.core.domain.mail_message import Address
 from lekto.core.domain.periods import Period
 from lekto.core.domain.rules import (
     Condition,
@@ -60,6 +62,32 @@ class Taxonomy:
         return frozenset() if contact is None else self.topics.get(contact, frozenset())
 
 
+@dataclass(frozen=True)
+class MailOf:
+    """The mail a document came with, as conditions see it: its mailbox, the sender's and the
+    recipients' addresses and names, its subject."""
+
+    mailbox_id: UUID
+    senders: tuple[str, ...]
+    recipients: tuple[str, ...]
+    subject: str
+
+    @classmethod
+    def of(cls, origin: MailOrigin | None) -> "MailOf | None":
+        if origin is None:
+            return None
+
+        def texts(addresses: Sequence[Address]) -> tuple[str, ...]:
+            return tuple(text for item in addresses for text in (item.address, item.name) if text)
+
+        return cls(
+            mailbox_id=origin.mailbox_id,
+            senders=texts(origin.sender),
+            recipients=texts((*origin.to, *origin.cc)),
+            subject=origin.subject,
+        )
+
+
 @dataclass(frozen=True, kw_only=True)
 class Facts:
     """A document's state as conditions see it.
@@ -91,6 +119,7 @@ class Facts:
     steps: Mapping[str, JsonValue] = field(default_factory=dict)
     kept_facts: tuple[DocumentFact, ...] = ()
     referred_types: tuple[DocumentTypeId | None, ...] = ()
+    mail: MailOf | None = None
 
     @classmethod
     def of(
@@ -105,6 +134,7 @@ class Facts:
         taxonomy: Taxonomy | None = None,
         steps: Mapping[str, JsonValue] | None = None,
         referred_types: Sequence[DocumentTypeId | None] = (),
+        mail: MailOf | None = None,
     ) -> "Facts":
         taxonomy = taxonomy or Taxonomy()
         return cls(
@@ -125,6 +155,7 @@ class Facts:
             steps=steps or {},
             kept_facts=tuple(kept_facts),
             referred_types=tuple(referred_types),
+            mail=mail,
         )
 
 
@@ -243,6 +274,21 @@ def _condition(
                 case Operator.MISSING:
                     return not facts.referred_types
             return any(str(kind) in values for kind in facts.referred_types if kind is not None)
+        case ConditionField.MAIL_MAILBOX:
+            mailbox = None if facts.mail is None else str(facts.mail.mailbox_id)
+            return _reference(op, mailbox, values)
+        case (
+            ConditionField.MAIL_SENDER | ConditionField.MAIL_RECIPIENT | ConditionField.MAIL_SUBJECT
+        ):
+            if facts.mail is None:
+                return False
+            texts = {
+                ConditionField.MAIL_SENDER: facts.mail.senders,
+                ConditionField.MAIL_RECIPIENT: facts.mail.recipients,
+                ConditionField.MAIL_SUBJECT: (facts.mail.subject,),
+            }[condition.field]
+            wanted = str(condition.value).casefold()
+            return any(_text_holds(op, text.casefold(), wanted) for text in texts)
         case ConditionField.FACT:
             # Read from the text (or decided by a person): never unknown.
             held = [fact.value for fact in fact_values(condition, facts.kept_facts)]
@@ -302,6 +348,17 @@ def _step(op: Operator, value: JsonValue | object, wanted: list[JsonValue]) -> b
                 return False
             return order > 0 if op is Operator.GT else order < 0
     return False
+
+
+def _text_holds(op: Operator, text: str, wanted: str) -> bool:
+    match op:
+        case Operator.IS:
+            return text == wanted
+        case Operator.STARTS_WITH:
+            return text.startswith(wanted)
+        case Operator.ENDS_WITH:
+            return text.endswith(wanted)
+    return wanted in text
 
 
 def _same(value: object, wanted: JsonValue) -> bool:

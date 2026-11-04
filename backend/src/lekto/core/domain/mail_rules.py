@@ -3,7 +3,8 @@
 A mail rule belongs to one mailbox. Its conditions look at the mail (sender, recipients,
 subject, the folder it lies in, whether it has attachments Lekto takes), all or any of them;
 none means every mail. Of a mailbox's active rules the first that matches decides, by priority
-(smaller first), the same priority by name; a mail no rule takes goes by the mailbox's fallback.
+(higher first, as with document rules), the same priority by name; a mail no rule takes goes by
+the mailbox's fallback.
 
 A rule takes the mail's attachments and text, the attachments, the text, or nothing; for one
 person, into a space they edit (else their personal one); the text gets a fixed document type
@@ -282,9 +283,10 @@ def record_facts(record: MailRecord) -> MailFacts:
 
 
 def first_match(rules: list[MailRule], facts: MailFacts) -> MailRule | None:
-    """The first active rule that matches, by priority, the same priority by name."""
+    """The first active rule that matches, by priority (higher first), the same priority by
+    name."""
     ordered = sorted(
         (rule for rule in rules if rule.enabled),
-        key=lambda rule: (rule.priority, rule.name.casefold()),
+        key=lambda rule: (-rule.priority, rule.name.casefold()),
     )
     return next((rule for rule in ordered if rule.matches(facts)), None)

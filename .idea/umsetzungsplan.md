@@ -2591,7 +2591,7 @@ Stand: freigegeben (Tobi, 04.11.2026).
 
 ### Eingangskanal Mail
 
-Stand: freigegeben (Frage- und Antwortrunde mit Tobi, 04.11.2026). Mock: Leinwand „Mail als Begleitschreiben“ (https://claude.ai/artifact/TMFyyhhCo9atGf3AA6cv18): A die HTML-Mail mit WeasyPrint gesetzt, B nur Text, C das Begleitschreiben in Lekto mit Herkunft und Bezug, D Regeln › Mails, E eine Mail-Regel, F System › Eingangskanäle › Mail, G eine Dokument-Regel mit Mail-Bedingung (D–G gegen DESIGN.md geprüft und angepasst).
+Stand: umgesetzt (#269–#274, 04.11.2026); freigegeben in der Frage- und Antwortrunde mit Tobi, 04.11.2026. Mock: Leinwand „Mail als Begleitschreiben“ (https://claude.ai/artifact/TMFyyhhCo9atGf3AA6cv18): A die HTML-Mail mit WeasyPrint gesetzt, B nur Text, C das Begleitschreiben in Lekto mit Herkunft und Bezug, D Regeln › Mails, E eine Mail-Regel, F System › Eingangskanäle › Mail, G eine Dokument-Regel mit Mail-Bedingung (D–G gegen DESIGN.md geprüft und angepasst).
 
 **Anlass (Tobi):** Heute kommen Dokumente über die Web-UI, die API und die Übernahme aus Paperless. Viele kommen per Mail (Rechnungen, Bescheide, Bestellungen), auch aus Genius Scan und vom Scanner am Mac. Lekto soll Postfächer abholen, je Postfach mit Regeln, was übernommen wird und wohin.
 
@@ -2643,6 +2643,13 @@ Stand: freigegeben (Frage- und Antwortrunde mit Tobi, 04.11.2026). Mock: Leinwan
 **Fragen zur Freigabe, beantwortet (Tobi, 04.11.2026):**
 1. Testdienst für IMAP: **GreenMail** als Compose-Dienst im Devcontainer und in der CI, nur für Tests.
 2. Reihenfolge wie oben; **veröffentlicht wird erst, wenn alle PRs fertig sind** („Du kannst komplett durchbauen“).
+
+**Umsetzung (Claude, 04.11.2026):** PR 1 bis 6 als #269 bis #274.
+- Der **feste Typ des Mailtexts** kam mit PR 4 statt PR 3: Der Richter entscheidet Typen aus Signalen, und `ImportedMetadata` ersetzt die ganze Klassifizierung. Den Typ setzt der Regel-Knoten vor den Dokument-Regeln am Begleitschreiben, wie eine Regelaktion; eine Entscheidung der Person geht vor.
+- **Mail-Regeln** sind eine eigene Entität (`MailRule`, Tabelle `mail_rules`), nicht das Regelmodell der Dokumente mit Versionen und Anwendungen. Die Priorität gilt wie bei den Dokument-Regeln: höhere zuerst (Mock D zeigte 1 vor 2). Die Regel-Seite zeigt sie unter „Mails“ (`?kind=mail`), der Editor folgt Mock E.
+- Der **Probelauf** einer Mail-Regel liest die letzten 50 Mails aus dem Abruf-Protokoll (`mail_records`, mit Absendern, Empfängern und Anhängen, Revision 0060), nicht vom Server: sofort, nur lesend, nichts wird markiert.
+- **Bezüge** einer Mail findet der Knoten `relate` über die Quelle „mail“ (Beleg: Message-ID); er verwirft sie nie, auch nicht für einen Anhang, den Lekto schon hatte.
+- **Offen:** Der Migrations-Client hält Paperless-Dokumente, die als `.eml` gespeichert sind, weiter für nicht übernehmbar (`expect.py`); eine „Meldung am Postfach“ für zu große Mails gibt es nur im Protokoll und im Probelauf, nicht am Postfach.
 
 ### M16 – Lesen
 

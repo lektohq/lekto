@@ -105,6 +105,11 @@ class ConditionField(StrEnum):
     DOCUMENT_DATE = "document_date"
     FACT = "fact"  # a fact of the document (#145): of `fact_kind`, in `fact_role` if given
     RELATION = "relation"  # a document it refers to (#145): any, or of one of the types
+    # The mail the document came with (`mail_origins`): its mailbox, sender, recipients, subject.
+    MAIL_MAILBOX = "mail_mailbox"
+    MAIL_SENDER = "mail_sender"
+    MAIL_RECIPIENT = "mail_recipient"
+    MAIL_SUBJECT = "mail_subject"
 
 
 class Operator(StrEnum):
@@ -117,12 +122,24 @@ class Operator(StrEnum):
     OVERLAPS = "overlaps"  # a period shares a day with the given one
     PRESENT = "present"
     MISSING = "missing"
+    STARTS_WITH = "starts_with"  # text, regardless of case
+    ENDS_WITH = "ends_with"
 
 
 type GroupMode = Literal["all", "any"]
 
 _REFERENCE_OPERATORS = frozenset({Operator.IS, Operator.IN, Operator.PRESENT, Operator.MISSING})
 _TAG_OPERATORS = frozenset({Operator.CONTAINS, Operator.IN, Operator.PRESENT, Operator.MISSING})
+_MAIL_TEXT = frozenset({Operator.CONTAINS, Operator.IS, Operator.STARTS_WITH, Operator.ENDS_WITH})
+MAIL_FIELDS = frozenset(
+    {
+        ConditionField.MAIL_MAILBOX,
+        ConditionField.MAIL_SENDER,
+        ConditionField.MAIL_RECIPIENT,
+        ConditionField.MAIL_SUBJECT,
+    }
+)
+"""The conditions on the mail a document came with (none: it came otherwise)."""
 _FIELD_OPERATORS: dict[ConditionField, frozenset[Operator]] = {
     ConditionField.STEP: frozenset(
         {
@@ -150,6 +167,10 @@ _FIELD_OPERATORS: dict[ConditionField, frozenset[Operator]] = {
         {Operator.IS, Operator.IN, Operator.MATCHES, Operator.PRESENT, Operator.MISSING}
     ),
     ConditionField.RELATION: _REFERENCE_OPERATORS,
+    ConditionField.MAIL_MAILBOX: _REFERENCE_OPERATORS,
+    ConditionField.MAIL_SENDER: _MAIL_TEXT,
+    ConditionField.MAIL_RECIPIENT: _MAIL_TEXT,
+    ConditionField.MAIL_SUBJECT: _MAIL_TEXT,
 }
 TAG_FIELDS: dict[ConditionField, TagScope] = {
     ConditionField.TAGS: TagScope.DOCUMENT,
@@ -159,7 +180,13 @@ TAG_FIELDS: dict[ConditionField, TagScope] = {
 }
 """The conditions on tags (a topic is one), and the scope of the tags each names."""
 _ID_FIELDS = frozenset(
-    {ConditionField.CONTACT, ConditionField.DOCUMENT_TYPE, ConditionField.RELATION, *TAG_FIELDS}
+    {
+        ConditionField.CONTACT,
+        ConditionField.DOCUMENT_TYPE,
+        ConditionField.RELATION,
+        ConditionField.MAIL_MAILBOX,
+        *TAG_FIELDS,
+    }
 )
 _ORDERED = frozenset({Operator.IS, Operator.GT, Operator.LT, Operator.PRESENT, Operator.MISSING})
 FIELD_TYPE_OPERATORS: dict[FieldType, frozenset[Operator]] = {
@@ -291,6 +318,10 @@ class Condition:
                 _step_value(self.op, value)
             case ConditionField.FACT:
                 _text(value, MAX_PATTERN if self.op is Operator.MATCHES else MAX_TEXT)
+            case ConditionField.MAIL_SENDER | ConditionField.MAIL_RECIPIENT:
+                _text(value, MAX_TEXT)
+            case ConditionField.MAIL_SUBJECT:
+                _text(value, MAX_TEXT)
 
     @property
     def target(self) -> str:
