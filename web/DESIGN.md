@@ -745,6 +745,17 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
   Empfangen, Weitergeleitet von, Anhang), only those with a value. Other documents show no card.
   A relation of the documents of one mail says "aus derselben Mail" with the subject.
 
+- **Mail rules** (mock D, E): the page "Regeln" has for admins a `Segmented` "Dokumente |
+  Mails" with counts above its list (`?kind=mail`); others see the document rules alone. Mails:
+  one section per mailbox, its title "Postfach „…“" with "Postfach ansehen" at its end, its rules
+  as cards in a column in the order they are asked (the name opens the editor; below it
+  priority · conditions → what it does; a paused one says why), and under them the mailbox's
+  fallback with "Am Postfach ändern". "Neue Regel" makes a mail rule there. The editor is the
+  rule editor's frame: name and priority, the mailbox (`Select`), the conditions (all or any;
+  field, comparison, value; a folder from the mailbox's), and the actions as its rows:
+  "Übernehmen" and "Für" always, "Space setzen", "Typ des Mailtexts" and "Mail danach" added
+  with "+ Aktion" and removed with their bin; delete in the head (`IconButton`).
+
 ### Navigation between list and detail
 
 - A list's state (lens, filters, sort, layout) lives in its URL, its words in the history entry
