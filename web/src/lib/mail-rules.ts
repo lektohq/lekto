@@ -13,6 +13,7 @@ export type MailField = components['schemas']['MailField'];
 export type MailOperator = components['schemas']['MailOperator'];
 export type MailParts = components['schemas']['MailParts'];
 export type MailAction = components['schemas']['MailAction'];
+export type DryRunMail = components['schemas']['DryRunMailOut'];
 
 export const FIELDS: readonly MailField[] = [
 	'sender',

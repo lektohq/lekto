@@ -186,4 +186,18 @@ async def test_mail_rules(api: Api) -> None:
     assert (await api.client.get(f"{PREFIX}/mail-rules", headers=auth(user))).status_code == 403
     listed = (await api.client.get(f"{PREFIX}/mail-rules", headers=auth(admin))).json()
     assert [item["name"] for item in listed] == ["Strom"]
+    dry = await api.client.post(
+        f"{PREFIX}/mail-rules/dry-run",
+        json={**body, "rule_id": created["id"]},
+        headers=auth(admin),
+    )
+    assert dry.status_code == 200, dry.text
+    assert dry.json() == []  # nothing fetched yet
+    dry = await api.client.post(
+        f"{PREFIX}/mail-rules/dry-run",
+        json={**body, "rule_id": created["id"]},
+        headers=auth(admin),
+    )
+    assert dry.status_code == 200, dry.text
+    assert dry.json() == []  # nothing fetched yet
     assert (await api.client.delete(url, headers=auth(admin))).status_code == 204
