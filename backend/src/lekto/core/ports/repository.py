@@ -44,6 +44,7 @@ from lekto.core.domain.ids import (
     LensId,
     MailboxId,
     MailRecordId,
+    MailRuleId,
     RuleApplicationId,
     RuleId,
     SpaceId,
@@ -57,6 +58,7 @@ from lekto.core.domain.inbox import Confirmation, InboxTab
 from lekto.core.domain.lenses import Lens
 from lekto.core.domain.mail import Mailbox
 from lekto.core.domain.mail_intake import MailOrigin, MailRecord
+from lekto.core.domain.mail_rules import MailRule
 from lekto.core.domain.master_data import Contact, DocumentType, Tag, TagScope
 from lekto.core.domain.open_identifiers import Sighting
 from lekto.core.domain.periods import Period
@@ -911,6 +913,32 @@ class MailRecordRepository(Protocol):
 
     async def recent(self, mailbox: MailboxId, *, limit: int) -> list[MailRecord]:
         """The mailbox's latest records, the latest first."""
+        ...
+
+
+class MailRuleRepository(Protocol):
+    """The mail rules of the mailboxes (`domain.mail_rules`)."""
+
+    async def get(self, id: MailRuleId) -> MailRule: ...
+
+    async def find(self, id: MailRuleId) -> MailRule | None: ...
+
+    async def add(self, rule: MailRule) -> None: ...
+
+    async def update(self, rule: MailRule) -> None:
+        """ConcurrencyError if it was changed meanwhile."""
+        ...
+
+    async def remove(self, id: MailRuleId) -> None:
+        """NotFoundError if it does not exist."""
+        ...
+
+    async def of_mailbox(self, mailbox: MailboxId) -> list[MailRule]:
+        """The mailbox's rules by priority, the same priority by name."""
+        ...
+
+    async def list_all(self) -> list[MailRule]:
+        """Every mail rule, by mailbox, then as `of_mailbox`."""
         ...
 
 

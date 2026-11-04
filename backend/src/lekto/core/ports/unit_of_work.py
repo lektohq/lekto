@@ -25,6 +25,7 @@ from lekto.core.ports.repository import (
     MailboxRepository,
     MailOriginRepository,
     MailRecordRepository,
+    MailRuleRepository,
     ProcessingFacts,
     ProcessingLog,
     ProfileRepository,
@@ -103,6 +104,8 @@ class UnitOfWork(Protocol):
     def mail_records(self) -> MailRecordRepository: ...
     @property
     def mail_origins(self) -> MailOriginRepository: ...
+    @property
+    def mail_rules(self) -> MailRuleRepository: ...
     @property
     def outbox(self) -> Outbox: ...
     @property

@@ -33,6 +33,7 @@ from lekto.adapters.outbound.memory.database import (
     LOGIN_FAILURES,
     MAIL_ORIGINS,
     MAIL_RECORDS,
+    MAIL_RULES,
     MAILBOXES,
     PROFILES,
     RULE_APPLICATIONS,
@@ -63,6 +64,7 @@ from lekto.adapters.outbound.memory.mail_records import (
     MemoryMailOriginRepository,
     MemoryMailRecordRepository,
 )
+from lekto.adapters.outbound.memory.mail_rules import MemoryMailRuleRepository
 from lekto.adapters.outbound.memory.mailboxes import MemoryMailboxRepository
 from lekto.adapters.outbound.memory.ordering import Rank, rank
 from lekto.adapters.outbound.memory.processing_facts import MemoryProcessingFacts, VerdictKey
@@ -174,6 +176,7 @@ class MemoryUnitOfWork:
         self.mailboxes = MemoryMailboxRepository(self, MAILBOXES)
         self.mail_records = MemoryMailRecordRepository(self, MAIL_RECORDS)
         self.mail_origins = MemoryMailOriginRepository(self, MAIL_ORIGINS)
+        self.mail_rules = MemoryMailRuleRepository(self, MAIL_RULES)
         self.outbox = MemoryOutbox(self)
         self.jobs = MemoryJobQueue(self)
         self.credentials = MemoryCredentialRepository(self, CREDENTIALS)
