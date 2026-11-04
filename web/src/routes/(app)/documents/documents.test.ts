@@ -679,6 +679,29 @@ describe('the archive page', () => {
 		expect(vi.mocked(goto)).toHaveBeenLastCalledWith('?tag=t1', searching(''));
 	});
 
+	it.each([
+		[4, () => m.search_total_meaning({ count: '4' })],
+		[0, () => m.search_meaning_only()]
+	])('counts what %i words found where the meaning ranks the rest', async (words, text) => {
+		state.entry = { words: 'Urlaubsgeld' };
+		vi.stubGlobal(
+			'fetch',
+			fakeApi({
+				'POST /api/v1/documents/search': () => ({
+					items: [{ document: listedOf({ id: 'd1', title: 'Eins' }), score: 0.8, snippet: [] }],
+					estimated_total: 1724,
+					word_total: words,
+					next_offset: null,
+					semantic: true,
+					mode: 'hybrid'
+				})
+			})
+		);
+		render(Page);
+		expect(await screen.findByText(text())).toBeTruthy();
+		expect(screen.queryByText(m.search_total({ count: '1.724' }))).toBeNull();
+	});
+
 	it('says when a search went by words alone, and offers the meaning once it is ready', async () => {
 		state.entry = { words: 'Weihnachten' };
 		let first = true;

@@ -320,6 +320,9 @@
 	// nothing of it where the installation has no search by meaning.
 	const searchNote = new SearchNote();
 	let meaning = $state(false);
+	// What the words of a search found, where the meaning took part: the meaning ranks every
+	// document, so the hits beyond are "similar ones by meaning", not a count of hits.
+	let worded = $state<{ total: number; meaning: boolean } | null>(null);
 
 	// One page of documents at a time, 50 to a page or as chosen and remembered (25, 50, 100;
 	// Tobi, 28.10.2026); the page stands in the link (`?page=`). The list counts its documents as the filters do; a search
@@ -343,7 +346,10 @@
 					body: { q: words }
 				})
 			);
-			if (offset === 0) searchNote.answered(words, data);
+			if (offset === 0) {
+				searchNote.answered(words, data);
+				worded = { total: data.word_total, meaning: data.mode === 'hybrid' };
+			}
 			const items = data.items.map((hit) => ({ document: hit.document, snippet: hit.snippet }));
 			return { items, total: data.estimated_total };
 		}
@@ -805,7 +811,15 @@ row of filters, on a desktop narrow by the title. -->
 			<PageTitle>{lens?.name ?? m.nav_documents()}</PageTitle>
 			{#if searching && list.loaded}
 				<p class="text-sm text-muted-foreground" aria-live="polite">
-					{m.search_total({ count: formatNumber(list.total) })}
+					{#if !worded?.meaning}
+						{m.search_total({ count: formatNumber(list.total) })}
+					{:else if worded.total > 0}
+						{m.search_total_meaning({ count: formatNumber(worded.total) })}
+					{:else if list.total > 0}
+						{m.search_meaning_only()}
+					{:else}
+						{m.search_total({ count: formatNumber(0) })}
+					{/if}
 				</p>
 			{:else if facets && !searching}
 				<p class="text-sm text-muted-foreground" aria-live="polite">

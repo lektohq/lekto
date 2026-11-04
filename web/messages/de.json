@@ -722,6 +722,8 @@
 	"search_placeholder": "Suche nach Wörtern oder Bedeutung",
 	"search_none": "Nichts gefunden.",
 	"search_total": "Treffer: etwa {count}",
+	"search_total_meaning": "Treffer: etwa {count}, dazu ähnliche nach Bedeutung",
+	"search_meaning_only": "Keine Treffer für die Wörter, ähnliche nach Bedeutung",
 	"search_slow": "Die Suche nach Bedeutung braucht gerade länger …",
 	"search_meaning_pending": "Die Suche nach Bedeutung wird noch vorbereitet; sobald sie bereit ist, kannst Du mit ihr suchen.",
 	"search_with_meaning": "Mit Bedeutung neu suchen",
