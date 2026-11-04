@@ -3,7 +3,10 @@
 The cases of the set become documents (the classification runs with their fixed answers, as in
 `evaluate --fake`), each backend indexes them with its model through the real `IndexingService`,
 and the queries of `queries.json` run through the real `SearchService` at each semantic ratio.
-A query counts as found at rank r if the first of its expected cases is the r-th result.
+A query counts as found at rank r if the first of its expected cases is the r-th result. Its
+R-precision is the share of its expected cases among the first n results, n the number of them
+(at most the cutoff); it is tied if chance decides between an expected case and another at the
+top, both with the first result's score.
 """
 
 import json
@@ -127,6 +130,23 @@ class QueryOutcome:
     got: tuple[str, ...]  # case names, best first
     seconds: float
     semantic: bool  # whether the meaning took part
+    scores: tuple[float | None, ...] = ()  # of the results in `got`
+
+    @property
+    def precision(self) -> float:
+        wanted = min(len(self.case.expected), CUTOFF)
+        return sum(1 for name in self.got[:wanted] if name in self.case.expected) / wanted
+
+    @property
+    def tied(self) -> bool:
+        if not self.scores or self.scores[0] is None:
+            return False
+        top = {
+            name
+            for name, score in zip(self.got, self.scores, strict=True)
+            if score == self.scores[0]
+        }
+        return len(top) > 1 and bool(top & self.case.expected) and bool(top - self.case.expected)
 
 
 @dataclass
@@ -145,6 +165,14 @@ class RatioResult:
     def rate(self, rank: int, kind: str | None = None) -> float:
         count = self.count(kind)
         return self.found(rank, kind) / count if count else 0.0
+
+    def precision(self, kind: str | None = None) -> float:
+        """Mean R-precision."""
+        rows = self._of(kind)
+        return sum(o.precision for o in rows) / len(rows) if rows else 0.0
+
+    def ties(self, kind: str | None = None) -> int:
+        return sum(1 for o in self._of(kind) if o.tied)
 
     @property
     def mrr(self) -> float:
@@ -287,4 +315,5 @@ async def _ask(
     seconds = time.perf_counter() - started
     got = tuple(names[item.document.id] for item in page.items)
     rank = next((position for position, name in enumerate(got, 1) if name in case.expected), None)
-    return QueryOutcome(case, rank, got, seconds, page.semantic)
+    scores = tuple(item.score for item in page.items)
+    return QueryOutcome(case, rank, got, seconds, page.semantic, scores)
