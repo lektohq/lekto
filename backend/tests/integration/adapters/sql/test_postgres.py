@@ -23,6 +23,7 @@ from tests.contracts.identity import IdentityRepositoriesContract
 from tests.contracts.inbox import InboxRepositoryContract
 from tests.contracts.job_queue import JobQueueContract
 from tests.contracts.lenses import LensRepositoryContract
+from tests.contracts.mailboxes import MailboxRepositoryContract
 from tests.contracts.processing_facts import ProcessingFactsContract
 from tests.contracts.rules import RuleRepositoriesContract
 from tests.contracts.tasks import TaskRepositoryContract
@@ -73,6 +74,10 @@ class TestPostgresTaskRepository(TaskRepositoryContract):
 
 
 class TestPostgresLensRepository(LensRepositoryContract):
+    pass
+
+
+class TestPostgresMailboxRepository(MailboxRepositoryContract):
     pass
 
 

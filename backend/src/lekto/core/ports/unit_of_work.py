@@ -22,6 +22,7 @@ from lekto.core.ports.repository import (
     FieldDefinitionRepository,
     InboxRepository,
     LensRepository,
+    MailboxRepository,
     ProcessingFacts,
     ProcessingLog,
     ProfileRepository,
@@ -94,6 +95,8 @@ class UnitOfWork(Protocol):
     def tasks(self) -> TaskRepository: ...
     @property
     def lenses(self) -> LensRepository: ...
+    @property
+    def mailboxes(self) -> MailboxRepository: ...
     @property
     def outbox(self) -> Outbox: ...
     @property

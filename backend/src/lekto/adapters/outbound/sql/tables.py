@@ -863,6 +863,40 @@ lenses = Table(
     Index(None, "owner_id", "name_key", unique=True),
 )
 
+# Mailboxes Lekto fetches from (`domain.mail`): the password as `SecretCipher` made it, the
+# folders as a JSON list, the interval in seconds, the status of the fetches with the reason of
+# the last failure (`Reason.to_json`). Names unique regardless of case. A document type a mail
+# text gets and the person a fallback takes everything for are kept: neither can be deleted
+# while a mailbox names it.
+mailboxes = Table(
+    "mailboxes",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("name", Text, nullable=False),
+    Column("name_key", Text, nullable=False, unique=True),
+    Column("host", Text, nullable=False),
+    Column("port", Integer, nullable=False),
+    Column("security", Text, nullable=False),
+    Column("username", Text, nullable=False),
+    Column("password", LargeBinary, nullable=False),
+    Column("folders", json_type(), nullable=False),
+    Column("interval_seconds", Integer, nullable=False),
+    Column("start", Text, nullable=False),
+    Column("since", Date, nullable=True),
+    Column("fallback", Text, nullable=False),
+    Column("fallback_user_id", Uuid, ForeignKey("users.id"), nullable=True),
+    Column("body_type_id", Uuid, ForeignKey("document_types.id"), nullable=True),
+    Column("enabled", Boolean, nullable=False),
+    Column("last_attempt_at", UtcDateTime, nullable=True),
+    Column("last_success_at", UtcDateTime, nullable=True),
+    Column("error", json_type(), nullable=True),
+    Column("mails", Integer, nullable=False),
+    Column("documents", Integer, nullable=False),
+    Column("created_at", UtcDateTime, nullable=False),
+    Column("updated_at", UtcDateTime, nullable=False),
+    Column("version", Integer, nullable=False),
+)
+
 # The log of delivery attempts. The answer of the receiver is not kept. `document_id` has no
 # foreign key: the document may be deleted while its log lives on.
 webhook_deliveries = Table(

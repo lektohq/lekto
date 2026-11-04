@@ -31,6 +31,7 @@ from lekto.adapters.outbound.memory.database import (
     FIELDS,
     LENSES,
     LOGIN_FAILURES,
+    MAILBOXES,
     PROFILES,
     RULE_APPLICATIONS,
     RULES,
@@ -56,6 +57,7 @@ from lekto.adapters.outbound.memory.identity import (
 )
 from lekto.adapters.outbound.memory.inbox import MemoryInboxRepository, SeenKey
 from lekto.adapters.outbound.memory.lenses import MemoryLensRepository
+from lekto.adapters.outbound.memory.mailboxes import MemoryMailboxRepository
 from lekto.adapters.outbound.memory.ordering import Rank, rank
 from lekto.adapters.outbound.memory.processing_facts import MemoryProcessingFacts, VerdictKey
 from lekto.adapters.outbound.memory.rows import _REMOVED, MemoryRepository, _copy
@@ -163,6 +165,7 @@ class MemoryUnitOfWork:
         self.webhooks = MemoryWebhookRepository(self, WEBHOOKS)
         self.tasks = MemoryTaskRepository(self, TASKS)
         self.lenses = MemoryLensRepository(self, LENSES)
+        self.mailboxes = MemoryMailboxRepository(self, MAILBOXES)
         self.outbox = MemoryOutbox(self)
         self.jobs = MemoryJobQueue(self)
         self.credentials = MemoryCredentialRepository(self, CREDENTIALS)
@@ -352,12 +355,16 @@ class MemoryUnitOfWork:
 
 # What refers to a row, as the SQL schema's foreign keys without ON DELETE CASCADE do.
 _REFERRERS: dict[str, tuple[tuple[Table[Any], Callable[[Any, UUID], bool]], ...]] = {
-    USERS.name: ((SPACES, lambda space, id: space.personal_of == id or id in space.members),),
+    USERS.name: (
+        (SPACES, lambda space, id: space.personal_of == id or id in space.members),
+        (MAILBOXES, lambda mailbox, id: mailbox.fallback_user_id == id),
+    ),
     SPACES.name: ((DOCUMENTS, lambda document, id: document.space_id == id),),
     CONTACTS.name: ((DOCUMENTS, lambda document, id: document.contact_id == id),),
     DOCUMENT_TYPES.name: (
         (DOCUMENTS, lambda document, id: document.document_type_id == id),
         (FIELDS, lambda field, id: id in (field.document_type_ids or ())),
+        (MAILBOXES, lambda mailbox, id: mailbox.body_type_id == id),
     ),
     TAGS.name: (
         (TAGS, lambda tag, id: tag.parent_id == id),
