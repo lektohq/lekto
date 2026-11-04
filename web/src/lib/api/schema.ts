@@ -7679,6 +7679,13 @@ export interface components {
 			 * @description Documents made from them.
 			 */
 			documents: number;
+			/**
+			 * Skipped At
+			 * @description When a mail was last left out because it was too large.
+			 */
+			skipped_at: string | null;
+			/** @description Which mail that was, and why. */
+			skipped: components['schemas']['ReasonOut'] | null;
 		};
 		/**
 		 * Me
@@ -9158,6 +9165,7 @@ export interface components {
 			| 'mail_server_error'
 			| 'mail_password_unreadable'
 			| 'mailbox_paused'
+			| 'mail_too_large'
 			| 'mail_rule_person_gone'
 			| 'mail_rule_space_unreachable'
 			| 'mail_rule_type_gone';

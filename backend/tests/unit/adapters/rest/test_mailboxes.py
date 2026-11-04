@@ -52,6 +52,8 @@ async def test_a_mailbox_is_created_tested_changed_and_deleted(api: Api) -> None
         "error": None,
         "mails": 0,
         "documents": 0,
+        "skipped_at": None,
+        "skipped": None,
     }
     url = f"{PREFIX}/mailboxes/{created['id']}"
 
