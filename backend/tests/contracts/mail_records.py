@@ -222,9 +222,9 @@ class MailRuleRepositoryContract:
         async with uow_factory() as uow:
             assert await uow.mail_rules.get(full.id) == full
             assert [item.name for item in await uow.mail_rules.of_mailbox(first.id)] == [
-                "Strom",
                 "A",
                 "b",
+                "Strom",
             ]
             assert len(await uow.mail_rules.list_all()) == 4
             stored = await uow.mail_rules.get(other.id)

@@ -21,8 +21,9 @@ router = APIRouter(prefix="/mail-rules", tags=["mail rules"], dependencies=PROTE
 
 WHO = "Only admins (403)."
 HOW = (
-    "Of a mailbox's active rules the first that matches a mail decides, by priority (smaller "
-    "first), the same priority by name; a mail no rule takes goes by the mailbox's fallback."
+    "Of a mailbox's active rules the first that matches a mail decides, by priority (higher "
+    "first, as with document rules), the same priority by name; a mail no rule takes goes by "
+    "the mailbox's fallback."
 )
 CHECKS = (
     "The person must be active, the space one they file into, the type one that exists; a "

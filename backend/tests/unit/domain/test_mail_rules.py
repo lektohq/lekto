@@ -83,7 +83,7 @@ def test_all_or_any_and_none() -> None:
 
 
 def test_the_first_by_priority_then_name_decides() -> None:
-    late, early, paused = rule("B", priority=5), rule("a", priority=5), rule("0", priority=1)
+    late, early, paused = rule("B", priority=5), rule("a", priority=5), rule("0", priority=9)
     paused.pause(because(ReasonCode.MAIL_RULE_PERSON_GONE), now=NOW)
     assert first_match([late, paused, early], FACTS) is early
     assert first_match([], FACTS) is None

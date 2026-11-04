@@ -2646,7 +2646,7 @@ Stand: umgesetzt (#269–#274, 04.11.2026); freigegeben in der Frage- und Antwor
 
 **Umsetzung (Claude, 04.11.2026):** PR 1 bis 6 als #269 bis #274.
 - Der **feste Typ des Mailtexts** kam mit PR 4 statt PR 3: Der Richter entscheidet Typen aus Signalen, und `ImportedMetadata` ersetzt die ganze Klassifizierung. Den Typ setzt der Regel-Knoten vor den Dokument-Regeln am Begleitschreiben, wie eine Regelaktion; eine Entscheidung der Person geht vor.
-- **Mail-Regeln** sind eine eigene Entität (`MailRule`, Tabelle `mail_rules`), nicht das Regelmodell der Dokumente mit Versionen und Anwendungen. Die Regel-Seite zeigt sie unter „Mails“ (`?kind=mail`), der Editor folgt Mock E.
+- **Mail-Regeln** sind eine eigene Entität (`MailRule`, Tabelle `mail_rules`), nicht das Regelmodell der Dokumente mit Versionen und Anwendungen. Die Priorität gilt wie bei den Dokument-Regeln: höhere zuerst (Mock D zeigte 1 vor 2). Die Regel-Seite zeigt sie unter „Mails“ (`?kind=mail`), der Editor folgt Mock E.
 - Der **Probelauf** einer Mail-Regel liest die letzten 50 Mails aus dem Abruf-Protokoll (`mail_records`, mit Absendern, Empfängern und Anhängen, Revision 0060), nicht vom Server: sofort, nur lesend, nichts wird markiert.
 - **Bezüge** einer Mail findet der Knoten `relate` über die Quelle „mail“ (Beleg: Message-ID); er verwirft sie nie, auch nicht für einen Anhang, den Lekto schon hatte.
 - **Offen:** Der Migrations-Client hält Paperless-Dokumente, die als `.eml` gespeichert sind, weiter für nicht übernehmbar (`expect.py`); eine „Meldung am Postfach“ für zu große Mails gibt es nur im Protokoll und im Probelauf, nicht am Postfach.
