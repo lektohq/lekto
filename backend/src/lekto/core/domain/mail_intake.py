@@ -102,7 +102,7 @@ class MailDecision:
     afterwards (`move_to` with `MOVE`). `rule`: the name of the rule that decided; None for the
     mailbox's fallback."""
 
-    user_id: UserId
+    user_id: UserId | None  # none when it takes nothing
     space_id: SpaceId | None = None
     parts: MailParts = MailParts.ALL
     body_type_id: DocumentTypeId | None = None
@@ -178,6 +178,8 @@ class MailOrigin:
     forwarded_by: tuple[Address, ...] = ()
     filename: str | None = None
     related: tuple[DocumentId, ...] = field(default_factory=tuple)
+    body_type_id: DocumentTypeId | None = None
+    """The type the cover letter gets (the rules node sets it, before the document rules)."""
     version: int = 0
 
     @property
