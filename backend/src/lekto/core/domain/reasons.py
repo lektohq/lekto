@@ -428,6 +428,9 @@ class ReasonCode(StrEnum):
     MAIL_SERVER_ERROR = "mail_server_error"
     MAIL_PASSWORD_UNREADABLE = "mail_password_unreadable"
     MAILBOX_PAUSED = "mailbox_paused"
+    MAIL_RULE_PERSON_GONE = "mail_rule_person_gone"
+    MAIL_RULE_SPACE_UNREACHABLE = "mail_rule_space_unreachable"
+    MAIL_RULE_TYPE_GONE = "mail_rule_type_gone"
 
 
 TEMPLATES: Mapping[ReasonCode, str] = {
@@ -961,6 +964,11 @@ TEMPLATES: Mapping[ReasonCode, str] = {
         "the stored password cannot be read (was the secret key changed?); enter it again"
     ),
     ReasonCode.MAILBOX_PAUSED: "the mailbox is paused; activate it to fetch",
+    ReasonCode.MAIL_RULE_PERSON_GONE: "the person it takes mails for is deleted or deactivated",
+    ReasonCode.MAIL_RULE_SPACE_UNREACHABLE: (
+        "its space is deleted, or the person it takes mails for no longer edits it"
+    ),
+    ReasonCode.MAIL_RULE_TYPE_GONE: "the document type of the mail text is deleted",
 }
 
 
