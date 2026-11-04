@@ -82,6 +82,12 @@ def letters(message: MailMessage) -> list[Letter]:
     return found
 
 
+def taken_names(message: MailMessage) -> tuple[str, ...]:
+    """The names of the attachments Lekto takes of a mail, across its letters (empty for one
+    without a name)."""
+    return tuple(part.filename or "" for letter in letters(message) for part in letter.taken)
+
+
 def _has_text(message: MailMessage) -> bool:
     return bool((message.text or "").strip()) or bool((message.html or "").strip())
 
@@ -143,6 +149,12 @@ class MailRecord:
     rule: str | None = None
     documents: int = 0
     fetched_at: datetime
+    senders: tuple[str, ...] = ()
+    """The sender's addresses and names, as the conditions of a mail rule look at them."""
+    recipients: tuple[str, ...] = ()
+    """The addresses and names it went to (To, Cc), likewise."""
+    attachments: tuple[str, ...] = ()
+    """The names of the attachments Lekto takes of it (empty for one without a name)."""
     version: int = 0
 
     def __post_init__(self) -> None:

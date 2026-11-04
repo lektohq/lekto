@@ -19,7 +19,7 @@ from enum import Enum, StrEnum
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import DocumentTypeId, MailboxId, MailRuleId, SpaceId, UserId, new_id
 from lekto.core.domain.mail import MailAction
-from lekto.core.domain.mail_intake import MailDecision, MailParts, letters
+from lekto.core.domain.mail_intake import MailDecision, MailParts, MailRecord, letters
 from lekto.core.domain.mail_message import Address, MailMessage
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.validation import require_name, require_utc
@@ -267,6 +267,17 @@ def mail_facts(message: MailMessage, folder: str) -> MailFacts:
         subject=message.subject,
         folder=folder,
         attachments=any(letter.taken for letter in letters(message)),
+    )
+
+
+def record_facts(record: MailRecord) -> MailFacts:
+    """What the conditions of a rule look at in a mail fetched before, as its record keeps it."""
+    return MailFacts(
+        senders=record.senders,
+        recipients=record.recipients,
+        subject=record.subject,
+        folder=record.folder,
+        attachments=bool(record.attachments),
     )
 
 
