@@ -1,5 +1,11 @@
 <script lang="ts">
 	import Plus from '@lucide/svelte/icons/plus';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import MailRulesList from '#lib/components/rules/MailRulesList.svelte';
+	import Segmented from '#lib/components/Segmented.svelte';
+	import type { MailRule } from '#lib/mail-rules.ts';
+	import type { Mailbox } from '#lib/mailboxes.ts';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
@@ -15,7 +21,7 @@
 	import { buttonVariants } from '#lib/components/ui/button/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
-	import type { Space, UserName } from '#lib/masterdata.svelte.ts';
+	import type { DocumentType, Space, UserName } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { reasonsText } from '#lib/reasons.ts';
 	import { scope } from '#lib/scope.svelte.ts';
@@ -29,6 +35,33 @@
 	import Loading from '#lib/components/Loading.svelte';
 
 	type Rule = components['schemas']['RuleOut'];
+
+	// The rules of the documents, and for admins the mail rules beside them (Tobi, 04.11.2026;
+	// mock D): a `Segmented` "Dokumente | Mails" with their counts; the choice stands in the URL.
+	const kind = $derived(
+		session.isAdmin && page.url.searchParams.get('kind') === 'mail' ? 'mail' : 'documents'
+	);
+	let mailRules = $state<MailRule[] | null>(null);
+	let mailboxes = $state<Mailbox[]>([]);
+	let types = $state<DocumentType[]>([]);
+
+	async function loadMail() {
+		if (!session.isAdmin) return;
+		try {
+			[mailRules, mailboxes, types] = await Promise.all([
+				unwrap(api.GET('/api/v1/mail-rules')),
+				unwrap(api.GET('/api/v1/mailboxes')),
+				unwrap(api.GET('/api/v1/document-types'))
+			]);
+		} catch (error) {
+			problem = describeError(error);
+		}
+	}
+
+	$effect(() => {
+		void session.isAdmin;
+		untrack(() => void loadMail());
+	});
 
 	let rules = $state<Rule[] | null>(null);
 	let users = $state<UserName[]>([]);
@@ -90,15 +123,37 @@
 <div class="flex flex-col gap-6">
 	<PageHeader title={m.nav_rules()}>
 		{#snippet actions()}
-			<a href="{BASE}/rules/new" class={cn(buttonVariants())}>
+			<a
+				href={kind === 'mail' ? `${BASE}/rules/mail/new` : `${BASE}/rules/new`}
+				class={cn(buttonVariants())}
+			>
 				<Plus aria-hidden="true" />
 				{m.rules_new()}
 			</a>
 		{/snippet}
 	</PageHeader>
 
+	{#if session.isAdmin}
+		<Segmented
+			label={m.rules_kind()}
+			value={kind}
+			options={[
+				{ value: 'documents', label: m.rules_kind_documents(), count: rules?.length },
+				{ value: 'mail', label: m.rules_kind_mail(), count: mailRules?.length }
+			]}
+			onchange={(value) => goto(value === 'mail' ? '?kind=mail' : '?')}
+			class="self-start"
+		/>
+	{/if}
+
 	{#if problem}
 		<LoadProblem {problem} onretry={load} />
+	{:else if kind === 'mail'}
+		{#if mailRules}
+			<MailRulesList bind:rules={mailRules} {mailboxes} {users} {spaces} {types} />
+		{:else}
+			<Loading />
+		{/if}
 	{:else if !rules}
 		<Loading />
 	{:else if rules.length === 0}

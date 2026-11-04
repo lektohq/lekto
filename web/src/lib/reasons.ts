@@ -451,7 +451,10 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	mail_folder_missing: entry(m.reason_mail_folder_missing),
 	mail_server_error: entry(m.reason_mail_server_error),
 	mail_password_unreadable: entry(m.reason_mail_password_unreadable),
-	mailbox_paused: entry(m.reason_mailbox_paused)
+	mailbox_paused: entry(m.reason_mailbox_paused),
+	mail_rule_person_gone: entry(m.reason_mail_rule_person_gone),
+	mail_rule_space_unreachable: entry(m.reason_mail_rule_space_unreachable),
+	mail_rule_type_gone: entry(m.reason_mail_rule_type_gone)
 };
 
 /** The nouns the API names things by (the kind `thing`), in the user's language. */

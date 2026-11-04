@@ -14,7 +14,8 @@ from tests.unit.test_openapi import CHECKED_IN
 class Excluded(StrEnum):
     ACCOUNT = "one's own account and signing in"
     MANAGING = (
-        "managing Lekto: users, spaces, webhooks, lenses, mailboxes, pipeline runs, training, index"
+        "managing Lekto: users, spaces, webhooks, lenses, mailboxes and their rules, "
+        "pipeline runs, training, index"
     )
     MASTER_DATA = "master data is only read"
     RULES = "rules are only read; made, changed and applied in the web UI"
@@ -183,6 +184,11 @@ ENDPOINTS: dict[str, str | Excluded] = {
     "PATCH /mailboxes/{id}": MANAGING,
     "DELETE /mailboxes/{id}": MANAGING,
     "POST /mailboxes/{id}/fetch": MANAGING,
+    "GET /mail-rules": MANAGING,
+    "POST /mail-rules": MANAGING,
+    "GET /mail-rules/{id}": MANAGING,
+    "PATCH /mail-rules/{id}": MANAGING,
+    "DELETE /mail-rules/{id}": MANAGING,
     "GET /spaces": "spaces_list",
     "POST /spaces": MANAGING,
     "GET /spaces/{id}": "spaces_list",
