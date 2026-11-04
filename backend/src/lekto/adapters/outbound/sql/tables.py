@@ -897,6 +897,60 @@ mailboxes = Table(
     Column("version", Integer, nullable=False),
 )
 
+# The mails Lekto fetched (`domain.mail_intake.MailRecord`): by folder, UIDVALIDITY and UID
+# a mail is not fetched again, by its Message-ID not from another folder or mailbox. They go
+# with their mailbox.
+mail_records = Table(
+    "mail_records",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("mailbox_id", Uuid, ForeignKey("mailboxes.id", ondelete="CASCADE"), nullable=False),
+    Column("folder", Text, nullable=False),
+    Column("uidvalidity", BigInteger, nullable=False),
+    Column("uid", BigInteger, nullable=False),
+    Column("message_id", Text, nullable=True, index=True),
+    Column("sender", Text, nullable=False),
+    Column("subject", Text, nullable=False),
+    Column("sent_at", UtcDateTime, nullable=True),
+    Column("arrived_at", UtcDateTime, nullable=False),
+    Column("size", BigInteger, nullable=False),
+    Column("outcome", Text, nullable=False),
+    Column("reason", json_type(), nullable=True),
+    Column("rule", Text, nullable=True),
+    Column("documents", Integer, nullable=False),
+    Column("fetched_at", UtcDateTime, nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint("mailbox_id", "folder", "uidvalidity", "uid"),
+    Index(None, "mailbox_id", "fetched_at"),
+)
+
+# Where a document came from when a mail brought it (`domain.mail_intake.MailOrigin`). It stays
+# when the mailbox and its records go: `record_id` and `mailbox_id` have no foreign key; the
+# documents of one mail share `record_id`.
+mail_origins = Table(
+    "mail_origins",
+    metadata,
+    Column("document_id", Uuid, ForeignKey("documents.id", ondelete="CASCADE"), primary_key=True),
+    Column("record_id", Uuid, nullable=False, index=True),
+    Column("mailbox_id", Uuid, nullable=False),
+    Column("mailbox", Text, nullable=False),
+    Column("rule", Text, nullable=True),
+    Column("role", Text, nullable=False),
+    Column("letter", Integer, nullable=False),
+    Column("outer", Boolean, nullable=False),
+    Column("message_id", Text, nullable=True),
+    Column("sender", json_type(), nullable=False),
+    Column("recipients", json_type(), nullable=False),
+    Column("copies", json_type(), nullable=False),
+    Column("subject", Text, nullable=False),
+    Column("sent_at", UtcDateTime, nullable=True),
+    Column("arrived_at", UtcDateTime, nullable=False),
+    Column("forwarded_by", json_type(), nullable=False),
+    Column("filename", Text, nullable=True),
+    Column("related", json_type(), nullable=False),
+    Column("version", Integer, nullable=False),
+)
+
 # The log of delivery attempts. The answer of the receiver is not kept. `document_id` has no
 # foreign key: the document may be deleted while its log lives on.
 webhook_deliveries = Table(
