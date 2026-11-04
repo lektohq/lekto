@@ -680,16 +680,17 @@ describe('the archive page', () => {
 	});
 
 	it.each([
-		[4, () => m.search_total_meaning({ count: '4' })],
-		[0, () => m.search_meaning_only()]
-	])('counts what %i words found where the meaning ranks the rest', async (words, text) => {
+		[4, 1724, () => m.search_total_meaning({ count: '4' })],
+		[0, 1724, () => m.search_meaning_only()],
+		[1, 1, () => m.search_total({ count: '1' })] // the floor left nothing beside the words
+	])('counts what %i words found among %i', async (words, total, text) => {
 		state.entry = { words: 'Urlaubsgeld' };
 		vi.stubGlobal(
 			'fetch',
 			fakeApi({
 				'POST /api/v1/documents/search': () => ({
 					items: [{ document: listedOf({ id: 'd1', title: 'Eins' }), score: 0.8, snippet: [] }],
-					estimated_total: 1724,
+					estimated_total: total,
 					word_total: words,
 					next_offset: null,
 					semantic: true,
