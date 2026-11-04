@@ -4,9 +4,9 @@
   vectors are only named when the document brings new ones). Meilisearch
   processes writes as tasks; every write here waits for its task, so a change is searchable when
   the call returns and a failed task raises `SearchIndexError` instead of getting lost.
-- Settings (searchable, filterable and sortable attributes, languages, stop words, the embedder)
-  are applied by the adapter itself, on first use and only when they differ from what the index
-  has, so that a restart does not index again.
+- Settings (searchable, filterable and sortable attributes, languages, the stop words and
+  synonyms of `languages/`, the embedder) are applied by the adapter itself, on first use and
+  only when they differ from what the index has, so that a restart does not index again.
 - Vectors are computed by Lekto and handed over (embedder `userProvided`, named `default`); a
   document may have several, one per section. A document without vectors opts out with `null`.
 - The rights filter is part of every search and built from `Visibility`. Values in filters are
@@ -20,6 +20,7 @@
 import asyncio
 import json
 import logging
+import re
 import unicodedata
 from collections.abc import AsyncIterator, Collection, Mapping, Sequence
 from datetime import UTC, date, datetime, time
@@ -30,7 +31,7 @@ from uuid import UUID
 import httpx2
 
 from lekto.adapters.outbound.http_client import excerpt
-from lekto.adapters.outbound.meilisearch.stop_words import stop_words
+from lekto.adapters.outbound.meilisearch.languages import stop_words, synonyms
 from lekto.core.domain.errors import SearchIndexError, SearchUnavailableError
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.pipeline import Lane
@@ -104,6 +105,9 @@ RANKING_RULES = ["sort", "words", "typo", "proximity", "attribute", "exactness"]
 # page of a search goes by the same strategy.
 MATCHING_STRATEGY = "frequency"
 MATCHING_FALLBACK = "last"
+# The point of an ordinal before a word: Meilisearch splits a query there, so "13. Gehalt" would
+# not meet its synonyms; dates and amounts ("31.12.2025", "1.297,42") keep theirs.
+_ORDINAL_POINT = re.compile(r"(?<=\d)\.(?=\s)")
 SORTED_BY = {
     SortKey.ARRIVAL: "created_at",  # nearest to the ids, which the index does not sort by
     SortKey.CREATED: "created_at",
@@ -217,7 +221,7 @@ class MeilisearchIndex:
         if query.filter.lanes is not None and not query.filter.lanes:
             return SearchResult(hits=[], estimated_total=0, semantic=False)
         body: dict[str, Any] = {
-            "q": query.text,
+            "q": _ORDINAL_POINT.sub("", query.text),
             "matchingStrategy": MATCHING_STRATEGY,
             "offset": query.offset,
             "limit": query.limit,
@@ -419,6 +423,7 @@ class MeilisearchIndex:
             "rankingRules": RANKING_RULES,
             "localizedAttributes": [{"locales": self._locales, "attributePatterns": ["*"]}],
             "stopWords": stop_words(self._locales),
+            "synonyms": synonyms(self._locales),
             # `SearchQuery` promises that `offset + limit` up to `MAX_HITS` is reachable.
             "pagination": {"maxTotalHits": MAX_HITS},
         }
@@ -602,10 +607,17 @@ def _spaces(spaces: Collection[UUID]) -> str:
 
 
 def _normalised(key: str, setting: Any) -> Any:
-    """Meilisearch keeps the sets of filterable and sortable attributes and the stop words in
-    its own order, and the stop words decomposed ("für" as "fu" and a diaeresis)."""
+    """Meilisearch keeps the sets of filterable and sortable attributes, the stop words and the
+    synonyms in its own order, and the stop words decomposed ("für" as "fu" and a diaeresis)."""
     if key in _UNORDERED and isinstance(setting, list):
         return sorted(unicodedata.normalize("NFC", str(item)) for item in setting)
+    if key == "synonyms" and isinstance(setting, dict):
+        return {
+            unicodedata.normalize("NFC", str(word)): sorted(
+                unicodedata.normalize("NFC", str(other)) for other in others
+            )
+            for word, others in setting.items()
+        }
     return setting
 
 

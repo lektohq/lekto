@@ -5,9 +5,10 @@ import secrets
 import httpx2
 
 from lekto.adapters.outbound.meilisearch import MeilisearchIndex
+from lekto.adapters.outbound.meilisearch.languages import synonym_groups
 from lekto.composition.settings import Settings
 from lekto.core.domain.ids import SpaceId, new_id
-from lekto.core.domain.search import Visibility
+from lekto.core.domain.search import IndexDocument, Visibility
 from tests.builders import index_document, search_query
 from tests.contracts.search_index import SearchIndexContract
 from tests.integration.services import drop, new_index
@@ -46,6 +47,30 @@ async def test_the_rare_word_decides_and_stop_words_do_not(search_index: Meilise
     # Two rare words in two documents: by the most frequent first nothing is left.
     result = await search_index.search(search_query("Hundesteuer Sofa", visible))
     assert [hit.id for hit in result.hits] == [tax.id]
+
+
+async def test_every_word_of_a_synonym_group_finds_the_others(
+    search_index: MeilisearchIndex,
+) -> None:
+    """The list is only worth what works: each word, as a query, finds a document in each of
+    the group's words, also where the splitting of compounds is in the way."""
+    groups = synonym_groups("deu")
+    documents: dict[str, IndexDocument] = {}
+    spaces = []
+    for group in groups:
+        space = SpaceId(new_id())
+        spaces.append(space)
+        for word in group:
+            documents[word] = index_document(space_id=space, title="Brief", text=f"Ihr {word}")
+    await search_index.upsert(list(documents.values()))
+    missed = []
+    for space, group in zip(spaces, groups, strict=True):
+        visible = Visibility(frozenset({space}))
+        for word in group:
+            result = await search_index.search(search_query(word, visible, limit=20))
+            found = {hit.id for hit in result.hits}
+            missed += [f"{word} -> {other}" for other in group if documents[other].id not in found]
+    assert missed == [], "\n".join(missed)
 
 
 async def test_the_settings_are_applied_once(meilisearch_settings: Settings) -> None:
