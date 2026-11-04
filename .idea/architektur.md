@@ -148,6 +148,7 @@ Drei Speicher mit klarer Aufgabe: Datenbank für Metadaten, Objektspeicher für 
 - Index ist abgeleitet und jederzeit aus Datenbank und S3 neu aufbaubar; Aktualisierung per Job, daher kurz verzögert.
 - Nur API und Worker sprechen mit Meilisearch: der Worker schreibt den Index (Jobs, Abgleich, Neuaufbau), die API sucht; jede Suche wird auf die Reichweite des Nutzers gefiltert (Admins mit `all_users`: alle Dokumente).
 - Deutsche Komposita werden zerlegt; Stemming nach Kenntnisstand nicht vorhanden, die semantische Suche fängt das ab ([Quelle](https://www.meilisearch.com/docs/resources/internals/typo_tolerance.md)).
+- Wortsuche (gemessen mit `evaluate-search`, Issue #192): Stoppwörter je Sprache (Deutsch: die Liste von Snowball), damit Füllwörter einer Frage nichts entscheiden; findet kein Dokument alle Wörter, fallen die häufigsten zuerst weg (`matchingStrategy` `frequency`), so bleibt das seltene Wort, das entscheidet; bleibt so nichts übrig, fragt der Adapter noch einmal nach Meilisearchs Voreinstellung (`last`, das erste Wort bleibt). Im hybriden Modus ändert das nichts messbar, die Bedeutung bestimmt die Reihenfolge; es trägt, wo die Suche auf Wörter zurückfällt.
 
 ## Datenmodell
 

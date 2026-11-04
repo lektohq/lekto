@@ -26,6 +26,28 @@ async def test_compound_words_are_split(search_index: MeilisearchIndex) -> None:
         assert [hit.id for hit in result.hits] == [document.id], word
 
 
+async def test_the_rare_word_decides_and_stop_words_do_not(search_index: MeilisearchIndex) -> None:
+    """The most frequent words of a query go first, so the rare word that decides stays, also
+    at its end; the stop words count for nothing; a query that this leaves without hits is asked
+    again by its first word."""
+    space = SpaceId(new_id())
+    visible = Visibility(frozenset({space}))
+    sofa = index_document(space_id=space, title="Rechnung", text="Rechnung über ein Sofa")
+    year = index_document(space_id=space, title="Rechnung für das neue Jahr", text="Rechnung")
+    tax = index_document(space_id=space, title="Hundesteuer 2026", text="Wie viel: 120 Euro.")
+    common = [
+        index_document(space_id=space, title="Umzug", text="Unsere neue Adresse"),
+        index_document(space_id=space, title="Preise", text="Neue Preise ab Mai"),
+    ]
+    await search_index.upsert([sofa, year, tax, *common])
+    result = await search_index.search(search_query("Rechnung für das neue Sofa", visible))
+    assert result.hits[0].id == sofa.id
+    assert (await search_index.search(search_query("wie viel ich", visible))).hits == []
+    # Two rare words in two documents: by the most frequent first nothing is left.
+    result = await search_index.search(search_query("Hundesteuer Sofa", visible))
+    assert [hit.id for hit in result.hits] == [tax.id]
+
+
 async def test_the_settings_are_applied_once(meilisearch_settings: Settings) -> None:
     """A second adapter on the same index finds the settings in place and changes nothing, so a
     restart does not index again."""
