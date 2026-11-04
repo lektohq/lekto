@@ -20,6 +20,7 @@ from lekto.adapters.outbound.memory.language_model import (
     FakeLanguageModel,
 )
 from lekto.adapters.outbound.memory.logos import FakeLogoFetcher
+from lekto.adapters.outbound.memory.mail_server import MemoryMailServer
 from lekto.adapters.outbound.memory.object_store import MemoryObjectStore
 from lekto.adapters.outbound.memory.oidc import FakeOidcProvider
 from lekto.adapters.outbound.memory.processing import (
@@ -62,6 +63,7 @@ __all__ = [
     "ManualClock",
     "MemoryDatabase",
     "MemoryEventBus",
+    "MemoryMailServer",
     "MemoryObjectStore",
     "MemorySearchIndex",
     "MemoryUnitOfWork",
