@@ -31,6 +31,7 @@ from lekto.core.services.inbox import InboxService
 from lekto.core.services.lenses import LensService
 from lekto.core.services.logos import LogoService
 from lekto.core.services.mail_intake import MailIntakeService
+from lekto.core.services.mail_rules import MailRuleService
 from lekto.core.services.mailboxes import MailboxService
 from lekto.core.services.master_data import NORMALISE_BATCH, MasterDataService
 from lekto.core.services.oidc import OidcService
@@ -168,6 +169,10 @@ class World:
     @property
     def mailboxes(self) -> MailboxService:
         return MailboxService(self.uow, self.clock, self.cipher, self.mail_server)
+
+    @property
+    def mail_rules(self) -> MailRuleService:
+        return MailRuleService(self.uow, self.clock)
 
     def mail_intake(
         self, pipeline: PipelineService | None = None, *, max_attachment: int = 10_000_000

@@ -21798,6 +21798,619 @@
         ]
       }
     },
+    "/api/v1/mail-rules": {
+      "get": {
+        "tags": [
+          "mail rules"
+        ],
+        "summary": "List mail rules",
+        "description": "Every mail rule, by mailbox, priority and name. Of a mailbox's active rules the first that matches a mail decides, by priority (smaller first), the same priority by name; a mail no rule takes goes by the mailbox's fallback. Only admins (403).",
+        "operationId": "list_mail_rules_api_v1_mail_rules_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MailRuleOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Mail Rules Api V1 Mail Rules Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unauthorized",
+                  "status": 401,
+                  "detail": "authentication is required"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Forbidden",
+                  "status": 403,
+                  "detail": "only editors and admins control the processing of this document"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Internal Server Error",
+                  "status": 500,
+                  "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "token": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "mail rules"
+        ],
+        "summary": "Create a mail rule",
+        "description": "Of a mailbox's active rules the first that matches a mail decides, by priority (smaller first), the same priority by name; a mail no rule takes goes by the mailbox's fallback. The person must be active, the space one they file into, the type one that exists; a person is needed unless the rule takes nothing, a folder with `move` (422). Only admins (403).",
+        "operationId": "create_mail_rule_api_v1_mail_rules_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MailRuleCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailRuleOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unauthorized",
+                  "status": 401,
+                  "detail": "authentication is required"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Forbidden",
+                  "status": 403,
+                  "detail": "only editors and admins control the processing of this document"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Not Found",
+                  "status": 404,
+                  "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": "from_node: Input should be 'ocr', 'parse', ..."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Internal Server Error",
+                  "status": 500,
+                  "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Content Too Large",
+                  "status": 413,
+                  "detail": "the request body is larger than 1048576 bytes"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/mail-rules/{id}": {
+      "get": {
+        "tags": [
+          "mail rules"
+        ],
+        "summary": "A mail rule",
+        "description": "Only admins (403).",
+        "operationId": "get_mail_rule_api_v1_mail_rules__id__get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailRuleOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unauthorized",
+                  "status": 401,
+                  "detail": "authentication is required"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Forbidden",
+                  "status": 403,
+                  "detail": "only editors and admins control the processing of this document"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Not Found",
+                  "status": 404,
+                  "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": "from_node: Input should be 'ocr', 'parse', ..."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Internal Server Error",
+                  "status": 500,
+                  "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "token": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "mail rules"
+        ],
+        "summary": "Change a mail rule",
+        "description": "Checks as when creating. Only admins (403).",
+        "operationId": "update_mail_rule_api_v1_mail_rules__id__patch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MailRulePatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailRuleOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unauthorized",
+                  "status": 401,
+                  "detail": "authentication is required"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Forbidden",
+                  "status": 403,
+                  "detail": "only editors and admins control the processing of this document"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Not Found",
+                  "status": 404,
+                  "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Conflict",
+                  "status": 409,
+                  "detail": "duplicate of document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": "from_node: Input should be 'ocr', 'parse', ..."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Internal Server Error",
+                  "status": 500,
+                  "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Content Too Large",
+                  "status": 413,
+                  "detail": "the request body is larger than 1048576 bytes"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "token": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "mail rules"
+        ],
+        "summary": "Delete a mail rule",
+        "description": "Only admins (403).",
+        "operationId": "delete_mail_rule_api_v1_mail_rules__id__delete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unauthorized",
+                  "status": 401,
+                  "detail": "authentication is required"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Forbidden",
+                  "status": 403,
+                  "detail": "only editors and admins control the processing of this document"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Not Found",
+                  "status": 404,
+                  "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": "from_node: Input should be 'ocr', 'parse', ..."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Internal Server Error",
+                  "status": 500,
+                  "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "token": []
+          }
+        ]
+      }
+    },
     "/api/v1/documents/{id}/origin": {
       "get": {
         "tags": [
@@ -32233,6 +32846,69 @@
         ],
         "title": "LogoSource"
       },
+      "MailAction": {
+        "type": "string",
+        "enum": [
+          "nothing",
+          "read",
+          "move",
+          "trash"
+        ],
+        "title": "MailAction",
+        "description": "What becomes of a mail on the server once Lekto has taken it: nothing, marked as read,\nmoved to a folder, or moved to the trash."
+      },
+      "MailConditionBody": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/MailField"
+          },
+          "op": {
+            "$ref": "#/components/schemas/MailOperator"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "field",
+          "op"
+        ],
+        "title": "MailConditionBody"
+      },
+      "MailField": {
+        "type": "string",
+        "enum": [
+          "sender",
+          "recipient",
+          "subject",
+          "folder",
+          "attachments"
+        ],
+        "title": "MailField"
+      },
+      "MailOperator": {
+        "type": "string",
+        "enum": [
+          "contains",
+          "is",
+          "starts_with",
+          "ends_with",
+          "present",
+          "missing"
+        ],
+        "title": "MailOperator"
+      },
       "MailOriginOut": {
         "properties": {
           "mailbox": {
@@ -32348,6 +33024,466 @@
         ],
         "title": "MailOriginOut",
         "description": "The mail a document came with, as it was then (a mailbox renamed or deleted since keeps\nits name here)."
+      },
+      "MailParts": {
+        "type": "string",
+        "enum": [
+          "all",
+          "attachments",
+          "text",
+          "nothing"
+        ],
+        "title": "MailParts",
+        "description": "What of a mail a rule takes."
+      },
+      "MailRuleCreate": {
+        "properties": {
+          "priority": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority",
+            "description": "Smaller first."
+          },
+          "any": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Any",
+            "description": "Any condition (or); else all (and)."
+          },
+          "conditions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MailConditionBody"
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conditions",
+            "description": "Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). None: every mail."
+          },
+          "parts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MailParts"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What it takes: `all` (the attachments and the text), `attachments`, `text`, `nothing`."
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id",
+            "description": "Whom it takes the mail for."
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Id",
+            "description": "A space the person files into; null: their personal one."
+          },
+          "text_type_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Type Id",
+            "description": "The document type of the mail's text; null: Lekto decides."
+          },
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MailAction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What becomes of the mail on the server: `nothing`, `read` (marked as read), `move` (to `move_to`), `trash`."
+          },
+          "move_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Move To"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "mailbox_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mailbox Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "mailbox_id",
+          "name"
+        ],
+        "title": "MailRuleCreate",
+        "description": "A new mail rule of a mailbox; what is left out gets the default (priority 100, all\nconditions, takes the attachments and the text, leaves the mail, active).",
+        "examples": [
+          {
+            "after": "read",
+            "conditions": [
+              {
+                "field": "sender",
+                "op": "ends_with",
+                "value": "@stadtwerke.example"
+              }
+            ],
+            "mailbox_id": "01a1a7fc-702c-736e-a661-ff59645bdc52",
+            "name": "Bills of the utilities",
+            "user_id": "01a1a7fc-7013-741e-ae72-58401e634e5d"
+          }
+        ]
+      },
+      "MailRuleOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "mailbox_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mailbox Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority"
+          },
+          "any": {
+            "type": "boolean",
+            "title": "Any"
+          },
+          "conditions": {
+            "items": {
+              "$ref": "#/components/schemas/MailConditionBody"
+            },
+            "type": "array",
+            "title": "Conditions"
+          },
+          "parts": {
+            "$ref": "#/components/schemas/MailParts"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Id"
+          },
+          "text_type_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Type Id"
+          },
+          "after": {
+            "$ref": "#/components/schemas/MailAction"
+          },
+          "move_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Move To"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "disabled_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasonOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why Lekto paused it; null otherwise."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "mailbox_id",
+          "name",
+          "priority",
+          "any",
+          "conditions",
+          "parts",
+          "user_id",
+          "space_id",
+          "text_type_id",
+          "after",
+          "move_to",
+          "enabled",
+          "disabled_reason",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "MailRuleOut"
+      },
+      "MailRulePatch": {
+        "properties": {
+          "priority": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority",
+            "description": "Smaller first."
+          },
+          "any": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Any",
+            "description": "Any condition (or); else all (and)."
+          },
+          "conditions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MailConditionBody"
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conditions",
+            "description": "Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). None: every mail."
+          },
+          "parts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MailParts"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What it takes: `all` (the attachments and the text), `attachments`, `text`, `nothing`."
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id",
+            "description": "Whom it takes the mail for."
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Id",
+            "description": "A space the person files into; null: their personal one."
+          },
+          "text_type_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Type Id",
+            "description": "The document type of the mail's text; null: Lekto decides."
+          },
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MailAction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What becomes of the mail on the server: `nothing`, `read` (marked as read), `move` (to `move_to`), `trash`."
+          },
+          "move_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Move To"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MailRulePatch",
+        "description": "What changes; what is left out stays. `space_id`, `text_type_id`, `user_id` and\n`move_to` given as null clear it. Switching it on clears why it was paused.",
+        "examples": [
+          {
+            "enabled": false
+          }
+        ]
       },
       "MailSecurity": {
         "type": "string",
@@ -35313,7 +36449,10 @@
           "mail_folder_missing",
           "mail_server_error",
           "mail_password_unreadable",
-          "mailbox_paused"
+          "mailbox_paused",
+          "mail_rule_person_gone",
+          "mail_rule_space_unreachable",
+          "mail_rule_type_gone"
         ],
         "title": "ReasonCode"
       },
@@ -41338,7 +42477,10 @@
       "detail": "text"
     },
     "mail_password_unreadable": {},
-    "mailbox_paused": {}
+    "mailbox_paused": {},
+    "mail_rule_person_gone": {},
+    "mail_rule_space_unreachable": {},
+    "mail_rule_type_gone": {}
   },
   "x-identifier-kinds": {
     "iban": {

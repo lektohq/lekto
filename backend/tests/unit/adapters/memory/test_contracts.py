@@ -63,6 +63,7 @@ from tests.contracts.logos import LOGO_PNG, LogoFetcherContract
 from tests.contracts.mail_records import (
     MailOriginRepositoryContract,
     MailRecordRepositoryContract,
+    MailRuleRepositoryContract,
 )
 from tests.contracts.mailboxes import MailboxRepositoryContract
 from tests.contracts.object_store import ObjectStoreContract
@@ -160,6 +161,10 @@ class TestMemoryMailRecordRepository(MailRecordRepositoryContract):
 
 
 class TestMemoryMailOriginRepository(MailOriginRepositoryContract):
+    pass
+
+
+class TestMemoryMailRuleRepository(MailRuleRepositoryContract):
     pass
 
 

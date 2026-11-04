@@ -3,10 +3,30 @@
 import pytest
 
 from lekto.core.domain.errors import ConflictError
-from lekto.core.domain.ids import DocumentId, MailRecordId, new_id
-from lekto.core.domain.mail import Mailbox, MailSecurity
-from lekto.core.domain.mail_intake import MailOrigin, MailOutcome, MailRecord, OriginRole
+from lekto.core.domain.ids import (
+    DocumentId,
+    DocumentTypeId,
+    MailRecordId,
+    SpaceId,
+    UserId,
+    new_id,
+)
+from lekto.core.domain.mail import MailAction, Mailbox, MailSecurity
+from lekto.core.domain.mail_intake import (
+    MailOrigin,
+    MailOutcome,
+    MailParts,
+    MailRecord,
+    OriginRole,
+)
 from lekto.core.domain.mail_message import Address
+from lekto.core.domain.mail_rules import (
+    MailCondition,
+    MailField,
+    MailOperator,
+    MailRule,
+    MailRuleChanges,
+)
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from tests import builders
@@ -135,6 +155,7 @@ class MailOriginRepositoryContract:
             outer=True,
             forwarded_by=(Address("Ben", "ben@example.test"), Address("", "c@example.test")),
             related=(other.id,),
+            body_type_id=DocumentTypeId(new_id()),
         )
         attached = origin(
             attachment.id, OriginRole.ATTACHMENT, filename="Rechnung.pdf", sent_at=None
@@ -158,3 +179,62 @@ class MailOriginRepositoryContract:
         async with uow_factory() as uow:
             assert await uow.mail_origins.find(attachment.id) is None
             assert len(await uow.mail_origins.of_record(record)) == 1
+
+
+class MailRuleRepositoryContract:
+    async def test_rules_by_mailbox_priority_and_name(self, uow_factory: UnitOfWorkFactory) -> None:
+        first, second = await a_mailbox(uow_factory, "A"), await a_mailbox(uow_factory, "B")
+        person = UserId(new_id())
+
+        def rule(mailbox: Mailbox, name: str, priority: int, **changes: object) -> MailRule:
+            values: dict[str, object] = {"name": name, "priority": priority, "user_id": person}
+            values.update(changes)
+            return MailRule.create(
+                mailbox_id=mailbox.id,
+                changes=MailRuleChanges(**values),  # type: ignore[arg-type]
+                now=NOW,
+            )
+
+        full = rule(
+            first,
+            "Strom",
+            1,
+            any=True,
+            conditions=(
+                MailCondition(MailField.SENDER, MailOperator.ENDS_WITH, "@stadtwerke.example"),
+                MailCondition(MailField.ATTACHMENTS, MailOperator.PRESENT),
+            ),
+            space_id=SpaceId(new_id()),
+            text_type_id=DocumentTypeId(new_id()),
+            after=MailAction.MOVE,
+            move_to="Lekto/Erledigt",
+        )
+        full.pause(because(ReasonCode.MAIL_RULE_TYPE_GONE), now=NOW + HOUR)
+        later, earlier = rule(first, "b", 5), rule(first, "A", 5)
+        other = rule(second, "Other", 0, parts=MailParts.NOTHING, after=MailAction.TRASH)
+        async with uow_factory() as uow:
+            for item in (later, other, full, earlier):
+                await uow.mail_rules.add(item)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.mail_rules.get(full.id) == full
+            assert [item.name for item in await uow.mail_rules.of_mailbox(first.id)] == [
+                "Strom",
+                "A",
+                "b",
+            ]
+            assert len(await uow.mail_rules.list_all()) == 4
+            stored = await uow.mail_rules.get(other.id)
+            stored.change(MailRuleChanges(name="Renamed"), now=NOW + HOUR)
+            await uow.mail_rules.update(stored)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert (await uow.mail_rules.get(other.id)).name == "Renamed"
+            await uow.mailboxes.remove(first.id)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.mail_rules.of_mailbox(first.id) == []
+            await uow.mail_rules.remove(other.id)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.mail_rules.list_all() == []

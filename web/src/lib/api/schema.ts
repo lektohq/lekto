@@ -2523,6 +2523,58 @@ export interface paths {
 		patch: operations['update_mailbox_api_v1_mailboxes__id__patch'];
 		trace?: never;
 	};
+	'/api/v1/mail-rules': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/**
+		 * List mail rules
+		 * @description Every mail rule, by mailbox, priority and name. Of a mailbox's active rules the first that matches a mail decides, by priority (smaller first), the same priority by name; a mail no rule takes goes by the mailbox's fallback. Only admins (403).
+		 */
+		get: operations['list_mail_rules_api_v1_mail_rules_get'];
+		put?: never;
+		/**
+		 * Create a mail rule
+		 * @description Of a mailbox's active rules the first that matches a mail decides, by priority (smaller first), the same priority by name; a mail no rule takes goes by the mailbox's fallback. The person must be active, the space one they file into, the type one that exists; a person is needed unless the rule takes nothing, a folder with `move` (422). Only admins (403).
+		 */
+		post: operations['create_mail_rule_api_v1_mail_rules_post'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/v1/mail-rules/{id}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/**
+		 * A mail rule
+		 * @description Only admins (403).
+		 */
+		get: operations['get_mail_rule_api_v1_mail_rules__id__get'];
+		put?: never;
+		post?: never;
+		/**
+		 * Delete a mail rule
+		 * @description Only admins (403).
+		 */
+		delete: operations['delete_mail_rule_api_v1_mail_rules__id__delete'];
+		options?: never;
+		head?: never;
+		/**
+		 * Change a mail rule
+		 * @description Checks as when creating. Only admins (403).
+		 */
+		patch: operations['update_mail_rule_api_v1_mail_rules__id__patch'];
+		trace?: never;
+	};
 	'/api/v1/documents/{id}/origin': {
 		parameters: {
 			query?: never;
@@ -7051,6 +7103,30 @@ export interface components {
 		 */
 		LogoSource: 'uploaded' | 'fetched';
 		/**
+		 * MailAction
+		 * @description What becomes of a mail on the server once Lekto has taken it: nothing, marked as read,
+		 *     moved to a folder, or moved to the trash.
+		 * @enum {string}
+		 */
+		MailAction: 'nothing' | 'read' | 'move' | 'trash';
+		/** MailConditionBody */
+		MailConditionBody: {
+			field: components['schemas']['MailField'];
+			op: components['schemas']['MailOperator'];
+			/** Value */
+			value?: string | null;
+		};
+		/**
+		 * MailField
+		 * @enum {string}
+		 */
+		MailField: 'sender' | 'recipient' | 'subject' | 'folder' | 'attachments';
+		/**
+		 * MailOperator
+		 * @enum {string}
+		 */
+		MailOperator: 'contains' | 'is' | 'starts_with' | 'ends_with' | 'present' | 'missing';
+		/**
 		 * MailOriginOut
 		 * @description The mail a document came with, as it was then (a mailbox renamed or deleted since keeps
 		 *     its name here).
@@ -7096,6 +7172,172 @@ export interface components {
 			forwarded_by: components['schemas']['AddressOut'][];
 			/** Message Id */
 			message_id: string | null;
+		};
+		/**
+		 * MailParts
+		 * @description What of a mail a rule takes.
+		 * @enum {string}
+		 */
+		MailParts: 'all' | 'attachments' | 'text' | 'nothing';
+		/**
+		 * MailRuleCreate
+		 * @description A new mail rule of a mailbox; what is left out gets the default (priority 100, all
+		 *     conditions, takes the attachments and the text, leaves the mail, active).
+		 * @example {
+		 *       "after": "read",
+		 *       "conditions": [
+		 *         {
+		 *           "field": "sender",
+		 *           "op": "ends_with",
+		 *           "value": "@stadtwerke.example"
+		 *         }
+		 *       ],
+		 *       "mailbox_id": "01a1a7fc-702c-736e-a661-ff59645bdc52",
+		 *       "name": "Bills of the utilities",
+		 *       "user_id": "01a1a7fc-7013-741e-ae72-58401e634e5d"
+		 *     }
+		 */
+		MailRuleCreate: {
+			/**
+			 * Priority
+			 * @description Smaller first.
+			 */
+			priority?: number | null;
+			/**
+			 * Any
+			 * @description Any condition (or); else all (and).
+			 */
+			any?: boolean | null;
+			/**
+			 * Conditions
+			 * @description Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). None: every mail.
+			 */
+			conditions?: components['schemas']['MailConditionBody'][] | null;
+			/** @description What it takes: `all` (the attachments and the text), `attachments`, `text`, `nothing`. */
+			parts?: components['schemas']['MailParts'] | null;
+			/**
+			 * User Id
+			 * @description Whom it takes the mail for.
+			 */
+			user_id?: string | null;
+			/**
+			 * Space Id
+			 * @description A space the person files into; null: their personal one.
+			 */
+			space_id?: string | null;
+			/**
+			 * Text Type Id
+			 * @description The document type of the mail's text; null: Lekto decides.
+			 */
+			text_type_id?: string | null;
+			/** @description What becomes of the mail on the server: `nothing`, `read` (marked as read), `move` (to `move_to`), `trash`. */
+			after?: components['schemas']['MailAction'] | null;
+			/** Move To */
+			move_to?: string | null;
+			/** Enabled */
+			enabled?: boolean | null;
+			/**
+			 * Mailbox Id
+			 * Format: uuid
+			 */
+			mailbox_id: string;
+			/** Name */
+			name: string;
+		};
+		/** MailRuleOut */
+		MailRuleOut: {
+			/**
+			 * Id
+			 * Format: uuid
+			 */
+			id: string;
+			/**
+			 * Mailbox Id
+			 * Format: uuid
+			 */
+			mailbox_id: string;
+			/** Name */
+			name: string;
+			/** Priority */
+			priority: number;
+			/** Any */
+			any: boolean;
+			/** Conditions */
+			conditions: components['schemas']['MailConditionBody'][];
+			parts: components['schemas']['MailParts'];
+			/** User Id */
+			user_id: string | null;
+			/** Space Id */
+			space_id: string | null;
+			/** Text Type Id */
+			text_type_id: string | null;
+			after: components['schemas']['MailAction'];
+			/** Move To */
+			move_to: string | null;
+			/** Enabled */
+			enabled: boolean;
+			/** @description Why Lekto paused it; null otherwise. */
+			disabled_reason: components['schemas']['ReasonOut'] | null;
+			/**
+			 * Created At
+			 * Format: date-time
+			 */
+			created_at: string;
+			/**
+			 * Updated At
+			 * Format: date-time
+			 */
+			updated_at: string;
+		};
+		/**
+		 * MailRulePatch
+		 * @description What changes; what is left out stays. `space_id`, `text_type_id`, `user_id` and
+		 *     `move_to` given as null clear it. Switching it on clears why it was paused.
+		 * @example {
+		 *       "enabled": false
+		 *     }
+		 */
+		MailRulePatch: {
+			/**
+			 * Priority
+			 * @description Smaller first.
+			 */
+			priority?: number | null;
+			/**
+			 * Any
+			 * @description Any condition (or); else all (and).
+			 */
+			any?: boolean | null;
+			/**
+			 * Conditions
+			 * @description Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). None: every mail.
+			 */
+			conditions?: components['schemas']['MailConditionBody'][] | null;
+			/** @description What it takes: `all` (the attachments and the text), `attachments`, `text`, `nothing`. */
+			parts?: components['schemas']['MailParts'] | null;
+			/**
+			 * User Id
+			 * @description Whom it takes the mail for.
+			 */
+			user_id?: string | null;
+			/**
+			 * Space Id
+			 * @description A space the person files into; null: their personal one.
+			 */
+			space_id?: string | null;
+			/**
+			 * Text Type Id
+			 * @description The document type of the mail's text; null: Lekto decides.
+			 */
+			text_type_id?: string | null;
+			/** @description What becomes of the mail on the server: `nothing`, `read` (marked as read), `move` (to `move_to`), `trash`. */
+			after?: components['schemas']['MailAction'] | null;
+			/** Move To */
+			move_to?: string | null;
+			/** Enabled */
+			enabled?: boolean | null;
+			/** Name */
+			name?: string | null;
 		};
 		/**
 		 * MailSecurity
@@ -8765,7 +9007,10 @@ export interface components {
 			| 'mail_folder_missing'
 			| 'mail_server_error'
 			| 'mail_password_unreadable'
-			| 'mailbox_paused';
+			| 'mailbox_paused'
+			| 'mail_rule_person_gone'
+			| 'mail_rule_space_unreachable'
+			| 'mail_rule_type_gone';
 		/**
 		 * ReasonOut
 		 * @description A reason with its code: a client translates `code` with `params`; the English text
@@ -28706,6 +28951,560 @@ export interface operations {
 				};
 				content: {
 					'application/json': components['schemas']['MailboxOut'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Conflict */
+			409: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Conflict",
+					 *       "status": 409,
+					 *       "detail": "duplicate of document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Content Too Large */
+			413: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Content Too Large",
+					 *       "status": 413,
+					 *       "detail": "the request body is larger than 1048576 bytes"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	list_mail_rules_api_v1_mail_rules_get: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['MailRuleOut'][];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	create_mail_rule_api_v1_mail_rules_post: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['MailRuleCreate'];
+			};
+		};
+		responses: {
+			/** @description Successful Response */
+			201: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['MailRuleOut'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Content Too Large */
+			413: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Content Too Large",
+					 *       "status": 413,
+					 *       "detail": "the request body is larger than 1048576 bytes"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	get_mail_rule_api_v1_mail_rules__id__get: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['MailRuleOut'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	delete_mail_rule_api_v1_mail_rules__id__delete: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			204: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	update_mail_rule_api_v1_mail_rules__id__patch: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['MailRulePatch'];
+			};
+		};
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['MailRuleOut'];
 				};
 			};
 			/** @description Unauthorized */

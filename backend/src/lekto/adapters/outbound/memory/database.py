@@ -20,6 +20,7 @@ from lekto.core.domain.jobs import Job
 from lekto.core.domain.lenses import Lens
 from lekto.core.domain.mail import Mailbox
 from lekto.core.domain.mail_intake import MailOrigin, MailRecord
+from lekto.core.domain.mail_rules import MailRule
 from lekto.core.domain.master_data import Contact, DocumentType, MasterData, Tag
 from lekto.core.domain.pipeline import NodeRun
 from lekto.core.domain.relations import Relation
@@ -152,6 +153,7 @@ LENSES = Table("lens", _lens_keys)
 MAILBOXES = Table("mailbox", _mailbox_keys)
 MAIL_RECORDS = Table("mail record", _mail_record_keys)
 MAIL_ORIGINS = Table[MailOrigin]("mail origin", _no_keys)
+MAIL_RULES = Table[MailRule]("mail rule", _no_keys)
 
 
 @dataclass

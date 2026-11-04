@@ -39,6 +39,7 @@ from lekto.adapters.outbound.sql.mail_records import (
     SqlMailOriginRepository,
     SqlMailRecordRepository,
 )
+from lekto.adapters.outbound.sql.mail_rules import SqlMailRuleRepository
 from lekto.adapters.outbound.sql.mailboxes import SqlMailboxRepository
 from lekto.adapters.outbound.sql.master_data import (
     SqlContactRepository,
@@ -124,6 +125,7 @@ class SqlUnitOfWork:
         self.mailboxes = SqlMailboxRepository(self._tx)
         self.mail_records = SqlMailRecordRepository(self._tx)
         self.mail_origins = SqlMailOriginRepository(self._tx)
+        self.mail_rules = SqlMailRuleRepository(self._tx)
         self.outbox = SqlOutbox(self._tx)
         self.jobs = SqlJobQueue(self._tx)
         self.credentials = SqlCredentialRepository(self._tx)
