@@ -9162,6 +9162,11 @@ export interface components {
 			 */
 			estimated_total: number;
 			/**
+			 * Word Total
+			 * @description An estimate of the hits of the words, not exact: what the words find. With the meaning, the hits beyond were found by it alone; for a single word those that hold it come first.
+			 */
+			word_total: number;
+			/**
 			 * Next Offset
 			 * @description Pass as `offset` for the next page; null on the last page.
 			 */

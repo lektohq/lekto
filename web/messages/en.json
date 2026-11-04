@@ -722,6 +722,8 @@
 	"search_placeholder": "Search words or meaning",
 	"search_none": "Nothing found.",
 	"search_total": "Hits: about {count}",
+	"search_total_meaning": "Hits: about {count}, and similar ones by meaning",
+	"search_meaning_only": "No hits for the words, similar ones by meaning",
 	"search_slow": "The search by meaning is taking longer right now …",
 	"search_meaning_pending": "It is still being prepared; you can search with it once it is ready.",
 	"search_with_meaning": "Search again with meaning",

@@ -221,6 +221,10 @@ class Settings(BaseSettings):
     # the search falls back to the words.
     search_semantic_ratio: Annotated[float, Field(ge=0, le=1)] = 0.5
     search_embed_timeout: Seconds = timedelta(seconds=5)
+    # A document found by the meaning alone, not by a word, is left out below this score: the
+    # meaning ranks every document, also for a word that names none ("abdidon"). It depends on
+    # the model; `lekto evaluate-search` measures it ("The floor of the meaning"). Unset: none.
+    search_meaning_min_score: Annotated[float | None, Field(ge=0, le=1)] = None
     # Indexing: characters of text per document; the text is cut into sections of about
     # `search_chunk_size` characters that get a vector each, at most `search_max_chunks`.
     search_max_text: Annotated[int, Field(ge=1000, le=10_000_000)] = 200_000
