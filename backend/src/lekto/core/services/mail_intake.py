@@ -53,6 +53,7 @@ from lekto.core.domain.mail_intake import (
     MailRecord,
     OriginRole,
     letters,
+    taken_names,
 )
 from lekto.core.domain.mail_message import MailMessage, read_mail
 from lekto.core.domain.mail_rules import MailRule, first_match, mail_facts
@@ -281,12 +282,16 @@ class MailIntakeService:
         except UnprocessableDocumentError as error:
             await self._keep(replace(record, outcome=MailOutcome.FAILED, reason=error.reason))
             return 0
+        facts = mail_facts(message, folder)
         record = replace(
             record,
             message_id=message.message_id,
             sender=", ".join(address.shown for address in message.sender),
             subject=message.subject,
             sent_at=message.date,
+            senders=facts.senders,
+            recipients=facts.recipients,
+            attachments=taken_names(message),
         )
         if message.message_id is not None:
             async with self._uow() as uow:

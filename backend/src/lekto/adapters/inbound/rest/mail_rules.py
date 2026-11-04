@@ -8,11 +8,14 @@ from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.mail_rules import (
+    DryRunMailOut,
     MailRuleCreate,
+    MailRuleDryRun,
     MailRuleOut,
     MailRulePatch,
 )
 from lekto.core.domain.ids import MailboxId, MailRuleId
+from lekto.core.services.mail_rules import DRY_RUN_MAILS
 
 router = APIRouter(prefix="/mail-rules", tags=["mail rules"], dependencies=PROTECTED)
 
@@ -53,6 +56,30 @@ async def create_mail_rule(
         user, MailboxId(body.mailbox_id), body.changes(body.name)
     )
     return MailRuleOut.of(rule)
+
+
+@router.post(
+    "/dry-run",
+    summary="Dry run of a mail rule",
+    description=(
+        f"What a rule (saved or not; with `rule_id` in place of the stored one) would do with the "
+        f"mailbox's latest {DRY_RUN_MAILS} mails, as Lekto recorded them when it fetched them: "
+        "whether its conditions hold and who would decide each, this rule, another before it, or "
+        f"the mailbox's fallback. Reads only; the mail server is not asked. {WHO}"
+    ),
+    response_model=list[DryRunMailOut],
+    responses=problem_responses(401, 403, 404, 422),
+)
+async def dry_run_mail_rule(
+    body: MailRuleDryRun, user: CurrentUser, context: Context
+) -> list[DryRunMailOut]:
+    found = await context.mail_rules.dry_run(
+        user,
+        MailboxId(body.mailbox_id),
+        body.changes(body.name),
+        rule=None if body.rule_id is None else MailRuleId(body.rule_id),
+    )
+    return [DryRunMailOut.of(item) for item in found]
 
 
 @router.get(

@@ -919,6 +919,10 @@ mail_records = Table(
     Column("rule", Text, nullable=True),
     Column("documents", Integer, nullable=False),
     Column("fetched_at", UtcDateTime, nullable=False),
+    # What a mail rule's conditions look at, for the dry run (`MailRecord`).
+    Column("senders", json_type(), nullable=False, server_default="[]"),
+    Column("recipients", json_type(), nullable=False, server_default="[]"),
+    Column("attachments", json_type(), nullable=False, server_default="[]"),
     Column("version", Integer, nullable=False),
     UniqueConstraint("mailbox_id", "folder", "uidvalidity", "uid"),
     Index(None, "mailbox_id", "fetched_at"),

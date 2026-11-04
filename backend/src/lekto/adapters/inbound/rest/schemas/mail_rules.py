@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from lekto.adapters.inbound.schemas import ReasonOut
 from lekto.core.domain.ids import DocumentTypeId, SpaceId, UserId
 from lekto.core.domain.mail import MailAction
-from lekto.core.domain.mail_intake import MailParts
+from lekto.core.domain.mail_intake import MailOutcome, MailParts
 from lekto.core.domain.mail_rules import (
     MAX_CONDITIONS,
     MAX_FOLDER,
@@ -25,6 +25,7 @@ from lekto.core.domain.mail_rules import (
     Unset,
 )
 from lekto.core.domain.validation import MAX_NAME
+from lekto.core.services.mail_rules import Decider, DryRunMail
 
 PARTS_HELP = (
     "What it takes: `all` (the attachments and the text), `attachments`, `text`, `nothing`."
@@ -138,6 +139,55 @@ class MailRulePatch(_Rule):
     model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [{"enabled": False}]})
 
     name: str | None = Field(default=None, min_length=1, max_length=MAX_NAME)
+
+
+class MailRuleDryRun(MailRuleCreate):
+    """A rule as the editor holds it, saved or not; `rule_id`: the stored one it stands for."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rule_id: UUID | None = Field(
+        default=None, description="The rule being edited: the dry run puts this one in its place."
+    )
+
+
+class DryRunMailOut(BaseModel):
+    """A mail fetched lately, and what would become of it with the rule."""
+
+    subject: str
+    sender: str
+    folder: str
+    sent_at: datetime | None
+    arrived_at: datetime
+    attachments: list[str] = Field(
+        description="The names of the attachments Lekto takes (empty for one without a name)."
+    )
+    outcome: MailOutcome = Field(description="What became of it when it came.")
+    matches: bool = Field(description="Whether the rule's conditions hold.")
+    decider: Decider = Field(
+        description=(
+            "Who would decide it now: `rule` (this one), `other` (another rule before it, named "
+            "in `rule`), `fallback` (the mailbox takes everything), `nothing` (no rule, the "
+            "mailbox takes nothing)."
+        )
+    )
+    rule: str | None
+
+    @classmethod
+    def of(cls, item: DryRunMail) -> "DryRunMailOut":
+        record = item.record
+        return cls(
+            subject=record.subject,
+            sender=record.sender,
+            folder=record.folder,
+            sent_at=record.sent_at,
+            arrived_at=record.arrived_at,
+            attachments=list(record.attachments),
+            outcome=record.outcome,
+            matches=item.matches,
+            decider=item.decider,
+            rule=item.rule,
+        )
 
 
 class MailRuleOut(BaseModel):

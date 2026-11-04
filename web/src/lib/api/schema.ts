@@ -2547,6 +2547,26 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/v1/mail-rules/dry-run': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/**
+		 * Dry run of a mail rule
+		 * @description What a rule (saved or not; with `rule_id` in place of the stored one) would do with the mailbox's latest 50 mails, as Lekto recorded them when it fetched them: whether its conditions hold and who would decide each, this rule, another before it, or the mailbox's fallback. Reads only; the mail server is not asked. Only admins (403).
+		 */
+		post: operations['dry_run_mail_rule_api_v1_mail_rules_dry_run_post'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/v1/mail-rules/{id}': {
 		parameters: {
 			query?: never;
@@ -4175,6 +4195,12 @@ export interface components {
 			/** Topic Ids */
 			topic_ids?: string[] | null;
 		};
+		/**
+		 * Decider
+		 * @description Who would decide a mail now.
+		 * @enum {string}
+		 */
+		Decider: 'rule' | 'other' | 'fallback' | 'nothing';
 		/** DeliveryDocumentOut */
 		DeliveryDocumentOut: {
 			/**
@@ -4985,6 +5011,41 @@ export interface components {
 			icon?: string | null;
 			/** Relation Target */
 			relation_target?: boolean | null;
+		};
+		/**
+		 * DryRunMailOut
+		 * @description A mail fetched lately, and what would become of it with the rule.
+		 */
+		DryRunMailOut: {
+			/** Subject */
+			subject: string;
+			/** Sender */
+			sender: string;
+			/** Folder */
+			folder: string;
+			/** Sent At */
+			sent_at: string | null;
+			/**
+			 * Arrived At
+			 * Format: date-time
+			 */
+			arrived_at: string;
+			/**
+			 * Attachments
+			 * @description The names of the attachments Lekto takes (empty for one without a name).
+			 */
+			attachments: string[];
+			/** @description What became of it when it came. */
+			outcome: components['schemas']['MailOutcome'];
+			/**
+			 * Matches
+			 * @description Whether the rule's conditions hold.
+			 */
+			matches: boolean;
+			/** @description Who would decide it now: `rule` (this one), `other` (another rule before it, named in `rule`), `fallback` (the mailbox takes everything), `nothing` (no rule, the mailbox takes nothing). */
+			decider: components['schemas']['Decider'];
+			/** Rule */
+			rule: string | null;
 		};
 		/**
 		 * EventBody
@@ -7174,6 +7235,12 @@ export interface components {
 			message_id: string | null;
 		};
 		/**
+		 * MailOutcome
+		 * @description What became of a fetched mail.
+		 * @enum {string}
+		 */
+		MailOutcome: 'taken' | 'no_rule' | 'nothing' | 'known' | 'too_large' | 'failed';
+		/**
 		 * MailParts
 		 * @description What of a mail a rule takes.
 		 * @enum {string}
@@ -7243,6 +7310,75 @@ export interface components {
 			mailbox_id: string;
 			/** Name */
 			name: string;
+		};
+		/**
+		 * MailRuleDryRun
+		 * @description A rule as the editor holds it, saved or not; `rule_id`: the stored one it stands for.
+		 * @example {
+		 *       "after": "read",
+		 *       "conditions": [
+		 *         {
+		 *           "field": "sender",
+		 *           "op": "ends_with",
+		 *           "value": "@stadtwerke.example"
+		 *         }
+		 *       ],
+		 *       "mailbox_id": "01a1a7fc-702c-736e-a661-ff59645bdc52",
+		 *       "name": "Bills of the utilities",
+		 *       "user_id": "01a1a7fc-7013-741e-ae72-58401e634e5d"
+		 *     }
+		 */
+		MailRuleDryRun: {
+			/**
+			 * Priority
+			 * @description Smaller first.
+			 */
+			priority?: number | null;
+			/**
+			 * Any
+			 * @description Any condition (or); else all (and).
+			 */
+			any?: boolean | null;
+			/**
+			 * Conditions
+			 * @description Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). None: every mail.
+			 */
+			conditions?: components['schemas']['MailConditionBody'][] | null;
+			/** @description What it takes: `all` (the attachments and the text), `attachments`, `text`, `nothing`. */
+			parts?: components['schemas']['MailParts'] | null;
+			/**
+			 * User Id
+			 * @description Whom it takes the mail for.
+			 */
+			user_id?: string | null;
+			/**
+			 * Space Id
+			 * @description A space the person files into; null: their personal one.
+			 */
+			space_id?: string | null;
+			/**
+			 * Text Type Id
+			 * @description The document type of the mail's text; null: Lekto decides.
+			 */
+			text_type_id?: string | null;
+			/** @description What becomes of the mail on the server: `nothing`, `read` (marked as read), `move` (to `move_to`), `trash`. */
+			after?: components['schemas']['MailAction'] | null;
+			/** Move To */
+			move_to?: string | null;
+			/** Enabled */
+			enabled?: boolean | null;
+			/**
+			 * Mailbox Id
+			 * Format: uuid
+			 */
+			mailbox_id: string;
+			/** Name */
+			name: string;
+			/**
+			 * Rule Id
+			 * @description The rule being edited: the dry run puts this one in its place.
+			 */
+			rule_id?: string | null;
 		};
 		/** MailRuleOut */
 		MailRuleOut: {
@@ -29165,6 +29301,132 @@ export interface operations {
 				};
 				content: {
 					'application/json': components['schemas']['MailRuleOut'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Content Too Large */
+			413: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Content Too Large",
+					 *       "status": 413,
+					 *       "detail": "the request body is larger than 1048576 bytes"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	dry_run_mail_rule_api_v1_mail_rules_dry_run_post: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['MailRuleDryRun'];
+			};
+		};
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['DryRunMailOut'][];
 				};
 			};
 			/** @description Unauthorized */

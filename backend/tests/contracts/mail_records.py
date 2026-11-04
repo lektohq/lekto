@@ -66,6 +66,9 @@ def a_record(mailbox: Mailbox, uid: int, **parts: object) -> MailRecord:
         "outcome": MailOutcome.TAKEN,
         "documents": 2,
         "fetched_at": NOW + uid * HOUR,
+        "senders": ("rechnung@stadtwerke.example", "Stadtwerke"),
+        "recipients": ("anna@example.test",),
+        "attachments": ("Rechnung.pdf", ""),
     }
     values.update(parts)
     return MailRecord(**values)  # type: ignore[arg-type]
