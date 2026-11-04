@@ -27,8 +27,17 @@ from lekto.core.domain.reasons import Reason
 from lekto.core.domain.validation import require_utc
 
 MAX_FORWARDS = 5
-MAX_MAIL_SIZE = 50 * 1024 * 1024
-"""A mail larger than this is not fetched (decision: Grenzen); its record says so."""
+HEADROOM = 1024 * 1024
+"""Bytes a mail has beyond its attachments: its header, its text."""
+
+
+def mail_limit(upload_max: int) -> int:
+    """The largest mail Lekto fetches: one whose attachment is as large as an upload may be
+    (`LEKTO_UPLOAD_MAX_SIZE`), in Base64 (a third larger), with its header and text. A larger
+    one is not fetched (the worker holds a mail in memory); its record and the mailbox say so."""
+    return upload_max * 4 // 3 + HEADROOM
+
+
 SMALL_IMAGE = 20 * 1024
 """An image smaller than this (bytes) is a logo or a signature: left out without a word."""
 

@@ -170,6 +170,10 @@ class MailboxStatusOut(BaseModel):
     )
     mails: int = Field(description="Mails taken in.")
     documents: int = Field(description="Documents made from them.")
+    skipped_at: datetime | None = Field(
+        description="When a mail was last left out because it was too large."
+    )
+    skipped: ReasonOut | None = Field(description="Which mail that was, and why.")
 
 
 class MailboxOut(BaseModel):
@@ -217,6 +221,8 @@ class MailboxOut(BaseModel):
                 error=None if status.error is None else ReasonOut.of(status.error),
                 mails=status.mails,
                 documents=status.documents,
+                skipped_at=status.skipped_at,
+                skipped=None if status.skipped is None else ReasonOut.of(status.skipped),
             ),
             created_at=mailbox.created_at,
             updated_at=mailbox.updated_at,
