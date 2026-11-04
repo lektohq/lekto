@@ -24,6 +24,7 @@ from lekto.core.ports.identity import DecryptionError, SecretCipher
 from lekto.core.ports.mail_server import MailServer, MailServerError
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import require_admin
+from lekto.core.services.mail_intake import schedule_fetch
 
 MAX_PASSWORD = 1000
 
@@ -87,6 +88,8 @@ class MailboxService:
                 mailbox.change(changes, now=now)
             await _check_references(uow, mailbox)
             await uow.mailboxes.add(mailbox)
+            if mailbox.enabled:
+                await schedule_fetch(uow, mailbox, now)
             await uow.commit()
             return mailbox
 
@@ -110,6 +113,8 @@ class MailboxService:
                 mailbox.set_password(self._encrypt(id, password), now=now)
             await _check_references(uow, mailbox)
             await uow.mailboxes.update(mailbox)
+            if mailbox.enabled:
+                await schedule_fetch(uow, mailbox, now)  # what changed counts at once
             await uow.commit()
             return mailbox
 

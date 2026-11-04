@@ -2,6 +2,7 @@
 "E-Mail", sender, recipients, date, subject and attachments, then the HTML or the text. It
 loads nothing from the network or the file system."""
 
+from email.message import EmailMessage
 from pathlib import Path
 
 import pypdfium2
@@ -10,7 +11,7 @@ import pytest
 from lekto.adapters.outbound.weasyprint import WeasyPrintMailRenderer
 from lekto.core.ports.mail_renderer import MailRenderer
 from tests.contracts.mail_renderer import MailRendererContract
-from tests.mails import plain_mail, rich_mail
+from tests.mails import PDF, PNG, plain_mail, rich_mail
 from tests.webhook_receiver import LocalReceiver
 
 
@@ -69,3 +70,18 @@ async def test_nothing_is_loaded_from_outside(tmp_path: Path) -> None:
         assert "Tracked" in text
         assert receiver.hits("/pixel.png") == 0
         assert receiver.hits("/style.css") == 0
+
+
+async def test_what_is_not_taken_is_named(tmp_path: Path) -> None:
+    message = EmailMessage()
+    message["From"] = "a@example.test"
+    message["Date"] = "Wed, 04 Nov 2026 10:00:00 +0100"
+    message["Subject"] = "Unterlagen"
+    message.set_content("Anbei.")
+    message.add_attachment(PDF, maintype="application", subtype="pdf", filename="Vertrag.pdf")
+    message.add_attachment(b"PK\x03\x04", maintype="application", subtype="zip", filename="x.zip")
+    message.add_attachment(PNG, maintype="image", subtype="png", filename="logo.png")
+    text = await _render(bytes(message), tmp_path)
+    assert "Anhänge Vertrag.pdf" in text
+    assert "Nicht übernommen x.zip" in text
+    assert "logo.png" not in text
