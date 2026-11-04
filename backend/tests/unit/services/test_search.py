@@ -1,9 +1,11 @@
 """Searching: what the caller may read, checked in the index and again in the database."""
 
 import asyncio
+import json
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import timedelta
+from typing import Any
 
 import pytest
 
@@ -13,6 +15,7 @@ from lekto.core.domain.documents import Document, DocumentChanges
 from lekto.core.domain.errors import (
     AuthenticationError,
     EmbeddingsError,
+    NotFoundError,
     PermissionDeniedError,
     SearchUnavailableError,
     ValidationError,
@@ -20,14 +23,16 @@ from lekto.core.domain.errors import (
 from lekto.core.domain.events import SearchMeaningReady
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import DocumentId
+from lekto.core.domain.labels import grid_layout
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.embeddings import EmbeddingResult, Embeddings
 from lekto.core.ports.repository import DocumentFilter
-from lekto.core.ports.search_index import SearchQuery, SearchResult
+from lekto.core.ports.search_index import SearchQuery, SearchResult, TextMatch
 from lekto.core.services.fact_decisions import FactAction, FactDecision
+from lekto.core.services.objects import structure_key, text_key
 from lekto.core.services.search import (
     KEEP_VECTORS,
     WARM_EVERY,
@@ -493,3 +498,41 @@ async def test_the_search_finds_documents_by_their_facts(scene: Scene) -> None:
             "Mietvertrag",
             DocumentFilter(facts=(FactCriterion(role=FactRole.PERSON),)),
         )
+
+
+async def test_the_places_of_a_hit_leave_out_leftovers_and_mark_the_best(scene: Scene) -> None:
+    """The index names where the words stand; the places are those worth marking, the best the
+    first in the line with the most different words."""
+    text = "Weihnachten im Haus\nIhr Weihnachtsgeld und die HU\nWeihnachtsgeld"
+    store = scene.setup.world.object_store
+    document = scene.private_document.id
+    await store.put(text_key(document), text.encode(), content_type="text/plain")
+    layout = json.dumps(grid_layout(text)).encode()
+    await store.put(structure_key(document), layout, content_type="application/json")
+
+    def at(word: str, after: int = 0) -> TextMatch:
+        start = text.index(word, after)
+        return TextMatch(start, start + len(word))
+
+    stem = at("Weihnacht")
+    named = [
+        stem,
+        TextMatch(stem.end, stem.end + 2),  # "en" of "Weihnachten": a leftover of the splitting
+        at("Weihnachtsgeld"),
+        at("HU"),
+        at("Weihnachtsgeld", text.rindex("\n")),
+    ]
+
+    class Named:
+        async def matches(self, *_: object) -> list[TextMatch]:
+            return named
+
+    index: Any = Named()
+    service = SearchService(scene.setup.world.uow, index, builders.SEARCH, store=store)
+    places = await service.places(scene.owner.id, document, "Weihnachtsgeld HU")
+    assert places.matched == 4  # the leftover is no place
+    assert [occurrence.own for occurrence in places.occurrences] == [False, True, False, False]
+    with pytest.raises(NotFoundError):
+        await service.places(scene.stranger.id, document, "Weihnachtsgeld")
+    with pytest.raises(ValidationError):
+        await service.places(scene.owner.id, document, " ")

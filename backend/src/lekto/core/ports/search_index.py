@@ -76,6 +76,15 @@ class SimilarQuery:
             raise ValueError(f"limit must be between 1 and {MAX_LIMIT}")
 
 
+@dataclass(frozen=True)
+class TextMatch:
+    """Where a word of a query stands in the text of a document as the index holds it:
+    characters `start` to `end` (exclusive)."""
+
+    start: int
+    end: int
+
+
 @dataclass(frozen=True, kw_only=True)
 class SearchHit:
     id: DocumentId
@@ -145,6 +154,15 @@ class SearchIndex(Protocol):
     async def search(self, query: SearchQuery) -> SearchResult:
         """Documents that match the text and the filter and that `query.visibility` allows,
         best first, from `offset` on, at most `limit`."""
+        ...
+
+    async def matches(
+        self, document: DocumentId, text: str, visibility: Visibility
+    ) -> list[TextMatch]:
+        """Where the words of `text` stand in the text of `document`, as a search for `text`
+        matches them (with the index's splitting of words and its synonyms), in the order of
+        the text; none if the document is not in the index, `visibility` hides it or nothing
+        matches."""
         ...
 
     async def similar(self, query: SimilarQuery) -> list[SearchHit]:

@@ -56,6 +56,7 @@ from lekto.core.ports.search_index import (
     SearchQuery,
     SearchResult,
     SimilarQuery,
+    TextMatch,
 )
 
 log = logging.getLogger(__name__)
@@ -92,6 +93,7 @@ FILTERABLE = [
     "field_ids",
     "facts",
     "document_date",
+    "id",  # the matches of a single document
 ]
 SORTABLE = ["document_date", "created_at", "title_key"]
 # Sorting comes first: without `sort` in a query it does nothing, with it the hits are in its
@@ -105,6 +107,7 @@ RANKING_RULES = ["sort", "words", "typo", "proximity", "attribute", "exactness"]
 # page of a search goes by the same strategy.
 MATCHING_STRATEGY = "frequency"
 MATCHING_FALLBACK = "last"
+MATCHED_WORDS = 10  # words of a query asked alone for where they stand in a document
 # The point of an ordinal before a word: Meilisearch splits a query there, so "13. Gehalt" would
 # not meet its synonyms; dates and amounts ("31.12.2025", "1.297,42") keep theirs.
 _ORDINAL_POINT = re.compile(r"(?<=\d)\.(?=\s)")
@@ -244,15 +247,62 @@ class MeilisearchIndex:
                 raise SearchIndexError("the index has no embedder, so it takes no vectors")
             body["vector"] = list(query.vector or ())
             body["hybrid"] = {"embedder": EMBEDDER, "semanticRatio": query.semantic_ratio}
-        hits, total = await self._search(body)
-        if total == 0 and query.text.strip():
-            hits, total = await self._search({**body, "matchingStrategy": MATCHING_FALLBACK})
+        data = await self._search(body)
+        try:
+            hits = [_hit_of(item) for item in data["hits"]]
+            total = int(data.get("estimatedTotalHits", data.get("totalHits", 0)))
+        except (KeyError, TypeError, ValueError):
+            raise SearchIndexError("Meilisearch sent an unusable search result") from None
         return SearchResult(
             hits=hits, estimated_total=max(total, query.offset + len(hits)), semantic=semantic
         )
 
-    async def _search(self, body: Mapping[str, Any]) -> tuple[list[SearchHit], int]:
-        """The hits of a search and the estimated number of all of them."""
+    async def matches(
+        self, document: DocumentId, text: str, visibility: Visibility
+    ) -> list[TextMatch]:
+        await self._ensure_ready()
+        if not text.strip():
+            return []
+        rights = filter_expression(visibility, DocumentFilter())
+        base: dict[str, Any] = {
+            "matchingStrategy": MATCHING_STRATEGY,
+            "filter": f"id = {_quote(document)}" + ("" if rights is None else f" AND {rights}"),
+            "limit": 1,
+            "attributesToRetrieve": ["text"],
+            "attributesToSearchOn": ["text"],
+            "showMatchesPosition": True,
+        }
+        # The whole query (its synonyms of more than one word), then each word alone: the
+        # strategy may drop a word the text holds for one it lacks ("13. Gehalt"). Each as whole
+        # words: a space after the last keeps it from standing for the start of others ("13"
+        # in "4.139,02").
+        query = _ORDINAL_POINT.sub("", text)
+        words = list(dict.fromkeys(query.split()))[:MATCHED_WORDS]
+        indexed = ""
+        found: set[tuple[int, int]] = set()
+        for asked in [query, *words] if len(words) > 1 else [query]:
+            data = await self._search({**base, "q": f"{asked} "})
+            try:
+                item = next(iter(data["hits"]), None)
+                if item is None:
+                    continue
+                indexed = str(item.get("text") or "")
+                positions = (item.get("_matchesPosition") or {}).get("text") or []
+                found.update((int(at["start"]), int(at["length"])) for at in positions)
+            except (KeyError, TypeError, ValueError):
+                raise SearchIndexError("Meilisearch sent unusable matches") from None
+        spans = sorted(found)
+        return _characters(indexed, spans)
+
+    async def _search(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        """The answer to a search; one that finds nothing by `MATCHING_STRATEGY` asked again
+        by `MATCHING_FALLBACK`."""
+        data = await self._ask(body)
+        if data.get("estimatedTotalHits", data.get("totalHits")) == 0 and body["q"].strip():
+            data = await self._ask({**body, "matchingStrategy": MATCHING_FALLBACK})
+        return data
+
+    async def _ask(self, body: Mapping[str, Any]) -> dict[str, Any]:
         response = await self._send("POST", f"/indexes/{self._index}/search", json=body)
         if response.status_code == 400 and _code(response) == "invalid_search_filter":
             # The index was lost and created again by a write, without its settings: set it up
@@ -262,13 +312,7 @@ class MeilisearchIndex:
             response = await self._send("POST", f"/indexes/{self._index}/search", json=body)
         if response.status_code == 404 and _code(response) == "index_not_found":
             self._ready_until = 0.0
-        data = _json(_checked(response))
-        try:
-            hits = [_hit_of(item) for item in data["hits"]]
-            total = int(data.get("estimatedTotalHits", data.get("totalHits", 0)))
-        except (KeyError, TypeError, ValueError):
-            raise SearchIndexError("Meilisearch sent an unusable search result") from None
-        return hits, total
+        return _json(_checked(response))
 
     async def similar(self, query: SimilarQuery) -> list[SearchHit]:
         await self._ensure_ready()
@@ -623,6 +667,30 @@ def _normalised(key: str, setting: Any) -> Any:
 
 def _quote(value: object) -> str:
     return json.dumps(str(value))
+
+
+def _characters(text: str, spans: Sequence[tuple[int, int]]) -> list[TextMatch]:
+    """Meilisearch's positions (`start`, `length`, sorted) count the bytes of UTF-8: as
+    characters of `text`. It names the parts of a compound one by one ("Miet", "vertrag"):
+    parts that touch are one match. Spans outside the text are left out."""
+    encoded = text.encode("utf-8")
+    joined: list[list[int]] = []
+    for start, length in spans:
+        if start < 0 or length <= 0 or start + length > len(encoded):
+            continue
+        if joined and start <= joined[-1][1]:
+            joined[-1][1] = max(joined[-1][1], start + length)
+        else:
+            joined.append([start, start + length])
+    matches = []
+    at = characters = 0  # counted on from the last match, not from the start each time
+    for start, end in joined:
+        characters += len(encoded[at:start].decode("utf-8", "ignore"))
+        begin = characters
+        characters += len(encoded[start:end].decode("utf-8", "ignore"))
+        matches.append(TextMatch(begin, characters))
+        at = end
+    return matches
 
 
 def _stamp(document: IndexDocument, part: str) -> str | None:

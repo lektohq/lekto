@@ -26,7 +26,7 @@ from lekto.core.domain.periods import Period
 from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.search import EmbeddingStamp, Segment, Visibility
 from lekto.core.ports.repository import DocumentFilter
-from lekto.core.ports.search_index import SearchQuery
+from lekto.core.ports.search_index import SearchQuery, TextMatch
 from tests.builders import DEFAULT_SETTINGS, NOW, index_document, search_query
 
 URL = "http://meilisearch:7700"
@@ -441,6 +441,28 @@ async def test_the_stop_words_as_meilisearch_keeps_them_are_in_place() -> None:
     )
     await sim.index().upsert([index_document()])
     assert sim.calls("PATCH", "/settings") == []
+
+
+async def test_the_matches_of_a_document_ask_the_query_and_each_word_alone() -> None:
+    sim = SimulatedMeilisearch()
+    sim.settings = wanted_settings(sim)
+    sim.search_answer = {
+        "hits": [
+            {
+                "id": str(uid(1)),
+                "text": "Größe: Gehalt",
+                "_matchesPosition": {"text": [{"start": 9, "length": 6}]},
+            }
+        ],
+        "estimatedTotalHits": 1,
+    }
+    visible = Visibility(frozenset({SpaceId(uid(100))}))
+    found = await sim.index().matches(DocumentId(uid(1)), "13. Gehalt Gehalt", visible)
+    assert found == [TextMatch(7, 13)]  # bytes counted as characters, once
+    bodies = [sim.body(call) for call in sim.calls("POST", "/search")]
+    assert [body["q"] for body in bodies] == ["13 Gehalt Gehalt ", "13 ", "Gehalt "]
+    assert all(body["filter"].startswith(f'id = "{uid(1)}" AND ') for body in bodies)
+    assert all(body["attributesToSearchOn"] == ["text"] for body in bodies)
 
 
 async def test_the_search_request_and_its_answer() -> None:

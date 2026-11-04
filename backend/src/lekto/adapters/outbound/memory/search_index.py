@@ -18,6 +18,7 @@ from lekto.core.domain.search import (
     IndexDocument,
     IndexState,
     Segment,
+    Visibility,
     vectors_by_section,
 )
 from lekto.core.domain.sorting import sort_key
@@ -29,6 +30,7 @@ from lekto.core.ports.search_index import (
     SearchQuery,
     SearchResult,
     SimilarQuery,
+    TextMatch,
 )
 
 _WORD = re.compile(r"\w+")
@@ -121,6 +123,24 @@ class MemorySearchIndex:
             for score, document in page
         ]
         return SearchResult(hits=hits, estimated_total=len(scored), semantic=use_vector)
+
+    async def matches(
+        self, document: DocumentId, text: str, visibility: Visibility
+    ) -> list[TextMatch]:
+        found = self._documents.get(document)
+        if found is None or not visibility.allows(found):
+            return []
+        terms = [word.casefold() for word in _WORD.findall(text)]
+        body = found.text
+
+        def whole(start: int, end: int) -> bool:  # as words, not the start of others
+            return not (start > 0 and body[start - 1].isalnum()) and not (
+                end < len(body) and body[end].isalnum()
+            )
+
+        return [
+            TextMatch(start, end) for start, end in _match_spans(body, terms) if whole(start, end)
+        ]
 
     async def similar(self, query: SimilarQuery) -> list[SearchHit]:
         if self._dimensions is None:

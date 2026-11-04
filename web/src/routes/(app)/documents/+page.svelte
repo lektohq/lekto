@@ -434,10 +434,12 @@
 		letGo();
 	}
 
-	/** The document in the Beam, paging through the documents of this page. */
+	/** The document in the Beam, paging through the documents of this page; from a search, with
+	 * where its words stand. */
 	function view(id: string) {
 		const ids = list.items.map((item) => item.document.id);
-		openBeam(ids, id, lens?.name ?? m.nav_documents());
+		const source = searching ? { kind: 'search' as const, words: query } : undefined;
+		openBeam(ids, id, lens?.name ?? m.nav_documents(), source ? { source } : {});
 	}
 
 	function selection(): BulkSelection {

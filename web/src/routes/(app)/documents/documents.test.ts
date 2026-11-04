@@ -139,6 +139,40 @@ describe('the archive page', () => {
 		});
 	});
 
+	it('opens a hit of a search in the Beam with where its words stand', async () => {
+		state.entry = { words: 'Strom' };
+		const hit = (id: string, title: string) => ({
+			document: listedOf({ id, title }),
+			score: 0.5,
+			snippet: []
+		});
+		vi.stubGlobal(
+			'fetch',
+			fakeApi({
+				'POST /api/v1/documents/search': () => ({
+					items: [hit('d1', 'Eins'), hit('d2', 'Zwei')],
+					estimated_total: 2,
+					next_offset: null,
+					semantic: false
+				})
+			})
+		);
+		const user = userEvent.setup();
+		render(Page);
+		await screen.findByText('Zwei');
+		screen.getByRole('link', { name: /Zwei/ }).focus();
+		await user.keyboard('{Enter}');
+		const source = { kind: 'search', words: 'Strom' };
+		expect(goto).toHaveBeenLastCalledWith('http://lekto/ui/documents', {
+			shallow: true,
+			state: {
+				words: 'Strom',
+				beam: { ids: ['d1', 'd2'], index: 1, from: m.nav_documents(), source }
+			},
+			persistState: true
+		});
+	});
+
 	it('stands the documents by month while sorted by a date, last those without one', async () => {
 		vi.stubGlobal(
 			'fetch',

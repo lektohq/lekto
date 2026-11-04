@@ -40,12 +40,15 @@
 	// through the places ("Fundstelle 2 von 5"). With `fact` it marks a value in each document
 	// it pages through (a relation's shared number). From the inbox (`review`) it marks the quotes
 	// of the fields that keep each document there, each with the field's name; from a rule's
-	// preview (`rule`) where its text conditions hit, each with its text. It never looks for a
-	// value itself: the places come from the endpoint that names them.
+	// preview (`rule`) where its text conditions hit, each with its text; from a search
+	// (`search`) where its words stand, the best place with a halo, and, where the meaning alone
+	// found it, that the words are not in its text. It never looks for a value itself: the places
+	// come from the endpoint that names them.
 	type Document = components['schemas']['DocumentDetails'];
 	type PlaceOut = components['schemas']['PlaceOut'];
 	type Check = components['schemas']['FieldCheckOut'];
 	type TextHit = components['schemas']['TextHitOut'];
+	type SearchPlaces = components['schemas']['SearchPlacesOut'];
 
 	const beam = $derived(page.state.beam ?? null);
 	const id = $derived(beam ? (beam.ids[beam.index] ?? null) : null);
@@ -76,6 +79,7 @@
 		place: PlaceOut | null;
 		checks: Check[];
 		hits: TextHit[];
+		search?: SearchPlaces;
 	} | null>(null);
 	let fields = $state<{ id: string; name: string }[] | null>(null);
 	const beginOwn = latest();
@@ -176,6 +180,16 @@
 				if (current()) ownMarks = { id: wanted, place, checks: [], hits: [] };
 				return;
 			}
+			if (source.kind === 'search') {
+				const search = await unwrap(
+					api.POST('/api/v1/documents/{id}/search-places', {
+						params: { path: { id: wanted } },
+						body: { q: source.words }
+					})
+				);
+				if (current()) ownMarks = { id: wanted, place: null, checks: [], hits: [], search };
+				return;
+			}
 			if (source.kind === 'rule') {
 				const found = await unwrap(
 					api.GET('/api/v1/rules/{id}/apply/hits/{document_id}', {
@@ -245,6 +259,19 @@
 						pinned: index === 0 && place === 0
 					}))
 				)
+			);
+		}
+		if (beam?.source?.kind === 'search') {
+			if (!ownMarks?.search || ownMarks.id !== id) return [];
+			return ownMarks.search.occurrences.flatMap((occurrence, index) =>
+				occurrence.locations.map((location) => ({
+					key: `word-${index}`,
+					label: '',
+					page: location.page,
+					boxes: location.boxes,
+					derived: false,
+					pinned: occurrence.own
+				}))
 			);
 		}
 		const source = beam?.source;
@@ -377,6 +404,9 @@
 			{:else if !document}
 				<Loading class="py-16 text-center" />
 			{:else}
+				{#if ownMarks?.id === id && ownMarks.search?.matched === 0}
+					<p class="pb-2 text-sm text-muted-foreground">{m.beam_meaning_only()}</p>
+				{/if}
 				<DocumentPages
 					bind:this={images}
 					{document}
