@@ -49,6 +49,16 @@ async def test_the_rare_word_decides_and_stop_words_do_not(search_index: Meilise
     assert [hit.id for hit in result.hits] == [tax.id]
 
 
+async def test_a_query_of_stop_words_alone_finds_nothing(search_index: MeilisearchIndex) -> None:
+    space = SpaceId(new_id())
+    document = index_document(space_id=space, title="Haus und Hof", text="Wie viel ich zahle")
+    await search_index.upsert([document])
+    visible = Visibility(frozenset({space}))
+    for text in ("und ", "wie viel ich", "*"):
+        assert (await search_index.search(search_query(text, visible))).hits == [], text
+    assert await search_index.matches(document.id, "und ", visible) == []
+
+
 async def test_every_word_of_a_synonym_group_finds_the_others(
     search_index: MeilisearchIndex,
 ) -> None:

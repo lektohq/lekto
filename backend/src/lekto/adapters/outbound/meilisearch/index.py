@@ -111,6 +111,7 @@ MATCHED_WORDS = 10  # words of a query asked alone for where they stand in a doc
 # The point of an ordinal before a word: Meilisearch splits a query there, so "13. Gehalt" would
 # not meet its synonyms; dates and amounts ("31.12.2025", "1.297,42") keep theirs.
 _ORDINAL_POINT = re.compile(r"(?<=\d)\.(?=\s)")
+_WORD = re.compile(r"\w+")
 SORTED_BY = {
     SortKey.ARRIVAL: "created_at",  # nearest to the ids, which the index does not sort by
     SortKey.CREATED: "created_at",
@@ -150,6 +151,7 @@ class MeilisearchIndex:
         self._build_index = f"{index}-rebuild"
         self._dimensions = dimensions
         self._locales = list(locales)
+        self._stop_words = frozenset(stop_words(self._locales))
         self._task_timeout = task_timeout
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
         self._client = httpx2.AsyncClient(
@@ -223,6 +225,9 @@ class MeilisearchIndex:
         await self._ensure_ready()
         if query.filter.lanes is not None and not query.filter.lanes:
             return SearchResult(hits=[], estimated_total=0, semantic=False)
+        if not self._decides(query.text):
+            semantic = query.vector is not None and query.semantic_ratio > 0
+            return SearchResult(hits=[], estimated_total=0, semantic=semantic)
         body: dict[str, Any] = {
             "q": _ORDINAL_POINT.sub("", query.text),
             "matchingStrategy": MATCHING_STRATEGY,
@@ -261,7 +266,7 @@ class MeilisearchIndex:
         self, document: DocumentId, text: str, visibility: Visibility
     ) -> list[TextMatch]:
         await self._ensure_ready()
-        if not text.strip():
+        if not self._decides(text):
             return []
         rights = filter_expression(visibility, DocumentFilter())
         base: dict[str, Any] = {
@@ -313,6 +318,12 @@ class MeilisearchIndex:
         if response.status_code == 404 and _code(response) == "index_not_found":
             self._ready_until = 0.0
         return _json(_checked(response))
+
+    def _decides(self, text: str) -> bool:
+        """Whether a word of `text` is left after the stop words: Meilisearch answers a query
+        without one ("und", "wie ich") with every document, as if nothing were asked."""
+        words = (unicodedata.normalize("NFC", word.casefold()) for word in _WORD.findall(text))
+        return any(word not in self._stop_words for word in words)
 
     async def similar(self, query: SimilarQuery) -> list[SearchHit]:
         await self._ensure_ready()
