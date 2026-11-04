@@ -2714,6 +2714,7 @@
 	"beam_next": "Next document",
 	"beam_position": "Document {current} of {total}",
 	"beam_open_document": "Open document",
+	"beam_meaning_only": "Found by its meaning: the words are not in its text.",
 	"beam_pages": "Pages of “{title}”",
 	"beam_gone": "The document is gone, or you can no longer see it.",
 	"back_to": "Back to {place}",

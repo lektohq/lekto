@@ -560,8 +560,14 @@ modal, over a dialog too.
   viewing. `tests/design-system.test.ts` keeps both: the eye only in `BeamTitle` and before
   "Woher gelernt?", a link to one document only where this section allows it.
 - A relation shows both documents, the newer first, the number they share marked in each. A
-  rule's preview shows where its text conditions hit, each labelled with its text.
-- **State:** the history entry's (`beam.svelte.ts`): ids only. The back button closes it, a
+  rule's preview shows where its text conditions hit, each labelled with its text. A hit of a
+  search (the documents list with words) shows where its words stand, as the search matched
+  them (the parts of compounds, the synonyms), without a label, the best place (the line with
+  the most of the words) with a halo; where the meaning alone found it, a line above the pages
+  says that the words are not in its text (Tobi, 04.11.2026).
+- **State:** the history entry's (`beam.svelte.ts`): ids only, and from a search its words,
+  which stand in the entry anyway (`page.state.words`) and go to the API in a body
+  (`POST /documents/{id}/search-places`), never in an address. The back button closes it, a
   reload brings it back, paging replaces the entry. A document that is gone closes it with a
   toast.
 - **"Dokument öffnen"** jumps there with the way back to here (see
