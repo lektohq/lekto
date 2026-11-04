@@ -948,6 +948,38 @@ mail_origins = Table(
     Column("forwarded_by", json_type(), nullable=False),
     Column("filename", Text, nullable=True),
     Column("related", json_type(), nullable=False),
+    Column("body_type_id", Uuid, nullable=True),
+    Column("version", Integer, nullable=False),
+)
+
+# The mail rules of a mailbox (`domain.mail_rules`): the conditions as JSON. The person, space
+# and type a rule names have no foreign key: a rule whose one is gone is paused when a mail
+# needs it. They go with their mailbox.
+mail_rules = Table(
+    "mail_rules",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "mailbox_id",
+        Uuid,
+        ForeignKey("mailboxes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("name", Text, nullable=False),
+    Column("priority", Integer, nullable=False),
+    Column("any", Boolean, nullable=False),
+    Column("conditions", json_type(), nullable=False),
+    Column("parts", Text, nullable=False),
+    Column("user_id", Uuid, nullable=True),
+    Column("space_id", Uuid, nullable=True),
+    Column("text_type_id", Uuid, nullable=True),
+    Column("after", Text, nullable=False),
+    Column("move_to", Text, nullable=True),
+    Column("enabled", Boolean, nullable=False),
+    Column("disabled_reason", json_type(), nullable=True),
+    Column("created_at", UtcDateTime, nullable=False),
+    Column("updated_at", UtcDateTime, nullable=False),
     Column("version", Integer, nullable=False),
 )
 

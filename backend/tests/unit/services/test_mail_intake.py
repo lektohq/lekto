@@ -3,30 +3,45 @@ not fetched twice, and what shows at the mailbox."""
 
 from datetime import timedelta
 from email.message import EmailMessage
+from typing import Any
 
 import pytest
 
+from lekto.adapters.outbound.regex import RegexPatternMatcher
 from lekto.core.domain.documents import Channel
-from lekto.core.domain.errors import ValidationError
+from lekto.core.domain.errors import PermissionDeniedError, ValidationError
 from lekto.core.domain.identifiers import Identifier, IdentifierKind
+from lekto.core.domain.ids import DocumentTypeId, new_id
 from lekto.core.domain.jobs import JobState
 from lekto.core.domain.mail import (
     Fallback,
     FetchStart,
+    MailAction,
     Mailbox,
     MailboxChanges,
     MailLogin,
     MailSecurity,
 )
-from lekto.core.domain.mail_intake import MailOutcome, OriginRole
+from lekto.core.domain.mail_intake import MailOutcome, MailParts, OriginRole
+from lekto.core.domain.mail_rules import (
+    MailCondition,
+    MailField,
+    MailOperator,
+    MailRule,
+    MailRuleChanges,
+)
+from lekto.core.domain.master_data import DocumentType
+from lekto.core.domain.pipeline import Node
 from lekto.core.domain.reasons import ReasonCode
+from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.services.classification.signals import FactsResult, FactsSignal, sender_line
 from lekto.core.services.mail_intake import FETCH_JOB, MailIntakeService, fetch_key
 from lekto.core.services.objects import text_key
 from lekto.core.services.relating import relate
+from lekto.core.services.rules.nodes import ApplyRulesNode
 from tests import mails
-from tests.builders import drain, incoming
+from tests.builders import TEMPLATES, drain, incoming
 from tests.unit.services.support import World
 
 LOGIN = MailLogin(
@@ -291,3 +306,114 @@ async def test_an_attachment_counts_its_sender_as_evidence(world: World) -> None
         str(utility.id)
     }
     assert sender_line(None) == ""
+
+
+async def _rule(world: World, admin: User, mailbox: Mailbox, **changes: Any) -> MailRule:
+    values: dict[str, Any] = {"name": "Strom"}
+    values.update(changes)
+    return await world.mail_rules.create(admin.id, mailbox.id, MailRuleChanges(**values))
+
+
+async def test_the_first_matching_rule_takes_a_mail(world: World) -> None:
+    admin, person, mailbox = await _setup(world, everything=False)
+    household = await world.spaces.create(admin.id, "Haushalt", members={person.id: SpaceRole.EDIT})
+    letter = DocumentType.create(name="E-Mail", now=world.clock.now())
+    async with world.uow() as uow:
+        await uow.document_types.add(letter)
+        await uow.commit()
+    await _rule(
+        world,
+        admin,
+        mailbox,
+        name="Newsletter",
+        priority=1,
+        conditions=(MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Newsletter"),),
+        parts=MailParts.NOTHING,
+        after=MailAction.TRASH,
+    )
+    await _rule(
+        world,
+        admin,
+        mailbox,
+        priority=2,
+        conditions=(
+            MailCondition(MailField.SENDER, MailOperator.ENDS_WITH, "@stadtwerke.example"),
+        ),
+        user_id=person.id,
+        space_id=household.id,
+        text_type_id=letter.id,
+        after=MailAction.READ,
+    )
+    _deliver(world, mails.plain_mail("Unser Newsletter"))
+    _deliver(world, mails.plain_mail("Ihre Rechnung"))
+    await _fetch(world, world.mail_intake())
+
+    (document,) = await world.documents.list_visible(person.id)
+    assert (document.original_filename, document.space_id) == ("Ihre Rechnung.eml", household.id)
+    async with world.uow() as uow:
+        records = sorted(await uow.mail_records.recent(mailbox.id, limit=5), key=lambda r: r.uid)
+        origin = await uow.mail_origins.find(document.id)
+    assert [(record.outcome, record.rule) for record in records] == [
+        (MailOutcome.NOTHING, "Newsletter"),
+        (MailOutcome.TAKEN, "Strom"),
+    ]
+    assert origin is not None and (origin.rule, origin.body_type_id) == ("Strom", letter.id)
+    account = world.mail_server.servers[(LOGIN.host, LOGIN.port)][LOGIN.username]
+    assert [mail.seen for mail in account.boxes["INBOX"].mails] == [True]  # read; the other gone
+    assert len(account.boxes["Trash"].mails) == 1
+
+
+async def test_a_rule_whose_person_is_gone_pauses_and_the_fallback_takes(world: World) -> None:
+    admin, person, mailbox = await _setup(world)
+    other = await world.user()
+    rule = await _rule(world, admin, mailbox, user_id=other.id)
+    await world.users.update(admin.id, other.id, active=False)
+    _deliver(world, mails.plain_mail())
+    await _fetch(world, world.mail_intake())
+    async with world.uow() as uow:
+        stored = await uow.mail_rules.get(rule.id)
+    assert not stored.enabled
+    assert stored.disabled_reason is not None
+    assert stored.disabled_reason.code is ReasonCode.MAIL_RULE_PERSON_GONE
+    assert len(await world.documents.list_visible(person.id)) == 1  # by the fallback
+
+
+async def test_only_admins_set_up_mail_rules_that_fit(world: World) -> None:
+    admin, person, mailbox = await _setup(world)
+    user = await world.user()
+    with pytest.raises(PermissionDeniedError):
+        await world.mail_rules.list_rules(user.id)
+    with pytest.raises(PermissionDeniedError):
+        await _rule(world, user, mailbox, user_id=person.id)
+    stranger = await world.spaces.create(admin.id, "Fremd")
+    with pytest.raises(ValidationError):
+        await _rule(world, admin, mailbox, user_id=person.id, space_id=stranger.id)
+    with pytest.raises(ValidationError):
+        await _rule(world, admin, mailbox, user_id=person.id, text_type_id=DocumentTypeId(new_id()))
+    made = await _rule(world, admin, mailbox, user_id=person.id)
+    changed = await world.mail_rules.change(admin.id, made.id, MailRuleChanges(priority=7))
+    assert changed.priority == 7
+    assert [item.id for item in await world.mail_rules.list_rules(admin.id)] == [made.id]
+    await world.mail_rules.delete(admin.id, made.id)
+    assert await world.mail_rules.list_rules(admin.id) == []
+
+
+async def test_the_mail_text_gets_the_type_of_its_rule(world: World) -> None:
+    admin, person, mailbox = await _setup(world, everything=False)
+    letter = DocumentType.create(name="E-Mail", now=world.clock.now())
+    async with world.uow() as uow:
+        await uow.document_types.add(letter)
+        await uow.commit()
+    await _rule(world, admin, mailbox, user_id=person.id, text_type_id=letter.id)
+    rules = ApplyRulesNode(
+        world.uow, world.object_store, RegexPatternMatcher(0.2), TEMPLATES, max_text=200_000
+    )
+    pipeline = world.pipeline({Node.APPLY_RULES: rules})
+    _deliver(world, mails.rich_mail())
+    await _fetch(world, world.mail_intake(pipeline))
+    await world.drain(pipeline)
+    documents = {
+        document.media_type: document for document in await world.documents.list_visible(person.id)
+    }
+    assert documents["message/rfc822"].document_type_id == letter.id
+    assert documents["application/pdf"].document_type_id is None  # an attachment: not the text

@@ -8,17 +8,19 @@ from uuid import UUID
 
 from lekto.core.domain.classification import (
     CHECKS,
+    DOCUMENT_TYPE,
     SPACE,
     FieldCheck,
     checks_from_json,
     field_key,
     node_reasons,
 )
-from lekto.core.domain.documents import Document
+from lekto.core.domain.documents import Document, DocumentChanges
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldDefinition
-from lekto.core.domain.ids import FieldId, SpaceId
+from lekto.core.domain.ids import DocumentTypeId, FieldId, SpaceId
 from lekto.core.domain.json_value import JsonObject, JsonValue, as_list
+from lekto.core.domain.mail_intake import OriginRole
 from lekto.core.domain.pipeline import RULES, TRIGGER, Node, NodeResult, NodeRun, Outcome
 from lekto.core.domain.reasons import Reason, ReasonCode, because, reasons_to_json
 from lekto.core.domain.rule_planner import Mode
@@ -178,6 +180,7 @@ class RulesResult:
         """Walk the chain of spaces on `document` (`probe`: a copy, nothing else is written).
         Stops where a rule waits for an answer or the node fails."""
         definitions = await field_definitions(uow)
+        typed = await _mail_type(uow, document, log, definitions, now)
         earlier = [space for space in chain_before(log) if space != document.space_id]
         visited = [*earlier, document.space_id]
         first = True
@@ -248,6 +251,8 @@ class RulesResult:
             TRIGGER: Trigger.INGEST.value,
             "rules": checked_rules(looked),
         }
+        if typed is not None:
+            output[MAIL_TYPE] = str(typed)
         if earlier:
             input["chain"] = [str(space) for space in earlier]
         if failures:
@@ -280,6 +285,32 @@ class RulesResult:
         else:
             result = NodeResult(outcome=Outcome.OK, model_version=RULES, input=input, output=output)
         return _Chain(_waiting_for_hand(document, definitions, result), asks, waiting, failed=False)
+
+
+MAIL_TYPE = "mail_type"
+"""In the node's output: the type a mail's text got from the mail rule or the mailbox."""
+
+
+async def _mail_type(
+    uow: UnitOfWork,
+    document: Document,
+    log: Sequence[NodeRun],
+    definitions: Mapping[FieldId, FieldDefinition],
+    now: datetime,
+) -> DocumentTypeId | None:
+    """Give a mail's text the type its mail rule (or mailbox) names, before the document's
+    rules run, as a rule's action would; not where a person decided the type, nor where the
+    type is gone. The type set, or None."""
+    origin = await uow.mail_origins.find(document.id)
+    if origin is None or origin.role is not OriginRole.COVER or origin.body_type_id is None:
+        return None
+    wanted = origin.body_type_id
+    if DOCUMENT_TYPE in provenance(log, document).person or document.document_type_id == wanted:
+        return None
+    if await uow.document_types.find(wanted) is None:
+        return None
+    document.apply_changes(DocumentChanges(document_type_id=wanted), definitions, now)
+    return wanted
 
 
 def _suggested_here(log: Sequence[NodeRun], document: Document) -> bool:

@@ -151,3 +151,39 @@ async def test_fetch_now_and_the_origin_of_a_document(api: Api) -> None:
     )
     assert paused.status_code == 200
     assert (await api.client.post(url, headers=auth(admin))).status_code == 422
+
+
+async def test_mail_rules(api: Api) -> None:
+    admin, user = await api.admin(), await api.user()
+    mailbox = await post(api, "/mailboxes", BODY, auth(admin))
+    body = {
+        "mailbox_id": mailbox["id"],
+        "name": "Strom",
+        "priority": 1,
+        "conditions": [{"field": "sender", "op": "ends_with", "value": "@stadtwerke.example"}],
+        "user_id": str(user.id),
+        "after": "move",
+        "move_to": "Lekto/Erledigt",
+    }
+    created = await post(api, "/mail-rules", body, auth(admin))
+    assert (created["parts"], created["any"], created["enabled"], created["text_type_id"]) == (
+        "all",
+        False,
+        True,
+        None,
+    )
+    assert created["conditions"] == [
+        {"field": "sender", "op": "ends_with", "value": "@stadtwerke.example"}
+    ]
+    url = f"{PREFIX}/mail-rules/{created['id']}"
+    changed = await api.client.patch(
+        url, json={"after": "read", "move_to": None, "enabled": False}, headers=auth(admin)
+    )
+    assert changed.status_code == 200, changed.text
+    assert (changed.json()["after"], changed.json()["move_to"]) == ("read", None)
+    bad = await api.client.patch(url, json={"user_id": None}, headers=auth(admin))
+    assert bad.status_code == 422  # it takes something: for whom?
+    assert (await api.client.get(f"{PREFIX}/mail-rules", headers=auth(user))).status_code == 403
+    listed = (await api.client.get(f"{PREFIX}/mail-rules", headers=auth(admin))).json()
+    assert [item["name"] for item in listed] == ["Strom"]
+    assert (await api.client.delete(url, headers=auth(admin))).status_code == 204

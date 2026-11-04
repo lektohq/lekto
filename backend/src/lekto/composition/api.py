@@ -89,6 +89,7 @@ def api_context(container: Container, settings: Settings, services: Services) ->
         lenses=services.lenses,
         mailboxes=services.mailboxes,
         mail_intake=services.mail_intake,
+        mail_rules=services.mail_rules,
         relations=services.relations,
         expected=services.expected,
         stream=services.stream,

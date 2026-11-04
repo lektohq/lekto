@@ -7,7 +7,7 @@ from sqlalchemy import Row, insert, select
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.transaction import Transaction
-from lekto.core.domain.ids import DocumentId, MailboxId, MailRecordId
+from lekto.core.domain.ids import DocumentId, DocumentTypeId, MailboxId, MailRecordId
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.mail_intake import MailOrigin, MailOutcome, MailRecord, OriginRole
 from lekto.core.domain.mail_message import Address
@@ -116,6 +116,7 @@ class SqlMailOriginRepository:
                 forwarded_by=addresses_json(origin.forwarded_by),
                 filename=origin.filename,
                 related=[str(id) for id in origin.related],
+                body_type_id=origin.body_type_id,
                 version=origin.version,
             )
         )
@@ -162,5 +163,6 @@ def _origin(row: Row[Any]) -> MailOrigin:
         forwarded_by=addresses_of(row.forwarded_by),
         filename=row.filename,
         related=tuple(DocumentId(UUID(id)) for id in row.related),
+        body_type_id=None if row.body_type_id is None else DocumentTypeId(row.body_type_id),
         version=row.version,
     )

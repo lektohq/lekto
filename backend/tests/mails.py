@@ -1,5 +1,6 @@
 """Mails for the tests, built with `email` of the standard library."""
 
+import hashlib
 from email.message import EmailMessage
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 24
@@ -13,7 +14,9 @@ def plain_mail(
     message["From"] = "Stadtwerke Musterstadt <rechnung@stadtwerke.example>"
     message["To"] = "Anna Beispiel <anna@example.test>"
     message["Date"] = "Wed, 04 Nov 2026 10:00:00 +0100"
-    message["Message-ID"] = "<rechnung-4711@stadtwerke.example>"
+    message["Message-ID"] = (
+        f"<{hashlib.sha256(subject.encode()).hexdigest()[:16]}@stadtwerke.example>"
+    )
     message["Subject"] = subject
     message.set_content(text)
     return bytes(message)

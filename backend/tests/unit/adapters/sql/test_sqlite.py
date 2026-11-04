@@ -20,6 +20,7 @@ from tests.contracts.lenses import LensRepositoryContract
 from tests.contracts.mail_records import (
     MailOriginRepositoryContract,
     MailRecordRepositoryContract,
+    MailRuleRepositoryContract,
 )
 from tests.contracts.mailboxes import MailboxRepositoryContract
 from tests.contracts.processing_facts import ProcessingFactsContract
@@ -72,6 +73,10 @@ class TestSqliteMailRecordRepository(MailRecordRepositoryContract):
 
 
 class TestSqliteMailOriginRepository(MailOriginRepositoryContract):
+    pass
+
+
+class TestSqliteMailRuleRepository(MailRuleRepositoryContract):
     pass
 
 
