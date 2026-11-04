@@ -22,6 +22,7 @@ from lekto.adapters.outbound.crypto import (
     decode_key,
 )
 from lekto.adapters.outbound.filesystem import FilesystemObjectStore
+from lekto.adapters.outbound.imap import ImapMailServer
 from lekto.adapters.outbound.liquid import LiquidTemplateRenderer
 from lekto.adapters.outbound.logos import HttpLogoFetcher
 from lekto.adapters.outbound.meilisearch import MeilisearchIndex
@@ -41,6 +42,7 @@ from lekto.adapters.outbound.memory import (
     FakeWebhookSender,
     MemoryDatabase,
     MemoryEventBus,
+    MemoryMailServer,
     MemoryObjectStore,
     MemorySearchIndex,
     MemoryUnitOfWorkFactory,
@@ -82,6 +84,7 @@ from lekto.core.ports.images import ImageNormaliser
 from lekto.core.ports.llm import LanguageModel
 from lekto.core.ports.locator import TextLocator
 from lekto.core.ports.logos import LogoFetcher
+from lekto.core.ports.mail_server import MailServer
 from lekto.core.ports.metadata import MetadataReader
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.ocr import Ocr
@@ -117,6 +120,7 @@ from lekto.core.services.indexing import IndexingPolicy, IndexingService
 from lekto.core.services.jobs import JobsService
 from lekto.core.services.lenses import LensService
 from lekto.core.services.logos import LogoService
+from lekto.core.services.mailboxes import MailboxService
 from lekto.core.services.maintenance import MaintenanceService
 from lekto.core.services.master_data import MasterDataService
 from lekto.core.services.nodes import OcrNode, PagesNode, ParseNode
@@ -379,6 +383,7 @@ class Container:
     cipher: SecretCipher
     refs: RefCipher
     webhook_sender: WebhookSender
+    mail_server: MailServer
     totp: Totp
     patterns: PatternMatcher
     templates: TemplateRenderer
@@ -447,6 +452,7 @@ def build_container(settings: Settings) -> Container:
         cipher=secret_cipher(settings),
         refs=ref_cipher(settings),
         webhook_sender=HttpWebhookSender(user_agent=USER_AGENT),
+        mail_server=ImapMailServer(),
         totp=PyotpTotp(),
         patterns=RegexPatternMatcher(settings.rules_pattern_timeout.total_seconds()),
         templates=LiquidTemplateRenderer(
@@ -496,6 +502,7 @@ def build_memory_container(
         cipher=FakeCipher(),
         refs=FakeRefCipher(),
         webhook_sender=FakeWebhookSender(),
+        mail_server=MemoryMailServer(),
         totp=FakeTotp(),
         patterns=RegexPatternMatcher(settings.rules_pattern_timeout.total_seconds()),
         templates=LiquidTemplateRenderer(
@@ -528,6 +535,7 @@ class Services:
     webhook_delivery: WebhookDeliveryService
     tasks: TaskService
     lenses: LensService
+    mailboxes: MailboxService
     relations: RelationService
     expected: ExpectedService
     stream: StreamService
@@ -847,6 +855,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
             retention=settings.retention,
         ),
         lenses=LensService(uow, clock),
+        mailboxes=MailboxService(uow, clock, container.cipher, container.mail_server),
         relations=RelationService(uow, clock),
         expected=ExpectedService(uow, clock),
         stream=StreamService(uow, clock),
