@@ -19,10 +19,18 @@ from lekto.adapters.inbound.mcp.tools.spaces import space_name
 from lekto.adapters.inbound.schemas import FieldJson, RuleReportOut, field_json
 from lekto.core.domain.classification import field_id_of
 from lekto.core.domain.document_facts import FactState
-from lekto.core.domain.documents import MAX_TITLE, UNSET, Document, DocumentChanges, Unset
+from lekto.core.domain.documents import (
+    MAX_TITLE,
+    UNSET,
+    Channel,
+    Document,
+    DocumentChanges,
+    Unset,
+)
 from lekto.core.domain.fields import FieldValue, field_from_json, field_to_json
 from lekto.core.domain.ids import DocumentId, FieldId, UserId, short_id
 from lekto.core.domain.json_value import JsonValue
+from lekto.core.domain.mail_intake import OriginRole
 from lekto.core.domain.pipeline import ACTOR, CONFIRMED_BY, VIA_TOKEN, NodeRun
 from lekto.core.domain.relations import RelationState
 from lekto.core.domain.spaces import SpaceRole
@@ -74,6 +82,16 @@ class OpenOut(BaseModel):
     fields: list[CheckOut]
 
 
+class MailOut(BaseModel):
+    """The mail a document came with."""
+
+    mailbox: str
+    sender: str
+    subject: str
+    sent_at: datetime | None
+    attachment: str | None = None  # the file's name, for an attachment
+
+
 class DocumentOut(BaseModel):
     id: str
     title: str
@@ -97,6 +115,7 @@ class DocumentOut(BaseModel):
     open: list[OpenOut] = []  # why it is yellow or red
     poorly_read: list[int] = []  # pages; their text may be wrong
     read_by_vision: bool | None = None
+    mail: MailOut | None = None
 
 
 class SearchItem(BaseModel):
@@ -256,6 +275,16 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
         names = await Names.load(context, user)
         out = document_out(document, view.access, names)
         out.space = await space_name(context, user, document.space_id)
+        if document.channel is Channel.MAIL:
+            origin = await context.mail_intake.origin(user, document.id)
+            if origin is not None:
+                out.mail = MailOut(
+                    mailbox=origin.mailbox,
+                    sender=", ".join(address.shown for address in origin.sender),
+                    subject=origin.subject,
+                    sent_at=origin.sent_at,
+                    attachment=origin.filename if origin.role is OriginRole.ATTACHMENT else None,
+                )
         if "relations" in wanted:
             out.relations = await relations(context, user, document.id, names)
         if "facts" in wanted:
