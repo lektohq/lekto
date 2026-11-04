@@ -25,7 +25,7 @@ FROM ghcr.io/astral-sh/uv:0.11.33 AS uv
 # Set by BuildKit; declared here so that `FROM s6-${TARGETARCH}` can use it.
 ARG TARGETARCH
 
-# --- base: Python and the system packages OCRmyPDF needs ----------------------------------------
+# --- base: Python and the system packages OCRmyPDF and WeasyPrint need ----------------------------
 FROM python:3.13.13-slim-trixie AS base
 
 ENV PYTHONUNBUFFERED=1 \
@@ -38,6 +38,9 @@ RUN apt-get update \
     && apt-get install --no-install-recommends -y \
         ca-certificates \
         ghostscript \
+        libharfbuzz-subset0 \
+        libpango-1.0-0 \
+        libpangoft2-1.0-0 \
         pngquant \
         qpdf \
         tesseract-ocr \
