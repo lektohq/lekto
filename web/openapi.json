@@ -26152,7 +26152,11 @@
           "field",
           "document_date",
           "fact",
-          "relation"
+          "relation",
+          "mail_mailbox",
+          "mail_sender",
+          "mail_recipient",
+          "mail_subject"
         ],
         "title": "ConditionField"
       },
@@ -35683,7 +35687,9 @@
           "lt",
           "overlaps",
           "present",
-          "missing"
+          "missing",
+          "starts_with",
+          "ends_with"
         ],
         "title": "Operator"
       },

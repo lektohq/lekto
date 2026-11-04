@@ -200,7 +200,11 @@ describe('the rule model', () => {
 			document_date: ['is', 'gt', 'lt', 'present', 'missing'],
 			step: ['is', 'in', 'contains', 'gt', 'lt', 'present', 'missing'],
 			fact: ['present', 'missing', 'is', 'in', 'matches'],
-			relation: ['present', 'missing', 'is', 'in']
+			relation: ['present', 'missing', 'is', 'in'],
+			mail_mailbox: ['is', 'in', 'present', 'missing'],
+			mail_sender: ['ends_with', 'contains', 'is', 'starts_with'],
+			mail_recipient: ['ends_with', 'contains', 'is', 'starts_with'],
+			mail_subject: ['ends_with', 'contains', 'is', 'starts_with']
 		});
 		expect(FIELD_TYPE_OPERATORS.boolean).toEqual(['is', 'present', 'missing']);
 		expect(FIELD_TYPE_OPERATORS.choice).toEqual(['is', 'in', 'present', 'missing']);

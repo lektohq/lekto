@@ -116,7 +116,11 @@ export const CONDITION_FIELDS: readonly ConditionField[] = [
 	'document_date',
 	'field',
 	'fact',
-	'relation'
+	'relation',
+	'mail_mailbox',
+	'mail_sender',
+	'mail_recipient',
+	'mail_subject'
 ];
 export const STEP_CONDITION_FIELDS: readonly ConditionField[] = ['step', ...CONDITION_FIELDS];
 
@@ -128,12 +132,15 @@ const ALL_OPERATORS: readonly Operator[] = [
 	'gt',
 	'lt',
 	'present',
-	'missing'
+	'missing',
+	'starts_with',
+	'ends_with'
 ];
 const REFERENCE: readonly Operator[] = ['is', 'in', 'present', 'missing'];
 const ORDERED: readonly Operator[] = ['is', 'gt', 'lt', 'present', 'missing'];
 const TEXTUAL: readonly Operator[] = ['is', 'in', 'contains', 'matches', 'present', 'missing'];
 const TAGS: readonly Operator[] = ['contains', 'in', 'present', 'missing'];
+const MAIL_TEXT: readonly Operator[] = ['ends_with', 'contains', 'is', 'starts_with'];
 
 /** The condition fields on tags, and the scope of the tags each names. */
 export const TAG_FIELDS = {
@@ -161,7 +168,11 @@ export const CONDITION_FIELD_OPERATORS: Record<
 	document_date: ORDERED,
 	step: ['is', 'in', 'contains', 'gt', 'lt', 'present', 'missing'],
 	fact: ['present', 'missing', 'is', 'in', 'matches'],
-	relation: ['present', 'missing', 'is', 'in']
+	relation: ['present', 'missing', 'is', 'in'],
+	mail_mailbox: ['is', 'in', 'present', 'missing'],
+	mail_sender: MAIL_TEXT,
+	mail_recipient: MAIL_TEXT,
+	mail_subject: MAIL_TEXT
 };
 
 export const FIELD_TYPE_OPERATORS: Record<FieldType, readonly Operator[]> = {
@@ -723,7 +734,10 @@ function checkValue(
 	if (
 		condition.field === 'text' ||
 		(condition.field === 'field' && textual) ||
-		condition.field === 'fact'
+		condition.field === 'fact' ||
+		condition.field === 'mail_sender' ||
+		condition.field === 'mail_recipient' ||
+		condition.field === 'mail_subject'
 	) {
 		return checkText(value, condition.op === 'matches' ? LIMITS.pattern : LIMITS.text);
 	}
@@ -736,6 +750,7 @@ function checkValue(
 		case 'contact_group':
 		case 'document_type_group':
 		case 'channel':
+		case 'mail_mailbox':
 			return typeof value === 'string' && value !== '' ? null : { code: 'choose' };
 		case 'document_date':
 			return isDate(value) ? null : { code: 'date' };

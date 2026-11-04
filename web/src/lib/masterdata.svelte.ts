@@ -8,6 +8,7 @@ import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { editableSpaces, handOverTargets } from '#lib/permissions.ts';
 import { scope } from '#lib/scope.svelte.ts';
+import { session } from '#lib/session.svelte.ts';
 
 export type Contact = components['schemas']['ContactOut'];
 export type DocumentType = components['schemas']['DocumentTypeOut'];
@@ -30,6 +31,9 @@ export interface Lookup {
 	/** The webhooks the caller sees (their own; an admin's: everybody's), where a page loaded
 	 * them (the rule pages: a rule sends through its author's webhooks). */
 	webhooks?: WebhookName[];
+	/** The mailboxes, for an admin on the rule pages: a document rule's mail conditions name
+	 * them (only admins read them). */
+	mailboxes?: { id: string; name: string }[];
 }
 
 /** A webhook as a rule names it. */
@@ -56,10 +60,15 @@ export async function loadLookup(): Promise<Lookup> {
 
 /** The master data with the webhooks the caller sees, for the rule pages. */
 export async function loadRuleLookup(): Promise<Lookup> {
-	const [lookup, webhooks] = await Promise.all([loadLookup(), unwrap(api.GET('/api/v1/webhooks'))]);
+	const [lookup, webhooks, mailboxes] = await Promise.all([
+		loadLookup(),
+		unwrap(api.GET('/api/v1/webhooks')),
+		session.isAdmin ? unwrap(api.GET('/api/v1/mailboxes')) : Promise.resolve([])
+	]);
 	return {
 		...lookup,
-		webhooks: webhooks.map(({ id, name, owner_id }) => ({ id, name, owner_id }))
+		webhooks: webhooks.map(({ id, name, owner_id }) => ({ id, name, owner_id })),
+		mailboxes: mailboxes.map(({ id, name }) => ({ id, name }))
 	};
 }
 

@@ -78,11 +78,19 @@
 		).map((role) => ({ value: role, label: roleLabel(role) }))
 	]);
 	const operators = $derived(operatorsFor(condition, lookup.fields));
+	// The mailbox only where the mailboxes are known (an admin's); the field it has stays.
 	const conditionFieldOptions = $derived(
-		(steps === null ? CONDITION_FIELDS : STEP_CONDITION_FIELDS).map((field) => ({
-			value: field,
-			label: fieldLabel(field)
-		}))
+		(steps === null ? CONDITION_FIELDS : STEP_CONDITION_FIELDS)
+			.filter(
+				(field) =>
+					field !== 'mail_mailbox' ||
+					(lookup.mailboxes?.length ?? 0) > 0 ||
+					condition.field === field
+			)
+			.map((field) => ({
+				value: field,
+				label: fieldLabel(field)
+			}))
 	);
 	// What a step condition compares with: a text, a number or true/false; after or before a
 	// number or a date.
@@ -140,6 +148,8 @@
 				return tagOptions(lookup.tags, 'topic');
 			case 'channel':
 				return CHANNELS.map((channel) => ({ value: channel, label: CHANNEL_LABELS[channel]() }));
+			case 'mail_mailbox':
+				return (lookup.mailboxes ?? []).map((entry) => ({ value: entry.id, label: entry.name }));
 			case 'field':
 				return field?.data_type === 'choice'
 					? field.choices.map((choice) => ({ value: choice, label: choice }))
