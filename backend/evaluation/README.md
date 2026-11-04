@@ -98,11 +98,18 @@ amounts), `compound` (compound words), `typo`, `paraphrase` (other words for the
 `english` (query in English, documents in German), `late` (only in the back part of the long
 statement, beyond the sections that get a vector), `confusable` (the right one among documents
 alike: the pay slips, the electrician's, the mail-order house's, the statements, the insurer's),
-`question` (asked as a person asks) and `purpose` (what a document is for, in none of its words).
+`question` (asked as a person asks), `purpose` (what a document is for, in none of its words),
+`part` (one part of a compound of the document), `inflected` (another form of a word of the
+document), `synonym` (another word for the same thing, not in the document), `field` (the contact
+or type of the documents, which others name in their text) and `ending` (a word Meilisearch
+splits into its stem and a short ending, "Kündigungen" into "kündigung" and "en"). A second,
+larger set are the example documents (`examples/documents`, see its README): 321 documents of
+one household with many alike, and their own queries.
 
 ```sh
 uv run lekto evaluate-search --fake                # flow only, as in CI
 uv run lekto evaluate-search --models bge-m3,other # models of the endpoint
+uv run lekto evaluate-search --words-only          # Meilisearch without embeddings
 uv run lekto evaluate-search --ratios 0,0.5,1 --queries FILE --output FILE
 ```
 
@@ -113,9 +120,15 @@ search service at each semantic ratio. A real run needs `LEKTO_MEILISEARCH_URL`,
 `LEKTO_EMBEDDING_DIMENSIONS` with any value, because the configuration is checked first (the
 real length is measured). Prefixes, section size and the rest come from the `LEKTO_` settings, so
 a model that needs other prefixes gets a run of its own. `--fake` uses bag-of-words vectors and
-the in-memory index: it shows that the flow works, not how good a model is.
+the in-memory index: it shows that the flow works, not how good a model is. `--words-only`
+indexes without embeddings and runs the queries by words alone, on Meilisearch without an
+embedding endpoint: for changes to the word search.
 
 The documents carry a number as title and file name, so a query cannot find a case by its name.
 The report goes to `search/reports/<date>-<models>.md`: Hit@1/3/5 (the share of queries whose
-answer is among the first 1, 3 or 5 hits), mean reciprocal rank, time per query, Hit@3 per kind
-of query, the cost of indexing (sections, seconds per section) and the queries that missed.
+answer is among the first 1, 3 or 5 hits), mean reciprocal rank, R-precision (the share of the
+expected cases among the first n hits, n the number expected: whether all pay slips come before
+the statements that name the employer), ties (queries where chance decides between an expected
+case and another at the top, both with the first hit's score), time per query, Hit@3 and
+R-precision per kind of query, the cost of indexing (sections, seconds per section) and the
+queries that missed or tied.
