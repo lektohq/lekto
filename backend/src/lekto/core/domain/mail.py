@@ -91,6 +91,8 @@ class MailboxStatus:
     error: Reason | None = None  # why the last attempt failed; none after a success
     mails: int = 0  # mails taken in
     documents: int = 0  # documents made from them
+    skipped_at: datetime | None = None  # when a mail was last left out, too large
+    skipped: Reason | None = None  # which and why
 
 
 @dataclass(frozen=True, kw_only=True)

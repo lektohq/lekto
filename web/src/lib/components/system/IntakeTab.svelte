@@ -18,6 +18,7 @@
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { describeError } from '#lib/errors.ts';
+	import { formatDate } from '#lib/i18n.ts';
 	import { statusOf, summaryOf, type Mailbox, type StatusTone } from '#lib/mailboxes.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { reasonText } from '#lib/reasons.ts';
@@ -118,6 +119,17 @@
 						<span class="text-sm text-muted-foreground">{summaryOf(mailbox)}</span>
 						{#if mailbox.status.error}
 							<span class="text-sm text-destructive">{reasonText(mailbox.status.error)}</span>
+						{/if}
+						{#if mailbox.status.skipped && mailbox.status.skipped_at}
+							<span class="text-sm text-lane-yellow-foreground"
+								>{m.mail_skipped({
+									when: formatDate(mailbox.status.skipped_at, {
+										dateStyle: 'medium',
+										timeStyle: 'short'
+									}),
+									reason: reasonText(mailbox.status.skipped)
+								})}</span
+							>
 						{/if}
 					</div>
 					<Switch

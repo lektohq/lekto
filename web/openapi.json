@@ -34450,6 +34450,30 @@
             "type": "integer",
             "title": "Documents",
             "description": "Documents made from them."
+          },
+          "skipped_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skipped At",
+            "description": "When a mail was last left out because it was too large."
+          },
+          "skipped": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasonOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which mail that was, and why."
           }
         },
         "type": "object",
@@ -34458,7 +34482,9 @@
           "last_success_at",
           "error",
           "mails",
-          "documents"
+          "documents",
+          "skipped_at",
+          "skipped"
         ],
         "title": "MailboxStatusOut",
         "description": "What the fetches found."
@@ -36878,6 +36904,7 @@
           "mail_server_error",
           "mail_password_unreadable",
           "mailbox_paused",
+          "mail_too_large",
           "mail_rule_person_gone",
           "mail_rule_space_unreachable",
           "mail_rule_type_gone"
@@ -42906,6 +42933,11 @@
     },
     "mail_password_unreadable": {},
     "mailbox_paused": {},
+    "mail_too_large": {
+      "subject": "text",
+      "size": "number",
+      "max": "number"
+    },
     "mail_rule_person_gone": {},
     "mail_rule_space_unreachable": {},
     "mail_rule_type_gone": {}
