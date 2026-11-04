@@ -23,7 +23,7 @@
 		submitLabel,
 		disabled = false,
 		destructive = false,
-		class: className,
+		size = 'md',
 		action,
 		ondelete,
 		deleteTitle = '',
@@ -38,8 +38,8 @@
 		/** Submitting is not possible yet (a name is missing). */
 		disabled?: boolean;
 		destructive?: boolean;
-		/** The width of the dialog. */
-		class?: string;
+		/** The width of the dialog (web/DESIGN.md, "Dialogs"). */
+		size?: 'sm' | 'md' | 'lg';
 		action: () => Promise<void>;
 		/** Deleting what the dialog edits: asked first, in the footer as the editors have it. */
 		ondelete?: () => Promise<void>;
@@ -76,16 +76,16 @@
 
 <Dialog.Root bind:open>
 	<Dialog.Content
-		size="md"
+		{size}
 		showCloseButton={!phone.current}
 		class={cn(
+			'flex flex-col overflow-hidden',
 			phone.current &&
-				'top-0 left-0 flex h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-0 bg-background p-0',
-			className
+				'top-0 left-0 h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 gap-0 rounded-none border-0 bg-background p-0'
 		)}
 	>
 		<AsyncForm
-			class={cn('flex flex-col gap-4', phone.current && 'min-h-0 flex-1 gap-0')}
+			class={cn('flex min-h-0 flex-col gap-4', phone.current && 'flex-1 gap-0')}
 			{action}
 			ondone={() => (open = false)}
 		>
@@ -150,7 +150,12 @@
 						<Dialog.Title>{title}</Dialog.Title>
 						{#if description}<Dialog.Description>{description}</Dialog.Description>{/if}
 					</Dialog.Header>
-					{@render fields(error)}
+					<!-- Title and footer stay; the fields scroll, the scrollbar at the dialog's edge. -->
+					<div
+						class="-mx-5 -my-1 flex min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain px-5 py-1"
+					>
+						{@render fields(error)}
+					</div>
 					{#if error ?? altError}<Field.Error>{error ?? altError}</Field.Error>{/if}
 					<Dialog.Footer>
 						{#if alternative}
