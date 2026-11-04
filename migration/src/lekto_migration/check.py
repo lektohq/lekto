@@ -32,6 +32,60 @@ MAGIC = (
     (b"II*\x00", "image/tiff"),
     (b"MM\x00*", "image/tiff"),
 )
+HEAD = 1024
+"""The bytes of a file `kind_of` looks at (as Lekto does)."""
+EML = "message/rfc822"
+_HEADER = re.compile(rb"([!-9;-~]+):")
+_MAIL_HEADERS = frozenset(
+    {
+        b"from",
+        b"to",
+        b"cc",
+        b"date",
+        b"subject",
+        b"message-id",
+        b"mime-version",
+        b"received",
+        b"return-path",
+        b"delivered-to",
+        b"reply-to",
+        b"content-type",
+        b"dkim-signature",
+        b"arc-seal",
+        b"authentication-results",
+        b"x-mailer",
+    }
+)
+
+
+def kind_of(head: bytes) -> str | None:
+    """The media type Lekto would take a file starting with `head` as, or None: by its first
+    bytes, or a mail by its header lines (as `lekto.core.domain.media_types.detect`)."""
+    found = next((media for magic, media in MAGIC if head.startswith(magic)), None)
+    if found is not None:
+        return found
+    if b"%PDF-" in head[:HEAD]:
+        return "application/pdf"
+    return EML if _is_mail(head[:HEAD]) else None
+
+
+def _is_mail(head: bytes) -> bool:
+    """Header lines only (or their continuations) as far as `head` goes, two of them names a
+    mail has, the first one a header."""
+    lines = head.replace(b"\r\n", b"\n").split(b"\n")
+    if len(lines) > 1:
+        lines = lines[:-1]  # the last may be cut off
+    names: set[bytes] = set()
+    for number, line in enumerate(lines):
+        if line == b"":
+            break
+        if line.startswith((b" ", b"\t")) and number > 0:
+            continue
+        match = _HEADER.match(line)
+        if match is None:
+            return False
+        names.add(match[1].lower())
+    return len(names & _MAIL_HEADERS) >= 2
 
 
 def words(text: str) -> int:
@@ -326,15 +380,15 @@ async def _files(
                 except PaperlessError as error:
                     found.append({"id": item.id, "title": item.title, "problem": str(error)})
                     return
-                head = path.read_bytes()[:8]
+                head = path.read_bytes()[:HEAD]
                 digest = download.sha256
         entry: dict[str, Any] = {"id": item.id, "title": item.title, "sha256": digest}
         kept = checksum(documents[item.id])
         if kept is not None and kept != digest:
             entry["problem"] = "the file differs from the checksum Paperless keeps"
-        kind = next((media for magic, media in MAGIC if head.startswith(magic)), None)
+        kind = kind_of(head)
         if kind is None:
-            entry["problem"] = "Lekto would not take the file (not a PDF, JPEG, PNG or TIFF)"
+            entry["problem"] = "Lekto would not take the file (not a PDF, JPEG, PNG, TIFF or mail)"
         elif kind != item.media_type:
             entry["note"] = f"the file is {kind}, Paperless says {item.media_type}"
         row = rows.get(item.id)
