@@ -1,6 +1,7 @@
 """Search: `POST /documents/search` (words and meaning in one call) and `POST /search/reindex`."""
 
 from typing import Annotated, Literal
+from uuid import UUID
 
 from fastapi import APIRouter, Query, Response
 
@@ -13,12 +14,14 @@ from lekto.adapters.inbound.rest.schemas.documents import ListedDocument
 from lekto.adapters.inbound.rest.schemas.search import (
     IndexCheckOut,
     SearchIn,
+    SearchPlacesOut,
     SearchResultItem,
     SearchResultPage,
     SearchStatusOut,
     SnippetSegment,
 )
 from lekto.adapters.inbound.schemas import ReasonOut
+from lekto.core.domain.ids import DocumentId
 from lekto.core.ports.search_index import MAX_HITS, MAX_LIMIT, SEARCH_PAGE
 
 router = APIRouter(tags=["search"], dependencies=PROTECTED)
@@ -91,6 +94,26 @@ async def search_documents(
         reason=None if page.reason is None else ReasonOut.of(page.reason),
         meaning_pending=page.meaning_pending,
     )
+
+
+@router.post(
+    "/documents/{id}/search-places",
+    openapi_extra=READS,
+    summary="Where the words of a search stand in a document",
+    description=(
+        "For a hit of `POST /documents/search`: where the words of `q` stand in the document's "
+        "text, as the search matches them (the parts of compounds, the synonyms), and where its "
+        "pages show them, the best place marked. Short leftovers of the splitting of words are "
+        "left out unless a word that short was asked for. Needs read access. The words go in "
+        "the body, as in the search."
+    ),
+    response_model=SearchPlacesOut,
+    responses=problem_responses(401, 404, 422, 503),
+)
+async def search_places(
+    id: UUID, body: SearchIn, user: CurrentUser, search: Search
+) -> SearchPlacesOut:
+    return SearchPlacesOut.of(await search.places(user, DocumentId(id), body.q))
 
 
 @router.post(

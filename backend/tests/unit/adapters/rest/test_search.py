@@ -1,5 +1,6 @@
 """Search over HTTP: who finds what, the parameters, the errors, the rebuild."""
 
+import json
 from dataclasses import replace
 from typing import Any
 from uuid import UUID
@@ -9,10 +10,13 @@ import pytest
 from lekto.adapters.inbound.rest import PREFIX
 from lekto.core.domain.errors import SearchUnavailableError
 from lekto.core.domain.ids import DocumentId
+from lekto.core.domain.labels import grid_layout
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.spaces import SpaceRole
+from lekto.core.services.objects import structure_key, text_key
+from tests import builders
 from tests.api import auth
-from tests.unit.adapters.rest.support import ACTORS, DENIED, Api, Scene, indexed_scene
+from tests.unit.adapters.rest.support import ACTORS, DENIED, Api, Scene, indexed_scene, upload
 
 SEARCH = f"{PREFIX}/documents/search"
 
@@ -255,3 +259,35 @@ async def test_every_user_sees_the_state_of_the_index_admins_check_it(api: Api) 
     assert check.status_code == 200
     assert check.json() == {**check.json(), "missing": 0, "outdated": 0, "extra": 0}
     assert check.json()["current"] == body["documents"]
+
+
+async def test_the_places_of_the_words_of_a_hit(api: Api) -> None:
+    owner = await api.user()
+    o = auth(owner)
+    document = await upload(api, o)
+    id = DocumentId(UUID(document))
+    text = "Stadtwerke Süd\nIhre Stromrechnung\nStrom und Rechnung"
+    store = api.container.object_store
+    await store.put(text_key(id), text.encode(), content_type="text/plain")
+    layout = json.dumps(grid_layout(text)).encode()
+    await store.put(structure_key(id), layout, content_type="application/json")
+    indexing = api.services.indexing
+    assert indexing is not None
+    await indexing.reconcile()
+    await builders.drain(indexing)
+
+    url = f"{PREFIX}/documents/{document}/search-places"
+    response = await api.client.post(url, json={"q": "Strom Rechnung"}, headers=o)
+    assert response.status_code == 200, response.text
+    places = response.json()
+    assert places["matched"] == len(places["occurrences"]) >= 2
+    # The best is the first place in the line with both words: the third.
+    (best,) = [item for item in places["occurrences"] if item["own"]]
+    assert best["locations"][0]["boxes"][0] == places["occurrences"][-2]["locations"][0]["boxes"][0]
+    # Found by the meaning alone: no places.
+    nothing = await api.client.post(url, json={"q": "Zahnarzt"}, headers=o)
+    assert nothing.json() == {"matched": 0, "occurrences": []}
+    # Who does not read the document learns nothing of it; the words go in the body only.
+    stranger = auth(await api.user())
+    assert (await api.client.post(url, json={"q": "Strom"}, headers=stranger)).status_code == 404
+    assert (await api.client.post(url, json={"q": ""}, headers=o)).status_code == 422

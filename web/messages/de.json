@@ -2714,6 +2714,7 @@
 	"beam_next": "Nächstes Dokument",
 	"beam_position": "Dokument {current} von {total}",
 	"beam_open_document": "Dokument öffnen",
+	"beam_meaning_only": "Über die Bedeutung gefunden, die Wörter stehen nicht im Text.",
 	"beam_pages": "Seiten von „{title}“",
 	"beam_gone": "Das Dokument gibt es nicht mehr, oder Du siehst es nicht mehr.",
 	"back_to": "Zurück zu {place}",

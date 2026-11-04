@@ -76,6 +76,7 @@ ENDPOINTS: dict[str, str | Excluded] = {
     "GET /documents/facets": "documents_list",
     "POST /documents/search": "documents_search",
     "POST /documents/search/warm": BROWSER,
+    "POST /documents/{id}/search-places": BROWSER,
     "GET /documents/stream": BROWSER,
     "POST /documents/bulk": WEB_UI,
     "GET /documents/bulk/{id}": WEB_UI,

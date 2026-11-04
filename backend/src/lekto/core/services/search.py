@@ -17,6 +17,8 @@ listeners, `listen`). Before a search, `warm` has the model of the embeddings lo
 
 import asyncio
 import logging
+import re
+from bisect import bisect_right
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -25,15 +27,23 @@ from enum import StrEnum
 
 from lekto.core.domain.document_facts import fact_tokens
 from lekto.core.domain.documents import Document
-from lekto.core.domain.errors import EmbeddingsError, SearchUnavailableError, ValidationError
+from lekto.core.domain.errors import (
+    EmbeddingsError,
+    NotFoundError,
+    SearchUnavailableError,
+    ValidationError,
+)
 from lekto.core.domain.events import SearchMeaningReady
 from lekto.core.domain.ids import DocumentId, SpaceId, UserId
+from lekto.core.domain.occurrences import Occurrence
 from lekto.core.domain.permissions import Reach, document_access, reach_access
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
 from lekto.core.domain.search import Segment, Visibility
 from lekto.core.domain.spaces import Space, SpaceRole
+from lekto.core.domain.text_places import TextPlaces
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.embeddings import Embeddings
+from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.repository import DocumentFilter, DocumentOrder, SortKey
 from lekto.core.ports.search_index import (
     MAX_HITS,
@@ -41,12 +51,19 @@ from lekto.core.ports.search_index import (
     SEARCH_PAGE,
     SearchIndex,
     SearchQuery,
+    TextMatch,
     check_search,
 )
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
-from lekto.core.services._access import check_fact_filter, load_actor, load_lister
+from lekto.core.services._access import (
+    check_fact_filter,
+    load_actor,
+    load_lister,
+    readable_document,
+)
 from lekto.core.services._tags import expanded, group_lookup, matches
 from lekto.core.services.inbox import in_inbox
+from lekto.core.services.objects import load_layout, load_text
 
 log = logging.getLogger(__name__)
 
@@ -57,6 +74,10 @@ WARM_EVERY = timedelta(minutes=1)
 _KEEP_AT_MOST = 200  # vectors of queries kept
 _PENDING_AT_MOST = 8  # queries embedded at once; beyond, a slow one is given up
 _WARM_TEXT = "Dokument"
+SHORTEST_PLACE = 3
+"""Characters a place of a search's words has at least, unless a word asked for is that short:
+Meilisearch also names the leftovers of its splitting ("en" of "Weihnachten")."""
+_WORD = re.compile(r"\w+")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -104,6 +125,16 @@ class SearchPage:
 
 
 @dataclass(frozen=True)
+class SearchPlaces:
+    """Where the words of a search stand in a document: how many places its text has (none:
+    found by the meaning alone, or not at all), and where its pages show them, in the order of
+    the text, the best `own` (the line with the most of the words, the first of them)."""
+
+    matched: int
+    occurrences: tuple[Occurrence, ...] = ()
+
+
+@dataclass(frozen=True)
 class _Meaning:
     """The vector of a query, or why there is none, and whether it is still being made."""
 
@@ -131,8 +162,12 @@ class SearchService:
         policy: SearchPolicy,
         embeddings: Embeddings | None = None,
         clock: Clock | None = None,
+        store: ObjectStore | None = None,
     ) -> None:
+        """`store`: where the texts and the words of the pages are, for `places`; without it
+        they name no places on the pages."""
         self._uow = uow
+        self._store = store
         self._index = index
         self._embeddings = embeddings
         self._policy = policy
@@ -293,6 +328,42 @@ class SearchService:
             items, result.estimated_total, end if more else None, mode, reason, pending
         )
 
+    async def places(self, actor: UserId, document: DocumentId, text: str) -> SearchPlaces:
+        """Where the words of a search for `text` stand in `document`, as the search matches
+        them, for one who reads it: what the Beam marks for a hit. ValidationError for an empty
+        text, NotFoundError for a document they do not read, SearchUnavailableError if the index
+        cannot be reached."""
+        check_search(text, 0, 0, 1)
+        async with self._uow() as uow:
+            user = await load_actor(uow, actor)
+            found, _ = await readable_document(uow, user, document)
+        # Read access is checked against the database; the index needs no reach of its own.
+        try:
+            matches = await self._index.matches(
+                found.id, text, Visibility(frozenset(), everything=True)
+            )
+        except SearchUnavailableError as error:
+            log.warning("the search index cannot be reached: %s", error)
+            raise SearchUnavailableError(because(ReasonCode.SEARCH_INDEX_UNAVAILABLE)) from error
+        if not matches or self._store is None:
+            return SearchPlaces(len(matches))
+        try:
+            content = (await load_text(self._store, found.id)).decode("utf-8", "replace")
+        except NotFoundError:
+            return SearchPlaces(0)
+        matches = _worth_marking(content, matches, text)
+        pages = await load_layout(self._store, found.id)
+        if not matches or not pages:
+            return SearchPlaces(len(matches))
+        places = await asyncio.to_thread(TextPlaces, content, pages)
+        best = _best(content, matches)
+        occurrences = tuple(
+            Occurrence(located, own=match == best)
+            for match in matches
+            if (located := places.locations(match.start, match.end))
+        )
+        return SearchPlaces(len(matches), occurrences)
+
     async def _meaning(self, actor: UserId, text: str) -> _Meaning:
         """The vector of the query, or why there is none: without embeddings, or with the
         service down, too slow or answering with a vector of another length, the search goes
@@ -382,3 +453,31 @@ class SearchService:
         while len(self._vectors) >= _KEEP_AT_MOST:
             del self._vectors[next(iter(self._vectors))]
         self._vectors[key] = (now + KEEP_VECTORS, vector)
+
+
+def _worth_marking(content: str, matches: list[TextMatch], text: str) -> list[TextMatch]:
+    """The places that show a word asked for: inside the text, and not a short leftover of the
+    splitting, unless such a short word was asked for ("HU")."""
+    short = {word.casefold() for word in _WORD.findall(text) if len(word) < SHORTEST_PLACE}
+    return [
+        match
+        for match in matches
+        if 0 <= match.start < match.end <= len(content)
+        and (
+            match.end - match.start >= SHORTEST_PLACE
+            or content[match.start : match.end].casefold() in short
+        )
+    ]
+
+
+def _best(content: str, matches: list[TextMatch]) -> TextMatch:
+    """The first place in the line that holds the most different words of the search."""
+    breaks = [at for at, character in enumerate(content) if character == "\n"]
+    by_line: dict[int, set[str]] = defaultdict(set)
+    first: dict[int, TextMatch] = {}
+    for match in matches:
+        line = bisect_right(breaks, match.start)
+        by_line[line].add(content[match.start : match.end].casefold())
+        first.setdefault(line, match)
+    line = min(by_line, key=lambda number: (-len(by_line[number]), number))
+    return first[line]

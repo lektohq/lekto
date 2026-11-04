@@ -73,6 +73,19 @@ async def test_every_word_of_a_synonym_group_finds_the_others(
     assert missed == [], "\n".join(missed)
 
 
+async def test_matches_name_the_parts_of_compounds_and_the_synonyms(
+    search_index: MeilisearchIndex,
+) -> None:
+    space = SpaceId(new_id())
+    text = "Bezüge: Gehalt 4.850,00, Einmalzahlung 2.000,00"
+    document = index_document(space_id=space, title="Brief", text=text)
+    await search_index.upsert([document])
+    visible = Visibility(frozenset({space}))
+    for query, shown in (("Einmalzahlung", "Einmalzahlung"), ("Weihnachtsgeld", "Einmalzahlung")):
+        found = await search_index.matches(document.id, query, visible)
+        assert [text[match.start : match.end] for match in found] == [shown], query
+
+
 async def test_the_settings_are_applied_once(meilisearch_settings: Settings) -> None:
     """A second adapter on the same index finds the settings in place and changes nothing, so a
     restart does not index again."""
