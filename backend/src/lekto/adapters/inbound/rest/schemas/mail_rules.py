@@ -60,7 +60,7 @@ class _Rule(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     priority: int | None = Field(
-        default=None, ge=MIN_PRIORITY, le=MAX_PRIORITY, description="Smaller first."
+        default=None, ge=MIN_PRIORITY, le=MAX_PRIORITY, description="Higher first."
     )
     any: bool | None = Field(default=None, description="Any condition (or); else all (and).")
     conditions: list[MailConditionBody] | None = Field(

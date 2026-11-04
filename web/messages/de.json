@@ -222,7 +222,7 @@
 	"mail_rule_generic": "Mail-Regel",
 	"mail_rule_saved": "Mail-Regel gespeichert.",
 	"mail_rule_delete_confirm": "Die Regel übernimmt keine Mails mehr. Was sie schon übernommen hat, bleibt.",
-	"mail_rule_priority_hint": "Die erste passende gilt.",
+	"mail_rule_priority_hint": "Höhere zuerst; die erste passende gilt.",
 	"mail_rule_mailbox": "Postfach",
 	"mail_rule_mode_all": "Alle treffen zu",
 	"mail_rule_mode_any": "Eine davon trifft zu",

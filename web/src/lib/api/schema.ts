@@ -2532,13 +2532,13 @@ export interface paths {
 		};
 		/**
 		 * List mail rules
-		 * @description Every mail rule, by mailbox, priority and name. Of a mailbox's active rules the first that matches a mail decides, by priority (smaller first), the same priority by name; a mail no rule takes goes by the mailbox's fallback. Only admins (403).
+		 * @description Every mail rule, by mailbox, priority and name. Of a mailbox's active rules the first that matches a mail decides, by priority (higher first, as with document rules), the same priority by name; a mail no rule takes goes by the mailbox's fallback. Only admins (403).
 		 */
 		get: operations['list_mail_rules_api_v1_mail_rules_get'];
 		put?: never;
 		/**
 		 * Create a mail rule
-		 * @description Of a mailbox's active rules the first that matches a mail decides, by priority (smaller first), the same priority by name; a mail no rule takes goes by the mailbox's fallback. The person must be active, the space one they file into, the type one that exists; a person is needed unless the rule takes nothing, a folder with `move` (422). Only admins (403).
+		 * @description Of a mailbox's active rules the first that matches a mail decides, by priority (higher first, as with document rules), the same priority by name; a mail no rule takes goes by the mailbox's fallback. The person must be active, the space one they file into, the type one that exists; a person is needed unless the rule takes nothing, a folder with `move` (422). Only admins (403).
 		 */
 		post: operations['create_mail_rule_api_v1_mail_rules_post'];
 		delete?: never;
@@ -7271,7 +7271,7 @@ export interface components {
 		MailRuleCreate: {
 			/**
 			 * Priority
-			 * @description Smaller first.
+			 * @description Higher first.
 			 */
 			priority?: number | null;
 			/**
@@ -7335,7 +7335,7 @@ export interface components {
 		MailRuleDryRun: {
 			/**
 			 * Priority
-			 * @description Smaller first.
+			 * @description Higher first.
 			 */
 			priority?: number | null;
 			/**
@@ -7440,7 +7440,7 @@ export interface components {
 		MailRulePatch: {
 			/**
 			 * Priority
-			 * @description Smaller first.
+			 * @description Higher first.
 			 */
 			priority?: number | null;
 			/**

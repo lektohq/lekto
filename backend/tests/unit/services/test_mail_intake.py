@@ -331,7 +331,7 @@ async def test_the_first_matching_rule_takes_a_mail(world: World) -> None:
         admin,
         mailbox,
         name="Newsletter",
-        priority=1,
+        priority=2,
         conditions=(MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Newsletter"),),
         parts=MailParts.NOTHING,
         after=MailAction.TRASH,
@@ -340,7 +340,7 @@ async def test_the_first_matching_rule_takes_a_mail(world: World) -> None:
         world,
         admin,
         mailbox,
-        priority=2,
+        priority=1,
         conditions=(
             MailCondition(MailField.SENDER, MailOperator.ENDS_WITH, "@stadtwerke.example"),
         ),
@@ -431,7 +431,7 @@ async def test_a_dry_run_over_the_latest_mails(world: World) -> None:
         admin,
         mailbox,
         name="Newsletter",
-        priority=1,
+        priority=3,
         conditions=(MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Newsletter"),),
         parts=MailParts.NOTHING,
     )

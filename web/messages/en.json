@@ -222,7 +222,7 @@
 	"mail_rule_generic": "Mail rule",
 	"mail_rule_saved": "Mail rule saved.",
 	"mail_rule_delete_confirm": "The rule takes no more mails. What it has taken in stays.",
-	"mail_rule_priority_hint": "The first that matches applies.",
+	"mail_rule_priority_hint": "Higher first; the first that matches applies.",
 	"mail_rule_mailbox": "Mailbox",
 	"mail_rule_mode_all": "All of them match",
 	"mail_rule_mode_any": "One of them matches",
