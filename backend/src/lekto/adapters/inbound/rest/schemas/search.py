@@ -69,6 +69,13 @@ class SearchResultPage(BaseModel):
     estimated_total: int = Field(
         description=f"An estimate of the hits, not exact. At most {MAX_HITS} hits can be reached."
     )
+    word_total: int = Field(
+        description=(
+            "An estimate of the hits of the words, not exact: what the words find. With the "
+            "meaning, the hits beyond were found by it alone; for a single word those that hold "
+            "it come first."
+        )
+    )
     next_offset: int | None = Field(
         description="Pass as `offset` for the next page; null on the last page."
     )

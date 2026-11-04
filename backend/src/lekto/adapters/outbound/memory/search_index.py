@@ -94,6 +94,7 @@ class MemorySearchIndex:
         terms = [word.casefold() for word in _WORD.findall(query.text)]
         use_vector = query.vector is not None and query.semantic_ratio > 0
         scored: list[tuple[float, IndexDocument]] = []
+        worded: set[DocumentId] = set()
         for document in self._documents.values():
             if not query.visibility.allows(document) or not _matches_filter(document, query.filter):
                 continue
@@ -101,6 +102,12 @@ class MemorySearchIndex:
             similarity = _similarity(document, query.vector) if use_vector else None
             if words == 0 and similarity is None:
                 continue
+            if words > 0:
+                worded.add(document.id)
+            elif (
+                query.meaning_min_score is not None and (similarity or 0) < query.meaning_min_score
+            ):
+                continue  # found by the meaning alone, too far from it
             if use_vector:
                 score = (1 - query.semantic_ratio) * words + query.semantic_ratio * (
                     similarity or 0
@@ -108,7 +115,11 @@ class MemorySearchIndex:
             else:
                 score = words
             scored.append((score, document))
-        scored.sort(key=lambda item: (-item[0], str(item[1].id)))
+        # A single word: the documents that hold it first (as the Meilisearch adapter).
+        first = use_vector and query.order is None and len(set(terms)) == 1
+        scored.sort(
+            key=lambda item: (first and item[1].id not in worded, -item[0], str(item[1].id))
+        )
         if query.order is not None:
             # In the order asked for; relevance breaks ties (the sort above is stable).
             scored = _ordered(scored, query.order)
@@ -122,7 +133,12 @@ class MemorySearchIndex:
             )
             for score, document in page
         ]
-        return SearchResult(hits=hits, estimated_total=len(scored), semantic=use_vector)
+        return SearchResult(
+            hits=hits,
+            estimated_total=len(scored),
+            semantic=use_vector,
+            word_total=len(worded) if use_vector else None,
+        )
 
     async def matches(
         self, document: DocumentId, text: str, visibility: Visibility

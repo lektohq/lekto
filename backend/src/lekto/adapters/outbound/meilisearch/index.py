@@ -107,6 +107,7 @@ RANKING_RULES = ["sort", "words", "typo", "proximity", "attribute", "exactness"]
 # page of a search goes by the same strategy.
 MATCHING_STRATEGY = "frequency"
 MATCHING_FALLBACK = "last"
+HYBRID_DEPTH = 200  # candidates of a search with the meaning, for the order of its pages
 MATCHED_WORDS = 10  # words of a query asked alone for where they stand in a document
 # The point of an ordinal before a word: Meilisearch splits a query there, so "13. Gehalt" would
 # not meet its synonyms; dates and amounts ("31.12.2025", "1.297,42") keep theirs.
@@ -250,17 +251,67 @@ class MeilisearchIndex:
         if semantic:
             if self._dimensions is None:
                 raise SearchIndexError("the index has no embedder, so it takes no vectors")
-            body["vector"] = list(query.vector or ())
-            body["hybrid"] = {"embedder": EMBEDDER, "semanticRatio": query.semantic_ratio}
+            return await self._hybrid(query, body)
         data = await self._search(body)
         try:
             hits = [_hit_of(item) for item in data["hits"]]
-            total = int(data.get("estimatedTotalHits", data.get("totalHits", 0)))
+            total = _total(data)
         except (KeyError, TypeError, ValueError):
             raise SearchIndexError("Meilisearch sent an unusable search result") from None
         return SearchResult(
-            hits=hits, estimated_total=max(total, query.offset + len(hits)), semantic=semantic
+            hits=hits, estimated_total=max(total, query.offset + len(hits)), semantic=False
         )
+
+    async def _hybrid(self, query: SearchQuery, body: Mapping[str, Any]) -> SearchResult:
+        """Words and meaning: Meilisearch's hybrid order, with the words asked alone beside it,
+        for how many they find and which documents they find. A query of a single word shows
+        those first, and a document found by the meaning alone below `meaning_min_score` is left
+        out. The candidates are the first `HYBRID_DEPTH` (or as many as the page reaches) of
+        both, so that every page of a search is cut from the same order."""
+        depth = min(MAX_HITS, max(HYBRID_DEPTH, query.offset + query.limit))
+        words_body = {**body, "offset": 0, "limit": depth}
+        hybrid_body = {
+            **words_body,
+            "vector": list(query.vector or ()),
+            "hybrid": {"embedder": EMBEDDER, "semanticRatio": query.semantic_ratio},
+        }
+        words, mixed = await self._search(words_body), await self._ask(hybrid_body)
+        try:
+            worded = {str(item["id"]): item for item in words["hits"]}
+            items = list(mixed["hits"])
+            word_total, total = _total(words), _total(mixed)
+            if query.order is None and self._single_word(query.text):
+                shown = {str(item["id"]) for item in items}
+                items = (
+                    [item for item in items if str(item["id"]) in worded]
+                    + [item for key, item in worded.items() if key not in shown]
+                    + [item for item in items if str(item["id"]) not in worded]
+                )
+            if query.meaning_min_score is not None:
+                floor = query.meaning_min_score
+                items = [
+                    item
+                    for item in items
+                    if str(item["id"]) in worded or float(item.get("_rankingScore", 0)) >= floor
+                ]
+            # The order is complete where the candidates did not run out, else it goes on.
+            whole = len(mixed["hits"]) < depth or (
+                query.meaning_min_score is not None and len(items) < len(mixed["hits"])
+            )
+            hits = [_hit_of(item) for item in items[query.offset : query.offset + query.limit]]
+        except (KeyError, TypeError, ValueError):
+            raise SearchIndexError("Meilisearch sent an unusable search result") from None
+        estimated = len(items) if whole else max(total, len(items))
+        return SearchResult(
+            hits=hits,
+            estimated_total=max(estimated, query.offset + len(hits)),
+            semantic=True,
+            word_total=word_total,
+        )
+
+    def _single_word(self, text: str) -> bool:
+        words = {unicodedata.normalize("NFC", word.casefold()) for word in _WORD.findall(text)}
+        return len(words - self._stop_words) == 1
 
     async def matches(
         self, document: DocumentId, text: str, visibility: Visibility
@@ -674,6 +725,10 @@ def _normalised(key: str, setting: Any) -> Any:
             for word, others in setting.items()
         }
     return setting
+
+
+def _total(data: Mapping[str, Any]) -> int:
+    return int(data.get("estimatedTotalHits", data.get("totalHits", 0)))
 
 
 def _quote(value: object) -> str:

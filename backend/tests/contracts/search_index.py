@@ -632,11 +632,61 @@ class SearchIndexContract:
         )
         assert ids(hybrid.hits) == {by_word.id, by_meaning.id}
         assert hybrid.semantic
+        assert hybrid.word_total == 1
         words_only = await search_index.search(
             query("Kündigung", who, vector=(0.0, 1.0, 0.0), semantic_ratio=0.0)
         )
         assert ids(words_only.hits) == {by_word.id}
         assert not words_only.semantic
+
+    async def test_a_single_word_shows_the_documents_that_hold_it_first(
+        self, search_index: SearchIndex
+    ) -> None:
+        owner = SpaceId(new_id())
+        by_word = index_document(
+            space_id=owner,
+            title="Abrechnung Juni",
+            text="Bezüge: Gehalt 5.020,00, Urlaubsgeld 1.200,00, Fahrtkosten 60,00 " * 20,
+            vectors=((0.0, 0.0, 1.0),),
+            embedding=STAMP,
+        )
+        alike = [
+            index_document(
+                space_id=owner, title=f"Ähnlich {n}", vectors=((0.0, 1.0, 0.0),), embedding=STAMP
+            )
+            for n in range(5)
+        ]
+        await search_index.upsert([*alike, by_word])
+        result = await search_index.search(
+            query("Urlaubsgeld", visibility(owner), vector=(0.0, 1.0, 0.0), semantic_ratio=0.5)
+        )
+        assert result.hits[0].id == by_word.id
+        assert result.word_total == 1
+        assert ids(result.hits) == {by_word.id} | {document.id for document in alike}
+
+    async def test_what_the_meaning_alone_finds_below_the_floor_is_left_out(
+        self, search_index: SearchIndex
+    ) -> None:
+        owner = SpaceId(new_id())
+        by_word = index_document(
+            space_id=owner, title="Urlaubsgeld", vectors=((1.0, 0.0, 0.0),), embedding=STAMP
+        )
+        near = index_document(
+            space_id=owner, title="Nah", vectors=((0.0, 1.0, 0.0),), embedding=STAMP
+        )
+        far = index_document(
+            space_id=owner, title="Fern", vectors=((1.0, 0.0, 0.0),), embedding=STAMP
+        )
+        await search_index.upsert([by_word, near, far])
+        who = visibility(owner)
+        floor = query(
+            "Urlaubsgeld", who, vector=(0.0, 1.0, 0.0), semantic_ratio=0.5, meaning_min_score=0.9
+        )
+        result = await search_index.search(floor)
+        assert ids(result.hits) == {by_word.id, near.id}  # a word hit stays, however far
+        assert result.estimated_total == 2
+        everything = await search_index.search(replace(floor, meaning_min_score=None))
+        assert ids(everything.hits) == {by_word.id, near.id, far.id}
 
     async def test_a_vector_never_shows_what_the_rights_hide(
         self, search_index: SearchIndex

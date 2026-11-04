@@ -1,7 +1,9 @@
 """The Markdown report of a search evaluation."""
 
 from lekto.adapters.inbound.evaluation.search import (
+    FLOORS,
     KINDS_AT,
+    NONSENSE,
     ModelResult,
     QuerySet,
     RatioResult,
@@ -75,6 +77,24 @@ def render_search(run: SearchRun, queries: QuerySet, info: SearchRunInfo) -> str
                 f"{ratio.precision(kind):.0%}" if ratio.count(kind) else "-"
                 for kind in queries.kinds
             )
+            lines.append(f"| {model.name} | {ratio.ratio:g} | {cells} |")
+    floored = [(model, ratio) for model in run.models for ratio in model.ratios if ratio.nonsense]
+    if floored:
+        lines += [
+            "",
+            "## The floor of the meaning",
+            "",
+            f"Per floor (`LEKTO_SEARCH_MEANING_MIN_SCORE`): the share of the queries found whose "
+            f"expected case stays (a word of the query shows in it, or the meaning scores it at "
+            f"least so high), and of {len(NONSENSE)} nonsense queries "
+            f"({', '.join(NONSENSE[:3])}, …) the share left without a result. Measured without a "
+            "floor.",
+            "",
+            f"| Model | Ratio | {' | '.join(f'{floor:.2f}' for floor in FLOORS)} |",
+            f"| --- | ---: | {' | '.join('---:' for _ in FLOORS)} |",
+        ]
+        for model, ratio in floored:
+            cells = " | ".join("{:.0%} / {:.0%}".format(*ratio.floor(floor)) for floor in FLOORS)
             lines.append(f"| {model.name} | {ratio.ratio:g} | {cells} |")
     lines += [
         "",

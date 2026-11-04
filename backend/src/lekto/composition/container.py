@@ -662,6 +662,7 @@ def search_policy_of(settings: Settings) -> SearchPolicy:
         embed_timeout=settings.search_embed_timeout,
         query_prefix=_prefix(settings.embedding_query_prefix),
         dimensions=settings.embedding_dimensions,
+        meaning_min_score=settings.search_meaning_min_score,
     )
 
 
