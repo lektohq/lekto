@@ -20,7 +20,10 @@ def render_search(run: SearchRun, queries: QuerySet, info: SearchRunInfo) -> str
         *(f"- {name}: `{value}`" for name, value in info.settings.items()),
         f"- Documents: {run.documents}, queries: {len(queries.cases)}",
         "- Result per query: the first expected case among the first 10 hits. Hit@k: the share of "
-        "queries found within the first k hits; MRR: mean of 1/rank (0 if not found).",
+        "queries found within the first k hits; MRR: mean of 1/rank (0 if not found); R-prec: "
+        "mean share of the expected cases among the first n hits, n the number expected; Ties: "
+        "queries where chance decides between an expected case and another at the top (same "
+        "score).",
     ]
     if info.fake:
         lines += [
@@ -30,15 +33,17 @@ def render_search(run: SearchRun, queries: QuerySet, info: SearchRunInfo) -> str
         ]
     lines += ["", "## Results", ""]
     lines += [
-        "| Model | Ratio | Hit@1 | Hit@3 | Hit@5 | MRR | Mean ms | p95 ms | Without meaning |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Model | Ratio | Hit@1 | Hit@3 | Hit@5 | MRR | R-prec | Ties | Mean ms | p95 ms "
+        "| Without meaning |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for model in run.models:
         for ratio in model.ratios:
             lines.append(
                 f"| {model.name} | {ratio.ratio:g} | {ratio.rate(1):.0%} | {ratio.rate(3):.0%} "
-                f"| {ratio.rate(5):.0%} | {ratio.mrr:.3f} | {ratio.mean_ms:.0f} "
-                f"| {ratio.p95_ms:.0f} | {ratio.without_meaning} |"
+                f"| {ratio.rate(5):.0%} | {ratio.mrr:.3f} | {ratio.precision():.0%} "
+                f"| {ratio.ties()} | {ratio.mean_ms:.0f} | {ratio.p95_ms:.0f} "
+                f"| {ratio.without_meaning} |"
             )
     lines += [
         "",
@@ -59,6 +64,20 @@ def render_search(run: SearchRun, queries: QuerySet, info: SearchRunInfo) -> str
             lines.append(f"| {model.name} | {ratio.ratio:g} | {cells} |")
     lines += [
         "",
+        "## R-precision by kind of query",
+        "",
+        f"| Model | Ratio | {' | '.join(_kind(queries, kind) for kind in queries.kinds)} |",
+        f"| --- | ---: | {' | '.join('---:' for _ in queries.kinds)} |",
+    ]
+    for model in run.models:
+        for ratio in model.ratios:
+            cells = " | ".join(
+                f"{ratio.precision(kind):.0%}" if ratio.count(kind) else "-"
+                for kind in queries.kinds
+            )
+            lines.append(f"| {model.name} | {ratio.ratio:g} | {cells} |")
+    lines += [
+        "",
         "## Cost of indexing",
         "",
         "| Model | Dimensions | Sections | Per document | Embedding s | Rebuild s "
@@ -73,19 +92,22 @@ def render_search(run: SearchRun, queries: QuerySet, info: SearchRunInfo) -> str
         if nearest is None:
             continue
         lines += [f"### {model.name}, ratio {nearest.ratio:g}", ""]
-        missed = [o for o in nearest.outcomes if o.rank is None or o.rank > KINDS_AT]
+        missed = [o for o in nearest.outcomes if o.rank is None or o.rank > KINDS_AT or o.tied]
         if not missed:
-            lines += [f"Every query is within the first {KINDS_AT} hits.", ""]
+            lines += [f"Every query is within the first {KINDS_AT} hits, none tied.", ""]
             continue
         lines += [
+            f"Queries not within the first {KINDS_AT} hits, and tied ones (rank with a *).",
+            "",
             "| Query | Kind | Expected | Rank | First hits |",
             "| --- | --- | --- | ---: | --- |",
         ]
         for outcome in missed:
+            rank = "-" if outcome.rank is None else str(outcome.rank)
             lines.append(
                 f"| {_cell(outcome.case.query)} | {outcome.case.kind} "
                 f"| {_cell(', '.join(sorted(outcome.case.expected)))} "
-                f"| {'-' if outcome.rank is None else outcome.rank} "
+                f"| {rank}{'*' if outcome.tied else ''} "
                 f"| {_cell(', '.join(outcome.got[:3]) or 'none')} |"
             )
         lines.append("")
