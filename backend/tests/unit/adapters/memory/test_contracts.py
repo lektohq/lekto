@@ -60,6 +60,10 @@ from tests.contracts.job_queue import JobQueueContract
 from tests.contracts.language_model import EmbeddingsContract, LanguageModelContract
 from tests.contracts.lenses import LensRepositoryContract
 from tests.contracts.logos import LOGO_PNG, LogoFetcherContract
+from tests.contracts.mail_records import (
+    MailOriginRepositoryContract,
+    MailRecordRepositoryContract,
+)
 from tests.contracts.mailboxes import MailboxRepositoryContract
 from tests.contracts.object_store import ObjectStoreContract
 from tests.contracts.processing import (
@@ -148,6 +152,14 @@ class TestMemoryLensRepository(LensRepositoryContract):
 
 
 class TestMemoryMailboxRepository(MailboxRepositoryContract):
+    pass
+
+
+class TestMemoryMailRecordRepository(MailRecordRepositoryContract):
+    pass
+
+
+class TestMemoryMailOriginRepository(MailOriginRepositoryContract):
     pass
 
 
