@@ -40,6 +40,7 @@ from lekto.core.domain.documents import Document
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import DocumentId, DocumentTypeId
 from lekto.core.domain.json_value import JsonObject
+from lekto.core.domain.mail_intake import OriginRole
 from lekto.core.domain.periods import Period
 from lekto.core.domain.pipeline import NodeResult, Outcome
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState, ordered
@@ -99,6 +100,7 @@ async def recognise(uow: UnitOfWork, document: Document) -> list[Found]:
         *await _targets(uow, document, kept, targets),
         *await _periods(uow, document, kept),
         *await _letters(uow, document, kept),
+        *await _mail(uow, document),
     ]:
         known = found.get(item.other.id)
         if known is None or (
@@ -106,6 +108,41 @@ async def recognise(uow: UnitOfWork, document: Document) -> list[Found]:
         ):
             found[item.other.id] = item
     return list(found.values())
+
+
+MAIL_EVIDENCE = "mail"
+"""The evidence of a relation between documents one mail brought: it holds once made, as the
+mail did (an attachment Lekto had before has no origin to find it again by)."""
+
+
+async def _mail(uow: UnitOfWork, document: Document) -> list[Found]:
+    """The documents of the same mail: a letter's text and its attachments, an outer letter
+    and the others, and the attachments Lekto had already that a letter refers to."""
+    origin = await uow.mail_origins.find(document.id)
+    if origin is None:
+        return []
+    evidence: JsonObject = {
+        "kind": MAIL_EVIDENCE,
+        "message_id": origin.message_id,
+        "subject": origin.subject,
+    }
+    others: list[DocumentId] = []
+    cover = origin.role is OriginRole.COVER
+    for item in await uow.mail_origins.of_record(origin.record_id):
+        if item.document_id == document.id:
+            continue
+        same = item.letter == origin.letter and (cover or item.role is OriginRole.COVER)
+        outer = cover and item.role is OriginRole.COVER and (origin.outer or item.outer)
+        if same or outer:
+            others.append(item.document_id)
+    if cover:
+        others.extend(origin.related)
+    found = []
+    for id in others:
+        other = await uow.documents.find(id)
+        if other is not None:
+            found.append(Found(other, RelationState.SET, evidence))
+    return found
 
 
 @dataclass(frozen=True)
@@ -129,6 +166,7 @@ async def relate(uow: UnitOfWork, document: Document, now: datetime) -> Relating
             and relation.decided_by is None
             and relation.state is not RelationState.REJECTED
             and relation.other(document.id) not in seen
+            and relation.evidence.get("kind") != MAIL_EVIDENCE
         ):
             await uow.document_relations.remove(relation.newer, relation.older)
             dropped.append(relation)

@@ -123,6 +123,7 @@ from lekto.core.services.indexing import IndexingPolicy, IndexingService
 from lekto.core.services.jobs import JobsService
 from lekto.core.services.lenses import LensService
 from lekto.core.services.logos import LogoService
+from lekto.core.services.mail_intake import MailIntakeService
 from lekto.core.services.mailboxes import MailboxService
 from lekto.core.services.maintenance import MaintenanceService
 from lekto.core.services.master_data import MasterDataService
@@ -542,6 +543,7 @@ class Services:
     tasks: TaskService
     lenses: LensService
     mailboxes: MailboxService
+    mail_intake: MailIntakeService
     relations: RelationService
     expected: ExpectedService
     stream: StreamService
@@ -891,6 +893,14 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
         documents=documents,
         inbox=InboxService(uow, clock),
         pipeline=pipeline,
+        mail_intake=MailIntakeService(
+            uow,
+            clock,
+            container.cipher,
+            container.mail_server,
+            pipeline,
+            max_attachment=int(settings.upload_max_size),
+        ),
         bulk=BulkService(uow, clock, documents, pipeline, search),
         maintenance=MaintenanceService(
             uow,

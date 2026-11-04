@@ -91,11 +91,12 @@ keep to it."""
 
 
 class Channel(StrEnum):
-    """How a document came in (its intake channel). Further connectors (mail, folder) follow."""
+    """How a document came in (its intake channel)."""
 
     WEB = "web"  # uploaded with a session (web UI)
     API = "api"  # uploaded with an API token
     MIGRATION = "migration"  # taken over from Paperless-ngx
+    MAIL = "mail"  # fetched from a mailbox
 
 
 class Unset(Enum):

@@ -7,6 +7,7 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
+from lekto.core.domain.mail_intake import Letter
 from lekto.core.domain.mail_message import Address, MailMessage, MailPart, read_mail
 from lekto.core.ports.mail_renderer import RenderedMail
 
@@ -22,6 +23,7 @@ _LABELS = {
         "date": "Datum",
         "subject": "Betreff",
         "attachments": "Anhänge",
+        "left": "Nicht übernommen",
         "none": "(ohne Betreff)",
         "moment": "%d.%m.%Y, %H:%M UTC",
     },
@@ -33,6 +35,7 @@ _LABELS = {
         "date": "Date",
         "subject": "Subject",
         "attachments": "Attachments",
+        "left": "Not taken",
         "none": "(no subject)",
         "moment": "%Y-%m-%d %H:%M UTC",
     },
@@ -94,12 +97,14 @@ class WeasyPrintMailRenderer:
 
     def _head(self, message: MailMessage) -> str:
         labels = self._labels
+        letter = Letter(message)
         rows = [
             ("from", _people(message.sender)),
             ("to", _people(message.to)),
             ("cc", _people(message.cc)),
             ("date", "" if message.date is None else message.date.strftime(labels["moment"])),
-            ("attachments", ", ".join(_names(message.attachments))),
+            ("attachments", ", ".join(_names(letter.taken))),
+            ("left", ", ".join(_names(letter.left))),
         ]
         lines = "".join(
             f'<p class="lekto-row"><span class="lekto-label">{labels[key]}</span> '

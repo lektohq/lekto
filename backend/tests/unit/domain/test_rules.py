@@ -154,7 +154,7 @@ INVALID_CONDITIONS: list[tuple[JsonObject, str]] = [
     ),
     ({"field": "text", "op": "matches", "value": "x", "case_sensitive": "yes"}, "true or false"),
     # values
-    ({"field": "channel", "op": "is", "value": "mail"}, "unknown channel 'mail'"),
+    ({"field": "channel", "op": "is", "value": "fax"}, "unknown channel 'fax'"),
     ({"field": "channel", "op": "in", "value": ["web", "fax"]}, "unknown channel 'fax'"),
     ({"field": "contact", "op": "is", "value": "not-an-id"}, "'not-an-id' is no id"),
     ({"field": "tags", "op": "contains", "value": 42}, "42 is no id"),

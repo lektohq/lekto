@@ -45,6 +45,7 @@ from lekto.core.services.bulk import BulkService
 from lekto.core.services.classifier import ClassifierService
 from lekto.core.services.indexing import IndexingService
 from lekto.core.services.logos import LogoService
+from lekto.core.services.mail_intake import MailIntakeService
 from lekto.core.services.maintenance import MaintenanceService
 from lekto.core.services.master_data import MasterDataService
 from lekto.core.services.pipeline import PipelineService
@@ -99,9 +100,11 @@ class Worker:
         classifier: ClassifierService | None = None,
         logos: LogoService | None = None,
         master_data: MasterDataService | None = None,
+        mail: MailIntakeService | None = None,
     ) -> None:
         self._pipeline = pipeline
         self._master_data = master_data
+        self._mail = mail
         self._logos = logos
         self._classifier = classifier
         self._rules = rules
@@ -135,6 +138,8 @@ class Worker:
             await self._indexing.schedule()
         if self._classifier is not None:
             await self._classifier.schedule()
+        if self._mail is not None:
+            await self._mail.schedule()
         groups = [_group("jobs", self._run_job, self._job_kinds(), self._concurrency)]
         if self._webhooks is not None:
             groups.append(
@@ -245,6 +250,7 @@ class Worker:
             self._master_data,
             self._logos,
             self._classifier,
+            self._mail,
         )
         return tuple(
             kind for service in services if service is not None for kind in service.job_kinds
@@ -260,6 +266,9 @@ class Worker:
         return (
             await self._maintenance.run_next_job()
             or (self._tasks is not None and await self._tasks.run_next_job())
+            # A mailbox's fetch before the pipeline: due every few minutes, it would wait out a
+            # long ingest otherwise; it takes at most a few dozen mails a run.
+            or (self._mail is not None and await self._mail.run_next_job())
             or await self._pipeline.run_next_job()
             or (self._rules is not None and await self._rules.run_next_job())
             or (self._bulk is not None and await self._bulk.run_next_job())
