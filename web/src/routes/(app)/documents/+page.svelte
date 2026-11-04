@@ -811,14 +811,12 @@ row of filters, on a desktop narrow by the title. -->
 			<PageTitle>{lens?.name ?? m.nav_documents()}</PageTitle>
 			{#if searching && list.loaded}
 				<p class="text-sm text-muted-foreground" aria-live="polite">
-					{#if !worded?.meaning}
+					{#if !worded?.meaning || list.total <= worded.total}
 						{m.search_total({ count: formatNumber(list.total) })}
 					{:else if worded.total > 0}
 						{m.search_total_meaning({ count: formatNumber(worded.total) })}
-					{:else if list.total > 0}
-						{m.search_meaning_only()}
 					{:else}
-						{m.search_total({ count: formatNumber(0) })}
+						{m.search_meaning_only()}
 					{/if}
 				</p>
 			{:else if facets && !searching}
