@@ -452,6 +452,7 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	mail_server_error: entry(m.reason_mail_server_error),
 	mail_password_unreadable: entry(m.reason_mail_password_unreadable),
 	mailbox_paused: entry(m.reason_mailbox_paused),
+	mail_too_large: entry(m.reason_mail_too_large, { size: 'number', max: 'number' }),
 	mail_rule_person_gone: entry(m.reason_mail_rule_person_gone),
 	mail_rule_space_unreachable: entry(m.reason_mail_rule_space_unreachable),
 	mail_rule_type_gone: entry(m.reason_mail_rule_type_gone)

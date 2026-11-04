@@ -63,6 +63,8 @@ class MailboxRepositoryContract:
                 error=because(ReasonCode.MAIL_FOLDER_MISSING, folder="Rechnungen/Strom"),
                 mails=12,
                 documents=30,
+                skipped_at=NOW,
+                skipped=because(ReasonCode.MAIL_TOO_LARGE, subject="Fotos", size=200, max=134),
             )
         )
         plain = a_mailbox("Plain")

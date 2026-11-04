@@ -44,7 +44,6 @@ from lekto.core.domain.mail import (
     password_context,
 )
 from lekto.core.domain.mail_intake import (
-    MAX_MAIL_SIZE,
     Letter,
     MailDecision,
     MailOrigin,
@@ -53,6 +52,7 @@ from lekto.core.domain.mail_intake import (
     MailRecord,
     OriginRole,
     letters,
+    mail_limit,
     taken_names,
 )
 from lekto.core.domain.mail_message import MailMessage, read_mail
@@ -103,6 +103,7 @@ class _Count:
     mails: int = 0
     documents: int = 0
     more: bool = False  # mails were left for the next run
+    skipped: Reason | None = None  # the latest mail left out, too large
 
 
 class MailIntakeService:
@@ -127,6 +128,7 @@ class MailIntakeService:
         self._server = server
         self._pipeline = pipeline
         self._max_attachment = max_attachment
+        self._max_mail = mail_limit(max_attachment)
         self._jobs = JobRunner(uow, clock)
 
     async def schedule(self) -> None:
@@ -218,6 +220,8 @@ class MailIntakeService:
                             error=error,
                             mails=status.mails + count.mails,
                             documents=status.documents + count.documents,
+                            skipped_at=started if count.skipped else status.skipped_at,
+                            skipped=count.skipped or status.skipped,
                         )
                     )
                     await uow.mailboxes.update(mailbox)
@@ -250,10 +254,18 @@ class MailIntakeService:
             if mailbox.start is FetchStart.SINCE_SETUP and info.arrived_at < mailbox.created_at:
                 continue  # the same day, before the mailbox was set up
             count.mails += 1
-            count.documents += await self._mail(session, mailbox, folder, found.uidvalidity, info)
+            count.documents += await self._mail(
+                session, mailbox, folder, found.uidvalidity, info, count
+            )
 
     async def _mail(
-        self, session: MailSession, mailbox: Mailbox, folder: str, uidvalidity: int, info: MailInfo
+        self,
+        session: MailSession,
+        mailbox: Mailbox,
+        folder: str,
+        uidvalidity: int,
+        info: MailInfo,
+        count: _Count,
     ) -> int:
         """Take one mail; the number of documents it made."""
         record = MailRecord(
@@ -271,8 +283,20 @@ class MailIntakeService:
             outcome=MailOutcome.TOO_LARGE,
             fetched_at=self._clock.now(),
         )
-        if info.size > MAX_MAIL_SIZE:
-            await self._keep(record)
+        if info.size > self._max_mail:
+            record = _named(record, await session.head(folder, info.uid))
+            reason = because(
+                ReasonCode.MAIL_TOO_LARGE,
+                subject=record.subject,
+                size=_megabytes(info.size),
+                max=_megabytes(self._max_mail),
+            )
+            log.warning(
+                "a mail too large to fetch",
+                extra={"mailbox_id": str(mailbox.id), "size": info.size},
+            )
+            count.skipped = reason
+            await self._keep(replace(record, reason=reason))
             return 0
         data = await session.fetch(folder, info.uid)
         if data is None:
@@ -495,6 +519,28 @@ class MailIntakeService:
                 await session.move(folder, uid, decision.move_to)
         except MailServerError as error:
             log.warning("the action on a mail failed", extra={"reason": error.reason.text})
+
+
+def _named(record: MailRecord, head: bytes | None) -> MailRecord:
+    """The record with the sender, subject and Message-ID of the mail's header lines."""
+    if not head:
+        return record
+    try:
+        message = read_mail(head)
+    except UnprocessableDocumentError:
+        return record
+    return replace(
+        record,
+        message_id=message.message_id,
+        sender=", ".join(address.shown for address in message.sender),
+        subject=message.subject,
+        sent_at=message.date,
+    )
+
+
+def _megabytes(size: int) -> int:
+    """Whole megabytes, rounded up."""
+    return -(-size // (1024 * 1024))
 
 
 def _search(mailbox: Mailbox) -> MailSearch:

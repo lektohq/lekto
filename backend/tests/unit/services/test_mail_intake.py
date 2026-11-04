@@ -23,7 +23,7 @@ from lekto.core.domain.mail import (
     MailLogin,
     MailSecurity,
 )
-from lekto.core.domain.mail_intake import MailOutcome, MailParts, OriginRole
+from lekto.core.domain.mail_intake import MailOutcome, MailParts, OriginRole, mail_limit
 from lekto.core.domain.mail_rules import (
     MailCondition,
     MailField,
@@ -218,15 +218,31 @@ async def test_a_mail_before_the_setup_is_left(world: World) -> None:
     assert await world.documents.list_visible(person.id) == []
 
 
-async def test_a_mail_too_large_is_recorded(world: World, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_a_mail_too_large_is_left_out_and_shows_at_the_mailbox(world: World) -> None:
     _, person, mailbox = await _setup(world)
-    monkeypatch.setattr("lekto.core.services.mail_intake.MAX_MAIL_SIZE", 10)
-    _deliver(world, mails.plain_mail())
-    await _fetch(world, world.mail_intake())
+    _deliver(world, mails.plain_mail("Fotos", "x" * (1024 * 1024 + 10)))
+    _deliver(world, mails.plain_mail("Klein"))
+    await _fetch(world, world.mail_intake(max_attachment=1))  # limit: 1 MB and a byte
     async with world.uow() as uow:
-        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
-    assert record.outcome is MailOutcome.TOO_LARGE
-    assert await world.documents.list_visible(person.id) == []
+        records = {
+            record.subject: record for record in await uow.mail_records.recent(mailbox.id, limit=5)
+        }
+        stored = await uow.mailboxes.get(mailbox.id)
+    large = records["Fotos"]
+    assert large.outcome is MailOutcome.TOO_LARGE
+    assert large.reason is not None and large.reason.code is ReasonCode.MAIL_TOO_LARGE
+    assert large.reason.params == {"subject": "Fotos", "size": 2, "max": 2}
+    assert stored.status.skipped == large.reason and stored.status.skipped_at is not None
+    assert stored.status.error is None  # the fetch itself went well
+    names = [
+        document.original_filename for document in await world.documents.list_visible(person.id)
+    ]
+    assert names == ["Klein.eml"]
+
+
+def test_a_mail_may_carry_an_attachment_as_large_as_an_upload() -> None:
+    upload = 100 * 1024 * 1024
+    assert mail_limit(upload) == upload * 4 // 3 + 1024 * 1024
 
 
 async def test_a_refused_login_shows_at_the_mailbox(world: World) -> None:

@@ -109,6 +109,13 @@ class MemoryMailSession:
         mail = self._mail(folder, uid)
         return None if mail is None else mail.data
 
+    async def head(self, folder: str, uid: int) -> bytes | None:
+        mail = self._mail(folder, uid)
+        if mail is None:
+            return None
+        end = mail.data.replace(b"\r\n", b"\n").find(b"\n\n")
+        return mail.data if end < 0 else mail.data.replace(b"\r\n", b"\n")[: end + 1]
+
     async def mark_read(self, folder: str, uid: int) -> None:
         mail = self._mail(folder, uid)
         if mail is not None:

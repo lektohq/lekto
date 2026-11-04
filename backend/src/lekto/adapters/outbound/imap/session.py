@@ -35,6 +35,9 @@ class ImapMailSession:
     async def fetch(self, folder: str, uid: int) -> bytes | None:
         return await self._call(self._fetch, folder, uid)
 
+    async def head(self, folder: str, uid: int) -> bytes | None:
+        return await self._call(self._fetch, folder, uid, "(BODY.PEEK[HEADER])")
+
     async def mark_read(self, folder: str, uid: int) -> None:
         await self._call(self._store, folder, uid, "+FLAGS", "(\\Seen)")
 
@@ -98,9 +101,9 @@ class ImapMailSession:
                 )
         return [found[uid] for uid in uids if uid in found]
 
-    def _fetch(self, folder: str, uid: int) -> bytes | None:
+    def _fetch(self, folder: str, uid: int, what: str = "(BODY.PEEK[])") -> bytes | None:
         self._select(folder)
-        status, answer = self._imap.uid("FETCH", str(uid), "(BODY.PEEK[])")
+        status, answer = self._imap.uid("FETCH", str(uid), what)
         if status != "OK":
             raise imaplib.IMAP4.error(answer)
         for part in answer:

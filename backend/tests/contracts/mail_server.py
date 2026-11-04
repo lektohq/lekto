@@ -114,6 +114,8 @@ class MailServerContract:
             assert [info.uid for info in infos] == [two, one]
             assert infos[1].arrived_at == EARLY and infos[1].size >= len(first)
             assert _lines(await session.fetch("INBOX", one)) == _lines(first)
+            head = _lines(await session.head("INBOX", one)) or b""
+            assert b"Subject: Erste" in head and b"Hallo Anna" not in head
             unseen = await session.search("INBOX", MailSearch(unseen=True))
             assert unseen.uids == (one, two)  # fetching marked nothing
             since = await session.search("INBOX", MailSearch(since=date(2026, 11, 3)))

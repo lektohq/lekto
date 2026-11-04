@@ -728,7 +728,9 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
 - **The row of a mailbox:** its name opens its dialog (there is no detail page), beside it the
   state of its fetches as a `Badge`: "Abruf in Ordnung" (`green`, `CircleCheck`), "Abruf gestört"
   (`red`, `OctagonX`) or "Noch nicht abgerufen" (`muted`, no icon). Below: server · folders ·
-  interval · the last fetch · counts, and the reason of a failure as a line in `destructive`.
+  interval · the last fetch · counts, and the reason of a failure as a line in `destructive`; a
+  mail left out because it was too large (beyond `LEKTO_UPLOAD_MAX_SIZE` with its Base64) as a
+  line in `lane-yellow-foreground`: "Ausgelassen am …: Die Mail „…“ hat … MB …".
   Trailing: the `Switch` (Aktiv / Pausiert, no badge for it) and the `EditButton`.
 - **The dialog** (`FormDialog`, `lg`): name; server, port and encryption in one row; user and
   password (empty keeps the stored one; it is never shown); "Verbindung testen" (`outline`)

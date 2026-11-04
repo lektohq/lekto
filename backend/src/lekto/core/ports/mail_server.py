@@ -64,6 +64,10 @@ class MailSession(Protocol):
         """The whole mail, unmarked; None if it is gone."""
         ...
 
+    async def head(self, folder: str, uid: int) -> bytes | None:
+        """The mail's header lines only, unmarked; None if it is gone."""
+        ...
+
     async def mark_read(self, folder: str, uid: int) -> None: ...
 
     async def move(self, folder: str, uid: int, target: str) -> None:

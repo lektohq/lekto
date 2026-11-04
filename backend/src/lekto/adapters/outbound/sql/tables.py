@@ -892,6 +892,9 @@ mailboxes = Table(
     Column("error", json_type(), nullable=True),
     Column("mails", Integer, nullable=False),
     Column("documents", Integer, nullable=False),
+    # The latest mail left out, too large (`MailboxStatus.skipped`).
+    Column("skipped_at", UtcDateTime, nullable=True),
+    Column("skipped", json_type(), nullable=True),
     Column("created_at", UtcDateTime, nullable=False),
     Column("updated_at", UtcDateTime, nullable=False),
     Column("version", Integer, nullable=False),
