@@ -130,7 +130,8 @@ asn: {to: field, name: ASN}
 Not taken over: notes (counted at each document; Lekto has no notes), Paperless' text (Lekto
 reads every document itself), history, share links, saved views, workflows, mail rules and
 accounts, documents in the trash, further versions of a file, matching rules. Files Lekto does
-not take (anything but PDF, JPEG, PNG, TIFF) are listed with the reason.
+not take (anything but PDF, JPEG, PNG, TIFF and mails stored as `.eml`) are listed with the
+reason.
 
 ## Aligning migrated documents
 

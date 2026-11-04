@@ -42,7 +42,7 @@ from lekto_migration.plan import (
     norm,
 )
 
-SUPPORTED = ("application/pdf", "image/jpeg", "image/png", "image/tiff")
+SUPPORTED = ("application/pdf", "image/jpeg", "image/png", "image/tiff", "message/rfc822")
 NAME_LIMIT = 200
 # The targets a document holds several of, by the attribute of `Expected`.
 GROUPS = {"tag": "tags", "contact_group": "contact_groups", "type_group": "type_groups"}
@@ -282,7 +282,10 @@ def _skip(document: dict[str, Any]) -> str | None:
     if document.get("root_document") not in (None, document["id"]):
         return f"the file is a version of document {document['root_document']}"
     if mime not in SUPPORTED:
-        return f"Lekto takes PDF, JPEG, PNG and TIFF; this file is {mime or 'of unknown type'}"
+        return (
+            "Lekto takes PDF, JPEG, PNG, TIFF and mails (.eml); "
+            f"this file is {mime or 'of unknown type'}"
+        )
     return None
 
 

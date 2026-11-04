@@ -244,7 +244,12 @@ def sample_archive(base_pdf: bytes, jpeg: bytes | None = None) -> Archive:
                 "change": {"users": [], "groups": []},
             },
         ),
-        document(17, 1, original_file_name="mail.eml", mime_type="message/rfc822"),
+        document(
+            17,
+            1,
+            original_file_name="letter.docx",
+            mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ),
         document(18, 1, deleted_at="2024-07-01T00:00:00Z"),
         document(
             19,

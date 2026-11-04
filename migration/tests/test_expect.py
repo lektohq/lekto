@@ -6,7 +6,8 @@ from typing import Any
 import pytest
 
 from lekto_migration import plan as plans
-from lekto_migration.expect import Context, coerce, expect, field_infos
+from lekto_migration.check import kind_of
+from lekto_migration.expect import SUPPORTED, Context, _skip, coerce, expect, field_infos
 from lekto_migration.plan import Review
 from tests.world import NOW, World
 
@@ -44,7 +45,7 @@ def test_the_first_plan_takes_a_document_over_as_it_is(world: World) -> None:
 
 
 def test_skipped_files_and_shared_documents(world: World) -> None:
-    assert "message/rfc822" in (world.expect(17).skip or "")
+    assert "wordprocessingml" in (world.expect(17).skip or "")
     assert "trash" in (world.expect(18).skip or "")
     shared = world.expect(13)
     assert shared.uploader == "anna"
@@ -271,3 +272,27 @@ def test_a_long_space_name_stays_in_bounds_and_apart(world: World) -> None:
     assert long is not None and shorter is not None
     assert len(long) <= 200 and len(shorter) <= 200 and long != shorter
     assert long.startswith("Geteilt: anna (bearbeiten), user-000-")
+
+
+def test_a_mail_is_taken_over() -> None:
+    document = {"id": 30, "mime_type": "message/rfc822", "root_document": None}
+    assert _skip(document) is None
+    assert "message/rfc822" in SUPPORTED
+
+
+@pytest.mark.parametrize(
+    ("head", "kind"),
+    [
+        (
+            b"Delivered-To: anna@example.test\r\nReceived: by 2002:a05 with SMTP id x;\r\n"
+            b"        Tue, 4 Nov 2026 01:00:00 -0800 (PST)\r\nFrom: a@example.test\r\n",
+            "message/rfc822",
+        ),
+        (b"From: a@example.test\nSubject: Hallo\n\nText", "message/rfc822"),
+        (b"Subject: only one\n\nText", None),
+        (b"%PDF-1.7\n", "application/pdf"),
+        (b"PK\x03\x04", None),
+    ],
+)
+def test_the_kind_of_a_file(head: bytes, kind: str | None) -> None:
+    assert kind_of(head) == kind
