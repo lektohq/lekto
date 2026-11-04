@@ -1,13 +1,15 @@
-"""The IMAP adapter of `MailServer`: signs in for each call, in a thread, and leaves again."""
+"""The IMAP adapter of `MailServer`: signs in, in a thread, and leaves again: for a list of the
+folders, or around a session of a fetch."""
 
 import asyncio
 import imaplib
 import ssl
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager, suppress
+from collections.abc import AsyncIterator, Callable, Iterator
+from contextlib import asynccontextmanager, contextmanager, suppress
 from datetime import timedelta
 
 from lekto.adapters.outbound.imap.names import listed
+from lekto.adapters.outbound.imap.session import ImapMailSession
 from lekto.core.domain.mail import MailLogin, MailSecurity
 from lekto.core.domain.reasons import Reason, ReasonCode, because
 from lekto.core.ports.mail_server import MailServerError
@@ -32,6 +34,15 @@ class ImapMailServer:
     async def folders(self, login: MailLogin) -> tuple[str, ...]:
         return await asyncio.to_thread(self._run, login, _folders)
 
+    @asynccontextmanager
+    async def session(self, login: MailLogin) -> AsyncIterator[ImapMailSession]:
+        imap = await asyncio.to_thread(self._connect, login)
+        try:
+            await asyncio.to_thread(self._sign_in, imap, login)
+            yield ImapMailSession(imap, _guarded)
+        finally:
+            await asyncio.to_thread(_leave, imap)
+
     def _run[T](self, login: MailLogin, work: Callable[[imaplib.IMAP4], T]) -> T:
         with self._session(login) as imap:
             try:
@@ -46,8 +57,7 @@ class ImapMailServer:
             self._sign_in(imap, login)
             yield imap
         finally:  # also after a refused login: the server ends the session
-            with suppress(imaplib.IMAP4.error, OSError):
-                imap.logout()
+            _leave(imap)
 
     def _connect(self, login: MailLogin) -> imaplib.IMAP4:
         try:
@@ -99,6 +109,24 @@ def _login_with_literal(imap: imaplib.IMAP4, login: MailLogin) -> None:
     if status != "OK":
         raise imaplib.IMAP4.error(_text(answer))
     imap.state = "AUTH"
+
+
+def _leave(imap: imaplib.IMAP4) -> None:
+    with suppress(imaplib.IMAP4.error, OSError):
+        imap.logout()
+
+
+def _guarded[T](work: Callable[..., T], *args: object) -> T:
+    """`work` in a session: what the server answers as an error is a MailServerError; a lost
+    connection says the server cannot be reached."""
+    try:
+        return work(*args)
+    except imaplib.IMAP4.abort as error:
+        raise MailServerError(_server_error(error)) from error
+    except imaplib.IMAP4.error as error:
+        raise MailServerError(_server_error(error)) from error
+    except OSError as error:
+        raise MailServerError(_server_error(error)) from error
 
 
 def _folders(imap: imaplib.IMAP4) -> tuple[str, ...]:
