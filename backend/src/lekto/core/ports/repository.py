@@ -934,7 +934,7 @@ class MailRuleRepository(Protocol):
         ...
 
     async def of_mailbox(self, mailbox: MailboxId) -> list[MailRule]:
-        """The mailbox's rules by priority, the same priority by name."""
+        """The mailbox's rules by priority (higher first), the same priority by name."""
         ...
 
     async def list_all(self) -> list[MailRule]:

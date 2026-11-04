@@ -12,6 +12,6 @@ class MemoryMailRuleRepository(MemoryRepository[MailRuleId, MailRule]):
     async def list_all(self) -> list[MailRule]:
         rows = sorted(
             self._all(),
-            key=lambda rule: (str(rule.mailbox_id), rule.priority, rule.name.casefold(), rule.id),
+            key=lambda rule: (str(rule.mailbox_id), -rule.priority, rule.name.casefold(), rule.id),
         )
         return [_copy(row) for row in rows]
