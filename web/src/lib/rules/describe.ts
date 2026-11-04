@@ -32,7 +32,11 @@ const CONDITION_FIELDS: Record<Exclude<ConditionField, 'field'>, () => string> =
 	document_date: m.field_date,
 	step: m.rule_field_step,
 	fact: m.rule_field_fact,
-	relation: m.rule_field_relation
+	relation: m.rule_field_relation,
+	mail_mailbox: m.rule_field_mail_mailbox,
+	mail_sender: m.rule_field_mail_sender,
+	mail_recipient: m.rule_field_mail_recipient,
+	mail_subject: m.rule_field_mail_subject
 };
 
 export function fieldLabel(field: ConditionField): string {
@@ -75,7 +79,9 @@ const OPERATORS: Record<Operator, () => string> = {
 	lt: m.rule_op_number_lt,
 	present: m.rule_op_present,
 	missing: m.rule_op_missing,
-	overlaps: m.rule_op_overlaps
+	overlaps: m.rule_op_overlaps,
+	starts_with: m.rule_op_starts_with,
+	ends_with: m.rule_op_ends_with
 };
 const TAG_OPERATORS: Partial<Record<Operator, () => string>> = {
 	contains: m.rule_op_tags_contains,
@@ -200,8 +206,10 @@ function describeConditionValue(
 			return nameOf(value, lookup?.documentTypes ?? []);
 		if (isTagField(condition.field) || condition.field === 'topic') return tagName(value, lookup);
 		if (condition.field === 'channel') return CHANNEL_LABELS[value as Channel]?.() ?? value;
+		if (condition.field === 'mail_mailbox') return nameOf(value, lookup?.mailboxes ?? []);
 		if (condition.field === 'text' || condition.field === 'fact') return value;
 		if (condition.op === 'contains' || condition.op === 'matches') return value;
+		if (condition.field.startsWith('mail_')) return value;
 	}
 	return describeValue(value, null);
 }

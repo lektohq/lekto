@@ -3858,7 +3858,11 @@ export interface components {
 			| 'field'
 			| 'document_date'
 			| 'fact'
-			| 'relation';
+			| 'relation'
+			| 'mail_mailbox'
+			| 'mail_sender'
+			| 'mail_recipient'
+			| 'mail_subject';
 		/**
 		 * ConditionSchema
 		 * @description `field` `op` `value`. Operators by field: contact, document_type: `is`, `in`, `present`,
@@ -8319,7 +8323,17 @@ export interface components {
 		 * @enum {string}
 		 */
 		Operator:
-			'is' | 'in' | 'contains' | 'matches' | 'gt' | 'lt' | 'overlaps' | 'present' | 'missing';
+			| 'is'
+			| 'in'
+			| 'contains'
+			| 'matches'
+			| 'gt'
+			| 'lt'
+			| 'overlaps'
+			| 'present'
+			| 'missing'
+			| 'starts_with'
+			| 'ends_with';
 		/**
 		 * OriginOut
 		 * @description Where a document came from; `mail` for one a mail brought, else null.
