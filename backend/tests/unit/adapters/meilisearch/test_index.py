@@ -141,6 +141,44 @@ async def test_a_missing_index_is_created_with_its_settings() -> None:
     assert settings["stopWords"] == sorted(settings["stopWords"])
 
 
+def test_the_synonyms_are_those_of_the_languages() -> None:
+    sim = SimulatedMeilisearch()
+    assert sim.index(locales=["eng"])._settings()["synonyms"] == {}  # no use for others yet
+    german = sim.index(locales=["deu"])._settings()["synonyms"]
+    assert "Einmalzahlung" in german["Weihnachtsgeld"]
+    assert "Weihnachtsgeld" in german["Einmalzahlung"]  # both ways
+    assert "Weihnachtsgeld" not in german["Weihnachtsgeld"]
+    assert all(others == sorted(others) for others in german.values())
+
+
+async def test_synonyms_in_place_in_another_order_are_not_applied_again() -> None:
+    sim = SimulatedMeilisearch()
+    sim.settings = wanted_settings(sim)
+    sim.settings["synonyms"] = {
+        word: list(reversed(others)) for word, others in reversed(sim.settings["synonyms"].items())
+    }
+    await sim.index().upsert([index_document()])
+    assert sim.calls("PATCH", "/settings") == []
+
+
+async def test_the_point_of_an_ordinal_leaves_the_query() -> None:
+    """Meilisearch splits a query at the point, so "13. Gehalt" would not meet its synonyms."""
+    sim = SimulatedMeilisearch()
+    sim.settings = wanted_settings(sim)
+    sim.search_answer = {"hits": [], "estimatedTotalHits": 1}
+    visible = Visibility(frozenset({SpaceId(uid(100))}))
+    for text, sent in (
+        ("13. Gehalt", "13 Gehalt"),
+        ("Rechnung vom 1. März", "Rechnung vom 1 März"),
+        ("31.12.2025", "31.12.2025"),
+        ("1.297,42 EUR", "1.297,42 EUR"),
+        ("Seite 3.", "Seite 3."),
+    ):
+        sim.requests.clear()
+        await sim.index().search(search_query(text, visible))
+        assert [sim.body(call)["q"] for call in sim.calls("POST", "/search")] == [sent]
+
+
 def test_the_stop_words_are_those_of_the_languages() -> None:
     sim = SimulatedMeilisearch()
     assert sim.index(locales=["eng"])._settings()["stopWords"] == []  # none measured yet
