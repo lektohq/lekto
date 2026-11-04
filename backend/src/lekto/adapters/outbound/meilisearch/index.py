@@ -107,6 +107,7 @@ RANKING_RULES = ["sort", "words", "typo", "proximity", "attribute", "exactness"]
 # page of a search goes by the same strategy.
 MATCHING_STRATEGY = "frequency"
 MATCHING_FALLBACK = "last"
+MATCHED_WORDS = 10  # words of a query asked alone for where they stand in a document
 # The point of an ordinal before a word: Meilisearch splits a query there, so "13. Gehalt" would
 # not meet its synonyms; dates and amounts ("31.12.2025", "1.297,42") keep theirs.
 _ORDINAL_POINT = re.compile(r"(?<=\d)\.(?=\s)")
@@ -263,8 +264,7 @@ class MeilisearchIndex:
         if not text.strip():
             return []
         rights = filter_expression(visibility, DocumentFilter())
-        body: dict[str, Any] = {
-            "q": _ORDINAL_POINT.sub("", text),
+        base: dict[str, Any] = {
             "matchingStrategy": MATCHING_STRATEGY,
             "filter": f"id = {_quote(document)}" + ("" if rights is None else f" AND {rights}"),
             "limit": 1,
@@ -272,16 +272,26 @@ class MeilisearchIndex:
             "attributesToSearchOn": ["text"],
             "showMatchesPosition": True,
         }
-        data = await self._search(body)
-        try:
-            item = next(iter(data["hits"]), None)
-            if item is None:
-                return []
-            indexed = str(item.get("text") or "")
-            positions = (item.get("_matchesPosition") or {}).get("text") or []
-            spans = sorted((int(at["start"]), int(at["length"])) for at in positions)
-        except (KeyError, TypeError, ValueError):
-            raise SearchIndexError("Meilisearch sent unusable matches") from None
+        # The whole query (its synonyms of more than one word), then each word alone: the
+        # strategy may drop a word the text holds for one it lacks ("13. Gehalt"). Each as whole
+        # words: a space after the last keeps it from standing for the start of others ("13"
+        # in "4.139,02").
+        query = _ORDINAL_POINT.sub("", text)
+        words = list(dict.fromkeys(query.split()))[:MATCHED_WORDS]
+        indexed = ""
+        found: set[tuple[int, int]] = set()
+        for asked in [query, *words] if len(words) > 1 else [query]:
+            data = await self._search({**base, "q": f"{asked} "})
+            try:
+                item = next(iter(data["hits"]), None)
+                if item is None:
+                    continue
+                indexed = str(item.get("text") or "")
+                positions = (item.get("_matchesPosition") or {}).get("text") or []
+                found.update((int(at["start"]), int(at["length"])) for at in positions)
+            except (KeyError, TypeError, ValueError):
+                raise SearchIndexError("Meilisearch sent unusable matches") from None
+        spans = sorted(found)
         return _characters(indexed, spans)
 
     async def _search(self, body: Mapping[str, Any]) -> dict[str, Any]:

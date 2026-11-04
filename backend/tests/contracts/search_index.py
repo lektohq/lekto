@@ -271,6 +271,23 @@ class SearchIndexContract:
         assert [text[match.start : match.end] for match in found] == ["Mietvertrag"] * 2
         assert [match.start for match in found] == sorted(match.start for match in found)
 
+    async def test_matches_name_each_word_that_stands_in_the_text(
+        self, search_index: SearchIndex
+    ) -> None:
+        """A word of the query that the text lacks takes nothing from those it holds, however
+        often the others stand in other documents; a word is no start of others ("13" of
+        "4.139,02")."""
+        owner = SpaceId(new_id())
+        text = "Abrechnung: Gehalt 5.020,00, Urlaubsgeld 1.200,00, Netto 4.139,02"
+        document = index_document(space_id=owner, title="Brief", text=text)
+        others = [
+            index_document(space_id=owner, title="Brief", text=f"Gehalt {number}")
+            for number in range(3)
+        ]
+        await search_index.upsert([document, *others])
+        found = await search_index.matches(document.id, "13. Gehalt", visibility(owner))
+        assert [text[match.start : match.end] for match in found] == ["Gehalt"], found
+
     async def test_no_matches_where_nothing_matches_or_may_be_seen(
         self, search_index: SearchIndex
     ) -> None:
