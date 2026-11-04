@@ -58,6 +58,7 @@ from lekto.core.domain.json_value import (
     as_uuid,
 )
 from lekto.core.domain.labels import LaidWord
+from lekto.core.domain.mail_intake import MailOrigin, OriginRole
 from lekto.core.domain.master_data import Contact
 from lekto.core.domain.permissions import Reach, reach_access
 from lekto.core.domain.pipeline import Node, NodeResult, NodeRun, Outcome, ProcessingHistory
@@ -149,7 +150,11 @@ class FactsSignal:
     where they come from (the text's patterns, a code), the role of their kind
     (`domain.document_facts`) and whose an IBAN or a creditor ID is (`domain.holders`), kept
     with the result together with the facts the language model read as the log has them then
-    (`kept_facts`; a person's decisions stay)."""
+    (`kept_facts`; a person's decisions stay).
+
+    An attachment a mail brought has its sender as evidence too (decision 16 of the mail
+    channel), as if the line stood in its text: a contact's known e-mail address or name then
+    counts. The text of the mail names its sender itself."""
 
     def __init__(
         self, uow: UnitOfWorkFactory, store: ObjectStore, codes: CodeReader | None = None
@@ -166,8 +171,10 @@ class FactsSignal:
         async with self._uow() as uow:
             contacts = await uow.contacts.list_all()
             persons = await matching_persons(uow)
+            origin = await uow.mail_origins.find(document.id)
+        searched = text + sender_line(origin)
         # Matching every contact's names against a long text takes a while: not in the loop.
-        output = await asyncio.to_thread(facts_of, text, contacts, codes or (), persons)
+        output = await asyncio.to_thread(facts_of, searched, contacts, codes or (), persons)
         if codes is not None:
             output["codes"] = len(codes)
         in_codes: set[tuple[IdentifierKind, str]] = set()
@@ -314,6 +321,14 @@ def facts_holders(
         if transfer is not None
     }
     return holders(text, facts, parties, tops=top, codes=giro)
+
+
+def sender_line(origin: MailOrigin | None) -> str:
+    """The sender of the mail an attachment came with, as a line to look for evidence in;
+    nothing for any other document."""
+    if origin is None or origin.role is not OriginRole.ATTACHMENT or not origin.sender:
+        return ""
+    return "\n\n" + ", ".join(address.shown for address in origin.sender)
 
 
 def facts_of(

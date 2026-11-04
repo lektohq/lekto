@@ -158,6 +158,9 @@
 		if (found.kind === 'letter_date' && typeof found.date === 'string') {
 			return m.relations_evidence_letter({ date: formatDate(found.date) });
 		}
+		if (found.kind === 'mail') {
+			return m.relations_evidence_mail({ subject: String(found.subject ?? '') });
+		}
 		return m.relations_by_lekto();
 	}
 

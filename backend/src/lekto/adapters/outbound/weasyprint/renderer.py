@@ -7,6 +7,7 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
+from lekto.core.domain.mail_intake import Letter
 from lekto.core.domain.mail_message import Address, MailMessage, MailPart, read_mail
 from lekto.core.ports.mail_renderer import RenderedMail
 
@@ -22,6 +23,7 @@ _LABELS = {
         "date": "Datum",
         "subject": "Betreff",
         "attachments": "Anhänge",
+        "left": "Nicht übernommen",
         "none": "(ohne Betreff)",
         "moment": "%d.%m.%Y, %H:%M UTC",
     },
@@ -33,13 +35,19 @@ _LABELS = {
         "date": "Date",
         "subject": "Subject",
         "attachments": "Attachments",
+        "left": "Not taken",
         "none": "(no subject)",
         "moment": "%Y-%m-%d %H:%M UTC",
     },
 }
 
-_STYLE = """
+_BASE = """
 @page { size: A4; margin: 16mm 15mm 18mm; }
+body { font: 10pt/1.45 "Nimbus Sans", "DejaVu Sans", sans-serif; color: #1b1a17; }
+"""
+"""The page and a plain font, before the mail's own styles: they may change it."""
+
+_STYLE = """
 .lekto-head { font: 9.5pt/1.4 "Nimbus Sans", "DejaVu Sans", sans-serif !important;
   color: #1b1a17 !important; background: #fff !important; margin: 0 0 6mm !important;
   padding: 0 0 3mm !important; border-bottom: 0.6pt solid #b9b5ad !important; }
@@ -88,18 +96,20 @@ class WeasyPrintMailRenderer:
         styles, body = _content(message)
         return (
             '<!doctype html><html><head><meta charset="utf-8">'
-            f"{styles}<style>{_STYLE}</style></head><body>"
+            f"<style>{_BASE}</style>{styles}<style>{_STYLE}</style></head><body>"
             f"{self._head(message)}{body}</body></html>"
         )
 
     def _head(self, message: MailMessage) -> str:
         labels = self._labels
+        letter = Letter(message)
         rows = [
             ("from", _people(message.sender)),
             ("to", _people(message.to)),
             ("cc", _people(message.cc)),
             ("date", "" if message.date is None else message.date.strftime(labels["moment"])),
-            ("attachments", ", ".join(_names(message.attachments))),
+            ("attachments", ", ".join(_names(letter.taken))),
+            ("left", ", ".join(_names(letter.left))),
         ]
         lines = "".join(
             f'<p class="lekto-row"><span class="lekto-label">{labels[key]}</span> '

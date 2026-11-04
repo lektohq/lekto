@@ -736,7 +736,14 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
   what the test found and what is chosen; how often (`Select`) and what a mail without a rule
   brings in (`Select`: "Nichts übernehmen" or "Alles für" a person) side by side; which mails
   as a `Segmented` of three with a `DateInput` for "Ab Datum" and a line under it; the type of
-  the mail text (`SearchSelect`). Deleting is in the footer.
+  the mail text (`SearchSelect`). Deleting is in the footer. A stored mailbox that is not
+  paused has "Jetzt abrufen" (`outline`, `RefreshCw`) beside the test; a toast says the fetch is
+  asked for.
+- **The origin of a document** (mock C): a document a mail brought shows the card "Herkunft" in
+  its facts pane, above "Bezüge": label and value rows as the file information has them
+  (Kanal, Postfach, Regel or "Ohne Regel (Rückfall des Postfachs)", Von, An, Betreff,
+  Empfangen, Weitergeleitet von, Anhang), only those with a value. Other documents show no card.
+  A relation of the documents of one mail says "aus derselben Mail" with the subject.
 
 ### Navigation between list and detail
 

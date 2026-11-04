@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import FactsPanel from '#lib/components/document/FactsPanel.svelte';
 	import PaneHead from '#lib/components/document/PaneHead.svelte';
+	import OriginCard from '#lib/components/document/OriginCard.svelte';
 	import RelationsCard from '#lib/components/document/RelationsCard.svelte';
 	import {
 		factCounts,
@@ -27,7 +28,8 @@
 		onmark,
 		onshowcode,
 		onchanged,
-		end
+		end,
+		mail = false
 	}: {
 		facts?: Facts | null;
 		documentId: string;
@@ -44,6 +46,8 @@
 		onchanged: () => void;
 		/** At the end of the head: the pane's switch. */
 		end?: Snippet;
+		/** A mail brought the document: its origin shows above the relations. */
+		mail?: boolean;
 	} = $props();
 
 	const summary = $derived(facts ? factsSummary(factCounts(facts)) : '');
@@ -73,6 +77,7 @@
 				{onshowcode}
 				{onchanged}
 			/>
+			{#if mail}<div class="mt-3.5"><OriginCard {documentId} /></div>{/if}
 			<div class="mt-3.5"><RelationsCard {documentId} {documentTitle} {lookup} /></div>
 		{:else}
 			<p class="p-2 text-sm text-muted-foreground">{m.facts_pending()}</p>

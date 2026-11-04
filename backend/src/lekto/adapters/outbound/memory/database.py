@@ -19,6 +19,7 @@ from lekto.core.domain.inbox import Confirmation
 from lekto.core.domain.jobs import Job
 from lekto.core.domain.lenses import Lens
 from lekto.core.domain.mail import Mailbox
+from lekto.core.domain.mail_intake import MailOrigin, MailRecord
 from lekto.core.domain.master_data import Contact, DocumentType, MasterData, Tag
 from lekto.core.domain.pipeline import NodeRun
 from lekto.core.domain.relations import Relation
@@ -100,6 +101,10 @@ def _mailbox_keys(mailbox: Mailbox) -> Iterable[Hashable]:
     return [("name", name_key(mailbox.name))]
 
 
+def _mail_record_keys(record: MailRecord) -> Iterable[Hashable]:
+    return [("uid", record.mailbox_id, record.folder, record.uidvalidity, record.uid)]
+
+
 def _no_keys(item: Entity[UUID]) -> Iterable[Hashable]:
     return []
 
@@ -145,6 +150,8 @@ WEBHOOK_DELIVERIES = Table("webhook delivery", _no_keys)
 TASKS = Table("task", _no_keys)
 LENSES = Table("lens", _lens_keys)
 MAILBOXES = Table("mailbox", _mailbox_keys)
+MAIL_RECORDS = Table("mail record", _mail_record_keys)
+MAIL_ORIGINS = Table[MailOrigin]("mail origin", _no_keys)
 
 
 @dataclass

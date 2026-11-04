@@ -84,7 +84,7 @@ async def test_the_report_counts_lanes_flow_and_who_decided(world: World) -> Non
 
     report = await service(world).report(owner.id, zone=UTC)
 
-    assert report.channels == {Channel.WEB, Channel.API}
+    assert report.channels == {Channel.WEB, Channel.API, Channel.MAIL}
     assert report.lanes == {Lane.GREEN: 2, Lane.YELLOW: 1, Lane.RED: 1}
     assert report.flow == (
         Flow(Lane.GREEN, Lane.GREEN, 2),

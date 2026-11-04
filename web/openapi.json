@@ -21281,6 +21281,126 @@
         ]
       }
     },
+    "/api/v1/mailboxes/{id}/fetch": {
+      "post": {
+        "tags": [
+          "mailboxes"
+        ],
+        "summary": "Fetch a mailbox now",
+        "description": "Brings the mailbox's next fetch forward to now; a worker does it. A fetch running already plans the next itself. 422 if the mailbox is paused. Only admins (403).",
+        "operationId": "fetch_mailbox_api_v1_mailboxes__id__fetch_post",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unauthorized",
+                  "status": 401,
+                  "detail": "authentication is required"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Forbidden",
+                  "status": 403,
+                  "detail": "only editors and admins control the processing of this document"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Not Found",
+                  "status": 404,
+                  "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": "from_node: Input should be 'ocr', 'parse', ..."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Internal Server Error",
+                  "status": 500,
+                  "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "token": []
+          }
+        ]
+      }
+    },
     "/api/v1/mailboxes/{id}": {
       "get": {
         "tags": [
@@ -21615,6 +21735,112 @@
                   "title": "Forbidden",
                   "status": 403,
                   "detail": "only editors and admins control the processing of this document"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Not Found",
+                  "status": 404,
+                  "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": "from_node: Input should be 'ocr', 'parse', ..."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Internal Server Error",
+                  "status": 500,
+                  "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/documents/{id}/origin": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Where a document came from",
+        "description": "Needs read access. For a document a mail brought: the mailbox, the rule, sender, recipients, subject, its dates and who forwarded it; `mail` is null for any other.",
+        "operationId": "origin_api_v1_documents__id__origin_get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OriginOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unauthorized",
+                  "status": 401,
+                  "detail": "authentication is required"
                 }
               }
             }
@@ -23641,6 +23867,25 @@
         "title": "AddTagsAction",
         "description": "Document tags (also those set by hand). A tag above one the document keeps or gets is\nnot added; a parent gives way to a child added."
       },
+      "AddressOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The display name; empty where the mail gives none."
+          },
+          "address": {
+            "type": "string",
+            "title": "Address"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "address"
+        ],
+        "title": "AddressOut"
+      },
       "AllGroup-Input": {
         "properties": {
           "all": {
@@ -24860,10 +25105,11 @@
         "enum": [
           "web",
           "api",
-          "migration"
+          "migration",
+          "mail"
         ],
         "title": "Channel",
-        "description": "How a document came in (its intake channel). Further connectors (mail, folder) follow."
+        "description": "How a document came in (its intake channel)."
       },
       "ClassesOut": {
         "properties": {
@@ -26197,7 +26443,7 @@
           },
           "channel": {
             "$ref": "#/components/schemas/Channel",
-            "description": "How the document arrived: `web` (web UI), `api`, `migration`."
+            "description": "How the document arrived: `web` (web UI), `api`, `migration`, `mail`."
           },
           "sha256": {
             "type": "string",
@@ -26515,7 +26761,7 @@
           },
           "channel": {
             "$ref": "#/components/schemas/Channel",
-            "description": "How the document arrived: `web` (web UI), `api`, `migration`."
+            "description": "How the document arrived: `web` (web UI), `api`, `migration`, `mail`."
           },
           "sha256": {
             "type": "string",
@@ -31320,7 +31566,7 @@
           },
           "channel": {
             "$ref": "#/components/schemas/Channel",
-            "description": "How the document arrived: `web` (web UI), `api`, `migration`."
+            "description": "How the document arrived: `web` (web UI), `api`, `migration`, `mail`."
           },
           "sha256": {
             "type": "string",
@@ -31986,6 +32232,122 @@
           "fetched"
         ],
         "title": "LogoSource"
+      },
+      "MailOriginOut": {
+        "properties": {
+          "mailbox": {
+            "type": "string",
+            "title": "Mailbox",
+            "description": "The mailbox's name."
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule",
+            "description": "The mail rule that took it; null: the fallback."
+          },
+          "role": {
+            "$ref": "#/components/schemas/OriginRole",
+            "description": "`cover`: the mail's text; `attachment`: one of its files."
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "sender": {
+            "items": {
+              "$ref": "#/components/schemas/AddressOut"
+            },
+            "type": "array",
+            "title": "Sender"
+          },
+          "to": {
+            "items": {
+              "$ref": "#/components/schemas/AddressOut"
+            },
+            "type": "array",
+            "title": "To"
+          },
+          "cc": {
+            "items": {
+              "$ref": "#/components/schemas/AddressOut"
+            },
+            "type": "array",
+            "title": "Cc"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At",
+            "description": "The mail's own date."
+          },
+          "arrived_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Arrived At",
+            "description": "When it arrived at the mailbox."
+          },
+          "forwarded_by": {
+            "items": {
+              "$ref": "#/components/schemas/AddressOut"
+            },
+            "type": "array",
+            "title": "Forwarded By",
+            "description": "Who forwarded the mail that held it, outermost first."
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mailbox",
+          "rule",
+          "role",
+          "filename",
+          "subject",
+          "sender",
+          "to",
+          "cc",
+          "sent_at",
+          "arrived_at",
+          "forwarded_by",
+          "message_id"
+        ],
+        "title": "MailOriginOut",
+        "description": "The mail a document came with, as it was then (a mailbox renamed or deleted since keeps\nits name here)."
       },
       "MailSecurity": {
         "type": "string",
@@ -33767,6 +34129,34 @@
         ],
         "title": "Operator"
       },
+      "OriginOut": {
+        "properties": {
+          "mail": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MailOriginOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "mail"
+        ],
+        "title": "OriginOut",
+        "description": "Where a document came from; `mail` for one a mail brought, else null."
+      },
+      "OriginRole": {
+        "type": "string",
+        "enum": [
+          "cover",
+          "attachment"
+        ],
+        "title": "OriginRole"
+      },
       "Outcome": {
         "type": "string",
         "enum": [
@@ -34922,7 +35312,8 @@
           "mail_login_failed",
           "mail_folder_missing",
           "mail_server_error",
-          "mail_password_unreadable"
+          "mail_password_unreadable",
+          "mailbox_paused"
         ],
         "title": "ReasonCode"
       },
@@ -40946,7 +41337,8 @@
     "mail_server_error": {
       "detail": "text"
     },
-    "mail_password_unreadable": {}
+    "mail_password_unreadable": {},
+    "mailbox_paused": {}
   },
   "x-identifier-kinds": {
     "iban": {

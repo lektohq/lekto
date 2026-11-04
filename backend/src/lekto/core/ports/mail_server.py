@@ -1,12 +1,17 @@
 """A mail server Lekto fetches from (IMAP).
 
-First adapter: `imaplib` of the standard library, in a thread. The port signs in for every call
-and leaves again; nothing stays open between fetches (no IDLE: Lekto fetches every few minutes).
-What goes wrong comes back as a `MailServerError` with a reason an admin can act on: the server
-cannot be reached, no secure connection, user name or password refused, a folder missing, or the
-server's own error.
+First adapter: `imaplib` of the standard library, in a thread. `folders` signs in for itself;
+a fetch opens a `session` and does its work in it, then leaves (no IDLE: Lekto fetches every
+few minutes). Mails are read with `BODY.PEEK`: reading marks nothing; only an action does.
+What goes wrong comes back as a `MailServerError` with a reason an admin can act on: the
+server cannot be reached, no secure connection, user name or password refused, a folder
+missing, or the server's own error.
 """
 
+from collections.abc import Sequence
+from contextlib import AbstractAsyncContextManager
+from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Protocol
 
 from lekto.core.domain.errors import DomainError
@@ -21,8 +26,62 @@ class MailServerError(DomainError):
         super().__init__(reason)
 
 
+@dataclass(frozen=True)
+class MailSearch:
+    """Which mails of a folder: arrived on `since` or later (by the server's date of arrival,
+    to the day), unread ones only (`unseen`), or all."""
+
+    since: date | None = None
+    unseen: bool = False
+
+
+@dataclass(frozen=True)
+class FolderMails:
+    """The UIDs a search found, ascending, and the folder's UIDVALIDITY: UIDs count only
+    together with it."""
+
+    uidvalidity: int
+    uids: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class MailInfo:
+    uid: int
+    size: int  # bytes
+    arrived_at: datetime  # the server's date of arrival (INTERNALDATE), UTC
+
+
+class MailSession(Protocol):
+    async def search(self, folder: str, search: MailSearch) -> FolderMails:
+        """MailServerError (`MAIL_FOLDER_MISSING`) if there is no such folder."""
+        ...
+
+    async def info(self, folder: str, uids: Sequence[int]) -> list[MailInfo]:
+        """Size and date of arrival of the mails `uids` still there, in the order of `uids`."""
+        ...
+
+    async def fetch(self, folder: str, uid: int) -> bytes | None:
+        """The whole mail, unmarked; None if it is gone."""
+        ...
+
+    async def mark_read(self, folder: str, uid: int) -> None: ...
+
+    async def move(self, folder: str, uid: int, target: str) -> None:
+        """MailServerError (`MAIL_FOLDER_MISSING`) if there is no folder `target`."""
+        ...
+
+    async def trash(self, folder: str, uid: int) -> None:
+        """Into the account's trash folder; deleted where it has none."""
+        ...
+
+
 class MailServer(Protocol):
     async def folders(self, login: MailLogin) -> tuple[str, ...]:
         """The folders of the account, by their full names as the server separates them
         (`INBOX`, `INBOX/Rechnungen`, ...), sorted, `INBOX` first. Raises MailServerError."""
+        ...
+
+    def session(self, login: MailLogin) -> AbstractAsyncContextManager[MailSession]:
+        """Signed in for the time of the `async with`. Raises MailServerError on entering
+        and from its calls."""
         ...

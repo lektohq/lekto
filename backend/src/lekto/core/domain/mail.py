@@ -53,6 +53,16 @@ class Fallback(StrEnum):
     EVERYTHING = "everything"
 
 
+class MailAction(StrEnum):
+    """What becomes of a mail on the server once Lekto has taken it: nothing, marked as read,
+    moved to a folder, or moved to the trash."""
+
+    NOTHING = "nothing"
+    READ = "read"
+    MOVE = "move"
+    TRASH = "trash"
+
+
 class Unset(Enum):
     UNSET = "unset"
 

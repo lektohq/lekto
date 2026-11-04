@@ -581,6 +581,7 @@
 								onshowcode={showCode}
 								onchanged={reloadFacts}
 								end={paneSwitch(rightSwitch)}
+								mail={document.channel === 'mail'}
 							/>
 						</div>
 					{/if}

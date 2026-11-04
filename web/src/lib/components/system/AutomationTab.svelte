@@ -44,7 +44,8 @@
 	const CHANNELS: { value: Channel; label: () => string }[] = [
 		{ value: 'web', label: m.automation_channel_web },
 		{ value: 'api', label: m.automation_channel_api },
-		{ value: 'migration', label: m.automation_channel_migration }
+		{ value: 'migration', label: m.automation_channel_migration },
+		{ value: 'mail', label: m.automation_channel_mail }
 	];
 	const PERIODS: { value: Period; label: () => string }[] = [
 		{ value: '30d', label: m.automation_period_30d },
@@ -88,7 +89,7 @@
 	} satisfies Chart.ChartConfig;
 	const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-	let channels = $state<Channel[]>(['web', 'api']);
+	let channels = $state<Channel[]>(['web', 'api', 'mail']);
 	let period = $state<Period>('12m');
 	let report = $state<Report | null>(null);
 	let problem = $state<string | null>(null);

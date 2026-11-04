@@ -287,6 +287,23 @@ class JobQueueContract:
             assert await uow.jobs.enqueue("test", {}, run_at=NOW, dedup_key="cleanup")
             await uow.commit()
 
+    async def test_hasten_brings_a_queued_job_forward(self, uow_factory: UnitOfWorkFactory) -> None:
+        later = await enqueue(uow_factory, run_at=timedelta(hours=1), dedup_key="mail:1")
+        assert later is not None
+        async with uow_factory() as uow:
+            assert await uow.jobs.hasten("mail:1", run_at=NOW)
+            assert not await uow.jobs.hasten("mail:2", run_at=NOW)
+            await uow.commit()
+        assert (await get(uow_factory, later)).run_at == NOW
+        async with uow_factory() as uow:
+            assert await uow.jobs.hasten("mail:1", run_at=NOW + timedelta(hours=2))
+            await uow.commit()
+        assert (await get(uow_factory, later)).run_at == NOW  # never later
+        assert await claim(uow_factory) is not None
+        async with uow_factory() as uow:
+            assert not await uow.jobs.hasten("mail:1", run_at=NOW)  # running, not queued
+        assert await next_due(uow_factory) == NOW + LEASE
+
     async def test_dedup_key_while_active(self, uow_factory: UnitOfWorkFactory) -> None:
         first = await enqueue(uow_factory, dedup_key="doc:1:ocr")
         assert first is not None

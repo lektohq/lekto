@@ -23,6 +23,8 @@ from lekto.core.ports.repository import (
     InboxRepository,
     LensRepository,
     MailboxRepository,
+    MailOriginRepository,
+    MailRecordRepository,
     ProcessingFacts,
     ProcessingLog,
     ProfileRepository,
@@ -97,6 +99,10 @@ class UnitOfWork(Protocol):
     def lenses(self) -> LensRepository: ...
     @property
     def mailboxes(self) -> MailboxRepository: ...
+    @property
+    def mail_records(self) -> MailRecordRepository: ...
+    @property
+    def mail_origins(self) -> MailOriginRepository: ...
     @property
     def outbox(self) -> Outbox: ...
     @property

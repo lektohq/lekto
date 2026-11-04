@@ -10,7 +10,7 @@ import email
 import email.policy
 import re
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.message import EmailMessage, Message
 from email.utils import getaddresses, parsedate_to_datetime
@@ -66,6 +66,8 @@ class MailMessage:
     """Parts the HTML can show by `cid:`."""
     messages: tuple["MailMessage", ...]
     """Mails attached to this one (a forward as attachment)."""
+    raw: bytes = field(repr=False, default=b"")
+    """The mail as a file (`.eml`): as received, or an attached one as it stands in it."""
 
 
 def read_mail(data: bytes) -> MailMessage:
@@ -73,10 +75,10 @@ def read_mail(data: bytes) -> MailMessage:
     message = email.message_from_bytes(data, policy=email.policy.default)
     if not isinstance(message, EmailMessage) or not (message["From"] or message["Date"]):
         raise UnprocessableDocumentError(because(ReasonCode.FILE_DAMAGED))
-    return _read(message)
+    return _read(message, data)
 
 
-def _read(message: EmailMessage) -> MailMessage:
+def _read(message: EmailMessage, raw: bytes) -> MailMessage:
     html = _body(message, "html")
     text = _body(message, "plain")
     attachments: list[MailPart] = []
@@ -87,7 +89,7 @@ def _read(message: EmailMessage) -> MailMessage:
         if kind == RFC822:
             inner = _attached(part)
             if inner is not None:
-                messages.append(_read(inner))
+                messages.append(_read(inner, _bytes(inner)))
             continue
         if _is_body(part, html, text):
             continue
@@ -120,7 +122,15 @@ def _read(message: EmailMessage) -> MailMessage:
         attachments=tuple(attachments),
         pictures=tuple(pictures),
         messages=tuple(messages),
+        raw=raw,
     )
+
+
+def _bytes(message: EmailMessage) -> bytes:
+    try:
+        return message.as_bytes(policy=email.policy.SMTP)
+    except (LookupError, UnicodeError, ValueError):
+        return message.as_bytes(policy=email.policy.compat32)
 
 
 def _leaves(message: Message) -> Iterator[Message]:

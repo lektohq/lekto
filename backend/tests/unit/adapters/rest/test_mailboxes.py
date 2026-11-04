@@ -1,5 +1,6 @@
 """`/mailboxes`: admins set up the mailboxes Lekto fetches from; the password never comes back."""
 
+from datetime import timedelta
 from typing import Any
 
 from lekto.adapters.inbound.rest import PREFIX
@@ -7,6 +8,8 @@ from lekto.adapters.outbound.memory import MemoryMailServer
 from lekto.core.domain.mail import MailLogin, MailSecurity
 from lekto.core.domain.users import User
 from tests.api import auth
+from tests.builders import drain
+from tests.mails import plain_mail
 from tests.unit.adapters.rest.support import Api, post
 
 BODY = {
@@ -60,7 +63,7 @@ async def test_a_mailbox_is_created_tested_changed_and_deleted(api: Api) -> None
             username="household@example.test",
             password="app-password",
         )
-    ).folders.append("Rechnungen")
+    ).add_folders("Rechnungen")
     tested = await _test(api, admin, {"mailbox_id": created["id"]})
     assert tested == {"ok": True, "folders": ["INBOX", "Rechnungen"], "error": None}
     refused = await _test(api, admin, {"password": "x"})
@@ -97,3 +100,54 @@ async def test_a_name_is_taken_once(api: Api) -> None:
         f"{PREFIX}/mailboxes", json={**BODY, "name": "HOUSEHOLD"}, headers=auth(admin)
     )
     assert again.status_code == 409
+
+
+async def test_fetch_now_and_the_origin_of_a_document(api: Api) -> None:
+    admin, user = await api.admin(), await api.user()
+    created = await post(
+        api,
+        "/mailboxes",
+        {**BODY, "fallback": "everything", "fallback_user_id": str(admin.id)},
+        auth(admin),
+    )
+    account = _server(api).add_account(
+        MailLogin(
+            host="imap.example.test",
+            port=993,
+            security=MailSecurity.TLS,
+            username="household@example.test",
+            password="app-password",
+        )
+    )
+    account.deliver("INBOX", plain_mail(), arrived_at=api.clock.now() + timedelta(minutes=1))
+    api.clock.advance(timedelta(minutes=2))
+    await drain(api.services.mail_intake)  # the first fetch, at once after creating
+    url = f"{PREFIX}/mailboxes/{created['id']}/fetch"
+    assert (await api.client.post(url, headers=auth(user))).status_code == 403
+    assert (await api.client.post(url, headers=auth(admin))).status_code == 202
+
+    listed = (await api.client.get(f"{PREFIX}/documents", headers=auth(admin))).json()
+    (document,) = listed["items"]
+    assert document["channel"] == "mail"
+    origin = await api.client.get(
+        f"{PREFIX}/documents/{document['id']}/origin", headers=auth(admin)
+    )
+    assert origin.status_code == 200, origin.text
+    mail = origin.json()["mail"]
+    assert (mail["mailbox"], mail["role"], mail["subject"], mail["rule"]) == (
+        "Household",
+        "cover",
+        "Ihre Rechnung Oktober",
+        None,
+    )
+    assert mail["sender"] == [
+        {"name": "Stadtwerke Musterstadt", "address": "rechnung@stadtwerke.example"}
+    ]
+    hidden = await api.client.get(f"{PREFIX}/documents/{document['id']}/origin", headers=auth(user))
+    assert hidden.status_code == 404
+
+    paused = await api.client.patch(
+        f"{PREFIX}/mailboxes/{created['id']}", json={"enabled": False}, headers=auth(admin)
+    )
+    assert paused.status_code == 200
+    assert (await api.client.post(url, headers=auth(admin))).status_code == 422
