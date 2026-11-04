@@ -131,7 +131,16 @@ class MemorySearchIndex:
         if found is None or not visibility.allows(found):
             return []
         terms = [word.casefold() for word in _WORD.findall(text)]
-        return [TextMatch(start, end) for start, end in _match_spans(found.text, terms)]
+        body = found.text
+
+        def whole(start: int, end: int) -> bool:  # as words, not the start of others
+            return not (start > 0 and body[start - 1].isalnum()) and not (
+                end < len(body) and body[end].isalnum()
+            )
+
+        return [
+            TextMatch(start, end) for start, end in _match_spans(body, terms) if whole(start, end)
+        ]
 
     async def similar(self, query: SimilarQuery) -> list[SearchHit]:
         if self._dimensions is None:
