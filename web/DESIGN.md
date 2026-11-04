@@ -755,6 +755,12 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
   field, comparison, value; a folder from the mailbox's), and the actions as its rows:
   "Übernehmen" and "Für" always, "Space setzen", "Typ des Mailtexts" and "Mail danach" added
   with "+ Aktion" and removed with their bin; delete in the head (`IconButton`).
+- **The dry run of a mail rule** (plan PR 5): below its editor, "Probelauf" (`Play`, `outline`)
+  asks what the rule as the form holds it would do with the mailbox's latest 50 mails, as Lekto
+  recorded them; it reads only and saves nothing. A line counts the mails it would take, then
+  the mails as rows (subject; sender · arrival · folder · attachments) with who would decide
+  each as a `Badge`: "Diese Regel" (`primary`), "Vorher: …" another rule before it (`muted`),
+  "Rückfall: alles" (`note`), "Keine Regel" (`muted`).
 
 ### Navigation between list and detail
 
