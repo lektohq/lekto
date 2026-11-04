@@ -101,7 +101,7 @@ async def test_the_cold_run_says_what_would_happen_and_writes_nothing(setup: Set
     assert ten["becomes"]["sources"]["contact"] == "correspondent 'ACME Energy'"
     assert "user 'tobias'" in ten["prepare"]
     text = (setup.directory / "reports" / "check.md").read_text()
-    assert "## New documents (8)" in text and "message/rfc822" in text
+    assert "## New documents (8)" in text and "wordprocessingml" in text
     assert PAPERLESS_KEY not in text and fake_lekto.TOKEN not in text
 
 
