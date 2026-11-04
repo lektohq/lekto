@@ -78,7 +78,7 @@ from lekto.core.domain.master_data import TagScope
 from lekto.core.domain.periods import Period
 from lekto.core.domain.pipeline import Outcome
 from lekto.core.domain.reasons import Reason, ReasonCode, because, written
-from lekto.core.domain.rule_conditions import Match, Taxonomy
+from lekto.core.domain.rule_conditions import MailOf, Match, Taxonomy
 from lekto.core.domain.rules import (
     AddTags,
     AskWebhook,
@@ -187,6 +187,7 @@ class Situation:
         default_factory=dict
     )
     codes: tuple[Code, ...] = ()
+    mail: MailOf | None = None
 
 
 @dataclass(frozen=True)

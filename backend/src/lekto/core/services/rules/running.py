@@ -68,6 +68,7 @@ from lekto.core.domain.reasons import Reason, ReasonCode, because, reasons_to_js
 from lekto.core.domain.rule_conditions import (
     TEXT_TARGET,
     Facts,
+    MailOf,
     PatternSubject,
     Taxonomy,
     pattern_subjects,
@@ -476,11 +477,13 @@ def facts(
     taxonomy: Taxonomy | None = None,
     kept_facts: Sequence[DocumentFact] = (),
     referred_types: Sequence[DocumentTypeId | None] = (),
+    mail: MailOf | None = None,
 ) -> Facts:
     return Facts.of(
         document,
         kept_facts=kept_facts,
         referred_types=referred_types,
+        mail=mail,
         text=prepared.text,
         patterns={**prepared.patterns, **patterns},
         unverified=origin.unverified,
@@ -550,6 +553,7 @@ async def situation(
     kept_facts: Sequence[DocumentFact] = (),
     codes: Sequence[Code] = (),
     referred_types: Mapping[UserId | None, tuple[DocumentTypeId | None, ...]] | None = None,
+    mail: MailOf | None = None,
 ) -> Situation:
     """Everything `plan` needs to know besides the matching rules. `loaded`: the master data
     of the run (`taxonomy`, for the document and at least `rules`); beyond it, only the
@@ -622,6 +626,7 @@ async def situation(
         kept_facts=tuple(kept_facts),
         codes=tuple(codes),
         referred_types=dict(referred_types or {}),
+        mail=mail,
     )
 
 

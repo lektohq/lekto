@@ -41,7 +41,14 @@ from lekto.core.domain.pipeline import (
     NodeRun,
 )
 from lekto.core.domain.reasons import Reason, ReasonCode, because
-from lekto.core.domain.rule_conditions import Facts, Match, distrusted_fields, evaluate, matches
+from lekto.core.domain.rule_conditions import (
+    Facts,
+    MailOf,
+    Match,
+    distrusted_fields,
+    evaluate,
+    matches,
+)
 from lekto.core.domain.rule_planner import Mode, Situation, plan
 from lekto.core.domain.rules import Action, AskWebhook, Missing, Rule, SendWebhook, StepCondition
 from lekto.core.domain.tasks import Task, TaskKind, TaskStatus, TaskStep
@@ -366,6 +373,7 @@ class Walker:
             unverified_tags=self.origin.model_tags,
             taxonomy=self.context.taxonomy,
             steps=steps,
+            mail=self.context.mail,
         )
 
 
@@ -427,11 +435,14 @@ async def run_rules(
     patterns, problems = await field_patterns(matcher, rules, document, kept)
     loaded = await taxonomy(uow, [document, *([] if before is None else [before[0]])], rules)
     referred = await referred_types(uow, document, {rule.current.created_by for rule in rules})
-    now_facts = facts(document, prepared, patterns, origin, loaded.taxonomy, kept)
+    mail = MailOf.of(await uow.mail_origins.find(document.id))
+    now_facts = facts(document, prepared, patterns, origin, loaded.taxonomy, kept, mail=mail)
     before_facts = None
     if before is not None:
         earlier = kept if kept_before is None else tuple(kept_before)
-        before_facts = facts(before[0], prepared, before[1], origin, loaded.taxonomy, earlier)
+        before_facts = facts(
+            before[0], prepared, before[1], origin, loaded.taxonomy, earlier, mail=mail
+        )
     matched = matches(rules, now_facts, definitions, before=before_facts, referred=referred)
     context = await situation(
         uow,
@@ -450,6 +461,7 @@ async def run_rules(
         kept_facts=kept,
         codes=prepared.codes,
         referred_types=referred,
+        mail=mail,
     )
     walker = Walker(
         uow,

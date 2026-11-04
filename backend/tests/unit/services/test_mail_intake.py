@@ -34,6 +34,7 @@ from lekto.core.domain.mail_rules import (
 from lekto.core.domain.master_data import DocumentType
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.reasons import ReasonCode
+from lekto.core.domain.rules import Condition, ConditionField, Operator, RuleScope
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.services.classification.signals import FactsResult, FactsSignal, sender_line
@@ -41,9 +42,11 @@ from lekto.core.services.mail_intake import FETCH_JOB, MailIntakeService, fetch_
 from lekto.core.services.mail_rules import Decider
 from lekto.core.services.objects import text_key
 from lekto.core.services.relating import relate
+from lekto.core.services.rules.management import RuleService
 from lekto.core.services.rules.nodes import ApplyRulesNode
 from tests import mails
 from tests.builders import TEMPLATES, drain, incoming
+from tests.unit.services.rules_support import add_tags, all_of, definition
 from tests.unit.services.support import World
 
 LOGIN = MailLogin(
@@ -460,3 +463,39 @@ async def test_a_dry_run_over_the_latest_mails(world: World) -> None:
     assert {item.decider for item in edited} == {Decider.RULE, Decider.NOTHING}
     with pytest.raises(PermissionDeniedError):
         await world.mail_rules.dry_run(person.id, mailbox.id, draft)
+
+
+async def test_a_document_rule_looks_at_the_mail_a_document_came_with(world: World) -> None:
+    admin, person, mailbox = await _setup(world)
+    tag = await world.master_data.create_tag(admin.id, "Strom")
+    rules = RuleService(world.uow, world.clock, TEMPLATES, RegexPatternMatcher(0.2))
+    await rules.create(
+        admin.id,
+        RuleScope.GLOBAL,
+        definition(
+            "Strom per Mail",
+            all_of(
+                Condition(
+                    field=ConditionField.MAIL_SENDER,
+                    op=Operator.ENDS_WITH,
+                    value="@stadtwerke.example",
+                ),
+                Condition(field=ConditionField.MAIL_MAILBOX, op=Operator.IS, value=str(mailbox.id)),
+            ),
+            add_tags(tag.id),
+        ),
+    )
+    step = ApplyRulesNode(
+        world.uow, world.object_store, RegexPatternMatcher(0.2), TEMPLATES, max_text=200_000
+    )
+    pipeline = world.pipeline({Node.APPLY_RULES: step})
+    uploaded = await pipeline.receive(person.id, incoming(b"%PDF-1.7\n%%EOF\n"), filename="a.pdf")
+    _deliver(world, mails.plain_mail())
+    await _fetch(world, world.mail_intake(pipeline))
+    await world.drain(pipeline)
+    by_channel = {
+        document.channel: document for document in await world.documents.list_visible(person.id)
+    }
+    assert tag.id in by_channel[Channel.MAIL].tag_ids
+    assert tag.id not in by_channel[Channel.API].tag_ids
+    assert uploaded.id == by_channel[Channel.API].id
