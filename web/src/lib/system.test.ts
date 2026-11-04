@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { monthLabel, systemTab } from './system.ts';
+import { monthLabel, systemTab, systemTabs } from './system.ts';
 
 describe('the tab of the page "System"', () => {
 	it('is the one the URL names, else the first', () => {
@@ -8,6 +8,13 @@ describe('the tab of the page "System"', () => {
 		expect(systemTab(new URLSearchParams(''))).toBe('automation');
 		expect(systemTab(new URLSearchParams('tab=classifier'))).toBe('classifier');
 		expect(systemTab(new URLSearchParams('tab=nonsense'))).toBe('automation');
+		expect(systemTab(new URLSearchParams('tab=intake'))).toBe('intake');
+		expect(systemTab(new URLSearchParams('tab=intake'), false)).toBe('automation');
+	});
+
+	it('keeps the intake channels to admins', () => {
+		expect(systemTabs(true)).toContain('intake');
+		expect(systemTabs(false)).not.toContain('intake');
 	});
 });
 
