@@ -15,7 +15,12 @@ from lekto.adapters.outbound.meilisearch.languages import (
 )
 from lekto.composition.settings import Settings
 
-LOCALES = sorted(item.name for item in files(languages).iterdir() if item.is_dir())
+# A folder of a language holds its lists (not the `__pycache__` beside them).
+LOCALES = sorted(
+    item.name
+    for item in files(languages).iterdir()
+    if item.is_dir() and any(entry.name.endswith(".txt") for entry in item.iterdir())
+)
 
 
 def test_a_folder_is_named_as_a_locale_of_the_settings() -> None:
