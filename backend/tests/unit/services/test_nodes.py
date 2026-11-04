@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from lekto.adapters.outbound.memory import FakeOcr, FakePageRenderer, FakeParser
+from lekto.adapters.outbound.memory import (
+    FakeMailRenderer,
+    FakeOcr,
+    FakePageRenderer,
+    FakeParser,
+)
 from lekto.adapters.outbound.memory.processing import FAKE_PDF, FAKE_READING
 from lekto.core.domain.documents import Document
 from lekto.core.domain.locations import Box
@@ -29,6 +34,7 @@ from lekto.core.services.objects import (
 )
 from lekto.core.services.pipeline import PipelineService
 from tests.builders import SAMPLES, incoming
+from tests.mails import plain_mail
 from tests.unit.services.support import World
 
 
@@ -74,12 +80,13 @@ def pipeline(
     ocr: FakeOcr | None = None,
     text: str = "Rechnung",
     pages: FakePageRenderer | None = None,
+    mail: FakeMailRenderer | None = None,
 ) -> PipelineService:
     store = world.object_store
     return world.pipeline(
         {
-            Node.OCR: OcrNode(store, ocr or FakeOcr()),
-            Node.PAGES: PagesNode(store, pages or FakePageRenderer()),
+            Node.OCR: OcrNode(store, ocr or FakeOcr(), mail),
+            Node.PAGES: PagesNode(store, pages or FakePageRenderer(), mail),
             Node.PARSE: ParseNode(store, FakeParser(text)),
         }
     )
@@ -279,3 +286,34 @@ async def test_work_directories_are_removed(
 )
 def test_has_text(text: str, expected: bool) -> None:
     assert has_text(text) is expected
+
+
+async def test_a_mail_is_set_not_read(world: World) -> None:
+    mail, ocr, pages = FakeMailRenderer(), FakeOcr(), FakePageRenderer(2)
+    service = pipeline(world, ocr=ocr, pages=pages, mail=mail)
+    owner = await world.user()
+    received = await service.receive(owner.id, incoming(plain_mail()), filename="Rechnung.eml")
+    await world.drain(service)
+    document = await world.documents.get(owner.id, received.id)
+    assert document.media_type == "message/rfc822"
+    assert document.lane is Lane.GREEN
+    assert document.page_count == 2
+    assert ocr.calls == []  # nothing recognised
+    assert len(mail.calls) == 2  # the archive, and the pages from the same
+    assert await world.object_store.get(archive_key(document.id)) == FAKE_PDF
+    assert pages.calls and pages.calls[0].suffix == ".pdf"
+    log = {
+        entry.node: entry for entry in await world.documents.processing_log(owner.id, document.id)
+    }
+    assert log[Node.OCR].result.model_version == "fake-mail 1"
+    assert log[Node.OCR].result.output["pdfa"] is True
+    assert not await world.object_store.exists(reading_key(document.id))
+
+
+async def test_a_mail_without_a_renderer_fails(world: World) -> None:
+    service = pipeline(world)
+    owner = await world.user()
+    received = await service.receive(owner.id, incoming(plain_mail()), filename="Rechnung.eml")
+    await world.drain(service)
+    document = await world.documents.get(owner.id, received.id)
+    assert document.lane is Lane.RED
