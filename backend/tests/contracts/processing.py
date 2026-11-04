@@ -17,6 +17,7 @@ from lekto.core.ports.ocr import Ocr
 from lekto.core.ports.pages import PageRenderer
 from lekto.core.ports.parser import DocumentParser
 from tests.builders import SAMPLES
+from tests.mails import plain_mail
 
 
 class OcrContract:
@@ -245,6 +246,10 @@ class MetadataReaderContract:
         metadata = await metadata_reader.read_metadata((SAMPLES / "photo.jpg").read_bytes())
         assert metadata.format == "JPEG"
         assert metadata.width and metadata.height
+
+    async def test_reads_a_mail(self, metadata_reader: MetadataReader) -> None:
+        metadata = await metadata_reader.read_metadata(plain_mail())
+        assert metadata.format == "E-Mail"
 
     @pytest.mark.parametrize("name", ["damaged.pdf", "unsupported.docx"])
     async def test_what_it_cannot_read_is_unprocessable(

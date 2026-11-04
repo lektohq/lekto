@@ -13205,7 +13205,7 @@
                   "file": {
                     "type": "string",
                     "format": "binary",
-                    "description": "PDF, JPEG, PNG or TIFF; recognised by content."
+                    "description": "PDF, JPEG, PNG, TIFF or a mail (`.eml`); recognised by content."
                   },
                   "space_id": {
                     "type": "string",
@@ -32749,7 +32749,8 @@
         "enum": [
           "info",
           "xmp",
-          "exif"
+          "exif",
+          "mail"
         ],
         "title": "MetadataSource"
       },

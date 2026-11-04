@@ -7306,7 +7306,7 @@ export interface components {
 		 * MetadataSource
 		 * @enum {string}
 		 */
-		MetadataSource: 'info' | 'xmp' | 'exif';
+		MetadataSource: 'info' | 'xmp' | 'exif' | 'mail';
 		/**
 		 * Missing
 		 * @description What a step that asks does without an answer (none in time, an error, an invalid
@@ -22033,7 +22033,7 @@ export interface operations {
 				'multipart/form-data': {
 					/**
 					 * Format: binary
-					 * @description PDF, JPEG, PNG or TIFF; recognised by content.
+					 * @description PDF, JPEG, PNG, TIFF or a mail (`.eml`); recognised by content.
 					 */
 					file: string;
 					/**
