@@ -47,7 +47,8 @@ export const TRIGGER_LABELS: Record<Trigger, () => string> = {
 export const CHANNEL_LABELS: Record<Channel, () => string> = {
 	web: m.rule_channel_web,
 	api: m.rule_channel_api,
-	migration: m.rule_channel_migration
+	migration: m.rule_channel_migration,
+	mail: m.rule_channel_mail
 };
 
 export const ACTION_LABELS: Record<ActionType, () => string> = {

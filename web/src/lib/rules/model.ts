@@ -102,7 +102,7 @@ export const LIMITS = {
 
 export const DEFAULT_PRIORITY = 100;
 export const TRIGGERS: readonly Trigger[] = ['ingest', 'change'];
-export const CHANNELS: readonly Channel[] = ['web', 'api', 'migration'];
+export const CHANNELS: readonly Channel[] = ['web', 'api', 'migration', 'mail'];
 /** The fields of a rule's head; a condition step has `step` too. */
 export const CONDITION_FIELDS: readonly ConditionField[] = [
 	'contact',

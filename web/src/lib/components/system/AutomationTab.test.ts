@@ -82,13 +82,13 @@ describe('the automation tab', () => {
 		expect(screen.getByText(m.automation_steps_signals())).toBeTruthy();
 	});
 
-	it("asks for the web and the API, 12 months, in the viewer's time zone", async () => {
+	it("asks for the web, the API and mail, 12 months, in the viewer's time zone", async () => {
 		const api = serve();
 		render(AutomationTab);
 		await screen.findByText(m.automation_first_green({ count: '70' }));
 		const zone = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
 		expect(calls(api)).toEqual([
-			`GET /api/v1/automation?channel=web&channel=api&period=12m&tz=${zone}`
+			`GET /api/v1/automation?channel=web&channel=api&channel=mail&period=12m&tz=${zone}`
 		]);
 	});
 
@@ -99,17 +99,23 @@ describe('the automation tab', () => {
 		await userEvent.click(screen.getByRole('button', { name: m.automation_channel_migration() }));
 		await userEvent.click(screen.getByRole('button', { name: m.automation_period_all() }));
 		await waitFor(() => expect(calls(api)).toHaveLength(3));
-		expect(calls(api)[1]).toContain('channel=web&channel=api&channel=migration&period=12m');
+		expect(calls(api)[1]).toContain(
+			'channel=web&channel=api&channel=migration&channel=mail&period=12m'
+		);
 		expect(calls(api)[2]).toContain('period=all');
 
-		for (const name of [m.automation_channel_web(), m.automation_channel_api()]) {
+		for (const name of [
+			m.automation_channel_web(),
+			m.automation_channel_api(),
+			m.automation_channel_mail()
+		]) {
 			await userEvent.click(screen.getByRole('button', { name }));
 		}
-		await waitFor(() => expect(calls(api)).toHaveLength(5));
+		await waitFor(() => expect(calls(api)).toHaveLength(6));
 		await userEvent.click(screen.getByRole('button', { name: m.automation_channel_migration() }));
 		const pressed = screen.getByRole('button', { name: m.automation_channel_migration() });
 		expect(pressed.getAttribute('aria-pressed')).toBe('true'); // the last one stays
-		expect(calls(api)).toHaveLength(5);
+		expect(calls(api)).toHaveLength(6);
 	});
 
 	it('tells the hit rate per field and groups the custom fields', async () => {

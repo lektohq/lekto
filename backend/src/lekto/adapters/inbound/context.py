@@ -26,6 +26,7 @@ from lekto.core.services.indexing import IndexingService
 from lekto.core.services.jobs import JobsService
 from lekto.core.services.lenses import LensService
 from lekto.core.services.logos import LogoService
+from lekto.core.services.mail_intake import MailIntakeService
 from lekto.core.services.mailboxes import MailboxService
 from lekto.core.services.master_data import MasterDataService
 from lekto.core.services.oidc import OidcService
@@ -68,6 +69,7 @@ class ApiContext:
     tasks: TaskService
     lenses: LensService
     mailboxes: MailboxService
+    mail_intake: MailIntakeService
     relations: RelationService
     expected: ExpectedService
     stream: StreamService

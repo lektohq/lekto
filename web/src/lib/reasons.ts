@@ -450,7 +450,8 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	mail_login_failed: entry(m.reason_mail_login_failed),
 	mail_folder_missing: entry(m.reason_mail_folder_missing),
 	mail_server_error: entry(m.reason_mail_server_error),
-	mail_password_unreadable: entry(m.reason_mail_password_unreadable)
+	mail_password_unreadable: entry(m.reason_mail_password_unreadable),
+	mailbox_paused: entry(m.reason_mailbox_paused)
 };
 
 /** The nouns the API names things by (the kind `thing`), in the user's language. */
