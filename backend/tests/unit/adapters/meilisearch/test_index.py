@@ -3,6 +3,7 @@ answers, how it treats failures. No network; the real service is covered by the 
 tests."""
 
 import json
+import unicodedata
 from collections.abc import Callable
 from datetime import date
 from typing import Any
@@ -136,6 +137,15 @@ async def test_a_missing_index_is_created_with_its_settings() -> None:
     assert "space_id" in settings["filterableAttributes"]
     assert "owner_id" not in settings["filterableAttributes"]
     assert settings["searchableAttributes"][0] == "title"
+    assert {"und", "ich", "wie", "viel"} <= set(settings["stopWords"])
+    assert settings["stopWords"] == sorted(settings["stopWords"])
+
+
+def test_the_stop_words_are_those_of_the_languages() -> None:
+    sim = SimulatedMeilisearch()
+    assert sim.index(locales=["eng"])._settings()["stopWords"] == []  # none measured yet
+    german = sim.index(locales=["deu"])._settings()["stopWords"]
+    assert sim.index(locales=["deu", "eng"])._settings()["stopWords"] == german
 
 
 async def test_settings_that_are_in_place_are_not_applied_again() -> None:
@@ -367,6 +377,34 @@ async def test_state_of_a_missing_document() -> None:
     assert await sim.index().state(DocumentId(uid(1))) is None
 
 
+async def test_a_search_that_finds_nothing_by_the_rarest_words_asks_again_by_the_first() -> None:
+    sim = SimulatedMeilisearch()
+    sim.settings = wanted_settings(sim)  # and the search finds nothing
+    result = await sim.index().search(_query())
+    assert [sim.body(call)["matchingStrategy"] for call in sim.calls("POST", "/search")] == [
+        "frequency",
+        "last",
+    ]
+    assert result.hits == []
+    # A later page of a search with hits keeps the strategy, even when it is empty.
+    sim.requests.clear()
+    sim.search_answer = {"hits": [], "estimatedTotalHits": 25}
+    await sim.index().search(_query(offset=40))
+    assert [sim.body(call)["matchingStrategy"] for call in sim.calls("POST", "/search")] == [
+        "frequency"
+    ]
+
+
+async def test_the_stop_words_as_meilisearch_keeps_them_are_in_place() -> None:
+    sim = SimulatedMeilisearch()
+    sim.settings = wanted_settings(sim)
+    sim.settings["stopWords"] = sorted(
+        unicodedata.normalize("NFD", word) for word in sim.settings["stopWords"]
+    )
+    await sim.index().upsert([index_document()])
+    assert sim.calls("PATCH", "/settings") == []
+
+
 async def test_the_search_request_and_its_answer() -> None:
     sim = SimulatedMeilisearch()
     sim.settings = wanted_settings(sim, dimensions=2)
@@ -391,6 +429,7 @@ async def test_the_search_request_and_its_answer() -> None:
     (search,) = sim.calls("POST", "/search")
     body = sim.body(search)
     assert (body["q"], body["offset"], body["limit"]) == ("Zahlung", 20, 10)
+    assert body["matchingStrategy"] == "frequency"
     assert body["vector"] == [0.5, 0.5]
     assert body["hybrid"] == {"embedder": "default", "semanticRatio": 0.3}
     assert body["attributesToCrop"] == ["text"]
@@ -420,11 +459,12 @@ async def test_an_index_that_was_created_without_settings_is_set_up_for_the_sear
         return None
 
     sim.fail = lost
+    sim.search_answer = {"hits": [{"id": str(uid(1)), "version": 1}], "estimatedTotalHits": 1}
     index = sim.index()
     await index.upsert([index_document()])  # the index counts as set up now
     settings_checks = len(sim.calls("GET", "/settings"))
     result = await index.search(_query())
-    assert result.hits == []
+    assert [hit.id for hit in result.hits] == [uid(1)]
     assert len(sim.calls("POST", "/search")) == 2
     assert len(sim.calls("GET", "/settings")) == settings_checks + 1
 
