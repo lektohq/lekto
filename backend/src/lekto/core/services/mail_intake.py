@@ -55,6 +55,8 @@ from lekto.core.domain.mail_intake import (
     letters,
 )
 from lekto.core.domain.mail_message import MailMessage, read_mail
+from lekto.core.domain.mail_rules import MailRule, first_match, mail_facts
+from lekto.core.domain.permissions import can_file_into
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.identity import DecryptionError, SecretCipher
@@ -291,7 +293,7 @@ class MailIntakeService:
                 if await uow.mail_records.has_message(message.message_id):
                     await self._keep(replace(record, outcome=MailOutcome.KNOWN))
                     return 0
-        decision = await self._decide(mailbox, message)
+        decision = await self._decide(mailbox, message, folder)
         if decision is None:
             await self._keep(replace(record, outcome=MailOutcome.NO_RULE))
             return 0
@@ -311,8 +313,21 @@ class MailIntakeService:
         await self._after(session, folder, info.uid, decision)
         return made
 
-    async def _decide(self, mailbox: Mailbox, message: MailMessage) -> MailDecision | None:
-        """The mailbox's fallback (the mail rules come with PR 4)."""
+    async def _decide(
+        self, mailbox: Mailbox, message: MailMessage, folder: str
+    ) -> MailDecision | None:
+        """The first of the mailbox's rules that matches, else the mailbox's fallback; None
+        for nothing. A rule whose person, space or type is gone or out of reach is paused with
+        the reason, and the next one asked."""
+        facts = mail_facts(message, folder)
+        async with self._uow() as uow:
+            rules = await uow.mail_rules.of_mailbox(mailbox.id)
+        while (rule := first_match(rules, facts)) is not None:
+            problem = await self._unfit(rule)
+            if problem is None:
+                return rule.decision()
+            await self._pause(rule, problem)
+            rules = [item for item in rules if item.id != rule.id]
         if mailbox.fallback is not Fallback.EVERYTHING or mailbox.fallback_user_id is None:
             return None
         async with self._uow() as uow:
@@ -321,10 +336,42 @@ class MailIntakeService:
             return None
         return MailDecision(user_id=person.id, body_type_id=mailbox.body_type_id)
 
+    async def _unfit(self, rule: MailRule) -> Reason | None:
+        """Why the rule cannot take a mail now; None if it can."""
+        if rule.user_id is None:
+            return None
+        async with self._uow() as uow:
+            person = await uow.users.find(rule.user_id)
+            if person is None or not person.active:
+                return because(ReasonCode.MAIL_RULE_PERSON_GONE)
+            if rule.space_id is not None:
+                space = await uow.spaces.find(rule.space_id)
+                if space is None or not can_file_into(person, space):
+                    return because(ReasonCode.MAIL_RULE_SPACE_UNREACHABLE)
+            if rule.text_type_id is not None and (
+                await uow.document_types.find(rule.text_type_id) is None
+            ):
+                return because(ReasonCode.MAIL_RULE_TYPE_GONE)
+        return None
+
+    async def _pause(self, rule: MailRule, reason: Reason) -> None:
+        async def store() -> None:
+            async with self._uow() as uow:
+                current = await uow.mail_rules.find(rule.id)
+                if current is not None and current.enabled:
+                    current.pause(reason, now=self._clock.now())
+                    await uow.mail_rules.update(current)
+                    await uow.commit()
+
+        log.info("a mail rule paused", extra={"rule_id": str(rule.id), "reason": reason.text})
+        await retrying(store, attempts=STORE_ATTEMPTS, backoff=True)
+
     async def _take(
         self, mailbox: Mailbox, record: MailRecord, message: MailMessage, decision: MailDecision
     ) -> int:
         made = 0
+        if decision.user_id is None or decision.parts is MailParts.NOTHING:
+            return made
         with tempfile.TemporaryDirectory(prefix="lekto-mail-") as work:
             folder = Path(work)
             for number, letter in enumerate(letters(message)):
@@ -362,6 +409,7 @@ class MailIntakeService:
                                 role=OriginRole.COVER,
                                 filename=name,
                                 related=tuple(related),
+                                body_type_id=decision.body_type_id,
                             )
                         )
                         made += 1
@@ -400,6 +448,7 @@ class MailIntakeService:
     ) -> tuple[DocumentId, bool] | None:
         """The document made of `data`, and whether it is new; for a file Lekto has already the
         one the person reads (None where they read it not)."""
+        assert decision.user_id is not None, "a decision that takes names its person"
         path = folder / new_id().hex
         await asyncio.to_thread(path.write_bytes, data)
         file = await asyncio.to_thread(IncomingFile.of, path)
