@@ -35157,6 +35157,11 @@
             "title": "Estimated Total",
             "description": "An estimate of the hits, not exact. At most 1000 hits can be reached."
           },
+          "word_total": {
+            "type": "integer",
+            "title": "Word Total",
+            "description": "An estimate of the hits of the words, not exact: what the words find. With the meaning, the hits beyond were found by it alone; for a single word those that hold it come first."
+          },
           "next_offset": {
             "anyOf": [
               {
@@ -35199,6 +35204,7 @@
         "required": [
           "items",
           "estimated_total",
+          "word_total",
           "next_offset",
           "semantic",
           "mode",

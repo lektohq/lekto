@@ -599,6 +599,7 @@ def test_search_defaults() -> None:
     assert settings.embedding_dimensions is None
     assert settings.search_semantic_ratio == 0.5
     assert settings.search_embed_timeout == timedelta(seconds=5)
+    assert settings.search_meaning_min_score is None
     assert (settings.search_max_text, settings.search_chunk_size, settings.search_max_chunks) == (
         200_000,
         1500,
@@ -616,6 +617,7 @@ def test_indexing_and_query_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         {
             "LEKTO_SEARCH_SEMANTIC_RATIO": "0.8",
             "LEKTO_SEARCH_EMBED_TIMEOUT": "2",
+            "LEKTO_SEARCH_MEANING_MIN_SCORE": "0.7",
             "LEKTO_SEARCH_MAX_TEXT": "50000",
             "LEKTO_SEARCH_CHUNK_SIZE": "800",
             "LEKTO_SEARCH_MAX_CHUNKS": "4",
@@ -628,6 +630,7 @@ def test_indexing_and_query_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = load_settings()
     assert settings.search_semantic_ratio == 0.8
     assert settings.search_embed_timeout == timedelta(seconds=2)
+    assert settings.search_meaning_min_score == 0.7
     assert (settings.search_max_text, settings.search_chunk_size, settings.search_max_chunks) == (
         50_000,
         800,
@@ -707,6 +710,7 @@ def test_either_embeddings_or_search_alone_needs_no_vector_length(
         ("LEKTO_EMBEDDING_DIMENSIONS", "0"),
         ("LEKTO_SEARCH_SEMANTIC_RATIO", "1.5"),
         ("LEKTO_SEARCH_SEMANTIC_RATIO", "-0.1"),
+        ("LEKTO_SEARCH_MEANING_MIN_SCORE", "1.5"),
         ("LEKTO_SEARCH_CHUNK_SIZE", "10"),
         ("LEKTO_SEARCH_MAX_CHUNKS", "0"),
         ("LEKTO_SEARCH_MAX_TEXT", "10"),

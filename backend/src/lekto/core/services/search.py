@@ -89,10 +89,14 @@ class SearchPolicy:
     embed_timeout: timedelta  # for the query; then plain full text
     query_prefix: str = ""  # put before the query, for models that ask for it
     dimensions: int | None = None  # the length of the vectors; a query of another goes by words
+    # A document found by the meaning alone below this score is left out; none: every one.
+    meaning_min_score: float | None = None
 
     def __post_init__(self) -> None:
         if not 0 <= self.semantic_ratio <= 1:
             raise ValueError("semantic_ratio must be between 0 and 1")
+        if self.meaning_min_score is not None and not 0 <= self.meaning_min_score <= 1:
+            raise ValueError("meaning_min_score must be between 0 and 1")
 
 
 @dataclass(frozen=True)
@@ -117,6 +121,7 @@ class SearchPage:
     mode: SearchMode
     reason: Reason | None = None  # why by words alone, where the meaning was to take part
     meaning_pending: bool = False  # the meaning is still being made: `SearchMeaningReady` follows
+    word_total: int = 0  # of the hits of the words; those beyond were found by the meaning
 
     @property
     def semantic(self) -> bool:
@@ -275,6 +280,7 @@ class SearchService:
                     order=order,
                     offset=offset,
                     limit=limit,
+                    meaning_min_score=self._policy.meaning_min_score,
                 )
             )
         except SearchUnavailableError as error:
@@ -324,8 +330,15 @@ class SearchService:
             mode, reason, pending = SearchMode.HYBRID, None, False
         else:
             mode, reason, pending = SearchMode.WORDS, meaning.reason, meaning.pending
+        words = result.estimated_total if result.word_total is None else result.word_total
         return SearchPage(
-            items, result.estimated_total, end if more else None, mode, reason, pending
+            items,
+            result.estimated_total,
+            end if more else None,
+            mode,
+            reason,
+            pending,
+            word_total=words,
         )
 
     async def places(self, actor: UserId, document: DocumentId, text: str) -> SearchPlaces:

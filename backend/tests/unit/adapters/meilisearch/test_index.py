@@ -5,6 +5,7 @@ tests."""
 import json
 import unicodedata
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import date
 from typing import Any
 from uuid import UUID
@@ -483,6 +484,41 @@ async def test_a_query_of_stop_words_alone_finds_nothing_without_asking() -> Non
     assert {sim.body(call)["q"] for call in sim.calls("POST", "/search")} == {"und"}
 
 
+async def test_with_the_meaning_one_word_finds_its_documents_first_above_the_floor() -> None:
+    sim = SimulatedMeilisearch()
+    sim.settings = wanted_settings(sim, dimensions=2)
+
+    def hit(n: int, score: float) -> dict[str, Any]:
+        return {"id": str(uid(n)), "version": 1, "_rankingScore": score}
+
+    words = {"hits": [hit(2, 0.3)], "estimatedTotalHits": 1}
+    mixed = {"hits": [hit(1, 0.8), hit(3, 0.6), hit(2, 0.5)], "estimatedTotalHits": 3}
+    sim.fail = lambda request: (
+        httpx2.Response(200, json=mixed if b'"hybrid"' in request.content else words)
+        if request.url.path.endswith("/search")
+        else None
+    )
+    index = sim.index(dimensions=2)
+    query = _query(vector=(0.5, 0.5), semantic_ratio=0.5, meaning_min_score=0.7)
+    result = await index.search(query)
+    # The word's document first; the meaning's below the floor left out.
+    assert [hit.id for hit in result.hits] == [uid(2), uid(1)]
+    assert (result.word_total, result.estimated_total, result.semantic) == (1, 2, True)
+    bodies = [sim.body(call) for call in sim.calls("POST", "/search")]
+    assert [(body["offset"], body["limit"], "hybrid" in body) for body in bodies] == [
+        (0, 200, False),
+        (0, 200, True),
+    ]
+    assert bodies[1]["vector"] == [0.5, 0.5]
+    assert bodies[1]["hybrid"] == {"embedder": "default", "semanticRatio": 0.5}
+    # Pages are cut from that order.
+    second = await index.search(replace(query, offset=1, limit=1))
+    assert [hit.id for hit in second.hits] == [uid(1)]
+    # More than one word: the order of the meaning and the words as Meilisearch has it.
+    two = await index.search(replace(query, text="Urlaubsgeld Juni", meaning_min_score=None))
+    assert [hit.id for hit in two.hits] == [uid(1), uid(3), uid(2)]
+
+
 async def test_the_search_request_and_its_answer() -> None:
     sim = SimulatedMeilisearch()
     sim.settings = wanted_settings(sim, dimensions=2)
@@ -501,18 +537,15 @@ async def test_the_search_request_and_its_answer() -> None:
         ],
         "estimatedTotalHits": 40,
     }
-    result = await sim.index(dimensions=2).search(
-        _query(vector=(0.5, 0.5), semantic_ratio=0.3, offset=20, limit=10)
-    )
+    result = await sim.index(dimensions=2).search(_query(offset=20, limit=10))
     (search,) = sim.calls("POST", "/search")
     body = sim.body(search)
     assert (body["q"], body["offset"], body["limit"]) == ("Zahlung", 20, 10)
     assert body["matchingStrategy"] == "frequency"
-    assert body["vector"] == [0.5, 0.5]
-    assert body["hybrid"] == {"embedder": "default", "semanticRatio": 0.3}
+    assert "vector" not in body and "hybrid" not in body
     assert body["attributesToCrop"] == ["text"]
     assert body["highlightPreTag"] == HIGHLIGHT_START
-    assert result.semantic
+    assert not result.semantic
     assert result.estimated_total == 40
     first, second = result.hits
     assert (first.id, first.version, first.score) == (uid(1), 3, 0.75)

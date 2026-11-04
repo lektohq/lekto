@@ -29,6 +29,21 @@ from lekto.core.services.search import SearchService
 
 CUTOFF = 10  # results looked at per query
 KINDS_AT = 3  # the rank that counts as found when comparing kinds of queries
+NONSENSE = (
+    "abdidon",
+    "Quarxelbum",
+    "Flimpstok",
+    "zibbelwatz",
+    "Trombulin Fexa",
+    "ghjkl",
+    "Wurmfluxion",
+    "plonkatrine",
+    "Snorvel 42",
+    "Kribbelmops",
+)
+"""Words that name no document: with the meaning, every result is noise. The best score of
+each shows where the floor of the meaning (`LEKTO_SEARCH_MEANING_MIN_SCORE`) leaves them out."""
+FLOORS = tuple(round(0.60 + 0.02 * step, 2) for step in range(11))
 
 
 @dataclass(frozen=True)
@@ -131,6 +146,15 @@ class QueryOutcome:
     seconds: float
     semantic: bool  # whether the meaning took part
     scores: tuple[float | None, ...] = ()  # of the results in `got`
+    marked: tuple[bool, ...] = ()  # of the results in `got`: whether a word of the query shows
+
+    def kept(self, floor: float) -> bool:
+        """Whether the first expected case found stays above `floor`: a word shows in it, or
+        the meaning scores it at least as high."""
+        for name, score, marked in zip(self.got, self.scores, self.marked, strict=True):
+            if name in self.case.expected:
+                return marked or (score is not None and score >= floor)
+        return False
 
     @property
     def precision(self) -> float:
@@ -153,6 +177,19 @@ class QueryOutcome:
 class RatioResult:
     ratio: float
     outcomes: list[QueryOutcome] = field(default_factory=list)
+    nonsense: list[float] = field(default_factory=list)  # the best score of each nonsense query
+
+    def floor(self, floor: float) -> tuple[float, float]:
+        """At `floor`: the share of the queries found whose expected case stays, and the share
+        of nonsense queries left without a result."""
+        found = [o for o in self.outcomes if o.rank is not None]
+        kept = sum(1 for o in found if o.kept(floor)) / len(found) if found else 0.0
+        empty = (
+            sum(1 for top in self.nonsense if top < floor) / len(self.nonsense)
+            if self.nonsense
+            else 0.0
+        )
+        return kept, empty
 
     def found(self, rank: int, kind: str | None = None) -> int:
         return sum(
@@ -291,6 +328,11 @@ async def _measure(
             result = RatioResult(ratio)
             for case in queries.cases:
                 result.outcomes.append(await _ask(search, owner, case, ratio, names))
+            if ratio > 0:
+                for text in NONSENSE:
+                    page = await search.search(owner, text, limit=1, semantic_ratio=ratio)
+                    scores = [item.score for item in page.items if item.score is not None]
+                    result.nonsense.append(scores[0] if scores else 0.0)
             results.append(result)
     return ModelResult(
         name=backend.name,
@@ -316,4 +358,5 @@ async def _ask(
     got = tuple(names[item.document.id] for item in page.items)
     rank = next((position for position, name in enumerate(got, 1) if name in case.expected), None)
     scores = tuple(item.score for item in page.items)
-    return QueryOutcome(case, rank, got, seconds, page.semantic, scores)
+    marked = tuple(any(segment.match for segment in item.snippet) for item in page.items)
+    return QueryOutcome(case, rank, got, seconds, page.semantic, scores, marked)

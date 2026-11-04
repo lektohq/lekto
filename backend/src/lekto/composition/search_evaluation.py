@@ -110,8 +110,12 @@ async def run_search_evaluation(
     uow, clock, store = container.unit_of_work, container.clock, container.object_store
     # The length of the vectors is measured per model, not the configured one.
     indexing_policy = replace(indexing_policy_of(settings), dimensions=None)
+    # Without a floor of the meaning: the report measures where one would cut.
     search_policy = replace(
-        search_policy_of(settings), embed_timeout=QUERY_TIMEOUT, dimensions=None
+        search_policy_of(settings),
+        embed_timeout=QUERY_TIMEOUT,
+        dimensions=None,
+        meaning_min_score=None,
     )
     services = SearchServices(
         indexing=lambda index, embeddings: IndexingService(
