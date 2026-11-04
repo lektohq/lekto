@@ -8,13 +8,15 @@
 # migration, health, the user of the Lekto processes (PUID/PGID, never root), the web UI below
 # /ui (files, page fallback, cache headers, the API's paths untouched), LEKTO_ROLE, a PDF
 # through OCR and parsing up to its lane (no language model: classification is uncertain, so
-# the lane is yellow), invalid configuration and a clean `docker stop`. Needs docker, curl and
+# the lane is yellow), a mail set as PDF (WeasyPrint) and parsed, invalid configuration and a
+# clean `docker stop`. Needs docker, curl and
 # python3 on the host; takes a few minutes. No language model, no other service.
 set -euo pipefail
 
 image=${1:?usage: test-image.sh IMAGE}
 here=$(cd "$(dirname "$0")" && pwd)
 sample=$here/../backend/tests/samples/text.pdf
+mail=$here/../backend/tests/samples/mail.eml
 prefix=lekto-test-$$
 work=$(mktemp -d)
 chmod 755 "$work"
@@ -178,6 +180,18 @@ if wait_for 300 "the document reaches a lane" has_lane; then
 import json, sys
 outcomes = json.loads(sys.argv[1])
 sys.exit(0 if outcomes.get('ocr') == 'ok' and outcomes.get('parse') == 'ok' else 1)" "$outcomes"
+fi
+
+step "a mail set as PDF and parsed up to its lane"
+id=$(curl -fsS -b "$jar" -H "X-CSRF-Token: $token" -F "file=@$mail" "$(url all)/documents" \
+  | python3 -c 'import json, sys; print(json.load(sys.stdin)["id"])')
+if wait_for 300 "the mail reaches a lane" has_lane; then
+  outcomes=$(document | python3 -c 'import json, sys; nodes = json.load(sys.stdin)["processing"]["nodes"]; print(json.dumps({n["node"]: n["outcome"] for n in nodes if n["outcome"]}))')
+  echo "   lane: $(lane), outcomes: $outcomes"
+  check "set, its pages drawn and parsed" python3 -c "
+import json, sys
+outcomes = json.loads(sys.argv[1])
+sys.exit(0 if all(outcomes.get(node) == 'ok' for node in ('ocr', 'pages', 'parse')) else 1)" "$outcomes"
 fi
 
 step "docker stop: orderly, no kill"
