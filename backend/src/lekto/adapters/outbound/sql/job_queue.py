@@ -97,6 +97,16 @@ class SqlJobQueue:
         self._tx.signal(Channel.JOBS, kind)
         return id
 
+    async def hasten(self, dedup_key: str, *, run_at: datetime) -> bool:
+        queued = and_(_jobs.c.dedup_key == dedup_key, _jobs.c.status == JobStatus.QUEUED.value)
+        found = (await self._tx.read(select(_jobs.c.kind, _jobs.c.run_at).where(queued))).first()
+        if found is None:
+            return False
+        if found.run_at > require_utc(run_at, "run_at"):
+            await self._tx.write(update(_jobs).where(queued).values(run_at=run_at))
+            self._tx.signal(Channel.JOBS, found.kind)
+        return True
+
     async def claim(
         self, *, now: datetime, lease: timedelta, kinds: Collection[str] | None = None
     ) -> Job | None:
