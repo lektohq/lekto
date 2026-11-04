@@ -42,6 +42,7 @@ from lekto.core.domain.ids import (
     DocumentTypeId,
     FieldId,
     LensId,
+    MailboxId,
     RuleApplicationId,
     RuleId,
     SpaceId,
@@ -53,6 +54,7 @@ from lekto.core.domain.ids import (
 )
 from lekto.core.domain.inbox import Confirmation, InboxTab
 from lekto.core.domain.lenses import Lens
+from lekto.core.domain.mail import Mailbox
 from lekto.core.domain.master_data import Contact, DocumentType, Tag, TagScope
 from lekto.core.domain.open_identifiers import Sighting
 from lekto.core.domain.periods import Period
@@ -863,6 +865,30 @@ class LensRepository(Protocol):
 
     async def list_for_owner(self, owner: UserId) -> list[Lens]:
         """The user's lenses by `position`, ties oldest first."""
+        ...
+
+
+class MailboxRepository(Protocol):
+    """The mailboxes Lekto fetches from (`domain.mail`)."""
+
+    async def get(self, id: MailboxId) -> Mailbox: ...
+
+    async def find(self, id: MailboxId) -> Mailbox | None: ...
+
+    async def add(self, mailbox: Mailbox) -> None:
+        """ConflictError if a mailbox has that name (regardless of case)."""
+        ...
+
+    async def update(self, mailbox: Mailbox) -> None:
+        """As `add` for the name; ConcurrencyError if it was changed meanwhile."""
+        ...
+
+    async def remove(self, id: MailboxId) -> None:
+        """NotFoundError if it does not exist."""
+        ...
+
+    async def list_all(self) -> list[Mailbox]:
+        """All mailboxes by name."""
         ...
 
 

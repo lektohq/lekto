@@ -20,6 +20,7 @@ const PATHS = [
 	'/ui/system?tab=classifier',
 	'/ui/system?tab=search',
 	'/ui/system?tab=jobs',
+	'/ui/system?tab=intake',
 	'/ui/system?tab=maintenance',
 	'/ui/admin/master-data',
 	'/ui/admin/master-data?tab=document-types',

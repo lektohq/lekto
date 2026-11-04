@@ -32,6 +32,10 @@ x-test-environment: &test-environment
   LEKTO_S3_PATH_STYLE: "true"
   LEKTO_MEILISEARCH_URL: http://meilisearch:7700
   LEKTO_MEILISEARCH_API_KEY: dev-meilisearch-master-key
+  # The mail server of the mail tests (GreenMail): plain IMAP, and the API that makes a new
+  # account for each test.
+  TEST_IMAP_URL: imap://greenmail:3143
+  TEST_GREENMAIL_URL: http://greenmail:8080
 
 services:
   dev:
@@ -54,6 +58,8 @@ services:
       garage-init:
         condition: service_completed_successfully
       meilisearch:
+        condition: service_healthy
+      greenmail:
         condition: service_healthy
 
   postgres:
@@ -106,6 +112,20 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  # Only for the mail channel: an IMAP and SMTP server that keeps nothing. Plain IMAP on 3143,
+  # its API on 8080 (the tests make their accounts there); `lekto` is an account to try by hand.
+  greenmail:
+    image: greenmail/standalone:2.1.14
+    environment:
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.imap -Dgreenmail.setup.test.smtp -Dgreenmail.hostname=0.0.0.0
+        -Dgreenmail.users=lekto:lekto-dev-mail@lekto.test
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/3143"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
 volumes:
   uv-cache:

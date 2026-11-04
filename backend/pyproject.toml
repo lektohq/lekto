@@ -76,7 +76,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [
     "unit: needs no external services (applied automatically to tests/unit)",
-    "integration: needs Postgres, Garage, Meilisearch or the OCR programs (applied automatically to tests/integration)",
+    "integration: needs Postgres, Garage, Meilisearch, GreenMail or the OCR programs (applied automatically to tests/integration)",
 ]
 
 # Hexagonal boundaries, checked with `lint-imports`.
@@ -119,6 +119,7 @@ type = "independence"
 modules = [
     "lekto.adapters.outbound.crypto",
     "lekto.adapters.outbound.filesystem",
+    "lekto.adapters.outbound.imap",
     "lekto.adapters.outbound.liquid",
     "lekto.adapters.outbound.logos",
     "lekto.adapters.outbound.meilisearch",

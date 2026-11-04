@@ -1,0 +1,99 @@
+"""`/mailboxes`: admins set up the mailboxes Lekto fetches from; the password never comes back."""
+
+from typing import Any
+
+from lekto.adapters.inbound.rest import PREFIX
+from lekto.adapters.outbound.memory import MemoryMailServer
+from lekto.core.domain.mail import MailLogin, MailSecurity
+from lekto.core.domain.users import User
+from tests.api import auth
+from tests.unit.adapters.rest.support import Api, post
+
+BODY = {
+    "name": "Household",
+    "host": "imap.example.test",
+    "port": 993,
+    "security": "tls",
+    "username": "household@example.test",
+    "password": "app-password",
+}
+
+
+def _server(api: Api) -> MemoryMailServer:
+    server = api.container.mail_server
+    assert isinstance(server, MemoryMailServer)
+    return server
+
+
+async def _test(api: Api, admin: User, extra: dict[str, Any]) -> Any:
+    body = {key: BODY[key] for key in ("host", "port", "security", "username")} | extra
+    answer = await api.client.post(f"{PREFIX}/mailboxes/test", json=body, headers=auth(admin))
+    assert answer.status_code == 200, answer.text
+    return answer.json()
+
+
+async def test_a_mailbox_is_created_tested_changed_and_deleted(api: Api) -> None:
+    admin = await api.admin()
+    created = await post(
+        api, "/mailboxes", {**BODY, "folders": ["INBOX", "Rechnungen"]}, auth(admin)
+    )
+    assert "password" not in created
+    assert (created["folders"], created["interval_minutes"], created["start"]) == (
+        ["INBOX", "Rechnungen"],
+        5,
+        "since_setup",
+    )
+    assert created["status"] == {
+        "last_attempt_at": None,
+        "last_success_at": None,
+        "error": None,
+        "mails": 0,
+        "documents": 0,
+    }
+    url = f"{PREFIX}/mailboxes/{created['id']}"
+
+    _server(api).add_account(
+        MailLogin(
+            host="imap.example.test",
+            port=993,
+            security=MailSecurity.TLS,
+            username="household@example.test",
+            password="app-password",
+        )
+    ).folders.append("Rechnungen")
+    tested = await _test(api, admin, {"mailbox_id": created["id"]})
+    assert tested == {"ok": True, "folders": ["INBOX", "Rechnungen"], "error": None}
+    refused = await _test(api, admin, {"password": "x"})
+    assert refused["ok"] is False and refused["error"]["code"] == "mail_login_failed"
+
+    changed = await api.client.patch(
+        url,
+        json={"start": "since_date", "since": "2026-01-01", "interval_minutes": 15},
+        headers=auth(admin),
+    )
+    assert changed.status_code == 200, changed.text
+    assert (changed.json()["since"], changed.json()["interval_minutes"]) == ("2026-01-01", 15)
+    missing_day = await api.client.patch(url, json={"since": None}, headers=auth(admin))
+    assert missing_day.status_code == 422
+
+    listed = (await api.client.get(f"{PREFIX}/mailboxes", headers=auth(admin))).json()
+    assert [item["name"] for item in listed] == ["Household"]
+    assert (await api.client.delete(url, headers=auth(admin))).status_code == 204
+    assert (await api.client.get(url, headers=auth(admin))).status_code == 404
+
+
+async def test_only_admins(api: Api) -> None:
+    user = await api.user()
+    answer = await api.client.get(f"{PREFIX}/mailboxes", headers=auth(user))
+    assert answer.status_code == 403
+    answer = await api.client.post(f"{PREFIX}/mailboxes", json=BODY, headers=auth(user))
+    assert answer.status_code == 403
+
+
+async def test_a_name_is_taken_once(api: Api) -> None:
+    admin = await api.admin()
+    await post(api, "/mailboxes", BODY, auth(admin))
+    again = await api.client.post(
+        f"{PREFIX}/mailboxes", json={**BODY, "name": "HOUSEHOLD"}, headers=auth(admin)
+    )
+    assert again.status_code == 409

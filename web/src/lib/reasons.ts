@@ -444,7 +444,13 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 		wanted: 'number'
 	}),
 	search_index_unavailable: entry(m.reason_search_index_unavailable),
-	search_not_configured: entry(m.reason_search_not_configured)
+	search_not_configured: entry(m.reason_search_not_configured),
+	mail_unreachable: entry(m.reason_mail_unreachable),
+	mail_tls_failed: entry(m.reason_mail_tls_failed),
+	mail_login_failed: entry(m.reason_mail_login_failed),
+	mail_folder_missing: entry(m.reason_mail_folder_missing),
+	mail_server_error: entry(m.reason_mail_server_error),
+	mail_password_unreadable: entry(m.reason_mail_password_unreadable)
 };
 
 /** The nouns the API names things by (the kind `thing`), in the user's language. */
@@ -525,7 +531,8 @@ const ACTIONS: Record<string, () => string> = {
 	move_document: m.action_move_document,
 	delete_document: m.action_delete_document,
 	reset_own_password: m.action_reset_own_password,
-	turn_off_own_totp: m.action_turn_off_own_totp
+	turn_off_own_totp: m.action_turn_off_own_totp,
+	manage_mailboxes: m.action_manage_mailboxes
 };
 
 function listLocale(): string {

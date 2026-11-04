@@ -2,22 +2,26 @@
 	import { page } from '$app/state';
 	import AutomationTab from '#lib/components/system/AutomationTab.svelte';
 	import ClassifierTab from '#lib/components/system/ClassifierTab.svelte';
+	import IntakeTab from '#lib/components/system/IntakeTab.svelte';
 	import JobsTab from '#lib/components/system/JobsTab.svelte';
 	import MaintenanceTab from '#lib/components/system/MaintenanceTab.svelte';
 	import SearchTab from '#lib/components/system/SearchTab.svelte';
 	import TabBar from '#lib/components/TabBar.svelte';
 	import { m } from '#lib/paraglide/messages.js';
-	import { SYSTEM_TABS, systemTab, type SystemTab } from '#lib/system.ts';
+	import { session } from '#lib/session.svelte.ts';
+	import { systemTab, systemTabs, type SystemTab } from '#lib/system.ts';
 	import PageHeader from '#lib/components/page/PageHeader.svelte';
 
 	// The page "System" (Tobi, 24.10.2026): what Lekto does by itself, for every user; acting
-	// on it (training, trying jobs again, the maintenance) is for admins. The tab stands in the URL.
-	const tab = $derived(systemTab(page.url.searchParams));
+	// on it (training, trying jobs again, the maintenance) is for admins, and so is the tab of the
+	// intake channels (Tobi, 04.11.2026). The tab stands in the URL.
+	const tab = $derived(systemTab(page.url.searchParams, session.isAdmin));
 	const LABELS: Record<SystemTab, () => string> = {
 		automation: m.system_tab_automation,
 		classifier: m.system_tab_classifier,
 		search: m.system_tab_search,
 		jobs: m.system_tab_jobs,
+		intake: m.system_tab_intake,
 		maintenance: m.system_tab_maintenance
 	};
 </script>
@@ -28,7 +32,7 @@
 	<PageHeader title={m.nav_system()} />
 	<TabBar
 		label={m.system_tabs()}
-		tabs={SYSTEM_TABS.map((value) => ({
+		tabs={systemTabs(session.isAdmin).map((value) => ({
 			key: value,
 			href: `?tab=${value}`,
 			label: LABELS[value]()
@@ -40,6 +44,8 @@
 			<JobsTab />
 		{:else if tab === 'maintenance'}
 			<MaintenanceTab />
+		{:else if tab === 'intake'}
+			<IntakeTab />
 		{:else if tab === 'search'}
 			<SearchTab />
 		{:else if tab === 'classifier'}

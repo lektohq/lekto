@@ -2,6 +2,7 @@ import os
 import secrets
 from collections.abc import AsyncIterator
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -53,6 +54,20 @@ def meilisearch_settings(settings: Settings) -> Settings:
     if probes.meilisearch_health(str(settings.meilisearch_url)) is None:
         pytest.skip(f"Meilisearch not reachable at {settings.meilisearch_url}")
     return settings
+
+
+@pytest.fixture(scope="session")
+def greenmail() -> tuple[str, int, str]:
+    """GreenMail's IMAP host and port and the base URL of its API (`TEST_IMAP_URL`,
+    `TEST_GREENMAIL_URL`)."""
+    imap_url, api_url = os.environ.get("TEST_IMAP_URL"), os.environ.get("TEST_GREENMAIL_URL")
+    if not imap_url or not api_url:
+        pytest.skip("TEST_IMAP_URL or TEST_GREENMAIL_URL is not set")
+    imap = urlsplit(imap_url)
+    host, port = imap.hostname or "", imap.port or 143
+    if not probes.imap_greeting(host, port):
+        pytest.skip(f"No IMAP server at {host}:{port}")
+    return host, port, api_url.rstrip("/")
 
 
 # The two set-ups of the end-to-end tests: SQLite with the filesystem, Postgres with S3 (Garage).

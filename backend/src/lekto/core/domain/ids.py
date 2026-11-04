@@ -26,6 +26,7 @@ WebhookId = NewType("WebhookId", UUID)
 DeliveryId = NewType("DeliveryId", UUID)
 TaskId = NewType("TaskId", UUID)
 LensId = NewType("LensId", UUID)
+MailboxId = NewType("MailboxId", UUID)
 
 _TIMESTAMP_BITS = 48
 _RANDOM_BITS = 80

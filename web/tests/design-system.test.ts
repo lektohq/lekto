@@ -185,7 +185,7 @@ describe('the design system (web/DESIGN.md)', () => {
 	it('sizes dialogs by their size, not by a width of their own', () => {
 		expect(
 			offenders((source) => {
-				const tagged = ['Dialog.Content', 'AlertDialog.Content'].flatMap((name) =>
+				const tagged = ['Dialog.Content', 'AlertDialog.Content', 'FormDialog'].flatMap((name) =>
 					tags(source, name)
 				);
 				return tagged.find((tag) => /\bmax-w-(?!none\b)/.test(tag)) ?? null;
