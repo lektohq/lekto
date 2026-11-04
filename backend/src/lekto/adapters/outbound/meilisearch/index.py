@@ -4,9 +4,9 @@
   vectors are only named when the document brings new ones). Meilisearch
   processes writes as tasks; every write here waits for its task, so a change is searchable when
   the call returns and a failed task raises `SearchIndexError` instead of getting lost.
-- Settings (searchable, filterable and sortable attributes, languages, the embedder) are applied
-  by the adapter itself, on first use and only when they differ from what the index has, so that
-  a restart does not index again.
+- Settings (searchable, filterable and sortable attributes, languages, stop words, the embedder)
+  are applied by the adapter itself, on first use and only when they differ from what the index
+  has, so that a restart does not index again.
 - Vectors are computed by Lekto and handed over (embedder `userProvided`, named `default`); a
   document may have several, one per section. A document without vectors opts out with `null`.
 - The rights filter is part of every search and built from `Visibility`. Values in filters are
@@ -20,6 +20,7 @@
 import asyncio
 import json
 import logging
+import unicodedata
 from collections.abc import AsyncIterator, Collection, Mapping, Sequence
 from datetime import UTC, date, datetime, time
 from time import monotonic
@@ -29,6 +30,7 @@ from uuid import UUID
 import httpx2
 
 from lekto.adapters.outbound.http_client import excerpt
+from lekto.adapters.outbound.meilisearch.stop_words import stop_words
 from lekto.core.domain.errors import SearchIndexError, SearchUnavailableError
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.pipeline import Lane
@@ -94,6 +96,14 @@ SORTABLE = ["document_date", "created_at", "title_key"]
 # Sorting comes first: without `sort` in a query it does nothing, with it the hits are in its
 # order and relevance only breaks ties.
 RANKING_RULES = ["sort", "words", "typo", "proximity", "attribute", "exactness"]
+# Which words a query may do without when no document has them all: the most frequent first, so
+# the rare word that decides stays ("Rechnung für das neue Sofa"); Meilisearch's default drops
+# the last words first. With the parts of German compounds counted as words, the most frequent
+# first can end with nothing ("Zahnreinigung beim Zahnarzt"); a query that finds nothing so is
+# asked again with the default, which keeps its first word. By the total, not the page, so every
+# page of a search goes by the same strategy.
+MATCHING_STRATEGY = "frequency"
+MATCHING_FALLBACK = "last"
 SORTED_BY = {
     SortKey.ARRIVAL: "created_at",  # nearest to the ids, which the index does not sort by
     SortKey.CREATED: "created_at",
@@ -109,7 +119,7 @@ STATE_FIELDS = [
     "layout",
 ]
 READY_FOR = 30.0  # seconds an index counts as set up before its settings are looked at again
-_UNORDERED = {"filterableAttributes", "sortableAttributes"}
+_UNORDERED = {"filterableAttributes", "sortableAttributes", "stopWords"}
 
 
 class MeilisearchIndex:
@@ -208,6 +218,7 @@ class MeilisearchIndex:
             return SearchResult(hits=[], estimated_total=0, semantic=False)
         body: dict[str, Any] = {
             "q": query.text,
+            "matchingStrategy": MATCHING_STRATEGY,
             "offset": query.offset,
             "limit": query.limit,
             "attributesToRetrieve": ["id", "version"],
@@ -229,6 +240,15 @@ class MeilisearchIndex:
                 raise SearchIndexError("the index has no embedder, so it takes no vectors")
             body["vector"] = list(query.vector or ())
             body["hybrid"] = {"embedder": EMBEDDER, "semanticRatio": query.semantic_ratio}
+        hits, total = await self._search(body)
+        if total == 0 and query.text.strip():
+            hits, total = await self._search({**body, "matchingStrategy": MATCHING_FALLBACK})
+        return SearchResult(
+            hits=hits, estimated_total=max(total, query.offset + len(hits)), semantic=semantic
+        )
+
+    async def _search(self, body: Mapping[str, Any]) -> tuple[list[SearchHit], int]:
+        """The hits of a search and the estimated number of all of them."""
         response = await self._send("POST", f"/indexes/{self._index}/search", json=body)
         if response.status_code == 400 and _code(response) == "invalid_search_filter":
             # The index was lost and created again by a write, without its settings: set it up
@@ -244,9 +264,7 @@ class MeilisearchIndex:
             total = int(data.get("estimatedTotalHits", data.get("totalHits", 0)))
         except (KeyError, TypeError, ValueError):
             raise SearchIndexError("Meilisearch sent an unusable search result") from None
-        return SearchResult(
-            hits=hits, estimated_total=max(total, query.offset + len(hits)), semantic=semantic
-        )
+        return hits, total
 
     async def similar(self, query: SimilarQuery) -> list[SearchHit]:
         await self._ensure_ready()
@@ -400,6 +418,7 @@ class MeilisearchIndex:
             "sortableAttributes": SORTABLE,
             "rankingRules": RANKING_RULES,
             "localizedAttributes": [{"locales": self._locales, "attributePatterns": ["*"]}],
+            "stopWords": stop_words(self._locales),
             # `SearchQuery` promises that `offset + limit` up to `MAX_HITS` is reachable.
             "pagination": {"maxTotalHits": MAX_HITS},
         }
@@ -583,9 +602,10 @@ def _spaces(spaces: Collection[UUID]) -> str:
 
 
 def _normalised(key: str, setting: Any) -> Any:
-    """Meilisearch keeps the sets of filterable and sortable attributes in its own order."""
+    """Meilisearch keeps the sets of filterable and sortable attributes and the stop words in
+    its own order, and the stop words decomposed ("für" as "fu" and a diaeresis)."""
     if key in _UNORDERED and isinstance(setting, list):
-        return sorted(setting)
+        return sorted(unicodedata.normalize("NFC", str(item)) for item in setting)
     return setting
 
 
