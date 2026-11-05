@@ -341,12 +341,7 @@
 			</Field.Field>
 			<Field.Field>
 				<HintLabel for="mailbox-start" label={m.mail_start()} hint={m.mail_start_hint()} />
-				<Select
-					id="mailbox-start"
-					value={form.start}
-					options={STARTS}
-					onchange={startChanged}
-				/>
+				<Select id="mailbox-start" value={form.start} options={STARTS} onchange={startChanged} />
 				{#if form.start === 'since_date'}
 					<DateInput label={m.mail_start_day()} bind:value={form.since} />
 				{/if}
