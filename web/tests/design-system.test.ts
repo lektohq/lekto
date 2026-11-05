@@ -267,6 +267,11 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(found).toEqual([]);
 	});
 
+	it('keeps a label with help as high as one without', () => {
+		const hint = sources['/src/lib/components/InfoHint.svelte'];
+		expect(hint).toMatch(/<span class="-my-1 flex">\s*<InfoTip\b[^>]*size="sm"/);
+	});
+
 	it('keeps the line under a field short; what explains goes into the HintLabel', () => {
 		const own = (text: string) => text.replace(/\{[^}]*\}/g, '').trim().length;
 		const found = offenders((source) => {
