@@ -46,6 +46,10 @@ class SqlMailboxRepository(SqlRepository[MailboxId, Mailbox]):
                 documents=row.documents,
                 skipped_at=row.skipped_at,
                 skipped=None if row.skipped is None else Reason.from_json(row.skipped),
+                step_failed_at=row.step_failed_at,
+                step_failed=(
+                    None if row.step_failed is None else Reason.from_json(row.step_failed)
+                ),
                 keywords=tuple(row.keywords),
                 own_keywords=row.own_keywords,
             ),
@@ -80,6 +84,8 @@ class SqlMailboxRepository(SqlRepository[MailboxId, Mailbox]):
             "documents": status.documents,
             "skipped_at": status.skipped_at,
             "skipped": None if status.skipped is None else status.skipped.to_json(),
+            "step_failed_at": status.step_failed_at,
+            "step_failed": None if status.step_failed is None else status.step_failed.to_json(),
             "keywords": list(status.keywords),
             "own_keywords": status.own_keywords,
             "created_at": entity.created_at,

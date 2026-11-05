@@ -7,7 +7,7 @@ import pytest
 from lekto.core.domain.condition_tree import MAX_DEPTH, Group
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import MailboxId, SpaceId, UserId, new_id
-from lekto.core.domain.mail import MailAction
+from lekto.core.domain.mail import MailAction, MailStep, step_flags
 from lekto.core.domain.mail_intake import MailParts
 from lekto.core.domain.mail_message import read_mail
 from lekto.core.domain.mail_rules import (
@@ -151,17 +151,60 @@ def test_what_a_rule_must_name() -> None:
     with pytest.raises(ValidationError):
         rule(user_id=None)  # it takes something: for whom?
     with pytest.raises(ValidationError):
-        rule(after=MailAction.MOVE)  # no folder
+        MailStep(MailAction.MOVE)  # no folder
     with pytest.raises(ValidationError):
         rule(priority=1001)
-    nothing = rule(parts=MailParts.NOTHING, space_id=SpaceId(new_id()), after=MailAction.TRASH)
+    trash = (MailStep(MailAction.TRASH),)
+    nothing = rule(parts=MailParts.NOTHING, space_id=SpaceId(new_id()), after=trash)
     assert (nothing.user_id, nothing.space_id) == (None, None)
-    moved = rule(after=MailAction.MOVE, move_to=" Lekto/Erledigt ")
-    assert moved.move_to == "Lekto/Erledigt"
-    moved.change(MailRuleChanges(after=MailAction.READ), now=NOW)
-    assert moved.move_to is None
+    moved = rule(after=(MailStep(MailAction.MOVE, " Lekto/Erledigt "),))
+    assert moved.after[0].value == "Lekto/Erledigt"
+    read = (MailStep(MailAction.READ), MailStep(MailAction.ADD_KEYWORD, "Lekto"))
+    moved.change(MailRuleChanges(after=read), now=NOW)
     decision = moved.decision()
-    assert (decision.user_id, decision.after, decision.rule) == (PERSON, MailAction.READ, "Strom")
+    assert (decision.user_id, decision.after, decision.rule) == (PERSON, read, "Strom")
+
+
+@pytest.mark.parametrize(
+    "steps",
+    [
+        (MailStep(MailAction.TRASH), MailStep(MailAction.READ)),  # trashing comes last
+        (MailStep(MailAction.MOVE, "A"), MailStep(MailAction.TRASH)),  # one that ends it
+        (MailStep(MailAction.READ), MailStep(MailAction.READ)),  # twice
+        tuple(MailStep(MailAction.ADD_KEYWORD, f"k{index}") for index in range(11)),
+    ],
+)
+def test_steps_in_their_order(steps: tuple[MailStep, ...]) -> None:
+    with pytest.raises(ValidationError):
+        rule(after=steps)
+
+
+@pytest.mark.parametrize(
+    ("action", "value"),
+    [
+        (MailAction.FLAG, "pink"),
+        (MailAction.FLAG, None),
+        (MailAction.ADD_KEYWORD, "zwei Wörter"),
+        (MailAction.READ, "x"),
+    ],
+)
+def test_a_bad_step_is_refused(action: MailAction, value: str | None) -> None:
+    with pytest.raises(ValidationError):
+        MailStep(action, value)
+
+
+def test_the_flags_of_a_step() -> None:
+    assert step_flags(MailStep(MailAction.FLAG, "purple")) == (
+        ("\\Flagged", "$MailFlagBit0", "$MailFlagBit2"),
+        ("$MailFlagBit1",),
+    )
+    assert step_flags(MailStep(MailAction.UNFLAG)) == (
+        (),
+        ("\\Flagged", "$MailFlagBit0", "$MailFlagBit1", "$MailFlagBit2"),
+    )
+    assert step_flags(MailStep(MailAction.UNREAD)) == ((), ("\\Seen",))
+    assert step_flags(MailStep(MailAction.REMOVE_KEYWORD, "Lekto")) == ((), ("Lekto",))
+    assert step_flags(MailStep(MailAction.MOVE, "A")) == ((), ())
 
 
 def test_a_paused_rule_is_switched_on_again() -> None:

@@ -12,7 +12,7 @@ from lekto.core.domain.ids import (
     UserId,
     new_id,
 )
-from lekto.core.domain.mail import MailAction, Mailbox, MailSecurity
+from lekto.core.domain.mail import MailAction, Mailbox, MailSecurity, MailStep
 from lekto.core.domain.mail_intake import (
     MailOrigin,
     MailOutcome,
@@ -224,12 +224,17 @@ class MailRuleRepositoryContract:
             ),
             space_id=SpaceId(new_id()),
             text_type_id=DocumentTypeId(new_id()),
-            after=MailAction.MOVE,
-            move_to="Lekto/Erledigt",
+            after=(
+                MailStep(MailAction.FLAG, "green"),
+                MailStep(MailAction.ADD_KEYWORD, "Lekto"),
+                MailStep(MailAction.MOVE, "Lekto/Erledigt"),
+            ),
         )
         full.pause(because(ReasonCode.MAIL_RULE_TYPE_GONE), now=NOW + HOUR)
         later, earlier = rule(first, "b", 5), rule(first, "A", 5)
-        other = rule(second, "Other", 0, parts=MailParts.NOTHING, after=MailAction.TRASH)
+        other = rule(
+            second, "Other", 0, parts=MailParts.NOTHING, after=(MailStep(MailAction.TRASH),)
+        )
         async with uow_factory() as uow:
             for item in (later, other, full, earlier):
                 await uow.mail_rules.add(item)

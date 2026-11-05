@@ -21,7 +21,7 @@ from lekto.core.domain.ids import (
     SpaceId,
     UserId,
 )
-from lekto.core.domain.mail import MailAction
+from lekto.core.domain.mail import MailStep
 from lekto.core.domain.mail_message import Address, MailMessage, MailPart
 from lekto.core.domain.mail_traits import Importance, MailMarks
 from lekto.core.domain.reasons import Reason
@@ -114,16 +114,15 @@ class MailParts(StrEnum):
 @dataclass(frozen=True, kw_only=True)
 class MailDecision:
     """What becomes of a mail: taken for `user` (into `space`, else their personal one), which
-    parts, the type of the text (`body_type_id`, none: open), and the action on the server
-    afterwards (`move_to` with `MOVE`). `rule`: the name of the rule that decided; None for the
-    mailbox's fallback."""
+    parts, the type of the text (`body_type_id`, none: open), and the steps on the server
+    afterwards, in order. `rule`: the name of the rule that decided; None for the mailbox's
+    fallback."""
 
     user_id: UserId | None  # none when it takes nothing
     space_id: SpaceId | None = None
     parts: MailParts = MailParts.ALL
     body_type_id: DocumentTypeId | None = None
-    after: MailAction = MailAction.NOTHING
-    move_to: str | None = None
+    after: tuple[MailStep, ...] = ()
     rule: str | None = None
 
 

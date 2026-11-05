@@ -9,8 +9,9 @@ fallback.
 
 A rule takes the mail's attachments and text, the attachments, the text, or nothing; for one
 person, into a space they edit (else their personal one); the text gets a fixed document type
-or Lekto determines it; on the server the mail is left, marked as read, moved to a folder, or
-moved to the trash. A rule whose person, space or type is gone or out of reach is paused with
+or Lekto determines it; on the server steps follow in order (`mail.MailStep`: read or unread,
+flagged or not, keywords added or removed), and at most one last that moves the mail to a
+folder or to the trash. A rule whose person, space or type is gone or out of reach is paused with
 that reason when a mail would need it.
 """
 
@@ -22,7 +23,7 @@ from lekto.core.domain.condition_tree import Group, check_limits, group_from_jso
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import DocumentTypeId, MailboxId, MailRuleId, SpaceId, UserId, new_id
 from lekto.core.domain.json_value import JsonObject, JsonValue, require_object
-from lekto.core.domain.mail import MailAction
+from lekto.core.domain.mail import MAX_FOLDER, MailStep, check_steps
 from lekto.core.domain.mail_intake import MailDecision, MailParts, MailRecord, letters
 from lekto.core.domain.mail_message import Address, MailMessage
 from lekto.core.domain.mail_traits import (
@@ -38,7 +39,6 @@ from lekto.core.domain.reasons import Reason
 from lekto.core.domain.validation import require_name, require_utc
 
 MAX_VALUE = 500
-MAX_FOLDER = 1000
 DEFAULT_PRIORITY = 100
 MIN_PRIORITY = 0
 MAX_PRIORITY = 1000
@@ -219,8 +219,7 @@ class MailRuleChanges:
     user_id: UserId | Unset | None = UNSET
     space_id: SpaceId | Unset | None = UNSET
     text_type_id: DocumentTypeId | Unset | None = UNSET
-    after: MailAction | Unset = UNSET
-    move_to: str | Unset | None = UNSET
+    after: tuple[MailStep, ...] | Unset = UNSET
     enabled: bool | Unset = UNSET
 
 
@@ -235,8 +234,7 @@ class MailRule:
     user_id: UserId | None  # whom it takes the mail for; none when it takes nothing
     space_id: SpaceId | None  # where to; none: the person's personal space
     text_type_id: DocumentTypeId | None  # the type of the text; none: Lekto determines it
-    after: MailAction
-    move_to: str | None  # with `MOVE`
+    after: tuple[MailStep, ...]  # on the server, in order; a move or the trash last
     enabled: bool
     disabled_reason: Reason | None
     created_at: datetime
@@ -258,8 +256,7 @@ class MailRule:
             user_id=None,
             space_id=None,
             text_type_id=None,
-            after=MailAction.NOTHING,
-            move_to=None,
+            after=(),
             enabled=True,
             disabled_reason=None,
             created_at=now,
@@ -304,7 +301,6 @@ class MailRule:
             parts=self.parts,
             body_type_id=self.text_type_id,
             after=self.after,
-            move_to=self.move_to,
             rule=self.name,
         )
 
@@ -325,13 +321,7 @@ class MailRule:
             self.user_id = self.space_id = self.text_type_id = None
         elif self.space_id is not None and self.user_id is None:
             raise ValidationError("space_id: only with a person")
-        if self.after is MailAction.MOVE:
-            folder = (self.move_to or "").strip()
-            if not folder or len(folder) > MAX_FOLDER:
-                raise ValidationError("move_to: the folder to move the mail to")
-            self.move_to = folder
-        else:
-            self.move_to = None
+        check_steps(self.after)
 
 
 def mail_texts(addresses: tuple[Address, ...]) -> tuple[str, ...]:

@@ -33127,13 +33127,17 @@
       "MailAction": {
         "type": "string",
         "enum": [
-          "nothing",
           "read",
+          "unread",
+          "flag",
+          "unflag",
+          "add_keyword",
+          "remove_keyword",
           "move",
           "trash"
         ],
         "title": "MailAction",
-        "description": "What becomes of a mail on the server once Lekto has taken it: nothing, marked as read,\nmoved to a folder, or moved to the trash."
+        "description": "A step on a mail on the server once Lekto has taken it (Tobi, 05.11.2026: an ordered\nlist of them): marked read or unread, flagged in a colour or not, a keyword added or\nremoved; then at most one that ends it, moved to a folder or to the trash."
       },
       "MailAllGroup-Input": {
         "properties": {
@@ -33596,26 +33600,18 @@
           "after": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/MailAction"
+                "items": {
+                  "$ref": "#/components/schemas/MailStepBody"
+                },
+                "type": "array",
+                "maxItems": 10
               },
               {
                 "type": "null"
               }
             ],
-            "description": "What becomes of the mail on the server: `nothing`, `read` (marked as read), `move` (to `move_to`), `trash`."
-          },
-          "move_to": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1000,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Move To"
+            "title": "After",
+            "description": "The steps on the mail on the server once taken, in order: `read`, `unread`, `flag` (with `value` a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`, as Apple Mail shows it), `unflag`, `add_keyword` and `remove_keyword` (with `value` an IMAP keyword), then at most one last: `move` (with `value` the folder) or `trash`. None twice; at most 10. A step the server refuses is noted at the mailbox; the next ones go on."
           },
           "enabled": {
             "anyOf": [
@@ -33650,7 +33646,19 @@
         "description": "A new mail rule of a mailbox; what is left out gets the default (priority 100, no\nconditions: every mail, takes the attachments and the text, leaves the mail, active).",
         "examples": [
           {
-            "after": "read",
+            "after": [
+              {
+                "action": "read"
+              },
+              {
+                "action": "add_keyword",
+                "value": "Lekto"
+              },
+              {
+                "action": "move",
+                "value": "Erledigt"
+              }
+            ],
             "conditions": {
               "all": [
                 {
@@ -33750,26 +33758,18 @@
           "after": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/MailAction"
+                "items": {
+                  "$ref": "#/components/schemas/MailStepBody"
+                },
+                "type": "array",
+                "maxItems": 10
               },
               {
                 "type": "null"
               }
             ],
-            "description": "What becomes of the mail on the server: `nothing`, `read` (marked as read), `move` (to `move_to`), `trash`."
-          },
-          "move_to": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1000,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Move To"
+            "title": "After",
+            "description": "The steps on the mail on the server once taken, in order: `read`, `unread`, `flag` (with `value` a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`, as Apple Mail shows it), `unflag`, `add_keyword` and `remove_keyword` (with `value` an IMAP keyword), then at most one last: `move` (with `value` the folder) or `trash`. None twice; at most 10. A step the server refuses is noted at the mailbox; the next ones go on."
           },
           "enabled": {
             "anyOf": [
@@ -33817,7 +33817,19 @@
         "description": "A rule as the editor holds it, saved or not; `rule_id`: the stored one it stands for.",
         "examples": [
           {
-            "after": "read",
+            "after": [
+              {
+                "action": "read"
+              },
+              {
+                "action": "add_keyword",
+                "value": "Lekto"
+              },
+              {
+                "action": "move",
+                "value": "Erledigt"
+              }
+            ],
             "conditions": {
               "all": [
                 {
@@ -33908,18 +33920,12 @@
             "title": "Text Type Id"
           },
           "after": {
-            "$ref": "#/components/schemas/MailAction"
-          },
-          "move_to": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Move To"
+            "items": {
+              "$ref": "#/components/schemas/MailStepBody"
+            },
+            "type": "array",
+            "title": "After",
+            "description": "The steps on the mail on the server once taken, in order: `read`, `unread`, `flag` (with `value` a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`, as Apple Mail shows it), `unflag`, `add_keyword` and `remove_keyword` (with `value` an IMAP keyword), then at most one last: `move` (with `value` the folder) or `trash`. None twice; at most 10. A step the server refuses is noted at the mailbox; the next ones go on."
           },
           "enabled": {
             "type": "boolean",
@@ -33959,7 +33965,6 @@
           "space_id",
           "text_type_id",
           "after",
-          "move_to",
           "enabled",
           "disabled_reason",
           "created_at",
@@ -34051,26 +34056,18 @@
           "after": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/MailAction"
+                "items": {
+                  "$ref": "#/components/schemas/MailStepBody"
+                },
+                "type": "array",
+                "maxItems": 10
               },
               {
                 "type": "null"
               }
             ],
-            "description": "What becomes of the mail on the server: `nothing`, `read` (marked as read), `move` (to `move_to`), `trash`."
-          },
-          "move_to": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1000,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Move To"
+            "title": "After",
+            "description": "The steps on the mail on the server once taken, in order: `read`, `unread`, `flag` (with `value` a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`, as Apple Mail shows it), `unflag`, `add_keyword` and `remove_keyword` (with `value` an IMAP keyword), then at most one last: `move` (with `value` the folder) or `trash`. None twice; at most 10. A step the server refuses is noted at the mailbox; the next ones go on."
           },
           "enabled": {
             "anyOf": [
@@ -34100,7 +34097,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "MailRulePatch",
-        "description": "What changes; what is left out stays. `conditions`, `space_id`, `text_type_id`,\n`user_id` and `move_to` given as null clear it (no conditions: every mail). Switching it\non clears why it was paused.",
+        "description": "What changes; what is left out stays. `conditions`, `space_id`, `text_type_id`,\n`user_id` given as null clear it (no conditions: every mail). Switching it\non clears why it was paused.",
         "examples": [
           {
             "enabled": false
@@ -34116,6 +34113,31 @@
         ],
         "title": "MailSecurity",
         "description": "How the connection is secured: TLS from the start (IMAPS, port 993), TLS after the\ngreeting (STARTTLS, port 143), or none (a server in one's own network)."
+      },
+      "MailStepBody": {
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/MailAction"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "MailStepBody"
       },
       "MailboxCreate": {
         "properties": {
@@ -34671,6 +34693,30 @@
             ],
             "description": "Which mail that was, and why."
           },
+          "step_failed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Failed At",
+            "description": "When a step of a mail rule on a mail on the server last failed."
+          },
+          "step_failed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasonOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which step, on which mail, and what the server answered."
+          },
           "keywords": {
             "items": {
               "type": "string"
@@ -34701,6 +34747,8 @@
           "documents",
           "skipped_at",
           "skipped",
+          "step_failed_at",
+          "step_failed",
           "keywords",
           "own_keywords"
         ],
@@ -37123,6 +37171,7 @@
           "mail_password_unreadable",
           "mailbox_paused",
           "mail_too_large",
+          "mail_step_failed",
           "mail_rule_person_gone",
           "mail_rule_space_unreachable",
           "mail_rule_type_gone"
@@ -43155,6 +43204,11 @@
       "subject": "text",
       "size": "number",
       "max": "number"
+    },
+    "mail_step_failed": {
+      "step": "thing",
+      "subject": "text",
+      "detail": "text"
     },
     "mail_rule_person_gone": {},
     "mail_rule_space_unreachable": {},

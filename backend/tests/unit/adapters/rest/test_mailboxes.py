@@ -54,6 +54,8 @@ async def test_a_mailbox_is_created_tested_changed_and_deleted(api: Api) -> None
         "documents": 0,
         "skipped_at": None,
         "skipped": None,
+        "step_failed_at": None,
+        "step_failed": None,
         "keywords": [],
         "own_keywords": None,
     }
@@ -181,8 +183,10 @@ async def test_mail_rules(api: Api) -> None:
             ]
         },
         "user_id": str(user.id),
-        "after": "move",
-        "move_to": "Lekto/Erledigt",
+        "after": [
+            {"action": "add_keyword", "value": "Lekto"},
+            {"action": "move", "value": "Lekto/Erledigt"},
+        ],
     }
     created = await post(api, "/mail-rules", body, auth(admin))
     assert (created["parts"], created["enabled"], created["text_type_id"]) == ("all", True, None)
@@ -200,10 +204,16 @@ async def test_mail_rules(api: Api) -> None:
     assert every.json()["conditions"] is None  # every mail
     url = f"{PREFIX}/mail-rules/{created['id']}"
     changed = await api.client.patch(
-        url, json={"after": "read", "move_to": None, "enabled": False}, headers=auth(admin)
+        url, json={"after": [{"action": "read"}], "enabled": False}, headers=auth(admin)
     )
     assert changed.status_code == 200, changed.text
-    assert (changed.json()["after"], changed.json()["move_to"]) == ("read", None)
+    assert changed.json()["after"] == [{"action": "read", "value": None}]
+    wrong = await api.client.patch(
+        url,
+        json={"after": [{"action": "trash"}, {"action": "read"}]},
+        headers=auth(admin),
+    )
+    assert wrong.status_code == 422  # trashing comes last
     bad = await api.client.patch(url, json={"user_id": None}, headers=auth(admin))
     assert bad.status_code == 422  # it takes something: for whom?
     assert (await api.client.get(f"{PREFIX}/mail-rules", headers=auth(user))).status_code == 403

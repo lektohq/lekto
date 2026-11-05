@@ -7202,11 +7202,13 @@ export interface components {
 		LogoSource: 'uploaded' | 'fetched';
 		/**
 		 * MailAction
-		 * @description What becomes of a mail on the server once Lekto has taken it: nothing, marked as read,
-		 *     moved to a folder, or moved to the trash.
+		 * @description A step on a mail on the server once Lekto has taken it (Tobi, 05.11.2026: an ordered
+		 *     list of them): marked read or unread, flagged in a colour or not, a keyword added or
+		 *     removed; then at most one that ends it, moved to a folder or to the trash.
 		 * @enum {string}
 		 */
-		MailAction: 'nothing' | 'read' | 'move' | 'trash';
+		MailAction:
+			'read' | 'unread' | 'flag' | 'unflag' | 'add_keyword' | 'remove_keyword' | 'move' | 'trash';
 		/**
 		 * MailAllGroup
 		 * @description All items hold (and); `not` turns the result around.
@@ -7375,7 +7377,19 @@ export interface components {
 		 * @description A new mail rule of a mailbox; what is left out gets the default (priority 100, no
 		 *     conditions: every mail, takes the attachments and the text, leaves the mail, active).
 		 * @example {
-		 *       "after": "read",
+		 *       "after": [
+		 *         {
+		 *           "action": "read"
+		 *         },
+		 *         {
+		 *           "action": "add_keyword",
+		 *           "value": "Lekto"
+		 *         },
+		 *         {
+		 *           "action": "move",
+		 *           "value": "Erledigt"
+		 *         }
+		 *       ],
 		 *       "conditions": {
 		 *         "all": [
 		 *           {
@@ -7421,10 +7435,11 @@ export interface components {
 			 * @description The document type of the mail's text; null: Lekto decides.
 			 */
 			text_type_id?: string | null;
-			/** @description What becomes of the mail on the server: `nothing`, `read` (marked as read), `move` (to `move_to`), `trash`. */
-			after?: components['schemas']['MailAction'] | null;
-			/** Move To */
-			move_to?: string | null;
+			/**
+			 * After
+			 * @description The steps on the mail on the server once taken, in order: `read`, `unread`, `flag` (with `value` a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`, as Apple Mail shows it), `unflag`, `add_keyword` and `remove_keyword` (with `value` an IMAP keyword), then at most one last: `move` (with `value` the folder) or `trash`. None twice; at most 10. A step the server refuses is noted at the mailbox; the next ones go on.
+			 */
+			after?: components['schemas']['MailStepBody'][] | null;
 			/** Enabled */
 			enabled?: boolean | null;
 			/**
@@ -7439,7 +7454,19 @@ export interface components {
 		 * MailRuleDryRun
 		 * @description A rule as the editor holds it, saved or not; `rule_id`: the stored one it stands for.
 		 * @example {
-		 *       "after": "read",
+		 *       "after": [
+		 *         {
+		 *           "action": "read"
+		 *         },
+		 *         {
+		 *           "action": "add_keyword",
+		 *           "value": "Lekto"
+		 *         },
+		 *         {
+		 *           "action": "move",
+		 *           "value": "Erledigt"
+		 *         }
+		 *       ],
 		 *       "conditions": {
 		 *         "all": [
 		 *           {
@@ -7485,10 +7512,11 @@ export interface components {
 			 * @description The document type of the mail's text; null: Lekto decides.
 			 */
 			text_type_id?: string | null;
-			/** @description What becomes of the mail on the server: `nothing`, `read` (marked as read), `move` (to `move_to`), `trash`. */
-			after?: components['schemas']['MailAction'] | null;
-			/** Move To */
-			move_to?: string | null;
+			/**
+			 * After
+			 * @description The steps on the mail on the server once taken, in order: `read`, `unread`, `flag` (with `value` a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`, as Apple Mail shows it), `unflag`, `add_keyword` and `remove_keyword` (with `value` an IMAP keyword), then at most one last: `move` (with `value` the folder) or `trash`. None twice; at most 10. A step the server refuses is noted at the mailbox; the next ones go on.
+			 */
+			after?: components['schemas']['MailStepBody'][] | null;
 			/** Enabled */
 			enabled?: boolean | null;
 			/**
@@ -7535,9 +7563,11 @@ export interface components {
 			space_id: string | null;
 			/** Text Type Id */
 			text_type_id: string | null;
-			after: components['schemas']['MailAction'];
-			/** Move To */
-			move_to: string | null;
+			/**
+			 * After
+			 * @description The steps on the mail on the server once taken, in order: `read`, `unread`, `flag` (with `value` a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`, as Apple Mail shows it), `unflag`, `add_keyword` and `remove_keyword` (with `value` an IMAP keyword), then at most one last: `move` (with `value` the folder) or `trash`. None twice; at most 10. A step the server refuses is noted at the mailbox; the next ones go on.
+			 */
+			after: components['schemas']['MailStepBody'][];
 			/** Enabled */
 			enabled: boolean;
 			/** @description Why Lekto paused it; null otherwise. */
@@ -7556,7 +7586,7 @@ export interface components {
 		/**
 		 * MailRulePatch
 		 * @description What changes; what is left out stays. `conditions`, `space_id`, `text_type_id`,
-		 *     `user_id` and `move_to` given as null clear it (no conditions: every mail). Switching it
+		 *     `user_id` given as null clear it (no conditions: every mail). Switching it
 		 *     on clears why it was paused.
 		 * @example {
 		 *       "enabled": false
@@ -7593,10 +7623,11 @@ export interface components {
 			 * @description The document type of the mail's text; null: Lekto decides.
 			 */
 			text_type_id?: string | null;
-			/** @description What becomes of the mail on the server: `nothing`, `read` (marked as read), `move` (to `move_to`), `trash`. */
-			after?: components['schemas']['MailAction'] | null;
-			/** Move To */
-			move_to?: string | null;
+			/**
+			 * After
+			 * @description The steps on the mail on the server once taken, in order: `read`, `unread`, `flag` (with `value` a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`, as Apple Mail shows it), `unflag`, `add_keyword` and `remove_keyword` (with `value` an IMAP keyword), then at most one last: `move` (with `value` the folder) or `trash`. None twice; at most 10. A step the server refuses is noted at the mailbox; the next ones go on.
+			 */
+			after?: components['schemas']['MailStepBody'][] | null;
 			/** Enabled */
 			enabled?: boolean | null;
 			/** Name */
@@ -7609,6 +7640,12 @@ export interface components {
 		 * @enum {string}
 		 */
 		MailSecurity: 'tls' | 'starttls' | 'none';
+		/** MailStepBody */
+		MailStepBody: {
+			action: components['schemas']['MailAction'];
+			/** Value */
+			value?: string | null;
+		};
 		/**
 		 * MailboxCreate
 		 * @description A new mailbox; what is left out gets the default (folder `INBOX`, every 5 minutes, since
@@ -7809,6 +7846,13 @@ export interface components {
 			skipped_at: string | null;
 			/** @description Which mail that was, and why. */
 			skipped: components['schemas']['ReasonOut'] | null;
+			/**
+			 * Step Failed At
+			 * @description When a step of a mail rule on a mail on the server last failed.
+			 */
+			step_failed_at: string | null;
+			/** @description Which step, on which mail, and what the server answered. */
+			step_failed: components['schemas']['ReasonOut'] | null;
 			/**
 			 * Keywords
 			 * @description The keywords its folders knew at the last fetch, to choose in a rule.
@@ -9299,6 +9343,7 @@ export interface components {
 			| 'mail_password_unreadable'
 			| 'mailbox_paused'
 			| 'mail_too_large'
+			| 'mail_step_failed'
 			| 'mail_rule_person_gone'
 			| 'mail_rule_space_unreachable'
 			| 'mail_rule_type_gone';
