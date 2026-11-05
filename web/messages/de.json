@@ -289,7 +289,7 @@
 	"reason_mail_rule_person_gone": "Die Person, für die sie Mails übernimmt, ist gelöscht oder deaktiviert.",
 	"reason_mail_rule_space_unreachable": "Der Space der Regel ist gelöscht, oder die Person bearbeitet ihn nicht mehr.",
 	"reason_mail_rule_type_gone": "Der Dokumenttyp des Mailtexts ist gelöscht.",
-	"reason_mail_rule_unreadable": "Ihre gespeicherten Bedingungen oder Schritte sind nicht lesbar: {detail}. Bearbeite sie und speichere sie mit beiden neu.",
+	"reason_mail_rule_unreadable": "Die gespeicherten Bedingungen oder Schritte der Regel sind nicht lesbar: {detail}. Bearbeite die Regel und speichere Bedingungen und Schritte neu.",
 	"mailbox_new_title": "Postfach anlegen",
 	"mailbox_none": "Noch kein Postfach. Lege eines an, damit Lekto Mails abholt.",
 	"mailbox_edit_title": "Postfach „{name}“ bearbeiten",
