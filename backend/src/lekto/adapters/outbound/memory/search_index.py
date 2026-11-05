@@ -1,15 +1,18 @@
 """An in-memory search index: words by substring, vectors by cosine similarity.
 
 Simple on purpose: it applies the same rights filter and criteria as the real index and ranks
-roughly alike, but it knows no typos, stemming or compound words beyond substrings.
+roughly alike, and leaves the stop words of its `locales` out as the real index does (a query
+of stop words alone finds nothing), but it knows no synonyms, typos, stemming or compound words
+beyond substrings.
 """
 
 import math
-import re
-from collections.abc import AsyncIterator, Mapping, Sequence
+import unicodedata
+from collections.abc import AsyncIterator, Collection, Mapping, Sequence
 from dataclasses import replace
 from datetime import date, datetime
 
+from lekto.adapters.outbound.languages import stop_words, words
 from lekto.adapters.outbound.memory.ordering import rank
 from lekto.core.domain.errors import SearchIndexError
 from lekto.core.domain.ids import DocumentId
@@ -33,7 +36,6 @@ from lekto.core.ports.search_index import (
     TextMatch,
 )
 
-_WORD = re.compile(r"\w+")
 _SNIPPET_BEFORE = 60
 _SNIPPET_LENGTH = 160
 # Weight of a match by field: the title counts most, the text least.
@@ -41,9 +43,11 @@ _FIELD_WEIGHTS = (1.0, 0.9, 0.8, 0.7, 0.6, 0.55, 0.5, 0.4)
 
 
 class MemorySearchIndex:
-    def __init__(self, *, dimensions: int | None = None) -> None:
-        """`dimensions`: refuse vectors of another length, as a real index does."""
+    def __init__(self, *, dimensions: int | None = None, locales: Collection[str] = ()) -> None:
+        """`dimensions`: refuse vectors of another length, as a real index does; `locales`: the
+        languages whose stop words it leaves out (`LEKTO_SEARCH_LOCALES`)."""
         self._dimensions = dimensions
+        self._stop_words = frozenset(stop_words(locales))
         self._documents: dict[DocumentId, IndexDocument] = {}
         # The layout each entry was written in (`LAYOUT`); a test may set an older one.
         self.layouts: dict[DocumentId, int] = {}
@@ -91,29 +95,31 @@ class MemorySearchIndex:
         )
 
     async def search(self, query: SearchQuery) -> SearchResult:
-        terms = [word.casefold() for word in _WORD.findall(query.text)]
+        terms = words(query.text, self._stop_words)
         use_vector = query.vector is not None and query.semantic_ratio > 0
+        if not terms:  # stop words alone, or nothing: as the real index, nothing
+            return SearchResult(hits=[], estimated_total=0, semantic=use_vector)
         scored: list[tuple[float, IndexDocument]] = []
         worded: set[DocumentId] = set()
         for document in self._documents.values():
             if not query.visibility.allows(document) or not _matches_filter(document, query.filter):
                 continue
-            words = _word_score(document, terms)
+            by_words = _word_score(document, terms)
             similarity = _similarity(document, query.vector) if use_vector else None
-            if words == 0 and similarity is None:
+            if by_words == 0 and similarity is None:
                 continue
-            if words > 0:
+            if by_words > 0:
                 worded.add(document.id)
             elif (
                 query.meaning_min_score is not None and (similarity or 0) < query.meaning_min_score
             ):
                 continue  # found by the meaning alone, too far from it
             if use_vector:
-                score = (1 - query.semantic_ratio) * words + query.semantic_ratio * (
+                score = (1 - query.semantic_ratio) * by_words + query.semantic_ratio * (
                     similarity or 0
                 )
             else:
-                score = words
+                score = by_words
             scored.append((score, document))
         # A single word: the documents that hold it first (as the Meilisearch adapter).
         first = use_vector and query.order is None and len(set(terms)) == 1
@@ -146,7 +152,7 @@ class MemorySearchIndex:
         found = self._documents.get(document)
         if found is None or not visibility.allows(found):
             return []
-        terms = [word.casefold() for word in _WORD.findall(text)]
+        terms = words(text, self._stop_words)
         body = found.text
 
         def whole(start: int, end: int) -> bool:  # as words, not the start of others
@@ -262,7 +268,7 @@ def _word_score(document: IndexDocument, terms: list[str]) -> float:
     """0 unless every term occurs somewhere; else the mean weight of the best field per term."""
     if not terms:
         return 0.0
-    fields = [field.casefold() for field in _fields(document)]
+    fields = [unicodedata.normalize("NFC", field.casefold()) for field in _fields(document)]
     total = 0.0
     for term in terms:
         weights = [w for field, w in zip(fields, _FIELD_WEIGHTS, strict=True) if term in field]

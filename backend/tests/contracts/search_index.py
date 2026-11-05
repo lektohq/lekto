@@ -664,6 +664,25 @@ class SearchIndexContract:
         assert result.word_total == 1
         assert ids(result.hits) == {by_word.id} | {document.id for document in alike}
 
+    async def test_stop_words_are_left_out_of_the_query(self, search_index: SearchIndex) -> None:
+        """ "Rechnung für die Stadtwerke" asks for the invoice and the utility, not for "für"
+        and "die"; a query of stop words alone asks nothing (Meilisearch would answer it
+        with every document)."""
+        owner = SpaceId(new_id())
+        invoice = index_document(
+            space_id=owner, title="Rechnung Stadtwerke", text="Abschlag für die Stadtwerke."
+        )
+        other = index_document(space_id=owner, title="Mahnung", text="Zahlung für die Miete.")
+        await search_index.upsert([invoice, other])
+        result = await search_index.search(
+            query("Rechnung für die Stadtwerke", visibility(owner), semantic_ratio=0.0)
+        )
+        assert ids(result.hits) == {invoice.id}
+        for text in ("für die", "und", "wie ich"):
+            result = await search_index.search(query(text, visibility(owner), semantic_ratio=0.0))
+            assert (result.hits, result.estimated_total) == ([], 0), text
+            assert await search_index.matches(invoice.id, text, visibility(owner)) == []
+
     async def test_what_the_meaning_alone_finds_below_the_floor_is_left_out(
         self, search_index: SearchIndex
     ) -> None:

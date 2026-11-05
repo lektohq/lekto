@@ -6,15 +6,27 @@ locale as `LEKTO_SEARCH_LOCALES` names it, such as `deu`):
   find.
 
 Lines starting with `#` are comments. A language without a file has none of them; a new
-language is a new folder.
+language is a new folder. Shared infrastructure of the search adapters, not an adapter: the
+Meilisearch adapter hands the words to its index, the in-memory one leaves the stop words out
+itself (`words`).
 """
 
+import re
+import unicodedata
 from collections import defaultdict
 from collections.abc import Collection
 from functools import cache
 from importlib.resources import files
 
 MAX_SYNONYMS = 50  # Meilisearch ignores the synonyms of a word beyond
+_WORD = re.compile(r"\w+")
+
+
+def words(text: str, stop_words: Collection[str] = ()) -> list[str]:
+    """The words of `text` as the stop words are written (NFC, casefolded), in their order,
+    without `stop_words`; nothing is left of a text of stop words alone ("und", "wie ich")."""
+    found = (unicodedata.normalize("NFC", word.casefold()) for word in _WORD.findall(text))
+    return [word for word in found if word not in stop_words]
 
 
 @cache

@@ -5,8 +5,8 @@ from importlib.resources import files
 
 import pytest
 
-from lekto.adapters.outbound.meilisearch import languages
-from lekto.adapters.outbound.meilisearch.languages import (
+from lekto.adapters.outbound import languages
+from lekto.adapters.outbound.languages import (
     MAX_SYNONYMS,
     stop_word_list,
     stop_words,

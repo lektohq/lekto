@@ -5,8 +5,9 @@
   processes writes as tasks; every write here waits for its task, so a change is searchable when
   the call returns and a failed task raises `SearchIndexError` instead of getting lost.
 - Settings (searchable, filterable and sortable attributes, languages, the stop words and
-  synonyms of `languages/`, the embedder) are applied by the adapter itself, on first use and
-  only when they differ from what the index has, so that a restart does not index again.
+  synonyms of `adapters/outbound/languages/`, the embedder) are applied by the adapter itself,
+  on first use and only when they differ from what the index has, so that a restart does not
+  index again.
 - Vectors are computed by Lekto and handed over (embedder `userProvided`, named `default`); a
   document may have several, one per section. A document without vectors opts out with `null`.
 - The rights filter is part of every search and built from `Visibility`. Values in filters are
@@ -31,7 +32,7 @@ from uuid import UUID
 import httpx2
 
 from lekto.adapters.outbound.http_client import excerpt
-from lekto.adapters.outbound.meilisearch.languages import stop_words, synonyms
+from lekto.adapters.outbound.languages import stop_words, synonyms, words
 from lekto.core.domain.errors import SearchIndexError, SearchUnavailableError
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.pipeline import Lane
@@ -112,7 +113,6 @@ MATCHED_WORDS = 10  # words of a query asked alone for where they stand in a doc
 # The point of an ordinal before a word: Meilisearch splits a query there, so "13. Gehalt" would
 # not meet its synonyms; dates and amounts ("31.12.2025", "1.297,42") keep theirs.
 _ORDINAL_POINT = re.compile(r"(?<=\d)\.(?=\s)")
-_WORD = re.compile(r"\w+")
 SORTED_BY = {
     SortKey.ARRIVAL: "created_at",  # nearest to the ids, which the index does not sort by
     SortKey.CREATED: "created_at",
@@ -309,8 +309,7 @@ class MeilisearchIndex:
         )
 
     def _single_word(self, text: str) -> bool:
-        words = {unicodedata.normalize("NFC", word.casefold()) for word in _WORD.findall(text)}
-        return len(words - self._stop_words) == 1
+        return len(set(words(text, self._stop_words))) == 1
 
     async def matches(
         self, document: DocumentId, text: str, visibility: Visibility
@@ -372,8 +371,7 @@ class MeilisearchIndex:
     def _decides(self, text: str) -> bool:
         """Whether a word of `text` is left after the stop words: Meilisearch answers a query
         without one ("und", "wie ich") with every document, as if nothing were asked."""
-        words = (unicodedata.normalize("NFC", word.casefold()) for word in _WORD.findall(text))
-        return any(word not in self._stop_words for word in words)
+        return bool(words(text, self._stop_words))
 
     async def similar(self, query: SimilarQuery) -> list[SearchHit]:
         await self._ensure_ready()
