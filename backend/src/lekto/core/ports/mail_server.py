@@ -84,7 +84,13 @@ class MailSession(Protocol):
         """The mail's header lines only, unmarked; None if it is gone."""
         ...
 
-    async def mark_read(self, folder: str, uid: int) -> None: ...
+    async def mark(
+        self, folder: str, uid: int, *, add: Sequence[str] = (), remove: Sequence[str] = ()
+    ) -> None:
+        """Add and remove IMAP flags and keywords (`\\Seen`, `\\Flagged`, `Lekto`).
+        MailServerError where the server refuses, such as a keyword of its own where it stores
+        none."""
+        ...
 
     async def move(self, folder: str, uid: int, target: str) -> None:
         """MailServerError (`MAIL_FOLDER_MISSING`) if there is no folder `target`."""

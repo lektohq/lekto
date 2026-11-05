@@ -38,6 +38,8 @@ const MAILBOX: Mailbox = {
 		documents: 0,
 		skipped_at: null,
 		skipped: null,
+		step_failed_at: null,
+		step_failed: null,
 		keywords: [],
 		own_keywords: null
 	},

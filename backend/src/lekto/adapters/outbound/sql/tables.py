@@ -895,6 +895,8 @@ mailboxes = Table(
     # The latest mail left out, too large (`MailboxStatus.skipped`).
     Column("skipped_at", UtcDateTime, nullable=True),
     Column("skipped", json_type(), nullable=True),
+    Column("step_failed_at", UtcDateTime, nullable=True),
+    Column("step_failed", json_type(), nullable=True),
     # The keywords its folders knew at the last fetch, and whether the server stores Lekto's own.
     Column("keywords", json_type(), nullable=False, server_default="[]"),
     Column("own_keywords", Boolean, nullable=True),
@@ -995,8 +997,9 @@ mail_rules = Table(
     Column("user_id", Uuid, nullable=True),
     Column("space_id", Uuid, nullable=True),
     Column("text_type_id", Uuid, nullable=True),
-    Column("after", Text, nullable=False),
-    Column("move_to", Text, nullable=True),
+    # The steps on a mail on the server, in order: [{"action": "read"}, {"action": "move",
+    # "value": "Erledigt"}]; a move or the trash last.
+    Column("steps", json_type(), nullable=False, server_default="[]"),
     Column("enabled", Boolean, nullable=False),
     Column("disabled_reason", json_type(), nullable=True),
     Column("created_at", UtcDateTime, nullable=False),

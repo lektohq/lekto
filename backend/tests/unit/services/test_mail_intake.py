@@ -23,6 +23,7 @@ from lekto.core.domain.mail import (
     MailboxChanges,
     MailLogin,
     MailSecurity,
+    MailStep,
 )
 from lekto.core.domain.mail_intake import MailOutcome, MailParts, OriginRole, mail_limit
 from lekto.core.domain.mail_rules import (
@@ -392,6 +393,34 @@ async def test_a_rule_on_the_marks_and_importance_of_a_mail(world: World) -> Non
     assert (stored.status.keywords, stored.status.own_keywords) == (("Lekto",), True)
 
 
+async def test_the_steps_on_a_mail_go_in_order_and_a_refused_one_shows(world: World) -> None:
+    """Read, flag and keyword before the move, which the mail keeps; a server that stores no
+    keywords of Lekto's own refuses the keyword and the flag's colour (Apple Mail's keywords),
+    the mailbox says so, and the next steps go on."""
+    admin, person, mailbox = await _setup(world, everything=False)
+    account = world.mail_server.servers[(LOGIN.host, LOGIN.port)][LOGIN.username]
+    account.add_folders("Erledigt")
+    steps = (
+        MailStep(MailAction.READ),
+        MailStep(MailAction.FLAG, "blue"),
+        MailStep(MailAction.ADD_KEYWORD, "Lekto"),
+        MailStep(MailAction.MOVE, "Erledigt"),
+    )
+    await _rule(world, admin, mailbox, user_id=person.id, after=steps)
+    account.own_keywords = False
+    _deliver(world, mails.plain_mail("Zweite"))
+    await _fetch(world, world.mail_intake())
+    (moved,) = account.boxes["Erledigt"].mails  # moved all the same, with its marks
+    assert account.boxes["INBOX"].mails == []
+    assert moved.seen and moved.flags == {"\\Flagged"}  # its colour is a keyword too
+    async with world.uow() as uow:
+        stored = await uow.mailboxes.get(mailbox.id)
+    failed = stored.status.step_failed
+    assert failed is not None and failed.code is ReasonCode.MAIL_STEP_FAILED
+    assert (failed.params["step"], failed.params["subject"]) == ("mail_step:add_keyword", "Zweite")
+    assert stored.status.step_failed_at is not None
+
+
 async def test_the_first_matching_rule_takes_a_mail(world: World) -> None:
     admin, person, mailbox = await _setup(world, everything=False)
     household = await world.spaces.create(admin.id, "Haushalt", members={person.id: SpaceRole.EDIT})
@@ -410,7 +439,7 @@ async def test_the_first_matching_rule_takes_a_mail(world: World) -> None:
             items=(MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Newsletter"),),
         ),
         parts=MailParts.NOTHING,
-        after=MailAction.TRASH,
+        after=(MailStep(MailAction.TRASH),),
     )
     await _rule(
         world,
@@ -424,7 +453,7 @@ async def test_the_first_matching_rule_takes_a_mail(world: World) -> None:
         user_id=person.id,
         space_id=household.id,
         text_type_id=letter.id,
-        after=MailAction.READ,
+        after=(MailStep(MailAction.READ),),
     )
     _deliver(world, mails.plain_mail("Unser Newsletter"))
     _deliver(world, mails.plain_mail("Ihre Rechnung"))

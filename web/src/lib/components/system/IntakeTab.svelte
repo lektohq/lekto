@@ -120,6 +120,17 @@
 						{#if mailbox.status.error}
 							<span class="text-sm text-destructive">{reasonText(mailbox.status.error)}</span>
 						{/if}
+						{#if mailbox.status.step_failed && mailbox.status.step_failed_at}
+							<span class="text-sm text-lane-yellow-foreground"
+								>{m.mail_step_failed({
+									when: formatDate(mailbox.status.step_failed_at, {
+										dateStyle: 'medium',
+										timeStyle: 'short'
+									}),
+									reason: reasonText(mailbox.status.step_failed)
+								})}</span
+							>
+						{/if}
 						{#if mailbox.status.skipped && mailbox.status.skipped_at}
 							<span class="text-sm text-lane-yellow-foreground"
 								>{m.mail_skipped({

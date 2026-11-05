@@ -2,7 +2,6 @@
 
 from collections.abc import Callable
 from datetime import datetime
-from typing import Annotated
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -11,10 +10,9 @@ from lekto.adapters.inbound.schemas import ReasonOut
 from lekto.core.domain.condition_tree import MAX_CONDITIONS, MAX_DEPTH
 from lekto.core.domain.ids import DocumentTypeId, SpaceId, UserId
 from lekto.core.domain.json_value import JsonValue
-from lekto.core.domain.mail import MailAction
+from lekto.core.domain.mail import MAX_FOLDER, MAX_STEPS, MailAction, MailStep
 from lekto.core.domain.mail_intake import MailOutcome, MailParts
 from lekto.core.domain.mail_rules import (
-    MAX_FOLDER,
     MAX_PRIORITY,
     MIN_PRIORITY,
     UNSET,
@@ -34,8 +32,11 @@ PARTS_HELP = (
     "What it takes: `all` (the attachments and the text), `attachments`, `text`, `nothing`."
 )
 AFTER_HELP = (
-    "What becomes of the mail on the server: `nothing`, `read` (marked as read), `move` (to "
-    "`move_to`), `trash`."
+    "The steps on the mail on the server once taken, in order: `read`, `unread`, `flag` (with "
+    "`value` a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`, as Apple "
+    "Mail shows it), `unflag`, `add_keyword` and `remove_keyword` (with `value` an IMAP "
+    "keyword), then at most one last: `move` (with `value` the folder) or `trash`. None twice; "
+    f"at most {MAX_STEPS}. A step the server refuses is noted at the mailbox; the next ones go on."
 )
 CONDITIONS_HELP = (
     "A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items "
@@ -56,6 +57,20 @@ class MailConditionBody(BaseModel):
     field: MailField
     op: MailOperator
     value: str | None = Field(default=None, max_length=MAX_FOLDER)
+
+
+class MailStepBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: MailAction
+    value: str | None = Field(default=None, max_length=MAX_FOLDER)
+
+    def domain(self) -> MailStep:
+        return MailStep(self.action, self.value)
+
+    @classmethod
+    def of(cls, step: MailStep) -> "MailStepBody":
+        return cls(action=step.action, value=step.value)
 
 
 class MailAllGroup(BaseModel):
@@ -114,8 +129,9 @@ class _Rule(BaseModel):
     text_type_id: UUID | None = Field(
         default=None, description="The document type of the mail's text; null: Lekto decides."
     )
-    after: MailAction | None = Field(default=None, description=AFTER_HELP)
-    move_to: Annotated[str, Field(min_length=1, max_length=MAX_FOLDER)] | None = None
+    after: list[MailStepBody] | None = Field(
+        default=None, max_length=MAX_STEPS, description=AFTER_HELP
+    )
     enabled: bool | None = None
 
     def changes(self, name: str | None) -> MailRuleChanges:
@@ -142,8 +158,7 @@ class _Rule(BaseModel):
             user_id=optional("user_id", self.user_id, UserId),
             space_id=optional("space_id", self.space_id, SpaceId),
             text_type_id=optional("text_type_id", self.text_type_id, DocumentTypeId),
-            after=UNSET if self.after is None else self.after,
-            move_to=self.move_to if "move_to" in given else UNSET,
+            after=UNSET if self.after is None else tuple(item.domain() for item in self.after),
             enabled=UNSET if self.enabled is None else self.enabled,
         )
 
@@ -165,7 +180,11 @@ class MailRuleCreate(_Rule):
                         ]
                     },
                     "user_id": "01a1a7fc-7013-741e-ae72-58401e634e5d",
-                    "after": "read",
+                    "after": [
+                        {"action": "read"},
+                        {"action": "add_keyword", "value": "Lekto"},
+                        {"action": "move", "value": "Erledigt"},
+                    ],
                 }
             ]
         },
@@ -177,7 +196,7 @@ class MailRuleCreate(_Rule):
 
 class MailRulePatch(_Rule):
     """What changes; what is left out stays. `conditions`, `space_id`, `text_type_id`,
-    `user_id` and `move_to` given as null clear it (no conditions: every mail). Switching it
+    `user_id` given as null clear it (no conditions: every mail). Switching it
     on clears why it was paused."""
 
     model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [{"enabled": False}]})
@@ -244,8 +263,7 @@ class MailRuleOut(BaseModel):
     user_id: UUID | None
     space_id: UUID | None
     text_type_id: UUID | None
-    after: MailAction
-    move_to: str | None
+    after: list[MailStepBody] = Field(description=AFTER_HELP)
     enabled: bool
     disabled_reason: ReasonOut | None = Field(description="Why Lekto paused it; null otherwise.")
     created_at: datetime
@@ -263,8 +281,7 @@ class MailRuleOut(BaseModel):
             user_id=rule.user_id,
             space_id=rule.space_id,
             text_type_id=rule.text_type_id,
-            after=rule.after,
-            move_to=rule.move_to,
+            after=[MailStepBody.of(step) for step in rule.after],
             enabled=rule.enabled,
             disabled_reason=(
                 None if rule.disabled_reason is None else ReasonOut.of(rule.disabled_reason)
