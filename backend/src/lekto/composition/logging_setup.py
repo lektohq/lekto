@@ -14,6 +14,9 @@ from lekto.composition.settings import Settings
 from lekto.core.services.tasks.files import EXTERNAL_TASKS_PATH
 
 HTTP_CLIENT_LOGGERS = ("httpx", "httpx2", "httpcore")
+CHATTY_LOGGERS = ("fontTools",)
+"""Libraries that log their every step at INFO: WeasyPrint's font subsetting (fontTools) writes a
+dozen lines for every mail it sets. Only their warnings get through."""
 
 
 def configure_logging(settings: Settings) -> None:
@@ -56,7 +59,7 @@ def configure_logging(settings: Settings) -> None:
     root.setLevel(settings.log_level)
     # The HTTP clients log the full URL of every request at INFO. Webhook and model URLs may carry
     # a credential in their path or query (n8n, Home Assistant), so only warnings get through.
-    for name in HTTP_CLIENT_LOGGERS:
+    for name in (*HTTP_CLIENT_LOGGERS, *CHATTY_LOGGERS):
         logging.getLogger(name).setLevel(max(logging.WARNING, root.level))
     access = logging.getLogger("uvicorn.access")
     for access_filter in (HideSecretQueries, DropHealthChecks):
