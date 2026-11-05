@@ -335,4 +335,23 @@ describe('the design system (web/DESIGN.md)', () => {
 			)
 		).toEqual([]);
 	});
+
+	it('builds every rule, of documents and of mails, from one set of parts', () => {
+		const own = (name: string) => `/src/lib/components/rules/${name}.svelte`;
+		expect(
+			offenders((source, path) =>
+				path === own('ModeSelect') ? null : line(source, /m\.rule_mode_(?:all|any)\(/)
+			)
+		).toEqual([]);
+		expect(
+			offenders((source, path) =>
+				path === own('RuleRow') ? null : line(source, /rounded-xl border bg-background p-3/)
+			)
+		).toEqual([]);
+		expect(
+			offenders((source, path) =>
+				path === own('DryRunGroup') ? null : line(source, /m\.rule_group_(?:fold|unfold)\(/)
+			)
+		).toEqual([]);
+	});
 });

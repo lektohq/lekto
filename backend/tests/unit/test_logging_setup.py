@@ -130,3 +130,13 @@ async def test_a_webhook_url_never_reaches_the_log(capsys: pytest.CaptureFixture
         await HttpWebhookSender().send(request(f"{receiver.url}/hooks/capability-token?key=abc"))
 
     assert "capability-token" not in capsys.readouterr().err
+
+
+def test_the_font_subsetting_of_a_mail_logs_only_warnings(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    configure_logging(settings(log_format="json", log_level="INFO"))
+    logging.getLogger("fontTools.subset").info("head pruned")
+    logging.getLogger("fontTools.subset").warning("a font could not be subset")
+    lines = capsys.readouterr().err.splitlines()
+    assert [json.loads(line)["event"] for line in lines] == ["a font could not be subset"]

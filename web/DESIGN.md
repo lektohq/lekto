@@ -747,29 +747,36 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
   Empfangen, Weitergeleitet von, Anhang), only those with a value. Other documents show no card.
   A relation of the documents of one mail says "aus derselben Mail" with the subject.
 
-- **Mail rules** (mock D, E): the page "Regeln" has for admins a `Segmented` "Dokumente |
-  Mails" with counts above its list (`?kind=mail`); others see the document rules alone. Mails:
-  one section per mailbox, its title "Postfach „…“" with "Postfach ansehen" at its end, its rules
-  as cards in a column in the order they are asked (the name opens the editor; below it
-  priority · conditions → what it does; a paused one says why), and under them the mailbox's
-  fallback with "Am Postfach ändern". "Neue Regel" makes a mail rule there. The editor is the
-  rule editor's frame: name and priority, the mailbox (`Select`), the conditions (all or any;
-  field, comparison, value; a folder from the mailbox's), and the actions as its rows:
-  "Übernehmen" and "Für" always, "Space setzen", "Typ des Mailtexts" and "Mail danach" added
-  with "+ Aktion" and removed with their bin; delete in the head (`IconButton`).
+- **Mail rules** (mock D, E; Tobi, 05.11.2026: no special case beside the document rules): the
+  page "Regeln" has for admins a `Segmented` "Dokumente | Mails" with counts above its list
+  (`?kind=mail`); others see the document rules alone. Mails: one section per mailbox, its title
+  "Postfach „…“" with "Postfach ansehen" at its end, its rules as cards in a column in the order
+  they are asked (the name opens the rule's page; below it priority · conditions → what it does;
+  a paused one says why), and under them the mailbox's fallback with "Am Postfach ändern".
+  "Neue Regel" makes a mail rule there. A mail rule goes the document rules' way: its page (the
+  switch, "Bearbeiten", "Probelauf", delete in the head; mailbox and priority below; the rule to
+  read as `RuleView` shows one), its editor (`…/edit`), saving switched off ("Speichern und
+  Probelauf") into its dry run (`…/apply?saved=1`), which switches it on.
+- **One set of parts and words for every rule:** the conditions' "Verknüpfung" (`ModeSelect`:
+  "Alle treffen zu", "Mindestens eine trifft zu"), the rows of conditions and actions
+  (`RuleRow`: a label for an action, the fields, up and down where the order counts, the bin),
+  the comparisons ("ist", "enthält", "beginnt mit", "endet auf"), "Bedingung hinzufügen",
+  "Aktion hinzufügen", "In Space ablegen", the priority's line. A mail rule's editor has the
+  mailbox (`Select`); "Übernehmen" and "Für" always, "In Space ablegen", "Typ des Mailtexts"
+  and "Mail danach" added with "Aktion hinzufügen". Words of their own only where the thing
+  differs (a mail's fields, what a mail rule takes).
+- **A rule's dry run is one page for both kinds** (`DryRunGroup`): the head with the rule's
+  switch and a hint, the bar (`SelectionBar`), groups as cards whose head says once what the
+  rule does, rows below, yellow groups last for what the rule cannot do alone. A mail rule's
+  dry run reads the mailbox's latest 50 mails as Lekto recorded them and changes nothing: one
+  group of the mails it would take (its actions in the head; rows: subject; sender · arrival ·
+  folder · attachments), then a yellow group per rule of higher priority that takes some of
+  them first ("Vorher: …"); the bar counts them ("12 von 50 Mails") and switches the rule on
+  ("Aktivieren").
 - **Mail conditions in document rules** (mock G): the subject choice of a condition offers
   "Mail: Postfach" (admins: only they read the mailboxes), "Mail: Absender", "Mail: Empfänger"
   and "Mail: Betreff", with "endet auf", "enthält", "ist", "beginnt mit"; a document no mail
   brought matches none of them (but "Mail: Postfach" "fehlt").
-- **The dry run of a mail rule** (plan PR 5): below its editor, "Probelauf" (`Play`, `outline`)
-  asks what the rule as the form holds it would do with the mailbox's latest 50 mails, as Lekto
-  recorded them; it reads only and saves nothing. A line counts the mails it would take, then
-  the mails as rows (subject; sender · arrival · folder · attachments) with who would decide
-  each as a `Badge`: "Diese Regel" (`primary`), "Vorher: …" another rule before it (`muted`),
-  "Rückfall: alles" (`note`), "Keine Regel" (`muted`).
-
-### Navigation between list and detail
-
 - A list's state (lens, filters, sort, layout) lives in its URL, its words in the history entry
   (see "No plain data in addresses"). A detail page reached from a list carries that URL and
   entry back (`from`), and its `BackLink` returns there. The inbox's previous/next works the same
