@@ -25,13 +25,23 @@ from lekto.adapters.outbound.sql import Database, SqlUnitOfWorkFactory, migrate,
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.migrations import downgrade
 from lekto.adapters.outbound.sql.types import UtcDateTime, json_type
+from lekto.core.domain.condition_tree import Group
 from lekto.core.domain.documents import Document, DocumentChanges
-from lekto.core.domain.errors import ConflictError, DuplicateDocumentError
+from lekto.core.domain.errors import ConflictError, DuplicateDocumentError, ValidationError
 from lekto.core.domain.events import DomainEvent
 from lekto.core.domain.fields import FieldDefinition, FieldType, Money
 from lekto.core.domain.ids import DocumentTypeId, RuleId, UserId, new_id
 from lekto.core.domain.jobs import Job
+from lekto.core.domain.mail import MailAction, MailStep
+from lekto.core.domain.mail_rules import (
+    MailCondition,
+    MailField,
+    MailOperator,
+    MailRule,
+    MailRuleChanges,
+)
 from lekto.core.domain.pipeline import NODES, Node
+from lekto.core.domain.reasons import ReasonCode
 from lekto.core.domain.rules import ForceReview, RuleScope
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.templates import TemplateValue
@@ -39,8 +49,9 @@ from lekto.core.domain.users import User
 from lekto.core.ports.event_bus import EventBus
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from tests import builders
-from tests.builders import NOW, PlaceholderNode, incoming
+from tests.builders import HOUR, NOW, PlaceholderNode, incoming
 from tests.contracts.event_bus import EventBusFactory, Recorder, publish, received
+from tests.contracts.mail_records import a_mailbox
 from tests.contracts.unit_of_work import owner_with_space
 from tests.service_suite import ServicesOverPersistence
 
@@ -111,6 +122,74 @@ class SqlAdapterSuite(ServicesOverPersistence):
                 assert await uow.jobs.claim(now=now, lease=LEASE) is None
                 await uow.commit()
         assert claimed == times
+
+    # --- mail rules -----------------------------------------------------------------------------
+
+    async def test_a_mail_rule_that_cannot_be_read_comes_paused(
+        self, database: Database, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """A stored rule whose conditions or steps cannot be read any more (a limit tightened
+        without a revision) comes paused with the reason, without them, next to the readable
+        rules; it takes a change only with both anew, and then reads as stored."""
+        mailbox = await a_mailbox(uow_factory)
+        person = UserId(new_id())
+        condition = MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Rechnung")
+
+        def rule(name: str, priority: int) -> MailRule:
+            return MailRule.create(
+                mailbox_id=mailbox.id,
+                changes=MailRuleChanges(
+                    name=name,
+                    priority=priority,
+                    user_id=person,
+                    conditions=Group(mode="all", items=(condition,)),
+                    after=(MailStep(MailAction.READ),),
+                ),
+                now=NOW,
+            )
+
+        bad_tree, bad_step, good = rule("Tree", 3), rule("Step", 2), rule("Good", 1)
+        async with uow_factory() as uow:
+            for item in (bad_tree, bad_step, good):
+                await uow.mail_rules.add(item)
+            await uow.commit()
+        async with database.writing() as connection:
+            rules = t.mail_rules
+            await connection.execute(
+                sa.update(rules)
+                .where(rules.c.id == bad_tree.id)
+                .values(conditions={"all": [{"field": "subject", "op": "nope", "value": "x"}]})
+            )
+            await connection.execute(
+                sa.update(rules).where(rules.c.id == bad_step.id).values(steps=[{"action": "nope"}])
+            )
+
+        async with uow_factory() as uow:
+            listed = await uow.mail_rules.of_mailbox(mailbox.id)
+            stored = {item.name: item for item in listed}
+        assert [item.name for item in listed] == ["Tree", "Step", "Good"]
+        for name, place in (("Tree", "conditions.all[0]"), ("Step", "after[0]")):
+            paused = stored[name]
+            assert (paused.enabled, paused.conditions, paused.after) == (False, None, ())
+            assert paused.disabled_reason is not None
+            assert paused.disabled_reason.code is ReasonCode.MAIL_RULE_UNREADABLE
+            assert place in str(paused.disabled_reason.params["detail"])
+        assert stored["Good"].enabled and stored["Good"].conditions is not None
+
+        with pytest.raises(ValidationError, match="anew"):
+            stored["Tree"].change(MailRuleChanges(name="Gas"), now=NOW + HOUR)
+        async with uow_factory() as uow:
+            fixed = await uow.mail_rules.get(bad_tree.id)
+            fixed.change(
+                MailRuleChanges(conditions=None, after=(MailStep(MailAction.TRASH),)),
+                now=NOW + HOUR,
+            )
+            await uow.mail_rules.update(fixed)
+            await uow.commit()
+        async with uow_factory() as uow:
+            read = await uow.mail_rules.get(bad_tree.id)
+        assert (read.enabled, read.disabled_reason) == (False, None)
+        assert (read.conditions, read.after) == (None, (MailStep(MailAction.TRASH),))
 
     # --- concurrency ----------------------------------------------------------------------------
 

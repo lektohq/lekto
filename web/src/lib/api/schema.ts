@@ -9305,7 +9305,8 @@ export interface components {
 			| 'mail_step_failed'
 			| 'mail_rule_person_gone'
 			| 'mail_rule_space_unreachable'
-			| 'mail_rule_type_gone';
+			| 'mail_rule_type_gone'
+			| 'mail_rule_unreadable';
 		/**
 		 * ReasonOut
 		 * @description A reason with its code: a client translates `code` with `params`; the English text
