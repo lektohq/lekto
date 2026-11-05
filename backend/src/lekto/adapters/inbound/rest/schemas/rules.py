@@ -148,6 +148,9 @@ class ConditionSchema(BaseModel):
     )
 
 
+# `MailAllGroup` and `MailAnyGroup` (`schemas/mail_rules.py`) are the same two models with the
+# mail rules' condition: a generic would rename them in OpenAPI (`AllGroup_ConditionSchema_`),
+# which the web client names them by (Tobi, 05.11.2026). Keep the four in step.
 class AllGroup(BaseModel):
     """All items hold (and); `not` turns the result around."""
 

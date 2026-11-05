@@ -78,6 +78,8 @@ class MailStepBody(BaseModel):
         return cls(action=step.action, value=step.value)
 
 
+# The same two models as `AllGroup` and `AnyGroup` of the document rules (`schemas/rules.py`)
+# with the mail rules' condition; see the note there. Keep the four in step.
 class MailAllGroup(BaseModel):
     """All items hold (and); `not` turns the result around."""
 
