@@ -20,6 +20,9 @@ three lanes: green (done), yellow (confirm), red (intervene).
   Every step is logged with input, result, confidence, model version and duration, and can be
   repeated. A value the model proposes counts only if it occurs in the text; an unknown contact
   or type makes the document yellow, never a silent guess.
+- **Mail.** Mailboxes Lekto fetches from over IMAP, with rules per mailbox for what a mail
+  brings in and for whom: the attachments become documents, the mail's text a document of its
+  own (set as PDF with WeasyPrint) related to them. A mail saved as `.eml` can be uploaded too.
 - **Rules.** Global rules (admins) and personal rules, built in the UI from conditions and
   actions, versioned, with a dry run before changes and retroactive application on request.
 - **Search.** Hybrid search in Meilisearch: words and meaning (vectors) in one query, filtered by

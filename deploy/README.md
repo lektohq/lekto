@@ -93,8 +93,8 @@ Generate the values with `openssl`:
 openssl rand -base64 32                              # LEKTO_SECRET_KEY: 32 random bytes, base64
 ```
 
-`LEKTO_SECRET_KEY` is required by every service (it encrypts TOTP and webhook secrets). Losing it
-means losing both. The key from `.devcontainer/compose.yml` is public and refused with secure cookies
+`LEKTO_SECRET_KEY` is required by every service (it encrypts TOTP and webhook secrets and the
+passwords of mailboxes). Losing it means losing them all. The key from `.devcontainer/compose.yml` is public and refused with secure cookies
 (the default; the example stacks run with `LEKTO_COOKIE_SECURE=false` and would take it, so never
 copy it). Meilisearch has no `*_FILE` variable: its key is always an environment variable of its
 container (`MEILI_MASTER_KEY`).
@@ -152,6 +152,13 @@ checked again for every redirect, at most three) and reads at most 1 MB in 10 s 
 with the user agent `Lekto/<version>`; a website learns that this Lekto fetched its icon. No
 logo service of a third party is asked. A proxy from the environment is not used for it. Switched
 off again, fetches still queued end without asking. Logos uploaded by an admin need no setting.
+
+Mailboxes (System › Eingangskanäle) are fetched over IMAP; the connection checks the server's
+certificate against the system's store. For a mail server with a certificate of your own
+authority, mount that certificate and point `SSL_CERT_FILE` at a bundle that holds it together
+with the system's (`/etc/ssl/certs/ca-certificates.crt`); `none` as the encryption is for a
+server in your own network only. `LEKTO_MAIL_TIMEOUT` (30 seconds) bounds connecting and every
+answer, `LEKTO_MAIL_RENDER_TIMEOUT` (two minutes) the setting of a mail as a PDF.
 
 ## Roles
 

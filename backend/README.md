@@ -1117,12 +1117,13 @@ where it is and edits where it goes (global: admins); every version names its sp
   | `topic` | `is`, `in`, `present`, `missing`; a topic matches the topics below it |
   | `tags` | `contains` (has this tag), `in` (has one of), `present`, `missing`; a tag matches the tags below it |
   | `contact_group`, `document_type_group` | as `tags`, over the groups of the document's contact (type) with their ancestors |
-  | `channel` (Eingangskanal: `web`, `api`, `migration`) | `is`, `in` |
+  | `channel` (Eingangskanal: `web`, `api`, `migration`, `mail`) | `is`, `in` |
   | `text` | `contains` (normalised like the classification checks), `matches` (regular expression) |
   | `document_date` | `is`, `gt`, `lt`, `present`, `missing` |
   | `field` (with `field_id`) | by data type: text and link `is`, `in`, `contains`, `matches`; number, amount, date `is`, `gt`, `lt`; yes/no `is`; choice `is`, `in`; period `is`, `overlaps` (shares a day with a period), `gt` (starts after a date), `lt` (ends before a date); all `present`, `missing` |
   | `fact` (with `fact_kind`, `fact_role` or any role; issue #145) | `present`, `missing`, `is`, `in` (the values as written, kept and compared normalised), `matches` (against each value as the text writes it, `^` and `$` at its ends); facts a person rejected do not count, and a fact condition is never unknown |
   | `relation` (issue #145) | `present` (refers to any document), `missing` (to none), `is`, `in` (to a document of one of the types); the set relations it refers by (the newer of the pair), not suggestions; never unknown |
+  | `mail_mailbox`, `mail_sender`, `mail_recipient` (To or Cc), `mail_to`, `mail_cc`, `mail_subject`, `mail_importance`, `mail_keyword`, `mail_flag` (see Mail) | the mail a document came with; for a document no mail brought every one fails (but `mail_mailbox` `missing`): the mailbox `is`, `in`, `present`, `missing`; the texts `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); the importance `is` (`high`, `normal`, `low`); a keyword `contains`, `present`, `missing`; the flag `present`, `missing`, `is` (a colour as Apple Mail shows it) |
 
   `matches` takes `case_sensitive` (default false). Patterns run with the `regex` package
   (`adapters/outbound/regex`) in a thread with a time limit (`LEKTO_RULES_PATTERN_TIMEOUT`); a
@@ -1494,6 +1495,10 @@ The session cookie is `__Host-lekto_session`: HTTP-only, `Secure`, `SameSite=Lax
 | `POST /documents/{id}/confirm` | Decide the open fields (`changes` as with `PATCH`, `accept_suggestions`, `space_id`; an open space with a suggestion moves there with `accept_suggestions` and stays otherwise, both a decision of its space), then continue from `resume_at` (`apply_rules`, or `fields` after a type change) up to filing (editors and admins); undecided fields: `422` with `open_fields`; handed over or out of the caller's reach: `{id, access: null}` |
 | `GET/POST /rules`, `GET/PUT/PATCH/DELETE /rules/{id}`, `GET /rules/{id}/versions`, `/versions/{number}` | Rules: list (`scope`, `space_id`, `include_disabled`, `all_users` for admins), create (`scope`, `space_id`, `enabled: false` to save it switched off), change (new version; with `scope`, `space_id` it moves; `enabled` switches it with the change), enable or disable, delete; see Rules |
 | `POST /rules/{id}/apply/preview`, `POST /rules/{id}/apply`, `GET /rule-applications/{id}` | Apply a rule to existing documents: preview, start (`202`), progress |
+| `GET/POST /mailboxes`, `GET/PATCH/DELETE /mailboxes/{id}` | Mailboxes Lekto fetches from (admins): server, port, encryption (`tls`, `starttls`, `none`), user name and password (stored encrypted, never shown; left out of a change, it stays), the folders, the interval, which mails (`since_setup`, `since_date`, `unread`), the fallback for a mail no rule takes (`nothing`, or `everything` for a person), the type of the mail text, and the status of the fetches; see Mail |
+| `POST /mailboxes/test`, `POST /mailboxes/{id}/fetch` | Sign in and list the folders and the keywords of the inbox (a failure is an answer with its reason); bring the next fetch forward to now (`202`, `422` for a paused mailbox) |
+| `GET/POST /mail-rules`, `GET/PATCH/DELETE /mail-rules/{id}`, `POST /mail-rules/dry-run` | Mail rules (admins): per mailbox, conditions on the mail as a tree (`sender`, `recipient`, `to`, `cc`, `subject`, `folder`, `attachments`, `importance`, `keyword`, `flag`), what it takes (`all`, `attachments`, `text`, `nothing`), for whom, into which space, the type of the text, and the steps on the mail on the server in order (`read`, `unread`, `flag`, `unflag`, `add_keyword`, `remove_keyword`, then `move` or `trash`); the dry run over the mailbox's latest 50 fetched mails, reading only |
+| `GET /documents/{id}/origin` | Where a document came from: the mail that brought it (mailbox, rule, sender, recipients, subject, dates, who forwarded it, importance, keywords, flag), `null` for any other; read access |
 | `GET /events` | Server-sent events of the documents the caller may read, for admins also `classifier.trained`; `?document_id=` |
 | `GET/POST /webhooks`, `GET/PATCH/DELETE /webhooks/{id}` | Webhooks: the caller's own (admins read everybody's, `?owner=`); create (the answer shows the secret once), change, switch on or off, delete; see Webhooks |
 | `POST/DELETE /webhooks/{id}/secret`, `POST /webhooks/{id}/test`, `GET /webhooks/{id}/deliveries` | Renew the secret (the old one signs 24 hours longer; an unsigned webhook signs from then on) or stop signing, send a test request, the delivery log (`before`, `limit`) |
@@ -1507,7 +1512,7 @@ The session cookie is `__Host-lekto_session`: HTTP-only, `Secure`, `SameSite=Lax
 
 - Uploads are streamed into a temporary file and hashed on the way; the limit
   `LEKTO_UPLOAD_MAX_SIZE` applies while receiving (`413`). The type is recognised from the
-  content (PDF, JPEG, PNG, TIFF; otherwise `415`). Every file exists once per installation: a
+  content (PDF, JPEG, PNG, TIFF or a mail saved as `.eml`; otherwise `415`). Every file exists once per installation: a
   file that lies in Lekto already is `409`, with `existing_document_id` if the caller may read
   that document; without it, the file lies in a space the caller cannot see. Moving,
   confirming and rules never meet a duplicate.
@@ -1845,6 +1850,53 @@ certificates are verified; there is no switch against that (use `http` or a vali
 Anyone who may create webhooks can make the server send `POST`s to addresses it can reach and
 see from status and error whether something answers; the body is fixed and the answer is not
 shown.
+
+## Mail
+
+The intake channel `mail` (`.idea/umsetzungsplan.md`, "Eingangskanal Mail"; Tobi, 04.11.2026):
+admins set up mailboxes Lekto fetches from over IMAP (`/mailboxes`; System › Eingangskanäle in
+the web UI), with mail rules per mailbox (`/mail-rules`; Regeln › Mails) that decide what a mail
+brings in and for whom.
+
+- **Fetching** (`core/services/mail_intake.py`; port `MailServer`, adapter
+  `adapters/outbound/imap` on `imaplib` in a thread): one job per mailbox (`mail.fetch`, dedup
+  key `mail:<id>`), run every interval of the mailbox and brought forward by
+  `POST /mailboxes/{id}/fetch`. A run signs in once and looks into each folder for the mails its
+  start allows (since setup, from a day, unread) that were not fetched before (per folder by
+  UIDVALIDITY and UID, across folders and mailboxes by Message-ID: `mail_records`), reads at most
+  50 of them with `BODY.PEEK` (nothing marked) and plans the next run at once while more wait.
+  A mail larger than an upload with its Base64 (`LEKTO_UPLOAD_MAX_SIZE`) is left out with its
+  head recorded, and the mailbox says so. The first active rule that matches decides (priority,
+  then name), else the mailbox's fallback. Of each letter of a mail (a forward is unwrapped to
+  the innermost, at most five levels; several attached mails are several letters) the readable
+  attachments become documents, then the letter itself as its `.eml`; an attachment Lekto has
+  already is related instead. Everything goes through `PipelineService.receive` with the
+  channel `mail`; the origin of each document (`mail_origins`: mailbox, rule, sender,
+  recipients, subject, dates, the chain of forwarders, importance, keywords, flag) stands
+  beside it (`GET /documents/{id}/origin`), and the documents of one mail relate to each other
+  (evidence `mail`, never dropped). Afterwards the rule's steps run on the mail on the server,
+  in order; a step the server refuses is noted at the mailbox. A failure of the server ends
+  the run and shows at the mailbox; a mail that cannot be taken is recorded as failed and the
+  run goes on.
+- **Mails as documents** (port `MailRenderer`, adapter `adapters/outbound/weasyprint`): a
+  `.eml`, fetched or uploaded, is set as a PDF/A with a head ("E-Mail": sender, recipients,
+  date, subject, the attachments taken and those left out) and the mail's HTML or text, in a
+  child process with a time limit (`LEKTO_MAIL_RENDER_TIMEOUT`), loading nothing from the
+  network or the file system (pictures only from the mail itself, `cid:`). The OCR node takes
+  that PDF as the archive instead of reading, the pages node draws its pages from it, and the
+  file information shows the mail's header lines.
+- **Secrets and limits:** the password is encrypted with `SecretCipher` bound to the mailbox's
+  id and never returned; a lost `LEKTO_SECRET_KEY` means `mail_password_unreadable` until it is
+  entered again. The connection checks the server's certificate against the system's store
+  (`tls` from the start, `starttls`, or `none` for a server in one's own network);
+  `LEKTO_MAIL_TIMEOUT` bounds connecting and every answer. On the server Lekto expunges a mail
+  only alone (`UID EXPUNGE`) and leaves it marked where the server cannot. The records of
+  fetched mails keep what the mail's head said only for the latest 500 of a mailbox (the dry
+  run of a mail rule reads the latest 50); the cleanup clears the rest (`forgotten_at`), and
+  the rows stay so that no mail is fetched twice.
+- **Rules on documents a mail brought:** document rules take the conditions `mail_*` (see
+  Rules), and the facts signal counts the sender of an attachment as evidence for a contact,
+  as if it stood in the text (decision 16).
 
 ## MCP
 

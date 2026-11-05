@@ -283,6 +283,22 @@ processing (`nextDecision`); without one, back to the inbox.
 - **Metadata:** the files from `/files`: size, SHA-256, a PDF's information and XMP, an
   image's EXIF.
 
+## Intake channels and mail rules
+
+The tab "Eingangskanäle" of the page "System" (`IntakeTab`, admins only) lists the mailboxes
+with the state of their fetches; `MailboxDialog` (`EditorShell`, the parts "Verbindung" and
+"Abruf") creates and changes one, tests the connection (`POST /mailboxes/test`, with
+`mailbox_id` in place of a stored password) and brings a fetch forward. The page "Regeln" shows
+admins the mail rules beside the document rules (`?kind=mail`; `MailRulesList`: one section per
+mailbox, the rules in the order they are asked, the mailbox's fallback below). A mail rule has a
+page (`MailRulePage` for the editor, `MailRuleView` to read it) and a dry run
+(`rules/mail/[id]/apply`) over the mailbox's latest fetched mails. The editor (`MailRuleForm`)
+shares the tree of conditions (`ConditionGroup`, `ConditionTree`, `rules/tree.ts`), the rows
+(`RuleRow`) and the words of a mail's fields (`mail-traits.ts`) with the document rules, which
+take the mail's fields as "Mail: …" conditions (`ConditionRow`). A document a mail brought shows
+the card "Herkunft" (`OriginCard`, `GET /documents/{id}/origin`) in its facts pane. The looks
+follow `DESIGN.md`, "Intake channels" and "Mail rules".
+
 ## API client
 
 `openapi.json` is the API's document, checked in; a backend unit test fails while it differs from
@@ -295,23 +311,28 @@ cd web && pnpm gen:api   # writes src/lib/api/schema.ts
 
 ## Layout
 
-| Path                           | Content                                                                         |
-| ------------------------------ | ------------------------------------------------------------------------------- |
-| `src/lib/api`                  | Client, `fetch` with session cookie and CSRF header, problem details            |
-| `src/lib/session.svelte.ts`    | The signed-in user and the CSRF token, in memory                                |
-| `src/lib/components`           | App shell, documents, dialogs, PDF viewer; `ui/` holds the shadcn-svelte ones   |
-| `src/lib/components/document`  | The document view: head, fields, content (Markdown), log, prompt                |
-| `src/lib/components/templates` | The template field, the template editor (sheet), the reference document picker  |
-| `src/lib/templates`            | Liquid colours and completions, the CodeMirror editor, the values templates see |
-| `src/lib/i18n.ts`              | Language switch, date, number and money formats                                 |
-| `src/lib/reasons.ts`           | The API's reasons with codes in the user's language (`reason_<code>` messages)  |
-| `src/lib/periods.ts`           | Periods in ISO 8601 (`2026-Q2`, `2026-W17`), read also in German forms          |
-| `src/lib/listing.ts`           | Sort and grid or list of the document view, remembered in this browser          |
-| `src/lib/bulk.svelte.ts`       | An action on many documents, followed by the page until it ends                 |
-| `src/lib/scope.svelte.ts`      | An admin's choice to include all users, remembered in this browser              |
-| `src/lib/permissions.ts`       | What the UI offers by role in a space: edit, move, hand over, members, rules    |
-| `src/routes`                   | `login`, the app pages in `(app)`; `(app)/dev/components` in development only   |
-| `messages/{en,de}.json`        | All texts; a test fails on raw text in markup and on missing keys               |
-| `tests/`                       | Tests across files (messages, raw text); `e2e/` the Playwright smoke test       |
+| Path                           | Content                                                                                                         |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `src/lib/api`                  | Client, `fetch` with session cookie and CSRF header, problem details                                            |
+| `src/lib/session.svelte.ts`    | The signed-in user and the CSRF token, in memory                                                                |
+| `src/lib/components`           | App shell, documents, dialogs, PDF viewer; `ui/` holds the shadcn-svelte ones                                   |
+| `src/lib/components/document`  | The document view: head, fields, content (Markdown), log, prompt                                                |
+| `src/lib/components/templates` | The template field, the template editor (sheet), the reference document picker                                  |
+| `src/lib/templates`            | Liquid colours and completions, the CodeMirror editor, the values templates see                                 |
+| `src/lib/i18n.ts`              | Language switch, date, number and money formats                                                                 |
+| `src/lib/reasons.ts`           | The API's reasons with codes in the user's language (`reason_<code>` messages)                                  |
+| `src/lib/periods.ts`           | Periods in ISO 8601 (`2026-Q2`, `2026-W17`), read also in German forms                                          |
+| `src/lib/listing.ts`           | Sort and grid or list of the document view, remembered in this browser                                          |
+| `src/lib/bulk.svelte.ts`       | An action on many documents, followed by the page until it ends                                                 |
+| `src/lib/scope.svelte.ts`      | An admin's choice to include all users, remembered in this browser                                              |
+| `src/lib/permissions.ts`       | What the UI offers by role in a space: edit, move, hand over, members, rules                                    |
+| `src/lib/mailboxes.ts`         | Mailboxes (System › Eingangskanäle): the form of their dialog, the state of their fetches                       |
+| `src/lib/mail-rules.ts`        | Mail rules: the form of the editor, its validation, a rule in one line                                          |
+| `src/lib/mail-rule-lookup.ts`  | What the pages of a mail rule load (mailboxes, users, every space, types), the names a rule shows               |
+| `src/lib/mail-traits.ts`       | A mail's fields with their comparisons and names, importance, keywords and flag colours, for both kinds of rule |
+| `src/lib/rules/tree.ts`        | The tree of conditions every rule has: groups of all or any, turned around or not                               |
+| `src/routes`                   | `login`, the app pages in `(app)`; `(app)/dev/components` in development only                                   |
+| `messages/{en,de}.json`        | All texts; a test fails on raw text in markup and on missing keys                                               |
+| `tests/`                       | Tests across files (messages, raw text); `e2e/` the Playwright smoke test                                       |
 
 Imports use `#lib/…` (package `imports`) with the file extension.
