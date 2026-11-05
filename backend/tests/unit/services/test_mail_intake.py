@@ -57,16 +57,10 @@ from lekto.core.services.rules.management import RuleService
 from lekto.core.services.rules.nodes import ApplyRulesNode
 from tests import mails
 from tests.builders import TEMPLATES, drain, incoming
+from tests.mails import LOGIN
 from tests.unit.services.rules_support import add_tags, all_of, definition
 from tests.unit.services.support import World
 
-LOGIN = MailLogin(
-    host="imap.example.test",
-    port=993,
-    security=MailSecurity.TLS,
-    username="household@example.test",
-    password="right",
-)
 LATER = timedelta(minutes=1)
 
 
@@ -211,14 +205,11 @@ async def test_a_mail_is_fetched_once_across_mailboxes(world: World) -> None:
     )
     await _fetch(world, world.mail_intake())
     async with world.uow() as uow:
-        outcomes = sorted(
-            [record.outcome for record in await uow.mail_records.recent(first.id, limit=5)]
-            + [record.outcome for record in await uow.mail_records.recent(second.id, limit=5)]
-        )
-    assert outcomes in (
-        [MailOutcome.KNOWN, MailOutcome.TAKEN],
-        [MailOutcome.KNOWN, MailOutcome.NO_RULE],
-    )
+        (of_first,) = await uow.mail_records.recent(first.id, limit=5)
+        (of_second,) = await uow.mail_records.recent(second.id, limit=5)
+    # The first mailbox's job was queued first and runs first: it takes the mail, the other
+    # mailbox knows its Message-ID then.
+    assert (of_first.outcome, of_second.outcome) == (MailOutcome.TAKEN, MailOutcome.KNOWN)
 
 
 async def test_the_start_of_a_mailbox(world: World) -> None:
@@ -275,6 +266,9 @@ async def test_a_mail_too_large_is_left_out_and_shows_at_the_mailbox(world: Worl
     assert large.outcome is MailOutcome.TOO_LARGE
     assert large.reason is not None and large.reason.code is ReasonCode.MAIL_TOO_LARGE
     assert large.reason.params == {"subject": "Fotos", "size": 2, "max": 2}
+    # Named by its header lines alone, fetched without the rest.
+    assert large.sender == "Stadtwerke Musterstadt <rechnung@stadtwerke.example>"
+    assert large.message_id is not None and large.sent_at is not None
     assert stored.status.skipped == large.reason and stored.status.skipped_at is not None
     assert stored.status.error is None  # the fetch itself went well
     names = [

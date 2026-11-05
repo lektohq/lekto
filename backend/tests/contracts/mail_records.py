@@ -5,7 +5,7 @@ from dataclasses import replace
 import pytest
 
 from lekto.core.domain.condition_tree import Group
-from lekto.core.domain.errors import ConflictError
+from lekto.core.domain.errors import ConcurrencyError, ConflictError, NotFoundError
 from lekto.core.domain.ids import (
     DocumentId,
     DocumentTypeId,
@@ -15,7 +15,7 @@ from lekto.core.domain.ids import (
     UserId,
     new_id,
 )
-from lekto.core.domain.mail import MailAction, Mailbox, MailSecurity, MailStep
+from lekto.core.domain.mail import MailAction, Mailbox, MailStep
 from lekto.core.domain.mail_intake import (
     MailOrigin,
     MailOutcome,
@@ -36,19 +36,13 @@ from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from tests import builders
 from tests.builders import HOUR, NOW
+from tests.contracts.mailboxes import a_mailbox as mailbox_entity
 from tests.contracts.unit_of_work import owner_with_space
 
 
 async def a_mailbox(uow_factory: UnitOfWorkFactory, name: str = "Household") -> Mailbox:
-    mailbox = Mailbox.create(
-        name=name,
-        host="imap.example.test",
-        port=993,
-        security=MailSecurity.TLS,
-        username="u",
-        encrypted_password=b"x",
-        now=NOW,
-    )
+    """A mailbox as the mailbox contract builds it, stored."""
+    mailbox = mailbox_entity(name)
     async with uow_factory() as uow:
         await uow.mailboxes.add(mailbox)
         await uow.commit()
@@ -108,6 +102,11 @@ class MailRecordRepositoryContract:
             assert not await uow.mail_records.has_message("m9@example.test")
             recent = await uow.mail_records.recent(mailbox.id, limit=4)
             assert [record.uid for record in recent[:2]] == [3, 2]
+            # The two fetched at the same time stand by id, the later id first.
+            assert [record.uid for record in recent[2:]] == [1, 1]
+            assert [record.id for record in recent[2:]] == sorted(
+                (record.id for record in recent[2:]), reverse=True
+            )
             assert recent[1] == failed
             assert (recent[0].importance, recent[0].marks) == (None, None)  # not known
 
@@ -279,6 +278,35 @@ class MailOriginRepositoryContract:
 
 
 class MailRuleRepositoryContract:
+    async def test_update_checks_the_version_and_a_rule_goes_once(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        mailbox = await a_mailbox(uow_factory)
+        rule = MailRule.create(
+            mailbox_id=mailbox.id,
+            changes=MailRuleChanges(name="Strom", user_id=UserId(new_id())),
+            now=NOW,
+        )
+        async with uow_factory() as uow:
+            await uow.mail_rules.add(rule)
+            await uow.commit()
+        async with uow_factory() as uow:
+            stored = await uow.mail_rules.get(rule.id)
+            stored.change(MailRuleChanges(name="Gas"), now=NOW + HOUR)
+            await uow.mail_rules.update(stored)
+            await uow.commit()
+        with pytest.raises(ConcurrencyError):
+            async with uow_factory() as uow:
+                rule.change(MailRuleChanges(name="Wasser"), now=NOW + HOUR)
+                await uow.mail_rules.update(rule)
+                await uow.commit()
+        async with uow_factory() as uow:
+            await uow.mail_rules.remove(rule.id)
+            await uow.commit()
+        with pytest.raises(NotFoundError):
+            async with uow_factory() as uow:
+                await uow.mail_rules.remove(rule.id)
+
     async def test_rules_by_mailbox_priority_and_name(self, uow_factory: UnitOfWorkFactory) -> None:
         first, second = await a_mailbox(uow_factory, "A"), await a_mailbox(uow_factory, "B")
         person = UserId(new_id())
