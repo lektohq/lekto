@@ -38,6 +38,11 @@ from typing import Literal, Self
 from uuid import UUID
 
 from lekto.core.domain.classification import field_key
+from lekto.core.domain.condition_tree import MAX_CONDITIONS as MAX_CONDITIONS
+from lekto.core.domain.condition_tree import MAX_DEPTH as MAX_DEPTH
+from lekto.core.domain.condition_tree import Group as Group
+from lekto.core.domain.condition_tree import GroupMode as GroupMode
+from lekto.core.domain.condition_tree import check_limits
 from lekto.core.domain.document_facts import FactRole
 from lekto.core.domain.documents import Channel
 from lekto.core.domain.errors import ValidationError
@@ -73,8 +78,6 @@ from lekto.core.domain.validation import require_name, require_utc
 DEFAULT_PRIORITY = 100
 MIN_PRIORITY = 0
 MAX_PRIORITY = 1000
-MAX_DEPTH = 5
-MAX_CONDITIONS = 50
 MAX_ACTIONS = 20
 MAX_TEXT = 500
 MAX_PATTERN = 200
@@ -125,8 +128,6 @@ class Operator(StrEnum):
     STARTS_WITH = "starts_with"  # text, regardless of case
     ENDS_WITH = "ends_with"
 
-
-type GroupMode = Literal["all", "any"]
 
 _REFERENCE_OPERATORS = frozenset({Operator.IS, Operator.IN, Operator.PRESENT, Operator.MISSING})
 _TAG_OPERATORS = frozenset({Operator.CONTAINS, Operator.IN, Operator.PRESENT, Operator.MISSING})
@@ -341,35 +342,6 @@ class Condition:
         return [] if self.value is None else [self.value]
 
 
-@dataclass(frozen=True, kw_only=True)
-class Group:
-    """`all` (and) or `any` (or) of its items; `negate` turns the result around."""
-
-    mode: GroupMode
-    items: tuple["Condition | Group", ...]
-    negate: bool = False
-
-    def __post_init__(self) -> None:
-        if self.mode not in ("all", "any"):
-            raise ValidationError(f"a group is 'all' or 'any', not {self.mode!r}")
-        if not self.items:
-            raise ValidationError("a group needs at least one condition")
-
-    def conditions(self) -> list[Condition]:
-        """All conditions of the tree, depth first."""
-        found: list[Condition] = []
-        for item in self.items:
-            if isinstance(item, Group):
-                found.extend(item.conditions())
-            else:
-                found.append(item)
-        return found
-
-    @property
-    def depth(self) -> int:
-        return 1 + max((item.depth for item in self.items if isinstance(item, Group)), default=0)
-
-
 STEP_NAME = re.compile(r"[a-z][a-z0-9_]{0,49}")
 """A step's name: what the steps after it write as `steps.<name>`."""
 _STEP_KEY = re.compile(r"[A-Za-z0-9_-]{1,100}")
@@ -544,7 +516,7 @@ class StepCondition:
     left it and on `steps` (`ConditionField.STEP`); otherwise it ends here, and its steps
     before count."""
 
-    conditions: Group
+    conditions: Group[Condition]
     type: Literal["condition"] = "condition"
 
 
@@ -597,7 +569,7 @@ class RuleDefinition:
     data; `check_fields` does the rest."""
 
     name: str
-    conditions: Group
+    conditions: Group[Condition]
     actions: tuple[Action, ...]
     priority: int = DEFAULT_PRIORITY
     triggers: frozenset[Trigger] = frozenset(Trigger)
@@ -615,11 +587,7 @@ class RuleDefinition:
             )
         if not self.triggers:
             raise ValidationError("a rule needs at least one trigger")
-        groups = [self.conditions, *(step.conditions for step in self.step_conditions)]
-        if any(group.depth > MAX_DEPTH for group in groups):
-            raise ValidationError(f"conditions may be nested at most {MAX_DEPTH} deep")
-        if len(self.all_conditions()) > MAX_CONDITIONS:
-            raise ValidationError(f"a rule has at most {MAX_CONDITIONS} conditions")
+        check_limits([self.conditions, *(step.conditions for step in self.step_conditions)])
         if any(
             condition.field is ConditionField.STEP for condition in self.conditions.conditions()
         ):
@@ -857,7 +825,9 @@ def condition_value(field: FieldDefinition, op: Operator, value: JsonValue) -> F
     return field_from_json(field, value)
 
 
-def condition_places(group: Group, where: str = "conditions") -> Iterator[tuple[str, Condition]]:
+def condition_places(
+    group: Group[Condition], where: str = "conditions"
+) -> Iterator[tuple[str, Condition]]:
     """The conditions of the tree with their place in the JSON form, depth first."""
     for index, item in enumerate(group.items):
         place = f"{where}.{group.mode}[{index}]"

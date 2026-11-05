@@ -35,7 +35,9 @@ type Must = list[Condition]
 """Conditions one of which must hold: one condition, or those of an `any` group."""
 
 
-def prefilter(group: Group, tree: TagTree, base: DocumentFilter) -> DocumentFilter | None:
+def prefilter(
+    group: Group[Condition], tree: TagTree, base: DocumentFilter
+) -> DocumentFilter | None:
     """`base` narrowed by what `group` demands of every document it holds for; None when no
     document can meet it (two contacts at once)."""
     found: DocumentFilter | None = base
@@ -46,7 +48,7 @@ def prefilter(group: Group, tree: TagTree, base: DocumentFilter) -> DocumentFilt
     return found
 
 
-def _musts(group: Group) -> list[Must]:
+def _musts(group: Group[Condition]) -> list[Must]:
     if group.negate:
         return []
     if group.mode == "any":
