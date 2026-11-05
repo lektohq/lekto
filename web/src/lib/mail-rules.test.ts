@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import {
 	complete,
+	conditionText,
 	createBody,
 	formOf,
 	newCondition,
@@ -85,6 +86,28 @@ describe('the form of a mail rule', () => {
 		expect(complete(form)).toBe(true); // "present" takes no value
 		form.conditions.items.push(newGroup<MailConditionNode>('all', []));
 		expect(complete(form)).toBe(false); // an empty subgroup
+	});
+
+	it('says the marks and importance of a mail, and takes only a keyword IMAP can carry', () => {
+		expect(conditionText({ field: 'importance', op: 'is', value: 'high' })).toBe(
+			`${m.mail_rule_field_importance()} ${m.rule_op_is()} ${m.mail_importance_high()}`
+		);
+		expect(conditionText({ field: 'flag', op: 'is', value: 'green' })).toBe(
+			`${m.mail_rule_field_flag()} ${m.rule_op_is()} ${m.mail_flag_green()}`
+		);
+		expect(conditionText({ field: 'keyword', op: 'contains', value: 'Lekto' })).toBe(
+			`${m.mail_rule_field_keyword()} ${m.rule_op_tags_contains()} Lekto`
+		);
+		expect(conditionText({ field: 'cc', op: 'is', value: 'ben@example.test' })).toBe(
+			`${m.mail_rule_field_cc()} ${m.rule_op_is()} ben@example.test`
+		);
+		const form = formOf(RULE);
+		const keyword = newCondition('keyword');
+		form.conditions.items.push(keyword);
+		keyword.value = 'zwei Wörter';
+		expect(complete(form)).toBe(false);
+		keyword.value = '$label1';
+		expect(complete(form)).toBe(true);
 	});
 
 	it('keeps groups and their "not" as the tree of every rule', () => {

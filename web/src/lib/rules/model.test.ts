@@ -204,7 +204,12 @@ describe('the rule model', () => {
 			mail_mailbox: ['is', 'in', 'present', 'missing'],
 			mail_sender: ['ends_with', 'contains', 'is', 'starts_with'],
 			mail_recipient: ['ends_with', 'contains', 'is', 'starts_with'],
-			mail_subject: ['ends_with', 'contains', 'is', 'starts_with']
+			mail_to: ['ends_with', 'contains', 'is', 'starts_with'],
+			mail_cc: ['ends_with', 'contains', 'is', 'starts_with'],
+			mail_subject: ['ends_with', 'contains', 'is', 'starts_with'],
+			mail_importance: ['is'],
+			mail_keyword: ['contains', 'present', 'missing'],
+			mail_flag: ['present', 'missing', 'is']
 		});
 		expect(FIELD_TYPE_OPERATORS.boolean).toEqual(['is', 'present', 'missing']);
 		expect(FIELD_TYPE_OPERATORS.choice).toEqual(['is', 'in', 'present', 'missing']);

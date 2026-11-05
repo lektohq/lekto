@@ -3,6 +3,7 @@
  * form of the editor as the API takes it, and a rule in one line for the list.
  */
 import type { components } from '#lib/api/schema.ts';
+import { flagLabel, importanceLabel, isKeyword } from '#lib/mail-traits.ts';
 import { folderLabel } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { operatorLabel } from '#lib/rules/describe.ts';
@@ -33,17 +34,27 @@ type ApiCondition = components['schemas']['MailConditionBody'];
 export const FIELDS: readonly MailField[] = [
 	'sender',
 	'recipient',
+	'to',
+	'cc',
 	'subject',
 	'folder',
-	'attachments'
+	'attachments',
+	'importance',
+	'keyword',
+	'flag'
 ];
 
 export const OPERATORS: Record<MailField, readonly MailOperator[]> = {
 	sender: ['ends_with', 'contains', 'is', 'starts_with'],
 	recipient: ['ends_with', 'contains', 'is', 'starts_with'],
+	to: ['ends_with', 'contains', 'is', 'starts_with'],
+	cc: ['ends_with', 'contains', 'is', 'starts_with'],
 	subject: ['contains', 'is', 'starts_with', 'ends_with'],
 	folder: ['is'],
-	attachments: ['present', 'missing']
+	attachments: ['present', 'missing'],
+	importance: ['is'],
+	keyword: ['contains', 'present', 'missing'],
+	flag: ['present', 'missing', 'is']
 };
 
 export const PARTS: readonly MailParts[] = ['all', 'attachments', 'text', 'nothing'];
@@ -52,18 +63,30 @@ export const AFTER: readonly MailAction[] = ['nothing', 'read', 'move', 'trash']
 export const FIELD_LABELS: Record<MailField, () => string> = {
 	sender: m.mail_rule_field_sender,
 	recipient: m.mail_rule_field_recipient,
+	to: m.mail_rule_field_to,
+	cc: m.mail_rule_field_cc,
 	subject: m.mail_rule_field_subject,
 	folder: m.mail_rule_field_folder,
-	attachments: m.mail_rule_field_attachments
+	attachments: m.mail_rule_field_attachments,
+	importance: m.mail_rule_field_importance,
+	keyword: m.mail_rule_field_keyword,
+	flag: m.mail_rule_field_flag
 };
 
-/** A comparison in the words of the document rules' ("ist", "endet auf"); attachments are
- * there or not. */
+/** A comparison in the words of the document rules' mail fields ("ist", "endet auf",
+ * "Schlagwörter enthalten"); attachments are there or not. */
 export function operatorText(field: MailField, op: MailOperator): string {
 	if (field === 'attachments') {
 		return op === 'present' ? m.mail_rule_attachments_present() : m.mail_rule_attachments_missing();
 	}
-	return operatorLabel('mail_sender', op);
+	return operatorLabel(field === 'keyword' ? 'mail_keyword' : 'mail_sender', op);
+}
+
+/** The value a condition on `field` starts with: the first of a choice, else empty. */
+export function firstValue(field: MailField, folders: readonly string[]): string {
+	if (field === 'folder') return folders[0] ?? '';
+	if (field === 'importance') return 'high';
+	return '';
 }
 
 export const PARTS_LABELS: Record<MailParts, () => string> = {
@@ -196,7 +219,11 @@ export function complete(form: MailRuleForm): boolean {
 		(!takes || form.userId !== '') &&
 		(after !== 'move' || form.moveTo.trim() !== '') &&
 		emptyGroups(form.conditions, false).length === 0 &&
-		conditionsOf(form.conditions).every((item) => !hasValue(item.op) || item.value.trim() !== '')
+		conditionsOf(form.conditions).every(
+			(item) =>
+				!hasValue(item.op) ||
+				(item.field === 'keyword' ? isKeyword(item.value.trim()) : item.value.trim() !== '')
+		)
 	);
 }
 
@@ -237,10 +264,23 @@ export function conditionText(item: Pick<MailConditionNode, 'field' | 'op' | 'va
 	return [
 		FIELD_LABELS[item.field](),
 		operatorText(item.field, item.op),
-		item.value ? (item.field === 'folder' ? `„${folderLabel(item.value)}“` : item.value) : ''
+		item.value ? valueText(item.field, item.value) : ''
 	]
 		.filter(Boolean)
 		.join(' ');
+}
+
+function valueText(field: MailField, value: string): string {
+	switch (field) {
+		case 'folder':
+			return `„${folderLabel(value)}“`;
+		case 'importance':
+			return importanceLabel(value);
+		case 'flag':
+			return flagLabel(value);
+		default:
+			return value;
+	}
 }
 
 /** What the rule does, one part each: what it takes, for whom, where, the type of the text,
