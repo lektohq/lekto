@@ -8,10 +8,10 @@ are in. A file that cannot be read, or an encrypted PDF, is unprocessable.
 """
 
 import asyncio
-import email
 import email.policy
 import io
 import re
+from email.parser import BytesHeaderParser
 
 import pikepdf
 from PIL import ExifTags, Image, UnidentifiedImageError
@@ -138,7 +138,8 @@ _MAIL_HEADERS = frozenset(
 
 
 def _mail(data: bytes) -> FileMetadata:
-    message = email.message_from_bytes(data, policy=email.policy.default)
+    # The header lines alone: the parts of a large mail are not read for them.
+    message = BytesHeaderParser(policy=email.policy.default).parsebytes(data)
     entries = []
     for name, value in message.items():
         if name.lower() not in _MAIL_HEADERS:

@@ -2,13 +2,19 @@
 
 from datetime import datetime
 
-from lekto.adapters.outbound.memory.database import DOCUMENTS
+from lekto.adapters.outbound.memory.database import DOCUMENTS, MAILBOXES
 from lekto.adapters.outbound.memory.rows import MemoryRepository, _copy
+from lekto.core.domain.errors import ConflictError
 from lekto.core.domain.ids import DocumentId, MailboxId, MailRecordId
 from lekto.core.domain.mail_intake import MailOrigin, MailRecord
 
 
 class MemoryMailRecordRepository(MemoryRepository[MailRecordId, MailRecord]):
+    async def add(self, record: MailRecord) -> None:
+        if self._uow._row(MAILBOXES, record.mailbox_id) is None:
+            raise ConflictError("mail record: no such mailbox")  # as the foreign key
+        await super().add(record)
+
     async def known_uids(self, mailbox: MailboxId, folder: str, uidvalidity: int) -> set[int]:
         return {
             row.uid
@@ -39,6 +45,11 @@ class MemoryMailRecordRepository(MemoryRepository[MailRecordId, MailRecord]):
 
 class MemoryMailOriginRepository(MemoryRepository[DocumentId, MailOrigin]):
     """An origin goes with its document, as the foreign key's cascade does."""
+
+    async def add(self, origin: MailOrigin) -> None:
+        if self._uow._row(DOCUMENTS, origin.document_id) is None:
+            raise ConflictError("mail origin: no such document")  # as the foreign key
+        await super().add(origin)
 
     async def find(self, document: DocumentId) -> MailOrigin | None:
         if self._uow._row(DOCUMENTS, document) is None:

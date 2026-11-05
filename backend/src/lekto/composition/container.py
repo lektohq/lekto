@@ -458,7 +458,7 @@ def build_container(settings: Settings) -> Container:
         cipher=secret_cipher(settings),
         refs=ref_cipher(settings),
         webhook_sender=HttpWebhookSender(user_agent=USER_AGENT),
-        mail_server=ImapMailServer(),
+        mail_server=ImapMailServer(timeout=settings.mail_timeout),
         mail_renderer=WeasyPrintMailRenderer(
             settings.template_locale, timeout=settings.mail_render_timeout
         ),

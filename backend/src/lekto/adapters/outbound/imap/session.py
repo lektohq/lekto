@@ -72,9 +72,13 @@ class ImapMailSession:
         self._keywords[folder] = folder_keywords(self._imap)
 
     def _uidvalidity(self) -> int:
+        """The folder's UIDVALIDITY as the SELECT answered it; 0 where the server gave none."""
         _, answer = self._imap.response("UIDVALIDITY")
         value = answer[-1] if answer else None
-        return int(value) if isinstance(value, bytes | str) and str(int(value)) else 0
+        try:
+            return int(value) if isinstance(value, bytes | str) else 0
+        except ValueError:
+            return 0
 
     def _search(self, folder: str, search: MailSearch) -> FolderMails:
         self._select(folder)
