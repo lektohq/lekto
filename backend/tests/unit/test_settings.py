@@ -421,6 +421,7 @@ def test_worker_and_processing_defaults() -> None:
     assert settings.node_retry_delay == timedelta(seconds=30)
     assert settings.ocr_languages == "deu+eng"
     assert settings.ocr_timeout == timedelta(minutes=10)
+    assert settings.mail_render_timeout == timedelta(minutes=2)
     assert settings.retention == timedelta(days=7)
 
 
