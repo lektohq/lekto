@@ -75,12 +75,12 @@ ID = str(new_id())
 ALWAYS = Condition(field=ConditionField.CHANNEL, op=Operator.IN, value=["web", "api"])
 
 
-def group(*items: Condition | Group, mode: str = "all") -> Group:
+def group(*items: Condition | Group[Condition], mode: str = "all") -> Group[Condition]:
     return Group(mode="all" if mode == "all" else "any", items=items)
 
 
 def definition(
-    *actions: Action, conditions: Group | None = None, name: str = "Invoices"
+    *actions: Action, conditions: Group[Condition] | None = None, name: str = "Invoices"
 ) -> RuleDefinition:
     return RuleDefinition(
         name=name,
@@ -237,7 +237,7 @@ def test_negated_group_from_json() -> None:
 # --- limits -----------------------------------------------------------------------------------
 
 
-def nested(depth: int) -> Group:
+def nested(depth: int) -> Group[Condition]:
     tree = group(ALWAYS)
     for _ in range(depth - 1):
         tree = group(tree)

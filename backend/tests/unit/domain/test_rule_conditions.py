@@ -82,7 +82,7 @@ UNKNOWN_CONTACT = cond(ConditionField.CONTACT, Operator.IS, str(ACME))
         (any_(IS_WEB, all_(IS_API, all_(UNKNOWN_CONTACT, negate=True))), False, None),
     ],
 )
-def test_three_valued_logic(group: Group, trusting: Truth, distrusting: Truth) -> None:
+def test_three_valued_logic(group: Group[Condition], trusting: Truth, distrusting: Truth) -> None:
     facts = Facts.of(doc(contact_id=ACME), unverified=frozenset({"contact"}))
 
     assert evaluate(group, facts, {}) is trusting

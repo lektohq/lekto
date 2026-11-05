@@ -7,6 +7,8 @@ form (see `rules`).
 from collections.abc import Mapping
 from enum import StrEnum
 
+from lekto.core.domain.condition_tree import group_from_json as tree_from_json
+from lekto.core.domain.condition_tree import group_to_json as tree_to_json
 from lekto.core.domain.document_facts import FactRole
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.identifiers import IdentifierKind
@@ -21,7 +23,6 @@ from lekto.core.domain.rules import (
     ConditionField,
     ForceReview,
     Group,
-    GroupMode,
     Missing,
     Operator,
     RemoveTags,
@@ -48,16 +49,8 @@ def definition_to_json(definition: RuleDefinition) -> JsonObject:
     }
 
 
-def group_to_json(group: Group) -> JsonObject:
-    data: JsonObject = {
-        group.mode: [
-            group_to_json(item) if isinstance(item, Group) else condition_to_json(item)
-            for item in group.items
-        ]
-    }
-    if group.negate:
-        data["not"] = True
-    return data
+def group_to_json(group: Group[Condition]) -> JsonObject:
+    return tree_to_json(group, condition_to_json)
 
 
 def condition_to_json(condition: Condition) -> JsonObject:
@@ -136,30 +129,8 @@ def definition_from_json(data: JsonValue) -> RuleDefinition:
     )
 
 
-def group_from_json(data: JsonValue, where: str = "conditions") -> Group:
-    object_ = require_object(data, where)
-    modes = [mode for mode in ("all", "any") if mode in object_]
-    if len(modes) != 1:
-        raise ValidationError(f"{where}: a group has exactly one of 'all' and 'any'")
-    mode: GroupMode = "all" if modes[0] == "all" else "any"
-    _only(object_, {mode, "not"}, where)
-    negate = object_.get("not", False)
-    if not isinstance(negate, bool):
-        raise ValidationError(f"{where}.not: expected true or false")
-    items = object_[mode]
-    if not isinstance(items, list):
-        raise ValidationError(f"{where}.{mode}: expected a list")
-    parsed: list[Condition | Group] = []
-    for index, item in enumerate(items):
-        place = f"{where}.{mode}[{index}]"
-        if isinstance(item, dict) and ("all" in item or "any" in item):
-            parsed.append(group_from_json(item, place))
-        else:
-            parsed.append(condition_from_json(item, place))
-    try:
-        return Group(mode=mode, items=tuple(parsed), negate=negate)
-    except ValidationError as error:
-        raise ValidationError(f"{where}: {error}") from None
+def group_from_json(data: JsonValue, where: str = "conditions") -> Group[Condition]:
+    return tree_from_json(data, condition_from_json, where)
 
 
 def condition_from_json(data: JsonValue, where: str = "condition") -> Condition:
