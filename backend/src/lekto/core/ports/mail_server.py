@@ -97,7 +97,9 @@ class MailSession(Protocol):
         ...
 
     async def trash(self, folder: str, uid: int) -> None:
-        """Into the account's trash folder; deleted where it has none."""
+        """Into the account's trash folder; where it has none, the mail is marked deleted and
+        expunged alone (never the folder's other marked mails), or left marked where the server
+        cannot expunge one mail alone."""
         ...
 
 

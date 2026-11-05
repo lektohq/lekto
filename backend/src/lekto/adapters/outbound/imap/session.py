@@ -144,8 +144,7 @@ class ImapMailSession:
         else:
             status, _ = self._imap.uid("COPY", str(uid), quoted(target).decode())
             if status == "OK":
-                self._store(folder, uid, "+FLAGS", "(\\Deleted)")
-                self._imap.expunge()
+                self._delete(folder, uid)
         if status != "OK":
             raise MailServerError(because(ReasonCode.MAIL_FOLDER_MISSING, folder=target))
 
@@ -154,8 +153,17 @@ class ImapMailSession:
         if trash is not None and trash != folder:
             self._move(folder, uid, trash)
             return
+        self._delete(folder, uid)
+
+    def _delete(self, folder: str, uid: int) -> None:
+        """Mark the mail deleted and expunge it alone (`UID EXPUNGE`, RFC 4315). A server
+        without UIDPLUS keeps it marked until a client expunges the folder: EXPUNGE would take
+        every mail anyone marked (Tobi, 05.11.2026)."""
         self._store(folder, uid, "+FLAGS", "(\\Deleted)")
-        self._imap.expunge()
+        if "UIDPLUS" in self._imap.capabilities:
+            status, answer = self._imap.uid("EXPUNGE", str(uid))
+            if status != "OK":
+                raise imaplib.IMAP4.error(answer)
 
     def _trash_folder(self) -> str | None:
         status, entries = self._imap.list()
