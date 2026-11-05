@@ -341,6 +341,18 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('chooses a contact or a document type by searching, never from a plain Select', () => {
+		const lists = /lookup\.(?:contacts|documentTypes)\b|\btypes\.map\(/;
+		expect(
+			offenders((source) => {
+				for (const match of source.matchAll(/<Select\b[\s\S]*?\/>/g)) {
+					if (lists.test(match[0])) return match[0].split('\n')[0];
+				}
+				return null;
+			})
+		).toEqual([]);
+	});
+
 	it('builds every rule, of documents and of mails, from one set of parts', () => {
 		const own = (name: string) => `/src/lib/components/rules/${name}.svelte`;
 		expect(

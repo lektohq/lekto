@@ -245,13 +245,14 @@
 		{#if takes && form.shown.includes('type')}
 			<RuleRow label={m.mail_rule_action_type()} onremove={() => hide('type')}>
 				<div class="flex min-w-0 flex-1 basis-64 flex-col gap-2">
-					<Select
+					<SearchSelect
+						id="mail-rule-type"
 						aria-label={m.mail_rule_action_type()}
+						title={m.picker_title_type()}
 						bind:value={form.typeId}
-						options={[
-							{ value: '', label: m.mail_rule_type_auto() },
-							...types.map((entry) => ({ value: entry.id, label: entry.name }))
-						]}
+						options={types.map((entry) => ({ value: entry.id, label: entry.name }))}
+						placeholder={m.mail_rule_type_auto()}
+						noneLabel={m.mail_rule_type_auto()}
 					/>
 				</div>
 			</RuleRow>

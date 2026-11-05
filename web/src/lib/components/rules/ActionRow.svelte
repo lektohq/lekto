@@ -1,5 +1,6 @@
 <script lang="ts">
 	import RuleRow from '#lib/components/rules/RuleRow.svelte';
+	import SearchSelect from '#lib/components/SearchSelect.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import { namedOptions, withChoice } from '#lib/components/rules/options.ts';
 	import ValueInput from '#lib/components/rules/ValueInput.svelte';
@@ -126,18 +127,22 @@
 				<p class="text-sm text-muted-foreground">{m.rule_space_unreachable_hint()}</p>
 			{/if}
 		{:else if action.type === 'set_contact'}
-			<Select
+			<SearchSelect
 				aria-label={label}
 				aria-invalid={invalid || undefined}
+				title={m.picker_title_contact()}
 				bind:value={action.contact_id}
-				options={withChoice(namedOptions(lookup.contacts), action.contact_id)}
+				options={namedOptions(lookup.contacts)}
+				placeholder={m.rule_choose()}
 			/>
 		{:else if action.type === 'set_document_type'}
-			<Select
+			<SearchSelect
 				aria-label={label}
 				aria-invalid={invalid || undefined}
+				title={m.picker_title_type()}
 				bind:value={action.document_type_id}
-				options={withChoice(namedOptions(lookup.documentTypes), action.document_type_id)}
+				options={namedOptions(lookup.documentTypes)}
+				placeholder={m.rule_choose()}
 			/>
 		{:else if action.type === 'set_topic'}
 			<!-- The one choice of a topic, as at a document. -->
