@@ -263,17 +263,41 @@ class MailIntakeService:
         async with self._uow() as uow:
             known = await uow.mail_records.known_uids(mailbox.id, folder, found.uidvalidity)
         new = [uid for uid in found.uids if uid not in known]
-        room = MAX_PER_RUN - count.mails
-        if len(new) > room:
-            count.more = True
-            new = new[:room]
-        for info in await session.info(folder, new):
-            if mailbox.start is FetchStart.SINCE_SETUP and info.arrived_at < mailbox.created_at:
-                continue  # the same day, before the mailbox was set up
+        for info in await self._due(session, mailbox, folder, new, count):
             count.mails += 1
             count.documents += await self._mail(
                 session, mailbox, folder, found.uidvalidity, info, count
             )
+
+    async def _due(
+        self,
+        session: MailSession,
+        mailbox: Mailbox,
+        folder: str,
+        new: list[int],
+        count: _Count,
+    ) -> list[MailInfo]:
+        """The mails of `new` (not fetched before) this run takes: at most the room `MAX_PER_RUN`
+        leaves; the rest waits for the next run, which comes at once. A mailbox that starts with
+        its setup leaves out the mails of that day that came before it; they get no record, so
+        the server lists them every time, and they are looked at before the room is cut: else
+        they would fill it on every run and, with more of them than the room, keep the newer
+        mails out for good."""
+        room = MAX_PER_RUN - count.mails
+        if mailbox.start is FetchStart.SINCE_SETUP:
+            infos = [
+                info
+                for info in await session.info(folder, new)
+                if info.arrived_at >= mailbox.created_at
+            ]
+            if len(infos) > room:
+                count.more = True
+                infos = infos[:room]
+            return infos
+        if len(new) > room:
+            count.more = True
+            new = new[:room]
+        return await session.info(folder, new)
 
     async def _mail(
         self,
