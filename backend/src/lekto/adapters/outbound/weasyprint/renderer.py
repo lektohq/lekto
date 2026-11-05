@@ -12,7 +12,7 @@ from typing import Any
 from lekto.adapters.outbound.system import run_process
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.mail_intake import Letter
-from lekto.core.domain.mail_message import Address, MailMessage, MailPart, read_mail
+from lekto.core.domain.mail_message import MailMessage, MailPart, address_line, read_mail
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.mail_renderer import RenderedMail
 
@@ -139,9 +139,9 @@ def page_of(message: MailMessage, locale: str) -> str:
 def _head(message: MailMessage, labels: dict[str, str]) -> str:
     letter = Letter(message)
     rows = [
-        ("from", _people(message.sender)),
-        ("to", _people(message.to)),
-        ("cc", _people(message.cc)),
+        ("from", address_line(message.sender)),
+        ("to", address_line(message.to)),
+        ("cc", address_line(message.cc)),
         ("date", "" if message.date is None else message.date.strftime(labels["moment"])),
         ("attachments", ", ".join(_names(letter.taken))),
         ("left", ", ".join(_names(letter.left))),
@@ -173,10 +173,6 @@ def _content(message: MailMessage) -> tuple[str, str]:
         body = found[1] if found else _HEAD.sub("", source)
         return styles, f'<div class="lekto-mail">{body}</div>'
     return "", f'<pre class="lekto-text">{html.escape(message.text or "")}</pre>'
-
-
-def _people(addresses: tuple[Address, ...]) -> str:
-    return ", ".join(address.shown for address in addresses)
 
 
 def _names(parts: tuple[MailPart, ...]) -> list[str]:

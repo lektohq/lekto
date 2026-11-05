@@ -6,7 +6,7 @@ import re
 from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from enum import Enum, StrEnum
+from enum import StrEnum
 from pathlib import PurePath
 from typing import Self
 
@@ -99,12 +99,9 @@ class Channel(StrEnum):
     MAIL = "mail"  # fetched from a mailbox
 
 
-class Unset(Enum):
-    UNSET = "unset"
-
-
-UNSET = Unset.UNSET
-"""Marks a field of DocumentChanges that is left as it is."""
+# `UNSET` marks a field of DocumentChanges that is left as it is (`domain.changes`).
+from lekto.core.domain.changes import UNSET as UNSET  # noqa: E402
+from lekto.core.domain.changes import Unset as Unset  # noqa: E402
 
 
 @dataclass(frozen=True, kw_only=True)

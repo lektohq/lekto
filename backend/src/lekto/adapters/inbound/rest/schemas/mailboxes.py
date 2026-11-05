@@ -9,13 +9,16 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.schemas import ReasonOut
+from lekto.core.domain.changes import UNSET
 from lekto.core.domain.ids import DocumentTypeId, UserId
 from lekto.core.domain.mail import (
+    MAX_FOLDER,
     MAX_FOLDERS,
+    MAX_HOST,
     MAX_INTERVAL,
     MAX_NAME,
+    MAX_USERNAME,
     MIN_INTERVAL,
-    UNSET,
     Fallback,
     FetchStart,
     Mailbox,
@@ -24,9 +27,6 @@ from lekto.core.domain.mail import (
 )
 from lekto.core.services.mailboxes import MAX_PASSWORD, ConnectionTest
 
-MAX_HOST = 255
-MAX_USERNAME = 320
-MAX_FOLDER = 1000
 _MINUTE = timedelta(minutes=1)
 
 SECURITY_HELP = (

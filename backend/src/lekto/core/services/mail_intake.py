@@ -56,7 +56,7 @@ from lekto.core.domain.mail_intake import (
     mail_limit,
     taken_names,
 )
-from lekto.core.domain.mail_message import MailMessage, read_mail
+from lekto.core.domain.mail_message import MailMessage, address_line, read_mail
 from lekto.core.domain.mail_rules import MailFacts, MailRule, first_match, mail_facts
 from lekto.core.domain.mail_traits import MailMarks
 from lekto.core.domain.permissions import can_file_into
@@ -353,7 +353,7 @@ class MailIntakeService:
         record = replace(
             record,
             message_id=message.message_id,
-            sender=", ".join(address.shown for address in message.sender),
+            sender=address_line(message.sender),
             subject=message.subject,
             sent_at=message.date,
             senders=facts.senders,
@@ -611,7 +611,7 @@ def _named(record: MailRecord, head: bytes | None) -> MailRecord:
     return replace(
         record,
         message_id=message.message_id,
-        sender=", ".join(address.shown for address in message.sender),
+        sender=address_line(message.sender),
         subject=message.subject,
         sent_at=message.date,
     )
