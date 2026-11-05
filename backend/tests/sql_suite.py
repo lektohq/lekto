@@ -3467,25 +3467,7 @@ class MigrationSuite:
         await _insert(
             empty_database,
             [
-                (
-                    t.mailboxes,
-                    {
-                        "id": mailbox,
-                        "name": "Home",
-                        "name_key": "home",
-                        "host": "imap.example.test",
-                        "port": 993,
-                        "security": "tls",
-                        "username": "home",
-                        "password": b"x",
-                        "folders": ["INBOX"],
-                        "interval_seconds": 300,
-                        "start": "since_setup",
-                        "fallback": "nothing",
-                        "mails": 0,
-                        "documents": 0,
-                    },
-                ),
+                (t.mailboxes, _MAILBOX | {"id": mailbox}),
                 (
                     old,
                     rule
@@ -3502,8 +3484,17 @@ class MigrationSuite:
                 (old, rule | {"id": every, "name": "Every", "any": False, "conditions": []}),
             ],
         )
-        await migrate(empty_database)
-        rules = t.mail_rules
+        await migrate(empty_database, "0062")
+        rules = sa.table(  # as revision 0062 left it
+            "mail_rules",
+            sa.column("id", sa.Uuid()),
+            sa.column("mailbox_id", sa.Uuid()),
+            *(sa.column(name) for name in ("name", "priority", "parts", "after", "enabled")),
+            sa.column("conditions", json_type()),
+            sa.column("created_at", UtcDateTime()),
+            sa.column("updated_at", UtcDateTime()),
+            sa.column("version", sa.Integer()),
+        )
 
         async def trees() -> dict[Any, Any]:
             async with empty_database.reading() as connection:
@@ -3541,6 +3532,73 @@ class MigrationSuite:
                 True,
                 [sender, {"field": "attachments", "op": "present", "value": None}],
             ),
+        ]
+
+    async def test_mail_rules_get_steps_with_revision_0064_and_back(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0064: a mail rule's one action becomes its list of steps (`nothing` none,
+        `move` with its folder); the downgrade takes the last step that was an action before."""
+        await migrate(empty_database, "0063")
+        mailbox = new_id()
+        before = sa.table(
+            "mail_rules",
+            sa.column("id", sa.Uuid()),
+            sa.column("mailbox_id", sa.Uuid()),
+            *(sa.column(name) for name in ("name", "priority", "parts", "after", "move_to")),
+            sa.column("enabled", sa.Boolean()),
+            sa.column("created_at", UtcDateTime()),
+            sa.column("updated_at", UtcDateTime()),
+            sa.column("version", sa.Integer()),
+        )
+        ids = {after: new_id() for after in ("nothing", "read", "move", "trash")}
+        rule = {"mailbox_id": mailbox, "parts": "all", "priority": 1}
+        await _insert(
+            empty_database,
+            [
+                (t.mailboxes, _MAILBOX | {"id": mailbox}),
+                *(
+                    (
+                        before,
+                        rule
+                        | {
+                            "id": id_,
+                            "name": after,
+                            "after": after,
+                            "move_to": "Erledigt" if after == "move" else None,
+                        },
+                    )
+                    for after, id_ in ids.items()
+                ),
+            ],
+        )
+        await migrate(empty_database)
+        rules = t.mail_rules
+        async with empty_database.reading() as connection:
+            steps = dict(await _read_all(connection, select(rules.c.name, rules.c.steps)))
+        assert steps == {
+            "nothing": [],
+            "read": [{"action": "read"}],
+            "move": [{"action": "move", "value": "Erledigt"}],
+            "trash": [{"action": "trash"}],
+        }
+        async with empty_database.writing() as connection:
+            await connection.execute(
+                sa.update(rules)
+                .where(rules.c.id == ids["read"])
+                .values(steps=[{"action": "flag", "value": "red"}, {"action": "read"}])
+            )
+
+        await downgrade(empty_database, "0063")
+        async with empty_database.reading() as connection:
+            rows = await _read_all(
+                connection, select(before.c.name, before.c.after, before.c.move_to)
+            )
+        assert sorted(rows) == [
+            ("move", "move", "Erledigt"),
+            ("nothing", "nothing", None),
+            ("read", "read", None),
+            ("trash", "trash", None),
         ]
 
     async def test_migrations_match_the_table_definitions(
@@ -3600,6 +3658,21 @@ _OLD = {
         sa.column("kind", sa.Text()),
         sa.column("value_text", sa.Text()),
     ),
+}
+_MAILBOX: dict[str, Any] = {
+    "name": "Home",
+    "name_key": "home",
+    "host": "imap.example.test",
+    "port": 993,
+    "security": "tls",
+    "username": "home",
+    "password": b"x",
+    "folders": ["INBOX"],
+    "interval_seconds": 300,
+    "start": "since_setup",
+    "fallback": "nothing",
+    "mails": 0,
+    "documents": 0,
 }
 _SIGNALS = ("signal_llm", "signal_classifier", "signal_neighbours", "signal_facts")
 _OK_UP_TO_CLASSIFY = {"receive": "ok", "ocr": "ok", "parse": "ok", "classify": "ok"}

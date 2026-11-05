@@ -46,6 +46,7 @@ class MemoryMailAccount:
     security: MailSecurity
     boxes: dict[str, MemoryFolder] = field(default_factory=lambda: {"INBOX": MemoryFolder(1)})
     own_keywords: bool = True  # whether it stores keywords of Lekto's own
+    known: set[str] = field(default_factory=set)  # every keyword its mails had, as FLAGS keeps
 
     def add_folders(self, *names: str) -> None:
         for name in names:
@@ -66,12 +67,12 @@ class MemoryMailAccount:
         uid = box.next_uid
         box.next_uid += 1
         box.mails.append(MemoryMail(uid, data, arrived_at.astimezone(UTC), seen, set(flags)))
+        self.known.update(flags)
         return uid
 
     def keywords(self, folder: str) -> tuple[str, ...]:
-        """The keywords the mails of `folder` carry, as a server's FLAGS would list them."""
-        box = self.boxes.get(folder)
-        return shown_keywords(flag for mail in box.mails for flag in mail.flags) if box else ()
+        """The keywords the account's mails had, as a server's FLAGS would list them."""
+        return shown_keywords(self.known) if folder in self.boxes else ()
 
 
 class MemoryMailServer:
@@ -159,10 +160,28 @@ class MemoryMailSession:
         end = mail.data.replace(b"\r\n", b"\n").find(b"\n\n")
         return mail.data if end < 0 else mail.data.replace(b"\r\n", b"\n")[: end + 1]
 
-    async def mark_read(self, folder: str, uid: int) -> None:
+    async def mark(
+        self, folder: str, uid: int, *, add: Sequence[str] = (), remove: Sequence[str] = ()
+    ) -> None:
         mail = self._mail(folder, uid)
-        if mail is not None:
-            mail.seen = True
+        if mail is None:
+            return
+        own = [name for name in add if not name.startswith("\\")]
+        if own and not self._account.own_keywords:
+            raise MailServerError(
+                because(ReasonCode.MAIL_SERVER_ERROR, detail="keywords are not stored")
+            )
+        for name in add:
+            if name.casefold() == SEEN.casefold():
+                mail.seen = True
+            else:
+                mail.flags.add(name)
+                self._account.known.add(name)
+        for name in remove:
+            if name.casefold() == SEEN.casefold():
+                mail.seen = False
+            else:
+                mail.flags = {flag for flag in mail.flags if flag.casefold() != name.casefold()}
 
     async def move(self, folder: str, uid: int, target: str) -> None:
         self._box(target)

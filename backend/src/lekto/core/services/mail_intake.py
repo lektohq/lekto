@@ -42,6 +42,7 @@ from lekto.core.domain.mail import (
     MailboxStatus,
     MailLogin,
     password_context,
+    step_flags,
 )
 from lekto.core.domain.mail_intake import (
     Letter,
@@ -105,6 +106,7 @@ class _Count:
     documents: int = 0
     more: bool = False  # mails were left for the next run
     skipped: Reason | None = None  # the latest mail left out, too large
+    step_failed: Reason | None = None  # the latest step on a mail the server refused
     keywords: set[str] = field(default_factory=set)  # those the folders know
     own_keywords: bool | None = None  # whether the server stores Lekto's own (in every folder)
 
@@ -225,6 +227,10 @@ class MailIntakeService:
                             documents=status.documents + count.documents,
                             skipped_at=started if count.skipped else status.skipped_at,
                             skipped=count.skipped or status.skipped,
+                            step_failed_at=(
+                                started if count.step_failed else status.step_failed_at
+                            ),
+                            step_failed=count.step_failed or status.step_failed,
                             keywords=(
                                 status.keywords
                                 if error
@@ -354,7 +360,7 @@ class MailIntakeService:
             return 0
         outcome = MailOutcome.TAKEN if made else MailOutcome.NOTHING
         await self._keep(replace(record, outcome=outcome, rule=decision.rule, documents=made))
-        await self._after(session, folder, info.uid, decision)
+        await self._after(session, folder, info.uid, decision, record.subject, count)
         return made
 
     async def _decide(self, mailbox: Mailbox, facts: MailFacts) -> MailDecision | None:
@@ -521,18 +527,52 @@ class MailIntakeService:
             await uow.commit()
 
     async def _after(
-        self, session: MailSession, folder: str, uid: int, decision: MailDecision
+        self,
+        session: MailSession,
+        folder: str,
+        uid: int,
+        decision: MailDecision,
+        subject: str,
+        count: _Count,
     ) -> None:
-        """What the decision does to the mail on the server; a failure there is logged only."""
-        try:
-            if decision.after is MailAction.READ:
-                await session.mark_read(folder, uid)
-            elif decision.after is MailAction.TRASH:
-                await session.trash(folder, uid)
-            elif decision.after is MailAction.MOVE and decision.move_to:
-                await session.move(folder, uid, decision.move_to)
-        except MailServerError as error:
-            log.warning("the action on a mail failed", extra={"reason": error.reason.text})
+        """The decision's steps on the mail on the server, in order. A step the server refuses
+        (a keyword where it stores none) is noted at the mailbox, the next ones go on; the
+        mail stays taken."""
+        for step in decision.after:
+            try:
+                match step.action:
+                    case MailAction.MOVE:
+                        await session.move(folder, uid, str(step.value))
+                    case MailAction.TRASH:
+                        await session.trash(folder, uid)
+                    case _:
+                        await _mark(session, folder, uid, *step_flags(step))
+            except MailServerError as error:
+                log.warning("a step on a mail failed", extra={"reason": error.reason.text})
+                count.step_failed = because(
+                    ReasonCode.MAIL_STEP_FAILED,
+                    step=f"mail_step:{step.action.value}",
+                    subject=subject,
+                    detail=error.reason.text,
+                )
+
+
+async def _mark(
+    session: MailSession, folder: str, uid: int, add: tuple[str, ...], remove: tuple[str, ...]
+) -> None:
+    """System flags first, keywords apart: a server that stores no keywords of its own still
+    takes `\\Flagged` and `\\Seen` (a flag without its colour) before it refuses the rest."""
+
+    def system(names: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(name for name in names if name.startswith("\\"))
+
+    def own(names: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(name for name in names if not name.startswith("\\"))
+
+    if system(add) or system(remove):
+        await session.mark(folder, uid, add=system(add), remove=system(remove))
+    if own(add) or own(remove):
+        await session.mark(folder, uid, add=own(add), remove=own(remove))
 
 
 def _named(record: MailRecord, head: bytes | None) -> MailRecord:

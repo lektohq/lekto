@@ -42,8 +42,13 @@ class ImapMailSession:
     async def head(self, folder: str, uid: int) -> bytes | None:
         return await self._call(self._fetch, folder, uid, "(BODY.PEEK[HEADER])")
 
-    async def mark_read(self, folder: str, uid: int) -> None:
-        await self._call(self._store, folder, uid, "+FLAGS", "(\\Seen)")
+    async def mark(
+        self, folder: str, uid: int, *, add: Sequence[str] = (), remove: Sequence[str] = ()
+    ) -> None:
+        if add:
+            await self._call(self._store, folder, uid, "+FLAGS", f"({' '.join(add)})")
+        if remove:
+            await self._call(self._store, folder, uid, "-FLAGS", f"({' '.join(remove)})")
 
     async def move(self, folder: str, uid: int, target: str) -> None:
         await self._call(self._move, folder, uid, target)

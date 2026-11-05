@@ -429,6 +429,7 @@ class ReasonCode(StrEnum):
     MAIL_PASSWORD_UNREADABLE = "mail_password_unreadable"
     MAILBOX_PAUSED = "mailbox_paused"
     MAIL_TOO_LARGE = "mail_too_large"
+    MAIL_STEP_FAILED = "mail_step_failed"
     MAIL_RULE_PERSON_GONE = "mail_rule_person_gone"
     MAIL_RULE_SPACE_UNREACHABLE = "mail_rule_space_unreachable"
     MAIL_RULE_TYPE_GONE = "mail_rule_type_gone"
@@ -968,6 +969,9 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.MAIL_TOO_LARGE: (
         "the mail '{subject}' has {size:number} MB; Lekto fetches mails of up to {max:number} MB "
         "(LEKTO_UPLOAD_MAX_SIZE)"
+    ),
+    ReasonCode.MAIL_STEP_FAILED: (
+        "on the server, '{step:thing}' failed for the mail '{subject}': {detail}"
     ),
     ReasonCode.MAIL_RULE_PERSON_GONE: "the person it takes mails for is deleted or deactivated",
     ReasonCode.MAIL_RULE_SPACE_UNREACHABLE: (
