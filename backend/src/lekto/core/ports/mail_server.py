@@ -18,6 +18,9 @@ from lekto.core.domain.errors import DomainError
 from lekto.core.domain.mail import MailLogin
 from lekto.core.domain.reasons import Reason
 
+TRASH_NAMES = ("Trash", "Papierkorb", "Deleted Messages", "Deleted Items", "INBOX.Trash")
+"""The names clients give the trash folder, looked for where the server flags none `\\Trash`."""
+
 
 class MailServerError(DomainError):
     """The mail server could not do what was asked; `reason` says why (`MAIL_...`)."""

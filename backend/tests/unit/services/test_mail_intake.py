@@ -486,6 +486,8 @@ async def test_the_first_matching_rule_takes_a_mail(world: World) -> None:
         text_type_id=letter.id,
         after=(MailStep(MailAction.READ),),
     )
+    account = world.mail_server.servers[(LOGIN.host, LOGIN.port)][LOGIN.username]
+    account.add_folders("Trash")
     _deliver(world, mails.plain_mail("Unser Newsletter"))
     _deliver(world, mails.plain_mail("Ihre Rechnung"))
     await _fetch(world, world.mail_intake())
@@ -500,7 +502,6 @@ async def test_the_first_matching_rule_takes_a_mail(world: World) -> None:
         (MailOutcome.TAKEN, "Strom"),
     ]
     assert origin is not None and (origin.rule, origin.body_type_id) == ("Strom", letter.id)
-    account = world.mail_server.servers[(LOGIN.host, LOGIN.port)][LOGIN.username]
     assert [mail.seen for mail in account.boxes["INBOX"].mails] == [True]  # read; the other gone
     assert len(account.boxes["Trash"].mails) == 1
 
