@@ -332,8 +332,7 @@ Two components that **look different on purpose**:
   parts of a long dialog under its title: a contact's, an account's), which
   part of a list shows (the open identifiers by source, the identifiers at contacts by source, the tags by kind, the jobs by state, the
   deliveries by outcome; with counts), and in a form a choice among two or
-  three short options that changes what follows (a webhook's trigger and body, which mails a
-  mailbox takes). A grey bar with
+  three short options that changes what follows (a webhook's trigger and body). A grey bar with
   the choice on a light pill that slides over (`motion-safe`, not on first show). Sizes: `md`
   40 px, `sm` 32 px; 44 px on the phone. With icons only (`names="hidden"`) every option has a label for its tooltip.
   Where it is wider than the room (a phone, five options with counts), it scrolls sideways as the
@@ -740,10 +739,12 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
     the stored one; it is never shown); "Verbindung testen" (`outline`) with what it found in a
     line beside it (`role="status"`). A stored mailbox that is not paused has "Jetzt abrufen"
     (`outline`, `RefreshCw`) beside the test; a toast says the fetch is asked for.
-  - **Abruf:** the folders as a `MultiPicker` of what the test found and what is chosen; how
-    often ("Wie oft", `Select`) and what a mail without a rule brings in (`Select`: "Nichts
-    übernehmen" or "Alles für" a person) side by side; which mails as a `Segmented` of three with
-    a `DateInput` for "Ab Datum" and a line under it; the type of the mail text (`SearchSelect`).
+  - **Abruf:** the folders as a `MultiPicker` of what the test found and what is chosen; then
+    two rows of two: how often ("Wie oft", `Select`) and what a mail without a rule brings in
+    (`Select`: "Nichts übernehmen" or "Alles für" a person); which mails and the type of the mail
+    text (`SearchSelect`). Which mails is one `Select` (Tobi, 05.11.2026): "Ab Einrichtung
+    (<day>)" ("Ab heute" for a new mailbox), "Ab einem Datum …" with a `DateInput` under it, "Alle
+    ungelesenen, egal wie alt"; what each means is in its `HintLabel`, no line under it.
   - A new mailbox opens at "Verbindung" and goes on to "Abruf" once a test found the folders.
     Deleting is in the footer.
 - **The origin of a document** (mock C): a document a mail brought shows the card "Herkunft" in
