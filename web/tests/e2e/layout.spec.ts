@@ -14,6 +14,8 @@ const PATHS = [
 	'/ui/spaces',
 	'/ui/rules',
 	'/ui/rules/new',
+	'/ui/rules?kind=mail',
+	'/ui/rules/mail/new',
 	'/ui/webhooks',
 	'/ui/webhooks/new',
 	'/ui/system',

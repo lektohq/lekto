@@ -480,6 +480,13 @@ avatar a dashed circle. Where all rows belong to one contact (the contact dialog
 grouped by kind. Above them the source (`Segmented`), then search, help and adding as one group
 that wraps as a whole under it where the row is narrow (a dialog), never the button alone.
 
+**Detail list** (`DetailList`, Tobi 05.11.2026): a few facts of one thing, each a label and a
+value, where a table would be too much: the origin of a mail (`OriginCard`), what a file says of
+itself (`DocumentFiles`). A `<dl>` as a grid: the labels in a column of 7.5 rem,
+`text-muted-foreground`, the values beside them breaking where they must (`break-words`),
+`text-sm`, `gap-x-3 gap-y-1.5`. A fact without a value is left out, not shown empty. The card
+around it gives the padding (`px-1 pb-1` in a `sm` card, `px-4 pb-4` otherwise).
+
 ### Tables
 
 `ui/table` only. The head is `text-xs font-medium text-muted-foreground`. Numbers align right with
@@ -731,7 +738,8 @@ The page "System" has a tab "Eingangskanäle" for admins only (Tobi, 04.11.2026)
 not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Postfach anlegen"
 (`default`) at its end, then the mailboxes as cards in a column (see [Lists](#lists)):
 
-- **The row of a mailbox:** its name opens its dialog (there is no detail page), beside it the
+- **The row of a mailbox:** its name opens its dialog (there is no detail page; `?mailbox=<id>`
+  in the address opens it too, for a link from the mail rules), beside it the
   state of its fetches as a `Badge`: "Abruf in Ordnung" (`green`, `CircleCheck`), "Abruf gestört"
   (`red`, `OctagonX`) or "Noch nicht abgerufen" (`muted`, no icon). Below: server · folders ·
   interval · the last fetch · counts, and the reason of a failure as a line in `destructive`; a
@@ -763,10 +771,14 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
 - **Mail rules** (mock D, E; Tobi, 05.11.2026: no special case beside the document rules): the
   page "Regeln" has for admins a `Segmented` "Dokumente | Mails" with counts above its list
   (`?kind=mail`); others see the document rules alone. Mails: one section per mailbox, its title
-  "Postfach „…“" with "Postfach ansehen" at its end, its rules as cards in a column in the order
-  they are asked (the name opens the rule's page; below it priority · conditions → what it does;
-  a paused one says why), and under them the mailbox's fallback with "Am Postfach ändern".
-  "Neue Regel" makes a mail rule there. A mail rule goes the document rules' way: its page (the
+  "Postfach „…“" with "Postfach ansehen" (a text link that opens the mailbox's dialog,
+  `/system?tab=intake&mailbox=<id>`) and "Neue Regel" (`outline`, `sm`: a mail rule for this
+  mailbox; Tobi, 05.11.2026) at its end, its rules as cards in a column in the order they are
+  asked (the name opens the rule's page; below it priority · conditions → what it does; a paused
+  one says why), and under them the mailbox's fallback with "Am Postfach ändern". The page's
+  "Neue Regel" makes a mail rule for the first mailbox. A row of a rule, the head of its page and
+  the group of a dry run are the same parts for both kinds (`RuleListRow`, `RuleHeader`,
+  `DryRunGroup`). A mail rule goes the document rules' way: its page (the
   switch, "Bearbeiten", "Probelauf", delete in the head; mailbox and priority below; the rule to
   read as `RuleView` shows one), its editor (`…/edit`), saving switched off ("Speichern und
   Probelauf") into its dry run (`…/apply?saved=1`), which switches it on.

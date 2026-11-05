@@ -18,20 +18,32 @@ import sqlalchemy as sa
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import Connection, insert, inspect, select
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from lekto.adapters.outbound.memory import ManualClock, MemoryObjectStore
 from lekto.adapters.outbound.sql import Database, SqlUnitOfWorkFactory, migrate, schema_state
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.migrations import downgrade
+from lekto.adapters.outbound.sql.migrations.versions import v0067_json_empty_as_null as v0067
 from lekto.adapters.outbound.sql.types import UtcDateTime, json_type
+from lekto.core.domain.condition_tree import Group
 from lekto.core.domain.documents import Document, DocumentChanges
-from lekto.core.domain.errors import ConflictError, DuplicateDocumentError
+from lekto.core.domain.errors import ConflictError, DuplicateDocumentError, ValidationError
 from lekto.core.domain.events import DomainEvent
 from lekto.core.domain.fields import FieldDefinition, FieldType, Money
 from lekto.core.domain.ids import DocumentTypeId, RuleId, UserId, new_id
 from lekto.core.domain.jobs import Job
+from lekto.core.domain.mail import MailAction, MailStep
+from lekto.core.domain.mail_rules import (
+    MailCondition,
+    MailField,
+    MailOperator,
+    MailRule,
+    MailRuleChanges,
+)
 from lekto.core.domain.pipeline import NODES, Node
+from lekto.core.domain.reasons import ReasonCode
 from lekto.core.domain.rules import ForceReview, RuleScope
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.templates import TemplateValue
@@ -39,8 +51,9 @@ from lekto.core.domain.users import User
 from lekto.core.ports.event_bus import EventBus
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from tests import builders
-from tests.builders import NOW, PlaceholderNode, incoming
+from tests.builders import HOUR, NOW, PlaceholderNode, incoming
 from tests.contracts.event_bus import EventBusFactory, Recorder, publish, received
+from tests.contracts.mail_records import a_mailbox
 from tests.contracts.unit_of_work import owner_with_space
 from tests.service_suite import ServicesOverPersistence
 
@@ -111,6 +124,106 @@ class SqlAdapterSuite(ServicesOverPersistence):
                 assert await uow.jobs.claim(now=now, lease=LEASE) is None
                 await uow.commit()
         assert claimed == times
+
+    # --- mail rules -----------------------------------------------------------------------------
+
+    async def test_a_mail_rule_that_cannot_be_read_comes_paused(
+        self, database: Database, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """A stored rule whose conditions or steps cannot be read any more (a limit tightened
+        without a revision) comes paused with the reason, without them, next to the readable
+        rules; it takes a change only with both anew, and then reads as stored."""
+        mailbox = await a_mailbox(uow_factory)
+        person = UserId(new_id())
+        condition = MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Rechnung")
+
+        def rule(name: str, priority: int) -> MailRule:
+            return MailRule.create(
+                mailbox_id=mailbox.id,
+                changes=MailRuleChanges(
+                    name=name,
+                    priority=priority,
+                    user_id=person,
+                    conditions=Group(mode="all", items=(condition,)),
+                    after=(MailStep(MailAction.READ),),
+                ),
+                now=NOW,
+            )
+
+        bad_tree, bad_step, good = rule("Tree", 3), rule("Step", 2), rule("Good", 1)
+        async with uow_factory() as uow:
+            for item in (bad_tree, bad_step, good):
+                await uow.mail_rules.add(item)
+            await uow.commit()
+        async with database.writing() as connection:
+            rules = t.mail_rules
+            await connection.execute(
+                sa.update(rules)
+                .where(rules.c.id == bad_tree.id)
+                .values(conditions={"all": [{"field": "subject", "op": "nope", "value": "x"}]})
+            )
+            await connection.execute(
+                sa.update(rules).where(rules.c.id == bad_step.id).values(steps=[{"action": "nope"}])
+            )
+
+        async with uow_factory() as uow:
+            listed = await uow.mail_rules.of_mailbox(mailbox.id)
+            stored = {item.name: item for item in listed}
+        assert [item.name for item in listed] == ["Tree", "Step", "Good"]
+        for name, place in (("Tree", "conditions.all[0]"), ("Step", "after[0]")):
+            paused = stored[name]
+            assert (paused.enabled, paused.conditions, paused.after) == (False, None, ())
+            assert paused.disabled_reason is not None
+            assert paused.disabled_reason.code is ReasonCode.MAIL_RULE_UNREADABLE
+            assert place in str(paused.disabled_reason.params["detail"])
+        assert stored["Good"].enabled and stored["Good"].conditions is not None
+
+        with pytest.raises(ValidationError, match="anew"):
+            stored["Tree"].change(MailRuleChanges(name="Gas"), now=NOW + HOUR)
+        async with uow_factory() as uow:
+            fixed = await uow.mail_rules.get(bad_tree.id)
+            fixed.change(
+                MailRuleChanges(conditions=None, after=(MailStep(MailAction.TRASH),)),
+                now=NOW + HOUR,
+            )
+            await uow.mail_rules.update(fixed)
+            await uow.commit()
+        async with uow_factory() as uow:
+            read = await uow.mail_rules.get(bad_tree.id)
+        assert (read.enabled, read.disabled_reason) == (False, None)
+        assert (read.conditions, read.after) == (None, (MailStep(MailAction.TRASH),))
+
+    async def test_an_empty_json_value_is_sql_null(
+        self, database: Database, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """What a repository writes as `None` into a JSON column is SQL NULL, which `IS NULL`
+        finds (revision 0067), not the JSON `null`."""
+        mailbox = await a_mailbox(uow_factory)
+        rule = MailRule.create(
+            mailbox_id=mailbox.id,
+            changes=MailRuleChanges(name="Every", user_id=UserId(new_id())),
+            now=NOW,
+        )
+        async with uow_factory() as uow:
+            await uow.mail_rules.add(rule)
+            await uow.commit()
+        rules, boxes = t.mail_rules, t.mailboxes
+        async with database.reading() as connection:
+            found = await _read_all(
+                connection,
+                select(rules.c.id).where(
+                    rules.c.conditions.is_(None), rules.c.disabled_reason.is_(None)
+                ),
+            )
+            found += await _read_all(
+                connection,
+                select(boxes.c.id).where(
+                    boxes.c.error.is_(None),
+                    boxes.c.skipped.is_(None),
+                    boxes.c.step_failed.is_(None),
+                ),
+            )
+        assert found == [(rule.id,), (mailbox.id,)]
 
     # --- concurrency ----------------------------------------------------------------------------
 
@@ -3600,6 +3713,90 @@ class MigrationSuite:
             ("read", "read", None),
             ("trash", "trash", None),
         ]
+        if empty_database.sqlite_path is None:  # SQLite keeps the default the fill needed
+            async with empty_database.reading() as connection:
+                columns = await connection.run_sync(
+                    lambda sync: {
+                        item["name"]: item["default"]
+                        for item in sa.inspect(sync).get_columns("mail_rules")
+                    }
+                )
+            assert columns["after"] is None
+
+    async def test_revision_0067_turns_the_json_null_into_null(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0067: the JSON `null` the column type wrote for an empty value becomes SQL
+        NULL in every JSON column that may be empty, which the type writes from then on; the
+        downgrade leaves it. The revision names every such column of its schema."""
+        await migrate(empty_database, "0066")
+
+        def nullable_json(sync: Connection) -> set[tuple[str, str]]:
+            inspector = inspect(sync)
+            return {
+                (table, column["name"])
+                for table in inspector.get_table_names()
+                for column in inspector.get_columns(table)
+                if isinstance(column["type"], sa.JSON) and column["nullable"]
+            }
+
+        async with empty_database.reading() as connection:
+            assert await connection.run_sync(nullable_json) == set(v0067.COLUMNS)
+        mailbox, every, some = new_id(), new_id(), new_id()
+        tree = {"all": [{"field": "subject", "op": "contains", "value": "Rechnung"}]}
+        reason = {"code": "mail_rule_type_gone", "params": {}}
+        empty = {"error": None, "skipped": None, "step_failed": None}
+        rule = {"mailbox_id": mailbox, "parts": "all", "priority": 1, "steps": [], "enabled": True}
+        await _insert(
+            empty_database,
+            [
+                (_json_null_before_0067(t.mailboxes), _MAILBOX | empty | {"id": mailbox}),
+                (
+                    _json_null_before_0067(t.mail_rules),
+                    rule
+                    | {"id": every, "name": "every", "conditions": None, "disabled_reason": None},
+                ),
+                (
+                    _json_null_before_0067(t.mail_rules),
+                    rule
+                    | {"id": some, "name": "some", "conditions": tree, "disabled_reason": reason},
+                ),
+            ],
+        )
+        boxes, rules = t.mailboxes, t.mail_rules
+        columns = [
+            boxes.c.error,
+            boxes.c.skipped,
+            boxes.c.step_failed,
+            rules.c.conditions,
+            rules.c.disabled_reason,
+        ]
+
+        async def empties() -> list[tuple[int, int]]:
+            """Per column: the rows with the JSON `null`, the rows with NULL."""
+            async with empty_database.reading() as connection:
+
+                async def count(where: Any) -> int:
+                    return (
+                        await connection.execute(select(sa.func.count()).where(where))
+                    ).scalar_one()
+
+                return [
+                    (await count(sa.cast(column, sa.Text) == "null"), await count(column.is_(None)))
+                    for column in columns
+                ]
+
+        assert await empties() == [(1, 0)] * len(columns)
+        await migrate(empty_database)
+        assert await empties() == [(0, 1)] * len(columns)
+        async with empty_database.reading() as connection:
+            kept = await _read_all(
+                connection,
+                select(rules.c.conditions, rules.c.disabled_reason).where(rules.c.id == some),
+            )
+        assert kept == [(tree, reason)]
+        await downgrade(empty_database, "0066")
+        assert await empties() == [(0, 1)] * len(columns)
 
     async def test_migrations_match_the_table_definitions(
         self, empty_database: Database, model_database: Database
@@ -3711,6 +3908,19 @@ _DEFAULTS: dict[str, Any] = {
     "attempts": 0,
     "releases": 0,
 }
+
+
+def _json_null_before_0067(table: sa.Table) -> sa.TableClause:
+    """`table` with its JSON columns as the type wrote them before revision 0067: a `None` as
+    the JSON `null`."""
+    before = sa.JSON().with_variant(JSONB(), "postgresql")
+    return sa.table(
+        table.name,
+        *(
+            sa.column(column.name, before if isinstance(column.type, sa.JSON) else column.type)
+            for column in table.c
+        ),
+    )
 
 
 async def _insert(

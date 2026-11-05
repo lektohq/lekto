@@ -1,6 +1,6 @@
 <script lang="ts" generics="C extends TreeCondition">
 	import ConditionTree from '#lib/components/rules/ConditionTree.svelte';
-	import { groupHeading, type TreeCondition, type TreeGroup } from '#lib/rules/tree.ts';
+	import { groupHeading, isGroup, type TreeCondition, type TreeGroup } from '#lib/rules/tree.ts';
 
 	// The conditions of a rule of any kind to read (a rule's page, a version): each group with
 	// its heading ("Alle davon", "Keine davon"), its items indented under it. The kind says a
@@ -13,10 +13,10 @@
 	<ul class="flex flex-col gap-1.5 border-l-2 pl-3">
 		{#each group.items as item (item.key)}
 			<li>
-				{#if item.kind === 'group'}
-					<ConditionTree group={item as TreeGroup<C>} {describe} />
+				{#if isGroup(item)}
+					<ConditionTree group={item} {describe} />
 				{:else}
-					{describe(item as C)}
+					{describe(item)}
 				{/if}
 			</li>
 		{/each}

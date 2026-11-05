@@ -31,6 +31,7 @@
 		deleteDescription = '',
 		class: className,
 		size = 'lg',
+		fixed = false,
 		tabs,
 		tab = $bindable(''),
 		children: body
@@ -49,6 +50,8 @@
 		deleteDescription?: string;
 		/** The height of the dialog with tabs. */
 		class?: string;
+		/** One height whatever part shows (web/DESIGN.md, "Dialogs": a dialog with parts keeps one height). */
+		fixed?: boolean;
 		/** The width of the dialog (`Dialog.Content`). */
 		size?: 'md' | 'lg' | 'xl';
 		tabs?: readonly Segment[];
@@ -73,7 +76,7 @@
 			'flex flex-col gap-0 overflow-hidden p-0',
 			phone.current
 				? 'top-0 left-0 h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 bg-background'
-				: cn('max-h-[calc(100dvh-2rem)]', className)
+				: cn('max-h-[calc(100dvh-2rem)]', fixed && 'h-[min(46.25rem,calc(100dvh-2rem))]', className)
 		)}
 	>
 		<AsyncForm class="flex min-h-0 flex-1 flex-col" {action} ondone={() => (open = false)}>

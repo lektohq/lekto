@@ -62,12 +62,15 @@ EMBEDDING_DIMENSIONS = BagOfWordsEmbeddings.DIMENSIONS
 def evaluation_container(run: Run) -> Container:
     """The adapters of a run, all in memory: for the trained one a search index with
     bag-of-words vectors and the scikit-learn classifier."""
-    container = build_memory_container()
+    settings = Settings.model_construct()
+    container = build_memory_container(settings=settings)
     if run is Run.COLD:
         return container
     return replace(
         container,
-        search_index=MemorySearchIndex(dimensions=EMBEDDING_DIMENSIONS),
+        search_index=MemorySearchIndex(
+            dimensions=EMBEDDING_DIMENSIONS, locales=settings.search_locales.split("+")
+        ),
         embeddings=BagOfWordsEmbeddings(dimensions=EMBEDDING_DIMENSIONS),
         classifier=SklearnClassifier(),
     )

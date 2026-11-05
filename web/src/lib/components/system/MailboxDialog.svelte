@@ -7,6 +7,7 @@
 	import DateInput from '#lib/components/DateInput.svelte';
 	import EditorShell from '#lib/components/EditorShell.svelte';
 	import HintLabel from '#lib/components/HintLabel.svelte';
+	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import MultiPicker from '#lib/components/MultiPicker.svelte';
 	import SearchSelect from '#lib/components/SearchSelect.svelte';
 	import Select from '#lib/components/Select.svelte';
@@ -22,6 +23,7 @@
 		folderLabel,
 		formOf,
 		intervalOptions,
+		LIMITS,
 		NOTHING,
 		patchBody,
 		portAfter,
@@ -58,6 +60,7 @@
 	let testing = $state(false);
 	let tested = $state<ConnectionTest | null>(null);
 	let testProblem = $state<string | null>(null);
+	let choicesProblem = $state<string | null>(null);
 	let part = $state<'connection' | 'fetch'>('connection');
 
 	const PARTS = [
@@ -79,14 +82,16 @@
 		void loadChoices();
 	});
 
+	/** The people and types the part "Abruf" chooses from; a failure shows there. */
 	async function loadChoices() {
+		choicesProblem = null;
 		try {
 			[users, types] = await Promise.all([
 				unwrap(api.GET('/api/v1/users')),
 				unwrap(api.GET('/api/v1/document-types'))
 			]);
 		} catch (error) {
-			testProblem = describeError(error);
+			choicesProblem = describeError(error);
 		}
 	}
 
@@ -226,12 +231,12 @@
 	deleteDescription={m.mailbox_delete_description()}
 	tabs={PARTS}
 	bind:tab={() => part, (value) => (part = value as 'connection' | 'fetch')}
-	class="h-[min(46.25rem,calc(100dvh-2rem))]"
+	fixed
 >
 	<div class={['flex flex-col gap-4', part !== 'connection' && 'hidden']}>
 		<Field.Field>
 			<Field.Label for="mailbox-name">{m.field_name()}</Field.Label>
-			<Input id="mailbox-name" bind:value={form.name} maxlength={100} required />
+			<Input id="mailbox-name" bind:value={form.name} maxlength={LIMITS.name} />
 		</Field.Field>
 		<div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_6rem_10rem]">
 			<Field.Field>
@@ -239,7 +244,7 @@
 				<Input
 					id="mailbox-host"
 					bind:value={form.host}
-					maxlength={255}
+					maxlength={LIMITS.host}
 					autocomplete="off"
 					spellcheck={false}
 					placeholder={m.mail_host_placeholder()}
@@ -265,7 +270,7 @@
 				<Input
 					id="mailbox-username"
 					bind:value={form.username}
-					maxlength={320}
+					maxlength={LIMITS.username}
 					autocomplete="off"
 					spellcheck={false}
 				/>
@@ -276,7 +281,7 @@
 					id="mailbox-password"
 					type="password"
 					bind:value={form.password}
-					maxlength={1000}
+					maxlength={LIMITS.password}
 					autocomplete="new-password"
 					placeholder={creating ? undefined : m.mail_password_stored()}
 					aria-describedby={creating ? undefined : 'mailbox-password-note'}
@@ -316,6 +321,9 @@
 		</div>
 	</div>
 	<div class={['flex flex-col gap-4', part !== 'fetch' && 'hidden']}>
+		{#if choicesProblem}
+			<LoadProblem problem={choicesProblem} onretry={loadChoices} />
+		{/if}
 		<Field.Field>
 			<HintLabel id="mailbox-folders-label" label={m.mail_folders()} hint={m.mail_folders_hint()} />
 			<MultiPicker
@@ -325,9 +333,6 @@
 				selected={form.folders}
 				onchange={(chosen) => (form.folders = chosen)}
 			/>
-			{#if !tested}
-				<Field.Description>{m.mail_folders_test_first()}</Field.Description>
-			{/if}
 		</Field.Field>
 		<div class="grid gap-4 sm:grid-cols-2">
 			<Field.Field>

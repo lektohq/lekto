@@ -6,7 +6,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.rest.schemas import groups
 from lekto.adapters.inbound.schemas import ReasonOut
+from lekto.core.domain.changes import UNSET, Unset
 from lekto.core.domain.condition_tree import MAX_CONDITIONS, MAX_DEPTH
 from lekto.core.domain.ids import DocumentTypeId, SpaceId, UserId
 from lekto.core.domain.json_value import JsonValue
@@ -14,14 +16,13 @@ from lekto.core.domain.mail import MAX_FOLDER, MAX_STEPS, MailAction, MailStep
 from lekto.core.domain.mail_intake import MailOutcome, MailParts
 from lekto.core.domain.mail_rules import (
     MAX_PRIORITY,
+    MAX_VALUE,
     MIN_PRIORITY,
-    UNSET,
     MailConditions,
     MailField,
     MailOperator,
     MailRule,
     MailRuleChanges,
-    Unset,
     conditions_from_json,
     conditions_to_json,
 )
@@ -51,12 +52,17 @@ CONDITIONS_HELP = (
 )
 
 
+MAX_CONDITION_VALUE = max(MAX_VALUE, MAX_FOLDER)
+"""A condition's value at most, before the domain checks it by its field (a folder's name may
+be longer than a text)."""
+
+
 class MailConditionBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     field: MailField
     op: MailOperator
-    value: str | None = Field(default=None, max_length=MAX_FOLDER)
+    value: str | None = Field(default=None, max_length=MAX_CONDITION_VALUE)
 
 
 class MailStepBody(BaseModel):
@@ -73,26 +79,10 @@ class MailStepBody(BaseModel):
         return cls(action=step.action, value=step.value)
 
 
-class MailAllGroup(BaseModel):
-    """All items hold (and); `not` turns the result around."""
-
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
-
-    all: list["MailConditionBody | MailAllGroup | MailAnyGroup"] = Field(
-        min_length=1, max_length=MAX_CONDITIONS
-    )
-    negate: bool = Field(default=False, alias="not")
-
-
-class MailAnyGroup(BaseModel):
-    """At least one item holds (or); `not` turns the result around."""
-
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
-
-    any: list["MailConditionBody | MailAllGroup | MailAnyGroup"] = Field(
-        min_length=1, max_length=MAX_CONDITIONS
-    )
-    negate: bool = Field(default=False, alias="not")
+# The tree of conditions, the groups of every kind of rule with this kind's condition.
+MailAllGroup = groups.AllGroup[MailConditionBody]
+MailAnyGroup = groups.AnyGroup[MailConditionBody]
+groups.resolve(MailAllGroup, MailAnyGroup, condition=MailConditionBody)
 
 
 type MailGroup = MailAllGroup | MailAnyGroup
@@ -217,6 +207,7 @@ class MailRuleDryRun(MailRuleCreate):
 class DryRunMailOut(BaseModel):
     """A mail fetched lately, and what would become of it with the rule."""
 
+    id: UUID = Field(description="The record of the mail.")
     subject: str
     sender: str
     folder: str
@@ -229,17 +220,19 @@ class DryRunMailOut(BaseModel):
     matches: bool = Field(description="Whether the rule's conditions hold.")
     decider: Decider = Field(
         description=(
-            "Who would decide it now: `rule` (this one), `other` (another rule before it, named "
-            "in `rule`), `fallback` (the mailbox takes everything), `nothing` (no rule, the "
-            "mailbox takes nothing)."
+            "Who would decide it now: `rule` (this one), `other` (another rule before it: "
+            "`rule`, `rule_id`), `fallback` (the mailbox takes everything), `nothing` (no rule, "
+            "the mailbox takes nothing)."
         )
     )
-    rule: str | None
+    rule: str | None = Field(description="The name of the rule before it; null otherwise.")
+    rule_id: UUID | None = Field(description="The rule before it; null otherwise.")
 
     @classmethod
     def of(cls, item: DryRunMail) -> "DryRunMailOut":
         record = item.record
         return cls(
+            id=record.id,
             subject=record.subject,
             sender=record.sender,
             folder=record.folder,
@@ -250,6 +243,7 @@ class DryRunMailOut(BaseModel):
             matches=item.matches,
             decider=item.decider,
             rule=item.rule,
+            rule_id=item.rule_id,
         )
 
 

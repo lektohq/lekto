@@ -2,6 +2,7 @@
 "E-Mail", sender, recipients, date, subject and attachments, then the HTML or the text. It
 loads nothing from the network or the file system."""
 
+from datetime import timedelta
 from email.message import EmailMessage
 from pathlib import Path
 
@@ -85,3 +86,13 @@ async def test_what_is_not_taken_is_named(tmp_path: Path) -> None:
     assert "Anhänge Vertrag.pdf" in text
     assert "Nicht übernommen x.zip" in text
     assert "logo.png" not in text
+
+
+async def test_a_mail_that_takes_too_long_to_set_is_stopped(tmp_path: Path) -> None:
+    """The child process is killed after the time limit: a mail's HTML comes from anyone."""
+    mail, target = tmp_path / "mail.eml", tmp_path / "mail.pdf"
+    mail.write_bytes(plain_mail())
+    renderer = WeasyPrintMailRenderer("de", timeout=timedelta(milliseconds=20))
+    with pytest.raises(TimeoutError):
+        await renderer.render(mail, target)
+    assert not target.exists()

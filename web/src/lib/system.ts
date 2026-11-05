@@ -19,7 +19,7 @@ export function systemTabs(admin: boolean): readonly SystemTab[] {
 	return admin ? SYSTEM_TABS : SYSTEM_TABS.filter((tab) => !ADMIN_TABS.includes(tab));
 }
 
-export function systemTab(params: Pick<URLSearchParams, 'get'>, admin = true): SystemTab {
+export function systemTab(params: Pick<URLSearchParams, 'get'>, admin: boolean): SystemTab {
 	const tab = params.get('tab') ?? '';
 	const tabs = systemTabs(admin);
 	return (tabs as readonly string[]).includes(tab) ? (tab as SystemTab) : tabs[0];

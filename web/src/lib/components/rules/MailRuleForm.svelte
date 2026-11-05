@@ -17,7 +17,6 @@
 		withStep,
 		canAddCondition,
 		canAddGroup,
-		complete,
 		FIELD_LABELS,
 		firstValue,
 		FIELDS,
@@ -34,8 +33,13 @@
 		type Optional
 	} from '#lib/mail-rules.ts';
 	import { withChoice } from '#lib/components/rules/options.ts';
-	import { flagOptions, importanceOptions, isKeyword, keywordOptions } from '#lib/mail-traits.ts';
-	import { folderLabel, type Mailbox } from '#lib/mailboxes.ts';
+	import {
+		flagOptions,
+		importanceOptions,
+		keywordOptions,
+		typedKeyword
+	} from '#lib/mail-traits.ts';
+	import { folderLabel, LIMITS as MAILBOX_LIMITS, type Mailbox } from '#lib/mailboxes.ts';
 	import {
 		userChoice,
 		type DocumentType,
@@ -43,6 +47,8 @@
 		type UserName
 	} from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
+	import { LIMITS } from '#lib/rules/model.ts';
+	import { move } from '#lib/rules/tree.ts';
 	import { cn } from '#lib/utils.ts';
 
 	// The editor of a mail rule (Tobi, 04.11.2026; mock E), in the frame of the document rule's:
@@ -50,16 +56,19 @@
 	// rule has (`ConditionGroup`: groups of all or any, turned around or not), and
 	// the actions: what it takes and for whom always, a space and the type of the mail's text
 	// where added ("+ Aktion"), and the steps on the mail on the server in order (a move or
-	// the trash last).
+	// the trash last). `errors` are by key as `validate` gives them (name, priority, mailbox,
+	// user, a condition's, a group's or a step's key); `error` is the line above the buttons.
 	let {
 		form,
 		mailboxes,
 		users,
 		spaces,
 		types,
+		errors = {},
 		busy = false,
 		error = null,
 		cancelHref,
+		oncancel,
 		onsubmit
 	}: {
 		form: MailRuleForm;
@@ -67,9 +76,11 @@
 		users: UserName[];
 		spaces: Space[];
 		types: DocumentType[];
+		errors?: Record<string, string>;
 		busy?: boolean;
 		error?: string | null;
 		cancelHref: string;
+		oncancel?: () => void;
 		onsubmit: () => void;
 	} = $props();
 
@@ -83,27 +94,30 @@
 	const addable = $derived(takes ? OPTIONALS.filter((item) => !form.shown.includes(item)) : []);
 	const steps = $derived(addableSteps(form.steps));
 
-	function moveStep(index: number, by: -1 | 1) {
-		const [item] = form.steps.splice(index, 1);
-		form.steps.splice(index + by, 0, item);
-	}
-
 	const people = $derived(
 		users
 			.filter((user) => user.active || user.id === form.userId)
 			.map((user) => ({ value: user.id, label: userChoice(user) }))
 	);
 	/** The person's personal space (empty), and the shared spaces they edit. */
-	const places = $derived([
-		{ value: '', label: m.mail_rule_space_personal() },
-		...spaces
+	const editable = $derived(
+		spaces
 			.filter(
 				(space) =>
 					space.personal_of === null &&
-					(space.id === form.spaceId ||
-						space.members.some((item) => item.user_id === form.userId && item.role === 'edit'))
+					space.members.some((item) => item.user_id === form.userId && item.role === 'edit')
 			)
 			.map((space) => ({ value: space.id, label: space.name }))
+	);
+	// A space the person does not edit (another person was chosen since): kept and named, but
+	// saving needs another choice, as `ActionRow` says it.
+	const unreachable = $derived(
+		form.spaceId !== '' && !editable.some((entry) => entry.value === form.spaceId)
+	);
+	const places = $derived([
+		{ value: '', label: m.mail_rule_space_personal() },
+		...editable,
+		...(unreachable ? [{ value: form.spaceId, label: m.rule_space_unreachable() }] : [])
 	]);
 	const folders = $derived(
 		(mailbox?.folders ?? []).map((name) => ({ value: name, label: folderLabel(name) }))
@@ -121,12 +135,6 @@
 		}
 	}
 
-	/** A keyword of the mailbox's folders, or one typed that IMAP can carry. */
-	async function useKeyword(name: string) {
-		const value = name.trim();
-		return isKeyword(value) ? { value, label: value } : null;
-	}
-
 	function hide(item: Optional) {
 		form.shown = form.shown.filter((entry) => entry !== item);
 	}
@@ -137,13 +145,19 @@
 	novalidate
 	onsubmit={(event) => {
 		event.preventDefault();
-		if (complete(form) && !busy) onsubmit();
+		if (!busy) onsubmit();
 	}}
 >
 	<div class="grid gap-4 sm:grid-cols-[1fr_12rem]">
 		<Field.Field>
 			<Field.Label for="mail-rule-name">{m.field_name()}</Field.Label>
-			<Input id="mail-rule-name" bind:value={form.name} maxlength={200} />
+			<Input
+				id="mail-rule-name"
+				bind:value={form.name}
+				maxlength={LIMITS.name}
+				aria-invalid={errors.name ? true : undefined}
+			/>
+			{#if errors.name}<Field.Error>{errors.name}</Field.Error>{/if}
 		</Field.Field>
 		<Field.Field>
 			<HintLabel
@@ -154,11 +168,13 @@
 			<Input
 				id="mail-rule-priority"
 				type="number"
-				min={0}
-				max={1000}
+				min={LIMITS.priorityMin}
+				max={LIMITS.priorityMax}
 				step={1}
 				bind:value={form.priority}
+				aria-invalid={errors.priority ? true : undefined}
 			/>
+			{#if errors.priority}<Field.Error>{errors.priority}</Field.Error>{/if}
 			<Field.Description>{m.rule_priority_hint()}</Field.Description>
 		</Field.Field>
 	</div>
@@ -169,13 +185,16 @@
 			id="mail-rule-mailbox"
 			bind:value={form.mailboxId}
 			options={mailboxes.map((entry) => ({ value: entry.id, label: entry.name }))}
+			aria-invalid={errors.mailbox ? true : undefined}
 		/>
+		{#if errors.mailbox}<Field.Error>{errors.mailbox}</Field.Error>{/if}
 	</Field.Field>
 
 	<section class="flex flex-col gap-3" aria-labelledby="mail-rule-conditions">
 		<SectionTitle id="mail-rule-conditions">{m.rule_conditions()}</SectionTitle>
 		{#snippet conditionRow(condition: MailConditionNode, moves: RowMoves)}
-			<RuleRow key={condition.key} moves {...moves}>
+			{@const invalid = Boolean(errors[condition.key])}
+			<RuleRow key={condition.key} error={errors[condition.key]} moves {...moves}>
 				<Select
 					aria-label={m.rule_condition_subject()}
 					value={condition.field}
@@ -198,36 +217,41 @@
 					{:else if condition.field === 'folder'}
 						<Select
 							aria-label={m.rule_condition_value()}
+							aria-invalid={invalid || undefined}
 							bind:value={condition.value}
 							options={folders}
 						/>
 					{:else if condition.field === 'importance'}
 						<Select
 							aria-label={m.rule_condition_value()}
+							aria-invalid={invalid || undefined}
 							bind:value={condition.value}
 							options={importanceOptions()}
 						/>
 					{:else if condition.field === 'flag'}
 						<Select
 							aria-label={m.rule_condition_value()}
+							aria-invalid={invalid || undefined}
 							bind:value={condition.value}
 							options={withChoice(flagOptions(), condition.value)}
 						/>
 					{:else if condition.field === 'keyword'}
 						<SearchSelect
 							aria-label={m.rule_condition_value()}
+							aria-invalid={invalid || undefined}
 							title={m.mail_keyword_title()}
 							bind:value={condition.value}
 							options={keywordOptions(mailbox?.status.keywords ?? [], condition.value)}
 							placeholder={m.rule_choose()}
-							create={useKeyword}
+							create={typedKeyword}
 							createLabel={m.mail_keyword_use}
 						/>
 					{:else}
 						<Input
 							aria-label={m.rule_condition_value()}
+							aria-invalid={invalid || undefined}
 							bind:value={condition.value}
-							maxlength={500}
+							maxlength={LIMITS.text}
 						/>
 					{/if}
 				</div>
@@ -236,7 +260,7 @@
 		<ConditionGroup
 			group={form.conditions}
 			root
-			errors={{}}
+			{errors}
 			row={conditionRow}
 			newCondition={() => newCondition()}
 			canAddCondition={canAddCondition(form)}
@@ -259,28 +283,37 @@
 		</RuleRow>
 
 		{#if takes}
-			<RuleRow label={m.mail_rule_action_user()}>
+			<RuleRow label={m.mail_rule_action_user()} error={errors.user}>
 				<div class="flex min-w-0 flex-1 basis-64 flex-col gap-2">
 					<SearchSelect
 						id="mail-rule-user"
+						aria-label={m.mail_rule_action_user()}
+						aria-invalid={errors.user ? true : undefined}
 						title={m.mail_rule_action_user()}
 						bind:value={form.userId}
 						options={people}
-						placeholder={m.value_unset()}
-						noneLabel={m.value_unset()}
+						placeholder={m.rule_choose()}
 					/>
 				</div>
 			</RuleRow>
 		{/if}
 
 		{#if takes && form.shown.includes('space')}
-			<RuleRow label={m.rule_action_set_space()} onremove={() => hide('space')}>
+			<RuleRow
+				label={m.rule_action_set_space()}
+				error={errors.space}
+				onremove={() => hide('space')}
+			>
 				<div class="flex min-w-0 flex-1 basis-64 flex-col gap-2">
 					<Select
 						aria-label={m.rule_action_set_space()}
+						aria-invalid={errors.space ? true : undefined}
 						bind:value={form.spaceId}
 						options={places}
 					/>
+					{#if unreachable}
+						<p class="text-sm text-muted-foreground">{m.rule_space_unreachable_hint()}</p>
+					{/if}
 				</div>
 			</RuleRow>
 		{/if}
@@ -306,36 +339,41 @@
 		{#each form.steps as step, index (step.key)}
 			{@const ends = ENDING.includes(step.action)}
 			{@const last = form.steps.findLastIndex((item) => !ENDING.includes(item.action))}
+			{@const invalid = Boolean(errors[step.key])}
 			<RuleRow
 				label={STEP_LABELS[step.action]()}
+				error={errors[step.key]}
 				moves={!ends}
-				onup={!ends && index > 0 ? () => moveStep(index, -1) : undefined}
-				ondown={!ends && index < last ? () => moveStep(index, 1) : undefined}
+				onup={!ends && index > 0 ? () => move(form.steps, index, -1) : undefined}
+				ondown={!ends && index < last ? () => move(form.steps, index, 1) : undefined}
 				onremove={() => form.steps.splice(index, 1)}
 			>
 				<div class="flex min-w-0 flex-1 basis-64 flex-col gap-2">
 					{#if step.action === 'flag'}
 						<Select
 							aria-label={STEP_LABELS[step.action]()}
+							aria-invalid={invalid || undefined}
 							bind:value={step.value}
 							options={flagOptions()}
 						/>
 					{:else if step.action === 'add_keyword' || step.action === 'remove_keyword'}
 						<SearchSelect
 							aria-label={STEP_LABELS[step.action]()}
+							aria-invalid={invalid || undefined}
 							title={m.mail_keyword_title()}
 							bind:value={step.value}
 							options={keywordOptions(mailbox?.status.keywords ?? [], step.value)}
 							placeholder={m.rule_choose()}
-							create={useKeyword}
+							create={typedKeyword}
 							createLabel={m.mail_keyword_use}
 						/>
 					{:else if step.action === 'move'}
 						<Input
 							aria-label={m.mail_rule_move_to()}
+							aria-invalid={invalid || undefined}
 							placeholder={m.mail_rule_move_to()}
 							bind:value={step.value}
-							maxlength={1000}
+							maxlength={MAILBOX_LIMITS.folder}
 						/>
 					{:else}
 						<span class="sr-only">{m.rule_no_value()}</span>
@@ -379,8 +417,10 @@
 		{#if error}<Field.Error>{error}</Field.Error>{/if}
 		<p class="text-sm text-muted-foreground">{m.rule_save_hint()}</p>
 		<div class="flex flex-wrap justify-end gap-2">
-			<a href={cancelHref} class={cn(buttonVariants({ variant: 'ghost' }))}>{m.cancel()}</a>
-			<Button type="submit" disabled={busy || !complete(form)}>{m.rule_save()}</Button>
+			<a href={cancelHref} class={cn(buttonVariants({ variant: 'ghost' }))} onclick={oncancel}
+				>{m.cancel()}</a
+			>
+			<Button type="submit" disabled={busy}>{m.rule_save()}</Button>
 		</div>
 	</div>
 </form>

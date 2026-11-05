@@ -3,10 +3,13 @@
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
+	import DetailList from '#lib/components/DetailList.svelte';
+	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import { reportError } from '#lib/errors.ts';
-	import { formatDate } from '#lib/i18n.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import { describeError } from '#lib/errors.ts';
+	import { formatMoment } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 
 	type MailOrigin = components['schemas']['MailOriginOut'];
@@ -14,10 +17,14 @@
 
 	// Where the document came from (Tobi, 04.11.2026; mock C): for one a mail brought, the
 	// mailbox, the rule that took it (or the mailbox's fallback), sender, recipients, subject,
-	// when it arrived and who forwarded it. Other documents show no card.
+	// when it arrived and who forwarded it. The card loads as the other cards do (a skeleton,
+	// then its rows; a load error on the card, web/DESIGN.md "States"); a document whose mail
+	// Lekto did not keep shows none.
 	let { documentId }: { documentId: string } = $props();
 
 	let mail = $state<MailOrigin | null>(null);
+	let loading = $state(true);
+	let problem = $state<string | null>(null);
 
 	$effect(() => {
 		const id = documentId;
@@ -26,20 +33,23 @@
 	});
 
 	async function load(id: string) {
+		loading = true;
+		problem = null;
 		try {
 			const origin = await unwrap(
 				api.GET('/api/v1/documents/{id}/origin', { params: { path: { id } } })
 			);
 			if (id === documentId) mail = origin.mail;
 		} catch (error) {
-			reportError(error);
+			if (id === documentId) problem = describeError(error);
+		} finally {
+			if (id === documentId) loading = false;
 		}
 	}
 
 	// What the mail was marked with on the server shows too (Tobi, 05.11.2026).
 	const people = (list: readonly Address[]) =>
 		list.map((item) => (item.name ? `${item.name} <${item.address}>` : item.address)).join(', ');
-	const moment = (value: string) => formatDate(value, { dateStyle: 'medium', timeStyle: 'short' });
 
 	const rows = $derived(
 		mail
@@ -58,7 +68,7 @@
 					],
 					[m.origin_keywords(), (mail.keywords ?? []).join(', ')],
 					[m.origin_flag(), mail.flag ? flagLabel(mail.flag) : ''],
-					[m.origin_received(), moment(mail.arrived_at)],
+					[m.origin_received(), formatMoment(mail.arrived_at)],
 					[m.origin_forwarded(), people(mail.forwarded_by)],
 					[m.origin_file(), mail.role === 'attachment' ? (mail.filename ?? '') : '']
 				].filter(([, value]) => value) as [string, string][])
@@ -66,16 +76,21 @@
 	);
 </script>
 
-{#if mail}
+{#if loading || problem || mail}
 	<Card.Root as="section" size="sm" aria-labelledby="origin-title">
 		<div class="px-1 pb-1">
 			<SectionTitle size="card" id="origin-title">{m.origin_title()}</SectionTitle>
 		</div>
-		<dl class="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 px-1 pb-1 text-sm">
-			{#each rows as [label, value] (label)}
-				<dt class="text-muted-foreground">{label}</dt>
-				<dd class="break-words">{value}</dd>
-			{/each}
-		</dl>
+		{#if loading}
+			<div class="flex flex-col gap-2 px-1 pb-1" aria-hidden="true">
+				<Skeleton class="h-4 w-2/3" />
+				<Skeleton class="h-4 w-1/2" />
+				<Skeleton class="h-4 w-3/4" />
+			</div>
+		{:else if problem}
+			<LoadProblem {problem} onretry={() => void load(documentId)} />
+		{:else}
+			<DetailList {rows} class="px-1 pb-1" />
+		{/if}
 	</Card.Root>
 {/if}

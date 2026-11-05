@@ -458,8 +458,10 @@ def build_container(settings: Settings) -> Container:
         cipher=secret_cipher(settings),
         refs=ref_cipher(settings),
         webhook_sender=HttpWebhookSender(user_agent=USER_AGENT),
-        mail_server=ImapMailServer(),
-        mail_renderer=WeasyPrintMailRenderer(settings.template_locale),
+        mail_server=ImapMailServer(timeout=settings.mail_timeout),
+        mail_renderer=WeasyPrintMailRenderer(
+            settings.template_locale, timeout=settings.mail_render_timeout
+        ),
         totp=PyotpTotp(),
         patterns=RegexPatternMatcher(settings.rules_pattern_timeout.total_seconds()),
         templates=LiquidTemplateRenderer(
@@ -517,7 +519,7 @@ def build_memory_container(
             locale=settings.template_locale, currency=settings.default_currency
         ),
         oidc=None,
-        search_index=MemorySearchIndex(),
+        search_index=MemorySearchIndex(locales=settings.search_locales.split("+")),
         language_model=None,
         embeddings=None,
         classifier=FakeClassifier(),
@@ -572,9 +574,12 @@ of `signal_llm` (#145), each once more after an unfit answer."""
 def node_lease(settings: Settings) -> timedelta:
     """How long a worker holds the job of a node: longer than any node may take, except the
     OCR of a document the vision model reads (`vision_lease`)."""
-    return (
-        max(settings.ocr_timeout, MODEL_CALLS_PER_NODE * settings.llm_timeout) + WORK_LEASE_MARGIN
+    longest = max(
+        settings.ocr_timeout,
+        settings.mail_render_timeout,
+        MODEL_CALLS_PER_NODE * settings.llm_timeout,
     )
+    return longest + WORK_LEASE_MARGIN
 
 
 def vision_lease(settings: Settings) -> timedelta | None:

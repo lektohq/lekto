@@ -55,3 +55,50 @@ export function keywordOptions(keywords: readonly string[], value = '') {
 	const all = value && !keywords.includes(value) ? [...keywords, value] : [...keywords];
 	return all.map((name) => ({ value: name, label: name }));
 }
+
+export type MailField = components['schemas']['MailField'];
+export type MailOperator = components['schemas']['MailOperator'];
+
+/** The comparisons of a mail's fields (DESIGN.md "A mail's fields"), the same in a mail rule
+ * and as "Mail: …" in a document rule; a new condition starts with the first. */
+/** The fields with a text to compare: an address field, or the subject. */
+export const MAIL_TEXT_FIELDS: readonly MailField[] = [
+	'sender',
+	'recipient',
+	'to',
+	'cc',
+	'subject'
+];
+const TEXT: readonly MailOperator[] = ['ends_with', 'contains', 'is', 'starts_with'];
+export const MAIL_FIELD_OPERATORS: Record<MailField, readonly MailOperator[]> = {
+	sender: TEXT,
+	recipient: TEXT,
+	to: TEXT,
+	cc: TEXT,
+	subject: TEXT,
+	folder: ['is'],
+	attachments: ['present', 'missing'],
+	importance: ['is'],
+	keyword: ['contains', 'present', 'missing'],
+	flag: ['present', 'missing', 'is']
+};
+
+/** A mail's fields by name ("Absender", "Betreff"): the same words in both kinds of rule. */
+export const MAIL_FIELD_LABELS: Record<MailField, () => string> = {
+	sender: m.mail_rule_field_sender,
+	recipient: m.mail_rule_field_recipient,
+	to: m.mail_rule_field_to,
+	cc: m.mail_rule_field_cc,
+	subject: m.mail_rule_field_subject,
+	folder: m.mail_rule_field_folder,
+	attachments: m.mail_rule_field_attachments,
+	importance: m.mail_rule_field_importance,
+	keyword: m.mail_rule_field_keyword,
+	flag: m.mail_rule_field_flag
+};
+
+/** A keyword typed into a picker as its choice, where IMAP can carry it. */
+export async function typedKeyword(name: string): Promise<{ value: string; label: string } | null> {
+	const value = name.trim();
+	return isKeyword(value) ? { value, label: value } : null;
+}

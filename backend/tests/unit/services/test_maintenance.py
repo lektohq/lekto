@@ -12,11 +12,13 @@ from lekto.core.domain.errors import AuthenticationError
 from lekto.core.domain.ids import DocumentId, EventId, new_id
 from lekto.core.domain.inbox import DONE_PERIOD, Confirmation
 from lekto.core.domain.jobs import JobStatus
+from lekto.core.domain.mail_intake import KEPT_RECORDS
 from lekto.core.domain.webhooks import DeliveryOutcome, WebhookDelivery
 from lekto.core.services.maintenance import CLEANUP_JOB, REMOVE_FILES_JOB, MaintenanceService
 from lekto.core.services.objects import derivative_keys, original_key
 from tests import builders
 from tests.builders import PASSWORD, incoming
+from tests.contracts.mail_records import a_mailbox, a_record
 from tests.unit.services.support import World
 
 INTERVAL = timedelta(hours=1)
@@ -273,3 +275,20 @@ async def test_a_cancelled_cleanup_gives_its_job_back_at_once(world: World) -> N
         0,
         "interrupted: the worker stopped",
     )
+
+
+async def test_cleanup_lets_old_mail_records_go_of_what_the_mail_said(world: World) -> None:
+    mailbox = await a_mailbox(world.uow)
+    async with world.uow() as uow:
+        for uid in range(1, KEPT_RECORDS + 3):
+            await uow.mail_records.add(a_record(mailbox, uid))
+        await uow.commit()
+    service = maintenance(world)
+    await service.schedule()
+    assert await service.run_next_job()
+    async with world.uow() as uow:
+        records = await uow.mail_records.recent(mailbox.id, limit=KEPT_RECORDS + 2)
+    forgotten = [record for record in records if record.forgotten_at is not None]
+    assert [record.uid for record in forgotten] == [2, 1]
+    assert all(record.subject == "" for record in forgotten)
+    assert all(record.subject == "Rechnung" for record in records[:KEPT_RECORDS])

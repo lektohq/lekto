@@ -42,6 +42,7 @@ from lekto.core.ports.llm import StructuredRequest
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from tests import builders
+from tests.builders import DEFAULT_SETTINGS
 from tests.contracts.classifier import ClassifierContract
 from tests.contracts.clock import ClockContract
 from tests.contracts.event_bus import EventBusContract, EventBusFactory
@@ -388,7 +389,9 @@ class TestBagOfWordsEmbeddings(EmbeddingsContract):
 
 @pytest.fixture
 def search_index() -> MemorySearchIndex:
-    return MemorySearchIndex(dimensions=DIMENSIONS)
+    return MemorySearchIndex(
+        dimensions=DIMENSIONS, locales=DEFAULT_SETTINGS.search_locales.split("+")
+    )
 
 
 class TestMemorySearchIndex(SearchIndexContract):

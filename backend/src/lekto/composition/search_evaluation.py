@@ -171,7 +171,9 @@ def _backends(
 
         @asynccontextmanager
         async def memory(dimensions: int | None) -> AsyncIterator[SearchIndex]:
-            yield MemorySearchIndex(dimensions=dimensions)
+            yield MemorySearchIndex(
+                dimensions=dimensions, locales=settings.search_locales.split("+")
+            )
 
         name = WORDS if embeddings is None else embeddings.model
         return [Backend(name, embeddings, memory)], "memory", "in memory"

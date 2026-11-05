@@ -11,10 +11,11 @@ say otherwise.
 attempt failed (a reason), and how many mails and documents it has taken.
 """
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
-from enum import Enum, StrEnum
+from enum import StrEnum
 
+from lekto.core.domain.changes import UNSET, Unset, apply_changes
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import DocumentTypeId, MailboxId, UserId, new_id
 from lekto.core.domain.mail_traits import (
@@ -29,6 +30,8 @@ from lekto.core.domain.reasons import Reason
 from lekto.core.domain.validation import require_utc
 
 MAX_NAME = 100
+MAX_HOST = 255
+MAX_USERNAME = 320
 MAX_FOLDERS = 20
 MAX_FOLDER = 1000  # characters of a folder's name
 MIN_INTERVAL = timedelta(minutes=1)
@@ -137,14 +140,6 @@ def check_steps(steps: tuple[MailStep, ...]) -> None:
         raise ValidationError("after: a step twice")
     if any(step.action in ENDING for step in steps[:-1]):
         raise ValidationError("after: moving or trashing comes last, once")
-
-
-class Unset(Enum):
-    UNSET = "unset"
-
-
-UNSET = Unset.UNSET
-"""Marks a part of `MailboxChanges` that is left as it is."""
 
 
 @dataclass(frozen=True)
@@ -266,16 +261,7 @@ class Mailbox:
         """Apply `changes`; ValidationError if the result is not a valid mailbox (nothing is
         changed then)."""
         require_utc(now, "now")
-        before = replace(self)
-        for name, value in vars(changes).items():
-            if value is not UNSET:
-                setattr(self, name, value)
-        try:
-            self._normalise()
-        except ValidationError:
-            for name, value in vars(before).items():
-                setattr(self, name, value)
-            raise
+        apply_changes(self, changes, self._normalise)
         self.updated_at = now
 
     def set_password(self, encrypted: bytes, *, now: datetime) -> None:
@@ -294,11 +280,13 @@ class Mailbox:
         self.host = self.host.strip()
         if not self.host or any(character.isspace() for character in self.host):
             raise ValidationError("host: a server name or address")
+        if len(self.host) > MAX_HOST:
+            raise ValidationError(f"host: at most {MAX_HOST} characters")
         if not 1 <= self.port <= 65535:
             raise ValidationError("port: 1 to 65535")
         self.username = self.username.strip()
-        if not self.username:
-            raise ValidationError("username: required")
+        if not self.username or len(self.username) > MAX_USERNAME:
+            raise ValidationError(f"username: 1 to {MAX_USERNAME} characters")
         folders = tuple(dict.fromkeys(folder.strip() for folder in self.folders))
         if not folders or "" in folders or len(folders) > MAX_FOLDERS:
             raise ValidationError(f"folders: 1 to {MAX_FOLDERS}, none empty")

@@ -3,6 +3,17 @@
 import hashlib
 from email.message import EmailMessage
 
+from lekto.core.domain.mail import MailLogin, MailSecurity
+
+LOGIN = MailLogin(
+    host="imap.example.test",
+    port=993,
+    security=MailSecurity.TLS,
+    username="household@example.test",
+    password="right",
+)
+"""The account the tests sign in to, on the memory mail server."""
+
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 24
 PDF = b"%PDF-1.7\n% a test attachment\n%%EOF\n"
 

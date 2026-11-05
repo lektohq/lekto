@@ -143,6 +143,55 @@ def importance_of(headers: Mapping[str, str | None]) -> Importance:
 # --- what the conditions of both kinds of rule ask --------------------------------------------
 
 
+@dataclass(frozen=True, kw_only=True)
+class MailHead:
+    """What a mail's head says, as the conditions of both kinds of rule look at it
+    (`mail_rules.MailFacts`, `rule_conditions.MailOf`): the texts of each address field (an
+    address and a name each; `recipients` is To and Cc together), the subject, the importance
+    and the marks on the server (none for a mail fetched before Lekto read them: their
+    conditions hold nothing)."""
+
+    senders: tuple[str, ...]
+    recipients: tuple[str, ...]
+    to: tuple[str, ...] = ()
+    cc: tuple[str, ...] = ()
+    subject: str
+    importance: Importance | None = None
+    marks: MailMarks | None = None
+
+    def texts(self, field: str) -> tuple[str, ...]:
+        """The texts of `field`: `sender`, `recipient` (To or Cc), `to`, `cc` or `subject`."""
+        match field:
+            case "sender":
+                return self.senders
+            case "recipient":
+                return self.recipients
+            case "to":
+                return self.to
+            case "cc":
+                return self.cc
+            case "subject":
+                return (self.subject,)
+        raise ValueError(f"a mail's head has no texts of {field!r}")
+
+    def text_holds(self, field: str, op: str, wanted: str) -> bool:
+        """Whether a text of `field` `is`, `starts_with`, `ends_with` or (any other `op`)
+        contains `wanted`, regardless of case."""
+        wanted = wanted.casefold()
+        return any(_compare(op, text.casefold(), wanted) for text in self.texts(field))
+
+
+def _compare(op: str, text: str, wanted: str) -> bool:
+    match op:
+        case "is":
+            return text == wanted
+        case "starts_with":
+            return text.startswith(wanted)
+        case "ends_with":
+            return text.endswith(wanted)
+    return wanted in text
+
+
 def importance_holds(importance: Importance | None, wanted: str) -> bool:
     """`is`: unknown (a mail fetched before Lekto read it) holds nothing."""
     return importance is not None and importance.value == wanted

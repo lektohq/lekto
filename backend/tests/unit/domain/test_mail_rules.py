@@ -7,6 +7,7 @@ import pytest
 from lekto.core.domain.condition_tree import MAX_DEPTH, Group
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import MailboxId, SpaceId, UserId, new_id
+from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.mail import MailAction, MailStep, step_flags
 from lekto.core.domain.mail_intake import MailParts
 from lekto.core.domain.mail_message import read_mail
@@ -21,6 +22,8 @@ from lekto.core.domain.mail_rules import (
     conditions_to_json,
     first_match,
     mail_facts,
+    steps_from_json,
+    steps_to_json,
 )
 from lekto.core.domain.mail_traits import FlagColor, Importance, MailMarks
 from lekto.core.domain.reasons import ReasonCode, because
@@ -213,6 +216,44 @@ def test_a_paused_rule_is_switched_on_again() -> None:
     assert (paused.enabled, paused.updated_at) == (False, NOW + HOUR)
     paused.change(MailRuleChanges(enabled=True), now=NOW + 2 * HOUR)
     assert (paused.enabled, paused.disabled_reason) == (True, None)
+
+
+def test_the_steps_in_json() -> None:
+    steps = (MailStep(MailAction.FLAG, "red"), MailStep(MailAction.MOVE, "Done"))
+    data = steps_to_json(steps)
+    assert data == [{"action": "flag", "value": "red"}, {"action": "move", "value": "Done"}]
+    assert steps_from_json(data) == steps
+    assert steps_from_json([]) == ()
+    cases: list[tuple[JsonValue, str]] = [
+        ({"action": "read"}, "after: expected a list"),
+        ([{"action": "nope"}], "after\\[0\\]: "),
+        ([{"action": "flag", "value": "pink"}], "after\\[0\\]: flag"),
+        ([{"action": "read", "value": 1}], "after\\[0\\].value"),
+        ([{"action": "read", "x": 1}], "after\\[0\\]: unknown key"),
+        ([{"action": "trash"}, {"action": "read"}], "after: moving or trashing comes last"),
+    ]
+    for bad, place in cases:
+        with pytest.raises(ValidationError, match=place):
+            steps_from_json(bad)
+
+
+def test_a_rule_read_without_its_conditions_and_steps() -> None:
+    unreadable = rule(conditions=Group(mode="all", items=(HIT,)))
+    unreadable.pause(because(ReasonCode.MAIL_RULE_UNREADABLE, detail="x"), now=NOW)
+    unreadable.conditions, unreadable.after = None, ()
+    assert unreadable.unreadable
+    with pytest.raises(ValidationError, match="anew"):
+        unreadable.change(MailRuleChanges(name="Gas"), now=NOW + HOUR)
+    with pytest.raises(ValidationError, match="anew"):
+        unreadable.change(MailRuleChanges(enabled=True, conditions=None), now=NOW + HOUR)
+    assert (unreadable.name, unreadable.updated_at) == ("Strom", NOW)
+    unreadable.change(
+        MailRuleChanges(conditions=None, after=(MailStep(MailAction.READ),)), now=NOW + HOUR
+    )
+    assert (unreadable.enabled, unreadable.disabled_reason) == (False, None)
+    assert not unreadable.unreadable
+    unreadable.change(MailRuleChanges(enabled=True), now=NOW + 2 * HOUR)
+    assert unreadable.enabled
 
 
 def test_the_facts_of_a_mail() -> None:
