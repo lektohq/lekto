@@ -387,7 +387,6 @@
 					{@const open = !folded.has(group.key)}
 					{@const choosable = group.items.filter((item) => !hasConflict(item))}
 					<DryRunGroup
-						label={bulkDocuments(group.items.length)}
 						count={bulkDocuments(group.items.length)}
 						conflict={group.conflict}
 						{open}

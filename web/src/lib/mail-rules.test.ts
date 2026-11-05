@@ -5,7 +5,9 @@ import {
 	complete,
 	conditionText,
 	createBody,
+	dryRunBody,
 	formOf,
+	mailsCount,
 	newCondition,
 	patchBody,
 	stepText,
@@ -187,6 +189,33 @@ describe('the form of a mail rule', () => {
 		expect(OPERATORS.keyword).toEqual(CONDITION_FIELD_OPERATORS.mail_keyword);
 		expect(OPERATORS.flag).toEqual(CONDITION_FIELD_OPERATORS.mail_flag);
 		expect(newCondition('subject').op).toBe(CONDITION_FIELD_OPERATORS.mail_subject[0]);
+	});
+
+	it('counts mails and sends a stored rule to its dry run as it is', () => {
+		expect(mailsCount(1)).toBe(m.mail_rule_mails_one());
+		expect(mailsCount(12)).toBe(m.mail_rule_mails({ count: 12 }));
+		expect(dryRunBody(RULE)).toEqual({
+			mailbox_id: 'm1',
+			name: 'Strom',
+			priority: 1,
+			conditions: RULE.conditions,
+			parts: 'all',
+			user_id: 'u1',
+			space_id: 's1',
+			text_type_id: null,
+			after: RULE.after,
+			rule_id: 'r1'
+		});
+	});
+
+	it('wants a space the person edits', () => {
+		const form = formOf(RULE);
+		const spaces = [
+			{ id: 's1', name: 'Haushalt', personal_of: null, members: [{ user_id: 'u1', role: 'edit' }] }
+		] as unknown as Parameters<typeof validate>[1];
+		expect(validate(form, spaces).space).toBeUndefined();
+		form.spaceId = 'gone';
+		expect(validate(form, spaces).space).toBe(m.rule_error_choose());
 	});
 
 	it('says a rule in one line', () => {

@@ -46,8 +46,8 @@ describe('OriginCard', () => {
 	it('names the mail a document came with', async () => {
 		answer = attachment;
 		render(OriginCard, { props: { documentId: 'd1' } });
-		expect(await screen.findByText(m.origin_title())).toBeTruthy();
-		expect(screen.getByText('Haushalt')).toBeTruthy();
+		expect(await screen.findByText('Haushalt')).toBeTruthy();
+		expect(screen.getByText(m.origin_title())).toBeTruthy();
 		expect(screen.getByText(m.origin_fallback())).toBeTruthy();
 		expect(screen.getByText('Stadtwerke <rechnung@stadtwerke.example>')).toBeTruthy();
 		expect(screen.getByText('anna@example.test')).toBeTruthy();
@@ -67,7 +67,7 @@ describe('OriginCard', () => {
 			mail: { ...attachment.mail!, importance: 'normal', keywords: null, flag: null, cc: [] }
 		};
 		render(OriginCard, { props: { documentId: 'd3' } });
-		expect(await screen.findByText(m.origin_title())).toBeTruthy();
+		expect(await screen.findByText('Haushalt')).toBeTruthy();
 		for (const label of [
 			m.origin_importance(),
 			m.origin_keywords(),
@@ -82,6 +82,13 @@ describe('OriginCard', () => {
 		answer = { mail: null };
 		render(OriginCard, { props: { documentId: 'd2' } });
 		await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
-		expect(screen.queryByText(m.origin_title())).toBeNull();
+		await vi.waitFor(() => expect(screen.queryByText(m.origin_title())).toBeNull());
+	});
+
+	it('keeps a load error on the card, with a way to try again', async () => {
+		fetchMock.mockImplementation(async () => new Response('down', { status: 503 }));
+		render(OriginCard, { props: { documentId: 'd4' } });
+		expect(await screen.findByRole('alert')).toBeTruthy();
+		expect(screen.getByText(m.origin_title())).toBeTruthy();
 	});
 });

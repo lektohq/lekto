@@ -61,6 +61,14 @@ export type MailOperator = components['schemas']['MailOperator'];
 
 /** The comparisons of a mail's fields (DESIGN.md "A mail's fields"), the same in a mail rule
  * and as "Mail: …" in a document rule; a new condition starts with the first. */
+/** The fields with a text to compare: an address field, or the subject. */
+export const MAIL_TEXT_FIELDS: readonly MailField[] = [
+	'sender',
+	'recipient',
+	'to',
+	'cc',
+	'subject'
+];
 const TEXT: readonly MailOperator[] = ['ends_with', 'contains', 'is', 'starts_with'];
 export const MAIL_FIELD_OPERATORS: Record<MailField, readonly MailOperator[]> = {
 	sender: TEXT,

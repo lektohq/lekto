@@ -3,6 +3,7 @@
  * form of the editor as the API takes it, and a rule in one line for the list.
  */
 import type { components } from '#lib/api/schema.ts';
+import type { Space } from '#lib/masterdata.svelte.ts';
 import {
 	flagLabel,
 	importanceLabel,
@@ -37,6 +38,7 @@ export type { MailField, MailOperator } from '#lib/mail-traits.ts';
 export type MailParts = components['schemas']['MailParts'];
 export type MailAction = components['schemas']['MailAction'];
 export type DryRunMail = components['schemas']['DryRunMailOut'];
+export type MailRuleDryRun = components['schemas']['MailRuleDryRun'];
 type ApiCondition = components['schemas']['MailConditionBody'];
 
 export const FIELDS: readonly MailField[] = [
@@ -257,7 +259,7 @@ export function formOf(rule: MailRule | null, mailboxId = '', typeId = ''): Mail
 
 /** The problems of the form in words, by key: `name`, `priority`, `mailbox`, `user`, and the
  * key of a condition, an empty group or a step (as the document rules' `validate`). */
-export function validate(form: MailRuleForm): Record<string, string> {
+export function validate(form: MailRuleForm, spaces?: readonly Space[]): Record<string, string> {
 	const problems: Record<string, string> = {};
 	const name = form.name.trim();
 	if (name === '') problems.name = m.rule_error_name();
@@ -274,6 +276,15 @@ export function validate(form: MailRuleForm): Record<string, string> {
 	}
 	if (form.mailboxId === '') problems.mailbox = m.rule_error_choose();
 	if (form.parts !== 'nothing' && form.userId === '') problems.user = m.rule_error_choose();
+	// The space, where the spaces are known (the editor knows them; a check of the form alone does not).
+	if (spaces && form.parts !== 'nothing' && form.shown.includes('space') && form.spaceId !== '') {
+		const edits = spaces.some(
+			(space) =>
+				space.id === form.spaceId &&
+				space.members.some((item) => item.user_id === form.userId && item.role === 'edit')
+		);
+		if (!edits) problems.space = m.rule_error_choose();
+	}
 	for (const group of emptyGroups(form.conditions, false)) {
 		problems[group.key] = m.rule_error_group_empty();
 	}
@@ -314,6 +325,26 @@ function body(form: MailRuleForm) {
 			action: step.action,
 			value: takesValue(step.action) ? step.value.trim() : null
 		}))
+	};
+}
+
+/** "1 Mail", "12 Mails". */
+export const mailsCount = (count: number): string =>
+	count === 1 ? m.mail_rule_mails_one() : m.mail_rule_mails({ count });
+
+/** A stored rule as the dry run takes it, in place of itself (`rule_id`). */
+export function dryRunBody(rule: MailRule): MailRuleDryRun {
+	return {
+		mailbox_id: rule.mailbox_id,
+		name: rule.name,
+		priority: rule.priority,
+		conditions: rule.conditions,
+		parts: rule.parts,
+		user_id: rule.user_id,
+		space_id: rule.space_id,
+		text_type_id: rule.text_type_id,
+		after: rule.after,
+		rule_id: rule.id
 	};
 }
 
