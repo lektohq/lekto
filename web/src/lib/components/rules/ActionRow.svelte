@@ -1,7 +1,5 @@
 <script lang="ts">
-	import ArrowDown from '@lucide/svelte/icons/arrow-down';
-	import ArrowUp from '@lucide/svelte/icons/arrow-up';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import RuleRow from '#lib/components/rules/RuleRow.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import { namedOptions, withChoice } from '#lib/components/rules/options.ts';
 	import ValueInput from '#lib/components/rules/ValueInput.svelte';
@@ -24,7 +22,6 @@
 	} from '#lib/rules/model.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import TagPicker from '#lib/components/TagPicker.svelte';
-	import IconButton from '#lib/components/IconButton.svelte';
 
 	// One step: an action, a step that asks a webhook, or a condition. `targets` are where the
 	// rule may file: the spaces whoever saves it edits, and other users' personal spaces
@@ -111,198 +108,183 @@
 	const missingOptions = MISSING.map((value) => ({ value, label: MISSING_LABELS[value]() }));
 </script>
 
-<div class="flex flex-col gap-2 rounded-xl border bg-background p-3" data-key={action.key}>
-	<div class="flex flex-wrap items-start gap-2">
-		<span class="w-full pt-2 text-sm font-medium sm:w-44">{label}</span>
-		<div class="flex min-w-0 flex-1 basis-64 flex-col gap-2">
-			{#if action.type === 'set_space'}
-				<Select
-					aria-label={label}
-					aria-invalid={invalid || undefined}
-					bind:value={action.space_id}
-					options={withChoice(targets, action.space_id, m.rule_space_unreachable())}
-				/>
-				{#if unreachable}
-					<p class="text-sm text-muted-foreground">{m.rule_space_unreachable_hint()}</p>
-				{/if}
-			{:else if action.type === 'set_contact'}
-				<Select
-					aria-label={label}
-					aria-invalid={invalid || undefined}
-					bind:value={action.contact_id}
-					options={withChoice(namedOptions(lookup.contacts), action.contact_id)}
-				/>
-			{:else if action.type === 'set_document_type'}
-				<Select
-					aria-label={label}
-					aria-invalid={invalid || undefined}
-					bind:value={action.document_type_id}
-					options={withChoice(namedOptions(lookup.documentTypes), action.document_type_id)}
-				/>
-			{:else if action.type === 'set_topic'}
-				<!-- The one choice of a topic, as at a document. -->
-				<TagPicker
-					id="topic-{action.key}"
-					{label}
-					title={m.picker_title_topic()}
-					scope="topic"
-					tags={lookup.tags}
-					selected={action.topic_id ? [action.topic_id] : []}
-					onchange={(next) => {
-						if (action.type === 'set_topic') action.topic_id = next[0] ?? '';
-					}}
-					single
-				/>
-			{:else if action.type === 'set_title'}
-				<TemplateInput
-					id="title-{action.key}"
-					{label}
-					{invalid}
-					fields={lookup.fields}
-					{steps}
-					bind:value={action.template}
-				/>
-			{:else if action.type === 'add_tags' || action.type === 'remove_tags'}
-				<!-- The one field for tags, in their colours, as at a document. -->
-				<TagPicker
-					id="tags-{action.key}"
-					{label}
-					title={m.field_tags()}
-					scope="document"
-					tags={lookup.tags}
-					selected={action.tag_ids}
-					onchange={(next) => {
-						if (action.type === 'add_tags' || action.type === 'remove_tags') action.tag_ids = next;
-					}}
-				/>
-			{:else if action.type === 'set_field'}
-				<Select
-					aria-label={m.rule_condition_field()}
-					aria-invalid={(invalid && !action.field_id) || undefined}
-					value={action.field_id}
-					options={withChoice(namedOptions(lookup.fields), action.field_id)}
-					onchange={(id) => {
-						if (action.type !== 'set_field') return;
-						const chosen = lookup.fields.find((entry) => entry.id === id) ?? null;
-						action.field_id = id;
-						action.value = (defaultValue('field', 'is', chosen) ?? '') as typeof action.value;
-						action.templated = undefined;
-					}}
-				/>
-				{#if action.field_id}
-					<ValueInput
-						{field}
-						{invalid}
-						template
-						{templated}
-						ontemplated={switchTemplated}
-						fields={lookup.fields}
-						{steps}
-						id="value-{action.key}"
-						label={m.rule_condition_value()}
-						value={action.value}
-						onchange={(next) => {
-							if (action.type === 'set_field') action.value = next as typeof action.value;
-						}}
-						{onunreadable}
-					/>
-				{/if}
-			{:else if action.type === 'force_review'}
-				<TemplateInput
-					id="reason-{action.key}"
-					label={m.rule_review_reason()}
-					{invalid}
-					fields={lookup.fields}
-					{steps}
-					bind:value={action.reason}
-				/>
-			{:else if action.type === 'ask_webhook'}
-				<div class="grid gap-3 sm:grid-cols-2">
-					<Field.Field>
-						<Field.Label for="ask-name-{action.key}">{m.rule_ask_name()}</Field.Label>
-						<Input
-							id="ask-name-{action.key}"
-							class="font-mono"
-							maxlength={50}
-							aria-invalid={invalid || undefined}
-							bind:value={action.name}
-						/>
-					</Field.Field>
-					<Field.Field>
-						<Field.Label for="ask-webhook-{action.key}">{m.rule_ask_webhook()}</Field.Label>
-						<Select
-							id="ask-webhook-{action.key}"
-							aria-invalid={(invalid && !action.webhook_id) || undefined}
-							bind:value={action.webhook_id}
-							options={withChoice(webhooks, action.webhook_id, m.rule_webhook_unknown())}
-						/>
-					</Field.Field>
-					<Field.Field>
-						<Field.Label for="ask-timeout-{action.key}">{m.rule_ask_timeout()}</Field.Label>
-						<Input
-							id="ask-timeout-{action.key}"
-							type="number"
-							min={0.5}
-							max={1440}
-							step={0.5}
-							value={String(action.timeout_seconds / 60)}
-							oninput={(event) => {
-								if (action.type === 'ask_webhook') {
-									action.timeout_seconds = Math.round(Number(event.currentTarget.value) * 60);
-								}
-							}}
-						/>
-					</Field.Field>
-					<Field.Field>
-						<Field.Label for="ask-missing-{action.key}">{m.rule_ask_missing()}</Field.Label>
-						<Select
-							id="ask-missing-{action.key}"
-							value={action.missing}
-							options={missingOptions}
-							onchange={(next) => {
-								if (action.type === 'ask_webhook') action.missing = next as Missing;
-							}}
-						/>
-					</Field.Field>
-				</div>
-				<p class="text-sm text-muted-foreground">{m.rule_ask_name_hint()}</p>
-				<p class="text-sm text-muted-foreground">
-					{webhooks.length ? m.rule_ask_hint() : m.rule_send_webhook_none()}
-				</p>
-			{:else if action.type === 'condition' && model}
-				<ConditionGroup
-					group={action.conditions}
-					{model}
-					{lookup}
-					{errors}
-					{steps}
-					top
-					onunreadable={onconditionunreadable}
-				/>
-				<p class="text-sm text-muted-foreground">{m.rule_condition_step_hint()}</p>
-			{:else if action.type === 'send_webhook'}
-				<Select
-					aria-label={label}
-					aria-invalid={invalid || undefined}
-					bind:value={action.webhook_id}
-					options={withChoice(webhooks, action.webhook_id, m.rule_webhook_unknown())}
-				/>
-				<p class="text-sm text-muted-foreground">
-					{webhooks.length ? m.rule_send_webhook_hint() : m.rule_send_webhook_none()}
-				</p>
+<RuleRow key={action.key} {label} {error} moves {onup} {ondown} {onremove}>
+	<div class="flex min-w-0 flex-1 basis-64 flex-col gap-2">
+		{#if action.type === 'set_space'}
+			<Select
+				aria-label={label}
+				aria-invalid={invalid || undefined}
+				bind:value={action.space_id}
+				options={withChoice(targets, action.space_id, m.rule_space_unreachable())}
+			/>
+			{#if unreachable}
+				<p class="text-sm text-muted-foreground">{m.rule_space_unreachable_hint()}</p>
 			{/if}
-		</div>
-		<div class="flex gap-0.5">
-			<IconButton label={m.rule_move_up()} disabled={!onup} onclick={() => onup?.()}>
-				<ArrowUp aria-hidden="true" />
-			</IconButton>
-			<IconButton label={m.rule_move_down()} disabled={!ondown} onclick={() => ondown?.()}>
-				<ArrowDown aria-hidden="true" />
-			</IconButton>
-			<IconButton label={m.rule_remove()} onclick={onremove}>
-				<Trash2 aria-hidden="true" />
-			</IconButton>
-		</div>
+		{:else if action.type === 'set_contact'}
+			<Select
+				aria-label={label}
+				aria-invalid={invalid || undefined}
+				bind:value={action.contact_id}
+				options={withChoice(namedOptions(lookup.contacts), action.contact_id)}
+			/>
+		{:else if action.type === 'set_document_type'}
+			<Select
+				aria-label={label}
+				aria-invalid={invalid || undefined}
+				bind:value={action.document_type_id}
+				options={withChoice(namedOptions(lookup.documentTypes), action.document_type_id)}
+			/>
+		{:else if action.type === 'set_topic'}
+			<!-- The one choice of a topic, as at a document. -->
+			<TagPicker
+				id="topic-{action.key}"
+				{label}
+				title={m.picker_title_topic()}
+				scope="topic"
+				tags={lookup.tags}
+				selected={action.topic_id ? [action.topic_id] : []}
+				onchange={(next) => {
+					if (action.type === 'set_topic') action.topic_id = next[0] ?? '';
+				}}
+				single
+			/>
+		{:else if action.type === 'set_title'}
+			<TemplateInput
+				id="title-{action.key}"
+				{label}
+				{invalid}
+				fields={lookup.fields}
+				{steps}
+				bind:value={action.template}
+			/>
+		{:else if action.type === 'add_tags' || action.type === 'remove_tags'}
+			<!-- The one field for tags, in their colours, as at a document. -->
+			<TagPicker
+				id="tags-{action.key}"
+				{label}
+				title={m.field_tags()}
+				scope="document"
+				tags={lookup.tags}
+				selected={action.tag_ids}
+				onchange={(next) => {
+					if (action.type === 'add_tags' || action.type === 'remove_tags') action.tag_ids = next;
+				}}
+			/>
+		{:else if action.type === 'set_field'}
+			<Select
+				aria-label={m.rule_condition_field()}
+				aria-invalid={(invalid && !action.field_id) || undefined}
+				value={action.field_id}
+				options={withChoice(namedOptions(lookup.fields), action.field_id)}
+				onchange={(id) => {
+					if (action.type !== 'set_field') return;
+					const chosen = lookup.fields.find((entry) => entry.id === id) ?? null;
+					action.field_id = id;
+					action.value = (defaultValue('field', 'is', chosen) ?? '') as typeof action.value;
+					action.templated = undefined;
+				}}
+			/>
+			{#if action.field_id}
+				<ValueInput
+					{field}
+					{invalid}
+					template
+					{templated}
+					ontemplated={switchTemplated}
+					fields={lookup.fields}
+					{steps}
+					id="value-{action.key}"
+					label={m.rule_condition_value()}
+					value={action.value}
+					onchange={(next) => {
+						if (action.type === 'set_field') action.value = next as typeof action.value;
+					}}
+					{onunreadable}
+				/>
+			{/if}
+		{:else if action.type === 'force_review'}
+			<TemplateInput
+				id="reason-{action.key}"
+				label={m.rule_review_reason()}
+				{invalid}
+				fields={lookup.fields}
+				{steps}
+				bind:value={action.reason}
+			/>
+		{:else if action.type === 'ask_webhook'}
+			<div class="grid gap-3 sm:grid-cols-2">
+				<Field.Field>
+					<Field.Label for="ask-name-{action.key}">{m.rule_ask_name()}</Field.Label>
+					<Input
+						id="ask-name-{action.key}"
+						class="font-mono"
+						maxlength={50}
+						aria-invalid={invalid || undefined}
+						bind:value={action.name}
+					/>
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="ask-webhook-{action.key}">{m.rule_ask_webhook()}</Field.Label>
+					<Select
+						id="ask-webhook-{action.key}"
+						aria-invalid={(invalid && !action.webhook_id) || undefined}
+						bind:value={action.webhook_id}
+						options={withChoice(webhooks, action.webhook_id, m.rule_webhook_unknown())}
+					/>
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="ask-timeout-{action.key}">{m.rule_ask_timeout()}</Field.Label>
+					<Input
+						id="ask-timeout-{action.key}"
+						type="number"
+						min={0.5}
+						max={1440}
+						step={0.5}
+						value={String(action.timeout_seconds / 60)}
+						oninput={(event) => {
+							if (action.type === 'ask_webhook') {
+								action.timeout_seconds = Math.round(Number(event.currentTarget.value) * 60);
+							}
+						}}
+					/>
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="ask-missing-{action.key}">{m.rule_ask_missing()}</Field.Label>
+					<Select
+						id="ask-missing-{action.key}"
+						value={action.missing}
+						options={missingOptions}
+						onchange={(next) => {
+							if (action.type === 'ask_webhook') action.missing = next as Missing;
+						}}
+					/>
+				</Field.Field>
+			</div>
+			<p class="text-sm text-muted-foreground">{m.rule_ask_name_hint()}</p>
+			<p class="text-sm text-muted-foreground">
+				{webhooks.length ? m.rule_ask_hint() : m.rule_send_webhook_none()}
+			</p>
+		{:else if action.type === 'condition' && model}
+			<ConditionGroup
+				group={action.conditions}
+				{model}
+				{lookup}
+				{errors}
+				{steps}
+				top
+				onunreadable={onconditionunreadable}
+			/>
+			<p class="text-sm text-muted-foreground">{m.rule_condition_step_hint()}</p>
+		{:else if action.type === 'send_webhook'}
+			<Select
+				aria-label={label}
+				aria-invalid={invalid || undefined}
+				bind:value={action.webhook_id}
+				options={withChoice(webhooks, action.webhook_id, m.rule_webhook_unknown())}
+			/>
+			<p class="text-sm text-muted-foreground">
+				{webhooks.length ? m.rule_send_webhook_hint() : m.rule_send_webhook_none()}
+			</p>
+		{/if}
 	</div>
-	{#if error}<Field.Error>{error}</Field.Error>{/if}
-</div>
+</RuleRow>

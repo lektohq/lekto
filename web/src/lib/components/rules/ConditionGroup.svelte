@@ -1,10 +1,10 @@
 <script lang="ts">
+	import ModeSelect from '#lib/components/rules/ModeSelect.svelte';
 	import ArrowDown from '@lucide/svelte/icons/arrow-down';
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
 	import ListPlus from '@lucide/svelte/icons/list-plus';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import Select from '#lib/components/Select.svelte';
 	import ConditionGroup from '#lib/components/rules/ConditionGroup.svelte';
 	import ConditionRow from '#lib/components/rules/ConditionRow.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -53,10 +53,6 @@
 	} = $props();
 
 	const root = $derived(top || group.key === model.conditions.key);
-	const modes = [
-		{ value: 'all', label: m.rule_mode_all() },
-		{ value: 'any', label: m.rule_mode_any() }
-	];
 	const error = $derived(errors[group.key]);
 
 	const remove = (index: number) => group.items.splice(index, 1);
@@ -77,13 +73,7 @@
 	aria-label={root ? m.rule_conditions() : m.rule_subgroup()}
 >
 	<div class="flex flex-wrap items-center gap-2">
-		<Select
-			aria-label={m.rule_mode()}
-			value={group.mode}
-			options={modes}
-			onchange={(mode) => (group.mode = mode === 'any' ? 'any' : 'all')}
-			class="w-full sm:w-56"
-		/>
+		<ModeSelect value={group.mode} onchange={(mode) => (group.mode = mode)} />
 		<Choice bind:checked={group.negate}>{m.rule_negate()}</Choice>
 		{#if !root}
 			<div class="ml-auto flex gap-0.5">
