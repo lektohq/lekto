@@ -2028,6 +2028,7 @@ Durations are seconds (`30`, `1.5`) or ISO 8601 (`PT1H`, `P7D`).
 | `LEKTO_OCR_LANGUAGES` | Worker | `deu+eng` | Tesseract languages, joined by `+` |
 | `LEKTO_OCR_TIMEOUT` | Worker | `600` | Seconds per document for OCR |
 | `LEKTO_MAIL_RENDER_TIMEOUT` | Worker | `120` | Seconds per mail for setting it as a PDF (WeasyPrint, in a child process) |
+| `LEKTO_MAIL_TIMEOUT` | both | `30` | Seconds for connecting to a mail server (IMAP) and for each of its answers; the API tests connections, the worker fetches |
 | `LEKTO_MEILISEARCH_URL` | both | unset | Without it there is no search (the API searches, the worker indexes) |
 | `LEKTO_MEILISEARCH_API_KEY` | both | unset | *secret*; the master key or a key with access to the index |
 | `LEKTO_MEILISEARCH_INDEX` | both | `lekto-documents` | The active index; a rebuild fills `<name>-rebuild` and swaps it in |
@@ -2075,7 +2076,7 @@ Durations are seconds (`30`, `1.5`) or ISO 8601 (`PT1H`, `P7D`).
 | `LEKTO_RULES_PATTERN_TIMEOUT` | both | `0.2` | Seconds a regular expression of a rule may run per text or value (worker: rules; API: previews) |
 | `LEKTO_RULES_MAX_TEXT` | both | `200000` | Characters of text rules look at (1,000 to 10,000,000) |
 | `LEKTO_RULES_APPLY_MAX_DOCUMENTS` | both | `1000` | Documents per retroactive rule application (1 to 100,000) |
-| `LEKTO_TEMPLATE_LOCALE` | both | `de` | Locale in which templates of rules and title patterns write dates and amounts (`datetime`, `currency`, `decimal`, an amount field as `3.650,00 EUR`); Babel's names, such as `de`, `en_US` |
+| `LEKTO_TEMPLATE_LOCALE` | both | `de` | Locale in which templates of rules and title patterns write dates and amounts (`datetime`, `currency`, `decimal`, an amount field as `3.650,00 EUR`); Babel's names, such as `de`, `en_US`. The head of a mail set as a PDF speaks its language too (German, else English) |
 
 ## Tests
 

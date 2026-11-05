@@ -1,5 +1,7 @@
 """Contract suite for `MailRecordRepository` and `MailOriginRepository` in the unit of work."""
 
+from dataclasses import replace
+
 import pytest
 
 from lekto.core.domain.condition_tree import Group
@@ -7,6 +9,7 @@ from lekto.core.domain.errors import ConflictError
 from lekto.core.domain.ids import (
     DocumentId,
     DocumentTypeId,
+    MailboxId,
     MailRecordId,
     SpaceId,
     UserId,
@@ -159,6 +162,14 @@ class MailRecordRepositoryContract:
             assert await uow.mail_records.known_uids(mailbox.id, "INBOX", 7) == {1, 2, 3}
             assert await uow.mail_records.has_message("m1@example.test")
 
+    async def test_a_record_needs_its_mailbox(self, uow_factory: UnitOfWorkFactory) -> None:
+        mailbox = await a_mailbox(uow_factory)
+        gone = replace(mailbox, id=MailboxId(new_id()))
+        with pytest.raises(ConflictError):
+            async with uow_factory() as uow:
+                await uow.mail_records.add(a_record(gone, 1))
+                await uow.commit()
+
     async def test_a_uid_is_recorded_once(self, uow_factory: UnitOfWorkFactory) -> None:
         mailbox = await a_mailbox(uow_factory)
         async with uow_factory() as uow:
@@ -182,6 +193,29 @@ class MailRecordRepositoryContract:
 
 
 class MailOriginRepositoryContract:
+    async def test_an_origin_needs_its_document(self, uow_factory: UnitOfWorkFactory) -> None:
+        mailbox = await a_mailbox(uow_factory)
+        origin = MailOrigin(
+            document_id=DocumentId(new_id()),
+            record_id=MailRecordId(new_id()),
+            mailbox_id=mailbox.id,
+            mailbox="Household",
+            rule=None,
+            role=OriginRole.COVER,
+            letter=0,
+            message_id=None,
+            sender=(),
+            to=(),
+            cc=(),
+            subject="Rechnung",
+            sent_at=None,
+            arrived_at=NOW,
+        )
+        with pytest.raises(ConflictError):
+            async with uow_factory() as uow:
+                await uow.mail_origins.add(origin)
+                await uow.commit()
+
     async def test_origins_by_document_and_by_mail(self, uow_factory: UnitOfWorkFactory) -> None:
         owner, space = await owner_with_space(uow_factory)
         cover, attachment = builders.document(owner, space), builders.document(owner, space)
