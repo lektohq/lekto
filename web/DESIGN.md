@@ -739,7 +739,8 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
   05.11.2026), a `Segmented` "Verbindung · Abruf"; one save stores both.
   - **Verbindung:** name; server, port and encryption in one row; user and password (empty keeps
     the stored one; it is never shown); "Verbindung testen" (`outline`) with what it found in a
-    line beside it (`role="status"`). A stored mailbox that is not paused has "Jetzt abrufen"
+    line beside it (`role="status"`), and in `muted-foreground` when the server stores no
+    keywords of Lekto's own ("Eigene Schlagwörter speichert dieser Server nicht."). A stored mailbox that is not paused has "Jetzt abrufen"
     (`outline`, `RefreshCw`) beside the test; a toast says the fetch is asked for.
   - **Abruf:** the folders as a `MultiPicker` of what the test found and what is chosen; then
     two rows of two: how often ("Wie oft", `Select`) and what a mail without a rule brings in
@@ -751,8 +752,9 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
     Deleting is in the footer.
 - **The origin of a document** (mock C): a document a mail brought shows the card "Herkunft" in
   its facts pane, above "Bezüge": label and value rows as the file information has them
-  (Kanal, Postfach, Regel or "Ohne Regel (Rückfall des Postfachs)", Von, An, Betreff,
-  Empfangen, Weitergeleitet von, Anhang), only those with a value. Other documents show no card.
+  (Kanal, Postfach, Regel or "Ohne Regel (Rückfall des Postfachs)", Von, An, CC, Betreff,
+  Wichtigkeit when high or low, Schlagwörter, Markierung with its colour, Empfangen,
+  Weitergeleitet von, Anhang), only those with a value. Other documents show no card.
   A relation of the documents of one mail says "aus derselben Mail" with the subject.
 
 - **Mail rules** (mock D, E; Tobi, 05.11.2026: no special case beside the document rules): the
@@ -777,6 +779,13 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
   mailbox (`Select`); "Übernehmen" and "Für" always, "In Space ablegen", "Typ des Mailtexts"
   and "Mail danach" added with "Aktion hinzufügen". Words of their own only where the thing
   differs (a mail's fields, what a mail rule takes).
+- **A mail's fields** (Tobi, 05.11.2026), the same in mail rules and as "Mail: …" in document
+  rules: Absender, "Empfänger (An oder CC)", An, CC, Betreff (texts: "endet auf", "enthält",
+  "ist", "beginnt mit"); Ordner, Anhänge (mail rules); Wichtigkeit ("ist" hoch / normal /
+  niedrig, a `Select`); Schlagwörter (the mail's IMAP keywords, worded as tags: "enthalten",
+  "vorhanden", "fehlen"; a `SearchSelect` of the keywords the mailboxes' folders know, a typed
+  one offered as "„…“ verwenden"); Markierung ("ist gesetzt", "fehlt", "ist" one of Apple Mail's
+  colours: Rot, Orange, Gelb, Grün, Blau, Lila, Grau). Words of `mail-traits.ts`.
 - **A rule's dry run is one page for both kinds** (`DryRunGroup`): the head with the rule's
   switch and a hint, the bar (`SelectionBar`), groups as cards whose head says once what the
   rule does, rows below, yellow groups last for what the rule cannot do alone. A mail rule's
@@ -786,9 +795,9 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
   them first ("Vorher: …"); the bar counts them ("12 von 50 Mails") and switches the rule on
   ("Aktivieren").
 - **Mail conditions in document rules** (mock G): the subject choice of a condition offers
-  "Mail: Postfach" (admins: only they read the mailboxes), "Mail: Absender", "Mail: Empfänger"
-  and "Mail: Betreff", with "endet auf", "enthält", "ist", "beginnt mit"; a document no mail
-  brought matches none of them (but "Mail: Postfach" "fehlt").
+  "Mail: Postfach" (admins: only they read the mailboxes) and a mail's fields as "Mail: …"
+  (see "A mail's fields"); a document no mail brought matches none of them (but "Mail:
+  Postfach" "fehlt"), nor does one taken before Lekto kept a mail's importance and marks.
 - A list's state (lens, filters, sort, layout) lives in its URL, its words in the history entry
   (see "No plain data in addresses"). A detail page reached from a list carries that URL and
   entry back (`from`), and its `BackLink` returns there. The inbox's previous/next works the same

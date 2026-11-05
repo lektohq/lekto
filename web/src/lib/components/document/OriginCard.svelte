@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { flagLabel, importanceLabel } from '#lib/mail-traits.ts';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
@@ -35,6 +36,7 @@
 		}
 	}
 
+	// What the mail was marked with on the server shows too (Tobi, 05.11.2026).
 	const people = (list: readonly Address[]) =>
 		list.map((item) => (item.name ? `${item.name} <${item.address}>` : item.address)).join(', ');
 	const moment = (value: string) => formatDate(value, { dateStyle: 'medium', timeStyle: 'short' });
@@ -47,7 +49,15 @@
 					[m.origin_rule(), mail.rule ?? m.origin_fallback()],
 					[m.origin_from(), people(mail.sender)],
 					[m.origin_to(), people(mail.to)],
+					[m.origin_cc(), people(mail.cc)],
 					[m.origin_subject(), mail.subject],
+					// Normal importance says nothing; high and low do.
+					[
+						m.origin_importance(),
+						mail.importance && mail.importance !== 'normal' ? importanceLabel(mail.importance) : ''
+					],
+					[m.origin_keywords(), (mail.keywords ?? []).join(', ')],
+					[m.origin_flag(), mail.flag ? flagLabel(mail.flag) : ''],
 					[m.origin_received(), moment(mail.arrived_at)],
 					[m.origin_forwarded(), people(mail.forwarded_by)],
 					[m.origin_file(), mail.role === 'attachment' ? (mail.filename ?? '') : '']
