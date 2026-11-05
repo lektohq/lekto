@@ -763,8 +763,12 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
   switch, "Bearbeiten", "Probelauf", delete in the head; mailbox and priority below; the rule to
   read as `RuleView` shows one), its editor (`…/edit`), saving switched off ("Speichern und
   Probelauf") into its dry run (`…/apply?saved=1`), which switches it on.
-- **One set of parts and words for every rule:** the conditions' "Verknüpfung" (`ModeSelect`:
-  "Alle treffen zu", "Mindestens eine trifft zu"), the rows of conditions and actions
+- **One set of parts and words for every rule:** the conditions are the same tree for every
+  kind (Tobi, 05.11.2026): `ConditionGroup` with its "Verknüpfung" (`ModeSelect`: "Alle treffen
+  zu", "Mindestens eine trifft zu"), "Umkehren (nicht)", subgroups ("Gruppe hinzufügen") and the
+  same limits; the kind gives only a condition's row. A rule's page reads them with
+  `ConditionTree` ("Alle davon", "Keine davon"), a line of a list with "und", "oder" and
+  "nicht (…)". A mail rule's empty root says it takes every mail. The rows of conditions and actions
   (`RuleRow`: a label for an action, the fields, up and down where the order counts, the bin),
   the comparisons ("ist", "enthält", "beginnt mit", "endet auf"), "Bedingung hinzufügen",
   "Aktion hinzufügen", "In Space ablegen", the priority's line. A mail rule's editor has the

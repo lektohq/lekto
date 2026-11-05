@@ -172,7 +172,7 @@ def fact_values(condition: Condition, kept: Sequence[DocumentFact]) -> list[Docu
 
 
 def evaluate(
-    group: Group,
+    group: Group[Condition],
     facts: Facts,
     definitions: Mapping[FieldId, FieldDefinition],
     *,
@@ -195,7 +195,7 @@ def evaluate(
     return result
 
 
-def distrusted_fields(group: Group, facts: Facts) -> tuple[str, ...]:
+def distrusted_fields(group: Group[Condition], facts: Facts) -> tuple[str, ...]:
     """The unconfirmed model fields the conditions look at."""
     found: list[str] = []
     for condition in group.conditions():

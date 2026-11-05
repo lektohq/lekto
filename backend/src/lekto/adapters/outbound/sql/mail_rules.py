@@ -2,15 +2,15 @@
 
 from typing import Any
 
-from sqlalchemy import Row, func, select
+from sqlalchemy import Row, func, null, select
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.repositories import SqlRepository, Values
 from lekto.core.domain.ids import DocumentTypeId, MailboxId, MailRuleId, SpaceId, UserId
-from lekto.core.domain.json_value import JsonValue
+from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.mail import MailAction
 from lekto.core.domain.mail_intake import MailParts
-from lekto.core.domain.mail_rules import MailCondition, MailField, MailOperator, MailRule
+from lekto.core.domain.mail_rules import MailRule, conditions_from_json, conditions_to_json
 from lekto.core.domain.reasons import Reason
 
 
@@ -39,8 +39,7 @@ class SqlMailRuleRepository(SqlRepository[MailRuleId, MailRule]):
             mailbox_id=MailboxId(row.mailbox_id),
             name=row.name,
             priority=row.priority,
-            any=row.any,
-            conditions=tuple(conditions_of(row.conditions)),
+            conditions=conditions_from_json(row.conditions),
             parts=MailParts(row.parts),
             user_id=None if row.user_id is None else UserId(row.user_id),
             space_id=None if row.space_id is None else SpaceId(row.space_id),
@@ -62,8 +61,7 @@ class SqlMailRuleRepository(SqlRepository[MailRuleId, MailRule]):
             "mailbox_id": entity.mailbox_id,
             "name": entity.name,
             "priority": entity.priority,
-            "any": entity.any,
-            "conditions": conditions_json(entity.conditions),
+            "conditions": _sql_json(conditions_to_json(entity.conditions)),
             "parts": entity.parts.value,
             "user_id": entity.user_id,
             "space_id": entity.space_id,
@@ -80,14 +78,6 @@ class SqlMailRuleRepository(SqlRepository[MailRuleId, MailRule]):
         }
 
 
-def conditions_json(conditions: tuple[MailCondition, ...]) -> list[JsonValue]:
-    return [
-        {"field": item.field.value, "op": item.op.value, "value": item.value} for item in conditions
-    ]
-
-
-def conditions_of(data: Any) -> list[MailCondition]:
-    return [
-        MailCondition(MailField(item["field"]), MailOperator(item["op"]), item.get("value"))
-        for item in data or ()
-    ]
+def _sql_json(value: JsonObject | None) -> Any:
+    """SQL NULL for no conditions, not the JSON `null`."""
+    return null() if value is None else value

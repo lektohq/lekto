@@ -33,11 +33,11 @@ def contact(*ids: ContactId) -> Condition:
 TEXT = ask(ConditionField.TEXT, Operator.CONTAINS, "Securities")
 
 
-def all_of(*items: Condition | Group, negate: bool = False) -> Group:
+def all_of(*items: Condition | Group[Condition], negate: bool = False) -> Group[Condition]:
     return Group(mode="all", items=items, negate=negate)
 
 
-def any_of(*items: Condition | Group) -> Group:
+def any_of(*items: Condition | Group[Condition]) -> Group[Condition]:
     return Group(mode="any", items=items)
 
 

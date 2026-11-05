@@ -67,11 +67,11 @@ def cond(
     )
 
 
-def all_(*items: Condition | Group, negate: bool = False) -> Group:
+def all_(*items: Condition | Group[Condition], negate: bool = False) -> Group[Condition]:
     return Group(mode="all", items=items, negate=negate)
 
 
-def any_(*items: Condition | Group, negate: bool = False) -> Group:
+def any_(*items: Condition | Group[Condition], negate: bool = False) -> Group[Condition]:
     return Group(mode="any", items=items, negate=negate)
 
 
@@ -85,7 +85,7 @@ _numbers = itertools.count(1)
 
 def rule(
     *actions: Action,
-    when: Group = ALWAYS,
+    when: Group[Condition] = ALWAYS,
     priority: int = 100,
     scope: RuleScope = RuleScope.SPACE,
     space: SpaceId = DEFAULT,
