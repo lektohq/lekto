@@ -59,7 +59,7 @@
 	// The dialog closed: the address names no mailbox any more.
 	$effect(() => {
 		if (!open && page.url.searchParams.has('mailbox')) {
-			void goto('?tab=intake', { replaceState: true, keepFocus: true });
+			void goto('?tab=intake', { replaceState: true });
 		}
 	});
 

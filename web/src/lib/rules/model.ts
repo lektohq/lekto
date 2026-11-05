@@ -20,7 +20,7 @@ import {
 	type TreeGroup
 } from '#lib/rules/tree.ts';
 import { isMoney, isPeriod } from '#lib/fields.ts';
-import { isKeyword, MAIL_FIELD_OPERATORS } from '#lib/mail-traits.ts';
+import { isKeyword, MAIL_FIELD_OPERATORS, MAIL_TEXT_FIELDS } from '#lib/mail-traits.ts';
 import { readPeriod, writePeriod } from '#lib/periods.ts';
 
 type Schemas = components['schemas'];
@@ -720,11 +720,7 @@ function checkValue(
 		condition.field === 'text' ||
 		(condition.field === 'field' && textual) ||
 		condition.field === 'fact' ||
-		condition.field === 'mail_sender' ||
-		condition.field === 'mail_recipient' ||
-		condition.field === 'mail_to' ||
-		condition.field === 'mail_cc' ||
-		condition.field === 'mail_subject'
+		MAIL_TEXT_FIELDS.some((part) => condition.field === `mail_${part}`)
 	) {
 		return checkText(value, condition.op === 'matches' ? LIMITS.pattern : LIMITS.text);
 	}

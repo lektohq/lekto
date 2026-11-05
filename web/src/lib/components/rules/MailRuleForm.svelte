@@ -39,7 +39,7 @@
 		keywordOptions,
 		typedKeyword
 	} from '#lib/mail-traits.ts';
-	import { folderLabel, FOLDER_MAX_LENGTH, type Mailbox } from '#lib/mailboxes.ts';
+	import { folderLabel, LIMITS as MAILBOX_LIMITS, type Mailbox } from '#lib/mailboxes.ts';
 	import {
 		userChoice,
 		type DocumentType,
@@ -100,16 +100,24 @@
 			.map((user) => ({ value: user.id, label: userChoice(user) }))
 	);
 	/** The person's personal space (empty), and the shared spaces they edit. */
-	const places = $derived([
-		{ value: '', label: m.mail_rule_space_personal() },
-		...spaces
+	const editable = $derived(
+		spaces
 			.filter(
 				(space) =>
 					space.personal_of === null &&
-					(space.id === form.spaceId ||
-						space.members.some((item) => item.user_id === form.userId && item.role === 'edit'))
+					space.members.some((item) => item.user_id === form.userId && item.role === 'edit')
 			)
 			.map((space) => ({ value: space.id, label: space.name }))
+	);
+	// A space the person does not edit (another person was chosen since): kept and named, but
+	// saving needs another choice, as `ActionRow` says it.
+	const unreachable = $derived(
+		form.spaceId !== '' && !editable.some((entry) => entry.value === form.spaceId)
+	);
+	const places = $derived([
+		{ value: '', label: m.mail_rule_space_personal() },
+		...editable,
+		...(unreachable ? [{ value: form.spaceId, label: m.rule_space_unreachable() }] : [])
 	]);
 	const folders = $derived(
 		(mailbox?.folders ?? []).map((name) => ({ value: name, label: folderLabel(name) }))
@@ -291,13 +299,21 @@
 		{/if}
 
 		{#if takes && form.shown.includes('space')}
-			<RuleRow label={m.rule_action_set_space()} onremove={() => hide('space')}>
+			<RuleRow
+				label={m.rule_action_set_space()}
+				error={errors.space}
+				onremove={() => hide('space')}
+			>
 				<div class="flex min-w-0 flex-1 basis-64 flex-col gap-2">
 					<Select
 						aria-label={m.rule_action_set_space()}
+						aria-invalid={errors.space ? true : undefined}
 						bind:value={form.spaceId}
 						options={places}
 					/>
+					{#if unreachable}
+						<p class="text-sm text-muted-foreground">{m.rule_space_unreachable_hint()}</p>
+					{/if}
 				</div>
 			</RuleRow>
 		{/if}
@@ -357,7 +373,7 @@
 							aria-invalid={invalid || undefined}
 							placeholder={m.mail_rule_move_to()}
 							bind:value={step.value}
-							maxlength={FOLDER_MAX_LENGTH}
+							maxlength={MAILBOX_LIMITS.folder}
 						/>
 					{:else}
 						<span class="sr-only">{m.rule_no_value()}</span>

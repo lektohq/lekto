@@ -63,7 +63,7 @@
 
 	async function save() {
 		if (!form) return;
-		errors = validate(form);
+		errors = validate(form, lookup?.spaces ?? []);
 		if (Object.keys(errors).length > 0) {
 			error = m.rule_form_invalid();
 			return;
