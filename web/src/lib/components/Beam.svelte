@@ -338,7 +338,8 @@
 >
 	<!-- The sheet itself takes the focus: ← → work at once, and no tooltip shows unasked. Above
 	     every dialog (z-60, web/DESIGN.md "Beam"), whichever was mounted last; the page behind
-	     stays sharp. -->
+	     stays sharp. No shadow: Safari paints it solid black beside the sheet once the pages are
+	     drawn anew at another zoom (Tobi, 05.11.2026); its border and the backdrop set it off. -->
 	<Sheet.Content
 		bind:ref={sheet}
 		data-beam
@@ -351,7 +352,7 @@
 			sheet?.focus();
 		}}
 		onkeydown={keydown}
-		class="z-[60] gap-0 p-0 outline-none data-[side=right]:w-full data-[side=right]:sm:max-w-[40rem]"
+		class="z-[60] gap-0 p-0 shadow-none outline-none data-[side=right]:w-full data-[side=right]:sm:max-w-[40rem]"
 	>
 		<div class="flex shrink-0 items-start gap-3 py-3 pr-2 pl-4 sm:pl-5">
 			<div class="min-w-0 flex-1">
