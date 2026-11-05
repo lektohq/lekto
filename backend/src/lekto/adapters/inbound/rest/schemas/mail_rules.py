@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.schemas import ReasonOut
+from lekto.core.domain.changes import UNSET, Unset
 from lekto.core.domain.condition_tree import MAX_CONDITIONS, MAX_DEPTH
 from lekto.core.domain.ids import DocumentTypeId, SpaceId, UserId
 from lekto.core.domain.json_value import JsonValue
@@ -14,14 +15,13 @@ from lekto.core.domain.mail import MAX_FOLDER, MAX_STEPS, MailAction, MailStep
 from lekto.core.domain.mail_intake import MailOutcome, MailParts
 from lekto.core.domain.mail_rules import (
     MAX_PRIORITY,
+    MAX_VALUE,
     MIN_PRIORITY,
-    UNSET,
     MailConditions,
     MailField,
     MailOperator,
     MailRule,
     MailRuleChanges,
-    Unset,
     conditions_from_json,
     conditions_to_json,
 )
@@ -51,12 +51,17 @@ CONDITIONS_HELP = (
 )
 
 
+MAX_CONDITION_VALUE = max(MAX_VALUE, MAX_FOLDER)
+"""A condition's value at most, before the domain checks it by its field (a folder's name may
+be longer than a text)."""
+
+
 class MailConditionBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     field: MailField
     op: MailOperator
-    value: str | None = Field(default=None, max_length=MAX_FOLDER)
+    value: str | None = Field(default=None, max_length=MAX_CONDITION_VALUE)
 
 
 class MailStepBody(BaseModel):

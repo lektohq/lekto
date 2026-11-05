@@ -9,7 +9,7 @@ characters rather than failing the mail.
 import email
 import email.policy
 import re
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.message import EmailMessage, Message
@@ -37,6 +37,16 @@ class Address:
         if self.name and self.name != self.address:
             return f"{self.name} <{self.address}>"
         return self.address
+
+
+def address_line(addresses: Iterable[Address]) -> str:
+    """The addresses as one line: `Name <address>, other@example.test`."""
+    return ", ".join(address.shown for address in addresses)
+
+
+def address_texts(addresses: Iterable[Address]) -> tuple[str, ...]:
+    """The addresses and names, each for itself, as conditions on addresses look at them."""
+    return tuple(text for item in addresses for text in (item.address, item.name) if text)
 
 
 @dataclass(frozen=True)

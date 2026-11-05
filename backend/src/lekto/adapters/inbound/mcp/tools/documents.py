@@ -31,6 +31,7 @@ from lekto.core.domain.fields import FieldValue, field_from_json, field_to_json
 from lekto.core.domain.ids import DocumentId, FieldId, UserId, short_id
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.mail_intake import OriginRole
+from lekto.core.domain.mail_message import address_line
 from lekto.core.domain.pipeline import ACTOR, CONFIRMED_BY, VIA_TOKEN, NodeRun
 from lekto.core.domain.relations import RelationState
 from lekto.core.domain.spaces import SpaceRole
@@ -280,7 +281,7 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
             if origin is not None:
                 out.mail = MailOut(
                     mailbox=origin.mailbox,
-                    sender=", ".join(address.shown for address in origin.sender),
+                    sender=address_line(origin.sender),
                     subject=origin.subject,
                     sent_at=origin.sent_at,
                     attachment=origin.filename if origin.role is OriginRole.ATTACHMENT else None,

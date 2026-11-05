@@ -59,6 +59,7 @@ from lekto.core.domain.json_value import (
 )
 from lekto.core.domain.labels import LaidWord
 from lekto.core.domain.mail_intake import MailOrigin, OriginRole
+from lekto.core.domain.mail_message import address_line
 from lekto.core.domain.master_data import Contact
 from lekto.core.domain.permissions import Reach, reach_access
 from lekto.core.domain.pipeline import Node, NodeResult, NodeRun, Outcome, ProcessingHistory
@@ -328,7 +329,7 @@ def sender_line(origin: MailOrigin | None) -> str:
     nothing for any other document."""
     if origin is None or origin.role is not OriginRole.ATTACHMENT or not origin.sender:
         return ""
-    return "\n\n" + ", ".join(address.shown for address in origin.sender)
+    return "\n\n" + address_line(origin.sender)
 
 
 def facts_of(

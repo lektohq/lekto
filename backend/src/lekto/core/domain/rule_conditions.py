@@ -25,14 +25,8 @@ from lekto.core.domain.fields import FieldDefinition, FieldType, FieldValue, Mon
 from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, TagId, UserId
 from lekto.core.domain.json_value import JsonValue, require_date
 from lekto.core.domain.mail_intake import MailOrigin
-from lekto.core.domain.mail_message import Address
-from lekto.core.domain.mail_traits import (
-    Importance,
-    MailMarks,
-    flag_holds,
-    importance_holds,
-    keyword_holds,
-)
+from lekto.core.domain.mail_message import address_texts
+from lekto.core.domain.mail_traits import MailHead, flag_holds, importance_holds, keyword_holds
 from lekto.core.domain.periods import Period
 from lekto.core.domain.rules import (
     Condition,
@@ -70,34 +64,22 @@ class Taxonomy:
 
 
 @dataclass(frozen=True, kw_only=True)
-class MailOf:
-    """The mail a document came with, as conditions see it: its mailbox, the sender's and the
-    recipients' addresses and names (To and Cc together and apart), its subject, importance
-    and marks on the server (none for a document taken before Lekto kept them)."""
+class MailOf(MailHead):
+    """The mail a document came with, as conditions see it: its mailbox and its head (the
+    importance and marks none for a document taken before Lekto kept them)."""
 
     mailbox_id: UUID
-    senders: tuple[str, ...]
-    recipients: tuple[str, ...]
-    to: tuple[str, ...] = ()
-    cc: tuple[str, ...] = ()
-    subject: str
-    importance: Importance | None = None
-    marks: MailMarks | None = None
 
     @classmethod
     def of(cls, origin: MailOrigin | None) -> "MailOf | None":
         if origin is None:
             return None
-
-        def texts(addresses: Sequence[Address]) -> tuple[str, ...]:
-            return tuple(text for item in addresses for text in (item.address, item.name) if text)
-
         return cls(
             mailbox_id=origin.mailbox_id,
-            senders=texts(origin.sender),
-            recipients=texts((*origin.to, *origin.cc)),
-            to=texts(origin.to),
-            cc=texts(origin.cc),
+            senders=address_texts(origin.sender),
+            recipients=address_texts((*origin.to, *origin.cc)),
+            to=address_texts(origin.to),
+            cc=address_texts(origin.cc),
             subject=origin.subject,
             importance=origin.importance,
             marks=origin.marks,
@@ -310,17 +292,9 @@ def _condition(
             | ConditionField.MAIL_CC
             | ConditionField.MAIL_SUBJECT
         ):
-            if facts.mail is None:
-                return False
-            texts = {
-                ConditionField.MAIL_SENDER: facts.mail.senders,
-                ConditionField.MAIL_RECIPIENT: facts.mail.recipients,
-                ConditionField.MAIL_TO: facts.mail.to,
-                ConditionField.MAIL_CC: facts.mail.cc,
-                ConditionField.MAIL_SUBJECT: (facts.mail.subject,),
-            }[condition.field]
-            wanted = str(condition.value).casefold()
-            return any(_text_holds(op, text.casefold(), wanted) for text in texts)
+            return facts.mail is not None and facts.mail.text_holds(
+                condition.field.value.removeprefix("mail_"), op.value, str(condition.value)
+            )
         case ConditionField.FACT:
             # Read from the text (or decided by a person): never unknown.
             held = [fact.value for fact in fact_values(condition, facts.kept_facts)]
@@ -380,17 +354,6 @@ def _step(op: Operator, value: JsonValue | object, wanted: list[JsonValue]) -> b
                 return False
             return order > 0 if op is Operator.GT else order < 0
     return False
-
-
-def _text_holds(op: Operator, text: str, wanted: str) -> bool:
-    match op:
-        case Operator.IS:
-            return text == wanted
-        case Operator.STARTS_WITH:
-            return text.startswith(wanted)
-        case Operator.ENDS_WITH:
-            return text.endswith(wanted)
-    return wanted in text
 
 
 def _same(value: object, wanted: JsonValue) -> bool:
