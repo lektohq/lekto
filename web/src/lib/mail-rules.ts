@@ -58,7 +58,20 @@ export const OPERATORS: Record<MailField, readonly MailOperator[]> = {
 };
 
 export const PARTS: readonly MailParts[] = ['all', 'attachments', 'text', 'nothing'];
-export const AFTER: readonly MailAction[] = ['nothing', 'read', 'move', 'trash'];
+/** The steps on a mail on the server (Tobi, 05.11.2026), in the order "Aktion hinzufügen"
+ * offers them; a move or the trash ends the list, once. */
+export const STEP_ACTIONS: readonly MailAction[] = [
+	'read',
+	'unread',
+	'flag',
+	'unflag',
+	'add_keyword',
+	'remove_keyword',
+	'move',
+	'trash'
+];
+export const ENDING: readonly MailAction[] = ['move', 'trash'];
+export const MAX_STEPS = 10;
 
 export const FIELD_LABELS: Record<MailField, () => string> = {
 	sender: m.mail_rule_field_sender,
@@ -96,12 +109,66 @@ export const PARTS_LABELS: Record<MailParts, () => string> = {
 	nothing: m.mail_rule_parts_nothing
 };
 
-export const AFTER_LABELS: Record<MailAction, () => string> = {
-	nothing: m.mail_rule_after_nothing,
-	read: m.mail_rule_after_read,
-	move: m.mail_rule_after_move,
-	trash: m.mail_rule_after_trash
+/** A step as its row and "Aktion hinzufügen" name it ("Schlagwort hinzufügen"). */
+export const STEP_LABELS: Record<MailAction, () => string> = {
+	read: m.mail_step_read,
+	unread: m.mail_step_unread,
+	flag: m.mail_step_flag,
+	unflag: m.mail_step_unflag,
+	add_keyword: m.mail_step_add_keyword,
+	remove_keyword: m.mail_step_remove_keyword,
+	move: m.mail_step_move,
+	trash: m.mail_step_trash
 };
+
+/** Whether a step names something: the flag's colour, a keyword, a folder. */
+export const takesValue = (action: MailAction) =>
+	action === 'flag' || action === 'add_keyword' || action === 'remove_keyword' || action === 'move';
+
+export interface StepForm {
+	key: string;
+	action: MailAction;
+	value: string;
+}
+
+export function newStep(action: MailAction): StepForm {
+	return { key: nextKey(), action, value: action === 'flag' ? 'red' : '' };
+}
+
+/** `steps` with a new one: an ending one last, another before an ending one. */
+export function withStep(steps: readonly StepForm[], action: MailAction): StepForm[] {
+	const step = newStep(action);
+	const end = steps.findIndex((item) => ENDING.includes(item.action));
+	if (ENDING.includes(action) || end < 0) return [...steps, step];
+	return [...steps.slice(0, end), step, ...steps.slice(end)];
+}
+
+/** The steps "Aktion hinzufügen" offers: one ending step at most, and those without a value
+ * once. */
+export function addableSteps(steps: readonly StepForm[]): MailAction[] {
+	if (steps.length >= MAX_STEPS) return [];
+	const ends = steps.some((item) => ENDING.includes(item.action));
+	return STEP_ACTIONS.filter(
+		(action) =>
+			!(ENDING.includes(action) && ends) &&
+			(takesValue(action) || !steps.some((item) => item.action === action))
+	);
+}
+
+function stepValid(step: StepForm): boolean {
+	const value = step.value.trim();
+	switch (step.action) {
+		case 'add_keyword':
+		case 'remove_keyword':
+			return isKeyword(value);
+		case 'move':
+			return value !== '';
+		case 'flag':
+			return value !== '';
+		default:
+			return true;
+	}
+}
 
 /** Whether the operator takes a value. */
 export const hasValue = (op: MailOperator) => op !== 'present' && op !== 'missing';
@@ -117,8 +184,8 @@ export interface MailConditionNode {
 export type MailGroupNode = TreeGroup<MailConditionNode>;
 
 /** The actions beside "Übernehmen" and "Für", each there or not (mock E: "+ Aktion"). */
-export type Optional = 'space' | 'type' | 'after';
-export const OPTIONALS: readonly Optional[] = ['space', 'type', 'after'];
+export type Optional = 'space' | 'type';
+export const OPTIONALS: readonly Optional[] = ['space', 'type'];
 
 export interface MailRuleForm {
 	mailboxId: string;
@@ -130,8 +197,8 @@ export interface MailRuleForm {
 	userId: string;
 	spaceId: string;
 	typeId: string;
-	after: MailAction;
-	moveTo: string;
+	/** On the server afterwards, in order; a move or the trash last. */
+	steps: StepForm[];
 	shown: Optional[];
 }
 
@@ -181,15 +248,13 @@ export function formOf(rule: MailRule | null, mailboxId = '', typeId = ''): Mail
 			userId: '',
 			spaceId: '',
 			typeId,
-			after: 'nothing',
-			moveTo: '',
+			steps: [],
 			shown: typeId ? ['type'] : []
 		};
 	}
 	const shown: Optional[] = [];
 	if (rule.space_id) shown.push('space');
 	if (rule.text_type_id) shown.push('type');
-	if (rule.after !== 'nothing') shown.push('after');
 	return {
 		mailboxId: rule.mailbox_id,
 		name: rule.name,
@@ -199,8 +264,11 @@ export function formOf(rule: MailRule | null, mailboxId = '', typeId = ''): Mail
 		userId: rule.user_id ?? '',
 		spaceId: rule.space_id ?? '',
 		typeId: rule.text_type_id ?? '',
-		after: rule.after,
-		moveTo: rule.move_to ?? '',
+		steps: rule.after.map((step) => ({
+			key: nextKey(),
+			action: step.action,
+			value: step.value ?? ''
+		})),
 		shown
 	};
 }
@@ -209,7 +277,6 @@ export function formOf(rule: MailRule | null, mailboxId = '', typeId = ''): Mail
 export function complete(form: MailRuleForm): boolean {
 	const priority = Number(form.priority);
 	const takes = form.parts !== 'nothing';
-	const after = form.shown.includes('after') ? form.after : 'nothing';
 	return (
 		form.mailboxId !== '' &&
 		form.name.trim() !== '' &&
@@ -217,7 +284,7 @@ export function complete(form: MailRuleForm): boolean {
 		priority >= 0 &&
 		priority <= 1000 &&
 		(!takes || form.userId !== '') &&
-		(after !== 'move' || form.moveTo.trim() !== '') &&
+		form.steps.every(stepValid) &&
 		emptyGroups(form.conditions, false).length === 0 &&
 		conditionsOf(form.conditions).every(
 			(item) =>
@@ -229,7 +296,6 @@ export function complete(form: MailRuleForm): boolean {
 
 function body(form: MailRuleForm) {
 	const takes = form.parts !== 'nothing';
-	const after = form.shown.includes('after') ? form.after : 'nothing';
 	return {
 		name: form.name.trim(),
 		priority: Number(form.priority),
@@ -240,8 +306,10 @@ function body(form: MailRuleForm) {
 		user_id: takes ? form.userId : null,
 		space_id: takes && form.shown.includes('space') && form.spaceId ? form.spaceId : null,
 		text_type_id: takes && form.shown.includes('type') && form.typeId ? form.typeId : null,
-		after,
-		move_to: after === 'move' ? form.moveTo.trim() : null
+		after: form.steps.map((step) => ({
+			action: step.action,
+			value: takesValue(step.action) ? step.value.trim() : null
+		}))
 	};
 }
 
@@ -283,6 +351,29 @@ function valueText(field: MailField, value: string): string {
 	}
 }
 
+/** A step on the mail in words ("Schlagwort „Lekto“ hinzufügen"). */
+export function stepText(step: { action: MailAction; value?: string | null }): string {
+	const value = step.value ?? '';
+	switch (step.action) {
+		case 'read':
+			return m.mail_rule_after_read();
+		case 'unread':
+			return m.mail_rule_after_unread();
+		case 'flag':
+			return m.mail_rule_after_flag({ color: flagLabel(value) });
+		case 'unflag':
+			return m.mail_rule_after_unflag();
+		case 'add_keyword':
+			return m.mail_rule_after_add_keyword({ keyword: value });
+		case 'remove_keyword':
+			return m.mail_rule_after_remove_keyword({ keyword: value });
+		case 'move':
+			return m.mail_rule_summary_move({ folder: folderLabel(value) });
+		case 'trash':
+			return m.mail_rule_after_trash();
+	}
+}
+
 /** What the rule does, one part each: what it takes, for whom, where, the type of the text,
  * the mail afterwards. */
 export function actionTexts(rule: MailRule, names: Names): string[] {
@@ -291,11 +382,7 @@ export function actionTexts(rule: MailRule, names: Names): string[] {
 	if (rule.space_id) does.push(m.mail_rule_summary_space({ name: names.space(rule.space_id) }));
 	if (rule.text_type_id)
 		does.push(m.mail_rule_summary_type({ name: names.type(rule.text_type_id) }));
-	if (rule.after === 'move' && rule.move_to) {
-		does.push(m.mail_rule_summary_move({ folder: folderLabel(rule.move_to) }));
-	} else if (rule.after !== 'nothing') {
-		does.push(AFTER_LABELS[rule.after]());
-	}
+	for (const step of rule.after) does.push(stepText(step));
 	return does;
 }
 

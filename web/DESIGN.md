@@ -776,8 +776,15 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
   (`RuleRow`: a label for an action, the fields, up and down where the order counts, the bin),
   the comparisons ("ist", "enthält", "beginnt mit", "endet auf"), "Bedingung hinzufügen",
   "Aktion hinzufügen", "In Space ablegen", the priority's line. A mail rule's editor has the
-  mailbox (`Select`); "Übernehmen" and "Für" always, "In Space ablegen", "Typ des Mailtexts"
-  and "Mail danach" added with "Aktion hinzufügen". Words of their own only where the thing
+  mailbox (`Select`); "Übernehmen" and "Für" always, "In Space ablegen" and "Typ des
+  Mailtexts" added with "Aktion hinzufügen". Below them the steps on the mail on the server
+  (Tobi, 05.11.2026), added under the label "Mail danach" of the same menu, one row each named
+  by its step: "Als gelesen markieren", "Als ungelesen markieren", "Markierung setzen" (a colour,
+  `Select`), "Markierung entfernen", "Schlagwort hinzufügen" / "entfernen" (as a keyword
+  condition), then at most one "Verschieben nach" (a folder) or "In den Papierkorb", always last
+  and without up and down; a line under them says Lekto goes through them in order. A step the
+  server refused shows at the mailbox as a line in `lane-yellow-foreground` ("Am …: … ging
+  nicht"), as a mail left out does. Words of their own only where the thing
   differs (a mail's fields, what a mail rule takes).
 - **A mail's fields** (Tobi, 05.11.2026), the same in mail rules and as "Mail: …" in document
   rules: Absender, "Empfänger (An oder CC)", An, CC, Betreff (texts: "endet auf", "enthält",
