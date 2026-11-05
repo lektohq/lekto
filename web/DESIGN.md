@@ -497,7 +497,7 @@ the deliveries by outcome and event). The documents list pages the same way (see
 | ------------------------------------------------------------ | ------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Ask before a destructive action                              | `ConfirmDialog` (alert dialog)              | centred, `size="md"`             | centred with gutter                                                                                                   |
 | A short form (space, token, code, move, reprocess, new user) | `FormDialog`                                | centred, `size` `sm`/`md`/`lg`   | full screen with the editor bar                                                                                       |
-| An editor of master data, lenses                             | `EditorShell`                               | dialog with sticky head and foot | full screen with the editor bar                                                                                       |
+| An editor of master data, lenses, a mailbox                  | `EditorShell`                               | dialog with sticky head and foot | full screen with the editor bar                                                                                       |
 | A secret shown once                                          | `SecretDialog`                              | centred, `size="md"`             | centred with gutter                                                                                                   |
 | A choice from many (tags, facets, topic; contact, type)      | popover / `TagPickerDialog`, `SearchSelect` | popover or dialog                | sheet from the bottom (`PhoneSheet`; `SearchSelect`: see [Fields](#fields))                                           |
 | Filters                                                      | sidebar                                     | sidebar                          | sheet from the bottom, title and close fixed on top, "Zurücksetzen" and "Ergebnisse anzeigen (N)" fixed at the bottom |
@@ -507,7 +507,7 @@ the deliveries by outcome and event). The documents list pages the same way (see
   so the scrollbar stands at the dialog's edge, never over a field; title, parts and footer stay
   (`FormDialog`, `EditorShell`, the account dialog). A dialog with parts keeps one height.
 - **Widths** come from the `size` prop (`sm` 384 px, `md` 512 px, `lg` 672 px, `xl` 768 px), a
-  `FormDialog`'s too (`md` unless a form needs fields side by side: a mailbox, `lg`). A
+  `FormDialog`'s too (`md` unless a form needs fields side by side, `lg`). A
   `class="max-w-*"` on dialog content is not used.
 - **Phone editor bar:** "Abbrechen" · title · "Speichern", fixed on top. The body scrolls. The
   action is a short verb there: a longer label of the desktop ("Ins Profil von Anna") becomes its
@@ -732,15 +732,18 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
   mail left out because it was too large (beyond `LEKTO_UPLOAD_MAX_SIZE` with its Base64) as a
   line in `lane-yellow-foreground`: "Ausgelassen am …: Die Mail „…“ hat … MB …".
   Trailing: the `Switch` (Aktiv / Pausiert, no badge for it) and the `EditButton`.
-- **The dialog** (`FormDialog`, `lg`): name; server, port and encryption in one row; user and
-  password (empty keeps the stored one; it is never shown); "Verbindung testen" (`outline`)
-  with what it found in a line beside it (`role="status"`); the folders as a `MultiPicker` of
-  what the test found and what is chosen; how often (`Select`) and what a mail without a rule
-  brings in (`Select`: "Nichts übernehmen" or "Alles für" a person) side by side; which mails
-  as a `Segmented` of three with a `DateInput` for "Ab Datum" and a line under it; the type of
-  the mail text (`SearchSelect`). Deleting is in the footer. A stored mailbox that is not
-  paused has "Jetzt abrufen" (`outline`, `RefreshCw`) beside the test; a toast says the fetch is
-  asked for.
+- **The dialog** (`EditorShell`, `lg`, one height) has two parts under its title (Tobi,
+  05.11.2026), a `Segmented` "Verbindung · Abruf"; one save stores both.
+  - **Verbindung:** name; server, port and encryption in one row; user and password (empty keeps
+    the stored one; it is never shown); "Verbindung testen" (`outline`) with what it found in a
+    line beside it (`role="status"`). A stored mailbox that is not paused has "Jetzt abrufen"
+    (`outline`, `RefreshCw`) beside the test; a toast says the fetch is asked for.
+  - **Abruf:** the folders as a `MultiPicker` of what the test found and what is chosen; how
+    often ("Wie oft", `Select`) and what a mail without a rule brings in (`Select`: "Nichts
+    übernehmen" or "Alles für" a person) side by side; which mails as a `Segmented` of three with
+    a `DateInput` for "Ab Datum" and a line under it; the type of the mail text (`SearchSelect`).
+  - A new mailbox opens at "Verbindung" and goes on to "Abruf" once a test found the folders.
+    Deleting is in the footer.
 - **The origin of a document** (mock C): a document a mail brought shows the card "Herkunft" in
   its facts pane, above "Bezüge": label and value rows as the file information has them
   (Kanal, Postfach, Regel or "Ohne Regel (Rückfall des Postfachs)", Von, An, Betreff,

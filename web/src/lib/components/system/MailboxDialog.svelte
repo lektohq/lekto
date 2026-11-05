@@ -5,7 +5,7 @@
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import DateInput from '#lib/components/DateInput.svelte';
-	import FormDialog from '#lib/components/FormDialog.svelte';
+	import EditorShell from '#lib/components/EditorShell.svelte';
 	import HintLabel from '#lib/components/HintLabel.svelte';
 	import MultiPicker from '#lib/components/MultiPicker.svelte';
 	import SearchSelect from '#lib/components/SearchSelect.svelte';
@@ -35,10 +35,12 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { reasonText } from '#lib/reasons.ts';
 
-	// The dialog of a mailbox (Tobi, 04.11.2026; mock D): where Lekto signs in, a test of the
-	// connection that lists the folders to pick from, how often and which mails it fetches, what
-	// a mail no rule takes brings in, and the type of a mail's text. The password is never shown
-	// again: left empty, the stored one stays. Deleting is in the footer.
+	// The dialog of a mailbox (Tobi, 04.11.2026; mock D) in two parts (Tobi, 05.11.2026):
+	// "Verbindung", where Lekto signs in and the test of the connection that lists the folders,
+	// and "Abruf": the folders to pick from, how often and which mails it fetches, what a mail no
+	// rule takes brings in, and the type of a mail's text. A new mailbox starts at the connection
+	// and goes on to the fetching once a test found the folders. One save stores both parts. The
+	// password is never shown again: left empty, the stored one stays. Deleting is in the footer.
 	let {
 		open = $bindable(false),
 		mailbox,
@@ -56,6 +58,12 @@
 	let testing = $state(false);
 	let tested = $state<ConnectionTest | null>(null);
 	let testProblem = $state<string | null>(null);
+	let part = $state<'connection' | 'fetch'>('connection');
+
+	const PARTS = [
+		{ value: 'connection', label: m.mailbox_part_connection() },
+		{ value: 'fetch', label: m.mailbox_part_fetch() }
+	];
 
 	const creating = $derived(mailbox === null);
 	const title = $derived(
@@ -65,6 +73,7 @@
 	$effect(() => {
 		if (!open) return;
 		form = formOf(mailbox);
+		part = 'connection';
 		tested = null;
 		testProblem = null;
 		void loadChoices();
@@ -134,6 +143,8 @@
 					}
 				})
 			);
+			// A new mailbox goes on to its folders once the test found them.
+			if (creating && !tested.error) part = 'fetch';
 		} catch (error) {
 			testProblem = describeError(error);
 		} finally {
@@ -188,27 +199,24 @@
 	}
 </script>
 
-<FormDialog
+<EditorShell
 	bind:open
-	size="lg"
 	{title}
+	shortTitle={m.mailbox_short()}
 	submitLabel={creating ? m.create() : m.save()}
 	disabled={!complete(form, creating)}
 	action={save}
 	ondelete={mailbox ? remove : undefined}
 	deleteTitle={mailbox ? m.mailbox_delete_title({ name: mailbox.name }) : ''}
 	deleteDescription={m.mailbox_delete_description()}
+	tabs={PARTS}
+	bind:tab={() => part, (value) => (part = value as 'connection' | 'fetch')}
+	class="h-[min(46.25rem,calc(100dvh-2rem))]"
 >
-	{#snippet children(error)}
+	<div class={['flex flex-col gap-4', part !== 'connection' && 'hidden']}>
 		<Field.Field>
 			<Field.Label for="mailbox-name">{m.field_name()}</Field.Label>
-			<Input
-				id="mailbox-name"
-				bind:value={form.name}
-				maxlength={100}
-				required
-				aria-invalid={error ? true : undefined}
-			/>
+			<Input id="mailbox-name" bind:value={form.name} maxlength={100} required />
 		</Field.Field>
 		<div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_6rem_10rem]">
 			<Field.Field>
@@ -288,6 +296,8 @@
 				{/if}
 			</p>
 		</div>
+	</div>
+	<div class={['flex flex-col gap-4', part !== 'fetch' && 'hidden']}>
 		<Field.Field>
 			<HintLabel id="mailbox-folders-label" label={m.mail_folders()} hint={m.mail_folders_hint()} />
 			<MultiPicker
@@ -354,5 +364,5 @@
 				noneLabel={m.mail_body_type_open()}
 			/>
 		</Field.Field>
-	{/snippet}
-</FormDialog>
+	</div>
+</EditorShell>
