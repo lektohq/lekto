@@ -787,7 +787,7 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
   nicht"), as a mail left out does. Words of their own only where the thing
   differs (a mail's fields, what a mail rule takes).
 - **A mail's fields** (Tobi, 05.11.2026), the same in mail rules and as "Mail: …" in document
-  rules: Absender, "Empfänger (An oder CC)", An, CC, Betreff (texts: "endet auf", "enthält",
+  rules: Absender, "Empfänger (An/CC)", An, CC, Betreff (texts: "endet auf", "enthält",
   "ist", "beginnt mit"); Ordner, Anhänge (mail rules); Wichtigkeit ("ist" hoch / normal /
   niedrig, a `Select`); Schlagwörter (the mail's IMAP keywords, worded as tags: "enthalten",
   "vorhanden", "fehlen"; a `SearchSelect` of the keywords the mailboxes' folders know, a typed

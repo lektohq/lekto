@@ -231,7 +231,7 @@
 	"mail_rule_mailbox": "Postfach",
 	"mail_rule_every_hint": "Ohne Bedingung gilt die Regel für jede Mail.",
 	"mail_rule_field_sender": "Absender",
-	"mail_rule_field_recipient": "Empfänger (An oder CC)",
+	"mail_rule_field_recipient": "Empfänger (An/CC)",
 	"mail_rule_field_subject": "Betreff",
 	"mail_rule_field_folder": "Ordner",
 	"mail_rule_field_attachments": "Anhänge",
