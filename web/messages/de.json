@@ -1405,6 +1405,8 @@
 	"rule_condition_operator": "Vergleich",
 	"rule_condition_value": "Wert",
 	"rule_condition_field": "Feld",
+	"rule_field_mail": "Mail",
+	"rule_condition_mail_part": "Angabe der Mail",
 	"rule_case_sensitive": "Groß-/Kleinschreibung beachten",
 	"rule_choose": "Bitte wählen …",
 	"rule_add_action": "Aktion hinzufügen",

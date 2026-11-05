@@ -46,6 +46,24 @@ const CONDITION_FIELDS: Record<Exclude<ConditionField, 'field'>, () => string> =
 	mail_flag: () => m.rule_field_of_mail({ field: m.mail_rule_field_flag() })
 };
 
+/** A part of the mail as the second choice after "Mail" names it ("Absender"); a rule's text
+ * keeps "Mail: Absender" (`fieldLabel`). */
+const MAIL_PART_LABELS: Partial<Record<ConditionField, () => string>> = {
+	mail_mailbox: m.mail_rule_mailbox,
+	mail_sender: m.mail_rule_field_sender,
+	mail_recipient: m.mail_rule_field_recipient,
+	mail_to: m.mail_rule_field_to,
+	mail_cc: m.mail_rule_field_cc,
+	mail_subject: m.mail_rule_field_subject,
+	mail_importance: m.mail_rule_field_importance,
+	mail_keyword: m.mail_rule_field_keyword,
+	mail_flag: m.mail_rule_field_flag
+};
+
+export function mailPartLabel(field: ConditionField): string {
+	return MAIL_PART_LABELS[field]?.() ?? fieldLabel(field);
+}
+
 export function fieldLabel(field: ConditionField): string {
 	return field === 'field' ? m.rule_field_field() : CONDITION_FIELDS[field]();
 }

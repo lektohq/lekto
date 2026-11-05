@@ -136,6 +136,15 @@ export const CONDITION_FIELDS: readonly ConditionField[] = [
 	'mail_flag'
 ];
 export const STEP_CONDITION_FIELDS: readonly ConditionField[] = ['step', ...CONDITION_FIELDS];
+/** The parts of the mail a document came with, chosen after the subject "Mail" (Tobi,
+ * 05.11.2026: as "Feld" is followed by the field), in the mail rules' order. */
+export const MAIL_PARTS: readonly ConditionField[] = CONDITION_FIELDS.filter(isMailField);
+/** The subject choice says "Mail" for all of them. */
+export const MAIL_SUBJECT = 'mail';
+
+export function isMailField(field: string): boolean {
+	return field.startsWith('mail_');
+}
 
 const ALL_OPERATORS: readonly Operator[] = [
 	'is',
