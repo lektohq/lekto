@@ -267,6 +267,12 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(found).toEqual([]);
 	});
 
+	it('gives the Beam no shadow, which Safari paints black at another zoom', () => {
+		const beam = sources['/src/lib/components/Beam.svelte'];
+		// Its attributes hold arrow functions (`=>`): up to its own class, not to the first `>`.
+		expect(beam).toMatch(/<Sheet\.Content\b[\s\S]*?\sclass="[^"]*\bshadow-none\b/);
+	});
+
 	it('keeps a label with help as high as one without', () => {
 		const hint = sources['/src/lib/components/InfoHint.svelte'];
 		expect(hint).toMatch(/<span class="-my-1 flex">\s*<InfoTip\b[^>]*size="sm"/);

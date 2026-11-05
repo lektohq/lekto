@@ -611,6 +611,9 @@ eingereiht") or report an error of an action. **A toast never replaces a load er
 
 ### Help and tooltips
 
+- **No shadow** (Tobi, 05.11.2026): Safari paints the shadow of the sheet solid black beside it
+  once its pages are drawn anew at another zoom, and keeps it so. Its left border and the
+  backdrop set it off. `design-system.test.ts` keeps the shadow away.
 - **Help of a field or section:** `InfoTip` or `HintLabel`, an info button beside the label that
   opens the text. The visible text stays what one needs to read the view. Help text holds at most
   about 200 characters. Longer explanations belong in the documentation.
