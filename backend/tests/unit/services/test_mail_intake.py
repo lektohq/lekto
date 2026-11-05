@@ -41,7 +41,12 @@ from lekto.core.domain.rules import Condition, ConditionField, Operator, RuleSco
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.services.classification.signals import FactsResult, FactsSignal, sender_line
-from lekto.core.services.mail_intake import FETCH_JOB, MailIntakeService, fetch_key
+from lekto.core.services.mail_intake import (
+    FETCH_JOB,
+    MAX_PER_RUN,
+    MailIntakeService,
+    fetch_key,
+)
 from lekto.core.services.mail_rules import Decider
 from lekto.core.services.objects import text_key
 from lekto.core.services.relating import relate
@@ -228,6 +233,29 @@ async def test_a_mail_before_the_setup_is_left(world: World) -> None:
     account.deliver("INBOX", mails.plain_mail(), arrived_at=world.clock.now() - timedelta(hours=1))
     await _fetch(world, world.mail_intake())
     assert await world.documents.list_visible(person.id) == []
+
+
+async def test_mails_before_the_setup_leave_the_room_to_the_new_ones(world: World) -> None:
+    """More mails of the day before the setup than a run takes: they are not recorded, so they
+    come back every run; they must not fill the run, nor make it repeat at once."""
+    _, person, mailbox = await _setup(world)
+    account = world.mail_server.servers[(LOGIN.host, LOGIN.port)][LOGIN.username]
+    earlier = world.clock.now() - timedelta(hours=1)
+    for number in range(MAX_PER_RUN + 10):
+        account.deliver("INBOX", mails.plain_mail(f"Alt {number}"), arrived_at=earlier)
+    _deliver(world, mails.plain_mail("Neu"))
+    service = world.mail_intake()
+    world.clock.advance(2 * LATER)
+    assert await service.run_next_job()
+    names = [
+        document.original_filename for document in await world.documents.list_visible(person.id)
+    ]
+    assert names == ["Neu.eml"]
+    async with world.uow() as uow:
+        (job,) = await uow.jobs.find(
+            now=world.clock.now(), states=[JobState.PLANNED], kind=FETCH_JOB, limit=5
+        )
+    assert job.run_at == world.clock.now() + mailbox.interval  # not at once
 
 
 async def test_a_mail_too_large_is_left_out_and_shows_at_the_mailbox(world: World) -> None:
