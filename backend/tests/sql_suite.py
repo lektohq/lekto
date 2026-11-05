@@ -3713,6 +3713,15 @@ class MigrationSuite:
             ("read", "read", None),
             ("trash", "trash", None),
         ]
+        if empty_database.sqlite_path is None:  # SQLite keeps the default the fill needed
+            async with empty_database.reading() as connection:
+                columns = await connection.run_sync(
+                    lambda sync: {
+                        item["name"]: item["default"]
+                        for item in sa.inspect(sync).get_columns("mail_rules")
+                    }
+                )
+            assert columns["after"] is None
 
     async def test_revision_0067_turns_the_json_null_into_null(
         self, empty_database: Database

@@ -11,7 +11,9 @@ becomes its list (`nothing`: none, `move` with `move_to`), and `after` and `move
 mailbox keeps when a step last failed and why (`step_failed_at`, `step_failed`).
 
 The columns have no keys, so SQLite adds and drops them in place. The downgrade gives a rule
-the last of its steps that was an action before (move, trash, read), or nothing.
+the last of its steps that was an action before (move, trash, read), or nothing; `after` needs
+a default while the rows get theirs, which it then takes away (revision 0062 had none; SQLite
+keeps it, harmless).
 """
 
 from collections.abc import Sequence
@@ -73,4 +75,6 @@ def downgrade() -> None:
             .where(_rules.c.id == id_)
             .values(after=last["action"], move_to=last.get("value"))
         )
+    if connection.dialect.name != "sqlite":
+        op.alter_column("mail_rules", "after", existing_type=sa.Text(), server_default=None)
     op.drop_column("mail_rules", "steps")
