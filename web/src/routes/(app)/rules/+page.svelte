@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import MailRulesList from '#lib/components/rules/MailRulesList.svelte';
+	import RuleListRow from '#lib/components/rules/RuleListRow.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
 	import { loadMailRuleLookup, type MailRuleLookup } from '#lib/mail-rule-lookup.ts';
 	import type { MailRule } from '#lib/mail-rules.ts';
@@ -14,12 +15,10 @@
 	import { BASE } from '#lib/base.ts';
 	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
-	import EditButton from '#lib/components/EditButton.svelte';
 	import TitlePatternBadge from '#lib/components/rules/TitlePatternBadge.svelte';
 	import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { buttonVariants } from '#lib/components/ui/button/index.ts';
-	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
 	import type { Space, UserName } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -31,7 +30,6 @@
 	import { session } from '#lib/session.svelte.ts';
 	import { cn } from '#lib/utils.ts';
 	import PageHeader from '#lib/components/page/PageHeader.svelte';
-	import * as Card from '#lib/components/ui/card/index.ts';
 	import Loading from '#lib/components/Loading.svelte';
 
 	type Rule = components['schemas']['RuleOut'];
@@ -166,58 +164,33 @@
 	{:else}
 		<ul class="flex flex-col gap-2">
 			{#each rules as rule (rule.id)}
-				<!-- The name's link takes the whole row; the switch and the pencil stand above it. -->
-				<Card.Root as="li" size="row" class="relative flex flex-wrap items-center gap-3">
-					<div class="flex min-w-0 flex-1 flex-col gap-1">
-						<span class="flex flex-wrap items-center gap-2">
-							<a
-								href="{BASE}/rules/{rule.id}"
-								class="truncate font-medium after:absolute after:inset-0 hover:underline"
-								aria-label={m.rule_open({ name: rule.name })}>{rule.name}</a
-							>
-							<Badge variant="note">
-								{placeName(rule)}
-							</Badge>
-							{#if rule.managed_by_document_type_id}
-								<TitlePatternBadge
-									documentTypeId={rule.managed_by_document_type_id}
-									name={rule.name}
-									ruleId={rule.id}
-								/>
-							{/if}
-						</span>
-						<span class="text-sm text-muted-foreground">
-							{m.rule_priority_short({ priority: rule.priority })} ·
-							{rule.triggers.map((trigger) => TRIGGER_LABELS[trigger]()).join(' · ')}
-						</span>
-						{#if rule.disabled_reason}
-							<span class="text-sm text-destructive">
-								{m.rule_disabled_reason({
-									reason: reasonsText(rule.disabled_reasons, rule.disabled_reason) ?? ''
-								})}
-							</span>
+				<RuleListRow
+					href="{BASE}/rules/{rule.id}"
+					editHref="{BASE}/rules/{rule.id}/edit"
+					name={rule.name}
+					enabled={rule.enabled}
+					canChange={canChangeRule(rule, session.user, spaces)}
+					busy={busy === rule.id}
+					disabledReason={rule.disabled_reason
+						? (reasonsText(rule.disabled_reasons, rule.disabled_reason) ?? '')
+						: null}
+					onswitch={(enabled) => switchRule(rule, enabled)}
+				>
+					{#snippet badges()}
+						<Badge variant="note">{placeName(rule)}</Badge>
+						{#if rule.managed_by_document_type_id}
+							<TitlePatternBadge
+								documentTypeId={rule.managed_by_document_type_id}
+								name={rule.name}
+								ruleId={rule.id}
+							/>
 						{/if}
-					</div>
-					{#if canChangeRule(rule, session.user, spaces)}
-						<Switch
-							bind:checked={() => rule.enabled, (enabled) => switchRule(rule, enabled)}
-							disabled={busy === rule.id}
-							class="relative z-10"
-							aria-label={rule.enabled
-								? m.rule_switch_off({ name: rule.name })
-								: m.rule_switch_on({ name: rule.name })}
-						/>
-						<EditButton
-							class="relative z-10"
-							label={m.rule_edit_title({ name: rule.name })}
-							href="{BASE}/rules/{rule.id}/edit"
-						/>
-					{:else}
-						<Badge variant={rule.enabled ? 'green' : 'muted'}>
-							{rule.enabled ? m.rule_on() : m.rule_off()}
-						</Badge>
-					{/if}
-				</Card.Root>
+					{/snippet}
+					{#snippet summary()}
+						{m.rule_priority_short({ priority: rule.priority })} ·
+						{rule.triggers.map((trigger) => TRIGGER_LABELS[trigger]()).join(' · ')}
+					{/snippet}
+				</RuleListRow>
 			{/each}
 		</ul>
 	{/if}
