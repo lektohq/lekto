@@ -33092,6 +33092,146 @@
         "title": "MailAction",
         "description": "What becomes of a mail on the server once Lekto has taken it: nothing, marked as read,\nmoved to a folder, or moved to the trash."
       },
+      "MailAllGroup-Input": {
+        "properties": {
+          "all": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/MailConditionBody"
+                },
+                {
+                  "$ref": "#/components/schemas/MailAllGroup-Input"
+                },
+                {
+                  "$ref": "#/components/schemas/MailAnyGroup-Input"
+                }
+              ]
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "All"
+          },
+          "not": {
+            "type": "boolean",
+            "title": "Not",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "all"
+        ],
+        "title": "MailAllGroup",
+        "description": "All items hold (and); `not` turns the result around."
+      },
+      "MailAllGroup-Output": {
+        "properties": {
+          "all": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/MailConditionBody"
+                },
+                {
+                  "$ref": "#/components/schemas/MailAllGroup-Output"
+                },
+                {
+                  "$ref": "#/components/schemas/MailAnyGroup-Output"
+                }
+              ]
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "All"
+          },
+          "not": {
+            "type": "boolean",
+            "title": "Not",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "all"
+        ],
+        "title": "MailAllGroup",
+        "description": "All items hold (and); `not` turns the result around."
+      },
+      "MailAnyGroup-Input": {
+        "properties": {
+          "any": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/MailConditionBody"
+                },
+                {
+                  "$ref": "#/components/schemas/MailAllGroup-Input"
+                },
+                {
+                  "$ref": "#/components/schemas/MailAnyGroup-Input"
+                }
+              ]
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Any"
+          },
+          "not": {
+            "type": "boolean",
+            "title": "Not",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "any"
+        ],
+        "title": "MailAnyGroup",
+        "description": "At least one item holds (or); `not` turns the result around."
+      },
+      "MailAnyGroup-Output": {
+        "properties": {
+          "any": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/MailConditionBody"
+                },
+                {
+                  "$ref": "#/components/schemas/MailAllGroup-Output"
+                },
+                {
+                  "$ref": "#/components/schemas/MailAnyGroup-Output"
+                }
+              ]
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Any"
+          },
+          "not": {
+            "type": "boolean",
+            "title": "Not",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "any"
+        ],
+        "title": "MailAnyGroup",
+        "description": "At least one item holds (or); `not` turns the result around."
+      },
       "MailConditionBody": {
         "properties": {
           "field": {
@@ -33300,33 +33440,20 @@
             "title": "Priority",
             "description": "Higher first."
           },
-          "any": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Any",
-            "description": "Any condition (or); else all (and)."
-          },
           "conditions": {
             "anyOf": [
               {
-                "items": {
-                  "$ref": "#/components/schemas/MailConditionBody"
-                },
-                "type": "array",
-                "maxItems": 20
+                "$ref": "#/components/schemas/MailAllGroup-Input"
+              },
+              {
+                "$ref": "#/components/schemas/MailAnyGroup-Input"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Conditions",
-            "description": "Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). None: every mail."
+            "description": "A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). Null: every mail."
           },
           "parts": {
             "anyOf": [
@@ -33432,17 +33559,19 @@
           "name"
         ],
         "title": "MailRuleCreate",
-        "description": "A new mail rule of a mailbox; what is left out gets the default (priority 100, all\nconditions, takes the attachments and the text, leaves the mail, active).",
+        "description": "A new mail rule of a mailbox; what is left out gets the default (priority 100, no\nconditions: every mail, takes the attachments and the text, leaves the mail, active).",
         "examples": [
           {
             "after": "read",
-            "conditions": [
-              {
-                "field": "sender",
-                "op": "ends_with",
-                "value": "@stadtwerke.example"
-              }
-            ],
+            "conditions": {
+              "all": [
+                {
+                  "field": "sender",
+                  "op": "ends_with",
+                  "value": "@stadtwerke.example"
+                }
+              ]
+            },
             "mailbox_id": "01a1a7fc-702c-736e-a661-ff59645bdc52",
             "name": "Bills of the utilities",
             "user_id": "01a1a7fc-7013-741e-ae72-58401e634e5d"
@@ -33465,33 +33594,20 @@
             "title": "Priority",
             "description": "Higher first."
           },
-          "any": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Any",
-            "description": "Any condition (or); else all (and)."
-          },
           "conditions": {
             "anyOf": [
               {
-                "items": {
-                  "$ref": "#/components/schemas/MailConditionBody"
-                },
-                "type": "array",
-                "maxItems": 20
+                "$ref": "#/components/schemas/MailAllGroup-Input"
+              },
+              {
+                "$ref": "#/components/schemas/MailAnyGroup-Input"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Conditions",
-            "description": "Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). None: every mail."
+            "description": "A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). Null: every mail."
           },
           "parts": {
             "anyOf": [
@@ -33614,13 +33730,15 @@
         "examples": [
           {
             "after": "read",
-            "conditions": [
-              {
-                "field": "sender",
-                "op": "ends_with",
-                "value": "@stadtwerke.example"
-              }
-            ],
+            "conditions": {
+              "all": [
+                {
+                  "field": "sender",
+                  "op": "ends_with",
+                  "value": "@stadtwerke.example"
+                }
+              ]
+            },
             "mailbox_id": "01a1a7fc-702c-736e-a661-ff59645bdc52",
             "name": "Bills of the utilities",
             "user_id": "01a1a7fc-7013-741e-ae72-58401e634e5d"
@@ -33647,16 +33765,20 @@
             "type": "integer",
             "title": "Priority"
           },
-          "any": {
-            "type": "boolean",
-            "title": "Any"
-          },
           "conditions": {
-            "items": {
-              "$ref": "#/components/schemas/MailConditionBody"
-            },
-            "type": "array",
-            "title": "Conditions"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MailAllGroup-Output"
+              },
+              {
+                "$ref": "#/components/schemas/MailAnyGroup-Output"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conditions",
+            "description": "A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). Null: every mail."
           },
           "parts": {
             "$ref": "#/components/schemas/MailParts"
@@ -33743,7 +33865,6 @@
           "mailbox_id",
           "name",
           "priority",
-          "any",
           "conditions",
           "parts",
           "user_id",
@@ -33774,33 +33895,20 @@
             "title": "Priority",
             "description": "Higher first."
           },
-          "any": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Any",
-            "description": "Any condition (or); else all (and)."
-          },
           "conditions": {
             "anyOf": [
               {
-                "items": {
-                  "$ref": "#/components/schemas/MailConditionBody"
-                },
-                "type": "array",
-                "maxItems": 20
+                "$ref": "#/components/schemas/MailAllGroup-Input"
+              },
+              {
+                "$ref": "#/components/schemas/MailAnyGroup-Input"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Conditions",
-            "description": "Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). None: every mail."
+            "description": "A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). Null: every mail."
           },
           "parts": {
             "anyOf": [
@@ -33904,7 +34012,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "MailRulePatch",
-        "description": "What changes; what is left out stays. `space_id`, `text_type_id`, `user_id` and\n`move_to` given as null clear it. Switching it on clears why it was paused.",
+        "description": "What changes; what is left out stays. `conditions`, `space_id`, `text_type_id`,\n`user_id` and `move_to` given as null clear it (no conditions: every mail). Switching it\non clears why it was paused.",
         "examples": [
           {
             "enabled": false

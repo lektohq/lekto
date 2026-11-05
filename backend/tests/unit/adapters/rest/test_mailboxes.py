@@ -162,21 +162,30 @@ async def test_mail_rules(api: Api) -> None:
         "mailbox_id": mailbox["id"],
         "name": "Strom",
         "priority": 1,
-        "conditions": [{"field": "sender", "op": "ends_with", "value": "@stadtwerke.example"}],
+        "conditions": {
+            "any": [
+                {"field": "sender", "op": "ends_with", "value": "@stadtwerke.example"},
+                {"all": [{"field": "attachments", "op": "present"}], "not": True},
+            ]
+        },
         "user_id": str(user.id),
         "after": "move",
         "move_to": "Lekto/Erledigt",
     }
     created = await post(api, "/mail-rules", body, auth(admin))
-    assert (created["parts"], created["any"], created["enabled"], created["text_type_id"]) == (
-        "all",
-        False,
-        True,
-        None,
+    assert (created["parts"], created["enabled"], created["text_type_id"]) == ("all", True, None)
+    assert created["conditions"] == {
+        "any": [
+            {"field": "sender", "op": "ends_with", "value": "@stadtwerke.example"},
+            {"all": [{"field": "attachments", "op": "present", "value": None}], "not": True},
+        ],
+        "not": False,
+    }
+    every = await api.client.patch(
+        f"{PREFIX}/mail-rules/{created['id']}", json={"conditions": None}, headers=auth(admin)
     )
-    assert created["conditions"] == [
-        {"field": "sender", "op": "ends_with", "value": "@stadtwerke.example"}
-    ]
+    assert every.status_code == 200, every.text
+    assert every.json()["conditions"] is None  # every mail
     url = f"{PREFIX}/mail-rules/{created['id']}"
     changed = await api.client.patch(
         url, json={"after": "read", "move_to": None, "enabled": False}, headers=auth(admin)

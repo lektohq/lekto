@@ -357,6 +357,24 @@ describe('the design system (web/DESIGN.md)', () => {
 			offenders((source, path) =>
 				path === own('DryRunGroup') ? null : line(source, /m\.rule_group_(?:fold|unfold)\(/)
 			)
+		).toEqual([]); // One tree of conditions: the group and its reading are built once, for every kind.
+		expect(
+			offenders((source, path) =>
+				path === own('ConditionGroup') ? null : line(source, /m\.rule_(?:negate|add_group)\(/)
+			)
 		).toEqual([]);
+		expect(
+			offenders((source, path) =>
+				path.endsWith('/lib/rules/tree.ts')
+					? null
+					: line(source, /m\.rule_group_(?:not_)?(?:all|any)\(/)
+			)
+		).toEqual([]);
+		for (const form of ['RuleBuilder', 'MailRuleForm']) {
+			expect(sources[own(form)]).toMatch(/<ConditionGroup\b/);
+		}
+		for (const view of ['RuleView', 'MailRuleView']) {
+			expect(sources[own(view)]).toMatch(/<ConditionTree\b/);
+		}
 	});
 });

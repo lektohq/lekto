@@ -7174,6 +7174,74 @@ export interface components {
 		 * @enum {string}
 		 */
 		MailAction: 'nothing' | 'read' | 'move' | 'trash';
+		/**
+		 * MailAllGroup
+		 * @description All items hold (and); `not` turns the result around.
+		 */
+		'MailAllGroup-Input': {
+			/** All */
+			all: (
+				| components['schemas']['MailConditionBody']
+				| components['schemas']['MailAllGroup-Input']
+				| components['schemas']['MailAnyGroup-Input']
+			)[];
+			/**
+			 * Not
+			 * @default false
+			 */
+			not: boolean;
+		};
+		/**
+		 * MailAllGroup
+		 * @description All items hold (and); `not` turns the result around.
+		 */
+		'MailAllGroup-Output': {
+			/** All */
+			all: (
+				| components['schemas']['MailConditionBody']
+				| components['schemas']['MailAllGroup-Output']
+				| components['schemas']['MailAnyGroup-Output']
+			)[];
+			/**
+			 * Not
+			 * @default false
+			 */
+			not: boolean;
+		};
+		/**
+		 * MailAnyGroup
+		 * @description At least one item holds (or); `not` turns the result around.
+		 */
+		'MailAnyGroup-Input': {
+			/** Any */
+			any: (
+				| components['schemas']['MailConditionBody']
+				| components['schemas']['MailAllGroup-Input']
+				| components['schemas']['MailAnyGroup-Input']
+			)[];
+			/**
+			 * Not
+			 * @default false
+			 */
+			not: boolean;
+		};
+		/**
+		 * MailAnyGroup
+		 * @description At least one item holds (or); `not` turns the result around.
+		 */
+		'MailAnyGroup-Output': {
+			/** Any */
+			any: (
+				| components['schemas']['MailConditionBody']
+				| components['schemas']['MailAllGroup-Output']
+				| components['schemas']['MailAnyGroup-Output']
+			)[];
+			/**
+			 * Not
+			 * @default false
+			 */
+			not: boolean;
+		};
 		/** MailConditionBody */
 		MailConditionBody: {
 			field: components['schemas']['MailField'];
@@ -7252,17 +7320,19 @@ export interface components {
 		MailParts: 'all' | 'attachments' | 'text' | 'nothing';
 		/**
 		 * MailRuleCreate
-		 * @description A new mail rule of a mailbox; what is left out gets the default (priority 100, all
-		 *     conditions, takes the attachments and the text, leaves the mail, active).
+		 * @description A new mail rule of a mailbox; what is left out gets the default (priority 100, no
+		 *     conditions: every mail, takes the attachments and the text, leaves the mail, active).
 		 * @example {
 		 *       "after": "read",
-		 *       "conditions": [
-		 *         {
-		 *           "field": "sender",
-		 *           "op": "ends_with",
-		 *           "value": "@stadtwerke.example"
-		 *         }
-		 *       ],
+		 *       "conditions": {
+		 *         "all": [
+		 *           {
+		 *             "field": "sender",
+		 *             "op": "ends_with",
+		 *             "value": "@stadtwerke.example"
+		 *           }
+		 *         ]
+		 *       },
 		 *       "mailbox_id": "01a1a7fc-702c-736e-a661-ff59645bdc52",
 		 *       "name": "Bills of the utilities",
 		 *       "user_id": "01a1a7fc-7013-741e-ae72-58401e634e5d"
@@ -7275,15 +7345,13 @@ export interface components {
 			 */
 			priority?: number | null;
 			/**
-			 * Any
-			 * @description Any condition (or); else all (and).
-			 */
-			any?: boolean | null;
-			/**
 			 * Conditions
-			 * @description Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). None: every mail.
+			 * @description A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). Null: every mail.
 			 */
-			conditions?: components['schemas']['MailConditionBody'][] | null;
+			conditions?:
+				| components['schemas']['MailAllGroup-Input']
+				| components['schemas']['MailAnyGroup-Input']
+				| null;
 			/** @description What it takes: `all` (the attachments and the text), `attachments`, `text`, `nothing`. */
 			parts?: components['schemas']['MailParts'] | null;
 			/**
@@ -7320,13 +7388,15 @@ export interface components {
 		 * @description A rule as the editor holds it, saved or not; `rule_id`: the stored one it stands for.
 		 * @example {
 		 *       "after": "read",
-		 *       "conditions": [
-		 *         {
-		 *           "field": "sender",
-		 *           "op": "ends_with",
-		 *           "value": "@stadtwerke.example"
-		 *         }
-		 *       ],
+		 *       "conditions": {
+		 *         "all": [
+		 *           {
+		 *             "field": "sender",
+		 *             "op": "ends_with",
+		 *             "value": "@stadtwerke.example"
+		 *           }
+		 *         ]
+		 *       },
 		 *       "mailbox_id": "01a1a7fc-702c-736e-a661-ff59645bdc52",
 		 *       "name": "Bills of the utilities",
 		 *       "user_id": "01a1a7fc-7013-741e-ae72-58401e634e5d"
@@ -7339,15 +7409,13 @@ export interface components {
 			 */
 			priority?: number | null;
 			/**
-			 * Any
-			 * @description Any condition (or); else all (and).
-			 */
-			any?: boolean | null;
-			/**
 			 * Conditions
-			 * @description Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). None: every mail.
+			 * @description A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). Null: every mail.
 			 */
-			conditions?: components['schemas']['MailConditionBody'][] | null;
+			conditions?:
+				| components['schemas']['MailAllGroup-Input']
+				| components['schemas']['MailAnyGroup-Input']
+				| null;
 			/** @description What it takes: `all` (the attachments and the text), `attachments`, `text`, `nothing`. */
 			parts?: components['schemas']['MailParts'] | null;
 			/**
@@ -7400,10 +7468,14 @@ export interface components {
 			name: string;
 			/** Priority */
 			priority: number;
-			/** Any */
-			any: boolean;
-			/** Conditions */
-			conditions: components['schemas']['MailConditionBody'][];
+			/**
+			 * Conditions
+			 * @description A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). Null: every mail.
+			 */
+			conditions:
+				| components['schemas']['MailAllGroup-Output']
+				| components['schemas']['MailAnyGroup-Output']
+				| null;
 			parts: components['schemas']['MailParts'];
 			/** User Id */
 			user_id: string | null;
@@ -7431,8 +7503,9 @@ export interface components {
 		};
 		/**
 		 * MailRulePatch
-		 * @description What changes; what is left out stays. `space_id`, `text_type_id`, `user_id` and
-		 *     `move_to` given as null clear it. Switching it on clears why it was paused.
+		 * @description What changes; what is left out stays. `conditions`, `space_id`, `text_type_id`,
+		 *     `user_id` and `move_to` given as null clear it (no conditions: every mail). Switching it
+		 *     on clears why it was paused.
 		 * @example {
 		 *       "enabled": false
 		 *     }
@@ -7444,15 +7517,13 @@ export interface components {
 			 */
 			priority?: number | null;
 			/**
-			 * Any
-			 * @description Any condition (or); else all (and).
-			 */
-			any?: boolean | null;
-			/**
 			 * Conditions
-			 * @description Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). None: every mail.
+			 * @description A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). Null: every mail.
 			 */
-			conditions?: components['schemas']['MailConditionBody'][] | null;
+			conditions?:
+				| components['schemas']['MailAllGroup-Input']
+				| components['schemas']['MailAnyGroup-Input']
+				| null;
 			/** @description What it takes: `all` (the attachments and the text), `attachments`, `text`, `nothing`. */
 			parts?: components['schemas']['MailParts'] | null;
 			/**

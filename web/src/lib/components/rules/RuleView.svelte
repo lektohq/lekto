@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ConditionTree from '#lib/components/rules/ConditionTree.svelte';
 	import TemplateText from '#lib/components/templates/TemplateText.svelte';
 	import type { Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -8,41 +9,21 @@
 		describeAction,
 		describeCondition
 	} from '#lib/rules/describe.ts';
-	import { fromApi, type ApiDefinition, type GroupNode } from '#lib/rules/model.ts';
+	import { fromApi, type ApiDefinition, type ConditionNode } from '#lib/rules/model.ts';
 
 	// A rule (or one of its versions) to read: when it runs, its conditions and actions.
 	let { definition, lookup }: { definition: ApiDefinition; lookup: Lookup | null } = $props();
 
 	const model = $derived(fromApi(definition));
 
-	function heading(group: GroupNode): string {
-		if (group.mode === 'all') return group.negate ? m.rule_group_not_all() : m.rule_group_all();
-		return group.negate ? m.rule_group_not_any() : m.rule_group_any();
-	}
+	const describe = (condition: ConditionNode) => describeCondition(condition, lookup);
 </script>
-
-{#snippet tree(group: GroupNode)}
-	<div class="flex flex-col gap-1.5">
-		<span class="text-sm text-muted-foreground">{heading(group)}</span>
-		<ul class="flex flex-col gap-1.5 border-l-2 pl-3">
-			{#each group.items as item (item.key)}
-				<li>
-					{#if item.kind === 'group'}
-						{@render tree(item)}
-					{:else}
-						{describeCondition(item, lookup)}
-					{/if}
-				</li>
-			{/each}
-		</ul>
-	</div>
-{/snippet}
 
 <dl class="grid gap-x-6 gap-y-4 sm:grid-cols-[10rem_1fr]">
 	<dt class="text-sm font-medium text-muted-foreground">{m.rule_triggers()}</dt>
 	<dd>{model.triggers.map((trigger) => TRIGGER_LABELS[trigger]()).join(' · ')}</dd>
 	<dt class="text-sm font-medium text-muted-foreground">{m.rule_conditions()}</dt>
-	<dd>{@render tree(model.conditions)}</dd>
+	<dd><ConditionTree group={model.conditions} {describe} /></dd>
 	<dt class="text-sm font-medium text-muted-foreground">{m.rule_actions()}</dt>
 	<dd>
 		<ul class="flex flex-col gap-1.5">
@@ -56,7 +37,7 @@
 						/>
 					{:else if action.type === 'condition'}
 						{describeAction(action, lookup)}
-						{@render tree(action.conditions)}
+						<ConditionTree group={action.conditions} {describe} />
 					{:else}
 						{describeAction(action, lookup)}
 					{/if}
