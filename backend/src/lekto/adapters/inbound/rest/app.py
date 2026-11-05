@@ -60,6 +60,7 @@ from lekto.adapters.inbound.rest.ui import ui_routes
 from lekto.adapters.inbound.waiting import dispatch_events
 from lekto.core.domain.document_facts import ROLES as FACT_ROLES
 from lekto.core.domain.identifiers import catalog as identifier_kinds
+from lekto.core.domain.mail_rules import OPERATORS as MAIL_OPERATORS
 from lekto.core.domain.reasons import catalog as reasons_catalog
 from lekto.core.ports.wakeup import Channel
 from lekto.core.services.tasks.desk import CALLBACK_PATH
@@ -253,6 +254,10 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
         schema["x-identifier-kinds"] = identifier_kinds()
         # The role of a fact of each kind until a source tells (`document_facts.ROLES`).
         schema["x-fact-roles"] = {kind.value: role.value for kind, role in FACT_ROLES.items()}
+        # The operators each field of a mail takes in a condition (`mail_rules.OPERATORS`).
+        schema["x-mail-operators"] = {
+            field.value: sorted(op.value for op in ops) for field, ops in MAIL_OPERATORS.items()
+        }
         for route_context in iter_route_contexts(app.routes):
             route = route_context.original_route
             if isinstance(route, APIRoute) and route.include_in_schema:

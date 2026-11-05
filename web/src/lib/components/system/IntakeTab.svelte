@@ -3,7 +3,8 @@
 	import OctagonX from '@lucide/svelte/icons/octagon-x';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { onMount } from 'svelte';
-	import { toast } from 'svelte-sonner';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import EditButton from '#lib/components/EditButton.svelte';
@@ -12,14 +13,13 @@
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import Loading from '#lib/components/Loading.svelte';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
+	import StatusBadge from '#lib/components/StatusBadge.svelte';
 	import MailboxDialog from '#lib/components/system/MailboxDialog.svelte';
-	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
-	import { describeError } from '#lib/errors.ts';
-	import { formatDate } from '#lib/i18n.ts';
-	import { statusOf, summaryOf, type Mailbox, type StatusTone } from '#lib/mailboxes.ts';
+	import { describeError, reportError } from '#lib/errors.ts';
+	import { cautions, statusOf, summaryOf, type Mailbox, type StatusTone } from '#lib/mailboxes.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { reasonText } from '#lib/reasons.ts';
 
@@ -27,6 +27,7 @@
 	// documents come in besides the web UI and the API. So far mail: the mailboxes Lekto fetches
 	// from, one row each (name and the state of its fetches, server, folders, interval, the last
 	// fetch and why it failed), the switch that pauses it and the pencil that opens its dialog.
+	// `?mailbox=<id>` in the address opens that mailbox's dialog (the mail rules link here).
 	let mailboxes = $state<Mailbox[] | null>(null);
 	let problem = $state<string | null>(null);
 	let busy = $state<string | null>(null);
@@ -48,7 +49,19 @@
 		}
 	}
 
-	onMount(load);
+	onMount(async () => {
+		await load();
+		const wanted = page.url.searchParams.get('mailbox');
+		const found = mailboxes?.find((item) => item.id === wanted);
+		if (found) edit(found);
+	});
+
+	// The dialog closed: the address names no mailbox any more.
+	$effect(() => {
+		if (!open && page.url.searchParams.has('mailbox')) {
+			void goto('?tab=intake', { replaceState: true });
+		}
+	});
 
 	function create() {
 		editing = null;
@@ -71,7 +84,7 @@
 			);
 			mailboxes = (mailboxes ?? []).map((item) => (item.id === changed.id ? changed : item));
 		} catch (error) {
-			toast.error(describeError(error));
+			reportError(error);
 		} finally {
 			busy = null;
 		}
@@ -111,37 +124,15 @@
 								class="truncate text-left font-medium hover:underline"
 								onclick={() => edit(mailbox)}>{mailbox.name}</button
 							>
-							<Badge variant={status.tone}>
-								{#if Icon}<Icon aria-hidden="true" strokeWidth={2.2} />{/if}
-								{status.label}
-							</Badge>
+							<StatusBadge tone={status.tone} label={status.label} icon={Icon} />
 						</span>
 						<span class="text-sm text-muted-foreground">{summaryOf(mailbox)}</span>
 						{#if mailbox.status.error}
 							<span class="text-sm text-destructive">{reasonText(mailbox.status.error)}</span>
 						{/if}
-						{#if mailbox.status.step_failed && mailbox.status.step_failed_at}
-							<span class="text-sm text-lane-yellow-foreground"
-								>{m.mail_step_failed({
-									when: formatDate(mailbox.status.step_failed_at, {
-										dateStyle: 'medium',
-										timeStyle: 'short'
-									}),
-									reason: reasonText(mailbox.status.step_failed)
-								})}</span
-							>
-						{/if}
-						{#if mailbox.status.skipped && mailbox.status.skipped_at}
-							<span class="text-sm text-lane-yellow-foreground"
-								>{m.mail_skipped({
-									when: formatDate(mailbox.status.skipped_at, {
-										dateStyle: 'medium',
-										timeStyle: 'short'
-									}),
-									reason: reasonText(mailbox.status.skipped)
-								})}</span
-							>
-						{/if}
+						{#each cautions(mailbox) as caution (caution.key)}
+							<span class="text-sm text-lane-yellow-foreground">{caution.text}</span>
+						{/each}
 					</div>
 					<Switch
 						bind:checked={() => mailbox.enabled, (enabled) => switchMailbox(mailbox, enabled)}

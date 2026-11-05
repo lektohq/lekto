@@ -13,35 +13,45 @@ or Lekto determines it; on the server steps follow in order (`mail.MailStep`: re
 flagged or not, keywords added or removed), and at most one last that moves the mail to a
 folder or to the trash. A rule whose person, space or type is gone or out of reach is paused with
 that reason when a mail would need it.
+
+A stored rule is read as a valid one: its conditions and steps check themselves as they are
+built (`conditions_from_json`, `steps_from_json`). One that cannot be read any more (a limit
+tightened without a revision, a row written by hand) comes paused with the reason
+`MAIL_RULE_UNREADABLE` and without its conditions and steps, so that the mailbox's other rules
+still fetch; it takes a change only with both anew (`change`). Whoever tightens a limit here
+(a keyword's length, a colour, an operator of a field) still brings a revision that turns the
+stored rows into what the limit allows, as revisions 0062 and 0064 did (Tobi, 05.11.2026).
 """
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum, StrEnum
+from enum import StrEnum
 
+from lekto.core.domain.changes import UNSET, Unset, apply_changes
 from lekto.core.domain.condition_tree import Group, check_limits, group_from_json, group_to_json
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import DocumentTypeId, MailboxId, MailRuleId, SpaceId, UserId, new_id
 from lekto.core.domain.json_value import JsonObject, JsonValue, require_object
-from lekto.core.domain.mail import MAX_FOLDER, MailStep, check_steps
+from lekto.core.domain.mail import MAX_FOLDER, MailAction, MailStep, check_steps
 from lekto.core.domain.mail_intake import MailDecision, MailParts, MailRecord, letters
-from lekto.core.domain.mail_message import Address, MailMessage
+from lekto.core.domain.mail_message import MailMessage, address_texts
 from lekto.core.domain.mail_traits import (
     FlagColor,
     Importance,
+    MailHead,
     MailMarks,
     flag_holds,
     importance_holds,
     is_keyword,
     keyword_holds,
 )
-from lekto.core.domain.reasons import Reason
+from lekto.core.domain.reasons import Reason, ReasonCode
+from lekto.core.domain.rules import DEFAULT_PRIORITY as DEFAULT_PRIORITY
+from lekto.core.domain.rules import MAX_PRIORITY as MAX_PRIORITY
+from lekto.core.domain.rules import MIN_PRIORITY as MIN_PRIORITY
 from lekto.core.domain.validation import require_name, require_utc
 
 MAX_VALUE = 500
-DEFAULT_PRIORITY = 100
-MIN_PRIORITY = 0
-MAX_PRIORITY = 1000
 
 
 class MailField(StrEnum):
@@ -85,20 +95,12 @@ OPERATORS: dict[MailField, frozenset[MailOperator]] = {
 
 
 @dataclass(frozen=True, kw_only=True)
-class MailFacts:
-    """What the conditions look at: the texts of each field (an address and a name each),
-    whether there are attachments to take, the importance and the marks on the server (none
-    for a mail fetched before Lekto read them: their conditions hold nothing)."""
+class MailFacts(MailHead):
+    """What a mail rule's conditions look at: the mail's head, the folder of the mailbox it
+    lies in, and whether there are attachments to take."""
 
-    senders: tuple[str, ...]
-    recipients: tuple[str, ...]
-    to: tuple[str, ...] = ()
-    cc: tuple[str, ...] = ()
-    subject: str
     folder: str
     attachments: bool
-    importance: Importance | None = None
-    marks: MailMarks | None = None
 
 
 @dataclass(frozen=True)
@@ -143,27 +145,7 @@ class MailCondition:
                 return keyword_holds(facts.marks, self.op.value, self.value)
             case MailField.FLAG:
                 return flag_holds(facts.marks, self.op.value, self.value)
-        texts = {
-            MailField.SENDER: facts.senders,
-            MailField.RECIPIENT: facts.recipients,
-            MailField.TO: facts.to,
-            MailField.CC: facts.cc,
-            MailField.SUBJECT: (facts.subject,),
-        }[self.field]
-        wanted = (self.value or "").casefold()
-        return any(_compare(self.op, text.casefold(), wanted) for text in texts)
-
-
-def _compare(op: MailOperator, text: str, wanted: str) -> bool:
-    match op:
-        case MailOperator.IS:
-            return text == wanted
-        case MailOperator.STARTS_WITH:
-            return text.startswith(wanted)
-        case MailOperator.ENDS_WITH:
-            return text.endswith(wanted)
-        case _:
-            return wanted in text
+        return facts.text_holds(self.field.value, self.op.value, self.value or "")
 
 
 type MailConditions = Group[MailCondition]
@@ -201,11 +183,37 @@ def conditions_from_json(data: JsonValue) -> MailConditions | None:
     return None if data is None else group_from_json(data, condition_from_json)
 
 
-class Unset(Enum):
-    UNSET = "unset"
+def steps_to_json(steps: tuple[MailStep, ...]) -> list[JsonValue]:
+    """The steps in the JSON form a rule's are stored in."""
+    found: list[JsonValue] = []
+    for step in steps:
+        data: JsonObject = {"action": step.action.value}
+        if step.value is not None:
+            data["value"] = step.value
+        found.append(data)
+    return found
 
 
-UNSET = Unset.UNSET
+def steps_from_json(data: JsonValue) -> tuple[MailStep, ...]:
+    """The steps of `data`, checked as a rule's (`check_steps`); ValidationError otherwise."""
+    if not isinstance(data, list):
+        raise ValidationError("after: expected a list")
+    steps = []
+    for index, item in enumerate(data):
+        where = f"after[{index}]"
+        object_ = require_object(item, where)
+        unknown = sorted(set(object_) - {"action", "value"})
+        if unknown:
+            raise ValidationError(f"{where}: unknown key '{unknown[0]}'")
+        value = object_.get("value")
+        if value is not None and not isinstance(value, str):
+            raise ValidationError(f"{where}.value: expected a text")
+        try:
+            steps.append(MailStep(MailAction(str(object_.get("action"))), value))
+        except (ValueError, ValidationError) as error:
+            raise ValidationError(f"{where}: {error}") from None
+    check_steps(tuple(steps))
+    return tuple(steps)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -265,21 +273,25 @@ class MailRule:
         rule.change(changes, now=now)
         return rule
 
+    @property
+    def unreadable(self) -> bool:
+        """Read without its conditions and steps (`MAIL_RULE_UNREADABLE`)."""
+        reason = self.disabled_reason
+        return reason is not None and reason.code is ReasonCode.MAIL_RULE_UNREADABLE
+
     def change(self, changes: MailRuleChanges, *, now: datetime) -> None:
         """Apply `changes`; ValidationError if the result is not a valid rule (nothing changes
-        then). Switching it on clears the reason it was paused for."""
+        then). Switching it on clears the reason it was paused for. A rule read without its
+        conditions and steps takes a change only with both anew; that ends the pause, and the
+        rule stays off until switched on."""
         require_utc(now, "now")
-        before = replace(self)
-        for name, value in vars(changes).items():
-            if value is not UNSET:
-                setattr(self, name, value)
-        try:
-            self._check()
-        except ValidationError:
-            for name, value in vars(before).items():
-                setattr(self, name, value)
-            raise
-        if self.enabled:
+        unreadable = self.unreadable
+        if unreadable and (changes.conditions is UNSET or changes.after is UNSET):
+            raise ValidationError(
+                "the stored rule cannot be read; save it anew with its conditions and steps"
+            )
+        apply_changes(self, changes, self._check)
+        if self.enabled or unreadable:
             self.disabled_reason = None
         self.updated_at = now
 
@@ -324,19 +336,14 @@ class MailRule:
         check_steps(self.after)
 
 
-def mail_texts(addresses: tuple[Address, ...]) -> tuple[str, ...]:
-    """The addresses and names conditions on addresses look at."""
-    return tuple(text for item in addresses for text in (item.address, item.name) if text)
-
-
 def mail_facts(message: MailMessage, folder: str, flags: frozenset[str] | None = None) -> MailFacts:
     """What the conditions of a rule look at in a mail lying in `folder` with IMAP `flags`
     (none: not known)."""
     return MailFacts(
-        senders=mail_texts(message.sender),
-        recipients=mail_texts((*message.to, *message.cc)),
-        to=mail_texts(message.to),
-        cc=mail_texts(message.cc),
+        senders=address_texts(message.sender),
+        recipients=address_texts((*message.to, *message.cc)),
+        to=address_texts(message.to),
+        cc=address_texts(message.cc),
         subject=message.subject,
         folder=folder,
         attachments=any(letter.taken for letter in letters(message)),

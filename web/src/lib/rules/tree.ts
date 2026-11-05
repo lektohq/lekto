@@ -33,6 +33,11 @@ let counter = 0;
 /** A key for a node of the editor, unique on the page. */
 export const nextKey = (): string => `t${++counter}`;
 
+/** Whether an item of the tree is a group (its conditions are the kind's). */
+export function isGroup<C extends TreeCondition>(item: C | TreeGroup<C>): item is TreeGroup<C> {
+	return item.kind === 'group';
+}
+
 export function newGroup<C extends TreeCondition>(
 	mode: Mode = 'all',
 	items: (C | TreeGroup<C>)[] = []
@@ -66,7 +71,7 @@ export function treeToApi<C extends TreeCondition, A>(
 	condition: (item: C) => A
 ): ApiTree<A> {
 	const items = group.items.map((item) =>
-		item.kind === 'group' ? treeToApi(item as TreeGroup<C>, condition) : condition(item as C)
+		isGroup(item) ? treeToApi(item, condition) : condition(item)
 	);
 	return group.mode === 'all'
 		? { all: items, not: group.negate }
@@ -75,20 +80,12 @@ export function treeToApi<C extends TreeCondition, A>(
 
 /** All conditions, depth first. */
 export function conditionsOf<C extends TreeCondition>(group: TreeGroup<C>): C[] {
-	return group.items.flatMap((item) =>
-		item.kind === 'group' ? conditionsOf(item as TreeGroup<C>) : [item as C]
-	);
+	return group.items.flatMap((item) => (isGroup(item) ? conditionsOf(item) : [item]));
 }
 
 /** 1 for a group without subgroups. */
 export function depthOf<C extends TreeCondition>(group: TreeGroup<C>): number {
-	return (
-		1 +
-		Math.max(
-			0,
-			...group.items.map((item) => (item.kind === 'group' ? depthOf(item as TreeGroup<C>) : 0))
-		)
-	);
+	return 1 + Math.max(0, ...group.items.map((item) => (isGroup(item) ? depthOf(item) : 0)));
 }
 
 /** The level of a group in the tree, 1 for the root; 0 if it is not in it. */
@@ -99,8 +96,8 @@ export function levelOf<C extends TreeCondition>(
 ): number {
 	if (root.key === key) return level;
 	for (const item of root.items) {
-		if (item.kind !== 'group') continue;
-		const found = levelOf(item as TreeGroup<C>, key, level + 1);
+		if (!isGroup(item)) continue;
+		const found = levelOf(item, key, level + 1);
 		if (found) return found;
 	}
 	return 0;
@@ -112,12 +109,7 @@ export function emptyGroups<C extends TreeCondition>(
 	root = true
 ): TreeGroup<C>[] {
 	const own = root && group.items.length === 0 ? [group] : [];
-	return [
-		...own,
-		...group.items.flatMap((item) =>
-			item.kind === 'group' ? emptyGroups(item as TreeGroup<C>) : []
-		)
-	];
+	return [...own, ...group.items.flatMap((item) => (isGroup(item) ? emptyGroups(item) : []))];
 }
 
 /** Move the item at `index` one place up (-1) or down (+1). */
@@ -140,7 +132,7 @@ export function treeText<C extends TreeCondition>(
 	inner = false
 ): string {
 	const parts = group.items.map((item) =>
-		item.kind === 'group' ? treeText(item as TreeGroup<C>, describe, true) : describe(item as C)
+		isGroup(item) ? treeText(item, describe, true) : describe(item)
 	);
 	const text = parts.join(group.mode === 'all' ? m.rule_and() : m.rule_or());
 	if (group.negate) return m.rule_not_text({ text });

@@ -10,14 +10,13 @@ from lekto.core.domain.mail import MailLogin, MailSecurity
 from lekto.core.domain.mail_traits import SEEN, shown_keywords
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.mail_server import (
+    TRASH_NAMES,
     FolderMails,
     MailAccount,
     MailInfo,
     MailSearch,
     MailServerError,
 )
-
-TRASH = "Trash"
 
 
 @dataclass
@@ -193,8 +192,15 @@ class MemoryMailSession:
             )
 
     async def trash(self, folder: str, uid: int) -> None:
-        self._account.add_folders(TRASH)
-        await self.move(folder, uid, TRASH)
+        """Into the folder named as a trash (`TRASH_NAMES`); deleted where there is none, as
+        the port says."""
+        trash = next((name for name in TRASH_NAMES if name in self._account.boxes), None)
+        if trash is not None and trash != folder:
+            await self.move(folder, uid, trash)
+            return
+        mail = self._mail(folder, uid)
+        if mail is not None:
+            self._box(folder).mails.remove(mail)
 
     def _box(self, folder: str) -> "MemoryFolder":
         box = self._account.boxes.get(folder)

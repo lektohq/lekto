@@ -198,7 +198,7 @@ class PagesNode:
             source, media_type = original, document.media_type
             if media_type == media_types.EML:
                 source, media_type = work / ARCHIVE_FILE, media_types.PDF
-                await _mail_renderer(self._mail).render(original, source)
+                await self._mail_pdf(document, original, source)
             rendered = await self._renderer.render_pages(
                 source, media_type=media_type, target=pages
             )
@@ -222,6 +222,15 @@ class PagesNode:
             },
         )
         return PagesResult(result, rendered.pages)
+
+    async def _mail_pdf(self, document: Document, original: Path, target: Path) -> None:
+        """The mail set as a PDF: the archive where OCR set it already (the same mail sets the
+        same PDF), else set here."""
+        key = archive_key(document.id)
+        if await self._store.exists(key):
+            await self._store.download(key, target)
+        else:
+            await _mail_renderer(self._mail).render(original, target)
 
 
 @dataclass(frozen=True)

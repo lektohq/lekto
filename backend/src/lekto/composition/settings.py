@@ -205,6 +205,11 @@ class Settings(BaseSettings):
     # the archive's text layer as it is set (PDFium), which needs no settings.
     ocr_languages: Annotated[str, Field(pattern=r"^[a-z_]+(\+[a-z_]+)*$")] = "deu+eng"
     ocr_timeout: Seconds = timedelta(minutes=10)
+    # A mail is set as a PDF (WeasyPrint) in a child process with a time limit: its HTML comes
+    # from anyone, and WeasyPrint has no limit of its own.
+    mail_render_timeout: Seconds = timedelta(minutes=2)
+    # Fetching mail (IMAP): connecting to the server, and each of its answers.
+    mail_timeout: Seconds = timedelta(seconds=30)
 
     # Search: Meilisearch holds the index of full text and vectors.
     meilisearch_url: AnyHttpUrl | None = None
@@ -301,7 +306,8 @@ class Settings(BaseSettings):
     rules_max_text: Annotated[int, Field(ge=1000, le=10_000_000)] = 200_000
     rules_apply_max_documents: Annotated[int, Field(ge=1, le=100_000)] = 1000
     # Templates of rules and title patterns write dates and amounts in this locale (`de`,
-    # `en_US`, ...; Babel's names).
+    # `en_US`, ...; Babel's names); the head of a mail set as a PDF speaks its language too
+    # (German, else English).
     template_locale: Annotated[str, AfterValidator(_locale)] = "de"
 
     @model_validator(mode="before")

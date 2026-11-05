@@ -10,6 +10,7 @@ import {
 	NOTHING,
 	patchBody,
 	portAfter,
+	cautions,
 	statusOf,
 	summaryOf,
 	type Mailbox
@@ -132,5 +133,27 @@ describe('the form of a mailbox', () => {
 		const form = formOf(null);
 		expect(portAfter(form, 'starttls')).toBe('143');
 		expect(portAfter({ ...form, port: '1993' }, 'starttls')).toBe('1993');
+	});
+});
+
+describe('what a mailbox left out or could not do', () => {
+	it('says nothing while all went well', () => {
+		expect(cautions(MAILBOX)).toEqual([]);
+	});
+
+	it('names the step that failed and the mail left out, with when', () => {
+		const reason = { code: 'mail_server_error', text: 'x', params: { detail: 'no' } };
+		const mailbox: Mailbox = {
+			...MAILBOX,
+			status: {
+				...MAILBOX.status,
+				step_failed_at: '2026-11-05T10:00:00Z',
+				step_failed: reason as unknown as Mailbox['status']['step_failed'],
+				skipped_at: '2026-11-04T10:00:00Z',
+				skipped: reason as unknown as Mailbox['status']['skipped']
+			}
+		};
+		expect(cautions(mailbox).map((item) => item.key)).toEqual(['step', 'skipped']);
+		expect(cautions(mailbox)[0].text).toContain('2026');
 	});
 });

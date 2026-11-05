@@ -1,7 +1,4 @@
 <script lang="ts">
-	import Pencil from '@lucide/svelte/icons/pencil';
-	import Play from '@lucide/svelte/icons/play';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
@@ -11,12 +8,11 @@
 	import type { components } from '#lib/api/schema.ts';
 	import { BASE } from '#lib/base.ts';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
+	import RuleHeader from '#lib/components/rules/RuleHeader.svelte';
 	import RuleView from '#lib/components/rules/RuleView.svelte';
 	import TitlePatternBadge from '#lib/components/rules/TitlePatternBadge.svelte';
 	import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import { buttonVariants } from '#lib/components/ui/button/index.ts';
-	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { reportError } from '#lib/errors.ts';
 	import { formatDate } from '#lib/i18n.ts';
 	import { userName } from '#lib/masterdata.svelte.ts';
@@ -26,12 +22,9 @@
 	import { RuleLoader } from '#lib/rules/page.svelte.ts';
 	import { moves, placeLabel, placeOf } from '#lib/rules/places.ts';
 	import { session } from '#lib/session.svelte.ts';
-	import { cn } from '#lib/utils.ts';
 	import { onChange } from '#lib/watch.svelte.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import PageHeader from '#lib/components/page/PageHeader.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
-	import IconButton from '#lib/components/IconButton.svelte';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import Loading from '#lib/components/Loading.svelte';
 
@@ -110,70 +103,47 @@
 <svelte:head><title>{rule?.name ?? m.nav_rules()} · {m.app_name()}</title></svelte:head>
 
 <div class="flex flex-col gap-6">
-	<PageHeader
+	<RuleHeader
 		title={rule?.name ?? m.rule_generic()}
 		back={{ href: `${BASE}/rules`, label: m.nav_rules() }}
+		{rule}
+		canChange={rule !== null && canChangeRule(rule, session.user, spaces)}
+		canApply={rule !== null && canApplyRule(rule, session.user, spaces)}
+		{busy}
+		editHref="{BASE}/rules/{id}/edit"
+		applyHref="{BASE}/rules/{id}/apply"
+		disabledReason={rule?.disabled_reason
+			? (reasonsText(rule.disabled_reasons, rule.disabled_reason) ?? '')
+			: null}
+		onswitch={switchRule}
+		ondelete={() => (removing = true)}
 	>
-		{#snippet actions()}
-			{#if rule && canChangeRule(rule, session.user, spaces)}
-				<Switch
-					bind:checked={() => rule?.enabled ?? false, switchRule}
-					disabled={busy}
-					aria-label={rule.enabled
-						? m.rule_switch_off({ name: rule.name })
-						: m.rule_switch_on({ name: rule.name })}
-				/>
-				<a href="{BASE}/rules/{rule.id}/edit" class={cn(buttonVariants({ variant: 'outline' }))}>
-					<Pencil aria-hidden="true" />
-					{m.rule_edit()}
-				</a>
-			{/if}
-			{#if rule && canApplyRule(rule, session.user, spaces)}
-				<a href="{BASE}/rules/{rule.id}/apply" class={cn(buttonVariants({ variant: 'outline' }))}>
-					<Play aria-hidden="true" />
-					{m.rule_dry_run()}
-				</a>
-			{/if}
-			{#if rule && canChangeRule(rule, session.user, spaces)}
-				<IconButton label={m.rule_delete({ name: rule.name })} onclick={() => (removing = true)}>
-					<Trash2 aria-hidden="true" />
-				</IconButton>
-			{/if}
-		{/snippet}
-		{#snippet below()}
+		{#snippet badges()}
 			{#if rule}
-				<span class="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-					<Badge variant="note">{placeName}</Badge>
-					{#if rule.managed_by_document_type_id}
-						<TitlePatternBadge
-							documentTypeId={rule.managed_by_document_type_id}
-							name={rule.name}
-							ruleId={rule.id}
-						/>
-					{/if}
-					{#if !canChangeRule(rule, session.user, spaces)}
-						<!-- The switch says it where the reader may change it. -->
-						<Badge variant={rule.enabled ? 'green' : 'muted'}>
-							{rule.enabled ? m.rule_on() : m.rule_off()}
-						</Badge>
-					{/if}
-					{m.rule_priority_short({ priority: rule.priority })}
-				</span>
-				{#if rule.disabled_reason}
-					<span class="text-sm text-destructive">
-						{m.rule_disabled_reason({
-							reason: reasonsText(rule.disabled_reasons, rule.disabled_reason) ?? ''
-						})}
-					</span>
-				{/if}
+				<Badge variant="note">{placeName}</Badge>
 				{#if rule.managed_by_document_type_id}
-					<p class="max-w-prose text-sm text-muted-foreground">
-						{m.rule_title_pattern_hint({ type: rule.name })}
-					</p>
+					<TitlePatternBadge
+						documentTypeId={rule.managed_by_document_type_id}
+						name={rule.name}
+						ruleId={rule.id}
+					/>
+				{/if}
+				{#if !canChangeRule(rule, session.user, spaces)}
+					<!-- The switch says it where the reader may change it. -->
+					<Badge variant={rule.enabled ? 'green' : 'muted'}>
+						{rule.enabled ? m.rule_on() : m.rule_off()}
+					</Badge>
 				{/if}
 			{/if}
 		{/snippet}
-	</PageHeader>
+		{#snippet extra()}
+			{#if rule?.managed_by_document_type_id}
+				<p class="max-w-prose text-sm text-muted-foreground">
+					{m.rule_title_pattern_hint({ type: rule.name })}
+				</p>
+			{/if}
+		{/snippet}
+	</RuleHeader>
 
 	{#if problem}
 		<LoadProblem {problem} onretry={() => loader.retry()} />

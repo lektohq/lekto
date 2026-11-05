@@ -1,5 +1,6 @@
-"""The generic in-memory repository: rows of one table of the unit of work, keyed by UUID,
-with optimistic locking on `version`."""
+"""The generic in-memory repository: rows of one table of the unit of work, keyed by UUID
+(`MemoryRows`), with optimistic locking on `version` where the rows change
+(`MemoryRepository`)."""
 
 import copy
 import dataclasses
@@ -8,7 +9,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from lekto.adapters.outbound.memory.database import Table
-from lekto.core.domain.entity import Entity
+from lekto.core.domain.entity import Entity, Identified
 from lekto.core.domain.errors import ConcurrencyError, ConflictError, NotFoundError
 
 if TYPE_CHECKING:
@@ -22,7 +23,9 @@ def _copy[E](entity: E) -> E:
     return copy.deepcopy(dataclasses.replace(entity))  # type: ignore[type-var]
 
 
-class MemoryRepository[K: UUID, E: Entity[UUID]]:
+class MemoryRows[K: UUID, E: Identified[UUID]]:
+    """Rows that are added, found, listed and removed; what only inserts builds on this."""
+
     def __init__(self, uow: "MemoryUnitOfWork", table: Table[E]) -> None:
         self._uow = uow
         self._table = table
@@ -43,19 +46,6 @@ class MemoryRepository[K: UUID, E: Entity[UUID]]:
         if self._uow._row(self._table, id) is not _REMOVED:
             raise ConflictError(f"{self._table.name} {id} already exists")
         self._uow._unique_or_fail(self._table, [*self._uow._rows(self._table), entity])
-        self._uow._write(self._table, id, _copy(entity))
-
-    async def update(self, entity: E) -> None:
-        self._uow._check_open()
-        id = entity.id
-        current = self._uow._row(self._table, id)
-        if current is _REMOVED:
-            raise NotFoundError(self._table.name, id)
-        if current.version != entity.version:
-            raise ConcurrencyError(f"{self._table.name} {id} was changed concurrently")
-        others = [row for row in self._uow._rows(self._table) if row is not current]
-        self._uow._unique_or_fail(self._table, [*others, entity])
-        entity.version += 1
         self._uow._write(self._table, id, _copy(entity))
 
     async def list_all(self) -> list[E]:
@@ -87,3 +77,20 @@ class MemoryRepository[K: UUID, E: Entity[UUID]]:
             changed = _copy(row)
             setattr(changed, field, value)
             self._uow._write(self._table, id, changed)
+
+
+class MemoryRepository[K: UUID, E: Entity[UUID]](MemoryRows[K, E]):
+    """Rows that change: `update` checks the version and raises it."""
+
+    async def update(self, entity: E) -> None:
+        self._uow._check_open()
+        id = entity.id
+        current = self._uow._row(self._table, id)
+        if current is _REMOVED:
+            raise NotFoundError(self._table.name, id)
+        if current.version != entity.version:
+            raise ConcurrencyError(f"{self._table.name} {id} was changed concurrently")
+        others = [row for row in self._uow._rows(self._table) if row is not current]
+        self._uow._unique_or_fail(self._table, [*others, entity])
+        entity.version += 1
+        self._uow._write(self._table, id, _copy(entity))

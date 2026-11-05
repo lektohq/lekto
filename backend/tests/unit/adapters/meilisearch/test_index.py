@@ -519,6 +519,39 @@ async def test_with_the_meaning_one_word_finds_its_documents_first_above_the_flo
     assert [hit.id for hit in two.hits] == [uid(1), uid(3), uid(2)]
 
 
+async def test_the_floor_of_the_meaning_keeps_the_words_hits_beyond_the_depth() -> None:
+    """Where the floor cuts a candidate, the meaning's documents beyond the depth lie below it
+    too, but the words' hits beyond are still counted, so that the pages reach them."""
+    sim = SimulatedMeilisearch()
+    sim.settings = wanted_settings(sim, dimensions=2)
+
+    def hit(n: int, score: float) -> dict[str, Any]:
+        return {"id": str(uid(n)), "version": 1, "_rankingScore": score}
+
+    # The 200 candidates: 150 by the meaning above the floor, 20 below it, 30 hits of the words.
+    mixed = {
+        "hits": [hit(n, 0.9) for n in range(1000, 1150)]
+        + [hit(n, 0.5) for n in range(1150, 1170)]
+        + [hit(n, 0.3) for n in range(1, 31)],
+        "estimatedTotalHits": 5000,
+    }
+    words = {"hits": [hit(n, 0.3) for n in range(1, 201)], "estimatedTotalHits": 300}
+    sim.fail = lambda request: (
+        httpx2.Response(200, json=mixed if b'"hybrid"' in request.content else words)
+        if request.url.path.endswith("/search")
+        else None
+    )
+    query = replace(
+        _query(vector=(0.5, 0.5), semantic_ratio=0.5, meaning_min_score=0.7, limit=10),
+        text="Urlaubsgeld Juni",
+    )
+    result = await sim.index(dimensions=2).search(query)
+    assert len(result.hits) == 10 and result.word_total == 300
+    # 180 here (150 of the meaning, 30 of the words), 170 known hits of the words beyond the
+    # candidates and 100 the words find beyond their page; the 20 below the floor are gone.
+    assert result.estimated_total == 180 + 170 + 100
+
+
 async def test_the_search_request_and_its_answer() -> None:
     sim = SimulatedMeilisearch()
     sim.settings = wanted_settings(sim, dimensions=2)

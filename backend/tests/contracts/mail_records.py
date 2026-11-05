@@ -1,18 +1,21 @@
 """Contract suite for `MailRecordRepository` and `MailOriginRepository` in the unit of work."""
 
+from dataclasses import replace
+
 import pytest
 
 from lekto.core.domain.condition_tree import Group
-from lekto.core.domain.errors import ConflictError
+from lekto.core.domain.errors import ConcurrencyError, ConflictError, NotFoundError
 from lekto.core.domain.ids import (
     DocumentId,
     DocumentTypeId,
+    MailboxId,
     MailRecordId,
     SpaceId,
     UserId,
     new_id,
 )
-from lekto.core.domain.mail import MailAction, Mailbox, MailSecurity, MailStep
+from lekto.core.domain.mail import MailAction, Mailbox, MailStep
 from lekto.core.domain.mail_intake import (
     MailOrigin,
     MailOutcome,
@@ -33,19 +36,13 @@ from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from tests import builders
 from tests.builders import HOUR, NOW
+from tests.contracts.mailboxes import a_mailbox as mailbox_entity
 from tests.contracts.unit_of_work import owner_with_space
 
 
 async def a_mailbox(uow_factory: UnitOfWorkFactory, name: str = "Household") -> Mailbox:
-    mailbox = Mailbox.create(
-        name=name,
-        host="imap.example.test",
-        port=993,
-        security=MailSecurity.TLS,
-        username="u",
-        encrypted_password=b"x",
-        now=NOW,
-    )
+    """A mailbox as the mailbox contract builds it, stored."""
+    mailbox = mailbox_entity(name)
     async with uow_factory() as uow:
         await uow.mailboxes.add(mailbox)
         await uow.commit()
@@ -105,8 +102,72 @@ class MailRecordRepositoryContract:
             assert not await uow.mail_records.has_message("m9@example.test")
             recent = await uow.mail_records.recent(mailbox.id, limit=4)
             assert [record.uid for record in recent[:2]] == [3, 2]
+            # The two fetched at the same time stand by id, the later id first.
+            assert [record.uid for record in recent[2:]] == [1, 1]
+            assert [record.id for record in recent[2:]] == sorted(
+                (record.id for record in recent[2:]), reverse=True
+            )
             assert recent[1] == failed
             assert (recent[0].importance, recent[0].marks) == (None, None)  # not known
+
+    async def test_old_records_let_go_of_what_the_mail_said(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        mailbox = await a_mailbox(uow_factory)
+        async with uow_factory() as uow:
+            for uid in (1, 2, 3):
+                await uow.mail_records.add(
+                    a_record(
+                        mailbox,
+                        uid,
+                        to=("anna@example.test",),
+                        cc=("Ben",),
+                        importance=Importance.HIGH,
+                        marks=MailMarks(keywords=("Lekto",), flag=FlagColor.RED),
+                        reason=because(ReasonCode.MAIL_TOO_LARGE, subject="Fotos", size=3, max=2),
+                    )
+                )
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.mail_records.forget_beyond(mailbox.id, keep=2, now=NOW + 5 * HOUR) == 1
+            assert await uow.mail_records.forget_beyond(mailbox.id, keep=2, now=NOW + 6 * HOUR) == 0
+            await uow.commit()
+        async with uow_factory() as uow:
+            three, two, one = await uow.mail_records.recent(mailbox.id, limit=3)
+            assert one.forgotten_at == NOW + 5 * HOUR
+            assert (one.sender, one.subject, one.reason, one.importance, one.marks) == (
+                "",
+                "",
+                None,
+                None,
+                None,
+            )
+            assert (one.senders, one.recipients, one.to, one.cc, one.attachments) == (
+                (),
+                (),
+                (),
+                (),
+                (),
+            )
+            assert (one.uid, one.message_id, one.outcome, one.documents, one.fetched_at) == (
+                1,
+                "m1@example.test",
+                MailOutcome.TAKEN,
+                2,
+                NOW + HOUR,
+            )
+            assert two.forgotten_at is None and three.forgotten_at is None
+            assert two.subject == "Rechnung" and two.marks is not None and two.reason is not None
+            assert await uow.mail_records.known_uids(mailbox.id, "INBOX", 7) == {1, 2, 3}
+            assert await uow.mail_records.has_message("m1@example.test")
+
+    async def test_a_record_needs_its_mailbox(self, uow_factory: UnitOfWorkFactory) -> None:
+        mailbox = await a_mailbox(uow_factory)
+        gone = replace(mailbox, id=MailboxId(new_id()))
+        with pytest.raises(ConflictError):
+            async with uow_factory() as uow:
+                await uow.mail_records.add(a_record(gone, 1))
+                await uow.commit()
 
     async def test_a_uid_is_recorded_once(self, uow_factory: UnitOfWorkFactory) -> None:
         mailbox = await a_mailbox(uow_factory)
@@ -131,6 +192,29 @@ class MailRecordRepositoryContract:
 
 
 class MailOriginRepositoryContract:
+    async def test_an_origin_needs_its_document(self, uow_factory: UnitOfWorkFactory) -> None:
+        mailbox = await a_mailbox(uow_factory)
+        origin = MailOrigin(
+            document_id=DocumentId(new_id()),
+            record_id=MailRecordId(new_id()),
+            mailbox_id=mailbox.id,
+            mailbox="Household",
+            rule=None,
+            role=OriginRole.COVER,
+            letter=0,
+            message_id=None,
+            sender=(),
+            to=(),
+            cc=(),
+            subject="Rechnung",
+            sent_at=None,
+            arrived_at=NOW,
+        )
+        with pytest.raises(ConflictError):
+            async with uow_factory() as uow:
+                await uow.mail_origins.add(origin)
+                await uow.commit()
+
     async def test_origins_by_document_and_by_mail(self, uow_factory: UnitOfWorkFactory) -> None:
         owner, space = await owner_with_space(uow_factory)
         cover, attachment = builders.document(owner, space), builders.document(owner, space)
@@ -194,6 +278,35 @@ class MailOriginRepositoryContract:
 
 
 class MailRuleRepositoryContract:
+    async def test_update_checks_the_version_and_a_rule_goes_once(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        mailbox = await a_mailbox(uow_factory)
+        rule = MailRule.create(
+            mailbox_id=mailbox.id,
+            changes=MailRuleChanges(name="Strom", user_id=UserId(new_id())),
+            now=NOW,
+        )
+        async with uow_factory() as uow:
+            await uow.mail_rules.add(rule)
+            await uow.commit()
+        async with uow_factory() as uow:
+            stored = await uow.mail_rules.get(rule.id)
+            stored.change(MailRuleChanges(name="Gas"), now=NOW + HOUR)
+            await uow.mail_rules.update(stored)
+            await uow.commit()
+        with pytest.raises(ConcurrencyError):
+            async with uow_factory() as uow:
+                rule.change(MailRuleChanges(name="Wasser"), now=NOW + HOUR)
+                await uow.mail_rules.update(rule)
+                await uow.commit()
+        async with uow_factory() as uow:
+            await uow.mail_rules.remove(rule.id)
+            await uow.commit()
+        with pytest.raises(NotFoundError):
+            async with uow_factory() as uow:
+                await uow.mail_rules.remove(rule.id)
+
     async def test_rules_by_mailbox_priority_and_name(self, uow_factory: UnitOfWorkFactory) -> None:
         first, second = await a_mailbox(uow_factory, "A"), await a_mailbox(uow_factory, "B")
         person = UserId(new_id())

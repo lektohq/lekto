@@ -24,7 +24,9 @@ disabling are state, not content, and make no version.
 
 Definitions are stored as JSON (`rules_json`). Values in conditions and actions keep their
 JSON form (field values as `field_to_json` writes them) and are read with the field
-definitions where needed (`check_fields`).
+definitions where needed (`check_fields`). A stored definition is read as a valid one: it checks
+itself as it is built. Whoever tightens a limit here brings a revision that turns the stored
+rows into what the limit allows (Tobi, 05.11.2026); else the rules could not be read.
 """
 
 import math

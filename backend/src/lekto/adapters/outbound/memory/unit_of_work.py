@@ -87,7 +87,7 @@ from lekto.core.domain.document_facts import (
     withdrawn,
 )
 from lekto.core.domain.documents import Document, Sha256
-from lekto.core.domain.entity import Entity
+from lekto.core.domain.entity import Identified
 from lekto.core.domain.errors import ConcurrencyError, ConflictError, NotFoundError
 from lekto.core.domain.events import DomainEvent
 from lekto.core.domain.fields import FieldDefinition
@@ -134,7 +134,7 @@ class MemoryUnitOfWork:
     def __init__(self, database: MemoryDatabase) -> None:
         self._db = database
         self._closed = False
-        self._writes: dict[str, dict[UUID, Entity[UUID] | None]] = {}
+        self._writes: dict[str, dict[UUID, Identified[UUID] | None]] = {}
         self._tables: dict[str, Table[Any]] = {}  # the tables written to, of any kind
         self._base_versions: dict[tuple[str, UUID], int | None] = {}
         self._log: list[NodeRun] = []
@@ -292,7 +292,7 @@ class MemoryUnitOfWork:
     def _check_versions(self) -> None:
         for (table_name, id), base in self._base_versions.items():
             committed = self._db.tables.get(table_name, {}).get(id)
-            if (None if committed is None else committed.version) != base:
+            if getattr(committed, "version", None) != base:
                 raise ConcurrencyError(f"{table_name} {id} was changed concurrently")
 
     def _check_uniqueness(self) -> None:
@@ -325,7 +325,7 @@ class MemoryUnitOfWork:
     # --- rows -----------------------------------------------------------------------------------
     # A table holds rows of its own kind only: those of `Table[E]` are `E`.
 
-    def _rows[E: Entity[UUID]](self, table: Table[E]) -> list[E]:
+    def _rows[E: Identified[UUID]](self, table: Table[E]) -> list[E]:
         """Committed rows with this unit's changes applied (not copied)."""
         committed = self._db.tables.get(table.name, {})
         writes = self._writes.get(table.name, {})
@@ -333,21 +333,22 @@ class MemoryUnitOfWork:
         rows += [row for id, row in writes.items() if id not in committed]
         return cast(list[E], [row for row in rows if row is not _REMOVED])
 
-    def _row[E: Entity[UUID]](self, table: Table[E], id: UUID) -> E | None:
+    def _row[E: Identified[UUID]](self, table: Table[E], id: UUID) -> E | None:
         writes = self._writes.get(table.name, {})
         row = writes[id] if id in writes else self._db.tables.get(table.name, {}).get(id)
         return cast(E | None, row)
 
-    def _write[E: Entity[UUID]](self, table: Table[E], id: UUID, row: E | None) -> None:
+    def _write[E: Identified[UUID]](self, table: Table[E], id: UUID, row: E | None) -> None:
         self._check_open()
         key = (table.name, id)
         if key not in self._base_versions:
             committed = self._db.tables.get(table.name, {}).get(id)
-            self._base_versions[key] = None if committed is None else committed.version
+            # Rows that only insert (`Identified`) have no version: None, as absent ones.
+            self._base_versions[key] = getattr(committed, "version", None)
         self._tables[table.name] = table
         self._writes.setdefault(table.name, {})[id] = row
 
-    def _check_unreferenced[E: Entity[UUID]](self, table: Table[E], id: UUID) -> None:
+    def _check_unreferenced[E: Identified[UUID]](self, table: Table[E], id: UUID) -> None:
         """ConflictError if a row refers to the row `id` of `table`: the SQL schema's foreign
         keys without a cascade refuse its removal so."""
         for referring, refers in _REFERRERS.get(table.name, ()):
@@ -355,7 +356,7 @@ class MemoryUnitOfWork:
                 raise ConflictError(f"a {referring.name} still refers to {table.name} {id}")
 
     @staticmethod
-    def _unique_or_fail[E: Entity[UUID]](table: Table[E], rows: Iterable[E]) -> None:
+    def _unique_or_fail[E: Identified[UUID]](table: Table[E], rows: Iterable[E]) -> None:
         seen: set[Hashable] = set()
         for row in rows:
             for key in table.unique_keys(row):

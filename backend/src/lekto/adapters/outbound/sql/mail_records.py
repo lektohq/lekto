@@ -1,9 +1,10 @@
 """Mail records and mail origins on SQL tables."""
 
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Row, insert, null, select
+from sqlalchemy import Row, insert, select, update
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.transaction import Transaction
@@ -47,7 +48,7 @@ class SqlMailRecordRepository:
                 cc_texts=list(record.cc),
                 importance=None if record.importance is None else record.importance.value,
                 **marks_values(record.marks),
-                version=record.version,
+                forgotten_at=record.forgotten_at,
             )
         )
 
@@ -76,6 +77,37 @@ class SqlMailRecordRepository:
         )
         return [_record(row) for row in rows]
 
+    async def forget_beyond(self, mailbox: MailboxId, *, keep: int, now: datetime) -> int:
+        latest = (
+            select(_records.c.id)
+            .where(_records.c.mailbox_id == mailbox)
+            .order_by(_records.c.fetched_at.desc(), _records.c.id.desc())
+            .limit(keep)
+        )
+        result = await self._tx.write(
+            update(_records)
+            .where(
+                _records.c.mailbox_id == mailbox,
+                _records.c.forgotten_at.is_(None),
+                _records.c.id.not_in(latest),
+            )
+            .values(
+                sender="",
+                subject="",
+                reason=None,
+                senders=[],
+                recipients=[],
+                attachments=[],
+                to_texts=[],
+                cc_texts=[],
+                importance=None,
+                keywords=None,
+                flag=None,
+                forgotten_at=now,
+            )
+        )
+        return int(result.rowcount)
+
 
 def _record(row: Row[Any]) -> MailRecord:
     return MailRecord(
@@ -102,7 +134,7 @@ def _record(row: Row[Any]) -> MailRecord:
         cc=tuple(row.cc_texts),
         importance=None if row.importance is None else Importance(row.importance),
         marks=marks_of(row.keywords, row.flag),
-        version=row.version,
+        forgotten_at=row.forgotten_at,
     )
 
 
@@ -134,7 +166,6 @@ class SqlMailOriginRepository:
                 body_type_id=origin.body_type_id,
                 importance=None if origin.importance is None else origin.importance.value,
                 **marks_values(origin.marks),
-                version=origin.version,
             )
         )
 
@@ -155,7 +186,7 @@ class SqlMailOriginRepository:
 def marks_values(marks: MailMarks | None) -> dict[str, Any]:
     """The columns of a mail's marks: keywords NULL when they are not known."""
     if marks is None:
-        return {"keywords": null(), "flag": None}
+        return {"keywords": None, "flag": None}
     return {
         "keywords": list(marks.keywords),
         "flag": None if marks.flag is None else marks.flag.value,
@@ -199,5 +230,4 @@ def _origin(row: Row[Any]) -> MailOrigin:
         body_type_id=None if row.body_type_id is None else DocumentTypeId(row.body_type_id),
         importance=None if row.importance is None else Importance(row.importance),
         marks=marks_of(row.keywords, row.flag),
-        version=row.version,
     )

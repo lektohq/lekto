@@ -13,6 +13,7 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import { copyText } from '#lib/clipboard.ts';
+	import DetailList from '#lib/components/DetailList.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
 	import ReceiptEdit from '#lib/components/document/ReceiptEdit.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -172,6 +173,17 @@
 	const when = (value: Date | string) =>
 		formatDate(value, { dateStyle: 'medium', timeStyle: 'short' });
 
+	/** What the file says of itself, then when it was made and changed. */
+	function passportRows(
+		said: [SaidKey, string][],
+		dates: { created: Date | null; changed: Date | null }
+	): [string, string][] {
+		const rows: [string, string][] = said.map(([key, value]) => [SAID[key](), value]);
+		if (dates.created) rows.push([m.files_step_created(), when(dates.created)]);
+		if (dates.changed) rows.push([m.files_step_changed(), when(dates.changed)]);
+		return rows;
+	}
+
 	function stepNote(step: Step): string {
 		if (step.kind === 'created' || step.kind === 'changed') return m.files_step_sender();
 		if (step.kind === 'archived' && files?.archive)
@@ -326,20 +338,7 @@
 				</div>
 			{/if}
 			{#if said.length > 0 || dates.created || dates.changed}
-				<dl class="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 px-4 pb-4 text-sm">
-					{#each said as [key, value] (key)}
-						<dt class="text-muted-foreground">{SAID[key]()}</dt>
-						<dd class="break-words">{value}</dd>
-					{/each}
-					{#if dates.created}
-						<dt class="text-muted-foreground">{m.files_step_created()}</dt>
-						<dd>{when(dates.created)}</dd>
-					{/if}
-					{#if dates.changed}
-						<dt class="text-muted-foreground">{m.files_step_changed()}</dt>
-						<dd>{when(dates.changed)}</dd>
-					{/if}
-				</dl>
+				<DetailList rows={passportRows(said, dates)} class="px-4 pb-4" />
 			{/if}
 		{/if}
 	</Card.Root>

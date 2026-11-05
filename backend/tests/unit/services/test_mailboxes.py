@@ -13,7 +13,6 @@ from lekto.core.domain.mail import (
     FetchStart,
     Mailbox,
     MailboxChanges,
-    MailLogin,
     MailSecurity,
     password_context,
 )
@@ -21,15 +20,8 @@ from lekto.core.domain.master_data import DocumentType
 from lekto.core.domain.reasons import ReasonCode
 from lekto.core.domain.users import Role, User
 from tests.builders import NOW
+from tests.mails import LOGIN
 from tests.unit.services.support import World
-
-SERVER = MailLogin(
-    host="imap.example.test",
-    port=993,
-    security=MailSecurity.TLS,
-    username="household@example.test",
-    password="right",
-)
 
 
 async def _admin(world: World) -> User:
@@ -40,11 +32,11 @@ async def _create(world: World, admin: User, name: str = "Household", **changes:
     return await world.mailboxes.create(
         admin.id,
         name=name,
-        host=SERVER.host,
-        port=SERVER.port,
-        security=SERVER.security,
-        username=SERVER.username,
-        password=SERVER.password,
+        host=LOGIN.host,
+        port=LOGIN.port,
+        security=LOGIN.security,
+        username=LOGIN.username,
+        password=LOGIN.password,
         changes=MailboxChanges(**changes) if changes else None,
     )
 
@@ -135,22 +127,22 @@ async def test_settings_are_checked(world: World) -> None:
 
 async def test_testing_a_connection_lists_the_folders_or_says_why_not(world: World) -> None:
     admin = await _admin(world)
-    world.mail_server.add_account(SERVER).add_folders("Rechnungen")
+    world.mail_server.add_account(LOGIN).add_folders("Rechnungen")
     found = await world.mailboxes.test_connection(
         admin.id,
-        host=SERVER.host,
-        port=SERVER.port,
-        security=SERVER.security,
-        username=SERVER.username,
+        host=LOGIN.host,
+        port=LOGIN.port,
+        security=LOGIN.security,
+        username=LOGIN.username,
         password="right",
     )
     assert (found.folders, found.error) == (("INBOX", "Rechnungen"), None)
     refused = await world.mailboxes.test_connection(
         admin.id,
-        host=SERVER.host,
-        port=SERVER.port,
-        security=SERVER.security,
-        username=SERVER.username,
+        host=LOGIN.host,
+        port=LOGIN.port,
+        security=LOGIN.security,
+        username=LOGIN.username,
         password="wrong",
     )
     assert refused.error is not None
@@ -159,14 +151,14 @@ async def test_testing_a_connection_lists_the_folders_or_says_why_not(world: Wor
 
 async def test_a_mailbox_is_tested_with_its_stored_password(world: World) -> None:
     admin = await _admin(world)
-    world.mail_server.add_account(SERVER)
+    world.mail_server.add_account(LOGIN)
     mailbox = await _create(world, admin)
     found = await world.mailboxes.test_connection(
         admin.id,
-        host=SERVER.host,
-        port=SERVER.port,
-        security=SERVER.security,
-        username=SERVER.username,
+        host=LOGIN.host,
+        port=LOGIN.port,
+        security=LOGIN.security,
+        username=LOGIN.username,
         mailbox_id=mailbox.id,
     )
     assert found.folders == ("INBOX",)
@@ -186,10 +178,10 @@ async def test_an_unreadable_password_says_so(world: World) -> None:
         await uow.commit()
     found = await world.mailboxes.test_connection(
         admin.id,
-        host=SERVER.host,
-        port=SERVER.port,
-        security=SERVER.security,
-        username=SERVER.username,
+        host=LOGIN.host,
+        port=LOGIN.port,
+        security=LOGIN.security,
+        username=LOGIN.username,
         mailbox_id=mailbox.id,
     )
     assert found.error is not None

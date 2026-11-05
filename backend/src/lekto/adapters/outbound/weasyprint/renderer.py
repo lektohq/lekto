@@ -1,15 +1,26 @@
 """The WeasyPrint adapter of `MailRenderer`."""
 
-import asyncio
 import html
+import json
 import re
+import sys
+from datetime import timedelta
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
+from lekto.adapters.outbound.system import run_process
+from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.mail_intake import Letter
-from lekto.core.domain.mail_message import Address, MailMessage, MailPart, read_mail
+from lekto.core.domain.mail_message import MailMessage, MailPart, address_line, read_mail
+from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.mail_renderer import RenderedMail
+
+CHILD = "lekto.adapters.outbound.weasyprint"
+"""The module the child process runs (`__main__`)."""
+NO_MAIL = 3
+"""Exit code of the child process when the file is no mail."""
+DEFAULT_TIMEOUT = timedelta(minutes=2)
 
 PDF_VARIANT = "pdf/a-3b"
 """PDF/A-3b: an archive like the others (PDF/A-2b and later allow what WeasyPrint writes)."""
@@ -69,59 +80,88 @@ _SCRIPT = re.compile(r"<script\b[^>]*>.*?</script>", re.IGNORECASE | re.DOTALL)
 
 
 class WeasyPrintMailRenderer:
-    """`locale`: the language of the head (`de`, else English)."""
+    """Sets each mail in a child process (`python -m lekto.adapters.outbound.weasyprint`) with a
+    time limit: a mail's HTML comes from anyone, and WeasyPrint has no limit of its own, so a
+    page built to take forever would hold the worker. `locale`: the language of the head
+    (`de`, else English); `timeout`: TimeoutError after it, the child killed."""
 
-    def __init__(self, locale: str = "de") -> None:
-        self._labels = _LABELS.get(locale.split("-")[0].lower(), _LABELS["en"])
+    def __init__(self, locale: str = "de", timeout: timedelta = DEFAULT_TIMEOUT) -> None:
+        self._locale = locale
+        self._timeout = timeout
 
     async def render(self, mail: Path, target: Path) -> RenderedMail:
-        return await asyncio.to_thread(self._render, mail, target)
-
-    def _render(self, mail: Path, target: Path) -> RenderedMail:
-        # Imported here: WeasyPrint loads Pango as it is imported, which only rendering needs.
-        import weasyprint
-
-        message = read_mail(mail.read_bytes())
-        page = weasyprint.HTML(string=self.page(message), url_fetcher=_fetcher(message.pictures))
-        document = page.render()
-        document.write_pdf(target, pdf_variant=PDF_VARIANT)
-        return RenderedMail(
-            pages=len(document.pages),
-            renderer=f"weasyprint {version('weasyprint')}",
-            pdfa=True,
+        completed = await run_process(
+            [sys.executable, "-m", CHILD, self._locale, str(mail), str(target)],
+            timeout=self._timeout,
         )
+        if completed.returncode == NO_MAIL:
+            raise UnprocessableDocumentError(because(ReasonCode.FILE_DAMAGED))
+        if completed.returncode != 0:
+            raise RuntimeError(
+                f"setting the mail failed with exit code {completed.returncode}: "
+                f"{_last_line(completed.stderr)}"
+            )
+        try:
+            data = json.loads(completed.stdout)
+            return RenderedMail(
+                pages=int(data["pages"]), renderer=str(data["renderer"]), pdfa=bool(data["pdfa"])
+            )
+        except (KeyError, TypeError, ValueError):
+            raise RuntimeError("setting the mail gave no usable answer") from None
 
-    def page(self, message: MailMessage) -> str:
-        """The HTML the PDF is set from."""
-        styles, body = _content(message)
-        return (
-            '<!doctype html><html><head><meta charset="utf-8">'
-            f"<style>{_BASE}</style>{styles}<style>{_STYLE}</style></head><body>"
-            f"{self._head(message)}{body}</body></html>"
-        )
 
-    def _head(self, message: MailMessage) -> str:
-        labels = self._labels
-        letter = Letter(message)
-        rows = [
-            ("from", _people(message.sender)),
-            ("to", _people(message.to)),
-            ("cc", _people(message.cc)),
-            ("date", "" if message.date is None else message.date.strftime(labels["moment"])),
-            ("attachments", ", ".join(_names(letter.taken))),
-            ("left", ", ".join(_names(letter.left))),
-        ]
-        lines = "".join(
-            f'<p class="lekto-row"><span class="lekto-label">{labels[key]}</span> '
-            f"{html.escape(value)}</p>"
-            for key, value in rows
-            if value
-        )
-        subject = message.subject or labels["none"]
-        return (
-            f'<header class="lekto-head"><p class="lekto-kind">{labels["kind"]}</p>'
-            f'<p class="lekto-subject">{html.escape(subject)}</p>{lines}</header>'
-        )
+def set_mail(mail: Path, target: Path, locale: str) -> RenderedMail:
+    """Write the mail `mail` as a PDF to `target`, in this process: what the child of
+    `WeasyPrintMailRenderer.render` does. UnprocessableDocumentError if it is no mail."""
+    # Imported here: WeasyPrint loads Pango as it is imported, which only the child needs.
+    import weasyprint
+
+    message = read_mail(mail.read_bytes())
+    page = weasyprint.HTML(string=page_of(message, locale), url_fetcher=_fetcher(message.pictures))
+    document = page.render()
+    document.write_pdf(target, pdf_variant=PDF_VARIANT)
+    return RenderedMail(
+        pages=len(document.pages), renderer=f"weasyprint {version('weasyprint')}", pdfa=True
+    )
+
+
+def page_of(message: MailMessage, locale: str) -> str:
+    """The HTML the PDF is set from, its head in `locale` (`de`, else English)."""
+    labels = _LABELS.get(locale.split("-")[0].lower(), _LABELS["en"])
+    styles, body = _content(message)
+    return (
+        '<!doctype html><html><head><meta charset="utf-8">'
+        f"<style>{_BASE}</style>{styles}<style>{_STYLE}</style></head><body>"
+        f"{_head(message, labels)}{body}</body></html>"
+    )
+
+
+def _head(message: MailMessage, labels: dict[str, str]) -> str:
+    letter = Letter(message)
+    rows = [
+        ("from", address_line(message.sender)),
+        ("to", address_line(message.to)),
+        ("cc", address_line(message.cc)),
+        ("date", "" if message.date is None else message.date.strftime(labels["moment"])),
+        ("attachments", ", ".join(_names(letter.taken))),
+        ("left", ", ".join(_names(letter.left))),
+    ]
+    lines = "".join(
+        f'<p class="lekto-row"><span class="lekto-label">{labels[key]}</span> '
+        f"{html.escape(value)}</p>"
+        for key, value in rows
+        if value
+    )
+    subject = message.subject or labels["none"]
+    return (
+        f'<header class="lekto-head"><p class="lekto-kind">{labels["kind"]}</p>'
+        f'<p class="lekto-subject">{html.escape(subject)}</p>{lines}</header>'
+    )
+
+
+def _last_line(text: str) -> str:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return lines[-1] if lines else ""
 
 
 def _content(message: MailMessage) -> tuple[str, str]:
@@ -133,10 +173,6 @@ def _content(message: MailMessage) -> tuple[str, str]:
         body = found[1] if found else _HEAD.sub("", source)
         return styles, f'<div class="lekto-mail">{body}</div>'
     return "", f'<pre class="lekto-text">{html.escape(message.text or "")}</pre>'
-
-
-def _people(addresses: tuple[Address, ...]) -> str:
-    return ", ".join(address.shown for address in addresses)
 
 
 def _names(parts: tuple[MailPart, ...]) -> list[str]:

@@ -3,7 +3,12 @@
 	import X from '@lucide/svelte/icons/x';
 	import MultiPicker from '#lib/components/MultiPicker.svelte';
 	import SearchSelect from '#lib/components/SearchSelect.svelte';
-	import { flagOptions, importanceOptions, isKeyword, keywordOptions } from '#lib/mail-traits.ts';
+	import {
+		flagOptions,
+		importanceOptions,
+		keywordOptions,
+		typedKeyword
+	} from '#lib/mail-traits.ts';
 	import Select from '#lib/components/Select.svelte';
 	import { namedOptions, withChoice } from '#lib/components/rules/options.ts';
 	import ValueInput from '#lib/components/rules/ValueInput.svelte';
@@ -154,11 +159,6 @@
 					? m.mail_keyword_title()
 					: null
 	);
-	/** A keyword of the mailboxes' folders, or one typed that IMAP can carry. */
-	async function useKeyword(name: string) {
-		const value = name.trim();
-		return isKeyword(value) ? { value, label: value } : null;
-	}
 	/** The choices of an id field or the channel. */
 	const choices = $derived.by(() => {
 		switch (condition.field) {
@@ -315,7 +315,7 @@
 				value={single}
 				options={choices}
 				placeholder={m.rule_choose()}
-				create={condition.field === 'mail_keyword' ? useKeyword : undefined}
+				create={condition.field === 'mail_keyword' ? typedKeyword : undefined}
 				createLabel={condition.field === 'mail_keyword' ? m.mail_keyword_use : undefined}
 				onchange={(next) => (condition.value = next)}
 			/>

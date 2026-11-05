@@ -9,7 +9,13 @@ from datetime import UTC, date, datetime, timedelta, timezone
 from lekto.adapters.outbound.imap.names import listed, quoted
 from lekto.core.domain.mail_traits import shown_keywords
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.ports.mail_server import FolderMails, MailInfo, MailSearch, MailServerError
+from lekto.core.ports.mail_server import (
+    TRASH_NAMES,
+    FolderMails,
+    MailInfo,
+    MailSearch,
+    MailServerError,
+)
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 _UID = re.compile(rb"UID (\d+)")
@@ -19,7 +25,6 @@ _DATE = re.compile(
 )
 _FLAGS = re.compile(rb"FLAGS \(([^)]*)\)")
 _LIST = re.compile(rb"\(([^)]*)\)")
-_TRASH_NAMES = ("Trash", "Papierkorb", "Deleted Messages", "Deleted Items", "INBOX.Trash")
 
 
 class ImapMailSession:
@@ -72,9 +77,13 @@ class ImapMailSession:
         self._keywords[folder] = folder_keywords(self._imap)
 
     def _uidvalidity(self) -> int:
+        """The folder's UIDVALIDITY as the SELECT answered it; 0 where the server gave none."""
         _, answer = self._imap.response("UIDVALIDITY")
         value = answer[-1] if answer else None
-        return int(value) if isinstance(value, bytes | str) and str(int(value)) else 0
+        try:
+            return int(value) if isinstance(value, bytes | str) else 0
+        except ValueError:
+            return 0
 
     def _search(self, folder: str, search: MailSearch) -> FolderMails:
         self._select(folder)
@@ -144,8 +153,7 @@ class ImapMailSession:
         else:
             status, _ = self._imap.uid("COPY", str(uid), quoted(target).decode())
             if status == "OK":
-                self._store(folder, uid, "+FLAGS", "(\\Deleted)")
-                self._imap.expunge()
+                self._delete(folder, uid)
         if status != "OK":
             raise MailServerError(because(ReasonCode.MAIL_FOLDER_MISSING, folder=target))
 
@@ -154,8 +162,17 @@ class ImapMailSession:
         if trash is not None and trash != folder:
             self._move(folder, uid, trash)
             return
+        self._delete(folder, uid)
+
+    def _delete(self, folder: str, uid: int) -> None:
+        """Mark the mail deleted and expunge it alone (`UID EXPUNGE`, RFC 4315). A server
+        without UIDPLUS keeps it marked until a client expunges the folder: EXPUNGE would take
+        every mail anyone marked (Tobi, 05.11.2026)."""
         self._store(folder, uid, "+FLAGS", "(\\Deleted)")
-        self._imap.expunge()
+        if "UIDPLUS" in self._imap.capabilities:
+            status, answer = self._imap.uid("EXPUNGE", str(uid))
+            if status != "OK":
+                raise imaplib.IMAP4.error(answer)
 
     def _trash_folder(self) -> str | None:
         status, entries = self._imap.list()
@@ -166,7 +183,7 @@ class ImapMailSession:
             if "\\trash" in flags:
                 return name
         names = {name for name, _ in folders}
-        return next((name for name in _TRASH_NAMES if name in names), None)
+        return next((name for name in TRASH_NAMES if name in names), None)
 
 
 def folder_keywords(imap: imaplib.IMAP4) -> tuple[tuple[str, ...], bool]:

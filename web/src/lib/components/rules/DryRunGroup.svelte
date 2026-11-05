@@ -12,6 +12,7 @@
 	// (`head`), how many they are, and folds the group; the items below as rows. A group the
 	// rule cannot act on alone (`conflict`) has a yellow head with a warning sign in place of the
 	// box that chooses it (`lead`).
+	const id = $props.id();
 	let {
 		label,
 		count,
@@ -22,8 +23,8 @@
 		head,
 		children
 	}: {
-		/** Names the group (its items, counted). */
-		label: string;
+		/** Names the group; its count unless given. */
+		label?: string;
 		/** The count beside the head ("12 Dokumente"). */
 		count: string;
 		conflict?: boolean;
@@ -33,13 +34,15 @@
 		head: Snippet;
 		children: Snippet;
 	} = $props();
+
+	const name = $derived(label ?? count);
 </script>
 
 <Card.Root
 	as="section"
 	size="flush"
 	class={cn('overflow-hidden', conflict && 'border-lane-yellow-foreground/35')}
-	aria-label={label}
+	aria-label={name}
 >
 	<div
 		class={cn(
@@ -61,15 +64,16 @@
 			size="sm"
 			label={open ? m.rule_group_fold() : m.rule_group_unfold()}
 			aria-expanded={open}
+			aria-controls="{id}-items"
 			onclick={onfold}
 		>
 			<ChevronDown
-				class={cn('transition-transform motion-reduce:transition-none', open && 'rotate-180')}
+				class={cn('motion-safe:transition-transform', open && 'rotate-180')}
 				aria-hidden="true"
 			/>
 		</IconButton>
 	</div>
 	{#if open}
-		<ul class="divide-y">{@render children()}</ul>
+		<ul id="{id}-items" class="divide-y">{@render children()}</ul>
 	{/if}
 </Card.Root>

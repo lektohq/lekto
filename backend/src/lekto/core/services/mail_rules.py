@@ -35,12 +35,14 @@ class Decider(StrEnum):
 @dataclass(frozen=True)
 class DryRunMail:
     """A mail fetched lately and what would become of it with the rule: whether its conditions
-    hold, who would decide it (the rule, another before it by `rule` name, or the fallback)."""
+    hold, who would decide it (the rule, another before it, `rule` by name and `rule_id`, or the
+    fallback)."""
 
     record: MailRecord
     matches: bool
     decider: Decider
     rule: str | None = None
+    rule_id: MailRuleId | None = None
 
 
 class MailRuleService:
@@ -103,15 +105,24 @@ class MailRuleService:
         for record in records:
             facts = record_facts(record)
             first = first_match([*others, draft], facts)
+            other = None if first is None or first is draft else first
             if first is draft:
-                decider, name = Decider.RULE, None
-            elif first is not None:
-                decider, name = Decider.OTHER, first.name
+                decider = Decider.RULE
+            elif other is not None:
+                decider = Decider.OTHER
             elif box.fallback is Fallback.EVERYTHING:
-                decider, name = Decider.FALLBACK, None
+                decider = Decider.FALLBACK
             else:
-                decider, name = Decider.NOTHING, None
-            found.append(DryRunMail(record, draft.matches(facts), decider, name))
+                decider = Decider.NOTHING
+            found.append(
+                DryRunMail(
+                    record,
+                    draft.matches(facts),
+                    decider,
+                    rule=None if other is None else other.name,
+                    rule_id=None if other is None else other.id,
+                )
+            )
         return found
 
     async def delete(self, actor: UserId, id: MailRuleId) -> None:

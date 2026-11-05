@@ -1,7 +1,4 @@
 <script lang="ts">
-	import Pencil from '@lucide/svelte/icons/pencil';
-	import Play from '@lucide/svelte/icons/play';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
@@ -10,21 +7,17 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import { BASE } from '#lib/base.ts';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
-	import IconButton from '#lib/components/IconButton.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import Loading from '#lib/components/Loading.svelte';
-	import PageHeader from '#lib/components/page/PageHeader.svelte';
 	import MailRuleView from '#lib/components/rules/MailRuleView.svelte';
+	import RuleHeader from '#lib/components/rules/RuleHeader.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import { buttonVariants } from '#lib/components/ui/button/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
 	import { loadMailRuleLookup, namesOf, type MailRuleLookup } from '#lib/mail-rule-lookup.ts';
 	import type { MailRule } from '#lib/mail-rules.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { reasonText } from '#lib/reasons.ts';
-	import { cn } from '#lib/utils.ts';
 
 	// A mail rule's page, as a document rule's (Tobi, 05.11.2026): its name, the switch,
 	// "Bearbeiten", "Probelauf" and delete in the head; its mailbox and priority below; the rule
@@ -86,52 +79,21 @@
 <svelte:head><title>{rule?.name ?? m.nav_rules()} · {m.app_name()}</title></svelte:head>
 
 <div class="flex flex-col gap-6">
-	<PageHeader
+	<RuleHeader
 		title={rule?.name ?? m.mail_rule_generic()}
 		back={{ href: `${BASE}/rules?kind=mail`, label: m.nav_rules() }}
+		{rule}
+		{busy}
+		editHref="{BASE}/rules/mail/{id}/edit"
+		applyHref="{BASE}/rules/mail/{id}/apply"
+		disabledReason={rule?.disabled_reason ? reasonText(rule.disabled_reason) : null}
+		onswitch={switchRule}
+		ondelete={() => (removing = true)}
 	>
-		{#snippet actions()}
-			{#if rule}
-				<Switch
-					bind:checked={() => rule?.enabled ?? false, switchRule}
-					disabled={busy}
-					aria-label={rule.enabled
-						? m.rule_switch_off({ name: rule.name })
-						: m.rule_switch_on({ name: rule.name })}
-				/>
-				<a
-					href="{BASE}/rules/mail/{rule.id}/edit"
-					class={cn(buttonVariants({ variant: 'outline' }))}
-				>
-					<Pencil aria-hidden="true" />
-					{m.rule_edit()}
-				</a>
-				<a
-					href="{BASE}/rules/mail/{rule.id}/apply"
-					class={cn(buttonVariants({ variant: 'outline' }))}
-				>
-					<Play aria-hidden="true" />
-					{m.rule_dry_run()}
-				</a>
-				<IconButton label={m.rule_delete({ name: rule.name })} onclick={() => (removing = true)}>
-					<Trash2 aria-hidden="true" />
-				</IconButton>
-			{/if}
+		{#snippet badges()}
+			<Badge variant="note">{m.mail_rules_mailbox({ name: mailbox })}</Badge>
 		{/snippet}
-		{#snippet below()}
-			{#if rule}
-				<span class="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-					<Badge variant="note">{m.mail_rules_mailbox({ name: mailbox })}</Badge>
-					{m.rule_priority_short({ priority: rule.priority })}
-				</span>
-				{#if rule.disabled_reason}
-					<span class="text-sm text-destructive">
-						{m.rule_disabled_reason({ reason: reasonText(rule.disabled_reason) })}
-					</span>
-				{/if}
-			{/if}
-		{/snippet}
-	</PageHeader>
+	</RuleHeader>
 
 	{#if problem}
 		<LoadProblem {problem} onretry={() => void load(id)} />

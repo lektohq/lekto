@@ -1,6 +1,29 @@
 import { describe, expect, it } from 'vitest';
+import openapi from '../../openapi.json';
 import { m } from '#lib/paraglide/messages.js';
-import { flagLabel, importanceLabel, isKeyword, keywordOptions } from './mail-traits.ts';
+import {
+	flagLabel,
+	importanceLabel,
+	isKeyword,
+	keywordOptions,
+	MAIL_FIELD_OPERATORS
+} from './mail-traits.ts';
+
+const operators = (openapi as unknown as { 'x-mail-operators': Record<string, string[]> })[
+	'x-mail-operators'
+];
+
+describe('the fields of a mail', () => {
+	it('take the operators the API takes for each, in the order of the UI', () => {
+		expect(Object.keys(MAIL_FIELD_OPERATORS).sort()).toEqual(Object.keys(operators).sort());
+		for (const [field, ops] of Object.entries(operators)) {
+			expect(
+				[...MAIL_FIELD_OPERATORS[field as keyof typeof MAIL_FIELD_OPERATORS]].sort(),
+				field
+			).toEqual([...ops].sort());
+		}
+	});
+});
 
 describe('the marks of a mail', () => {
 	it('names importance and flag colours in the words of the UI', () => {

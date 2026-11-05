@@ -3,12 +3,12 @@ import { monthLabel, systemTab, systemTabs } from './system.ts';
 
 describe('the tab of the page "System"', () => {
 	it('is the one the URL names, else the first', () => {
-		expect(systemTab(new URLSearchParams('tab=jobs'))).toBe('jobs');
-		expect(systemTab(new URLSearchParams('tab=search'))).toBe('search');
-		expect(systemTab(new URLSearchParams(''))).toBe('automation');
-		expect(systemTab(new URLSearchParams('tab=classifier'))).toBe('classifier');
-		expect(systemTab(new URLSearchParams('tab=nonsense'))).toBe('automation');
-		expect(systemTab(new URLSearchParams('tab=intake'))).toBe('intake');
+		expect(systemTab(new URLSearchParams('tab=jobs'), true)).toBe('jobs');
+		expect(systemTab(new URLSearchParams('tab=search'), true)).toBe('search');
+		expect(systemTab(new URLSearchParams(''), true)).toBe('automation');
+		expect(systemTab(new URLSearchParams('tab=classifier'), true)).toBe('classifier');
+		expect(systemTab(new URLSearchParams('tab=nonsense'), true)).toBe('automation');
+		expect(systemTab(new URLSearchParams('tab=intake'), true)).toBe('intake');
 		expect(systemTab(new URLSearchParams('tab=intake'), false)).toBe('automation');
 	});
 

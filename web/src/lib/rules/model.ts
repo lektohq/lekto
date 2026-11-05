@@ -20,7 +20,7 @@ import {
 	type TreeGroup
 } from '#lib/rules/tree.ts';
 import { isMoney, isPeriod } from '#lib/fields.ts';
-import { isKeyword } from '#lib/mail-traits.ts';
+import { isKeyword, MAIL_FIELD_OPERATORS, MAIL_TEXT_FIELDS } from '#lib/mail-traits.ts';
 import { readPeriod, writePeriod } from '#lib/periods.ts';
 
 type Schemas = components['schemas'];
@@ -36,7 +36,8 @@ export type Period = Schemas['PeriodValue'];
 export type Value =
 	string | boolean | number | Money | Period | string[] | (string | number | boolean)[] | null;
 export type ApiCondition = Schemas['ConditionSchema'];
-export type ApiGroup = Schemas['AllGroup-Output'] | Schemas['AnyGroup-Output'];
+export type ApiGroup =
+	Schemas['AllGroup_ConditionSchema_-Output'] | Schemas['AnyGroup_ConditionSchema_-Output'];
 export type ApiAction = Schemas['RuleOut']['actions'][number];
 export type ActionType = ApiAction['type'];
 export type Missing = Schemas['Missing'];
@@ -162,7 +163,6 @@ const REFERENCE: readonly Operator[] = ['is', 'in', 'present', 'missing'];
 const ORDERED: readonly Operator[] = ['is', 'gt', 'lt', 'present', 'missing'];
 const TEXTUAL: readonly Operator[] = ['is', 'in', 'contains', 'matches', 'present', 'missing'];
 const TAGS: readonly Operator[] = ['contains', 'in', 'present', 'missing'];
-const MAIL_TEXT: readonly Operator[] = ['ends_with', 'contains', 'is', 'starts_with'];
 
 /** The condition fields on tags, and the scope of the tags each names. */
 export const TAG_FIELDS = {
@@ -192,14 +192,15 @@ export const CONDITION_FIELD_OPERATORS: Record<
 	fact: ['present', 'missing', 'is', 'in', 'matches'],
 	relation: ['present', 'missing', 'is', 'in'],
 	mail_mailbox: ['is', 'in', 'present', 'missing'],
-	mail_sender: MAIL_TEXT,
-	mail_recipient: MAIL_TEXT,
-	mail_to: MAIL_TEXT,
-	mail_cc: MAIL_TEXT,
-	mail_subject: MAIL_TEXT,
-	mail_importance: ['is'],
-	mail_keyword: ['contains', 'present', 'missing'],
-	mail_flag: ['present', 'missing', 'is']
+	// The mail's fields take the comparisons the mail rules give them.
+	mail_sender: MAIL_FIELD_OPERATORS.sender,
+	mail_recipient: MAIL_FIELD_OPERATORS.recipient,
+	mail_to: MAIL_FIELD_OPERATORS.to,
+	mail_cc: MAIL_FIELD_OPERATORS.cc,
+	mail_subject: MAIL_FIELD_OPERATORS.subject,
+	mail_importance: MAIL_FIELD_OPERATORS.importance,
+	mail_keyword: MAIL_FIELD_OPERATORS.keyword,
+	mail_flag: MAIL_FIELD_OPERATORS.flag
 };
 
 export const FIELD_TYPE_OPERATORS: Record<FieldType, readonly Operator[]> = {
@@ -720,11 +721,7 @@ function checkValue(
 		condition.field === 'text' ||
 		(condition.field === 'field' && textual) ||
 		condition.field === 'fact' ||
-		condition.field === 'mail_sender' ||
-		condition.field === 'mail_recipient' ||
-		condition.field === 'mail_to' ||
-		condition.field === 'mail_cc' ||
-		condition.field === 'mail_subject'
+		MAIL_TEXT_FIELDS.some((part) => condition.field === `mail_${part}`)
 	) {
 		return checkText(value, condition.op === 'matches' ? LIMITS.pattern : LIMITS.text);
 	}

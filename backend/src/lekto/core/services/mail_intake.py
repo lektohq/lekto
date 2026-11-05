@@ -56,7 +56,7 @@ from lekto.core.domain.mail_intake import (
     mail_limit,
     taken_names,
 )
-from lekto.core.domain.mail_message import MailMessage, read_mail
+from lekto.core.domain.mail_message import MailMessage, address_line, read_mail
 from lekto.core.domain.mail_rules import MailFacts, MailRule, first_match, mail_facts
 from lekto.core.domain.mail_traits import MailMarks
 from lekto.core.domain.permissions import can_file_into
@@ -263,17 +263,41 @@ class MailIntakeService:
         async with self._uow() as uow:
             known = await uow.mail_records.known_uids(mailbox.id, folder, found.uidvalidity)
         new = [uid for uid in found.uids if uid not in known]
+        for info in await self._due(session, mailbox, folder, new, count):
+            made = await self._mail(session, mailbox, folder, found.uidvalidity, info, count)
+            if made is not None:
+                count.mails += 1
+                count.documents += made
+
+    async def _due(
+        self,
+        session: MailSession,
+        mailbox: Mailbox,
+        folder: str,
+        new: list[int],
+        count: _Count,
+    ) -> list[MailInfo]:
+        """The mails of `new` (not fetched before) this run takes: at most the room `MAX_PER_RUN`
+        leaves; the rest waits for the next run, which comes at once. A mailbox that starts with
+        its setup leaves out the mails of that day that came before it; they get no record, so
+        the server lists them every time, and they are looked at before the room is cut: else
+        they would fill it on every run and, with more of them than the room, keep the newer
+        mails out for good."""
         room = MAX_PER_RUN - count.mails
+        if mailbox.start is FetchStart.SINCE_SETUP:
+            infos = [
+                info
+                for info in await session.info(folder, new)
+                if info.arrived_at >= mailbox.created_at
+            ]
+            if len(infos) > room:
+                count.more = True
+                infos = infos[:room]
+            return infos
         if len(new) > room:
             count.more = True
             new = new[:room]
-        for info in await session.info(folder, new):
-            if mailbox.start is FetchStart.SINCE_SETUP and info.arrived_at < mailbox.created_at:
-                continue  # the same day, before the mailbox was set up
-            count.mails += 1
-            count.documents += await self._mail(
-                session, mailbox, folder, found.uidvalidity, info, count
-            )
+        return await session.info(folder, new)
 
     async def _mail(
         self,
@@ -283,8 +307,9 @@ class MailIntakeService:
         uidvalidity: int,
         info: MailInfo,
         count: _Count,
-    ) -> int:
-        """Take one mail; the number of documents it made."""
+    ) -> int | None:
+        """Take one mail; the number of documents it made, or None for a mail gone meanwhile
+        (looked at next time, if it comes back)."""
         record = MailRecord(
             id=MailRecordId(new_id()),
             mailbox_id=mailbox.id,
@@ -318,7 +343,7 @@ class MailIntakeService:
             return 0
         data = await session.fetch(folder, info.uid)
         if data is None:
-            return 0  # gone meanwhile: looked at next time, if it comes back
+            return None
         try:
             message = read_mail(data)
         except UnprocessableDocumentError as error:
@@ -328,7 +353,7 @@ class MailIntakeService:
         record = replace(
             record,
             message_id=message.message_id,
-            sender=", ".join(address.shown for address in message.sender),
+            sender=address_line(message.sender),
             subject=message.subject,
             sent_at=message.date,
             senders=facts.senders,
@@ -586,7 +611,7 @@ def _named(record: MailRecord, head: bytes | None) -> MailRecord:
     return replace(
         record,
         message_id=message.message_id,
-        sender=", ".join(address.shown for address in message.sender),
+        sender=address_line(message.sender),
         subject=message.subject,
         sent_at=message.date,
     )

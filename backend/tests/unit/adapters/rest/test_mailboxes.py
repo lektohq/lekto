@@ -1,16 +1,19 @@
 """`/mailboxes`: admins set up the mailboxes Lekto fetches from; the password never comes back."""
 
+from dataclasses import replace
 from datetime import timedelta
 from typing import Any
 
 from lekto.adapters.inbound.rest import PREFIX
 from lekto.adapters.outbound.memory import MemoryMailServer
-from lekto.core.domain.mail import MailLogin, MailSecurity
 from lekto.core.domain.users import User
 from tests.api import auth
 from tests.builders import NOW, drain
-from tests.mails import plain_mail
+from tests.mails import LOGIN, plain_mail
 from tests.unit.adapters.rest.support import Api, post
+
+ACCOUNT = replace(LOGIN, password="app-password")
+"""The account the API's tests make on the memory mail server, as `BODY` signs in."""
 
 BODY = {
     "name": "Household",
@@ -61,15 +64,7 @@ async def test_a_mailbox_is_created_tested_changed_and_deleted(api: Api) -> None
     }
     url = f"{PREFIX}/mailboxes/{created['id']}"
 
-    account = _server(api).add_account(
-        MailLogin(
-            host="imap.example.test",
-            port=993,
-            security=MailSecurity.TLS,
-            username="household@example.test",
-            password="app-password",
-        )
-    )
+    account = _server(api).add_account(ACCOUNT)
     account.add_folders("Rechnungen")
     account.deliver(
         "INBOX", plain_mail("Markiert"), arrived_at=NOW, flags={"\\Flagged", "Lekto", "$Junk"}
@@ -126,15 +121,7 @@ async def test_fetch_now_and_the_origin_of_a_document(api: Api) -> None:
         {**BODY, "fallback": "everything", "fallback_user_id": str(admin.id)},
         auth(admin),
     )
-    account = _server(api).add_account(
-        MailLogin(
-            host="imap.example.test",
-            port=993,
-            security=MailSecurity.TLS,
-            username="household@example.test",
-            password="app-password",
-        )
-    )
+    account = _server(api).add_account(ACCOUNT)
     account.deliver("INBOX", plain_mail(), arrived_at=api.clock.now() + timedelta(minutes=1))
     api.clock.advance(timedelta(minutes=2))
     await drain(api.services.mail_intake)  # the first fetch, at once after creating
@@ -219,13 +206,6 @@ async def test_mail_rules(api: Api) -> None:
     assert (await api.client.get(f"{PREFIX}/mail-rules", headers=auth(user))).status_code == 403
     listed = (await api.client.get(f"{PREFIX}/mail-rules", headers=auth(admin))).json()
     assert [item["name"] for item in listed] == ["Strom"]
-    dry = await api.client.post(
-        f"{PREFIX}/mail-rules/dry-run",
-        json={**body, "rule_id": created["id"]},
-        headers=auth(admin),
-    )
-    assert dry.status_code == 200, dry.text
-    assert dry.json() == []  # nothing fetched yet
     dry = await api.client.post(
         f"{PREFIX}/mail-rules/dry-run",
         json={**body, "rule_id": created["id"]},

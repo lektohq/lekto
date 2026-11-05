@@ -144,7 +144,7 @@
 	deleteDescription={m.master_delete_confirm()}
 	{tabs}
 	bind:tab
-	class="h-[min(46.25rem,calc(100dvh-2rem))]"
+	fixed
 >
 	{#if tab === 'general'}
 		<Field.Field>
