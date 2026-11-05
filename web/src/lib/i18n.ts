@@ -40,6 +40,11 @@ function formatLocale(): string {
  * day in every time zone; a moment is shown in the browser's time. Text that is no date comes
  * back as it is.
  */
+/** A moment with its time ("5. Nov. 2026, 14:03"), as the lists of fetches and origins show it. */
+export function formatMoment(value: Date | string): string {
+	return formatDate(value, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
 export function formatDate(
 	value: Date | string,
 	options: Intl.DateTimeFormatOptions = { dateStyle: 'medium' }

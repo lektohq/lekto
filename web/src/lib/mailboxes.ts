@@ -4,8 +4,9 @@
  * API takes it.
  */
 import type { components } from '#lib/api/schema.ts';
-import { formatDate } from '#lib/i18n.ts';
+import { formatDate, formatMoment } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
+import { reasonText } from '#lib/reasons.ts';
 
 export type Mailbox = components['schemas']['MailboxOut'];
 export type MailboxCreate = components['schemas']['MailboxCreate'];
@@ -15,8 +16,40 @@ export type FetchStart = components['schemas']['FetchStart'];
 export type ConnectionTest = components['schemas']['ConnectionTestOut'];
 
 export const INBOX = 'INBOX';
-/** Characters of a folder's name at most, as the API takes it. */
-export const FOLDER_MAX_LENGTH = 1000;
+/** Characters at most, as the API takes them. */
+export const LIMITS = {
+	name: 100,
+	host: 255,
+	username: 320,
+	password: 1000,
+	folder: 1000
+} as const;
+
+/** What the mailbox left out or could not do lately, as lines in the lane's yellow
+ * (web/DESIGN.md, "Intake channels"). */
+export function cautions(mailbox: Mailbox): { key: string; text: string }[] {
+	const { status } = mailbox;
+	const found: { key: string; text: string }[] = [];
+	if (status.step_failed && status.step_failed_at) {
+		found.push({
+			key: 'step',
+			text: m.mail_step_failed({
+				when: formatMoment(status.step_failed_at),
+				reason: reasonText(status.step_failed)
+			})
+		});
+	}
+	if (status.skipped && status.skipped_at) {
+		found.push({
+			key: 'skipped',
+			text: m.mail_skipped({
+				when: formatMoment(status.skipped_at),
+				reason: reasonText(status.skipped)
+			})
+		});
+	}
+	return found;
+}
 
 /** The usual port of each kind of security. */
 export const DEFAULT_PORTS: Record<MailSecurity, number> = { tls: 993, starttls: 143, none: 143 };
