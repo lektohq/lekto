@@ -34,7 +34,10 @@ const KINDS: Record<string, () => string> = {
 	'tags.normalise': m.job_kind_tags_normalise,
 	'rules.apply': m.job_kind_rules_apply,
 	'maintenance.cleanup': m.job_kind_maintenance_cleanup,
-	'documents.remove_files': m.job_kind_documents_remove_files
+	'documents.remove_files': m.job_kind_documents_remove_files,
+	'documents.bulk': m.job_kind_documents_bulk,
+	'mail.fetch': m.job_kind_mail_fetch,
+	'tasks.expire': m.job_kind_tasks_expire
 };
 
 export function kindLabel(kind: string): string {
