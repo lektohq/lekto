@@ -41,6 +41,8 @@
 		placeholder,
 		noneLabel,
 		searchLabel = m.assignment_search(),
+		'aria-label': ariaLabel,
+		'aria-invalid': ariaInvalid,
 		onchange,
 		create,
 		chosen
@@ -53,9 +55,13 @@
 		disabled?: boolean;
 		/** What the field says without a value. */
 		placeholder: string;
-		/** The entry that clears the value. */
-		noneLabel: string;
+		/** The entry that clears the value; none where a value must be chosen (a rule's
+		 * contact or document type). */
+		noneLabel?: string;
 		searchLabel?: string;
+		/** The name where no label stands for it (a row of a rule). */
+		'aria-label'?: string;
+		'aria-invalid'?: boolean;
 		/** Called with the new value when the user picks one. */
 		onchange?: (value: string) => void;
 		/** Make an entry named so to begin with (a dialog); null when it closed without. */
@@ -112,6 +118,8 @@
 		{id}
 		{disabled}
 		role="combobox"
+		aria-label={ariaLabel}
+		aria-invalid={ariaInvalid}
 		data-value={value}
 		class={cn(FIELD, FIELD_HEIGHT, 'flex items-center gap-2 text-left')}
 	>
@@ -135,7 +143,7 @@
 			<Command.Empty class="py-4 text-center text-sm text-muted-foreground">
 				{m.assignment_none_found()}
 			</Command.Empty>
-			{#if words === ''}
+			{#if words === '' && noneLabel}
 				<Command.Item value={NONE} onSelect={() => pick('')} class={row}>
 					<span class="flex-1">{noneLabel}</span>
 					{#if value === ''}<Check aria-hidden="true" />{/if}

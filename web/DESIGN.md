@@ -242,7 +242,9 @@ divider.
 - **`Select`**: a short, fixed list. On desktop a list in the style of the other pickers, on the
   phone the system's native picker.
 - **`SearchSelect`** (one of many by searching: contact, document type), looking like a
-  `Select`. A popover on desktop; on the phone a sheet from the bottom (`PhoneSheet`) named by
+  `Select`, wherever one is chosen: a document, many documents, a mailbox's and a mail rule's type
+  of the mail text, a rule's action and the value of its condition (Tobi, 05.11.2026). Without
+  `noneLabel` where a value must be chosen (a rule's contact or type). A popover on desktop; on the phone a sheet from the bottom (`PhoneSheet`) named by
   its `title` ("Kontakt wählen"), with a close button and rows of 48 px; a choice closes it
   (Tobi, 28.10.2026). Admins can create from the search (`CreateOffer`).
 - **`SearchField`**: every search input, in pickers, lists and pages alike. The header search and
