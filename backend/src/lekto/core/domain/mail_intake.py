@@ -23,6 +23,7 @@ from lekto.core.domain.ids import (
 )
 from lekto.core.domain.mail import MailAction
 from lekto.core.domain.mail_message import Address, MailMessage, MailPart
+from lekto.core.domain.mail_traits import Importance, MailMarks
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.validation import require_utc
 
@@ -164,6 +165,13 @@ class MailRecord:
     """The addresses and names it went to (To, Cc), likewise."""
     attachments: tuple[str, ...] = ()
     """The names of the attachments Lekto takes of it (empty for one without a name)."""
+    to: tuple[str, ...] = ()
+    """The addresses and names in To, as `recipients`; Cc likewise."""
+    cc: tuple[str, ...] = ()
+    importance: Importance | None = None
+    """As its header gave it; none for a mail fetched before Lekto read it, or too large."""
+    marks: MailMarks | None = None
+    """Its keywords and flag on the server when it was fetched; none likewise."""
     version: int = 0
 
     def __post_init__(self) -> None:
@@ -201,6 +209,10 @@ class MailOrigin:
     related: tuple[DocumentId, ...] = field(default_factory=tuple)
     body_type_id: DocumentTypeId | None = None
     """The type the cover letter gets (the rules node sets it, before the document rules)."""
+    importance: Importance | None = None
+    """The letter's importance, as its header gives it; none for a document taken before."""
+    marks: MailMarks | None = None
+    """The keywords and flag the mail had on the server when it was fetched; none likewise."""
     version: int = 0
 
     @property

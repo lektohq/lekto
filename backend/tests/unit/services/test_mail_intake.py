@@ -32,6 +32,7 @@ from lekto.core.domain.mail_rules import (
     MailRule,
     MailRuleChanges,
 )
+from lekto.core.domain.mail_traits import FlagColor, Importance, MailMarks
 from lekto.core.domain.master_data import DocumentType
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.reasons import ReasonCode
@@ -83,9 +84,18 @@ async def _setup(
     return admin, person, mailbox
 
 
-def _deliver(world: World, data: bytes, *, folder: str = "INBOX", seen: bool = False) -> int:
+def _deliver(
+    world: World,
+    data: bytes,
+    *,
+    folder: str = "INBOX",
+    seen: bool = False,
+    flags: frozenset[str] = frozenset(),
+) -> int:
     account = world.mail_server.servers[(LOGIN.host, LOGIN.port)][LOGIN.username]
-    return account.deliver(folder, data, arrived_at=world.clock.now() + LATER, seen=seen)
+    return account.deliver(
+        folder, data, arrived_at=world.clock.now() + LATER, seen=seen, flags=flags
+    )
 
 
 async def _fetch(world: World, service: MailIntakeService) -> None:
@@ -334,6 +344,52 @@ async def _rule(world: World, admin: User, mailbox: Mailbox, **changes: Any) -> 
     values: dict[str, Any] = {"name": "Strom"}
     values.update(changes)
     return await world.mail_rules.create(admin.id, mailbox.id, MailRuleChanges(**values))
+
+
+async def test_a_rule_on_the_marks_and_importance_of_a_mail(world: World) -> None:
+    """Flag, keyword and importance decide; the record, the origin and the mailbox keep them."""
+    admin, person, mailbox = await _setup(world, everything=False)
+    await _rule(
+        world,
+        admin,
+        mailbox,
+        conditions=Group(
+            mode="all",
+            items=(
+                MailCondition(MailField.FLAG, MailOperator.IS, "green"),
+                MailCondition(MailField.KEYWORD, MailOperator.CONTAINS, "lekto"),
+                Group(
+                    mode="all",
+                    items=(MailCondition(MailField.IMPORTANCE, MailOperator.IS, "low"),),
+                    negate=True,
+                ),
+            ),
+        ),
+        user_id=person.id,
+    )
+    urgent = mails.plain_mail("Dringend").replace(b"Subject:", b"Importance: high\r\nSubject:", 1)
+    green = frozenset({"\\Flagged", "$MailFlagBit0", "$MailFlagBit1", "Lekto"})
+    _deliver(world, urgent, flags=green)
+    _deliver(world, mails.plain_mail("Blau"), flags=frozenset({"\\Flagged", "$MailFlagBit2"}))
+    await _fetch(world, world.mail_intake())
+
+    (document,) = await world.documents.list_visible(person.id)
+    assert document.original_filename == "Dringend.eml"
+    async with world.uow() as uow:
+        records = {r.subject: r for r in await uow.mail_records.recent(mailbox.id, limit=5)}
+        origin = await uow.mail_origins.find(document.id)
+        stored = await uow.mailboxes.get(mailbox.id)
+    taken = records["Dringend"]
+    assert (taken.importance, taken.marks) == (
+        Importance.HIGH,
+        MailMarks(keywords=("Lekto",), flag=FlagColor.GREEN),
+    )
+    assert records["Blau"].outcome is MailOutcome.NO_RULE
+    assert origin is not None and (origin.importance, origin.marks) == (
+        taken.importance,
+        taken.marks,
+    )
+    assert (stored.status.keywords, stored.status.own_keywords) == (("Lekto",), True)
 
 
 async def test_the_first_matching_rule_takes_a_mail(world: World) -> None:

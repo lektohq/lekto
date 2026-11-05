@@ -9,6 +9,7 @@ from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.evidence import DocumentText
 from lekto.core.domain.fields import FieldDefinition, Money, Url
 from lekto.core.domain.json_value import JsonValue
+from lekto.core.domain.mail_traits import FlagColor, Importance, MailMarks
 from lekto.core.domain.periods import Period
 from lekto.core.domain.rule_conditions import (
     Facts,
@@ -487,8 +488,12 @@ def test_a_topic_condition_matches_the_topics_below_it_and_is_unknown_unconfirme
 MAIL = MailOf(
     mailbox_id=UUID("01a1a7fc-702c-736e-a661-ff59645bdc52"),
     senders=("rechnung@stadtwerke.example", "Stadtwerke"),
-    recipients=("anna@example.test", "Anna"),
+    recipients=("anna@example.test", "Anna", "ben@example.test"),
+    to=("anna@example.test", "Anna"),
+    cc=("ben@example.test",),
     subject="Ihre Rechnung Oktober",
+    importance=Importance.HIGH,
+    marks=MailMarks(keywords=("Lekto",), flag=FlagColor.BLUE),
 )
 
 
@@ -502,6 +507,14 @@ MAIL = MailOf(
         (cond(ConditionField.MAIL_SENDER, Operator.STARTS_WITH, "info@"), False, False),
         (cond(ConditionField.MAIL_RECIPIENT, Operator.IS, "anna@example.test"), True, False),
         (cond(ConditionField.MAIL_SUBJECT, Operator.CONTAINS, "rechnung"), True, False),
+        (cond(ConditionField.MAIL_TO, Operator.IS, "ben@example.test"), False, False),
+        (cond(ConditionField.MAIL_CC, Operator.IS, "ben@example.test"), True, False),
+        (cond(ConditionField.MAIL_IMPORTANCE, Operator.IS, "high"), True, False),
+        (cond(ConditionField.MAIL_IMPORTANCE, Operator.IS, "normal"), False, False),
+        (cond(ConditionField.MAIL_KEYWORD, Operator.CONTAINS, "lekto"), True, False),
+        (cond(ConditionField.MAIL_KEYWORD, Operator.MISSING), False, False),
+        (cond(ConditionField.MAIL_FLAG, Operator.IS, "blue"), True, False),
+        (cond(ConditionField.MAIL_FLAG, Operator.MISSING), False, False),
     ],
 )
 def test_conditions_on_the_mail_a_document_came_with(
@@ -515,5 +528,11 @@ def test_conditions_on_the_mail_a_document_came_with(
 def test_text_operators_only_for_the_mail() -> None:
     with pytest.raises(ValidationError):
         cond(ConditionField.TEXT, Operator.ENDS_WITH, "x")
+    with pytest.raises(ValidationError):
+        cond(ConditionField.MAIL_IMPORTANCE, Operator.IS, "urgent")
+    with pytest.raises(ValidationError):
+        cond(ConditionField.MAIL_FLAG, Operator.IS, "pink")
+    with pytest.raises(ValidationError):
+        cond(ConditionField.MAIL_KEYWORD, Operator.CONTAINS, "two words")
     with pytest.raises(ValidationError):
         cond(ConditionField.MAIL_MAILBOX, Operator.IS, "not an id")

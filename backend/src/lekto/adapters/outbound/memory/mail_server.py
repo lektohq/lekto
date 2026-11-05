@@ -7,8 +7,15 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from lekto.core.domain.mail import MailLogin, MailSecurity
+from lekto.core.domain.mail_traits import SEEN, shown_keywords
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.ports.mail_server import FolderMails, MailInfo, MailSearch, MailServerError
+from lekto.core.ports.mail_server import (
+    FolderMails,
+    MailAccount,
+    MailInfo,
+    MailSearch,
+    MailServerError,
+)
 
 TRASH = "Trash"
 
@@ -19,6 +26,11 @@ class MemoryMail:
     data: bytes
     arrived_at: datetime
     seen: bool = False
+    flags: set[str] = field(default_factory=set)  # keywords and flags besides \Seen
+
+    @property
+    def all_flags(self) -> frozenset[str]:
+        return frozenset(self.flags | ({SEEN} if self.seen else set()))
 
 
 @dataclass
@@ -33,18 +45,33 @@ class MemoryMailAccount:
     password: str
     security: MailSecurity
     boxes: dict[str, MemoryFolder] = field(default_factory=lambda: {"INBOX": MemoryFolder(1)})
+    own_keywords: bool = True  # whether it stores keywords of Lekto's own
 
     def add_folders(self, *names: str) -> None:
         for name in names:
             self.boxes.setdefault(name, MemoryFolder(len(self.boxes) + 1))
 
-    def deliver(self, folder: str, data: bytes, *, arrived_at: datetime, seen: bool = False) -> int:
-        """Put a mail into `folder` (made if missing); returns its UID."""
+    def deliver(
+        self,
+        folder: str,
+        data: bytes,
+        *,
+        arrived_at: datetime,
+        seen: bool = False,
+        flags: set[str] | frozenset[str] = frozenset(),
+    ) -> int:
+        """Put a mail into `folder` (made if missing), with its keywords and flags; returns its
+        UID."""
         box = self.boxes.setdefault(folder, MemoryFolder(len(self.boxes) + 1))
         uid = box.next_uid
         box.next_uid += 1
-        box.mails.append(MemoryMail(uid, data, arrived_at.astimezone(UTC), seen))
+        box.mails.append(MemoryMail(uid, data, arrived_at.astimezone(UTC), seen, set(flags)))
         return uid
+
+    def keywords(self, folder: str) -> tuple[str, ...]:
+        """The keywords the mails of `folder` carry, as a server's FLAGS would list them."""
+        box = self.boxes.get(folder)
+        return shown_keywords(flag for mail in box.mails for flag in mail.flags) if box else ()
 
 
 class MemoryMailServer:
@@ -63,9 +90,15 @@ class MemoryMailServer:
         self.servers.setdefault(where, {})[login.username] = account
         return account
 
-    async def folders(self, login: MailLogin) -> tuple[str, ...]:
+    async def account(self, login: MailLogin) -> MailAccount:
         account = self._account(login)
-        return tuple(sorted(account.boxes, key=lambda name: (name != "INBOX", name.casefold())))
+        return MailAccount(
+            folders=tuple(
+                sorted(account.boxes, key=lambda name: (name != "INBOX", name.casefold()))
+            ),
+            keywords=account.keywords("INBOX"),
+            own_keywords=account.own_keywords,
+        )
 
     @asynccontextmanager
     async def session(self, login: MailLogin) -> AsyncIterator["MemoryMailSession"]:
@@ -95,12 +128,22 @@ class MemoryMailSession:
             if (search.since is None or mail.arrived_at.date() >= search.since)
             and not (search.unseen and mail.seen)
         )
-        return FolderMails(uidvalidity=box.uidvalidity, uids=uids)
+        return FolderMails(
+            uidvalidity=box.uidvalidity,
+            uids=uids,
+            keywords=self._account.keywords(folder),
+            own_keywords=self._account.own_keywords,
+        )
 
     async def info(self, folder: str, uids: Sequence[int]) -> list[MailInfo]:
         mails = {mail.uid: mail for mail in self._box(folder).mails}
         return [
-            MailInfo(uid=uid, size=len(mails[uid].data), arrived_at=mails[uid].arrived_at)
+            MailInfo(
+                uid=uid,
+                size=len(mails[uid].data),
+                arrived_at=mails[uid].arrived_at,
+                flags=mails[uid].all_flags,
+            )
             for uid in uids
             if uid in mails
         ]
@@ -126,7 +169,9 @@ class MemoryMailSession:
         mail = self._mail(folder, uid)
         if mail is not None:
             self._box(folder).mails.remove(mail)
-            self._account.deliver(target, mail.data, arrived_at=mail.arrived_at, seen=mail.seen)
+            self._account.deliver(
+                target, mail.data, arrived_at=mail.arrived_at, seen=mail.seen, flags=mail.flags
+            )
 
     async def trash(self, folder: str, uid: int) -> None:
         self._account.add_folders(TRASH)

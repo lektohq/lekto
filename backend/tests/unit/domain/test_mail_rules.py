@@ -1,5 +1,7 @@
 """Mail rules: conditions on the mail, the first that matches, and what a rule must name."""
 
+from dataclasses import replace
+
 import pytest
 
 from lekto.core.domain.condition_tree import MAX_DEPTH, Group
@@ -20,17 +22,23 @@ from lekto.core.domain.mail_rules import (
     first_match,
     mail_facts,
 )
+from lekto.core.domain.mail_traits import FlagColor, Importance, MailMarks
 from lekto.core.domain.reasons import ReasonCode, because
 from tests.builders import HOUR, NOW
 from tests.mails import plain_mail, rich_mail
 
 FACTS = MailFacts(
     senders=("rechnung@stadtwerke.example", "Stadtwerke Musterstadt"),
-    recipients=("anna@example.test",),
+    recipients=("anna@example.test", "ben@example.test"),
+    to=("anna@example.test",),
+    cc=("ben@example.test",),
     subject="Ihre Rechnung Oktober",
     folder="INBOX",
     attachments=True,
+    importance=Importance.LOW,
+    marks=MailMarks(keywords=("Lekto", "$label1"), flag=FlagColor.ORANGE),
 )
+UNKNOWN = replace(FACTS, importance=None, marks=None)
 PERSON = UserId(new_id())
 
 
@@ -51,16 +59,30 @@ def rule(name: str = "Strom", **changes: object) -> MailRule:
         (MailCondition(MailField.SENDER, MailOperator.CONTAINS, "musterstadt"), True),
         (MailCondition(MailField.SENDER, MailOperator.IS, "rechnung@stadtwerke.example"), True),
         (MailCondition(MailField.SENDER, MailOperator.STARTS_WITH, "info@"), False),
-        (MailCondition(MailField.RECIPIENT, MailOperator.IS, "ben@example.test"), False),
+        (MailCondition(MailField.RECIPIENT, MailOperator.IS, "carl@example.test"), False),
         (MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "rechnung"), True),
         (MailCondition(MailField.FOLDER, MailOperator.IS, "INBOX"), True),
         (MailCondition(MailField.FOLDER, MailOperator.IS, "inbox"), False),
         (MailCondition(MailField.ATTACHMENTS, MailOperator.PRESENT), True),
         (MailCondition(MailField.ATTACHMENTS, MailOperator.MISSING), False),
+        (MailCondition(MailField.RECIPIENT, MailOperator.IS, "ben@example.test"), True),
+        (MailCondition(MailField.TO, MailOperator.IS, "ben@example.test"), False),
+        (MailCondition(MailField.CC, MailOperator.ENDS_WITH, "@example.test"), True),
+        (MailCondition(MailField.IMPORTANCE, MailOperator.IS, "low"), True),
+        (MailCondition(MailField.IMPORTANCE, MailOperator.IS, "high"), False),
+        (MailCondition(MailField.KEYWORD, MailOperator.CONTAINS, "LEKTO"), True),
+        (MailCondition(MailField.KEYWORD, MailOperator.CONTAINS, "Erledigt"), False),
+        (MailCondition(MailField.KEYWORD, MailOperator.PRESENT), True),
+        (MailCondition(MailField.FLAG, MailOperator.PRESENT), True),
+        (MailCondition(MailField.FLAG, MailOperator.IS, "orange"), True),
+        (MailCondition(MailField.FLAG, MailOperator.IS, "red"), False),
+        (MailCondition(MailField.FLAG, MailOperator.MISSING), False),
     ],
 )
 def test_conditions(condition: MailCondition, holds: bool) -> None:
     assert condition.holds(FACTS) is holds
+    if condition.field in (MailField.IMPORTANCE, MailField.KEYWORD, MailField.FLAG):
+        assert not condition.holds(UNKNOWN)  # a mail fetched before Lekto read them
 
 
 @pytest.mark.parametrize(
@@ -70,6 +92,9 @@ def test_conditions(condition: MailCondition, holds: bool) -> None:
         (MailField.ATTACHMENTS, MailOperator.PRESENT, "x"),
         (MailField.SUBJECT, MailOperator.CONTAINS, " "),
         (MailField.SUBJECT, MailOperator.PRESENT, None),
+        (MailField.IMPORTANCE, MailOperator.IS, "urgent"),
+        (MailField.FLAG, MailOperator.IS, "pink"),
+        (MailField.KEYWORD, MailOperator.CONTAINS, "zwei Wörter"),
     ],
 )
 def test_a_bad_condition_is_refused(field: MailField, op: MailOperator, value: str | None) -> None:

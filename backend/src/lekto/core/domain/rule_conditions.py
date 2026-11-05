@@ -26,6 +26,13 @@ from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, TagId, Use
 from lekto.core.domain.json_value import JsonValue, require_date
 from lekto.core.domain.mail_intake import MailOrigin
 from lekto.core.domain.mail_message import Address
+from lekto.core.domain.mail_traits import (
+    Importance,
+    MailMarks,
+    flag_holds,
+    importance_holds,
+    keyword_holds,
+)
 from lekto.core.domain.periods import Period
 from lekto.core.domain.rules import (
     Condition,
@@ -62,15 +69,20 @@ class Taxonomy:
         return frozenset() if contact is None else self.topics.get(contact, frozenset())
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class MailOf:
     """The mail a document came with, as conditions see it: its mailbox, the sender's and the
-    recipients' addresses and names, its subject."""
+    recipients' addresses and names (To and Cc together and apart), its subject, importance
+    and marks on the server (none for a document taken before Lekto kept them)."""
 
     mailbox_id: UUID
     senders: tuple[str, ...]
     recipients: tuple[str, ...]
+    to: tuple[str, ...] = ()
+    cc: tuple[str, ...] = ()
     subject: str
+    importance: Importance | None = None
+    marks: MailMarks | None = None
 
     @classmethod
     def of(cls, origin: MailOrigin | None) -> "MailOf | None":
@@ -84,7 +96,11 @@ class MailOf:
             mailbox_id=origin.mailbox_id,
             senders=texts(origin.sender),
             recipients=texts((*origin.to, *origin.cc)),
+            to=texts(origin.to),
+            cc=texts(origin.cc),
             subject=origin.subject,
+            importance=origin.importance,
+            marks=origin.marks,
         )
 
 
@@ -277,14 +293,30 @@ def _condition(
         case ConditionField.MAIL_MAILBOX:
             mailbox = None if facts.mail is None else str(facts.mail.mailbox_id)
             return _reference(op, mailbox, values)
+        case ConditionField.MAIL_IMPORTANCE:
+            return facts.mail is not None and importance_holds(
+                facts.mail.importance, str(condition.value)
+            )
+        case ConditionField.MAIL_KEYWORD:
+            value = None if condition.value is None else str(condition.value)
+            return facts.mail is not None and keyword_holds(facts.mail.marks, op.value, value)
+        case ConditionField.MAIL_FLAG:
+            value = None if condition.value is None else str(condition.value)
+            return facts.mail is not None and flag_holds(facts.mail.marks, op.value, value)
         case (
-            ConditionField.MAIL_SENDER | ConditionField.MAIL_RECIPIENT | ConditionField.MAIL_SUBJECT
+            ConditionField.MAIL_SENDER
+            | ConditionField.MAIL_RECIPIENT
+            | ConditionField.MAIL_TO
+            | ConditionField.MAIL_CC
+            | ConditionField.MAIL_SUBJECT
         ):
             if facts.mail is None:
                 return False
             texts = {
                 ConditionField.MAIL_SENDER: facts.mail.senders,
                 ConditionField.MAIL_RECIPIENT: facts.mail.recipients,
+                ConditionField.MAIL_TO: facts.mail.to,
+                ConditionField.MAIL_CC: facts.mail.cc,
                 ConditionField.MAIL_SUBJECT: (facts.mail.subject,),
             }[condition.field]
             wanted = str(condition.value).casefold()

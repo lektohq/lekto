@@ -58,12 +58,14 @@ class _GreenMail:
         *,
         arrived_at: datetime,
         seen: bool = False,
+        flags: Sequence[str] = (),
     ) -> None:
+        marks = [*flags, *(["\\Seen"] if seen else [])]
         with imaplib.IMAP4(self._host, self._port, timeout=probes.TIMEOUT) as imap:
             imap.login(login.username, login.password)
             status, answer = imap.append(
                 quoted(folder).decode(),
-                "(\\Seen)" if seen else "",
+                f"({' '.join(marks)})" if marks else "",
                 imaplib.Time2Internaldate(arrived_at),
                 data,
             )
