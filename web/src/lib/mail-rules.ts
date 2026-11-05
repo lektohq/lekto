@@ -5,6 +5,7 @@
 import type { components } from '#lib/api/schema.ts';
 import { folderLabel } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
+import { operatorLabel } from '#lib/rules/describe.ts';
 
 export type MailRule = components['schemas']['MailRuleOut'];
 export type MailRuleCreate = components['schemas']['MailRuleCreate'];
@@ -42,14 +43,14 @@ export const FIELD_LABELS: Record<MailField, () => string> = {
 	attachments: m.mail_rule_field_attachments
 };
 
-export const OPERATOR_LABELS: Record<MailOperator, () => string> = {
-	contains: m.mail_rule_op_contains,
-	is: m.mail_rule_op_is,
-	starts_with: m.mail_rule_op_starts_with,
-	ends_with: m.mail_rule_op_ends_with,
-	present: m.mail_rule_op_present,
-	missing: m.mail_rule_op_missing
-};
+/** A comparison in the words of the document rules' ("ist", "endet auf"); attachments are
+ * there or not. */
+export function operatorText(field: MailField, op: MailOperator): string {
+	if (field === 'attachments') {
+		return op === 'present' ? m.mail_rule_attachments_present() : m.mail_rule_attachments_missing();
+	}
+	return operatorLabel('mail_sender', op);
+}
 
 export const PARTS_LABELS: Record<MailParts, () => string> = {
 	all: m.mail_rule_parts_all,
@@ -189,26 +190,28 @@ export function patchBody(form: MailRuleForm): MailRulePatch {
 	return body(form);
 }
 
-interface Names {
+export interface Names {
 	user: (id: string | null | undefined) => string;
 	space: (id: string | null | undefined) => string;
 	type: (id: string | null | undefined) => string;
 }
 
-/** A rule in one line: its priority, its conditions, then what it does. */
-export function summaryOf(rule: MailRule, names: Names): string {
-	const conditions = rule.conditions.map((item) =>
+/** The conditions in words, one each ("Absender endet auf @stadtwerke.example"). */
+export function conditionTexts(rule: Pick<MailRule, 'conditions'>): string[] {
+	return rule.conditions.map((item) =>
 		[
 			FIELD_LABELS[item.field](),
-			OPERATOR_LABELS[item.op](),
+			operatorText(item.field, item.op),
 			item.value ? (item.field === 'folder' ? `„${folderLabel(item.value)}“` : item.value) : ''
 		]
 			.filter(Boolean)
 			.join(' ')
 	);
-	const when = conditions.length
-		? conditions.join(rule.any ? m.mail_rule_or() : m.mail_rule_and())
-		: m.mail_rule_every();
+}
+
+/** What the rule does, one part each: what it takes, for whom, where, the type of the text,
+ * the mail afterwards. */
+export function actionTexts(rule: MailRule, names: Names): string[] {
 	const does: string[] = [PARTS_LABELS[rule.parts]()];
 	if (rule.user_id) does.push(m.mail_rule_summary_for({ name: names.user(rule.user_id) }));
 	if (rule.space_id) does.push(m.mail_rule_summary_space({ name: names.space(rule.space_id) }));
@@ -219,5 +222,14 @@ export function summaryOf(rule: MailRule, names: Names): string {
 	} else if (rule.after !== 'nothing') {
 		does.push(AFTER_LABELS[rule.after]());
 	}
-	return `${m.rule_priority_short({ priority: rule.priority })} · ${when} → ${does.join(', ')}`;
+	return does;
+}
+
+/** A rule in one line: its priority, its conditions, then what it does. */
+export function summaryOf(rule: MailRule, names: Names): string {
+	const conditions = conditionTexts(rule);
+	const when = conditions.length
+		? conditions.join(rule.any ? m.mail_rule_or() : m.mail_rule_and())
+		: m.mail_rule_every();
+	return `${m.rule_priority_short({ priority: rule.priority })} · ${when} → ${actionTexts(rule, names).join(', ')}`;
 }

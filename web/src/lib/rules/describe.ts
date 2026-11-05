@@ -33,10 +33,11 @@ const CONDITION_FIELDS: Record<Exclude<ConditionField, 'field'>, () => string> =
 	step: m.rule_field_step,
 	fact: m.rule_field_fact,
 	relation: m.rule_field_relation,
-	mail_mailbox: m.rule_field_mail_mailbox,
-	mail_sender: m.rule_field_mail_sender,
-	mail_recipient: m.rule_field_mail_recipient,
-	mail_subject: m.rule_field_mail_subject
+	// The words of the mail rules' fields, as of the mail ("Mail: Absender").
+	mail_mailbox: () => m.rule_field_of_mail({ field: m.mail_rule_mailbox() }),
+	mail_sender: () => m.rule_field_of_mail({ field: m.mail_rule_field_sender() }),
+	mail_recipient: () => m.rule_field_of_mail({ field: m.mail_rule_field_recipient() }),
+	mail_subject: () => m.rule_field_of_mail({ field: m.mail_rule_field_subject() })
 };
 
 export function fieldLabel(field: ConditionField): string {

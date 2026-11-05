@@ -108,7 +108,7 @@
 								<a
 									href="{BASE}/rules/mail/{rule.id}"
 									class="truncate font-medium after:absolute after:inset-0 hover:underline"
-									>{rule.name}</a
+									aria-label={m.rule_open({ name: rule.name })}>{rule.name}</a
 								>
 								<span class="text-sm text-muted-foreground">{summaryOf(rule, names)}</span>
 								{#if rule.disabled_reason}
@@ -128,7 +128,7 @@
 							<EditButton
 								class="relative z-10"
 								label={m.rule_edit_title({ name: rule.name })}
-								href="{BASE}/rules/mail/{rule.id}"
+								href="{BASE}/rules/mail/{rule.id}/edit"
 							/>
 						</Card.Root>
 					{/each}
