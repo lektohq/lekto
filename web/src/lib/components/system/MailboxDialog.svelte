@@ -9,12 +9,12 @@
 	import HintLabel from '#lib/components/HintLabel.svelte';
 	import MultiPicker from '#lib/components/MultiPicker.svelte';
 	import SearchSelect from '#lib/components/SearchSelect.svelte';
-	import Segmented from '#lib/components/Segmented.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
+	import { isoDayLocal } from '#lib/dates.ts';
 	import { formatDate } from '#lib/i18n.ts';
 	import {
 		complete,
@@ -37,8 +37,8 @@
 
 	// The dialog of a mailbox (Tobi, 04.11.2026; mock D) in two parts (Tobi, 05.11.2026):
 	// "Verbindung", where Lekto signs in and the test of the connection that lists the folders,
-	// and "Abruf": the folders to pick from, how often and which mails it fetches, what a mail no
-	// rule takes brings in, and the type of a mail's text. A new mailbox starts at the connection
+	// and "Abruf": the folders to pick from, then two rows of two: how often and what a mail no
+	// rule takes brings in, which mails it fetches and the type of a mail's text. A new mailbox starts at the connection
 	// and goes on to the fetching once a test found the folders. One save stores both parts. The
 	// password is never shown again: left empty, the stored one stays. Deleting is in the footer.
 	let {
@@ -96,8 +96,15 @@
 		{ value: 'none', label: m.mail_security_none() }
 	];
 
+	// Which mails, in one choice (Tobi, 05.11.2026): from the day of setting up (a new mailbox:
+	// today), from a day picked under it, or every unread one, however old.
 	const STARTS = $derived([
-		{ value: 'since_setup', label: m.mail_start_since_setup() },
+		{
+			value: 'since_setup',
+			label: mailbox
+				? m.mail_start_since_setup({ day: formatDate(mailbox.created_at) })
+				: m.mail_start_since_today()
+		},
 		{ value: 'since_date', label: m.mail_start_since_date() },
 		{ value: 'unread', label: m.mail_start_unread() }
 	]);
@@ -119,6 +126,14 @@
 			label: folderLabel(name)
 		}))
 	);
+
+	/** A day to start from begins at the day of setting up (a new mailbox: today). */
+	function startChanged(value: string) {
+		form.start = value as FetchStart;
+		if (form.start === 'since_date' && form.since === '') {
+			form.since = isoDayLocal(mailbox ? new Date(mailbox.created_at) : new Date());
+		}
+	}
 
 	function securityChanged(value: string) {
 		const security = value as MailSecurity;
@@ -324,45 +339,28 @@
 				<HintLabel for="mailbox-fallback" label={m.mail_fallback()} hint={m.mail_fallback_hint()} />
 				<Select id="mailbox-fallback" bind:value={form.fallback} options={fallbacks} />
 			</Field.Field>
+			<Field.Field>
+				<HintLabel for="mailbox-start" label={m.mail_start()} hint={m.mail_start_hint()} />
+				<Select id="mailbox-start" value={form.start} options={STARTS} onchange={startChanged} />
+				{#if form.start === 'since_date'}
+					<DateInput label={m.mail_start_day()} bind:value={form.since} />
+				{/if}
+			</Field.Field>
+			<Field.Field>
+				<HintLabel
+					for="mailbox-body-type"
+					label={m.mail_body_type()}
+					hint={m.mail_body_type_hint()}
+				/>
+				<SearchSelect
+					id="mailbox-body-type"
+					title={m.picker_title_type()}
+					bind:value={form.bodyTypeId}
+					options={types.map((entry) => ({ value: entry.id, label: entry.name }))}
+					placeholder={m.mail_body_type_open()}
+					noneLabel={m.mail_body_type_open()}
+				/>
+			</Field.Field>
 		</div>
-		<Field.Field>
-			<Field.Label id="mailbox-start-label">{m.mail_start()}</Field.Label>
-			<Segmented
-				labelledby="mailbox-start-label"
-				options={STARTS}
-				bind:value={() => form.start, (value) => (form.start = value as FetchStart)}
-			/>
-			{#if form.start === 'since_date'}
-				<DateInput label={m.mail_start_since_date()} bind:value={form.since} />
-			{/if}
-			{#if form.start === 'unread'}
-				<Field.Description>{m.mail_start_unread_note()}</Field.Description>
-			{:else if form.start === 'since_date'}
-				<Field.Description>{m.mail_start_since_date_note()}</Field.Description>
-			{:else if mailbox}
-				<Field.Description
-					>{m.mail_start_since_setup_note({
-						day: formatDate(mailbox.created_at)
-					})}</Field.Description
-				>
-			{:else}
-				<Field.Description>{m.mail_start_since_setup_new()}</Field.Description>
-			{/if}
-		</Field.Field>
-		<Field.Field>
-			<HintLabel
-				for="mailbox-body-type"
-				label={m.mail_body_type()}
-				hint={m.mail_body_type_hint()}
-			/>
-			<SearchSelect
-				id="mailbox-body-type"
-				title={m.picker_title_type()}
-				bind:value={form.bodyTypeId}
-				options={types.map((entry) => ({ value: entry.id, label: entry.name }))}
-				placeholder={m.mail_body_type_open()}
-				noneLabel={m.mail_body_type_open()}
-			/>
-		</Field.Field>
 	</div>
 </EditorShell>
