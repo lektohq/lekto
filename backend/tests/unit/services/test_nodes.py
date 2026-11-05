@@ -299,7 +299,7 @@ async def test_a_mail_is_set_not_read(world: World) -> None:
     assert document.lane is Lane.GREEN
     assert document.page_count == 2
     assert ocr.calls == []  # nothing recognised
-    assert len(mail.calls) == 2  # the archive, and the pages from the same
+    assert 1 <= len(mail.calls) <= 2  # OCR sets the archive; the pages take it, or came first
     assert await world.object_store.get(archive_key(document.id)) == FAKE_PDF
     assert pages.calls and pages.calls[0].suffix == ".pdf"
     log = {
@@ -308,6 +308,24 @@ async def test_a_mail_is_set_not_read(world: World) -> None:
     assert log[Node.OCR].result.model_version == "fake-mail 1"
     assert log[Node.OCR].result.output["pdfa"] is True
     assert not await world.object_store.exists(reading_key(document.id))
+
+
+async def test_the_pages_of_a_mail_take_the_archive_where_it_is_set_already(
+    world: World,
+) -> None:
+    mail = FakeMailRenderer()
+    service = pipeline(world, mail=mail)
+    owner = await world.user()
+    received = await service.receive(owner.id, incoming(plain_mail()), filename="Rechnung.eml")
+    await world.drain(service)
+    document = await world.documents.get(owner.id, received.id)
+    store = world.object_store
+    before = len(mail.calls)
+    await PagesNode(store, FakePageRenderer(1), mail).run(document)
+    assert len(mail.calls) == before  # the archive is there: not set again
+    await store.delete(archive_key(document.id))
+    await PagesNode(store, FakePageRenderer(1), mail).run(document)
+    assert len(mail.calls) == before + 1  # without it, the pages set the mail themselves
 
 
 async def test_a_mail_without_a_renderer_fails(world: World) -> None:

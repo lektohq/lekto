@@ -9,7 +9,13 @@ from datetime import UTC, date, datetime, timedelta, timezone
 from lekto.adapters.outbound.imap.names import listed, quoted
 from lekto.core.domain.mail_traits import shown_keywords
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.ports.mail_server import FolderMails, MailInfo, MailSearch, MailServerError
+from lekto.core.ports.mail_server import (
+    TRASH_NAMES,
+    FolderMails,
+    MailInfo,
+    MailSearch,
+    MailServerError,
+)
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 _UID = re.compile(rb"UID (\d+)")
@@ -19,7 +25,6 @@ _DATE = re.compile(
 )
 _FLAGS = re.compile(rb"FLAGS \(([^)]*)\)")
 _LIST = re.compile(rb"\(([^)]*)\)")
-_TRASH_NAMES = ("Trash", "Papierkorb", "Deleted Messages", "Deleted Items", "INBOX.Trash")
 
 
 class ImapMailSession:
@@ -178,7 +183,7 @@ class ImapMailSession:
             if "\\trash" in flags:
                 return name
         names = {name for name, _ in folders}
-        return next((name for name in _TRASH_NAMES if name in names), None)
+        return next((name for name in TRASH_NAMES if name in names), None)
 
 
 def folder_keywords(imap: imaplib.IMAP4) -> tuple[tuple[str, ...], bool]:

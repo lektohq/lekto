@@ -172,6 +172,39 @@ class MailServerContract:
             assert (await session.search("INBOX", MailSearch())).uids == ()
             assert await session.fetch("INBOX", two) is None
 
+    async def test_a_folder_beyond_ascii_in_a_session(
+        self, server: MailServer, world: MailWorld
+    ) -> None:
+        login = world.account(["Bestätigungen"])
+        world.deliver(login, "Bestätigungen", plain_mail("Eins"), arrived_at=EARLY)
+        world.deliver(login, "INBOX", plain_mail("Zwei"), arrived_at=EARLY)
+        async with server.session(login) as session:
+            (one,) = (await session.search("Bestätigungen", MailSearch())).uids
+            assert _lines(await session.fetch("Bestätigungen", one)) == _lines(plain_mail("Eins"))
+            (two,) = (await session.search("INBOX", MailSearch())).uids
+            await session.move("INBOX", two, "Bestätigungen")
+            assert len((await session.search("Bestätigungen", MailSearch())).uids) == 2
+            assert (await session.search("INBOX", MailSearch())).uids == ()
+
+    async def test_the_trash_is_the_folder_named_so(
+        self, server: MailServer, world: MailWorld
+    ) -> None:
+        login = world.account(["Trash"])
+        world.deliver(login, "INBOX", plain_mail("Weg"), arrived_at=EARLY)
+        async with server.session(login) as session:
+            (uid,) = (await session.search("INBOX", MailSearch())).uids
+            await session.trash("INBOX", uid)
+            assert (await session.search("INBOX", MailSearch())).uids == ()
+            (moved,) = (await session.search("Trash", MailSearch())).uids
+            assert _lines(await session.fetch("Trash", moved)) == _lines(plain_mail("Weg"))
+
+    async def test_a_mail_that_is_gone(self, server: MailServer, world: MailWorld) -> None:
+        login = world.account()
+        async with server.session(login) as session:
+            assert await session.info("INBOX", [999]) == []
+            assert await session.head("INBOX", 999) is None
+            assert await session.fetch("INBOX", 999) is None
+
     async def test_a_missing_folder(self, server: MailServer, world: MailWorld) -> None:
         login = world.account()
         async with server.session(login) as session:
