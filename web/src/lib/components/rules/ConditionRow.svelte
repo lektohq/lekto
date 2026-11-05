@@ -2,6 +2,7 @@
 	import RuleRow from '#lib/components/rules/RuleRow.svelte';
 	import X from '@lucide/svelte/icons/x';
 	import MultiPicker from '#lib/components/MultiPicker.svelte';
+	import SearchSelect from '#lib/components/SearchSelect.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import { namedOptions, withChoice } from '#lib/components/rules/options.ts';
 	import ValueInput from '#lib/components/rules/ValueInput.svelte';
@@ -129,6 +130,15 @@
 		}))
 	);
 	const fieldOptions = $derived(withChoice(namedOptions(lookup.fields), condition.fieldId ?? ''));
+	/** A contact or a document type is chosen by searching (`SearchSelect`): the title of its
+	 * picker; null for the other fields. */
+	const searched = $derived(
+		condition.field === 'contact'
+			? m.picker_title_contact()
+			: condition.field === 'document_type' || condition.field === 'relation'
+				? m.picker_title_type()
+				: null
+	);
 	/** The choices of an id field or the channel. */
 	const choices = $derived.by(() => {
 		switch (condition.field) {
@@ -258,6 +268,17 @@
 					{m.rule_add_value()}
 				</Button>
 			</div>
+		{:else if choices && searched}
+			<!-- One of many by searching, as everywhere a contact or document type is chosen. -->
+			<SearchSelect
+				aria-label={valueLabel}
+				aria-invalid={invalid || undefined}
+				title={searched}
+				value={single}
+				options={choices}
+				placeholder={m.rule_choose()}
+				onchange={(next) => (condition.value = next)}
+			/>
 		{:else if choices && condition.field !== 'field'}
 			<Select
 				aria-label={valueLabel}
