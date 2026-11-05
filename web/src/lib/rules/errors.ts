@@ -17,8 +17,7 @@ export interface SaveErrors {
 
 /** The key of the block at `path`, or null. */
 export function keyAt(path: string, model: RuleModel): string | null {
-	const parts = path.split(/[.[\]]+/).filter(Boolean);
-	const [head, ...rest] = parts;
+	const [head, ...rest] = partsOf(path);
 	if (head === 'name' || head === 'priority' || head === 'triggers') return head;
 	if (head === 'actions') {
 		const index = Number(rest[0]);
@@ -82,10 +81,16 @@ export function saveErrors(error: unknown, model: RuleModel): SaveErrors {
 	return result;
 }
 
-/** Whether the schema parts on `path` (`AllGroup-Input`, `ConditionSchema`) are the kinds of
- * the blocks there; request validation reports one error for every kind it tried. */
+/** The parts of a place: names, indexes (`all[1]`, `all.1`) and the schema parts request
+ * validation puts in between (`AllGroup[ConditionSchema]`, `ConditionSchema`). */
+function partsOf(path: string): string[] {
+	return path.match(/[A-Za-z_][\w-]*(?:\[[A-Za-z_][\w-]*\])?|\d+/g) ?? [];
+}
+
+/** Whether the schema parts on `path` (`AllGroup[ConditionSchema]`, `ConditionSchema`) are the
+ * kinds of the blocks there; request validation reports one error for every kind it tried. */
 function fits(path: string, model: RuleModel): boolean {
-	const [head, ...rest] = path.split(/[.[\]]+/).filter(Boolean);
+	const [head, ...rest] = partsOf(path);
 	if (head !== 'conditions') return true;
 	let node: GroupNode | RuleModel['conditions']['items'][number] = model.conditions;
 	for (let i = 0; i < rest.length; i++) {

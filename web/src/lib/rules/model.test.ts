@@ -464,7 +464,10 @@ describe('errors of saving', () => {
 	it('finds the block of a place', () => {
 		expect(keyAt('conditions.all[1].any[1]', model)).toBe(group.items[1].key);
 		expect(
-			keyAt('conditions.AllGroup-Input.all.1.AnyGroup-Input.any.0.ConditionSchema.value', model)
+			keyAt(
+				'conditions.AllGroup[ConditionSchema].all.1.AnyGroup[ConditionSchema].any.0.ConditionSchema.value',
+				model
+			)
 		).toBe(group.items[0].key);
 		expect(keyAt('conditions', model)).toBe(model.conditions.key);
 		expect(keyAt('actions[1]', model)).toBe(model.actions[1].key);
@@ -475,11 +478,11 @@ describe('errors of saving', () => {
 
 	it('keeps only the kinds of the blocks from request validation', () => {
 		const detail = [
-			'conditions.AllGroup.all.1.ConditionSchema.field: Field required',
-			'conditions.AllGroup.all.1.AllGroup.all: Field required',
-			"conditions.AllGroup.all.1.AnyGroup.any.0.ConditionSchema.op: Input should be 'is'",
-			'conditions.AllGroup.all.1.AnyGroup.any.0.AllGroup.all: Field required',
-			'conditions.AnyGroup.any: Field required'
+			'conditions.AllGroup[ConditionSchema].all.1.ConditionSchema.field: Field required',
+			'conditions.AllGroup[ConditionSchema].all.1.AllGroup[ConditionSchema].all: Field required',
+			"conditions.AllGroup[ConditionSchema].all.1.AnyGroup[ConditionSchema].any.0.ConditionSchema.op: Input should be 'is'",
+			'conditions.AllGroup[ConditionSchema].all.1.AnyGroup[ConditionSchema].any.0.AllGroup[ConditionSchema].all: Field required',
+			'conditions.AnyGroup[ConditionSchema].any: Field required'
 		].join('; ');
 		expect(saveErrors(failed(422, detail), model)).toEqual({
 			byKey: { [group.items[0].key]: "Input should be 'is'" },
