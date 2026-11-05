@@ -787,7 +787,7 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
   nicht"), as a mail left out does. Words of their own only where the thing
   differs (a mail's fields, what a mail rule takes).
 - **A mail's fields** (Tobi, 05.11.2026), the same in mail rules and as "Mail: …" in document
-  rules: Absender, "Empfänger (An oder CC)", An, CC, Betreff (texts: "endet auf", "enthält",
+  rules: Absender, "Empfänger (An/CC)", An, CC, Betreff (texts: "endet auf", "enthält",
   "ist", "beginnt mit"); Ordner, Anhänge (mail rules); Wichtigkeit ("ist" hoch / normal /
   niedrig, a `Select`); Schlagwörter (the mail's IMAP keywords, worded as tags: "enthalten",
   "vorhanden", "fehlen"; a `SearchSelect` of the keywords the mailboxes' folders know, a typed
@@ -802,8 +802,9 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
   them first ("Vorher: …"); the bar counts them ("12 von 50 Mails") and switches the rule on
   ("Aktivieren").
 - **Mail conditions in document rules** (mock G): the subject choice of a condition offers
-  "Mail: Postfach" (admins: only they read the mailboxes) and a mail's fields as "Mail: …"
-  (see "A mail's fields"); a document no mail brought matches none of them (but "Mail:
+  "Mail" once; a second `Select` beside it, where "Feld" has its field and "Fakt" its kind
+  (Tobi, 05.11.2026), chooses the part: "Postfach" (admins: only they read the mailboxes) and a
+  mail's fields (see "A mail's fields"), "Absender" first. A rule's text keeps "Mail: Absender …"; a document no mail brought matches none of them (but "Mail:
   Postfach" "fehlt"), nor does one taken before Lekto kept a mail's importance and marks.
 - A list's state (lens, filters, sort, layout) lives in its URL, its words in the history entry
   (see "No plain data in addresses"). A detail page reached from a list carries that URL and

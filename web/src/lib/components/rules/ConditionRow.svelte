@@ -14,12 +14,15 @@
 	import { IDENTIFIER_KINDS, NUMBER_KINDS, PERSON_KINDS, labelOfKind } from '#lib/identifiers.ts';
 	import type { Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { CHANNEL_LABELS, fieldLabel, operatorLabel } from '#lib/rules/describe.ts';
+	import { CHANNEL_LABELS, fieldLabel, mailPartLabel, operatorLabel } from '#lib/rules/describe.ts';
 	import { tagOptions } from '#lib/tags.ts';
 	import { Choice } from '#lib/components/ui/choice/index.ts';
 	import {
 		CHANNELS,
 		CONDITION_FIELDS,
+		isMailField,
+		MAIL_PARTS,
+		MAIL_SUBJECT,
 		STEP_CONDITION_FIELDS,
 		TAG_FIELDS,
 		changeField,
@@ -77,20 +80,29 @@
 		).map((role) => ({ value: role, label: roleLabel(role) }))
 	]);
 	const operators = $derived(operatorsFor(condition, lookup.fields));
-	// The mailbox only where the mailboxes are known (an admin's); the field it has stays.
-	const conditionFieldOptions = $derived(
-		(steps === null ? CONDITION_FIELDS : STEP_CONDITION_FIELDS)
-			.filter(
-				(field) =>
-					field !== 'mail_mailbox' ||
-					(lookup.mailboxes?.length ?? 0) > 0 ||
-					condition.field === field
-			)
-			.map((field) => ({
-				value: field,
-				label: fieldLabel(field)
-			}))
+	// The mail's parts follow "Mail" in a second choice, as a field follows "Feld" (Tobi,
+	// 05.11.2026). The mailbox only where the mailboxes are known (an admin's); the part a
+	// condition has stays.
+	const mail = $derived(isMailField(condition.field));
+	const conditionFieldOptions = $derived([
+		...(steps === null ? CONDITION_FIELDS : STEP_CONDITION_FIELDS)
+			.filter((field) => !isMailField(field))
+			.map((field) => ({ value: field, label: fieldLabel(field) })),
+		{ value: MAIL_SUBJECT, label: m.rule_field_mail() }
+	]);
+	const mailPartOptions = $derived(
+		MAIL_PARTS.filter(
+			(field) =>
+				field !== 'mail_mailbox' || (lookup.mailboxes?.length ?? 0) > 0 || condition.field === field
+		).map((field) => ({ value: field, label: mailPartLabel(field) }))
 	);
+	function changeSubject(subject: string) {
+		if (subject === MAIL_SUBJECT) {
+			if (!mail) changeConditionField(condition, 'mail_sender', lookup.fields);
+			return;
+		}
+		changeConditionField(condition, subject as ConditionField, lookup.fields);
+	}
 	// What a step condition compares with: a text, a number or true/false; after or before a
 	// number or a date.
 	type Kind = 'text' | 'number' | 'date' | 'true' | 'false';
@@ -194,11 +206,20 @@
 <RuleRow key={condition.key} {error} moves {onup} {ondown} {onremove}>
 	<Select
 		aria-label={m.rule_condition_subject()}
-		value={condition.field}
+		value={mail ? MAIL_SUBJECT : condition.field}
 		options={conditionFieldOptions}
-		onchange={(field) => changeConditionField(condition, field as ConditionField, lookup.fields)}
+		onchange={changeSubject}
 		class="w-full sm:w-44"
 	/>
+	{#if mail}
+		<Select
+			aria-label={m.rule_condition_mail_part()}
+			value={condition.field}
+			options={mailPartOptions}
+			onchange={(field) => changeConditionField(condition, field as ConditionField, lookup.fields)}
+			class="w-full sm:w-44"
+		/>
+	{/if}
 	{#if condition.field === 'step'}
 		<Input
 			aria-label={m.rule_step_path()}
