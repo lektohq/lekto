@@ -78,7 +78,7 @@ describe('the form of a mail rule', () => {
 
 	it('says a rule in one line', () => {
 		expect(summaryOf(RULE, names)).toBe(
-			`${m.rule_priority_short({ priority: 1 })} · ${m.mail_rule_field_sender()} ${m.mail_rule_op_ends_with()} @stadtwerke.example${m.mail_rule_or()}${m.mail_rule_field_attachments()} ${m.mail_rule_op_present()} → ${m.mail_rule_parts_all()}, ${m.mail_rule_summary_for({ name: 'Max' })}, ${m.mail_rule_summary_space({ name: 'Haushalt' })}, ${m.mail_rule_summary_move({ folder: 'Lekto/Erledigt' })}`
+			`${m.rule_priority_short({ priority: 1 })} · ${m.mail_rule_field_sender()} ${m.rule_op_ends_with()} @stadtwerke.example${m.mail_rule_or()}${m.mail_rule_field_attachments()} ${m.mail_rule_attachments_present()} → ${m.mail_rule_parts_all()}, ${m.mail_rule_summary_for({ name: 'Max' })}, ${m.mail_rule_summary_space({ name: 'Haushalt' })}, ${m.mail_rule_summary_move({ folder: 'Lekto/Erledigt' })}`
 		);
 		expect(
 			summaryOf(

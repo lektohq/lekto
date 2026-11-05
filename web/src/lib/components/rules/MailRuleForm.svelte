@@ -1,8 +1,8 @@
 <script lang="ts">
 	import Plus from '@lucide/svelte/icons/plus';
-	import type { Snippet } from 'svelte';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import IconButton from '#lib/components/IconButton.svelte';
+	import HintLabel from '#lib/components/HintLabel.svelte';
+	import ModeSelect from '#lib/components/rules/ModeSelect.svelte';
+	import RuleRow from '#lib/components/rules/RuleRow.svelte';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import SearchSelect from '#lib/components/SearchSelect.svelte';
 	import Select from '#lib/components/Select.svelte';
@@ -18,7 +18,7 @@
 		FIELDS,
 		hasValue,
 		newCondition,
-		OPERATOR_LABELS,
+		operatorText,
 		OPERATORS,
 		OPTIONALS,
 		PARTS,
@@ -68,7 +68,7 @@
 	const MAX_CONDITIONS = 20;
 
 	const OPTIONAL_LABELS: Record<Optional, () => string> = {
-		space: m.mail_rule_action_space,
+		space: m.rule_action_set_space,
 		type: m.mail_rule_action_type,
 		after: m.mail_rule_action_after
 	};
@@ -104,6 +104,11 @@
 		if (field === 'folder') condition.value = folders[0]?.value ?? '';
 	}
 
+	function move(index: number, by: -1 | 1) {
+		const [item] = form.conditions.splice(index, 1);
+		form.conditions.splice(index + by, 0, item);
+	}
+
 	function hide(item: Optional) {
 		form.shown = form.shown.filter((entry) => entry !== item);
 	}
@@ -123,7 +128,11 @@
 			<Input id="mail-rule-name" bind:value={form.name} maxlength={200} />
 		</Field.Field>
 		<Field.Field>
-			<Field.Label for="mail-rule-priority">{m.rule_priority()}</Field.Label>
+			<HintLabel
+				for="mail-rule-priority"
+				label={m.rule_priority()}
+				hint={m.mail_rule_priority_info()}
+			/>
 			<Input
 				id="mail-rule-priority"
 				type="number"
@@ -132,7 +141,7 @@
 				step={1}
 				bind:value={form.priority}
 			/>
-			<Field.Description>{m.mail_rule_priority_hint()}</Field.Description>
+			<Field.Description>{m.rule_priority_hint()}</Field.Description>
 		</Field.Field>
 	</div>
 
@@ -147,60 +156,57 @@
 
 	<section class="flex flex-col gap-3" aria-labelledby="mail-rule-conditions">
 		<SectionTitle id="mail-rule-conditions">{m.rule_conditions()}</SectionTitle>
-		<div class="flex flex-col gap-3 rounded-2xl border bg-card p-3" role="group">
-			<Select
-				aria-label={m.rule_mode()}
+		<div
+			class="flex flex-col gap-3 rounded-2xl border bg-card p-3"
+			role="group"
+			aria-label={m.rule_conditions()}
+		>
+			<ModeSelect
 				value={form.any ? 'any' : 'all'}
-				options={[
-					{ value: 'all', label: m.mail_rule_mode_all() },
-					{ value: 'any', label: m.mail_rule_mode_any() }
-				]}
 				onchange={(mode) => (form.any = mode === 'any')}
-				class="w-full sm:w-56"
 			/>
 			{#each form.conditions as condition, index (condition.key)}
-				<div class="flex flex-col gap-2 rounded-xl border bg-background p-3">
-					<div class="flex flex-wrap items-start gap-2">
-						<Select
-							aria-label={m.rule_condition_subject()}
-							value={condition.field}
-							options={FIELDS.map((field) => ({ value: field, label: FIELD_LABELS[field]() }))}
-							onchange={(field) => changeField(index, field as MailField)}
-							class="w-full sm:w-44"
-						/>
-						<Select
-							aria-label={m.rule_condition_operator()}
-							bind:value={condition.op}
-							options={OPERATORS[condition.field].map((op) => ({
-								value: op,
-								label: OPERATOR_LABELS[op]()
-							}))}
-							class="w-full sm:w-40"
-						/>
+				<RuleRow
+					key={condition.key}
+					moves
+					onup={index > 0 ? () => move(index, -1) : undefined}
+					ondown={index < form.conditions.length - 1 ? () => move(index, 1) : undefined}
+					onremove={() => form.conditions.splice(index, 1)}
+				>
+					<Select
+						aria-label={m.rule_condition_subject()}
+						value={condition.field}
+						options={FIELDS.map((field) => ({ value: field, label: FIELD_LABELS[field]() }))}
+						onchange={(field) => changeField(index, field as MailField)}
+						class="w-full sm:w-44"
+					/>
+					<Select
+						aria-label={m.rule_condition_operator()}
+						bind:value={condition.op}
+						options={OPERATORS[condition.field].map((op) => ({
+							value: op,
+							label: operatorText(condition.field, op)
+						}))}
+						class="w-full sm:w-48"
+					/>
+					<div class="min-w-0 flex-1 basis-56">
 						{#if condition.field === 'folder'}
 							<Select
 								aria-label={m.rule_condition_value()}
 								bind:value={condition.value}
 								options={folders}
-								class="min-w-0 flex-1 basis-48"
 							/>
 						{:else if hasValue(condition.op)}
 							<Input
 								aria-label={m.rule_condition_value()}
 								bind:value={condition.value}
 								maxlength={500}
-								class="min-w-0 flex-1 basis-48"
 							/>
+						{:else}
+							<span class="sr-only">{m.rule_no_value()}</span>
 						{/if}
-						<IconButton
-							label={m.rule_remove()}
-							onclick={() => form.conditions.splice(index, 1)}
-							class="ml-auto"
-						>
-							<Trash2 aria-hidden="true" />
-						</IconButton>
 					</div>
-				</div>
+				</RuleRow>
 			{/each}
 			{#if form.conditions.length === 0}
 				<p class="text-sm text-muted-foreground">{m.mail_rule_every_hint()}</p>
@@ -221,71 +227,62 @@
 
 	<section class="flex flex-col gap-3" aria-labelledby="mail-rule-actions">
 		<SectionTitle id="mail-rule-actions">{m.rule_actions()}</SectionTitle>
-		{#snippet row(label: string, optional: Optional | null, content: Snippet)}
-			<div class="flex flex-col gap-2 rounded-xl border bg-background p-3">
-				<div class="flex flex-wrap items-start gap-2">
-					<span class="w-full pt-2 text-sm font-medium sm:w-44">{label}</span>
-					<div class="flex min-w-0 flex-1 basis-64 flex-col gap-2">{@render content()}</div>
-					{#if optional}
-						<IconButton label={m.rule_remove()} onclick={() => hide(optional)}>
-							<Trash2 aria-hidden="true" />
-						</IconButton>
-					{/if}
-				</div>
-			</div>
-		{/snippet}
 
-		{#snippet parts()}
-			<Select
-				aria-label={m.mail_rule_action_parts()}
-				bind:value={form.parts}
-				options={PARTS.map((value) => ({ value, label: PARTS_LABELS[value]() }))}
-			/>
-		{/snippet}
-		{@render row(m.mail_rule_action_parts(), null, parts)}
+		<RuleRow label={m.mail_rule_action_parts()}>
+			<div class="flex min-w-0 flex-1 basis-64 flex-col gap-2">
+				<Select
+					aria-label={m.mail_rule_action_parts()}
+					bind:value={form.parts}
+					options={PARTS.map((value) => ({ value, label: PARTS_LABELS[value]() }))}
+				/>
+			</div>
+		</RuleRow>
 
 		{#if takes}
-			{#snippet person()}
-				<SearchSelect
-					id="mail-rule-user"
-					title={m.mail_rule_action_user()}
-					bind:value={form.userId}
-					options={people}
-					placeholder={m.value_unset()}
-					noneLabel={m.value_unset()}
-				/>
-			{/snippet}
-			{@render row(m.mail_rule_action_user(), null, person)}
+			<RuleRow label={m.mail_rule_action_user()}>
+				<div class="flex min-w-0 flex-1 basis-64 flex-col gap-2">
+					<SearchSelect
+						id="mail-rule-user"
+						title={m.mail_rule_action_user()}
+						bind:value={form.userId}
+						options={people}
+						placeholder={m.value_unset()}
+						noneLabel={m.value_unset()}
+					/>
+				</div>
+			</RuleRow>
 		{/if}
 
 		{#if takes && form.shown.includes('space')}
-			{#snippet place()}
-				<Select
-					aria-label={m.mail_rule_action_space()}
-					bind:value={form.spaceId}
-					options={places}
-				/>
-			{/snippet}
-			{@render row(m.mail_rule_action_space(), 'space', place)}
+			<RuleRow label={m.rule_action_set_space()} onremove={() => hide('space')}>
+				<div class="flex min-w-0 flex-1 basis-64 flex-col gap-2">
+					<Select
+						aria-label={m.rule_action_set_space()}
+						bind:value={form.spaceId}
+						options={places}
+					/>
+				</div>
+			</RuleRow>
 		{/if}
 
 		{#if takes && form.shown.includes('type')}
-			{#snippet type()}
-				<Select
-					aria-label={m.mail_rule_action_type()}
-					bind:value={form.typeId}
-					options={[
-						{ value: '', label: m.mail_rule_type_auto() },
-						...types.map((entry) => ({ value: entry.id, label: entry.name }))
-					]}
-				/>
-			{/snippet}
-			{@render row(m.mail_rule_action_type(), 'type', type)}
+			<RuleRow label={m.mail_rule_action_type()} onremove={() => hide('type')}>
+				<div class="flex min-w-0 flex-1 basis-64 flex-col gap-2">
+					<Select
+						aria-label={m.mail_rule_action_type()}
+						bind:value={form.typeId}
+						options={[
+							{ value: '', label: m.mail_rule_type_auto() },
+							...types.map((entry) => ({ value: entry.id, label: entry.name }))
+						]}
+					/>
+				</div>
+			</RuleRow>
 		{/if}
 
 		{#if form.shown.includes('after')}
-			{#snippet after()}
-				<div class="flex flex-wrap gap-2">
+			<RuleRow label={m.mail_rule_action_after()} onremove={() => hide('after')}>
+				<div class="flex min-w-0 flex-1 basis-64 flex-wrap gap-2">
 					<Select
 						aria-label={m.mail_rule_action_after()}
 						bind:value={form.after}
@@ -302,8 +299,7 @@
 						/>
 					{/if}
 				</div>
-			{/snippet}
-			{@render row(m.mail_rule_action_after(), 'after', after)}
+			</RuleRow>
 		{/if}
 
 		{#if addable.length > 0}
@@ -327,9 +323,10 @@
 
 	<div class="flex flex-col gap-3 border-t pt-4">
 		{#if error}<Field.Error>{error}</Field.Error>{/if}
+		<p class="text-sm text-muted-foreground">{m.rule_save_hint()}</p>
 		<div class="flex flex-wrap justify-end gap-2">
 			<a href={cancelHref} class={cn(buttonVariants({ variant: 'ghost' }))}>{m.cancel()}</a>
-			<Button type="submit" disabled={busy || !complete(form)}>{m.save()}</Button>
+			<Button type="submit" disabled={busy || !complete(form)}>{m.rule_save()}</Button>
 		</div>
 	</div>
 </form>
