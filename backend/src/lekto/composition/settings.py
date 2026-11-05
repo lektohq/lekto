@@ -205,6 +205,9 @@ class Settings(BaseSettings):
     # the archive's text layer as it is set (PDFium), which needs no settings.
     ocr_languages: Annotated[str, Field(pattern=r"^[a-z_]+(\+[a-z_]+)*$")] = "deu+eng"
     ocr_timeout: Seconds = timedelta(minutes=10)
+    # A mail is set as a PDF (WeasyPrint) in a child process with a time limit: its HTML comes
+    # from anyone, and WeasyPrint has no limit of its own.
+    mail_render_timeout: Seconds = timedelta(minutes=2)
 
     # Search: Meilisearch holds the index of full text and vectors.
     meilisearch_url: AnyHttpUrl | None = None

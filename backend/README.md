@@ -245,8 +245,10 @@ process (`services/_kept.py`).
   (`UnprocessableDocumentError`) fails at once. The processing log records input, output,
   engine version, reason and duration of every run.
 - OCRmyPDF (`adapters/outbound/ocrmypdf`) runs as a child process per document with a time
-  limit (`LEKTO_OCR_TIMEOUT`); on timeout or cancellation the process group is killed. The job
-  lease is the longest limit of a node (OCR, or twice `LEKTO_LLM_TIMEOUT`) plus two minutes, so a
+  limit (`LEKTO_OCR_TIMEOUT`); on timeout or cancellation the process group is killed. So does
+  WeasyPrint (`adapters/outbound/weasyprint`), which sets a mail as a PDF
+  (`LEKTO_MAIL_RENDER_TIMEOUT`): a mail's HTML comes from anyone. The job
+  lease is the longest limit of a node (OCR, the setting of a mail, or twice `LEKTO_LLM_TIMEOUT`) plus two minutes, so a
   node normally keeps its claim; if it overruns (e.g. a slow S3 transfer), another worker takes
   the job over and the late result is discarded. The OCR of a document a person has read with
   the vision model extends its claim to `LEKTO_VLM_TIMEOUT` plus two minutes when it starts
@@ -2023,6 +2025,7 @@ Durations are seconds (`30`, `1.5`) or ISO 8601 (`PT1H`, `P7D`).
 | `LEKTO_RETENTION` | Worker | `P7D` | Age of finished jobs, delivered events and webhook log rows to remove |
 | `LEKTO_OCR_LANGUAGES` | Worker | `deu+eng` | Tesseract languages, joined by `+` |
 | `LEKTO_OCR_TIMEOUT` | Worker | `600` | Seconds per document for OCR |
+| `LEKTO_MAIL_RENDER_TIMEOUT` | Worker | `120` | Seconds per mail for setting it as a PDF (WeasyPrint, in a child process) |
 | `LEKTO_MEILISEARCH_URL` | both | unset | Without it there is no search (the API searches, the worker indexes) |
 | `LEKTO_MEILISEARCH_API_KEY` | both | unset | *secret*; the master key or a key with access to the index |
 | `LEKTO_MEILISEARCH_INDEX` | both | `lekto-documents` | The active index; a rebuild fills `<name>-rebuild` and swaps it in |
