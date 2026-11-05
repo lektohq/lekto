@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Plus from '@lucide/svelte/icons/plus';
 	import HintLabel from '#lib/components/HintLabel.svelte';
-	import ModeSelect from '#lib/components/rules/ModeSelect.svelte';
+	import ConditionGroup, { type RowMoves } from '#lib/components/rules/ConditionGroup.svelte';
 	import RuleRow from '#lib/components/rules/RuleRow.svelte';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import SearchSelect from '#lib/components/SearchSelect.svelte';
@@ -13,6 +13,8 @@
 	import {
 		AFTER,
 		AFTER_LABELS,
+		canAddCondition,
+		canAddGroup,
 		complete,
 		FIELD_LABELS,
 		FIELDS,
@@ -23,6 +25,7 @@
 		OPTIONALS,
 		PARTS,
 		PARTS_LABELS,
+		type MailConditionNode,
 		type MailField,
 		type MailRuleForm,
 		type Optional
@@ -38,7 +41,8 @@
 	import { cn } from '#lib/utils.ts';
 
 	// The editor of a mail rule (Tobi, 04.11.2026; mock E), in the frame of the document rule's:
-	// name and priority, the mailbox it belongs to, the conditions on the mail (all or any), and
+	// name and priority, the mailbox it belongs to, the conditions on the mail in the tree every
+	// rule has (`ConditionGroup`: groups of all or any, turned around or not), and
 	// the actions: what it takes and for whom always, a space, the type of the mail's text and
 	// what becomes of the mail on the server where added ("+ Aktion").
 	let {
@@ -65,7 +69,6 @@
 
 	const mailbox = $derived(mailboxes.find((entry) => entry.id === form.mailboxId) ?? null);
 	const takes = $derived(form.parts !== 'nothing');
-	const MAX_CONDITIONS = 20;
 
 	const OPTIONAL_LABELS: Record<Optional, () => string> = {
 		space: m.rule_action_set_space,
@@ -97,16 +100,10 @@
 		(mailbox?.folders ?? []).map((name) => ({ value: name, label: folderLabel(name) }))
 	);
 
-	function changeField(index: number, field: MailField) {
-		const condition = form.conditions[index];
+	function changeField(condition: MailConditionNode, field: MailField) {
 		condition.field = field;
 		if (!OPERATORS[field].includes(condition.op)) condition.op = OPERATORS[field][0];
 		if (field === 'folder') condition.value = folders[0]?.value ?? '';
-	}
-
-	function move(index: number, by: -1 | 1) {
-		const [item] = form.conditions.splice(index, 1);
-		form.conditions.splice(index + by, 0, item);
 	}
 
 	function hide(item: Optional) {
@@ -156,73 +153,53 @@
 
 	<section class="flex flex-col gap-3" aria-labelledby="mail-rule-conditions">
 		<SectionTitle id="mail-rule-conditions">{m.rule_conditions()}</SectionTitle>
-		<div
-			class="flex flex-col gap-3 rounded-2xl border bg-card p-3"
-			role="group"
-			aria-label={m.rule_conditions()}
-		>
-			<ModeSelect
-				value={form.any ? 'any' : 'all'}
-				onchange={(mode) => (form.any = mode === 'any')}
-			/>
-			{#each form.conditions as condition, index (condition.key)}
-				<RuleRow
-					key={condition.key}
-					moves
-					onup={index > 0 ? () => move(index, -1) : undefined}
-					ondown={index < form.conditions.length - 1 ? () => move(index, 1) : undefined}
-					onremove={() => form.conditions.splice(index, 1)}
-				>
-					<Select
-						aria-label={m.rule_condition_subject()}
-						value={condition.field}
-						options={FIELDS.map((field) => ({ value: field, label: FIELD_LABELS[field]() }))}
-						onchange={(field) => changeField(index, field as MailField)}
-						class="w-full sm:w-44"
-					/>
-					<Select
-						aria-label={m.rule_condition_operator()}
-						bind:value={condition.op}
-						options={OPERATORS[condition.field].map((op) => ({
-							value: op,
-							label: operatorText(condition.field, op)
-						}))}
-						class="w-full sm:w-48"
-					/>
-					<div class="min-w-0 flex-1 basis-56">
-						{#if condition.field === 'folder'}
-							<Select
-								aria-label={m.rule_condition_value()}
-								bind:value={condition.value}
-								options={folders}
-							/>
-						{:else if hasValue(condition.op)}
-							<Input
-								aria-label={m.rule_condition_value()}
-								bind:value={condition.value}
-								maxlength={500}
-							/>
-						{:else}
-							<span class="sr-only">{m.rule_no_value()}</span>
-						{/if}
-					</div>
-				</RuleRow>
-			{/each}
-			{#if form.conditions.length === 0}
-				<p class="text-sm text-muted-foreground">{m.mail_rule_every_hint()}</p>
-			{/if}
-			<div>
-				<Button
-					variant="outline"
-					size="sm"
-					disabled={form.conditions.length >= MAX_CONDITIONS}
-					onclick={() => form.conditions.push(newCondition())}
-				>
-					<Plus aria-hidden="true" />
-					{m.rule_add_condition()}
-				</Button>
-			</div>
-		</div>
+		{#snippet conditionRow(condition: MailConditionNode, moves: RowMoves)}
+			<RuleRow key={condition.key} moves {...moves}>
+				<Select
+					aria-label={m.rule_condition_subject()}
+					value={condition.field}
+					options={FIELDS.map((field) => ({ value: field, label: FIELD_LABELS[field]() }))}
+					onchange={(field) => changeField(condition, field as MailField)}
+					class="w-full sm:w-44"
+				/>
+				<Select
+					aria-label={m.rule_condition_operator()}
+					bind:value={condition.op}
+					options={OPERATORS[condition.field].map((op) => ({
+						value: op,
+						label: operatorText(condition.field, op)
+					}))}
+					class="w-full sm:w-48"
+				/>
+				<div class="min-w-0 flex-1 basis-56">
+					{#if condition.field === 'folder'}
+						<Select
+							aria-label={m.rule_condition_value()}
+							bind:value={condition.value}
+							options={folders}
+						/>
+					{:else if hasValue(condition.op)}
+						<Input
+							aria-label={m.rule_condition_value()}
+							bind:value={condition.value}
+							maxlength={500}
+						/>
+					{:else}
+						<span class="sr-only">{m.rule_no_value()}</span>
+					{/if}
+				</div>
+			</RuleRow>
+		{/snippet}
+		<ConditionGroup
+			group={form.conditions}
+			root
+			errors={{}}
+			row={conditionRow}
+			newCondition={() => newCondition()}
+			canAddCondition={canAddCondition(form)}
+			canAddGroup={(group) => canAddGroup(form, group)}
+			empty={m.mail_rule_every_hint()}
+		/>
 	</section>
 
 	<section class="flex flex-col gap-3" aria-labelledby="mail-rule-actions">

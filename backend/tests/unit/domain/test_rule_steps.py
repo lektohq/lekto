@@ -31,7 +31,7 @@ ANY = Group(
 )
 
 
-def on(path: str, op: Operator, value: JsonValue = None) -> Group:
+def on(path: str, op: Operator, value: JsonValue = None) -> Group[Condition]:
     return Group(
         mode="all", items=(Condition(field=ConditionField.STEP, op=op, value=value, path=path),)
     )

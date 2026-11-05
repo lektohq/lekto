@@ -1,10 +1,11 @@
 """Mail rules: what a mailbox's mails bring in (umsetzungsplan "Eingangskanal Mail", decision 12).
 
 A mail rule belongs to one mailbox. Its conditions look at the mail (sender, recipients,
-subject, the folder it lies in, whether it has attachments Lekto takes), all or any of them;
-none means every mail. Of a mailbox's active rules the first that matches decides, by priority
-(higher first, as with document rules), the same priority by name; a mail no rule takes goes by
-the mailbox's fallback.
+subject, the folder it lies in, whether it has attachments Lekto takes), in the tree every rule
+has (`condition_tree`: groups of all or any, turned around or not); none means every mail. Of
+a mailbox's active rules the first that matches decides, by priority (higher first, as with
+document rules), the same priority by name; a mail no rule takes goes by the mailbox's
+fallback.
 
 A rule takes the mail's attachments and text, the attachments, the text, or nothing; for one
 person, into a space they edit (else their personal one); the text gets a fixed document type
@@ -17,15 +18,16 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import Enum, StrEnum
 
+from lekto.core.domain.condition_tree import Group, check_limits, group_from_json, group_to_json
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import DocumentTypeId, MailboxId, MailRuleId, SpaceId, UserId, new_id
+from lekto.core.domain.json_value import JsonObject, JsonValue, require_object
 from lekto.core.domain.mail import MailAction
 from lekto.core.domain.mail_intake import MailDecision, MailParts, MailRecord, letters
 from lekto.core.domain.mail_message import Address, MailMessage
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.validation import require_name, require_utc
 
-MAX_CONDITIONS = 20
 MAX_VALUE = 500
 MAX_FOLDER = 1000
 DEFAULT_PRIORITY = 100
@@ -119,6 +121,41 @@ def _compare(op: MailOperator, text: str, wanted: str) -> bool:
             return wanted in text
 
 
+type MailConditions = Group[MailCondition]
+
+
+def condition_to_json(condition: MailCondition) -> JsonObject:
+    data: JsonObject = {"field": condition.field.value, "op": condition.op.value}
+    if condition.value is not None:
+        data["value"] = condition.value
+    return data
+
+
+def condition_from_json(data: JsonValue, where: str = "condition") -> MailCondition:
+    object_ = require_object(data, where)
+    unknown = sorted(set(object_) - {"field", "op", "value"})
+    if unknown:
+        raise ValidationError(f"{where}: unknown key '{unknown[0]}'")
+    value = object_.get("value")
+    if value is not None and not isinstance(value, str):
+        raise ValidationError(f"{where}.value: expected a text")
+    try:
+        return MailCondition(
+            MailField(str(object_.get("field"))), MailOperator(str(object_.get("op"))), value
+        )
+    except ValueError as error:
+        raise ValidationError(f"{where}: {error}") from None
+
+
+def conditions_to_json(conditions: MailConditions | None) -> JsonObject | None:
+    """The tree in the JSON form of every rule's; None: every mail."""
+    return None if conditions is None else group_to_json(conditions, condition_to_json)
+
+
+def conditions_from_json(data: JsonValue) -> MailConditions | None:
+    return None if data is None else group_from_json(data, condition_from_json)
+
+
 class Unset(Enum):
     UNSET = "unset"
 
@@ -132,8 +169,7 @@ class MailRuleChanges:
 
     name: str | Unset = UNSET
     priority: int | Unset = UNSET
-    any: bool | Unset = UNSET
-    conditions: tuple[MailCondition, ...] | Unset = UNSET
+    conditions: MailConditions | Unset | None = UNSET
     parts: MailParts | Unset = UNSET
     user_id: UserId | Unset | None = UNSET
     space_id: SpaceId | Unset | None = UNSET
@@ -149,8 +185,7 @@ class MailRule:
     mailbox_id: MailboxId
     name: str
     priority: int
-    any: bool  # any condition (or), else all of them (and)
-    conditions: tuple[MailCondition, ...]
+    conditions: MailConditions | None  # none: every mail
     parts: MailParts
     user_id: UserId | None  # whom it takes the mail for; none when it takes nothing
     space_id: SpaceId | None  # where to; none: the person's personal space
@@ -173,8 +208,7 @@ class MailRule:
             mailbox_id=mailbox_id,
             name="",
             priority=DEFAULT_PRIORITY,
-            any=False,
-            conditions=(),
+            conditions=None,
             parts=MailParts.ALL,
             user_id=None,
             space_id=None,
@@ -214,10 +248,9 @@ class MailRule:
         self.updated_at = now
 
     def matches(self, facts: MailFacts) -> bool:
-        if not self.conditions:
+        if self.conditions is None:
             return True
-        results = (condition.holds(facts) for condition in self.conditions)
-        return any(results) if self.any else all(results)
+        return self.conditions.holds(lambda condition: condition.holds(facts))
 
     def decision(self) -> MailDecision:
         return MailDecision(
@@ -238,8 +271,8 @@ class MailRule:
             or not MIN_PRIORITY <= self.priority <= MAX_PRIORITY
         ):
             raise ValidationError(f"priority: a whole number from {MIN_PRIORITY} to {MAX_PRIORITY}")
-        if len(self.conditions) > MAX_CONDITIONS:
-            raise ValidationError(f"conditions: at most {MAX_CONDITIONS}")
+        if self.conditions is not None:
+            check_limits([self.conditions])
         takes = self.parts is not MailParts.NOTHING
         if takes and self.user_id is None:
             raise ValidationError("user_id: the person the mail is taken for")

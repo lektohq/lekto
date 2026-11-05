@@ -148,7 +148,7 @@ class Titles:
 # --- rule definitions ---------------------------------------------------------------------------
 
 
-def all_of(*items: Condition | Group, negate: bool = False) -> Group:
+def all_of(*items: Condition | Group[Condition], negate: bool = False) -> Group[Condition]:
     return Group(mode="all", items=items, negate=negate)
 
 
@@ -175,7 +175,7 @@ def text_matches(pattern: str) -> Condition:
 
 def definition(
     name: str,
-    conditions: Condition | Group,
+    conditions: Condition | Group[Condition],
     *actions: Action,
     triggers: Iterable[Trigger] = (Trigger.INGEST, Trigger.CHANGE),
     priority: int = 100,

@@ -8,15 +8,20 @@
 	import type { Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { ACTION_LABELS } from '#lib/rules/describe.ts';
-	import ConditionGroup from '#lib/components/rules/ConditionGroup.svelte';
+	import ConditionGroup, { type RowMoves } from '#lib/components/rules/ConditionGroup.svelte';
+	import ConditionRow from '#lib/components/rules/ConditionRow.svelte';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import {
 		MISSING,
 		asFixed,
 		asTemplate,
+		canAddCondition,
+		canAddGroup,
 		defaultValue,
 		isTemplated,
+		newCondition,
 		type ActionNode,
+		type ConditionNode,
 		type Missing,
 		type RuleModel
 	} from '#lib/rules/model.ts';
@@ -265,14 +270,25 @@
 				{webhooks.length ? m.rule_ask_hint() : m.rule_send_webhook_none()}
 			</p>
 		{:else if action.type === 'condition' && model}
+			{@const rule = model}
+			{#snippet stepRow(condition: ConditionNode, moves: RowMoves)}
+				<ConditionRow
+					{condition}
+					{lookup}
+					{steps}
+					error={errors[condition.key]}
+					{...moves}
+					onunreadable={(unreadable) => onconditionunreadable?.(condition.key, unreadable)}
+				/>
+			{/snippet}
 			<ConditionGroup
 				group={action.conditions}
-				{model}
-				{lookup}
-				{errors}
-				{steps}
 				top
-				onunreadable={onconditionunreadable}
+				{errors}
+				row={stepRow}
+				newCondition={() => newCondition('step')}
+				canAddCondition={canAddCondition(rule)}
+				canAddGroup={(group) => canAddGroup(rule, group)}
 			/>
 			<p class="text-sm text-muted-foreground">{m.rule_condition_step_hint()}</p>
 		{:else if action.type === 'send_webhook'}

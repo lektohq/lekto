@@ -3443,6 +3443,106 @@ class MigrationSuite:
         await downgrade(empty_database, "0054")
         assert await stored() == expected
 
+    async def test_mail_rules_get_the_tree_with_revision_0062_and_back(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0062: a mail rule's list and `any` become the top group of the tree every
+        rule has, no conditions NULL; the downgrade turns a plain tree back and drops a rule
+        with subgroups or `not`."""
+        await migrate(empty_database, "0061")
+        mailbox, plain, every, nested = new_id(), new_id(), new_id(), new_id()
+        old = sa.table(
+            "mail_rules",
+            sa.column("id", sa.Uuid()),
+            sa.column("mailbox_id", sa.Uuid()),
+            *(sa.column(name) for name in ("name", "priority", "any")),
+            sa.column("conditions", json_type()),
+            *(sa.column(name) for name in ("parts", "after", "enabled")),
+            sa.column("created_at", UtcDateTime()),
+            sa.column("updated_at", UtcDateTime()),
+            sa.column("version", sa.Integer()),
+        )
+        sender = {"field": "sender", "op": "ends_with", "value": "@stadtwerke.example"}
+        rule = {"mailbox_id": mailbox, "parts": "all", "after": "nothing"}
+        await _insert(
+            empty_database,
+            [
+                (
+                    t.mailboxes,
+                    {
+                        "id": mailbox,
+                        "name": "Home",
+                        "name_key": "home",
+                        "host": "imap.example.test",
+                        "port": 993,
+                        "security": "tls",
+                        "username": "home",
+                        "password": b"x",
+                        "folders": ["INBOX"],
+                        "interval_seconds": 300,
+                        "start": "since_setup",
+                        "fallback": "nothing",
+                        "mails": 0,
+                        "documents": 0,
+                    },
+                ),
+                (
+                    old,
+                    rule
+                    | {
+                        "id": plain,
+                        "name": "Plain",
+                        "any": True,
+                        "conditions": [
+                            sender,
+                            {"field": "attachments", "op": "present", "value": None},
+                        ],
+                    },
+                ),
+                (old, rule | {"id": every, "name": "Every", "any": False, "conditions": []}),
+            ],
+        )
+        await migrate(empty_database)
+        rules = t.mail_rules
+
+        async def trees() -> dict[Any, Any]:
+            async with empty_database.reading() as connection:
+                rows = await _read_all(connection, select(rules.c.id, rules.c.conditions))
+            return dict(rows)
+
+        assert await trees() == {
+            plain: {"any": [sender, {"field": "attachments", "op": "present"}]},
+            every: None,
+        }
+        await _insert(
+            empty_database,
+            [
+                (
+                    rules,
+                    rule
+                    | {
+                        "id": nested,
+                        "name": "Nested",
+                        "conditions": {"all": [sender], "not": True},
+                    },
+                )
+            ],
+        )
+
+        await downgrade(empty_database, "0061")
+        async with empty_database.reading() as connection:
+            rows = await _read_all(
+                connection, select(old.c.id, old.c.any, old.c.conditions).order_by(old.c.name)
+            )
+        assert rows == [
+            (every, False, []),
+            (
+                plain,
+                True,
+                [sender, {"field": "attachments", "op": "present", "value": None}],
+            ),
+        ]
+
     async def test_migrations_match_the_table_definitions(
         self, empty_database: Database, model_database: Database
     ) -> None:

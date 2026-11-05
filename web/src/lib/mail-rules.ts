@@ -6,6 +6,19 @@ import type { components } from '#lib/api/schema.ts';
 import { folderLabel } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { operatorLabel } from '#lib/rules/describe.ts';
+import {
+	conditionsOf,
+	emptyGroups,
+	levelOf,
+	newGroup,
+	nextKey,
+	treeFromApi,
+	treeText,
+	treeToApi,
+	TREE_LIMITS,
+	type ApiTree,
+	type TreeGroup
+} from '#lib/rules/tree.ts';
 
 export type MailRule = components['schemas']['MailRuleOut'];
 export type MailRuleCreate = components['schemas']['MailRuleCreate'];
@@ -15,6 +28,7 @@ export type MailOperator = components['schemas']['MailOperator'];
 export type MailParts = components['schemas']['MailParts'];
 export type MailAction = components['schemas']['MailAction'];
 export type DryRunMail = components['schemas']['DryRunMailOut'];
+type ApiCondition = components['schemas']['MailConditionBody'];
 
 export const FIELDS: readonly MailField[] = [
 	'sender',
@@ -69,12 +83,15 @@ export const AFTER_LABELS: Record<MailAction, () => string> = {
 /** Whether the operator takes a value. */
 export const hasValue = (op: MailOperator) => op !== 'present' && op !== 'missing';
 
-export interface ConditionForm {
-	key: number;
+/** A condition of a mail rule in the editor: a leaf of the tree every rule has. */
+export interface MailConditionNode {
+	kind: 'condition';
+	key: string;
 	field: MailField;
 	op: MailOperator;
 	value: string;
 }
+export type MailGroupNode = TreeGroup<MailConditionNode>;
 
 /** The actions beside "Übernehmen" and "Für", each there or not (mock E: "+ Aktion"). */
 export type Optional = 'space' | 'type' | 'after';
@@ -84,8 +101,8 @@ export interface MailRuleForm {
 	mailboxId: string;
 	name: string;
 	priority: string;
-	any: boolean;
-	conditions: ConditionForm[];
+	/** The root may be empty: a rule without conditions takes every mail. */
+	conditions: MailGroupNode;
 	parts: MailParts;
 	userId: string;
 	spaceId: string;
@@ -95,10 +112,38 @@ export interface MailRuleForm {
 	shown: Optional[];
 }
 
-let keys = 0;
+export function newCondition(field: MailField = 'sender'): MailConditionNode {
+	return { kind: 'condition', key: nextKey(), field, op: OPERATORS[field][0], value: '' };
+}
 
-export function newCondition(field: MailField = 'sender'): ConditionForm {
-	return { key: ++keys, field, op: OPERATORS[field][0], value: '' };
+function conditionFromApi(item: ApiCondition): MailConditionNode {
+	return {
+		kind: 'condition',
+		key: nextKey(),
+		field: item.field,
+		op: item.op,
+		value: item.value ?? ''
+	};
+}
+
+function conditionToApi(item: MailConditionNode): ApiCondition {
+	return { field: item.field, op: item.op, value: hasValue(item.op) ? item.value.trim() : null };
+}
+
+/** The tree of a stored rule's conditions; empty for one without (every mail). */
+export function treeOf(rule: Pick<MailRule, 'conditions'>): MailGroupNode {
+	return rule.conditions
+		? treeFromApi(rule.conditions as ApiTree<ApiCondition>, conditionFromApi)
+		: newGroup<MailConditionNode>('all', []);
+}
+
+export function canAddCondition(form: MailRuleForm): boolean {
+	return conditionsOf(form.conditions).length < TREE_LIMITS.conditions;
+}
+
+/** A subgroup in `group` stays within the depth limit and brings a condition with it. */
+export function canAddGroup(form: MailRuleForm, group: MailGroupNode): boolean {
+	return canAddCondition(form) && levelOf(form.conditions, group.key) < TREE_LIMITS.depth;
 }
 
 /** The form of a stored rule, or of a new one for `mailboxId` with its mailbox's type. */
@@ -108,8 +153,7 @@ export function formOf(rule: MailRule | null, mailboxId = '', typeId = ''): Mail
 			mailboxId,
 			name: '',
 			priority: '100',
-			any: false,
-			conditions: [newCondition()],
+			conditions: newGroup<MailConditionNode>('all', [newCondition()]),
 			parts: 'all',
 			userId: '',
 			spaceId: '',
@@ -127,13 +171,7 @@ export function formOf(rule: MailRule | null, mailboxId = '', typeId = ''): Mail
 		mailboxId: rule.mailbox_id,
 		name: rule.name,
 		priority: String(rule.priority),
-		any: rule.any,
-		conditions: rule.conditions.map((item) => ({
-			key: ++keys,
-			field: item.field,
-			op: item.op,
-			value: item.value ?? ''
-		})),
+		conditions: treeOf(rule),
 		parts: rule.parts,
 		userId: rule.user_id ?? '',
 		spaceId: rule.space_id ?? '',
@@ -157,7 +195,8 @@ export function complete(form: MailRuleForm): boolean {
 		priority <= 1000 &&
 		(!takes || form.userId !== '') &&
 		(after !== 'move' || form.moveTo.trim() !== '') &&
-		form.conditions.every((item) => !hasValue(item.op) || item.value.trim() !== '')
+		emptyGroups(form.conditions, false).length === 0 &&
+		conditionsOf(form.conditions).every((item) => !hasValue(item.op) || item.value.trim() !== '')
 	);
 }
 
@@ -167,12 +206,9 @@ function body(form: MailRuleForm) {
 	return {
 		name: form.name.trim(),
 		priority: Number(form.priority),
-		any: form.any,
-		conditions: form.conditions.map((item) => ({
-			field: item.field,
-			op: item.op,
-			value: hasValue(item.op) ? item.value.trim() : null
-		})),
+		conditions: form.conditions.items.length
+			? (treeToApi(form.conditions, conditionToApi) as MailRuleCreate['conditions'])
+			: null,
 		parts: form.parts,
 		user_id: takes ? form.userId : null,
 		space_id: takes && form.shown.includes('space') && form.spaceId ? form.spaceId : null,
@@ -196,17 +232,15 @@ export interface Names {
 	type: (id: string | null | undefined) => string;
 }
 
-/** The conditions in words, one each ("Absender endet auf @stadtwerke.example"). */
-export function conditionTexts(rule: Pick<MailRule, 'conditions'>): string[] {
-	return rule.conditions.map((item) =>
-		[
-			FIELD_LABELS[item.field](),
-			operatorText(item.field, item.op),
-			item.value ? (item.field === 'folder' ? `„${folderLabel(item.value)}“` : item.value) : ''
-		]
-			.filter(Boolean)
-			.join(' ')
-	);
+/** A condition in words ("Absender endet auf @stadtwerke.example"). */
+export function conditionText(item: Pick<MailConditionNode, 'field' | 'op' | 'value'>): string {
+	return [
+		FIELD_LABELS[item.field](),
+		operatorText(item.field, item.op),
+		item.value ? (item.field === 'folder' ? `„${folderLabel(item.value)}“` : item.value) : ''
+	]
+		.filter(Boolean)
+		.join(' ');
 }
 
 /** What the rule does, one part each: what it takes, for whom, where, the type of the text,
@@ -227,9 +261,7 @@ export function actionTexts(rule: MailRule, names: Names): string[] {
 
 /** A rule in one line: its priority, its conditions, then what it does. */
 export function summaryOf(rule: MailRule, names: Names): string {
-	const conditions = conditionTexts(rule);
-	const when = conditions.length
-		? conditions.join(rule.any ? m.mail_rule_or() : m.mail_rule_and())
-		: m.mail_rule_every();
+	const tree = treeOf(rule);
+	const when = tree.items.length ? treeText(tree, conditionText) : m.mail_rule_every();
 	return `${m.rule_priority_short({ priority: rule.priority })} · ${when} → ${actionTexts(rule, names).join(', ')}`;
 }
