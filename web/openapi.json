@@ -37110,7 +37110,8 @@
           "mail_step_failed",
           "mail_rule_person_gone",
           "mail_rule_space_unreachable",
-          "mail_rule_type_gone"
+          "mail_rule_type_gone",
+          "mail_rule_unreadable"
         ],
         "title": "ReasonCode"
       },
@@ -43148,7 +43149,10 @@
     },
     "mail_rule_person_gone": {},
     "mail_rule_space_unreachable": {},
-    "mail_rule_type_gone": {}
+    "mail_rule_type_gone": {},
+    "mail_rule_unreadable": {
+      "detail": "text"
+    }
   },
   "x-identifier-kinds": {
     "iban": {

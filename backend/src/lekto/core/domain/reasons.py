@@ -433,6 +433,7 @@ class ReasonCode(StrEnum):
     MAIL_RULE_PERSON_GONE = "mail_rule_person_gone"
     MAIL_RULE_SPACE_UNREACHABLE = "mail_rule_space_unreachable"
     MAIL_RULE_TYPE_GONE = "mail_rule_type_gone"
+    MAIL_RULE_UNREADABLE = "mail_rule_unreadable"
 
 
 TEMPLATES: Mapping[ReasonCode, str] = {
@@ -978,6 +979,10 @@ TEMPLATES: Mapping[ReasonCode, str] = {
         "its space is deleted, or the person it takes mails for no longer edits it"
     ),
     ReasonCode.MAIL_RULE_TYPE_GONE: "the document type of the mail text is deleted",
+    ReasonCode.MAIL_RULE_UNREADABLE: (
+        "its stored conditions or steps cannot be read: {detail}; edit it and save it with "
+        "both anew"
+    ),
 }
 
 
