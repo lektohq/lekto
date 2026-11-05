@@ -4,8 +4,8 @@ import secrets
 
 import httpx2
 
+from lekto.adapters.outbound.languages import synonym_groups
 from lekto.adapters.outbound.meilisearch import MeilisearchIndex
-from lekto.adapters.outbound.meilisearch.languages import synonym_groups
 from lekto.composition.settings import Settings
 from lekto.core.domain.ids import SpaceId, new_id
 from lekto.core.domain.search import IndexDocument, Visibility

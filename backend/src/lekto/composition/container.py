@@ -519,7 +519,7 @@ def build_memory_container(
             locale=settings.template_locale, currency=settings.default_currency
         ),
         oidc=None,
-        search_index=MemorySearchIndex(),
+        search_index=MemorySearchIndex(locales=settings.search_locales.split("+")),
         language_model=None,
         embeddings=None,
         classifier=FakeClassifier(),
