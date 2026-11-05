@@ -2,13 +2,12 @@
 
 from typing import Any
 
-from sqlalchemy import Row, func, null, select
+from sqlalchemy import Row, func, select
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.repositories import SqlRepository, Values
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import DocumentTypeId, MailboxId, MailRuleId, SpaceId, UserId
-from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.mail_intake import MailParts
 from lekto.core.domain.mail_rules import (
     MailRule,
@@ -74,7 +73,7 @@ class SqlMailRuleRepository(SqlRepository[MailRuleId, MailRule]):
             "mailbox_id": entity.mailbox_id,
             "name": entity.name,
             "priority": entity.priority,
-            "conditions": _sql_json(conditions_to_json(entity.conditions)),
+            "conditions": conditions_to_json(entity.conditions),
             "parts": entity.parts.value,
             "user_id": entity.user_id,
             "space_id": entity.space_id,
@@ -88,8 +87,3 @@ class SqlMailRuleRepository(SqlRepository[MailRuleId, MailRule]):
             "updated_at": entity.updated_at,
             "version": entity.version,
         }
-
-
-def _sql_json(value: JsonObject | None) -> Any:
-    """SQL NULL for no conditions, not the JSON `null`."""
-    return null() if value is None else value
