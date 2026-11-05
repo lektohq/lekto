@@ -65,6 +65,15 @@ class MailboxRepositoryContract:
                 documents=30,
                 skipped_at=NOW,
                 skipped=because(ReasonCode.MAIL_TOO_LARGE, subject="Fotos", size=200, max=134),
+                step_failed_at=NOW + HOUR,
+                step_failed=because(
+                    ReasonCode.MAIL_STEP_FAILED,
+                    step="mail_step:add_keyword",
+                    subject="Fotos",
+                    detail="keywords are not stored",
+                ),
+                keywords=("$label1", "Lekto"),
+                own_keywords=False,
             )
         )
         plain = a_mailbox("Plain")
@@ -75,6 +84,7 @@ class MailboxRepositoryContract:
         async with uow_factory() as uow:
             assert await uow.mailboxes.get(mailbox.id) == mailbox
             assert await uow.mailboxes.get(plain.id) == plain
+            assert (await uow.mailboxes.get(plain.id)).status.own_keywords is None  # not known
 
     async def test_names_are_unique_regardless_of_case(
         self, uow_factory: UnitOfWorkFactory

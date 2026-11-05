@@ -264,10 +264,10 @@ class MailIntakeService:
             known = await uow.mail_records.known_uids(mailbox.id, folder, found.uidvalidity)
         new = [uid for uid in found.uids if uid not in known]
         for info in await self._due(session, mailbox, folder, new, count):
-            count.mails += 1
-            count.documents += await self._mail(
-                session, mailbox, folder, found.uidvalidity, info, count
-            )
+            made = await self._mail(session, mailbox, folder, found.uidvalidity, info, count)
+            if made is not None:
+                count.mails += 1
+                count.documents += made
 
     async def _due(
         self,
@@ -307,8 +307,9 @@ class MailIntakeService:
         uidvalidity: int,
         info: MailInfo,
         count: _Count,
-    ) -> int:
-        """Take one mail; the number of documents it made."""
+    ) -> int | None:
+        """Take one mail; the number of documents it made, or None for a mail gone meanwhile
+        (looked at next time, if it comes back)."""
         record = MailRecord(
             id=MailRecordId(new_id()),
             mailbox_id=mailbox.id,
@@ -342,7 +343,7 @@ class MailIntakeService:
             return 0
         data = await session.fetch(folder, info.uid)
         if data is None:
-            return 0  # gone meanwhile: looked at next time, if it comes back
+            return None
         try:
             message = read_mail(data)
         except UnprocessableDocumentError as error:

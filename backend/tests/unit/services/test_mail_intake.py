@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from lekto.adapters.outbound.memory.mail_server import MemoryMailSession
 from lekto.adapters.outbound.regex import RegexPatternMatcher
 from lekto.core.domain.condition_tree import Group
 from lekto.core.domain.documents import Channel
@@ -43,12 +44,14 @@ from lekto.core.domain.users import Role, User
 from lekto.core.services.classification.signals import FactsResult, FactsSignal, sender_line
 from lekto.core.services.mail_intake import (
     FETCH_JOB,
+    LEASE,
     MAX_PER_RUN,
     MailIntakeService,
     fetch_key,
 )
 from lekto.core.services.mail_rules import Decider
 from lekto.core.services.objects import text_key
+from lekto.core.services.pipeline import PipelineService
 from lekto.core.services.relating import relate
 from lekto.core.services.rules.management import RuleService
 from lekto.core.services.rules.nodes import ApplyRulesNode
@@ -638,3 +641,243 @@ async def test_a_document_rule_looks_at_the_mail_a_document_came_with(world: Wor
     assert tag.id in by_channel[Channel.MAIL].tag_ids
     assert tag.id not in by_channel[Channel.API].tag_ids
     assert uploaded.id == by_channel[Channel.API].id
+
+
+async def _records(world: World, mailbox: Mailbox) -> list[Any]:
+    async with world.uow() as uow:
+        found = await uow.mail_records.recent(mailbox.id, limit=100)
+    return sorted(found, key=lambda r: (r.fetched_at, r.uid))
+
+
+async def _status(world: World, mailbox: Mailbox) -> Any:
+    async with world.uow() as uow:
+        return (await uow.mailboxes.get(mailbox.id)).status
+
+
+async def test_a_folder_whose_uidvalidity_changed_is_read_again_without_doubles(
+    world: World,
+) -> None:
+    _, person, mailbox = await _setup(world)
+    _deliver(world, mails.plain_mail())
+    service = world.mail_intake()
+    await _fetch(world, service)
+    account = world.mail_server.servers[(LOGIN.host, LOGIN.port)][LOGIN.username]
+    account.boxes["INBOX"].uidvalidity = 99  # the server renumbered the folder
+    world.clock.advance(mailbox.interval)
+    await _fetch(world, service)
+    records = await _records(world, mailbox)
+    assert [(record.uidvalidity, record.outcome) for record in records] == [
+        (1, MailOutcome.TAKEN),
+        (99, MailOutcome.KNOWN),  # the same Message-ID: fetched, not taken again
+    ]
+    assert len(await world.documents.list_visible(person.id)) == 1
+
+
+async def test_more_mails_than_a_run_takes_come_in_the_next_run_at_once(world: World) -> None:
+    _, person, mailbox = await _setup(world)
+    for number in range(MAX_PER_RUN + 5):
+        _deliver(world, mails.plain_mail(f"Mail {number}"))
+    service = world.mail_intake()
+    world.clock.advance(2 * LATER)
+    assert await service.run_next_job()
+    assert len(await world.documents.list_visible(person.id)) == MAX_PER_RUN
+    async with world.uow() as uow:
+        (job,) = await uow.jobs.find(
+            now=world.clock.now(), states=[JobState.DUE], kind=FETCH_JOB, limit=5
+        )
+    assert job.run_at == world.clock.now()  # the rest at once, not after the interval
+    assert await service.run_next_job()
+    assert len(await world.documents.list_visible(person.id)) == MAX_PER_RUN + 5
+    assert (await _status(world, mailbox)).mails == MAX_PER_RUN + 5
+
+
+async def test_an_unreadable_mail_is_recorded_as_failed_and_the_fetch_goes_on(
+    world: World,
+) -> None:
+    _, person, mailbox = await _setup(world)
+    _deliver(world, b"no header lines at all\r\n")
+    _deliver(world, mails.plain_mail("Gut"))
+    await _fetch(world, world.mail_intake())
+    records = await _records(world, mailbox)
+    assert [record.outcome for record in records] == [MailOutcome.FAILED, MailOutcome.TAKEN]
+    assert records[0].reason is not None and records[0].reason.code is ReasonCode.FILE_DAMAGED
+    assert [d.original_filename for d in await world.documents.list_visible(person.id)] == [
+        "Gut.eml"
+    ]
+    status = await _status(world, mailbox)
+    assert (status.mails, status.documents, status.error) == (2, 1, None)
+
+
+async def test_a_mail_gone_between_the_search_and_the_fetch_is_not_counted(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, person, mailbox = await _setup(world)
+    _deliver(world, mails.plain_mail())
+
+    async def gone(self: MemoryMailSession, folder: str, uid: int) -> bytes | None:
+        return None
+
+    monkeypatch.setattr(MemoryMailSession, "fetch", gone)
+    await _fetch(world, world.mail_intake())
+    assert await _records(world, mailbox) == []  # looked at next time, if it comes back
+    assert await world.documents.list_visible(person.id) == []
+    assert (await _status(world, mailbox)).mails == 0
+
+
+async def test_a_mail_that_cannot_be_taken_is_recorded_as_failed_with_its_rule(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    admin, person, mailbox = await _setup(world, everything=False)
+    await _rule(world, admin, mailbox, user_id=person.id)
+    _deliver(world, mails.plain_mail())
+
+    async def refuse(self: PipelineService, *args: object, **kwargs: object) -> None:
+        raise ValidationError("the store is full")
+
+    monkeypatch.setattr(PipelineService, "receive", refuse)
+    await _fetch(world, world.mail_intake())
+    (record,) = await _records(world, mailbox)
+    assert (record.outcome, record.rule, record.documents) == (MailOutcome.FAILED, "Strom", 0)
+    assert record.reason is not None and "full" in record.reason.text
+    assert (await _status(world, mailbox)).error is None  # the fetch itself went well
+
+
+async def test_a_rule_whose_space_or_type_is_gone_pauses_with_the_reason(world: World) -> None:
+    admin, person, mailbox = await _setup(world)
+    household = await world.spaces.create(
+        admin.id, "Haushalt", members={person.id: SpaceRole.EDIT, admin.id: SpaceRole.EDIT}
+    )
+    letter = DocumentType.create(name="E-Mail", now=world.clock.now())
+    async with world.uow() as uow:
+        await uow.document_types.add(letter)
+        await uow.commit()
+    spaced = await _rule(
+        world, admin, mailbox, name="Space", priority=2, user_id=person.id, space_id=household.id
+    )
+    typed = await _rule(
+        world, admin, mailbox, name="Typ", priority=1, user_id=person.id, text_type_id=letter.id
+    )
+    await world.spaces.remove_member(admin.id, household.id, person.id)
+    await world.master_data.delete_document_type(admin.id, letter.id)
+    _deliver(world, mails.plain_mail())
+    await _fetch(world, world.mail_intake())
+    async with world.uow() as uow:
+        reasons = {
+            rule.name: rule.disabled_reason.code if rule.disabled_reason else None
+            for rule in await uow.mail_rules.of_mailbox(mailbox.id)
+        }
+    assert reasons == {
+        spaced.name: ReasonCode.MAIL_RULE_SPACE_UNREACHABLE,
+        typed.name: ReasonCode.MAIL_RULE_TYPE_GONE,
+    }
+    (record,) = await _records(world, mailbox)
+    assert (record.outcome, record.rule) == (MailOutcome.TAKEN, None)  # by the fallback
+
+
+async def test_a_deactivated_fallback_person_takes_nothing(world: World) -> None:
+    admin, person, mailbox = await _setup(world)
+    await world.users.update(admin.id, person.id, active=False)
+    _deliver(world, mails.plain_mail())
+    await _fetch(world, world.mail_intake())
+    (record,) = await _records(world, mailbox)
+    assert record.outcome is MailOutcome.NO_RULE
+
+
+async def test_the_worker_start_queues_the_fetch_of_every_enabled_mailbox(world: World) -> None:
+    admin, _, mailbox = await _setup(world)
+    paused = await world.mailboxes.create(
+        admin.id,
+        name="Pausiert",
+        host=LOGIN.host,
+        port=LOGIN.port,
+        security=LOGIN.security,
+        username="other",
+        password="x",
+        changes=MailboxChanges(enabled=False),
+    )
+    service = world.mail_intake()
+    await _fetch(world, service)  # the next fetch is queued after the interval
+    async with world.uow() as uow:  # a worker that died took the queued job with it
+        world.clock.advance(timedelta(hours=1))
+        job = await uow.jobs.claim(now=world.clock.now(), lease=LEASE, kinds=[FETCH_JOB])
+        assert job is not None
+        await uow.jobs.complete(job, now=world.clock.now())
+        await uow.commit()
+    await service.schedule()
+    async with world.uow() as uow:
+        queued = await uow.jobs.find(
+            now=world.clock.now(), states=[JobState.DUE, JobState.PLANNED], kind=FETCH_JOB, limit=5
+        )
+    assert [job.dedup_key for job in queued] == [fetch_key(mailbox.id)]  # not the paused one
+    assert paused.enabled is False
+
+
+async def test_the_job_of_a_deleted_mailbox_ends(world: World) -> None:
+    admin, _, mailbox = await _setup(world)
+    await world.mailboxes.delete(admin.id, mailbox.id)
+    service = world.mail_intake()
+    world.clock.advance(2 * LATER)
+    assert await service.run_next_job()  # ran and ended
+    async with world.uow() as uow:
+        queued = await uow.jobs.find(
+            now=world.clock.now(), states=[JobState.DUE, JobState.PLANNED], kind=FETCH_JOB, limit=5
+        )
+    assert queued == []
+
+
+async def test_a_password_that_cannot_be_read_shows_at_the_mailbox(world: World) -> None:
+    _, _, mailbox = await _setup(world)
+    async with world.uow() as uow:
+        stored = await uow.mailboxes.get(mailbox.id)
+        stored.set_password(b"written with another key", now=world.clock.now())
+        await uow.mailboxes.update(stored)
+        await uow.commit()
+    await _fetch(world, world.mail_intake())
+    status = await _status(world, mailbox)
+    assert status.error is not None and status.error.code is ReasonCode.MAIL_PASSWORD_UNREADABLE
+
+
+async def test_a_mailbox_that_starts_from_a_day(world: World) -> None:
+    _, person, _ = await _setup(
+        world, start=FetchStart.SINCE_DATE, since=world.clock.now().date() - timedelta(days=7)
+    )
+    account = world.mail_server.servers[(LOGIN.host, LOGIN.port)][LOGIN.username]
+    account.deliver(
+        "INBOX", mails.plain_mail("Alt"), arrived_at=world.clock.now() - timedelta(days=8)
+    )
+    account.deliver(
+        "INBOX", mails.plain_mail("Neuer"), arrived_at=world.clock.now() - timedelta(days=6)
+    )
+    await _fetch(world, world.mail_intake())
+    names = [d.original_filename for d in await world.documents.list_visible(person.id)]
+    assert names == ["Neuer.eml"]
+
+
+async def test_a_missing_folder_ends_the_fetch_after_the_others(world: World) -> None:
+    _, person, mailbox = await _setup(world, folders=("INBOX", "Nirgends"))
+    _deliver(world, mails.plain_mail())
+    await _fetch(world, world.mail_intake())
+    assert len(await world.documents.list_visible(person.id)) == 1  # INBOX came first
+    status = await _status(world, mailbox)
+    assert status.error is not None and status.error.code is ReasonCode.MAIL_FOLDER_MISSING
+    assert status.error.params == {"folder": "Nirgends"}
+    assert (status.mails, status.last_success_at) == (1, None)
+
+
+async def test_an_attachment_larger_than_an_upload_is_left_out(world: World) -> None:
+    """The mail itself fits (`mail_limit` leaves room for its head); the attachment does not."""
+    _, person, mailbox = await _setup(world)
+    message = EmailMessage()
+    message["From"] = "a@example.test"
+    message["Date"] = "Wed, 04 Nov 2026 10:00:00 +0100"
+    message["Subject"] = "Fotos"
+    message.set_content("Anbei.")
+    message.add_attachment(
+        mails.PDF + b"x" * 3000, maintype="application", subtype="pdf", filename="Gross.pdf"
+    )
+    _deliver(world, bytes(message))
+    await _fetch(world, world.mail_intake(max_attachment=2000))
+    names = [d.original_filename for d in await world.documents.list_visible(person.id)]
+    assert names == ["Fotos.eml"]  # the text, without the attachment
+    (record,) = await _records(world, mailbox)
+    assert (record.outcome, record.documents) == (MailOutcome.TAKEN, 1)
