@@ -5050,6 +5050,12 @@ export interface components {
 		 * @description A mail fetched lately, and what would become of it with the rule.
 		 */
 		DryRunMailOut: {
+			/**
+			 * Id
+			 * Format: uuid
+			 * @description The record of the mail.
+			 */
+			id: string;
 			/** Subject */
 			subject: string;
 			/** Sender */
@@ -5075,10 +5081,18 @@ export interface components {
 			 * @description Whether the rule's conditions hold.
 			 */
 			matches: boolean;
-			/** @description Who would decide it now: `rule` (this one), `other` (another rule before it, named in `rule`), `fallback` (the mailbox takes everything), `nothing` (no rule, the mailbox takes nothing). */
+			/** @description Who would decide it now: `rule` (this one), `other` (another rule before it: `rule`, `rule_id`), `fallback` (the mailbox takes everything), `nothing` (no rule, the mailbox takes nothing). */
 			decider: components['schemas']['Decider'];
-			/** Rule */
+			/**
+			 * Rule
+			 * @description The name of the rule before it; null otherwise.
+			 */
 			rule: string | null;
+			/**
+			 * Rule Id
+			 * @description The rule before it; null otherwise.
+			 */
+			rule_id: string | null;
 		};
 		/**
 		 * EventBody

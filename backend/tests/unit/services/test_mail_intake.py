@@ -585,9 +585,11 @@ async def test_a_dry_run_over_the_latest_mails(world: World) -> None:
     found = await world.mail_rules.dry_run(admin.id, mailbox.id, draft)
     by_subject = {item.record.subject: item for item in found}
     assert len(found) == 3
-    assert (by_subject["Unser Newsletter"].decider, by_subject["Unser Newsletter"].rule) == (
+    newsletter = by_subject["Unser Newsletter"]
+    assert (newsletter.decider, newsletter.rule, newsletter.rule_id) == (
         Decider.OTHER,
         "Newsletter",
+        other.id,
     )
     rich = by_subject["Ihre Rechnung über 123,45 €"]
     assert (rich.matches, rich.decider) == (True, Decider.RULE)

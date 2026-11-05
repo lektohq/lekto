@@ -13,7 +13,7 @@
 	import DryRunGroup from '#lib/components/rules/DryRunGroup.svelte';
 	import SelectionBar from '#lib/components/SelectionBar.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
 	import { formatMoment } from '#lib/i18n.ts';
@@ -28,6 +28,7 @@
 	import { folderLabel } from '#lib/mailboxes.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { phone } from '#lib/phone.svelte.ts';
+	import { cn } from '#lib/utils.ts';
 
 	// The dry run of a mail rule (Tobi, 05.11.2026: as the document rules'; web/DESIGN.md, "A
 	// rule's dry run"): what the rule as it is stored would do with the mailbox's latest mails,
@@ -91,17 +92,17 @@
 	}
 
 	const taken = $derived(mails?.filter((item) => item.decider === 'rule') ?? []);
-	/** The mails a rule before it takes, by that rule. */
+	/** The mails a rule before it takes, by that rule (its id: names are not unique). */
 	const before = $derived.by(() => {
-		const groups: Record<string, DryRunMail[]> = {};
+		const groups: Record<string, { name: string; items: DryRunMail[] }> = {};
 		for (const item of mails ?? []) {
-			if (item.decider !== 'other' || !item.matches) continue;
-			const name = item.rule ?? '';
-			groups[name] = [...(groups[name] ?? []), item];
+			if (item.decider !== 'other' || !item.matches || !item.rule_id) continue;
+			(groups[item.rule_id] ??= { name: item.rule ?? '', items: [] }).items.push(item);
 		}
 		return Object.entries(groups);
 	});
-	const conflicts = $derived(before.reduce((sum, [, items]) => sum + items.length, 0));
+	const conflicts = $derived(before.reduce((sum, [, group]) => sum + group.items.length, 0));
+	const textLink = cn(buttonVariants({ variant: 'link', size: 'inline' }));
 	const title = $derived(rule ? m.rule_apply_title({ name: rule.name }) : m.rule_apply_generic());
 	const names = $derived(lookup ? namesOf(lookup) : null);
 	const doing = $derived(rule && names ? actionTexts(rule, names) : []);
@@ -184,25 +185,28 @@
 						onfold={() => fold('rule')}
 					>
 						{#snippet head()}
-							{#each doing as text, index (index)}
+							{#each doing as text (text)}
 								<span class="text-sm font-medium">{text}</span>
 							{/each}
 						{/snippet}
-						{#each taken as item, index (index)}{@render row(item)}{/each}
+						{#each taken as item (item.id)}{@render row(item)}{/each}
 					</DryRunGroup>
 				{/if}
-				{#each before as [name, items] (name)}
+				{#each before as [ruleId, group] (ruleId)}
 					<DryRunGroup
-						count={mailsCount(items.length)}
+						count={mailsCount(group.items.length)}
 						conflict
-						open={!folded.has(`before:${name}`)}
-						onfold={() => fold(`before:${name}`)}
+						open={!folded.has(`before:${ruleId}`)}
+						onfold={() => fold(`before:${ruleId}`)}
 					>
 						{#snippet head()}
-							<Badge variant="yellow">{m.mail_rule_before({ name })}</Badge>
+							<Badge variant="yellow">{m.mail_rule_before({ name: group.name })}</Badge>
 							<span class="text-sm text-muted-foreground">{m.mail_rule_before_hint()}</span>
+							<a href="{BASE}/rules/mail/{ruleId}" class={textLink}>
+								{m.rule_open({ name: group.name })}
+							</a>
 						{/snippet}
-						{#each items as item, index (index)}{@render row(item)}{/each}
+						{#each group.items as item (item.id)}{@render row(item)}{/each}
 					</DryRunGroup>
 				{/each}
 			</div>
