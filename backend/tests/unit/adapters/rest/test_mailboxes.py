@@ -8,7 +8,7 @@ from lekto.adapters.outbound.memory import MemoryMailServer
 from lekto.core.domain.mail import MailLogin, MailSecurity
 from lekto.core.domain.users import User
 from tests.api import auth
-from tests.builders import drain
+from tests.builders import NOW, drain
 from tests.mails import plain_mail
 from tests.unit.adapters.rest.support import Api, post
 
@@ -54,10 +54,12 @@ async def test_a_mailbox_is_created_tested_changed_and_deleted(api: Api) -> None
         "documents": 0,
         "skipped_at": None,
         "skipped": None,
+        "keywords": [],
+        "own_keywords": None,
     }
     url = f"{PREFIX}/mailboxes/{created['id']}"
 
-    _server(api).add_account(
+    account = _server(api).add_account(
         MailLogin(
             host="imap.example.test",
             port=993,
@@ -65,9 +67,19 @@ async def test_a_mailbox_is_created_tested_changed_and_deleted(api: Api) -> None
             username="household@example.test",
             password="app-password",
         )
-    ).add_folders("Rechnungen")
+    )
+    account.add_folders("Rechnungen")
+    account.deliver(
+        "INBOX", plain_mail("Markiert"), arrived_at=NOW, flags={"\\Flagged", "Lekto", "$Junk"}
+    )
     tested = await _test(api, admin, {"mailbox_id": created["id"]})
-    assert tested == {"ok": True, "folders": ["INBOX", "Rechnungen"], "error": None}
+    assert tested == {
+        "ok": True,
+        "folders": ["INBOX", "Rechnungen"],
+        "keywords": ["Lekto"],
+        "own_keywords": True,
+        "error": None,
+    }
     refused = await _test(api, admin, {"password": "x"})
     assert refused["ok"] is False and refused["error"]["code"] == "mail_login_failed"
 

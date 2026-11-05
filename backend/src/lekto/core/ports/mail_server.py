@@ -38,10 +38,14 @@ class MailSearch:
 @dataclass(frozen=True)
 class FolderMails:
     """The UIDs a search found, ascending, and the folder's UIDVALIDITY: UIDs count only
-    together with it."""
+    together with it. `keywords`: those the folder knows (its FLAGS and PERMANENTFLAGS, as
+    `mail_traits.shown_keywords` offers them); `own_keywords`: whether the server stores
+    keywords of Lekto's own there (PERMANENTFLAGS hold `\\*`)."""
 
     uidvalidity: int
     uids: tuple[int, ...]
+    keywords: tuple[str, ...] = ()
+    own_keywords: bool = False
 
 
 @dataclass(frozen=True)
@@ -49,6 +53,17 @@ class MailInfo:
     uid: int
     size: int  # bytes
     arrived_at: datetime  # the server's date of arrival (INTERNALDATE), UTC
+    flags: frozenset[str] = frozenset()  # its IMAP flags and keywords, as the server has them
+
+
+@dataclass(frozen=True)
+class MailAccount:
+    """What a test of a connection finds: the folders (`MailServer.account`), the keywords the
+    inbox knows and whether the server stores keywords of its own."""
+
+    folders: tuple[str, ...]
+    keywords: tuple[str, ...] = ()
+    own_keywords: bool = False
 
 
 class MailSession(Protocol):
@@ -57,7 +72,8 @@ class MailSession(Protocol):
         ...
 
     async def info(self, folder: str, uids: Sequence[int]) -> list[MailInfo]:
-        """Size and date of arrival of the mails `uids` still there, in the order of `uids`."""
+        """Size, date of arrival and flags of the mails `uids` still there, in the order of
+        `uids`."""
         ...
 
     async def fetch(self, folder: str, uid: int) -> bytes | None:
@@ -80,9 +96,10 @@ class MailSession(Protocol):
 
 
 class MailServer(Protocol):
-    async def folders(self, login: MailLogin) -> tuple[str, ...]:
+    async def account(self, login: MailLogin) -> MailAccount:
         """The folders of the account, by their full names as the server separates them
-        (`INBOX`, `INBOX/Rechnungen`, ...), sorted, `INBOX` first. Raises MailServerError."""
+        (`INBOX`, `INBOX/Rechnungen`, ...), sorted, `INBOX` first, and the keywords of its inbox.
+        Raises MailServerError."""
         ...
 
     def session(self, login: MailLogin) -> AbstractAsyncContextManager[MailSession]:

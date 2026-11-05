@@ -174,6 +174,12 @@ class MailboxStatusOut(BaseModel):
         description="When a mail was last left out because it was too large."
     )
     skipped: ReasonOut | None = Field(description="Which mail that was, and why.")
+    keywords: list[str] = Field(
+        description="The keywords its folders knew at the last fetch, to choose in a rule."
+    )
+    own_keywords: bool | None = Field(
+        description="Whether the server stores keywords of Lekto's own; null before a fetch."
+    )
 
 
 class MailboxOut(BaseModel):
@@ -223,6 +229,8 @@ class MailboxOut(BaseModel):
                 documents=status.documents,
                 skipped_at=status.skipped_at,
                 skipped=None if status.skipped is None else ReasonOut.of(status.skipped),
+                keywords=list(status.keywords),
+                own_keywords=status.own_keywords,
             ),
             created_at=mailbox.created_at,
             updated_at=mailbox.updated_at,
@@ -258,10 +266,17 @@ class ConnectionTestBody(BaseModel):
 
 
 class ConnectionTestOut(BaseModel):
-    """The folders the account has (`INBOX` first), or why signing in failed."""
+    """The folders the account has (`INBOX` first), the keywords its inbox knows and whether
+    the server stores keywords of Lekto's own; or why signing in failed."""
 
     ok: bool
     folders: list[str]
+    keywords: list[str] = Field(
+        description="Keywords (tags) the inbox knows, without the clients' own (a forward, spam)."
+    )
+    own_keywords: bool = Field(
+        description="Whether the server stores keywords of Lekto's own (PERMANENTFLAGS `\\*`)."
+    )
     error: ReasonOut | None
 
     @classmethod
@@ -269,5 +284,7 @@ class ConnectionTestOut(BaseModel):
         return cls(
             ok=test.error is None,
             folders=list(test.folders),
+            keywords=list(test.keywords),
+            own_keywords=test.own_keywords,
             error=None if test.error is None else ReasonOut.of(test.error),
         )

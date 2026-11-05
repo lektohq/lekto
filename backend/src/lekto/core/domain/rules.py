@@ -70,6 +70,7 @@ from lekto.core.domain.ids import (
     new_id,
 )
 from lekto.core.domain.json_value import JsonValue, require_date, require_uuid
+from lekto.core.domain.mail_traits import FlagColor, Importance, is_keyword
 from lekto.core.domain.master_data import DocumentType, TagScope
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.tasks import DEFAULT_TIMEOUT, validate_timeout
@@ -111,8 +112,13 @@ class ConditionField(StrEnum):
     # The mail the document came with (`mail_origins`): its mailbox, sender, recipients, subject.
     MAIL_MAILBOX = "mail_mailbox"
     MAIL_SENDER = "mail_sender"
-    MAIL_RECIPIENT = "mail_recipient"
+    MAIL_RECIPIENT = "mail_recipient"  # To or Cc
+    MAIL_TO = "mail_to"
+    MAIL_CC = "mail_cc"
     MAIL_SUBJECT = "mail_subject"
+    MAIL_IMPORTANCE = "mail_importance"  # high, normal or low (`mail_traits`)
+    MAIL_KEYWORD = "mail_keyword"  # an IMAP keyword the mail had on the server
+    MAIL_FLAG = "mail_flag"  # flagged, in a colour
 
 
 class Operator(StrEnum):
@@ -137,7 +143,12 @@ MAIL_FIELDS = frozenset(
         ConditionField.MAIL_MAILBOX,
         ConditionField.MAIL_SENDER,
         ConditionField.MAIL_RECIPIENT,
+        ConditionField.MAIL_TO,
+        ConditionField.MAIL_CC,
         ConditionField.MAIL_SUBJECT,
+        ConditionField.MAIL_IMPORTANCE,
+        ConditionField.MAIL_KEYWORD,
+        ConditionField.MAIL_FLAG,
     }
 )
 """The conditions on the mail a document came with (none: it came otherwise)."""
@@ -171,7 +182,12 @@ _FIELD_OPERATORS: dict[ConditionField, frozenset[Operator]] = {
     ConditionField.MAIL_MAILBOX: _REFERENCE_OPERATORS,
     ConditionField.MAIL_SENDER: _MAIL_TEXT,
     ConditionField.MAIL_RECIPIENT: _MAIL_TEXT,
+    ConditionField.MAIL_TO: _MAIL_TEXT,
+    ConditionField.MAIL_CC: _MAIL_TEXT,
     ConditionField.MAIL_SUBJECT: _MAIL_TEXT,
+    ConditionField.MAIL_IMPORTANCE: frozenset({Operator.IS}),
+    ConditionField.MAIL_KEYWORD: frozenset({Operator.CONTAINS, Operator.PRESENT, Operator.MISSING}),
+    ConditionField.MAIL_FLAG: frozenset({Operator.IS, Operator.PRESENT, Operator.MISSING}),
 }
 TAG_FIELDS: dict[ConditionField, TagScope] = {
     ConditionField.TAGS: TagScope.DOCUMENT,
@@ -319,8 +335,22 @@ class Condition:
                 _step_value(self.op, value)
             case ConditionField.FACT:
                 _text(value, MAX_PATTERN if self.op is Operator.MATCHES else MAX_TEXT)
-            case ConditionField.MAIL_SENDER | ConditionField.MAIL_RECIPIENT:
+            case (
+                ConditionField.MAIL_SENDER
+                | ConditionField.MAIL_RECIPIENT
+                | ConditionField.MAIL_TO
+                | ConditionField.MAIL_CC
+            ):
                 _text(value, MAX_TEXT)
+            case ConditionField.MAIL_IMPORTANCE:
+                if value not in {item.value for item in Importance}:
+                    raise ValidationError("mail_importance: high, normal or low")
+            case ConditionField.MAIL_FLAG:
+                if value not in {item.value for item in FlagColor}:
+                    raise ValidationError(f"mail_flag: a colour, not {value!r}")
+            case ConditionField.MAIL_KEYWORD:
+                if not isinstance(value, str) or not is_keyword(value):
+                    raise ValidationError(f"mail_keyword: not one IMAP can carry: {value!r}")
             case ConditionField.MAIL_SUBJECT:
                 _text(value, MAX_TEXT)
 

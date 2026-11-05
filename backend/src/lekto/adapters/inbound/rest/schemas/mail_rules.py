@@ -41,9 +41,12 @@ CONDITIONS_HELP = (
     "A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items "
     f"are conditions or groups again, nested at most {MAX_DEPTH} deep, at most {MAX_CONDITIONS} "
     "conditions. "
-    "Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, "
-    "`ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` "
-    "with `present` or `missing` (attachments Lekto takes). Null: every mail."
+    "Fields: `sender`, `recipient` (To or Cc), `to`, `cc` and `subject` with `contains`, `is`, "
+    "`starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; "
+    "`attachments` with `present` or `missing` (attachments Lekto takes); `importance` with `is` "
+    "(`high`, `normal`, `low`); `keyword` with `contains` (an IMAP keyword, regardless of "
+    "case), `present` or `missing`; `flag` with `present`, `missing` or `is` (a colour: `red`, "
+    "`orange`, `yellow`, `green`, `blue`, `purple`, `gray`). Null: every mail."
 )
 
 

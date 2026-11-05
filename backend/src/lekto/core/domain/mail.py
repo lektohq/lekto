@@ -93,6 +93,8 @@ class MailboxStatus:
     documents: int = 0  # documents made from them
     skipped_at: datetime | None = None  # when a mail was last left out, too large
     skipped: Reason | None = None  # which and why
+    keywords: tuple[str, ...] = ()  # the keywords its folders knew at the last fetch
+    own_keywords: bool | None = None  # whether the server stores Lekto's own; none: not known
 
 
 @dataclass(frozen=True, kw_only=True)

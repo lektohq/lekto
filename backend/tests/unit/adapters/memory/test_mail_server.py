@@ -35,9 +35,10 @@ class _World:
         *,
         arrived_at: datetime,
         seen: bool = False,
+        flags: Sequence[str] = (),
     ) -> None:
         account = self._server.servers[(login.host, login.port)][login.username]
-        account.deliver(folder, data, arrived_at=arrived_at, seen=seen)
+        account.deliver(folder, data, arrived_at=arrived_at, seen=seen, flags=set(flags))
 
     def unreachable(self) -> MailLogin:
         return MailLogin(

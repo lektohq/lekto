@@ -26156,7 +26156,12 @@
           "mail_mailbox",
           "mail_sender",
           "mail_recipient",
-          "mail_subject"
+          "mail_to",
+          "mail_cc",
+          "mail_subject",
+          "mail_importance",
+          "mail_keyword",
+          "mail_flag"
         ],
         "title": "ConditionField"
       },
@@ -26285,7 +26290,7 @@
           "op"
         ],
         "title": "ConditionSchema",
-        "description": "`field` `op` `value`. Operators by field: contact, document_type: `is`, `in`, `present`,\n`missing`; topic: the same, where a topic matches the ones below it too (unknown while the\nmodel set it and nobody confirmed it); tags (document tags), contact_group (the groups of\nthe document's contact),\ndocument_type_group (those of its type): `contains` (this one), `in` (one of), `present`\n(any), `missing` (none), where a tag or group matches the ones below it too; channel:\n`is`, `in`; text: `contains`, `matches` (regular expression); document_date and\nnumber, amount, date fields: `is`, `gt`, `lt`, `present`, `missing`; text and link\nfields: `is`, `in`, `contains`, `matches`, `present`, `missing`; choice: `is`, `in`,\n`present`, `missing`; boolean: `is`, `present`, `missing`; period fields: `is`,\n`overlaps` (shares a day with the given period), `gt` (starts after the date), `lt` (ends\nbefore the date), `present`, `missing`; step (in a condition step only: what a step that\nasks brought, at `path`): `is`, `in` (texts without case, numbers as numbers, true or\nfalse), `contains` (a text in a text, an item of a list), `gt`, `lt` (a number or a date),\n`present`, `missing`; fact (`fact_kind`, `fact_role` if given; facts a person rejected do\nnot count): `is`, `in` (the values as written, compared as Lekto compares them), `matches`\n(against each value as the text writes it; `^` and `$` mark its ends), `present`,\n`missing`; relation (the documents it refers to by a set relation; suggestions do not\ncount): `present` (any), `missing` (none), `is`, `in` (one of the document type ids).",
+        "description": "`field` `op` `value`. Operators by field: contact, document_type: `is`, `in`, `present`,\n`missing`; topic: the same, where a topic matches the ones below it too (unknown while the\nmodel set it and nobody confirmed it); tags (document tags), contact_group (the groups of\nthe document's contact),\ndocument_type_group (those of its type): `contains` (this one), `in` (one of), `present`\n(any), `missing` (none), where a tag or group matches the ones below it too; channel:\n`is`, `in`; text: `contains`, `matches` (regular expression); document_date and\nnumber, amount, date fields: `is`, `gt`, `lt`, `present`, `missing`; text and link\nfields: `is`, `in`, `contains`, `matches`, `present`, `missing`; choice: `is`, `in`,\n`present`, `missing`; boolean: `is`, `present`, `missing`; period fields: `is`,\n`overlaps` (shares a day with the given period), `gt` (starts after the date), `lt` (ends\nbefore the date), `present`, `missing`; step (in a condition step only: what a step that\nasks brought, at `path`): `is`, `in` (texts without case, numbers as numbers, true or\nfalse), `contains` (a text in a text, an item of a list), `gt`, `lt` (a number or a date),\n`present`, `missing`; fact (`fact_kind`, `fact_role` if given; facts a person rejected do\nnot count): `is`, `in` (the values as written, compared as Lekto compares them), `matches`\n(against each value as the text writes it; `^` and `$` mark its ends), `present`,\n`missing`; relation (the documents it refers to by a set relation; suggestions do not\ncount): `present` (any), `missing` (none), `is`, `in` (one of the document type ids); the\nmail a document came with (none: every mail condition fails): mail_mailbox: `is`, `in`,\n`present`, `missing`; mail_sender, mail_recipient (To or Cc), mail_to, mail_cc,\nmail_subject: `contains`, `is`, `starts_with`, `ends_with` (regardless of case);\nmail_importance: `is` (`high`, `normal`, `low`); mail_keyword: `contains` (an IMAP keyword\nthe mail had, regardless of case), `present`, `missing`; mail_flag: `present`, `missing`,\n`is` (a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`).",
         "examples": [
           {
             "field": "contact",
@@ -26497,6 +26502,19 @@
             "type": "array",
             "title": "Folders"
           },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keywords",
+            "description": "Keywords (tags) the inbox knows, without the clients' own (a forward, spam)."
+          },
+          "own_keywords": {
+            "type": "boolean",
+            "title": "Own Keywords",
+            "description": "Whether the server stores keywords of Lekto's own (PERMANENTFLAGS `\\*`)."
+          },
           "error": {
             "anyOf": [
               {
@@ -26512,10 +26530,12 @@
         "required": [
           "ok",
           "folders",
+          "keywords",
+          "own_keywords",
           "error"
         ],
         "title": "ConnectionTestOut",
-        "description": "The folders the account has (`INBOX` first), or why signing in failed."
+        "description": "The folders the account has (`INBOX` first), the keywords its inbox knows and whether\nthe server stores keywords of Lekto's own; or why signing in failed."
       },
       "ContactCreate": {
         "properties": {
@@ -30087,6 +30107,20 @@
         ],
         "title": "FileMetadataOut"
       },
+      "FlagColor": {
+        "type": "string",
+        "enum": [
+          "red",
+          "orange",
+          "yellow",
+          "green",
+          "blue",
+          "purple",
+          "gray"
+        ],
+        "title": "FlagColor",
+        "description": "Apple Mail's colours of a flag, in the order of their numbers."
+      },
       "FlowOut": {
         "properties": {
           "first_lane": {
@@ -30897,6 +30931,15 @@
           "rejected"
         ],
         "title": "IdentifierSource"
+      },
+      "Importance": {
+        "type": "string",
+        "enum": [
+          "high",
+          "normal",
+          "low"
+        ],
+        "title": "Importance"
       },
       "InboxDoneOut": {
         "properties": {
@@ -33266,9 +33309,14 @@
         "enum": [
           "sender",
           "recipient",
+          "to",
+          "cc",
           "subject",
           "folder",
-          "attachments"
+          "attachments",
+          "importance",
+          "keyword",
+          "flag"
         ],
         "title": "MailField"
       },
@@ -33380,6 +33428,43 @@
               }
             ],
             "title": "Message Id"
+          },
+          "importance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Importance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As the letter's header gives it; null for a document taken before."
+          },
+          "keywords": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keywords",
+            "description": "The keywords the mail had on the server when fetched; null: not known."
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlagColor"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The colour of its flag on the server then; null: not flagged or not known."
           }
         },
         "type": "object",
@@ -33395,7 +33480,10 @@
           "sent_at",
           "arrived_at",
           "forwarded_by",
-          "message_id"
+          "message_id",
+          "importance",
+          "keywords",
+          "flag"
         ],
         "title": "MailOriginOut",
         "description": "The mail a document came with, as it was then (a mailbox renamed or deleted since keeps\nits name here)."
@@ -33453,7 +33541,7 @@
               }
             ],
             "title": "Conditions",
-            "description": "A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). Null: every mail."
+            "description": "A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To or Cc), `to`, `cc` and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes); `importance` with `is` (`high`, `normal`, `low`); `keyword` with `contains` (an IMAP keyword, regardless of case), `present` or `missing`; `flag` with `present`, `missing` or `is` (a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`). Null: every mail."
           },
           "parts": {
             "anyOf": [
@@ -33607,7 +33695,7 @@
               }
             ],
             "title": "Conditions",
-            "description": "A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). Null: every mail."
+            "description": "A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To or Cc), `to`, `cc` and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes); `importance` with `is` (`high`, `normal`, `low`); `keyword` with `contains` (an IMAP keyword, regardless of case), `present` or `missing`; `flag` with `present`, `missing` or `is` (a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`). Null: every mail."
           },
           "parts": {
             "anyOf": [
@@ -33778,7 +33866,7 @@
               }
             ],
             "title": "Conditions",
-            "description": "A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). Null: every mail."
+            "description": "A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To or Cc), `to`, `cc` and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes); `importance` with `is` (`high`, `normal`, `low`); `keyword` with `contains` (an IMAP keyword, regardless of case), `present` or `missing`; `flag` with `present`, `missing` or `is` (a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`). Null: every mail."
           },
           "parts": {
             "$ref": "#/components/schemas/MailParts"
@@ -33908,7 +33996,7 @@
               }
             ],
             "title": "Conditions",
-            "description": "A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). Null: every mail."
+            "description": "A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To or Cc), `to`, `cc` and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes); `importance` with `is` (`high`, `normal`, `low`); `keyword` with `contains` (an IMAP keyword, regardless of case), `present` or `missing`; `flag` with `present`, `missing` or `is` (a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`). Null: every mail."
           },
           "parts": {
             "anyOf": [
@@ -34582,6 +34670,26 @@
               }
             ],
             "description": "Which mail that was, and why."
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keywords",
+            "description": "The keywords its folders knew at the last fetch, to choose in a rule."
+          },
+          "own_keywords": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Own Keywords",
+            "description": "Whether the server stores keywords of Lekto's own; null before a fetch."
           }
         },
         "type": "object",
@@ -34592,7 +34700,9 @@
           "mails",
           "documents",
           "skipped_at",
-          "skipped"
+          "skipped",
+          "keywords",
+          "own_keywords"
         ],
         "title": "MailboxStatusOut",
         "description": "What the fetches found."

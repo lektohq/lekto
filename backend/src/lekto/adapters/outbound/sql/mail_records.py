@@ -3,7 +3,7 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Row, insert, select
+from sqlalchemy import Row, insert, null, select
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.transaction import Transaction
@@ -11,6 +11,7 @@ from lekto.core.domain.ids import DocumentId, DocumentTypeId, MailboxId, MailRec
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.mail_intake import MailOrigin, MailOutcome, MailRecord, OriginRole
 from lekto.core.domain.mail_message import Address
+from lekto.core.domain.mail_traits import FlagColor, Importance, MailMarks
 from lekto.core.domain.reasons import Reason
 
 _records, _origins = t.mail_records, t.mail_origins
@@ -42,6 +43,10 @@ class SqlMailRecordRepository:
                 senders=list(record.senders),
                 recipients=list(record.recipients),
                 attachments=list(record.attachments),
+                to_texts=list(record.to),
+                cc_texts=list(record.cc),
+                importance=None if record.importance is None else record.importance.value,
+                **marks_values(record.marks),
                 version=record.version,
             )
         )
@@ -93,6 +98,10 @@ def _record(row: Row[Any]) -> MailRecord:
         senders=tuple(row.senders),
         recipients=tuple(row.recipients),
         attachments=tuple(row.attachments),
+        to=tuple(row.to_texts),
+        cc=tuple(row.cc_texts),
+        importance=None if row.importance is None else Importance(row.importance),
+        marks=marks_of(row.keywords, row.flag),
         version=row.version,
     )
 
@@ -123,6 +132,8 @@ class SqlMailOriginRepository:
                 filename=origin.filename,
                 related=[str(id) for id in origin.related],
                 body_type_id=origin.body_type_id,
+                importance=None if origin.importance is None else origin.importance.value,
+                **marks_values(origin.marks),
                 version=origin.version,
             )
         )
@@ -139,6 +150,22 @@ class SqlMailOriginRepository:
             .order_by(_origins.c.letter, _origins.c.role.desc(), _origins.c.document_id)
         )
         return [_origin(row) for row in rows]
+
+
+def marks_values(marks: MailMarks | None) -> dict[str, Any]:
+    """The columns of a mail's marks: keywords NULL when they are not known."""
+    if marks is None:
+        return {"keywords": null(), "flag": None}
+    return {
+        "keywords": list(marks.keywords),
+        "flag": None if marks.flag is None else marks.flag.value,
+    }
+
+
+def marks_of(keywords: Any, flag: str | None) -> MailMarks | None:
+    if keywords is None:
+        return None
+    return MailMarks(keywords=tuple(keywords), flag=None if flag is None else FlagColor(flag))
 
 
 def addresses_json(addresses: tuple[Address, ...]) -> list[JsonValue]:
@@ -170,5 +197,7 @@ def _origin(row: Row[Any]) -> MailOrigin:
         filename=row.filename,
         related=tuple(DocumentId(UUID(id)) for id in row.related),
         body_type_id=None if row.body_type_id is None else DocumentTypeId(row.body_type_id),
+        importance=None if row.importance is None else Importance(row.importance),
+        marks=marks_of(row.keywords, row.flag),
         version=row.version,
     )

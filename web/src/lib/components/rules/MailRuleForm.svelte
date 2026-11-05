@@ -17,6 +17,7 @@
 		canAddGroup,
 		complete,
 		FIELD_LABELS,
+		firstValue,
 		FIELDS,
 		hasValue,
 		newCondition,
@@ -30,6 +31,8 @@
 		type MailRuleForm,
 		type Optional
 	} from '#lib/mail-rules.ts';
+	import { withChoice } from '#lib/components/rules/options.ts';
+	import { flagOptions, importanceOptions, isKeyword, keywordOptions } from '#lib/mail-traits.ts';
 	import { folderLabel, type Mailbox } from '#lib/mailboxes.ts';
 	import {
 		userChoice,
@@ -101,9 +104,21 @@
 	);
 
 	function changeField(condition: MailConditionNode, field: MailField) {
+		const choice = ['folder', 'importance', 'flag', 'keyword'];
 		condition.field = field;
 		if (!OPERATORS[field].includes(condition.op)) condition.op = OPERATORS[field][0];
-		if (field === 'folder') condition.value = folders[0]?.value ?? '';
+		if (choice.includes(field)) {
+			condition.value = firstValue(
+				field,
+				folders.map((item) => item.value)
+			);
+		}
+	}
+
+	/** A keyword of the mailbox's folders, or one typed that IMAP can carry. */
+	async function useKeyword(name: string) {
+		const value = name.trim();
+		return isKeyword(value) ? { value, label: value } : null;
 	}
 
 	function hide(item: Optional) {
@@ -172,20 +187,42 @@
 					class="w-full sm:w-48"
 				/>
 				<div class="min-w-0 flex-1 basis-56">
-					{#if condition.field === 'folder'}
+					{#if !hasValue(condition.op)}
+						<span class="sr-only">{m.rule_no_value()}</span>
+					{:else if condition.field === 'folder'}
 						<Select
 							aria-label={m.rule_condition_value()}
 							bind:value={condition.value}
 							options={folders}
 						/>
-					{:else if hasValue(condition.op)}
+					{:else if condition.field === 'importance'}
+						<Select
+							aria-label={m.rule_condition_value()}
+							bind:value={condition.value}
+							options={importanceOptions()}
+						/>
+					{:else if condition.field === 'flag'}
+						<Select
+							aria-label={m.rule_condition_value()}
+							bind:value={condition.value}
+							options={withChoice(flagOptions(), condition.value)}
+						/>
+					{:else if condition.field === 'keyword'}
+						<SearchSelect
+							aria-label={m.rule_condition_value()}
+							title={m.mail_keyword_title()}
+							bind:value={condition.value}
+							options={keywordOptions(mailbox?.status.keywords ?? [], condition.value)}
+							placeholder={m.rule_choose()}
+							create={useKeyword}
+							createLabel={m.mail_keyword_use}
+						/>
+					{:else}
 						<Input
 							aria-label={m.rule_condition_value()}
 							bind:value={condition.value}
 							maxlength={500}
 						/>
-					{:else}
-						<span class="sr-only">{m.rule_no_value()}</span>
 					{/if}
 				</div>
 			</RuleRow>

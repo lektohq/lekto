@@ -7,6 +7,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime, timedelta, timezone
 
 from lekto.adapters.outbound.imap.names import listed, quoted
+from lekto.core.domain.mail_traits import shown_keywords
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.mail_server import FolderMails, MailInfo, MailSearch, MailServerError
 
@@ -16,6 +17,8 @@ _SIZE = re.compile(rb"RFC822\.SIZE (\d+)")
 _DATE = re.compile(
     rb'INTERNALDATE "\s?(\d{1,2})-(\w{3})-(\d{4}) (\d{2}):(\d{2}):(\d{2}) ([+-]\d{4})"'
 )
+_FLAGS = re.compile(rb"FLAGS \(([^)]*)\)")
+_LIST = re.compile(rb"\(([^)]*)\)")
 _TRASH_NAMES = ("Trash", "Papierkorb", "Deleted Messages", "Deleted Items", "INBOX.Trash")
 
 
@@ -24,6 +27,7 @@ class ImapMailSession:
         self._imap = imap
         self._run = run
         self._selected: str | None = None
+        self._keywords: dict[str, tuple[tuple[str, ...], bool]] = {}
         self._lock = asyncio.Lock()
 
     async def search(self, folder: str, search: MailSearch) -> FolderMails:
@@ -60,6 +64,7 @@ class ImapMailSession:
         if status != "OK":
             raise MailServerError(because(ReasonCode.MAIL_FOLDER_MISSING, folder=folder))
         self._selected = folder
+        self._keywords[folder] = folder_keywords(self._imap)
 
     def _uidvalidity(self) -> int:
         _, answer = self._imap.response("UIDVALIDITY")
@@ -78,14 +83,20 @@ class ImapMailSession:
         if status != "OK":
             raise imaplib.IMAP4.error(answer)
         found = b" ".join(part for part in answer if isinstance(part, bytes)).split()
-        return FolderMails(uidvalidity=uidvalidity, uids=tuple(sorted(int(uid) for uid in found)))
+        keywords, own = self._keywords.get(folder, ((), False))
+        return FolderMails(
+            uidvalidity=uidvalidity,
+            uids=tuple(sorted(int(uid) for uid in found)),
+            keywords=keywords,
+            own_keywords=own,
+        )
 
     def _info(self, folder: str, uids: list[int]) -> list[MailInfo]:
         if not uids:
             return []
         self._select(folder)
         status, answer = self._imap.uid(
-            "FETCH", ",".join(map(str, uids)), "(UID RFC822.SIZE INTERNALDATE)"
+            "FETCH", ",".join(map(str, uids)), "(UID RFC822.SIZE INTERNALDATE FLAGS)"
         )
         if status != "OK":
             raise imaplib.IMAP4.error(answer)
@@ -95,9 +106,13 @@ class ImapMailSession:
             if not isinstance(line, bytes):
                 continue
             uid, size, moment = _UID.search(line), _SIZE.search(line), _DATE.search(line)
+            flags = _FLAGS.search(line)
             if uid and size and moment:
                 found[int(uid[1])] = MailInfo(
-                    uid=int(uid[1]), size=int(size[1]), arrived_at=_moment(moment)
+                    uid=int(uid[1]),
+                    size=int(size[1]),
+                    arrived_at=_moment(moment),
+                    flags=frozenset(_names(flags[1])) if flags else frozenset(),
                 )
         return [found[uid] for uid in uids if uid in found]
 
@@ -147,6 +162,28 @@ class ImapMailSession:
                 return name
         names = {name for name, _ in folders}
         return next((name for name in _TRASH_NAMES if name in names), None)
+
+
+def folder_keywords(imap: imaplib.IMAP4) -> tuple[tuple[str, ...], bool]:
+    """The keywords the selected folder knows (FLAGS, PERMANENTFLAGS), as a person may choose
+    them, and whether the server stores keywords of its own there (`\\*`). Takes the answers
+    of the SELECT or EXAMINE just made."""
+    names: set[str] = set()
+    own = False
+    for key in ("FLAGS", "PERMANENTFLAGS"):
+        _, answer = imap.response(key)
+        for item in answer or ():
+            if not isinstance(item, bytes):
+                continue
+            listed_ = _LIST.search(item)
+            found = _names(listed_[1] if listed_ else item)
+            own = own or (key == "PERMANENTFLAGS" and "\\*" in found)
+            names.update(found)
+    return shown_keywords(names), own
+
+
+def _names(data: bytes) -> list[str]:
+    return [name for name in data.decode("ascii", "replace").split() if name]
 
 
 def _day(day: date) -> str:

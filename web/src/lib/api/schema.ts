@@ -3862,7 +3862,12 @@ export interface components {
 			| 'mail_mailbox'
 			| 'mail_sender'
 			| 'mail_recipient'
-			| 'mail_subject';
+			| 'mail_to'
+			| 'mail_cc'
+			| 'mail_subject'
+			| 'mail_importance'
+			| 'mail_keyword'
+			| 'mail_flag';
 		/**
 		 * ConditionSchema
 		 * @description `field` `op` `value`. Operators by field: contact, document_type: `is`, `in`, `present`,
@@ -3883,7 +3888,13 @@ export interface components {
 		 *     not count): `is`, `in` (the values as written, compared as Lekto compares them), `matches`
 		 *     (against each value as the text writes it; `^` and `$` mark its ends), `present`,
 		 *     `missing`; relation (the documents it refers to by a set relation; suggestions do not
-		 *     count): `present` (any), `missing` (none), `is`, `in` (one of the document type ids).
+		 *     count): `present` (any), `missing` (none), `is`, `in` (one of the document type ids); the
+		 *     mail a document came with (none: every mail condition fails): mail_mailbox: `is`, `in`,
+		 *     `present`, `missing`; mail_sender, mail_recipient (To or Cc), mail_to, mail_cc,
+		 *     mail_subject: `contains`, `is`, `starts_with`, `ends_with` (regardless of case);
+		 *     mail_importance: `is` (`high`, `normal`, `low`); mail_keyword: `contains` (an IMAP keyword
+		 *     the mail had, regardless of case), `present`, `missing`; mail_flag: `present`, `missing`,
+		 *     `is` (a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`).
 		 * @example {
 		 *       "field": "contact",
 		 *       "op": "is",
@@ -4034,13 +4045,24 @@ export interface components {
 		};
 		/**
 		 * ConnectionTestOut
-		 * @description The folders the account has (`INBOX` first), or why signing in failed.
+		 * @description The folders the account has (`INBOX` first), the keywords its inbox knows and whether
+		 *     the server stores keywords of Lekto's own; or why signing in failed.
 		 */
 		ConnectionTestOut: {
 			/** Ok */
 			ok: boolean;
 			/** Folders */
 			folders: string[];
+			/**
+			 * Keywords
+			 * @description Keywords (tags) the inbox knows, without the clients' own (a forward, spam).
+			 */
+			keywords: string[];
+			/**
+			 * Own Keywords
+			 * @description Whether the server stores keywords of Lekto's own (PERMANENTFLAGS `\*`).
+			 */
+			own_keywords: boolean;
 			error: components['schemas']['ReasonOut'] | null;
 		};
 		/**
@@ -5740,6 +5762,12 @@ export interface components {
 			 */
 			entries: components['schemas']['MetadataEntryOut'][];
 		};
+		/**
+		 * FlagColor
+		 * @description Apple Mail's colours of a flag, in the order of their numbers.
+		 * @enum {string}
+		 */
+		FlagColor: 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'gray';
 		/** FlowOut */
 		FlowOut: {
 			first_lane: components['schemas']['Lane'];
@@ -6155,6 +6183,11 @@ export interface components {
 		 * @enum {string}
 		 */
 		IdentifierSource: 'manual' | 'learned' | 'rejected';
+		/**
+		 * Importance
+		 * @enum {string}
+		 */
+		Importance: 'high' | 'normal' | 'low';
 		/**
 		 * InboxDoneOut
 		 * @description How a document left the caller's inbox.
@@ -7253,7 +7286,17 @@ export interface components {
 		 * MailField
 		 * @enum {string}
 		 */
-		MailField: 'sender' | 'recipient' | 'subject' | 'folder' | 'attachments';
+		MailField:
+			| 'sender'
+			| 'recipient'
+			| 'to'
+			| 'cc'
+			| 'subject'
+			| 'folder'
+			| 'attachments'
+			| 'importance'
+			| 'keyword'
+			| 'flag';
 		/**
 		 * MailOperator
 		 * @enum {string}
@@ -7305,6 +7348,15 @@ export interface components {
 			forwarded_by: components['schemas']['AddressOut'][];
 			/** Message Id */
 			message_id: string | null;
+			/** @description As the letter's header gives it; null for a document taken before. */
+			importance: components['schemas']['Importance'] | null;
+			/**
+			 * Keywords
+			 * @description The keywords the mail had on the server when fetched; null: not known.
+			 */
+			keywords: string[] | null;
+			/** @description The colour of its flag on the server then; null: not flagged or not known. */
+			flag: components['schemas']['FlagColor'] | null;
 		};
 		/**
 		 * MailOutcome
@@ -7346,7 +7398,7 @@ export interface components {
 			priority?: number | null;
 			/**
 			 * Conditions
-			 * @description A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). Null: every mail.
+			 * @description A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To or Cc), `to`, `cc` and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes); `importance` with `is` (`high`, `normal`, `low`); `keyword` with `contains` (an IMAP keyword, regardless of case), `present` or `missing`; `flag` with `present`, `missing` or `is` (a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`). Null: every mail.
 			 */
 			conditions?:
 				| components['schemas']['MailAllGroup-Input']
@@ -7410,7 +7462,7 @@ export interface components {
 			priority?: number | null;
 			/**
 			 * Conditions
-			 * @description A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). Null: every mail.
+			 * @description A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To or Cc), `to`, `cc` and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes); `importance` with `is` (`high`, `normal`, `low`); `keyword` with `contains` (an IMAP keyword, regardless of case), `present` or `missing`; `flag` with `present`, `missing` or `is` (a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`). Null: every mail.
 			 */
 			conditions?:
 				| components['schemas']['MailAllGroup-Input']
@@ -7470,7 +7522,7 @@ export interface components {
 			priority: number;
 			/**
 			 * Conditions
-			 * @description A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). Null: every mail.
+			 * @description A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To or Cc), `to`, `cc` and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes); `importance` with `is` (`high`, `normal`, `low`); `keyword` with `contains` (an IMAP keyword, regardless of case), `present` or `missing`; `flag` with `present`, `missing` or `is` (a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`). Null: every mail.
 			 */
 			conditions:
 				| components['schemas']['MailAllGroup-Output']
@@ -7518,7 +7570,7 @@ export interface components {
 			priority?: number | null;
 			/**
 			 * Conditions
-			 * @description A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes). Null: every mail.
+			 * @description A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To or Cc), `to`, `cc` and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes); `importance` with `is` (`high`, `normal`, `low`); `keyword` with `contains` (an IMAP keyword, regardless of case), `present` or `missing`; `flag` with `present`, `missing` or `is` (a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`). Null: every mail.
 			 */
 			conditions?:
 				| components['schemas']['MailAllGroup-Input']
@@ -7757,6 +7809,16 @@ export interface components {
 			skipped_at: string | null;
 			/** @description Which mail that was, and why. */
 			skipped: components['schemas']['ReasonOut'] | null;
+			/**
+			 * Keywords
+			 * @description The keywords its folders knew at the last fetch, to choose in a rule.
+			 */
+			keywords: string[];
+			/**
+			 * Own Keywords
+			 * @description Whether the server stores keywords of Lekto's own; null before a fetch.
+			 */
+			own_keywords: boolean | null;
 		};
 		/**
 		 * Me

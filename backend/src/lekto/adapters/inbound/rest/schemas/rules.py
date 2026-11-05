@@ -71,7 +71,13 @@ class ConditionSchema(BaseModel):
     not count): `is`, `in` (the values as written, compared as Lekto compares them), `matches`
     (against each value as the text writes it; `^` and `$` mark its ends), `present`,
     `missing`; relation (the documents it refers to by a set relation; suggestions do not
-    count): `present` (any), `missing` (none), `is`, `in` (one of the document type ids)."""
+    count): `present` (any), `missing` (none), `is`, `in` (one of the document type ids); the
+    mail a document came with (none: every mail condition fails): mail_mailbox: `is`, `in`,
+    `present`, `missing`; mail_sender, mail_recipient (To or Cc), mail_to, mail_cc,
+    mail_subject: `contains`, `is`, `starts_with`, `ends_with` (regardless of case);
+    mail_importance: `is` (`high`, `normal`, `low`); mail_keyword: `contains` (an IMAP keyword
+    the mail had, regardless of case), `present`, `missing`; mail_flag: `present`, `missing`,
+    `is` (a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`)."""
 
     model_config = ConfigDict(
         extra="forbid",

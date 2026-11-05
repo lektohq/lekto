@@ -20,7 +20,7 @@ the mailbox; a mail that cannot be taken is recorded as failed and the fetch goe
 import asyncio
 import logging
 import tempfile
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from pathlib import Path
 from uuid import UUID
@@ -56,7 +56,8 @@ from lekto.core.domain.mail_intake import (
     taken_names,
 )
 from lekto.core.domain.mail_message import MailMessage, read_mail
-from lekto.core.domain.mail_rules import MailRule, first_match, mail_facts
+from lekto.core.domain.mail_rules import MailFacts, MailRule, first_match, mail_facts
+from lekto.core.domain.mail_traits import MailMarks
 from lekto.core.domain.permissions import can_file_into
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
 from lekto.core.ports.clock import Clock
@@ -104,6 +105,8 @@ class _Count:
     documents: int = 0
     more: bool = False  # mails were left for the next run
     skipped: Reason | None = None  # the latest mail left out, too large
+    keywords: set[str] = field(default_factory=set)  # those the folders know
+    own_keywords: bool | None = None  # whether the server stores Lekto's own (in every folder)
 
 
 class MailIntakeService:
@@ -222,6 +225,12 @@ class MailIntakeService:
                             documents=status.documents + count.documents,
                             skipped_at=started if count.skipped else status.skipped_at,
                             skipped=count.skipped or status.skipped,
+                            keywords=(
+                                status.keywords
+                                if error
+                                else tuple(sorted(count.keywords, key=str.casefold))
+                            ),
+                            own_keywords=status.own_keywords if error else count.own_keywords,
                         )
                     )
                     await uow.mailboxes.update(mailbox)
@@ -243,6 +252,8 @@ class MailIntakeService:
     ) -> None:
         search = _search(mailbox)
         found = await session.search(folder, search)
+        count.keywords.update(found.keywords)
+        count.own_keywords = found.own_keywords and count.own_keywords is not False
         async with self._uow() as uow:
             known = await uow.mail_records.known_uids(mailbox.id, folder, found.uidvalidity)
         new = [uid for uid in found.uids if uid not in known]
@@ -282,6 +293,7 @@ class MailIntakeService:
             size=info.size,
             outcome=MailOutcome.TOO_LARGE,
             fetched_at=self._clock.now(),
+            marks=MailMarks.of_flags(info.flags),
         )
         if info.size > self._max_mail:
             record = _named(record, await session.head(folder, info.uid))
@@ -306,7 +318,7 @@ class MailIntakeService:
         except UnprocessableDocumentError as error:
             await self._keep(replace(record, outcome=MailOutcome.FAILED, reason=error.reason))
             return 0
-        facts = mail_facts(message, folder)
+        facts = mail_facts(message, folder, info.flags)
         record = replace(
             record,
             message_id=message.message_id,
@@ -315,6 +327,9 @@ class MailIntakeService:
             sent_at=message.date,
             senders=facts.senders,
             recipients=facts.recipients,
+            to=facts.to,
+            cc=facts.cc,
+            importance=facts.importance,
             attachments=taken_names(message),
         )
         if message.message_id is not None:
@@ -322,7 +337,7 @@ class MailIntakeService:
                 if await uow.mail_records.has_message(message.message_id):
                     await self._keep(replace(record, outcome=MailOutcome.KNOWN))
                     return 0
-        decision = await self._decide(mailbox, message, folder)
+        decision = await self._decide(mailbox, facts)
         if decision is None:
             await self._keep(replace(record, outcome=MailOutcome.NO_RULE))
             return 0
@@ -342,13 +357,10 @@ class MailIntakeService:
         await self._after(session, folder, info.uid, decision)
         return made
 
-    async def _decide(
-        self, mailbox: Mailbox, message: MailMessage, folder: str
-    ) -> MailDecision | None:
+    async def _decide(self, mailbox: Mailbox, facts: MailFacts) -> MailDecision | None:
         """The first of the mailbox's rules that matches, else the mailbox's fallback; None
         for nothing. A rule whose person, space or type is gone or out of reach is paused with
         the reason, and the next one asked."""
-        facts = mail_facts(message, folder)
         async with self._uow() as uow:
             rules = await uow.mail_rules.of_mailbox(mailbox.id)
         while (rule := first_match(rules, facts)) is not None:
@@ -470,6 +482,8 @@ class MailIntakeService:
             sent_at=message.date,
             arrived_at=record.arrived_at,
             forwarded_by=letter.forwarded_by,
+            importance=message.importance,
+            marks=record.marks,
         )
 
     async def _receive(

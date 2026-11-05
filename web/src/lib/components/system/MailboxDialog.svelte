@@ -308,6 +308,9 @@
 					<span class="text-lane-green-foreground"
 						>{m.mail_test_ok({ count: tested.folders.length })}</span
 					>
+					{#if !tested.own_keywords}
+						<span class="text-muted-foreground">{m.mail_test_no_own_keywords()}</span>
+					{/if}
 				{/if}
 			</p>
 		</div>

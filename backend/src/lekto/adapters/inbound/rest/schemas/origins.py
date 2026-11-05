@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from lekto.core.domain.mail_intake import MailOrigin, OriginRole
 from lekto.core.domain.mail_message import Address
+from lekto.core.domain.mail_traits import FlagColor, Importance
 
 
 class AddressOut(BaseModel):
@@ -37,6 +38,15 @@ class MailOriginOut(BaseModel):
         description="Who forwarded the mail that held it, outermost first."
     )
     message_id: str | None
+    importance: Importance | None = Field(
+        description="As the letter's header gives it; null for a document taken before."
+    )
+    keywords: list[str] | None = Field(
+        description="The keywords the mail had on the server when fetched; null: not known."
+    )
+    flag: FlagColor | None = Field(
+        description="The colour of its flag on the server then; null: not flagged or not known."
+    )
 
     @classmethod
     def of(cls, origin: MailOrigin) -> "MailOriginOut":
@@ -53,6 +63,9 @@ class MailOriginOut(BaseModel):
             arrived_at=origin.arrived_at,
             forwarded_by=[AddressOut.of(item) for item in origin.forwarded_by],
             message_id=origin.message_id,
+            importance=origin.importance,
+            keywords=None if origin.marks is None else list(origin.marks.keywords),
+            flag=None if origin.marks is None else origin.marks.flag,
         )
 
 
