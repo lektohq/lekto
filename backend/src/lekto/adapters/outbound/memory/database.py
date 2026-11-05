@@ -9,7 +9,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 from lekto.core.domain.classifier import ClassifierModel
 from lekto.core.domain.document_facts import DocumentFact
 from lekto.core.domain.documents import Document
-from lekto.core.domain.entity import Entity
+from lekto.core.domain.entity import Identified
 from lekto.core.domain.events import DomainEvent
 from lekto.core.domain.fields import FieldDefinition
 from lekto.core.domain.first_runs import FieldVerdict, FirstRun
@@ -31,7 +31,7 @@ from lekto.core.ports.wakeup import Channel
 
 
 @dataclass(frozen=True)
-class Table[E: Entity[UUID]]:
+class Table[E: Identified[UUID]]:
     """A kind of entity: its name in errors and the keys that must be unique across the table."""
 
     name: str
@@ -106,7 +106,7 @@ def _mail_record_keys(record: MailRecord) -> Iterable[Hashable]:
     return [("uid", record.mailbox_id, record.folder, record.uidvalidity, record.uid)]
 
 
-def _no_keys(item: Entity[UUID]) -> Iterable[Hashable]:
+def _no_keys(item: Identified[UUID]) -> Iterable[Hashable]:
     return []
 
 
@@ -188,7 +188,7 @@ class SeenMark:
 class MemoryDatabase:
     """What has been committed. Rows are private copies; insertion order is creation order."""
 
-    tables: dict[str, dict[UUID, Entity[UUID]]] = field(default_factory=dict)
+    tables: dict[str, dict[UUID, Identified[UUID]]] = field(default_factory=dict)
     processing_log: list[NodeRun] = field(default_factory=list)
     outbox: list[DomainEvent] = field(default_factory=list)
     recorded_at: dict[EventId, datetime] = field(default_factory=dict)  # when committed

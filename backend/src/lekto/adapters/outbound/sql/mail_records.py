@@ -49,7 +49,6 @@ class SqlMailRecordRepository:
                 importance=None if record.importance is None else record.importance.value,
                 **marks_values(record.marks),
                 forgotten_at=record.forgotten_at,
-                version=record.version,
             )
         )
 
@@ -136,7 +135,6 @@ def _record(row: Row[Any]) -> MailRecord:
         importance=None if row.importance is None else Importance(row.importance),
         marks=marks_of(row.keywords, row.flag),
         forgotten_at=row.forgotten_at,
-        version=row.version,
     )
 
 
@@ -168,7 +166,6 @@ class SqlMailOriginRepository:
                 body_type_id=origin.body_type_id,
                 importance=None if origin.importance is None else origin.importance.value,
                 **marks_values(origin.marks),
-                version=origin.version,
             )
         )
 
@@ -233,5 +230,4 @@ def _origin(row: Row[Any]) -> MailOrigin:
         body_type_id=None if row.body_type_id is None else DocumentTypeId(row.body_type_id),
         importance=None if row.importance is None else Importance(row.importance),
         marks=marks_of(row.keywords, row.flag),
-        version=row.version,
     )
