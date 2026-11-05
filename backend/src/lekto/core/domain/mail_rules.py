@@ -13,6 +13,11 @@ or Lekto determines it; on the server steps follow in order (`mail.MailStep`: re
 flagged or not, keywords added or removed), and at most one last that moves the mail to a
 folder or to the trash. A rule whose person, space or type is gone or out of reach is paused with
 that reason when a mail would need it.
+
+A stored rule is read as a valid one: its conditions and steps check themselves as they are
+built. Whoever tightens a limit here (a keyword's length, a colour, an operator of a field)
+brings a revision that turns the stored rows into what the limit allows, as revisions 0062
+and 0064 did (Tobi, 05.11.2026); else the mailbox's rules could not be read, nor fetched by.
 """
 
 from dataclasses import dataclass
