@@ -108,6 +108,57 @@ class MailRecordRepositoryContract:
             assert recent[1] == failed
             assert (recent[0].importance, recent[0].marks) == (None, None)  # not known
 
+    async def test_old_records_let_go_of_what_the_mail_said(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        mailbox = await a_mailbox(uow_factory)
+        async with uow_factory() as uow:
+            for uid in (1, 2, 3):
+                await uow.mail_records.add(
+                    a_record(
+                        mailbox,
+                        uid,
+                        to=("anna@example.test",),
+                        cc=("Ben",),
+                        importance=Importance.HIGH,
+                        marks=MailMarks(keywords=("Lekto",), flag=FlagColor.RED),
+                        reason=because(ReasonCode.MAIL_TOO_LARGE, subject="Fotos", size=3, max=2),
+                    )
+                )
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.mail_records.forget_beyond(mailbox.id, keep=2, now=NOW + 5 * HOUR) == 1
+            assert await uow.mail_records.forget_beyond(mailbox.id, keep=2, now=NOW + 6 * HOUR) == 0
+            await uow.commit()
+        async with uow_factory() as uow:
+            three, two, one = await uow.mail_records.recent(mailbox.id, limit=3)
+            assert one.forgotten_at == NOW + 5 * HOUR
+            assert (one.sender, one.subject, one.reason, one.importance, one.marks) == (
+                "",
+                "",
+                None,
+                None,
+                None,
+            )
+            assert (one.senders, one.recipients, one.to, one.cc, one.attachments) == (
+                (),
+                (),
+                (),
+                (),
+                (),
+            )
+            assert (one.uid, one.message_id, one.outcome, one.documents, one.fetched_at) == (
+                1,
+                "m1@example.test",
+                MailOutcome.TAKEN,
+                2,
+                NOW + HOUR,
+            )
+            assert two.forgotten_at is None and three.forgotten_at is None
+            assert two.subject == "Rechnung" and two.marks is not None and two.reason is not None
+            assert await uow.mail_records.known_uids(mailbox.id, "INBOX", 7) == {1, 2, 3}
+            assert await uow.mail_records.has_message("m1@example.test")
+
     async def test_a_uid_is_recorded_once(self, uow_factory: UnitOfWorkFactory) -> None:
         mailbox = await a_mailbox(uow_factory)
         async with uow_factory() as uow:

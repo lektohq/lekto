@@ -126,6 +126,12 @@ class MailDecision:
     rule: str | None = None
 
 
+KEPT_RECORDS = 500
+"""A mailbox's records that keep what the mail's head said (Tobi, 05.11.2026): the dry run of a
+mail rule looks at the latest fifty; the rest let go of it (`MailRecord.forget`) and stay only
+so that no mail is fetched twice."""
+
+
 class MailOutcome(StrEnum):
     """What became of a fetched mail."""
 
@@ -171,10 +177,29 @@ class MailRecord:
     """As its header gave it; none for a mail fetched before Lekto read it, or too large."""
     marks: MailMarks | None = None
     """Its keywords and flag on the server when it was fetched; none likewise."""
+    forgotten_at: datetime | None = None
+    """When the record let go of what the mail's head said (`forget`); none while it keeps it."""
     version: int = 0
 
     def __post_init__(self) -> None:
         require_utc(self.fetched_at, "fetched_at")
+
+    def forget(self, *, now: datetime) -> None:
+        """Let go of what the mail's head said: sender, subject, recipients, attachments,
+        importance, marks and the reason (it names the subject). The record stays, with its
+        UIDs, Message-ID and outcome, so that the mail is not fetched twice."""
+        require_utc(now, "now")
+        self.sender = ""
+        self.subject = ""
+        self.reason = None
+        self.senders = ()
+        self.recipients = ()
+        self.to = ()
+        self.cc = ()
+        self.attachments = ()
+        self.importance = None
+        self.marks = None
+        self.forgotten_at = now
 
 
 class OriginRole(StrEnum):

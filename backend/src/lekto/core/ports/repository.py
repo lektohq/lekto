@@ -915,6 +915,12 @@ class MailRecordRepository(Protocol):
         """The mailbox's latest records, the latest first."""
         ...
 
+    async def forget_beyond(self, mailbox: MailboxId, *, keep: int, now: datetime) -> int:
+        """Let the mailbox's records beyond its latest `keep` go of what the mail's head said
+        (`MailRecord.forget`, at `now`); those that did before stay as they are. How many
+        did now."""
+        ...
+
 
 class MailRuleRepository(Protocol):
     """The mail rules of the mailboxes (`domain.mail_rules`)."""

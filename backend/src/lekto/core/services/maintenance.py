@@ -24,6 +24,7 @@ from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.inbox import DONE_PERIOD
 from lekto.core.domain.jobs import Job, RetryPolicy
 from lekto.core.domain.json_value import JsonObject, as_int
+from lekto.core.domain.mail_intake import KEPT_RECORDS
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.event_bus import EventBus
 from lekto.core.ports.object_store import ObjectStore
@@ -172,6 +173,7 @@ class MaintenanceService:
                 tasks = await uow.tasks.purge(before=before)
                 secrets = await _drop_expired_secrets(uow, now)
                 inbox = await uow.inbox.purge(before=now - DONE_PERIOD)
+                mails = await _forget_old_mails(uow, now)
                 await uow.jobs.complete(job, now=now)
                 await uow.jobs.enqueue(CLEANUP_JOB, {}, run_at=next_run, dedup_key=CLEANUP_JOB)
                 await uow.commit()
@@ -193,8 +195,18 @@ class MaintenanceService:
                 "tasks_removed": tasks,
                 "webhook_secrets_dropped": secrets,
                 "inbox_marks_removed": inbox,
+                "mail_records_forgotten": mails,
             },
         )
+
+
+async def _forget_old_mails(uow: UnitOfWork, now: datetime) -> int:
+    """A mailbox's records beyond its latest `KEPT_RECORDS` let go of what the mail's head said
+    (the dry run of a mail rule needs far fewer); the rows stay, so no mail is fetched twice."""
+    forgotten = 0
+    for mailbox in await uow.mailboxes.list_all():
+        forgotten += await uow.mail_records.forget_beyond(mailbox.id, keep=KEPT_RECORDS, now=now)
+    return forgotten
 
 
 async def _drop_expired_secrets(uow: UnitOfWork, now: datetime) -> int:
