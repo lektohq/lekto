@@ -207,6 +207,7 @@ class MailRuleDryRun(MailRuleCreate):
 class DryRunMailOut(BaseModel):
     """A mail fetched lately, and what would become of it with the rule."""
 
+    id: UUID = Field(description="The record of the mail.")
     subject: str
     sender: str
     folder: str
@@ -219,17 +220,19 @@ class DryRunMailOut(BaseModel):
     matches: bool = Field(description="Whether the rule's conditions hold.")
     decider: Decider = Field(
         description=(
-            "Who would decide it now: `rule` (this one), `other` (another rule before it, named "
-            "in `rule`), `fallback` (the mailbox takes everything), `nothing` (no rule, the "
-            "mailbox takes nothing)."
+            "Who would decide it now: `rule` (this one), `other` (another rule before it: "
+            "`rule`, `rule_id`), `fallback` (the mailbox takes everything), `nothing` (no rule, "
+            "the mailbox takes nothing)."
         )
     )
-    rule: str | None
+    rule: str | None = Field(description="The name of the rule before it; null otherwise.")
+    rule_id: UUID | None = Field(description="The rule before it; null otherwise.")
 
     @classmethod
     def of(cls, item: DryRunMail) -> "DryRunMailOut":
         record = item.record
         return cls(
+            id=record.id,
             subject=record.subject,
             sender=record.sender,
             folder=record.folder,
@@ -240,6 +243,7 @@ class DryRunMailOut(BaseModel):
             matches=item.matches,
             decider=item.decider,
             rule=item.rule,
+            rule_id=item.rule_id,
         )
 
 

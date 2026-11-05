@@ -28656,6 +28656,12 @@
       },
       "DryRunMailOut": {
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "The record of the mail."
+          },
           "subject": {
             "type": "string",
             "title": "Subject"
@@ -28704,7 +28710,7 @@
           },
           "decider": {
             "$ref": "#/components/schemas/Decider",
-            "description": "Who would decide it now: `rule` (this one), `other` (another rule before it, named in `rule`), `fallback` (the mailbox takes everything), `nothing` (no rule, the mailbox takes nothing)."
+            "description": "Who would decide it now: `rule` (this one), `other` (another rule before it: `rule`, `rule_id`), `fallback` (the mailbox takes everything), `nothing` (no rule, the mailbox takes nothing)."
           },
           "rule": {
             "anyOf": [
@@ -28715,11 +28721,26 @@
                 "type": "null"
               }
             ],
-            "title": "Rule"
+            "title": "Rule",
+            "description": "The name of the rule before it; null otherwise."
+          },
+          "rule_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Id",
+            "description": "The rule before it; null otherwise."
           }
         },
         "type": "object",
         "required": [
+          "id",
           "subject",
           "sender",
           "folder",
@@ -28729,7 +28750,8 @@
           "outcome",
           "matches",
           "decider",
-          "rule"
+          "rule",
+          "rule_id"
         ],
         "title": "DryRunMailOut",
         "description": "A mail fetched lately, and what would become of it with the rule."
