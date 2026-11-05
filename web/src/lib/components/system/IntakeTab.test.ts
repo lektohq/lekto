@@ -26,7 +26,9 @@ const MAILBOX: Mailbox = {
 		mails: 3,
 		documents: 4,
 		skipped_at: '2026-11-05T09:00:00Z',
-		skipped: { code: 'mail_too_large', params: { subject: 'Fotos', size: 180, max: 134 } }
+		skipped: { code: 'mail_too_large', params: { subject: 'Fotos', size: 180, max: 134 } },
+		keywords: [],
+		own_keywords: null
 	},
 	created_at: '2026-11-04T10:00:00Z',
 	updated_at: '2026-11-04T10:00:00Z'

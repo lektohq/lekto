@@ -45,6 +45,7 @@
 		'aria-invalid': ariaInvalid,
 		onchange,
 		create,
+		createLabel = (args: { name: string }) => m.create_named(args),
 		chosen
 	}: {
 		value?: string;
@@ -66,6 +67,8 @@
 		onchange?: (value: string) => void;
 		/** Make an entry named so to begin with (a dialog); null when it closed without. */
 		create?: (name: string) => Promise<SearchOption | null>;
+		/** The offer of `create` ("„…“ anlegen …"; a keyword: "„…“ verwenden"). */
+		createLabel?: (args: { name: string }) => string;
 		chosen?: Snippet<[SearchOption]>;
 	} = $props();
 
@@ -164,7 +167,7 @@
 				<Command.Group class={cn(found.length > 0 && 'border-t')}>
 					<Command.Item value="create:" onSelect={() => make(create)} class={cn(row, 'text-brand')}>
 						<Plus aria-hidden="true" class="text-brand" />
-						{m.create_named({ name: query.trim() })}
+						{createLabel({ name: query.trim() })}
 					</Command.Item>
 				</Command.Group>
 			{/if}

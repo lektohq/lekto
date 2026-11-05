@@ -3,6 +3,7 @@
 	import X from '@lucide/svelte/icons/x';
 	import MultiPicker from '#lib/components/MultiPicker.svelte';
 	import SearchSelect from '#lib/components/SearchSelect.svelte';
+	import { flagOptions, importanceOptions, isKeyword, keywordOptions } from '#lib/mail-traits.ts';
 	import Select from '#lib/components/Select.svelte';
 	import { namedOptions, withChoice } from '#lib/components/rules/options.ts';
 	import ValueInput from '#lib/components/rules/ValueInput.svelte';
@@ -137,8 +138,15 @@
 			? m.picker_title_contact()
 			: condition.field === 'document_type' || condition.field === 'relation'
 				? m.picker_title_type()
-				: null
+				: condition.field === 'mail_keyword'
+					? m.mail_keyword_title()
+					: null
 	);
+	/** A keyword of the mailboxes' folders, or one typed that IMAP can carry. */
+	async function useKeyword(name: string) {
+		const value = name.trim();
+		return isKeyword(value) ? { value, label: value } : null;
+	}
 	/** The choices of an id field or the channel. */
 	const choices = $derived.by(() => {
 		switch (condition.field) {
@@ -157,6 +165,15 @@
 				return CHANNELS.map((channel) => ({ value: channel, label: CHANNEL_LABELS[channel]() }));
 			case 'mail_mailbox':
 				return (lookup.mailboxes ?? []).map((entry) => ({ value: entry.id, label: entry.name }));
+			case 'mail_importance':
+				return importanceOptions();
+			case 'mail_flag':
+				return flagOptions();
+			case 'mail_keyword':
+				return keywordOptions(
+					[...new Set((lookup.mailboxes ?? []).flatMap((entry) => entry.keywords))].sort(),
+					single
+				);
 			case 'field':
 				return field?.data_type === 'choice'
 					? field.choices.map((choice) => ({ value: choice, label: choice }))
@@ -277,6 +294,8 @@
 				value={single}
 				options={choices}
 				placeholder={m.rule_choose()}
+				create={condition.field === 'mail_keyword' ? useKeyword : undefined}
+				createLabel={condition.field === 'mail_keyword' ? m.mail_keyword_use : undefined}
 				onchange={(next) => (condition.value = next)}
 			/>
 		{:else if choices && condition.field !== 'field'}

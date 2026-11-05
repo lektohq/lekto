@@ -37,7 +37,9 @@ const MAILBOX: Mailbox = {
 		mails: 0,
 		documents: 0,
 		skipped_at: null,
-		skipped: null
+		skipped: null,
+		keywords: [],
+		own_keywords: null
 	},
 	created_at: '2026-11-04T10:00:00Z',
 	updated_at: '2026-11-04T10:00:00Z'

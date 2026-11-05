@@ -32,8 +32,8 @@ export interface Lookup {
 	 * them (the rule pages: a rule sends through its author's webhooks). */
 	webhooks?: WebhookName[];
 	/** The mailboxes, for an admin on the rule pages: a document rule's mail conditions name
-	 * them (only admins read them). */
-	mailboxes?: { id: string; name: string }[];
+	 * them (only admins read them), with the keywords their folders know. */
+	mailboxes?: { id: string; name: string; keywords: string[] }[];
 }
 
 /** A webhook as a rule names it. */
@@ -68,7 +68,11 @@ export async function loadRuleLookup(): Promise<Lookup> {
 	return {
 		...lookup,
 		webhooks: webhooks.map(({ id, name, owner_id }) => ({ id, name, owner_id })),
-		mailboxes: mailboxes.map(({ id, name }) => ({ id, name }))
+		mailboxes: mailboxes.map(({ id, name, status }) => ({
+			id,
+			name,
+			keywords: status.keywords
+		}))
 	};
 }
 

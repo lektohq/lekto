@@ -16,6 +16,7 @@ from email.message import EmailMessage, Message
 from email.utils import getaddresses, parsedate_to_datetime
 
 from lekto.core.domain.errors import UnprocessableDocumentError
+from lekto.core.domain.mail_traits import Importance, importance_of
 from lekto.core.domain.reasons import ReasonCode, because
 
 RFC822 = "message/rfc822"
@@ -68,6 +69,8 @@ class MailMessage:
     """Mails attached to this one (a forward as attachment)."""
     raw: bytes = field(repr=False, default=b"")
     """The mail as a file (`.eml`): as received, or an attached one as it stands in it."""
+    importance: Importance = Importance.NORMAL
+    """As its header gives it (`mail_traits.importance_of`)."""
 
 
 def read_mail(data: bytes) -> MailMessage:
@@ -123,6 +126,12 @@ def _read(message: EmailMessage, raw: bytes) -> MailMessage:
         pictures=tuple(pictures),
         messages=tuple(messages),
         raw=raw,
+        importance=importance_of(
+            {
+                name: _header(message, name) or None
+                for name in ("importance", "x-priority", "priority", "x-msmail-priority")
+            }
+        ),
     )
 
 

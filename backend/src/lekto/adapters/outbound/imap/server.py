@@ -9,10 +9,10 @@ from contextlib import asynccontextmanager, contextmanager, suppress
 from datetime import timedelta
 
 from lekto.adapters.outbound.imap.names import listed
-from lekto.adapters.outbound.imap.session import ImapMailSession
+from lekto.adapters.outbound.imap.session import ImapMailSession, folder_keywords
 from lekto.core.domain.mail import MailLogin, MailSecurity
 from lekto.core.domain.reasons import Reason, ReasonCode, because
-from lekto.core.ports.mail_server import MailServerError
+from lekto.core.ports.mail_server import MailAccount, MailServerError
 
 MAX_DETAIL = 200
 INBOX = "INBOX"
@@ -31,8 +31,8 @@ class ImapMailServer:
         self._timeout = timeout.total_seconds()
         self._ssl_context = ssl_context or ssl.create_default_context()
 
-    async def folders(self, login: MailLogin) -> tuple[str, ...]:
-        return await asyncio.to_thread(self._run, login, _folders)
+    async def account(self, login: MailLogin) -> MailAccount:
+        return await asyncio.to_thread(self._run, login, _account)
 
     @asynccontextmanager
     async def session(self, login: MailLogin) -> AsyncIterator[ImapMailSession]:
@@ -127,6 +127,17 @@ def _guarded[T](work: Callable[..., T], *args: object) -> T:
         raise MailServerError(_server_error(error)) from error
     except OSError as error:
         raise MailServerError(_server_error(error)) from error
+
+
+def _account(imap: imaplib.IMAP4) -> MailAccount:
+    """The folders, and the keywords of the inbox, read only (EXAMINE: nothing changes)."""
+    folders = _folders(imap)
+    keywords: tuple[str, ...] = ()
+    own = False
+    status, _ = imap.select(INBOX, readonly=True)
+    if status == "OK":
+        keywords, own = folder_keywords(imap)
+    return MailAccount(folders=folders, keywords=keywords, own_keywords=own)
 
 
 def _folders(imap: imaplib.IMAP4) -> tuple[str, ...]:

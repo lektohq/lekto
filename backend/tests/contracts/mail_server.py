@@ -38,8 +38,9 @@ class MailWorld(Protocol):
         *,
         arrived_at: datetime,
         seen: bool = False,
+        flags: Sequence[str] = (),
     ) -> None:
-        """Put a mail into the account's `folder`."""
+        """Put a mail into the account's `folder`, with IMAP `flags` and keywords."""
         ...
 
 
@@ -56,7 +57,7 @@ class MailServerContract:
         self, server: MailServer, world: MailWorld
     ) -> None:
         login = world.account(["Rechnungen", "Belege & Co", "Bestätigungen"])
-        assert await server.folders(login) == (
+        assert (await server.account(login)).folders == (
             "INBOX",
             "Belege & Co",
             "Bestätigungen",
@@ -64,22 +65,22 @@ class MailServerContract:
         )
 
     async def test_a_new_account_has_its_inbox(self, server: MailServer, world: MailWorld) -> None:
-        assert await server.folders(world.account()) == ("INBOX",)
+        assert (await server.account(world.account())).folders == ("INBOX",)
 
     async def test_a_password_beyond_ascii(self, server: MailServer, world: MailWorld) -> None:
         login = world.account(password="Grüße-1")
-        assert await server.folders(login) == ("INBOX",)
+        assert (await server.account(login)).folders == ("INBOX",)
 
     async def test_a_wrong_password_is_refused(self, server: MailServer, world: MailWorld) -> None:
         login = replace(world.account(), password="wrong")
         with pytest.raises(MailServerError) as caught:
-            await server.folders(login)
+            await server.account(login)
         assert caught.value.reason.code is ReasonCode.MAIL_LOGIN_FAILED
 
     async def test_an_unknown_user_is_refused(self, server: MailServer, world: MailWorld) -> None:
         login = replace(world.account(), username="nobody-here")
         with pytest.raises(MailServerError) as caught:
-            await server.folders(login)
+            await server.account(login)
         assert caught.value.reason.code is ReasonCode.MAIL_LOGIN_FAILED
 
     async def test_an_address_where_nobody_listens(
@@ -87,14 +88,14 @@ class MailServerContract:
     ) -> None:
         login = world.unreachable()
         with pytest.raises(MailServerError) as caught:
-            await server.folders(login)
+            await server.account(login)
         assert caught.value.reason.code is ReasonCode.MAIL_UNREACHABLE
         assert caught.value.reason.params == {"host": login.host}
 
     async def test_tls_with_a_server_without_it(self, server: MailServer, world: MailWorld) -> None:
         login = replace(world.account(), security=MailSecurity.TLS)
         with pytest.raises(MailServerError) as caught:
-            await server.folders(login)
+            await server.account(login)
         assert caught.value.reason.code is ReasonCode.MAIL_TLS_FAILED
 
     async def test_a_session_finds_reads_and_leaves_mails_unread(
@@ -123,6 +124,30 @@ class MailServerContract:
             await session.mark_read("INBOX", one)
             assert (await session.search("INBOX", MailSearch(unseen=True))).uids == (two,)
             assert (await session.search("Rechnungen", MailSearch())).uids == ()
+
+    async def test_a_session_reads_flags_and_keywords(
+        self, server: MailServer, world: MailWorld
+    ) -> None:
+        login = world.account()
+        world.deliver(
+            login,
+            "INBOX",
+            plain_mail("Markiert"),
+            arrived_at=EARLY,
+            flags=["\\Flagged", "$MailFlagBit1", "Lekto", "$Forwarded"],
+        )
+        world.deliver(login, "INBOX", plain_mail("Schlicht"), arrived_at=LATE, seen=True)
+        async with server.session(login) as session:
+            found = await session.search("INBOX", MailSearch())
+            one, two = found.uids
+            flagged, plain = await session.info("INBOX", [one, two])
+            assert {"\\Flagged", "$MailFlagBit1", "Lekto"} <= flagged.flags
+            assert "\\Seen" in plain.flags and "Lekto" not in plain.flags
+            assert "Lekto" in found.keywords  # $Forwarded is a client's own: not offered
+            assert "$Forwarded" not in found.keywords and "$MailFlagBit1" not in found.keywords
+            assert found.own_keywords
+        account = await server.account(login)
+        assert "Lekto" in account.keywords and account.own_keywords
 
     async def test_a_session_moves_and_throws_away(
         self, server: MailServer, world: MailWorld

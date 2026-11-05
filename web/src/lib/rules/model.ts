@@ -20,6 +20,7 @@ import {
 	type TreeGroup
 } from '#lib/rules/tree.ts';
 import { isMoney, isPeriod } from '#lib/fields.ts';
+import { isKeyword } from '#lib/mail-traits.ts';
 import { readPeriod, writePeriod } from '#lib/periods.ts';
 
 type Schemas = components['schemas'];
@@ -127,7 +128,12 @@ export const CONDITION_FIELDS: readonly ConditionField[] = [
 	'mail_mailbox',
 	'mail_sender',
 	'mail_recipient',
-	'mail_subject'
+	'mail_to',
+	'mail_cc',
+	'mail_subject',
+	'mail_importance',
+	'mail_keyword',
+	'mail_flag'
 ];
 export const STEP_CONDITION_FIELDS: readonly ConditionField[] = ['step', ...CONDITION_FIELDS];
 
@@ -179,7 +185,12 @@ export const CONDITION_FIELD_OPERATORS: Record<
 	mail_mailbox: ['is', 'in', 'present', 'missing'],
 	mail_sender: MAIL_TEXT,
 	mail_recipient: MAIL_TEXT,
-	mail_subject: MAIL_TEXT
+	mail_to: MAIL_TEXT,
+	mail_cc: MAIL_TEXT,
+	mail_subject: MAIL_TEXT,
+	mail_importance: ['is'],
+	mail_keyword: ['contains', 'present', 'missing'],
+	mail_flag: ['present', 'missing', 'is']
 };
 
 export const FIELD_TYPE_OPERATORS: Record<FieldType, readonly Operator[]> = {
@@ -702,6 +713,8 @@ function checkValue(
 		condition.field === 'fact' ||
 		condition.field === 'mail_sender' ||
 		condition.field === 'mail_recipient' ||
+		condition.field === 'mail_to' ||
+		condition.field === 'mail_cc' ||
 		condition.field === 'mail_subject'
 	) {
 		return checkText(value, condition.op === 'matches' ? LIMITS.pattern : LIMITS.text);
@@ -716,7 +729,11 @@ function checkValue(
 		case 'document_type_group':
 		case 'channel':
 		case 'mail_mailbox':
+		case 'mail_importance':
+		case 'mail_flag':
 			return typeof value === 'string' && value !== '' ? null : { code: 'choose' };
+		case 'mail_keyword':
+			return typeof value === 'string' && isKeyword(value) ? null : { code: 'value' };
 		case 'document_date':
 			return isDate(value) ? null : { code: 'date' };
 		case 'field':

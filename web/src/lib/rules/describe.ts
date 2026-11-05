@@ -19,6 +19,7 @@ import type {
 import { isTagField, isTemplated } from '#lib/rules/model.ts';
 import { session } from '#lib/session.svelte.ts';
 import { pathLabel } from '#lib/tags.ts';
+import { flagLabel, importanceLabel } from '#lib/mail-traits.ts';
 
 const CONDITION_FIELDS: Record<Exclude<ConditionField, 'field'>, () => string> = {
 	contact: m.field_contact,
@@ -37,7 +38,12 @@ const CONDITION_FIELDS: Record<Exclude<ConditionField, 'field'>, () => string> =
 	mail_mailbox: () => m.rule_field_of_mail({ field: m.mail_rule_mailbox() }),
 	mail_sender: () => m.rule_field_of_mail({ field: m.mail_rule_field_sender() }),
 	mail_recipient: () => m.rule_field_of_mail({ field: m.mail_rule_field_recipient() }),
-	mail_subject: () => m.rule_field_of_mail({ field: m.mail_rule_field_subject() })
+	mail_to: () => m.rule_field_of_mail({ field: m.mail_rule_field_to() }),
+	mail_cc: () => m.rule_field_of_mail({ field: m.mail_rule_field_cc() }),
+	mail_subject: () => m.rule_field_of_mail({ field: m.mail_rule_field_subject() }),
+	mail_importance: () => m.rule_field_of_mail({ field: m.mail_rule_field_importance() }),
+	mail_keyword: () => m.rule_field_of_mail({ field: m.mail_rule_field_keyword() }),
+	mail_flag: () => m.rule_field_of_mail({ field: m.mail_rule_field_flag() })
 };
 
 export function fieldLabel(field: ConditionField): string {
@@ -117,7 +123,8 @@ export function operatorLabel(
 	type: FieldType | null = null
 ): string {
 	let special: Partial<Record<Operator, () => string>> = {};
-	if (isTagField(field)) special = TAG_OPERATORS;
+	// Keywords are a mail's tags: "Schlagwörter enthalten Lekto".
+	if (isTagField(field) || field === 'mail_keyword') special = TAG_OPERATORS;
 	else if (field === 'relation') special = RELATION_OPERATORS;
 	else if (field === 'document_date' || type === 'date') special = DATE_OPERATORS;
 	else if (type === 'number' || type === 'amount') special = NUMBER_OPERATORS;
@@ -183,7 +190,9 @@ export function describeCondition(condition: ConditionNode, lookup: Lookup | nul
 	const values = Array.isArray(condition.value) ? condition.value : [condition.value];
 	const text = values.map((value) => describeConditionValue(condition, value, lookup)).join(', ');
 	const quoted =
-		condition.field === 'text' || condition.op === 'contains' || condition.op === 'matches';
+		condition.field === 'text' ||
+		((condition.op === 'contains' || condition.op === 'matches') &&
+			condition.field !== 'mail_keyword');
 	const shown = quoted && !isTagField(condition.field) ? m.rule_quoted({ text }) : text;
 	const caseNote = condition.caseSensitive ? ` (${m.rule_case_sensitive()})` : '';
 	return `${subject} ${op} ${shown}${caseNote}`;
@@ -208,6 +217,8 @@ function describeConditionValue(
 		if (isTagField(condition.field) || condition.field === 'topic') return tagName(value, lookup);
 		if (condition.field === 'channel') return CHANNEL_LABELS[value as Channel]?.() ?? value;
 		if (condition.field === 'mail_mailbox') return nameOf(value, lookup?.mailboxes ?? []);
+		if (condition.field === 'mail_importance') return importanceLabel(value);
+		if (condition.field === 'mail_flag') return flagLabel(value);
 		if (condition.field === 'text' || condition.field === 'fact') return value;
 		if (condition.op === 'contains' || condition.op === 'matches') return value;
 		if (condition.field.startsWith('mail_')) return value;
