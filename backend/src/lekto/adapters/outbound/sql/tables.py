@@ -938,6 +938,8 @@ mail_records = Table(
     Column("importance", Text, nullable=True),
     Column("keywords", json_type(), nullable=True),
     Column("flag", Text, nullable=True),
+    # When the record let go of what the mail's head said (revision 0065); null while it keeps it.
+    Column("forgotten_at", UtcDateTime, nullable=True),
     Column("version", Integer, nullable=False),
     UniqueConstraint("mailbox_id", "folder", "uidvalidity", "uid"),
     Index(None, "mailbox_id", "fetched_at"),

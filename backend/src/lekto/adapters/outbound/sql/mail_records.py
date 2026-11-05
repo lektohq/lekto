@@ -1,9 +1,10 @@
 """Mail records and mail origins on SQL tables."""
 
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Row, insert, null, select
+from sqlalchemy import Row, insert, null, select, update
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.transaction import Transaction
@@ -47,6 +48,7 @@ class SqlMailRecordRepository:
                 cc_texts=list(record.cc),
                 importance=None if record.importance is None else record.importance.value,
                 **marks_values(record.marks),
+                forgotten_at=record.forgotten_at,
                 version=record.version,
             )
         )
@@ -76,6 +78,37 @@ class SqlMailRecordRepository:
         )
         return [_record(row) for row in rows]
 
+    async def forget_beyond(self, mailbox: MailboxId, *, keep: int, now: datetime) -> int:
+        latest = (
+            select(_records.c.id)
+            .where(_records.c.mailbox_id == mailbox)
+            .order_by(_records.c.fetched_at.desc(), _records.c.id.desc())
+            .limit(keep)
+        )
+        result = await self._tx.write(
+            update(_records)
+            .where(
+                _records.c.mailbox_id == mailbox,
+                _records.c.forgotten_at.is_(None),
+                _records.c.id.not_in(latest),
+            )
+            .values(
+                sender="",
+                subject="",
+                reason=null(),
+                senders=[],
+                recipients=[],
+                attachments=[],
+                to_texts=[],
+                cc_texts=[],
+                importance=null(),
+                keywords=null(),
+                flag=null(),
+                forgotten_at=now,
+            )
+        )
+        return int(result.rowcount)
+
 
 def _record(row: Row[Any]) -> MailRecord:
     return MailRecord(
@@ -102,6 +135,7 @@ def _record(row: Row[Any]) -> MailRecord:
         cc=tuple(row.cc_texts),
         importance=None if row.importance is None else Importance(row.importance),
         marks=marks_of(row.keywords, row.flag),
+        forgotten_at=row.forgotten_at,
         version=row.version,
     )
 

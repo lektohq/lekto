@@ -1589,8 +1589,10 @@ The session cookie is `__Host-lekto_session`: HTTP-only, `Secure`, `SameSite=Lax
   `LEKTO_CLEANUP_INTERVAL` and removes finished jobs and delivered events older than
   `LEKTO_RETENTION`, webhook delivery log rows of that age, ended sessions, stale counts of
   failed sign-ins, the previous secrets of webhooks whose grace period
-  (`LEKTO_WEBHOOK_SECRET_GRACE`) is over, and what only the inbox's done needs after 14 days
-  (see Inbox). The same loop runs the removal of a deleted document's files.
+  (`LEKTO_WEBHOOK_SECRET_GRACE`) is over, what only the inbox's done needs after 14 days
+  (see Inbox), and what a mailbox's fetched mails beyond its latest 500 keep of the mail
+  (sender, subject, recipients, attachments; the rows stay, so no mail is fetched twice). The
+  same loop runs the removal of a deleted document's files.
 - Pipeline steps go before index jobs: the search index lags behind a bulk ingest and catches
   up when no step is due (the document lists read the database, not the index).
 - Rule applications (`rules.apply`) and changes of many documents (`documents.bulk`) run 25

@@ -1,5 +1,7 @@
 """In-memory mail records and mail origins, on the tables of the in-memory unit of work."""
 
+from datetime import datetime
+
 from lekto.adapters.outbound.memory.database import DOCUMENTS
 from lekto.adapters.outbound.memory.rows import MemoryRepository, _copy
 from lekto.core.domain.ids import DocumentId, MailboxId, MailRecordId
@@ -21,6 +23,18 @@ class MemoryMailRecordRepository(MemoryRepository[MailRecordId, MailRecord]):
         rows = [row for row in self._all() if row.mailbox_id == mailbox]
         rows.sort(key=lambda row: (row.fetched_at, row.id), reverse=True)
         return [_copy(row) for row in rows[:limit]]
+
+    async def forget_beyond(self, mailbox: MailboxId, *, keep: int, now: datetime) -> int:
+        rows = [row for row in self._all() if row.mailbox_id == mailbox]
+        rows.sort(key=lambda row: (row.fetched_at, row.id), reverse=True)
+        forgotten = 0
+        for row in rows[keep:]:
+            if row.forgotten_at is None:
+                record = _copy(row)
+                record.forget(now=now)
+                self._uow._write(self._table, record.id, record)
+                forgotten += 1
+        return forgotten
 
 
 class MemoryMailOriginRepository(MemoryRepository[DocumentId, MailOrigin]):
