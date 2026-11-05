@@ -940,7 +940,6 @@ mail_records = Table(
     Column("flag", Text, nullable=True),
     # When the record let go of what the mail's head said (revision 0065); null while it keeps it.
     Column("forgotten_at", UtcDateTime, nullable=True),
-    Column("version", Integer, nullable=False),
     UniqueConstraint("mailbox_id", "folder", "uidvalidity", "uid"),
     Index(None, "mailbox_id", "fetched_at"),
 )
@@ -974,7 +973,6 @@ mail_origins = Table(
     Column("importance", Text, nullable=True),
     Column("keywords", json_type(), nullable=True),
     Column("flag", Text, nullable=True),
-    Column("version", Integer, nullable=False),
 )
 
 # The mail rules of a mailbox (`domain.mail_rules`): the conditions as JSON. The person, space

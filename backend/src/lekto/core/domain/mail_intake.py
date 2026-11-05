@@ -179,7 +179,6 @@ class MailRecord:
     """Its keywords and flag on the server when it was fetched; none likewise."""
     forgotten_at: datetime | None = None
     """When the record let go of what the mail's head said (`forget`); none while it keeps it."""
-    version: int = 0
 
     def __post_init__(self) -> None:
         require_utc(self.fetched_at, "fetched_at")
@@ -237,7 +236,6 @@ class MailOrigin:
     """The letter's importance, as its header gives it; none for a document taken before."""
     marks: MailMarks | None = None
     """The keywords and flag the mail had on the server when it was fetched; none likewise."""
-    version: int = 0
 
     @property
     def id(self) -> DocumentId:

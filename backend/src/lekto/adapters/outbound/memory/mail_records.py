@@ -3,13 +3,13 @@
 from datetime import datetime
 
 from lekto.adapters.outbound.memory.database import DOCUMENTS, MAILBOXES
-from lekto.adapters.outbound.memory.rows import MemoryRepository, _copy
+from lekto.adapters.outbound.memory.rows import MemoryRows, _copy
 from lekto.core.domain.errors import ConflictError
 from lekto.core.domain.ids import DocumentId, MailboxId, MailRecordId
 from lekto.core.domain.mail_intake import MailOrigin, MailRecord
 
 
-class MemoryMailRecordRepository(MemoryRepository[MailRecordId, MailRecord]):
+class MemoryMailRecordRepository(MemoryRows[MailRecordId, MailRecord]):
     async def add(self, record: MailRecord) -> None:
         if self._uow._row(MAILBOXES, record.mailbox_id) is None:
             raise ConflictError("mail record: no such mailbox")  # as the foreign key
@@ -43,7 +43,7 @@ class MemoryMailRecordRepository(MemoryRepository[MailRecordId, MailRecord]):
         return forgotten
 
 
-class MemoryMailOriginRepository(MemoryRepository[DocumentId, MailOrigin]):
+class MemoryMailOriginRepository(MemoryRows[DocumentId, MailOrigin]):
     """An origin goes with its document, as the foreign key's cascade does."""
 
     async def add(self, origin: MailOrigin) -> None:

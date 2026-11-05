@@ -148,7 +148,8 @@ job queue) and the event bus on SQLite or Postgres, selected by `LEKTO_DB_TYPE`.
 SQLAlchemy 2 Core (async; aiosqlite, asyncpg); the domain classes are not ORM-mapped,
 `tables.py` defines the tables and the repositories convert explicitly.
 
-- Isolation is read committed with optimistic locking (`version` column) on both databases.
+- Isolation is read committed with optimistic locking (`version` column) on both databases;
+  the records of fetched mails and the origins of documents, only ever inserted, have none.
   On SQLite, reads run in autocommit mode and a unit takes the write lock with
   `BEGIN IMMEDIATE` before its first write; writers are serialized. A task must not open a
   second writing unit while its first one is still open: it would wait for its own lock until
