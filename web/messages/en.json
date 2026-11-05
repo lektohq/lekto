@@ -231,7 +231,7 @@
 	"mail_rule_mailbox": "Mailbox",
 	"mail_rule_every_hint": "Without a condition the rule applies to every mail.",
 	"mail_rule_field_sender": "Sender",
-	"mail_rule_field_recipient": "Recipient (To or Cc)",
+	"mail_rule_field_recipient": "Recipient (To/Cc)",
 	"mail_rule_field_subject": "Subject",
 	"mail_rule_field_folder": "Folder",
 	"mail_rule_field_attachments": "Attachments",
