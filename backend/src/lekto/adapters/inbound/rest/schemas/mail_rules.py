@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.rest.schemas import groups
 from lekto.adapters.inbound.schemas import ReasonOut
 from lekto.core.domain.changes import UNSET, Unset
 from lekto.core.domain.condition_tree import MAX_CONDITIONS, MAX_DEPTH
@@ -78,28 +79,10 @@ class MailStepBody(BaseModel):
         return cls(action=step.action, value=step.value)
 
 
-# The same two models as `AllGroup` and `AnyGroup` of the document rules (`schemas/rules.py`)
-# with the mail rules' condition; see the note there. Keep the four in step.
-class MailAllGroup(BaseModel):
-    """All items hold (and); `not` turns the result around."""
-
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
-
-    all: list["MailConditionBody | MailAllGroup | MailAnyGroup"] = Field(
-        min_length=1, max_length=MAX_CONDITIONS
-    )
-    negate: bool = Field(default=False, alias="not")
-
-
-class MailAnyGroup(BaseModel):
-    """At least one item holds (or); `not` turns the result around."""
-
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
-
-    any: list["MailConditionBody | MailAllGroup | MailAnyGroup"] = Field(
-        min_length=1, max_length=MAX_CONDITIONS
-    )
-    negate: bool = Field(default=False, alias="not")
+# The tree of conditions, the groups of every kind of rule with this kind's condition.
+MailAllGroup = groups.AllGroup[MailConditionBody]
+MailAnyGroup = groups.AnyGroup[MailConditionBody]
+groups.resolve(MailAllGroup, MailAnyGroup, condition=MailConditionBody)
 
 
 type MailGroup = MailAllGroup | MailAnyGroup

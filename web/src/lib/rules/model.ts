@@ -36,7 +36,8 @@ export type Period = Schemas['PeriodValue'];
 export type Value =
 	string | boolean | number | Money | Period | string[] | (string | number | boolean)[] | null;
 export type ApiCondition = Schemas['ConditionSchema'];
-export type ApiGroup = Schemas['AllGroup-Output'] | Schemas['AnyGroup-Output'];
+export type ApiGroup =
+	Schemas['AllGroup_ConditionSchema_-Output'] | Schemas['AnyGroup_ConditionSchema_-Output'];
 export type ApiAction = Schemas['RuleOut']['actions'][number];
 export type ActionType = ApiAction['type'];
 export type Missing = Schemas['Missing'];

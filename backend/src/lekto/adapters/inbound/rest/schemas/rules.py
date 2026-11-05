@@ -10,6 +10,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.rest.schemas import groups
 from lekto.adapters.inbound.rest.schemas.open_identifiers import OccurrenceOut
 from lekto.adapters.inbound.schemas import (
     FieldJson,
@@ -148,29 +149,10 @@ class ConditionSchema(BaseModel):
     )
 
 
-# `MailAllGroup` and `MailAnyGroup` (`schemas/mail_rules.py`) are the same two models with the
-# mail rules' condition: a generic would rename them in OpenAPI (`AllGroup_ConditionSchema_`),
-# which the web client names them by (Tobi, 05.11.2026). Keep the four in step.
-class AllGroup(BaseModel):
-    """All items hold (and); `not` turns the result around."""
-
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
-
-    all: list["ConditionSchema | AllGroup | AnyGroup"] = Field(
-        min_length=1, max_length=MAX_CONDITIONS
-    )
-    negate: bool = Field(default=False, alias="not")
-
-
-class AnyGroup(BaseModel):
-    """At least one item holds (or); `not` turns the result around."""
-
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
-
-    any: list["ConditionSchema | AllGroup | AnyGroup"] = Field(
-        min_length=1, max_length=MAX_CONDITIONS
-    )
-    negate: bool = Field(default=False, alias="not")
+# The tree of conditions, the groups of every kind of rule with this kind's condition.
+AllGroup = groups.AllGroup[ConditionSchema]
+AnyGroup = groups.AnyGroup[ConditionSchema]
+groups.resolve(AllGroup, AnyGroup, condition=ConditionSchema)
 
 
 class SetSpaceAction(BaseModel):

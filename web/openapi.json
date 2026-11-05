@@ -24639,26 +24639,10 @@
         ],
         "title": "AddressOut"
       },
-      "AllGroup-Input": {
+      "AllGroup_ConditionSchema_-Input": {
         "properties": {
           "all": {
-            "items": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/ConditionSchema"
-                },
-                {
-                  "$ref": "#/components/schemas/AllGroup-Input"
-                },
-                {
-                  "$ref": "#/components/schemas/AnyGroup-Input"
-                }
-              ]
-            },
-            "type": "array",
-            "maxItems": 50,
-            "minItems": 1,
-            "title": "All"
+            "$ref": "#/components/schemas/GroupItems_ConditionSchema_-Input"
           },
           "not": {
             "type": "boolean",
@@ -24671,29 +24655,12 @@
         "required": [
           "all"
         ],
-        "title": "AllGroup",
-        "description": "All items hold (and); `not` turns the result around."
+        "title": "AllGroup[ConditionSchema]"
       },
-      "AllGroup-Output": {
+      "AllGroup_ConditionSchema_-Output": {
         "properties": {
           "all": {
-            "items": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/ConditionSchema"
-                },
-                {
-                  "$ref": "#/components/schemas/AllGroup-Output"
-                },
-                {
-                  "$ref": "#/components/schemas/AnyGroup-Output"
-                }
-              ]
-            },
-            "type": "array",
-            "maxItems": 50,
-            "minItems": 1,
-            "title": "All"
+            "$ref": "#/components/schemas/GroupItems_ConditionSchema_-Output"
           },
           "not": {
             "type": "boolean",
@@ -24706,29 +24673,48 @@
         "required": [
           "all"
         ],
-        "title": "AllGroup",
-        "description": "All items hold (and); `not` turns the result around."
+        "title": "AllGroup[ConditionSchema]"
       },
-      "AnyGroup-Input": {
+      "AllGroup_MailConditionBody_-Input": {
+        "properties": {
+          "all": {
+            "$ref": "#/components/schemas/GroupItems_MailConditionBody_-Input"
+          },
+          "not": {
+            "type": "boolean",
+            "title": "Not",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "all"
+        ],
+        "title": "AllGroup[MailConditionBody]"
+      },
+      "AllGroup_MailConditionBody_-Output": {
+        "properties": {
+          "all": {
+            "$ref": "#/components/schemas/GroupItems_MailConditionBody_-Output"
+          },
+          "not": {
+            "type": "boolean",
+            "title": "Not",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "all"
+        ],
+        "title": "AllGroup[MailConditionBody]"
+      },
+      "AnyGroup_ConditionSchema_-Input": {
         "properties": {
           "any": {
-            "items": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/ConditionSchema"
-                },
-                {
-                  "$ref": "#/components/schemas/AllGroup-Input"
-                },
-                {
-                  "$ref": "#/components/schemas/AnyGroup-Input"
-                }
-              ]
-            },
-            "type": "array",
-            "maxItems": 50,
-            "minItems": 1,
-            "title": "Any"
+            "$ref": "#/components/schemas/GroupItems_ConditionSchema_-Input"
           },
           "not": {
             "type": "boolean",
@@ -24741,29 +24727,12 @@
         "required": [
           "any"
         ],
-        "title": "AnyGroup",
-        "description": "At least one item holds (or); `not` turns the result around."
+        "title": "AnyGroup[ConditionSchema]"
       },
-      "AnyGroup-Output": {
+      "AnyGroup_ConditionSchema_-Output": {
         "properties": {
           "any": {
-            "items": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/ConditionSchema"
-                },
-                {
-                  "$ref": "#/components/schemas/AllGroup-Output"
-                },
-                {
-                  "$ref": "#/components/schemas/AnyGroup-Output"
-                }
-              ]
-            },
-            "type": "array",
-            "maxItems": 50,
-            "minItems": 1,
-            "title": "Any"
+            "$ref": "#/components/schemas/GroupItems_ConditionSchema_-Output"
           },
           "not": {
             "type": "boolean",
@@ -24776,8 +24745,43 @@
         "required": [
           "any"
         ],
-        "title": "AnyGroup",
-        "description": "At least one item holds (or); `not` turns the result around."
+        "title": "AnyGroup[ConditionSchema]"
+      },
+      "AnyGroup_MailConditionBody_-Input": {
+        "properties": {
+          "any": {
+            "$ref": "#/components/schemas/GroupItems_MailConditionBody_-Input"
+          },
+          "not": {
+            "type": "boolean",
+            "title": "Not",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "any"
+        ],
+        "title": "AnyGroup[MailConditionBody]"
+      },
+      "AnyGroup_MailConditionBody_-Output": {
+        "properties": {
+          "any": {
+            "$ref": "#/components/schemas/GroupItems_MailConditionBody_-Output"
+          },
+          "not": {
+            "type": "boolean",
+            "title": "Not",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "any"
+        ],
+        "title": "AnyGroup[MailConditionBody]"
       },
       "ApplicationStatus": {
         "type": "string",
@@ -26328,10 +26332,10 @@
           "conditions": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AllGroup-Input"
+                "$ref": "#/components/schemas/AllGroup_ConditionSchema_-Input"
               },
               {
-                "$ref": "#/components/schemas/AnyGroup-Input"
+                "$ref": "#/components/schemas/AnyGroup_ConditionSchema_-Input"
               }
             ],
             "title": "Conditions",
@@ -26356,10 +26360,10 @@
           "conditions": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AllGroup-Output"
+                "$ref": "#/components/schemas/AllGroup_ConditionSchema_-Output"
               },
               {
-                "$ref": "#/components/schemas/AnyGroup-Output"
+                "$ref": "#/components/schemas/AnyGroup_ConditionSchema_-Output"
               }
             ],
             "title": "Conditions",
@@ -30452,6 +30456,78 @@
         ],
         "title": "GraphNodeOut"
       },
+      "GroupItems_ConditionSchema_-Input": {
+        "items": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/ConditionSchema"
+            },
+            {
+              "$ref": "#/components/schemas/AllGroup_ConditionSchema_-Input"
+            },
+            {
+              "$ref": "#/components/schemas/AnyGroup_ConditionSchema_-Input"
+            }
+          ]
+        },
+        "type": "array",
+        "maxItems": 50,
+        "minItems": 1
+      },
+      "GroupItems_ConditionSchema_-Output": {
+        "items": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/ConditionSchema"
+            },
+            {
+              "$ref": "#/components/schemas/AllGroup_ConditionSchema_-Output"
+            },
+            {
+              "$ref": "#/components/schemas/AnyGroup_ConditionSchema_-Output"
+            }
+          ]
+        },
+        "type": "array",
+        "maxItems": 50,
+        "minItems": 1
+      },
+      "GroupItems_MailConditionBody_-Input": {
+        "items": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/MailConditionBody"
+            },
+            {
+              "$ref": "#/components/schemas/AllGroup_MailConditionBody_-Input"
+            },
+            {
+              "$ref": "#/components/schemas/AnyGroup_MailConditionBody_-Input"
+            }
+          ]
+        },
+        "type": "array",
+        "maxItems": 50,
+        "minItems": 1
+      },
+      "GroupItems_MailConditionBody_-Output": {
+        "items": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/MailConditionBody"
+            },
+            {
+              "$ref": "#/components/schemas/AllGroup_MailConditionBody_-Output"
+            },
+            {
+              "$ref": "#/components/schemas/AnyGroup_MailConditionBody_-Output"
+            }
+          ]
+        },
+        "type": "array",
+        "maxItems": 50,
+        "minItems": 1
+      },
       "Grouping": {
         "type": "string",
         "enum": [
@@ -33139,146 +33215,6 @@
         "title": "MailAction",
         "description": "A step on a mail on the server once Lekto has taken it (Tobi, 05.11.2026: an ordered\nlist of them): marked read or unread, flagged in a colour or not, a keyword added or\nremoved; then at most one that ends it, moved to a folder or to the trash."
       },
-      "MailAllGroup-Input": {
-        "properties": {
-          "all": {
-            "items": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/MailConditionBody"
-                },
-                {
-                  "$ref": "#/components/schemas/MailAllGroup-Input"
-                },
-                {
-                  "$ref": "#/components/schemas/MailAnyGroup-Input"
-                }
-              ]
-            },
-            "type": "array",
-            "maxItems": 50,
-            "minItems": 1,
-            "title": "All"
-          },
-          "not": {
-            "type": "boolean",
-            "title": "Not",
-            "default": false
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "all"
-        ],
-        "title": "MailAllGroup",
-        "description": "All items hold (and); `not` turns the result around."
-      },
-      "MailAllGroup-Output": {
-        "properties": {
-          "all": {
-            "items": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/MailConditionBody"
-                },
-                {
-                  "$ref": "#/components/schemas/MailAllGroup-Output"
-                },
-                {
-                  "$ref": "#/components/schemas/MailAnyGroup-Output"
-                }
-              ]
-            },
-            "type": "array",
-            "maxItems": 50,
-            "minItems": 1,
-            "title": "All"
-          },
-          "not": {
-            "type": "boolean",
-            "title": "Not",
-            "default": false
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "all"
-        ],
-        "title": "MailAllGroup",
-        "description": "All items hold (and); `not` turns the result around."
-      },
-      "MailAnyGroup-Input": {
-        "properties": {
-          "any": {
-            "items": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/MailConditionBody"
-                },
-                {
-                  "$ref": "#/components/schemas/MailAllGroup-Input"
-                },
-                {
-                  "$ref": "#/components/schemas/MailAnyGroup-Input"
-                }
-              ]
-            },
-            "type": "array",
-            "maxItems": 50,
-            "minItems": 1,
-            "title": "Any"
-          },
-          "not": {
-            "type": "boolean",
-            "title": "Not",
-            "default": false
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "any"
-        ],
-        "title": "MailAnyGroup",
-        "description": "At least one item holds (or); `not` turns the result around."
-      },
-      "MailAnyGroup-Output": {
-        "properties": {
-          "any": {
-            "items": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/MailConditionBody"
-                },
-                {
-                  "$ref": "#/components/schemas/MailAllGroup-Output"
-                },
-                {
-                  "$ref": "#/components/schemas/MailAnyGroup-Output"
-                }
-              ]
-            },
-            "type": "array",
-            "maxItems": 50,
-            "minItems": 1,
-            "title": "Any"
-          },
-          "not": {
-            "type": "boolean",
-            "title": "Not",
-            "default": false
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "any"
-        ],
-        "title": "MailAnyGroup",
-        "description": "At least one item holds (or); `not` turns the result around."
-      },
       "MailConditionBody": {
         "properties": {
           "field": {
@@ -33535,10 +33471,10 @@
           "conditions": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/MailAllGroup-Input"
+                "$ref": "#/components/schemas/AllGroup_MailConditionBody_-Input"
               },
               {
-                "$ref": "#/components/schemas/MailAnyGroup-Input"
+                "$ref": "#/components/schemas/AnyGroup_MailConditionBody_-Input"
               },
               {
                 "type": "null"
@@ -33693,10 +33629,10 @@
           "conditions": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/MailAllGroup-Input"
+                "$ref": "#/components/schemas/AllGroup_MailConditionBody_-Input"
               },
               {
-                "$ref": "#/components/schemas/MailAnyGroup-Input"
+                "$ref": "#/components/schemas/AnyGroup_MailConditionBody_-Input"
               },
               {
                 "type": "null"
@@ -33868,10 +33804,10 @@
           "conditions": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/MailAllGroup-Output"
+                "$ref": "#/components/schemas/AllGroup_MailConditionBody_-Output"
               },
               {
-                "$ref": "#/components/schemas/MailAnyGroup-Output"
+                "$ref": "#/components/schemas/AnyGroup_MailConditionBody_-Output"
               },
               {
                 "type": "null"
@@ -33991,10 +33927,10 @@
           "conditions": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/MailAllGroup-Input"
+                "$ref": "#/components/schemas/AllGroup_MailConditionBody_-Input"
               },
               {
-                "$ref": "#/components/schemas/MailAnyGroup-Input"
+                "$ref": "#/components/schemas/AnyGroup_MailConditionBody_-Input"
               },
               {
                 "type": "null"
@@ -37873,10 +37809,10 @@
           "conditions": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AllGroup-Input"
+                "$ref": "#/components/schemas/AllGroup_ConditionSchema_-Input"
               },
               {
-                "$ref": "#/components/schemas/AnyGroup-Input"
+                "$ref": "#/components/schemas/AnyGroup_ConditionSchema_-Input"
               }
             ],
             "title": "Conditions",
@@ -38057,10 +37993,10 @@
           "conditions": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AllGroup-Input"
+                "$ref": "#/components/schemas/AllGroup_ConditionSchema_-Input"
               },
               {
-                "$ref": "#/components/schemas/AnyGroup-Input"
+                "$ref": "#/components/schemas/AnyGroup_ConditionSchema_-Input"
               }
             ],
             "title": "Conditions",
@@ -38276,10 +38212,10 @@
           "conditions": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AllGroup-Output"
+                "$ref": "#/components/schemas/AllGroup_ConditionSchema_-Output"
               },
               {
-                "$ref": "#/components/schemas/AnyGroup-Output"
+                "$ref": "#/components/schemas/AnyGroup_ConditionSchema_-Output"
               }
             ],
             "title": "Conditions"
@@ -38589,10 +38525,10 @@
           "conditions": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AllGroup-Output"
+                "$ref": "#/components/schemas/AllGroup_ConditionSchema_-Output"
               },
               {
-                "$ref": "#/components/schemas/AnyGroup-Output"
+                "$ref": "#/components/schemas/AnyGroup_ConditionSchema_-Output"
               }
             ],
             "title": "Conditions"

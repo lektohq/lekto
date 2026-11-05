@@ -3043,68 +3043,72 @@ export interface components {
 			/** Address */
 			address: string;
 		};
-		/**
-		 * AllGroup
-		 * @description All items hold (and); `not` turns the result around.
-		 */
-		'AllGroup-Input': {
-			/** All */
-			all: (
-				| components['schemas']['ConditionSchema']
-				| components['schemas']['AllGroup-Input']
-				| components['schemas']['AnyGroup-Input']
-			)[];
+		/** AllGroup[ConditionSchema] */
+		'AllGroup_ConditionSchema_-Input': {
+			all: components['schemas']['GroupItems_ConditionSchema_-Input'];
 			/**
 			 * Not
 			 * @default false
 			 */
 			not: boolean;
 		};
-		/**
-		 * AllGroup
-		 * @description All items hold (and); `not` turns the result around.
-		 */
-		'AllGroup-Output': {
-			/** All */
-			all: (
-				| components['schemas']['ConditionSchema']
-				| components['schemas']['AllGroup-Output']
-				| components['schemas']['AnyGroup-Output']
-			)[];
+		/** AllGroup[ConditionSchema] */
+		'AllGroup_ConditionSchema_-Output': {
+			all: components['schemas']['GroupItems_ConditionSchema_-Output'];
 			/**
 			 * Not
 			 * @default false
 			 */
 			not: boolean;
 		};
-		/**
-		 * AnyGroup
-		 * @description At least one item holds (or); `not` turns the result around.
-		 */
-		'AnyGroup-Input': {
-			/** Any */
-			any: (
-				| components['schemas']['ConditionSchema']
-				| components['schemas']['AllGroup-Input']
-				| components['schemas']['AnyGroup-Input']
-			)[];
+		/** AllGroup[MailConditionBody] */
+		'AllGroup_MailConditionBody_-Input': {
+			all: components['schemas']['GroupItems_MailConditionBody_-Input'];
 			/**
 			 * Not
 			 * @default false
 			 */
 			not: boolean;
 		};
-		/**
-		 * AnyGroup
-		 * @description At least one item holds (or); `not` turns the result around.
-		 */
-		'AnyGroup-Output': {
-			/** Any */
-			any: (
-				| components['schemas']['ConditionSchema']
-				| components['schemas']['AllGroup-Output']
-				| components['schemas']['AnyGroup-Output']
-			)[];
+		/** AllGroup[MailConditionBody] */
+		'AllGroup_MailConditionBody_-Output': {
+			all: components['schemas']['GroupItems_MailConditionBody_-Output'];
+			/**
+			 * Not
+			 * @default false
+			 */
+			not: boolean;
+		};
+		/** AnyGroup[ConditionSchema] */
+		'AnyGroup_ConditionSchema_-Input': {
+			any: components['schemas']['GroupItems_ConditionSchema_-Input'];
+			/**
+			 * Not
+			 * @default false
+			 */
+			not: boolean;
+		};
+		/** AnyGroup[ConditionSchema] */
+		'AnyGroup_ConditionSchema_-Output': {
+			any: components['schemas']['GroupItems_ConditionSchema_-Output'];
+			/**
+			 * Not
+			 * @default false
+			 */
+			not: boolean;
+		};
+		/** AnyGroup[MailConditionBody] */
+		'AnyGroup_MailConditionBody_-Input': {
+			any: components['schemas']['GroupItems_MailConditionBody_-Input'];
+			/**
+			 * Not
+			 * @default false
+			 */
+			not: boolean;
+		};
+		/** AnyGroup[MailConditionBody] */
+		'AnyGroup_MailConditionBody_-Output': {
+			any: components['schemas']['GroupItems_MailConditionBody_-Output'];
 			/**
 			 * Not
 			 * @default false
@@ -3969,7 +3973,9 @@ export interface components {
 			 * Conditions
 			 * @description On the document as the rule's steps before left it, and on `step` (what a step that asks brought). If they do not hold, the rule ends here; its steps before count.
 			 */
-			conditions: components['schemas']['AllGroup-Input'] | components['schemas']['AnyGroup-Input'];
+			conditions:
+				| components['schemas']['AllGroup_ConditionSchema_-Input']
+				| components['schemas']['AnyGroup_ConditionSchema_-Input'];
 		};
 		/** ConditionStepAction */
 		'ConditionStepAction-Output': {
@@ -3983,7 +3989,8 @@ export interface components {
 			 * @description On the document as the rule's steps before left it, and on `step` (what a step that asks brought). If they do not hold, the rule ends here; its steps before count.
 			 */
 			conditions:
-				components['schemas']['AllGroup-Output'] | components['schemas']['AnyGroup-Output'];
+				| components['schemas']['AllGroup_ConditionSchema_-Output']
+				| components['schemas']['AnyGroup_ConditionSchema_-Output'];
 		};
 		/**
 		 * ConfirmRequest
@@ -5918,6 +5925,26 @@ export interface components {
 			 */
 			waits_for: components['schemas']['Node'][];
 		};
+		'GroupItems_ConditionSchema_-Input': (
+			| components['schemas']['ConditionSchema']
+			| components['schemas']['AllGroup_ConditionSchema_-Input']
+			| components['schemas']['AnyGroup_ConditionSchema_-Input']
+		)[];
+		'GroupItems_ConditionSchema_-Output': (
+			| components['schemas']['ConditionSchema']
+			| components['schemas']['AllGroup_ConditionSchema_-Output']
+			| components['schemas']['AnyGroup_ConditionSchema_-Output']
+		)[];
+		'GroupItems_MailConditionBody_-Input': (
+			| components['schemas']['MailConditionBody']
+			| components['schemas']['AllGroup_MailConditionBody_-Input']
+			| components['schemas']['AnyGroup_MailConditionBody_-Input']
+		)[];
+		'GroupItems_MailConditionBody_-Output': (
+			| components['schemas']['MailConditionBody']
+			| components['schemas']['AllGroup_MailConditionBody_-Output']
+			| components['schemas']['AnyGroup_MailConditionBody_-Output']
+		)[];
 		/**
 		 * Grouping
 		 * @description What the documents of a lens stand under: nothing, the month of their document date, how
@@ -7209,74 +7236,6 @@ export interface components {
 		 */
 		MailAction:
 			'read' | 'unread' | 'flag' | 'unflag' | 'add_keyword' | 'remove_keyword' | 'move' | 'trash';
-		/**
-		 * MailAllGroup
-		 * @description All items hold (and); `not` turns the result around.
-		 */
-		'MailAllGroup-Input': {
-			/** All */
-			all: (
-				| components['schemas']['MailConditionBody']
-				| components['schemas']['MailAllGroup-Input']
-				| components['schemas']['MailAnyGroup-Input']
-			)[];
-			/**
-			 * Not
-			 * @default false
-			 */
-			not: boolean;
-		};
-		/**
-		 * MailAllGroup
-		 * @description All items hold (and); `not` turns the result around.
-		 */
-		'MailAllGroup-Output': {
-			/** All */
-			all: (
-				| components['schemas']['MailConditionBody']
-				| components['schemas']['MailAllGroup-Output']
-				| components['schemas']['MailAnyGroup-Output']
-			)[];
-			/**
-			 * Not
-			 * @default false
-			 */
-			not: boolean;
-		};
-		/**
-		 * MailAnyGroup
-		 * @description At least one item holds (or); `not` turns the result around.
-		 */
-		'MailAnyGroup-Input': {
-			/** Any */
-			any: (
-				| components['schemas']['MailConditionBody']
-				| components['schemas']['MailAllGroup-Input']
-				| components['schemas']['MailAnyGroup-Input']
-			)[];
-			/**
-			 * Not
-			 * @default false
-			 */
-			not: boolean;
-		};
-		/**
-		 * MailAnyGroup
-		 * @description At least one item holds (or); `not` turns the result around.
-		 */
-		'MailAnyGroup-Output': {
-			/** Any */
-			any: (
-				| components['schemas']['MailConditionBody']
-				| components['schemas']['MailAllGroup-Output']
-				| components['schemas']['MailAnyGroup-Output']
-			)[];
-			/**
-			 * Not
-			 * @default false
-			 */
-			not: boolean;
-		};
 		/** MailConditionBody */
 		MailConditionBody: {
 			field: components['schemas']['MailField'];
@@ -7415,8 +7374,8 @@ export interface components {
 			 * @description A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To or Cc), `to`, `cc` and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes); `importance` with `is` (`high`, `normal`, `low`); `keyword` with `contains` (an IMAP keyword, regardless of case), `present` or `missing`; `flag` with `present`, `missing` or `is` (a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`). Null: every mail.
 			 */
 			conditions?:
-				| components['schemas']['MailAllGroup-Input']
-				| components['schemas']['MailAnyGroup-Input']
+				| components['schemas']['AllGroup_MailConditionBody_-Input']
+				| components['schemas']['AnyGroup_MailConditionBody_-Input']
 				| null;
 			/** @description What it takes: `all` (the attachments and the text), `attachments`, `text`, `nothing`. */
 			parts?: components['schemas']['MailParts'] | null;
@@ -7492,8 +7451,8 @@ export interface components {
 			 * @description A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To or Cc), `to`, `cc` and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes); `importance` with `is` (`high`, `normal`, `low`); `keyword` with `contains` (an IMAP keyword, regardless of case), `present` or `missing`; `flag` with `present`, `missing` or `is` (a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`). Null: every mail.
 			 */
 			conditions?:
-				| components['schemas']['MailAllGroup-Input']
-				| components['schemas']['MailAnyGroup-Input']
+				| components['schemas']['AllGroup_MailConditionBody_-Input']
+				| components['schemas']['AnyGroup_MailConditionBody_-Input']
 				| null;
 			/** @description What it takes: `all` (the attachments and the text), `attachments`, `text`, `nothing`. */
 			parts?: components['schemas']['MailParts'] | null;
@@ -7553,8 +7512,8 @@ export interface components {
 			 * @description A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To or Cc), `to`, `cc` and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes); `importance` with `is` (`high`, `normal`, `low`); `keyword` with `contains` (an IMAP keyword, regardless of case), `present` or `missing`; `flag` with `present`, `missing` or `is` (a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`). Null: every mail.
 			 */
 			conditions:
-				| components['schemas']['MailAllGroup-Output']
-				| components['schemas']['MailAnyGroup-Output']
+				| components['schemas']['AllGroup_MailConditionBody_-Output']
+				| components['schemas']['AnyGroup_MailConditionBody_-Output']
 				| null;
 			parts: components['schemas']['MailParts'];
 			/** User Id */
@@ -7603,8 +7562,8 @@ export interface components {
 			 * @description A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items are conditions or groups again, nested at most 5 deep, at most 50 conditions. Fields: `sender`, `recipient` (To or Cc), `to`, `cc` and `subject` with `contains`, `is`, `starts_with`, `ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` with `present` or `missing` (attachments Lekto takes); `importance` with `is` (`high`, `normal`, `low`); `keyword` with `contains` (an IMAP keyword, regardless of case), `present` or `missing`; `flag` with `present`, `missing` or `is` (a colour: `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`). Null: every mail.
 			 */
 			conditions?:
-				| components['schemas']['MailAllGroup-Input']
-				| components['schemas']['MailAnyGroup-Input']
+				| components['schemas']['AllGroup_MailConditionBody_-Input']
+				| components['schemas']['AnyGroup_MailConditionBody_-Input']
 				| null;
 			/** @description What it takes: `all` (the attachments and the text), `attachments`, `text`, `nothing`. */
 			parts?: components['schemas']['MailParts'] | null;
@@ -9763,7 +9722,9 @@ export interface components {
 			 * Conditions
 			 * @description Nested at most 5 deep, at most 50 conditions.
 			 */
-			conditions: components['schemas']['AllGroup-Input'] | components['schemas']['AnyGroup-Input'];
+			conditions:
+				| components['schemas']['AllGroup_ConditionSchema_-Input']
+				| components['schemas']['AnyGroup_ConditionSchema_-Input'];
 			/**
 			 * Actions
 			 * @description The steps, in order: actions, steps that ask a webhook and condition steps. Each rule works on its own copy of the document and sees what its own steps before set; the actions of all rules are combined at the end.
@@ -9851,7 +9812,9 @@ export interface components {
 			 * Conditions
 			 * @description Nested at most 5 deep, at most 50 conditions.
 			 */
-			conditions: components['schemas']['AllGroup-Input'] | components['schemas']['AnyGroup-Input'];
+			conditions:
+				| components['schemas']['AllGroup_ConditionSchema_-Input']
+				| components['schemas']['AnyGroup_ConditionSchema_-Input'];
 			/**
 			 * Actions
 			 * @description The steps, in order: actions, steps that ask a webhook and condition steps. Each rule works on its own copy of the document and sees what its own steps before set; the actions of all rules are combined at the end.
@@ -9926,7 +9889,8 @@ export interface components {
 			triggers: components['schemas']['Trigger'][];
 			/** Conditions */
 			conditions:
-				components['schemas']['AllGroup-Output'] | components['schemas']['AnyGroup-Output'];
+				| components['schemas']['AllGroup_ConditionSchema_-Output']
+				| components['schemas']['AnyGroup_ConditionSchema_-Output'];
 			/** Actions */
 			actions: (
 				| components['schemas']['SetSpaceAction']
@@ -10070,7 +10034,8 @@ export interface components {
 			triggers: components['schemas']['Trigger'][];
 			/** Conditions */
 			conditions:
-				components['schemas']['AllGroup-Output'] | components['schemas']['AnyGroup-Output'];
+				| components['schemas']['AllGroup_ConditionSchema_-Output']
+				| components['schemas']['AnyGroup_ConditionSchema_-Output'];
 			/** Actions */
 			actions: (
 				| components['schemas']['SetSpaceAction']
