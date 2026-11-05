@@ -229,6 +229,8 @@ divider.
   (`FIELD`, `FIELD_HEIGHT`, and `FIELD_FRAME` for a frame around an input).
 - **Label:** `Label`, or `HintLabel` when the field has help (info button beside the label, see
   [Help](#help-and-tooltips)). Every field has a label.
+  The info button (`InfoHint`) reaches over the label's line without making it higher: a label
+  with help is as high as one without, so fields side by side start on one line.
 - **A line under a field** (`Field.Description`, Tobi, 03.11.2026): only a short fact one needs
   while filling it in: a range, a format, what empty means, a limit ("1 bis 64.", "Leer heißt:
   läuft nicht ab."), or the values that go with it ("Für alle Typen: …"). One line, at most 60
