@@ -17,6 +17,7 @@
 		createBody,
 		formOf,
 		patchBody,
+		validate,
 		type MailRule,
 		type MailRuleForm as Form
 	} from '#lib/mail-rules.ts';
@@ -33,6 +34,7 @@
 	let initial = '';
 	let lookup = $state<MailRuleLookup | null>(null);
 	let problem = $state<string | null>(null);
+	let errors = $state<Record<string, string>>({});
 	let error = $state<string | null>(null);
 	let busy = $state(false);
 	let leaving = $state(false);
@@ -61,6 +63,11 @@
 
 	async function save() {
 		if (!form) return;
+		errors = validate(form);
+		if (Object.keys(errors).length > 0) {
+			error = m.rule_form_invalid();
+			return;
+		}
 		busy = true;
 		error = null;
 		try {
@@ -110,9 +117,11 @@
 			users={lookup.users}
 			spaces={lookup.spaces}
 			types={lookup.types}
+			{errors}
 			{busy}
 			{error}
 			cancelHref={back}
+			oncancel={() => (leaving = true)}
 			onsubmit={save}
 		/>
 	{/if}

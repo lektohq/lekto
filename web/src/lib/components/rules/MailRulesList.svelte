@@ -9,47 +9,22 @@
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { reportError } from '#lib/errors.ts';
+	import { namesOf, type MailRuleLookup } from '#lib/mail-rule-lookup.ts';
 	import { summaryOf, type MailRule } from '#lib/mail-rules.ts';
 	import type { Mailbox } from '#lib/mailboxes.ts';
-	import {
-		userChoice,
-		type DocumentType,
-		type Space,
-		type UserName
-	} from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { reasonText } from '#lib/reasons.ts';
 
 	// The mail rules (Tobi, 04.11.2026; mock D): one section per mailbox, its rules in the order
 	// they are asked (priority, then name), the first that matches decides; below them the
-	// mailbox's fallback, changed at the mailbox. A row's name opens its editor (there is no
-	// detail page); the switch pauses it, the pencil edits it.
-	let {
-		rules = $bindable(),
-		mailboxes,
-		users,
-		spaces,
-		types
-	}: {
-		rules: MailRule[];
-		mailboxes: Mailbox[];
-		users: UserName[];
-		spaces: Space[];
-		types: DocumentType[];
-	} = $props();
+	// mailbox's fallback, changed at the mailbox. A row's name opens the rule's page; the
+	// switch pauses it, the pencil edits it. `lookup`: what the rules name (every space).
+	let { rules = $bindable(), lookup }: { rules: MailRule[]; lookup: MailRuleLookup } = $props();
 
 	let busy = $state<string | null>(null);
 
-	const names = {
-		user: (id: string | null | undefined) => {
-			const user = users.find((entry) => entry.id === id);
-			return user ? userChoice(user) : m.rule_unknown();
-		},
-		space: (id: string | null | undefined) =>
-			spaces.find((entry) => entry.id === id)?.name ?? m.rule_unknown(),
-		type: (id: string | null | undefined) =>
-			types.find((entry) => entry.id === id)?.name ?? m.rule_unknown()
-	};
+	const mailboxes = $derived(lookup.mailboxes);
+	const names = $derived(namesOf(lookup));
 
 	const fallback = (mailbox: Mailbox) =>
 		mailbox.fallback === 'everything'

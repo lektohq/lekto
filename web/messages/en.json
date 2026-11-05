@@ -236,6 +236,7 @@
 	"mail_rule_field_folder": "Folder",
 	"mail_rule_field_attachments": "Attachments",
 	"mail_keyword_use": "Use “{name}”",
+	"mail_rule_error_keyword": "A keyword as IMAP carries it: at most 100 characters, without spaces, brackets, quotes, %, * or \\.",
 	"mail_keyword_title": "Choose a keyword",
 	"mail_flag_gray": "Grey",
 	"mail_flag_purple": "Purple",

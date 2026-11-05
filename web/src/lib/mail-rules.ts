@@ -3,10 +3,19 @@
  * form of the editor as the API takes it, and a rule in one line for the list.
  */
 import type { components } from '#lib/api/schema.ts';
-import { flagLabel, importanceLabel, isKeyword } from '#lib/mail-traits.ts';
+import {
+	flagLabel,
+	importanceLabel,
+	isKeyword,
+	MAIL_FIELD_LABELS,
+	MAIL_FIELD_OPERATORS,
+	type MailField,
+	type MailOperator
+} from '#lib/mail-traits.ts';
 import { folderLabel } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
-import { operatorLabel } from '#lib/rules/describe.ts';
+import { mailOperatorLabel } from '#lib/rules/describe.ts';
+import { DEFAULT_PRIORITY, LIMITS } from '#lib/rules/model.ts';
 import {
 	conditionsOf,
 	emptyGroups,
@@ -24,8 +33,7 @@ import {
 export type MailRule = components['schemas']['MailRuleOut'];
 export type MailRuleCreate = components['schemas']['MailRuleCreate'];
 export type MailRulePatch = components['schemas']['MailRulePatch'];
-export type MailField = components['schemas']['MailField'];
-export type MailOperator = components['schemas']['MailOperator'];
+export type { MailField, MailOperator } from '#lib/mail-traits.ts';
 export type MailParts = components['schemas']['MailParts'];
 export type MailAction = components['schemas']['MailAction'];
 export type DryRunMail = components['schemas']['DryRunMailOut'];
@@ -44,18 +52,8 @@ export const FIELDS: readonly MailField[] = [
 	'flag'
 ];
 
-export const OPERATORS: Record<MailField, readonly MailOperator[]> = {
-	sender: ['ends_with', 'contains', 'is', 'starts_with'],
-	recipient: ['ends_with', 'contains', 'is', 'starts_with'],
-	to: ['ends_with', 'contains', 'is', 'starts_with'],
-	cc: ['ends_with', 'contains', 'is', 'starts_with'],
-	subject: ['contains', 'is', 'starts_with', 'ends_with'],
-	folder: ['is'],
-	attachments: ['present', 'missing'],
-	importance: ['is'],
-	keyword: ['contains', 'present', 'missing'],
-	flag: ['present', 'missing', 'is']
-};
+/** The comparisons of each field, as the document rules' mail conditions have them. */
+export const OPERATORS = MAIL_FIELD_OPERATORS;
 
 export const PARTS: readonly MailParts[] = ['all', 'attachments', 'text', 'nothing'];
 /** The steps on a mail on the server (Tobi, 05.11.2026), in the order "Aktion hinzufügen"
@@ -73,27 +71,11 @@ export const STEP_ACTIONS: readonly MailAction[] = [
 export const ENDING: readonly MailAction[] = ['move', 'trash'];
 export const MAX_STEPS = 10;
 
-export const FIELD_LABELS: Record<MailField, () => string> = {
-	sender: m.mail_rule_field_sender,
-	recipient: m.mail_rule_field_recipient,
-	to: m.mail_rule_field_to,
-	cc: m.mail_rule_field_cc,
-	subject: m.mail_rule_field_subject,
-	folder: m.mail_rule_field_folder,
-	attachments: m.mail_rule_field_attachments,
-	importance: m.mail_rule_field_importance,
-	keyword: m.mail_rule_field_keyword,
-	flag: m.mail_rule_field_flag
-};
+export const FIELD_LABELS = MAIL_FIELD_LABELS;
 
 /** A comparison in the words of the document rules' mail fields ("ist", "endet auf",
  * "Schlagwörter enthalten"); attachments are there or not. */
-export function operatorText(field: MailField, op: MailOperator): string {
-	if (field === 'attachments') {
-		return op === 'present' ? m.mail_rule_attachments_present() : m.mail_rule_attachments_missing();
-	}
-	return operatorLabel(field === 'keyword' ? 'mail_keyword' : 'mail_sender', op);
-}
+export const operatorText = mailOperatorLabel;
 
 /** The value a condition on `field` starts with: the first of a choice, else empty. */
 export function firstValue(field: MailField, folders: readonly string[]): string {
@@ -155,18 +137,18 @@ export function addableSteps(steps: readonly StepForm[]): MailAction[] {
 	);
 }
 
-function stepValid(step: StepForm): boolean {
+/** What is wrong with a step's value, in words; null where nothing is. */
+function stepProblem(step: StepForm): string | null {
 	const value = step.value.trim();
 	switch (step.action) {
 		case 'add_keyword':
 		case 'remove_keyword':
-			return isKeyword(value);
+			return isKeyword(value) ? null : m.mail_rule_error_keyword();
 		case 'move':
-			return value !== '';
 		case 'flag':
-			return value !== '';
+			return value === '' ? m.rule_error_value() : null;
 		default:
-			return true;
+			return null;
 	}
 }
 
@@ -242,7 +224,7 @@ export function formOf(rule: MailRule | null, mailboxId = '', typeId = ''): Mail
 		return {
 			mailboxId,
 			name: '',
-			priority: '100',
+			priority: String(DEFAULT_PRIORITY),
 			conditions: newGroup<MailConditionNode>('all', [newCondition()]),
 			parts: 'all',
 			userId: '',
@@ -273,26 +255,48 @@ export function formOf(rule: MailRule | null, mailboxId = '', typeId = ''): Mail
 	};
 }
 
-/** Whether the form can be saved. */
-export function complete(form: MailRuleForm): boolean {
+/** The problems of the form in words, by key: `name`, `priority`, `mailbox`, `user`, and the
+ * key of a condition, an empty group or a step (as the document rules' `validate`). */
+export function validate(form: MailRuleForm): Record<string, string> {
+	const problems: Record<string, string> = {};
+	const name = form.name.trim();
+	if (name === '') problems.name = m.rule_error_name();
+	else if (name.length > LIMITS.name) {
+		problems.name = m.rule_error_text_long({ max: LIMITS.name });
+	}
 	const priority = Number(form.priority);
-	const takes = form.parts !== 'nothing';
-	return (
-		form.mailboxId !== '' &&
-		form.name.trim() !== '' &&
-		Number.isInteger(priority) &&
-		priority >= 0 &&
-		priority <= 1000 &&
-		(!takes || form.userId !== '') &&
-		form.steps.every(stepValid) &&
-		emptyGroups(form.conditions, false).length === 0 &&
-		conditionsOf(form.conditions).every(
-			(item) =>
-				!hasValue(item.op) ||
-				(item.field === 'keyword' ? isKeyword(item.value.trim()) : item.value.trim() !== '')
-		)
-	);
+	if (
+		!Number.isInteger(priority) ||
+		priority < LIMITS.priorityMin ||
+		priority > LIMITS.priorityMax
+	) {
+		problems.priority = m.rule_error_priority();
+	}
+	if (form.mailboxId === '') problems.mailbox = m.rule_error_choose();
+	if (form.parts !== 'nothing' && form.userId === '') problems.user = m.rule_error_choose();
+	for (const group of emptyGroups(form.conditions, false)) {
+		problems[group.key] = m.rule_error_group_empty();
+	}
+	for (const item of conditionsOf(form.conditions)) {
+		if (!hasValue(item.op)) continue;
+		const value = item.value.trim();
+		if (item.field === 'keyword') {
+			if (!isKeyword(value)) problems[item.key] = m.mail_rule_error_keyword();
+		} else if (value === '') {
+			problems[item.key] = m.rule_error_value();
+		} else if (item.field !== 'folder' && value.length > LIMITS.text) {
+			problems[item.key] = m.rule_error_text_long({ max: LIMITS.text });
+		}
+	}
+	for (const step of form.steps) {
+		const problem = stepProblem(step);
+		if (problem) problems[step.key] = problem;
+	}
+	return problems;
 }
+
+/** Whether the form can be saved. */
+export const complete = (form: MailRuleForm): boolean => Object.keys(validate(form)).length === 0;
 
 function body(form: MailRuleForm) {
 	const takes = form.parts !== 'nothing';
