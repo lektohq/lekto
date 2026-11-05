@@ -43353,5 +43353,57 @@
     "your_reference": "refers",
     "letter_date": "refers",
     "child_benefit_number": "person"
+  },
+  "x-mail-operators": {
+    "sender": [
+      "contains",
+      "ends_with",
+      "is",
+      "starts_with"
+    ],
+    "recipient": [
+      "contains",
+      "ends_with",
+      "is",
+      "starts_with"
+    ],
+    "to": [
+      "contains",
+      "ends_with",
+      "is",
+      "starts_with"
+    ],
+    "cc": [
+      "contains",
+      "ends_with",
+      "is",
+      "starts_with"
+    ],
+    "subject": [
+      "contains",
+      "ends_with",
+      "is",
+      "starts_with"
+    ],
+    "folder": [
+      "is"
+    ],
+    "attachments": [
+      "missing",
+      "present"
+    ],
+    "importance": [
+      "is"
+    ],
+    "keyword": [
+      "contains",
+      "missing",
+      "present"
+    ],
+    "flag": [
+      "is",
+      "missing",
+      "present"
+    ]
   }
 }
