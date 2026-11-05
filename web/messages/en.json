@@ -1405,6 +1405,8 @@
 	"rule_condition_operator": "Comparison",
 	"rule_condition_value": "Value",
 	"rule_condition_field": "Field",
+	"rule_field_mail": "Mail",
+	"rule_condition_mail_part": "Part of the mail",
 	"rule_case_sensitive": "Match case",
 	"rule_choose": "Choose …",
 	"rule_add_action": "Add action",
