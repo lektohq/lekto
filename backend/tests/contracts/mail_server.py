@@ -121,7 +121,7 @@ class MailServerContract:
             assert unseen.uids == (one, two)  # fetching marked nothing
             since = await session.search("INBOX", MailSearch(since=date(2026, 11, 3)))
             assert since.uids == (two, found.uids[2])
-            await session.mark_read("INBOX", one)
+            await session.mark("INBOX", one, add=["\\Seen"])
             assert (await session.search("INBOX", MailSearch(unseen=True))).uids == (two,)
             assert (await session.search("Rechnungen", MailSearch())).uids == ()
 
@@ -146,6 +146,12 @@ class MailServerContract:
             assert "Lekto" in found.keywords  # $Forwarded is a client's own: not offered
             assert "$Forwarded" not in found.keywords and "$MailFlagBit1" not in found.keywords
             assert found.own_keywords
+            await session.mark("INBOX", two, add=["\\Flagged", "Erledigt"], remove=["\\Seen"])
+            await session.mark("INBOX", one, remove=["lekto", "$MailFlagBit1"])
+            again = {info.uid: info.flags for info in await session.info("INBOX", [one, two])}
+            assert {"\\Flagged", "Erledigt"} <= again[two] and "\\Seen" not in again[two]
+            assert "Lekto" not in again[one] and "$MailFlagBit1" not in again[one]
+            assert "\\Flagged" in again[one]
         account = await server.account(login)
         assert "Lekto" in account.keywords and account.own_keywords
 

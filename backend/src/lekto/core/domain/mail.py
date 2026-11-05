@@ -17,11 +17,20 @@ from enum import Enum, StrEnum
 
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import DocumentTypeId, MailboxId, UserId, new_id
+from lekto.core.domain.mail_traits import (
+    COLOR_BITS,
+    FLAGGED,
+    SEEN,
+    FlagColor,
+    flag_bits,
+    is_keyword,
+)
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.validation import require_utc
 
 MAX_NAME = 100
 MAX_FOLDERS = 20
+MAX_FOLDER = 1000  # characters of a folder's name
 MIN_INTERVAL = timedelta(minutes=1)
 MAX_INTERVAL = timedelta(hours=24)
 DEFAULT_INTERVAL = timedelta(minutes=5)
@@ -54,13 +63,80 @@ class Fallback(StrEnum):
 
 
 class MailAction(StrEnum):
-    """What becomes of a mail on the server once Lekto has taken it: nothing, marked as read,
-    moved to a folder, or moved to the trash."""
+    """A step on a mail on the server once Lekto has taken it (Tobi, 05.11.2026: an ordered
+    list of them): marked read or unread, flagged in a colour or not, a keyword added or
+    removed; then at most one that ends it, moved to a folder or to the trash."""
 
-    NOTHING = "nothing"
     READ = "read"
-    MOVE = "move"
+    UNREAD = "unread"
+    FLAG = "flag"  # with a colour (`mail_traits.FlagColor`)
+    UNFLAG = "unflag"
+    ADD_KEYWORD = "add_keyword"  # with the keyword
+    REMOVE_KEYWORD = "remove_keyword"  # with the keyword
+    MOVE = "move"  # with the folder
     TRASH = "trash"
+
+
+ENDING = frozenset({MailAction.MOVE, MailAction.TRASH})
+"""The steps after which the mail is gone from its folder: last, and at most one."""
+MAX_STEPS = 10
+
+
+def step_flags(step: "MailStep") -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """The IMAP flags a step adds and removes (none for a move or the trash): a flag's colour
+    as Apple Mail's bits, the other bits taken away."""
+    match step.action:
+        case MailAction.READ:
+            return (SEEN,), ()
+        case MailAction.UNREAD:
+            return (), (SEEN,)
+        case MailAction.FLAG:
+            bits = flag_bits(FlagColor(str(step.value)))
+            return (FLAGGED, *bits), tuple(bit for bit in COLOR_BITS if bit not in bits)
+        case MailAction.UNFLAG:
+            return (), (FLAGGED, *COLOR_BITS)
+        case MailAction.ADD_KEYWORD:
+            return (str(step.value),), ()
+        case MailAction.REMOVE_KEYWORD:
+            return (), (str(step.value),)
+    return (), ()
+
+
+@dataclass(frozen=True)
+class MailStep:
+    """One step on a mail on the server; `value`: the colour of `FLAG`, the keyword of
+    `ADD_KEYWORD` and `REMOVE_KEYWORD`, the folder of `MOVE`, none for the others."""
+
+    action: MailAction
+    value: str | None = None
+
+    def __post_init__(self) -> None:
+        value = None if self.value is None else self.value.strip()
+        match self.action:
+            case MailAction.FLAG:
+                if value not in {item.value for item in FlagColor}:
+                    raise ValidationError(f"flag: a colour, not {value!r}")
+            case MailAction.ADD_KEYWORD | MailAction.REMOVE_KEYWORD:
+                if value is None or not is_keyword(value):
+                    raise ValidationError(f"{self.action}: not a keyword IMAP can carry")
+            case MailAction.MOVE:
+                if not value or len(value) > MAX_FOLDER:
+                    raise ValidationError("move: the folder to move the mail to")
+            case _:
+                if value is not None:
+                    raise ValidationError(f"{self.action} takes no value")
+        object.__setattr__(self, "value", value)
+
+
+def check_steps(steps: tuple[MailStep, ...]) -> None:
+    """At most `MAX_STEPS`, none twice, and one that ends it only last. ValidationError
+    otherwise."""
+    if len(steps) > MAX_STEPS:
+        raise ValidationError(f"after: at most {MAX_STEPS} steps")
+    if len(set(steps)) != len(steps):
+        raise ValidationError("after: a step twice")
+    if any(step.action in ENDING for step in steps[:-1]):
+        raise ValidationError("after: moving or trashing comes last, once")
 
 
 class Unset(Enum):
@@ -93,6 +169,8 @@ class MailboxStatus:
     documents: int = 0  # documents made from them
     skipped_at: datetime | None = None  # when a mail was last left out, too large
     skipped: Reason | None = None  # which and why
+    step_failed_at: datetime | None = None  # when a step on a mail on the server last failed
+    step_failed: Reason | None = None  # which, on which mail, and the server's answer
     keywords: tuple[str, ...] = ()  # the keywords its folders knew at the last fetch
     own_keywords: bool | None = None  # whether the server stores Lekto's own; none: not known
 

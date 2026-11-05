@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import {
+	addableSteps,
 	complete,
 	conditionText,
 	createBody,
 	formOf,
 	newCondition,
 	patchBody,
+	stepText,
 	summaryOf,
+	withStep,
 	type MailConditionNode,
 	type MailRule
 } from './mail-rules.ts';
@@ -29,8 +32,10 @@ const RULE: MailRule = {
 	user_id: 'u1',
 	space_id: 's1',
 	text_type_id: null,
-	after: 'move',
-	move_to: 'Lekto/Erledigt',
+	after: [
+		{ action: 'add_keyword', value: 'Lekto' },
+		{ action: 'move', value: 'Lekto/Erledigt' }
+	],
 	enabled: true,
 	disabled_reason: null,
 	created_at: '2026-11-04T10:00:00Z',
@@ -59,8 +64,7 @@ describe('the form of a mail rule', () => {
 			user_id: 'u1',
 			text_type_id: 't1',
 			space_id: null,
-			after: 'nothing',
-			move_to: null,
+			after: [],
 			conditions: {
 				all: [{ field: 'sender', op: 'ends_with', value: '@stadtwerke.example' }],
 				not: false
@@ -72,14 +76,11 @@ describe('the form of a mail rule', () => {
 
 	it('keeps what a stored rule has, and drops what is taken away', () => {
 		const form = formOf(RULE);
-		expect(form.shown).toEqual(['space', 'after']);
-		expect(patchBody(form)).toMatchObject({
-			space_id: 's1',
-			after: 'move',
-			move_to: 'Lekto/Erledigt'
-		});
+		expect(form.shown).toEqual(['space']);
+		expect(patchBody(form)).toMatchObject({ space_id: 's1', after: RULE.after });
 		form.shown = [];
-		expect(patchBody(form)).toMatchObject({ space_id: null, after: 'nothing', move_to: null });
+		form.steps = [];
+		expect(patchBody(form)).toMatchObject({ space_id: null, after: [] });
 		form.parts = 'nothing';
 		expect(patchBody(form)).toMatchObject({ user_id: null, parts: 'nothing' });
 		form.conditions.items.push(newCondition('attachments'));
@@ -110,6 +111,33 @@ describe('the form of a mail rule', () => {
 		expect(complete(form)).toBe(true);
 	});
 
+	it('keeps a move or the trash last, once, and steps without a value once', () => {
+		let steps = withStep([], 'move');
+		steps = withStep(steps, 'read');
+		steps = withStep(steps, 'flag');
+		expect(steps.map((step) => step.action)).toEqual(['read', 'flag', 'move']);
+		expect(addableSteps(steps)).toEqual([
+			'unread',
+			'flag',
+			'unflag',
+			'add_keyword',
+			'remove_keyword'
+		]);
+		const form = formOf(RULE);
+		form.steps = steps;
+		expect(complete(form)).toBe(false); // the move names no folder
+		steps[2].value = 'Erledigt';
+		expect(complete(form)).toBe(true);
+		expect(createBody(form).after).toEqual([
+			{ action: 'read', value: null },
+			{ action: 'flag', value: 'red' },
+			{ action: 'move', value: 'Erledigt' }
+		]);
+		expect(stepText({ action: 'flag', value: 'blue' })).toBe(
+			m.mail_rule_after_flag({ color: m.mail_flag_blue() })
+		);
+	});
+
 	it('keeps groups and their "not" as the tree of every rule', () => {
 		const nested: MailRule = {
 			...RULE,
@@ -129,7 +157,7 @@ describe('the form of a mail rule', () => {
 
 	it('says a rule in one line', () => {
 		expect(summaryOf(RULE, names)).toBe(
-			`${m.rule_priority_short({ priority: 1 })} · ${m.mail_rule_field_sender()} ${m.rule_op_ends_with()} @stadtwerke.example${m.rule_or()}${m.mail_rule_field_attachments()} ${m.mail_rule_attachments_present()} → ${m.mail_rule_parts_all()}, ${m.mail_rule_summary_for({ name: 'Max' })}, ${m.mail_rule_summary_space({ name: 'Haushalt' })}, ${m.mail_rule_summary_move({ folder: 'Lekto/Erledigt' })}`
+			`${m.rule_priority_short({ priority: 1 })} · ${m.mail_rule_field_sender()} ${m.rule_op_ends_with()} @stadtwerke.example${m.rule_or()}${m.mail_rule_field_attachments()} ${m.mail_rule_attachments_present()} → ${m.mail_rule_parts_all()}, ${m.mail_rule_summary_for({ name: 'Max' })}, ${m.mail_rule_summary_space({ name: 'Haushalt' })}, ${m.mail_rule_after_add_keyword({ keyword: 'Lekto' })}, ${m.mail_rule_summary_move({ folder: 'Lekto/Erledigt' })}`
 		);
 		expect(
 			summaryOf(
@@ -139,7 +167,7 @@ describe('the form of a mail rule', () => {
 					parts: 'nothing',
 					user_id: null,
 					space_id: null,
-					after: 'trash'
+					after: [{ action: 'trash' }]
 				},
 				names
 			)

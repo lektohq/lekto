@@ -174,6 +174,12 @@ class MailboxStatusOut(BaseModel):
         description="When a mail was last left out because it was too large."
     )
     skipped: ReasonOut | None = Field(description="Which mail that was, and why.")
+    step_failed_at: datetime | None = Field(
+        description="When a step of a mail rule on a mail on the server last failed."
+    )
+    step_failed: ReasonOut | None = Field(
+        description="Which step, on which mail, and what the server answered."
+    )
     keywords: list[str] = Field(
         description="The keywords its folders knew at the last fetch, to choose in a rule."
     )
@@ -229,6 +235,10 @@ class MailboxOut(BaseModel):
                 documents=status.documents,
                 skipped_at=status.skipped_at,
                 skipped=None if status.skipped is None else ReasonOut.of(status.skipped),
+                step_failed_at=status.step_failed_at,
+                step_failed=(
+                    None if status.step_failed is None else ReasonOut.of(status.step_failed)
+                ),
                 keywords=list(status.keywords),
                 own_keywords=status.own_keywords,
             ),
