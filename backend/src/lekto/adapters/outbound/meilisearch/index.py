@@ -294,14 +294,13 @@ class MeilisearchIndex:
                     for item in items
                     if str(item["id"]) in worded or float(item.get("_rankingScore", 0)) >= floor
                 ]
-            # The order is complete where the candidates did not run out, else it goes on.
-            whole = len(mixed["hits"]) < depth or (
-                query.meaning_min_score is not None and len(items) < len(mixed["hits"])
-            )
             hits = [_hit_of(item) for item in items[query.offset : query.offset + query.limit]]
+            cut = query.meaning_min_score is not None and len(items) < len(mixed["hits"])
+            estimated = _estimate(
+                items, worded, word_total, total, exhausted=len(mixed["hits"]) < depth, cut=cut
+            )
         except (KeyError, TypeError, ValueError):
             raise SearchIndexError("Meilisearch sent an unusable search result") from None
-        estimated = len(items) if whole else max(total, len(items))
         return SearchResult(
             hits=hits,
             estimated_total=max(estimated, query.offset + len(hits)),
@@ -725,6 +724,30 @@ def _normalised(key: str, setting: Any) -> Any:
             for word, others in setting.items()
         }
     return setting
+
+
+def _estimate(
+    items: Sequence[Mapping[str, Any]],
+    worded: Mapping[str, Any],
+    word_total: int,
+    total: int,
+    *,
+    exhausted: bool,
+    cut: bool,
+) -> int:
+    """How many hits the hybrid search has: all of `items` where the candidates ran out
+    (`exhausted`); where the floor of the meaning `cut` some, `items` and the words' hits
+    beyond them (`worded` holds the first page of the words, `word_total` counts them all): the
+    meaning's documents beyond the candidates lie below the floor too, as the order is by score
+    (sorted otherwise, nothing is known of them, and they do not count); else what Meilisearch
+    estimates."""
+    if exhausted:
+        return len(items)
+    if cut:
+        here = {str(item["id"]) for item in items}
+        beyond = sum(1 for key in worded if key not in here) + max(0, word_total - len(worded))
+        return len(items) + beyond
+    return max(total, len(items))
 
 
 def _total(data: Mapping[str, Any]) -> int:
