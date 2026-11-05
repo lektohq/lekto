@@ -895,6 +895,9 @@ mailboxes = Table(
     # The latest mail left out, too large (`MailboxStatus.skipped`).
     Column("skipped_at", UtcDateTime, nullable=True),
     Column("skipped", json_type(), nullable=True),
+    # The keywords its folders knew at the last fetch, and whether the server stores Lekto's own.
+    Column("keywords", json_type(), nullable=False, server_default="[]"),
+    Column("own_keywords", Boolean, nullable=True),
     Column("created_at", UtcDateTime, nullable=False),
     Column("updated_at", UtcDateTime, nullable=False),
     Column("version", Integer, nullable=False),
@@ -926,6 +929,13 @@ mail_records = Table(
     Column("senders", json_type(), nullable=False, server_default="[]"),
     Column("recipients", json_type(), nullable=False, server_default="[]"),
     Column("attachments", json_type(), nullable=False, server_default="[]"),
+    # To and Cc apart (`recipients` holds both), the importance and the marks on the server
+    # (keywords NULL: not known, a mail fetched before Lekto read them; `flag` its colour).
+    Column("to_texts", json_type(), nullable=False, server_default="[]"),
+    Column("cc_texts", json_type(), nullable=False, server_default="[]"),
+    Column("importance", Text, nullable=True),
+    Column("keywords", json_type(), nullable=True),
+    Column("flag", Text, nullable=True),
     Column("version", Integer, nullable=False),
     UniqueConstraint("mailbox_id", "folder", "uidvalidity", "uid"),
     Index(None, "mailbox_id", "fetched_at"),
@@ -956,6 +966,10 @@ mail_origins = Table(
     Column("filename", Text, nullable=True),
     Column("related", json_type(), nullable=False),
     Column("body_type_id", Uuid, nullable=True),
+    # The letter's importance and the mail's marks on the server, as on `mail_records`.
+    Column("importance", Text, nullable=True),
+    Column("keywords", json_type(), nullable=True),
+    Column("flag", Text, nullable=True),
     Column("version", Integer, nullable=False),
 )
 

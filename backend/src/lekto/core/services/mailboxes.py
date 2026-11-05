@@ -31,9 +31,12 @@ MAX_PASSWORD = 1000
 
 @dataclass(frozen=True, kw_only=True)
 class ConnectionTest:
-    """What a test of a connection found: the folders, or why it failed."""
+    """What a test of a connection found: the folders, the keywords of the inbox and whether
+    the server stores keywords of Lekto's own; or why it failed."""
 
     folders: tuple[str, ...] = ()
+    keywords: tuple[str, ...] = ()
+    own_keywords: bool = False
     error: Reason | None = None
 
 
@@ -155,7 +158,12 @@ class MailboxService:
             password=password,
         )
         try:
-            return ConnectionTest(folders=await self._server.folders(login))
+            account = await self._server.account(login)
+            return ConnectionTest(
+                folders=account.folders,
+                keywords=account.keywords,
+                own_keywords=account.own_keywords,
+            )
         except MailServerError as error:
             return ConnectionTest(error=error.reason)
 

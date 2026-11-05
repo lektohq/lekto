@@ -25,6 +25,15 @@ from lekto.core.domain.json_value import JsonObject, JsonValue, require_object
 from lekto.core.domain.mail import MailAction
 from lekto.core.domain.mail_intake import MailDecision, MailParts, MailRecord, letters
 from lekto.core.domain.mail_message import Address, MailMessage
+from lekto.core.domain.mail_traits import (
+    FlagColor,
+    Importance,
+    MailMarks,
+    flag_holds,
+    importance_holds,
+    is_keyword,
+    keyword_holds,
+)
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.validation import require_name, require_utc
 
@@ -37,10 +46,15 @@ MAX_PRIORITY = 1000
 
 class MailField(StrEnum):
     SENDER = "sender"  # the sender's address or name
-    RECIPIENT = "recipient"  # an address or name it went to (To, Cc)
+    RECIPIENT = "recipient"  # an address or name it went to (To or Cc)
+    TO = "to"  # an address or name in To
+    CC = "cc"  # an address or name in Cc
     SUBJECT = "subject"
     FOLDER = "folder"  # the folder of the mailbox it lies in
     ATTACHMENTS = "attachments"  # attachments Lekto takes
+    IMPORTANCE = "importance"  # high, normal or low (`mail_traits`)
+    KEYWORD = "keyword"  # an IMAP keyword on the server (a tag)
+    FLAG = "flag"  # flagged, in a colour (Apple Mail's)
 
 
 class MailOperator(StrEnum):
@@ -55,25 +69,36 @@ class MailOperator(StrEnum):
 _TEXT = frozenset(
     {MailOperator.CONTAINS, MailOperator.IS, MailOperator.STARTS_WITH, MailOperator.ENDS_WITH}
 )
+_THERE = frozenset({MailOperator.PRESENT, MailOperator.MISSING})
 OPERATORS: dict[MailField, frozenset[MailOperator]] = {
     MailField.SENDER: _TEXT,
     MailField.RECIPIENT: _TEXT,
+    MailField.TO: _TEXT,
+    MailField.CC: _TEXT,
     MailField.SUBJECT: _TEXT,
     MailField.FOLDER: frozenset({MailOperator.IS}),
-    MailField.ATTACHMENTS: frozenset({MailOperator.PRESENT, MailOperator.MISSING}),
+    MailField.ATTACHMENTS: _THERE,
+    MailField.IMPORTANCE: frozenset({MailOperator.IS}),
+    MailField.KEYWORD: _THERE | {MailOperator.CONTAINS},
+    MailField.FLAG: _THERE | {MailOperator.IS},
 }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class MailFacts:
-    """What the conditions look at: the texts of each field (an address and a name each), and
-    whether there are attachments to take."""
+    """What the conditions look at: the texts of each field (an address and a name each),
+    whether there are attachments to take, the importance and the marks on the server (none
+    for a mail fetched before Lekto read them: their conditions hold nothing)."""
 
     senders: tuple[str, ...]
     recipients: tuple[str, ...]
+    to: tuple[str, ...] = ()
+    cc: tuple[str, ...] = ()
     subject: str
     folder: str
     attachments: bool
+    importance: Importance | None = None
+    marks: MailMarks | None = None
 
 
 @dataclass(frozen=True)
@@ -90,19 +115,39 @@ class MailCondition:
                 raise ValidationError(f"'{self.op}' takes no value")
             return
         value = (self.value or "").strip()
-        limit = MAX_FOLDER if self.field is MailField.FOLDER else MAX_VALUE
-        if not value or len(value) > limit:
-            raise ValidationError(f"{self.field}: a value of 1 to {limit} characters")
+        match self.field:
+            case MailField.IMPORTANCE:
+                if value not in {item.value for item in Importance}:
+                    raise ValidationError("importance: high, normal or low")
+            case MailField.FLAG:
+                if value not in {item.value for item in FlagColor}:
+                    raise ValidationError(f"flag: a colour, not {value!r}")
+            case MailField.KEYWORD:
+                if not is_keyword(value):
+                    raise ValidationError(f"keyword: not one IMAP can carry: {value!r}")
+            case _:
+                limit = MAX_FOLDER if self.field is MailField.FOLDER else MAX_VALUE
+                if not value or len(value) > limit:
+                    raise ValidationError(f"{self.field}: a value of 1 to {limit} characters")
         object.__setattr__(self, "value", value)
 
     def holds(self, facts: MailFacts) -> bool:
-        if self.field is MailField.ATTACHMENTS:
-            return facts.attachments == (self.op is MailOperator.PRESENT)
-        if self.field is MailField.FOLDER:
-            return facts.folder == self.value
+        match self.field:
+            case MailField.ATTACHMENTS:
+                return facts.attachments == (self.op is MailOperator.PRESENT)
+            case MailField.FOLDER:
+                return facts.folder == self.value
+            case MailField.IMPORTANCE:
+                return importance_holds(facts.importance, self.value or "")
+            case MailField.KEYWORD:
+                return keyword_holds(facts.marks, self.op.value, self.value)
+            case MailField.FLAG:
+                return flag_holds(facts.marks, self.op.value, self.value)
         texts = {
             MailField.SENDER: facts.senders,
             MailField.RECIPIENT: facts.recipients,
+            MailField.TO: facts.to,
+            MailField.CC: facts.cc,
             MailField.SUBJECT: (facts.subject,),
         }[self.field]
         wanted = (self.value or "").casefold()
@@ -289,18 +334,24 @@ class MailRule:
             self.move_to = None
 
 
-def mail_facts(message: MailMessage, folder: str) -> MailFacts:
-    """What the conditions of a rule look at in a mail lying in `folder`."""
+def mail_texts(addresses: tuple[Address, ...]) -> tuple[str, ...]:
+    """The addresses and names conditions on addresses look at."""
+    return tuple(text for item in addresses for text in (item.address, item.name) if text)
 
-    def texts(addresses: tuple[Address, ...]) -> tuple[str, ...]:
-        return tuple(text for item in addresses for text in (item.address, item.name) if text)
 
+def mail_facts(message: MailMessage, folder: str, flags: frozenset[str] | None = None) -> MailFacts:
+    """What the conditions of a rule look at in a mail lying in `folder` with IMAP `flags`
+    (none: not known)."""
     return MailFacts(
-        senders=texts(message.sender),
-        recipients=texts((*message.to, *message.cc)),
+        senders=mail_texts(message.sender),
+        recipients=mail_texts((*message.to, *message.cc)),
+        to=mail_texts(message.to),
+        cc=mail_texts(message.cc),
         subject=message.subject,
         folder=folder,
         attachments=any(letter.taken for letter in letters(message)),
+        importance=message.importance,
+        marks=None if flags is None else MailMarks.of_flags(flags),
     )
 
 
@@ -309,9 +360,13 @@ def record_facts(record: MailRecord) -> MailFacts:
     return MailFacts(
         senders=record.senders,
         recipients=record.recipients,
+        to=record.to,
+        cc=record.cc,
         subject=record.subject,
         folder=record.folder,
         attachments=bool(record.attachments),
+        importance=record.importance,
+        marks=record.marks,
     )
 
 

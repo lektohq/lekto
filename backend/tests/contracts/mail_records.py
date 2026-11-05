@@ -28,6 +28,7 @@ from lekto.core.domain.mail_rules import (
     MailRule,
     MailRuleChanges,
 )
+from lekto.core.domain.mail_traits import FlagColor, Importance, MailMarks
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from tests import builders
@@ -86,6 +87,10 @@ class MailRecordRepositoryContract:
             rule="Strom",
             message_id=None,
             sent_at=None,
+            to=("anna@example.test",),
+            cc=("ben@example.test", "Ben"),
+            importance=Importance.HIGH,
+            marks=MailMarks(keywords=("Lekto", "$label1"), flag=FlagColor.GREEN),
         )
         async with uow_factory() as uow:
             await uow.mail_records.add(a_record(mailbox, 1))
@@ -98,9 +103,10 @@ class MailRecordRepositoryContract:
             assert await uow.mail_records.known_uids(mailbox.id, "INBOX", 8) == {1}
             assert await uow.mail_records.has_message("m3@example.test")
             assert not await uow.mail_records.has_message("m9@example.test")
-            recent = await uow.mail_records.recent(mailbox.id, limit=2)
-            assert [record.uid for record in recent] == [3, 2]
+            recent = await uow.mail_records.recent(mailbox.id, limit=4)
+            assert [record.uid for record in recent[:2]] == [3, 2]
             assert recent[1] == failed
+            assert (recent[0].importance, recent[0].marks) == (None, None)  # not known
 
     async def test_a_uid_is_recorded_once(self, uow_factory: UnitOfWorkFactory) -> None:
         mailbox = await a_mailbox(uow_factory)
@@ -160,6 +166,8 @@ class MailOriginRepositoryContract:
             forwarded_by=(Address("Ben", "ben@example.test"), Address("", "c@example.test")),
             related=(other.id,),
             body_type_id=DocumentTypeId(new_id()),
+            importance=Importance.LOW,
+            marks=MailMarks(keywords=(), flag=FlagColor.RED),
         )
         attached = origin(
             attachment.id, OriginRole.ATTACHMENT, filename="Rechnung.pdf", sent_at=None
