@@ -15,6 +15,8 @@ export type FetchStart = components['schemas']['FetchStart'];
 export type ConnectionTest = components['schemas']['ConnectionTestOut'];
 
 export const INBOX = 'INBOX';
+/** Characters of a folder's name at most, as the API takes it. */
+export const FOLDER_MAX_LENGTH = 1000;
 
 /** The usual port of each kind of security. */
 export const DEFAULT_PORTS: Record<MailSecurity, number> = { tls: 993, starttls: 143, none: 143 };

@@ -19,7 +19,13 @@ import type {
 import { isTagField, isTemplated } from '#lib/rules/model.ts';
 import { session } from '#lib/session.svelte.ts';
 import { pathLabel } from '#lib/tags.ts';
-import { flagLabel, importanceLabel } from '#lib/mail-traits.ts';
+import {
+	flagLabel,
+	importanceLabel,
+	MAIL_FIELD_LABELS,
+	type MailField,
+	type MailOperator
+} from '#lib/mail-traits.ts';
 
 const CONDITION_FIELDS: Record<Exclude<ConditionField, 'field'>, () => string> = {
 	contact: m.field_contact,
@@ -36,32 +42,34 @@ const CONDITION_FIELDS: Record<Exclude<ConditionField, 'field'>, () => string> =
 	relation: m.rule_field_relation,
 	// The words of the mail rules' fields, as of the mail ("Mail: Absender").
 	mail_mailbox: () => m.rule_field_of_mail({ field: m.mail_rule_mailbox() }),
-	mail_sender: () => m.rule_field_of_mail({ field: m.mail_rule_field_sender() }),
-	mail_recipient: () => m.rule_field_of_mail({ field: m.mail_rule_field_recipient() }),
-	mail_to: () => m.rule_field_of_mail({ field: m.mail_rule_field_to() }),
-	mail_cc: () => m.rule_field_of_mail({ field: m.mail_rule_field_cc() }),
-	mail_subject: () => m.rule_field_of_mail({ field: m.mail_rule_field_subject() }),
-	mail_importance: () => m.rule_field_of_mail({ field: m.mail_rule_field_importance() }),
-	mail_keyword: () => m.rule_field_of_mail({ field: m.mail_rule_field_keyword() }),
-	mail_flag: () => m.rule_field_of_mail({ field: m.mail_rule_field_flag() })
+	mail_sender: () => m.rule_field_of_mail({ field: MAIL_FIELD_LABELS.sender() }),
+	mail_recipient: () => m.rule_field_of_mail({ field: MAIL_FIELD_LABELS.recipient() }),
+	mail_to: () => m.rule_field_of_mail({ field: MAIL_FIELD_LABELS.to() }),
+	mail_cc: () => m.rule_field_of_mail({ field: MAIL_FIELD_LABELS.cc() }),
+	mail_subject: () => m.rule_field_of_mail({ field: MAIL_FIELD_LABELS.subject() }),
+	mail_importance: () => m.rule_field_of_mail({ field: MAIL_FIELD_LABELS.importance() }),
+	mail_keyword: () => m.rule_field_of_mail({ field: MAIL_FIELD_LABELS.keyword() }),
+	mail_flag: () => m.rule_field_of_mail({ field: MAIL_FIELD_LABELS.flag() })
+};
+
+/** The part of the mail a document rule's condition looks at, by the mail rules' name of it. */
+const MAIL_PART: Partial<Record<ConditionField, MailField>> = {
+	mail_sender: 'sender',
+	mail_recipient: 'recipient',
+	mail_to: 'to',
+	mail_cc: 'cc',
+	mail_subject: 'subject',
+	mail_importance: 'importance',
+	mail_keyword: 'keyword',
+	mail_flag: 'flag'
 };
 
 /** A part of the mail as the second choice after "Mail" names it ("Absender"); a rule's text
  * keeps "Mail: Absender" (`fieldLabel`). */
-const MAIL_PART_LABELS: Partial<Record<ConditionField, () => string>> = {
-	mail_mailbox: m.mail_rule_mailbox,
-	mail_sender: m.mail_rule_field_sender,
-	mail_recipient: m.mail_rule_field_recipient,
-	mail_to: m.mail_rule_field_to,
-	mail_cc: m.mail_rule_field_cc,
-	mail_subject: m.mail_rule_field_subject,
-	mail_importance: m.mail_rule_field_importance,
-	mail_keyword: m.mail_rule_field_keyword,
-	mail_flag: m.mail_rule_field_flag
-};
-
 export function mailPartLabel(field: ConditionField): string {
-	return MAIL_PART_LABELS[field]?.() ?? fieldLabel(field);
+	const part = MAIL_PART[field];
+	if (part) return MAIL_FIELD_LABELS[part]();
+	return field === 'mail_mailbox' ? m.mail_rule_mailbox() : fieldLabel(field);
 }
 
 export function fieldLabel(field: ConditionField): string {
@@ -140,14 +148,25 @@ export function operatorLabel(
 	op: Operator,
 	type: FieldType | null = null
 ): string {
+	const part = MAIL_PART[field];
+	if (part) return mailOperatorLabel(part, op as MailOperator);
 	let special: Partial<Record<Operator, () => string>> = {};
-	// Keywords are a mail's tags: "Schlagwörter enthalten Lekto".
-	if (isTagField(field) || field === 'mail_keyword') special = TAG_OPERATORS;
+	if (isTagField(field)) special = TAG_OPERATORS;
 	else if (field === 'relation') special = RELATION_OPERATORS;
 	else if (field === 'document_date' || type === 'date') special = DATE_OPERATORS;
 	else if (type === 'number' || type === 'amount') special = NUMBER_OPERATORS;
 	else if (type === 'period') special = PERIOD_OPERATORS;
 	return (special[op] ?? OPERATORS[op])();
+}
+
+/** A comparison of a mail's field in its words, in a mail rule and in a document rule alike:
+ * keywords are a mail's tags ("Schlagwörter enthalten Lekto"), attachments are there or not. */
+export function mailOperatorLabel(field: MailField, op: MailOperator): string {
+	if (field === 'attachments') {
+		return op === 'present' ? m.mail_rule_attachments_present() : m.mail_rule_attachments_missing();
+	}
+	const special = field === 'keyword' ? TAG_OPERATORS[op] : undefined;
+	return (special ?? OPERATORS[op])();
 }
 
 const PROBLEMS: Record<Problem['code'], (params: Record<string, string | number>) => string> = {

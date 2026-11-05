@@ -4,8 +4,8 @@
 	import { page } from '$app/state';
 	import MailRulesList from '#lib/components/rules/MailRulesList.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
+	import { loadMailRuleLookup, type MailRuleLookup } from '#lib/mail-rule-lookup.ts';
 	import type { MailRule } from '#lib/mail-rules.ts';
-	import type { Mailbox } from '#lib/mailboxes.ts';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
@@ -21,7 +21,7 @@
 	import { buttonVariants } from '#lib/components/ui/button/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
-	import type { DocumentType, Space, UserName } from '#lib/masterdata.svelte.ts';
+	import type { Space, UserName } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { reasonsText } from '#lib/reasons.ts';
 	import { scope } from '#lib/scope.svelte.ts';
@@ -42,20 +42,25 @@
 		session.isAdmin && page.url.searchParams.get('kind') === 'mail' ? 'mail' : 'documents'
 	);
 	let mailRules = $state<MailRule[] | null>(null);
-	let mailboxes = $state<Mailbox[]>([]);
-	let types = $state<DocumentType[]>([]);
+	// What a mail rule names (every space: admins read them all, whoever is a member).
+	let mailLookup = $state<MailRuleLookup | null>(null);
 
 	async function loadMail() {
 		if (!session.isAdmin) return;
 		try {
-			[mailRules, mailboxes, types] = await Promise.all([
+			[mailRules, mailLookup] = await Promise.all([
 				unwrap(api.GET('/api/v1/mail-rules')),
-				unwrap(api.GET('/api/v1/mailboxes')),
-				unwrap(api.GET('/api/v1/document-types'))
+				loadMailRuleLookup()
 			]);
 		} catch (error) {
 			problem = describeError(error);
 		}
+	}
+
+	function retry() {
+		problem = null;
+		void load();
+		void loadMail();
 	}
 
 	$effect(() => {
@@ -147,10 +152,10 @@
 	{/if}
 
 	{#if problem}
-		<LoadProblem {problem} onretry={load} />
+		<LoadProblem {problem} onretry={retry} />
 	{:else if kind === 'mail'}
-		{#if mailRules}
-			<MailRulesList bind:rules={mailRules} {mailboxes} {users} {spaces} {types} />
+		{#if mailRules && mailLookup}
+			<MailRulesList bind:rules={mailRules} lookup={mailLookup} />
 		{:else}
 			<Loading />
 		{/if}

@@ -236,6 +236,7 @@
 	"mail_rule_field_folder": "Ordner",
 	"mail_rule_field_attachments": "Anhänge",
 	"mail_keyword_use": "„{name}“ verwenden",
+	"mail_rule_error_keyword": "Ein Schlagwort, wie IMAP es trägt: höchstens 100 Zeichen, ohne Leerzeichen, Klammern, Anführungszeichen, %, * und \\.",
 	"mail_keyword_title": "Schlagwort wählen",
 	"mail_flag_gray": "Grau",
 	"mail_flag_purple": "Lila",
