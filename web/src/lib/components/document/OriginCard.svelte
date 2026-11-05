@@ -3,6 +3,7 @@
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
+	import DetailList from '#lib/components/DetailList.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import * as Card from '#lib/components/ui/card/index.ts';
@@ -89,12 +90,7 @@
 		{:else if problem}
 			<LoadProblem {problem} onretry={() => void load(documentId)} />
 		{:else}
-			<dl class="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 px-1 pb-1 text-sm">
-				{#each rows as [label, value] (label)}
-					<dt class="text-muted-foreground">{label}</dt>
-					<dd class="break-words">{value}</dd>
-				{/each}
-			</dl>
+			<DetailList {rows} class="px-1 pb-1" />
 		{/if}
 	</Card.Root>
 {/if}

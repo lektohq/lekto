@@ -480,6 +480,13 @@ avatar a dashed circle. Where all rows belong to one contact (the contact dialog
 grouped by kind. Above them the source (`Segmented`), then search, help and adding as one group
 that wraps as a whole under it where the row is narrow (a dialog), never the button alone.
 
+**Detail list** (`DetailList`, Tobi 05.11.2026): a few facts of one thing, each a label and a
+value, where a table would be too much: the origin of a mail (`OriginCard`), what a file says of
+itself (`DocumentFiles`). A `<dl>` as a grid: the labels in a column of 7.5 rem,
+`text-muted-foreground`, the values beside them breaking where they must (`break-words`),
+`text-sm`, `gap-x-3 gap-y-1.5`. A fact without a value is left out, not shown empty. The card
+around it gives the padding (`px-1 pb-1` in a `sm` card, `px-4 pb-4` otherwise).
+
 ### Tables
 
 `ui/table` only. The head is `text-xs font-medium text-muted-foreground`. Numbers align right with
