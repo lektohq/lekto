@@ -453,6 +453,7 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	mail_password_unreadable: entry(m.reason_mail_password_unreadable),
 	mailbox_paused: entry(m.reason_mailbox_paused),
 	mail_too_large: entry(m.reason_mail_too_large, { size: 'number', max: 'number' }),
+	mail_step_failed: entry(m.reason_mail_step_failed, { step: 'thing' }),
 	mail_rule_person_gone: entry(m.reason_mail_rule_person_gone),
 	mail_rule_space_unreachable: entry(m.reason_mail_rule_space_unreachable),
 	mail_rule_type_gone: entry(m.reason_mail_rule_type_gone)
@@ -460,6 +461,15 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 
 /** The nouns the API names things by (the kind `thing`), in the user's language. */
 const THINGS: Record<string, () => string> = {
+	// A step of a mail rule on a mail on the server.
+	'mail_step:read': m.mail_step_read,
+	'mail_step:unread': m.mail_step_unread,
+	'mail_step:flag': m.mail_step_flag,
+	'mail_step:unflag': m.mail_step_unflag,
+	'mail_step:add_keyword': m.mail_step_add_keyword,
+	'mail_step:remove_keyword': m.mail_step_remove_keyword,
+	'mail_step:move': m.mail_step_move,
+	'mail_step:trash': m.mail_step_trash,
 	document: m.thing_document,
 	contact: m.thing_contact,
 	'document type': m.thing_document_type,

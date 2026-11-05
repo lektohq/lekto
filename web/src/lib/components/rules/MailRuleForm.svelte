@@ -11,8 +11,10 @@
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import {
-		AFTER,
-		AFTER_LABELS,
+		addableSteps,
+		ENDING,
+		STEP_LABELS,
+		withStep,
 		canAddCondition,
 		canAddGroup,
 		complete,
@@ -46,8 +48,9 @@
 	// The editor of a mail rule (Tobi, 04.11.2026; mock E), in the frame of the document rule's:
 	// name and priority, the mailbox it belongs to, the conditions on the mail in the tree every
 	// rule has (`ConditionGroup`: groups of all or any, turned around or not), and
-	// the actions: what it takes and for whom always, a space, the type of the mail's text and
-	// what becomes of the mail on the server where added ("+ Aktion").
+	// the actions: what it takes and for whom always, a space and the type of the mail's text
+	// where added ("+ Aktion"), and the steps on the mail on the server in order (a move or
+	// the trash last).
 	let {
 		form,
 		mailboxes,
@@ -75,12 +78,15 @@
 
 	const OPTIONAL_LABELS: Record<Optional, () => string> = {
 		space: m.rule_action_set_space,
-		type: m.mail_rule_action_type,
-		after: m.mail_rule_action_after
+		type: m.mail_rule_action_type
 	};
-	const addable = $derived(
-		OPTIONALS.filter((item) => !form.shown.includes(item) && (takes || item === 'after'))
-	);
+	const addable = $derived(takes ? OPTIONALS.filter((item) => !form.shown.includes(item)) : []);
+	const steps = $derived(addableSteps(form.steps));
+
+	function moveStep(index: number, by: -1 | 1) {
+		const [item] = form.steps.splice(index, 1);
+		form.steps.splice(index + by, 0, item);
+	}
 
 	const people = $derived(
 		users
@@ -295,29 +301,53 @@
 			</RuleRow>
 		{/if}
 
-		{#if form.shown.includes('after')}
-			<RuleRow label={m.mail_rule_action_after()} onremove={() => hide('after')}>
-				<div class="flex min-w-0 flex-1 basis-64 flex-wrap gap-2">
-					<Select
-						aria-label={m.mail_rule_action_after()}
-						bind:value={form.after}
-						options={AFTER.map((value) => ({ value, label: AFTER_LABELS[value]() }))}
-						class="w-full sm:w-56"
-					/>
-					{#if form.after === 'move'}
+		<!-- What becomes of the mail on the server, step by step (Tobi, 05.11.2026): a move or
+		the trash ends the list, so it stays last and does not move. -->
+		{#each form.steps as step, index (step.key)}
+			{@const ends = ENDING.includes(step.action)}
+			{@const last = form.steps.findLastIndex((item) => !ENDING.includes(item.action))}
+			<RuleRow
+				label={STEP_LABELS[step.action]()}
+				moves={!ends}
+				onup={!ends && index > 0 ? () => moveStep(index, -1) : undefined}
+				ondown={!ends && index < last ? () => moveStep(index, 1) : undefined}
+				onremove={() => form.steps.splice(index, 1)}
+			>
+				<div class="flex min-w-0 flex-1 basis-64 flex-col gap-2">
+					{#if step.action === 'flag'}
+						<Select
+							aria-label={STEP_LABELS[step.action]()}
+							bind:value={step.value}
+							options={flagOptions()}
+						/>
+					{:else if step.action === 'add_keyword' || step.action === 'remove_keyword'}
+						<SearchSelect
+							aria-label={STEP_LABELS[step.action]()}
+							title={m.mail_keyword_title()}
+							bind:value={step.value}
+							options={keywordOptions(mailbox?.status.keywords ?? [], step.value)}
+							placeholder={m.rule_choose()}
+							create={useKeyword}
+							createLabel={m.mail_keyword_use}
+						/>
+					{:else if step.action === 'move'}
 						<Input
 							aria-label={m.mail_rule_move_to()}
 							placeholder={m.mail_rule_move_to()}
-							bind:value={form.moveTo}
+							bind:value={step.value}
 							maxlength={1000}
-							class="min-w-0 flex-1 basis-48"
 						/>
+					{:else}
+						<span class="sr-only">{m.rule_no_value()}</span>
 					{/if}
 				</div>
 			</RuleRow>
+		{/each}
+		{#if form.steps.length > 0}
+			<p class="text-sm text-muted-foreground">{m.mail_rule_steps_hint()}</p>
 		{/if}
 
-		{#if addable.length > 0}
+		{#if addable.length > 0 || steps.length > 0}
 			<div>
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger class={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
@@ -330,6 +360,15 @@
 								>{OPTIONAL_LABELS[item]()}</DropdownMenu.Item
 							>
 						{/each}
+						{#if steps.length > 0}
+							{#if addable.length > 0}<DropdownMenu.Separator />{/if}
+							<DropdownMenu.Label>{m.mail_rule_action_after()}</DropdownMenu.Label>
+							{#each steps as action (action)}
+								<DropdownMenu.Item onSelect={() => (form.steps = withStep(form.steps, action))}
+									>{STEP_LABELS[action]()}</DropdownMenu.Item
+								>
+							{/each}
+						{/if}
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			</div>
