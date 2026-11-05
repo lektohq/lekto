@@ -2,6 +2,7 @@
 
 import pytest
 
+from lekto.core.domain.condition_tree import Group
 from lekto.core.domain.errors import ConflictError
 from lekto.core.domain.ids import (
     DocumentId,
@@ -202,10 +203,16 @@ class MailRuleRepositoryContract:
             first,
             "Strom",
             1,
-            any=True,
-            conditions=(
-                MailCondition(MailField.SENDER, MailOperator.ENDS_WITH, "@stadtwerke.example"),
-                MailCondition(MailField.ATTACHMENTS, MailOperator.PRESENT),
+            conditions=Group(
+                mode="any",
+                items=(
+                    MailCondition(MailField.SENDER, MailOperator.ENDS_WITH, "@stadtwerke.example"),
+                    Group(
+                        mode="all",
+                        items=(MailCondition(MailField.ATTACHMENTS, MailOperator.PRESENT),),
+                        negate=True,
+                    ),
+                ),
             ),
             space_id=SpaceId(new_id()),
             text_type_id=DocumentTypeId(new_id()),

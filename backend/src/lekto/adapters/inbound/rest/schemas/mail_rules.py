@@ -8,21 +8,24 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.schemas import ReasonOut
+from lekto.core.domain.condition_tree import MAX_CONDITIONS, MAX_DEPTH
 from lekto.core.domain.ids import DocumentTypeId, SpaceId, UserId
+from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.mail import MailAction
 from lekto.core.domain.mail_intake import MailOutcome, MailParts
 from lekto.core.domain.mail_rules import (
-    MAX_CONDITIONS,
     MAX_FOLDER,
     MAX_PRIORITY,
     MIN_PRIORITY,
     UNSET,
-    MailCondition,
+    MailConditions,
     MailField,
     MailOperator,
     MailRule,
     MailRuleChanges,
     Unset,
+    conditions_from_json,
+    conditions_to_json,
 )
 from lekto.core.domain.validation import MAX_NAME
 from lekto.core.services.mail_rules import Decider, DryRunMail
@@ -35,9 +38,12 @@ AFTER_HELP = (
     "`move_to`), `trash`."
 )
 CONDITIONS_HELP = (
+    "A tree as a document rule's: a group of `all` or `any`, `not` turns it around; its items "
+    f"are conditions or groups again, nested at most {MAX_DEPTH} deep, at most {MAX_CONDITIONS} "
+    "conditions. "
     "Fields: `sender`, `recipient` (To, Cc) and `subject` with `contains`, `is`, `starts_with`, "
     "`ends_with` (an address or a name, regardless of case); `folder` with `is`; `attachments` "
-    "with `present` or `missing` (attachments Lekto takes). None: every mail."
+    "with `present` or `missing` (attachments Lekto takes). Null: every mail."
 )
 
 
@@ -48,12 +54,44 @@ class MailConditionBody(BaseModel):
     op: MailOperator
     value: str | None = Field(default=None, max_length=MAX_FOLDER)
 
-    def domain(self) -> MailCondition:
-        return MailCondition(self.field, self.op, self.value)
 
-    @classmethod
-    def of(cls, condition: MailCondition) -> "MailConditionBody":
-        return cls(field=condition.field, op=condition.op, value=condition.value)
+class MailAllGroup(BaseModel):
+    """All items hold (and); `not` turns the result around."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    all: list["MailConditionBody | MailAllGroup | MailAnyGroup"] = Field(
+        min_length=1, max_length=MAX_CONDITIONS
+    )
+    negate: bool = Field(default=False, alias="not")
+
+
+class MailAnyGroup(BaseModel):
+    """At least one item holds (or); `not` turns the result around."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    any: list["MailConditionBody | MailAllGroup | MailAnyGroup"] = Field(
+        min_length=1, max_length=MAX_CONDITIONS
+    )
+    negate: bool = Field(default=False, alias="not")
+
+
+type MailGroup = MailAllGroup | MailAnyGroup
+
+
+def _tree(group: MailGroup) -> MailConditions:
+    data: JsonValue = group.model_dump(mode="json", by_alias=True, exclude_defaults=True)
+    tree = conditions_from_json(data)
+    assert tree is not None
+    return tree
+
+
+def _group_out(conditions: MailConditions | None) -> MailGroup | None:
+    data = conditions_to_json(conditions)
+    if data is None:
+        return None
+    return MailAnyGroup.model_validate(data) if "any" in data else MailAllGroup.model_validate(data)
 
 
 class _Rule(BaseModel):
@@ -62,9 +100,8 @@ class _Rule(BaseModel):
     priority: int | None = Field(
         default=None, ge=MIN_PRIORITY, le=MAX_PRIORITY, description="Higher first."
     )
-    any: bool | None = Field(default=None, description="Any condition (or); else all (and).")
-    conditions: list[MailConditionBody] | None = Field(
-        default=None, max_length=MAX_CONDITIONS, description=CONDITIONS_HELP
+    conditions: MailAllGroup | MailAnyGroup | None = Field(
+        default=None, description=CONDITIONS_HELP
     )
     parts: MailParts | None = Field(default=None, description=PARTS_HELP)
     user_id: UUID | None = Field(default=None, description="Whom it takes the mail for.")
@@ -91,11 +128,12 @@ class _Rule(BaseModel):
         return MailRuleChanges(
             name=UNSET if name is None else name,
             priority=UNSET if self.priority is None else self.priority,
-            any=UNSET if self.any is None else self.any,
             conditions=(
                 UNSET
+                if "conditions" not in given
+                else None
                 if self.conditions is None
-                else tuple(item.domain() for item in self.conditions)
+                else _tree(self.conditions)
             ),
             parts=UNSET if self.parts is None else self.parts,
             user_id=optional("user_id", self.user_id, UserId),
@@ -108,8 +146,8 @@ class _Rule(BaseModel):
 
 
 class MailRuleCreate(_Rule):
-    """A new mail rule of a mailbox; what is left out gets the default (priority 100, all
-    conditions, takes the attachments and the text, leaves the mail, active)."""
+    """A new mail rule of a mailbox; what is left out gets the default (priority 100, no
+    conditions: every mail, takes the attachments and the text, leaves the mail, active)."""
 
     model_config = ConfigDict(
         extra="forbid",
@@ -118,9 +156,11 @@ class MailRuleCreate(_Rule):
                 {
                     "mailbox_id": "01a1a7fc-702c-736e-a661-ff59645bdc52",
                     "name": "Bills of the utilities",
-                    "conditions": [
-                        {"field": "sender", "op": "ends_with", "value": "@stadtwerke.example"}
-                    ],
+                    "conditions": {
+                        "all": [
+                            {"field": "sender", "op": "ends_with", "value": "@stadtwerke.example"}
+                        ]
+                    },
                     "user_id": "01a1a7fc-7013-741e-ae72-58401e634e5d",
                     "after": "read",
                 }
@@ -133,8 +173,9 @@ class MailRuleCreate(_Rule):
 
 
 class MailRulePatch(_Rule):
-    """What changes; what is left out stays. `space_id`, `text_type_id`, `user_id` and
-    `move_to` given as null clear it. Switching it on clears why it was paused."""
+    """What changes; what is left out stays. `conditions`, `space_id`, `text_type_id`,
+    `user_id` and `move_to` given as null clear it (no conditions: every mail). Switching it
+    on clears why it was paused."""
 
     model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [{"enabled": False}]})
 
@@ -195,8 +236,7 @@ class MailRuleOut(BaseModel):
     mailbox_id: UUID
     name: str
     priority: int
-    any: bool
-    conditions: list[MailConditionBody]
+    conditions: MailAllGroup | MailAnyGroup | None = Field(description=CONDITIONS_HELP)
     parts: MailParts
     user_id: UUID | None
     space_id: UUID | None
@@ -215,8 +255,7 @@ class MailRuleOut(BaseModel):
             mailbox_id=rule.mailbox_id,
             name=rule.name,
             priority=rule.priority,
-            any=rule.any,
-            conditions=[MailConditionBody.of(item) for item in rule.conditions],
+            conditions=_group_out(rule.conditions),
             parts=rule.parts,
             user_id=rule.user_id,
             space_id=rule.space_id,

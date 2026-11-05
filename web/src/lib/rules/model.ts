@@ -6,6 +6,19 @@
  * The tables and limits mirror `lekto.core.domain.rules`; the API checks everything again.
  */
 import type { components } from '#lib/api/schema.ts';
+import {
+	conditionsOf,
+	depthOf,
+	levelOf,
+	move,
+	newGroup as newTreeGroup,
+	nextKey,
+	treeFromApi,
+	treeToApi,
+	TREE_LIMITS,
+	type ApiTree,
+	type TreeGroup
+} from '#lib/rules/tree.ts';
 import { isMoney, isPeriod } from '#lib/fields.ts';
 import { readPeriod, writePeriod } from '#lib/periods.ts';
 
@@ -47,13 +60,8 @@ export interface ConditionNode {
 	factRole: string | null;
 }
 
-export interface GroupNode {
-	kind: 'group';
-	key: string;
-	mode: 'all' | 'any';
-	negate: boolean;
-	items: RuleNode[];
-}
+/** A group of a document rule's conditions: the tree every rule has (`tree.ts`). */
+export type GroupNode = TreeGroup<ConditionNode>;
 
 export type RuleNode = ConditionNode | GroupNode;
 /** A step that checks: its conditions as the builder edits them. */
@@ -89,8 +97,7 @@ export interface FieldInfo {
 }
 
 export const LIMITS = {
-	depth: 5,
-	conditions: 50,
+	...TREE_LIMITS,
 	actions: 20,
 	list: 100,
 	text: 500,
@@ -208,9 +215,6 @@ export const STEP_PATH = /^[a-z][a-z0-9_]{0,49}(\.[A-Za-z0-9_-]{1,100})*$/;
 export const MISSING: readonly Missing[] = ['red', 'yellow', 'continue'];
 export const TIMEOUT = { min: 30, max: 86_400, default: 300 } as const;
 
-let counter = 0;
-const nextKey = (): string => `n${++counter}`;
-
 // --- from and to the API ------------------------------------------------------------------
 
 export function fromApi(definition: ApiDefinition): RuleModel {
@@ -231,15 +235,7 @@ function actionFromApi(action: ApiAction): ActionNode {
 }
 
 function groupFromApi(group: ApiGroup): GroupNode {
-	const mode = 'all' in group ? 'all' : 'any';
-	const items = 'all' in group ? group.all : group.any;
-	return {
-		kind: 'group',
-		key: nextKey(),
-		mode,
-		negate: group.not ?? false,
-		items: items.map((item) => ('field' in item ? conditionFromApi(item) : groupFromApi(item)))
-	};
+	return treeFromApi(group as ApiTree<ApiCondition>, conditionFromApi);
 }
 
 function conditionFromApi(condition: ApiCondition): ConditionNode {
@@ -269,12 +265,7 @@ export function toApi(model: RuleModel): ApiDefinition {
 }
 
 function groupToApi(group: GroupNode): ApiGroup {
-	const items = group.items.map((item) =>
-		item.kind === 'group' ? groupToApi(item) : conditionToApi(item)
-	);
-	return group.mode === 'all'
-		? { all: items, not: group.negate }
-		: { any: items, not: group.negate };
+	return treeToApi(group, conditionToApi) as ApiGroup;
 }
 
 function conditionToApi(condition: ConditionNode): ApiCondition {
@@ -326,7 +317,7 @@ export function newModel(): RuleModel {
 }
 
 export function newGroup(mode: 'all' | 'any' = 'all', items: RuleNode[] = []): GroupNode {
-	return { kind: 'group', key: nextKey(), mode, negate: false, items };
+	return newTreeGroup<ConditionNode>(mode, items);
 }
 
 export function newCondition(field: ConditionField = 'contact'): ConditionNode {
@@ -478,10 +469,7 @@ function isEmpty(value: Value): boolean {
 
 // --- the tree -----------------------------------------------------------------------------
 
-/** All conditions, depth first. */
-export function conditionsOf(group: GroupNode): ConditionNode[] {
-	return group.items.flatMap((item) => (item.kind === 'group' ? conditionsOf(item) : [item]));
-}
+export { conditionsOf, depthOf, levelOf, move };
 
 /** The conditions of the rule's head and of its condition steps. */
 export function allConditions(model: RuleModel): ConditionNode[] {
@@ -501,22 +489,6 @@ export function asksBefore(model: RuleModel, index: number): string[] {
 		.flatMap((action) => (action.type === 'ask_webhook' && action.name ? [action.name] : []));
 }
 
-/** 1 for a group without subgroups. */
-export function depthOf(group: GroupNode): number {
-	return 1 + Math.max(0, ...group.items.map((item) => (item.kind === 'group' ? depthOf(item) : 0)));
-}
-
-/** The level of a group in the tree, 1 for the root; 0 if it is not in it. */
-export function levelOf(root: GroupNode, key: string, level = 1): number {
-	if (root.key === key) return level;
-	for (const item of root.items) {
-		if (item.kind !== 'group') continue;
-		const found = levelOf(item, key, level + 1);
-		if (found) return found;
-	}
-	return 0;
-}
-
 export function canAddCondition(model: RuleModel): boolean {
 	return allConditions(model).length < LIMITS.conditions;
 }
@@ -529,13 +501,6 @@ export function canAddGroup(model: RuleModel, group: GroupNode): boolean {
 	];
 	const level = Math.max(...roots.map((root) => levelOf(root, group.key)));
 	return canAddCondition(model) && level < LIMITS.depth;
-}
-
-/** Move the item at `index` one place up (-1) or down (+1). */
-export function move<T>(items: T[], index: number, by: -1 | 1): void {
-	const target = index + by;
-	if (target < 0 || target >= items.length) return;
-	[items[index], items[target]] = [items[target], items[index]];
 }
 
 /** The field an action sets alone; two such actions contradict each other (a webhook twice

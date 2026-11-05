@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from lekto.adapters.outbound.regex import RegexPatternMatcher
+from lekto.core.domain.condition_tree import Group
 from lekto.core.domain.documents import Channel
 from lekto.core.domain.errors import PermissionDeniedError, ValidationError
 from lekto.core.domain.identifiers import Identifier, IdentifierKind
@@ -348,7 +349,10 @@ async def test_the_first_matching_rule_takes_a_mail(world: World) -> None:
         mailbox,
         name="Newsletter",
         priority=2,
-        conditions=(MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Newsletter"),),
+        conditions=Group(
+            mode="all",
+            items=(MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Newsletter"),),
+        ),
         parts=MailParts.NOTHING,
         after=MailAction.TRASH,
     )
@@ -357,8 +361,9 @@ async def test_the_first_matching_rule_takes_a_mail(world: World) -> None:
         admin,
         mailbox,
         priority=1,
-        conditions=(
-            MailCondition(MailField.SENDER, MailOperator.ENDS_WITH, "@stadtwerke.example"),
+        conditions=Group(
+            mode="all",
+            items=(MailCondition(MailField.SENDER, MailOperator.ENDS_WITH, "@stadtwerke.example"),),
         ),
         user_id=person.id,
         space_id=household.id,
@@ -448,7 +453,10 @@ async def test_a_dry_run_over_the_latest_mails(world: World) -> None:
         mailbox,
         name="Newsletter",
         priority=3,
-        conditions=(MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Newsletter"),),
+        conditions=Group(
+            mode="all",
+            items=(MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Newsletter"),),
+        ),
         parts=MailParts.NOTHING,
     )
     _deliver(world, mails.plain_mail("Unser Newsletter"))
@@ -458,7 +466,9 @@ async def test_a_dry_run_over_the_latest_mails(world: World) -> None:
     draft = MailRuleChanges(
         name="Mit Anhängen",
         priority=2,
-        conditions=(MailCondition(MailField.ATTACHMENTS, MailOperator.PRESENT),),
+        conditions=Group(
+            mode="all", items=(MailCondition(MailField.ATTACHMENTS, MailOperator.PRESENT),)
+        ),
         user_id=person.id,
     )
     found = await world.mail_rules.dry_run(admin.id, mailbox.id, draft)

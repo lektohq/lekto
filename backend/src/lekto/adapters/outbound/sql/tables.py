@@ -975,8 +975,8 @@ mail_rules = Table(
     ),
     Column("name", Text, nullable=False),
     Column("priority", Integer, nullable=False),
-    Column("any", Boolean, nullable=False),
-    Column("conditions", json_type(), nullable=False),
+    # The tree of conditions as every rule has it (`condition_tree`); NULL: every mail.
+    Column("conditions", json_type(), nullable=True),
     Column("parts", Text, nullable=False),
     Column("user_id", Uuid, nullable=True),
     Column("space_id", Uuid, nullable=True),

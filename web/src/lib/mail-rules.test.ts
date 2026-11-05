@@ -7,19 +7,23 @@ import {
 	newCondition,
 	patchBody,
 	summaryOf,
+	type MailConditionNode,
 	type MailRule
 } from './mail-rules.ts';
+import { newGroup } from '#lib/rules/tree.ts';
 
 const RULE: MailRule = {
 	id: 'r1',
 	mailbox_id: 'm1',
 	name: 'Strom',
 	priority: 1,
-	any: true,
-	conditions: [
-		{ field: 'sender', op: 'ends_with', value: '@stadtwerke.example' },
-		{ field: 'attachments', op: 'present', value: null }
-	],
+	conditions: {
+		any: [
+			{ field: 'sender', op: 'ends_with', value: '@stadtwerke.example' },
+			{ field: 'attachments', op: 'present', value: null }
+		],
+		not: false
+	},
 	parts: 'all',
 	user_id: 'u1',
 	space_id: 's1',
@@ -46,7 +50,7 @@ describe('the form of a mail rule', () => {
 		expect(complete(form)).toBe(false); // no name, no person, an empty condition
 		form.name = 'Strom';
 		form.userId = 'u1';
-		form.conditions[0].value = '@stadtwerke.example';
+		(form.conditions.items[0] as MailConditionNode).value = '@stadtwerke.example';
 		expect(complete(form)).toBe(true);
 		expect(createBody(form)).toMatchObject({
 			mailbox_id: 'm1',
@@ -56,8 +60,13 @@ describe('the form of a mail rule', () => {
 			space_id: null,
 			after: 'nothing',
 			move_to: null,
-			conditions: [{ field: 'sender', op: 'ends_with', value: '@stadtwerke.example' }]
+			conditions: {
+				all: [{ field: 'sender', op: 'ends_with', value: '@stadtwerke.example' }],
+				not: false
+			}
 		});
+		form.conditions.items = [];
+		expect(createBody(form).conditions).toBeNull(); // no conditions: every mail
 	});
 
 	it('keeps what a stored rule has, and drops what is taken away', () => {
@@ -72,19 +81,38 @@ describe('the form of a mail rule', () => {
 		expect(patchBody(form)).toMatchObject({ space_id: null, after: 'nothing', move_to: null });
 		form.parts = 'nothing';
 		expect(patchBody(form)).toMatchObject({ user_id: null, parts: 'nothing' });
-		form.conditions.push(newCondition('attachments'));
+		form.conditions.items.push(newCondition('attachments'));
 		expect(complete(form)).toBe(true); // "present" takes no value
+		form.conditions.items.push(newGroup<MailConditionNode>('all', []));
+		expect(complete(form)).toBe(false); // an empty subgroup
+	});
+
+	it('keeps groups and their "not" as the tree of every rule', () => {
+		const nested: MailRule = {
+			...RULE,
+			conditions: {
+				all: [
+					{ field: 'sender', op: 'ends_with', value: '@stadtwerke.example' },
+					{ any: [{ field: 'subject', op: 'contains', value: 'Mahnung' }], not: true }
+				],
+				not: false
+			}
+		};
+		expect(patchBody(formOf(nested)).conditions).toEqual(nested.conditions);
+		expect(summaryOf(nested, names)).toContain(
+			`${m.rule_and()}${m.rule_not_text({ text: `${m.mail_rule_field_subject()} ${m.rule_op_contains()} Mahnung` })}`
+		);
 	});
 
 	it('says a rule in one line', () => {
 		expect(summaryOf(RULE, names)).toBe(
-			`${m.rule_priority_short({ priority: 1 })} · ${m.mail_rule_field_sender()} ${m.rule_op_ends_with()} @stadtwerke.example${m.mail_rule_or()}${m.mail_rule_field_attachments()} ${m.mail_rule_attachments_present()} → ${m.mail_rule_parts_all()}, ${m.mail_rule_summary_for({ name: 'Max' })}, ${m.mail_rule_summary_space({ name: 'Haushalt' })}, ${m.mail_rule_summary_move({ folder: 'Lekto/Erledigt' })}`
+			`${m.rule_priority_short({ priority: 1 })} · ${m.mail_rule_field_sender()} ${m.rule_op_ends_with()} @stadtwerke.example${m.rule_or()}${m.mail_rule_field_attachments()} ${m.mail_rule_attachments_present()} → ${m.mail_rule_parts_all()}, ${m.mail_rule_summary_for({ name: 'Max' })}, ${m.mail_rule_summary_space({ name: 'Haushalt' })}, ${m.mail_rule_summary_move({ folder: 'Lekto/Erledigt' })}`
 		);
 		expect(
 			summaryOf(
 				{
 					...RULE,
-					conditions: [],
+					conditions: null,
 					parts: 'nothing',
 					user_id: null,
 					space_id: null,

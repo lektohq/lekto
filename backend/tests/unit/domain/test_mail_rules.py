@@ -2,6 +2,7 @@
 
 import pytest
 
+from lekto.core.domain.condition_tree import MAX_DEPTH, Group
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import MailboxId, SpaceId, UserId, new_id
 from lekto.core.domain.mail import MailAction
@@ -14,6 +15,8 @@ from lekto.core.domain.mail_rules import (
     MailOperator,
     MailRule,
     MailRuleChanges,
+    conditions_from_json,
+    conditions_to_json,
     first_match,
     mail_facts,
 )
@@ -74,12 +77,42 @@ def test_a_bad_condition_is_refused(field: MailField, op: MailOperator, value: s
         MailCondition(field, op, value)
 
 
-def test_all_or_any_and_none() -> None:
-    hit = MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Rechnung")
-    miss = MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Newsletter")
-    assert not rule(conditions=(hit, miss)).matches(FACTS)
-    assert rule(conditions=(hit, miss), any=True).matches(FACTS)
+HIT = MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Rechnung")
+MISS = MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Newsletter")
+
+
+def test_the_tree_of_every_rule() -> None:
+    assert not rule(conditions=Group(mode="all", items=(HIT, MISS))).matches(FACTS)
+    assert rule(conditions=Group(mode="any", items=(HIT, MISS))).matches(FACTS)
+    assert rule(conditions=Group(mode="all", items=(MISS,), negate=True)).matches(FACTS)
+    inner = Group(mode="any", items=(MISS, Group(mode="all", items=(HIT,), negate=True)))
+    assert not rule(conditions=Group(mode="all", items=(HIT, inner))).matches(FACTS)
     assert rule().matches(FACTS)  # no condition: every mail
+
+
+def test_the_tree_has_the_limits_of_every_rule() -> None:
+    deep: Group[MailCondition] = Group(mode="all", items=(HIT,))
+    for _ in range(MAX_DEPTH):
+        deep = Group(mode="all", items=(deep,))
+    with pytest.raises(ValidationError, match="deep"):
+        rule(conditions=deep)
+
+
+def test_the_tree_in_json() -> None:
+    tree = Group(mode="any", items=(HIT, Group(mode="all", items=(MISS,), negate=True)))
+    data = conditions_to_json(tree)
+    assert data == {
+        "any": [
+            {"field": "subject", "op": "contains", "value": "Rechnung"},
+            {"all": [{"field": "subject", "op": "contains", "value": "Newsletter"}], "not": True},
+        ]
+    }
+    assert conditions_from_json(data) == tree
+    assert conditions_to_json(None) is None and conditions_from_json(None) is None
+    with pytest.raises(ValidationError, match="unknown key"):
+        conditions_from_json({"all": [{"field": "subject", "op": "is", "value": "x", "y": 1}]})
+    with pytest.raises(ValidationError):
+        conditions_from_json({"all": [{"field": "nope", "op": "is", "value": "x"}]})
 
 
 def test_the_first_by_priority_then_name_decides() -> None:

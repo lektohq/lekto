@@ -1,7 +1,8 @@
 <script lang="ts">
 	import Select from '#lib/components/Select.svelte';
 	import ActionRow from '#lib/components/rules/ActionRow.svelte';
-	import ConditionGroup from '#lib/components/rules/ConditionGroup.svelte';
+	import ConditionGroup, { type RowMoves } from '#lib/components/rules/ConditionGroup.svelte';
+	import ConditionRow from '#lib/components/rules/ConditionRow.svelte';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
 	import HintLabel from '#lib/components/HintLabel.svelte';
 	import * as Field from '#lib/components/ui/field/index.ts';
@@ -15,9 +16,13 @@
 		LIMITS,
 		TRIGGERS,
 		asksBefore,
+		canAddCondition,
+		canAddGroup,
 		move,
 		newAction,
+		newCondition,
 		type ActionType,
+		type ConditionNode,
 		type RuleModel
 	} from '#lib/rules/model.ts';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
@@ -150,7 +155,24 @@
 
 	<section class="flex flex-col gap-3" aria-labelledby="rule-conditions">
 		<SectionTitle id="rule-conditions">{m.rule_conditions()}</SectionTitle>
-		<ConditionGroup group={model.conditions} {model} {lookup} {errors} onunreadable={mark} />
+		{#snippet conditionRow(condition: ConditionNode, moves: RowMoves)}
+			<ConditionRow
+				{condition}
+				{lookup}
+				error={errors[condition.key]}
+				{...moves}
+				onunreadable={(unreadable) => mark(condition.key, unreadable)}
+			/>
+		{/snippet}
+		<ConditionGroup
+			group={model.conditions}
+			root
+			{errors}
+			row={conditionRow}
+			newCondition={() => newCondition('contact')}
+			canAddCondition={canAddCondition(model)}
+			canAddGroup={(group) => canAddGroup(model, group)}
+		/>
 	</section>
 
 	<section class="flex flex-col gap-3" aria-labelledby="rule-actions">
