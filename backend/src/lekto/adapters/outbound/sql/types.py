@@ -66,8 +66,7 @@ class ExactDecimal(TypeDecorator[Decimal]):
 
 
 def json_type() -> TypeEngine[Any]:
-    """JSON values: `jsonb` on Postgres, text on SQLite. An empty value is the JSON `null` (a
-    `None` written), read back as `None`; a few columns hold SQL `NULL` instead (`null()`
-    written), read back the same. So a query that asks a JSON column for empty asks for both;
-    none does so far (Tobi, 05.11.2026)."""
-    return JSON().with_variant(JSONB(), "postgresql")
+    """JSON values: `jsonb` on Postgres, text on SQLite. An empty value (`None` written) is SQL
+    `NULL`, never the JSON `null`, and reads back as `None`: `IS NULL` finds it (revision 0067
+    turned the JSON `null` the type wrote before into `NULL`; Tobi, 05.11.2026)."""
+    return JSON(none_as_null=True).with_variant(JSONB(none_as_null=True), "postgresql")

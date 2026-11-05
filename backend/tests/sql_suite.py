@@ -18,12 +18,14 @@ import sqlalchemy as sa
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import Connection, insert, inspect, select
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from lekto.adapters.outbound.memory import ManualClock, MemoryObjectStore
 from lekto.adapters.outbound.sql import Database, SqlUnitOfWorkFactory, migrate, schema_state
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.migrations import downgrade
+from lekto.adapters.outbound.sql.migrations.versions import v0067_json_empty_as_null as v0067
 from lekto.adapters.outbound.sql.types import UtcDateTime, json_type
 from lekto.core.domain.condition_tree import Group
 from lekto.core.domain.documents import Document, DocumentChanges
@@ -190,6 +192,38 @@ class SqlAdapterSuite(ServicesOverPersistence):
             read = await uow.mail_rules.get(bad_tree.id)
         assert (read.enabled, read.disabled_reason) == (False, None)
         assert (read.conditions, read.after) == (None, (MailStep(MailAction.TRASH),))
+
+    async def test_an_empty_json_value_is_sql_null(
+        self, database: Database, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """What a repository writes as `None` into a JSON column is SQL NULL, which `IS NULL`
+        finds (revision 0067), not the JSON `null`."""
+        mailbox = await a_mailbox(uow_factory)
+        rule = MailRule.create(
+            mailbox_id=mailbox.id,
+            changes=MailRuleChanges(name="Every", user_id=UserId(new_id())),
+            now=NOW,
+        )
+        async with uow_factory() as uow:
+            await uow.mail_rules.add(rule)
+            await uow.commit()
+        rules, boxes = t.mail_rules, t.mailboxes
+        async with database.reading() as connection:
+            found = await _read_all(
+                connection,
+                select(rules.c.id).where(
+                    rules.c.conditions.is_(None), rules.c.disabled_reason.is_(None)
+                ),
+            )
+            found += await _read_all(
+                connection,
+                select(boxes.c.id).where(
+                    boxes.c.error.is_(None),
+                    boxes.c.skipped.is_(None),
+                    boxes.c.step_failed.is_(None),
+                ),
+            )
+        assert found == [(rule.id,), (mailbox.id,)]
 
     # --- concurrency ----------------------------------------------------------------------------
 
@@ -3680,6 +3714,81 @@ class MigrationSuite:
             ("trash", "trash", None),
         ]
 
+    async def test_revision_0067_turns_the_json_null_into_null(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0067: the JSON `null` the column type wrote for an empty value becomes SQL
+        NULL in every JSON column that may be empty, which the type writes from then on; the
+        downgrade leaves it. The revision names every such column of its schema."""
+        await migrate(empty_database, "0066")
+
+        def nullable_json(sync: Connection) -> set[tuple[str, str]]:
+            inspector = inspect(sync)
+            return {
+                (table, column["name"])
+                for table in inspector.get_table_names()
+                for column in inspector.get_columns(table)
+                if isinstance(column["type"], sa.JSON) and column["nullable"]
+            }
+
+        async with empty_database.reading() as connection:
+            assert await connection.run_sync(nullable_json) == set(v0067.COLUMNS)
+        mailbox, every, some = new_id(), new_id(), new_id()
+        tree = {"all": [{"field": "subject", "op": "contains", "value": "Rechnung"}]}
+        reason = {"code": "mail_rule_type_gone", "params": {}}
+        empty = {"error": None, "skipped": None, "step_failed": None}
+        rule = {"mailbox_id": mailbox, "parts": "all", "priority": 1, "steps": [], "enabled": True}
+        await _insert(
+            empty_database,
+            [
+                (_json_null_before_0067(t.mailboxes), _MAILBOX | empty | {"id": mailbox}),
+                (
+                    _json_null_before_0067(t.mail_rules),
+                    rule
+                    | {"id": every, "name": "every", "conditions": None, "disabled_reason": None},
+                ),
+                (
+                    _json_null_before_0067(t.mail_rules),
+                    rule
+                    | {"id": some, "name": "some", "conditions": tree, "disabled_reason": reason},
+                ),
+            ],
+        )
+        boxes, rules = t.mailboxes, t.mail_rules
+        columns = [
+            boxes.c.error,
+            boxes.c.skipped,
+            boxes.c.step_failed,
+            rules.c.conditions,
+            rules.c.disabled_reason,
+        ]
+
+        async def empties() -> list[tuple[int, int]]:
+            """Per column: the rows with the JSON `null`, the rows with NULL."""
+            async with empty_database.reading() as connection:
+
+                async def count(where: Any) -> int:
+                    return (
+                        await connection.execute(select(sa.func.count()).where(where))
+                    ).scalar_one()
+
+                return [
+                    (await count(sa.cast(column, sa.Text) == "null"), await count(column.is_(None)))
+                    for column in columns
+                ]
+
+        assert await empties() == [(1, 0)] * len(columns)
+        await migrate(empty_database)
+        assert await empties() == [(0, 1)] * len(columns)
+        async with empty_database.reading() as connection:
+            kept = await _read_all(
+                connection,
+                select(rules.c.conditions, rules.c.disabled_reason).where(rules.c.id == some),
+            )
+        assert kept == [(tree, reason)]
+        await downgrade(empty_database, "0066")
+        assert await empties() == [(0, 1)] * len(columns)
+
     async def test_migrations_match_the_table_definitions(
         self, empty_database: Database, model_database: Database
     ) -> None:
@@ -3790,6 +3899,19 @@ _DEFAULTS: dict[str, Any] = {
     "attempts": 0,
     "releases": 0,
 }
+
+
+def _json_null_before_0067(table: sa.Table) -> sa.TableClause:
+    """`table` with its JSON columns as the type wrote them before revision 0067: a `None` as
+    the JSON `null`."""
+    before = sa.JSON().with_variant(JSONB(), "postgresql")
+    return sa.table(
+        table.name,
+        *(
+            sa.column(column.name, before if isinstance(column.type, sa.JSON) else column.type)
+            for column in table.c
+        ),
+    )
 
 
 async def _insert(

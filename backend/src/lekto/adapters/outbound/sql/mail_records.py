@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Row, insert, null, select, update
+from sqlalchemy import Row, insert, select, update
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.transaction import Transaction
@@ -94,15 +94,15 @@ class SqlMailRecordRepository:
             .values(
                 sender="",
                 subject="",
-                reason=null(),
+                reason=None,
                 senders=[],
                 recipients=[],
                 attachments=[],
                 to_texts=[],
                 cc_texts=[],
-                importance=null(),
-                keywords=null(),
-                flag=null(),
+                importance=None,
+                keywords=None,
+                flag=None,
                 forgotten_at=now,
             )
         )
@@ -186,7 +186,7 @@ class SqlMailOriginRepository:
 def marks_values(marks: MailMarks | None) -> dict[str, Any]:
     """The columns of a mail's marks: keywords NULL when they are not known."""
     if marks is None:
-        return {"keywords": null(), "flag": None}
+        return {"keywords": None, "flag": None}
     return {
         "keywords": list(marks.keywords),
         "flag": None if marks.flag is None else marks.flag.value,
