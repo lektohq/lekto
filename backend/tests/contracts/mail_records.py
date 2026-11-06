@@ -11,11 +11,12 @@ from lekto.core.domain.ids import (
     DocumentTypeId,
     MailboxId,
     MailRecordId,
+    MailRuleId,
     SpaceId,
     UserId,
     new_id,
 )
-from lekto.core.domain.mail import MailAction, Mailbox, MailStep
+from lekto.core.domain.mail import MailAction, Mailbox, MailStep, StepOutcome
 from lekto.core.domain.mail_intake import (
     MailOrigin,
     MailOutcome,
@@ -168,6 +169,50 @@ class MailRecordRepositoryContract:
             async with uow_factory() as uow:
                 await uow.mail_records.add(a_record(gone, 1))
                 await uow.commit()
+
+    async def test_mails_waiting_for_a_rule_and_what_became_of_them(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        mailbox = await a_mailbox(uow_factory)
+        waiting = a_record(mailbox, 1, outcome=MailOutcome.NO_RULE, documents=0)
+        later = a_record(mailbox, 2, outcome=MailOutcome.NO_RULE, documents=0)
+        gone = a_record(mailbox, 3, outcome=MailOutcome.NO_RULE, documents=0)
+        taken = a_record(mailbox, 4)
+        async with uow_factory() as uow:
+            for record in (waiting, later, gone, taken):
+                await uow.mail_records.add(record)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert [r.uid for r in await uow.mail_records.waiting(mailbox.id)] == [3, 2, 1]
+            steps = (
+                StepOutcome(MailStep(MailAction.READ)),
+                StepOutcome(
+                    MailStep(MailAction.ADD_KEYWORD, "Lekto"),
+                    because(ReasonCode.MAIL_SERVER_ERROR, detail="no keywords"),
+                ),
+            )
+            settled = replace(
+                later,
+                outcome=MailOutcome.TAKEN,
+                rule="Strom",
+                rule_id=MailRuleId(new_id()),
+                documents=2,
+                decided_at=NOW + 9 * HOUR,
+                steps=steps,
+                subject="ignored",  # what the head said stays as stored
+            )
+            await uow.mail_records.settle(settled)
+            await uow.mail_records.settle(replace(gone, gone_at=NOW + 9 * HOUR))
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert [r.uid for r in await uow.mail_records.waiting(mailbox.id)] == [1]
+            stored = {r.uid: r for r in await uow.mail_records.recent(mailbox.id, limit=9)}
+            assert stored[2] == replace(settled, subject=later.subject)
+            assert stored[2].later and stored[2].steps == steps
+            assert stored[3].gone_at == NOW + 9 * HOUR and not stored[3].waiting
+        with pytest.raises(NotFoundError):
+            async with uow_factory() as uow:
+                await uow.mail_records.settle(a_record(mailbox, 9))
 
     async def test_a_uid_is_recorded_once(self, uow_factory: UnitOfWorkFactory) -> None:
         mailbox = await a_mailbox(uow_factory)

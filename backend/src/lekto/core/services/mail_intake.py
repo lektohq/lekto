@@ -41,6 +41,7 @@ from lekto.core.domain.mail import (
     Mailbox,
     MailboxStatus,
     MailLogin,
+    StepOutcome,
     password_context,
     step_flags,
 )
@@ -57,7 +58,13 @@ from lekto.core.domain.mail_intake import (
     taken_names,
 )
 from lekto.core.domain.mail_message import MailMessage, address_line, read_mail
-from lekto.core.domain.mail_rules import MailFacts, MailRule, first_match, mail_facts
+from lekto.core.domain.mail_rules import (
+    MailFacts,
+    MailRule,
+    first_match,
+    mail_facts,
+    record_facts,
+)
 from lekto.core.domain.mail_traits import MailMarks
 from lekto.core.domain.permissions import can_file_into
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
@@ -106,6 +113,7 @@ class _Count:
     documents: int = 0
     more: bool = False  # mails were left for the next run
     skipped: Reason | None = None  # the latest mail left out, too large
+    later: int = 0  # mails without a rule a rule switched on since took
     step_failed: Reason | None = None  # the latest step on a mail the server refused
     keywords: set[str] = field(default_factory=set)  # those the folders know
     own_keywords: bool | None = None  # whether the server stores Lekto's own (in every folder)
@@ -268,6 +276,90 @@ class MailIntakeService:
             if made is not None:
                 count.mails += 1
                 count.documents += made
+        await self._waiting(session, mailbox, folder, found.uidvalidity, count)
+
+    async def _waiting(
+        self,
+        session: MailSession,
+        mailbox: Mailbox,
+        folder: str,
+        uidvalidity: int,
+        count: _Count,
+    ) -> None:
+        """The folder's mails no rule took (`MailRecord.waiting`): a rule switched on since may
+        take them now (Tobi, 06.11.2026); the fallback does not. Lekto judges them by what their
+        records keep, with their flags as they are now, and fetches only those a rule takes,
+        within the room of the run. A mail gone from the folder (or behind a new UIDVALIDITY) is
+        noted so and no longer waits."""
+        async with self._uow() as uow:
+            rules = [rule for rule in await uow.mail_rules.of_mailbox(mailbox.id) if rule.enabled]
+            waiting = [
+                record
+                for record in await uow.mail_records.waiting(mailbox.id)
+                if record.folder == folder
+            ]
+        if not rules or not waiting:
+            return
+        current = [record for record in waiting if record.uidvalidity == uidvalidity]
+        infos = {info.uid: info for info in await session.info(folder, [r.uid for r in current])}
+        now = self._clock.now()
+        for record in waiting:
+            if record.uidvalidity != uidvalidity or record.uid not in infos:
+                await self._settle(replace(record, gone_at=now))
+        for record in current:
+            info = infos.get(record.uid)
+            if info is None:
+                continue
+            facts = replace(record_facts(record), marks=MailMarks.of_flags(info.flags))
+            if first_match(rules, facts) is None:
+                continue
+            if count.mails + count.later >= MAX_PER_RUN:
+                count.more = True
+                return
+            made = await self._later(session, mailbox, record, facts, count)
+            if made is not None:
+                count.later += 1
+                count.documents += made
+
+    async def _later(
+        self,
+        session: MailSession,
+        mailbox: Mailbox,
+        record: MailRecord,
+        facts: MailFacts,
+        count: _Count,
+    ) -> int | None:
+        """Take a mail without a rule that a rule takes now; the documents it made, or None if
+        no rule took it after all (one paused) or it is gone."""
+        decision = await self._decide(mailbox, facts, fallback=False)
+        if decision is None:
+            return None
+        data = await session.fetch(record.folder, record.uid)
+        if data is None:
+            await self._settle(replace(record, gone_at=self._clock.now()))
+            return None
+        now = self._clock.now()
+        decided = replace(record, rule=decision.rule, rule_id=decision.rule_id, decided_at=now)
+        try:
+            message = read_mail(data)
+        except UnprocessableDocumentError as error:
+            await self._settle(replace(decided, outcome=MailOutcome.FAILED, reason=error.reason))
+            return 0
+        try:
+            made = await self._take(mailbox, record, message, decision)
+        except DomainError as error:
+            log.warning(
+                "a waiting mail could not be taken",
+                extra={"mailbox_id": str(mailbox.id), "reason": error.reason.text},
+            )
+            await self._settle(replace(decided, outcome=MailOutcome.FAILED, reason=error.reason))
+            return 0
+        outcome = MailOutcome.TAKEN if made else MailOutcome.NOTHING
+        steps = await self._after(
+            session, record.folder, record.uid, decision, record.subject, count
+        )
+        await self._settle(replace(decided, outcome=outcome, documents=made, steps=steps))
+        return made
 
     async def _due(
         self,
@@ -380,18 +472,38 @@ class MailIntakeService:
                 extra={"mailbox_id": str(mailbox.id), "reason": error.reason.text},
             )
             await self._keep(
-                replace(record, outcome=MailOutcome.FAILED, reason=error.reason, rule=decision.rule)
+                replace(
+                    record,
+                    outcome=MailOutcome.FAILED,
+                    reason=error.reason,
+                    rule=decision.rule,
+                    rule_id=decision.rule_id,
+                    decided_at=record.fetched_at,
+                )
             )
             return 0
         outcome = MailOutcome.TAKEN if made else MailOutcome.NOTHING
-        await self._keep(replace(record, outcome=outcome, rule=decision.rule, documents=made))
-        await self._after(session, folder, info.uid, decision, record.subject, count)
+        record = replace(
+            record,
+            outcome=outcome,
+            rule=decision.rule,
+            rule_id=decision.rule_id,
+            documents=made,
+            decided_at=record.fetched_at,
+        )
+        await self._keep(record)
+        steps = await self._after(session, folder, info.uid, decision, record.subject, count)
+        if steps:
+            await self._settle(replace(record, steps=steps))
         return made
 
-    async def _decide(self, mailbox: Mailbox, facts: MailFacts) -> MailDecision | None:
-        """The first of the mailbox's rules that matches, else the mailbox's fallback; None
-        for nothing. A rule whose person, space or type is gone or out of reach is paused with
-        the reason, and the next one asked."""
+    async def _decide(
+        self, mailbox: Mailbox, facts: MailFacts, *, fallback: bool = True
+    ) -> MailDecision | None:
+        """The first of the mailbox's rules that matches, else the mailbox's fallback (unless
+        `fallback` is False: a mail without a rule taken later); None for nothing. A rule whose
+        person, space or type is gone or out of reach is paused with the reason, and the next
+        one asked."""
         async with self._uow() as uow:
             rules = await uow.mail_rules.of_mailbox(mailbox.id)
         while (rule := first_match(rules, facts)) is not None:
@@ -400,7 +512,11 @@ class MailIntakeService:
                 return rule.decision()
             await self._pause(rule, problem)
             rules = [item for item in rules if item.id != rule.id]
-        if mailbox.fallback is not Fallback.EVERYTHING or mailbox.fallback_user_id is None:
+        if (
+            not fallback
+            or mailbox.fallback is not Fallback.EVERYTHING
+            or mailbox.fallback_user_id is None
+        ):
             return None
         async with self._uow() as uow:
             person = await uow.users.find(mailbox.fallback_user_id)
@@ -546,6 +662,11 @@ class MailIntakeService:
             await uow.mail_records.add(record)
             await uow.commit()
 
+    async def _settle(self, record: MailRecord) -> None:
+        async with self._uow() as uow:
+            await uow.mail_records.settle(record)
+            await uow.commit()
+
     async def _keep_origin(self, origin: MailOrigin) -> None:
         async with self._uow() as uow:
             await uow.mail_origins.add(origin)
@@ -559,10 +680,11 @@ class MailIntakeService:
         decision: MailDecision,
         subject: str,
         count: _Count,
-    ) -> None:
-        """The decision's steps on the mail on the server, in order. A step the server refuses
-        (a keyword where it stores none) is noted at the mailbox, the next ones go on; the
-        mail stays taken."""
+    ) -> tuple[StepOutcome, ...]:
+        """The decision's steps on the mail on the server, in order, each with why the server
+        refused it. A refused step (a keyword where it stores none) is noted at the mailbox, the
+        next ones go on; the mail stays taken."""
+        done: list[StepOutcome] = []
         for step in decision.after:
             try:
                 match step.action:
@@ -580,6 +702,10 @@ class MailIntakeService:
                     subject=subject,
                     detail=error.reason.text,
                 )
+                done.append(StepOutcome(step, error.reason))
+            else:
+                done.append(StepOutcome(step))
+        return tuple(done)
 
 
 async def _mark(

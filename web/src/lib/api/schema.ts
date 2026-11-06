@@ -2558,7 +2558,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * Dry run of a mail rule
-		 * @description What a rule (saved or not; with `rule_id` in place of the stored one) would do with the mailbox's latest 50 mails, as Lekto recorded them when it fetched them: whether its conditions hold and who would decide each, this rule, another before it, or the mailbox's fallback. Reads only; the mail server is not asked. Only admins (403).
+		 * @description What a rule (saved or not; with `rule_id` in place of the stored one) would do with the mailbox's latest 50 mails and every mail still waiting for a rule (`waiting`), as Lekto recorded them when it fetched them, the latest first: whether its conditions hold and who would decide each, this rule, another before it, or the mailbox's fallback. A waiting mail goes to its rule at the next fetch. Reads only; the mail server is not asked. Only admins (403).
 		 */
 		post: operations['dry_run_mail_rule_api_v1_mail_rules_dry_run_post'];
 		delete?: never;
@@ -2590,7 +2590,7 @@ export interface paths {
 		head?: never;
 		/**
 		 * Change a mail rule
-		 * @description Checks as when creating. Only admins (403).
+		 * @description Checks as when creating. Switching a rule on brings its mailbox's next fetch forward to now, which gives it the mails waiting for a rule. Only admins (403).
 		 */
 		patch: operations['update_mail_rule_api_v1_mail_rules__id__patch'];
 		trace?: never;
@@ -5093,6 +5093,11 @@ export interface components {
 			 * @description The rule before it; null otherwise.
 			 */
 			rule_id: string | null;
+			/**
+			 * Waiting
+			 * @description No rule took it yet: the next fetch gives it to the rule that decides it now (never to the fallback), as long as it lies in its folder and is among the mailbox's latest 500.
+			 */
+			waiting: boolean;
 		};
 		/**
 		 * EventBody
