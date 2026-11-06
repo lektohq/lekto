@@ -96,6 +96,21 @@ class ImapMailServer:
             raise MailServerError(because(ReasonCode.MAIL_LOGIN_FAILED)) from error
         except OSError as error:
             raise MailServerError(because(ReasonCode.MAIL_UNREACHABLE, host=login.host)) from error
+        _learn_capabilities(imap)
+
+
+def _learn_capabilities(imap: imaplib.IMAP4) -> None:
+    """The server's capabilities once signed in. `imaplib` keeps those of the greeting, and many
+    servers name little more there than how to sign in: iCloud names UIDPLUS only afterwards,
+    so a moved mail stayed in the folder marked deleted (Tobi, 06.11.2026); Dovecot names MOVE
+    only afterwards. Without an answer the greeting's stay."""
+    try:
+        status, answer = imap.capability()
+    except (imaplib.IMAP4.error, OSError):
+        return
+    line = answer[-1] if status == "OK" and answer else None
+    if isinstance(line, bytes) and line.strip():
+        imap.capabilities = tuple(line.decode("ascii", "replace").upper().split())
 
 
 def _login_with_literal(imap: imaplib.IMAP4, login: MailLogin) -> None:
