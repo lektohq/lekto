@@ -148,6 +148,20 @@ async def test_everything_for_a_person_makes_documents_of_a_mail(world: World) -
     assert len(await world.documents.list_visible(person.id)) == 3
 
 
+async def test_what_apple_mail_sends_inline_becomes_a_document(world: World) -> None:
+    """Apple Mail sends a PDF `inline` with a file name (Tobi, 06.11.2026): it is taken as an
+    attachment beside the mail's text; the logo the HTML embeds is not."""
+    _, person, _ = await _setup(world)
+    _deliver(world, mails.apple_mail())
+    await _fetch(world, world.mail_intake())
+    documents = await world.documents.list_visible(person.id)
+    assert sorted(document.original_filename for document in documents) == [
+        "Ein Test mit Anhang.eml",
+        "Foto.png",
+        "Rechnung.pdf",
+    ]
+
+
 async def test_nothing_without_a_rule(world: World) -> None:
     _, person, mailbox = await _setup(world, everything=False)
     _deliver(world, mails.plain_mail())

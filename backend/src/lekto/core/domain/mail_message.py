@@ -72,7 +72,8 @@ class MailMessage:
     html: str | None
     text: str | None
     attachments: tuple[MailPart, ...]
-    """Parts given as attachments, attached mails aside (`messages`)."""
+    """Parts given as attachments, or inline with a file name and shown nowhere by `cid:` (as
+    Apple Mail sends a PDF); attached mails aside (`messages`)."""
     pictures: tuple[MailPart, ...]
     """Parts the HTML can show by `cid:`."""
     messages: tuple["MailMessage", ...]
@@ -94,6 +95,7 @@ def read_mail(data: bytes) -> MailMessage:
 def _read(message: EmailMessage, raw: bytes) -> MailMessage:
     html = _body(message, "html")
     text = _body(message, "plain")
+    shown = _html_of(message)
     attachments: list[MailPart] = []
     pictures: list[MailPart] = []
     messages: list[MailMessage] = []
@@ -120,7 +122,7 @@ def _read(message: EmailMessage, raw: bytes) -> MailMessage:
         )
         if content_id is not None and kind.startswith("image/"):
             pictures.append(piece)
-        if disposition == "attachment" or (piece.filename and not piece.inline):
+        if disposition == "attachment" or (piece.filename and not _embedded(piece, shown)):
             attachments.append(piece)
     return MailMessage(
         sender=_addresses(message, "From"),
@@ -171,6 +173,30 @@ def _body(message: EmailMessage, kind: str) -> tuple[Message, str] | None:
         return None
     content = _text(part)
     return None if content is None else (part, content)
+
+
+def _html_of(message: EmailMessage) -> str:
+    """The HTML of all the mail's own text parts, in lower case: Apple Mail splits its text
+    around what it shows inline, so the part `get_body` takes need not hold every `cid:`."""
+    return "\n".join(
+        content.casefold()
+        for part in _leaves(message)
+        if part.get_content_type() == "text/html"
+        and part.get_content_disposition() != "attachment"
+        and (content := _text(part)) is not None
+    )
+
+
+def _embedded(piece: MailPart, html: str) -> bool:
+    """Whether a part is shown inside the mail's text (`cid:` in its HTML): a logo, a picture of
+    the signature. A part sent inline but shown nowhere by reference is an attachment, as Apple
+    Mail sends a PDF or a photo (Content-Disposition `inline` with a file name; Tobi,
+    06.11.2026)."""
+    return (
+        piece.inline
+        and piece.content_id is not None
+        and f"cid:{piece.content_id.casefold()}" in html
+    )
 
 
 def _is_body(part: Message, *bodies: tuple[Message, str] | None) -> bool:
