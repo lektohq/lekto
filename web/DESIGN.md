@@ -496,10 +496,11 @@ colour of its own: lane colours mean state. On the phone a table keeps to the co
 where it is wider, it scrolls inside its card, never the page. A list a person reads item by
 item is a list of rows, not a table. Pagination is `Pagination`, 50 to a page unless the table
 offers other sizes in a small menu beside the count (`outline`, `sm`): the jobs and the
-deliveries of a webhook 25, 50 and 100, 25 at first; the choice is remembered per table in the
+deliveries of a webhook and the mails of a mailbox 25, 50 and 100, 25 at first; the choice is remembered per table in the
 browser (`page-size.ts`) and holds wherever that table shows. Above such a table, a `Segmented`
 with counts picks what it shows and a `Select` narrows it to a kind (the jobs by state and kind,
-the deliveries by outcome and event). The documents list pages the same way (see [Lists](#lists)).
+the deliveries by outcome and event, the mails of a mailbox by outcome and rule). The documents
+list pages the same way (see [Lists](#lists)).
 
 ### Dialogs, sheets, editors
 
@@ -738,14 +739,32 @@ The page "System" has a tab "Eingangskanäle" for admins only (Tobi, 04.11.2026)
 not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Postfach anlegen"
 (`default`) at its end, then the mailboxes as cards in a column (see [Lists](#lists)):
 
-- **The row of a mailbox:** its name opens its dialog (there is no detail page; `?mailbox=<id>`
-  in the address opens it too, for a link from the mail rules), beside it the
+- **The row of a mailbox:** its name opens its page (Tobi, 06.11.2026; the whole row is the
+  link, the switch and the pencil above it), beside it the
   state of its fetches as a `Badge`: "Abruf in Ordnung" (`green`, `CircleCheck`), "Abruf gestört"
   (`red`, `OctagonX`) or "Noch nicht abgerufen" (`muted`, no icon). Below: server · folders ·
   interval · the last fetch · counts, and the reason of a failure as a line in `destructive`; a
   mail left out because it was too large (beyond `LEKTO_UPLOAD_MAX_SIZE` with its Base64) as a
   line in `lane-yellow-foreground`: "Ausgelassen am …: Die Mail „…“ hat … MB …".
-  Trailing: the `Switch` (Aktiv / Pausiert, no badge for it) and the `EditButton`.
+  Trailing: the `Switch` (Aktiv / Pausiert, no badge for it) and the `EditButton`, which opens
+  the dialog. The lines under the name are `MailboxLines`, the same in the head of its page.
+- **The page of a mailbox** (`/system/mailboxes/<id>`; Tobi, 06.11.2026, mock „Postfach-Seite
+  mit Verarbeitung“), built as the page of a webhook: `PageHeader` with the name, back to
+  "Eingangskanäle", the state of its fetches (`StatusBadge`, "Pausiert" `muted` when paused) and
+  `MailboxLines` below; actions "Bearbeiten" (`outline`, `Pencil`: the dialog), "Jetzt abrufen"
+  (`outline`, `RefreshCw`, not while paused) and delete (`IconButton`, `ConfirmDialog`). When
+  mails without a rule now match an active rule, an `Alert` (`note`) says how many and which
+  rules take them at the next fetch, with "Jetzt abrufen" (`sm`). Above the log a `Segmented`
+  with counts (Alle, Übernommen, Ohne Regel, Ausgelassen, Fehlgeschlagen, Schon bekannt) and a
+  `Select` of the mailbox's rules; the card "Verarbeitung" (its `InfoTip` says that only the
+  latest 500 mails wait for a rule) holds the table: Abgerufen · Mail (subject, sender below;
+  a record that let go of its head says so) · Ordner · Ergebnis (a `Badge`: Übernommen `green`,
+  Ohne Regel and Schon bekannt `muted`, Ausgelassen `yellow`, Fehlgeschlagen `red`; below in
+  `xs`: the rule or the fallback, "nichts übernommen", "nachträglich am …", the reason, "nicht
+  mehr im Ordner", and in `lane-yellow-foreground` the rule that takes a waiting mail at the
+  next fetch) · Dokumente (their count, a link that opens them in the Beam; those the viewer may
+  not read as "+n nicht sichtbar") · Auf dem Server (the steps done; a refused one in
+  `lane-yellow-foreground` with the server's reason). Pages as the deliveries'.
 - **The dialog** (`EditorShell`, `lg`, one height) has two parts under its title (Tobi,
   05.11.2026), a `Segmented` "Verbindung · Abruf"; one save stores both.
   - **Verbindung:** name; server, port and encryption in one row; user and password (empty keeps
@@ -771,8 +790,8 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
 - **Mail rules** (mock D, E; Tobi, 05.11.2026: no special case beside the document rules): the
   page "Regeln" has for admins a `Segmented` "Dokumente | Mails" with counts above its list
   (`?kind=mail`); others see the document rules alone. Mails: one section per mailbox, its title
-  "Postfach „…“" with "Postfach ansehen" (a text link that opens the mailbox's dialog,
-  `/system?tab=intake&mailbox=<id>`) and "Neue Regel" (`outline`, `sm`: a mail rule for this
+  "Postfach „…“" with "Postfach ansehen" (a text link to the mailbox's page,
+  `/system/mailboxes/<id>`) and "Neue Regel" (`outline`, `sm`: a mail rule for this
   mailbox; Tobi, 05.11.2026) at its end, its rules as cards in a column in the order they are
   asked (the name opens the rule's page; below it priority · conditions → what it does; a paused
   one says why), and under them the mailbox's fallback with "Am Postfach ändern". The page's
