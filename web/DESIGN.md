@@ -990,6 +990,11 @@ worker, and Lekto works as a website.
   action "Neu laden"; its ✕ puts it off until the app starts again. It is the one toast that
   waits for the person ("Alerts"). A page that already runs the new version (it was reloaded)
   takes the new worker without a word.
+- **Safe areas:** the page reaches under the notch and the home indicator (`viewport-fit=cover`;
+  the status bar stays opaque, `apple-mobile-web-app-status-bar-style` `default`). The shell
+  keeps the side insets free; full-screen editors on the phone, bars stuck to the bottom, sheets
+  from below and the menu sheet, fixed buttons and toasts keep theirs
+  (`env(safe-area-inset-*)`, at least the padding they had).
 - **Offline:** while the device has no connection, the header shows the badge "Offline" beside
   the logo (`Badge`, `muted`, `md`, `wifi-off`). `LoadProblem` says "Keine Verbindung …" in place
   of its problem and tries again by itself once the device is back online. A start without a
@@ -1124,7 +1129,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     "Nummer" alone only for the numbers of the document ("Fakt, Kennung, Nummer");
   - `tests/app.test.ts`: the service worker keeps no answer of the API, only the app's own files;
     the manifest starts below the base and names icons that exist in their sizes, one maskable;
-    the bars' colours are the tokens ("App");
+    the bars' colours are the tokens; every full-screen or bottom-edge surface keeps the safe
+    area free ("App");
   - `tests/no-raw-text.test.ts`: no raw text in markup; `tests/no-raw-choice.test.ts`: no raw
     checkbox or radio.
 
