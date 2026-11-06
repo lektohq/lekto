@@ -57,7 +57,7 @@ from lekto.core.domain.ids import (
 from lekto.core.domain.inbox import Confirmation, InboxTab
 from lekto.core.domain.lenses import Lens
 from lekto.core.domain.mail import Mailbox
-from lekto.core.domain.mail_intake import MailOrigin, MailRecord
+from lekto.core.domain.mail_intake import MailOrigin, MailOutcome, MailRecord
 from lekto.core.domain.mail_rules import MailRule
 from lekto.core.domain.master_data import Contact, DocumentType, Tag, TagScope
 from lekto.core.domain.open_identifiers import Sighting
@@ -913,6 +913,26 @@ class MailRecordRepository(Protocol):
 
     async def recent(self, mailbox: MailboxId, *, limit: int) -> list[MailRecord]:
         """The mailbox's latest records, the latest first."""
+        ...
+
+    async def page(
+        self,
+        mailbox: MailboxId,
+        *,
+        outcomes: Collection[MailOutcome] | None = None,
+        rule: MailRuleId | None = None,
+        offset: int = 0,
+        limit: int = PAGE_SIZE,
+    ) -> list[MailRecord]:
+        """The mailbox's records, the latest fetched first, `offset` in; only `outcomes` and
+        those `rule` took where given."""
+        ...
+
+    async def counts(
+        self, mailbox: MailboxId, *, rule: MailRuleId | None = None
+    ) -> dict[MailOutcome, int]:
+        """How many of the mailbox's records by outcome (of those `rule` took, if given);
+        outcomes without any left out."""
         ...
 
     async def waiting(self, mailbox: MailboxId) -> list[MailRecord]:

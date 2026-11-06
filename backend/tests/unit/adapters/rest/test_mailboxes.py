@@ -113,6 +113,67 @@ async def test_a_name_is_taken_once(api: Api) -> None:
     assert again.status_code == 409
 
 
+async def test_the_log_of_a_mailbox(api: Api) -> None:
+    """The mails a mailbox fetched, by outcome and rule, with their documents; a mail no rule
+    took names the rule switched on since that takes it at the next fetch."""
+    admin, user = await api.admin(), await api.user()
+    created = await post(api, "/mailboxes", BODY, auth(admin))
+    account = _server(api).add_account(ACCOUNT)
+    soon = api.clock.now() + timedelta(minutes=1)
+    account.deliver("INBOX", plain_mail("Ihre Rechnung"), arrived_at=soon)
+    account.deliver("INBOX", plain_mail("Unser Newsletter"), arrived_at=soon)
+    api.clock.advance(timedelta(minutes=2))
+    await drain(api.services.mail_intake)
+    url = f"{PREFIX}/mailboxes/{created['id']}/mails"
+    assert (await api.client.get(url, headers=auth(user))).status_code == 403
+
+    rule = await post(
+        api,
+        "/mail-rules",
+        {
+            "mailbox_id": created["id"],
+            "name": "Rechnungen",
+            "conditions": {"all": [{"field": "subject", "op": "contains", "value": "Rechnung"}]},
+            "user_id": str(admin.id),
+            "enabled": False,
+        },
+        auth(admin),
+    )
+    page = (await api.client.get(url, headers=auth(admin))).json()
+    assert (page["total"], page["next_offset"]) == (2, None)
+    assert {item["subject"]: item["outcome"] for item in page["items"]} == {
+        "Ihre Rechnung": "no_rule",
+        "Unser Newsletter": "no_rule",
+    }
+    assert all(item["waiting"] and item["next_rule"] is None for item in page["items"])
+
+    switched = await api.client.patch(
+        f"{PREFIX}/mail-rules/{rule['id']}", json={"enabled": True}, headers=auth(admin)
+    )
+    assert switched.status_code == 200, switched.text
+    summary = (await api.client.get(f"{url}/summary", headers=auth(admin))).json()
+    assert summary["counts"] == {"no_rule": 2}
+    assert [(item["rule"]["name"], item["mails"]) for item in summary["waiting"]] == [
+        ("Rechnungen", 1)
+    ]
+    assert summary["kept"] == 500 and [item["name"] for item in summary["rules"]] == ["Rechnungen"]
+
+    await drain(api.services.mail_intake)  # switching it on brought the fetch forward
+    taken = (await api.client.get(url, params={"outcome": "taken"}, headers=auth(admin))).json()
+    (item,) = taken["items"]
+    assert (item["subject"], item["rule"], item["rule_id"]) == (
+        "Ihre Rechnung",
+        "Rechnungen",
+        rule["id"],
+    )
+    assert [document["title"] for document in item["documents"]] == ["Ihre Rechnung"]
+    assert item["documents_hidden"] == 0 and not item["waiting"]
+    by_rule = await api.client.get(url, params={"rule_id": rule["id"]}, headers=auth(admin))
+    assert by_rule.json()["total"] == 1
+    paged = (await api.client.get(url, params={"limit": 1}, headers=auth(admin))).json()
+    assert (len(paged["items"]), paged["next_offset"]) == (1, 1)
+
+
 async def test_fetch_now_and_the_origin_of_a_document(api: Api) -> None:
     admin, user = await api.admin(), await api.user()
     created = await post(

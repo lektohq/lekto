@@ -1,13 +1,16 @@
 """In-memory mail records and mail origins, on the tables of the in-memory unit of work."""
 
 import copy
+from collections import Counter
+from collections.abc import Collection
 from datetime import datetime
 
 from lekto.adapters.outbound.memory.database import DOCUMENTS, MAILBOXES
 from lekto.adapters.outbound.memory.rows import MemoryRows, _copy
 from lekto.core.domain.errors import ConflictError, NotFoundError
-from lekto.core.domain.ids import DocumentId, MailboxId, MailRecordId
-from lekto.core.domain.mail_intake import SETTLED, MailOrigin, MailRecord
+from lekto.core.domain.ids import DocumentId, MailboxId, MailRecordId, MailRuleId
+from lekto.core.domain.mail_intake import SETTLED, MailOrigin, MailOutcome, MailRecord
+from lekto.core.ports.repository import PAGE_SIZE
 
 
 class MemoryMailRecordRepository(MemoryRows[MailRecordId, MailRecord]):
@@ -30,6 +33,33 @@ class MemoryMailRecordRepository(MemoryRows[MailRecordId, MailRecord]):
         rows = [row for row in self._all() if row.mailbox_id == mailbox]
         rows.sort(key=lambda row: (row.fetched_at, row.id), reverse=True)
         return [_copy(row) for row in rows[:limit]]
+
+    async def page(
+        self,
+        mailbox: MailboxId,
+        *,
+        outcomes: Collection[MailOutcome] | None = None,
+        rule: MailRuleId | None = None,
+        offset: int = 0,
+        limit: int = PAGE_SIZE,
+    ) -> list[MailRecord]:
+        rows = [
+            row for row in self._chosen(mailbox, rule) if not outcomes or row.outcome in outcomes
+        ]
+        rows.sort(key=lambda row: (row.fetched_at, row.id), reverse=True)
+        return [_copy(row) for row in rows[offset : offset + limit]]
+
+    async def counts(
+        self, mailbox: MailboxId, *, rule: MailRuleId | None = None
+    ) -> dict[MailOutcome, int]:
+        return dict(Counter(row.outcome for row in self._chosen(mailbox, rule)))
+
+    def _chosen(self, mailbox: MailboxId, rule: MailRuleId | None) -> list[MailRecord]:
+        return [
+            row
+            for row in self._all()
+            if row.mailbox_id == mailbox and (rule is None or row.rule_id == rule)
+        ]
 
     async def waiting(self, mailbox: MailboxId) -> list[MailRecord]:
         rows = [row for row in self._all() if row.mailbox_id == mailbox and row.waiting]

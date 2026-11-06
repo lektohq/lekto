@@ -184,6 +184,8 @@ ENDPOINTS: dict[str, str | Excluded] = {
     "PATCH /mailboxes/{id}": MANAGING,
     "DELETE /mailboxes/{id}": MANAGING,
     "POST /mailboxes/{id}/fetch": MANAGING,
+    "GET /mailboxes/{id}/mails": MANAGING,
+    "GET /mailboxes/{id}/mails/summary": MANAGING,
     "GET /mail-rules": MANAGING,
     "POST /mail-rules": MANAGING,
     "POST /mail-rules/dry-run": MANAGING,

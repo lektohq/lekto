@@ -214,6 +214,34 @@ class MailRecordRepositoryContract:
             async with uow_factory() as uow:
                 await uow.mail_records.settle(a_record(mailbox, 9))
 
+    async def test_a_page_of_the_log_and_its_counts(self, uow_factory: UnitOfWorkFactory) -> None:
+        mailbox, other = await a_mailbox(uow_factory), await a_mailbox(uow_factory, "Other")
+        rule = MailRuleId(new_id())
+        records = [
+            a_record(mailbox, 1, rule_id=rule),
+            a_record(mailbox, 2, outcome=MailOutcome.NO_RULE, documents=0),
+            a_record(mailbox, 3, rule_id=rule),
+            a_record(mailbox, 4, outcome=MailOutcome.FAILED, documents=0),
+            a_record(other, 5),
+        ]
+        async with uow_factory() as uow:
+            for record in records:
+                await uow.mail_records.add(record)
+            await uow.commit()
+        async with uow_factory() as uow:
+            log = uow.mail_records
+            assert [r.uid for r in await log.page(mailbox.id)] == [4, 3, 2, 1]
+            assert [r.uid for r in await log.page(mailbox.id, offset=1, limit=2)] == [3, 2]
+            failed = await log.page(mailbox.id, outcomes={MailOutcome.FAILED, MailOutcome.KNOWN})
+            assert [r.uid for r in failed] == [4]
+            assert [r.uid for r in await log.page(mailbox.id, rule=rule)] == [3, 1]
+            assert await log.counts(mailbox.id) == {
+                MailOutcome.TAKEN: 2,
+                MailOutcome.NO_RULE: 1,
+                MailOutcome.FAILED: 1,
+            }
+            assert await log.counts(mailbox.id, rule=rule) == {MailOutcome.TAKEN: 2}
+
     async def test_a_uid_is_recorded_once(self, uow_factory: UnitOfWorkFactory) -> None:
         mailbox = await a_mailbox(uow_factory)
         async with uow_factory() as uow:
