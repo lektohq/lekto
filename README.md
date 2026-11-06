@@ -1,42 +1,42 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/release/banner-dark.svg">
+  <img alt="Lekto" src=".github/release/banner-light.svg" width="100%">
+</picture>
+
+[![version](https://img.shields.io/github/v/release/tb1337/lekto-dms?label=version&color=0d6b6b)](https://github.com/tb1337/lekto-dms/releases)
+[![ghcr.io](https://img.shields.io/badge/ghcr.io-tb1337%2Flekto-0d6b6b)](https://github.com/tb1337/lekto-dms/pkgs/container/lekto)
+[![license](https://img.shields.io/badge/license-GPL--3.0-0d6b6b)](LICENSE)
+[![python](https://img.shields.io/badge/python-3.13-0d6b6b)](backend/README.md)
+
 # Lekto DMS
 
 **Lekto DMS** is a self-hosted, headless document management system and a replacement for
-Paperless-ngx. Every feature is exposed through the REST API; the web UI, the MCP server for AI
-clients and the Paperless migration tool are clients of that API. Documents run through OCR,
-parsing and a classification whose confidence comes from verifiable facts, and end up in one of
-three lanes: green (done), yellow (confirm), red (intervene).
-
-> Status: **0.1** – the first release. One person's archive of about 1500 documents runs on it,
-> taken over from Paperless-ngx with the migration client. Expect rough edges; the API is the
-> contract, the UI covers it.
+Paperless-ngx. It reads every document, files it and finds it again, and it shows why it
+decided what it did. The name comes from *lector*, the reader; the owl in the logo reads with
+one eye and searches with the magnifier in the other.
 
 ## What it does
 
-- **Multi-user.** Native logins with optional TOTP, optional OpenID Connect. Permissions are
-  attached to spaces, never to single documents: every member of a space reads or edits its
-  documents; admins see and manage everything.
-- **Explainable ingest.** Receive → OCR (OCRmyPDF, PDF/A) → read the text as it is set → classify
-  (language model, OpenAI-compatible: Ollama or cloud) → extract fields → apply rules → file.
-  Every step is logged with input, result, confidence, model version and duration, and can be
-  repeated. A value the model proposes counts only if it occurs in the text; an unknown contact
-  or type makes the document yellow, never a silent guess.
-- **Mail.** Mailboxes Lekto fetches from over IMAP, with rules per mailbox for what a mail
-  brings in and for whom: the attachments become documents, the mail's text a document of its
-  own (set as PDF with WeasyPrint) related to them. A mail saved as `.eml` can be uploaded too.
-- **Rules.** Global rules (admins) and personal rules, built in the UI from conditions and
-  actions, versioned, with a dry run before changes and retroactive application on request.
-- **Search.** Hybrid search in Meilisearch: words and meaning (vectors) in one query, filtered by
-  the caller's rights.
-- **Integration.** Webhooks (signed, Standard Webhooks), server-sent events, an MCP server at
-  `/api/v1/mcp` for Claude and other AI clients, OpenAPI with a generated TypeScript client.
-- **Storage.** SQLite or Postgres, local file system or S3 (Garage), Meilisearch. Originals are
-  immutable and addressed by their SHA-256.
+- **Explainable intake.** Upload, mail or API → OCR (OCRmyPDF, PDF/A) → a language model, a
+  classifier, similar documents and the facts of the text propose → a judge decides → one of
+  three lanes: green (done), yellow (confirm), red (intervene). A value counts only if it stands
+  in the text; every step is logged and can be repeated. A vision model rereads poorly read
+  pages on request.
+- **Facts and identifiers.** IBANs, customer, contract and tax numbers tie a document to its
+  contact; documents relate to each other, and recurring ones form series with the next one
+  expected.
+- **Mail.** IMAP mailboxes with rules per mailbox: attachments become documents, the mail's text
+  a PDF of its own beside them. A saved `.eml` can be uploaded too.
+- **Rules.** Global and per space, built in the UI from conditions and actions, versioned, with
+  a dry run and retroactive application; titles from Liquid templates.
+- **Search.** Words and meaning in one query (Meilisearch, hybrid), always within the caller's
+  rights; saved views as lenses.
+- **People and spaces.** Native logins with TOTP, OpenID Connect. Rights belong to spaces, never
+  to single documents.
+- **Integration.** Signed webhooks, server-sent events and an MCP server at `/api/v1/mcp` for
+  Claude and other AI clients.
 
 ## Quick start
-
-**Run it with Docker** (the production shape: the image `ghcr.io/tb1337/lekto` with API and
-worker under s6-overlay, plus Meilisearch, optionally Postgres, S3, Ollama and a TLS proxy):
-the Compose examples in [docker/](docker/), operation in [deploy/README.md](deploy/README.md).
 
 ```sh
 cd docker
@@ -44,73 +44,40 @@ cp .env.example .env               # fill in the secrets
 docker compose up -d
 ```
 
-Then open <http://localhost:8000/> and sign in as `admin` with `LEKTO_ADMIN_PASSWORD`. Point
-`LEKTO_LLM_BASE_URL` and `LEKTO_EMBEDDING_BASE_URL` in `.env` at an Ollama or another
-OpenAI-compatible endpoint (or add `compose.ollama.yml`); without one, documents stop yellow for a
-person to classify and the search works with words only.
+Open <http://localhost:8000/> and sign in as `admin` with `LEKTO_ADMIN_PASSWORD`. Point
+`LEKTO_LLM_BASE_URL` and `LEKTO_EMBEDDING_BASE_URL` at Ollama or another OpenAI-compatible
+endpoint (or add `compose.ollama.yml`); without one, documents wait yellow for a person and the
+search works with words only. More setups (Postgres, S3, more workers, Caddy, Traefik, nginx):
+[docker/](docker/), operation and backup: [deploy/README.md](deploy/README.md).
 
-**Run it from the devcontainer** (development, or a personal instance on your machine): open the
-repository in VS Code, "Reopen in Container", run the task **Lekto: Set up dev instance**, fill
-in `.devcontainer/dev.local.env`, run **Lekto: Start**. Details, data separation, backup and the
-migration from Paperless: [.devcontainer/README.md](.devcontainer/README.md).
+From Paperless-ngx: [migration/README.md](migration/README.md). Development in the devcontainer:
+[.devcontainer/README.md](.devcontainer/README.md) and [CLAUDE.md](CLAUDE.md).
 
-**Take a Paperless-ngx archive over:** [migration/README.md](migration/README.md) (`plan`, `check`,
-`prepare`, `run`; only through the two APIs).
+## How it is built
+
+- **Headless.** The REST API (OpenAPI) is the only way in; the web UI (SvelteKit), the MCP server
+  and the migration client are its clients.
+- **Hexagonal.** A plain Python core with ports; FastAPI, SQLAlchemy and every service behind
+  adapters with contract tests.
+- **Asynchronous.** The API answers at once, a worker processes; events reach the UI, webhooks
+  and the search index through a transactional outbox.
+- **Storage.** SQLite or Postgres, file system or S3, Meilisearch. Originals never change and are
+  addressed by their SHA-256.
+- **Models.** Any OpenAI-compatible endpoint, local (Ollama) or in the cloud: a language model,
+  embeddings and optionally a vision model.
+- **Configuration.** Environment variables with the prefix `LEKTO_`, secrets also as files.
 
 ## Documentation
 
 | Document | Content |
 | --- | --- |
-| [backend/README.md](backend/README.md) | Architecture of the backend, every `LEKTO_` variable with default, role and meaning, the REST API, processing, classification, rules, search, webhooks, MCP, tests |
-| [docker/](docker/) | Compose examples with the published images: SQLite, Postgres, more workers, S3 (Garage), Ollama, Caddy, Traefik, nginx, the migration from Paperless-ngx; settings in `.env` |
-| [examples/model-calls/](examples/model-calls/) | An example consumer of model calls (Python, standard library, Ollama), with a Compose extension to try it |
-| [deploy/README.md](deploy/README.md) | The image: roles, user and volumes, health and logs, stopping, reverse proxy, backup and restore, updating |
-| [.devcontainer/README.md](.devcontainer/README.md) | Development and the development instance in the devcontainer: tasks, data separation, Ollama, memory, migration, backup |
-| [web/README.md](web/README.md) | The web UI: stack, commands, API client, CSP |
+| [backend/README.md](backend/README.md) | Architecture, every `LEKTO_` variable, the REST API, processing, rules, search, webhooks, mail, MCP |
+| [deploy/README.md](deploy/README.md) | The image: roles, volumes, health, reverse proxy, backup, updating |
+| [docker/](docker/) | Compose examples with the published images |
+| [web/README.md](web/README.md) | The web UI; its design system in [web/DESIGN.md](web/DESIGN.md) |
 | [migration/README.md](migration/README.md) | The Paperless-ngx migration client |
-| `.idea/` | Design documents in German: `architektur.md` (binding), `umsetzungsplan.md`, `prompts/`, `reviews/` |
-
-## Principles
-
-- **Headless.** The REST API (OpenAPI) is the only way in. No back doors for the UI or the
-  migration.
-- **Hexagonal.** The domain core knows no database, object store, search engine or LLM, only
-  ports it defines itself. Every technology lives in a replaceable adapter with a contract test.
-- **Asynchronous.** API calls return at once (`202 Accepted`); processing runs in the worker.
-  State changes are published as events (transactional outbox) to the UI, webhooks and the
-  search index.
-- **Configuration by environment.** Variables with the prefix `LEKTO_`, secrets also as files;
-  no configuration file.
-
-## Glossary
-
-| Term | Meaning |
-| --- | --- |
-| Document | A file with metadata. Lies in exactly one space; at most one contact and one type. Names who uploaded it, which carries no rights. |
-| Contact | The other party of a document (Paperless: correspondent). Global. |
-| Document type | Kind of document. Global; brings its own fields. |
-| Tag | Free classification, any number per document. Carries no permissions. |
-| Field | User-defined field (Paperless: custom field). Scope: global or per document type. |
-| Space | Filing and permission unit (before 0.3: drawer). Its members read or edit its documents; every user has a personal space, where their uploads land. |
-| Inbox | Where new, yellow and red documents wait for the editors of their space. |
-| Lane | Processing outcome: green, yellow or red. |
-| Rule | Trigger, conditions and actions. Global rules by admins, space rules by the editors of a space. |
-
-## Development
-
-Everything runs in the devcontainer (Python 3.13, uv, Node.js, pnpm, OCRmyPDF, Postgres,
-Garage, Meilisearch). The checks, in `backend/`:
-
-```sh
-uv run ruff check . && uv run ruff format --check .
-uv run mypy
-uv run lint-imports
-uv run pytest -n auto            # unit and integration tests
-```
-
-Web UI in `web/`: `pnpm lint && pnpm format:check && pnpm check && pnpm test && pnpm build`.
-Migration client in `migration/`: `uv run ruff check . && uv run mypy && uv run pytest`.
-`CLAUDE.md` holds the rules for contributions: architecture, commits, labels, language.
+| [examples/](examples/) | Synthetic example documents, an MCP evaluation, a model-call consumer |
+| [.devcontainer/README.md](.devcontainer/README.md) | Development and a personal instance in the devcontainer |
 
 ## License
 
