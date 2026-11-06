@@ -79,7 +79,13 @@
 					body: { enabled }
 				})
 			);
-			toast.success(enabled ? m.rule_switched_on() : m.rule_switched_off());
+			toast.success(
+				enabled
+					? next.length > 0
+						? m.mail_rule_switched_on_fetch({ count: next.length })
+						: m.rule_switched_on()
+					: m.rule_switched_off()
+			);
 		} catch (error) {
 			reportError(error);
 		} finally {
@@ -92,6 +98,10 @@
 	}
 
 	const taken = $derived(mails?.filter((item) => item.decider === 'rule') ?? []);
+	// What the rule takes at the next fetch (no rule took them: Tobi, 06.11.2026), and what it
+	// would have taken among the mails already dealt with.
+	const next = $derived(taken.filter((item) => item.waiting));
+	const done = $derived(taken.filter((item) => !item.waiting));
 	/** The mails a rule before it takes, by that rule (its id: names are not unique). */
 	const before = $derived.by(() => {
 		const groups: Record<string, { name: string; items: DryRunMail[] }> = {};
@@ -126,7 +136,12 @@
 		{busy}
 	>
 		{#snippet hint()}
-			{#if conflicts > 0}{m.mail_rule_preview_before({ count: conflicts })}{/if}
+			{[
+				next.length > 0 ? m.mail_rule_preview_waiting({ count: next.length }) : '',
+				conflicts > 0 ? m.mail_rule_preview_before({ count: conflicts }) : ''
+			]
+				.filter(Boolean)
+				.join(' · ')}
 		{/snippet}
 		{#snippet actions()}
 			{#if rule && !rule.enabled}
@@ -178,20 +193,23 @@
 			<EmptyNote>{m.mail_rule_preview_nothing({ count: mails.length })}</EmptyNote>
 		{:else}
 			<div class="flex flex-col gap-4">
-				{#if taken.length > 0}
-					<DryRunGroup
-						count={mailsCount(taken.length)}
-						open={!folded.has('rule')}
-						onfold={() => fold('rule')}
-					>
-						{#snippet head()}
-							{#each doing as text (text)}
-								<span class="text-sm font-medium">{text}</span>
-							{/each}
-						{/snippet}
-						{#each taken as item (item.id)}{@render row(item)}{/each}
-					</DryRunGroup>
-				{/if}
+				{#each [{ key: 'next', items: next, note: m.mail_rule_group_waiting() }, { key: 'rule', items: done, note: m.mail_rule_group_done() }] as group (group.key)}
+					{#if group.items.length > 0}
+						<DryRunGroup
+							count={mailsCount(group.items.length)}
+							open={!folded.has(group.key)}
+							onfold={() => fold(group.key)}
+						>
+							{#snippet head()}
+								{#each doing as text (text)}
+									<span class="text-sm font-medium">{text}</span>
+								{/each}
+								<span class="text-sm text-muted-foreground">{group.note}</span>
+							{/snippet}
+							{#each group.items as item (item.id)}{@render row(item)}{/each}
+						</DryRunGroup>
+					{/if}
+				{/each}
 				{#each before as [ruleId, group] (ruleId)}
 					<DryRunGroup
 						count={mailsCount(group.items.length)}
