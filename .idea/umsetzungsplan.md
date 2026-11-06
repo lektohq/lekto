@@ -2652,6 +2652,24 @@ Stand: umgesetzt (#269–#274, 04.11.2026); freigegeben in der Frage- und Antwor
 - **Nachgezogen (Tobi, 05.11.2026):** Der Migrations-Client übernimmt Paperless-Dokumente, die als `.eml` gespeichert sind (#275). Die Grenze einer Mail folgt aus `LEKTO_UPLOAD_MAX_SIZE` (ein Anhang so groß wie ein Upload, in Base64 ein Drittel mehr, dazu 1 MB für Kopf und Text) statt fester 50 MB; eine größere Mail holt Lekto nur mit ihrem Kopf und nennt sie am Postfach („Ausgelassen am …“).
 - **Nachgezogen (Review, Tobi, 05.11.2026):** `mail_records` hält Absender, Empfänger, Betreff, Anhangsnamen, Wichtigkeit und Markierungen einer Mail nur für den Probelauf einer Mail-Regel (die letzten 50 Mails). Die Wartung leert diese Spalten bei allem außer den **letzten 500 je Postfach** (`forgotten_at`, Revision 0065); UID, UIDVALIDITY, Message-ID und Ausgang bleiben, damit keine Mail zweimal geholt wird. Das Rendern einer Mail läuft wie OCR in einem Kindprozess mit Zeitlimit (`LEKTO_MAIL_RENDER_TIMEOUT`, 2 Minuten): das HTML kommt von Fremden. Auf dem Server entfernt Lekto eine Mail nur allein (`UID EXPUNGE`, UIDPLUS) und lässt sie ohne UIDPLUS nur markiert liegen: `EXPUNGE` nähme jede Mail, die ein Mail-Programm markiert hat.
 
+### Mail-Regeln nachträglich und die Seite eines Postfachs
+
+Stand: Plan mit Tobi abgestimmt, 06.11.2026; in Umsetzung. Mock: „Postfach-Seite mit Verarbeitung“ (https://claude.ai/artifact/3mi6TLsPuVHxWvU9xuzVY7).
+
+**Anlass (Tobi, 06.11.2026):** Eine Mail-Regel auf dem Testsystem schien nicht zu laufen. Lekto prüfte jede Mail genau einmal, beim ersten Abruf; eine Regel, die erst danach entsteht oder aktiviert wird, kam an den Bestand nicht mehr heran. „Jede Mail, die nicht bereits von einer Regel verarbeitet wurde, und durch neue aktivierte Regeln dann für eine Verarbeitung vorgesehen wird, soll auch verarbeitet werden.“ Dazu eine Übersicht, was mit jeder Mail geschah.
+
+**Entscheidungen (Tobi, 06.11.2026):**
+- **Wann:** bei jedem Abruf. Er prüft außer den neuen Mails die Mails „ohne Regel“ des Ordners gegen die aktiven Regeln. „Aktivieren“ im Probelauf holt den nächsten Abruf auf jetzt.
+- **Welche:** nur Mails „ohne Regel“. Was der Rückfall des Postfachs übernommen hat, bleibt erledigt; der Rückfall nimmt auch nachträglich keine wartende Mail.
+- **Inzwischen:** Gelesene Mails zählen mit (sie waren beim Abruf im Umfang des Postfachs). Ist eine Mail nicht mehr im Ordner (oder hat der Ordner eine neue UIDVALIDITY), wartet sie nicht mehr und heißt „nicht mehr im Ordner“.
+- **Altbestand:** Nur Mails, deren Kopf Lekto noch kennt (die neuesten `KEPT_RECORDS`, 500 je Postfach); ältere bleiben „ohne Regel“.
+- **Ort der Übersicht:** eine eigene Seite des Postfachs wie die eines Webhooks; der Name unter System › Eingangskanäle öffnet sie, „Bearbeiten“ dort den bekannten Dialog.
+- **Labels:** beide PRs `enhancement`, die Version bleibt 0.12.x.
+
+**Umsetzung:**
+- **PR 1 – nachträglich verarbeiten:** `mail_records` hält die Regel per ID (`rule_id`), wann eine Regel oder der Rückfall entschied (`decided_at`, später als `fetched_at`: nachträglich), die Schritte auf dem Server mit dem Grund eines abgelehnten (`steps`) und wann die Mail fehlte (`gone_at`), Revision 0068. `MailRecordRepository.waiting` liefert die wartenden Mails, `settle` schreibt nur, was aus einer Mail wurde (die Wartung kann den Kopf derweil vergessen). Der Abruf beurteilt wartende Mails nach dem Gespeicherten und ihren Flags von jetzt (ein `FETCH` je Ordner) und holt nur, was eine Regel nimmt, im Rahmen von `MAX_PER_RUN`. Der Probelauf liest die letzten 50 Mails und alle wartenden; die wartenden, die die Regel nähme, stehen zuerst („beim nächsten Abruf“).
+- **PR 2 – Seite des Postfachs:** API für die Mails eines Postfachs (Filter nach Ergebnis und Regel, Seiten) mit einer Zusammenfassung (Zahlen je Ergebnis, wartende Mails je Regel) und den Dokumenten einer Mail; die Seite `/system/mailboxes/{id}` nach dem Mock, gebaut wie die Seite eines Webhooks (Kopf, Hinweis, `Segmented` mit Zahlen, `Select` der Regel, Tabelle mit Seiten). DESIGN.md beschreibt sie.
+
 ### M16 – Lesen
 
 - `PageRenderer` statt `PreviewRenderer`: alle Seiten als WebP-Derivate; Endpunkt `GET /documents/{id}/pages/{n}`.

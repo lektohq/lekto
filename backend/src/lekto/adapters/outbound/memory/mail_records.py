@@ -1,12 +1,13 @@
 """In-memory mail records and mail origins, on the tables of the in-memory unit of work."""
 
+import copy
 from datetime import datetime
 
 from lekto.adapters.outbound.memory.database import DOCUMENTS, MAILBOXES
 from lekto.adapters.outbound.memory.rows import MemoryRows, _copy
-from lekto.core.domain.errors import ConflictError
+from lekto.core.domain.errors import ConflictError, NotFoundError
 from lekto.core.domain.ids import DocumentId, MailboxId, MailRecordId
-from lekto.core.domain.mail_intake import MailOrigin, MailRecord
+from lekto.core.domain.mail_intake import SETTLED, MailOrigin, MailRecord
 
 
 class MemoryMailRecordRepository(MemoryRows[MailRecordId, MailRecord]):
@@ -29,6 +30,21 @@ class MemoryMailRecordRepository(MemoryRows[MailRecordId, MailRecord]):
         rows = [row for row in self._all() if row.mailbox_id == mailbox]
         rows.sort(key=lambda row: (row.fetched_at, row.id), reverse=True)
         return [_copy(row) for row in rows[:limit]]
+
+    async def waiting(self, mailbox: MailboxId) -> list[MailRecord]:
+        rows = [row for row in self._all() if row.mailbox_id == mailbox and row.waiting]
+        rows.sort(key=lambda row: (row.fetched_at, row.id), reverse=True)
+        return [_copy(row) for row in rows]
+
+    async def settle(self, record: MailRecord) -> None:
+        self._uow._check_open()
+        current = self._uow._row(self._table, record.id)
+        if current is None:
+            raise NotFoundError(self._table.name, record.id)
+        changed = _copy(current)
+        for name in SETTLED:
+            setattr(changed, name, copy.deepcopy(getattr(record, name)))
+        self._uow._write(self._table, record.id, changed)
 
     async def forget_beyond(self, mailbox: MailboxId, *, keep: int, now: datetime) -> int:
         rows = [row for row in self._all() if row.mailbox_id == mailbox]

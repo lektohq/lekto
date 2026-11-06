@@ -18,10 +18,11 @@ from lekto.core.domain.ids import (
     DocumentTypeId,
     MailboxId,
     MailRecordId,
+    MailRuleId,
     SpaceId,
     UserId,
 )
-from lekto.core.domain.mail import MailStep
+from lekto.core.domain.mail import MailStep, StepOutcome
 from lekto.core.domain.mail_message import Address, MailMessage, MailPart
 from lekto.core.domain.mail_traits import Importance, MailMarks
 from lekto.core.domain.reasons import Reason
@@ -115,7 +116,7 @@ class MailParts(StrEnum):
 class MailDecision:
     """What becomes of a mail: taken for `user` (into `space`, else their personal one), which
     parts, the type of the text (`body_type_id`, none: open), and the steps on the server
-    afterwards, in order. `rule`: the name of the rule that decided; None for the mailbox's
+    afterwards, in order. `rule` and `rule_id`: the rule that decided; None for the mailbox's
     fallback."""
 
     user_id: UserId | None  # none when it takes nothing
@@ -124,12 +125,14 @@ class MailDecision:
     body_type_id: DocumentTypeId | None = None
     after: tuple[MailStep, ...] = ()
     rule: str | None = None
+    rule_id: MailRuleId | None = None
 
 
 KEPT_RECORDS = 500
 """A mailbox's records that keep what the mail's head said (Tobi, 05.11.2026): the dry run of a
-mail rule looks at the latest fifty; the rest let go of it (`MailRecord.forget`) and stay only
-so that no mail is fetched twice."""
+mail rule looks at the latest fifty, a rule switched on later takes the mails without a rule
+among them (Tobi, 06.11.2026: only these); the rest let go of it (`MailRecord.forget`) and stay
+only so that no mail is fetched twice."""
 
 
 class MailOutcome(StrEnum):
@@ -179,6 +182,15 @@ class MailRecord:
     """Its keywords and flag on the server when it was fetched; none likewise."""
     forgotten_at: datetime | None = None
     """When the record let go of what the mail's head said (`forget`); none while it keeps it."""
+    rule_id: MailRuleId | None = None
+    """The rule that took it (`rule`: its name then); none for the fallback or no rule."""
+    decided_at: datetime | None = None
+    """When a rule or the fallback took it: at its fetch, or later, when a rule switched on
+    afterwards took it from the mails no rule had taken (Tobi, 06.11.2026)."""
+    steps: tuple[StepOutcome, ...] = ()
+    """The steps on the mail on the server, in order, each with why it failed (none: done)."""
+    gone_at: datetime | None = None
+    """When a fetch found it no longer in its folder while no rule had taken it."""
 
     def __post_init__(self) -> None:
         require_utc(self.fetched_at, "fetched_at")
@@ -199,6 +211,25 @@ class MailRecord:
         self.importance = None
         self.marks = None
         self.forgotten_at = now
+
+    @property
+    def later(self) -> bool:
+        """Whether a later fetch took it: a rule switched on after it came."""
+        return self.decided_at is not None and self.decided_at > self.fetched_at
+
+    @property
+    def waiting(self) -> bool:
+        """Whether a rule may still take it: no rule took it, it lies in its folder, and the
+        record keeps what the mail's head said (the latest `KEPT_RECORDS`)."""
+        return (
+            self.outcome is MailOutcome.NO_RULE
+            and self.gone_at is None
+            and self.forgotten_at is None
+        )
+
+
+SETTLED = ("outcome", "reason", "rule", "rule_id", "documents", "decided_at", "steps", "gone_at")
+"""What a record's `MailRecordRepository.settle` stores: what became of the mail."""
 
 
 class OriginRole(StrEnum):

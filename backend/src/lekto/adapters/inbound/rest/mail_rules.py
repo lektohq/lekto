@@ -64,9 +64,11 @@ async def create_mail_rule(
     summary="Dry run of a mail rule",
     description=(
         f"What a rule (saved or not; with `rule_id` in place of the stored one) would do with the "
-        f"mailbox's latest {DRY_RUN_MAILS} mails, as Lekto recorded them when it fetched them: "
-        "whether its conditions hold and who would decide each, this rule, another before it, or "
-        f"the mailbox's fallback. Reads only; the mail server is not asked. {WHO}"
+        f"mailbox's latest {DRY_RUN_MAILS} mails and every mail still waiting for a rule "
+        "(`waiting`), as Lekto recorded them when it fetched them, the latest first: whether its "
+        "conditions hold and who would decide each, this rule, another before it, or the "
+        "mailbox's fallback. A waiting mail goes to its rule at the next fetch. Reads only; the "
+        f"mail server is not asked. {WHO}"
     ),
     response_model=list[DryRunMailOut],
     responses=problem_responses(401, 403, 404, 422),
@@ -97,7 +99,10 @@ async def get_mail_rule(id: UUID, user: CurrentUser, context: Context) -> MailRu
 @router.patch(
     "/{id}",
     summary="Change a mail rule",
-    description=f"Checks as when creating. {WHO}",
+    description=(
+        "Checks as when creating. Switching a rule on brings its mailbox's next fetch forward to "
+        f"now, which gives it the mails waiting for a rule. {WHO}"
+    ),
     response_model=MailRuleOut,
     responses=problem_responses(401, 403, 404, 409, 422),
 )

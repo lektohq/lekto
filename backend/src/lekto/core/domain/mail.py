@@ -131,6 +131,14 @@ class MailStep:
         object.__setattr__(self, "value", value)
 
 
+@dataclass(frozen=True)
+class StepOutcome:
+    """A step done on a mail on the server, and why the server refused it (none: done)."""
+
+    step: MailStep
+    failed: Reason | None = None
+
+
 def check_steps(steps: tuple[MailStep, ...]) -> None:
     """At most `MAX_STEPS`, none twice, and one that ends it only last. ValidationError
     otherwise."""

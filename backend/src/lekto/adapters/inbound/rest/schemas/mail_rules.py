@@ -227,6 +227,13 @@ class DryRunMailOut(BaseModel):
     )
     rule: str | None = Field(description="The name of the rule before it; null otherwise.")
     rule_id: UUID | None = Field(description="The rule before it; null otherwise.")
+    waiting: bool = Field(
+        description=(
+            "No rule took it yet: the next fetch gives it to the rule that decides it now (never "
+            "to the fallback), as long as it lies in its folder and is among the mailbox's "
+            "latest 500."
+        )
+    )
 
     @classmethod
     def of(cls, item: DryRunMail) -> "DryRunMailOut":
@@ -244,6 +251,7 @@ class DryRunMailOut(BaseModel):
             decider=item.decider,
             rule=item.rule,
             rule_id=item.rule_id,
+            waiting=item.waiting,
         )
 
 
