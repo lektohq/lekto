@@ -148,8 +148,8 @@ jobs:
           path: backend/.mypy_cache
           key: ${{ steps.mypy-cache.outputs.cache-primary-key }}
 
-  # The migration client (Paperless-ngx to Lekto): lint, types and tests against stand-ins for both
-  # APIs, then its image. Fast on purpose (httpx2 is its only dependency); its tests against the
+  # The migration client: lint, types and tests against stand-ins for both APIs, then its
+  # image. Fast on purpose (httpx2 is its only dependency); its tests against the
   # real API run in `backend`.
   migration:
     needs: changes

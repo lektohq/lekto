@@ -1,7 +1,6 @@
 """Classifier: learns contact, document type, topic, tags and the space from confirmed
-documents (their texts and metadata) and predicts them for a new text, as Paperless-ngx's
-matching does. A trained model is bytes: the caller keeps it (in the object store) and hands it
-back to predict."""
+documents (their texts and metadata) and predicts them for a new text. A trained model is
+bytes: the caller keeps it (in the object store) and hands it back to predict."""
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
