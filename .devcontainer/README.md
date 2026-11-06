@@ -58,7 +58,7 @@ Once, in the devcontainer (VS Code: Terminal → Run Task):
    `LEKTO_EMBEDDING_BASE_URL` and its API key in `LEKTO_LLM_API_KEY` and
    `LEKTO_EMBEDDING_API_KEY` (or remove the model variables to run without a language model: documents then stop yellow for the
    contact and the type, and the search works with words only). The other values fit the
-   devcontainer. All variables: [backend/README.md](../backend/README.md#configuration).
+   devcontainer. All variables: [docs/configuration.md](../docs/configuration.md).
 3. **Lekto: Start** (below).
 
 Keep `LEKTO_SECRET_KEY` (TOTP and webhook secrets are encrypted with it) and the admin password

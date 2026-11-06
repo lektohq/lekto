@@ -10,6 +10,7 @@ Python backend, hexagonal (ports and adapters); the REST API is the only way in.
 | `backend/` | Python package `lekto`: `core` (domain, ports, services), `adapters` (inbound, outbound), `composition` |
 | `web/` | Web UI: SvelteKit single-page app below `/ui`, client generated from `web/openapi.json` (see `web/README.md`); design system in `web/DESIGN.md` (binding) |
 | `migration/` | Paperless-ngx migration client: separate uv project `lekto_migration` (`plan`, `check`, `prepare`, `run`; see `migration/README.md`) |
+| `docs/` | User documentation: `configuration.md` (every `LEKTO_` variable), `templates.md` (Liquid templates) |
 | `deploy/` | Runtime image files (s6-overlay services, `image/rootfs`), `test-image.sh`, `README.md` (operation, backup) |
 | `examples/` | `model-calls/`: an example consumer of model calls through a webhook (Python, standard library only, Ollama) and a Compose extension to try it; `documents/`: 321 synthetic documents of one household in every quality stage, `manifest.json` with what Lekto should find, search queries for `evaluate-search` (`search/`), their generator (`generate.py`, see its `README.md`); `mcp-eval/`: questions about those documents asked through Claude Code with Lekto's MCP server, hits and tokens (`seed.py`, `tasks.py`, `run.py`, see its `README.md`) |
 | `docker/` | Compose examples with the published images (`ghcr.io/tb1337/lekto:latest`): SQLite, Postgres, extensions (workers, S3, Ollama, Caddy, Traefik, nginx), migration; settings in `.env` (`.env.example`) |
@@ -88,7 +89,8 @@ changes in `migration/` its checks.
   The pattern matcher and the template renderer are the stated exceptions: the `regex` and
   `liquid` adapters need no service and serve the memory container too.
 - Configuration is environment variables with prefix `LEKTO_` only, no config file. Secrets also work
-  as `LEKTO_<NAME>_FILE`; both set is an error. See `backend/src/lekto/composition/settings.py`.
+  as `LEKTO_<NAME>_FILE`; both set is an error. See `backend/src/lekto/composition/settings.py`;
+  every variable has a row in `docs/configuration.md` (a test checks names, roles, values, secrets).
 - Async throughout (FastAPI, SQLAlchemy async, async HTTP clients).
 - Tests: `tests/unit` (marker `unit`) needs no services, `tests/integration` (marker `integration`) does.
   Markers are applied by directory. Contract suites live in `tests/contracts`; adapters subclass them.
