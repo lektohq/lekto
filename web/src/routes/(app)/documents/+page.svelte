@@ -1041,7 +1041,8 @@ row of filters, on a desktop narrow by the title. -->
 					{/if}
 				</LoadProblem>
 			{:else if list.empty}
-				<EmptyNote>
+				<!-- The owl only before the first document (web/DESIGN.md, "Logo and owl"). -->
+				<EmptyNote mascot={!isFiltered(filters) && !searching}>
 					{isFiltered(filters)
 						? m.documents_none_filtered()
 						: searching
