@@ -14,8 +14,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# pytest runs with `-n logical`: `-n auto` counts physical cores, and a runner's two vCPUs are one,
-# so the tests ran in a single process.
+# pytest runs with `-n logical`: `-n auto` counts physical cores, half of a runner's vCPUs, so
+# the tests ran in half as many processes.
 
 # Caches: only pushes to main write them, one entry per content (lock file; the OCR programs'
 # packages per runner image); pull requests read main's entries. The uv cache is off:
@@ -101,12 +101,28 @@ jobs:
           fi
           exit 0
 
-  # Lint, types, import contracts and the unit tests (the SQL adapter on SQLite among them).
+  # Lint, types and import contracts (`checks`), and the unit tests (the SQL adapter on SQLite
+  # among them) in two parts side by side (`--shard`, backend/tests/conftest.py).
   backend:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
+    name: backend (${{ matrix.part }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - part: checks
+            run: |
+              uv run ruff check .
+              uv run ruff format --check .
+              uv run mypy
+              uv run lint-imports
+          - part: tests 1/2
+            run: uv run pytest -m unit -n logical --shard 1/2
+          - part: tests 2/2
+            run: uv run pytest -m unit -n logical --shard 2/2
     defaults:
       run:
         working-directory: backend
@@ -118,20 +134,19 @@ jobs:
       - run: uv sync --locked
       # mypy's cache: most of its work are the dependencies, so one entry per lock file.
       - id: mypy-cache
+        if: matrix.part == 'checks'
         uses: actions/cache/restore@v5
         with:
           path: backend/.mypy_cache
           key: mypy-${{ hashFiles('backend/uv.lock', 'backend/pyproject.toml') }}
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run mypy
-      - if: env.WRITE_CACHE == 'true' && steps.mypy-cache.outputs.cache-hit != 'true'
+      - run: ${{ matrix.run }}
+      - if: >-
+          matrix.part == 'checks' && env.WRITE_CACHE == 'true'
+          && steps.mypy-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
           path: backend/.mypy_cache
           key: ${{ steps.mypy-cache.outputs.cache-primary-key }}
-      - run: uv run lint-imports
-      - run: uv run pytest -m unit -n logical
 
   # The migration client (Paperless-ngx to Lekto): lint, types and tests against stand-ins for both
   # APIs, then its image. Fast on purpose (httpx2 is its only dependency); its tests against the
@@ -186,14 +201,33 @@ jobs:
       - name: Workflows
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
 
-  # The web UI: lint, format, types, unit tests (Vitest in jsdom), the generated API client
-  # against web/openapi.json, and the build. Playwright runs locally only (no browsers here).
-  # The pnpm store is cached per lock file, written from main only.
+  # The web UI, in four parts side by side: lint and format; types, the generated API client
+  # against web/openapi.json and the build; the unit tests (Vitest in jsdom) in two halves
+  # (`--shard`, by file). Playwright runs locally only (no browsers here). The pnpm store is
+  # cached per lock file, written from main only (by `lint`).
   web:
     needs: changes
     if: needs.changes.outputs.web == 'true'
+    name: web (${{ matrix.part }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - part: lint
+            run: |
+              pnpm lint
+              pnpm format:check
+          - part: build
+            run: |
+              pnpm check
+              pnpm gen:api && git diff --exit-code src/lib/api/schema.ts
+              pnpm build
+          - part: tests 1/2
+            run: pnpm test --shard=1/2
+          - part: tests 2/2
+            run: pnpm test --shard=2/2
     defaults:
       run:
         working-directory: web
@@ -213,18 +247,14 @@ jobs:
           path: ${{ steps.store.outputs.path }}
           key: pnpm-${{ hashFiles('web/pnpm-lock.yaml') }}
       - run: pnpm install --frozen-lockfile
-      - if: env.WRITE_CACHE == 'true' && steps.pnpm-cache.outputs.cache-hit != 'true'
+      - if: >-
+          matrix.part == 'lint' && env.WRITE_CACHE == 'true'
+          && steps.pnpm-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
           path: ${{ steps.store.outputs.path }}
           key: ${{ steps.pnpm-cache.outputs.cache-primary-key }}
-      - run: pnpm lint
-      - run: pnpm format:check
-      - run: pnpm check
-      - run: pnpm test
-      - name: The API client matches openapi.json
-        run: pnpm gen:api && git diff --exit-code src/lib/api/schema.ts
-      - run: pnpm build
+      - run: ${{ matrix.run }}
 
   # The integration tests against the devcontainer's services (Postgres, Garage, Meilisearch,
   # GreenMail) and the OCR programs, on the runner. No test may skip. The OCR programs come from
