@@ -16,13 +16,14 @@ from lekto.core.domain.events import (
     DocumentUpdated,
     DomainEvent,
     LaneChanged,
+    MailboxFetched,
     NodeCompleted,
     NodeDeferred,
     NodeDelegated,
     NodeStarted,
     ReviewRequired,
 )
-from lekto.core.domain.ids import DocumentId, SpaceId, UserId, new_id
+from lekto.core.domain.ids import DocumentId, MailboxId, SpaceId, UserId, new_id
 from lekto.core.domain.jobs import RetryPolicy
 from lekto.core.domain.pipeline import Lane, Node, Outcome
 from lekto.core.ports.clock import Clock
@@ -143,6 +144,7 @@ class EventBusContract:
                 readers=(UserId(new_id()), UserId(new_id())),
             ),
             ClassifierTrained(occurred_at=NOW, number=3, examples=120),
+            MailboxFetched(occurred_at=NOW, mailbox_id=MailboxId(new_id()), mails=4, later=2),
         ]
         assert {type(event) for event in events} == set(EVENT_TYPES.values())
         await publish(uow_factory, *events)

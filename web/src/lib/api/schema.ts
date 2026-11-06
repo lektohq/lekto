@@ -2170,7 +2170,7 @@ export interface paths {
 		};
 		/**
 		 * Progress of documents (server-sent events)
-		 * @description A stream of document events (`document.received`, `document.node_started`, `document.node_deferred`, `document.node_completed`, `document.lane_changed`, `document.filed`, `document.updated`, `document.deleted`), only for documents the caller may read at that moment (`document.deleted`: could read when it was deleted); other users' documents are visible once green. Every user also gets `classifier.trained` (a new model, with its `number` and `examples`), unless the stream follows one document. A searcher gets `search.meaning_ready` (with the `query`) when the meaning of a query that had to go by words alone is ready (`meaning_pending` of the search), unless the stream follows one document. Each event has the event type as `event`, the event id as `id`, and JSON as `data` (see `EventMessage`). Events are thin: fetch the document for its state. There is no replay; after reconnecting, fetch the current state. The stream starts with the comment `: ready` once it is registered: every event after that reaches it. It checks regularly that its session or token is still valid and ends otherwise.
+		 * @description A stream of document events (`document.received`, `document.node_started`, `document.node_deferred`, `document.node_completed`, `document.lane_changed`, `document.filed`, `document.updated`, `document.deleted`), only for documents the caller may read at that moment (`document.deleted`: could read when it was deleted); other users' documents are visible once green. Every user also gets `classifier.trained` (a new model, with its `number` and `examples`), unless the stream follows one document; an active admin gets `mailbox.fetched` (with the `mailbox_id`) when a fetch of a mailbox ended. A searcher gets `search.meaning_ready` (with the `query`) when the meaning of a query that had to go by words alone is ready (`meaning_pending` of the search), unless the stream follows one document. Each event has the event type as `event`, the event id as `id`, and JSON as `data` (see `EventMessage`). Events are thin: fetch the document for its state. There is no replay; after reconnecting, fetch the current state. The stream starts with the comment `: ready` once it is registered: every event after that reaches it. It checks regularly that its session or token is still valid and ends otherwise.
 		 */
 		get: operations['events_api_v1_events_get'];
 		put?: never;
@@ -11870,7 +11870,8 @@ export interface components {
 		 * EventMessage
 		 * @description A domain event, thin: fetch the document for details. Fields beyond `type`, `id`,
 		 *     `occurred_at` and `document_id` depend on the type (`classifier.trained`: `number` and
-		 *     `examples` of the new model; `search.meaning_ready`: the `query`).
+		 *     `examples` of the new model; `mailbox.fetched`: the `mailbox_id`, its new `mails` and the
+		 *     mails without a rule a rule took `later`; `search.meaning_ready`: the `query`).
 		 */
 		EventMessage: {
 			/**
@@ -11890,7 +11891,7 @@ export interface components {
 			occurred_at: string;
 			/**
 			 * Document Id
-			 * @description The document; absent from `classifier.trained` and `search.meaning_ready`.
+			 * @description The document; absent from `classifier.trained`, `mailbox.fetched` and `search.meaning_ready`.
 			 * @default null
 			 */
 			document_id: string | null;

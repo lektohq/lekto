@@ -764,7 +764,10 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
   mehr im Ordner", and in `lane-yellow-foreground` the rule that takes a waiting mail at the
   next fetch) · Dokumente (their count, a link that opens them in the Beam; those the viewer may
   not read as "+n nicht sichtbar") · Auf dem Server (the steps done; a refused one in
-  `lane-yellow-foreground` with the server's reason). Pages as the deliveries'.
+  `lane-yellow-foreground` with the server's reason). Pages as the deliveries'. Live: the
+  end of each fetch of the mailbox (`mailbox.fetched`, admins only) loads its head, the note and
+  the shown page of the log anew, as does the list of the intake channels; after a break of the
+  event stream both load anew.
 - **The dialog** (`EditorShell`, `lg`, one height) has two parts under its title (Tobi,
   05.11.2026), a `Segmented` "Verbindung · Abruf"; one save stores both.
   - **Verbindung:** name; server, port and encryption in one row; user and password (empty keeps

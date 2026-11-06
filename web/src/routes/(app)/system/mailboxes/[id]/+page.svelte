@@ -31,6 +31,7 @@
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import * as Table from '#lib/components/ui/table/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
+	import { events } from '#lib/events.svelte.ts';
 	import { formatDate, formatNumber } from '#lib/i18n.ts';
 	import {
 		failedSteps,
@@ -58,7 +59,8 @@
 	// the page of a webhook: its head with the state of its fetches, "Bearbeiten" (the dialog),
 	// "Jetzt abrufen" and delete; a note when mails without a rule now match a rule (they come at
 	// the next fetch); then its log, a table with pages: what became of each mail it fetched, by
-	// outcome and by rule, with the documents it made and the steps on the server.
+	// outcome and by rule, with the documents it made and the steps on the server. The end of
+	// each fetch of it shows at once (`mailbox.fetched`).
 	const id = $derived(page.params.id ?? '');
 	let mailbox = $state<Mailbox | null>(null);
 	let problem = $state<string | null>(null);
@@ -134,6 +136,25 @@
 			void mails.reload();
 		});
 		void load(wanted);
+	});
+
+	// Live (Tobi, 06.11.2026): the end of a fetch of this mailbox shows what became of its mails
+	// at once; after a break of the stream the page loads anew, an end may have been missed.
+	$effect(() => {
+		const wanted = id;
+		return events.on('mailbox.fetched', (event) => {
+			if (event.mailbox_id !== wanted) return;
+			void load(wanted);
+			void mails.refresh();
+		});
+	});
+
+	$effect(() => {
+		if (events.generation === 0) return;
+		untrack(() => {
+			void load(id);
+			void mails.refresh();
+		});
 	});
 
 	function show(next: string) {

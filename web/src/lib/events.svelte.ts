@@ -30,8 +30,9 @@ export const WEBHOOK_EVENT_TYPES = [
 ] as const;
 export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number];
 
-/** The events without a document for every user: a new model of the classifier. */
-export const SYSTEM_EVENT_TYPES = ['classifier.trained'] as const;
+/** The events without a document: a new model of the classifier (every user), the end of a
+ * fetch of a mailbox (admins: `mailbox_id`). */
+export const SYSTEM_EVENT_TYPES = ['classifier.trained', 'mailbox.fetched'] as const;
 export type SystemEventType = (typeof SYSTEM_EVENT_TYPES)[number];
 
 /** The events of the caller's own searches: the meaning of a query is ready (`query`). */
