@@ -1,10 +1,11 @@
 """Mail records and mail origins on SQL tables."""
 
+from collections.abc import Collection
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Row, insert, select, update
+from sqlalchemy import Row, func, insert, select, update
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.transaction import Transaction
@@ -16,6 +17,7 @@ from lekto.core.domain.mail_intake import MailOrigin, MailOutcome, MailRecord, O
 from lekto.core.domain.mail_message import Address
 from lekto.core.domain.mail_traits import FlagColor, Importance, MailMarks
 from lekto.core.domain.reasons import Reason
+from lekto.core.ports.repository import PAGE_SIZE
 
 _records, _origins = t.mail_records, t.mail_origins
 
@@ -50,6 +52,35 @@ class SqlMailRecordRepository:
                 **_settled(record),
             )
         )
+
+    async def page(
+        self,
+        mailbox: MailboxId,
+        *,
+        outcomes: Collection[MailOutcome] | None = None,
+        rule: MailRuleId | None = None,
+        offset: int = 0,
+        limit: int = PAGE_SIZE,
+    ) -> list[MailRecord]:
+        query = select(_records).where(*_chosen(mailbox, rule))
+        if outcomes:
+            query = query.where(_records.c.outcome.in_([item.value for item in outcomes]))
+        rows = await self._tx.read(
+            query.order_by(_records.c.fetched_at.desc(), _records.c.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        return [_record(row) for row in rows]
+
+    async def counts(
+        self, mailbox: MailboxId, *, rule: MailRuleId | None = None
+    ) -> dict[MailOutcome, int]:
+        rows = await self._tx.read(
+            select(_records.c.outcome, func.count().label("records"))
+            .where(*_chosen(mailbox, rule))
+            .group_by(_records.c.outcome)
+        )
+        return {MailOutcome(row.outcome): int(row.records) for row in rows}
 
     async def waiting(self, mailbox: MailboxId) -> list[MailRecord]:
         rows = await self._tx.read(
@@ -165,6 +196,14 @@ def _record(row: Row[Any]) -> MailRecord:
         ),
         gone_at=row.gone_at,
     )
+
+
+def _chosen(mailbox: MailboxId, rule: MailRuleId | None) -> list[Any]:
+    """The mailbox's records, those `rule` took where given."""
+    return [
+        _records.c.mailbox_id == mailbox,
+        *([] if rule is None else [_records.c.rule_id == rule]),
+    ]
 
 
 def _settled(record: MailRecord) -> dict[str, Any]:

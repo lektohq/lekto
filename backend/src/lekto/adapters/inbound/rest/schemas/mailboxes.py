@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from lekto.adapters.inbound.schemas import ReasonOut
+from lekto.adapters.inbound.schemas import DocumentRefOut, ReasonOut
 from lekto.core.domain.changes import UNSET
 from lekto.core.domain.ids import DocumentTypeId, UserId
 from lekto.core.domain.mail import (
@@ -21,11 +21,21 @@ from lekto.core.domain.mail import (
     MIN_INTERVAL,
     Fallback,
     FetchStart,
+    MailAction,
     Mailbox,
     MailboxChanges,
     MailSecurity,
+    StepOutcome,
 )
-from lekto.core.services.mailboxes import MAX_PASSWORD, ConnectionTest
+from lekto.core.domain.mail_intake import KEPT_RECORDS, MailOutcome
+from lekto.core.domain.mail_rules import MailRule
+from lekto.core.services.mailboxes import (
+    MAX_PASSWORD,
+    ConnectionTest,
+    MailsPage,
+    MailSummary,
+    MailView,
+)
 
 _MINUTE = timedelta(minutes=1)
 
@@ -297,4 +307,145 @@ class ConnectionTestOut(BaseModel):
             keywords=list(test.keywords),
             own_keywords=test.own_keywords,
             error=None if test.error is None else ReasonOut.of(test.error),
+        )
+
+
+class MailRuleRefOut(BaseModel):
+    id: UUID
+    name: str
+    enabled: bool
+
+    @classmethod
+    def of(cls, rule: MailRule) -> "MailRuleRefOut":
+        return cls(id=rule.id, name=rule.name, enabled=rule.enabled)
+
+
+class MailStepOut(BaseModel):
+    action: MailAction
+    value: str | None
+    failed: ReasonOut | None = Field(description="Why the server refused it; null: done.")
+
+    @classmethod
+    def of(cls, item: StepOutcome) -> "MailStepOut":
+        return cls(
+            action=item.step.action,
+            value=item.step.value,
+            failed=None if item.failed is None else ReasonOut.of(item.failed),
+        )
+
+
+class MailOut(BaseModel):
+    """A mail the mailbox fetched and what became of it."""
+
+    id: UUID
+    folder: str
+    subject: str = Field(description="Empty once Lekto let go of what the head said.")
+    sender: str
+    sent_at: datetime | None
+    arrived_at: datetime = Field(description="When it arrived at the server.")
+    fetched_at: datetime
+    size: int = Field(description="Bytes.")
+    outcome: MailOutcome = Field(
+        description=(
+            "`taken`: documents made; `nothing`: taken, nothing in it to take; `no_rule`: no rule "
+            "took it and the fallback takes nothing; `known`: its Message-ID came before; "
+            "`too_large`; `failed`."
+        )
+    )
+    reason: ReasonOut | None = Field(description="Why it was left out or failed.")
+    rule: str | None = Field(description="The rule that took it, by its name then.")
+    rule_id: UUID | None = Field(description="That rule; null for the fallback or no rule.")
+    decided_at: datetime | None = Field(
+        description="When a rule or the fallback took it; later than `fetched_at`: afterwards."
+    )
+    later: bool = Field(description="A rule switched on after it came took it.")
+    documents: list[DocumentRefOut] = Field(description="Those the caller may read.")
+    documents_hidden: int = Field(description="Its documents the caller may not read, or gone.")
+    steps: list[MailStepOut] = Field(description="The steps on the server, in order.")
+    gone_at: datetime | None = Field(
+        description="When a fetch found it gone from its folder while no rule had taken it."
+    )
+    forgotten: bool = Field(description="Lekto let go of what its head said (an old mail).")
+    waiting: bool = Field(description="No rule took it yet, and one switched on later may.")
+    next_rule: MailRuleRefOut | None = Field(
+        description="For a waiting mail: the rule that takes it at the next fetch."
+    )
+
+    @classmethod
+    def of(cls, view: MailView) -> "MailOut":
+        record = view.record
+        return cls(
+            id=record.id,
+            folder=record.folder,
+            subject=record.subject,
+            sender=record.sender,
+            sent_at=record.sent_at,
+            arrived_at=record.arrived_at,
+            fetched_at=record.fetched_at,
+            size=record.size,
+            outcome=record.outcome,
+            reason=None if record.reason is None else ReasonOut.of(record.reason),
+            rule=record.rule,
+            rule_id=record.rule_id,
+            decided_at=record.decided_at,
+            later=record.later,
+            documents=[DocumentRefOut.of(ref) for ref in view.documents],
+            documents_hidden=view.hidden,
+            steps=[MailStepOut.of(item) for item in record.steps],
+            gone_at=record.gone_at,
+            forgotten=record.forgotten_at is not None,
+            waiting=record.waiting,
+            next_rule=None if view.next_rule is None else MailRuleRefOut.of(view.next_rule),
+        )
+
+
+class MailPageOut(BaseModel):
+    items: list[MailOut]
+    total: int = Field(description="How many mails match in all.")
+    next_offset: int | None = Field(
+        description="Pass as `offset` for the next page; null on the last page."
+    )
+
+    @classmethod
+    def of(cls, page: MailsPage, offset: int) -> "MailPageOut":
+        end = offset + len(page.mails)
+        return cls(
+            items=[MailOut.of(view) for view in page.mails],
+            total=page.total,
+            next_offset=end if page.mails and end < page.total else None,
+        )
+
+
+class MailWaitingOut(BaseModel):
+    rule: MailRuleRefOut
+    mails: int = Field(description="Waiting mails it takes at the next fetch.")
+
+
+class MailSummaryOut(BaseModel):
+    """What the log of a mailbox holds."""
+
+    counts: dict[MailOutcome, int] = Field(
+        description="Mails by outcome (of `rule_id`, if given); outcomes without any left out."
+    )
+    rules: list[MailRuleRefOut] = Field(description="The mailbox's rules, to narrow the log.")
+    waiting: list[MailWaitingOut] = Field(
+        description=(
+            "Mails no rule took yet that an active rule takes at the next fetch, by rule (those "
+            "without any left out)."
+        )
+    )
+    kept: int = Field(
+        description=f"Mails whose head Lekto keeps, the latest {KEPT_RECORDS}: only these wait."
+    )
+
+    @classmethod
+    def of(cls, summary: MailSummary) -> "MailSummaryOut":
+        return cls(
+            counts=dict(summary.counts),
+            rules=[MailRuleRefOut.of(rule) for rule in summary.rules],
+            waiting=[
+                MailWaitingOut(rule=MailRuleRefOut.of(rule), mails=count)
+                for rule, count in summary.waiting
+            ],
+            kept=KEPT_RECORDS,
         )

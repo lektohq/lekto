@@ -11,6 +11,7 @@ from lekto.core.domain.fields import FieldValue, field_to_json
 from lekto.core.domain.reasons import Reason, ReasonCode
 from lekto.core.domain.rule_planner import Effect, Note, NoteKind, RuleReport
 from lekto.core.domain.rules import RuleScope
+from lekto.core.services._access import DocumentRef
 from lekto.core.services.rules.running import Send
 
 
@@ -45,6 +46,17 @@ def field_json(value: FieldValue) -> str | bool | MoneyValue | PeriodValue:
     """A value as the API writes it: its JSON form (`field_to_json`) as the response schema
     has it."""
     return _FIELD_JSON.validate_python(field_to_json(value))
+
+
+class DocumentRefOut(BaseModel):
+    """A document as a list names it (one the caller may read)."""
+
+    id: UUID
+    title: str
+
+    @classmethod
+    def of(cls, ref: DocumentRef) -> "DocumentRefOut":
+        return cls(id=ref.id, title=ref.title)
 
 
 class ReasonOut(BaseModel):
