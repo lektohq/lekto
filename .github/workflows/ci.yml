@@ -401,7 +401,8 @@ jobs:
   # SQLite: migration, health, user (never root), roles, a PDF through OCR and parsing, stop.
   # No layer cache: measured, a cold build takes 2.5 minutes, while restoring the cache takes
   # about one minute and writing it two more, and it would take space from the 10 GB of the
-  # repository's caches.
+  # repository's caches. The image goes into the runner's Docker with zstd layers: packing them
+  # took a third of gzip's time (locally 18 instead of 41 seconds), the image is as large.
   image:
     needs: changes
     if: needs.changes.outputs.image == 'true'
@@ -415,20 +416,22 @@ jobs:
             runner: ubuntu-24.04-arm
     name: image (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
       - uses: docker/setup-buildx-action@v4
         with:
           cache-binary: false
       - name: Build the runtime image
+        timeout-minutes: 10
         uses: docker/build-push-action@v7
         with:
           context: .
           target: runtime
-          load: true
+          outputs: type=docker,compression=zstd,force-compression=true
           tags: lekto:ci
       - name: Size of the image
         run: docker image inspect lekto:ci --format 'image size {{.Size}} bytes' | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Test the image
+        timeout-minutes: 8
         run: deploy/test-image.sh lekto:ci
