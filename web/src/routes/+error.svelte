@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import Logo from '#lib/components/Logo.svelte';
+	import Mascot from '#lib/components/Mascot.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { home } from '#lib/navigation.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -12,7 +13,13 @@
 <svelte:head><title>{notFound ? m.error_not_found() : m.error_title()}</title></svelte:head>
 
 <main class="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-6 px-6">
-	<Logo class="text-xl" />
+	<!-- A page that does not exist gets the owl in place of the logo; a real error keeps the
+	     logo, the owl would be too playful there (web/DESIGN.md, "Logo and owl"). -->
+	{#if notFound}
+		<Mascot class="w-20" />
+	{:else}
+		<Logo class="text-xl" />
+	{/if}
 	<PageTitle>
 		{notFound ? m.error_not_found() : m.error_title()}
 	</PageTitle>

@@ -170,15 +170,42 @@ phone the page scrolls.
 - **Below `lg`:** a sheet from the right, 320 px wide. Its button is the rightmost item of the
   header (thumb corner).
 - **Start page:** the overview at `/`, reached by the logo; it has no menu entry.
-- **Header items:** logo (favicon icon before the wordmark "lekto"), menu, search (the field where
-  the header has room, `searchPlaces`: from `2xl`, for admins from 1720 px; otherwise the
-  magnifier), user menu (avatar).
+- **Header items:** logo (the owl's head before the wordmark "lekto", see
+  [Logo and owl](#logo-and-owl)), menu, search (the field where the header has room,
+  `searchPlaces`: from `2xl`, for admins from 1720 px; otherwise the magnifier), user menu
+  (avatar).
 - **User menu:** name and role, the admin switch "Alle Nutzer einbeziehen", language and appearance
   (`LanguageChoices`, `ThemeChoices`, each a `Segmented`), settings, API documentation, sign out;
   last, below a line, the version that runs ("Lekto 0.8.0", `text-xs`, muted, no item to
   choose; `lekto_version` of `GET /auth/me`). On the phone (below `sm`) the sheet holds all of
   it, the version at its end: the header shows only logo, magnifier and menu button.
 - **Inbox counter:** a badge on the menu entry, coloured by the worst lane it holds.
+
+## Logo and owl
+
+The owl stands for Lekto: it reads like a lector, searches with the magnifier and keeps the
+overview (Tobi, 06.11.2026).
+
+- **Logo** (`Logo`): the owl's head, a tile in the brand colour with feather ears; one eye is the
+  magnifier, the other reads (its pupil looks down to the right); a small beak below. The wordmark
+  "lekto" in Geist Mono follows it; the head is 1.2 em, so the logo is sized by its font size. In
+  the dark theme the tile takes the lighter brand colour and the strokes turn dark. The same
+  drawing is `static/favicon.svg` (always petrol and white), the Apple touch icon (on the `panel`
+  tint, because iOS fills transparent corners black) and the head of the release banners (white,
+  the face in the banner's ground).
+- **Owl** (`Mascot`): the same face on a body whose belly is the three lines of a page, sitting on
+  a line. It stands only where a moment is rare and means something, never as decoration of a
+  working view:
+  - the sign-in page, at the foot of the panel, 112 px wide (from `lg`; the phone has no panel and
+    keeps the small logo);
+  - the page that does not exist (404), 80 px, in place of the logo; every other error keeps the
+    logo, where the owl would be too playful;
+  - `EmptyNote` with `mascot`, 64 px: the inbox with nothing waiting (tab "Alle"; its other tabs
+    stay plain) and the documents before the first one (not "Kein Dokument passt zu diesen
+    Filtern").
+
+  The words beside it say everything, so screen readers skip it. A new place needs a decision
+  and its entry in the guard.
 
 ## Components
 
@@ -686,6 +713,8 @@ Every view that loads has these four states. Each looks the same everywhere:
 | Error     | `LoadProblem` (`role="alert"`, "Erneut versuchen")                     | On the page, not as a toast. A detail page keeps its header and back link                        |
 | Not found | `LoadProblem` with the way back                                        | Never a dead end                                                                                 |
 
+Two empty notes carry the owl ([Logo and owl](#logo-and-owl)).
+
 ## Patterns
 
 ### Footers
@@ -1055,7 +1084,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     (`pressed`) only where each toggles on its own ("Tabs and switches"); every master data tab
     in the order tabs, search, filter row, list, with no paragraph before the list ("Master data
     tabs"); tooltips only through `ui/tooltip` ("Help and tooltips"); `Progress` only in the
-    selection bars of runs on many and the upload summary ("Choosing many");
+    selection bars of runs on many and the upload summary ("Choosing many"); the owl (`Mascot`,
+    `EmptyNote` with `mascot`) only at its places ("Logo and owl");
   - `src/lib/tips.test.ts`: one box of help at a time, the next without delay; a tooltip opens on
     a focus Tab brought, not on one handed back;
   - `src/lib/via-token.test.ts`: every file that has a person's API token (`via_token`, a

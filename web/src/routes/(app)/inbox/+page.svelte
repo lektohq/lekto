@@ -213,7 +213,8 @@
 			buttonClass="h-11 sm:h-9"
 		/>
 	{:else if list.empty}
-		<EmptyNote>{EMPTY[tab ?? 'all']()}</EmptyNote>
+		<!-- The owl only when nothing at all waits (web/DESIGN.md, "Logo and owl"). -->
+		<EmptyNote mascot={!tab}>{EMPTY[tab ?? 'all']()}</EmptyNote>
 	{:else}
 		<ul class="flex flex-col gap-2" aria-busy={list.loading}>
 			{#each list.items as item (item.document.id)}

@@ -4,7 +4,8 @@
 // through `IconButton`, one way to view a document (the Beam), toggle chips only where each
 // toggles on its own, one order on the master data tabs, tooltips through `ui/tooltip`, a run's
 // progress in the selection bar, fields in the API's order, short lines under fields, a document's
-// pages through `DocumentPages`, a topic chosen through the tag picker, one height for fields. An
+// pages through `DocumentPages`, a topic chosen through the tag picker, one height for fields,
+// the owl only at its places. An
 // exception needs its line in DESIGN.md ("Exceptions") and here; the
 // lists of exceptions may only shrink.
 import { describe, expect, it } from 'vitest';
@@ -75,6 +76,20 @@ const DOCUMENT_LINK = /documentHref\(|inboxDocument\(|BASE\}\/documents\/(?:\{|\
 const TOGGLE_CHIPS = new Set([
 	'/src/lib/components/PeriodFacet.svelte',
 	'/src/lib/components/system/AutomationTab.svelte',
+	'/src/routes/(app)/dev/components/+page.svelte'
+]);
+
+/** Where the owl stands (DESIGN.md, "Logo and owl"): the sign-in, the page that does not exist,
+ * and through `EmptyNote` the inbox with nothing waiting and the documents before the first one;
+ * the style guide shows it. */
+const MASCOT = new Set([
+	'/src/lib/components/EmptyNote.svelte',
+	'/src/routes/login/+page.svelte',
+	'/src/routes/+error.svelte'
+]);
+const MASCOT_NOTES = new Set([
+	'/src/routes/(app)/inbox/+page.svelte',
+	'/src/routes/(app)/documents/+page.svelte',
 	'/src/routes/(app)/dev/components/+page.svelte'
 ]);
 
@@ -394,5 +409,18 @@ describe('the design system (web/DESIGN.md)', () => {
 		for (const view of ['RuleView', 'MailRuleView']) {
 			expect(sources[own(view)]).toMatch(/<ConditionTree\b/);
 		}
+	});
+
+	it('shows the owl only where a moment is rare: sign-in, not found, nothing waiting, no document', () => {
+		expect(
+			offenders((source, path) => (MASCOT.has(path) ? null : line(source, /<Mascot\b/)))
+		).toEqual([]);
+		expect(
+			offenders((source, path) =>
+				MASCOT_NOTES.has(path)
+					? null
+					: (tags(source, 'EmptyNote').find((tag) => /\bmascot\b/.test(tag)) ?? null)
+			)
+		).toEqual([]);
 	});
 });
