@@ -66,8 +66,9 @@ jobs:
           matches() { [ "$files" = ALL ] || echo "$files" | grep -qE "$1"; }
           ci='^\.github/(workflows/ci\.yml|compose\.ci\.yml|scripts/ocr-packages\.sh)$'
           lock='^backend/(pyproject\.toml|uv\.lock)$'
-          # web/openapi.json: a backend test compares it with the API.
-          code="^backend/|^web/openapi\.json$|^\.devcontainer/(compose\.yml|garage)|$ci"
+          # web/openapi.json: a backend test compares it with the API; docs/configuration.md
+          # one with the settings.
+          code="^backend/|^web/openapi\.json$|^docs/configuration\.md$|^\.devcontainer/(compose\.yml|garage)|$ci"
           migration="^migration/|^web/openapi\.json$|$ci"
           # The backend's unit tests run the migration client against the API, too.
           backend_tests="$code|^migration/"
