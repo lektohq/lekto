@@ -1,8 +1,7 @@
 # CLAUDE.md
 
-Lekto DMS (technical name `lekto`) is a self-hosted, headless document management system, a
-replacement for Paperless-ngx. Python backend, hexagonal (ports and adapters); the REST API is the
-only way in.
+Lekto DMS (technical name `lekto`) is a self-hosted, headless document management system.
+Python backend, hexagonal (ports and adapters); the REST API is the only way in.
 
 ## Layout
 
