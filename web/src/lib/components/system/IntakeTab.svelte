@@ -2,7 +2,7 @@
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import OctagonX from '@lucide/svelte/icons/octagon-x';
 	import Plus from '@lucide/svelte/icons/plus';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import EditButton from '#lib/components/EditButton.svelte';
@@ -19,6 +19,7 @@
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
+	import { events } from '#lib/events.svelte.ts';
 	import { statusOf, type Mailbox, type StatusTone } from '#lib/mailboxes.ts';
 	import { m } from '#lib/paraglide/messages.js';
 
@@ -26,7 +27,8 @@
 	// documents come in besides the web UI and the API. So far mail: the mailboxes Lekto fetches
 	// from, one row each (name and the state of its fetches, server, folders, interval, the last
 	// fetch and why it failed), the switch that pauses it and the pencil that opens its dialog.
-	// Its name opens its page (Tobi, 06.11.2026): what became of each mail it fetched.
+	// Its name opens its page (Tobi, 06.11.2026): what became of each mail it fetched. The end
+	// of a fetch shows in the row at once (`mailbox.fetched`).
 	let mailboxes = $state<Mailbox[] | null>(null);
 	let problem = $state<string | null>(null);
 	let busy = $state<string | null>(null);
@@ -49,6 +51,14 @@
 	}
 
 	onMount(load);
+
+	// The end of a fetch shows in its row at once (Tobi, 06.11.2026), and after a break of the
+	// stream the list loads anew.
+	onMount(() => events.on('mailbox.fetched', () => void load()));
+	$effect(() => {
+		if (events.generation === 0) return;
+		untrack(() => void load());
+	});
 
 	function create() {
 		editing = null;

@@ -13,6 +13,7 @@ from lekto.adapters.outbound.regex import RegexPatternMatcher
 from lekto.core.domain.condition_tree import Group
 from lekto.core.domain.documents import Channel
 from lekto.core.domain.errors import PermissionDeniedError, ValidationError
+from lekto.core.domain.events import MailboxFetched
 from lekto.core.domain.identifiers import Identifier, IdentifierKind
 from lekto.core.domain.ids import DocumentTypeId, new_id
 from lekto.core.domain.jobs import JobState
@@ -476,6 +477,8 @@ async def test_a_rule_switched_on_later_takes_the_mails_no_rule_took(world: Worl
     world.clock.advance(LATER)
     await world.mail_rules.change(admin.id, rule.id, MailRuleChanges(enabled=True))
     await drain(world.mail_intake())  # switching it on brought the fetch forward to now
+    fetched = [event for event in world.events() if isinstance(event, MailboxFetched)]
+    assert [(e.mailbox_id, e.mails, e.later) for e in fetched[-1:]] == [(mailbox.id, 0, 1)]
 
     (document,) = await world.documents.list_visible(person.id)
     assert document.original_filename == "Ihre Rechnung.eml"

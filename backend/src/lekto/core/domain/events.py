@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import ClassVar
 
-from lekto.core.domain.ids import DocumentId, EventId, SpaceId, UserId, new_id
+from lekto.core.domain.ids import DocumentId, EventId, MailboxId, SpaceId, UserId, new_id
 from lekto.core.domain.pipeline import Lane, Node, Outcome
 from lekto.core.domain.validation import require_utc
 
@@ -153,6 +153,19 @@ class ClassifierTrained(DomainEvent):
 
 
 @dataclass(frozen=True, kw_only=True)
+class MailboxFetched(DomainEvent):
+    """A fetch of a mailbox ended (Tobi, 06.11.2026): its page and the intake channels show what
+    became of its mails anew. `mails`: the new mails it took in, `later`: the mails without a rule
+    a rule switched on since took. For the active admins' event streams (only they see
+    mailboxes), not for webhooks."""
+
+    type: ClassVar[str] = "mailbox.fetched"
+    mailbox_id: MailboxId
+    mails: int = 0
+    later: int = 0
+
+
+@dataclass(frozen=True, kw_only=True)
 class SearchMeaningReady(DomainEvent):
     """The meaning of a query that a search of `user_id` had to do without (it was not ready in
     time) is ready now: a search for it again takes the meaning into account. Not stored, for
@@ -185,4 +198,5 @@ DOCUMENT_EVENT_TYPES: dict[str, type[DocumentEvent]] = {
 EVENT_TYPES: dict[str, type[DomainEvent]] = {
     **DOCUMENT_EVENT_TYPES,
     ClassifierTrained.type: ClassifierTrained,
+    MailboxFetched.type: MailboxFetched,
 }
