@@ -314,6 +314,7 @@ class MailRule:
             body_type_id=self.text_type_id,
             after=self.after,
             rule=self.name,
+            rule_id=self.id,
         )
 
     def _check(self) -> None:

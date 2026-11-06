@@ -18,9 +18,11 @@ from lekto.core.domain.reasons import Action
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import require_admin
+from lekto.core.services.mail_intake import schedule_fetch
 
 DRY_RUN_MAILS = 50
-"""The latest mails of a mailbox a dry run looks at."""
+"""The latest mails of a mailbox a dry run looks at, besides every mail still waiting for a
+rule (`MailRecord.waiting`)."""
 
 
 class Decider(StrEnum):
@@ -34,15 +36,17 @@ class Decider(StrEnum):
 
 @dataclass(frozen=True)
 class DryRunMail:
-    """A mail fetched lately and what would become of it with the rule: whether its conditions
-    hold, who would decide it (the rule, another before it, `rule` by name and `rule_id`, or the
-    fallback)."""
+    """A mail fetched lately, or one still waiting for a rule, and what would become of it with
+    the rule: whether its conditions hold, who would decide it (the rule, another before it,
+    `rule` by name and `rule_id`, or the fallback). `waiting`: no rule took it yet, so the next
+    fetch gives it to the rule that decides it now (not to the fallback)."""
 
     record: MailRecord
     matches: bool
     decider: Decider
     rule: str | None = None
     rule_id: MailRuleId | None = None
+    waiting: bool = False
 
 
 class MailRuleService:
@@ -68,6 +72,8 @@ class MailRuleService:
             rule = MailRule.create(mailbox_id=mailbox, changes=changes, now=self._clock.now())
             await _check(uow, rule)
             await uow.mail_rules.add(rule)
+            if rule.enabled:
+                await self._fetch_soon(uow, rule)
             await uow.commit()
             return rule
 
@@ -75,11 +81,21 @@ class MailRuleService:
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.MANAGE_MAILBOXES)
             rule = await uow.mail_rules.get(id)
+            was_on = rule.enabled
             rule.change(changes, now=self._clock.now())
             await _check(uow, rule)
             await uow.mail_rules.update(rule)
+            if rule.enabled and not was_on:
+                await self._fetch_soon(uow, rule)
             await uow.commit()
             return rule
+
+    async def _fetch_soon(self, uow: UnitOfWork, rule: MailRule) -> None:
+        """A rule switched on takes the mails waiting for a rule at the next fetch: it comes
+        at once (the mailbox's, if it is not paused)."""
+        mailbox = await uow.mailboxes.get(rule.mailbox_id)
+        if mailbox.enabled:
+            await schedule_fetch(uow, mailbox, self._clock.now())
 
     async def dry_run(
         self,
@@ -90,8 +106,9 @@ class MailRuleService:
         rule: MailRuleId | None = None,
     ) -> list[DryRunMail]:
         """What a rule as `changes` describe it (in place of `rule`, a stored one being edited)
-        would do with the mailbox's latest mails, as their records keep them; reads only. The
-        rule counts as active. ValidationError if it is no valid rule."""
+        would do with the mailbox's latest mails and those still waiting for a rule, as their
+        records keep them, the latest first; reads only. The rule counts as active.
+        ValidationError if it is no valid rule."""
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.MANAGE_MAILBOXES)
             box = await uow.mailboxes.get(mailbox)
@@ -100,7 +117,14 @@ class MailRuleService:
                 draft.id = rule
             draft.enabled = True
             others = [item for item in await uow.mail_rules.of_mailbox(box.id) if item.id != rule]
-            records = await uow.mail_records.recent(box.id, limit=DRY_RUN_MAILS)
+            latest = await uow.mail_records.recent(box.id, limit=DRY_RUN_MAILS)
+            waiting = await uow.mail_records.waiting(box.id)
+        seen = {record.id for record in latest}
+        records = sorted(
+            [*latest, *(record for record in waiting if record.id not in seen)],
+            key=lambda record: (record.fetched_at, record.id),
+            reverse=True,
+        )
         found = []
         for record in records:
             facts = record_facts(record)
@@ -110,7 +134,7 @@ class MailRuleService:
                 decider = Decider.RULE
             elif other is not None:
                 decider = Decider.OTHER
-            elif box.fallback is Fallback.EVERYTHING:
+            elif box.fallback is Fallback.EVERYTHING and not record.waiting:
                 decider = Decider.FALLBACK
             else:
                 decider = Decider.NOTHING
@@ -121,6 +145,7 @@ class MailRuleService:
                     decider,
                     rule=None if other is None else other.name,
                     rule_id=None if other is None else other.id,
+                    waiting=record.waiting,
                 )
             )
         return found
