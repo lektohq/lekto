@@ -9,7 +9,7 @@ from typing import Any
 from uuid import UUID
 
 from lekto.core.domain.events import EVENT_TYPES, DomainEvent
-from lekto.core.domain.ids import DocumentId, EventId, SpaceId, UserId
+from lekto.core.domain.ids import DocumentId, EventId, MailboxId, SpaceId, UserId
 from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.pipeline import Lane, Node, Outcome
 
@@ -49,6 +49,9 @@ _FIELDS: dict[str, tuple[Callable[[Any], JsonValue], Callable[[Any], object]]] =
     "fields": (list, tuple),
     "number": (int, int),
     "examples": (int, int),
+    "mailbox_id": (str, lambda value: MailboxId(UUID(value))),
+    "mails": (int, int),
+    "later": (int, int),
 }
 """Per field of an event: how it is written to the payload and read back."""
 _COLUMNS = frozenset({"id", "occurred_at"})

@@ -1,8 +1,9 @@
 """`/mailboxes`: the mailboxes Lekto fetches from, for admins."""
 
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
 from lekto.adapters.inbound.rest.context import Context
@@ -13,8 +14,12 @@ from lekto.adapters.inbound.rest.schemas.mailboxes import (
     MailboxCreate,
     MailboxOut,
     MailboxPatch,
+    MailPageOut,
+    MailSummaryOut,
 )
-from lekto.core.domain.ids import MailboxId
+from lekto.core.domain.ids import MailboxId, MailRuleId
+from lekto.core.domain.mail_intake import MailOutcome
+from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE
 
 router = APIRouter(prefix="/mailboxes", tags=["mailboxes"], dependencies=PROTECTED)
 
@@ -98,6 +103,61 @@ async def test_connection(
 )
 async def fetch_mailbox(id: UUID, user: CurrentUser, context: Context) -> None:
     await context.mail_intake.fetch_now(user, MailboxId(id))
+
+
+@router.get(
+    "/{id}/mails",
+    summary="The mails a mailbox fetched",
+    description=(
+        "Newest fetch first: what became of each mail, the rule that took it (afterwards, "
+        "`later`), its documents as far as the caller may read them and its steps on the "
+        "server; for a mail no rule took yet the rule that takes it at the next fetch. "
+        "`outcome` and `rule_id` narrow the log; `GET /mailboxes/{id}/mails/summary` counts it "
+        f"by outcome. {WHO}"
+    ),
+    response_model=MailPageOut,
+    responses=problem_responses(401, 403, 404, 422),
+)
+async def list_mails(
+    id: UUID,
+    user: CurrentUser,
+    context: Context,
+    outcome: Annotated[list[MailOutcome] | None, Query(description="Repeat for several.")] = None,
+    rule_id: Annotated[UUID | None, Query(description="Only the mails this rule took.")] = None,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=PAGE_LIMIT)] = PAGE_SIZE,
+) -> MailPageOut:
+    page = await context.mailboxes.mails(
+        user,
+        MailboxId(id),
+        outcomes=frozenset(outcome) if outcome else None,
+        rule=None if rule_id is None else MailRuleId(rule_id),
+        offset=offset,
+        limit=limit,
+    )
+    return MailPageOut.of(page, offset)
+
+
+@router.get(
+    "/{id}/mails/summary",
+    summary="What the log of a mailbox holds",
+    description=(
+        "How many mails by outcome (of those `rule_id` took, if given), the mailbox's rules, and "
+        f"how many mails no rule took yet each active rule takes at the next fetch. {WHO}"
+    ),
+    response_model=MailSummaryOut,
+    responses=problem_responses(401, 403, 404, 422),
+)
+async def mail_summary(
+    id: UUID,
+    user: CurrentUser,
+    context: Context,
+    rule_id: Annotated[UUID | None, Query(description="Only the mails this rule took.")] = None,
+) -> MailSummaryOut:
+    summary = await context.mailboxes.mail_summary(
+        user, MailboxId(id), rule=None if rule_id is None else MailRuleId(rule_id)
+    )
+    return MailSummaryOut.of(summary)
 
 
 @router.get(

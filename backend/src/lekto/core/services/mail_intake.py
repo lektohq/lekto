@@ -32,6 +32,7 @@ from lekto.core.domain.errors import (
     UnprocessableDocumentError,
     ValidationError,
 )
+from lekto.core.domain.events import MailboxFetched
 from lekto.core.domain.ids import DocumentId, MailboxId, MailRecordId, UserId, new_id
 from lekto.core.domain.jobs import Job
 from lekto.core.domain.mail import (
@@ -248,6 +249,16 @@ class MailIntakeService:
                         )
                     )
                     await uow.mailboxes.update(mailbox)
+                    await uow.outbox.add(
+                        [
+                            MailboxFetched(
+                                occurred_at=now,
+                                mailbox_id=mailbox.id,
+                                mails=count.mails,
+                                later=count.later,
+                            )
+                        ]
+                    )
                 await uow.jobs.complete(
                     job, now=now, result={"mails": count.mails, "documents": count.documents}
                 )
