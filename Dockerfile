@@ -34,7 +34,11 @@ ENV PYTHONUNBUFFERED=1 \
 # Only for the build: keeps debconf from warning about a missing terminal.
 ARG DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update \
+# apt gives up on a mirror that stops answering and tries again, instead of waiting without end
+# (on the CI runner it waited 15 minutes for one, 06.11.2026); the stages on `base` keep this.
+RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
+        > /etc/apt/apt.conf.d/80-network \
+    && apt-get update \
     && apt-get install --no-install-recommends -y \
         ca-certificates \
         ghostscript \
