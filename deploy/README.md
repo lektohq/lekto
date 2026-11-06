@@ -237,6 +237,11 @@ The web UI is at `/ui/` (`/` leads there). Lekto sets its cache headers: files b
 (`no-cache`) is revalidated on every load, so an update shows at once. A proxy cache keeps these
 headers; it must not cache `/api/` (the API's answers are personal).
 
+Behind HTTPS the web UI installs as an app (the browser's "Install" or "Add to Home Screen"): its
+service worker (`/ui/service-worker.js`, revalidated like every other file) keeps the files of
+the web UI for a start without a connection, never an answer of the API. Over plain HTTP the
+browser offers no install and Lekto works as a website.
+
 Two paths must not be buffered or cut short by the proxy:
 
 - `/api/v1/events`: server-sent events, minutes to hours.
