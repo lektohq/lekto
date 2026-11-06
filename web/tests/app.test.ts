@@ -10,6 +10,11 @@ import { appFiles, pageFiles, pageKey, shellPaths, strategy } from '#lib/app-cac
 import { BASE } from '#lib/base.ts';
 import { THEME_COLORS } from '#lib/theme-color.ts';
 
+const sources = import.meta.glob<string>('/src/**/*.svelte', {
+	query: '?raw',
+	import: 'default',
+	eager: true
+});
 const ORIGIN = 'https://lekto.example.org';
 const SHELL = new Set(shellPaths(['favicon.svg', 'theme.js', 'manifest.webmanifest'], BASE));
 const icons = import.meta.glob<string>('/static/*.png', {
@@ -173,4 +178,22 @@ describe('the colour of the bars', () => {
 		expect(themeScript).toContain(`'${THEME_COLORS.dark}'`);
 		expect(themeScript).toContain(`'${THEME_COLORS.light}'`);
 	});
+});
+
+describe('the safe areas of the installed app', () => {
+	it('reaches under the notch and the home indicator', () => {
+		expect(html).toContain('viewport-fit=cover');
+	});
+
+	// A surface that covers the whole phone screen or stands at its bottom edge keeps the insets
+	// free: full-screen editors, bars stuck to the bottom, sheets from below, fixed buttons.
+	const EDGE =
+		/\bh-dvh max-h-dvh\b|\bsticky bottom-0\b|\bfixed\b[^'"]*\bbottom-|data-\[side=bottom\]:inset-x-0/;
+
+	it.each(Object.entries(sources).filter(([, source]) => EDGE.test(source)))(
+		'%s keeps the safe area free',
+		(_, source) => {
+			expect(source).toContain('env(safe-area-inset-');
+		}
+	);
 });

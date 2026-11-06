@@ -75,7 +75,7 @@
 		class={cn(
 			'flex flex-col gap-0 overflow-hidden p-0',
 			phone.current
-				? 'top-0 left-0 h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 bg-background'
+				? 'top-0 left-0 h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]'
 				: cn('max-h-[calc(100dvh-2rem)]', fixed && 'h-[min(46.25rem,calc(100dvh-2rem))]', className)
 		)}
 	>
