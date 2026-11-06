@@ -7,6 +7,7 @@
 	import { apiError } from '#lib/api/problem.ts';
 	import LanguageMenu from '#lib/components/LanguageMenu.svelte';
 	import Logo from '#lib/components/Logo.svelte';
+	import Mascot from '#lib/components/Mascot.svelte';
 	import ThemeMenu from '#lib/components/ThemeMenu.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
@@ -95,7 +96,9 @@
 			<Logo class="text-[88px] leading-none tracking-[-0.04em]" />
 			<p class="max-w-[380px] text-xl leading-normal text-muted-foreground">{m.login_tagline()}</p>
 		</div>
-		<div></div>
+		<!-- The owl at the foot of the panel (web/DESIGN.md, "Logo and owl"); the phone has no
+		     panel and keeps the small logo above the form. -->
+		<Mascot class="w-28 self-end" />
 	</aside>
 
 	<div class="flex flex-1 flex-col">
