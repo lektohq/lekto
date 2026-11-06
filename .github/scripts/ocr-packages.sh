@@ -12,7 +12,9 @@
 # apt has no limit of its own: on 06.11.2026 it waited three times for a mirror that had stopped
 # answering, until the job's limit (15 minutes) cancelled it, without its log. Here every
 # connection may stand still for 20 seconds, every attempt takes at most LIMIT, and the log is
-# shown when the last of ATTEMPTS fails.
+# shown when the last of ATTEMPTS fails. A mirror can also trickle, which no timeout of apt's
+# notices (the same day, Azure's sent 2 of 66 MB a minute): the attempts after the first go to
+# Ubuntu's own archive instead of the runner's mirror.
 set -euo pipefail
 
 PACKAGES=(
@@ -51,8 +53,16 @@ attempt() {
     && "${sudo[@]}" timeout "$LIMIT" apt-get "${apt_options[@]}" install --fix-broken \
       --no-install-recommends -y "$@" "${PACKAGES[@]}"
 }
+other_mirror() {
+  [ -n "${parts:-}" ] || return 0
+  sed -i -E 's#^URIs:[[:space:]]*mirror\+file:.*#URIs: http://archive.ubuntu.com/ubuntu/#' \
+    "$parts/ubuntu.sources"
+}
 from_archive() {  # $@: further options of the install (--download-only)
   for number in $(seq "$ATTEMPTS"); do
+    if [ "$number" -gt 1 ]; then
+      other_mirror
+    fi
     attempt "$@" >>"$log" 2>&1 && return 0
     code=$?  # 124: the attempt took longer than LIMIT
     echo "attempt $number of $ATTEMPTS failed (code $code)" | tee -a "$log" >&2
