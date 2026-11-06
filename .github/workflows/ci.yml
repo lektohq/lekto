@@ -17,9 +17,9 @@ concurrency:
 # pytest runs with `-n logical`: `-n auto` counts physical cores, and a runner's two vCPUs are one,
 # so the tests ran in a single process.
 
-# Caches: only pushes to main write them, one entry per content (lock file);
-# pull requests read main's entries. The uv cache is off: downloading the wheels is as fast as
-# restoring them.
+# Caches: only pushes to main write them, one entry per content (lock file; the OCR programs'
+# packages per runner image); pull requests read main's entries. The uv cache is off:
+# downloading the wheels is as fast as restoring them.
 env:
   WRITE_CACHE: ${{ github.event_name == 'push' }}
 
@@ -64,7 +64,7 @@ jobs:
           fi
           echo "$files"
           matches() { [ "$files" = ALL ] || echo "$files" | grep -qE "$1"; }
-          ci='^\.github/(workflows/ci\.yml|compose\.ci\.yml)$'
+          ci='^\.github/(workflows/ci\.yml|compose\.ci\.yml|scripts/ocr-packages\.sh)$'
           lock='^backend/(pyproject\.toml|uv\.lock)$'
           # web/openapi.json: a backend test compares it with the API.
           code="^backend/|^web/openapi\.json$|^\.devcontainer/(compose\.yml|garage)|$ci"
@@ -227,12 +227,15 @@ jobs:
       - run: pnpm build
 
   # The integration tests against the devcontainer's services (Postgres, Garage, Meilisearch,
-  # GreenMail) and the OCR programs, on the runner. No test may skip.
+  # GreenMail) and the OCR programs, on the runner. No test may skip. The OCR programs come from
+  # the cache `ocr-packages` fills, without the network; else from the Ubuntu archive, within time
+  # limits (.github/scripts/ocr-packages.sh). The step that sets them up fails within 5 minutes
+  # and shows why, instead of waiting for a mirror until the job's limit.
   integration:
     needs: changes
     if: needs.changes.outputs.integration == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     env:
       COMPOSE: docker compose -f .devcontainer/compose.yml -f .github/compose.ci.yml
     steps:
@@ -243,18 +246,23 @@ jobs:
             | jq -r '.services.dev.environment | to_entries[] | "\(.key)=\(.value)"' \
             | sed -E 's#^LEKTO_DB_HOST=.*#LEKTO_DB_HOST=localhost#; s#//(garage|meilisearch|greenmail):#//localhost:#' \
             >> "$GITHUB_ENV"
+      - id: ocr
+        run: echo "key=$(.github/scripts/ocr-packages.sh key)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v5
+        with:
+          path: ${{ runner.temp }}/ocr-debs
+          key: ${{ steps.ocr.outputs.key }}
       - name: Start the services and install the OCR programs, in parallel
+        timeout-minutes: 5
         run: |
-          (
-            sudo apt-get update -q
-            sudo apt-get install --no-install-recommends -y -q \
-              ghostscript pngquant qpdf tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng unpaper \
-              libharfbuzz-subset0 libpango-1.0-0 libpangoft2-1.0-0
-          ) > "$RUNNER_TEMP/apt.log" 2>&1 &
-          apt=$!
-          $COMPOSE up -d --wait postgres meilisearch garage greenmail
+          .github/scripts/ocr-packages.sh install "$RUNNER_TEMP/ocr-debs" > "$RUNNER_TEMP/ocr.log" 2>&1 &
+          ocr=$!
+          $COMPOSE up -d --wait --wait-timeout 120 postgres meilisearch garage greenmail
           $COMPOSE run --rm garage-init
-          wait $apt || { cat "$RUNNER_TEMP/apt.log"; exit 1; }
+          status=0
+          wait $ocr || status=$?
+          cat "$RUNNER_TEMP/ocr.log"
+          exit $status
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: false
@@ -274,6 +282,30 @@ jobs:
       - name: Show service logs
         if: failure()
         run: $COMPOSE logs
+
+  # The .deb files of the OCR programs for `integration`, from main only (pull requests read its
+  # caches): fetched once per runner image and script, a lookup otherwise.
+  ocr-packages:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - id: ocr
+        run: echo "key=$(.github/scripts/ocr-packages.sh key)" >> "$GITHUB_OUTPUT"
+      - id: cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ runner.temp }}/ocr-debs
+          key: ${{ steps.ocr.outputs.key }}
+          lookup-only: true
+      - if: steps.cache.outputs.cache-hit != 'true'
+        run: .github/scripts/ocr-packages.sh download "$RUNNER_TEMP/ocr-debs"
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ runner.temp }}/ocr-debs
+          key: ${{ steps.ocr.outputs.key }}
 
   # The dev image, only when its inputs change. First amd64: the devcontainer's services start
   # like "Reopen in Container", Garage's init is repeatable, and the image's own OCR programs
