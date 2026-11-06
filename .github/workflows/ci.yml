@@ -257,15 +257,21 @@ jobs:
       - run: ${{ matrix.run }}
 
   # The integration tests against the devcontainer's services (Postgres, Garage, Meilisearch,
-  # GreenMail) and the OCR programs, on the runner. No test may skip. The OCR programs come from
+  # GreenMail) and the OCR programs, on the runner, in two parts side by side (`--shard`), each
+  # with services of its own. No test may skip. The OCR programs come from
   # the cache `ocr-packages` fills, without the network; else from the Ubuntu archive, within time
   # limits (.github/scripts/ocr-packages.sh). The step that sets them up fails within 5 minutes
   # and shows why, instead of waiting for a mirror until the job's limit.
   integration:
     needs: changes
     if: needs.changes.outputs.integration == 'true'
+    name: integration (${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1/2, 2/2]
     env:
       COMPOSE: docker compose -f .devcontainer/compose.yml -f .github/compose.ci.yml
     steps:
@@ -303,7 +309,8 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          uv run pytest -m integration -n logical -v -rs | tee pytest.log
+          uv run pytest -m integration -n logical --shard ${{ matrix.shard }} -v -rs --durations=20 \
+            | tee pytest.log
           # pytest marks skipped tests as SKIPPED; test names may contain "skipped".
           if grep -q SKIPPED pytest.log; then
             echo "Integration tests were skipped: a service or program is missing" >&2
