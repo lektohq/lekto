@@ -23,6 +23,8 @@ export default defineConfig({
 			// A single-page app: every page path falls back to index.html, served by the API.
 			adapter: adapter({ fallback: 'index.html' }),
 			paths: { base: BASE },
+			// `lib/app-update.ts` registers the service worker, not during `pnpm dev`.
+			serviceWorker: { register: false },
 			csp: {
 				mode: 'hash',
 				directives: {
