@@ -71,7 +71,9 @@ Development in the devcontainer: [.devcontainer/README.md](.devcontainer/README.
 
 | Document | Content |
 | --- | --- |
-| [backend/README.md](backend/README.md) | Architecture, every `LEKTO_` variable, the REST API, processing, rules, search, webhooks, mail, MCP |
+| [docs/configuration.md](docs/configuration.md) | Every `LEKTO_` variable: default, values, meaning |
+| [docs/templates.md](docs/templates.md) | Templates for titles, rules and webhook bodies |
+| [backend/README.md](backend/README.md) | Architecture, the REST API, processing, rules, search, webhooks, mail, MCP |
 | [deploy/README.md](deploy/README.md) | The image: roles, volumes, health, reverse proxy, backup, updating |
 | [docker/](docker/) | Compose examples with the published images |
 | [web/README.md](web/README.md) | The web UI; its design system in [web/DESIGN.md](web/DESIGN.md) |

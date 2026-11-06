@@ -78,8 +78,9 @@ over plain HTTP (`LEKTO_COOKIE_SECURE=false`): put a TLS proxy in front before a
 Environment variables with the prefix `LEKTO_`, no configuration file; the Compose files show
 the ones that matter. The start stops with a message naming every invalid variable (`docker compose
 up` without `-d`, or `docker compose logs lekto`). A running container prints its effective
-configuration, secrets masked, with `docker compose exec lekto lekto-run lekto check`. The complete list is
-in [backend/README.md](../backend/README.md#configuration).
+configuration, secrets masked, with `docker compose exec lekto lekto-run lekto check`. Every
+variable, with its default, values and meaning, and the variables of the image (`PUID`, `PGID`,
+`S6_*`): [docs/configuration.md](../docs/configuration.md).
 
 **Secrets** come either as plain variables or as files. The examples in `docker/` pass them as
 variables from `.env`: simple, but such a value is also stored, readable by every process, in
@@ -98,32 +99,6 @@ passwords of mailboxes). Losing it means losing them all. The key from `.devcont
 (the default; the example stacks run with `LEKTO_COOKIE_SECURE=false` and would take it, so never
 copy it). Meilisearch has no `*_FILE` variable: its key is always an environment variable of its
 container (`MEILI_MASTER_KEY`).
-
-| Variable | Default | Notes |
-| --- | --- | --- |
-| `LEKTO_ROLE` | `all` | `all`, `api` or `worker` (next section) |
-| `LEKTO_SECRET_KEY(_FILE)` | – | required |
-| `LEKTO_ADMIN_USERNAME`, `LEKTO_ADMIN_PASSWORD(_FILE)` | – | create the first admin while there is none |
-| `LEKTO_DB_TYPE` | `sqlite` | `postgres` needs `LEKTO_DB_HOST`, `_NAME`, `_USER`, `_PASSWORD(_FILE)` |
-| `LEKTO_STORAGE_TYPE` | `filesystem` | `s3` needs `LEKTO_S3_ENDPOINT_URL`, `_BUCKET`, `_ACCESS_KEY_ID(_FILE)`, `_SECRET_ACCESS_KEY(_FILE)` |
-| `LEKTO_MEILISEARCH_URL`, `_API_KEY(_FILE)` | – | search; without it Lekto works without search |
-| `LEKTO_LLM_BASE_URL`, `_MODEL` | – | set both or neither; `LEKTO_LLM_TIMEOUT` (seconds, 300) |
-| `LEKTO_EMBEDDING_BASE_URL`, `_MODEL`, `_DIMENSIONS`, `_QUERY_PREFIX` | – | with Meilisearch and embeddings the dimensions are required |
-| `LEKTO_VLM_BASE_URL`, `_MODEL`, `_API_KEY(_FILE)` | – | a vision language model that reads a document's pages when a person asks for it; set both or neither; `LEKTO_VLM_TIMEOUT` (seconds per document, 1800) |
-| `LEKTO_LOGO_FETCH` | `false` | fetch the logos of contacts from their own websites; see [Outgoing requests](#outgoing-requests) |
-| `LEKTO_COOKIE_SECURE`, `LEKTO_FORWARDED_ALLOW_IPS`, `LEKTO_PUBLIC_URL` | `true`, –, – | behind a proxy, see below |
-| `LEKTO_UPLOAD_MAX_SIZE` | 100 MiB | the proxy's body limit must allow it |
-| `LEKTO_UI_DIR` | `/opt/lekto/ui` | the web UI's files; unset it to serve the API only |
-| `LEKTO_WORKER_CONCURRENCY`, `LEKTO_WORKER_SHUTDOWN_TIMEOUT` | 2, 30 s | jobs at the same time (OCR shares the CPU cores among them); see [Stopping](#stopping) |
-| `LEKTO_WORKER_POLL_INTERVAL`, `LEKTO_EVENTS_POLL_INTERVAL` | 1 s, 1 s | how often the worker looks for jobs and both services for events while no signal reaches them; see [Idle](#idle) |
-| `LEKTO_MCP_ENABLED`, `LEKTO_MCP_TEXT_MAX` | `true`, 20000 | the MCP endpoint and the characters one `documents_text` returns |
-| `LEKTO_WEBHOOKS_PER_USER` | 20 | webhooks per user |
-| `LEKTO_WEBHOOK_TIMEOUT`, `_MAX_ATTEMPTS`, `_RETRY_DELAY` | 10 s, 10, 30 s | per attempt; attempts per event; first delay, doubling up to one hour |
-| `LEKTO_WEBHOOK_DISABLE_AFTER`, `_CONCURRENCY`, `_SECRET_GRACE` | 20, 4, 24 h | given-up deliveries in a row until a webhook is switched off; parallel deliveries; how long a renewed secret's predecessor still signs |
-| `LEKTO_LOG_FORMAT`, `LEKTO_LOG_LEVEL` | `json`, `INFO` | all services log to stdout/stderr |
-
-Variables of the image itself (not `LEKTO_`, so not checked as settings): `PUID`, `PGID`, and the
-`S6_*` variables of s6-overlay.
 
 ### Language model
 
