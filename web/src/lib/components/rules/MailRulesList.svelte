@@ -35,7 +35,7 @@
 			? m.mail_rules_fallback_everything({ name: names.user(mailbox.fallback_user_id) })
 			: m.mail_rules_fallback_nothing();
 
-	const mailboxHref = (mailbox: Mailbox) => `${BASE}/system?tab=intake&mailbox=${mailbox.id}`;
+	const mailboxHref = (mailbox: Mailbox) => `${BASE}/system/mailboxes/${mailbox.id}`;
 
 	async function switchRule(rule: MailRule, enabled: boolean) {
 		busy = rule.id;

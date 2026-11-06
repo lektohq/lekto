@@ -5,8 +5,9 @@ classifier, and for a searcher that the meaning of their query is ready
 `EventHub` subscribes to the event bus (subscriber `api.sse`, dispatched by the API process
 with `waiting.dispatch_events`)
 and hands each document event to the open streams of the users who may read the document at
-that moment, and `classifier.trained` to every stream that does not follow one document
-(every user sees the classifier on the page "System", Tobi 24.10.2026). Events are pushed only
+that moment, and `classifier.trained` to every stream that does not follow one document (every
+user sees the classifier on the page "System", Tobi 24.10.2026); `mailbox.fetched` to those
+streams of the active admins (only they see mailboxes, Tobi 06.11.2026). Events are pushed only
 to connected clients; there is no replay, so a client that reconnects fetches the current
 state. One API instance is assumed: several instances would
 share the subscription and each would see only part of the events (a broker is the way out).
@@ -33,6 +34,7 @@ from lekto.core.domain.events import (
     DocumentEvent,
     DocumentUpdated,
     DomainEvent,
+    MailboxFetched,
     SearchMeaningReady,
 )
 from lekto.core.domain.ids import DocumentId, UserId
@@ -113,6 +115,9 @@ class EventHub:
         if isinstance(event, ClassifierTrained):
             self._to_all(event)
             return
+        if isinstance(event, MailboxFetched):
+            await self._to_admins(event)
+            return
         if not isinstance(event, DocumentEvent):
             return
         listeners = [
@@ -139,6 +144,16 @@ class EventHub:
         """Hand the event to the streams of its user that do not follow one document."""
         for listener in list(self._listeners):
             if listener.user == event.user_id and listener.document is None:
+                listener.offer(event)
+
+    async def _to_admins(self, event: DomainEvent) -> None:
+        """To the streams of the active admins that do not follow one document."""
+        listeners = [listener for listener in self._listeners if listener.document is None]
+        if not listeners:
+            return
+        admins = await self._documents.active_admins({listener.user for listener in listeners})
+        for listener in listeners:
+            if listener.user in admins:
                 listener.offer(event)
 
     def _to_all(self, event: DomainEvent) -> None:

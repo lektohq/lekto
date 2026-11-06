@@ -13,8 +13,8 @@ from lekto.adapters.inbound.rest.events import EventHub, message
 from lekto.adapters.outbound.memory import FakeEmbeddings
 from lekto.composition.container import build_memory_container, build_services
 from lekto.composition.settings import Settings
-from lekto.core.domain.events import ClassifierTrained, DocumentUpdated
-from lekto.core.domain.ids import DocumentId, UserId, new_id
+from lekto.core.domain.events import ClassifierTrained, DocumentUpdated, MailboxFetched
+from lekto.core.domain.ids import DocumentId, MailboxId, UserId, new_id
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role
 from lekto.core.ports.embeddings import EmbeddingResult
@@ -101,6 +101,31 @@ async def test_the_end_of_a_training_reaches_every_user(api: Api) -> None:
         event = streams[user.id].events[0]
         assert (event["number"], event["examples"]) == (4, 120)
         assert "document_id" not in event
+        close_event_streams(api.app)
+        await asyncio.wait_for(asyncio.gather(*tasks), timeout=5)
+
+
+async def test_the_end_of_a_fetch_reaches_the_admins_only(api: Api) -> None:
+    user, admin = await api.user(), await api.admin()
+    mailbox = MailboxId(new_id())
+    async with serving(api.app) as url, httpx2.AsyncClient(base_url=url, timeout=10) as client:
+        streams = {member.id: Stream() for member in (user, admin)}
+        tasks = [
+            asyncio.create_task(listen(client, member, streams[member.id]))
+            for member in (user, admin)
+        ]
+        for stream in streams.values():
+            await asyncio.wait_for(stream.ready.wait(), timeout=5)
+        async with api.container.unit_of_work() as uow:
+            await uow.outbox.add(
+                [MailboxFetched(occurred_at=NOW, mailbox_id=mailbox, mails=3, later=1)]
+            )
+            await uow.outbox.add([ClassifierTrained(occurred_at=NOW, number=5, examples=9)])
+            await uow.commit()
+        await until(lambda: streams[user.id].types() == ["classifier.trained"])
+        await until(lambda: streams[admin.id].types() == ["mailbox.fetched", "classifier.trained"])
+        event = streams[admin.id].events[0]
+        assert (event["mailbox_id"], event["mails"], event["later"]) == (str(mailbox), 3, 1)
         close_event_streams(api.app)
         await asyncio.wait_for(asyncio.gather(*tasks), timeout=5)
 

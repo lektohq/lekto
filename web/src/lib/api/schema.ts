@@ -2170,7 +2170,7 @@ export interface paths {
 		};
 		/**
 		 * Progress of documents (server-sent events)
-		 * @description A stream of document events (`document.received`, `document.node_started`, `document.node_deferred`, `document.node_completed`, `document.lane_changed`, `document.filed`, `document.updated`, `document.deleted`), only for documents the caller may read at that moment (`document.deleted`: could read when it was deleted); other users' documents are visible once green. Every user also gets `classifier.trained` (a new model, with its `number` and `examples`), unless the stream follows one document. A searcher gets `search.meaning_ready` (with the `query`) when the meaning of a query that had to go by words alone is ready (`meaning_pending` of the search), unless the stream follows one document. Each event has the event type as `event`, the event id as `id`, and JSON as `data` (see `EventMessage`). Events are thin: fetch the document for its state. There is no replay; after reconnecting, fetch the current state. The stream starts with the comment `: ready` once it is registered: every event after that reaches it. It checks regularly that its session or token is still valid and ends otherwise.
+		 * @description A stream of document events (`document.received`, `document.node_started`, `document.node_deferred`, `document.node_completed`, `document.lane_changed`, `document.filed`, `document.updated`, `document.deleted`), only for documents the caller may read at that moment (`document.deleted`: could read when it was deleted); other users' documents are visible once green. Every user also gets `classifier.trained` (a new model, with its `number` and `examples`), unless the stream follows one document; an active admin gets `mailbox.fetched` (with the `mailbox_id`) when a fetch of a mailbox ended. A searcher gets `search.meaning_ready` (with the `query`) when the meaning of a query that had to go by words alone is ready (`meaning_pending` of the search), unless the stream follows one document. Each event has the event type as `event`, the event id as `id`, and JSON as `data` (see `EventMessage`). Events are thin: fetch the document for its state. There is no replay; after reconnecting, fetch the current state. The stream starts with the comment `: ready` once it is registered: every event after that reaches it. It checks regularly that its session or token is still valid and ends otherwise.
 		 */
 		get: operations['events_api_v1_events_get'];
 		put?: never;
@@ -2489,6 +2489,46 @@ export interface paths {
 		 * @description Brings the mailbox's next fetch forward to now; a worker does it. A fetch running already plans the next itself. 422 if the mailbox is paused. Only admins (403).
 		 */
 		post: operations['fetch_mailbox_api_v1_mailboxes__id__fetch_post'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/v1/mailboxes/{id}/mails': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/**
+		 * The mails a mailbox fetched
+		 * @description Newest fetch first: what became of each mail, the rule that took it (afterwards, `later`), its documents as far as the caller may read them and its steps on the server; for a mail no rule took yet the rule that takes it at the next fetch. `outcome` and `rule_id` narrow the log; `GET /mailboxes/{id}/mails/summary` counts it by outcome. Only admins (403).
+		 */
+		get: operations['list_mails_api_v1_mailboxes__id__mails_get'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/v1/mailboxes/{id}/mails/summary': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/**
+		 * What the log of a mailbox holds
+		 * @description How many mails by outcome (of those `rule_id` took, if given), the mailbox's rules, and how many mails no rule took yet each active rule takes at the next fetch. Only admins (403).
+		 */
+		get: operations['mail_summary_api_v1_mailboxes__id__mails_summary_get'];
+		put?: never;
+		post?: never;
 		delete?: never;
 		options?: never;
 		head?: never;
@@ -4909,6 +4949,19 @@ export interface components {
 			rules: components['schemas']['RuleReportOut'][] | null;
 			/** @description Who would see the document; null if the caller could not read it then. */
 			visibility: components['schemas']['VisibilityOut'] | null;
+		};
+		/**
+		 * DocumentRefOut
+		 * @description A document as a list names it (one the caller may read).
+		 */
+		DocumentRefOut: {
+			/**
+			 * Id
+			 * Format: uuid
+			 */
+			id: string;
+			/** Title */
+			title: string;
 		};
 		/**
 		 * DocumentSort
@@ -7339,11 +7392,120 @@ export interface components {
 			flag: components['schemas']['FlagColor'] | null;
 		};
 		/**
+		 * MailOut
+		 * @description A mail the mailbox fetched and what became of it.
+		 */
+		MailOut: {
+			/**
+			 * Id
+			 * Format: uuid
+			 */
+			id: string;
+			/** Folder */
+			folder: string;
+			/**
+			 * Subject
+			 * @description Empty once Lekto let go of what the head said.
+			 */
+			subject: string;
+			/** Sender */
+			sender: string;
+			/** Sent At */
+			sent_at: string | null;
+			/**
+			 * Arrived At
+			 * Format: date-time
+			 * @description When it arrived at the server.
+			 */
+			arrived_at: string;
+			/**
+			 * Fetched At
+			 * Format: date-time
+			 */
+			fetched_at: string;
+			/**
+			 * Size
+			 * @description Bytes.
+			 */
+			size: number;
+			/** @description `taken`: documents made; `nothing`: taken, nothing in it to take; `no_rule`: no rule took it and the fallback takes nothing; `known`: its Message-ID came before; `too_large`; `failed`. */
+			outcome: components['schemas']['MailOutcome'];
+			/** @description Why it was left out or failed. */
+			reason: components['schemas']['ReasonOut'] | null;
+			/**
+			 * Rule
+			 * @description The rule that took it, by its name then.
+			 */
+			rule: string | null;
+			/**
+			 * Rule Id
+			 * @description That rule; null for the fallback or no rule.
+			 */
+			rule_id: string | null;
+			/**
+			 * Decided At
+			 * @description When a rule or the fallback took it; later than `fetched_at`: afterwards.
+			 */
+			decided_at: string | null;
+			/**
+			 * Later
+			 * @description A rule switched on after it came took it.
+			 */
+			later: boolean;
+			/**
+			 * Documents
+			 * @description Those the caller may read.
+			 */
+			documents: components['schemas']['DocumentRefOut'][];
+			/**
+			 * Documents Hidden
+			 * @description Its documents the caller may not read, or gone.
+			 */
+			documents_hidden: number;
+			/**
+			 * Steps
+			 * @description The steps on the server, in order.
+			 */
+			steps: components['schemas']['MailStepOut'][];
+			/**
+			 * Gone At
+			 * @description When a fetch found it gone from its folder while no rule had taken it.
+			 */
+			gone_at: string | null;
+			/**
+			 * Forgotten
+			 * @description Lekto let go of what its head said (an old mail).
+			 */
+			forgotten: boolean;
+			/**
+			 * Waiting
+			 * @description No rule took it yet, and one switched on later may.
+			 */
+			waiting: boolean;
+			/** @description For a waiting mail: the rule that takes it at the next fetch. */
+			next_rule: components['schemas']['MailRuleRefOut'] | null;
+		};
+		/**
 		 * MailOutcome
 		 * @description What became of a fetched mail.
 		 * @enum {string}
 		 */
 		MailOutcome: 'taken' | 'no_rule' | 'nothing' | 'known' | 'too_large' | 'failed';
+		/** MailPageOut */
+		MailPageOut: {
+			/** Items */
+			items: components['schemas']['MailOut'][];
+			/**
+			 * Total
+			 * @description How many mails match in all.
+			 */
+			total: number;
+			/**
+			 * Next Offset
+			 * @description Pass as `offset` for the next page; null on the last page.
+			 */
+			next_offset: number | null;
+		};
 		/**
 		 * MailParts
 		 * @description What of a mail a rule takes.
@@ -7611,6 +7773,18 @@ export interface components {
 			/** Name */
 			name?: string | null;
 		};
+		/** MailRuleRefOut */
+		MailRuleRefOut: {
+			/**
+			 * Id
+			 * Format: uuid
+			 */
+			id: string;
+			/** Name */
+			name: string;
+			/** Enabled */
+			enabled: boolean;
+		};
 		/**
 		 * MailSecurity
 		 * @description How the connection is secured: TLS from the start (IMAPS, port 993), TLS after the
@@ -7623,6 +7797,51 @@ export interface components {
 			action: components['schemas']['MailAction'];
 			/** Value */
 			value?: string | null;
+		};
+		/** MailStepOut */
+		MailStepOut: {
+			action: components['schemas']['MailAction'];
+			/** Value */
+			value: string | null;
+			/** @description Why the server refused it; null: done. */
+			failed: components['schemas']['ReasonOut'] | null;
+		};
+		/**
+		 * MailSummaryOut
+		 * @description What the log of a mailbox holds.
+		 */
+		MailSummaryOut: {
+			/**
+			 * Counts
+			 * @description Mails by outcome (of `rule_id`, if given); outcomes without any left out.
+			 */
+			counts: {
+				[key: string]: number;
+			};
+			/**
+			 * Rules
+			 * @description The mailbox's rules, to narrow the log.
+			 */
+			rules: components['schemas']['MailRuleRefOut'][];
+			/**
+			 * Waiting
+			 * @description Mails no rule took yet that an active rule takes at the next fetch, by rule (those without any left out).
+			 */
+			waiting: components['schemas']['MailWaitingOut'][];
+			/**
+			 * Kept
+			 * @description Mails whose head Lekto keeps, the latest 500: only these wait.
+			 */
+			kept: number;
+		};
+		/** MailWaitingOut */
+		MailWaitingOut: {
+			rule: components['schemas']['MailRuleRefOut'];
+			/**
+			 * Mails
+			 * @description Waiting mails it takes at the next fetch.
+			 */
+			mails: number;
 		};
 		/**
 		 * MailboxCreate
@@ -11651,7 +11870,8 @@ export interface components {
 		 * EventMessage
 		 * @description A domain event, thin: fetch the document for details. Fields beyond `type`, `id`,
 		 *     `occurred_at` and `document_id` depend on the type (`classifier.trained`: `number` and
-		 *     `examples` of the new model; `search.meaning_ready`: the `query`).
+		 *     `examples` of the new model; `mailbox.fetched`: the `mailbox_id`, its new `mails` and the
+		 *     mails without a rule a rule took `later`; `search.meaning_ready`: the `query`).
 		 */
 		EventMessage: {
 			/**
@@ -11671,7 +11891,7 @@ export interface components {
 			occurred_at: string;
 			/**
 			 * Document Id
-			 * @description The document; absent from `classifier.trained` and `search.meaning_ready`.
+			 * @description The document; absent from `classifier.trained`, `mailbox.fetched` and `search.meaning_ready`.
 			 * @default null
 			 */
 			document_id: string | null;
@@ -28949,6 +29169,230 @@ export interface operations {
 				};
 				content: {
 					'application/json': unknown;
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	list_mails_api_v1_mailboxes__id__mails_get: {
+		parameters: {
+			query?: {
+				/** @description Repeat for several. */
+				outcome?: components['schemas']['MailOutcome'][] | null;
+				/** @description Only the mails this rule took. */
+				rule_id?: string | null;
+				offset?: number;
+				limit?: number;
+			};
+			header?: never;
+			path: {
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['MailPageOut'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	mail_summary_api_v1_mailboxes__id__mails_summary_get: {
+		parameters: {
+			query?: {
+				/** @description Only the mails this rule took. */
+				rule_id?: string | null;
+			};
+			header?: never;
+			path: {
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['MailSummaryOut'];
 				};
 			};
 			/** @description Unauthorized */

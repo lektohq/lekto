@@ -202,6 +202,8 @@ async def test_openapi_lists_every_endpoint(api: Api) -> None:
         (f"{PREFIX}/mailboxes/{{id}}", "patch"),
         (f"{PREFIX}/mailboxes/{{id}}", "delete"),
         (f"{PREFIX}/mailboxes/{{id}}/fetch", "post"),
+        (f"{PREFIX}/mailboxes/{{id}}/mails", "get"),
+        (f"{PREFIX}/mailboxes/{{id}}/mails/summary", "get"),
         (f"{PREFIX}/mail-rules", "get"),
         (f"{PREFIX}/mail-rules", "post"),
         (f"{PREFIX}/mail-rules/dry-run", "post"),
