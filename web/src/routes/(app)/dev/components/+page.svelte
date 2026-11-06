@@ -361,6 +361,7 @@
 				</Button>
 			{/snippet}
 		</EmptyNote>
+		<EmptyNote compact mascot>{m.inbox_empty()}</EmptyNote>
 		<div class="flex max-w-xl flex-col gap-3">
 			{#each ALERTS as variant (variant)}
 				<Alert.Root {variant}>

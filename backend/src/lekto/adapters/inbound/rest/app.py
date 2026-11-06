@@ -4,12 +4,15 @@ one, below `/ui`."""
 import asyncio
 import contextlib
 import logging
-from collections.abc import AsyncIterator, Callable, Iterator, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
 from typing import Protocol
 
 from fastapi import FastAPI
 from fastapi.dependencies.models import Dependant
+from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.routing import APIRoute, iter_route_contexts
+from starlette.requests import Request
+from starlette.responses import HTMLResponse
 from starlette.routing import BaseRoute
 
 from lekto import __version__
@@ -56,7 +59,7 @@ from lekto.adapters.inbound.rest.middleware import LimitRequestBody, NoStore
 from lekto.adapters.inbound.rest.paths import HEALTH_PATH, MCP_PATH, PREFIX
 from lekto.adapters.inbound.rest.schemas.events import EventMessage
 from lekto.adapters.inbound.rest.schemas.external import TaskAnswer
-from lekto.adapters.inbound.rest.ui import ui_routes
+from lekto.adapters.inbound.rest.ui import UI_PREFIX, ui_routes
 from lekto.adapters.inbound.waiting import dispatch_events
 from lekto.core.domain.document_facts import ROLES as FACT_ROLES
 from lekto.core.domain.identifiers import catalog as identifier_kinds
@@ -107,6 +110,9 @@ log = logging.getLogger(__name__)
 
 DISPATCHER_TIMEOUT = 5
 """Seconds the event dispatch may take to end when the app stops, before it is cancelled."""
+
+DOCS_PATH = f"{PREFIX}/docs"
+FAVICON_PATH = f"{UI_PREFIX}/favicon.svg"
 
 
 class Mount(Protocol):
@@ -160,8 +166,9 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
         description=DESCRIPTION,
         lifespan=lifespan,
         openapi_url=f"{PREFIX}/openapi.json",
-        docs_url=f"{PREFIX}/docs",
+        docs_url=None,  # below, with Lekto's favicon
         redoc_url=None,
+        swagger_ui_oauth2_redirect_url=None,  # no OAuth flow to try out
     )
     app.state.context = context
     app.state.hub = hub
@@ -179,7 +186,7 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
     app.add_middleware(
         NoStore,
         prefix=PREFIX,
-        public=(HEALTH_PATH, f"{PREFIX}/docs", f"{PREFIX}/openapi.json", f"{PREFIX}/redoc"),
+        public=(HEALTH_PATH, DOCS_PATH, f"{PREFIX}/openapi.json", f"{PREFIX}/redoc"),
         # A logo is master data every user sees; its URL changes with it.
         cacheable=(master_data.LOGO_PATH,),
     )
@@ -216,6 +223,7 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
         health.router,
     ):
         app.include_router(router, prefix=PREFIX)
+    app.add_route(DOCS_PATH, _docs(app.title), include_in_schema=False)
     outgoing.describe(app)
     for mount in mounts:
         app.router.routes.extend(mount.routes)
@@ -300,6 +308,21 @@ def _calls(dependant: Dependant) -> Iterator[Callable[..., object] | None]:
     for dependency in dependant.dependencies:
         yield dependency.call
         yield from _calls(dependency)
+
+
+def _docs(title: str) -> Callable[[Request], Awaitable[HTMLResponse]]:
+    """The API documentation (Swagger UI) as FastAPI draws it, with Lekto's owl in the tab instead
+    of FastAPI's icon. Without the web UI the favicon is missing, and the browser shows none."""
+
+    async def docs(request: Request) -> HTMLResponse:
+        root = request.scope.get("root_path", "").rstrip("/")
+        return get_swagger_ui_html(
+            openapi_url=f"{root}{PREFIX}/openapi.json",
+            title=f"{title} - Swagger UI",
+            swagger_favicon_url=f"{root}{FAVICON_PATH}",
+        )
+
+    return docs
 
 
 def close_event_streams(app: FastAPI) -> None:

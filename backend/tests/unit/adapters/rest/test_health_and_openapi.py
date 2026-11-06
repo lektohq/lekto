@@ -18,6 +18,7 @@ from lekto.adapters.inbound.rest import (
     create_app,
     schemas,
 )
+from lekto.adapters.inbound.rest.app import DOCS_PATH, FAVICON_PATH
 from lekto.composition.api import api_context
 from lekto.composition.container import build_memory_container, build_services
 from tests import builders
@@ -32,6 +33,14 @@ async def test_health_is_ok_without_authentication(api: Api) -> None:
     assert response.status_code == 200
     checks = {"database": "ok", "object_store": "ok", "search": "ok"}
     assert response.json() == {"status": "ok", "checks": checks}
+
+
+async def test_the_api_documentation_carries_lektos_favicon(api: Api) -> None:
+    response = await api.client.get(DOCS_PATH)
+    assert response.status_code == 200
+    assert f'href="{FAVICON_PATH}"' in response.text
+    assert f"url: '{PREFIX}/openapi.json'" in response.text
+    assert "oauth2RedirectUrl" not in response.text
 
 
 def test_the_paths_known_outside_the_routes_are_routes(api: Api) -> None:
