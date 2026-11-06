@@ -173,7 +173,7 @@ phone the page scrolls.
 - **Header items:** logo (the owl's head before the wordmark "lekto", see
   [Logo and owl](#logo-and-owl)), menu, search (the field where the header has room,
   `searchPlaces`: from `2xl`, for admins from 1720 px; otherwise the magnifier), user menu
-  (avatar).
+  (avatar); while there is no connection, the badge "Offline" beside the logo ([App](#app)).
 - **User menu:** name and role, the admin switch "Alle Nutzer einbeziehen", language and appearance
   (`LanguageChoices`, `ThemeChoices`, each a `Segmented`), settings, API documentation, sign out;
   last, below a line, the version that runs ("Lekto 0.8.0", `text-xs`, muted, no item to
@@ -642,7 +642,8 @@ modal, over a dialog too.
 | `caution` (red)          | A risk or a failure                       |
 
 Toasts (`svelte-sonner`) confirm an action that has finished ("Gespeichert", "3 Dokumente
-eingereiht") or report an error of an action. **A toast never replaces a load error on the page.**
+eingereiht") or report an error of an action. One toast waits for the person instead: a new
+version of the app ([App](#app)). **A toast never replaces a load error on the page.**
 
 ### Help and tooltips
 
@@ -968,6 +969,34 @@ moves nothing beside it.
 Only `motion-safe`: the sliding pill of `Segmented`, the underline of `TabBar`, opening sheets and
 dialogs. Nothing moves on first show. Nothing grows over its neighbours on hover.
 
+## App
+
+Lekto installs as an app (Tobi, 06.11.2026): "Zum Home-Bildschirm" in Safari on the iPhone and
+iPad, "Zum Dock hinzufügen" in Safari on the Mac, "Installieren" in Chrome and Edge. It needs
+HTTPS (`localhost` aside); without it the browser offers no install and registers no service
+worker, and Lekto works as a website.
+
+- **Manifest** (`static/manifest.webmanifest`): "Lekto", starts at `/ui/`, scope `/` (the answer
+  of single sign-on below `/api` stays in the app), `standalone`. Icons, rendered from
+  `favicon.svg`: the owl's head alone at 192 and 512 px, a maskable one on the panel tone with
+  the owl inside the safe circle, and the favicon itself.
+- **The colour of the bars** (`theme-color`) is the header's ground, `--card`, light or dark as
+  the app shows itself: `static/theme.js` before the first paint, `lib/theme-color.ts` after.
+- **What the device keeps:** the service worker (`src/service-worker/`) keeps the files of one
+  version of the app and nothing else. Every request to the API goes to the network; documents,
+  pages, PDFs, thumbnails and lists never lie on the device (`lib/app-cache.ts`). A page comes
+  from the network; without one the kept page starts the app.
+- **A new version:** a toast that stays until it is answered, "Neue Version bereit" with the
+  action "Neu laden"; its ✕ puts it off until the app starts again. It is the one toast that
+  waits for the person ("Alerts"). A page that already runs the new version (it was reloaded)
+  takes the new worker without a word.
+- **Offline:** while the device has no connection, the header shows the badge "Offline" beside
+  the logo (`Badge`, `muted`, `md`, `wifi-off`). `LoadProblem` says "Keine Verbindung …" in place
+  of its problem and tries again by itself once the device is back online. A start without a
+  connection ends on the error page with "Keine Verbindung", which loads again by itself.
+  Nothing is written offline: an action fails as it does without the server ("Der Server ist
+  nicht erreichbar.").
+
 ## Touch targets
 
 - **Phone (below `sm`):** every control is at least 44 × 44 px. A smaller visual element (the ✕ of
@@ -1093,6 +1122,9 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     ("Names of people");
   - `tests/messages-tone.test.ts`: German texts without "Sie" and without a lowercase "du", and
     "Nummer" alone only for the numbers of the document ("Fakt, Kennung, Nummer");
+  - `tests/app.test.ts`: the service worker keeps no answer of the API, only the app's own files;
+    the manifest starts below the base and names icons that exist in their sizes, one maskable;
+    the bars' colours are the tokens ("App");
   - `tests/no-raw-text.test.ts`: no raw text in markup; `tests/no-raw-choice.test.ts`: no raw
     checkbox or radio.
 

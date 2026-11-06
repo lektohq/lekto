@@ -12,7 +12,9 @@
 	import Sun from '@lucide/svelte/icons/sun';
 	import SunMoon from '@lucide/svelte/icons/sun-moon';
 	import Users from '@lucide/svelte/icons/users';
+	import WifiOff from '@lucide/svelte/icons/wifi-off';
 	import { setMode, userPrefersMode } from 'mode-watcher';
+	import { online } from 'svelte/reactivity/window';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { API_DOCS, BASE } from '#lib/base.ts';
@@ -20,6 +22,7 @@
 	import HeaderSearch from '#lib/components/HeaderSearch.svelte';
 	import Logo from '#lib/components/Logo.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { buttonVariants } from '#lib/components/ui/button/index.ts';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
@@ -151,6 +154,12 @@
 			<a href={home()} class="relative rounded-md text-lg after:absolute after:-inset-y-1.5"
 				><Logo /></a
 			>
+			<!-- Without a connection (web/DESIGN.md, "App"); the pages say what they cannot load. -->
+			{#if online.current === false}
+				<Badge variant="muted" size="md" role="status"
+					><WifiOff aria-hidden="true" />{m.offline()}</Badge
+				>
+			{/if}
 
 			<!-- The menu in the header from lg (web/DESIGN.md, "Navigation"): the work, then
 			     administering and operating; below xl that second group behind "More" (German names
