@@ -7,8 +7,9 @@ import pytest
 
 from lekto.core.domain import media_types
 from lekto.core.domain.errors import UnprocessableDocumentError
+from lekto.core.domain.mail_intake import letters
 from lekto.core.domain.mail_message import Address, read_mail
-from tests.mails import PDF, PNG, plain_mail, rich_mail
+from tests.mails import PDF, PNG, apple_mail, plain_mail, rich_mail
 
 
 def test_reads_what_a_mail_says_about_itself() -> None:
@@ -32,6 +33,20 @@ def test_reads_text_html_attachments_pictures_and_attached_mails() -> None:
     (inner,) = mail.messages
     assert (inner.subject, inner.text) == ("Vertrag", "Der Vertrag.\n")
     assert inner.attachments == ()
+
+
+def test_what_apple_mail_sends_inline_with_a_file_name_is_an_attachment() -> None:
+    """Apple Mail sends a PDF or a photo `inline` with a file name; it is an attachment unless
+    the HTML embeds it by `cid:` (in any of its HTML parts, regardless of case)."""
+    mail = read_mail(apple_mail())
+    assert [(part.filename, part.media_type) for part in mail.attachments] == [
+        ("Rechnung.pdf", "application/pdf"),
+        ("Foto.png", "image/png"),
+    ]
+    assert mail.attachments[0].data == PDF
+    assert [part.content_id for part in mail.pictures] == ["Logo@Example"]
+    (letter,) = letters(mail)
+    assert [part.filename for part in letter.taken] == ["Rechnung.pdf", "Foto.png"]
 
 
 def test_a_plain_mail_has_its_text_only() -> None:
