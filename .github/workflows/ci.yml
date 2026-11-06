@@ -309,7 +309,8 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          uv run pytest -m integration -n logical --shard ${{ matrix.shard }} -v -rs | tee pytest.log
+          uv run pytest -m integration -n logical --shard ${{ matrix.shard }} -v -rs --durations=20 \
+            | tee pytest.log
           # pytest marks skipped tests as SKIPPED; test names may contain "skipped".
           if grep -q SKIPPED pytest.log; then
             echo "Integration tests were skipped: a service or program is missing" >&2
