@@ -46,7 +46,7 @@
 	import Loading from '#lib/components/Loading.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 
-	// The document's files as a passport (Tobi, 20.10.2026; not a table as in Paperless-ngx): the
+	// The document's files as a passport (Tobi, 20.10.2026; not a table): the
 	// life of the file from the sender to its last change in Lekto, one passport each for the
 	// original and the archive (format, size beside the other's, a fingerprint of its SHA-256,
 	// what made it, what it says about itself), and below every entry of their metadata, to

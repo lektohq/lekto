@@ -130,7 +130,7 @@ def _topics(topic_ids: Iterable[TagId]) -> frozenset[TagId]:
 
 @dataclass(kw_only=True)
 class Contact(MasterData):
-    """The other party of a document (Paperless-ngx: correspondent).
+    """The other party of a document.
 
     `aliases` are other names the contact is written as in documents ("Nord Krankenversicherung
     AG" for "Nord Versicherungsgruppe"); classification matches them like the name. They are

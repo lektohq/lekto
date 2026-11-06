@@ -95,7 +95,7 @@ class Channel(StrEnum):
 
     WEB = "web"  # uploaded with a session (web UI)
     API = "api"  # uploaded with an API token
-    MIGRATION = "migration"  # taken over from Paperless-ngx
+    MIGRATION = "migration"  # taken over from another system with its metadata
     MAIL = "mail"  # fetched from a mailbox
 
 

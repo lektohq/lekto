@@ -1,4 +1,4 @@
-"""Field definitions (Paperless-ngx: custom fields) and the values they accept."""
+"""Field definitions and the values they accept."""
 
 import re
 import unicodedata

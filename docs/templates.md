@@ -43,7 +43,7 @@ attributes of objects, no `include` or `render`.
 | `document_type_groups` | the groups the type is in, a list | as `tags` |
 | `space` | the space's name; a personal space by its user's name | `Haushalt` |
 | `uploaded_by` | who uploaded it, by display name (else user name; no rights come with it; until 0.5 `owner`) | `Tobias Example` |
-| `channel` | how the document came: `web` (uploaded in the web UI), `api` (with an API token), `migration` (taken over from Paperless-ngx) | `web` |
+| `channel` | how the document came: `web` (uploaded in the web UI), `api` (with an API token), `migration` (taken over from another system with its metadata) | `web` |
 | `pages` | the number of pages | `2` |
 | `field.<key>` | the value of a field, see below | |
 | `steps.<name>` | in a rule's step: what a step before it that asks a webhook brought (its answer, JSON: objects with `.key`, lists with `.0`, …); missing without an answer | `{{ steps.accounting.beleg }}` → `B-4711` |

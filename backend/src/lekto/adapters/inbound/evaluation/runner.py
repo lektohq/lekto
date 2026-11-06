@@ -6,7 +6,7 @@ rules and filing pass through; the signals, the judge and the fields node are th
 the pipeline, with the given model.
 
 A run is cold (a fresh installation: the classifier and the similar documents abstain) or
-trained: the training corpus is taken over first as from Paperless, indexed, and the
+trained: the training corpus is taken over first as by a migration, indexed, and the
 classifier trained on it. After each case a person sets the expected values (confirming in
 the inbox, or changing a green document), and the log tells which automatic values they
 corrected.
@@ -312,7 +312,7 @@ async def _take_over(
     owner: User,
 ) -> None:
     """Take the corpus over with its metadata (as the migration does: it counts as confirmed),
-    a topic set by a person afterwards (Paperless knows none), index it and train the
+    a topic set by a person afterwards (a migration brings none), index it and train the
     classifier on it."""
     assert environment.indexing is not None and environment.classifier is not None
     pipeline = environment.pipeline_for(None)

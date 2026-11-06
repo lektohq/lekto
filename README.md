@@ -10,10 +10,10 @@
 
 # Lekto DMS
 
-**Lekto DMS** is a self-hosted, headless document management system and a replacement for
-Paperless-ngx. It reads every document, files it and finds it again, and it shows why it
-decided what it did. The name comes from *lector*, the reader; the owl in the logo reads with
-one eye and searches with the magnifier in the other.
+**Lekto DMS** is a self-hosted, headless document management system. It reads every document,
+files it and finds it again, and it shows why it decided what it did. The name comes from
+*lector*, the reader; the owl in the logo reads with one eye and searches with the magnifier in
+the other.
 
 ## What it does
 
@@ -50,8 +50,8 @@ endpoint (or add `compose.ollama.yml`); without one, documents wait yellow for a
 search works with words only. More setups (Postgres, S3, more workers, Caddy, Traefik, nginx):
 [docker/](docker/), operation and backup: [deploy/README.md](deploy/README.md).
 
-From Paperless-ngx: [migration/README.md](migration/README.md). Development in the devcontainer:
-[.devcontainer/README.md](.devcontainer/README.md) and [CLAUDE.md](CLAUDE.md).
+Development in the devcontainer: [.devcontainer/README.md](.devcontainer/README.md) and
+[CLAUDE.md](CLAUDE.md).
 
 ## How it is built
 
@@ -75,7 +75,6 @@ From Paperless-ngx: [migration/README.md](migration/README.md). Development in t
 | [deploy/README.md](deploy/README.md) | The image: roles, volumes, health, reverse proxy, backup, updating |
 | [docker/](docker/) | Compose examples with the published images |
 | [web/README.md](web/README.md) | The web UI; its design system in [web/DESIGN.md](web/DESIGN.md) |
-| [migration/README.md](migration/README.md) | The Paperless-ngx migration client |
 | [examples/](examples/) | Synthetic example documents, an MCP evaluation, a model-call consumer |
 | [.devcontainer/README.md](.devcontainer/README.md) | Development and a personal instance in the devcontainer |
 

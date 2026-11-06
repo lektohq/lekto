@@ -120,8 +120,7 @@ class ImportedMetadata:
     tag_ids: frozenset[TagId] = frozenset()
     document_date: date | None = None
     fields: Mapping[FieldId, FieldValue] = field(default_factory=dict)
-    # When it came in at the source system (Paperless-ngx: `added`); the document keeps it as
-    # its `created_at`. In UTC.
+    # When it came in at the source system; the document keeps it as its `created_at`. In UTC.
     created_at: datetime | None = None
     review: tuple[ImportedReview, ...] = ()
 

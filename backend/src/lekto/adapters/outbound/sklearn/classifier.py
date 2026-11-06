@@ -1,6 +1,5 @@
 """Classifier on scikit-learn: TF-IDF of words and word pairs, and a logistic regression for the
-contact, one for the document type, one for the topic and one per tag, as Paperless-ngx learns
-its matching.
+contact, one for the document type, one for the topic and one per tag.
 
 scikit-learn only fits. The model is the fitted numbers in an npz archive (vocabulary, inverse
 document frequencies, coefficients, classes), read with `allow_pickle=False`: a model cannot
