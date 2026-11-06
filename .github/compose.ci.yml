@@ -2,6 +2,9 @@
 # so the services publish their ports there.
 services:
   postgres:
+    # The job's databases need not survive a crash: without fsync the tests take a quarter less
+    # time, and DROP DATABASE (its checkpoint) no longer takes up to half a minute.
+    command: [postgres, -c, fsync=off, -c, synchronous_commit=off, -c, full_page_writes=off]
     ports:
       - 5432:5432
   garage:
