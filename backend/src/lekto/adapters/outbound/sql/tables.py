@@ -940,6 +940,13 @@ mail_records = Table(
     Column("flag", Text, nullable=True),
     # When the record let go of what the mail's head said (revision 0065); null while it keeps it.
     Column("forgotten_at", UtcDateTime, nullable=True),
+    # What became of it (revision 0068): the rule that took it, when a rule or the fallback
+    # decided (later than `fetched_at`: a rule switched on afterwards), its steps on the server
+    # with why one failed, and when a fetch found it gone from its folder while no rule took it.
+    Column("rule_id", Uuid, nullable=True),
+    Column("decided_at", UtcDateTime, nullable=True),
+    Column("steps", json_type(), nullable=True),
+    Column("gone_at", UtcDateTime, nullable=True),
     UniqueConstraint("mailbox_id", "folder", "uidvalidity", "uid"),
     Index(None, "mailbox_id", "fetched_at"),
 )

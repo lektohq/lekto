@@ -811,11 +811,14 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
 - **A rule's dry run is one page for both kinds** (`DryRunGroup`): the head with the rule's
   switch and a hint, the bar (`SelectionBar`), groups as cards whose head says once what the
   rule does, rows below, yellow groups last for what the rule cannot do alone. A mail rule's
-  dry run reads the mailbox's latest 50 mails as Lekto recorded them and changes nothing: one
-  group of the mails it would take (its actions in the head; rows: subject; sender · arrival ·
-  folder · attachments), then a yellow group per rule of higher priority that takes some of
-  them first ("Vorher: …"); the bar counts them ("12 von 50 Mails") and switches the rule on
-  ("Aktivieren").
+  dry run reads the mailbox's latest 50 mails and every mail no rule has taken yet (Tobi,
+  06.11.2026) as Lekto recorded them and changes nothing: first the group of mails it takes at
+  the next fetch ("beim nächsten Abruf: noch keine Regel hat sie übernommen"), then the group
+  of those already dealt with it would have taken ("schon verarbeitet"), both with its actions
+  in the head (rows: subject; sender · arrival · folder · attachments), then a yellow group per
+  rule of higher priority that takes some of them first ("Vorher: …"); the bar counts them
+  ("12 von 50 Mails · 3 davon beim nächsten Abruf") and switches the rule on ("Aktivieren"),
+  which brings the mailbox's fetch forward, and a toast says how many waiting mails it takes.
 - **Mail conditions in document rules** (mock G): the subject choice of a condition offers
   "Mail" once; a second `Select` beside it, where "Feld" has its field and "Fakt" its kind
   (Tobi, 05.11.2026), chooses the part: "Postfach" (admins: only they read the mailboxes) and a

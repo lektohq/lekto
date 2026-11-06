@@ -446,6 +446,86 @@ async def test_the_steps_on_a_mail_go_in_order_and_a_refused_one_shows(world: Wo
     assert stored.status.step_failed_at is not None
 
 
+async def test_a_rule_switched_on_later_takes_the_mails_no_rule_took(world: World) -> None:
+    """Tobi, 06.11.2026: mails no rule took wait; a rule switched on afterwards takes those it
+    matches at the next fetch, which switching it on brings forward. A mail gone from its folder
+    no longer waits; the fallback never takes a waiting mail."""
+    admin, person, mailbox = await _setup(world, everything=False)
+    account = world.mail_server.servers[(LOGIN.host, LOGIN.port)][LOGIN.username]
+    _deliver(world, mails.plain_mail("Ihre Rechnung"))
+    _deliver(world, mails.plain_mail("Unser Newsletter"))
+    gone = _deliver(world, mails.plain_mail("Rechnung, gelöscht"))
+    await _fetch(world, world.mail_intake())
+    async with world.uow() as uow:
+        assert len(await uow.mail_records.waiting(mailbox.id)) == 3
+    inbox = account.boxes["INBOX"]
+    inbox.mails = [mail for mail in inbox.mails if mail.uid != gone]  # deleted by the person
+
+    rule = await _rule(
+        world,
+        admin,
+        mailbox,
+        conditions=Group(
+            mode="all",
+            items=(MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Rechnung"),),
+        ),
+        user_id=person.id,
+        after=(MailStep(MailAction.READ),),
+        enabled=False,
+    )
+    world.clock.advance(LATER)
+    await world.mail_rules.change(admin.id, rule.id, MailRuleChanges(enabled=True))
+    await drain(world.mail_intake())  # switching it on brought the fetch forward to now
+
+    (document,) = await world.documents.list_visible(person.id)
+    assert document.original_filename == "Ihre Rechnung.eml"
+    async with world.uow() as uow:
+        records = {r.subject: r for r in await uow.mail_records.recent(mailbox.id, limit=9)}
+        origin = await uow.mail_origins.find(document.id)
+    taken = records["Ihre Rechnung"]
+    assert (taken.outcome, taken.rule, taken.rule_id, taken.documents) == (
+        MailOutcome.TAKEN,
+        "Strom",
+        rule.id,
+        1,
+    )
+    assert taken.later and [item.step.action for item in taken.steps] == [MailAction.READ]
+    assert origin is not None and origin.rule == "Strom"
+    assert next(mail for mail in inbox.mails if mail.uid == taken.uid).seen
+    assert records["Rechnung, gelöscht"].gone_at is not None
+    assert records["Unser Newsletter"].waiting
+
+    await world.mailboxes.change(
+        admin.id,
+        mailbox.id,
+        MailboxChanges(fallback=Fallback.EVERYTHING, fallback_user_id=person.id),
+    )
+    intake = world.mail_intake()
+    await intake.fetch_now(admin.id, mailbox.id)
+    await drain(intake)
+    assert len(await world.documents.list_visible(person.id)) == 1  # not the fallback's
+    async with world.uow() as uow:
+        assert [r.subject for r in await uow.mail_records.waiting(mailbox.id)] == [
+            "Unser Newsletter"
+        ]
+
+
+async def test_the_dry_run_names_the_mails_waiting_for_a_rule(world: World) -> None:
+    admin, person, mailbox = await _setup(world, everything=False)
+    _deliver(world, mails.plain_mail("Ihre Rechnung"))
+    await _fetch(world, world.mail_intake())
+    draft = MailRuleChanges(
+        name="Rechnungen",
+        conditions=Group(
+            mode="all",
+            items=(MailCondition(MailField.SUBJECT, MailOperator.CONTAINS, "Rechnung"),),
+        ),
+        user_id=person.id,
+    )
+    (item,) = await world.mail_rules.dry_run(admin.id, mailbox.id, draft)
+    assert (item.waiting, item.decider, item.matches) == (True, Decider.RULE, True)
+
+
 async def test_the_first_matching_rule_takes_a_mail(world: World) -> None:
     admin, person, mailbox = await _setup(world, everything=False)
     household = await world.spaces.create(admin.id, "Haushalt", members={person.id: SpaceRole.EDIT})
