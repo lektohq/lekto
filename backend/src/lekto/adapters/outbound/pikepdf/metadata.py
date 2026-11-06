@@ -1,5 +1,5 @@
 """The metadata of a stored file: of a PDF with pikepdf (its document information and its XMP
-packet, as Paperless-ngx shows them), of an image with Pillow (format, size, resolution, EXIF).
+packet), of an image with Pillow (format, size, resolution, EXIF).
 
 Values are text as the file holds them; a value of bytes (an EXIF maker note) is left out, a
 long one cut at `MAX_VALUE` characters. Of an image's tags, those that only describe how its

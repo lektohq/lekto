@@ -972,7 +972,7 @@ what every model learned and how well, oldest first; training on request is for 
 from before stand in an inbox only while they are processed, yellow or red, and a run that
 started before the update makes no document new unless it is its first. `GET /inbox` lists
 everything open, not only yellow and red documents: a client that wants those asks for
-`tab=review` or `tab=intervene`. Documents taken over from Paperless-ngx with their metadata
+`tab=review` or `tab=intervene`. Documents taken over by a migration with their metadata
 (`migration`) are not new: the metadata are a person's (see Inbox).
 
 **After the update to 0.5.** The project is called Lekto now, not Papiq: variables, cookies,
@@ -1017,7 +1017,7 @@ Revision 0035 adds display names (`users.display_name`, unique through `display_
 the profiles (`user_profiles`, `user_aliases` (unique per user only), `user_identifiers`), and
 lets a contact's identifier name a user (`contact_identifiers.user_id`; until revision 0040 set
 to null with the user). Nothing is filled in: users are shown by their username until they or an admin enter a
-display name (settings, user management), a migration fills them from Paperless. Once a user has
+display name (settings, user management), or a migration fills them. Once a user has
 one, `{{ uploaded_by }}` in titles and paths renders it instead of the username: titles and
 paths rendered anew change.
 
@@ -1722,8 +1722,8 @@ if it does not fit); its values are checked as the model's (quotes literally in 
 reading confidence, a contact green only with a second signal or hard evidence). An `error`,
 an answer that does not fit and none by the deadline make the document red; there is no second
 attempt. The context (without the task and its links) and the answer lie beside the document as
-the model's exchanges do; the log names the contract and `producer`. Documents taken over from
-Paperless-ngx send no task. `signal_llm` waits for the page images (`pages`), so the links
+the model's exchanges do; the log names the contract and `producer`. Documents taken over by
+a migration send no task. `signal_llm` waits for the page images (`pages`), so the links
 work when the task goes; it does not need them, so processing again from `pages` leaves it
 alone (`GET /pipeline`: `waits_for`).
 

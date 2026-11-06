@@ -15,7 +15,7 @@ Layout of a set directory:
   `evaluation` profiling the uploader of the documents.
 - `training/<name>.md` and `training/<name>.json`: the corpus the trained run takes over
   before the cases, a document's text and its metadata (`contact`, `document_type`, `tags`,
-  `document_date`, `topic`: set by a person after the takeover, as Paperless has none).
+  `document_date`, `topic`: set by a person after the takeover, as a migration brings none).
 - `cases/<name>.md`: the document text, as the parse node would produce it.
 - `cases/<name>.json`: `description`, `expected` (`lane`, `contact`, `document_type`,
   `topic`, `tags`, `document_date`, `fields` by name, in the JSON form of the API, `space`:
@@ -237,7 +237,7 @@ class Case:
 
 @dataclass(frozen=True)
 class TrainingDocument:
-    """A document of the training corpus: taken over with its metadata, as from Paperless."""
+    """A document of the training corpus: taken over with its metadata, as by a migration."""
 
     name: str
     text: str

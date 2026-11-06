@@ -461,8 +461,8 @@ class ImportedMetadataIn(BaseModel):
     created_at: AwareDatetime | None = Field(
         default=None,
         description=(
-            "When the document came in at the source system (Paperless-ngx: `added`), with a "
-            "time zone; not in the future. It becomes the document's `created_at`."
+            "When the document came in at the source system, with a time zone; not in the "
+            "future. It becomes the document's `created_at`."
         ),
     )
     review: list[ImportedReviewIn] = Field(

@@ -16,7 +16,7 @@ to check that the checks catch wrong answers.
 - `training/<name>.md` and `.json`: the training corpus, 57 earlier letters of eleven contacts
   of the set with their metadata, in the style of their cases (as a sender's letters look
   alike), with IBANs, VAT IDs, customer numbers and mail domains, and a `topic` where the
-  contact has topics (a person sets it after the takeover: Paperless knows none). The
+  contact has topics (a person sets it after the takeover: a migration brings none). The
   household's IBAN stands on letters of several contacts and the utility's also on the bank
   statements: training must learn neither. The insurance group (Hanse Versicherung AG) is
   also the household's employer: its topics are work and three insurances, its personnel
@@ -56,7 +56,7 @@ Every case runs twice, each time on a fresh installation in memory:
 
 - **cold**: no classifier, no similar documents; the language model and the facts in the text
   decide, the rule from before the signals.
-- **trained**: the corpus is taken over first as from Paperless (it counts as confirmed),
+- **trained**: the corpus is taken over first as by a migration (it counts as confirmed),
   indexed with bag-of-words vectors and trained on with scikit-learn, so the classifier, the
   similar documents and the learned identifiers take part.
 
