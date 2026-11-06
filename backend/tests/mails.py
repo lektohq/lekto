@@ -1,9 +1,11 @@
 """Mails for the tests, built with `email` of the standard library."""
 
+import base64
 import hashlib
 from email.message import EmailMessage
 
 from lekto.core.domain.mail import MailLogin, MailSecurity
+from lekto.core.domain.mail_intake import SMALL_IMAGE
 
 LOGIN = MailLogin(
     host="imap.example.test",
@@ -63,3 +65,58 @@ def rich_mail(html: str | None = None) -> bytes:
     inner.set_content("Der Vertrag.")
     message.add_attachment(inner)
     return bytes(message)
+
+
+def apple_mail() -> bytes:
+    """As Apple Mail sends a mail with a PDF (Tobi, 06.11.2026): its HTML split around what it
+    shows inline, the PDF and a photo `inline` with a file name, and a logo the second part of
+    the HTML embeds by `cid:`."""
+    pdf = base64.b64encode(PDF).decode()
+    png = base64.b64encode(PNG).decode()
+    photo = base64.b64encode(PNG + bytes(SMALL_IMAGE)).decode()  # larger than a logo
+    return (
+        "From: Anna Beispiel <anna@example.test>\r\n"
+        "To: dms@example.test\r\n"
+        "Subject: Ein Test mit Anhang\r\n"
+        "Date: Fri, 06 Nov 2026 09:27:00 +0100\r\n"
+        "Message-ID: <apple-1@example.test>\r\n"
+        "MIME-Version: 1.0\r\n"
+        'Content-Type: multipart/alternative; boundary="alt"\r\n'
+        "\r\n"
+        "--alt\r\n"
+        "Content-Type: text/plain; charset=utf-8\r\n"
+        "\r\n"
+        "Hallo,\r\nanbei die Rechnung.\r\n"
+        "--alt\r\n"
+        'Content-Type: multipart/mixed; boundary="mix"\r\n'
+        "\r\n"
+        "--mix\r\n"
+        "Content-Type: text/html; charset=utf-8\r\n"
+        "\r\n"
+        "<html><body><p>Hallo,</p><p>anbei die Rechnung.</p></body></html>\r\n"
+        "--mix\r\n"
+        'Content-Type: application/pdf; name="Rechnung.pdf"\r\n'
+        'Content-Disposition: inline; filename="Rechnung.pdf"\r\n'
+        "Content-Transfer-Encoding: base64\r\n"
+        "\r\n"
+        f"{pdf}\r\n"
+        "--mix\r\n"
+        'Content-Type: image/png; name="Foto.png"\r\n'
+        'Content-Disposition: inline; filename="Foto.png"\r\n'
+        "Content-Transfer-Encoding: base64\r\n"
+        "\r\n"
+        f"{photo}\r\n"
+        "--mix\r\n"
+        'Content-Type: image/png; name="Logo.png"\r\n'
+        'Content-Disposition: inline; filename="Logo.png"\r\n'
+        "Content-ID: <Logo@Example>\r\n"
+        "Content-Transfer-Encoding: base64\r\n"
+        "\r\n"
+        f"{png}\r\n"
+        "--mix\r\n"
+        "Content-Type: text/html; charset=utf-8\r\n"
+        "\r\n"
+        '<html><body><p>Gruß</p><img src="cid:logo@example"></body></html>\r\n'
+        "--mix--\r\n"
+        "--alt--\r\n"
+    ).encode()
