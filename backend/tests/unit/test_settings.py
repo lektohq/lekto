@@ -1,8 +1,14 @@
 import re
+from collections.abc import Iterable
 from datetime import timedelta
 from pathlib import Path
+from types import UnionType
+from typing import Annotated, Literal, Union, get_args, get_origin
 
+import annotated_types
 import pytest
+from pydantic import ByteSize, SecretStr
+from pydantic.fields import FieldInfo
 
 from lekto.composition.errors import ConfigurationError
 from lekto.composition.settings import (
@@ -728,21 +734,96 @@ def test_invalid_search_settings(monkeypatch: pytest.MonkeyPatch, name: str, val
         load_settings()
 
 
-README = Path(__file__).parents[2] / "README.md"
-_DOCUMENTED = re.compile(r"^\| `(LEKTO_[A-Z0-9_]+)` \| (API|Worker|both) \| ", re.MULTILINE)
+REFERENCE = Path(__file__).parents[3] / "docs" / "configuration.md"
+_ROW = re.compile(r"^\| `(LEKTO_[A-Z0-9_]+)` \| (API|Worker|both) \| (.*) \|$", re.MULTILINE)
+
+
+def _documented() -> dict[str, list[str]]:
+    """The rows of docs/configuration.md by variable: role, default, values, meaning."""
+    rows = _ROW.findall(REFERENCE.read_text(encoding="utf-8"))
+    names = [name for name, _, _ in rows]
+    assert len(names) == len(set(names)), "a variable is documented twice"
+    return {name: [role, *rest.split(" | ")] for name, role, rest in rows}
 
 
 def test_every_setting_is_documented_with_its_role() -> None:
-    """backend/README.md, section Configuration, is the one place for all `LEKTO_` variables:
-    one row per setting with its role (API, Worker or both), default and meaning."""
-    documented = _DOCUMENTED.findall(README.read_text(encoding="utf-8"))
-    names = [name for name, _ in documented]
-    expected = [ENV_PREFIX + name.upper() for name in Settings.model_fields]
-    assert sorted(names) == sorted(expected), (
-        f"missing in README: {sorted(set(expected) - set(names))}; "
-        f"unknown in README: {sorted(set(names) - set(expected))}"
+    """docs/configuration.md is the one place for all `LEKTO_` variables: one row per setting
+    with its role (API, Worker or both), default, values and meaning."""
+    names = set(_documented())
+    expected = {ENV_PREFIX + name.upper() for name in Settings.model_fields}
+    assert names == expected, (
+        f"missing in docs/configuration.md: {sorted(expected - names)}; "
+        f"unknown there: {sorted(names - expected)}"
     )
-    assert len(names) == len(set(names)), "a variable is documented twice"
+    assert all(len(cells) == 4 for cells in _documented().values()), "a row lacks a column"
+
+
+def _visit(items: Iterable[object], found: dict[str, object]) -> None:
+    for item in items:
+        if isinstance(item, FieldInfo):
+            _visit(item.metadata, found)
+        for bound in (annotated_types.Ge, annotated_types.Gt, annotated_types.Le):
+            if isinstance(item, bound):
+                found[bound.__name__.lower()] = getattr(item, bound.__name__.lower())
+
+
+def _walk(annotation: object, found: dict[str, object]) -> object:
+    """The type of a setting without `None` and `Annotated`; collects the bounds on the way."""
+    if get_origin(annotation) is Annotated:
+        _visit(annotation.__metadata__, found)  # type: ignore[attr-defined]
+        return _walk(get_args(annotation)[0], found)
+    if get_origin(annotation) in (Union, UnionType):
+        kinds = [_walk(arg, found) for arg in get_args(annotation) if arg is not type(None)]
+        return kinds[0]
+    return annotation
+
+
+# A range in the column Values joins its ends with an en dash: 1, the dash, 64.
+DASH = "\u2013"
+
+
+def _number(value: object) -> str:
+    return f"{value:,}" if isinstance(value, int) else f"{value:g}"
+
+
+def _expected_values(name: str) -> list[str]:
+    """What the column Values must name for a setting, derived from its annotation: the
+    choices, the bounds, `duration` or `size`, and *secret*."""
+    field = Settings.model_fields[name]
+    found: dict[str, object] = {}
+    _visit(field.metadata, found)
+    kind = _walk(field.annotation, found)
+    if get_origin(kind) is Literal:
+        return [f"`{choice}`" for choice in get_args(kind)]
+    if kind is bool:
+        return ["`true`", "`false`"]
+    if kind is SecretStr:
+        return ["*secret*"]
+    if kind is ByteSize:
+        return ["size"]
+    if kind is timedelta:
+        if "ge" in found and "le" in found:
+            low, high = found["ge"], found["le"]
+            assert isinstance(low, timedelta) and isinstance(high, timedelta)
+            seconds = f"{_number(low.total_seconds())}{DASH}{_number(high.total_seconds())}"
+            return [f"duration, {seconds} s"]
+        return ["duration"]
+    if "ge" in found and "le" in found:
+        return [f"{_number(found['ge'])}{DASH}{_number(found['le'])}"]
+    if "gt" in found and "le" in found:
+        return [f"more than {_number(found['gt'])}, at most {_number(found['le'])}"]
+    return []
+
+
+@pytest.mark.parametrize("name", sorted(Settings.model_fields))
+def test_the_values_column_names_what_a_setting_takes(name: str) -> None:
+    """The column Values in docs/configuration.md says what `settings.py` accepts: a changed
+    choice, bound or secret fails here until the page says it too."""
+    values = _documented()[ENV_PREFIX + name.upper()][2]
+    for expected in _expected_values(name):
+        assert expected in values, f"{ENV_PREFIX + name.upper()}: {expected!r} not in {values!r}"
+    if "*secret*" not in _expected_values(name):
+        assert "*secret*" not in values, f"{ENV_PREFIX + name.upper()} is no secret"
 
 
 def test_renamed_variables_are_refused_with_their_new_name(monkeypatch: pytest.MonkeyPatch) -> None:

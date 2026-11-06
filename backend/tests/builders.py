@@ -44,7 +44,7 @@ from lekto.core.services.pipeline import (
 )
 
 DEFAULT_SETTINGS = Settings.model_construct()
-"""The shipped defaults (`backend/README.md`, Configuration): tests take thresholds and
+"""The shipped defaults (`docs/configuration.md`): tests take thresholds and
 limits from here, so the one source of a default is `composition/settings.py`."""
 # Templates of rules and title patterns, as the memory container renders them.
 TEMPLATES = LiquidTemplateRenderer(
