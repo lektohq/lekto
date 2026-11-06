@@ -81,9 +81,11 @@
 			);
 			toast.success(
 				enabled
-					? next.length > 0
-						? m.mail_rule_switched_on_fetch({ count: next.length })
-						: m.rule_switched_on()
+					? next.length === 1
+						? m.mail_rule_switched_on_fetch_one()
+						: next.length > 1
+							? m.mail_rule_switched_on_fetch({ count: next.length })
+							: m.rule_switched_on()
 					: m.rule_switched_off()
 			);
 		} catch (error) {
