@@ -1129,7 +1129,10 @@ where it is and edits where it goes (global: admins); every version names its sp
 
   `matches` takes `case_sensitive` (default false). Patterns run with the `regex` package
   (`adapters/outbound/regex`) in a thread with a time limit (`LEKTO_RULES_PATTERN_TIMEOUT`); a
-  pattern that times out does not match and is logged. All patterns of one run on one
+  pattern that times out does not match and is logged. A pattern whose counted repetitions add
+  up to more than 10 000 characters (`((a{200}){200}){200}`: eight million) is refused with
+  `pattern_too_large`, a stored one does not match: `regex` spells them out when it compiles,
+  which takes seconds and gigabytes and no time limit stops. All patterns of one run on one
   document get two seconds together, a preview page twenty; the patterns left do not match. The text is the parsed text without
   markup, at most `LEKTO_RULES_MAX_TEXT` characters; it is loaded only if a rule looks at it.
 - **Actions.** `set_space`, `set_contact`, `set_topic`, `set_document_type`, `set_title`,

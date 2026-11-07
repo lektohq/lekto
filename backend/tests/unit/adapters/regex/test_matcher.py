@@ -7,7 +7,9 @@ import pytest
 
 from lekto.adapters.outbound.regex import RegexPatternMatcher
 from lekto.adapters.outbound.regex.matcher import _compile
+from lekto.adapters.outbound.regex.size import MAX_SPELLED_OUT
 from lekto.core.domain.errors import ValidationError
+from lekto.core.domain.reasons import ReasonCode
 from tests.contracts.patterns import PatternMatcherContract
 
 TIMEOUT = 0.05  # seconds
@@ -55,3 +57,11 @@ async def test_compiled_patterns_are_cached_per_case_setting(
     assert after.hits - before.hits == 4
     assert _compile(pattern, True) is _compile(pattern, True)
     assert _compile(pattern, True) is not _compile(pattern, False)
+
+
+def test_a_pattern_too_large_names_the_limit(pattern_matcher: RegexPatternMatcher) -> None:
+    pattern_matcher.validate(f"a{{{MAX_SPELLED_OUT}}}")
+    with pytest.raises(ValidationError, match="too large") as caught:
+        pattern_matcher.validate(f"a{{{MAX_SPELLED_OUT + 1}}}")
+    assert caught.value.reason.code is ReasonCode.PATTERN_TOO_LARGE
+    assert caught.value.reason.params == {"pattern": "a{10001}", "max": MAX_SPELLED_OUT}

@@ -9759,6 +9759,7 @@ export interface components {
 			| 'due_field_not_date'
 			| 'sort_field_invalid'
 			| 'pattern_invalid'
+			| 'pattern_too_large'
 			| 'search_no_embeddings'
 			| 'search_embed_timeout'
 			| 'search_embed_failed'
