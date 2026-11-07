@@ -23,8 +23,10 @@ next one.
 
 ## What it does
 
-For every file it is given, the shortcut sends `POST <URL>/api/v1/documents` with the file in the
-form field `file` and the token as `Authorization: Bearer`. Then:
+It takes PDFs, images and files (scans from the Files app, mails as `.eml`). A photo in HEIC, as the
+iPhone takes them, it turns into a JPEG first: Lekto reads JPEG, PNG and TIFF. For every file, the
+shortcut sends `POST <URL>/api/v1/documents` with the file in the form field `file` and the token
+as `Authorization: Bearer`. Then:
 
 - **"An Lekto gesendet"**: the document is in Lekto; the shortcut opens it (in Safari: iOS opens
   links there, not in the app on the Home Screen, so you may have to sign in there).
