@@ -13233,6 +13233,7 @@
             }
           }
         },
+        "x-uploads": true,
         "security": [
           {
             "session": []
@@ -37671,6 +37672,7 @@
           "totp_off",
           "code_invalid",
           "read_only_token",
+          "upload_only_token",
           "csrf_missing",
           "session_needed",
           "oidc_mismatch",
@@ -41695,9 +41697,11 @@
         "type": "string",
         "enum": [
           "read",
-          "read_write"
+          "read_write",
+          "upload"
         ],
-        "title": "TokenScope"
+        "title": "TokenScope",
+        "description": "What an API token may do: read, read and write, or only upload documents (a shortcut\non a phone that sends shared files; it reads nothing, not even what it uploaded)."
       },
       "TotpSetupOut": {
         "properties": {
@@ -42949,7 +42953,7 @@
       "token": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Personal API token (`lekto_…`); scope `read` allows reading only: GET, and the POST operations marked `x-reads` (a search with its words in the body)."
+        "description": "Personal API token (`lekto_…`); scope `read` allows reading only: GET, and the POST operations marked `x-reads` (a search with its words in the body); scope `upload` allows only the operation marked `x-uploads` (`POST /documents`)."
       },
       "taskToken": {
         "type": "http",
@@ -43481,6 +43485,7 @@
     "totp_off": {},
     "code_invalid": {},
     "read_only_token": {},
+    "upload_only_token": {},
     "csrf_missing": {
       "header": "text"
     },
