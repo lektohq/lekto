@@ -10,6 +10,7 @@
 	import { appleDevice, install, isAndroid } from '#lib/install.svelte.ts';
 	import { ACCEPT, intakeOf, readDrop, type Intake } from '#lib/intake.ts';
 	import { m } from '#lib/paraglide/messages.js';
+	import { session } from '#lib/session.svelte.ts';
 	import { uploads } from '#lib/upload.svelte.ts';
 	import { cn } from '#lib/utils.ts';
 
@@ -22,8 +23,9 @@
 	let over = $state(false);
 	// Android in the browser: the installed app is in the share sheet (web/DESIGN.md, "App").
 	const offerInstall = $derived(install.available && isAndroid());
-	// iPhone, iPad and Mac: the shortcut, until the person has a token that only uploads.
-	const apple = appleDevice() !== null;
+	// iPhone, iPad and Mac: the shortcut, if the server names one, until the person has a token
+	// that only uploads.
+	const apple = $derived(appleDevice() !== null && session.shortcutUrl !== null);
 	let shortcutReady = $state(true);
 	$effect(() => {
 		if (!open || !apple) return;

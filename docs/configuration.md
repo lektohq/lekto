@@ -120,6 +120,7 @@ Originals, archive PDFs, page images and the classifier's models.
 | `LEKTO_REQUEST_MAX_SIZE` | API | `1MiB` | size | Largest body of every other request (JSON); larger ones get `413` |
 | `LEKTO_UI_DIR` | API | –; image: `/opt/lekto/ui` | path | The built web UI (`web/build`), served below `/ui`; `/` leads there. Must contain `index.html`; unset serves the API only |
 | `LEKTO_FORWARDED_ALLOW_IPS` | API | –; required with `LEKTO_COOKIE_SECURE=true` | text | Reverse proxies whose `X-Forwarded-For` is trusted, comma-separated. Secure cookies mean a TLS-terminating proxy in front of Lekto: name its address, or the per-source throttle of sign-ins sees only the proxy. `*` only if the proxy sets the header itself, replacing what clients send |
+| `LEKTO_SHORTCUT_URL` | API | – | text | The iCloud link of the shortcut "An Lekto senden" for iPhone, iPad and Mac ([shortcut.md](shortcut.md)): the web UI offers to set it up there. `https://` only. Unset, the web UI shows nothing of the shortcut. The Compose examples' `.env.example` carries the current link |
 
 ## Sign-in and sessions
 

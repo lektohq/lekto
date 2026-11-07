@@ -205,8 +205,11 @@
 			{:else if tab === 'notifications'}
 				<NotificationsCard />
 			{:else if tab === 'tokens'}
-				<!-- On iPhone, iPad and Mac the shortcut first (web/DESIGN.md, "Settings"). -->
-				{#if device}<ShortcutCard {device} />{/if}
+				<!-- On iPhone, iPad and Mac the shortcut first, if the server names one (web/DESIGN.md,
+				     "Settings"). -->
+				{#if device && session.shortcutUrl}
+					<ShortcutCard {device} link={session.shortcutUrl} />
+				{/if}
 				<TokensCard />
 			{:else}
 				<ProfileForm data={profile} part="numbers" onsaved={saved} />

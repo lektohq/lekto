@@ -36191,6 +36191,18 @@
             "type": "string",
             "title": "Lekto Version",
             "description": "The version of Lekto that answers (its release)."
+          },
+          "shortcut_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shortcut Url",
+            "description": "The link that adds the shortcut \"An Lekto senden\" for iPhone, iPad and Mac (`LEKTO_SHORTCUT_URL`); null: the server offers none."
           }
         },
         "type": "object",
@@ -36203,7 +36215,8 @@
           "has_password",
           "totp_enabled",
           "linked_accounts",
-          "lekto_version"
+          "lekto_version",
+          "shortcut_url"
         ],
         "title": "Me",
         "examples": [
@@ -36212,6 +36225,7 @@
             "has_password": true,
             "lekto_version": "0.8.0",
             "linked_accounts": [],
+            "shortcut_url": "https://www.icloud.com/shortcuts/8d752558e38f4f64bf9c61faa4694a75",
             "token_scope": "read",
             "totp_enabled": false,
             "user": {

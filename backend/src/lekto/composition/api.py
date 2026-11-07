@@ -77,6 +77,7 @@ def api_context(container: Container, settings: Settings, services: Services) ->
         indexing=services.indexing,
         classifier=services.classifier,
         cookie_secure=settings.cookie_secure,
+        shortcut_url=settings.shortcut_url,
         pipeline=services.pipeline,
         documents=services.documents,
         inbox=services.inbox,
