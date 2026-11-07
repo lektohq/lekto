@@ -37,6 +37,7 @@ from lekto.adapters.outbound.memory import (
     FakePageRenderer,
     FakeParser,
     FakePasswordHasher,
+    FakePushSender,
     FakeRefCipher,
     FakeTextLocator,
     FakeTotp,
@@ -63,6 +64,7 @@ from lekto.adapters.outbound.sql import SqlEventBus, SqlUnitOfWorkFactory, SqlWa
 from lekto.adapters.outbound.system import SystemClock
 from lekto.adapters.outbound.weasyprint import WeasyPrintMailRenderer
 from lekto.adapters.outbound.webhooks import HttpWebhookSender
+from lekto.adapters.outbound.webpush.sender import WebPushSender
 from lekto.adapters.outbound.zxing import ZxingCodeReader
 from lekto.composition.database import open_database
 from lekto.composition.errors import AdapterNotAvailableError
@@ -94,6 +96,7 @@ from lekto.core.ports.ocr import Ocr
 from lekto.core.ports.pages import PageRenderer
 from lekto.core.ports.parser import DocumentParser
 from lekto.core.ports.patterns import PatternMatcher
+from lekto.core.ports.push import PushSender
 from lekto.core.ports.search_index import SearchIndex
 from lekto.core.ports.templates import TemplateRenderer
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
@@ -133,6 +136,7 @@ from lekto.core.services.oidc import OidcService
 from lekto.core.services.open_identifiers import OpenIdentifierService
 from lekto.core.services.pipeline import NodeExecutor, PipelineService
 from lekto.core.services.profiles import ProfileService
+from lekto.core.services.push import PushService
 from lekto.core.services.relating import RelateNode
 from lekto.core.services.relations import RelationService
 from lekto.core.services.rules import RuleService
@@ -388,6 +392,7 @@ class Container:
     cipher: SecretCipher
     refs: RefCipher
     webhook_sender: WebhookSender
+    push_sender: PushSender | None  # with a VAPID key
     mail_server: MailServer
     mail_renderer: MailRenderer
     totp: Totp
@@ -458,6 +463,15 @@ def build_container(settings: Settings) -> Container:
         cipher=secret_cipher(settings),
         refs=ref_cipher(settings),
         webhook_sender=HttpWebhookSender(user_agent=USER_AGENT),
+        push_sender=(
+            WebPushSender(
+                private_key=settings.push_vapid_private_key.get_secret_value(),
+                subject=settings.push_subject,
+                user_agent=USER_AGENT,
+            )
+            if settings.push_vapid_private_key is not None and settings.push_subject is not None
+            else None
+        ),
         mail_server=ImapMailServer(timeout=settings.mail_timeout),
         mail_renderer=WeasyPrintMailRenderer(
             settings.template_locale, timeout=settings.mail_render_timeout
@@ -511,6 +525,7 @@ def build_memory_container(
         cipher=FakeCipher(),
         refs=FakeRefCipher(),
         webhook_sender=FakeWebhookSender(),
+        push_sender=FakePushSender(),
         mail_server=MemoryMailServer(),
         mail_renderer=FakeMailRenderer(),
         totp=FakeTotp(),
@@ -543,6 +558,7 @@ class Services:
     bulk: BulkService
     webhooks: WebhookService
     webhook_delivery: WebhookDeliveryService
+    push: PushService
     tasks: TaskService
     lenses: LensService
     mailboxes: MailboxService
@@ -870,6 +886,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
             retention=settings.retention,
         ),
         lenses=LensService(uow, clock),
+        push=PushService(uow, clock, container.push_sender),
         mailboxes=MailboxService(uow, clock, container.cipher, container.mail_server),
         relations=RelationService(uow, clock),
         expected=ExpectedService(uow, clock),

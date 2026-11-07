@@ -49,6 +49,12 @@ ENDPOINTS: dict[str, str | Excluded] = {
     "POST /auth/totp/recovery-codes": ACCOUNT,
     "GET /auth/tokens": ACCOUNT,
     "POST /auth/tokens": ACCOUNT,
+    # notifications on one's own devices: a browser subscribes itself
+    "GET /push": BROWSER,
+    "GET /push/devices": ACCOUNT,
+    "POST /push/devices": BROWSER,
+    "DELETE /push/devices/{id}": ACCOUNT,
+    "POST /push/devices/{id}/test": ACCOUNT,
     "DELETE /auth/tokens/{id}": ACCOUNT,
     "POST /auth/oidc/link": ACCOUNT,
     "DELETE /auth/oidc/link": ACCOUNT,

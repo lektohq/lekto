@@ -68,6 +68,12 @@ import structlog
 
 from lekto.adapters.inbound.evaluation import EvaluationSetError, Run
 from lekto.adapters.outbound.sql import SchemaState
+from lekto.adapters.outbound.webpush.sender import (
+    b64url,
+    new_private_key,
+    private_key_of,
+    public_bytes,
+)
 from lekto.composition.api import run_api
 from lekto.composition.database import check_schema, migrate_database
 from lekto.composition.endpoints import external_endpoints
@@ -111,6 +117,9 @@ def main(argv: Sequence[str] = ()) -> int:
     if _as_root():
         print(ROOT_WARNING, file=sys.stderr)
         return 1
+    if command == "vapid-key":
+        # Before the settings: the key is what an installation without push still lacks.
+        return _vapid_key()
     try:
         if arguments.env_file is not None:
             apply_env_file(arguments.env_file)
@@ -138,6 +147,18 @@ def main(argv: Sequence[str] = ()) -> int:
         )
         return 1
     return COMMANDS[command](settings, arguments)
+
+
+def public_key_of(private: str) -> str:
+    return b64url(public_bytes(private_key_of(private)))
+
+
+def _vapid_key() -> int:
+    """A new key for web push, as the line of an environment file, and its public key."""
+    private = new_private_key()
+    print(f"LEKTO_PUSH_VAPID_PRIVATE_KEY={private}")
+    print(f"# public key (browsers get it from GET /api/v1/push): {public_key_of(private)}")
+    return 0
 
 
 def cli() -> None:
@@ -171,6 +192,7 @@ HELP: Mapping[str, str] = {
     "fetch-logos": "queue fetching the logos of contacts without one",
     "reparse": "queue reading the text of every document again",
     "train": "train the classifier from the confirmed documents now",
+    "vapid-key": "print a new VAPID key for notifications (LEKTO_PUSH_VAPID_PRIVATE_KEY)",
 }
 ENV_FILE = (
     "take the LEKTO_ settings from this file of KEY=value lines instead of the environment "
@@ -408,6 +430,7 @@ COMMANDS: dict[str, Command] = {
     "reindex": _reindex,
     **QUEUES,
     "train": _train,
+    "vapid-key": lambda settings, arguments: _vapid_key(),
 }
 
 

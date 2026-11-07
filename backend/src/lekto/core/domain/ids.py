@@ -29,6 +29,7 @@ LensId = NewType("LensId", UUID)
 MailboxId = NewType("MailboxId", UUID)
 MailRecordId = NewType("MailRecordId", UUID)
 MailRuleId = NewType("MailRuleId", UUID)
+PushDeviceId = NewType("PushDeviceId", UUID)
 
 _TIMESTAMP_BITS = 48
 _RANDOM_BITS = 80
