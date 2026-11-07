@@ -2672,7 +2672,7 @@ Stand: Plan mit Tobi abgestimmt, 06.11.2026; in Umsetzung. Mock: „Postfach-Sei
 
 ### Lekto als App: PWA, Teilen, Kurzbefehl, Push
 
-Stand: Plan, mit Tobi abgestimmt am 06.11.2026, alle Fragen beantwortet. Mock: Leinwand „Lekto als App“ (https://claude.ai/artifact/TgYQUUsFQvWgWLfSKG3ZVt): 1A/1B Update-Hinweis als Toast oder Leiste, 1C Offline, 2 Hinweis im Upload-Dialog, 3A/3B Kurzbefehl einrichten auf iPhone und Mac, 4A Reiter Benachrichtigungen, 4B Sperrbildschirm und Badge.
+Stand: gebaut in der Nacht 06./07.11.2026 als #302–#309 (gestapelt, nicht gemergt); offene Punkte für Tobi in der Notiz von Claude. Plan mit Tobi abgestimmt am 06.11.2026, alle Fragen beantwortet. Mock: Leinwand „Lekto als App“ (https://claude.ai/artifact/TgYQUUsFQvWgWLfSKG3ZVt): 1A/1B Update-Hinweis als Toast oder Leiste, 1C Offline, 2 Hinweis im Upload-Dialog, 3A/3B Kurzbefehl einrichten auf iPhone und Mac, 4A Reiter Benachrichtigungen, 4B Sperrbildschirm und Badge.
 
 **Anlass (Tobi, 06.11.2026):** „Meinst Du wir kriegen es hin, eine PWA zu bauen? Das UI ist schon Mobile optimiert.“ Dazu: Dokumente vom Handy aus dem Teilen-Menü an Lekto schicken, und Push-Nachrichten, auch auf dem iPhone.
 
