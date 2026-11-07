@@ -2727,6 +2727,7 @@
 	"reason_due_field_not_date": "The deadline must be a date field.",
 	"reason_sort_field_invalid": "A list sorts only by a date, period, number or amount field.",
 	"reason_pattern_invalid": "The pattern “{pattern}” is not valid: {detail}",
+	"reason_pattern_too_large": "The pattern “{pattern}” is too large: its repetitions add up to more than {max} characters.",
 	"reason_search_no_embeddings": "Searched by words only: no search by meaning is set up.",
 	"reason_search_embed_timeout": "Searched by words only: the meaning of the query was not ready within {seconds} seconds.",
 	"reason_search_embed_failed": "Searched by words only: the service for the meaning did not answer.",

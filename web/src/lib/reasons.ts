@@ -436,6 +436,7 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	due_field_not_date: entry(m.reason_due_field_not_date),
 	sort_field_invalid: entry(m.reason_sort_field_invalid),
 	pattern_invalid: entry(m.reason_pattern_invalid),
+	pattern_too_large: entry(m.reason_pattern_too_large, { max: 'number' }),
 	search_no_embeddings: entry(m.reason_search_no_embeddings),
 	search_embed_timeout: entry(m.reason_search_embed_timeout, { seconds: 'number' }),
 	search_embed_failed: entry(m.reason_search_embed_failed),

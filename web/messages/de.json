@@ -2727,6 +2727,7 @@
 	"reason_due_field_not_date": "Die Frist muss ein Datumsfeld sein.",
 	"reason_sort_field_invalid": "Eine Liste sortiert nur nach einem Datums-, Zeitraum-, Zahl- oder Betragsfeld.",
 	"reason_pattern_invalid": "Das Muster „{pattern}“ ist ungültig: {detail}",
+	"reason_pattern_too_large": "Das Muster „{pattern}“ ist zu groß: Seine Wiederholungen ergeben mehr als {max} Zeichen.",
 	"reason_search_no_embeddings": "Nur nach Wörtern gesucht: Eine Suche nach Bedeutung ist nicht eingerichtet.",
 	"reason_search_embed_timeout": "Nur nach Wörtern gesucht: Die Bedeutung der Anfrage war nicht innerhalb von {seconds} Sekunden bereit.",
 	"reason_search_embed_failed": "Nur nach Wörtern gesucht: Der Dienst für die Bedeutung hat nicht geantwortet.",
