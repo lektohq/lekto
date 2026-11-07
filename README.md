@@ -10,6 +10,11 @@
 
 # Lekto DMS
 
+> [!WARNING]
+> Lekto is in beta. Breaking changes can come with any release: in the REST API, the
+> configuration, the database and the stored data. Read the release notes before you update, and
+> keep a backup ([deploy/README.md](deploy/README.md)).
+
 **Lekto DMS** is a self-hosted, headless document management system. It reads every document,
 files it and finds it again, and it shows why it decided what it did. The name comes from
 *lector*, the reader; the owl in the logo reads with one eye and searches with the magnifier in
