@@ -49,6 +49,11 @@ class BearerAuth:
             response = problem(401, str(error), headers={"WWW-Authenticate": "Bearer"})
             await response(scope, receive, send)
             return
+        if principal.only_uploads:
+            # A token for a shortcut that sends shared files: no tools at all.
+            response = problem(403, "this API token may only upload documents")
+            await response(scope, receive, send)
+            return
         scope.setdefault("state", {})["principal"] = principal
         await self._app(scope, receive, send)
 
