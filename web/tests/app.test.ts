@@ -6,8 +6,19 @@ import css from '../src/app.css?raw';
 import html from '../src/app.html?raw';
 import themeScript from '../static/theme.js?raw';
 import manifestText from '../static/manifest.webmanifest?raw';
-import { appFiles, pageFiles, pageKey, shellPaths, strategy } from '#lib/app-cache.ts';
+import {
+	appFiles,
+	belongsTo,
+	isShareId,
+	pageFiles,
+	pageKey,
+	sharedKey,
+	sharePath,
+	shellPaths,
+	strategy
+} from '#lib/app-cache.ts';
 import { BASE } from '#lib/base.ts';
+import { ACCEPT, skipReason } from '#lib/intake.ts';
 import { THEME_COLORS } from '#lib/theme-color.ts';
 
 const sources = import.meta.glob<string>('/src/**/*.svelte', {
@@ -196,4 +207,44 @@ describe('the safe areas of the installed app', () => {
 			expect(source).toContain('env(safe-area-inset-');
 		}
 	);
+});
+
+describe('sharing with the installed app', () => {
+	const manifest = JSON.parse(manifestText) as {
+		share_target: {
+			action: string;
+			method: string;
+			enctype: string;
+			params: { files: { name: string; accept: string[] }[] };
+		};
+	};
+
+	it('keeps what is posted to the share target, nothing else that is posted', () => {
+		expect(decide(sharePath(BASE), { method: 'POST', mode: 'navigate' })).toBe('share');
+		expect(decide(`${BASE}/inbox`, { method: 'POST', mode: 'navigate' })).toBe('network');
+		expect(decide('/api/v1/documents', { method: 'POST' })).toBe('network');
+		expect(decide(sharePath(BASE), { mode: 'navigate' })).toBe('page');
+	});
+
+	it('names a share by a random id only', () => {
+		const id = '0b6f1c1e-6a8a-4a3e-9d0a-3b8c2a1f4e55';
+		expect(isShareId(id)).toBe(true);
+		expect(isShareId('Rechnung.pdf')).toBe(false);
+		expect(isShareId(null)).toBe(false);
+		expect(belongsTo(sharedKey(BASE, id, 2), BASE, id)).toBe(true);
+		expect(belongsTo(sharedKey(BASE, id, 2), BASE, id.replace('0b', '1b'))).toBe(false);
+	});
+
+	it('posts files to the share target, of the kinds an upload takes', () => {
+		const target = manifest.share_target;
+		expect(target.action).toBe(sharePath(BASE));
+		expect([target.method, target.enctype]).toEqual(['POST', 'multipart/form-data']);
+		const [files] = target.params.files;
+		expect(files.name).toBe('files');
+		for (const kind of files.accept) {
+			const taken = kind.startsWith('.') ? skipReason(`file${kind}`, '') : skipReason('file', kind);
+			expect(taken, kind).toBeNull();
+		}
+		for (const kind of ACCEPT.split(',')) expect(files.accept).toContain(kind);
+	});
 });
