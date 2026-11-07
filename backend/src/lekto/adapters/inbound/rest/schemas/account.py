@@ -127,6 +127,7 @@ class Me(BaseModel):
                     "totp_enabled": False,
                     "linked_accounts": [],
                     "lekto_version": "0.8.0",
+                    "shortcut_url": "https://www.icloud.com/shortcuts/8d752558e38f4f64bf9c61faa4694a75",
                 }
             ]
         }
@@ -141,6 +142,12 @@ class Me(BaseModel):
     totp_enabled: bool
     linked_accounts: list[LinkOut]
     lekto_version: str = Field(description="The version of Lekto that answers (its release).")
+    shortcut_url: str | None = Field(
+        description=(
+            'The link that adds the shortcut "An Lekto senden" for iPhone, iPad and Mac '
+            "(`LEKTO_SHORTCUT_URL`); null: the server offers none."
+        )
+    )
 
 
 class PasswordChange(BaseModel):
