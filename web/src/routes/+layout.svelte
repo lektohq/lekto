@@ -22,5 +22,15 @@
 
 <!-- No transition-blocking <style> element: the CSP allows no inline style elements. -->
 <ModeWatcher disableHeadScriptInjection disableTransitions={false} />
-<Toaster richColors={false} closeButton />
+<!-- Above the home indicator of the installed app (web/DESIGN.md, "App"). -->
+<Toaster
+	richColors={false}
+	closeButton
+	mobileOffset={{
+		top: 'calc(16px + env(safe-area-inset-top))',
+		right: 'calc(16px + env(safe-area-inset-right))',
+		bottom: 'calc(16px + env(safe-area-inset-bottom))',
+		left: 'calc(16px + env(safe-area-inset-left))'
+	}}
+/>
 {@render children()}

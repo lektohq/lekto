@@ -81,7 +81,7 @@
 		class={cn(
 			'flex flex-col overflow-hidden',
 			phone.current &&
-				'top-0 left-0 h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 gap-0 rounded-none border-0 bg-background p-0'
+				'top-0 left-0 h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 gap-0 rounded-none border-0 bg-background p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]'
 		)}
 	>
 		<AsyncForm
