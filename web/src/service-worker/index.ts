@@ -18,6 +18,7 @@ import {
 	strategy
 } from '#lib/app-cache.ts';
 import { BASE as base } from '#lib/base.ts';
+import { type PushPayload, pushText } from '#lib/push-text.ts';
 
 const CACHE = `lekto-${version}`;
 const PAGE = pageKey(base);
@@ -151,5 +152,59 @@ async function forgetOldShares(): Promise<void> {
 	for (const request of await cache.keys()) {
 		const kept = Number((await cache.match(request))?.headers.get('x-lekto-kept') ?? 0);
 		if (Date.now() - kept > SHARED_FOR_MS) await cache.delete(request);
+	}
+}
+
+/** A notification from Lekto (`services.push`): data, worded in the device's language. On
+ * iPhone and iPad every push must show one; the app's icon gets the number of the inbox. */
+worker.addEventListener('push', (event) => {
+	event.waitUntil(show(event.data));
+});
+
+async function show(data: PushMessageData | null): Promise<void> {
+	let payload: PushPayload;
+	try {
+		payload = data?.json() as PushPayload;
+	} catch {
+		payload = { kind: 'test', params: {}, url: `${base}/`, badge: null, tag: null, locale: 'en' };
+	}
+	const { title, body } = pushText(payload);
+	const badge = payload.badge;
+	const navigator = worker.navigator as WorkerNavigator & {
+		setAppBadge?: (count?: number) => Promise<void>;
+		clearAppBadge?: () => Promise<void>;
+	};
+	if (typeof badge === 'number') {
+		await (badge > 0 ? navigator.setAppBadge?.(badge) : navigator.clearAppBadge?.())?.catch(
+			() => undefined
+		);
+	}
+	await worker.registration.showNotification(title, {
+		body,
+		tag: payload.tag ?? undefined,
+		icon: `${base}/icon-192.png`,
+		data: { url: payload.url }
+	});
+}
+
+/** A tap opens what it is about: in an open window of the app, else a new one. */
+worker.addEventListener('notificationclick', (event) => {
+	event.notification.close();
+	const target = new URL(
+		String((event.notification.data as { url?: string } | null)?.url ?? `${base}/`),
+		worker.location.origin
+	);
+	if (target.origin !== worker.location.origin) return;
+	event.waitUntil(open(target.href));
+});
+
+async function open(url: string): Promise<void> {
+	const windows = await worker.clients.matchAll({ type: 'window', includeUncontrolled: true });
+	const app = windows.find((client) => new URL(client.url).pathname.startsWith(`${base}/`));
+	if (app) {
+		await app.focus();
+		await app.navigate(url).catch(() => undefined);
+	} else {
+		await worker.clients.openWindow(url);
 	}
 }

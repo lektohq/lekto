@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { setAppBadge } from '#lib/app-badge.ts';
 	import AppShell from '#lib/components/AppShell.svelte';
 	import MasterDataDialogHost from '#lib/components/MasterDataDialogHost.svelte';
 	import { events } from '#lib/events.svelte.ts';
@@ -14,6 +15,11 @@
 	// The effects below follow the signed-in user, not the user object: a reload of the session
 	// (every navigation) must not restart the stream or drop the uploads.
 	const userId = $derived(session.user?.id ?? null);
+
+	// The installed app's icon shows what the inbox counter shows (web/DESIGN.md, "App").
+	$effect(() => {
+		if (userId) setAppBadge(inbox.summary?.open);
+	});
 
 	// After a reconnect the counter may be stale.
 	$effect(() => {
