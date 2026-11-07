@@ -13,13 +13,14 @@
 	import { reportError } from '#lib/errors.ts';
 	import type { AppleDevice } from '#lib/install.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { lektoAddress, SHORTCUT_LINK, SHORTCUT_NAME } from '#lib/shortcut.ts';
+	import { lektoAddress, SHORTCUT_NAME } from '#lib/shortcut.ts';
 	import { tokenChanges, tokensChanged } from '#lib/tokens.svelte.ts';
 
 	// The shortcut "An Lekto senden" (web/DESIGN.md, "App"), on iPhone, iPad and Mac only: setting
 	// it up creates a token that may only upload and shows it with Lekto's address, in the order
 	// the Shortcuts app asks for them, and the link that adds the shortcut there.
-	let { device }: { device: AppleDevice } = $props();
+	// `link`: the server's (`LEKTO_SHORTCUT_URL`); the card stands only where there is one.
+	let { device, link }: { device: AppleDevice; link: string } = $props();
 
 	type Token = components['schemas']['TokenOut'];
 
@@ -113,7 +114,7 @@
 			{@render field('address', m.shortcut_address_label(), address)}
 			<Dialog.Footer>
 				<Button variant="outline" onclick={() => (token = null)}>{m.secret_done()}</Button>
-				<Button href={SHORTCUT_LINK} target="_blank" rel="noopener">{m.shortcut_add()}</Button>
+				<Button href={link} target="_blank" rel="noopener">{m.shortcut_add()}</Button>
 			</Dialog.Footer>
 		{/if}
 	</Dialog.Content>

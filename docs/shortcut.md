@@ -6,6 +6,10 @@ the share menu of every app and, in the Finder, under right-click › Quick Acti
 
 ## Set it up
 
+The operator names the shortcut's link in `LEKTO_SHORTCUT_URL` (`docs/configuration.md`; the
+Compose examples' `.env.example` carries the current one). Without it, Lekto shows nothing of the
+shortcut.
+
 1. Open Lekto on the device (Safari, or the app on the Home Screen) and go to
    **Settings › API-Tokens**. On iPhone, iPad and Mac the card **"Kurzbefehl für iPhone, iPad und
    Mac"** stands first.

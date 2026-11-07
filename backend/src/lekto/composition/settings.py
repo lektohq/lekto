@@ -303,6 +303,10 @@ class Settings(BaseSettings):
     push_vapid_private_key: SecretStr | None = None
     push_subject: Annotated[str, Field(pattern=r"^(mailto:|https://)\S+$")] | None = None
 
+    # The iCloud link of the shortcut "An Lekto senden" for iPhone, iPad and Mac (docs/shortcut.md):
+    # the web UI offers to set it up. Unset: the web UI shows nothing of the shortcut.
+    shortcut_url: Annotated[str, Field(pattern=r"^https://\S+$")] | None = None
+
     # Logos of contacts: fetched from the contact's own website (its domain entered among its
     # identifiers) when on. Off, Lekto never asks the web on its own; uploads work either way.
     logo_fetch: bool = False

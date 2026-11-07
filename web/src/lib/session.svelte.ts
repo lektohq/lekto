@@ -15,6 +15,9 @@ class Session {
 	user = $state<User | null>(null);
 	/** The version of Lekto that answers, from `GET /auth/me`; shown in the account's menu. */
 	version = $state<string | null>(null);
+	/** The link of the shortcut for iPhone, iPad and Mac (`LEKTO_SHORTCUT_URL`); null: the server
+	 * offers none, and the web UI shows nothing of it. */
+	shortcutUrl = $state<string | null>(null);
 	#csrf: string | null = null;
 
 	get isAdmin(): boolean {
@@ -36,6 +39,7 @@ class Session {
 			if (JSON.stringify(this.user) !== JSON.stringify(data.user)) this.user = data.user;
 			this.#csrf = data.csrf_token;
 			this.version = data.lekto_version;
+			this.shortcutUrl = data.shortcut_url;
 			return true;
 		}
 		this.clear();
@@ -52,6 +56,7 @@ class Session {
 	clear(): void {
 		this.user = null;
 		this.version = null;
+		this.shortcutUrl = null;
 		this.#csrf = null;
 	}
 

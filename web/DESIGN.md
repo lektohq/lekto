@@ -997,8 +997,9 @@ worker, and Lekto works as a website.
   offers the install, "Schneller aus dem Teilen-Menü: App installieren" (a link button that opens
   the browser's own question). The installed app shows none.
 - **The shortcut (iPhone, iPad, Mac):** Safari has no share target; the shortcut "An Lekto
-  senden" (Tobi's, added through its iCloud link, `lib/shortcut.ts`) sends shared files with a
-  token that may only upload. Its card stands first in Settings › API-Tokens, on Apple devices
+  senden" (Tobi's, added through its iCloud link) sends shared files with a token that may only
+  upload. The server names the link (`LEKTO_SHORTCUT_URL`, in `GET /auth/me`); without one the
+  web UI shows nothing of the shortcut, neither card nor hint. Its card stands first in Settings › API-Tokens, on Apple devices
   only, built like the tokens' card: title and a line of what it does; its action, "Einrichten",
   stands under them (its other words are long).
   Setting it up creates the token "Kurzbefehl · iPhone" (iPad, Mac) and shows, in a dialog, the
