@@ -5,6 +5,7 @@
 	import { startAppUpdates } from '#lib/app-update.ts';
 	import { Toaster } from '#lib/components/ui/sonner/index.ts';
 	import { getLocale } from '#lib/i18n.ts';
+	import { install } from '#lib/install.svelte.ts';
 	import { setThemeColor } from '#lib/theme-color.ts';
 
 	let { children } = $props();
@@ -17,7 +18,10 @@
 		setThemeColor(mode.current === 'dark');
 	});
 
-	onMount(startAppUpdates);
+	onMount(() => {
+		install.watch();
+		startAppUpdates();
+	});
 </script>
 
 <!-- No transition-blocking <style> element: the CSP allows no inline style elements. -->

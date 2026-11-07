@@ -1,8 +1,10 @@
 <script lang="ts">
+	import Download from '@lucide/svelte/icons/download';
 	import Upload from '@lucide/svelte/icons/upload';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import { reportError } from '#lib/errors.ts';
+	import { install, isAndroid } from '#lib/install.svelte.ts';
 	import { ACCEPT, intakeOf, readDrop, type Intake } from '#lib/intake.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { uploads } from '#lib/upload.svelte.ts';
@@ -15,6 +17,8 @@
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
 	let over = $state(false);
+	// Android in the browser: the installed app is in the share sheet (web/DESIGN.md, "App").
+	const offerInstall = $derived(install.available && isAndroid());
 	let input = $state<HTMLInputElement | null>(null);
 
 	function take(intake: Intake) {
@@ -74,5 +78,16 @@
 				onchange={chosen}
 			/>
 		</div>
+		{#if offerInstall}
+			<p class="flex items-center gap-2.5 border-t pt-4 text-sm text-muted-foreground">
+				<Download class="size-4 shrink-0" aria-hidden="true" />
+				<span
+					>{m.upload_share_hint()}
+					<Button variant="link" size="inline" onclick={() => void install.ask()}
+						>{m.upload_install_app()}</Button
+					></span
+				>
+			</p>
+		{/if}
 	</Dialog.Content>
 </Dialog.Root>

@@ -2711,7 +2711,7 @@ Stand: Plan, mit Tobi abgestimmt am 06.11.2026, alle Fragen beantwortet. Mock: L
 
 *Stufe 2 – Teilen auf Android (Share Target)*
 - Manifest `share_target`: `POST` `/ui/share`, `multipart/form-data`, Dateien PDF, Bilder, `.eml`.
-- Der Service Worker nimmt den Post an, legt die Dateien unter einer zufälligen ID in einen eigenen Cache und leitet auf `/ui/share` weiter (die ID im History-State, nicht in der Adresse). Die Seite zeigt den Upload-Dialog mit den Dateien (Space wählen wie sonst), lädt über die API hoch und löscht die Dateien aus dem Cache, auch beim Abbrechen; liegengebliebene löscht der Worker nach einer Stunde. Ohne Anmeldung erst die Anmeldung, dann weiter.
+- Der Service Worker nimmt den Post an, legt die Dateien unter einer zufälligen ID in einen eigenen Cache und leitet auf `/ui/share?id=…` weiter (gebaut 07.11.2026: eine zufällige ID, die nichts nennt, wie „Keine Klardaten in Adressen“ es erlaubt; ein Service Worker kann nur weiterleiten, keinen History-State setzen; die Seite nimmt die ID danach aus der Adresse). Die Seite zeigt den Upload-Dialog mit den Dateien (Space wählen wie sonst), lädt über die API hoch und löscht die Dateien aus dem Cache, auch beim Abbrechen; liegengebliebene löscht der Worker nach einer Stunde. Ohne Anmeldung erst die Anmeldung, dann weiter.
 - **Hinweis im Upload-Dialog auf Android:** „Schneller aus dem Teilen-Menü: App installieren“ (über `beforeinstallprompt`); in der installierten App verschwindet er.
 
 *Stufe 3 – Kurzbefehl für iPhone, iPad und Mac*

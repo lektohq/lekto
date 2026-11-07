@@ -6,7 +6,17 @@
 import { version } from '$app/env';
 import { assets } from '$app/manifest';
 import { self as worker } from '$app/service-worker';
-import { appFiles, pageFiles, pageKey, shellPaths, strategy } from '#lib/app-cache.ts';
+import {
+	appFiles,
+	pageFiles,
+	pageKey,
+	SHARED_CACHE,
+	SHARED_FOR_MS,
+	sharedKey,
+	sharePath,
+	shellPaths,
+	strategy
+} from '#lib/app-cache.ts';
 import { BASE as base } from '#lib/base.ts';
 
 const CACHE = `lekto-${version}`;
@@ -36,8 +46,11 @@ worker.addEventListener('activate', (event) => {
 	event.waitUntil(
 		(async () => {
 			for (const key of await caches.keys()) {
-				if (key !== CACHE && key.startsWith('lekto-')) await caches.delete(key);
+				if (key !== CACHE && key !== SHARED_CACHE && key.startsWith('lekto-')) {
+					await caches.delete(key);
+				}
 			}
+			await forgetOldShares();
 			// The first version takes the open pages over at once, so that what they load from
 			// now on is kept; a later one comes only when the person reloads.
 			await worker.clients.claim();
@@ -79,6 +92,9 @@ worker.addEventListener('fetch', (event) => {
 		case 'page':
 			event.respondWith(page(request));
 			break;
+		case 'share':
+			event.respondWith(share(request));
+			break;
 		case 'network':
 			// Not handled: the browser fetches it as if there were no service worker.
 			break;
@@ -101,5 +117,39 @@ async function page(request: Request): Promise<Response> {
 		const kept = await (await caches.open(CACHE)).match(PAGE);
 		if (kept) return kept;
 		throw error;
+	}
+}
+
+/** Files another app shared (Android's share sheet, the manifest's `share_target`): kept under a
+ * random id until the page `<base>/share` uploads them, at most an hour. */
+async function share(request: Request): Promise<Response> {
+	const form = await request.formData();
+	const files = form.getAll('files').filter((item): item is File => item instanceof File);
+	const id = crypto.randomUUID();
+	const cache = await caches.open(SHARED_CACHE);
+	const now = String(Date.now());
+	await Promise.all(
+		files.map((file, index) =>
+			cache.put(
+				sharedKey(base, id, index),
+				new Response(file, {
+					headers: {
+						'content-type': file.type || 'application/octet-stream',
+						'x-lekto-name': encodeURIComponent(file.name),
+						'x-lekto-kept': now
+					}
+				})
+			)
+		)
+	);
+	await forgetOldShares();
+	return Response.redirect(`${sharePath(base)}?id=${id}`, 303);
+}
+
+async function forgetOldShares(): Promise<void> {
+	const cache = await caches.open(SHARED_CACHE);
+	for (const request of await cache.keys()) {
+		const kept = Number((await cache.match(request))?.headers.get('x-lekto-kept') ?? 0);
+		if (Date.now() - kept > SHARED_FOR_MS) await cache.delete(request);
 	}
 }
