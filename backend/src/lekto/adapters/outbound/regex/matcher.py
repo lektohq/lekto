@@ -1,17 +1,24 @@
 """Searches run in a worker thread with the GIL released (`concurrent=True`), so a slow pattern
-blocks neither the event loop nor other threads until its time limit stops it."""
+blocks neither the event loop nor other threads until its time limit stops it. A pattern that
+would spell out more than `MAX_SPELLED_OUT` characters when it compiles is refused before it is
+compiled (`size`): no time limit stops the compiling."""
 
 import asyncio
 from functools import lru_cache
 
 import regex
 
+from lekto.adapters.outbound.regex.size import MAX_SPELLED_OUT, spelled_out
 from lekto.core.domain.errors import PatternTimeoutError, ValidationError
 from lekto.core.domain.reasons import ReasonCode, because
 
 
 @lru_cache(maxsize=512)
 def _compile(pattern: str, case_sensitive: bool) -> "regex.Pattern[str]":
+    if spelled_out(pattern) > MAX_SPELLED_OUT:
+        raise ValidationError(
+            because(ReasonCode.PATTERN_TOO_LARGE, pattern=pattern, max=MAX_SPELLED_OUT)
+        )
     flags = regex.VERSION0 if case_sensitive else regex.VERSION0 | regex.IGNORECASE
     try:
         return regex.compile(pattern, flags)
