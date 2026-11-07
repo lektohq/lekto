@@ -38,6 +38,7 @@ from lekto.core.domain.webhooks import (
     WebhookDelivery,
 )
 from lekto.core.ports.webhook_sender import WebhookRequest
+from lekto.core.services._push_queue import PUSH_JOB
 from lekto.core.services.webhooks import DELIVER_JOB, WebhookDeliveryService
 from lekto.core.services.webhooks.delivery import queue_rule_send
 from tests import builders
@@ -422,6 +423,13 @@ async def test_a_webhook_is_switched_off_after_repeated_failures_and_success_res
     await deliver(404)
     off = await world.webhooks.get(user.id, webhook.id)
     assert (off.active, off.disabled_reason, off.failed_streak) == (False, DISABLED_FAILING, 3)
+    # Its owner hears of it (web push), once.
+    (notice,) = [j for j in world.database.jobs.values() if j.kind == PUSH_JOB]
+    assert notice.payload == {
+        "user_id": str(user.id),
+        "kind": "webhook_disabled",
+        "params": {"webhook_id": str(webhook.id), "name": webhook.name},
+    }
     # Switched off: nothing is queued any more.
     before = len(deliveries(world))
     await service.on_event(lane_changed(document))

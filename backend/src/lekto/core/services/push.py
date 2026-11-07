@@ -10,29 +10,165 @@ device (`push_off`). Devices are settings: no events.
 
 import logging
 from dataclasses import replace
+from datetime import timedelta
+from uuid import UUID
 
 from lekto.core.domain.errors import ConcurrencyError, ConflictError, NotFoundError
+from lekto.core.domain.events import DomainEvent, ReviewRequired
 from lekto.core.domain.ids import PushDeviceId, UserId, new_id
+from lekto.core.domain.inbox import InboxTab
+from lekto.core.domain.jobs import Job
+from lekto.core.domain.json_value import JsonObject
+from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.push import (
+    ADMIN_KINDS,
     GIVE_UP_AFTER,
     MAX_DEVICES,
     PushDevice,
     PushKind,
     PushMessage,
+    PushPreferences,
 )
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.push import PushOutcome, PushResult, PushSender
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
+from lekto.core.services._jobs import JobRunner
+from lekto.core.services._push_queue import PUSH_JOB, queue_push
+from lekto.core.services.inbox import InboxService, in_inbox
 
 log = logging.getLogger(__name__)
 
+SUBSCRIBER = "push"
+"""The name of the event bus subscription that notes documents coming to wait."""
+
+LEASE = timedelta(minutes=2)
+TITLES = 3
+"""Titles of documents a notification names at most."""
+
 
 class PushService:
-    def __init__(self, uow: UnitOfWorkFactory, clock: Clock, sender: PushSender | None) -> None:
+    job_kinds = (PUSH_JOB,)
+    """The kinds of jobs `run_next_job` runs."""
+
+    def __init__(
+        self,
+        uow: UnitOfWorkFactory,
+        clock: Clock,
+        sender: PushSender | None,
+        inbox: InboxService,
+    ) -> None:
         self._uow = uow
         self._clock = clock
         self._sender = sender
+        self._inbox = inbox
+        self._jobs = JobRunner(uow, clock)
+
+    # --- what a person wants ----------------------------------------------------------------
+
+    async def preferences(self, actor: UserId) -> PushPreferences:
+        async with self._uow() as uow:
+            return await uow.push_preferences.find(actor) or PushPreferences(id=actor)
+
+    async def set_preferences(
+        self, actor: UserId, *, kinds: frozenset[PushKind], titles: bool
+    ) -> PushPreferences:
+        async with self._uow() as uow:
+            preferences = await uow.push_preferences.find(actor) or PushPreferences(id=actor)
+            preferences = replace(preferences, kinds=kinds, titles=titles)
+            await uow.push_preferences.save(preferences)
+            await uow.commit()
+        return preferences
+
+    # --- what causes a notification ---------------------------------------------------------
+
+    async def on_event(self, event: DomainEvent) -> None:
+        """The event bus subscriber: a document came to wait (yellow or red) for its editors;
+        each who has a device and wants it notes the document for their next notification."""
+        if self._sender is None or not isinstance(event, ReviewRequired):
+            return
+        async with self._uow() as uow:
+            document = await uow.documents.find(event.document_id)
+            space = None if document is None else await uow.spaces.find(document.space_id)
+            if document is None or space is None:
+                return
+            queued: list[UserId] = []
+            for editor in sorted(space.editors):
+                user = await uow.users.find(editor)
+                if user is None or not user.active:
+                    continue
+                if not await uow.push_devices.list_for(editor):
+                    continue
+                preferences = await uow.push_preferences.find(editor) or PushPreferences(id=editor)
+                if not preferences.wants(PushKind.WAITING):
+                    continue
+                preferences.note_waiting(document.id)
+                await uow.push_preferences.save(preferences)
+                queued.append(editor)
+            await queue_push(uow, self._clock.now(), queued, PushKind.WAITING)
+            await uow.commit()
+
+    # --- sending ------------------------------------------------------------------------------
+
+    async def run_next_job(self) -> bool:
+        """Claim and send a due notification; False if none was due."""
+        return await self._jobs.run_next([PUSH_JOB], LEASE, self._run)
+
+    async def _run(self, job: Job) -> None:
+        try:
+            user = UserId(UUID(str(job.payload["user_id"])))
+            kind = PushKind(str(job.payload["kind"]))
+            params = job.payload.get("params") or {}
+            assert isinstance(params, dict)
+        except (KeyError, ValueError, AssertionError) as error:
+            await self._jobs.invalid(job, error)
+            return
+        message = await self._message(user, kind, params)
+        sent = 0 if message is None else await self.send_to(user, message)
+        await self._jobs.end(job, result={"sent": sent})
+
+    async def _message(
+        self, user: UserId, kind: PushKind, params: JsonObject
+    ) -> PushMessage | None:
+        """What to tell `user` now, None if nothing (switched off, gone meanwhile)."""
+        async with self._uow() as uow:
+            person = await uow.users.find(user)
+            preferences = await uow.push_preferences.find(user) or PushPreferences(id=user)
+            if person is None or not person.active or not preferences.wants(kind):
+                return None
+            if kind in ADMIN_KINDS and not person.is_admin:
+                return None
+            if kind is not PushKind.WAITING:
+                return _notice(kind, params)
+            pending = preferences.pending
+            if pending:
+                preferences.pending = ()
+                await uow.push_preferences.save(preferences)
+            documents = [d for d in [await uow.documents.find(id) for id in pending] if d]
+            waiting = await in_inbox(uow, user, documents, all_users=False)
+            still = [
+                document
+                for document in reversed(documents)
+                if document.id in waiting and document.lane in (Lane.YELLOW, Lane.RED)
+            ]
+            await uow.commit()
+        if not still:
+            return None
+        summary = await self._inbox.summary(user)
+        count = summary.counts.get(InboxTab.REVIEW, 0) + summary.counts.get(InboxTab.INTERVENE, 0)
+        one = still[0].id if len(still) == 1 else None
+        return PushMessage(
+            kind=PushKind.WAITING,
+            params={
+                "count": max(count, len(still)),
+                "new": len(still),
+                "titles": [d.title for d in still[:TITLES]] if preferences.titles else [],
+            },
+            url=f"/ui/documents/{one}" if one is not None else "/ui/inbox",
+            badge=summary.open,
+            tag="lekto-waiting",
+            topic="waiting",
+        )
 
     @property
     def enabled(self) -> bool:
@@ -151,3 +287,19 @@ class PushService:
         if device is None or device.user_id != actor:
             raise NotFoundError("push device", id)
         return device
+
+
+def _notice(kind: PushKind, params: JsonObject) -> PushMessage:
+    """A notification about one thing: a mailbox, a webhook, jobs."""
+    match kind:
+        case PushKind.MAILBOX_FAILED:
+            url = f"/ui/system/mailboxes/{params.get('mailbox_id', '')}"
+        case PushKind.WEBHOOK_DISABLED:
+            url = f"/ui/webhooks/{params.get('webhook_id', '')}"
+        case PushKind.JOB_FAILED:
+            url = "/ui/system?tab=jobs"
+        case _:
+            url = "/ui/"
+    return PushMessage(
+        kind=kind, params=params, url=url, tag=f"lekto-{kind.value}", topic=kind.value
+    )

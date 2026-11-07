@@ -10,6 +10,7 @@ from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.push import (
     PushDeviceIn,
     PushDeviceOut,
+    PushPreferencesBody,
     PushSettingsOut,
     PushTestOut,
 )
@@ -90,3 +91,33 @@ async def remove_device(id: UUID, user: CurrentUser, context: Context) -> Respon
 )
 async def test_device(id: UUID, user: CurrentUser, context: Context) -> PushTestOut:
     return PushTestOut.of(await context.push.test(user, PushDeviceId(id)))
+
+
+@router.get(
+    "/preferences",
+    summary="What the caller is told about",
+    description="Every kind is on and titles are named until the caller changes it.",
+    response_model=PushPreferencesBody,
+    responses=problem_responses(401),
+)
+async def get_preferences(user: CurrentUser, context: Context) -> PushPreferencesBody:
+    return PushPreferencesBody.of(await context.push.preferences(user))
+
+
+@router.put(
+    "/preferences",
+    summary="Choose what the caller is told about",
+    description=(
+        "A notification of a kind left out is not sent; documents waiting meanwhile are named "
+        "in the next notification once `waiting` is on again."
+    ),
+    response_model=PushPreferencesBody,
+    responses=problem_responses(401, 409, 422),
+)
+async def set_preferences(
+    body: PushPreferencesBody, user: CurrentUser, context: Context
+) -> PushPreferencesBody:
+    preferences = await context.push.set_preferences(
+        user, kinds=body.kinds_domain(), titles=body.titles
+    )
+    return PushPreferencesBody.of(preferences)

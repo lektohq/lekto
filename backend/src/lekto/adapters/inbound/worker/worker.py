@@ -49,6 +49,7 @@ from lekto.core.services.mail_intake import MailIntakeService
 from lekto.core.services.maintenance import MaintenanceService
 from lekto.core.services.master_data import MasterDataService
 from lekto.core.services.pipeline import PipelineService
+from lekto.core.services.push import PushService
 from lekto.core.services.rules.retroactive import RuleApplicationService
 from lekto.core.services.tasks.service import TaskService
 from lekto.core.services.webhooks import WebhookDeliveryService
@@ -101,10 +102,12 @@ class Worker:
         logos: LogoService | None = None,
         master_data: MasterDataService | None = None,
         mail: MailIntakeService | None = None,
+        push: PushService | None = None,
     ) -> None:
         self._pipeline = pipeline
         self._master_data = master_data
         self._mail = mail
+        self._push = push
         self._logos = logos
         self._classifier = classifier
         self._rules = rules
@@ -251,6 +254,7 @@ class Worker:
             self._logos,
             self._classifier,
             self._mail,
+            self._push,
         )
         return tuple(
             kind for service in services if service is not None for kind in service.job_kinds
@@ -269,6 +273,7 @@ class Worker:
             # A mailbox's fetch before the pipeline: due every few minutes, it would wait out a
             # long ingest otherwise; it takes at most a few dozen mails a run.
             or (self._mail is not None and await self._mail.run_next_job())
+            or (self._push is not None and await self._push.run_next_job())
             or await self._pipeline.run_next_job()
             or (self._rules is not None and await self._rules.run_next_job())
             or (self._bulk is not None and await self._bulk.run_next_job())
