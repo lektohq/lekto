@@ -293,6 +293,7 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	totp_off: entry(m.reason_totp_off),
 	code_invalid: entry(m.reason_code_invalid),
 	read_only_token: entry(m.reason_read_only_token),
+	upload_only_token: entry(m.reason_upload_only_token),
 	csrf_missing: entry(m.reason_csrf_missing),
 	session_needed: entry(m.reason_session_needed),
 	oidc_mismatch: entry(m.reason_oidc_mismatch),

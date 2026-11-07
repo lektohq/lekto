@@ -75,10 +75,16 @@
 		await load().catch(reportError);
 	}
 
-	const scopes = [
-		{ value: 'read', label: m.token_scope_read() },
-		{ value: 'read_write', label: m.token_scope_read_write() }
-	];
+	// The scope `upload` is for a shortcut that sends shared files (web/DESIGN.md, "App").
+	const SCOPE_LABELS: Record<Scope, () => string> = {
+		read: m.token_scope_read,
+		read_write: m.token_scope_read_write,
+		upload: m.token_scope_upload
+	};
+	const scopes = (['read', 'read_write', 'upload'] as const).map((value) => ({
+		value,
+		label: SCOPE_LABELS[value]()
+	}));
 	const today = new Date().toLocaleDateString('sv');
 </script>
 
@@ -117,7 +123,7 @@
 							</p>
 						</div>
 						<Badge variant="note">
-							{token.scope === 'read' ? m.token_scope_read() : m.token_scope_read_write()}
+							{SCOPE_LABELS[token.scope]()}
 						</Badge>
 						<IconButton
 							label={m.token_revoke_named({ name: token.name })}

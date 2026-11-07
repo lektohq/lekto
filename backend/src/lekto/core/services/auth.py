@@ -112,6 +112,11 @@ class Principal:
         return self.api_token is None or self.api_token.scope.can_write
 
     @property
+    def only_uploads(self) -> bool:
+        """Whether the caller's token may do nothing but upload documents."""
+        return self.api_token is not None and self.api_token.scope.only_uploads
+
+    @property
     def via(self) -> ViaToken | None:
         """The token the caller acts through, for what records their decisions; None in a
         session."""

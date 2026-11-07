@@ -16,7 +16,7 @@ from lekto.composition.container import build_memory_container, build_services
 from lekto.core.domain.errors import AuthenticationError
 from lekto.core.domain.identity import TokenScope
 from tests.api import auth, bearer
-from tests.builders import PASSWORD
+from tests.builders import PASSWORD, SAMPLES
 from tests.unit.adapters.rest.support import Api, make_app
 
 PUBLIC = {
@@ -442,3 +442,37 @@ async def test_token_expiry_may_have_any_offset(api: Api) -> None:
         )
     assert response.status_code == 201, response.text
     assert response.json()["expires_at"] == "2030-01-01T00:00:00Z"
+
+
+async def test_an_upload_token_uploads_and_does_nothing_else(api: Api) -> None:
+    """The scope `upload` (a shortcut on a phone): `POST /documents`, nothing else, not even
+    reading what it uploaded."""
+    user = await api.user()
+    _, token = await api.services.auth.create_api_token(user.id, "shortcut", TokenScope.UPLOAD)
+    headers = bearer(token)
+    files = {"file": ("scan.pdf", (SAMPLES / "scan.pdf").read_bytes(), "application/pdf")}
+    uploaded = await api.client.post(f"{PREFIX}/documents", files=files, headers=headers)
+    assert uploaded.status_code == 202, uploaded.text
+    document = uploaded.json()["id"]
+    again = await api.client.post(f"{PREFIX}/documents", files=files, headers=headers)
+    assert again.status_code == 409
+    assert again.json()["existing_document_id"] == document
+    for method, path, body in [
+        ("GET", "/documents", None),
+        ("GET", f"/documents/{document}", None),
+        ("GET", "/auth/me", None),
+        ("POST", "/spaces", {"name": "A"}),
+        ("POST", "/documents/search", {"q": "x"}),
+    ]:
+        refused = await api.client.request(method, PREFIX + path, json=body, headers=headers)
+        assert refused.status_code == 403, (method, path)
+        assert refused.json()["reason"]["code"] == "upload_only_token"
+
+
+async def test_a_read_token_does_not_upload(api: Api) -> None:
+    user = await api.user()
+    _, token = await api.services.auth.create_api_token(user.id, "reader", TokenScope.READ)
+    files = {"file": ("scan.pdf", (SAMPLES / "scan.pdf").read_bytes(), "application/pdf")}
+    refused = await api.client.post(f"{PREFIX}/documents", files=files, headers=bearer(token))
+    assert refused.status_code == 403
+    assert refused.json()["reason"]["code"] == "read_only_token"
