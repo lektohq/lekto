@@ -203,6 +203,8 @@ async def test_openapi_lists_every_endpoint(api: Api) -> None:
         (f"{PREFIX}/push/devices", "post"),
         (f"{PREFIX}/push/devices/{{id}}", "delete"),
         (f"{PREFIX}/push/devices/{{id}}/test", "post"),
+        (f"{PREFIX}/push/preferences", "get"),
+        (f"{PREFIX}/push/preferences", "put"),
         (f"{PREFIX}/lenses", "get"),
         (f"{PREFIX}/lenses", "post"),
         (f"{PREFIX}/lenses/order", "put"),

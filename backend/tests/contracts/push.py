@@ -6,8 +6,8 @@ import pytest
 
 from lekto.adapters.outbound.memory.push import FAKE_PUBLIC_KEY
 from lekto.core.domain.errors import ConcurrencyError, ConflictError, NotFoundError
-from lekto.core.domain.ids import PushDeviceId, UserId, new_id
-from lekto.core.domain.push import PushDevice, PushKind, PushMessage
+from lekto.core.domain.ids import DocumentId, PushDeviceId, UserId, new_id
+from lekto.core.domain.push import PushDevice, PushKind, PushMessage, PushPreferences
 from lekto.core.ports.push import PushOutcome, PushSender
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from tests.builders import HOUR, NOW
@@ -104,6 +104,48 @@ class PushDeviceRepositoryContract:
             assert await uow.push_devices.find(device.id) is None
             with pytest.raises(NotFoundError):
                 await uow.push_devices.remove(device.id)
+
+
+class PushPreferencesRepositoryContract:
+    async def test_preferences_are_saved_and_changed(self, uow_factory: UnitOfWorkFactory) -> None:
+        user = await a_user(uow_factory)
+        documents = (DocumentId(new_id()), DocumentId(new_id()))
+        async with uow_factory() as uow:
+            assert await uow.push_preferences.find(user.id) is None
+            await uow.push_preferences.save(
+                PushPreferences(
+                    id=user.id, kinds=frozenset({PushKind.WAITING}), titles=False, pending=documents
+                )
+            )
+            await uow.commit()
+        async with uow_factory() as uow:
+            stored = await uow.push_preferences.find(user.id)
+            assert stored is not None
+            assert (stored.kinds, stored.titles, stored.pending) == (
+                frozenset({PushKind.WAITING}),
+                False,
+                documents,
+            )
+            stored.pending = ()
+            await uow.push_preferences.save(stored)
+            await uow.commit()
+        async with uow_factory() as uow:
+            changed = await uow.push_preferences.find(user.id)
+            assert changed is not None and changed.pending == () and changed.version == 2
+            stale = PushPreferences(id=user.id, version=1)
+            with pytest.raises(ConcurrencyError):
+                await uow.push_preferences.save(stale)
+
+    async def test_they_go_with_their_user(self, uow_factory: UnitOfWorkFactory) -> None:
+        user = await a_user(uow_factory)
+        async with uow_factory() as uow:
+            await uow.push_preferences.save(PushPreferences(id=user.id))
+            await uow.commit()
+        async with uow_factory() as uow:
+            await uow.users.remove(user.id)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.push_preferences.find(user.id) is None
 
 
 class PushSenderContract:

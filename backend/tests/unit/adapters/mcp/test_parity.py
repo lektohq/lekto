@@ -55,6 +55,8 @@ ENDPOINTS: dict[str, str | Excluded] = {
     "POST /push/devices": BROWSER,
     "DELETE /push/devices/{id}": ACCOUNT,
     "POST /push/devices/{id}/test": ACCOUNT,
+    "GET /push/preferences": ACCOUNT,
+    "PUT /push/preferences": ACCOUNT,
     "DELETE /auth/tokens/{id}": ACCOUNT,
     "POST /auth/oidc/link": ACCOUNT,
     "DELETE /auth/oidc/link": ACCOUNT,

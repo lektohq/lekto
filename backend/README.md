@@ -1918,6 +1918,15 @@ iPhone and iPad (iOS 16.4 and later), browsers elsewhere. Configured with
 - **Sending** (`webpush` adapter): each message encrypted for the device (RFC 8291,
   `aes128gcm`), the request signed with Lekto's key (VAPID, RFC 8292). A push service that no
   longer knows the device (404, 410) or 20 failures in a row make Lekto forget it.
+- **When** (`services.push`, job `push.send`, 60 s of quiet after what caused it, one per person
+  and kind; Tobi, 06.11.2026): a document comes to wait in the person's inbox (yellow or red;
+  the editors of its space, `waiting`: how many wait, how many are new, up to three titles, the
+  document itself if it is one, the inbox's count as the badge), one of their webhooks is
+  switched off (`webhook_disabled`, to its owner), and for admins a mailbox starts failing to
+  fetch (`mailbox_failed`, once until it works again) or a job is given up (`job_failed`). The
+  documents noted meanwhile are named in the next notification if they still wait.
+  `/push/preferences` switches each kind off and the titles (they may show on a locked screen);
+  all are on until then.
 - **What a message says**: data only, its kind and parameters, the address to open and the
   number for the app's icon; the service worker words it in the device's language. `POST
   /push/devices/{id}/test` sends a test notification.

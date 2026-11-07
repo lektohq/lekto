@@ -9,7 +9,7 @@ from enum import StrEnum
 from typing import Protocol
 
 from lekto.core.domain.ids import PushDeviceId, UserId
-from lekto.core.domain.push import PushDevice, PushMessage
+from lekto.core.domain.push import PushDevice, PushMessage, PushPreferences
 
 
 class PushDeviceRepository(Protocol):
@@ -28,6 +28,14 @@ class PushDeviceRepository(Protocol):
     async def remove(self, id: PushDeviceId) -> None: ...
 
     async def remove_for_user(self, user: UserId) -> int: ...
+
+
+class PushPreferencesRepository(Protocol):
+    async def find(self, user: UserId) -> PushPreferences | None: ...
+
+    async def save(self, preferences: PushPreferences) -> None:
+        """Add them, or update them (ConcurrencyError if they changed meanwhile)."""
+        ...
 
 
 class PushOutcome(StrEnum):
