@@ -21,8 +21,10 @@ from lekto.core.domain.ids import DocumentId, JobId
 from lekto.core.domain.jobs import Job, JobStatus
 from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.pipeline import Node
+from lekto.core.domain.push import PushKind
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
+from lekto.core.services._push_queue import PUSH_JOB, active_admins, queue_push
 
 log = logging.getLogger(__name__)
 
@@ -131,6 +133,7 @@ class JobRunner:
                     await uow.jobs.complete(job, now=self._clock.now(), result=result)
                 else:
                     await uow.jobs.fail(job, now=self._clock.now(), error=error)
+                    await _tell_admins(uow, job, self._clock.now())
                 if also is not None:
                     await also(uow)
                 await uow.commit()
@@ -157,6 +160,7 @@ class JobRunner:
             async with self._uow() as uow:
                 if run_at is None:
                     await uow.jobs.fail(job, now=self._clock.now(), error=error)
+                    await _tell_admins(uow, job, self._clock.now())
                 else:
                     await uow.jobs.reschedule(job, run_at=run_at, error=error)
                 if also is not None:
@@ -223,3 +227,12 @@ async def retrying[T](
 
 async def _backoff(attempt: int) -> None:
     await asyncio.sleep(random.uniform(0, STORE_BACKOFF * attempt))
+
+
+async def _tell_admins(uow: UnitOfWork, job: Job, now: datetime) -> None:
+    """A job was given up: the admins hear of it (the jobs of the system page), within the
+    quiet once for any number. Not of a notification's own job: that would ask for another."""
+    if job.kind != PUSH_JOB:
+        await queue_push(
+            uow, now, await active_admins(uow), PushKind.JOB_FAILED, {"kind": job.kind}
+        )

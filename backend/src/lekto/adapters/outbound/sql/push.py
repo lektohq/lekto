@@ -1,13 +1,14 @@
 """The devices of web push in SQL."""
 
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import Row, delete, select
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.repositories import SqlRepository, Values
-from lekto.core.domain.ids import PushDeviceId, UserId
-from lekto.core.domain.push import PushDevice
+from lekto.core.domain.ids import DocumentId, PushDeviceId, UserId
+from lekto.core.domain.push import PushDevice, PushKind, PushPreferences
 
 
 class SqlPushDeviceRepository(SqlRepository[PushDeviceId, PushDevice]):
@@ -57,5 +58,35 @@ class SqlPushDeviceRepository(SqlRepository[PushDeviceId, PushDevice]):
             created_at=row.created_at,
             last_success_at=row.last_success_at,
             failures=row.failures,
+            version=row.version,
+        )
+
+
+class SqlPushPreferencesRepository(SqlRepository[UserId, PushPreferences]):
+    kind = "push preferences"
+    table = t.push_preferences
+    key = "user_id"
+
+    async def save(self, preferences: PushPreferences) -> None:
+        if await self.find(preferences.id) is None:
+            await self.add(preferences)
+        else:
+            await self.update(preferences)
+
+    def _values(self, entity: PushPreferences) -> Values:
+        return {
+            "user_id": entity.id,
+            "kinds": sorted(kind.value for kind in entity.kinds),
+            "titles": entity.titles,
+            "pending": [str(document) for document in entity.pending],
+            "version": entity.version,
+        }
+
+    def _entity(self, row: Row[Any]) -> PushPreferences:
+        return PushPreferences(
+            id=UserId(row.user_id),
+            kinds=frozenset(PushKind(kind) for kind in row.kinds if kind in PushKind),
+            titles=row.titles,
+            pending=tuple(DocumentId(UUID(document)) for document in row.pending),
             version=row.version,
         )

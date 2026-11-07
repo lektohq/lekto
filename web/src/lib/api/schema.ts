@@ -2515,6 +2515,30 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/v1/push/preferences': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/**
+		 * What the caller is told about
+		 * @description Every kind is on and titles are named until the caller changes it.
+		 */
+		get: operations['get_preferences_api_v1_push_preferences_get'];
+		/**
+		 * Choose what the caller is told about
+		 * @description A notification of a kind left out is not sent; documents waiting meanwhile are named in the next notification once `waiting` is on again.
+		 */
+		put: operations['set_preferences_api_v1_push_preferences_put'];
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/v1/mailboxes': {
 		parameters: {
 			query?: never;
@@ -9267,6 +9291,28 @@ export interface components {
 		 * @enum {string}
 		 */
 		PushOutcome: 'delivered' | 'gone' | 'failed';
+		/**
+		 * PushPreferencesBody
+		 * @example {
+		 *       "kinds": [
+		 *         "waiting",
+		 *         "webhook_disabled"
+		 *       ],
+		 *       "titles": true
+		 *     }
+		 */
+		PushPreferencesBody: {
+			/**
+			 * Kinds
+			 * @description What the caller is told about: `waiting` (documents wait in their inbox), `webhook_disabled` (one of their webhooks was switched off), and for admins `mailbox_failed` (a mailbox fails to fetch) and `job_failed` (a job was given up).
+			 */
+			kinds: ('waiting' | 'mailbox_failed' | 'webhook_disabled' | 'job_failed')[];
+			/**
+			 * Titles
+			 * @description Whether a notification names the documents' titles (it may show on a locked screen).
+			 */
+			titles: boolean;
+		};
 		/** PushSettingsOut */
 		PushSettingsOut: {
 			/**
@@ -29435,6 +29481,186 @@ export interface operations {
 					 *       "title": "Conflict",
 					 *       "status": 409,
 					 *       "detail": "duplicate of document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	get_preferences_api_v1_push_preferences_get: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['PushPreferencesBody'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	set_preferences_api_v1_push_preferences_put: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['PushPreferencesBody'];
+			};
+		};
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['PushPreferencesBody'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Conflict */
+			409: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Conflict",
+					 *       "status": 409,
+					 *       "detail": "duplicate of document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Content Too Large */
+			413: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Content Too Large",
+					 *       "status": 413,
+					 *       "detail": "the request body is larger than 1048576 bytes"
 					 *     }
 					 */
 					'application/problem+json': components['schemas']['Problem'];

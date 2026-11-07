@@ -476,6 +476,7 @@
 	"job_kind_maintenance_cleanup": "Aufräumen",
 	"job_kind_documents_remove_files": "Dateien eines gelöschten Dokuments entfernen",
 	"job_kind_mail_fetch": "Mails abrufen",
+	"job_kind_push_send": "Benachrichtigung senden",
 	"job_kind_documents_bulk": "Mehrere Dokumente bearbeiten",
 	"job_kind_tasks_expire": "Auftrag ohne Antwort beenden",
 	"nav_settings": "Einstellungen",

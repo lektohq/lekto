@@ -782,6 +782,18 @@ push_devices = Table(
     Column("version", Integer, nullable=False),
 )
 
+# What a person wants to be told about, and the documents that came to wait since their last
+# notification (ids, at most 50).
+push_preferences = Table(
+    "push_preferences",
+    metadata,
+    Column("user_id", Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("kinds", json_type(), nullable=False),
+    Column("titles", Boolean, nullable=False),
+    Column("pending", json_type(), nullable=False),
+    Column("version", Integer, nullable=False),
+)
+
 api_tokens = Table(
     "api_tokens",
     metadata,

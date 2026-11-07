@@ -24,7 +24,7 @@ from tests.contracts.mail_records import (
 )
 from tests.contracts.mailboxes import MailboxRepositoryContract
 from tests.contracts.processing_facts import ProcessingFactsContract
-from tests.contracts.push import PushDeviceRepositoryContract
+from tests.contracts.push import PushDeviceRepositoryContract, PushPreferencesRepositoryContract
 from tests.contracts.rules import RuleRepositoriesContract
 from tests.contracts.tasks import TaskRepositoryContract
 from tests.contracts.unit_of_work import UnitOfWorkContract, owner_with_space
@@ -180,4 +180,8 @@ async def test_a_failed_unit_releases_the_task(uow_factory: UnitOfWorkFactory) -
 
 
 class TestSqlitePushDevices(PushDeviceRepositoryContract):
+    pass
+
+
+class TestSqlitePushPreferences(PushPreferencesRepositoryContract):
     pass

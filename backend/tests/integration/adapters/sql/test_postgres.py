@@ -30,7 +30,7 @@ from tests.contracts.mail_records import (
 )
 from tests.contracts.mailboxes import MailboxRepositoryContract
 from tests.contracts.processing_facts import ProcessingFactsContract
-from tests.contracts.push import PushDeviceRepositoryContract
+from tests.contracts.push import PushDeviceRepositoryContract, PushPreferencesRepositoryContract
 from tests.contracts.rules import RuleRepositoriesContract
 from tests.contracts.tasks import TaskRepositoryContract
 from tests.contracts.unit_of_work import UnitOfWorkContract
@@ -270,4 +270,8 @@ async def test_the_listener_connects_again_and_misses_nothing(
 
 
 class TestPostgresPushDevices(PushDeviceRepositoryContract):
+    pass
+
+
+class TestPostgresPushPreferences(PushPreferencesRepositoryContract):
     pass
