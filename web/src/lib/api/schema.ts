@@ -8176,6 +8176,7 @@ export interface components {
 		 *       "has_password": true,
 		 *       "lekto_version": "0.8.0",
 		 *       "linked_accounts": [],
+		 *       "shortcut_url": "https://www.icloud.com/shortcuts/8d752558e38f4f64bf9c61faa4694a75",
 		 *       "token_scope": "read",
 		 *       "totp_enabled": false,
 		 *       "user": {
@@ -8214,6 +8215,11 @@ export interface components {
 			 * @description The version of Lekto that answers (its release).
 			 */
 			lekto_version: string;
+			/**
+			 * Shortcut Url
+			 * @description The link that adds the shortcut "An Lekto senden" for iPhone, iPad and Mac (`LEKTO_SHORTCUT_URL`); null: the server offers none.
+			 */
+			shortcut_url: string | null;
 		};
 		/** MemberDetails */
 		MemberDetails: {

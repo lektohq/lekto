@@ -6,6 +6,10 @@ the share menu of every app and, in the Finder, under right-click › Quick Acti
 
 ## Set it up
 
+The operator names the shortcut's link in `LEKTO_SHORTCUT_URL` (`docs/configuration.md`; the
+Compose examples' `.env.example` carries the current one). Without it, Lekto shows nothing of the
+shortcut.
+
 1. Open Lekto on the device (Safari, or the app on the Home Screen) and go to
    **Settings › API-Tokens**. On iPhone, iPad and Mac the card **"Kurzbefehl für iPhone, iPad und
    Mac"** stands first.
@@ -23,8 +27,10 @@ next one.
 
 ## What it does
 
-For every file it is given, the shortcut sends `POST <URL>/api/v1/documents` with the file in the
-form field `file` and the token as `Authorization: Bearer`. Then:
+It takes PDFs, images and files (scans from the Files app, mails as `.eml`). A photo in HEIC, as the
+iPhone takes them, it turns into a JPEG first: Lekto reads JPEG, PNG and TIFF. For every file, the
+shortcut sends `POST <URL>/api/v1/documents` with the file in the form field `file` and the token
+as `Authorization: Bearer`. Then:
 
 - **"An Lekto gesendet"**: the document is in Lekto; the shortcut opens it (in Safari: iOS opens
   links there, not in the app on the Home Screen, so you may have to sign in there).

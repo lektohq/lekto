@@ -857,3 +857,12 @@ def test_push_needs_a_valid_key_and_a_subject(monkeypatch: pytest.MonkeyPatch) -
     settings = load_settings()
     assert settings.push_vapid_private_key is not None
     assert settings.push_vapid_private_key.get_secret_value() == key
+
+
+def test_the_shortcut_link_is_https_and_has_no_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert load_settings().shortcut_url is None
+    with pytest.raises(ConfigurationError, match="LEKTO_SHORTCUT_URL"):
+        set_env(monkeypatch, {"LEKTO_SHORTCUT_URL": "http://www.icloud.com/shortcuts/x"})
+        load_settings()
+    monkeypatch.setenv("LEKTO_SHORTCUT_URL", "https://www.icloud.com/shortcuts/x")
+    assert load_settings().shortcut_url == "https://www.icloud.com/shortcuts/x"

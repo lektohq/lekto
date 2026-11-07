@@ -12,11 +12,12 @@ from fastapi.routing import APIRoute, iter_route_contexts
 from lekto import __version__
 from lekto.adapters.inbound.rest import PREFIX
 from lekto.adapters.inbound.rest.auth import CSRF_HEADER
+from lekto.adapters.outbound.memory import ManualClock
 from lekto.composition.container import build_memory_container, build_services
 from lekto.core.domain.errors import AuthenticationError
 from lekto.core.domain.identity import TokenScope
 from tests.api import auth, bearer
-from tests.builders import PASSWORD, SAMPLES
+from tests.builders import NOW, PASSWORD, SAMPLES
 from tests.unit.adapters.rest.support import Api, make_app
 
 PUBLIC = {
@@ -95,6 +96,7 @@ async def test_login_sets_a_secure_cookie(api: Api) -> None:
     assert me.json()["authenticated_with"] == "session"
     assert me.json()["csrf_token"] == body["csrf_token"]
     assert me.json()["lekto_version"] == __version__
+    assert me.json()["shortcut_url"] is None  # none configured: the web UI offers no shortcut
 
 
 async def test_insecure_cookies_only_when_configured() -> None:
@@ -476,3 +478,17 @@ async def test_a_read_token_does_not_upload(api: Api) -> None:
     refused = await api.client.post(f"{PREFIX}/documents", files=files, headers=bearer(token))
     assert refused.status_code == 403
     assert refused.json()["reason"]["code"] == "read_only_token"
+
+
+async def test_me_names_the_shortcut_the_server_offers() -> None:
+    link = "https://www.icloud.com/shortcuts/8d752558e38f4f64bf9c61faa4694a75"
+    clock = ManualClock(NOW)
+    container = build_memory_container(clock)
+    services = build_services(container)
+    app = make_app(container, services, shortcut_url=link)
+    client = httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="https://lekto")
+    api = Api(container, services, app, client, clock)
+    user = await api.user()
+    async with api.client:
+        me = (await api.client.get(f"{PREFIX}/auth/me", headers=auth(user))).json()
+    assert me["shortcut_url"] == link

@@ -101,6 +101,8 @@ class ApiContext:
     # Where browsers reach the web UI (`LEKTO_PUBLIC_URL` and `/ui`), for links MCP clients give
     # the user; None without `LEKTO_PUBLIC_URL`.
     ui_url: str | None = None
+    # The iCloud link of the shortcut for iPhone, iPad and Mac; None: the web UI offers none.
+    shortcut_url: str | None = None
     # `False` only for development over plain HTTP: cookies without `Secure`.
     cookie_secure: bool
     # Event streams check every so often that their session or token is still valid.
