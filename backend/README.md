@@ -110,7 +110,8 @@ authenticate.
   changes or is reset (the caller's own session is renewed). Every sign-in starts a new session.
   Last use is written at most once a minute. The CSRF token of a session is derived from its
   token (HMAC), so nothing more is stored.
-- API tokens: `lekto_` plus 256 random bits, stored as SHA-256; scope `read` or `read_write`,
+- API tokens: `lekto_` plus 256 random bits, stored as SHA-256; scope `read`, `read_write` or
+  `upload` (only `POST /documents`: a shortcut that sends shared files from a phone),
   a name, optional expiry, last use. Shown once. They survive a password change unless the
   caller (or the admin resetting it) asks to revoke them, and are refused while the account is
   deactivated.
@@ -1437,7 +1438,9 @@ test calls every registered route without credentials and expects `401`. Request
 something need, with a session, the header `X-CSRF-Token` (from the sign-in answer or
 `GET /auth/me`) and, with a token, the scope `read_write`; otherwise `403`. A POST that only reads
 (`x-reads` in the API description: a search with its words in the body) is open to a `read`
-token; with a session it needs the header all the same. Changing sign-in
+token; with a session it needs the header all the same. A token of the scope `upload` reaches
+only the upload (`x-uploads`: `POST /documents`); everything else answers `403`
+(`upload_only_token`), reading too. Changing sign-in
 data needs a session, so a leaked API token cannot take over an account: the own password,
 TOTP, tokens, sessions and links (`/auth/*`), and the admin endpoints that create users with a
 password, reset passwords, turn TOTP off and remove links. Admins cannot reset their own
@@ -1913,7 +1916,7 @@ so rights and rules are the same.
 
 Every tool has a class. A `read` tool only reads; a `write` tool changes, but nothing a person
 could not undo. A token with scope `read` is offered the read tools only, and a call of another
-tool is refused. Deleting, moving, reprocessing, reading with the VLM, uploading, rules,
+tool is refused; one with scope `upload` gets `403` for every request to the endpoint. Deleting, moving, reprocessing, reading with the VLM, uploading, rules,
 master data and managing Lekto are no tools: the client points the user to the web UI.
 
 | Tool | Class | Does |

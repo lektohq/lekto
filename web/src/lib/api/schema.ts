@@ -9383,6 +9383,7 @@ export interface components {
 			| 'totp_off'
 			| 'code_invalid'
 			| 'read_only_token'
+			| 'upload_only_token'
 			| 'csrf_missing'
 			| 'session_needed'
 			| 'oidc_mismatch'
@@ -11394,9 +11395,11 @@ export interface components {
 		};
 		/**
 		 * TokenScope
+		 * @description What an API token may do: read, read and write, or only upload documents (a shortcut
+		 *     on a phone that sends shared files; it reads nothing, not even what it uploaded).
 		 * @enum {string}
 		 */
-		TokenScope: 'read' | 'read_write';
+		TokenScope: 'read' | 'read_write' | 'upload';
 		/**
 		 * TotpSetupOut
 		 * @description Shown once. Confirm with a code to turn TOTP on.

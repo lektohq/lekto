@@ -268,6 +268,7 @@ class ReasonCode(StrEnum):
     TOTP_OFF = "totp_off"
     CODE_INVALID = "code_invalid"
     READ_ONLY_TOKEN = "read_only_token"
+    UPLOAD_ONLY_TOKEN = "upload_only_token"
     CSRF_MISSING = "csrf_missing"
     SESSION_NEEDED = "session_needed"
     OIDC_MISMATCH = "oidc_mismatch"
@@ -740,6 +741,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.TOTP_OFF: "TOTP is off",
     ReasonCode.CODE_INVALID: "the code is not valid",
     ReasonCode.READ_ONLY_TOKEN: "this API token may only read",
+    ReasonCode.UPLOAD_ONLY_TOKEN: "this API token may only upload documents",
     ReasonCode.CSRF_MISSING: "the header {header} is missing or wrong",
     ReasonCode.SESSION_NEEDED: "this needs a signed-in session, not an API token",
     ReasonCode.OIDC_MISMATCH: "the sign-in does not match the one started here",
