@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import Trash from '@lucide/svelte/icons/trash-2';
 	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
+	import { tokenChanges, tokensChanged } from '#lib/tokens.svelte.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
@@ -14,7 +14,7 @@
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
-	import { describeError, reportError } from '#lib/errors.ts';
+	import { describeError } from '#lib/errors.ts';
 	import { formatDate } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import IconButton from '#lib/components/IconButton.svelte';
@@ -44,7 +44,11 @@
 		}
 	}
 
-	onMount(load);
+	// Again whenever a token is created or revoked here or on the shortcut's card.
+	$effect(() => {
+		void tokenChanges.version;
+		void load();
+	});
 
 	function openCreate() {
 		name = '';
@@ -65,14 +69,14 @@
 			})
 		);
 		created = token.token;
-		await load();
+		tokensChanged();
 	}
 
 	async function revoke() {
 		if (!revoking) return;
 		await unwrap(api.DELETE('/api/v1/auth/tokens/{id}', { params: { path: { id: revoking.id } } }));
 		toast.success(m.token_revoked());
-		await load().catch(reportError);
+		tokensChanged();
 	}
 
 	// The scope `upload` is for a shortcut that sends shared files (web/DESIGN.md, "App").
