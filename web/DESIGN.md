@@ -753,7 +753,7 @@ linking an account came back with an error the sign-in), the last with its count
 
 - **Profil:** display name, other names, birth date, e-mail, own identifiers.
 - **Anmeldung:** password, second factor, single sign-on, sessions.
-- **API-Tokens:** the tokens.
+- **API-Tokens:** on iPhone, iPad and Mac first the shortcut ([App](#app)), then the tokens.
 - **Kennungen bei Kontakten:** the identifiers at contacts, grouped by contact ("Lists").
 
 A tab with a form saves only its own part, and guards it ("Saving and leaving").
@@ -995,6 +995,19 @@ worker, and Lekto works as a website.
   line, one hint (`text-sm`, muted, with its icon): on Android in the browser, while the browser
   offers the install, "Schneller aus dem Teilen-Menü: App installieren" (a link button that opens
   the browser's own question). The installed app shows none.
+- **The shortcut (iPhone, iPad, Mac):** Safari has no share target; the shortcut "An Lekto
+  senden" (Tobi's, added through its iCloud link, `lib/shortcut.ts`) sends shared files with a
+  token that may only upload. Its card stands first in Settings › API-Tokens, on Apple devices
+  only, built like the tokens' card: title and a line of what it does; its action, "Einrichten",
+  stands under them (its other words are long).
+  Setting it up creates the token "Kurzbefehl · iPhone" (iPad, Mac) and shows, in a dialog, the
+  token and Lekto's address in the order the Shortcuts app asks for them, each with a copy
+  button, then "Zu Kurzbefehle hinzufügen" (the link) and "Ist gesichert". Once a token that only
+  uploads exists, the card says "Eingerichtet" (`green` badge), shows the three ways (share menu
+  on iPhone and iPad, share menu on the Mac, Finder's quick actions) and offers "Weiteres Gerät
+  einrichten". The dialog "Hochladen" on an Apple device without such a token carries the hint
+  "Schneller aus dem Teilen-Menü: Kurzbefehl einrichten", leading to that card; Android's hint
+  stands in its place there.
 - **A new version:** a toast that stays until it is answered, "Neue Version bereit" with the
   action "Neu laden"; its ✕ puts it off until the app starts again. It is the one toast that
   waits for the person ("Alerts"). A page that already runs the new version (it was reloaded)
