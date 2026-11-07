@@ -2696,7 +2696,7 @@ Stand: gebaut in der Nacht 06./07.11.2026 als #302–#309 (gestapelt, nicht geme
 9. **Anlässe für Push:** „Dokumente warten auf Dich“ für alle; für Admins dazu ein Postfach mit Fehler, ein abgeschalteter Webhook, ein Job, der aufgab. Jeder Anlass einzeln abschaltbar.
 10. **Ruhe vor dem Senden:** 60 s.
 11. **Ein Tippen auf die Nachricht** öffnet bei genau einem Dokument dieses Dokument, sonst den Eingang.
-12. **Kurzbefehl** „An Lekto senden“ über den iCloud-Link https://www.icloud.com/shortcuts/042c55c8777f4262aec7f1dbb7bd4bbc; Karte im Reiter API-Tokens und Zeile im Upload-Dialog, beide nur auf Apple-Geräten.
+12. **Kurzbefehl** „An Lekto senden“ über den iCloud-Link https://www.icloud.com/shortcuts/8d752558e38f4f64bf9c61faa4694a75 (seit 07.11.2026: nimmt PDFs, Bilder und Dateien, wandelt HEIC in JPEG; zuvor …/042c55c8777f4262aec7f1dbb7bd4bbc nur PDFs); Karte im Reiter API-Tokens und Zeile im Upload-Dialog, beide nur auf Apple-Geräten.
 
 **Vorschlag:**
 
