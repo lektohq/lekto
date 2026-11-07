@@ -764,6 +764,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
     )
     index, embeddings = container.search_index, container.embeddings
     facts = FactsSignal(uow, store, container.codes)
+    inbox = InboxService(uow, clock)
     public_url = None if settings.public_url is None else str(settings.public_url)
     desk = TaskDesk(container.cipher, container.templates, link_base=public_url)
     executors: dict[Node, NodeExecutor] = {
@@ -886,7 +887,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
             retention=settings.retention,
         ),
         lenses=LensService(uow, clock),
-        push=PushService(uow, clock, container.push_sender),
+        push=PushService(uow, clock, container.push_sender, inbox),
         mailboxes=MailboxService(uow, clock, container.cipher, container.mail_server),
         relations=RelationService(uow, clock),
         expected=ExpectedService(uow, clock),
@@ -915,7 +916,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
             pipeline_version=__version__,
         ),
         documents=documents,
-        inbox=InboxService(uow, clock),
+        inbox=inbox,
         pipeline=pipeline,
         mail_rules=MailRuleService(uow, clock),
         mail_intake=MailIntakeService(

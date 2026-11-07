@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 from lekto.adapters.outbound.memory.rows import MemoryRepository, _copy
 from lekto.core.domain.ids import PushDeviceId, UserId
-from lekto.core.domain.push import PushDevice, PushMessage
+from lekto.core.domain.push import PushDevice, PushMessage, PushPreferences
 from lekto.core.ports.push import PushOutcome, PushResult
 
 # A valid P-256 point, base64url, as a stand-in for Lekto's VAPID public key.
@@ -23,6 +23,14 @@ class MemoryPushDeviceRepository(MemoryRepository[PushDeviceId, PushDevice]):
 
     async def remove_for_user(self, user: UserId) -> int:
         return self._remove_rows([row for row in self._all() if row.user_id == user])
+
+
+class MemoryPushPreferencesRepository(MemoryRepository[UserId, PushPreferences]):
+    async def save(self, preferences: PushPreferences) -> None:
+        if self._uow._row(self._table, preferences.id) is None:
+            await self.add(preferences)
+        else:
+            await self.update(preferences)
 
 
 class FakePushSender:

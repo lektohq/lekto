@@ -6,7 +6,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from lekto.core.domain.push import MAX_DEVICE_NAME, MAX_ENDPOINT, PushDevice
+from lekto.core.domain.push import (
+    MAX_DEVICE_NAME,
+    MAX_ENDPOINT,
+    PushDevice,
+    PushKind,
+    PushPreferences,
+)
 from lekto.core.ports.push import PushOutcome, PushResult
 
 
@@ -92,3 +98,38 @@ class PushTestOut(BaseModel):
     @classmethod
     def of(cls, result: PushResult) -> "PushTestOut":
         return cls(outcome=result.outcome)
+
+
+NoticeKind = Literal["waiting", "mailbox_failed", "webhook_disabled", "job_failed"]
+
+
+class PushPreferencesBody(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"kinds": ["waiting", "webhook_disabled"], "titles": True}]
+        },
+    )
+
+    kinds: list[NoticeKind] = Field(
+        description=(
+            "What the caller is told about: `waiting` (documents wait in their inbox), "
+            "`webhook_disabled` (one of their webhooks was switched off), and for admins "
+            "`mailbox_failed` (a mailbox fails to fetch) and `job_failed` (a job was given up)."
+        )
+    )
+    titles: bool = Field(
+        description=(
+            "Whether a notification names the documents' titles (it may show on a locked screen)."
+        )
+    )
+
+    @classmethod
+    def of(cls, preferences: PushPreferences) -> "PushPreferencesBody":
+        return cls(
+            kinds=sorted(kind.value for kind in preferences.kinds),  # type: ignore[misc]
+            titles=preferences.titles,
+        )
+
+    def kinds_domain(self) -> frozenset[PushKind]:
+        return frozenset(PushKind(kind) for kind in self.kinds)

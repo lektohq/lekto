@@ -16,7 +16,7 @@ from enum import StrEnum
 from urllib.parse import urlsplit
 
 from lekto.core.domain.errors import ValidationError
-from lekto.core.domain.ids import PushDeviceId, UserId
+from lekto.core.domain.ids import DocumentId, PushDeviceId, UserId
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.validation import require_name, require_utc
 
@@ -143,3 +143,40 @@ class PushMessage:
             "tag": self.tag,
             "locale": locale,
         }
+
+
+PENDING_LIMIT = 50
+"""Documents that came to wait since the last notification, kept for the next one at most."""
+
+ADMIN_KINDS = frozenset({PushKind.MAILBOX_FAILED, PushKind.JOB_FAILED})
+"""What only admins are told about (mailboxes and jobs are theirs to look after)."""
+
+DEFAULT_KINDS = frozenset(
+    {PushKind.WAITING, PushKind.MAILBOX_FAILED, PushKind.WEBHOOK_DISABLED, PushKind.JOB_FAILED}
+)
+
+
+@dataclass(kw_only=True)
+class PushPreferences:
+    """What a person wants to be told about (`kinds`; a test always comes), whether the titles
+    of documents stand in a notification (`titles`: it may show on a locked screen), and the
+    documents that came to wait in their inbox since the last notification (`pending`).
+    Its id is the user's."""
+
+    id: UserId
+    kinds: frozenset[PushKind] = DEFAULT_KINDS
+    titles: bool = True
+    pending: tuple[DocumentId, ...] = ()
+    version: int = 1
+
+    def __post_init__(self) -> None:
+        self.kinds = frozenset(kind for kind in self.kinds if kind is not PushKind.TEST)
+        self.pending = tuple(dict.fromkeys(self.pending))[-PENDING_LIMIT:]
+
+    def wants(self, kind: PushKind) -> bool:
+        return kind is PushKind.TEST or kind in self.kinds
+
+    def note_waiting(self, document: DocumentId) -> None:
+        self.pending = tuple(
+            dict.fromkeys((*(d for d in self.pending if d != document), document))
+        )[-PENDING_LIMIT:]

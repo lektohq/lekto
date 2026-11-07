@@ -68,6 +68,7 @@ from lekto.core.domain.mail_rules import (
 )
 from lekto.core.domain.mail_traits import MailMarks
 from lekto.core.domain.permissions import can_file_into
+from lekto.core.domain.push import PushKind
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.identity import DecryptionError, SecretCipher
@@ -81,6 +82,7 @@ from lekto.core.ports.mail_server import (
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import load_actor, readable_document, require_admin
 from lekto.core.services._jobs import JobRunner, retrying
+from lekto.core.services._push_queue import active_admins, queue_push
 from lekto.core.services.pipeline import IncomingFile, PipelineService
 
 log = logging.getLogger(__name__)
@@ -249,6 +251,16 @@ class MailIntakeService:
                         )
                     )
                     await uow.mailboxes.update(mailbox)
+                    if error is not None and status.error is None:
+                        # Failing now, after it worked: the admins hear of it once, not at
+                        # every fetch that fails again.
+                        await queue_push(
+                            uow,
+                            now,
+                            await active_admins(uow),
+                            PushKind.MAILBOX_FAILED,
+                            {"mailbox_id": str(mailbox.id), "name": mailbox.name},
+                        )
                     await uow.outbox.add(
                         [
                             MailboxFetched(

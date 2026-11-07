@@ -42,6 +42,7 @@ from lekto.core.domain.reasons import ReasonCode
 from lekto.core.domain.rules import Condition, ConditionField, Operator, RuleScope
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
+from lekto.core.services._push_queue import PUSH_JOB
 from lekto.core.services.classification.signals import FactsResult, FactsSignal, sender_line
 from lekto.core.services.mail_intake import (
     FETCH_JOB,
@@ -306,6 +307,14 @@ async def test_a_refused_login_shows_at_the_mailbox(world: World) -> None:
     assert stored.status.error is not None
     assert stored.status.error.code is ReasonCode.MAIL_LOGIN_FAILED
     assert stored.status.last_success_at is None and stored.status.last_attempt_at is not None
+    # The admins hear of it once: a fetch that fails again tells nobody.
+    notices = [j for j in world.database.jobs.values() if j.kind == PUSH_JOB]
+    assert [(j.payload["user_id"], j.payload["kind"]) for j in notices] == [
+        (str(admin.id), "mailbox_failed")
+    ]
+    world.clock.advance(timedelta(hours=1))
+    await _fetch(world, world.mail_intake())
+    assert len([j for j in world.database.jobs.values() if j.kind == PUSH_JOB]) == 1
 
 
 async def test_a_paused_mailbox_is_not_fetched(world: World) -> None:

@@ -142,3 +142,22 @@ async def test_without_a_key_there_is_no_push(api: Api) -> None:
         )
         assert refused.status_code == 409
         assert refused.json()["reason"]["code"] == "push_off"
+
+
+async def test_what_a_person_is_told_about(api: Api) -> None:
+    user = await api.user()
+    path = f"{PREFIX}/push/preferences"
+    defaults = (await api.client.get(path, headers=auth(user))).json()
+    assert defaults == {
+        "kinds": ["job_failed", "mailbox_failed", "waiting", "webhook_disabled"],
+        "titles": True,
+    }
+    changed = await api.client.put(
+        path, json={"kinds": ["waiting"], "titles": False}, headers=auth(user)
+    )
+    assert changed.json() == {"kinds": ["waiting"], "titles": False}
+    assert (await api.client.get(path, headers=auth(user))).json() == changed.json()
+    refused = await api.client.put(
+        path, json={"kinds": ["test"], "titles": True}, headers=auth(user)
+    )
+    assert refused.status_code == 422

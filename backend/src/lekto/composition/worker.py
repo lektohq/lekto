@@ -7,6 +7,7 @@ from lekto.adapters.inbound.worker import Worker
 from lekto.composition.container import Container, Services, build_container, build_services
 from lekto.composition.settings import Settings
 from lekto.core.services.indexing import SUBSCRIBER
+from lekto.core.services.push import SUBSCRIBER as PUSH_SUBSCRIBER
 from lekto.core.services.webhooks import SUBSCRIBER as WEBHOOK_SUBSCRIBER
 
 
@@ -34,6 +35,8 @@ def build_worker(container: Container, settings: Settings, services: Services) -
     if services.indexing is not None:
         container.event_bus.subscribe(SUBSCRIBER, services.indexing.on_event)
     container.event_bus.subscribe(WEBHOOK_SUBSCRIBER, services.webhook_delivery.on_event)
+    # Always, also without a VAPID key: switched on later, it does not start with old events.
+    container.event_bus.subscribe(PUSH_SUBSCRIBER, services.push.on_event)
     return Worker(
         pipeline=services.pipeline,
         maintenance=services.maintenance,
@@ -55,4 +58,5 @@ def build_worker(container: Container, settings: Settings, services: Services) -
         logos=services.logos,
         master_data=services.master_data,
         mail=services.mail_intake,
+        push=services.push,
     )

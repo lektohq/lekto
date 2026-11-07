@@ -37,6 +37,7 @@ const KINDS: Record<string, () => string> = {
 	'documents.remove_files': m.job_kind_documents_remove_files,
 	'documents.bulk': m.job_kind_documents_bulk,
 	'mail.fetch': m.job_kind_mail_fetch,
+	'push.send': m.job_kind_push_send,
 	'tasks.expire': m.job_kind_tasks_expire
 };
 
