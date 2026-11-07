@@ -41,3 +41,15 @@ export const install = new Install();
 export function isAndroid(): boolean {
 	return /Android/i.test(navigator.userAgent);
 }
+
+export type AppleDevice = 'iPhone' | 'iPad' | 'Mac';
+
+/** iPhone, iPad or Mac: the share sheet takes a shortcut there (web/DESIGN.md, "App"). An iPad
+ * names itself a Mac; its touch screen tells it apart. */
+export function appleDevice(): AppleDevice | null {
+	const agent = navigator.userAgent;
+	if (/iPhone|iPod/.test(agent)) return 'iPhone';
+	if (/iPad/.test(agent)) return 'iPad';
+	if (/Macintosh/.test(agent)) return navigator.maxTouchPoints > 1 ? 'iPad' : 'Mac';
+	return null;
+}

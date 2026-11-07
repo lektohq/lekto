@@ -73,6 +73,7 @@ Development in the devcontainer: [.devcontainer/README.md](.devcontainer/README.
 | --- | --- |
 | [docs/configuration.md](docs/configuration.md) | Every `LEKTO_` variable: default, values, meaning |
 | [docs/templates.md](docs/templates.md) | Templates for titles, rules and webhook bodies |
+| [docs/shortcut.md](docs/shortcut.md) | The shortcut that sends shared files from iPhone, iPad and Mac |
 | [backend/README.md](backend/README.md) | Architecture, the REST API, processing, rules, search, webhooks, mail, MCP |
 | [deploy/README.md](deploy/README.md) | The image: roles, volumes, health, reverse proxy, backup, updating |
 | [docker/](docker/) | Compose examples with the published images |
