@@ -1,10 +1,13 @@
 <script lang="ts">
 	import Download from '@lucide/svelte/icons/download';
 	import Upload from '@lucide/svelte/icons/upload';
+	import Zap from '@lucide/svelte/icons/zap';
+	import { api } from '#lib/api/client.ts';
+	import { BASE } from '#lib/base.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import { reportError } from '#lib/errors.ts';
-	import { install, isAndroid } from '#lib/install.svelte.ts';
+	import { appleDevice, install, isAndroid } from '#lib/install.svelte.ts';
 	import { ACCEPT, intakeOf, readDrop, type Intake } from '#lib/intake.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { uploads } from '#lib/upload.svelte.ts';
@@ -19,6 +22,16 @@
 	let over = $state(false);
 	// Android in the browser: the installed app is in the share sheet (web/DESIGN.md, "App").
 	const offerInstall = $derived(install.available && isAndroid());
+	// iPhone, iPad and Mac: the shortcut, until the person has a token that only uploads.
+	const apple = appleDevice() !== null;
+	let shortcutReady = $state(true);
+	$effect(() => {
+		if (!open || !apple) return;
+		api.GET('/api/v1/auth/tokens').then(
+			(answer) => (shortcutReady = answer.data?.some((token) => token.scope === 'upload') ?? true),
+			() => (shortcutReady = true)
+		);
+	});
 	let input = $state<HTMLInputElement | null>(null);
 
 	function take(intake: Intake) {
@@ -78,7 +91,20 @@
 				onchange={chosen}
 			/>
 		</div>
-		{#if offerInstall}
+		{#if apple && !shortcutReady}
+			<p class="flex items-center gap-2.5 border-t pt-4 text-sm text-muted-foreground">
+				<Zap class="size-4 shrink-0" aria-hidden="true" />
+				<span
+					>{m.upload_share_hint()}
+					<Button
+						variant="link"
+						size="inline"
+						href={`${BASE}/settings?tab=tokens`}
+						onclick={() => (open = false)}>{m.upload_set_up_shortcut()}</Button
+					></span
+				>
+			</p>
+		{:else if offerInstall}
 			<p class="flex items-center gap-2.5 border-t pt-4 text-sm text-muted-foreground">
 				<Download class="size-4 shrink-0" aria-hidden="true" />
 				<span
