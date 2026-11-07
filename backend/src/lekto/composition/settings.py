@@ -31,6 +31,7 @@ from pydantic_settings import (
 
 from lekto.adapters.outbound.crypto import decode_key
 from lekto.adapters.outbound.liquid import parse_locale
+from lekto.adapters.outbound.webpush.sender import private_key_of as vapid_key_of
 from lekto.composition.errors import ConfigurationError
 
 ENV_PREFIX = "LEKTO_"
@@ -296,6 +297,12 @@ class Settings(BaseSettings):
     # search index with embeddings); 0 turns them off.
     neighbours: Annotated[int, Field(ge=0, le=20)] = 5
 
+    # Web push (notifications on the devices of people): Lekto's VAPID key (32 bytes, base64url;
+    # `lekto vapid-key` makes one) and the contact the push services may write to (`mailto:` or
+    # `https:`), set together or neither. Without them Lekto sends no notification.
+    push_vapid_private_key: SecretStr | None = None
+    push_subject: Annotated[str, Field(pattern=r"^(mailto:|https://)\S+$")] | None = None
+
     # Logos of contacts: fetched from the contact's own website (its domain entered among its
     # identifiers) when on. Off, Lekto never asks the web on its own; uploads work either way.
     logo_fetch: bool = False
@@ -383,6 +390,18 @@ class Settings(BaseSettings):
                 f"{_env('session_max_age')} must not be shorter than {_env('session_idle_timeout')}"
             )
         problems += self._oidc_problems()
+        if (self.push_vapid_private_key is None) != (self.push_subject is None):
+            problems.append(
+                f"{_env('push_vapid_private_key')} and {_env('push_subject')} must be set together"
+            )
+        if self.push_vapid_private_key is not None:
+            try:
+                vapid_key_of(self.push_vapid_private_key.get_secret_value())
+            except ValueError:
+                problems.append(
+                    f"{_env('push_vapid_private_key')}: not a VAPID private key (32 bytes, "
+                    "base64url); create one with `lekto vapid-key`"
+                )
         for prefix in ("llm", "embedding", "vlm"):
             url, model = f"{prefix}_base_url", f"{prefix}_model"
             if (getattr(self, url) is None) != (getattr(self, model) is None):

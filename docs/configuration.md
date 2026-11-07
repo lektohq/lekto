@@ -11,7 +11,8 @@ take and what they do.
   [Sign-in and sessions](#sign-in-and-sessions) · [OpenID Connect](#openid-connect) ·
   [Webhooks](#webhooks) · [MCP](#mcp) · [Worker](#worker) · [OCR and mail](#ocr-and-mail) ·
   [Search](#search) · [Language model](#language-model) · [Embeddings](#embeddings) ·
-  [Vision model](#vision-model) · [Classification](#classification) · [Logos](#logos) ·
+  [Vision model](#vision-model) · [Classification](#classification) ·
+  [Notifications](#notifications) · [Logos](#logos) ·
   [Rules and templates](#rules-and-templates)
 - [The image](#the-image) · [The migration client](#the-migration-client)
 
@@ -272,6 +273,18 @@ together or neither; off without them.
 | `LEKTO_CLASSIFIER_RETRAIN_AFTER` | both | `25` | 1–1,000,000 | Documents confirmed since the last model before it is trained again |
 | `LEKTO_CLASSIFIER_THRESHOLD` | Worker | `0.8` | more than 0, at most 1 | A prediction this sure names its contact, type or tag |
 | `LEKTO_NEIGHBOURS` | Worker | `5` | 0–20 | Similar confirmed documents that vote on a new one (needs the search index with embeddings); `0` turns them off |
+
+## Notifications
+
+Web push: notifications on the devices of people who switched them on (the installed app on
+iPhone and iPad, browsers elsewhere). Lekto encrypts each message for the device and sends it to
+the device's push service (Apple, Google, Mozilla, Microsoft): an outgoing connection, as for
+logos. Set both variables or neither; without them Lekto sends no notification.
+
+| Variable | Role | Default | Values | Meaning |
+| --- | --- | --- | --- | --- |
+| `LEKTO_PUSH_VAPID_PRIVATE_KEY` | both | – | text, *secret* | Lekto's key for the push services, 32 bytes base64url: `lekto vapid-key` prints a new one. Keep it: with another key, every device has to switch notifications on again |
+| `LEKTO_PUSH_SUBJECT` | both | – | text | How a push service reaches the operator: `mailto:admin@example.org` or an `https://` address |
 
 ## Logos
 

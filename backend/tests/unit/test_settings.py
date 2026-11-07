@@ -10,6 +10,7 @@ import pytest
 from pydantic import ByteSize, SecretStr
 from pydantic.fields import FieldInfo
 
+from lekto.adapters.outbound.webpush.sender import new_private_key
 from lekto.composition.errors import ConfigurationError
 from lekto.composition.settings import (
     DEVELOPMENT_SECRET_KEY,
@@ -836,3 +837,23 @@ def test_the_file_variant_of_a_renamed_variable_is_refused_too(
 ) -> None:
     message = error_message(monkeypatch, {"LEKTO_STEP_RETRY_DELAY_FILE": "/run/secrets/delay"})
     assert message == "LEKTO_STEP_RETRY_DELAY_FILE was renamed to LEKTO_NODE_RETRY_DELAY"
+
+
+def test_push_needs_a_valid_key_and_a_subject(monkeypatch: pytest.MonkeyPatch) -> None:
+    key = new_private_key()
+    assert "must be set together" in error_message(
+        monkeypatch, {"LEKTO_PUSH_VAPID_PRIVATE_KEY": key}
+    )
+    monkeypatch.delenv("LEKTO_PUSH_VAPID_PRIVATE_KEY")
+    message = error_message(
+        monkeypatch,
+        {"LEKTO_PUSH_VAPID_PRIVATE_KEY": "c2hvcnQ", "LEKTO_PUSH_SUBJECT": "mailto:a@example.org"},
+    )
+    assert "not a VAPID private key" in message and "c2hvcnQ" not in message
+    set_env(monkeypatch, {"LEKTO_PUSH_VAPID_PRIVATE_KEY": key, "LEKTO_PUSH_SUBJECT": "admin"})
+    with pytest.raises(ConfigurationError, match="LEKTO_PUSH_SUBJECT"):
+        load_settings()
+    monkeypatch.setenv("LEKTO_PUSH_SUBJECT", "https://lekto.example.org")
+    settings = load_settings()
+    assert settings.push_vapid_private_key is not None
+    assert settings.push_vapid_private_key.get_secret_value() == key

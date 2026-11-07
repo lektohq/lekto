@@ -1902,6 +1902,26 @@ brings in and for whom.
   Rules), and the facts signal counts the sender of an attachment as evidence for a contact,
   as if it stood in the text (decision 16).
 
+## Notifications
+
+Web push (RFC 8030) to the devices a person switched notifications on for: the installed app on
+iPhone and iPad (iOS 16.4 and later), browsers elsewhere. Configured with
+`LEKTO_PUSH_VAPID_PRIVATE_KEY` and `LEKTO_PUSH_SUBJECT` (`docs/configuration.md`); without them
+`GET /push` answers `enabled: false` and devices are refused (`409 push_off`).
+
+- **Devices** (`/push/devices`): a browser's subscription, its address at its push service
+  (`endpoint`) and keys (`p256dh`, `auth`), a name and the language (`de`, `en`) its
+  notifications speak. Only addresses of a known push service are taken (Apple, Google, Mozilla,
+  Microsoft: `push_endpoint_refused`), at most 20 devices per person (`push_devices_limit`). The
+  same address again replaces the device, also one another person subscribed in that browser.
+  A device is its owner's alone (404 for anyone else); deleting a user deletes theirs.
+- **Sending** (`webpush` adapter): each message encrypted for the device (RFC 8291,
+  `aes128gcm`), the request signed with Lekto's key (VAPID, RFC 8292). A push service that no
+  longer knows the device (404, 410) or 20 failures in a row make Lekto forget it.
+- **What a message says**: data only, its kind and parameters, the address to open and the
+  number for the app's icon; the service worker words it in the device's language. `POST
+  /push/devices/{id}/test` sends a test notification.
+
 ## MCP
 
 The API serves the Model Context Protocol (Streamable HTTP, stateless, JSON answers) at

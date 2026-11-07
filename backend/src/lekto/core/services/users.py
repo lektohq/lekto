@@ -340,6 +340,7 @@ class UserService:
             await uow.lenses.remove_for_owner(id)
             await uow.sessions.remove_for_user(id)
             await uow.api_tokens.remove_for_user(id)
+            await uow.push_devices.remove_for_user(id)
             await uow.external_identities.remove_for_user(id)
             await uow.credentials.remove(id)
             await uow.inbox.remove_for_user(id)

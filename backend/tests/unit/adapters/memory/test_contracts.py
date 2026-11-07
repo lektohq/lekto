@@ -22,6 +22,7 @@ from lekto.adapters.outbound.memory import (
     FakePageRenderer,
     FakeParser,
     FakePasswordHasher,
+    FakePushSender,
     FakeRefCipher,
     FakeTextLocator,
     FakeTotp,
@@ -77,6 +78,7 @@ from tests.contracts.processing import (
     TextLocatorContract,
 )
 from tests.contracts.processing_facts import ProcessingFactsContract
+from tests.contracts.push import PushDeviceRepositoryContract, PushSenderContract
 from tests.contracts.rules import RuleRepositoriesContract
 from tests.contracts.search_index import DIMENSIONS, SearchIndexContract
 from tests.contracts.tasks import TaskRepositoryContract
@@ -405,3 +407,13 @@ def classifier() -> FakeClassifier:
 
 class TestFakeClassifier(ClassifierContract):
     pass
+
+
+class TestMemoryPushDevices(PushDeviceRepositoryContract):
+    pass
+
+
+class TestFakePushSender(PushSenderContract):
+    @pytest.fixture
+    def sender(self) -> FakePushSender:
+        return FakePushSender()
