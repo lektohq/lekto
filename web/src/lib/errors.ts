@@ -35,6 +35,12 @@ export function describeError(error: unknown): string {
 	return m.error_unexpected({ status: 0 });
 }
 
+/** Whether a call failed because no answer came at all (no connection, the server down):
+ * `fetch` rejects with a TypeError then, worded by each browser its own way. */
+export function isNetworkError(error: unknown): boolean {
+	return error instanceof TypeError && /fetch|network|load failed/i.test(error.message);
+}
+
 /** Show a failed call as a toast. */
 export function reportError(error: unknown): void {
 	toast.error(describeError(error));

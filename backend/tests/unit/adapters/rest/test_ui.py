@@ -25,6 +25,8 @@ def build(tmp_path: Path) -> Path:
     (root / SCRIPT_PATH).write_text(SCRIPT, encoding="utf-8")
     (root / "_app" / "version.json").write_text('{"version":"1"}', encoding="utf-8")
     (root / "favicon.svg").write_text("<svg/>", encoding="utf-8")
+    (root / "manifest.webmanifest").write_text('{"name":"Lekto"}', encoding="utf-8")
+    (root / "service-worker.js").write_text("self.x = 1;", encoding="utf-8")
     (root / ".env").write_text("SECRET=1", encoding="utf-8")
     (tmp_path / "outside.txt").write_text("outside", encoding="utf-8")
     return root
@@ -88,6 +90,17 @@ async def test_other_files_are_revalidated(client: httpx2.AsyncClient, path: str
     response = await client.get(path)
     assert response.status_code == 200
     assert response.headers["cache-control"] == REVALIDATE
+
+
+async def test_the_app_is_installable(client: httpx2.AsyncClient) -> None:
+    """The manifest with its own type, the service worker always asked again: a browser takes a
+    new version only when it sees the worker changed (web/DESIGN.md, "App")."""
+    manifest = await client.get("/ui/manifest.webmanifest")
+    assert manifest.headers["content-type"].startswith("application/manifest+json")
+    assert manifest.headers["cache-control"] == REVALIDATE
+    worker = await client.get("/ui/service-worker.js")
+    assert worker.headers["content-type"].startswith("text/javascript")
+    assert worker.headers["cache-control"] == REVALIDATE
 
 
 @pytest.mark.parametrize(
