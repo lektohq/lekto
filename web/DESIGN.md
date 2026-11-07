@@ -1013,8 +1013,10 @@ worker, and Lekto works as a website.
   - _Dieses Gerät_: "Benachrichtigungen einschalten" (the browser asks for leave on that tap);
     once on, the `green` badge "An", "Test senden" and "Ausschalten". On an iPhone or iPad in
     Safari a `tip` alert instead, the three steps into the app on the Home Screen; a browser
-    without push, or a server without a key, says so in one line; blocked notifications say
-    where to allow them.
+    without push, or a server without a key, says so in one line. Blocked notifications get a
+    `warning` alert with the steps for this browser: the app in the Dock has settings of its own,
+    apart from Safari's; Chrome and Edge through the symbol in the address bar; macOS's own
+    leave; then reload.
   - _Wann_: a switch per kind, taking effect at once: documents wait, a webhook was switched off,
     for admins a mailbox fails and a job gave up.
   - _Sperrbildschirm_: "Titel der Dokumente zeigen" (on), else only how many.

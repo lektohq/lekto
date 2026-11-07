@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { deviceName, keyBytes } from '#lib/push-device.ts';
+import { deviceName, keyBytes, unblockSteps } from '#lib/push-device.ts';
 
 function agent(value: string, touchPoints = 0) {
 	vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(value);
@@ -29,5 +29,19 @@ describe('this device', () => {
 			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Safari/537.36 Edg/140.0'
 		);
 		expect(deviceName()).toBe('Windows · Edge');
+	});
+
+	it('says where to allow notifications again in this browser', () => {
+		vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: false } as MediaQueryList);
+		agent(
+			'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15'
+		);
+		expect(unblockSteps()).toEqual(['safari', 'macos']);
+		vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList);
+		expect(unblockSteps()).toEqual(['dock-app', 'macos']);
+		agent(
+			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Safari/537.36'
+		);
+		expect(unblockSteps()).toEqual(['address-bar']);
 	});
 });

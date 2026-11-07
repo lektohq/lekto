@@ -18,7 +18,14 @@
 	import { describeError, reportError } from '#lib/errors.ts';
 	import { formatDate, getLocale } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { currentSubscription, deviceName, pushSupport, subscribe } from '#lib/push-device.ts';
+	import {
+		currentSubscription,
+		deviceName,
+		pushSupport,
+		subscribe,
+		unblockSteps,
+		type UnblockStep
+	} from '#lib/push-device.ts';
 	import { session } from '#lib/session.svelte.ts';
 
 	// Settings › Benachrichtigungen (web/DESIGN.md, "App"): this device (switch on, test, switch
@@ -47,6 +54,14 @@
 		{ kind: 'job_failed', label: m.notifications_kind_job_failed, admin: true }
 	];
 	const shown = $derived(KINDS.filter((item) => !item.admin || session.isAdmin));
+	// Where to allow them again, for this browser (a Dock app has settings of its own).
+	const UNBLOCK: Record<UnblockStep, () => string> = {
+		'dock-app': m.notifications_unblock_dock_app,
+		safari: m.notifications_unblock_safari,
+		'address-bar': m.notifications_unblock_address_bar,
+		macos: m.notifications_unblock_macos
+	};
+	const unblock = support === 'ready' ? unblockSteps() : [];
 
 	async function load() {
 		problem = null;
@@ -194,7 +209,15 @@
 					<Button variant="ghost" onclick={switchOff}>{m.notifications_switch_off()}</Button>
 				</div>
 			{:else if blocked}
-				<p class="text-muted-foreground">{m.notifications_blocked()}</p>
+				<Alert.Root variant="warning">
+					<Alert.Title>{m.notifications_blocked()}</Alert.Title>
+					<Alert.Description>
+						<ol class="list-decimal pl-5">
+							{#each unblock as step (step)}<li>{UNBLOCK[step]()}</li>{/each}
+							<li>{m.notifications_unblock_reload()}</li>
+						</ol>
+					</Alert.Description>
+				</Alert.Root>
 			{:else}
 				<Button class="self-start" aria-disabled={busy} onclick={switchOn}>
 					{m.notifications_switch_on()}
