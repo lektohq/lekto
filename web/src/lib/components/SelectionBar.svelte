@@ -35,7 +35,7 @@
 	class={cn(
 		'flex flex-wrap items-center gap-x-3 gap-y-2',
 		phone.current
-			? 'sticky bottom-0 z-10 -mx-4 border-t bg-card px-4 pt-2 pb-4'
+			? 'sticky bottom-0 z-10 -mx-4 border-t bg-card px-4 pt-2 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))]'
 			: cn(
 					cardVariants({ size: 'flush' }),
 					'sticky top-20 z-10 bg-panel py-1.5 pr-2',
