@@ -34,6 +34,7 @@ from lekto.core.services.oidc import OidcService
 from lekto.core.services.open_identifiers import OpenIdentifierService
 from lekto.core.services.pipeline import PipelineService
 from lekto.core.services.profiles import ProfileService
+from lekto.core.services.push import PushService
 from lekto.core.services.relations import RelationService
 from lekto.core.services.rules import RuleService
 from lekto.core.services.rules.retroactive import RuleApplicationService
@@ -69,6 +70,7 @@ class ApiContext:
     webhook_delivery: WebhookDeliveryService
     tasks: TaskService
     lenses: LensService
+    push: PushService
     mailboxes: MailboxService
     mail_intake: MailIntakeService
     mail_rules: MailRuleService
