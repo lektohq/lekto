@@ -748,11 +748,12 @@ Destructive actions are in editors and on detail pages, not in list rows.
 ### Settings
 
 The settings (Tobi, 02.11.2026): the account card (name, user name, role), then a `TabBar`
-Profil · Anmeldung · API-Tokens · Kennungen bei Kontakten (`?tab=`; without it the first, after
+Profil · Anmeldung · Benachrichtigungen · API-Tokens · Kennungen bei Kontakten (`?tab=`; without it the first, after
 linking an account came back with an error the sign-in), the last with its count.
 
 - **Profil:** display name, other names, birth date, e-mail, own identifiers.
 - **Anmeldung:** password, second factor, single sign-on, sessions.
+- **Benachrichtigungen:** this device, when, the locked screen, the devices ([App](#app)).
 - **API-Tokens:** on iPhone, iPad and Mac first the shortcut ([App](#app)), then the tokens.
 - **Kennungen bei Kontakten:** the identifiers at contacts, grouped by contact ("Lists").
 
@@ -1008,6 +1009,22 @@ worker, and Lekto works as a website.
   einrichten". The dialog "Hochladen" on an Apple device without such a token carries the hint
   "Schneller aus dem Teilen-Menü: Kurzbefehl einrichten", leading to that card; Android's hint
   stands in its place there.
+- **Notifications** (Settings › Benachrichtigungen; Tobi, 06.11.2026), four cards:
+  - _Dieses Gerät_: "Benachrichtigungen einschalten" (the browser asks for leave on that tap);
+    once on, the `green` badge "An", "Test senden" and "Ausschalten". On an iPhone or iPad in
+    Safari a `tip` alert instead, the three steps into the app on the Home Screen; a browser
+    without push, or a server without a key, says so in one line; blocked notifications say
+    where to allow them.
+  - _Wann_: a switch per kind, taking effect at once: documents wait, a webhook was switched off,
+    for admins a mailbox fails and a job gave up.
+  - _Sperrbildschirm_: "Titel der Dokumente zeigen" (on), else only how many.
+  - _Geräte_: name, "dieses Gerät", when last delivered, removed through a trash button and a
+    confirmation, as the tokens are.
+- **A notification** is worded by the service worker in the device's language
+  (`lib/push-text.ts`): "3 Dokumente warten auf Dich" with up to three titles, or the name of the
+  mailbox or webhook. A tap opens the document if it is one, else the inbox or the page of what
+  it names, in an open window of the app if there is one. The app's icon carries the inbox's
+  count, set by a notification and kept by the open app.
 - **A new version:** a toast that stays until it is answered, "Neue Version bereit" with the
   action "Neu laden"; its ✕ puts it off until the app starts again. It is the one toast that
   waits for the person ("Alerts"). A page that already runs the new version (it was reloaded)

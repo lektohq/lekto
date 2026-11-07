@@ -29,7 +29,13 @@ export async function loadProfile(userId: string | null): Promise<ProfileData> {
 
 /** The tabs of the settings (Tobi, 02.11.2026); the first is shown without `?tab=` and for an
  * unknown one, the sign-in where linking an account came back with an error. */
-export const SETTINGS_TABS = ['profile', 'sign-in', 'tokens', 'identifiers'] as const;
+export const SETTINGS_TABS = [
+	'profile',
+	'sign-in',
+	'notifications',
+	'tokens',
+	'identifiers'
+] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 export function settingsTab(params: Pick<URLSearchParams, 'get'>): SettingsTab {
