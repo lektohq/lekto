@@ -986,6 +986,15 @@ worker, and Lekto works as a website.
   version of the app and nothing else. Every request to the API goes to the network; documents,
   pages, PDFs, thumbnails and lists never lie on the device (`lib/app-cache.ts`). A page comes
   from the network; without one the kept page starts the app.
+- **Sharing to Lekto (Android):** the installed app stands in the share sheet (`share_target`:
+  PDF, images, mails, what "Hochladen" takes). The worker keeps the shared files under a random
+  id, at most an hour; the page `/share` hands them to the upload (into the personal space, as
+  "Hochladen" does) and goes on to the inbox, which shows what came of them. Taken files are gone
+  from the device; a share opened again says that nothing waits any more.
+- **Installing from the upload:** in the dialog "Hochladen", under the drop area and set off by a
+  line, one hint (`text-sm`, muted, with its icon): on Android in the browser, while the browser
+  offers the install, "Schneller aus dem Teilen-Menü: App installieren" (a link button that opens
+  the browser's own question). The installed app shows none.
 - **A new version:** a toast that stays until it is answered, "Neue Version bereit" with the
   action "Neu laden"; its ✕ puts it off until the app starts again. It is the one toast that
   waits for the person ("Alerts"). A page that already runs the new version (it was reloaded)
@@ -1130,7 +1139,7 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
   - `tests/app.test.ts`: the service worker keeps no answer of the API, only the app's own files;
     the manifest starts below the base and names icons that exist in their sizes, one maskable;
     the bars' colours are the tokens; every full-screen or bottom-edge surface keeps the safe
-    area free ("App");
+    area free; the share target takes what an upload takes ("App");
   - `tests/no-raw-text.test.ts`: no raw text in markup; `tests/no-raw-choice.test.ts`: no raw
     checkbox or radio.
 

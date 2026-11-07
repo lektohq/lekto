@@ -1,5 +1,5 @@
 /**
- * What the service worker (`src/service-worker.ts`) does with a request. A pure function, so that
+ * What the service worker (`src/service-worker/index.ts`) does with a request. A pure function, so that
  * the rule of the app (web/DESIGN.md, "App") has a test of its own: nothing the API answers is
  * ever kept on the device, only the files of the app itself.
  *
@@ -10,8 +10,10 @@
  *   to one version of the app, whose cache goes with it.
  * - `page`: a page of the app, from the network, so that a reload always gets the newest app;
  *   without a connection the app's page from the cache, which then says it is offline.
+ * - `share`: files another app shares with the installed one (the manifest's `share_target`,
+ *   `POST <base>/share`): kept until the page `<base>/share` hands them to the upload.
  */
-export type Strategy = 'network' | 'file' | 'page';
+export type Strategy = 'network' | 'file' | 'page' | 'share';
 
 export interface RequestLike {
 	url: string;
@@ -30,10 +32,11 @@ export function strategy(
 	base: string,
 	shell: ReadonlySet<string>
 ): Strategy {
-	if (request.method !== 'GET') return 'network';
 	const url = new URL(request.url);
 	if (url.origin !== origin) return 'network';
 	const path = url.pathname;
+	if (request.method === 'POST' && path === sharePath(base)) return 'share';
+	if (request.method !== 'GET') return 'network';
 	if (path === '/api' || path.startsWith('/api/')) return 'network';
 	if (path !== base && !path.startsWith(`${base}/`)) return 'network';
 	if (request.mode === 'navigate') return 'page';
@@ -78,4 +81,31 @@ export function appFiles(urls: readonly string[], origin: string, base: string):
 		}
 	}
 	return [...found];
+}
+
+/** Shared files wait in their own cache, not in the one of a version: an update in between
+ * keeps them. */
+export const SHARED_CACHE = 'lekto-shared';
+
+/** How long shared files wait for the page that uploads them. */
+export const SHARED_FOR_MS = 60 * 60 * 1000;
+
+/** The share target's address, and the page that takes the files over. */
+export function sharePath(base: string): string {
+	return `${base}/share`;
+}
+
+/** A share's id: random, it names nothing (web/DESIGN.md, "No plain data in addresses"). */
+export function isShareId(id: string | null): id is string {
+	return id !== null && /^[0-9a-f-]{36}$/.test(id);
+}
+
+/** The address under which the `index`-th file of a share is kept. */
+export function sharedKey(base: string, id: string, index: number): string {
+	return `${sharePath(base)}/${id}/${index}`;
+}
+
+/** Whether a kept address belongs to a share. */
+export function belongsTo(path: string, base: string, id: string): boolean {
+	return path.startsWith(`${sharePath(base)}/${id}/`);
 }
