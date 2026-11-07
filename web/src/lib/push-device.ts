@@ -80,3 +80,18 @@ export function deviceName(): string {
 	const system = apple ?? (isAndroid() ? 'Android' : systemName(agent));
 	return [system, browserName(agent)].filter(Boolean).join(' · ');
 }
+
+/** Where the person allows notifications again after blocking them, for this browser: the app
+ * in the Dock has settings of its own, apart from Safari's; macOS asks once more for the app. */
+export type UnblockStep = 'dock-app' | 'safari' | 'address-bar' | 'macos';
+
+export function unblockSteps(): UnblockStep[] {
+	const agent = navigator.userAgent;
+	const browser = browserName(agent);
+	const mac = appleDevice() === 'Mac';
+	const steps: UnblockStep[] = [];
+	if (browser === 'Safari') steps.push(installed() ? 'dock-app' : 'safari');
+	else steps.push('address-bar');
+	if (mac) steps.push('macos');
+	return steps;
+}
