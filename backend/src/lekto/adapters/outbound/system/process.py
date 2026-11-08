@@ -8,11 +8,18 @@ A child gets the process's environment without Lekto's own settings (`LEKTO_*`):
 secret key and the database and storage credentials, and OCRmyPDF, Ghostscript and Tesseract,
 which process documents of unknown origin, have no use for them. What a child needs beyond that
 (the vision plugin's configuration) the caller passes in `env`.
+
+A child may get a limit of its address space (`memory`, `LEKTO_CHILD_MAX_MEMORY`), which the
+programs it starts inherit: a document built to make them allocate without end fails the child,
+not the worker. The limit is set right after the start (`prlimit`), not in the child before it
+runs: that hook is not safe in a process with threads. The child is then still starting its
+interpreter, long before it starts a program of its own.
 """
 
 import asyncio
 import contextlib
 import os
+import resource
 import signal
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -38,10 +45,12 @@ async def run_process(
     timeout: timedelta,
     env: Mapping[str, str] | None = None,
     tail: int = TAIL,
+    memory: int | None = None,
 ) -> Completed:
     """Run `args` and wait for it. TimeoutError after `timeout`; the process group is killed
     then, and also when the caller is cancelled. `env` adds to the child's environment (see the
-    module); `tail` is how much of the end of its error output is kept."""
+    module); `tail` is how much of the end of its error output is kept; `memory` the bytes of
+    address space the child and what it starts may take each (see the module)."""
     process = await asyncio.create_subprocess_exec(
         *args,
         stdin=asyncio.subprocess.DEVNULL,
@@ -50,6 +59,9 @@ async def run_process(
         start_new_session=True,
         env=child_environment(env),
     )
+    if memory is not None:
+        with contextlib.suppress(ProcessLookupError):  # it ended already
+            resource.prlimit(process.pid, resource.RLIMIT_AS, (memory, memory))
     try:
         stdout, stderr = await asyncio.wait_for(
             process.communicate(), timeout=timeout.total_seconds()

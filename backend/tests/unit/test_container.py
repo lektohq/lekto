@@ -16,7 +16,7 @@ from lekto.adapters.outbound.meilisearch import MeilisearchIndex
 from lekto.adapters.outbound.memory import FakeLogoFetcher, FakeOcr, FakeParser, ManualClock
 from lekto.adapters.outbound.ocrmypdf import OcrmypdfEngine
 from lekto.adapters.outbound.ocrmypdf import engine as ocrmypdf_engine
-from lekto.adapters.outbound.ocrmypdf.vision import CONFIG_ENV, KEY_ENV
+from lekto.adapters.outbound.ocrmypdf.vision import CONFIG_ENV
 from lekto.adapters.outbound.oidc import AuthlibOidcProvider
 from lekto.adapters.outbound.openai_compat import OpenAiCompatEmbeddings, OpenAiCompatLanguageModel
 from lekto.adapters.outbound.pdfium import LayoutParser
@@ -79,11 +79,13 @@ type Run = tuple[list[str], timedelta, dict[str, str]]
 
 
 class OcrRuns:
-    """Stands in for OCRmyPDF's process: keeps the command line, time limit and environment
-    of each run and fails it, so the engine stops there."""
+    """Stands in for OCRmyPDF's process: keeps the command line, time limit, environment and
+    memory limit of each run and fails it, so the engine stops there."""
 
     def __init__(self) -> None:
         self.runs: list[Run] = []
+        self.memory: list[int | None] = []
+        self.keys: list[str] = []
 
     async def __call__(
         self,
@@ -92,8 +94,13 @@ class OcrRuns:
         timeout: timedelta,
         env: dict[str, str] | None = None,
         tail: int = 0,
+        memory: int | None = None,
     ) -> Completed:
         self.runs.append((list(args), timeout, env or {}))
+        self.memory.append(memory)
+        config = json.loads((env or {}).get(CONFIG_ENV, "{}"))
+        if "key_file" in config:  # the folder goes after the run: read it while it stands
+            self.keys.append(Path(config["key_file"]).read_text(encoding="utf-8"))
         return Completed(returncode=15, stdout="", stderr="stopped by the test")
 
 
@@ -212,6 +219,7 @@ async def test_processing_adapters_follow_the_settings(tmp_path: Path, ocr_runs:
     configured = settings(
         ocr_languages="deu+eng+fra",
         ocr_timeout="120",
+        child_max_memory="1GiB",
         storage_path=tmp_path,
     )
     ocr = container.OCR_ENGINES["ocrmypdf"](configured)
@@ -220,6 +228,7 @@ async def test_processing_adapters_follow_the_settings(tmp_path: Path, ocr_runs:
     command, timeout, _ = await first_run(ocr, ocr_runs, tmp_path)
     assert command[command.index("--language") + 1] == "deu+eng+fra"
     assert timeout == timedelta(minutes=2)
+    assert ocr_runs.memory[-1] == 1024**3
     assert isinstance(container.PARSERS["layout"](configured), LayoutParser)
 
 
@@ -236,7 +245,8 @@ async def test_a_vision_model_reads_pages_when_configured(
     assert isinstance(ocr, OcrmypdfEngine)
     assert ocr.vision == VisionModel(model="claude-sonnet", endpoint="chat.example")
     _, timeout, environment = await first_run(ocr, ocr_runs, tmp_path, vision=True)
-    assert environment[KEY_ENV] == "vlm-key"
+    assert all("vlm-key" not in value for value in environment.values())
+    assert ocr_runs.keys == ["vlm-key"]  # the plugin reads it from the file the config names
     assert json.loads(environment[CONFIG_ENV])["timeout"] == 300  # seconds for one page
     assert timeout == timedelta(minutes=10)  # for the whole document
     # Reading a document with the model may take longer than OCR: that OCR holds its job

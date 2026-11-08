@@ -19,8 +19,14 @@ from fastapi.routing import APIRoute
 
 from lekto.adapters.inbound.bearer import bearer_token
 from lekto.adapters.inbound.rest.context import ApiContext, Context
+from lekto.adapters.inbound.rest.paths import LOGIN_PATH
 from lekto.core.domain.errors import AuthenticationError, PermissionDeniedError
-from lekto.core.domain.identity import ViaToken, csrf_matches
+from lekto.core.domain.identity import (
+    KNOWN_DEVICE_LIFETIME,
+    KNOWN_DEVICES_PER_BROWSER,
+    ViaToken,
+    csrf_matches,
+)
 from lekto.core.domain.ids import UserId
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.services.auth import Principal, SignedIn
@@ -30,6 +36,9 @@ SECURE_SESSION_COOKIE = "__Host-lekto_session"
 SESSION_COOKIE = "lekto_session"  # without `Secure`, for development over plain HTTP
 SECURE_FLOW_COOKIE = "__Host-lekto_oidc"
 FLOW_COOKIE = "lekto_oidc"
+# The known device's tokens, sent only to the sign-in: `__Host-` would need the path `/`.
+SECURE_DEVICE_COOKIE = "__Secure-lekto_device"
+DEVICE_COOKIE = "lekto_device"
 CSRF_HEADER = "X-CSRF-Token"
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 READS_KEY = "x-reads"
@@ -91,6 +100,10 @@ def session_cookie_name(context: ApiContext) -> str:
 
 def flow_cookie_name(context: ApiContext) -> str:
     return SECURE_FLOW_COOKIE if context.cookie_secure else FLOW_COOKIE
+
+
+def device_cookie_name(context: ApiContext) -> str:
+    return SECURE_DEVICE_COOKIE if context.cookie_secure else DEVICE_COOKIE
 
 
 async def authenticate(request: Request, context: Context) -> Principal:
@@ -216,6 +229,28 @@ def set_flow_cookie(response: Response, context: ApiContext, value: str) -> None
 
 def clear_flow_cookie(response: Response, context: ApiContext) -> None:
     response.delete_cookie(flow_cookie_name(context), **_cookie_attributes(context))
+
+
+def known_devices(request: Request, context: ApiContext) -> list[str]:
+    """The tokens of known devices this browser keeps (`set_device_cookie`)."""
+    value = request.cookies.get(device_cookie_name(context), "")
+    return [token for token in value.split(".") if token][-KNOWN_DEVICES_PER_BROWSER:]
+
+
+def set_device_cookie(response: Response, context: ApiContext, signed_in: SignedIn) -> None:
+    """After a sign-in with the password: the known devices' tokens (URL-safe, joined by dots),
+    for the sign-in only, out of reach of scripts, sent on requests of the site only."""
+    if not signed_in.devices:
+        return
+    response.set_cookie(
+        device_cookie_name(context),
+        ".".join(signed_in.devices),
+        max_age=int(KNOWN_DEVICE_LIFETIME.total_seconds()),
+        path=LOGIN_PATH,
+        secure=context.cookie_secure,
+        httponly=True,
+        samesite="strict",
+    )
 
 
 def client_address(request: Request) -> str | None:

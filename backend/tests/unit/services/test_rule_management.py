@@ -450,6 +450,14 @@ async def test_a_pattern_is_checked_by_the_matcher_that_runs_it(world: World) ->
     with pytest.raises(ValidationError, match="invalid pattern"):
         broken = definition("Broken", text_matches("[a-"), AddTags(frozenset({street.id})))
         await rules.change(admin, rule.id, broken)
+    with pytest.raises(ValidationError, match="invalid pattern"):
+        flags = definition("Flags", text_matches("(?V1)a"), AddTags(frozenset({street.id})))
+        await rules.create(admin, RuleScope.GLOBAL, flags)
+    with pytest.raises(ValidationError, match="too large"):
+        huge = definition(
+            "Huge", text_matches("((a{200}){200}){200}"), AddTags(frozenset({street.id}))
+        )
+        await rules.create(admin, RuleScope.GLOBAL, huge)
 
 
 async def test_an_admin_lists_the_rules_of_any_space(world: World) -> None:

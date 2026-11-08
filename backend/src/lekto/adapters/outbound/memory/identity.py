@@ -10,12 +10,19 @@ from lekto.core.domain.identity import (
     ApiToken,
     Credential,
     ExternalIdentity,
+    KnownDevice,
     LoginFailures,
     Session,
     ThrottleRule,
     failure_id,
 )
-from lekto.core.domain.ids import ApiTokenId, ExternalIdentityId, SessionId, UserId
+from lekto.core.domain.ids import (
+    ApiTokenId,
+    ExternalIdentityId,
+    KnownDeviceId,
+    SessionId,
+    UserId,
+)
 
 if TYPE_CHECKING:
     from lekto.adapters.outbound.memory.unit_of_work import MemoryUnitOfWork
@@ -63,6 +70,20 @@ class MemoryApiTokenRepository(MemoryRepository[ApiTokenId, ApiToken]):
 
     async def remove_for_user(self, user: UserId) -> int:
         return self._remove_rows([row for row in self._all() if row.user_id == user])
+
+
+class MemoryKnownDeviceRepository(MemoryRepository[KnownDeviceId, KnownDevice]):
+    async def find_by_token(self, token_hash: str) -> KnownDevice | None:
+        return next((_copy(row) for row in self._all() if row.token_hash == token_hash), None)
+
+    async def renew(self, id: KnownDeviceId, expires_at: datetime) -> None:
+        self._touch(id, "expires_at", expires_at)
+
+    async def remove_for_user(self, user: UserId) -> int:
+        return self._remove_rows([row for row in self._all() if row.user_id == user])
+
+    async def purge(self, *, now: datetime) -> int:
+        return self._remove_rows([row for row in self._all() if row.expires_at <= now])
 
 
 class MemoryExternalIdentityRepository:

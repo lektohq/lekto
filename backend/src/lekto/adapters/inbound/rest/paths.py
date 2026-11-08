@@ -4,6 +4,8 @@ PREFIX = "/api/v1"
 
 HEALTH_PATH = f"{PREFIX}/health"
 """The health check: public, and left out of the access log."""
+LOGIN_PATH = f"{PREFIX}/auth/login"
+"""The sign-in with the password, the one address the known device's cookie is sent to."""
 OIDC_CALLBACK_PATH = f"{PREFIX}/auth/oidc/callback"
 """Where the identity provider sends the browser back (the redirect URI); the access log leaves
 out its query."""

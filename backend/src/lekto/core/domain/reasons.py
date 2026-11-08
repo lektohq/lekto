@@ -418,6 +418,7 @@ class ReasonCode(StrEnum):
     DUE_FIELD_NOT_DATE = "due_field_not_date"
     SORT_FIELD_INVALID = "sort_field_invalid"
     PATTERN_INVALID = "pattern_invalid"
+    PATTERN_TOO_LARGE = "pattern_too_large"
     # how a search searched
     SEARCH_NO_EMBEDDINGS = "search_no_embeddings"
     SEARCH_EMBED_TIMEOUT = "search_embed_timeout"
@@ -953,6 +954,10 @@ TEMPLATES: Mapping[ReasonCode, str] = {
         "sort_field_id: not a field a list sorts by (date, period, number or amount)"
     ),
     ReasonCode.PATTERN_INVALID: "invalid pattern '{pattern}': {detail}",
+    ReasonCode.PATTERN_TOO_LARGE: (
+        "pattern '{pattern}' is too large: its repetitions add up to more than {max:number} "
+        "characters"
+    ),
     ReasonCode.SEARCH_NO_EMBEDDINGS: "searched by words only: no embeddings are set up",
     ReasonCode.SEARCH_EMBED_TIMEOUT: (
         "searched by words only: the meaning of the query was not ready within "
