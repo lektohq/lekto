@@ -66,6 +66,11 @@ class MemoryMailRecordRepository(MemoryRows[MailRecordId, MailRecord]):
         rows.sort(key=lambda row: (row.fetched_at, row.id), reverse=True)
         return [_copy(row) for row in rows]
 
+    async def steps_due(self, mailbox: MailboxId) -> list[MailRecord]:
+        rows = [row for row in self._all() if row.mailbox_id == mailbox and row.steps_due]
+        rows.sort(key=lambda row: (row.fetched_at, row.id))
+        return [_copy(row) for row in rows]
+
     async def settle(self, record: MailRecord) -> None:
         self._uow._check_open()
         current = self._uow._row(self._table, record.id)

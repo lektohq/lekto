@@ -2812,6 +2812,7 @@
 	"reason_mailbox_paused": "The mailbox is paused. Activate it for Lekto to fetch.",
 	"reason_mail_too_large": "The mail “{subject}” has {size} MB; Lekto fetches mails of up to {max} MB (LEKTO_UPLOAD_MAX_SIZE).",
 	"reason_mail_step_failed": "“{step}” failed on the server for the mail “{subject}”: {detail}",
+	"reason_mail_step_gone": "The mail was no longer in its folder.",
 	"thing_document": "Document",
 	"thing_contact": "Contact",
 	"thing_document_type": "Document type",

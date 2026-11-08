@@ -939,12 +939,17 @@ class MailRecordRepository(Protocol):
         """The mailbox's mails a rule may still take (`MailRecord.waiting`), the latest first."""
         ...
 
+    async def steps_due(self, mailbox: MailboxId) -> list[MailRecord]:
+        """The mailbox's records with steps on the server still to run, the earliest fetched
+        first."""
+        ...
+
     async def settle(self, record: MailRecord) -> None:
         """Store what became of the mail since it was recorded: its outcome, reason, rule,
-        documents, when it was decided, its steps on the server and whether it is gone. What
-        the mail's head said stays as stored (the cleanup may have let go of it meanwhile).
-        Only the fetch of its mailbox changes a record, one at a time. NotFoundError if there
-        is none."""
+        documents, when it was decided, its steps on the server (done and due) and whether it
+        is gone. What the mail's head said stays as stored (the cleanup may have let go of it
+        meanwhile). Only the fetch of its mailbox changes a record, one at a time. NotFoundError
+        if there is none."""
         ...
 
     async def forget_beyond(self, mailbox: MailboxId, *, keep: int, now: datetime) -> int:

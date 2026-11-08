@@ -95,6 +95,14 @@ class SqlMailRecordRepository:
         )
         return [_record(row) for row in rows]
 
+    async def steps_due(self, mailbox: MailboxId) -> list[MailRecord]:
+        rows = await self._tx.read(
+            select(_records)
+            .where(_records.c.mailbox_id == mailbox, _records.c.steps_due.is_not(None))
+            .order_by(_records.c.fetched_at, _records.c.id)
+        )
+        return [_record(row) for row in rows]
+
     async def settle(self, record: MailRecord) -> None:
         result = await self._tx.write(
             update(_records).where(_records.c.id == record.id).values(**_settled(record))
@@ -189,13 +197,22 @@ def _record(row: Row[Any]) -> MailRecord:
         decided_at=row.decided_at,
         steps=tuple(
             StepOutcome(
-                MailStep(MailAction(item["action"]), item.get("value")),
+                _step_of(item),
                 None if item.get("failed") is None else Reason.from_json(item["failed"]),
             )
             for item in row.steps or ()
         ),
         gone_at=row.gone_at,
+        steps_due=tuple(_step_of(item) for item in row.steps_due or ()),
     )
+
+
+def _step_of(item: Any) -> MailStep:
+    return MailStep(MailAction(item["action"]), item.get("value"))
+
+
+def _step_json(step: MailStep) -> dict[str, Any]:
+    return {"action": step.action.value} | ({} if step.value is None else {"value": step.value})
 
 
 def _chosen(mailbox: MailboxId, rule: MailRuleId | None) -> list[Any]:
@@ -216,13 +233,13 @@ def _settled(record: MailRecord) -> dict[str, Any]:
         "documents": record.documents,
         "decided_at": record.decided_at,
         "steps": [
-            {"action": item.step.action.value}
-            | ({} if item.step.value is None else {"value": item.step.value})
+            _step_json(item.step)
             | ({} if item.failed is None else {"failed": item.failed.to_json()})
             for item in record.steps
         ]
         or None,
         "gone_at": record.gone_at,
+        "steps_due": [_step_json(step) for step in record.steps_due] or None,
     }
 
 
