@@ -87,6 +87,24 @@ Buchungstag   Vorgang                                  Betrag
     }
 
 
+def test_a_customer_number_in_a_booking_is_the_payee_s() -> None:
+    text = """Kontoauszug 10/2026
+02.10.2026   Lastschrift Musterfunk GmbH KdNr 4711000815   -24,99 EUR
+05.10.2026   Lastschrift Versand Muster KD-NR. 81234 RE-NR. 99887   -10,00 EUR
+"""
+    found = kinds(holders_of(text))
+    assert found["4711000815"] == (HolderKind.THIRD_PARTY, None)
+    assert found["81234"] == (HolderKind.THIRD_PARTY, None)
+
+
+def test_a_customer_number_outside_bookings_tells_no_holder() -> None:
+    letter = "Stadtwerke Musterstadt GmbH\nIhre Kundennummer: 4711000815\nSehr geehrter Herr Nord,"
+    assert holders_of(letter) == {}
+    # Also in a booking: one place outside the bookings keeps it the document's.
+    both = letter + "\n02.10.2026   Abschlag KdNr 4711000815   -45,00 EUR\n"
+    assert holders_of(both) == {}
+
+
 def test_a_statement_with_the_payee_above_the_number() -> None:
     text = f"""Datum        Buchungstext                       Betrag
 03.10.2026   Hausmeisterdienst Weber            -80,00 EUR
