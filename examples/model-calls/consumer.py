@@ -6,7 +6,7 @@ Lekto sends a model call as a task (see `webhooks` in Lekto's OpenAPI document):
 as JSON, with the task's callback and one-time token. This consumer takes the request at once
 (202), asks Ollama with the answer's JSON Schema as the format, and posts the answer to the
 callback with the token as `Authorization: Bearer`. One request at a time; the others wait in
-order.
+order, up to `MAX_WAITING` of them (then 503). A body larger than `MAX_BODY` is refused (413).
 
 Settings (environment):
 
@@ -20,6 +20,9 @@ Settings (environment):
   webhook that header in Lekto).
 - `AGENT_SECRET`: if set (`whsec_…`, the webhook's secret), a request must carry Lekto's
   signature (`webhook-signature`, Standard Webhooks).
+
+  At least one of the two must be set; without, the consumer does not start: anyone who reaches
+  its port could make the model work and have the answer posted where they like.
 - `LEKTO_URL`: if set, the callback goes there instead of `LEKTO_PUBLIC_URL` (e.g.
   `http://lekto:8000` inside a Compose network).
 - `AGENT_MAX_CHARACTERS`: the text is cut to this many characters, its beginning and end kept
@@ -34,6 +37,7 @@ import json
 import logging
 import os
 import queue
+import sys
 import threading
 import time
 import urllib.error
@@ -54,9 +58,11 @@ MAX_CHARACTERS = int(os.environ.get("AGENT_MAX_CHARACTERS", "24000"))
 TIMEOUT = int(os.environ.get("AGENT_TIMEOUT", "600"))
 PRODUCER = f"example consumer, {MODEL}"[:100]
 TOLERANCE = 300  # seconds a signed request may be old
+MAX_BODY = 16 * 1024 * 1024  # bytes of a request; Lekto's contexts are far smaller
+MAX_WAITING = 100  # requests waiting for the model
 
 log = logging.getLogger("consumer")
-work: "queue.Queue[dict[str, Any]]" = queue.Queue()
+work: "queue.Queue[dict[str, Any]]" = queue.Queue(maxsize=MAX_WAITING)
 
 SYSTEM = """\
 You read one document for a document management system. Answer with one JSON object that \
@@ -253,28 +259,36 @@ def signed(headers: Any, body: bytes) -> bool:
 
 class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 (the name http.server calls)
-        body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
         if TOKEN and not hmac.compare_digest(
             self.headers.get("Authorization", ""), f"Bearer {TOKEN}"
         ):
-            self.send_response(HTTPStatus.UNAUTHORIZED)
-            self.end_headers()
-            return
+            return self.answer(HTTPStatus.UNAUTHORIZED)
+        length = self.headers.get("Content-Length")
+        if length is None:
+            return self.answer(HTTPStatus.LENGTH_REQUIRED)
+        if not length.isdigit():
+            return self.answer(HTTPStatus.BAD_REQUEST)
+        if int(length) > MAX_BODY:
+            return self.answer(HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
+        body = self.rfile.read(int(length))
         if SECRET and not signed(self.headers, body):
-            self.send_response(HTTPStatus.UNAUTHORIZED)
-            self.end_headers()
-            return
+            return self.answer(HTTPStatus.UNAUTHORIZED)
         try:
             context = json.loads(body)
         except ValueError:
-            self.send_response(HTTPStatus.BAD_REQUEST)
-            self.end_headers()
-            return
-        if isinstance(context, dict) and context.get("contract") in MESSAGES:
-            work.put(context)  # answered later, at the callback
-            self.send_response(HTTPStatus.ACCEPTED)
-        else:
-            self.send_response(HTTPStatus.NO_CONTENT)  # an event or a test: nothing to do
+            return self.answer(HTTPStatus.BAD_REQUEST)
+        if not (isinstance(context, dict) and context.get("contract") in MESSAGES):
+            return self.answer(HTTPStatus.NO_CONTENT)  # an event or a test: nothing to do
+        try:
+            work.put_nowait(context)  # answered later, at the callback
+        except queue.Full:
+            return self.answer(HTTPStatus.SERVICE_UNAVAILABLE)
+        self.answer(HTTPStatus.ACCEPTED)
+
+    def answer(self, status: HTTPStatus) -> None:
+        # A refused request's body may be left unread: the connection ends with the answer.
+        self.close_connection = True
+        self.send_response(status)
         self.end_headers()
 
     def log_message(self, format: str, *args: Any) -> None:
@@ -283,6 +297,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    if not TOKEN and not SECRET:
+        sys.exit("Set AGENT_TOKEN or AGENT_SECRET (or both): no request is taken unchecked.")
     threading.Thread(target=worker, daemon=True).start()
     server = ThreadingHTTPServer(("", PORT), Handler)
     log.info("listening on port %s; model %s at %s", PORT, MODEL, OLLAMA_URL)
