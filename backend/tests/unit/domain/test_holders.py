@@ -376,6 +376,7 @@ DOMAIN_PARTIES = Parties(
         UTILITY_PARTY,
         Party("Hausverwaltung Ost", ("Hausverwaltung Ost",)),
         Party("Stadtwerke Süd", ("Stadtwerke Süd",)),
+        Party("Hotel Inn", ("Hotel Inn",)),
     ],
 )
 
@@ -389,6 +390,9 @@ DOMAIN_PARTIES = Parties(
         ("stadtwerke-sued.de", "Stadtwerke Süd"),  # umlauts folded as in the names
         ("stadtwerke.de", None),  # two contacts as much: not to tell
         ("paypal.com", None),
+        ("hotel-inn.de", "Hotel Inn"),
+        # "inn" in "spinnerei", but three of fifteen letters: no domain of "Hotel Inn".
+        ("spinnerei-muster.de", None),
     ],
 )
 def test_a_domain_is_the_contact_s_whose_name_it_carries(domain: str, owner: str | None) -> None:

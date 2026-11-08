@@ -303,7 +303,9 @@ def domain_owner(domain: str, contacts: Iterable[Party]) -> str | None:
     """The name of the contact an e-mail domain is: one a person gave it, else the one with the
     most letters of its names' words (three letters or more, without legal forms) in the
     domain's name before its top level (`stadtwerke-nordheim` of `stadtwerke-nordheim.de` for
-    "Stadtwerke Nordheim GmbH"); None where none or two of them do as much."""
+    "Stadtwerke Nordheim GmbH"), as long as they make up at least half of it (`spinnerei`
+    holds "Inn", yet is no domain of "Hotel Inn"); None where none or two of them do as
+    much."""
     domain = domain.lower()
     contacts = list(contacts)
     for party in contacts:
@@ -316,7 +318,7 @@ def domain_owner(domain: str, contacts: Iterable[Party]) -> str | None:
     for party in contacts:
         words = {word for name in party.names for word in _WORD.findall(match_key(name))}
         score = sum(len(word) for word in words - _FILLERS if word in stem)
-        if score:
+        if score and score * 2 >= len(stem):
             scores[party.name] = max(score, scores.get(party.name, 0))
     if not scores:
         return None
