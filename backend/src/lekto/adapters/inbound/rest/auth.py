@@ -66,7 +66,8 @@ SECURITY_SCHEMES = {
         "scheme": "bearer",
         "description": (
             "Personal API token (`lekto_…`); scope `read` allows reading only: GET, and the "
-            f"POST operations marked `{READS_KEY}` (a search with its words in the body); scope "
+            f"POST operations marked `{READS_KEY}` (a search with its words in the body, a dry "
+            "run, a preview, a check); scope "
             f"`upload` allows only the operation marked `{UPLOADS_KEY}` (`POST /documents`)."
         ),
     },

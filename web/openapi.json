@@ -10386,6 +10386,7 @@
             }
           }
         },
+        "x-reads": true,
         "security": [
           {
             "session": []
@@ -10908,6 +10909,7 @@
             }
           }
         },
+        "x-reads": true,
         "security": [
           {
             "session": []
@@ -11874,6 +11876,7 @@
             }
           }
         },
+        "x-reads": true,
         "security": [
           {
             "session": []
@@ -15004,6 +15007,7 @@
             }
           }
         },
+        "x-reads": true,
         "security": [
           {
             "session": []
@@ -23195,6 +23199,7 @@
             }
           }
         },
+        "x-reads": true,
         "security": [
           {
             "session": []
@@ -27502,7 +27507,9 @@
               {
                 "type": "string",
                 "maxLength": 1000,
-                "minLength": 1
+                "minLength": 1,
+                "format": "password",
+                "writeOnly": true
               },
               {
                 "type": "null"
@@ -35667,8 +35674,10 @@
             "type": "string",
             "maxLength": 1000,
             "minLength": 1,
+            "format": "password",
             "title": "Password",
-            "description": "Stored encrypted, never shown again."
+            "description": "Stored encrypted, never shown again.",
+            "writeOnly": true
           }
         },
         "additionalProperties": false,
@@ -35992,7 +36001,9 @@
               {
                 "type": "string",
                 "maxLength": 1000,
-                "minLength": 1
+                "minLength": 1,
+                "format": "password",
+                "writeOnly": true
               },
               {
                 "type": "null"
@@ -43908,7 +43919,7 @@
       "token": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Personal API token (`lekto_…`); scope `read` allows reading only: GET, and the POST operations marked `x-reads` (a search with its words in the body); scope `upload` allows only the operation marked `x-uploads` (`POST /documents`)."
+        "description": "Personal API token (`lekto_…`); scope `read` allows reading only: GET, and the POST operations marked `x-reads` (a search with its words in the body, a dry run, a preview, a check); scope `upload` allows only the operation marked `x-uploads` (`POST /documents`)."
       },
       "taskToken": {
         "type": "http",

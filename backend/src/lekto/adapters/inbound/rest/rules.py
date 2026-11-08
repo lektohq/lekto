@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Request, Response
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, Via
+from lekto.adapters.inbound.rest.auth import PROTECTED, READS, CurrentUser, Via
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.cursors import decode_cursor, encode_cursor
 from lekto.adapters.inbound.rest.params import AllRules
@@ -210,6 +210,7 @@ WHO_APPLIES = (
     ),
     response_model=ApplyPreviewOut,
     responses=problem_responses(401, 403, 404, 422),
+    openapi_extra=READS,
 )
 async def preview_apply(
     id: UUID, body: ApplyPreviewRequest, user: CurrentUser, context: Context
@@ -324,6 +325,7 @@ async def get_application(id: UUID, user: CurrentUser, context: Context) -> Rule
     ),
     response_model=TemplatePreviewOut,
     responses=problem_responses(401, 404, 422),
+    openapi_extra=READS,
 )
 async def preview_template(
     body: TemplatePreviewIn, user: CurrentUser, context: Context
