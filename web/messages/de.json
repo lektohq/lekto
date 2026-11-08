@@ -2037,7 +2037,7 @@
 	"identifier_kind_ticket_number": "Ticket- oder Vorgangsnummer",
 	"identifier_kind_child_benefit_number": "Kindergeldnummer",
 	"facts_numbers": "Nummern des Dokuments",
-	"facts_numbers_hint": "Eigene, eines Strangs oder eines Dokuments, auf das es verweist",
+	"facts_numbers_hint": "Eigene, eines Strangs, eines Dokuments, auf das es verweist, und weitere wie USt-IdNr. oder IBAN",
 	"facts_decide": "Korrigieren oder verwerfen",
 	"facts_decide_value_label": "{value} korrigieren oder verwerfen",
 	"facts_decide_title": "{kind}",
