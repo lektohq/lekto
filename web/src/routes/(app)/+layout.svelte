@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { setAppBadge } from '#lib/app-badge.ts';
+	import { retryDelay } from '#lib/backoff.ts';
 	import AppShell from '#lib/components/AppShell.svelte';
 	import MasterDataDialogHost from '#lib/components/MasterDataDialogHost.svelte';
 	import { events } from '#lib/events.svelte.ts';
@@ -27,11 +28,18 @@
 		if (userId) void inbox.refresh();
 	});
 
+	// Attempts in a row that the API closed; the wait before the next one grows with them.
+	let failures = 0;
+	$effect(() => {
+		if (events.connected) failures = 0;
+	});
+
 	// One event stream while someone is signed in; it closes with the session (sign-out, 401).
 	$effect(() => {
 		if (!userId) return;
 		let retry: ReturnType<typeof setTimeout> | undefined;
 		let ended = false;
+		failures = 0;
 		const open = () =>
 			events.start(async () => {
 				if (ended) return;
@@ -43,7 +51,7 @@
 				} catch {
 					// The API is not reachable right now; try again below.
 				}
-				if (!ended) retry = setTimeout(open, 5000);
+				if (!ended) retry = setTimeout(open, retryDelay(++failures));
 			});
 		open();
 		inbox.start();
