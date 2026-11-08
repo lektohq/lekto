@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 from datetime import timedelta
 
+from lekto.core.domain.webhooks import PrivateTargets
+
 TEST_REQUESTS = 10
 TEST_WINDOW = timedelta(minutes=1)
 """Test requests a user may send per window: they go out at once, to any address."""
@@ -20,6 +22,7 @@ class WebhookPolicy:
     max_retry_delay: timedelta = timedelta(hours=1)
     disable_after: int  # deliveries given up in a row until the webhook is switched off
     timeout: timedelta  # per attempt
+    private_targets: PrivateTargets  # whose webhooks may reach the own network
     test_requests: int = TEST_REQUESTS
     test_window: timedelta = TEST_WINDOW
 

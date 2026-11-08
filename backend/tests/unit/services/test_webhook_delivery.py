@@ -710,6 +710,54 @@ async def test_an_unusable_secret_gives_up(world: World) -> None:
     assert world.sender.requests == []
 
 
+# --- the own network ----------------------------------------------------------------------------
+
+
+async def demote(world: World, user: User) -> None:
+    async with world.uow() as uow:
+        await uow.users.update(replace(await uow.users.get(user.id), role=Role.USER))
+        await uow.commit()
+
+
+async def test_only_an_admins_webhook_may_reach_the_own_network(world: World) -> None:
+    user, admin = await world.user(), await world.user(role=Role.ADMIN)
+    document = await seed(world, admin)
+    shared = await seed(world, user)
+    await hook(world, admin, url="http://192.168.178.20/hook")
+    await hook(world, user)
+    service = world.webhook_delivery()
+    await service.on_event(lane_changed(document))
+    await service.on_event(lane_changed(shared))
+    await run_all(service)
+    sent = {request.url: request.private for request in world.sender.requests}
+    assert sent == {"http://192.168.178.20/hook": True, URL: False}
+
+
+async def test_a_target_in_the_own_network_is_dropped_once_its_owner_is_no_admin(
+    world: World,
+) -> None:
+    owner = await world.user(role=Role.ADMIN)
+    document = await seed(world, owner)
+    webhook, _ = await hook(world, owner, url="http://192.168.178.20/hook")
+    await demote(world, owner)
+    service = world.webhook_delivery()
+    await service.on_event(lane_changed(document))
+    await run_all(service)
+    (row,) = await log(world, webhook)
+    assert (row.outcome, row.status_code, row.next_attempt_at) == (
+        DeliveryOutcome.DROPPED,
+        None,
+        None,
+    )
+    assert row.error and "own network" in row.error
+    assert world.sender.requests == []
+    assert all(job.status is JobStatus.DONE for job in deliveries(world))
+    # Not a failure of the receiver: it does not count towards switching the webhook off.
+    assert (await world.webhooks.get(owner.id, webhook.id)).failed_streak == 0
+    test = await service.send_test(owner.id, webhook.id)
+    assert test.outcome is DeliveryOutcome.DROPPED
+
+
 # --- test request -------------------------------------------------------------------------------
 
 

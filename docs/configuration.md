@@ -162,6 +162,7 @@ or none, and register `<LEKTO_PUBLIC_URL>/api/v1/auth/oidc/callback` as redirect
 | `LEKTO_WEBHOOK_RETRY_DELAY` | Worker | `30` | duration | Before the second attempt, doubling after, at most an hour |
 | `LEKTO_WEBHOOK_DISABLE_AFTER` | Worker | `20` | 1–10,000 | Deliveries given up in a row until a webhook is switched off |
 | `LEKTO_WEBHOOK_CONCURRENCY` | Worker | `4` | 1–64 | Deliveries at the same time |
+| `LEKTO_WEBHOOK_PRIVATE_TARGETS` | both | `admins` | `all`, `admins`, `none` | Whose webhooks may reach addresses that are not public: the own network, the machine itself. `admins`: only an admin's; others reach public addresses. The API refuses such an address when a webhook is saved, the worker when it sends (after resolving the name); a refused delivery is dropped |
 
 ## MCP
 
