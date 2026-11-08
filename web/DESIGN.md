@@ -1168,7 +1168,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     in the order tabs, search, filter row, list, with no paragraph before the list ("Master data
     tabs"); tooltips only through `ui/tooltip` ("Help and tooltips"); `Progress` only in the
     selection bars of runs on many and the upload summary ("Choosing many"); dates and times
-    through `DateInput`, no native date or time field ("Fields"); the owl (`Mascot`,
+    through `DateInput`, no native date or time field ("Fields"); "Abbrechen" before the
+    primary action, never after it ("Footers"); the owl (`Mascot`,
     `EmptyNote` with `mascot`) only at its places ("Logo and owl");
   - `src/lib/tips.test.ts`: one box of help at a time, the next without delay; a tooltip opens on
     a focus Tab brought, not on one handed back;
