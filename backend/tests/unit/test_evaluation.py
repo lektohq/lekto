@@ -62,10 +62,10 @@ async def test_the_fixed_answers_give_the_expected_lanes(tmp_path: Path) -> None
     assert "the trained one took over 57 documents of the training corpus first" in text
     assert "## Lanes (trained)" in text
     assert "## Instructions in the document text (cold)" in text
-    # The rule's holders with the model's fixed ones: every one expected (`facts-3`), the VAT
-    # IDs and e-mail domains of the rule alone.
-    assert "Holders (cold): 12 of 12 numbers with the holder expected." in text
-    assert "Holders (trained): 13 of 13 numbers with the holder expected." in text
+    # The rule's holders with the model's fixed ones: every one expected (`facts-3`), the
+    # e-mail domains and customer numbers of the rule alone (VAT IDs have none since #215).
+    assert "Holders (cold): 10 of 10 numbers with the holder expected." in text
+    assert "Holders (trained): 11 of 11 numbers with the holder expected." in text
 
 
 async def test_the_labels_are_recorded_and_counted_but_enforce_nothing(tmp_path: Path) -> None:
@@ -212,20 +212,15 @@ async def test_the_trained_run_learns_from_the_corpus() -> None:
         }
         for name, contact in contacts.items()
     }
-    assert (IdentifierKind.VAT_ID, "DE276543210") in learned["Versandhaus Bergmann GmbH"]
+    assert (IdentifierKind.CUSTOMER_NUMBER, "887766") in learned["Versandhaus Bergmann GmbH"]
     every = {value for identifiers in learned.values() for _, value in identifiers}
     assert "DE89370400440532013000" not in every
     assert "DE12250501800004471100" not in every
     # Entered by hand, it stays so.
     insurer = contacts["Hanse Versicherung AG"]
     assert any(item.source is IdentifierSource.MANUAL for item in insurer.identifiers)
-    # The health insurer's letters all carry its topic: the domain learned points to it.
-    (domain,) = [
-        item
-        for item in contacts["Gesundkasse BKK"].identifiers
-        if item.kind is IdentifierKind.EMAIL_DOMAIN
-    ]
-    assert domain.source is IdentifierSource.LEARNED and domain.topic_id is not None
+    # Domains are entered by hand only since #215: the health insurer's letters teach none.
+    assert contacts["Gesundkasse BKK"].identifiers == []
     (logo,) = [result for result in results if result.case.name == "31-absender-nur-kennung"]
     assert logo.lane is Lane.GREEN
     (best, *_) = logo.checks["contact"].candidates

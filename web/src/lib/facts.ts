@@ -37,6 +37,7 @@ export interface KeptFact {
 	role: FactRole;
 	origins: readonly FactOrigin[];
 	state?: FactState;
+	holder?: Holder | null;
 }
 
 /** The roles a person gives a fact, in the order the forms offer them. */

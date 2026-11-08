@@ -92,7 +92,7 @@ def test_a_contact_keeps_its_logo_and_the_domains_whose_fetch_failed() -> None:
         now=NOW,
         identifiers=[
             Identifier(IdentifierKind.EMAIL_DOMAIN, "nord.example"),
-            Identifier(IdentifierKind.IBAN, "DE89370400440532013000"),
+            Identifier(IdentifierKind.CUSTOMER_NUMBER, "4711"),
         ],
     )
     contact.set_learned([Identifier(IdentifierKind.EMAIL_DOMAIN, "a-nord.example")])

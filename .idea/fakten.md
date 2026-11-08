@@ -45,8 +45,8 @@ Rechnung hat zehn Beträge), mit Beschriftung ist er ein Feld; Felder haben die 
 
 | Rolle | Beispiele | Wofür |
 | --- | --- | --- |
-| zeigt auf den Kontakt | Kundennummer, Personalnummer, Gläubiger-ID, Handelsregisternummer, Steuernummer eines Unternehmens | Kontakt, Thema |
-| zeigt auf ein Bezugsziel | Vertragsnummer (seit #215 auch Policen-, Mitglieds- und Darlehensnummer), Zählernummer, Mandatsreferenz, Kfz-Kennzeichen | Serie, Bezug zum Vertrag |
+| zeigt auf den Kontakt | Kundennummer, Personalnummer, Gläubiger-ID, Handelsregisternummer, Steuernummer eines Unternehmens | Kontakt, Thema (seit #215 nur Kunden- und Personalnummer als Kennung eines Kontakts, die übrigen nur als Fakt) |
+| zeigt auf ein Bezugsziel | Vertragsnummer (seit #215 auch Policen-, Mitglieds- und Darlehensnummer), Zählernummer, Mandatsreferenz, Kfz-Kennzeichen | Serie, Bezug zum Vertrag (als Kennung eines Kontakts seit #215 nur die Vertragsnummer) |
 | kennzeichnet das Dokument | Rechnungs-, Gutschrift-, Bestell- oder Auftragsnummer | Ziel für Bezüge, Feld |
 | verbindet einen Strang | Aktenzeichen, „Unser Zeichen“, Schaden-, Ticketnummer | Abzweig im Stream |
 | verweist auf ein Dokument | „Ihre Rechnung Nr. …“, „Ihr Schreiben vom …“, „Ihr Zeichen“ | Bezug |

@@ -54,6 +54,7 @@ from lekto.core.domain.identifiers.reading import (
 )
 from lekto.core.domain.identifiers.registry import (
     CONTACT_KINDS,
+    LEARNED_KINDS,
     NAMING_KINDS,
     PERSON_KINDS,
     TYPES,
@@ -68,6 +69,7 @@ from lekto.core.domain.identifiers.visibility import seen_by
 __all__ = [
     "CONTACT_KINDS",
     "FREE_MAIL",
+    "LEARNED_KINDS",
     "LEARN_FROM",
     "MAX_IDENTIFIERS",
     "NAMING_KINDS",

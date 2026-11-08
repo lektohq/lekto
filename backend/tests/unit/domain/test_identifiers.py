@@ -5,6 +5,7 @@ import pytest
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.identifiers import (
     CONTACT_KINDS,
+    LEARNED_KINDS,
     NAMING_KINDS,
     PERSON_KINDS,
     TYPES,
@@ -365,23 +366,24 @@ def test_a_domain_stands_for_its_subdomains() -> None:
 
 def test_training_learns_what_only_one_contacts_documents_carry() -> None:
     utility, bank = ContactId(new_id()), ContactId(new_id())
+    theirs, shared = (CUSTOMER, "88770011"), (CUSTOMER, "11223344")
+    contract = (IdentifierKind.CONTRACT_NUMBER, "4711")
     learned = mine_identifiers(
         [
-            Confirmed(utility, None, frozenset({(IBAN, THEIR_IBAN), (IBAN, OWN_IBAN)})),
-            Confirmed(
-                utility, None, frozenset({(IBAN, THEIR_IBAN), (IBAN, OWN_IBAN), (CUSTOMER, "4711")})
-            ),
-            Confirmed(bank, None, frozenset({(IBAN, OWN_IBAN), (VAT, "DE123456789")})),
-            Confirmed(bank, None, frozenset({(IBAN, OWN_IBAN)})),
+            Confirmed(utility, None, frozenset({theirs, shared, (IBAN, THEIR_IBAN)})),
+            Confirmed(utility, None, frozenset({theirs, shared, (IBAN, THEIR_IBAN), contract})),
+            Confirmed(bank, None, frozenset({shared, (VAT, "DE123456789")})),
+            Confirmed(bank, None, frozenset({shared, (VAT, "DE123456789")})),
         ]
     )
-    # The owner's IBAN stands at both; the customer number and the VAT number only once.
-    assert learned == {utility: [Identifier(IBAN, THEIR_IBAN, IdentifierSource.LEARNED)]}
+    # The shared number stands at both, the contract number only once; IBANs and VAT IDs are
+    # no contact's identifiers since #215.
+    assert learned == {utility: [Identifier(*theirs, IdentifierSource.LEARNED)]}
 
 
 def test_a_document_without_contact_or_a_taken_value_keeps_it_from_being_learned() -> None:
     utility = ContactId(new_id())
-    found = frozenset({(IBAN, THEIR_IBAN)})
+    found = frozenset({(CUSTOMER, "88770011")})
     theirs, unknown = Confirmed(utility, None, found), Confirmed(None, None, found)
     assert mine_identifiers([theirs, theirs, unknown]) == {}
     assert mine_identifiers([theirs, theirs], taken=found) == {}
@@ -400,34 +402,34 @@ def test_a_learned_identifier_points_to_the_topic_all_its_documents_carry() -> N
             Confirmed(employer, None, frozenset({policy})),
         ]
     )
+    # The domain is entered by hand only (#215).
     assert learned == {
         employer: [
             Identifier(CUSTOMER, "KV-1", IdentifierSource.LEARNED),  # one without a topic
-            Identifier(DOMAIN, "nord.example", IdentifierSource.LEARNED),  # two topics
             Identifier(PERSONNEL, "4711", IdentifierSource.LEARNED, work),
         ]
     }
 
 
 def test_a_contact_keeps_entered_learned_and_rejected_identifiers_apart() -> None:
-    iban = Identifier(IBAN, THEIR_IBAN)
+    iban = Identifier(CUSTOMER, "88770011")  # the names stay from when it was an IBAN
     domain = Identifier(DOMAIN, "stadtwerke.example")
-    vat = Identifier(VAT, "DE123456789")
+    vat = Identifier(IdentifierKind.CONTRACT_NUMBER, "C-0815")
     contact = Contact.create(name="Stadtwerke", now=NOW, identifiers=[iban])
     contact.set_learned([domain, vat, iban])
     assert [(item.kind, item.source) for item in contact.identifiers] == [
-        (IBAN, IdentifierSource.MANUAL),
-        (VAT, IdentifierSource.LEARNED),
+        (CUSTOMER, IdentifierSource.MANUAL),
         (DOMAIN, IdentifierSource.LEARNED),
+        (IdentifierKind.CONTRACT_NUMBER, IdentifierSource.LEARNED),
     ]
     # Taking over a learned one, rejecting another.
     contact.set_identifiers([iban, vat], rejected=[domain])
     assert [(item.kind, item.source) for item in contact.identifiers] == [
-        (IBAN, IdentifierSource.MANUAL),
-        (VAT, IdentifierSource.MANUAL),
+        (CUSTOMER, IdentifierSource.MANUAL),
+        (IdentifierKind.CONTRACT_NUMBER, IdentifierSource.MANUAL),
         (DOMAIN, IdentifierSource.REJECTED),
     ]
-    assert [item.kind for item in contact.evidence()] == [IBAN, VAT]
+    assert [item.kind for item in contact.evidence()] == [CUSTOMER, IdentifierKind.CONTRACT_NUMBER]
     # Training does not bring a rejected one back; entering it by hand does.
     contact.set_learned([domain])
     assert contact.identifiers[-1].source is IdentifierSource.REJECTED
@@ -445,17 +447,16 @@ def test_a_learned_number_belongs_to_whom_all_its_documents_surely_belong() -> N
     employer = ContactId(new_id())
     anna, bob = UserId(new_id()), UserId(new_id())
     own, shared = SpaceId(new_id()), SpaceId(new_id())
-    number, iban = (PERSONNEL, "12345"), (IBAN, THEIR_IBAN)
+    number = (PERSONNEL, "12345")
 
     def learn(*whose: frozenset[UserId]) -> list[Identifier]:
         documents = [
-            Confirmed(employer, None, frozenset({number, iban}), space, users)
+            Confirmed(employer, None, frozenset({number}), space, users)
             for space, users in zip((own, shared), whose, strict=True)
         ]
         return list(mine_identifiers(documents)[employer])
 
     assert learn(frozenset({anna}), frozenset({anna})) == [
-        Identifier(IBAN, THEIR_IBAN, IdentifierSource.LEARNED, learned_in=frozenset({own, shared})),
         Identifier(
             PERSONNEL, "12345", IdentifierSource.LEARNED, None, anna, frozenset({own, shared})
         ),
@@ -466,20 +467,18 @@ def test_a_learned_number_belongs_to_whom_all_its_documents_surely_belong() -> N
         (frozenset({anna}), frozenset({anna, bob})),
         (frozenset({anna}), frozenset()),
     ):
-        assert [item.user_id for item in learn(*whose)] == [None, None]
+        assert [item.user_id for item in learn(*whose)] == [None]
 
 
-def test_a_learned_tax_number_names_nobody() -> None:
-    """A company's tax number stands on all its letters: learned, it names nobody, even where
-    every document of it is surely one user's (Tobi, 02.11.2026)."""
+def test_a_tax_number_is_not_learned() -> None:
+    """A company's tax number stands on all its letters; since #215 it is no contact's
+    identifier and training learns none (before, a learned one named nobody)."""
     insurer = ContactId(new_id())
     anna = UserId(new_id())
     own = SpaceId(new_id())
     tax = (IdentifierKind.TAX_NUMBER, "6420000010")
     documents = [Confirmed(insurer, None, frozenset({tax}), own, frozenset({anna}))] * 2
-    assert list(mine_identifiers(documents)[insurer]) == [
-        Identifier(*tax, IdentifierSource.LEARNED, learned_in=frozenset({own}))
-    ]
+    assert mine_identifiers(documents) == {}
 
 
 def test_who_sees_a_contacts_identifier() -> None:
@@ -524,12 +523,27 @@ def test_every_kind_has_its_type_and_says_whose_it_is() -> None:
         IdentifierKind.COMMERCIAL_REGISTER,
         IdentifierKind.TAX_NUMBER,
     }
-    assert {IBAN, VAT, CUSTOMER, PERSONNEL, DOMAIN} | contracts | companies == CONTACT_KINDS
+    contacts_values = {IBAN, VAT, CUSTOMER, PERSONNEL, DOMAIN} | contracts | companies
+    assert {kind for kind in IdentifierKind if TYPES[kind].for_contacts} == contacts_values
+    # A contact carries only these as its identifiers; training learns all but the domain (#215).
+    contract = IdentifierKind.CONTRACT_NUMBER
+    assert {CUSTOMER, contract, PERSONNEL, DOMAIN} == CONTACT_KINDS
+    assert {CUSTOMER, contract, PERSONNEL} == LEARNED_KINDS
     assert {IBAN, TAX, SOCIAL, HEALTH, ADDRESS, IdentifierKind.CHILD_BENEFIT_NUMBER} == PERSON_KINDS
     # A company's tax number names nobody (Tobi, 02.11.2026).
     assert {CUSTOMER, PERSONNEL} | contracts == NAMING_KINDS
-    assert catalog()["customer_number"] == {"contact": True, "person": False, "names_user": True}
-    assert catalog()["tax_number"] == {"contact": True, "person": False, "names_user": False}
+    assert catalog()["customer_number"] == {
+        "contact": True,
+        "person": False,
+        "at_contact": True,
+        "names_user": True,
+    }
+    assert catalog()["tax_number"] == {
+        "contact": True,
+        "person": False,
+        "at_contact": False,
+        "names_user": False,
+    }
 
 
 def test_candidates_of_any_reader_are_checked_and_weighed() -> None:

@@ -29083,6 +29083,17 @@
             "type": "array",
             "title": "Spans",
             "description": "Where it stands in the text."
+          },
+          "holder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HolderOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whose it is where it stands (an IBAN), if told."
           }
         },
         "type": "object",
@@ -29095,7 +29106,7 @@
           "spans"
         ],
         "title": "DocumentNumberOut",
-        "description": "A fact kept for the document: a number that is no contact's or person's identifier, its\nown (invoice, credit note, order number), a strand's (file reference, \"Unser Zeichen\",\nclaim, ticket) or another document's it refers to (\"Ihre Rechnung Nr.\", \"Ihr Zeichen\"); or\none of another kind a person decided."
+        "description": "A fact kept for the document: a number that is no contact's identifier nor a person's\nalone, its own (invoice, credit note, order number), a strand's (file reference, \"Unser\nZeichen\", claim, ticket), another document's it refers to (\"Ihre Rechnung Nr.\", \"Ihr\nZeichen\") or, since #215, one that only tells the contact or a contract (VAT ID, IBAN,\nlicence plate); or one of another kind a person decided."
       },
       "DocumentOutOfReach": {
         "properties": {
@@ -31879,7 +31890,7 @@
           "source"
         ],
         "title": "HolderOut",
-        "description": "Whose an IBAN, a creditor ID, a VAT ID or an e-mail domain is where it stands."
+        "description": "Whose an IBAN, an e-mail domain or a customer number (in bookings) is where it stands."
       },
       "HolderOutcome": {
         "type": "string",
@@ -44823,131 +44834,157 @@
     "iban": {
       "contact": true,
       "person": true,
+      "at_contact": false,
       "names_user": false
     },
     "vat_id": {
       "contact": true,
       "person": false,
+      "at_contact": false,
       "names_user": false
     },
     "customer_number": {
       "contact": true,
       "person": false,
+      "at_contact": true,
       "names_user": true
     },
     "personnel_number": {
       "contact": true,
       "person": false,
+      "at_contact": true,
       "names_user": true
     },
     "email_domain": {
       "contact": true,
       "person": false,
+      "at_contact": true,
       "names_user": false
     },
     "tax_id": {
       "contact": false,
       "person": true,
+      "at_contact": false,
       "names_user": false
     },
     "social_security_number": {
       "contact": false,
       "person": true,
+      "at_contact": false,
       "names_user": false
     },
     "health_insurance_number": {
       "contact": false,
       "person": true,
+      "at_contact": false,
       "names_user": false
     },
     "email_address": {
       "contact": false,
       "person": true,
+      "at_contact": false,
       "names_user": false
     },
     "creditor_id": {
       "contact": true,
       "person": false,
+      "at_contact": false,
       "names_user": false
     },
     "commercial_register": {
       "contact": true,
       "person": false,
+      "at_contact": false,
       "names_user": false
     },
     "tax_number": {
       "contact": true,
       "person": false,
+      "at_contact": false,
       "names_user": false
     },
     "contract_number": {
       "contact": true,
       "person": false,
+      "at_contact": true,
       "names_user": true
     },
     "meter_number": {
       "contact": true,
       "person": false,
+      "at_contact": false,
       "names_user": true
     },
     "mandate_reference": {
       "contact": true,
       "person": false,
+      "at_contact": false,
       "names_user": true
     },
     "license_plate": {
       "contact": true,
       "person": false,
+      "at_contact": false,
       "names_user": true
     },
     "invoice_number": {
       "contact": false,
       "person": false,
+      "at_contact": false,
       "names_user": false
     },
     "credit_note_number": {
       "contact": false,
       "person": false,
+      "at_contact": false,
       "names_user": false
     },
     "order_number": {
       "contact": false,
       "person": false,
+      "at_contact": false,
       "names_user": false
     },
     "file_reference": {
       "contact": false,
       "person": false,
+      "at_contact": false,
       "names_user": false
     },
     "our_reference": {
       "contact": false,
       "person": false,
+      "at_contact": false,
       "names_user": false
     },
     "claim_number": {
       "contact": false,
       "person": false,
+      "at_contact": false,
       "names_user": false
     },
     "ticket_number": {
       "contact": false,
       "person": false,
+      "at_contact": false,
       "names_user": false
     },
     "your_reference": {
       "contact": false,
       "person": false,
+      "at_contact": false,
       "names_user": false
     },
     "letter_date": {
       "contact": false,
       "person": false,
+      "at_contact": false,
       "names_user": false
     },
     "child_benefit_number": {
       "contact": false,
       "person": true,
+      "at_contact": false,
       "names_user": false
     }
   },

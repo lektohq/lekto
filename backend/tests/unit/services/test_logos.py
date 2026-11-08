@@ -103,7 +103,7 @@ async def test_a_logo_goes_with_its_contact_also_while_one_is_stored(world: Worl
 # --- fetching ---------------------------------------------------------------------------------
 
 DOMAIN = Identifier(IdentifierKind.EMAIL_DOMAIN, "nord.example")
-IBAN = Identifier(IdentifierKind.IBAN, "DE89370400440532013000")
+NUMBER = Identifier(IdentifierKind.CUSTOMER_NUMBER, "8801")
 
 
 async def queued(world: World) -> list[dict[str, object]]:
@@ -127,7 +127,7 @@ async def test_a_new_domain_queues_the_fetch_of_the_logo(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     fetcher = FakeLogoFetcher({"nord.example": PNG})
     master, logos = world.fetching(fetcher)
-    nord = await master.create_contact(admin.id, "Nord", identifiers=[DOMAIN, IBAN])
+    nord = await master.create_contact(admin.id, "Nord", identifiers=[DOMAIN, NUMBER])
     plain = await master.create_contact(
         admin.id, "Süd", identifiers=[Identifier(IdentifierKind.CUSTOMER_NUMBER, "4711")]
     )
@@ -142,7 +142,7 @@ async def test_a_new_domain_queues_the_fetch_of_the_logo(world: World) -> None:
 
     # A rename, another identifier: nothing to fetch.
     await master.change_contact(admin.id, nord.id, name="Nord AG")
-    await master.change_contact(admin.id, nord.id, identifiers=[DOMAIN, IBAN])
+    await master.change_contact(admin.id, nord.id, identifiers=[DOMAIN, NUMBER])
     # Attached from a document, a domain of a contact without a logo.
     attached = Identifier(IdentifierKind.EMAIL_DOMAIN, "sued.example")
     await master.add_identifier(admin.id, plain.id, attached)
@@ -366,7 +366,7 @@ async def test_fetch_logos_queues_the_contacts_without_one(world: World) -> None
     fetcher = FakeLogoFetcher({"nord.example": PNG})
     master = world.master_data  # identifiers entered without fetching on
     with_domain = await master.create_contact(admin.id, "Nord", identifiers=[DOMAIN])
-    await master.create_contact(admin.id, "Bare", identifiers=[IBAN])
+    await master.create_contact(admin.id, "Bare", identifiers=[NUMBER])
     with_logo = await master.create_contact(
         admin.id, "Logo", identifiers=[Identifier(IdentifierKind.EMAIL_DOMAIN, "logo.example")]
     )

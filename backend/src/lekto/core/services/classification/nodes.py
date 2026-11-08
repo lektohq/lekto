@@ -515,7 +515,7 @@ class LlmSignal(_ModelStep):
     async def _facts(
         self, document: Document, sent: Shortened, calls: list[ModelCall]
     ) -> tuple[JsonObject, list[StructuredAnswer], list[ReadFact] | None, list[ReadHolder] | None]:
-        """The facts with their role the model reads, and whose the IBANs and creditor IDs the
+        """The facts with their role the model reads, and whose the IBANs the
         patterns read in the text sent are (`facts-3`): a second request on the beginning the
         first shared (system prompt and document: prompt caching). The output's part, the
         answers, the facts and the holders (None: it read none). What goes wrong is in the

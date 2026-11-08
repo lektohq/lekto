@@ -68,12 +68,12 @@ async def contacts(world: World, *items: Contact) -> None:
 
 
 async def test_facts_are_names_and_identifiers_in_the_text(world: World) -> None:
-    iban = Identifier.parse(IdentifierKind.IBAN, THEIR_IBAN)
-    utility = Contact.create(name="Stadtwerke Musterstadt", now=builders.NOW, identifiers=[iban])
+    number = Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "4711-0815")
+    utility = Contact.create(name="Stadtwerke Musterstadt", now=builders.NOW, identifiers=[number])
     insurer = Contact.create(name="Nord Versicherungsgruppe", now=builders.NOW, aliases=["Nord KV"])
     rejected = Contact.create(name="Bank", now=builders.NOW)
     rejected.set_identifiers(
-        [], rejected=[Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "4711-0815")]
+        [], rejected=[Identifier.parse(IdentifierKind.EMAIL_DOMAIN, "musterstadt.example")]
     )
     await contacts(world, utility, insurer, rejected)
     document = await stored(world, await world.user(), TEXT)
@@ -84,31 +84,29 @@ async def test_facts_are_names_and_identifiers_in_the_text(world: World) -> None
         {"contact_id": str(insurer.id), "name": "Nord KV", "alias": True},
     ]
     assert output(result)["identifiers"] == [
-        {"contact_id": str(utility.id), "kind": "iban", "value": iban.value}
+        {"contact_id": str(utility.id), "kind": "customer_number", "value": number.value}
     ]
-    # The other IBAN belongs to no contact; the rejected customer number is no evidence, but
-    # known.
-    assert output(result)["unknown_identifiers"] == [
-        {"kind": "iban", "value": "DE02120300000000202051"}
-    ]
+    # IBANs are no contact's identifiers since #215: neither evidence nor unknown.
+    assert output(result)["unknown_identifiers"] == []
 
 
-async def test_a_payee_s_iban_is_no_evidence_of_its_contact(world: World) -> None:
-    """A bank statement lists the utility's IBAN in a booking: the utility's identifier, but
-    a third party's there, so no evidence that the statement is the utility's."""
-    iban = Identifier.parse(IdentifierKind.IBAN, THEIR_IBAN)
-    utility = Contact.create(name="Stadtwerke Musterstadt", now=builders.NOW, identifiers=[iban])
+async def test_a_payee_s_number_is_no_evidence_of_its_contact(world: World) -> None:
+    """A bank statement lists the utility's customer number in a booking: the utility's
+    identifier, but a third party's there, so no evidence that the statement is the
+    utility's."""
+    number = Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "4711-0815")
+    utility = Contact.create(name="Stadtwerke Musterstadt", now=builders.NOW, identifiers=[number])
     bank = Contact.create(name="Beispielbank", now=builders.NOW)
     await contacts(world, utility, bank)
     text = (
         "Beispielbank   Kontoauszug 10/2026\n"
-        f"02.10.2026   Lastschrift   Stadtwerke Musterstadt   {THEIR_IBAN}   -45,00 EUR\n"
+        "02.10.2026   Lastschrift   Stadtwerke Musterstadt KdNr 4711-0815   -45,00 EUR\n"
     )
     document = await stored(world, await world.user(), text)
     result = await FactsSignal(world.uow, world.object_store).run(document)
     assert output(result)["identifiers"] == []
     assert output(result)["foreign_identifiers"] == [
-        {"contact_id": str(utility.id), "kind": "iban", "value": iban.value}
+        {"contact_id": str(utility.id), "kind": "customer_number", "value": number.value}
     ]
 
 

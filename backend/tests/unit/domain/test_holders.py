@@ -127,10 +127,8 @@ Sparkasse Musterstadt   IBAN {spaced(UTILITY)}   BIC SPMUDE33
 Gläubiger-ID {UTILITY_CI}
 """
     found = kinds(holders_of(text, foot=frozenset({UTILITY, UTILITY_CI})))
-    assert found == {
-        UTILITY: (HolderKind.SENDER, None),
-        UTILITY_CI: (HolderKind.SENDER, None),
-    }
+    # A creditor ID has no holder since #215: no contact's identifier.
+    assert found == {UTILITY: (HolderKind.SENDER, None)}
 
 
 def test_bank_details_tell_the_sender_on_their_line() -> None:
@@ -329,56 +327,6 @@ def test_rule_and_model_together() -> None:
     )
     # What the model told before is no rule's.
     assert merged_holder(sender, model) == model
-
-
-# --- VAT IDs (Tobi, 28.10.2026) ---------------------------------------------------------------
-
-OURS_VAT, YOURS_VAT, PARENT_VAT = "DE123456789", "DE811569869", "DE136695976"
-
-
-def test_a_vat_id_s_label_tells_whose_it_is() -> None:
-    text = f"""Rechnung 4711
-Ihre USt-IdNr.: {YOURS_VAT}
-Leistung                                   120,00 EUR
-Unsere USt-IdNr.: {OURS_VAT}
-"""
-    assert kinds(holders_of(text)) == {
-        YOURS_VAT: (HolderKind.RECIPIENT, None),
-        OURS_VAT: (HolderKind.SENDER, None),
-    }
-
-
-def test_a_vat_id_beside_a_name_is_that_contact_s() -> None:
-    text = f"""Rechnung 4711
-Leistung                                   120,00 EUR
-
-Stadtwerke Musterstadt GmbH · USt-IdNr. {OURS_VAT}
-Nordwerk AG · USt-IdNr. {PARENT_VAT}
-"""
-    found = kinds(holders_of(text))
-    assert found[OURS_VAT] == (HolderKind.SENDER, "Stadtwerke Musterstadt GmbH ·")
-    assert found[PARENT_VAT][0] is HolderKind.SENDER
-    # To the document's contact, the other company's is a third party's.
-    held = holders_of(text)[(IdentifierKind.VAT_ID, PARENT_VAT)]
-    assert held_by(held, ["Stadtwerke Musterstadt GmbH"]) is HolderKind.THIRD_PARTY
-
-
-def test_a_vat_id_alone_is_the_sender_s_two_unlabelled_are_unclear() -> None:
-    alone = f"Rechnung 4711\nLeistung   120,00 EUR\nUSt-IdNr. {OURS_VAT}\n"
-    assert kinds(holders_of(alone)) == {OURS_VAT: (HolderKind.SENDER, None)}
-    two = f"Rechnung\nUSt-IdNr. {OURS_VAT}\nUSt-IdNr. {PARENT_VAT}\n"
-    assert {kind for kind, _ in kinds(holders_of(two)).values()} == {HolderKind.UNCLEAR}
-    # The label of the line above with its own number is not this one's.
-    under = (
-        f"Rechnung\nUnsere USt-IdNr. {OURS_VAT}\n"
-        f"Eine Gesellschaft der Holding SE · USt-IdNr. {PARENT_VAT}\n"
-    )
-    assert kinds(holders_of(under)) == {
-        OURS_VAT: (HolderKind.SENDER, None),
-        PARENT_VAT: (HolderKind.UNCLEAR, None),
-    }
-    # At the foot of the page, as an IBAN there: the sender's.
-    assert kinds(holders_of(two, foot=frozenset({OURS_VAT})))[OURS_VAT][0] is HolderKind.SENDER
 
 
 # --- e-mail domains: by the name ----------------------------------------------------------------
