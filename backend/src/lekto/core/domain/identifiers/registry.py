@@ -4,7 +4,8 @@ a value."""
 
 from collections.abc import Mapping
 
-from lekto.core.domain.identifiers.base import IdentifierKind, IdentifierType
+from lekto.core.domain.errors import ValidationError
+from lekto.core.domain.identifiers.base import IdentifierKind, IdentifierType, is_date
 from lekto.core.domain.identifiers.child_benefit_number import ChildBenefitNumber
 from lekto.core.domain.identifiers.claim_number import ClaimNumber
 from lekto.core.domain.identifiers.commercial_register import CommercialRegister
@@ -34,6 +35,7 @@ from lekto.core.domain.identifiers.tax_number import TaxNumber
 from lekto.core.domain.identifiers.ticket_number import TicketNumber
 from lekto.core.domain.identifiers.vat_id import VatId
 from lekto.core.domain.identifiers.your_reference import YourReference
+from lekto.core.domain.reasons import ReasonCode, because
 
 TYPES: Mapping[IdentifierKind, IdentifierType] = {
     item.kind: item
@@ -90,7 +92,10 @@ def normalise_identifier(kind: IdentifierKind, raw: str) -> str:
     """The comparable form of an identifier (`IdentifierType.normalise`): numbers without
     spaces and separators in upper case (an IBAN with a valid check sum, a personnel number
     without leading zeros, a person's number with a valid check digit), a domain or an e-mail
-    address in lower case; ValidationError if `raw` is none of its kind."""
+    address in lower case; ValidationError if `raw` is none of its kind, or a date where a
+    number is meant (`is_date`: whoever read it, a pattern or the language model)."""
+    if kind is not IdentifierKind.LETTER_DATE and is_date(raw):
+        raise ValidationError(because(ReasonCode.NOT_OF_KIND, kind=kind.value, value=raw))
     return TYPES[kind].normalise(raw)
 
 
