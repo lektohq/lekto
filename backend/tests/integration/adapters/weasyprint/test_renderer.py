@@ -11,6 +11,7 @@ import pytest
 
 from lekto.adapters.outbound.weasyprint import WeasyPrintMailRenderer
 from lekto.core.ports.mail_renderer import MailRenderer
+from tests.builders import DEFAULT_SETTINGS
 from tests.contracts.mail_renderer import MailRendererContract
 from tests.mails import PDF, PNG, plain_mail, rich_mail
 from tests.webhook_receiver import LocalReceiver
@@ -19,7 +20,7 @@ from tests.webhook_receiver import LocalReceiver
 class TestWeasyPrintMailRenderer(MailRendererContract):
     @pytest.fixture
     def renderer(self) -> MailRenderer:
-        return WeasyPrintMailRenderer("de")
+        return WeasyPrintMailRenderer("de", memory=int(DEFAULT_SETTINGS.child_max_memory))
 
 
 def _text(pdf: Path) -> str:

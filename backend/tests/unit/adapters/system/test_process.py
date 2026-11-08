@@ -49,3 +49,42 @@ async def test_the_end_of_the_error_output_is_kept_as_far_as_asked() -> None:
         [sys.executable, "-c", script], timeout=timedelta(seconds=30), tail=8000
     )
     assert more.stderr == "a" * 3000 + "b" * 5000
+
+
+ALLOCATE = "import sys; block = bytearray(int(sys.argv[1]) * 1024 * 1024); print(len(block))"
+LIMIT_OF_A_GRANDCHILD = (
+    "import subprocess, sys; "
+    "print(subprocess.run([sys.executable, '-I', '-c', "
+    "'import resource; print(resource.getrlimit(resource.RLIMIT_AS)[0])'], "
+    "capture_output=True, text=True).stdout.strip())"
+)
+MiB = 1024 * 1024
+
+
+async def test_a_child_takes_no_more_memory_than_its_limit() -> None:
+    """A document built to make Ghostscript or Tesseract allocate without end fails its child,
+    not the worker."""
+    small = await run_process(
+        [sys.executable, "-I", "-c", ALLOCATE, "16"],
+        timeout=timedelta(seconds=30),
+        memory=512 * MiB,
+    )
+    assert small.returncode == 0, small.stderr
+    large = await run_process(
+        [sys.executable, "-I", "-c", ALLOCATE, "1024"],
+        timeout=timedelta(seconds=30),
+        memory=512 * MiB,
+    )
+    assert large.returncode != 0
+    assert "MemoryError" in large.stderr
+
+
+async def test_the_programs_a_child_starts_inherit_its_limit() -> None:
+    """OCRmyPDF starts Ghostscript and Tesseract: they get the same limit."""
+    completed = await run_process(
+        [sys.executable, "-I", "-c", LIMIT_OF_A_GRANDCHILD],
+        timeout=timedelta(seconds=30),
+        memory=512 * MiB,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert int(completed.stdout) == 512 * MiB

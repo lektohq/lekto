@@ -93,6 +93,7 @@ class Runs:
         timeout: timedelta,
         env: dict[str, str] | None = None,
         tail: int = 0,
+        memory: int | None = None,
     ) -> Completed:
         if args[0] == "tesseract":
             return Completed(returncode=0, stdout="tesseract 5.5.0\n", stderr="")

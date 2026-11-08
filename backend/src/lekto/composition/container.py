@@ -313,6 +313,7 @@ def ocrmypdf_engine(settings: Settings) -> OcrmypdfEngine:
         jobs=_cores_per_job(settings),
         vision=vision,
         vision_timeout=settings.vlm_timeout,
+        memory=int(settings.child_max_memory),
     )
 
 
@@ -474,7 +475,9 @@ def build_container(settings: Settings) -> Container:
         ),
         mail_server=ImapMailServer(timeout=settings.mail_timeout),
         mail_renderer=WeasyPrintMailRenderer(
-            settings.template_locale, timeout=settings.mail_render_timeout
+            settings.template_locale,
+            timeout=settings.mail_render_timeout,
+            memory=int(settings.child_max_memory),
         ),
         totp=PyotpTotp(),
         patterns=RegexPatternMatcher(settings.rules_pattern_timeout.total_seconds()),
