@@ -23193,7 +23193,7 @@ export interface operations {
 					 */
 					space_id?: string;
 					/**
-					 * @description The intake channel, for rules. Default: `web` with a session, `api` with an API token; `migration` for imports from another system.
+					 * @description The intake channel, for rules. Default: `web` with a session, `api` with an API token; `migration` for imports from another system (admins only).
 					 * @enum {string}
 					 */
 					channel?: 'migration';

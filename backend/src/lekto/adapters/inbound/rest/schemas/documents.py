@@ -497,7 +497,7 @@ class UploadFields(BaseModel):
         default=None,
         description=(
             "The intake channel, for rules. Default: `web` with a session, `api` with an "
-            "API token; `migration` for imports from another system."
+            "API token; `migration` for imports from another system (admins only)."
         ),
         json_schema_extra={"enum": [Channel.MIGRATION.value]},
     )

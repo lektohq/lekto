@@ -2875,6 +2875,7 @@
 	"action_change_unconfirmed": "change a document without confirming it",
 	"action_give_upload_metadata": "give metadata with an upload",
 	"action_upload_for_others": "upload on behalf of another user",
+	"action_upload_as_migration": "upload through the channel “migration”",
 	"action_control_processing": "control the processing of this document",
 	"action_read_processing_log": "read the processing log of this document",
 	"action_read_exchanges": "read the model exchanges of this document",
