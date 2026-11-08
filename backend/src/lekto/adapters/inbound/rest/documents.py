@@ -24,6 +24,7 @@ from starlette.background import BackgroundTask
 
 from lekto.adapters.inbound.rest.auth import (
     PROTECTED,
+    READS,
     UPLOADS,
     Authenticated,
     CurrentUser,
@@ -381,6 +382,7 @@ async def update_document(
     ),
     response_model=DocumentPreviewOut,
     responses=problem_responses(401, 403, 404, 409, 422),
+    openapi_extra=READS,
 )
 async def preview_change(
     id: UUID,
