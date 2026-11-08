@@ -977,7 +977,7 @@ mail_records = Table(
     Column("decided_at", UtcDateTime, nullable=True),
     Column("steps", json_type(), nullable=True),
     Column("gone_at", UtcDateTime, nullable=True),
-    # The steps on the server still to run (revision 0072); null when none are due.
+    # The steps on the server still to run (revision 0073); null when none are due.
     Column("steps_due", json_type(), nullable=True),
     UniqueConstraint("mailbox_id", "folder", "uidvalidity", "uid"),
     Index(None, "mailbox_id", "fetched_at"),

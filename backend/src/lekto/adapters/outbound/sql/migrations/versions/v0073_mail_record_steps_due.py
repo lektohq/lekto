@@ -1,7 +1,7 @@
 """Mail records keep the steps on the server still to run
 
-Revision ID: 0072
-Revises: 0071
+Revision ID: 0073
+Revises: 0072
 Create Date: 2026-11-08 10:00:00.000000
 
 A mail's record was stored before the steps on the server ran (mark it read, move it), so a
@@ -18,8 +18,8 @@ from alembic import op
 
 from lekto.adapters.outbound.sql import types
 
-revision: str = "0072"
-down_revision: str | None = "0071"
+revision: str = "0073"
+down_revision: str | None = "0072"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
