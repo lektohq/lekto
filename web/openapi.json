@@ -13233,7 +13233,7 @@
                     "enum": [
                       "migration"
                     ],
-                    "description": "The intake channel, for rules. Default: `web` with a session, `api` with an API token; `migration` for imports from another system."
+                    "description": "The intake channel, for rules. Default: `web` with a session, `api` with an API token; `migration` for imports from another system (admins only)."
                   },
                   "uploaded_by": {
                     "type": "string",
