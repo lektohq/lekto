@@ -406,6 +406,8 @@ class ReasonCode(StrEnum):
     URL_NO_HOST = "url_no_host"
     URL_CREDENTIALS = "url_credentials"
     URL_FRAGMENT = "url_fragment"
+    WEBHOOK_PRIVATE_ADMINS = "webhook_private_admins"
+    WEBHOOK_PRIVATE_NONE = "webhook_private_none"
     HEADER_NAME_INVALID = "header_name_invalid"
     HEADER_RESERVED = "header_reserved"
     HEADER_VALUE_INVALID = "header_value_invalid"
@@ -934,6 +936,11 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.URL_NO_HOST: "the URL needs a host",
     ReasonCode.URL_CREDENTIALS: "the URL must not contain a user name or password",
     ReasonCode.URL_FRAGMENT: "the URL must not have a fragment",
+    ReasonCode.WEBHOOK_PRIVATE_ADMINS: (
+        "only an admin's webhook may reach an address in the own network; others reach public "
+        "addresses"
+    ),
+    ReasonCode.WEBHOOK_PRIVATE_NONE: "no webhook may reach an address in the own network",
     ReasonCode.HEADER_NAME_INVALID: "'{name}' is no valid header name",
     ReasonCode.HEADER_RESERVED: "Lekto sets the header '{name}' itself",
     ReasonCode.HEADER_VALUE_INVALID: (

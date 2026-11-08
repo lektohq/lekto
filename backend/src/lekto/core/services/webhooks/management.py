@@ -36,6 +36,7 @@ from lekto.core.domain.webhooks import (
     WebhookDelivery,
     headers_from_bytes,
     headers_to_bytes,
+    names_private_address,
     new_secret,
     validate_header_names,
     validate_header_value,
@@ -168,6 +169,7 @@ class WebhookService:
             if model_call is not None:
                 webhook.serve(model_call, now=now)
                 await _check_model_call(uow, user, webhook)
+            self._check_target(webhook, user)
             await uow.webhooks.add(webhook)
             await uow.commit()
         return CreatedWebhook(webhook, secret)
@@ -239,11 +241,25 @@ class WebhookService:
                 await _check_model_call(uow, user, webhook)
             elif switched_on and webhook.model_call is not None:
                 await _check_model_call(uow, user, webhook, granted=True)
+            if url is not None:
+                owner = (
+                    user if webhook.owner_id == user.id else await uow.users.find(webhook.owner_id)
+                )
+                self._check_target(webhook, owner)
             await uow.webhooks.update(webhook)
             if more_room:
                 await wake_queue(uow, webhook.id, now)
             await uow.commit()
             return webhook
+
+    def _check_target(self, webhook: Webhook, owner: User | None) -> None:
+        """ValidationError if the URL names an address that is not public (`localhost`,
+        `192.168.…`) and the owner's webhooks may not reach one. A name is checked when the
+        request is sent, after resolving it."""
+        targets = self._policy.private_targets
+        admin = owner is not None and owner.is_active_admin
+        if names_private_address(webhook.url) and not targets.allow(admin):
+            raise ValidationError(because(targets.refusal()))
 
     async def delete(self, actor: UserId, id: WebhookId) -> None:
         """The webhook and its log. Deliveries that are queued find it gone and stop; the rules

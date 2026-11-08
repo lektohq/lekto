@@ -429,6 +429,8 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	url_no_host: entry(m.reason_url_no_host),
 	url_credentials: entry(m.reason_url_credentials),
 	url_fragment: entry(m.reason_url_fragment),
+	webhook_private_admins: entry(m.reason_webhook_private_admins),
+	webhook_private_none: entry(m.reason_webhook_private_none),
 	header_name_invalid: entry(m.reason_header_name_invalid),
 	header_reserved: entry(m.reason_header_reserved),
 	header_value_invalid: entry(m.reason_header_value_invalid, { max: 'number' }),

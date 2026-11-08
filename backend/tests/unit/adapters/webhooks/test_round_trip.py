@@ -52,7 +52,10 @@ async def test_a_green_document_reaches_the_receiver_signed_after_a_failed_try()
             build_memory_container(),
             webhook_sender=HttpWebhookSender(user_agent=f"Lekto/{__version__}"),
         )
-        settings = Settings.model_construct(webhook_retry_delay=timedelta(milliseconds=50))
+        # The receiver listens on the loopback interface: the own network is allowed here.
+        settings = Settings.model_construct(
+            webhook_retry_delay=timedelta(milliseconds=50), webhook_private_targets="all"
+        )
         services = build_services(container, settings)
         builders.skip_classification(services.pipeline)
         container.event_bus.subscribe(SUBSCRIBER, services.webhook_delivery.on_event)

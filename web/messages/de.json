@@ -2785,6 +2785,8 @@
 	"reason_url_no_host": "Die URL braucht einen Host.",
 	"reason_url_credentials": "Die URL darf keinen Benutzernamen und kein Passwort enthalten.",
 	"reason_url_fragment": "Die URL darf kein Fragment (#…) haben.",
+	"reason_webhook_private_admins": "Nur Webhooks eines Admins dürfen Adressen im eigenen Netz erreichen. Dein Webhook kann öffentliche Adressen ansprechen.",
+	"reason_webhook_private_none": "Kein Webhook darf Adressen im eigenen Netz erreichen.",
 	"reason_header_name_invalid": "„{name}“ ist kein gültiger Header-Name.",
 	"reason_header_reserved": "Den Header „{name}“ setzt Lekto selbst.",
 	"reason_header_value_invalid": "Der Wert von „{name}“ muss 1 bis {max} druckbare ASCII-Zeichen haben, Leerzeichen nur innen.",
