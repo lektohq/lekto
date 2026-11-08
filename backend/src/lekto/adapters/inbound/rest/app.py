@@ -187,7 +187,7 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
     app.add_middleware(
         NoStore,
         prefix=PREFIX,
-        public=(HEALTH_PATH, DOCS_PATH, f"{PREFIX}/openapi.json", f"{PREFIX}/redoc"),
+        public=(HEALTH_PATH, DOCS_PATH, f"{PREFIX}/openapi.json"),
         # A logo is master data every user sees; its URL changes with it.
         cacheable=(master_data.LOGO_PATH,),
     )
