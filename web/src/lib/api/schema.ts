@@ -8015,6 +8015,7 @@ export interface components {
 			username: string;
 			/**
 			 * Password
+			 * Format: password
 			 * @description Stored encrypted, never shown again.
 			 */
 			password: string;
