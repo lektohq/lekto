@@ -95,11 +95,20 @@ authenticate.
   count per /64 network); the counts are
   in the database. Every attempt is counted atomically before it is checked (an upsert),
   blocking as if it fails, and taken back if it does not fail, so attempts that arrive
-  together cannot pass the throttle at once. A blocked account refuses every attempt (`429`), also a correct password, so
-  TOTP codes cannot be guessed. A blocked source refuses only wrong sign-ins (`429` instead of
-  `401`, not counted for the source again); a correct sign-in from there succeeds, so failures
-  from an address many users share (a proxy, NAT) lock nobody out. Success clears the
-  account's count.
+  together cannot pass the throttle at once. A blocked account refuses every attempt (`429`),
+  also a correct password, so TOTP codes cannot be guessed. A blocked source refuses only wrong
+  sign-ins (`429` instead of `401`, not counted for the source again); a correct sign-in from
+  there succeeds, so failures from an address many users share (a proxy, NAT) lock nobody out.
+- Known devices (OWASP's [device cookies](https://owasp.org/www-community/Slow_Down_Online_Guessing_Attacks_with_Device_Cookies)):
+  whoever knows a username could keep its account blocked with a wrong password every 15
+  minutes. So a sign-in with the password makes the browser a known device of the user (a
+  random token in the cookie `__Secure-lekto_device`, only its SHA-256 hash in
+  `known_devices`); its later attempts as that user count under the device, by the same rule,
+  not under the account. Guesses from elsewhere block the account but not its owner's
+  browsers; the second factor is asked all the same. A browser stays known for a year after its
+  last sign-in and for at most five users (the oldest go first); an admin's password reset and
+  deleting the user end all their devices. Success clears the count of the account, or of the
+  device the attempt counted under.
 - TOTP (RFC 6238, pyotp), optional per user: set up with a new secret, which takes effect when a
   code confirms it; then ten recovery codes (80 bits each) are shown once and stored as SHA-256
   hashes. Codes of the previous and next 30-second step are accepted, each step only once. The
@@ -1452,11 +1461,14 @@ seconds that their session or token still holds and end otherwise.
 
 The session cookie is `__Host-lekto_session`: HTTP-only, `Secure`, `SameSite=Lax`, `Path=/`, for
 `LEKTO_SESSION_MAX_AGE`; with `LEKTO_COOKIE_SECURE=false` it is `lekto_session` without
-`Secure`. Sign-in accepts JSON only, so a form on another site cannot sign anyone in.
+`Secure`. The known device's cookie is `__Secure-lekto_device` (`lekto_device`): the tokens of
+the browser's known devices joined by dots, HTTP-only, `SameSite=Strict`, sent only to
+`/api/v1/auth/login`, for a year; signing out leaves it. Sign-in accepts JSON only, so a form on
+another site cannot sign anyone in.
 
 | Endpoint | Purpose |
 | --- | --- |
-| `POST /auth/login` | Username, password, optional `code` or `recovery_code`; sets the cookie, returns the CSRF token |
+| `POST /auth/login` | Username, password, optional `code` or `recovery_code`; sets the session cookie and the known device's, returns the CSRF token |
 | `POST /auth/logout`, `GET /auth/me` | Sign out; who is calling and how |
 | `GET/PATCH /auth/me/profile` | The own profile: display name, aliases, birth date, e-mail, identifiers, the numbers at contacts (`numbers`, `declined_numbers`); what is given changes (a session; API tokens `403`) |
 | `POST /auth/password` | Change the own password: other sessions end, `revoke_tokens` optional |

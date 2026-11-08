@@ -9,6 +9,7 @@ import pytest
 from lekto.adapters.outbound.memory import MemoryEventBus
 from lekto.adapters.outbound.memory.database import SeenMark
 from lekto.core.domain.errors import AuthenticationError
+from lekto.core.domain.identity import KNOWN_DEVICE_LIFETIME, hash_token
 from lekto.core.domain.ids import DocumentId, EventId, new_id
 from lekto.core.domain.inbox import DONE_PERIOD, Confirmation
 from lekto.core.domain.jobs import JobStatus
@@ -114,6 +115,17 @@ async def test_cleanup_removes_ended_sessions_and_old_failures(world: World) -> 
     async with world.uow() as uow:
         assert await uow.sessions.find_by_token(signed_in.session.token_hash) is None
         assert await uow.login_failures.find("account:alice") is None
+
+
+async def test_cleanup_removes_devices_known_no_longer(world: World) -> None:
+    service = maintenance(world)
+    await world.account("alice")
+    [device] = (await world.auth.login("alice", PASSWORD)).devices
+    await service.schedule()
+    world.clock.advance(KNOWN_DEVICE_LIFETIME)
+    assert await service.run_next_job()
+    async with world.uow() as uow:
+        assert await uow.known_devices.find_by_token(hash_token(device)) is None
 
 
 async def test_deleting_a_document_removes_its_files(world: World) -> None:

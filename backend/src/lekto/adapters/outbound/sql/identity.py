@@ -1,6 +1,6 @@
-"""Identity repositories on SQL tables: credentials, sessions, API tokens, links to identity
-providers and failed sign-ins. Updates are optimistic as in `repositories`; `touch` updates
-only a timestamp and leaves the version alone."""
+"""Identity repositories on SQL tables: credentials, sessions, API tokens, known devices, links
+to identity providers and failed sign-ins. Updates are optimistic as in `repositories`; `touch`
+and `renew` update only a timestamp and leave the version alone."""
 
 from collections.abc import Sequence
 from datetime import datetime, timedelta
@@ -27,6 +27,7 @@ from lekto.core.domain.identity import (
     ApiToken,
     Credential,
     ExternalIdentity,
+    KnownDevice,
     LoginFailures,
     LoginMethod,
     Session,
@@ -34,7 +35,13 @@ from lekto.core.domain.identity import (
     TokenScope,
     TotpSetting,
 )
-from lekto.core.domain.ids import ApiTokenId, ExternalIdentityId, SessionId, UserId
+from lekto.core.domain.ids import (
+    ApiTokenId,
+    ExternalIdentityId,
+    KnownDeviceId,
+    SessionId,
+    UserId,
+)
 
 
 class SqlCredentialRepository(SqlRepository[UserId, Credential]):
@@ -226,6 +233,55 @@ def _api_token(row: Row[Any]) -> ApiToken:
         created_at=row.created_at,
         expires_at=row.expires_at,
         last_used_at=row.last_used_at,
+        version=row.version,
+    )
+
+
+class SqlKnownDeviceRepository:
+    def __init__(self, transaction: Transaction) -> None:
+        self._tx = transaction
+
+    async def add(self, device: KnownDevice) -> None:
+        await self._tx.write(
+            insert(t.known_devices).values(
+                id=device.id,
+                user_id=device.user_id,
+                token_hash=device.token_hash,
+                created_at=device.created_at,
+                expires_at=device.expires_at,
+                version=device.version,
+            )
+        )
+
+    async def find_by_token(self, token_hash: str) -> KnownDevice | None:
+        table = t.known_devices
+        row = (await self._tx.read(select(table).where(table.c.token_hash == token_hash))).first()
+        return None if row is None else _known_device(row)
+
+    async def renew(self, id: KnownDeviceId, expires_at: datetime) -> None:
+        table = t.known_devices
+        await self._tx.write(
+            update(table)
+            .where(table.c.id == id, table.c.expires_at < expires_at)
+            .values(expires_at=expires_at)
+        )
+
+    async def remove_for_user(self, user: UserId) -> int:
+        table = t.known_devices
+        return (await self._tx.write(delete(table).where(table.c.user_id == user))).rowcount
+
+    async def purge(self, *, now: datetime) -> int:
+        table = t.known_devices
+        return (await self._tx.write(delete(table).where(table.c.expires_at <= now))).rowcount
+
+
+def _known_device(row: Row[Any]) -> KnownDevice:
+    return KnownDevice(
+        id=KnownDeviceId(row.id),
+        user_id=UserId(row.user_id),
+        token_hash=row.token_hash,
+        created_at=row.created_at,
+        expires_at=row.expires_at,
         version=row.version,
     )
 
