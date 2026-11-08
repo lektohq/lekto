@@ -55,9 +55,8 @@ class OpenAction(StrEnum):
 @dataclass(frozen=True, kw_only=True)
 class OpenDecision:
     """What a person decides about the open identifier of `kind` and `value`. `contact`: where;
-    without one, the learned one's contact, or the one contact an unknown one's documents
-    name (confirming one whose documents name several needs it; rejecting it notes it at the
-    one with most documents)."""
+    without one, the learned one's contact or the one a suggestion names (a learned one moves
+    to another contact with it)."""
 
     kind: IdentifierKind
     value: str
