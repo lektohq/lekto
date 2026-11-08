@@ -117,12 +117,7 @@ async def test_admins_see_the_holders_against_their_decisions(api: Api) -> None:
     assert response.status_code == 200, response.text
     body = response.json()
     zero = {"right": 0, "learned_rejected": 0, "refused_confirmed": 0, "unclear": 0, "unread": 0}
-    assert [item["kind"] for item in body["kinds"]] == [
-        "creditor_id",
-        "email_domain",
-        "iban",
-        "vat_id",
-    ]
+    assert [item["kind"] for item in body["kinds"]] == ["email_domain", "iban"]
     assert body["recommendation"] == zero  # nothing decided yet
     cases = f"{PREFIX}/automation/holders/cases"
     none = await api.client.get(

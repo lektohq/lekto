@@ -111,10 +111,11 @@ def test_the_social_security_label_is_no_customer_label() -> None:
 
 def test_a_persons_numbers_are_never_learned() -> None:
     contact = ContactId(new_id())
-    document = Confirmed(contact, None, frozenset({(TAX, TAX_ID), (IdentifierKind.IBAN, IBAN)}))
+    number = (CUSTOMER, "K4711")
+    document = Confirmed(contact, None, frozenset({(TAX, TAX_ID), number}))
     learned = mine_identifiers([document, document])
-    assert [item.key for item in learned[contact]] == [(IdentifierKind.IBAN, IBAN)]
-    assert mine_identifiers([document] * 2, taken=[(IdentifierKind.IBAN, IBAN)]) == {}
+    assert [item.key for item in learned[contact]] == [number]
+    assert mine_identifiers([document] * 2, taken=[number]) == {}
 
 
 def test_a_profile() -> None:
@@ -145,7 +146,9 @@ def test_a_contact_names_a_user_only_by_a_customer_or_personnel_number() -> None
     contact.set_identifiers([Identifier.parse(CUSTOMER, "K-1001", user_id=user)])
     assert contact.identifiers[0].user_id == user
     with pytest.raises(ValidationError, match="names the user"):
-        contact.set_identifiers([Identifier.parse(IdentifierKind.IBAN, IBAN, user_id=user)])
+        contact.set_identifiers(
+            [Identifier.parse(IdentifierKind.EMAIL_DOMAIN, "a.example", user_id=user)]
+        )
     with pytest.raises(ValidationError, match="kind"):
         contact.set_identifiers([Identifier.parse(TAX, TAX_ID)])
     # Training finds whose a number is; a rejected one names nobody.
@@ -170,7 +173,7 @@ def test_a_user_keeps_their_numbers_at_a_contact() -> None:
         now=builders.NOW,
         topic_ids=[topic],
         identifiers=[
-            Identifier.parse(IdentifierKind.IBAN, IBAN),
+            Identifier.parse(IdentifierKind.EMAIL_DOMAIN, "insurer.example"),
             Identifier.parse(CUSTOMER, "K-1001", user_id=anna),
             Identifier.parse(CUSTOMER, "K-9009", user_id=bob),
         ],
@@ -186,19 +189,19 @@ def test_a_user_keeps_their_numbers_at_a_contact() -> None:
         declined=[(CUSTOMER, "K3003")],
     )
     assert [(item.value, item.source, item.user_id) for item in insurer.identifiers] == [
-        (IBAN, IdentifierSource.MANUAL, None),
         ("K2002", IdentifierSource.MANUAL, anna),  # taken over
         ("K4004", IdentifierSource.MANUAL, anna),
         ("K9009", IdentifierSource.MANUAL, bob),  # not hers: stays
+        ("insurer.example", IdentifierSource.MANUAL, None),
         ("K3003", IdentifierSource.REJECTED, None),  # declined; K1001 she took away
     ]
-    assert insurer.identifiers[1].topic_id == topic
-    for taken in ("K9009", IBAN):
-        kind = IdentifierKind.IBAN if taken == IBAN else CUSTOMER
+    assert insurer.identifiers[0].topic_id == topic
+    domain = IdentifierKind.EMAIL_DOMAIN
+    for kind, taken in ((CUSTOMER, "K9009"), (domain, "insurer.example")):
         with pytest.raises(ConflictError, match="already taken"):
             insurer.set_numbers_of(anna, [Identifier.parse(kind, taken)])
     with pytest.raises(ValidationError, match="names the user"):
-        insurer.set_numbers_of(anna, [Identifier.parse(IdentifierKind.VAT_ID, "DE123456789")])
+        insurer.set_numbers_of(anna, [Identifier.parse(domain, "anna.example")])
     with pytest.raises(ValidationError):
         insurer.set_numbers_of(
             anna, [Identifier.parse(CUSTOMER, "K5005", topic_id=TagId(new_id()))]
@@ -304,9 +307,10 @@ def test_a_person_in_public_form_is_found_by_their_display_name_alone() -> None:
     assert facts_in(text, [contact], persons=[anna.public()]).persons == ()
     named = facts_in(f"An Anna Example. {text}", [contact], persons=[anna.public()])
     assert [(p.strength, p.evidence) for p in named.persons] == [(Strength.WEAK, ("name",))]
-    # Her IBAN shows as unknown: that it is hers is private.
+    # Her IBAN shows nowhere as hers: that it is hers is private (and no contact carries IBANs
+    # since #215, so it is no identifier of the facts either).
     iban = facts_in("IBAN DE89 3704 0044 0532 0130 00", [], persons=[anna.public()])
-    assert [item.key for item in iban.identifiers] == [(IdentifierKind.IBAN, IBAN)]
+    assert iban.identifiers == () and iban.persons == ()
 
 
 def test_a_profile_declines_only_what_is_not_its_own() -> None:

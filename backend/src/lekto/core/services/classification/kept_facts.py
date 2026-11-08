@@ -1,6 +1,6 @@
 """Keeping a document's facts (`domain.document_facts`) from both readers: the patterns and
 codes of `signal_facts`, and the facts with their role the language model read in `signal_llm`
-(`facts-3`, with the holders of the IBANs and creditor IDs). The two signals run side by side,
+(`facts-3`, with the holders of the IBANs). The two signals run side by side,
 so whichever stores its result merges both: the facts signal the model's latest facts and
 holders from the log, the model's signal the codes and the rule's holders (`domain.holders`)
 already kept.

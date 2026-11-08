@@ -673,15 +673,15 @@ async def test_the_recipient_is_never_the_contact(world: World) -> None:
 
 
 async def test_an_identifier_in_the_text_backs_the_contact(world: World) -> None:
-    """The model reads only a similar name; the contact's IBAN in the text stands for it,
-    but alone it is no more than a suggestion."""
+    """The model reads only a similar name; the contact's customer number in the text stands
+    for it, but alone it is no more than a suggestion."""
     seeded = await seed(world)
     utility = seeded.contacts["Stadtwerke Musterstadt GmbH"]
-    utility.set_identifiers([Identifier.parse(IdentifierKind.IBAN, IBAN)])
+    utility.set_identifiers([Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "K-77881")])
     async with world.uow() as uow:
         await uow.contacts.update(utility)
         await uow.commit()
-    text = INVOICE.replace("Stadtwerke Musterstadt GmbH", "SWM") + f"\nIBAN {IBAN}\n"
+    text = INVOICE.replace("Stadtwerke Musterstadt GmbH", "SWM") + "\nKundennummer K-77881\n"
     result = await classify(world, proposal(sender={"value": "SWM", "evidence": None}), text)
     contact = checks(result.result)["contact"]
     assert contact.outcome is Outcome.UNCERTAIN
@@ -690,7 +690,7 @@ async def test_an_identifier_in_the_text_backs_the_contact(world: World) -> None
         "'Stadtwerke Musterstadt GmbH'"
     )
     (candidate, new) = contact.candidates
-    assert candidate.sources[0].identifiers == ("iban",)
+    assert candidate.sources[0].identifiers == ("customer_number",)
     assert (new.value, new.label) == (None, "SWM")
 
 

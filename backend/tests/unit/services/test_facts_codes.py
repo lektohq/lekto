@@ -25,7 +25,8 @@ from tests.unit.services.test_signals import contacts, stored
 
 GIRO_IBAN = "DE89370400440532013000"
 OWN_IBAN = "DE02120300000000202051"
-TEXT = f"Lekto Test GmbH\nRechnung 4711\nLastschrift von {OWN_IBAN}\n"
+TEXT = f"Lekto Test GmbH\nRechnung 4711\nKundennummer K-4711\nLastschrift von {OWN_IBAN}\n"
+CUSTOMER = (IdentifierKind.CUSTOMER_NUMBER, "K4711")
 
 
 async def with_archive(world: World, document: Document) -> Document:
@@ -40,8 +41,7 @@ async def facts(world: World, document: Document, reader: FakeCodeReader) -> Fac
 
 
 async def test_the_identifiers_and_the_payee_of_a_code_count(world: World) -> None:
-    iban = Identifier.parse(IdentifierKind.IBAN, GIRO_IBAN)
-    payee = Contact.create(name="Lekto Test GmbH", now=builders.NOW, identifiers=[iban])
+    payee = Contact.create(name="Lekto Test GmbH", now=builders.NOW)
     await contacts(world, payee)
     text = "Rechnung 4711\nBetrag 123,45 EUR\n"  # neither the payee nor its IBAN in the text
     document = await with_archive(world, await stored(world, await world.user(), text))
@@ -49,9 +49,8 @@ async def test_the_identifiers_and_the_payee_of_a_code_count(world: World) -> No
     assert result.output["named"] == [
         {"contact_id": str(payee.id), "name": "Lekto Test GmbH", "alias": False, "in_code": True}
     ]
-    assert result.output["identifiers"] == [
-        {"contact_id": str(payee.id), "kind": "iban", "value": GIRO_IBAN, "in_code": True}
-    ]
+    # The code's IBAN is a fact; no contact carries IBANs as identifiers since #215.
+    assert result.output["identifiers"] == []
     assert result.output["codes"] == 1
     assert {fact.key for fact in result.facts} == {(IdentifierKind.IBAN, GIRO_IBAN)}
 
@@ -82,7 +81,7 @@ async def test_codes_that_cannot_be_read_leave_the_facts_of_the_text(world: Worl
     document = await with_archive(world, await stored(world, await world.user(), TEXT))
     result = await facts(world, document, Broken())
     assert "codes" not in result.output
-    assert {fact.key for fact in result.facts} == {(IdentifierKind.IBAN, OWN_IBAN)}
+    assert {fact.key for fact in result.facts} == {(IdentifierKind.IBAN, OWN_IBAN), CUSTOMER}
     assert not await world.object_store.exists(codes_key(document.id))
     # Without an archive (or a reader) there are no codes either.
     other = await stored(world, await world.user(), TEXT)
@@ -145,8 +144,8 @@ async def test_admins_learn_which_other_contacts_show_an_identifier(world: World
     admin = await world.user(role=Role.ADMIN)
     report = await world.documents.facts(admin.id, document.id)
     assert report.other_contacts is not None
-    # The owner's own IBAN stands on the bank's documents too, never counting the utility.
-    assert report.other_contacts[(IdentifierKind.IBAN, OWN_IBAN)] == {bank.id}
+    # The customer number stands on the bank's documents too, never counting the utility.
+    assert report.other_contacts[CUSTOMER] == {bank.id}
     assert document.uploaded_by is not None
     assert (await world.documents.facts(document.uploaded_by, document.id)).other_contacts is None
 
@@ -206,7 +205,8 @@ def an_iban(account: int) -> str:
 
 async def test_the_report_lists_every_identifier_of_a_long_statement(world: World) -> None:
     """A bank statement shows more IBANs than the facts signal reports (`MOST`): the report
-    lists them all among the identifiers, none as a fact it does not find."""
+    lists them all among the document's numbers (no contact's identifiers since #215), none as
+    a fact it does not find."""
     owner = await world.user(role=Role.ADMIN)
     ibans = [an_iban(account) for account in range(1, MOST + 6)]
     text = "Kontoauszug\n" + "".join(
@@ -218,16 +218,16 @@ async def test_the_report_lists_every_identifier_of_a_long_statement(world: Worl
         await result.apply(uow, await uow.documents.get(document.id), builders.NOW)
         await uow.commit()
     report = await world.documents.facts(owner.id, document.id)
-    assert sorted(item.value for item in report.facts.identifiers) == sorted(ibans)
+    assert sorted(item.fact.value for item in report.numbers) == sorted(ibans)
     assert report.decided == ()
 
 
 async def test_the_report_shows_an_identifier_rejected_at_a_contact(world: World) -> None:
-    """An IBAN rejected at the bank stays among the identifiers, marked where, backing no
-    contact: not a further fact the sources do not find."""
+    """A customer number rejected at the bank stays among the identifiers, marked where, backing
+    no contact: not a further fact the sources do not find."""
     owner = await world.user(role=Role.ADMIN)
     bank = Contact.create(name="Beispielbank", now=builders.NOW)
-    bank.set_identifiers([], rejected=[Identifier.parse(IdentifierKind.IBAN, OWN_IBAN)])
+    bank.set_identifiers([], rejected=[Identifier(*CUSTOMER)])
     await contacts(world, bank)
     document = await stored(world, owner, TEXT)
     result = await facts(world, document, FakeCodeReader([]))
@@ -235,9 +235,9 @@ async def test_the_report_shows_an_identifier_rejected_at_a_contact(world: World
         await result.apply(uow, await uow.documents.get(document.id), builders.NOW)
         await uow.commit()
     report = await world.documents.facts(owner.id, document.id)
-    (iban,) = [item for item in report.facts.identifiers if item.value == OWN_IBAN]
-    assert (iban.contact_id, iban.rejected_at) == (None, bank.id)
+    (customer,) = [item for item in report.facts.identifiers if item.key == CUSTOMER]
+    assert (customer.contact_id, customer.rejected_at) == (None, bank.id)
     assert report.decided == ()
     # The signal's evidence still leaves it out.
     assert result.output["identifiers"] == []
-    assert OWN_IBAN not in str(result.output["unknown_identifiers"])
+    assert CUSTOMER[1] not in str(result.output["unknown_identifiers"])

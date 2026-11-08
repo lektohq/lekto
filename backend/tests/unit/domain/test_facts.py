@@ -65,9 +65,9 @@ def test_an_identifier_is_found_as_it_is_written() -> None:
 
 
 def test_facts_of_text_and_codes_with_their_places() -> None:
-    iban = Identifier.parse(IdentifierKind.IBAN, "DE89 3704 0044 0532 0130 00")
-    rejected = Identifier.parse(IdentifierKind.IBAN, "DE02120300000000202051")
-    utility = Contact.create(name="Stadtwerke Müllheim-Süd", now=NOW, identifiers=[iban])
+    customer = Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "2004-7718")
+    rejected = Identifier.parse(IdentifierKind.EMAIL_DOMAIN, "stadtwerke-muellheim.example")
+    utility = Contact.create(name="Stadtwerke Müllheim-Süd", now=NOW, identifiers=[customer])
     bank = Contact.create(name="Bank", now=NOW)
     bank.set_identifiers([], rejected=[rejected])
     club = Contact.create(name="Kasse Süd", now=NOW)
@@ -86,18 +86,18 @@ def test_facts_of_text_and_codes_with_their_places() -> None:
         ),
     )
     by_value = {item.value: item for item in facts.identifiers}
-    assert by_value["DE89370400440532013000"] == FoundIdentifier(
-        kind=IdentifierKind.IBAN,
-        value="DE89370400440532013000",
+    assert by_value["20047718"] == FoundIdentifier(
+        kind=IdentifierKind.CUSTOMER_NUMBER,
+        value="20047718",
         contact_id=utility.id,
         in_text=True,
         in_code=False,
-        spans=(Span(TEXT.index("DE89"), TEXT.index("DE89") + 27),),
+        spans=(Span(TEXT.index("2004-7718"), TEXT.index("2004-7718") + 9),),
     )
-    # The GiroCode's IBAN belongs to no contact; the rejected one is neither shown nor evidence.
-    giro = by_value["DE75512108001245126199"]
-    assert (giro.contact_id, giro.in_text, giro.in_code, giro.spans) == (None, False, True, ())
-    assert "DE02120300000000202051" not in by_value
+    # IBANs, the GiroCode's too, are no contact's identifiers since #215; the rejected domain
+    # is neither shown nor evidence.
+    assert not any(item.kind is IdentifierKind.IBAN for item in facts.identifiers)
+    assert "stadtwerke-muellheim.example" not in by_value
     # Those of contacts first.
     assert facts.identifiers[0].contact_id == utility.id
     # Without places, no spans.

@@ -11,7 +11,7 @@ import pytest
 from lekto.adapters.inbound.rest import PREFIX
 from lekto.adapters.outbound.memory import FakeParser, ManualClock
 from lekto.composition.container import build_memory_container, build_services
-from lekto.core.domain.identifiers import Identifier, IdentifierKind, IdentifierSource
+from lekto.core.domain.identifiers import Identifier, IdentifierKind
 from lekto.core.domain.identity import TokenScope
 from lekto.core.domain.ids import DocumentId, UserId
 from lekto.core.domain.labels import grid_layout
@@ -183,29 +183,16 @@ async def test_identifiers_of_persons_and_of_contacts(api: Api) -> None:
     assert future.status_code == 422
 
     iban = "DE89370400440532013000"
-    bank = await api.services.master_data.create_contact(
-        admin.id, "Bank", identifiers=[Identifier.parse(IdentifierKind.IBAN, iban)]
-    )
-    taken = await change(api, anna, {"identifiers": [{"kind": "iban", "value": iban}]})
-    assert taken.status_code == 409
-    assert "Bank" in taken.json()["detail"]
-    # A learned one gives way: the person's own number was learned as the contact's.
-    async with api.container.unit_of_work() as uow:
-        contact = await uow.contacts.get(bank.id)
-        contact.identifiers = [Identifier(IdentifierKind.IBAN, iban, IdentifierSource.LEARNED)]
-        await uow.contacts.update(contact)
-        await uow.commit()
+    bank = await api.services.master_data.create_contact(admin.id, "Bank")
     mine = await change(api, anna, {"identifiers": [{"kind": "iban", "value": iban}]})
     assert mine.status_code == 200, mine.text
-    contact_out = (await get(api, f"/contacts/{bank.id}", auth(admin))).json()
-    assert contact_out["identifiers"] == []
-    # A contact cannot take a person's number.
+    # A contact carries no IBAN since #215: neither hers nor any other.
     refused = await api.client.post(
         f"{PREFIX}/contacts/{bank.id}/identifiers",
         json={"kind": "iban", "value": iban},
         headers=auth(admin),
     )
-    assert refused.status_code == 409
+    assert refused.status_code == 422
     # A contact's customer number names the user it belongs to.
     named = await api.client.post(
         f"{PREFIX}/contacts/{bank.id}/identifiers",

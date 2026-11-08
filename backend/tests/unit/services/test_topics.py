@@ -58,7 +58,7 @@ async def test_a_contact_enables_topics_and_its_identifiers_point_to_them(world:
             admin.id,
             "Süd",
             identifiers=[
-                Identifier.parse(IdentifierKind.IBAN, "DE89370400440532013000", topic_id=other.id)
+                Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "K-9009", topic_id=other.id)
             ],
         )
     # Attaching from a document's facts: with a topic of the contact, or none.
@@ -68,7 +68,7 @@ async def test_a_contact_enables_topics_and_its_identifiers_point_to_them(world:
         "4711": work.id,
         "KV20261": health.id,
     }
-    stranger = Identifier.parse(IdentifierKind.VAT_ID, "DE123456789", topic_id=other.id)
+    stranger = Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "K-1010", topic_id=other.id)
     with pytest.raises(ValidationError, match="topic"):
         await service.add_identifier(admin.id, contact.id, stranger)
     # Taking a topic away leaves its identifiers without one.

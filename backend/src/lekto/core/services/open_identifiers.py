@@ -19,7 +19,6 @@ from lekto.core.domain.errors import (
     ValidationError,
 )
 from lekto.core.domain.identifiers import (
-    CONTACT_KINDS,
     Identifier,
     IdentifierKind,
     IdentifierSource,
@@ -27,6 +26,7 @@ from lekto.core.domain.identifiers import (
 )
 from lekto.core.domain.ids import ContactId, UserId
 from lekto.core.domain.open_identifiers import (
+    OPEN_KINDS,
     OpenIdentifier,
     OpenSource,
     Recommendation,
@@ -298,7 +298,7 @@ async def _open(
     """The open identifiers, the names of the contacts and the persons (`User.label`, as
     everywhere), and the identifiers training learned by key (each at one contact)."""
     contacts = await uow.contacts.list_all()
-    sightings = await uow.document_facts.sightings(CONTACT_KINDS)
+    sightings = await uow.document_facts.sightings(OPEN_KINDS)
     personal = await person_identifiers(uow)
     persons = await matching_persons(uow)
     declined = {
