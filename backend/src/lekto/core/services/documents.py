@@ -593,6 +593,15 @@ class DocumentService:
         except NotFoundError:
             raise ConflictError(because(ReasonCode.NO_STRUCTURE_YET)) from None
 
+    async def check_referable(self, actor: UserId, kind: IdentifierKind) -> None:
+        """Whether the caller may turn a value of `kind` into its reference or a reference back
+        into its value (`/identifiers/refs`): a person's kinds only admins, as the `fact` filter
+        and the places (PermissionDeniedError). A reference in an address must tell nobody the
+        value they could not find documents by."""
+        async with self._uow() as uow:
+            user = await load_actor(uow, actor)
+        check_fact_filter(user, DocumentFilter(facts=(FactCriterion(kind=kind),)))
+
     async def identifier_place(
         self, actor: UserId, id: DocumentId, kind: IdentifierKind, value: str
     ) -> Place:
