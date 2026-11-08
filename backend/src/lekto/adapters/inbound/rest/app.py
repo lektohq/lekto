@@ -2,8 +2,11 @@
 one, below `/ui`."""
 
 import asyncio
+import base64
 import contextlib
+import hashlib
 import logging
+import re
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
 from typing import Protocol
 
@@ -125,6 +128,9 @@ DISPATCHER_TIMEOUT = 5
 
 DOCS_PATH = f"{PREFIX}/docs"
 FAVICON_PATH = f"{UI_PREFIX}/favicon.svg"
+SWAGGER_PATH = f"{UI_PREFIX}/swagger"
+"""Where the web UI ships Swagger UI's script and style (`web/vite-swagger.js`)."""
+_INLINE_SCRIPT = re.compile(r"<script>(.*?)</script>", re.DOTALL)
 
 
 class Mount(Protocol):
@@ -236,7 +242,9 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
         health.router,
     ):
         app.include_router(router, prefix=PREFIX)
-    app.add_route(DOCS_PATH, _docs(app.title), include_in_schema=False)
+    app.add_route(
+        DOCS_PATH, _docs(app.title, ui=context.ui_directory is not None), include_in_schema=False
+    )
     outgoing.describe(app)
     for mount in mounts:
         app.router.routes.extend(mount.routes)
@@ -323,19 +331,46 @@ def _calls(dependant: Dependant) -> Iterator[Callable[..., object] | None]:
         yield from _calls(dependency)
 
 
-def _docs(title: str) -> Callable[[Request], Awaitable[HTMLResponse]]:
+def _docs(title: str, *, ui: bool) -> Callable[[Request], Awaitable[HTMLResponse]]:
     """The API documentation (Swagger UI) as FastAPI draws it, with Lekto's owl in the tab instead
-    of FastAPI's icon. Without the web UI the favicon is missing, and the browser shows none."""
+    of FastAPI's icon, and its script and style from the web UI, not from a CDN: the page runs in
+    the API's origin, where the session cookie holds. Its own Content-Security-Policy lets only
+    those files and the page's one inline script run. Without the web UI there is no page (404);
+    the description stays at `openapi.json`."""
 
     async def docs(request: Request) -> HTMLResponse:
         root = request.scope.get("root_path", "").rstrip("/")
-        return get_swagger_ui_html(
+        if not ui:
+            return HTMLResponse(
+                "The API documentation comes with the web UI. The API's description: "
+                f"{root}{PREFIX}/openapi.json",
+                status_code=404,
+                headers=_DOCS_HEADERS,
+            )
+        page = get_swagger_ui_html(
             openapi_url=f"{root}{PREFIX}/openapi.json",
             title=f"{title} - Swagger UI",
+            swagger_js_url=f"{root}{SWAGGER_PATH}/swagger-ui-bundle.js",
+            swagger_css_url=f"{root}{SWAGGER_PATH}/swagger-ui.css",
             swagger_favicon_url=f"{root}{FAVICON_PATH}",
         )
+        scripts = " ".join(
+            f"'sha256-{base64.b64encode(hashlib.sha256(script.encode()).digest()).decode()}'"
+            for script in _INLINE_SCRIPT.findall(bytes(page.body).decode())
+        )
+        page.headers.update(_DOCS_HEADERS)
+        page.headers["Content-Security-Policy"] = (
+            f"default-src 'none'; script-src 'self' {scripts}; style-src 'self'; "
+            "style-src-attr 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; "
+            "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+        )
+        return page
 
     return docs
+
+
+# The docs are among the public paths, which `NoStore` leaves alone.
+_DOCS_HEADERS = {"Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff"}
 
 
 def close_event_streams(app: FastAPI) -> None:

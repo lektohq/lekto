@@ -6,11 +6,13 @@ import { svelteTesting } from '@testing-library/svelte/vite';
 import { defineConfig } from 'vitest/config';
 import { BASE } from './src/lib/base.ts';
 import { pdfjsAssets } from './vite-pdfjs.js';
+import { swaggerAssets } from './vite-swagger.js';
 
 export default defineConfig({
 	plugins: [
 		tailwindcss(),
 		pdfjsAssets(),
+		swaggerAssets(),
 		paraglideVitePlugin({
 			project: './project.inlang',
 			outdir: './src/lib/paraglide',
