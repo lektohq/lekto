@@ -1016,21 +1016,21 @@
 					<span>{filingHint.text}</span>
 				</p>
 			{/if}
-			<div class="flex gap-2">
-				<Button type="submit" disabled={busy || blocked || (filing !== null && spaceTarget === '')}
-					>{m.review_confirm()}</Button
-				>
+			<div class="flex justify-end gap-2">
 				<Button type="button" variant="ghost" disabled={busy} onclick={reset}>
 					{m.review_reset()}
 				</Button>
+				<Button type="submit" disabled={busy || blocked || (filing !== null && spaceTarget === '')}
+					>{m.review_confirm()}</Button
+				>
 			</div>
 		{:else}
 			<p class="text-sm text-muted-foreground">{m.edit_hint()}</p>
-			<div class="flex gap-2">
-				<Button type="submit" disabled={!dirty || busy || blocked}>{m.edit_review()}</Button>
+			<div class="flex justify-end gap-2">
 				<Button type="button" variant="ghost" disabled={!dirty || busy} onclick={reset}>
 					{m.edit_discard()}
 				</Button>
+				<Button type="submit" disabled={!dirty || busy || blocked}>{m.edit_review()}</Button>
 			</div>
 		{/if}
 	</div>

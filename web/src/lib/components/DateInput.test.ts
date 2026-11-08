@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
 
 // The real picker, not the stand-in of the other component tests (`tests/setup.ts`).
@@ -15,6 +15,43 @@ describe('DateInput', () => {
 			.filter(Boolean);
 		expect(parts.sort()).toEqual(['10', '2026', '26']);
 		expect(screen.getByRole('button')).toBeTruthy();
+	});
+
+	it('adds hour and minute with granularity minute and writes them back', async () => {
+		const onchange = vi.fn();
+		render(DateInput, {
+			value: '2026-10-26T14:30',
+			label: 'Came in',
+			granularity: 'minute',
+			onchange
+		});
+		const field = screen.getByRole('group', { name: 'Came in' });
+		const hour = field.querySelector<HTMLElement>('[data-segment="hour"]');
+		expect(hour).toBeTruthy();
+		expect(field.querySelector('[data-segment="minute"]')?.textContent?.trim()).toBe('30');
+		hour?.focus();
+		await fireEvent.keyDown(hour as HTMLElement, { key: 'ArrowUp' });
+		expect(onchange).toHaveBeenLastCalledWith('2026-10-26T15:30');
+	});
+
+	it('shows the day picked in the calendar after a segment had the focus', async () => {
+		const onchange = vi.fn();
+		render(DateInput, { value: '2026-10-26', label: 'Document date', onchange });
+		const field = screen.getByRole('group', { name: 'Document date' });
+		const day = field.querySelector<HTMLElement>('[data-segment="day"]') as HTMLElement;
+		day.focus();
+		await fireEvent.focusOut(day);
+		await fireEvent.click(screen.getByRole('button'));
+		const picked = await waitFor(() => {
+			const cell = [...document.querySelectorAll<HTMLElement>('[data-bits-day]')].find(
+				(cell) => !cell.hasAttribute('data-outside-month') && cell.textContent?.trim() === '20'
+			);
+			expect(cell).toBeTruthy();
+			return cell as HTMLElement;
+		});
+		await fireEvent.click(picked);
+		expect(onchange).toHaveBeenLastCalledWith('2026-10-20');
+		await waitFor(() => expect(day.textContent?.trim()).toBe('20'));
 	});
 
 	it('stays empty without a day', () => {

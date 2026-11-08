@@ -2,7 +2,7 @@
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
-	import { parseDate, type DateValue } from '@internationalized/date';
+	import { parseDate, parseDateTime, type DateValue } from '@internationalized/date';
 	import { DatePicker } from 'bits-ui';
 	import { FIELD, FIELD_HEIGHT } from '#lib/components/ui/field-look.ts';
 	import { getLocale, regionalLocale } from '#lib/i18n.ts';
@@ -11,13 +11,16 @@
 
 	// A date in the language of the UI (web/DESIGN.md, "Fields"), not of the browser as the
 	// native date input has it: day, month and year to type, and a calendar beside them. The
-	// value is a day as the API writes it (`2026-10-26`), or '' for none.
+	// value is a day as the API writes it (`2026-10-26`), or '' for none. With `granularity`
+	// `minute` hour and minute follow, and the value is the local date and time
+	// (`2026-10-26T14:30`, as `min` and `max`).
 	let {
 		value = $bindable(''),
 		id,
 		label,
 		min,
 		max,
+		granularity = 'day',
 		disabled = false,
 		invalid = false,
 		class: className,
@@ -29,6 +32,7 @@
 		label: string;
 		min?: string;
 		max?: string;
+		granularity?: 'day' | 'minute';
 		disabled?: boolean;
 		invalid?: boolean;
 		class?: string;
@@ -38,23 +42,45 @@
 	function toDate(text: string | undefined): DateValue | undefined {
 		if (!text) return undefined;
 		try {
-			return parseDate(text.slice(0, 10));
+			return granularity === 'minute'
+				? parseDateTime(text.slice(0, 16))
+				: parseDate(text.slice(0, 10));
 		} catch {
 			return undefined;
 		}
 	}
 
+	/** The value as this field writes it: the day, or the day with hour and minute. */
+	function written(date: DateValue): string {
+		const text = date.toString();
+		return granularity === 'minute' ? text.slice(0, 16) : text.slice(0, 10);
+	}
+
 	const locale = regionalLocale(getLocale());
+
+	// bits-ui (2.19 to 2.20.6) pads a segment with a zero when the focus leaves it and marks it as
+	// being typed then; a day picked in the calendar afterwards shows that segment's old digits
+	// although the value took the new day (a segment had the focus, the calendar opened). It clears
+	// the mark at that reading of the value: once the calendar has closed, the value is read again.
+	// Not while a date is half typed, which bits-ui would clear at that reading.
+	let fresh = $state(0);
 </script>
 
 <DatePicker.Root
 	bind:value={
-		() => toDate(value),
+		() => {
+			void fresh;
+			return toDate(value);
+		},
 		(next) => {
-			value = next ? next.toString() : '';
+			value = next ? written(next) : '';
 			onchange?.(value);
 		}
 	}
+	onOpenChangeComplete={(open) => {
+		if (!open && value) fresh++;
+	}}
+	{granularity}
 	{locale}
 	minValue={toDate(min)}
 	maxValue={toDate(max)}
