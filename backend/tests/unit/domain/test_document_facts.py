@@ -205,7 +205,7 @@ def test_a_person_s_number_never_comes_in_under_another_kind() -> None:
     assert isinstance(refused, Reason) and refused.code is ReasonCode.FACT_OF_A_PERSON
     member = check(
         text,
-        read("membership_number", "123FK456789", "target", "Mitglied 123FK456789"),
+        read("contract_number", "123FK456789", "target", "Mitglied 123FK456789"),
         frozenset({child}),
     )
     assert isinstance(member, Reason) and member.code is ReasonCode.FACT_OF_A_PERSON

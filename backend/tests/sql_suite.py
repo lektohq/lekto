@@ -3556,6 +3556,131 @@ class MigrationSuite:
         await downgrade(empty_database, "0054")
         assert await stored() == expected
 
+    async def test_one_contract_number_after_revision_0071(self, empty_database: Database) -> None:
+        """Revision 0071 (#215): policy, membership and loan numbers become contract numbers
+        everywhere; where a value stands twice, the one a person decided stays."""
+        await migrate(empty_database, "0070")
+        ids = {
+            name: new_id()
+            for name in ("anna", "space", "insurer", "club", "document", "rule", "lens")
+        }
+        identifier = {"contact_id": ids["insurer"]}
+        fact = {"document_id": ids["document"], "role": "target", "origins": "pattern"}
+        condition = {"field": "fact", "op": "is", "value": "111111", "fact_kind": "policy_number"}
+        await _insert(
+            empty_database,
+            [
+                (
+                    t.users,
+                    {"id": ids["anna"], "username": "a", "username_key": "a", "role": "user"},
+                ),
+                (
+                    t.spaces,
+                    {
+                        "id": ids["space"],
+                        "name": "A",
+                        "name_key": "a",
+                        "personal_of": ids["anna"],
+                        "created_at": NOW,
+                        "version": 1,
+                    },
+                ),
+                (t.contacts, {"id": ids["insurer"], "name": "Insurer", "name_key": "insurer"}),
+                (t.contacts, {"id": ids["club"], "name": "Club", "name_key": "club"}),
+                # Entered at the insurer as a policy, learned at the club as a contract.
+                (
+                    t.contact_identifiers,
+                    identifier | {"kind": "policy_number", "value": "111111", "source": "manual"},
+                ),
+                (
+                    t.contact_identifiers,
+                    {
+                        "contact_id": ids["club"],
+                        "kind": "contract_number",
+                        "value": "111111",
+                        "source": "learned",
+                    },
+                ),
+                (
+                    t.contact_identifiers,
+                    identifier | {"kind": "loan_number", "value": "222222", "source": "learned"},
+                ),
+                (
+                    t.user_identifiers,
+                    {"user_id": ids["anna"], "kind": "membership_number", "value": "333333"},
+                ),
+                (
+                    t.user_identifiers,
+                    {"user_id": ids["anna"], "kind": "contract_number", "value": "333333"},
+                ),
+                (t.documents, {"id": ids["document"], "space_id": ids["space"]}),
+                (
+                    t.document_facts,
+                    fact | {"kind": "policy_number", "value": "444444", "state": "corrected"},
+                ),
+                (
+                    t.document_facts,
+                    fact | {"kind": "contract_number", "value": "444444", "state": "found"},
+                ),
+                (t.rules, {"id": ids["rule"], "scope": "global", "current_version": 1}),
+                (
+                    t.rule_versions,
+                    {
+                        "rule_id": ids["rule"],
+                        "number": 1,
+                        "triggers": [],
+                        "conditions": {"all": [condition], "negate": False},
+                        "actions": [],
+                    },
+                ),
+                (
+                    t.lenses,
+                    {
+                        "id": ids["lens"],
+                        "owner_id": ids["anna"],
+                        "name": "L",
+                        "name_key": "l",
+                        "position": 0,
+                        "filter": {"facts": [{"kind": "membership_number", "value": "333333"}]},
+                        "grouping": "none",
+                        "layout": "list",
+                        "card_field_ids": [],
+                    },
+                ),
+            ],
+        )
+        await migrate(empty_database)
+        async with empty_database.reading() as connection:
+            contacts = await _read_all(
+                connection,
+                select(
+                    t.contact_identifiers.c.contact_id,
+                    t.contact_identifiers.c.kind,
+                    t.contact_identifiers.c.value,
+                    t.contact_identifiers.c.source,
+                ),
+            )
+            users = await _read_all(
+                connection, select(t.user_identifiers.c.kind, t.user_identifiers.c.value)
+            )
+            facts = await _read_all(
+                connection,
+                select(t.document_facts.c.kind, t.document_facts.c.value, t.document_facts.c.state),
+            )
+            (conditions,) = (await connection.execute(select(t.rule_versions.c.conditions))).one()
+            (lens,) = (await connection.execute(select(t.lenses.c.filter))).one()
+        assert sorted(contacts, key=str) == sorted(
+            [
+                (ids["insurer"], "contract_number", "111111", "manual"),
+                (ids["insurer"], "contract_number", "222222", "learned"),
+            ],
+            key=str,
+        )
+        assert users == [("contract_number", "333333")]
+        assert facts == [("contract_number", "444444", "corrected")]
+        assert conditions["all"][0]["fact_kind"] == "contract_number"
+        assert lens["facts"] == [{"kind": "contract_number", "value": "333333"}]
+
     async def test_mail_rules_get_the_tree_with_revision_0062_and_back(
         self, empty_database: Database
     ) -> None:

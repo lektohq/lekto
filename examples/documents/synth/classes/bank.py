@@ -614,7 +614,7 @@ def loan_contract(
         f"Darlehensvertrag Auto {number}",
         bill,
         fields={"Betrag": money(amount), "Vertragsbeginn": day.isoformat()},
-        facts=[("loan_number", number), ("iban", MAX_IBAN)],
+        facts=[("contract_number", number), ("iban", MAX_IBAN)],
         download=f"Darlehensvertrag_{number}.pdf",
     )
 
@@ -658,7 +658,7 @@ def loan_statement(year: int, number: str, opening: Decimal, rate: Decimal, seed
         f"Darlehen Jahresauszug {year}",
         bill,
         fields={"Kontostand": money(-closing), "Bezugszeitraum": f"{year}"},
-        facts=[("loan_number", number)],
+        facts=[("contract_number", number)],
         download=f"Jahreskontoauszug_{year}_{number}.pdf",
     )
 

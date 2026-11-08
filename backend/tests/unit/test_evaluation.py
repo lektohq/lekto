@@ -62,7 +62,7 @@ async def test_the_fixed_answers_give_the_expected_lanes(tmp_path: Path) -> None
     assert "the trained one took over 57 documents of the training corpus first" in text
     assert "## Lanes (trained)" in text
     assert "## Instructions in the document text (cold)" in text
-    # The rule's holders with the model's fixed ones: every one expected (`facts-2`), the VAT
+    # The rule's holders with the model's fixed ones: every one expected (`facts-3`), the VAT
     # IDs and e-mail domains of the rule alone.
     assert "Holders (cold): 12 of 12 numbers with the holder expected." in text
     assert "Holders (trained): 13 of 13 numbers with the holder expected." in text

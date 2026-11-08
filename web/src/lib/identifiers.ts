@@ -17,15 +17,12 @@ export const IDENTIFIER_KINDS: readonly IdentifierKind[] = [
 	'vat_id',
 	'customer_number',
 	'contract_number',
-	'policy_number',
-	'membership_number',
 	'personnel_number',
 	'email_domain',
 	'creditor_id',
 	'commercial_register',
 	'tax_number',
 	'meter_number',
-	'loan_number',
 	'mandate_reference',
 	'license_plate'
 ];
@@ -45,10 +42,7 @@ export const NAMING_KINDS: readonly IdentifierKind[] = [
 	'customer_number',
 	'personnel_number',
 	'contract_number',
-	'policy_number',
-	'membership_number',
 	'meter_number',
-	'loan_number',
 	'mandate_reference',
 	'license_plate'
 ];
@@ -87,10 +81,7 @@ const KIND_LABELS: Record<IdentifierKind, () => string> = {
 	commercial_register: m.identifier_kind_commercial_register,
 	tax_number: m.identifier_kind_tax_number,
 	contract_number: m.identifier_kind_contract_number,
-	policy_number: m.identifier_kind_policy_number,
-	membership_number: m.identifier_kind_membership_number,
 	meter_number: m.identifier_kind_meter_number,
-	loan_number: m.identifier_kind_loan_number,
 	mandate_reference: m.identifier_kind_mandate_reference,
 	license_plate: m.identifier_kind_license_plate,
 	invoice_number: m.identifier_kind_invoice_number,

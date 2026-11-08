@@ -503,7 +503,7 @@ def _close(a: str, b: str) -> bool:
     return any(long[:i] + long[i + 1 :] == short for i in range(len(long)))
 
 
-# --- the holders the language model tells (`facts-2`) -----------------------------------------
+# --- the holders the language model tells (`facts-3`) -----------------------------------------
 
 NEAR = 400
 """Characters around a number within which the holder's name the model gives must stand."""
