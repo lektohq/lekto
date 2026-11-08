@@ -17,7 +17,7 @@ from synth.numbers import euro, german
 D = Decimal
 LEASE = "MV-2025-08-1204"
 MEMBER = "40871"
-OLD_TENANT = "BW5-EG-links"
+OLD_TENANT = "BW5-EG-0104"
 
 
 def lease(day: date, seed: int = 0) -> Doc:
@@ -110,7 +110,7 @@ def lease(day: date, seed: int = 0) -> Doc:
         bill,
         recipient="max+erika",
         fields={"Vertragsbeginn": "2025-08-01", "Betrag": money("1032.00")},
-        facts=[("contract_number", LEASE), ("membership_number", MEMBER), ("iban", s.iban)],
+        facts=[("contract_number", LEASE), ("contract_number", MEMBER), ("iban", s.iban)],
         download="Mietvertrag_Lindenallee12.pdf",
     )
 
@@ -139,7 +139,7 @@ def membership(day: date, seed: int = 0) -> Doc:
         document_type="Bescheinigung",
         title="Mitgliedschaft Wohnbau",
         both=True,
-        facts=[("membership_number", MEMBER), ("iban", c.WOHNBAU.iban)],
+        facts=[("contract_number", MEMBER), ("iban", c.WOHNBAU.iban)],
         fields={"Betrag": money("925.00"), "Fällig am": "2025-07-15"},
         sign=("Paul Wagner", "Vorstand"),
         seed=seed,
@@ -290,7 +290,7 @@ def rent_increase(day: date, seed: int = 0) -> Doc:
         document_type="Mitteilung",
         title="Mieterhöhung Dezember 2026",
         both=True,
-        facts=[("contract_number", LEASE), ("membership_number", MEMBER)],
+        facts=[("contract_number", LEASE), ("contract_number", MEMBER)],
         fields={"Betrag": money("1068.96")},
         sign=("Ingrid Hoffmann", "Vorstand"),
         seed=seed,
