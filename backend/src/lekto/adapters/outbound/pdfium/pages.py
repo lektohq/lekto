@@ -21,6 +21,12 @@ from lekto.core.ports.pages import PREVIEW_FILE, RenderedPages
 DEFAULT_WIDTH = 1200
 DEFAULT_PREVIEW_WIDTH = 400
 _QUALITY = 80
+PIXELS_PER_POINT = 2
+"""How fine a page is rendered at most: enough for the page width of an A4 page."""
+MAX_EDGE = 10_000
+"""Pixels of a page image's long edge at most: a page eight times as high as wide keeps the
+full width, and a page of any size a PDF may give (14 400 points a side) renders within about
+50 MB. Rendered at a fixed scale, such a page of a file of 553 bytes asked for 3.3 GB."""
 
 
 class PdfiumPageRenderer:
@@ -42,7 +48,7 @@ class PdfiumPageRenderer:
         scratch.mkdir()
         try:
             if media_type == media_types.PDF:
-                pages = _pdf_pages(source)
+                pages = _pdf_pages(source, self._width)
                 renderer = f"pdfium {pypdfium2.PDFIUM_INFO.build}"
             else:
                 pages = _image_pages(source)
@@ -62,10 +68,17 @@ class PdfiumPageRenderer:
         return RenderedPages(pages=count, renderer=renderer)
 
 
+def page_scale(width: float, height: float, target: int) -> float:
+    """Pixels per point for a page `width` by `height` points: at most `PIXELS_PER_POINT`, no
+    wider than `target` pixels, its long edge at most `MAX_EDGE`. From the page's size, which
+    the file gives as it likes."""
+    return min(PIXELS_PER_POINT, target / max(width, 1.0), MAX_EDGE / max(width, height, 1.0))
+
+
 @contextmanager
-def _pdf_pages(source: Path) -> Iterator[Iterator[Image.Image]]:
-    """The pages of a PDF, rendered one at a time at 2 pixels per point (enough for the page
-    width); the caller scales them."""
+def _pdf_pages(source: Path, width: int) -> Iterator[Iterator[Image.Image]]:
+    """The pages of a PDF, rendered one at a time at `page_scale` for `width` pixels; the
+    caller fits them (rendering rounds up)."""
     try:
         with LOCK:
             document = pypdfium2.PdfDocument(source)
@@ -80,7 +93,7 @@ def _pdf_pages(source: Path) -> Iterator[Iterator[Image.Image]]:
             with LOCK:
                 page = document[index]
                 try:
-                    bitmap = page.render(scale=2)
+                    bitmap = page.render(scale=page_scale(*page.get_size(), width))
                     image: Image.Image = bitmap.to_pil().convert("RGB")
                 finally:
                     page.close()
