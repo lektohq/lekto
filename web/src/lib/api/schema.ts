@@ -927,7 +927,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * The reference to a value
-		 * @description The reference to an identifier's value, for addresses that name it (the `fact` filter of the documents): the value goes in the body, the reference in the URL, so the value stays out of histories, bookmarks and logs. The same value (normalised) always gives the same reference while the instance's secret key stays. 422 for a value that is none of its kind.
+		 * @description The reference to an identifier's value, for addresses that name it (the `fact` filter of the documents): the value goes in the body, the reference in the URL, so the value stays out of histories, bookmarks and logs. The same value (normalised) always gives the same reference while the instance's secret key stays. 422 for a value that is none of its kind. A person's kinds (tax ID, social security, health insurance and child benefit numbers, personal e-mail addresses) only for admins (403), as the `fact` filter.
 		 */
 		post: operations['make_ref_api_v1_identifiers_refs_post'];
 		delete?: never;
@@ -945,7 +945,7 @@ export interface paths {
 		};
 		/**
 		 * The value of a reference
-		 * @description To show what a reference names. 422 for one that names no value of the kind.
+		 * @description To show what a reference names. 422 for one that names no value of the kind. A person's kinds only for admins (403), as `POST /identifiers/refs`.
 		 */
 		get: operations['read_ref_api_v1_identifiers_refs__kind___ref__get'];
 		put?: never;
@@ -19366,6 +19366,23 @@ export interface operations {
 					 *       "title": "Unauthorized",
 					 *       "status": 401,
 					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
 					 *     }
 					 */
 					'application/problem+json': components['schemas']['Problem'];

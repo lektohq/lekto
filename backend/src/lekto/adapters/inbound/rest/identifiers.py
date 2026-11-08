@@ -187,12 +187,15 @@ refs_router = APIRouter(prefix="/identifiers/refs", tags=["identifiers"], depend
         "filter of the documents): the value goes in the body, the reference in the URL, so "
         "the value stays out of histories, bookmarks and logs. The same value (normalised) "
         "always gives the same reference while the instance's secret key stays. 422 for a "
-        "value that is none of its kind."
+        "value that is none of its kind. A person's kinds (tax ID, social security, health "
+        "insurance and child benefit numbers, personal e-mail addresses) only for admins (403), "
+        "as the `fact` filter."
     ),
     response_model=RefOut,
-    responses=problem_responses(401, 422),
+    responses=problem_responses(401, 403, 422),
 )
 async def make_ref(body: RefIn, user: CurrentUser, context: Context) -> RefOut:
+    await context.documents.check_referable(user, body.kind)
     value = normalise_identifier(body.kind, body.value)
     return RefOut(kind=body.kind, value=value, ref=seal(context.refs, body.kind, value))
 
@@ -200,9 +203,12 @@ async def make_ref(body: RefIn, user: CurrentUser, context: Context) -> RefOut:
 @refs_router.get(
     "/{kind}/{ref}",
     summary="The value of a reference",
-    description="To show what a reference names. 422 for one that names no value of the kind.",
+    description=(
+        "To show what a reference names. 422 for one that names no value of the kind. A "
+        "person's kinds only for admins (403), as `POST /identifiers/refs`."
+    ),
     response_model=RefOut,
-    responses=problem_responses(401, 422),
+    responses=problem_responses(401, 403, 422),
 )
 async def read_ref(
     kind: IdentifierKind,
@@ -210,6 +216,7 @@ async def read_ref(
     user: CurrentUser,
     context: Context,
 ) -> RefOut:
+    await context.documents.check_referable(user, kind)
     return RefOut(kind=kind, value=opened(context.refs, kind, ref), ref=ref)
 
 
