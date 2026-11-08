@@ -11,8 +11,12 @@ The model answers in JSON (`SCHEMA`); an answer that does not fit is asked for o
 page leaves a record in the folder the configuration names (`page-<n>.json`): its words, those
 the model could not read (`UNREADABLE`) and what was sent and received. A page the model cannot
 read leaves the reason there (`error.json`, `write_error`). The configuration comes
-in the environment (`CONFIG_ENV`, the key apart in `KEY_ENV`), since the plugin runs in
-OCRmyPDF's process and its workers. Neither the key nor the page's text is logged.
+in the environment (`CONFIG_ENV`), since the plugin runs in OCRmyPDF's process and its workers.
+The key does not: the environment goes on to Ghostscript, Tesseract and the other programs
+OCRmyPDF starts, which parse the document. It stands in a file of the records folder that only
+Lekto's user may read (`KEY_FILE`), which the environment names, and goes with the folder; the
+folder is no path Ghostscript may read in its safe mode (`-dSAFER`, as OCRmyPDF runs it).
+Neither the key nor the page's text is logged.
 """
 
 import base64
@@ -43,7 +47,8 @@ from lekto.core.domain.exchanges import ModelCall
 PROMPT = "read-1"
 """The version of `SYSTEM` and `SCHEMA`, for the processing log."""
 CONFIG_ENV = "LEKTO_OCR_VISION"
-KEY_ENV = "LEKTO_OCR_VISION_KEY"
+KEY_FILE = "key"
+"""The file of the records folder that holds the key."""
 MAX_PIXELS = 1_150_000  # what Claude looks at; larger images are scaled down by the service
 MAX_EDGE = 1568
 MAX_TOKENS = 16_000  # a dense page with its boxes takes about 2,500
@@ -142,31 +147,37 @@ class PageRecord:
 
 
 def environment(settings: VisionSettings, records: Path) -> dict[str, str]:
-    """The environment for OCRmyPDF's process: where the plugin finds its configuration."""
-    config = {
+    """The environment for OCRmyPDF's process: where the plugin finds its configuration. Writes
+    the key, if any, to `KEY_FILE` in `records` (an existing folder), readable by this user
+    only; the environment names the file, not the key."""
+    config: dict[str, object] = {
         "base_url": settings.base_url,
         "model": settings.model,
         "timeout": settings.timeout.total_seconds(),
         "records": str(records),
     }
-    env = {CONFIG_ENV: json.dumps(config)}
     if settings.api_key:
-        env[KEY_ENV] = settings.api_key
-    return env
+        key = records / KEY_FILE
+        descriptor = os.open(key, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as file:
+            file.write(settings.api_key)
+        config["key_file"] = str(key)
+    return {CONFIG_ENV: json.dumps(config)}
 
 
 def configuration() -> tuple[VisionSettings, Path]:
     """The settings and the folder for the page records, from the environment."""
     try:
         config = json.loads(os.environ[CONFIG_ENV])
+        key_file = config.get("key_file")
         settings = VisionSettings(
             base_url=str(config["base_url"]),
             model=str(config["model"]),
-            api_key=os.environ.get(KEY_ENV) or None,
+            api_key=None if key_file is None else Path(key_file).read_text(encoding="utf-8"),
             timeout=timedelta(seconds=float(config["timeout"])),
         )
         return settings, Path(config["records"])
-    except (KeyError, ValueError, TypeError) as error:
+    except (KeyError, ValueError, TypeError, OSError) as error:
         raise VisionError(f"the vision plugin has no usable configuration in {CONFIG_ENV}") from (
             error
         )

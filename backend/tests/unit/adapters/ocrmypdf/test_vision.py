@@ -4,6 +4,7 @@ OCR tree OCRmyPDF gets."""
 import base64
 import io
 import json
+import stat
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -18,7 +19,7 @@ from lekto.adapters.outbound.ocrmypdf import plugin
 from lekto.adapters.outbound.ocrmypdf.plugin import VisionOcrEngine, page_element
 from lekto.adapters.outbound.ocrmypdf.vision import (
     CONFIG_ENV,
-    KEY_ENV,
+    KEY_FILE,
     MAX_PIXELS,
     SYSTEM,
     Line,
@@ -192,7 +193,7 @@ def test_the_configuration_goes_through_the_environment(
         base_url="https://vlm.example/v1", model="vlm-1", api_key="k", timeout=timedelta(seconds=90)
     )
     env = environment(settings, tmp_path)
-    assert env[KEY_ENV] == "k"
+    assert list(env) == [CONFIG_ENV]
     assert "k" not in json.loads(env[CONFIG_ENV]).values()
     for name, value in env.items():
         monkeypatch.setenv(name, value)
@@ -200,6 +201,36 @@ def test_the_configuration_goes_through_the_environment(
     monkeypatch.delenv(CONFIG_ENV)
     with pytest.raises(VisionError, match="no usable configuration"):
         configuration()
+
+
+def test_the_key_stays_out_of_the_environment_of_what_ocrmypdf_starts(tmp_path: Path) -> None:
+    """Ghostscript and Tesseract inherit OCRmyPDF's environment and parse the document: the key
+    stands in a file only Lekto's user may read, which the environment names."""
+    secret = "sk-vision-0123456789"
+    settings = VisionSettings(
+        base_url="https://vlm.example/v1",
+        model="vlm-1",
+        api_key=secret,
+        timeout=timedelta(seconds=60),
+    )
+    env = environment(settings, tmp_path)
+    assert all(secret not in value for value in env.values())
+    key = tmp_path / KEY_FILE
+    assert json.loads(env[CONFIG_ENV])["key_file"] == str(key)
+    assert key.read_text(encoding="utf-8") == secret
+    assert stat.S_IMODE(key.stat().st_mode) == 0o600
+
+
+def test_without_a_key_there_is_no_key_file(tmp_path: Path) -> None:
+    settings = VisionSettings(
+        base_url="http://ollama:11434/v1",
+        model="vlm-1",
+        api_key=None,
+        timeout=timedelta(seconds=60),
+    )
+    env = environment(settings, tmp_path)
+    assert "key_file" not in json.loads(env[CONFIG_ENV])
+    assert not (tmp_path / KEY_FILE).exists()
 
 
 def test_the_records_of_the_pages_in_order(tmp_path: Path) -> None:

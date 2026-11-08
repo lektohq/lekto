@@ -186,7 +186,7 @@ class OcrmypdfEngine:
                 assert self._vision is not None
                 await asyncio.to_thread(records.mkdir)
                 mode = ["--force-ocr", "--deskew", "--plugin", PLUGIN]
-                env = environment(self._vision, records)
+                env = await asyncio.to_thread(environment, self._vision, records)
                 timeout = self._vision_timeout
             elif unreadable:
                 mode = ["--force-ocr", "--deskew"]
