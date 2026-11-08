@@ -246,6 +246,26 @@ def test_a_number_of_a_kind_with_a_holder_needs_its_contact_s_each_time() -> Non
     )
 
 
+def test_a_customer_number_is_its_contact_s_unless_a_booking_gives_it_another() -> None:
+    utility = Contact.create(name="Stadtwerke", now=NOW)
+    # No holder told: the contact's, as before customer numbers had holders.
+    unbooked = [seen(utility.id, CUSTOMER, 1), seen(utility.id, CUSTOMER, 2)]
+    assert advice(open_identifiers([utility], unbooked)[0]) == (
+        Recommendation.CONFIRM,
+        ReasonCode.RECOMMEND_CONFIRM,
+    )
+    booked = [seen(utility.id, CUSTOMER, 1), seen(utility.id, CUSTOMER, 2, holder=THIRD)]
+    assert advice(open_identifiers([utility], booked)[0]) is None
+
+
+def test_a_learned_customer_number_of_the_bookings_is_recommended_to_reject() -> None:
+    bank = Contact.create(name="Bank", now=NOW)
+    bank.set_learned([Identifier(*CUSTOMER, IdentifierSource.LEARNED)])
+    payees = [seen(bank.id, CUSTOMER, day, holder=THIRD) for day in (1, 2, 3)]
+    (item,) = open_identifiers([bank], payees)
+    assert advice(item) == (Recommendation.REJECT, ReasonCode.RECOMMEND_REJECT_FOREIGN)
+
+
 def test_a_learned_one_someone_else_holds_is_recommended_to_reject() -> None:
     bank = Contact.create(name="Bank", now=NOW)
     bank.set_learned([Identifier(*IBAN, IdentifierSource.LEARNED)])

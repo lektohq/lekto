@@ -30,8 +30,8 @@ Layout of a set directory:
   `kind`, `value`, `role`, `evidence`, `label`; `holders`: its holders of the listed IBANs and
   creditor IDs, `kind`, `value`, `holder`, `name`, `evidence`). `expected.facts` (`kind`,
   `value` as written, `role`) are the facts the document must have, scored where given;
-  `expected.holders` (`kind`, `value`, `holder`) whose its IBANs, creditor IDs, VAT IDs and
-  e-mail domains are, scored where given;
+  `expected.holders` (`kind`, `value`, `holder`) whose its IBANs, creditor IDs, VAT IDs,
+  e-mail domains and customer numbers in bookings are, scored where given;
   `expected.relations` the cases of the run it is related with (either way), by name; a case
   without them expects none. `expected` and
   `fake` may give `lanes` by run where a run differs; `runs` names the runs a case belongs to
