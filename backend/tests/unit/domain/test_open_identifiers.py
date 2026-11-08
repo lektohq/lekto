@@ -74,19 +74,28 @@ def test_a_learned_one_is_open_with_the_documents_that_show_it() -> None:
     assert (item.written, item.last) == ("2004 7718", date(2026, 10, 9))
 
 
-def test_an_unknown_one_is_open_with_the_contacts_of_its_documents() -> None:
-    utility, bank = (Contact.create(name=name, now=NOW) for name in ("Stadtwerke", "Bank"))
+def test_a_domain_that_fits_its_contact_s_name_is_suggested_for_it() -> None:
+    """Since #215 a contact's kind at no contact is no longer open (unknown): only a domain whose
+    name fits the contact of its documents, while that contact has none entered (#215)."""
+    utility, bank = (Contact.create(name=name, now=NOW) for name in ("Stadtwerke Nord", "Bank"))
+    site = (IdentifierKind.EMAIL_DOMAIN, "stadtwerke-nord.example")
+    portal = (IdentifierKind.EMAIL_DOMAIN, "kundenportal.example")
     sightings = [
-        seen(bank.id, OTHER, 3),
-        seen(utility.id, OTHER, 4),
-        seen(utility.id, OTHER, 5),
-        seen(utility.id, INVOICE, 5),  # not a contact's kind
-        seen(utility.id, VAT, 5),  # no contact's identifier since #215
+        seen(utility.id, site, 4),
+        seen(utility.id, site, 5),
+        seen(bank.id, site, 3),  # the bank's name does not fit it
+        seen(utility.id, portal, 5),  # nor does the utility's this one
+        seen(utility.id, OTHER, 5),  # a customer number at no contact: not open
+        seen(utility.id, INVOICE, 5),
+        seen(utility.id, VAT, 5),
     ]
     (item,) = open_identifiers([utility, bank], sightings)
-    assert (item.key, item.source) == (OTHER, OpenSource.UNKNOWN)
-    assert item.contacts == (utility.id, bank.id)  # most documents first
-    assert (len(item.seen), item.written) == (3, OTHER[1])
+    assert (item.key, item.source, item.contacts) == (site, OpenSource.SUGGESTED, (utility.id,))
+    assert len(item.seen) == 2  # its contact's documents
+    assert advice(item) == (Recommendation.CONFIRM, ReasonCode.RECOMMEND_CONFIRM_NAMED)
+    # A contact with a domain entered gets none suggested.
+    utility.set_identifiers([Identifier(IdentifierKind.EMAIL_DOMAIN, "nord.example")])
+    assert open_identifiers([utility, bank], sightings) == []
 
 
 def test_an_iban_or_a_vat_id_is_no_contact_s() -> None:
@@ -165,6 +174,12 @@ def test_what_a_contact_or_a_person_has_is_not_open() -> None:
 
 def test_the_most_documents_come_first_then_the_newest() -> None:
     utility = Contact.create(name="Stadtwerke", now=NOW)
+    utility.set_learned(
+        [
+            Identifier(*CUSTOMER, IdentifierSource.LEARNED),
+            Identifier(*OTHER, IdentifierSource.LEARNED),
+        ]
+    )
     sightings = [
         seen(utility.id, OTHER, 1),
         seen(utility.id, DOMAIN, 2),
@@ -220,6 +235,7 @@ def test_one_in_two_documents_of_its_contact_alone_is_recommended_to_confirm() -
 
 def test_a_number_of_a_kind_with_a_holder_needs_its_contact_s_each_time() -> None:
     utility = Contact.create(name="Stadtwerke", now=NOW)
+    utility.set_learned([Identifier(*DOMAIN, IdentifierSource.LEARNED)])  # learned before #215
     unread = [seen(utility.id, DOMAIN, 1), seen(utility.id, DOMAIN, 2)]  # read before holders
     assert advice(open_identifiers([utility], unread)[0]) is None
     own = [seen(utility.id, DOMAIN, 1, holder=SENDER), seen(utility.id, DOMAIN, 2, holder=SENDER)]
@@ -231,14 +247,19 @@ def test_a_number_of_a_kind_with_a_holder_needs_its_contact_s_each_time() -> Non
 
 def test_a_customer_number_is_its_contact_s_unless_a_booking_gives_it_another() -> None:
     utility = Contact.create(name="Stadtwerke", now=NOW)
+    utility.set_learned([Identifier(*CUSTOMER, IdentifierSource.LEARNED)])
     # No holder told: the contact's, as before customer numbers had holders.
     unbooked = [seen(utility.id, CUSTOMER, 1), seen(utility.id, CUSTOMER, 2)]
     assert advice(open_identifiers([utility], unbooked)[0]) == (
         Recommendation.CONFIRM,
         ReasonCode.RECOMMEND_CONFIRM,
     )
+    # One of its documents gives it another in a booking: learned there wrongly.
     booked = [seen(utility.id, CUSTOMER, 1), seen(utility.id, CUSTOMER, 2, holder=THIRD)]
-    assert advice(open_identifiers([utility], booked)[0]) is None
+    assert advice(open_identifiers([utility], booked)[0]) == (
+        Recommendation.REJECT,
+        ReasonCode.RECOMMEND_REJECT_FOREIGN,
+    )
 
 
 def test_a_learned_customer_number_of_the_bookings_is_recommended_to_reject() -> None:
@@ -280,6 +301,7 @@ def test_a_payee_on_another_s_statement_does_not_count_against_it() -> None:
 
 def test_no_recommendation_for_a_reference_or_one_of_several_contacts() -> None:
     utility, bank = (Contact.create(name=name, now=NOW) for name in ("Stadtwerke", "Bank"))
+    utility.set_learned([Identifier(*CUSTOMER, IdentifierSource.LEARNED)])
     referred = [
         seen(utility.id, CUSTOMER, 1),
         Sighting(
@@ -290,13 +312,9 @@ def test_no_recommendation_for_a_reference_or_one_of_several_contacts() -> None:
         ),
     ]
     assert advice(open_identifiers([utility], referred)[0]) is None
-    shared = [
-        seen(utility.id, CUSTOMER, 1),
-        seen(utility.id, CUSTOMER, 2),
-        seen(bank.id, CUSTOMER, 3),
-    ]
-    (unknown,) = open_identifiers([utility, bank], shared)
-    assert (unknown.source, advice(unknown)) == (OpenSource.UNKNOWN, None)
+    # One at no contact that two contacts' documents show is not open at all (#215).
+    shared = [seen(utility.id, OTHER, 1), seen(utility.id, OTHER, 2), seen(bank.id, OTHER, 3)]
+    assert [item.key for item in open_identifiers([utility, bank], shared)] == [CUSTOMER]
 
 
 def test_a_suggestion_two_documents_name_is_recommended() -> None:

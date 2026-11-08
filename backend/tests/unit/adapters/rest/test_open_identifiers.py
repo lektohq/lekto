@@ -91,13 +91,13 @@ async def test_admins_see_the_open_identifiers(api: Api) -> None:
     ]
     assert (page["total"], page["counts"], page["kinds"]) == (
         1,
-        {"learned": 1, "unknown": 1, "suggested": 0},
+        {"learned": 1, "suggested": 1},
         {"customer_number": 1},
     )
-    # The domain has no holder yet (read before it had one): no recommendation.
-    assert (page["recommended"], page["to_confirm"]) == (1, 1)
+    # Over every source: the learned one and the domain suggested (it fits the contact's name).
+    assert (page["recommended"], page["to_confirm"]) == (2, 2)
     summary = await api.client.get(f"{URL}/summary", headers=auth(admin))
-    assert summary.json() == {"learned": 1, "unknown": 1, "suggested": 0}
+    assert summary.json() == {"learned": 1, "suggested": 1}
 
     site = api.container.refs.seal(SITE[1], context="email_domain")
     detail = await api.client.get(f"{URL}/email_domain/{site}", headers=auth(admin))
@@ -196,14 +196,19 @@ async def test_the_recommended_are_confirmed_at_once(api: Api) -> None:
     contact = await seeded(api)
     admin = await api.admin()
     only = await api.client.get(URL, params={"recommended": True}, headers=auth(admin))
-    assert [item["value"] for item in only.json()["items"]] == [CUSTOMER[1]]
+    assert [item["value"] for item in only.json()["items"]] == [CUSTOMER[1], SITE[1]]
     done = await api.client.post(f"{URL}/recommended", headers=auth(admin))
     assert done.status_code == 200, done.text
     assert done.json() == [
-        {"kind": "customer_number", "value": CUSTOMER[1], "done": True, "reason": None}
+        {"kind": "customer_number", "value": CUSTOMER[1], "done": True, "reason": None},
+        {"kind": "email_domain", "value": SITE[1], "done": True, "reason": None},
     ]
     after = (await api.client.get(URL, headers=auth(admin))).json()
-    assert (after["counts"]["learned"], after["to_confirm"]) == (0, 0)
+    assert (after["counts"]["learned"], after["counts"]["suggested"], after["to_confirm"]) == (
+        0,
+        0,
+        0,
+    )
     async with api.container.unit_of_work() as uow:
         stored = await uow.contacts.get(contact.id)
     assert any(item.value == CUSTOMER[1] and item.source.value == "manual"

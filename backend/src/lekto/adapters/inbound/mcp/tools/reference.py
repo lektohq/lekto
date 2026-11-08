@@ -151,14 +151,14 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
 
     @tools.read(
         "identifiers_open",
-        "Identifiers no person confirmed yet: learned by training at a contact, or unknown "
-        "(confirmed documents show them, no contact has them); the most documents first, "
-        "with Lekto's recommendation. Decided in the web UI.",
+        "Identifiers no person confirmed yet: learned by training at a contact, or suggested "
+        "(a domain that fits its contact's name, an IBAN for a person's profile); the most "
+        "documents first, with Lekto's recommendation. Decided in the web UI.",
         admin=True,
     )
     async def identifiers_open(
         ctx: Context,
-        source: Literal["learned", "unknown", "suggested"] | None = None,
+        source: Literal["learned", "suggested"] | None = None,
         query: Annotated[str | None, Field(max_length=100)] = None,
         offset: Annotated[int, Field(ge=0)] = 0,
     ) -> str:
