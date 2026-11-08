@@ -31,6 +31,9 @@ services:
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entrypoints.websecure.address=:443
+      # Traefik v3 stops reading a request after 60 s, the body included: an upload of
+      # LEKTO_UPLOAD_MAX_SIZE (100 MiB) then needs 14 Mbit/s. 15 minutes take it from 1 Mbit/s on.
+      - --entrypoints.websecure.transport.respondingTimeouts.readTimeout=15m
       - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?set ACME_EMAIL in .env}
       - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
       - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web

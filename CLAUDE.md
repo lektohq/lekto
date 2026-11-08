@@ -65,6 +65,9 @@ Publishing a release on GitHub runs `.github/workflows/release.yml`: it builds `
 (`python3 -m unittest discover -s .github/scripts`). For a release that got `latest`, a last job
 tells the homelab its version (`repository_dispatch`, secrets `HOMELAB_DISPATCH_REPO` and
 `HOMELAB_DISPATCH_TOKEN`; see `deploy/README.md`). The repository carries the version `0.0.0.dev0`.
+Every action in a workflow is pinned to its commit with the version in a comment
+(`uses: actions/checkout@<sha> # v6.1.0`, which Renovate updates); a test in `.github/scripts`
+fails on a tag.
 
 Migration client, in `migration/` (`migration/README.md`):
 
@@ -110,9 +113,11 @@ changes in `migration/` its checks.
 Every pull request carries exactly one category label from `.github/labels.yml` (`new-feature`,
 `bugfix`, `enhancement`, `refactor`, `performance`, `maintenance`, `ci`, `documentation`,
 `dependencies`, `dev-deps`, `breaking-change`); the Release Drafter builds the release notes from
-them. A pull request that changes only `.idea/` gets `skip-changelog`. The version bump follows
-the labels (`breaking-change` or `major`: major; `new-feature` or `minor`: minor; else patch).
-Tobi publishes and tags the release from the draft.
+them. A pull request that changes only `.idea/` gets `skip-changelog`. Renovate (`renovate.json`,
+the hosted app) labels its own: `dependencies`, `dev-deps` (development dependencies, the
+devcontainer), `ci` (actions); it suggests a version 10 days after its release at the earliest.
+The version bump follows the labels (`breaking-change` or `major`: major; `new-feature` or
+`minor`: minor; else patch). Tobi publishes and tags the release from the draft.
 A pull request a user notices fills the section `## Release notes` of its description with one
 sentence on what changes for them; it stands under the title in the release notes. A pull request
 that changes the REST API (`web/openapi.json`) fills `## API` with one line on what changes in it;

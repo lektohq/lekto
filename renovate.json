@@ -1,0 +1,59 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "timezone": "Europe/Berlin",
+  "schedule": [
+    "* 0-5 * * 1"
+  ],
+  "prConcurrentLimit": 5,
+  "minimumReleaseAge": "10 days",
+  "labels": [
+    "dependencies"
+  ],
+  "packageRules": [
+    {
+      "description": "Development dependencies: the dev groups of the Python projects, the web UI's devDependencies",
+      "matchDepTypes": [
+        "devDependencies",
+        "dependency-groups"
+      ],
+      "labels": [
+        "dev-deps"
+      ]
+    },
+    {
+      "description": "The devcontainer: its features and the services of its compose file",
+      "matchFileNames": [
+        ".devcontainer/**"
+      ],
+      "labels": [
+        "dev-deps"
+      ]
+    },
+    {
+      "description": "The actions of the workflows, pinned to their commits",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "labels": [
+        "ci"
+      ]
+    },
+    {
+      "description": "Lekto's own images, which the compose examples name",
+      "matchPackageNames": [
+        "ghcr.io/tb1337/**"
+      ],
+      "enabled": false
+    }
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "* 0-5 1 * *"
+    ]
+  }
+}
