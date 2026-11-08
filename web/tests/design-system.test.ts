@@ -5,7 +5,7 @@
 // toggles on its own, one order on the master data tabs, tooltips through `ui/tooltip`, a run's
 // progress in the selection bar, fields in the API's order, short lines under fields, a document's
 // pages through `DocumentPages`, a topic chosen through the tag picker, one height for fields,
-// the owl only at its places. An
+// dates and times through `DateInput`, the owl only at its places. An
 // exception needs its line in DESIGN.md ("Exceptions") and here; the
 // lists of exceptions may only shrink.
 import { describe, expect, it } from 'vitest';
@@ -351,6 +351,17 @@ describe('the design system (web/DESIGN.md)', () => {
 				}
 				return null;
 			})
+		).toEqual([]);
+	});
+
+	it('takes dates and times through DateInput, never a field in the language of the browser', () => {
+		// The stand-in of `DateInput` in the component tests (`lib/testing`) is no view.
+		expect(
+			offenders((source, path) =>
+				path.startsWith('/src/lib/testing/')
+					? null
+					: line(source, /\btype=[^\n]*?["'](?:date|datetime-local|time|month|week)["']/)
+			)
 		).toEqual([]);
 	});
 
