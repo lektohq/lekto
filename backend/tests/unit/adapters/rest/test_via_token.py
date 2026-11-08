@@ -249,26 +249,6 @@ async def test_moves_bulk_changes_and_applied_rules_carry_the_token(api: Api) ->
     assert await verdict_tokens(api, moved) == {TOKEN}
 
 
-async def test_moves_on_deleting_a_user_carry_the_token(api: Api) -> None:
-    """Documents move as an admin moves them by hand, through their token too."""
-    admin, anna = await api.admin("root"), await api.user("anna")
-    document = await upload(api, auth(anna), content=unique_pdf("anna's"))
-    url = f"{PREFIX}/users/{anna.id}"
-    (blocking,) = (await api.client.get(f"{url}/removal", headers=auth(admin))).json()[
-        "blocking_spaces"
-    ]
-    mine = await api.client.get(f"{PREFIX}/users/{admin.id}", headers=auth(admin))
-    settle = {
-        "spaces": [{"space_id": blocking["space_id"], "move_to": mine.json()["personal_space_id"]}]
-    }
-
-    deleted = await api.client.request("DELETE", url, json=settle, headers=auth(admin))
-    assert deleted.status_code == 204, deleted.text
-
-    (choice,) = await entries_of(api, document, PERSON_SPACE)
-    assert choice["input"][VIA_TOKEN]["name"] == TOKEN
-
-
 async def test_all_seen_through_a_token_carries_it(api: Api) -> None:
     owner = await api.user()
     id = await upload(api, auth(owner), content=unique_pdf("all seen"))

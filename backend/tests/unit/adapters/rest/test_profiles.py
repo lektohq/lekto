@@ -283,7 +283,8 @@ async def test_a_deleted_user_takes_their_profile_along(api: Api) -> None:
             Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "K-4711", user_id=UserId(anna.id))
         ],
     )
-    deleted = await api.client.delete(f"{PREFIX}/users/{anna.id}", headers=auth(admin))
+    async with api.sign_in(admin) as session:
+        deleted = await session.client.delete(f"{PREFIX}/users/{anna.id}", headers=session.headers)
     assert deleted.status_code == 204, deleted.text
     async with api.container.unit_of_work() as uow:
         assert await uow.profiles.find(anna.id) is None
