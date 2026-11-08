@@ -30,7 +30,7 @@ that stands alone in the document is the sender's where its places tell nothing.
 
 import re
 from bisect import bisect_right
-from collections.abc import Callable, Collection, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -187,7 +187,8 @@ def holders(
     """The holder of each of `facts` of `HOLDER_KINDS` the text shows, by the rule: from its
     places in `text` (`identifier_spans`), how far down its page each starts (`tops`) and the
     name of a code on the pages that holds it (`codes`: a GiroCode's payee). A person's own
-    number is theirs wherever it stands."""
+    number is theirs wherever it stands. A customer number has one only where it stands in
+    bookings alone (`booking_holder`)."""
     shown = [fact for fact in facts if fact.kind in HOLDER_KINDS]
     numbers = {kind: sum(1 for fact in shown if fact.kind is kind) for kind in HOLDER_KINDS}
     lines = _Lines(text)
@@ -195,6 +196,12 @@ def holders(
     for fact in shown:
         if fact.kind is IdentifierKind.EMAIL_DOMAIN:
             found[fact.key] = domain_holder(fact.value, text, parties)
+            continue
+        if fact.kind is IdentifierKind.CUSTOMER_NUMBER:
+            spans = identifier_spans(text, fact.kind, fact.value)
+            booked = booking_holder([lines.place(span.start, span.end, None, 1) for span in spans])
+            if booked is not None:
+                found[fact.key] = booked
             continue
         coded = (codes or {}).get(fact.key)
         if fact.key in parties.person_numbers:
@@ -223,6 +230,16 @@ def holders(
                 held = Holder(HolderKind.SENDER, HolderSource.RULE)  # the only one: the sender's
             found[fact.key] = held
     return found
+
+
+def booking_holder(places: Sequence[Place]) -> Holder | None:
+    """Whose a customer number is by where it stands: another party's where each of its places
+    is a booking (a line with a date or an amount: "KdNr 4711 Lastschrift 01.02.2026 -24,99",
+    the payee's number on a bank statement), else none told (the document's contact's, as
+    before customer numbers had holders)."""
+    if places and all(_BOOKING.search(place.line) for place in places):
+        return Holder(HolderKind.THIRD_PARTY, HolderSource.RULE)
+    return None
 
 
 def held_by(holder: Holder | None, names: Iterable[str]) -> HolderKind | None:
