@@ -207,6 +207,11 @@ processes, so a job queued by the API starts within 5 s there (at once while the
 pooling (PgBouncer, PgCat) the notifications never arrive, and jobs and events start only at the
 once-a-minute look: connect Lekto directly or use session pooling.
 
+A Postgres on another host is reached over TLS with `LEKTO_DB_SSLMODE=verify-full` (and
+`LEKTO_DB_SSLROOTCERT` for a certificate of your own authority). Unset, the driver encrypts if
+the server offers it but checks no certificate, and falls back to plain text, which anyone on
+the way can force; in the Compose examples Postgres runs in the same network as Lekto.
+
 ## Stopping
 
 `docker stop` sends SIGTERM to s6, which stops the services together: Uvicorn ends its streams and

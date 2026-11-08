@@ -11,6 +11,7 @@ wait for its own lock until the busy timeout; `begin_write` raises RuntimeError 
 """
 
 import asyncio
+import ssl
 import weakref
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -26,6 +27,9 @@ from sqlalchemy.dialects.sqlite import Insert as SqliteInsert
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
 from lekto.core.ports.wakeup import Channel
+
+Tls = ssl.SSLContext | str | bool | None
+"""How Postgres connections use TLS, as asyncpg's `ssl` takes it."""
 
 # SQLite engine settings, applied to every connection.
 SQLITE_BUSY_TIMEOUT = timedelta(seconds=15)
@@ -43,9 +47,15 @@ _SQLITE_READER_PRAGMAS = (_SQLITE_BUSY,)
 class Database:
     """An async engine for SQLite or Postgres. Create it with `sqlite()` or `postgres()`."""
 
-    def __init__(self, engine: AsyncEngine, sqlite_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        engine: AsyncEngine,
+        sqlite_path: Path | None = None,
+        tls: "Tls" = None,
+    ) -> None:
         self.engine = engine
         self.sqlite_path = sqlite_path  # the file of a SQLite database
+        self._tls = tls  # Postgres: asyncpg's `ssl`, None for its default
         # Tasks holding SQLite's write lock.
         self._writers: weakref.WeakSet[asyncio.Task[Any]] = weakref.WeakSet()
         # Told what a commit queued, on SQLite (a channel, and the job's kind on `JOBS`); on
@@ -74,7 +84,12 @@ class Database:
         return cls(engine, sqlite_path=path)
 
     @classmethod
-    def postgres(cls, *, host: str, port: int, name: str, user: str, password: str) -> "Database":
+    def postgres(
+        cls, *, host: str, port: int, name: str, user: str, password: str, tls: "Tls" = None
+    ) -> "Database":
+        """`tls` is asyncpg's `ssl`: a mode (`prefer`, …), False, or a context that requires TLS
+        and checks the server as it says; None leaves asyncpg's default (`PGSSLMODE`, else
+        `prefer`)."""
         url = URL.create(
             "postgresql+asyncpg",
             username=user,
@@ -83,7 +98,8 @@ class Database:
             port=port,
             database=name,
         )
-        return cls(create_async_engine(url))
+        arguments = {} if tls is None else {"connect_args": {"ssl": tls}}
+        return cls(create_async_engine(url, **arguments), tls=tls)
 
     @property
     def is_sqlite(self) -> bool:
@@ -102,6 +118,7 @@ class Database:
             password=url.password,
             database=url.database,
             server_settings={"application_name": "lekto listener"},
+            **({} if self._tls is None else {"ssl": self._tls}),
         )
 
     def insert(self, table: Table) -> PostgresInsert | SqliteInsert:
