@@ -2037,7 +2037,7 @@
 	"identifier_kind_ticket_number": "Ticket number",
 	"identifier_kind_child_benefit_number": "Child benefit number",
 	"facts_numbers": "Numbers of the document",
-	"facts_numbers_hint": "Its own, a strand’s, or another document’s it refers to",
+	"facts_numbers_hint": "Its own, a strand’s, another document’s it refers to, and others such as VAT IDs or IBANs",
 	"facts_decide": "Correct or reject",
 	"facts_decide_value_label": "Correct or reject {value}",
 	"facts_decide_title": "{kind}",

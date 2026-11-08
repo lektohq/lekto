@@ -760,12 +760,12 @@ async def test_field_definitions_change(api: Api) -> None:
 
 async def test_contact_identifiers(api: Api) -> None:
     a = auth(await api.admin())
-    iban = {"kind": "iban", "value": "de89 3704 0044 0532 0130 00"}
+    iban = {"kind": "customer_number", "value": "k-4711"}  # the name from when it was an IBAN
     contact = await post(api, "/contacts", {"name": "Stadtwerke", "identifiers": [iban]}, a)
     assert contact["identifiers"] == [
         {
-            "kind": "iban",
-            "value": "DE89370400440532013000",
+            "kind": "customer_number",
+            "value": "K4711",
             "source": "manual",
             "topic_id": None,
             "user_id": None,
@@ -781,7 +781,9 @@ async def test_contact_identifiers(api: Api) -> None:
     )
     assert response.status_code == 409
     for bad in (
-        {"identifiers": [{"kind": "iban", "value": "DE00 1234"}]},
+        {"identifiers": [{"kind": "customer_number", "value": "12"}]},
+        # No contact's identifier since #215.
+        {"identifiers": [{"kind": "iban", "value": "DE89 3704 0044 0532 0130 00"}]},
         {"identifiers": [{"kind": "phone", "value": "0621 1234"}]},
         {"identifiers": [{"kind": "email_domain", "value": "gmail.com"}]},
     ):

@@ -147,6 +147,15 @@ def test_every_kind_has_a_role_and_the_numbers_of_documents_are_no_identifiers()
         K.TICKET_NUMBER,
         K.YOUR_REFERENCE,
         K.LETTER_DATE,
+        # No contact's identifiers since #215: listed among the document's numbers.
+        K.IBAN,
+        K.VAT_ID,
+        K.COMMERCIAL_REGISTER,
+        K.TAX_NUMBER,
+        K.CREDITOR_ID,
+        K.METER_NUMBER,
+        K.MANDATE_REFERENCE,
+        K.LICENSE_PLATE,
     } == NUMBER_KINDS
 
 

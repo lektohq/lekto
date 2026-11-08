@@ -32,6 +32,8 @@ _LABEL = re.compile(
 class CustomerNumber(IdentifierType):
     kind = IdentifierKind.CUSTOMER_NUMBER
     for_contacts = True
+    at_contacts = True
+    learned = True
     names_user = True
 
     def normalise(self, raw: str) -> str:

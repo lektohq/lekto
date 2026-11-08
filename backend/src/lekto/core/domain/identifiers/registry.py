@@ -67,15 +67,19 @@ TYPES: Mapping[IdentifierKind, IdentifierType] = {
 }
 """Every kind's type (a test holds that none is missing)."""
 
-CONTACT_KINDS = frozenset(kind for kind, item in TYPES.items() if item.for_contacts)
-"""The kinds a contact's identifiers have; training learns only these."""
+CONTACT_KINDS = frozenset(kind for kind, item in TYPES.items() if item.at_contacts)
+"""The kinds a contact's identifiers have (#215: customer, contract, personnel number, e-mail
+domain)."""
+LEARNED_KINDS = frozenset(kind for kind, item in TYPES.items() if item.learned)
+"""The kinds training learns at a contact (not the e-mail domain: entered by hand only)."""
 PERSON_KINDS = frozenset(kind for kind, item in TYPES.items() if item.for_persons)
 """The kinds a person's identifiers have."""
 NAMING_KINDS = frozenset(kind for kind, item in TYPES.items() if item.names_user)
 """The kinds of a contact's identifiers that may name the user they belong to (a contract, a
 policy, a personnel number)."""
-OWN_KINDS = PERSON_KINDS - CONTACT_KINDS
-"""The kinds only a person has (not the IBAN: a contact has one too)."""
+OWN_KINDS = PERSON_KINDS - {kind for kind, item in TYPES.items() if item.for_contacts}
+"""The kinds only a person has (not the IBAN: a contact has one too, though no longer as its
+identifier)."""
 
 
 def type_of(kind: IdentifierKind) -> IdentifierType:
@@ -94,12 +98,14 @@ def normalise_identifier(kind: IdentifierKind, raw: str) -> str:
 
 
 def catalog() -> dict[str, dict[str, bool]]:
-    """The kinds and whose they are, for the OpenAPI document (`x-identifier-kinds`): `contact`,
-    `person`, `names_user`."""
+    """The kinds and whose they are, for the OpenAPI document (`x-identifier-kinds`): `contact`
+    (a contact's value may stand as it), `person`, `at_contact` (a contact carries it as an
+    identifier), `names_user`."""
     return {
         kind.value: {
             "contact": item.for_contacts,
             "person": item.for_persons,
+            "at_contact": item.at_contacts,
             "names_user": item.names_user,
         }
         for kind, item in TYPES.items()

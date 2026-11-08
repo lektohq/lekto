@@ -67,7 +67,7 @@ async def test_names_identifiers_and_codes_with_their_places(facts_api: Api) -> 
         "/contacts",
         {
             "name": "Lekto Test GmbH",
-            "identifiers": [{"kind": "iban", "value": "DE89370400440532013000"}],
+            "identifiers": [{"kind": "customer_number", "value": "2004-7718"}],
         },
         auth(admin),
     )
@@ -95,13 +95,14 @@ async def test_names_identifiers_and_codes_with_their_places(facts_api: Api) -> 
     assert (named["contact_id"], named["in_text"], named["in_code"]) == (contact_id, True, True)
     assert [TEXT[span["start"] : span["end"]] for span in named["spans"]] == ["Lekto Test"]
     by_value = {item["value"]: item for item in facts["identifiers"]}
-    iban = by_value["DE89370400440532013000"]
-    assert (iban["contact_id"], iban["in_text"], iban["in_code"]) == (contact_id, True, True)
-    # The GiroCode's payee holds it; other kinds have no holder.
-    assert iban["holder"] == {"kind": "sender", "name": "Lekto Test GmbH", "source": "rule"}
     customer = by_value["20047718"]
-    assert customer["contact_id"] is None
-    assert customer["holder"] is None
+    assert customer["contact_id"] == contact_id
+    assert customer["holder"] is None  # outside bookings: none told
+    # IBANs are numbers of the document since #215; the GiroCode's payee holds it.
+    numbers = {item["value"]: item for item in facts["numbers"]}
+    iban = numbers["DE89370400440532013000"]
+    assert iban["holder"] == {"kind": "sender", "name": "Lekto Test GmbH", "source": "rule"}
+    assert set(by_value) == {"20047718"}
     assert [TEXT[span["start"] : span["end"]] for span in customer["spans"]] == ["2004-7718"]
     # Where it stands on the page, a box per line: the word on the grid of the parsed text.
     assert customer["spans"][0]["locations"] == [
@@ -141,11 +142,7 @@ async def test_names_identifiers_and_codes_with_their_places(facts_api: Api) -> 
     assert {
         item["value"]: (item["other_contacts"], item["other_contact_ids"])
         for item in as_admin["identifiers"]
-    } == {
-        "DE89370400440532013000": (0, []),
-        "20047718": (0, []),
-        "DE02120300000000202051": (0, []),
-    }
+    } == {"20047718": (0, [])}
 
 
 async def test_facts_need_read_access_and_a_text(facts_api: Api) -> None:
@@ -204,7 +201,12 @@ async def test_a_person_decides_about_a_fact(facts_api: Api) -> None:
     async def numbers(body: Mapping[str, object]) -> list[tuple[str, str, str]]:
         response = await api.client.post(decide, json=body, headers=auth(owner))
         assert response.status_code == 200, response.text
-        return [(item["value"], item["role"], item["state"]) for item in response.json()["numbers"]]
+        # The text's IBANs stand among the numbers too (#215): only the invoice numbers here.
+        return [
+            (item["value"], item["role"], item["state"])
+            for item in response.json()["numbers"]
+            if item["kind"] == "invoice_number"
+        ]
 
     given = {"action": "add", "kind": "invoice_number", "value": "R-1001", "role": "own"}
     assert await numbers(given) == [("R1001", "own", "added")]

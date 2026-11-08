@@ -1,8 +1,8 @@
-"""Whose an IBAN, a creditor ID or a VAT ID is where it stands (`.idea/umsetzungsplan.md`,
-"Inhaber von IBANs und Gläubiger-IDs", "Inhaber von USt-IdNr. und E-Mail-Domains"): the fixed
-rule on the text and the pages, German and English, that holds when the language model tells
-nothing (it is asked for IBANs and creditor IDs only). Whose an e-mail domain is, its name
-tells (`domain_holder`).
+"""Whose an IBAN is where it stands (`.idea/umsetzungsplan.md`, "Inhaber von IBANs und
+Gläubiger-IDs"): the fixed rule on the text and the pages, German and English, that holds when
+the language model tells nothing (it is asked for IBANs only). Whose an e-mail domain is, its
+name tells (`domain_holder`); a customer number has one only in bookings (`booking_holder`).
+Creditor IDs and VAT IDs had holders until #215.
 
 A number's places are read one by one, each from its line, the three lines above and where it
 stands on its page. The first rule that applies tells (`_at`):
@@ -24,8 +24,7 @@ The sender named is the document's contact only where the name is its name or an
 rule does not know the contact, those who use the holder compare (`Holder`). A number's holder
 is that of its places (`holders`): a recipient's at one place is theirs; places that differ
 between sender and another party leave it unclear. A person's own number (their profile) is
-theirs wherever it stands, and the name of a GiroCode that holds one is its holder's. A VAT ID
-that stands alone in the document is the sender's where its places tell nothing.
+theirs wherever it stands, and the name of a GiroCode that holds one is its holder's.
 """
 
 import re
@@ -107,7 +106,6 @@ _LABEL = re.compile(
 )
 _WORD = re.compile(r"[a-z]{3,}")
 _ANOTHER_NUMBER = re.compile(r"\b[A-Z]{2}\d{2}[ A-Z0-9]{12,}")
-_ANOTHER_VAT = re.compile(r"\b[A-Z]{2} ?\d[\d ]{7,13}\b")
 # A column: words apart by one or two spaces; columns apart by three spaces or a table's `|`.
 _COLUMN = re.compile(r"[^\s|]+(?: {1,2}[^\s|]+)*")
 _COLUMNS = re.compile(r"\s{3,}|\s*\|\s*")
@@ -163,9 +161,7 @@ class Parties:
 class Place:
     """Where a number stands: its `line`, the `column` it starts at there and how it is
     `written`, the lines `above` it (the nearest last), how far down its page it starts (None
-    where the pages are not known), how many numbers of its kind the document shows, and
-    whether it may be a party's of a booking or a list (`booked`: an IBAN or a creditor ID; a
-    VAT ID stands in no booking)."""
+    where the pages are not known) and how many numbers of its kind the document shows."""
 
     line: str
     column: int
@@ -173,7 +169,6 @@ class Place:
     above: tuple[str, ...] = ()
     top: float | None = None
     numbers: int = 1
-    booked: bool = True
 
 
 def holders(
@@ -211,24 +206,11 @@ def holders(
             found[fact.key] = _named_holder(coded, parties)
             continue
         places = [
-            lines.place(
-                span.start,
-                span.end,
-                tops(span.start, span.end),
-                numbers[fact.kind],
-                booked=fact.kind is not IdentifierKind.VAT_ID,
-            )
+            lines.place(span.start, span.end, tops(span.start, span.end), numbers[fact.kind])
             for span in identifier_spans(text, fact.kind, fact.value)
         ]
         if places:
-            held = _of_places([holder_at(place, parties) for place in places])
-            if (
-                held.kind is HolderKind.UNCLEAR
-                and fact.kind is IdentifierKind.VAT_ID
-                and numbers[fact.kind] == 1
-            ):
-                held = Holder(HolderKind.SENDER, HolderSource.RULE)  # the only one: the sender's
-            found[fact.key] = held
+            found[fact.key] = _of_places([holder_at(place, parties) for place in places])
     return found
 
 
@@ -358,8 +340,8 @@ def _at(place: Place, parties: Parties) -> tuple[HolderKind, str | None]:
         return HolderKind.SENDER, None
     if _RECIPIENT.search(line):
         return HolderKind.RECIPIENT, None
-    beside = [(name, booking and place.booked) for name, booking in _names_beside(place)]
-    listed = place.numbers >= LIST and place.booked
+    beside = _names_beside(place)
+    listed = place.numbers >= LIST
     for name, booking in beside:
         if parties.person(name):
             return HolderKind.RECIPIENT, name
@@ -376,10 +358,7 @@ def _at(place: Place, parties: Parties) -> tuple[HolderKind, str | None]:
     for name, booking in beside:
         if booking or listed:  # a booking's party, or a party of a list
             return HolderKind.THIRD_PARTY, name or None
-    # A label above whose line holds a number of its own is that number's (a VAT ID under
-    # "Unsere USt-IdNr. DE…" is not the sender's for it).
-    above = [raw for raw in place.above[:2] if place.booked or not _ANOTHER_VAT.search(raw)]
-    context = " ".join([*reversed(above), line])
+    context = " ".join([*reversed(place.above[:2]), line])
     if _RECIPIENT.search(context):
         return HolderKind.RECIPIENT, None
     if _TARGET.search(context):
@@ -467,15 +446,13 @@ class _Lines:
         for line in self._lines:
             self._starts.append(self._starts[-1] + len(line) + 1)
 
-    def place(
-        self, start: int, end: int, top: float | None, numbers: int, *, booked: bool = True
-    ) -> Place:
+    def place(self, start: int, end: int, top: float | None, numbers: int) -> Place:
         index = bisect_right(self._starts, start) - 1
         line = self._lines[index]
         column = start - self._starts[index]
         written = line[column : column + end - start]
         above = tuple(reversed(self._lines[max(0, index - _ABOVE) : index]))
-        return Place(line, column, written, above, top, numbers, booked)
+        return Place(line, column, written, above, top, numbers)
 
 
 def _words(text: str) -> frozenset[str]:

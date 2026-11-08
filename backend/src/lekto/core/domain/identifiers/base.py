@@ -123,14 +123,19 @@ VALUE = rf"{_BEFORE}({_WORDS})"
 
 class IdentifierType:
     """One kind of identifier, all it knows in one place (each kind's module defines one, the
-    registry lists them): whose it is (`for_contacts`, `for_persons`), whether a contact's may
-    name the user it belongs to (`names_user`), its comparable form (`normalise`), how it is
-    found in a text (`find`), how a value of it may stand in one (`written`) and when a found
-    value is it (`matches`)."""
+    registry lists them): whose it is (`for_contacts`, `for_persons`), whether a contact carries
+    it as an identifier (`at_contacts`) and training learns it there (`learned`), whether a
+    contact's may name the user it belongs to (`names_user`), its comparable form (`normalise`),
+    how it is found in a text (`find`), how a value of it may stand in one (`written`) and when
+    a found value is it (`matches`)."""
 
     kind: ClassVar[IdentifierKind]
-    for_contacts: ClassVar[bool] = False
+    for_contacts: ClassVar[bool] = False  # a contact's value may stand as it (seen by all)
     for_persons: ClassVar[bool] = False
+    # A contact carries it as an identifier, entered or learned; since #215 only the kinds that
+    # tell more than the contact the language model and the classifier recognise anyway.
+    at_contacts: ClassVar[bool] = False
+    learned: ClassVar[bool] = False  # training learns it at a contact (an `at_contacts` kind)
     names_user: ClassVar[bool] = False
 
     def normalise(self, raw: str) -> str:

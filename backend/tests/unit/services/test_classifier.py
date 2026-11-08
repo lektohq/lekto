@@ -22,10 +22,9 @@ from lekto.core.domain.document_facts import (
 from lekto.core.domain.documents import Document, DocumentChanges
 from lekto.core.domain.errors import ConflictError, NotFoundError, PermissionDeniedError
 from lekto.core.domain.events import ClassifierTrained
-from lekto.core.domain.identifiers import Identifier, IdentifierKind, IdentifierSource
+from lekto.core.domain.identifiers import Identifier, IdentifierKind, IdentifierSource, Key
 from lekto.core.domain.ids import ContactId
 from lekto.core.domain.master_data import Assignment, Contact, Tag, TagScope
-from lekto.core.domain.profiles import Profile
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.repository import DocumentFilter
@@ -82,7 +81,8 @@ async def corpus(world: World) -> tuple[User, Contact, Contact]:
             world,
             owner,
             utility,
-            f"Stadtwerke Stromrechnung Zählerstand {number} IBAN {THEIR_IBAN} von {OWN_IBAN}",
+            f"Stadtwerke Stromrechnung Zählerstand {number} Kundennummer K-4711 "
+            f"IBAN {THEIR_IBAN} von {OWN_IBAN}",
         )
         await confirmed(world, owner, bank, f"Beispielbank Kontoauszug Saldo {number} {OWN_IBAN}")
     return owner, utility, bank
@@ -100,9 +100,9 @@ async def test_training_learns_from_the_confirmed_documents(world: World) -> Non
     assert await world.object_store.get(classifier_key(1))
     async with world.uow() as uow:
         learned = (await uow.contacts.get(utility.id)).identifiers
-        # The owner's own IBAN stands in both contacts' documents: never learned.
+        # The customer number only; IBANs are no contact's identifiers since #215.
         assert [(item.kind, item.source) for item in learned] == [
-            (IdentifierKind.IBAN, IdentifierSource.LEARNED)
+            (IdentifierKind.CUSTOMER_NUMBER, IdentifierSource.LEARNED)
         ]
         assert (await uow.contacts.get(bank.id)).identifiers == []
     predicted = await classifier.predict("Stadtwerke Zählerstand Stromrechnung")
@@ -110,34 +110,15 @@ async def test_training_learns_from_the_confirmed_documents(world: World) -> Non
     assert predicted[1].contacts[0][0] == utility.id
 
 
-async def test_a_persons_own_number_is_never_a_contacts(world: World) -> None:
-    """The utility's IBAN in its documents is the account of a user (their profile): training
-    does not learn it as the utility's."""
-    owner, utility, _ = await corpus(world)
-    async with world.uow() as uow:
-        await uow.profiles.add(
-            Profile(
-                id=owner.id,
-                identifiers=[Identifier.parse(IdentifierKind.IBAN, THEIR_IBAN)],
-                version=1,
-            )
-        )
-        await uow.commit()
-    model = await service(world).train()
-    assert model.summary["learned_identifiers"] == 0
-    async with world.uow() as uow:
-        assert (await uow.contacts.get(utility.id)).identifiers == []
-
-
-async def keep_iban(world: World, document: Document, value: str, holder: Holder) -> None:
-    """The document keeps the IBAN `value` as a fact with its `holder`."""
+async def keep_fact(world: World, document: Document, key: Key, holder: Holder) -> None:
+    """The document keeps the fact `key` with its `holder`."""
     async with world.uow() as uow:
         await uow.document_facts.replace_found(
             document.id,
             [
                 DocumentFact(
-                    kind=IdentifierKind.IBAN,
-                    value=value.replace(" ", ""),
+                    kind=key[0],
+                    value=key[1],
                     role=FactRole.CONTACT,
                     origins=frozenset({FactOrigin.PATTERN}),
                     position=0,
@@ -148,43 +129,34 @@ async def keep_iban(world: World, document: Document, value: str, holder: Holder
         await uow.commit()
 
 
-async def test_an_iban_counts_only_where_it_is_its_contact_s(world: World) -> None:
-    """The bank's statements list the utility's IBAN in their bookings: it is a third party's
-    there and does not count for the bank, so training learns it at the utility. Before the
-    holders it stood at two contacts and was never learned."""
+async def test_a_number_counts_only_where_it_is_its_contact_s(world: World) -> None:
+    """The bank's statements list the utility's customer number in their bookings: it is a
+    third party's there and does not count for the bank, so training learns it at the utility.
+    Without the holder it stood at two contacts and was never learned."""
     owner, utility, bank = await corpus(world)
-    payee = Holder(HolderKind.SENDER, HolderSource.RULE, "Stadtwerke")
+    customer = (IdentifierKind.CUSTOMER_NUMBER, "K4711")
+    payee = Holder(HolderKind.THIRD_PARTY, HolderSource.RULE)
     for number in range(2):
         statement = await confirmed(
             world,
             owner,
             bank,
-            f"Beispielbank Kontoauszug {number} Lastschrift Stadtwerke {THEIR_IBAN}",
+            f"Beispielbank Kontoauszug {number}\n"
+            "01.10.2026   Lastschrift Stadtwerke KdNr K-4711   -45,00 EUR",
         )
-        await keep_iban(world, statement, THEIR_IBAN, payee)
+        await keep_fact(world, statement, customer, payee)
     await service(world).train()
     async with world.uow() as uow:
         learned = [item.key for item in (await uow.contacts.get(utility.id)).identifiers]
-        assert learned == [(IdentifierKind.IBAN, THEIR_IBAN.replace(" ", ""))]
+        assert learned == [customer]
         assert (await uow.contacts.get(bank.id)).identifiers == []
 
 
-async def test_an_iban_a_person_holds_is_never_learned(world: World) -> None:
-    """On one of the utility's bills its IBAN is the customer's own ("Ihr Konto"): a person's,
-    never learned."""
-    owner, utility, _ = await corpus(world)
-    bill = await confirmed(world, owner, utility, f"Stadtwerke Rechnung Ihr Konto {THEIR_IBAN}")
-    await keep_iban(world, bill, THEIR_IBAN, Holder(HolderKind.RECIPIENT, HolderSource.RULE))
-    await service(world).train()
-    async with world.uow() as uow:
-        assert (await uow.contacts.get(utility.id)).identifiers == []
-
-
 async def test_training_follows_a_person_s_decisions_about_facts(world: World) -> None:
-    """The utility's IBAN rejected on its documents is not learned; a customer number a person
+    """The utility's customer number rejected on its documents is not learned; one a person
     added (the text writes it so no pattern reads it) is."""
     _, utility, _ = await corpus(world)
-    their = (IdentifierKind.IBAN, THEIR_IBAN.replace(" ", ""))
+    their = (IdentifierKind.CUSTOMER_NUMBER, "K4711")
     async with world.uow() as uow:
         documents = await uow.documents.query(
             DocumentFilter(contacts=frozenset({utility.id})), limit=9
@@ -219,8 +191,8 @@ async def test_training_follows_a_person_s_decisions_about_facts(world: World) -
 
 async def test_a_learned_number_knows_whose_it_is_and_where_it_was_learned(world: World) -> None:
     """Issue #82: the pay slips in a user's personal space teach the employer her personnel
-    number as hers; the IBAN learned there names nobody, but only the members of that space see
-    it. A contract number in a shared space that names nobody surely is nobody's."""
+    number as hers, seen by the members of that space. A customer number in a shared space that
+    names nobody surely is nobody's."""
     anna, bob = await world.user(), await world.user()
     employer = Contact.create(name="Arbeitgeber", now=builders.NOW)
     utility = Contact.create(name="Stadtwerke", now=builders.NOW)
@@ -249,8 +221,6 @@ async def test_a_learned_number_knows_whose_it_is_and_where_it_was_learned(world
         }
     personnel = learned[IdentifierKind.PERSONNEL_NUMBER]
     assert (personnel.user_id, personnel.learned_in) == (anna.id, frozenset({own.id}))
-    iban = learned[IdentifierKind.IBAN]
-    assert (iban.user_id, iban.learned_in) == (None, frozenset({own.id}))
     contract = learned[IdentifierKind.CUSTOMER_NUMBER]
     assert (contract.user_id, contract.learned_in) == (None, frozenset({family.id}))
 
@@ -280,8 +250,8 @@ async def test_topics_are_learned_and_given_to_the_identifiers_of_one_topic(
     world: World,
 ) -> None:
     """The utility's documents carry "Strom", the bank's "Girokonto" (set by hand: not
-    learned as a class). The utility's IBAN stands only in documents of "Strom": it points to
-    it."""
+    learned as a class). The utility's customer number stands only in documents of "Strom": it
+    points to it."""
     _, utility, bank = await corpus(world)
     power = Tag.create(name="Strom", now=builders.NOW, scope=TagScope.TOPIC)
     account = Tag.create(
@@ -303,7 +273,7 @@ async def test_topics_are_learned_and_given_to_the_identifiers_of_one_topic(
     await classifier.train()
     async with world.uow() as uow:
         (learned,) = (await uow.contacts.get(utility.id)).identifiers
-        assert (learned.kind, learned.topic_id) == (IdentifierKind.IBAN, power.id)
+        assert (learned.kind, learned.topic_id) == (IdentifierKind.CUSTOMER_NUMBER, power.id)
     predicted = await classifier.predict("Stadtwerke Zählerstand Stromrechnung")
     assert predicted is not None
     # One topic the classification sets is no target to tell apart.

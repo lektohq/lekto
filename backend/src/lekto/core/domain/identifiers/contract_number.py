@@ -24,6 +24,8 @@ the label, nor letters of an address."""
 class ContractNumber(LabelledNumber):
     kind = IdentifierKind.CONTRACT_NUMBER
     for_contacts = True
+    at_contacts = True
+    learned = True
     names_user = True
     fewest_digits = 4  # not a short code of a form ("332")
     compounds = COMPOUND

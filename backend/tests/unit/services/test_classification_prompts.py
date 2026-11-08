@@ -426,12 +426,8 @@ def test_the_facts_task_lists_the_kinds_and_roles_a_model_reads() -> None:
 def test_the_facts_task_lists_the_numbers_whose_holder_it_asks_for() -> None:
     task = facts_task(
         marker="document-ab12",
-        numbers=[
-            (IdentifierKind.CREDITOR_ID, "DE98ZZZ09999999999"),
-            (IdentifierKind.IBAN, "DE89370400440532013000"),
-        ],
+        numbers=[(IdentifierKind.IBAN, "DE89370400440532013000")],
     )
-    assert "- creditor_id (creditor ID): DE98ZZZ09999999999" in task
     assert "- iban (IBAN): DE89370400440532013000" in task
     assert "- third_party: anyone else" in task
     assert "- holders: one entry per listed number" in task

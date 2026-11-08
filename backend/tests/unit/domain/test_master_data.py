@@ -121,7 +121,7 @@ def test_a_contact_enables_topics_and_its_identifiers_point_to_them() -> None:
     contact.set_learned(
         [
             Identifier(IdentifierKind.EMAIL_DOMAIN, "nord.example", topic_id=health.id),
-            Identifier(IdentifierKind.IBAN, "DE89370400440532013000", topic_id=other.id),
+            Identifier(IdentifierKind.CUSTOMER_NUMBER, "K99", topic_id=other.id),
         ]
     )
     learned = [item for item in contact.identifiers if item.source is IdentifierSource.LEARNED]

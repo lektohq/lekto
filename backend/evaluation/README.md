@@ -18,10 +18,10 @@ to check that the checks catch wrong answers.
   alike), with IBANs, VAT IDs, customer numbers and mail domains, and a `topic` where the
   contact has topics (a person sets it after the takeover: a migration brings none). The
   household's IBAN stands on letters of several contacts and the utility's also on the bank
-  statements: training must learn neither. The insurance group (Hanse Versicherung AG) is
-  also the household's employer: its topics are work and three insurances, its personnel
-  number and the number of the health insurance policy point to two of them; the health
-  insurer's letters all carry its topic, so the domain learned from them points to it.
+  statements: training learns no IBAN, VAT ID or mail domain (since #215 only customer,
+  contract and personnel numbers). The insurance group (Hanse Versicherung AG) is also the
+  household's employer: its topics are work and three insurances, its personnel number and the
+  number of the health insurance policy point to two of them.
 - `cases/<name>.md`: the document text, as the parse step would produce it (OCR and parsing are
   not part of the evaluation); its structure, the words with their boxes the label check looks
   at, is set from it on a fixed grid, a line per line and a column per character.

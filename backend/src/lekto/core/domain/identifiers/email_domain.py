@@ -28,6 +28,7 @@ _WEB = re.compile(r"(?<![a-z0-9@.-])(?:https?://(?:www\.)?|www\.)((?:[a-z0-9-]+\
 class EmailDomain(IdentifierType):
     kind = IdentifierKind.EMAIL_DOMAIN
     for_contacts = True
+    at_contacts = True  # entered by hand only (logo, holder; #215)
 
     def normalise(self, raw: str) -> str:
         """In lower case, from an e-mail or web address too (without `mailto:`, the part before

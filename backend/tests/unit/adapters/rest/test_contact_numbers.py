@@ -16,8 +16,8 @@ from tests.api import auth
 from tests.unit.adapters.rest.support import Api
 
 OWN = "/auth/me/profile"
-PUBLIC_IBAN = "DE89370400440532013000"
-LEARNED_IBAN = "DE02120300000000202051"
+PUBLIC = "K1000"  # a customer number that names nobody
+LEARNED = "V778899"  # a contract number learned in a space
 CUSTOMER = IdentifierKind.CUSTOMER_NUMBER
 PERSONNEL = IdentifierKind.PERSONNEL_NUMBER
 
@@ -67,7 +67,7 @@ async def test_a_contact_shows_each_user_what_they_may_see(api: Api) -> None:
         admin.id,
         "Insurer",
         identifiers=[
-            Identifier.parse(IdentifierKind.IBAN, PUBLIC_IBAN),
+            Identifier.parse(CUSTOMER, PUBLIC),
             Identifier.parse(CUSTOMER, "K-4711", user_id=UserId(anna.id)),
         ],
     )
@@ -75,9 +75,9 @@ async def test_a_contact_shows_each_user_what_they_may_see(api: Api) -> None:
     await learn(
         api,
         insurer.id,
-        Identifier(IdentifierKind.IBAN, LEARNED_IBAN, learned, learned_in=frozenset({own})),
+        Identifier(IdentifierKind.CONTRACT_NUMBER, LEARNED, learned, learned_in=frozenset({own})),
         Identifier(PERSONNEL, "12345", learned, None, UserId(anna.id), frozenset({own})),
-        Identifier(IdentifierKind.VAT_ID, "DE123456789", learned),  # before 0040: no spaces
+        Identifier(CUSTOMER, "K7007", learned),  # before 0040: no spaces
     )
     await api.services.master_data.change_contact(
         admin.id,
@@ -86,18 +86,18 @@ async def test_a_contact_shows_each_user_what_they_may_see(api: Api) -> None:
     )
 
     assert await values(api, admin, insurer.id) == [
-        PUBLIC_IBAN,
+        PUBLIC,
         "K4711",
-        LEARNED_IBAN,
-        "DE123456789",
+        "K7007",
         "12345",
+        LEARNED,
         "insurer.example",
     ]
-    assert await values(api, anna, insurer.id) == [PUBLIC_IBAN, "K4711", LEARNED_IBAN, "12345"]
-    assert await values(api, bob, insurer.id) == [PUBLIC_IBAN]
+    assert await values(api, anna, insurer.id) == [PUBLIC, "K4711", "12345", LEARNED]
+    assert await values(api, bob, insurer.id) == [PUBLIC]
     # A member of the space it was learned in sees what was learned there, not her numbers.
     await api.services.spaces.set_member(anna.id, own, bob.id, SpaceRole.READ)
-    assert await values(api, bob, insurer.id) == [PUBLIC_IBAN, LEARNED_IBAN]
+    assert await values(api, bob, insurer.id) == [PUBLIC, LEARNED]
 
 
 async def test_a_user_keeps_their_numbers_in_their_profile(api: Api) -> None:
