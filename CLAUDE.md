@@ -65,6 +65,9 @@ Publishing a release on GitHub runs `.github/workflows/release.yml`: it builds `
 (`python3 -m unittest discover -s .github/scripts`). For a release that got `latest`, a last job
 tells the homelab its version (`repository_dispatch`, secrets `HOMELAB_DISPATCH_REPO` and
 `HOMELAB_DISPATCH_TOKEN`; see `deploy/README.md`). The repository carries the version `0.0.0.dev0`.
+Every action in a workflow is pinned to its commit with the version in a comment
+(`uses: actions/checkout@<sha> # v6.1.0`, which Renovate updates); a test in `.github/scripts`
+fails on a tag.
 
 Migration client, in `migration/` (`migration/README.md`):
 
