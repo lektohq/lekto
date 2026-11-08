@@ -144,7 +144,8 @@ def _image_pages(source: Path, width: int) -> Iterator[Iterator[Image.Image]]:
                 if orientation in _UPRIGHT:
                     small = small.transpose(_UPRIGHT[orientation])
                 yield flatten_on_white(small).convert("RGB")
-        except OSError as error:
+        # A later frame over Pillow's limit is found only when it is loaded.
+        except (OSError, Image.DecompressionBombError) as error:
             raise UnprocessableDocumentError(
                 because(ReasonCode.IMAGE_UNREADABLE_DETAIL, detail=str(error))
             ) from None
