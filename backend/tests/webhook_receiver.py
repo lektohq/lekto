@@ -56,6 +56,10 @@ class LocalReceiver:
     def unreachable_url(self) -> str:
         return f"http://127.0.0.1:{free_port()}"
 
+    @property
+    def private_url(self) -> str:
+        return self.url  # the loopback interface
+
     def hits(self, path: str) -> int:
         return Counter(r.path for r in self.received)[path]
 

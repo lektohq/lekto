@@ -392,3 +392,13 @@ async def test_an_admins_webhook_serves_as_a_model_call(api: Api) -> None:
     assert short.status_code == 422
     ended = await api.client.patch(url, json={"model_call": None}, headers=auth(admin))
     assert ended.json()["model_call"] is None
+
+
+async def test_a_users_webhook_into_the_own_network_is_a_422(api: Api) -> None:
+    user, admin = await api.user(), await api.admin()
+    body = BODY | {"url": "http://192.168.178.1/hook"}
+    refused = await api.client.post(f"{PREFIX}/webhooks", json=body, headers=auth(user))
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["reason"]["code"] == "webhook_private_admins"
+    taken = await api.client.post(f"{PREFIX}/webhooks", json=body, headers=auth(admin))
+    assert taken.status_code == 201, taken.text

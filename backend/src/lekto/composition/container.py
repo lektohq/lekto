@@ -72,6 +72,7 @@ from lekto.composition.settings import Settings
 from lekto.core.domain.jobs import WORK_LEASE_MARGIN, RetryPolicy
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.verdict import Thresholds
+from lekto.core.domain.webhooks import PrivateTargets
 from lekto.core.ports.classifier import Classifier
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.codes import CodeReader
@@ -665,6 +666,7 @@ def webhook_policy_of(settings: Settings) -> WebhookPolicy:
         retry_delay=settings.webhook_retry_delay,
         disable_after=settings.webhook_disable_after,
         timeout=settings.webhook_timeout,
+        private_targets=PrivateTargets(settings.webhook_private_targets),
     )
 
 

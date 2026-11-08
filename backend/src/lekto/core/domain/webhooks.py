@@ -35,6 +35,7 @@ from enum import StrEnum
 from urllib.parse import urlsplit
 from uuid import UUID
 
+from lekto.core.domain.addresses import is_public, literal
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.events import DOCUMENT_EVENT_TYPES
 from lekto.core.domain.ids import DeliveryId, DocumentId, EventId, UserId, WebhookId, new_id
@@ -139,6 +140,36 @@ def validate_url(url: str) -> str:
     if parts.fragment:
         raise ValidationError(because(ReasonCode.URL_FRAGMENT))
     return url
+
+
+class PrivateTargets(StrEnum):
+    """Whose webhooks may reach an address that is not public: the own network, the machine
+    itself (`LEKTO_WEBHOOK_PRIVATE_TARGETS`). A webhook can make the worker POST anywhere it
+    reaches, and some services there answer without a password (Tobi, 08.11.2026)."""
+
+    ALL = "all"
+    ADMINS = "admins"  # the default: connecting the home's services is an admin's task
+    NONE = "none"
+
+    def allow(self, owner_is_admin: bool) -> bool:
+        """Whether a webhook of an owner who is (or is not) an active admin may reach one."""
+        return self is PrivateTargets.ALL or (self is PrivateTargets.ADMINS and owner_is_admin)
+
+    def refusal(self) -> ReasonCode:
+        """Why a webhook is refused such a target."""
+        if self is PrivateTargets.NONE:
+            return ReasonCode.WEBHOOK_PRIVATE_NONE
+        return ReasonCode.WEBHOOK_PRIVATE_ADMINS
+
+
+def names_private_address(url: str) -> bool:
+    """Whether `url` names a target that is not public by its host alone: `localhost` or an
+    address that is not public. A name is known only when it is resolved, before sending."""
+    host = (urlsplit(url).hostname or "").rstrip(".")
+    if host == "localhost" or host.endswith(".localhost"):
+        return True
+    address = literal(host)
+    return address is not None and not is_public(address)
 
 
 def validate_header_names(names: Iterable[str]) -> tuple[str, ...]:
@@ -498,7 +529,8 @@ class DeliveryOutcome(StrEnum):
     DELIVERED = "delivered"  # answered with 2xx
     RETRYING = "retrying"  # the attempt failed, another follows
     GAVE_UP = "gave_up"  # failed for good
-    DROPPED = "dropped"  # not sent: the right to see the document is gone, or the webhook is off
+    DROPPED = "dropped"  # not sent: the document is out of reach, the webhook is off, or the
+    # target is in the own network, which the webhook may not reach (`PrivateTargets`)
 
 
 @dataclass(kw_only=True)

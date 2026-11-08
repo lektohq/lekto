@@ -201,6 +201,12 @@ class WebhookDeliveryService:
         lease = self._policy.timeout + ATTEMPT_LEASE_MARGIN
         return await self._jobs.run_next([DELIVER_JOB], lease, self._run_claimed)
 
+    async def _private(self, uow: UnitOfWork, webhook: Webhook) -> bool:
+        """Whether the webhook may reach an address that is not public: by its owner, as
+        `LEKTO_WEBHOOK_PRIVATE_TARGETS` says, at the time of sending."""
+        owner = await uow.users.find(webhook.owner_id)
+        return self._policy.private_targets.allow(owner is not None and owner.is_active_admin)
+
     async def send_test(self, actor: UserId, id: WebhookId) -> WebhookDelivery:
         """Owner or admin: send a `webhook.test` request now, once, and return the log row. Works
         for a switched-off webhook too; does not count towards switching it off. A test request
@@ -212,6 +218,7 @@ class WebhookDeliveryService:
             self._count_test_request(actor, now)
             event_id = EventId(new_id())
             body = await self._body(uow, webhook, event_id, TEST_EVENT, now, None)
+            private = await self._private(uow, webhook)
         try:
             secrets, own = self._decrypt(webhook, now)
         except (DecryptionError, ValueError):
@@ -220,9 +227,15 @@ class WebhookDeliveryService:
             response = (
                 body
                 if isinstance(body, WebhookResponse)
-                else await self._send(webhook, secrets, own, event_id, body)
+                else await self._send(webhook, secrets, own, event_id, body, private=private)
             )
-        outcome = DeliveryOutcome.DELIVERED if _is_success(response) else DeliveryOutcome.GAVE_UP
+        outcome = (
+            DeliveryOutcome.DELIVERED
+            if _is_success(response)
+            else DeliveryOutcome.DROPPED
+            if response.refused
+            else DeliveryOutcome.GAVE_UP
+        )
         delivery = _row(webhook, event_id, TEST_EVENT, None, 1, now, response, outcome)
         async with self._uow() as uow:
             await uow.webhooks.add_delivery(delivery)
@@ -297,6 +310,7 @@ class WebhookDeliveryService:
                     uow, webhook, event_id, event_type, occurred_at, document_id, rule
                 )
             )
+            private = await self._private(uow, webhook)
         attempt = job.tries
         if reason is not None:
             response = WebhookResponse(status_code=None, duration_ms=0, error=reason)
@@ -322,7 +336,7 @@ class WebhookDeliveryService:
             if isinstance(body, WebhookResponse):
                 response, outcome = body, DeliveryOutcome.GAVE_UP
             else:
-                response = await self._send(webhook, secrets, own, event_id, body)
+                response = await self._send(webhook, secrets, own, event_id, body, private=private)
                 outcome = self._outcome(response, attempt)
         await self._settle_attempt(
             job, webhook_id, event_id, event_type, document_id, attempt, now, response, outcome
@@ -347,6 +361,7 @@ class WebhookDeliveryService:
                 if webhook is None or task is None
                 else await _reason_to_drop(uow, webhook, event_type, document_id)
             )
+            private = webhook is not None and await self._private(uow, webhook)
         if task is None or task.status is not TaskStatus.OPEN or task.encrypted_request is None:
             await self._jobs.end(job)
             return
@@ -372,6 +387,7 @@ class WebhookDeliveryService:
                     {**own, **request.headers(task)},
                     EventId(task.id),
                     request.body,
+                    private=private,
                 )
                 outcome = self._task_outcome(response, attempt, task)
         await self._settle_task_attempt(job, task, event_type, attempt, now, response, outcome)
@@ -379,6 +395,8 @@ class WebhookDeliveryService:
     def _task_outcome(self, response: WebhookResponse, attempt: int, task: Task) -> DeliveryOutcome:
         if _is_success(response):
             return DeliveryOutcome.DELIVERED
+        if response.refused:  # the task fails: no attempt would reach the target
+            return DeliveryOutcome.GAVE_UP
         next_attempt = TASK_RETRY.next_run(attempt, self._clock.now())
         if (
             _is_temporary(response)
@@ -453,6 +471,8 @@ class WebhookDeliveryService:
     def _outcome(self, response: WebhookResponse, attempt: int) -> DeliveryOutcome:
         if _is_success(response):
             return DeliveryOutcome.DELIVERED
+        if response.refused:  # not sent, not tried again, not counted against the webhook
+            return DeliveryOutcome.DROPPED
         if _is_temporary(response) and attempt < self._policy.max_attempts:
             return DeliveryOutcome.RETRYING
         return DeliveryOutcome.GAVE_UP
@@ -515,9 +535,12 @@ class WebhookDeliveryService:
         own: dict[str, str],
         event_id: EventId,
         body: bytes,
+        *,
+        private: bool,
     ) -> WebhookResponse:
         """`own`: the webhook's own headers; Lekto's (content type, id, timestamp, signature)
-        cannot be among them (`validate_header_names`)."""
+        cannot be among them (`validate_header_names`). `private`: the target may be an address
+        that is not public."""
         headers = {
             **own,
             "Content-Type": "application/json",
@@ -525,7 +548,11 @@ class WebhookDeliveryService:
         }
         return await self._sender.send(
             WebhookRequest(
-                url=webhook.url, headers=headers, body=body, timeout=self._policy.timeout
+                url=webhook.url,
+                headers=headers,
+                body=body,
+                timeout=self._policy.timeout,
+                private=private,
             )
         )
 

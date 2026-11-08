@@ -287,7 +287,12 @@ location ~ ^/api/v1/(events|mcp) {
 ## Webhooks
 
 The worker delivers webhooks, so the worker container needs network access to their targets, also
-in your own network. Lekto follows no redirects and ignores the proxy environment variables
+in your own network. A webhook can make the worker POST to anything it reaches, and some services
+answer without a password (Ollama, Node-RED without `adminAuth`, a router's page). So only an
+admin's webhooks reach addresses that are not public (`LEKTO_WEBHOOK_PRIVATE_TARGETS=admins`, the
+default): the worker resolves the target's name, refuses it unless every address is public, and
+connects to the address it checked. Set up the connections to the services of your home as an
+admin, or set `all` if every user may reach them. Lekto follows no redirects and ignores the proxy environment variables
 (`HTTP_PROXY` and the like), so the targets must be reachable directly from the worker's network. A
 target that does not answer holds up deliveries up to `LEKTO_WEBHOOK_TIMEOUT` each, at most
 `LEKTO_WEBHOOK_CONCURRENCY` at a time; processing documents is not affected.
