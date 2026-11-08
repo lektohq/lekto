@@ -82,7 +82,7 @@ GREEN: dict[str, tuple[Call, Mapping[str, int]]] = {
             "owner": 200,
             "reader": 403,
             "writer": 200,
-            "read_token": 403,
+            "read_token": 200,  # the owner's: a dry run stores nothing (`x-reads`)
             "admin": 200,
             **HIDDEN,
             **DENIED,

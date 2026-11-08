@@ -4,6 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Query
+from pydantic import SecretStr
 
 from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
 from lekto.adapters.inbound.rest.context import Context
@@ -58,7 +59,7 @@ async def create_mailbox(body: MailboxCreate, user: CurrentUser, context: Contex
         port=body.port,
         security=body.security,
         username=body.username,
-        password=body.password,
+        password=body.password.get_secret_value(),
         changes=body.settings(),
     )
     return MailboxOut.of(mailbox)
@@ -85,7 +86,7 @@ async def test_connection(
         port=body.port,
         security=body.security,
         username=body.username,
-        password=body.password,
+        password=_plain(body.password),
         mailbox_id=None if body.mailbox_id is None else MailboxId(body.mailbox_id),
     )
     return ConnectionTestOut.of(test)
@@ -182,7 +183,7 @@ async def update_mailbox(
     id: UUID, body: MailboxPatch, user: CurrentUser, context: Context
 ) -> MailboxOut:
     mailbox = await context.mailboxes.change(
-        user, MailboxId(id), body.changes(), password=body.password
+        user, MailboxId(id), body.changes(), password=_plain(body.password)
     )
     return MailboxOut.of(mailbox)
 
@@ -196,3 +197,8 @@ async def update_mailbox(
 )
 async def delete_mailbox(id: UUID, user: CurrentUser, context: Context) -> None:
     await context.mailboxes.delete(user, MailboxId(id))
+
+
+def _plain(password: SecretStr | None) -> str | None:
+    """The password as the service takes it; it stays a secret until here."""
+    return None if password is None else password.get_secret_value()

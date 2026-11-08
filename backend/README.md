@@ -1449,8 +1449,8 @@ depends on it except the five public ones (sign-in, OIDC start, info and callbac
 test calls every registered route without credentials and expects `401`. Requests that change
 something need, with a session, the header `X-CSRF-Token` (from the sign-in answer or
 `GET /auth/me`) and, with a token, the scope `read_write`; otherwise `403`. A POST that only reads
-(`x-reads` in the API description: a search with its words in the body) is open to a `read`
-token; with a session it needs the header all the same. A token of the scope `upload` reaches
+(`x-reads` in the API description: a search with its words in the body, a dry run, a preview or
+a check that stores nothing) is open to a `read` token; with a session it needs the header all the same. A token of the scope `upload` reaches
 only the upload (`x-uploads`: `POST /documents`); everything else answers `403`
 (`upload_only_token`), reading too. Changing sign-in
 data needs a session, so a leaked API token cannot take over an account: the own password,

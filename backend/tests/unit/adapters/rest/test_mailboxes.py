@@ -5,6 +5,11 @@ from datetime import timedelta
 from typing import Any
 
 from lekto.adapters.inbound.rest import PREFIX
+from lekto.adapters.inbound.rest.schemas.mailboxes import (
+    ConnectionTestBody,
+    MailboxCreate,
+    MailboxPatch,
+)
 from lekto.adapters.outbound.memory import MemoryMailServer
 from lekto.core.domain.users import User
 from tests.api import auth
@@ -94,6 +99,19 @@ async def test_a_mailbox_is_created_tested_changed_and_deleted(api: Api) -> None
     assert [item["name"] for item in listed] == ["Household"]
     assert (await api.client.delete(url, headers=auth(admin))).status_code == 204
     assert (await api.client.get(url, headers=auth(admin))).status_code == 404
+
+
+def test_a_password_is_not_shown_by_the_bodies() -> None:
+    """A body in a log line or an error shows no password."""
+    bodies = [
+        MailboxCreate.model_validate(BODY),
+        MailboxPatch.model_validate({"password": BODY["password"]}),
+        ConnectionTestBody.model_validate(
+            {key: value for key, value in BODY.items() if key != "name"}
+        ),
+    ]
+    for body in bodies:
+        assert "app-password" not in repr(body)
 
 
 async def test_only_admins(api: Api) -> None:
