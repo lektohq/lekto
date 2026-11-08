@@ -45,16 +45,29 @@
 	}
 
 	const locale = regionalLocale(getLocale());
+
+	// bits-ui (2.19 to 2.20.6) pads a segment with a zero when the focus leaves it and marks it as
+	// being typed then; a day picked in the calendar afterwards shows that segment's old digits
+	// although the value took the new day (a segment had the focus, the calendar opened). It clears
+	// the mark at that reading of the value: once the calendar has closed, the value is read again.
+	// Not while a date is half typed, which bits-ui would clear at that reading.
+	let fresh = $state(0);
 </script>
 
 <DatePicker.Root
 	bind:value={
-		() => toDate(value),
+		() => {
+			void fresh;
+			return toDate(value);
+		},
 		(next) => {
 			value = next ? next.toString() : '';
 			onchange?.(value);
 		}
 	}
+	onOpenChangeComplete={(open) => {
+		if (!open && value) fresh++;
+	}}
 	{locale}
 	minValue={toDate(min)}
 	maxValue={toDate(max)}
