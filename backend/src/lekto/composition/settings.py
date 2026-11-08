@@ -189,6 +189,9 @@ class Settings(BaseSettings):
     webhook_retry_delay: Seconds = timedelta(seconds=30)
     webhook_disable_after: Annotated[int, Field(ge=1, le=10_000)] = 20
     webhook_concurrency: Annotated[int, Field(ge=1, le=64)] = 4
+    # Whose webhooks may reach addresses that are not public (the own network, the machine): API
+    # (saving) and worker (sending).
+    webhook_private_targets: Literal["all", "admins", "none"] = "admins"
 
     # MCP: the endpoint `/api/v1/mcp` of the API (tools for AI clients, API tokens as bearer),
     # and the most characters one `documents_text` call returns.

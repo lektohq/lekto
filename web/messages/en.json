@@ -2785,6 +2785,8 @@
 	"reason_url_no_host": "The URL needs a host.",
 	"reason_url_credentials": "The URL must not contain a user name or password.",
 	"reason_url_fragment": "The URL must not have a fragment (#…).",
+	"reason_webhook_private_admins": "Only an admin's webhooks may reach addresses in the own network. Your webhook can reach public addresses.",
+	"reason_webhook_private_none": "No webhook may reach addresses in the own network.",
 	"reason_header_name_invalid": "“{name}” is no valid header name.",
 	"reason_header_reserved": "Lekto sets the header “{name}” itself.",
 	"reason_header_value_invalid": "The value of “{name}” must have 1 to {max} characters of printable ASCII, spaces only inside.",

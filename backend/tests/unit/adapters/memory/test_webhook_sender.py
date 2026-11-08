@@ -9,6 +9,7 @@ from tests.webhook_receiver import Received, default_answer
 
 BASE = "http://receiver.test"
 NOBODY = "http://nobody.test"
+PRIVATE = "http://192.168.0.10"
 
 
 class _Receiver:
@@ -19,9 +20,10 @@ class _Receiver:
 
     url = BASE
     unreachable_url = NOBODY
+    private_url = PRIVATE
 
     def hits(self, path: str) -> int:
-        return sum(1 for r in self._sender.requests if r.url == BASE + path)
+        return sum(1 for r in self._sender.requests if r.url in (BASE + path, PRIVATE + path))
 
     def last_body(self) -> bytes:
         return self._sender.requests[-1].body
@@ -33,7 +35,7 @@ class _Receiver:
 def _answer(request: WebhookRequest) -> int | str:
     if request.url.startswith(NOBODY):
         return "cannot connect"
-    path = request.url.removeprefix(BASE)
+    path = request.url.removeprefix(BASE).removeprefix(PRIVATE)
     if path == "/slow":
         return f"no answer within {request.timeout.total_seconds():g} seconds"
     status, _ = default_answer(Received("POST", path, {}, request.body))

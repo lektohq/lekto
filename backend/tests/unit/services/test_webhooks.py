@@ -13,6 +13,7 @@ from lekto.core.domain.errors import (
     ValidationError,
 )
 from lekto.core.domain.ids import DocumentId, EventId, WebhookId, new_id
+from lekto.core.domain.reasons import ReasonCode
 from lekto.core.domain.users import Role
 from lekto.core.domain.webhooks import (
     DISABLED_FAILING,
@@ -20,6 +21,7 @@ from lekto.core.domain.webhooks import (
     DeliveryOutcome,
     ModelCallKind,
     ModelCallRole,
+    PrivateTargets,
     WebhookDelivery,
     headers_from_bytes,
     new_secret,
@@ -63,6 +65,64 @@ async def test_a_bad_url_or_event_type_is_refused(world: World) -> None:
     with pytest.raises(ValidationError):
         await world.webhooks.create(user.id, name="x", url=URL, event_types=["nonsense"])
     assert await world.webhooks.list_webhooks(user.id) == []
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://localhost:1880/flows",
+        "http://192.168.178.1/",
+        "http://10.0.0.5:11434/api/pull",
+        "http://[::1]/",
+        "http://169.254.169.254/latest",
+    ],
+)
+async def test_only_an_admins_webhook_names_an_address_in_the_own_network(
+    world: World, url: str
+) -> None:
+    user, admin = await world.user(), await world.user(role=Role.ADMIN)
+    with pytest.raises(ValidationError) as refused:
+        await world.webhooks.create(user.id, name="x", url=url, event_types=["*"])
+    assert refused.value.reason is not None
+    assert refused.value.reason.code is ReasonCode.WEBHOOK_PRIVATE_ADMINS
+    created = await world.webhooks.create(admin.id, name="x", url=url, event_types=["*"])
+    assert created.webhook.url == url
+    # A name is checked when it is resolved, before sending.
+    await world.webhooks.create(user.id, name="y", url="http://n8n.lan/", event_types=["*"])
+
+
+async def test_an_admin_does_not_point_a_users_webhook_into_the_own_network(
+    world: World,
+) -> None:
+    user, admin = await world.user(), await world.user(role=Role.ADMIN)
+    created = await world.webhooks.create(user.id, name="x", url=URL, event_types=["*"])
+    with pytest.raises(ValidationError):
+        await world.webhooks.update(admin.id, created.webhook.id, url="http://127.0.0.1/")
+    # The rest of the webhook may change.
+    await world.webhooks.update(user.id, created.webhook.id, name="renamed")
+
+
+async def test_with_none_no_webhook_names_an_address_in_the_own_network(world: World) -> None:
+    admin = await world.user(role=Role.ADMIN)
+    service = replace_policy(world, PrivateTargets.NONE)
+    with pytest.raises(ValidationError) as refused:
+        await service.create(admin.id, name="x", url="http://127.0.0.1/", event_types=["*"])
+    assert refused.value.reason is not None
+    assert refused.value.reason.code is ReasonCode.WEBHOOK_PRIVATE_NONE
+    everyone = replace_policy(world, PrivateTargets.ALL)
+    user = await world.user()
+    await everyone.create(user.id, name="x", url="http://127.0.0.1/", event_types=["*"])
+
+
+def replace_policy(world: World, targets: PrivateTargets) -> WebhookService:
+    return WebhookService(
+        world.uow,
+        world.clock,
+        world.cipher,
+        replace(builders.WEBHOOKS, private_targets=targets),
+        builders.TEMPLATES,
+        retention=builders.RETENTION,
+    )
 
 
 async def test_the_number_of_webhooks_per_user_is_limited(world: World) -> None:

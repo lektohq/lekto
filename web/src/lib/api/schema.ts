@@ -9748,6 +9748,8 @@ export interface components {
 			| 'url_no_host'
 			| 'url_credentials'
 			| 'url_fragment'
+			| 'webhook_private_admins'
+			| 'webhook_private_none'
 			| 'header_name_invalid'
 			| 'header_reserved'
 			| 'header_value_invalid'
