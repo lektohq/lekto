@@ -1,11 +1,14 @@
 """Health endpoint and the OpenAPI contract."""
 
+import base64
+import hashlib
 import importlib
 import json
 import pkgutil
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
+from pathlib import Path
 from typing import Any
 
 import httpx2
@@ -18,12 +21,12 @@ from lekto.adapters.inbound.rest import (
     create_app,
     schemas,
 )
-from lekto.adapters.inbound.rest.app import DOCS_PATH, FAVICON_PATH
+from lekto.adapters.inbound.rest.app import DOCS_PATH, FAVICON_PATH, SWAGGER_PATH
 from lekto.composition.api import api_context
 from lekto.composition.container import build_memory_container, build_services
 from tests import builders
 from tests.builders import PASSWORD, SECRET_KEY
-from tests.unit.adapters.rest.support import Api
+from tests.unit.adapters.rest.support import Api, make_app
 
 PROBLEM = "application/problem+json"
 
@@ -35,12 +38,40 @@ async def test_health_is_ok_without_authentication(api: Api) -> None:
     assert response.json() == {"status": "ok", "checks": checks}
 
 
-async def test_the_api_documentation_carries_lektos_favicon(api: Api) -> None:
-    response = await api.client.get(DOCS_PATH)
+async def docs(ui_directory: Path | None) -> httpx2.Response:
+    container = build_memory_container()
+    app = make_app(container, build_services(container), ui_directory=ui_directory)
+    transport = httpx2.ASGITransport(app=app)
+    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
+        return await client.get(DOCS_PATH)
+
+
+async def test_the_api_documentation_comes_with_the_web_ui_not_a_cdn(tmp_path: Path) -> None:
+    (tmp_path / "index.html").write_text("<!doctype html>", encoding="utf-8")
+    response = await docs(tmp_path)
     assert response.status_code == 200
-    assert f'href="{FAVICON_PATH}"' in response.text
-    assert f"url: '{PREFIX}/openapi.json'" in response.text
-    assert "oauth2RedirectUrl" not in response.text
+    page = response.text
+    assert f'href="{FAVICON_PATH}"' in page
+    assert f"url: '{PREFIX}/openapi.json'" in page
+    assert "oauth2RedirectUrl" not in page
+    assert f'src="{SWAGGER_PATH}/swagger-ui-bundle.js"' in page
+    assert f'href="{SWAGGER_PATH}/swagger-ui.css"' in page
+    assert "cdn." not in page
+    # Only the page's own inline script runs, by its hash.
+    (script,) = re.findall(r"<script>(.*?)</script>", page, re.DOTALL)
+    digest = base64.b64encode(hashlib.sha256(script.encode()).digest()).decode()
+    policy = response.headers["content-security-policy"]
+    assert f"script-src 'self' 'sha256-{digest}';" in policy
+    assert "default-src 'none'" in policy
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["x-content-type-options"] == "nosniff"
+
+
+async def test_without_the_web_ui_there_is_no_api_documentation() -> None:
+    response = await docs(None)
+    assert response.status_code == 404
+    assert f"{PREFIX}/openapi.json" in response.text
+    assert "<script" not in response.text
 
 
 def test_the_description_names_the_scopes_and_the_tools_of_today(api: Api) -> None:
