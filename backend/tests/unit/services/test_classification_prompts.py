@@ -393,7 +393,7 @@ def test_every_call_shares_the_system_prompt_and_no_list_is_in_it() -> None:
     assert "evidence:" in SYSTEM and "label:" in SYSTEM
 
 
-# --- the facts with their role and the holders (`facts-2`) ------------------------------------
+# --- the facts with their role and the holders (`facts-3`) ------------------------------------
 
 
 def test_the_facts_task_lists_the_kinds_and_roles_a_model_reads() -> None:

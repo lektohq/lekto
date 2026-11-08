@@ -122,7 +122,7 @@ BOOKED_HOLDER_KINDS = frozenset({IdentifierKind.CUSTOMER_NUMBER})
 without one they are the document's contact's, as before they had holders."""
 
 MODEL_HOLDER_KINDS = frozenset({IdentifierKind.IBAN, IdentifierKind.CREDITOR_ID})
-"""The kinds whose holder the language model is asked for (`facts-2`); the others' the rule
+"""The kinds whose holder the language model is asked for (`facts-3`); the others' the rule
 tells alone (Tobi, 28.10.2026)."""
 
 SURE_HOLDER_KINDS = frozenset({IdentifierKind.EMAIL_DOMAIN})
@@ -143,10 +143,7 @@ ROLES: Mapping[IdentifierKind, FactRole] = {
     IdentifierKind.COMMERCIAL_REGISTER: FactRole.CONTACT,
     IdentifierKind.TAX_NUMBER: FactRole.CONTACT,
     IdentifierKind.CONTRACT_NUMBER: FactRole.TARGET,
-    IdentifierKind.POLICY_NUMBER: FactRole.TARGET,
-    IdentifierKind.MEMBERSHIP_NUMBER: FactRole.TARGET,
     IdentifierKind.METER_NUMBER: FactRole.TARGET,
-    IdentifierKind.LOAN_NUMBER: FactRole.TARGET,
     IdentifierKind.MANDATE_REFERENCE: FactRole.TARGET,
     IdentifierKind.LICENSE_PLATE: FactRole.TARGET,
     IdentifierKind.INVOICE_NUMBER: FactRole.OWN,

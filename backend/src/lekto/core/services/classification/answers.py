@@ -535,7 +535,7 @@ def parse_facts(content: str) -> list[ReadFact]:
 
 
 def parse_holders(content: str) -> list[ReadHolder]:
-    """The holders the facts call tells (`facts-2`), strict about each entry's structure; an
+    """The holders the facts call tells (`facts-3`), strict about each entry's structure; an
     answer without them (an earlier prompt) tells none. A holder or number not listed is kept
     for the check to refuse (`holders.checked_holder`)."""
     data = _load(content)

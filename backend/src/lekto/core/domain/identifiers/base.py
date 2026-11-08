@@ -30,11 +30,8 @@ class IdentifierKind(StrEnum):
     COMMERCIAL_REGISTER = "commercial_register"  # Handelsregisternummer (HRB 12345)
     TAX_NUMBER = "tax_number"  # a company's Steuernummer
     # Point to what a series refers to: a contract, a policy, a meter.
-    CONTRACT_NUMBER = "contract_number"
-    POLICY_NUMBER = "policy_number"  # Versicherungsschein-, Policennummer
-    MEMBERSHIP_NUMBER = "membership_number"
+    CONTRACT_NUMBER = "contract_number"  # also policy, membership, loan numbers since #215
     METER_NUMBER = "meter_number"  # Zählernummer
-    LOAN_NUMBER = "loan_number"  # Darlehensnummer
     MANDATE_REFERENCE = "mandate_reference"  # SEPA Mandatsreferenz
     LICENSE_PLATE = "license_plate"  # Kfz-Kennzeichen
     # Mark the document itself.

@@ -32013,10 +32013,7 @@
           "commercial_register",
           "tax_number",
           "contract_number",
-          "policy_number",
-          "membership_number",
           "meter_number",
-          "loan_number",
           "mandate_reference",
           "license_plate",
           "invoice_number",
@@ -44888,22 +44885,7 @@
       "person": false,
       "names_user": true
     },
-    "policy_number": {
-      "contact": true,
-      "person": false,
-      "names_user": true
-    },
-    "membership_number": {
-      "contact": true,
-      "person": false,
-      "names_user": true
-    },
     "meter_number": {
-      "contact": true,
-      "person": false,
-      "names_user": true
-    },
-    "loan_number": {
       "contact": true,
       "person": false,
       "names_user": true
@@ -44983,10 +44965,7 @@
     "commercial_register": "contact",
     "tax_number": "contact",
     "contract_number": "target",
-    "policy_number": "target",
-    "membership_number": "target",
     "meter_number": "target",
-    "loan_number": "target",
     "mandate_reference": "target",
     "license_plate": "target",
     "invoice_number": "own",
