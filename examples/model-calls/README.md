@@ -71,6 +71,10 @@ key (such as Open WebUI's pass-through to Ollama; its documentation names the pa
 | `AGENT_PORT` | `8080` | where the consumer listens |
 | `AGENT_TOKEN` | – | if set, requests must carry `Authorization: Bearer <AGENT_TOKEN>` |
 | `AGENT_SECRET` | – | if set (the webhook's `whsec_…`), requests must carry Lekto's signature |
+
+At least one of `AGENT_TOKEN` and `AGENT_SECRET` must be set, or the consumer does not start.
+It refuses a body over 16 MiB (413) and, while 100 requests wait for the model, any further one
+(503).
 | `LEKTO_URL` | – | if set, answers go there instead of `LEKTO_PUBLIC_URL` |
 | `AGENT_MAX_CHARACTERS` | `24000` | the text is cut to this, its beginning and end kept |
 | `AGENT_TIMEOUT` | `600` | seconds for one answer of Ollama |
