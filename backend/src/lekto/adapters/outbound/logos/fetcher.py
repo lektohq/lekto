@@ -5,9 +5,9 @@ Every request (the page, the manifest, each icon, each redirect):
 
 - goes over HTTPS to port 443 only, without credentials in the address;
 - resolves the host name and refuses it unless every address it has is public
-  (`core.domain.addresses.is_public`), then connects to the address it checked, with the host name as
-  `Host` and for TLS (SNI and the certificate), so that a second answer of the name server
-  cannot lead elsewhere (DNS rebinding);
+  (`core.domain.addresses.is_public`), then connects to the address it checked, with the host
+  name as `Host` and for TLS (SNI and the certificate), so that a second answer of the name
+  server cannot lead elsewhere (DNS rebinding);
 - follows at most `MAX_REDIRECTS` redirects itself, each checked like the first;
 - takes at most `TIMEOUT` with its redirects, reads at most `MAX_SIZE` bytes as sent and as
   decoded (a page longer than that is read as far as that, its head is what counts; a longer

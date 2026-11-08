@@ -28,6 +28,11 @@ class Receiver(Protocol):
         """An address where nobody listens."""
         ...
 
+    @property
+    def private_url(self) -> str:
+        """The receiver at an address that is not public (the own network or the machine)."""
+        ...
+
     def hits(self, path: str) -> int:
         """How many requests the path has received."""
         ...
@@ -39,8 +44,10 @@ class Receiver(Protocol):
         ...
 
 
-def request(url: str, timeout: float = 5.0) -> WebhookRequest:
-    return WebhookRequest(url=url, headers=HEADERS, body=BODY, timeout=timedelta(seconds=timeout))
+def request(url: str, timeout: float = 5.0, *, private: bool = True) -> WebhookRequest:
+    return WebhookRequest(
+        url=url, headers=HEADERS, body=BODY, timeout=timedelta(seconds=timeout), private=private
+    )
 
 
 class WebhookSenderContract:
@@ -63,6 +70,18 @@ class WebhookSenderContract:
         headers = receiver.last_headers()
         assert headers["webhook-id"] == "e"
         assert headers["content-type"] == "application/json"
+
+    async def test_a_target_in_the_own_network_is_reached_only_when_allowed(
+        self, sender: WebhookSender, receiver: Receiver
+    ) -> None:
+        refused = await sender.send(request(f"{receiver.private_url}/status/200", private=False))
+        assert (refused.status_code, refused.refused) == (None, True)
+        assert refused.error
+        assert receiver.private_url not in refused.error
+        assert receiver.hits("/status/200") == 0
+        allowed = await sender.send(request(f"{receiver.private_url}/status/200"))
+        assert (allowed.status_code, allowed.refused) == (200, False)
+        assert receiver.hits("/status/200") == 1
 
     @pytest.mark.parametrize("code", [204, 400, 404, 410, 429, 500, 503])
     async def test_a_status_is_an_answer_not_an_error(
