@@ -2,9 +2,12 @@
 
 import asyncio
 import logging
+import ssl
 import time
+from pathlib import Path
 
 from lekto.adapters.outbound.sql import Database, SchemaState, migrate, schema_state
+from lekto.adapters.outbound.sql.database import Tls
 from lekto.composition.settings import Settings
 
 
@@ -21,7 +24,28 @@ def open_database(settings: Settings, *, read_only: bool = False) -> Database:
         name=settings.db_name,
         user=settings.db_user,
         password=settings.db_password.get_secret_value(),
+        tls=tls_of(settings.db_sslmode, settings.db_sslrootcert),
     )
+
+
+def tls_of(mode: str | None, root_certificate: Path | None) -> Tls:
+    """How Postgres connections use TLS, by `LEKTO_DB_SSLMODE` (libpq's modes). Unset leaves
+    asyncpg's default, which honours `PGSSLMODE`. The checking modes trust the root certificate
+    given, else the system's."""
+    match mode:
+        case None:
+            return None
+        case "disable":
+            return False
+        case "verify-ca" | "verify-full":
+            context = ssl.create_default_context(
+                cafile=None if root_certificate is None else str(root_certificate)
+            )
+            # verify-ca: a certificate of a trusted authority, for any host name.
+            context.check_hostname = mode == "verify-full"
+            return context
+        case _:
+            return mode  # allow, prefer, require: asyncpg checks no certificate
 
 
 async def migrate_database(settings: Settings) -> None:
