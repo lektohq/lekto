@@ -2431,6 +2431,114 @@ export interface paths {
 		patch: operations['update_lens_api_v1_lenses__id__patch'];
 		trace?: never;
 	};
+	'/api/v1/push': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/**
+		 * Notifications on this server
+		 * @description Whether the server sends notifications, and the key browsers subscribe with.
+		 */
+		get: operations['push_settings_api_v1_push_get'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/v1/push/devices': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/**
+		 * List the caller's devices
+		 * @description The devices the caller receives notifications on, oldest first.
+		 */
+		get: operations['list_devices_api_v1_push_devices_get'];
+		put?: never;
+		/**
+		 * Receive notifications on a device
+		 * @description A browser's subscription (`PushSubscription`): its address at the push service and its keys. The address must be one of a known push service (Apple, Google, Mozilla, Microsoft; 422 `push_endpoint_refused`), the keys valid (422 `push_keys_invalid`). The same address again replaces the device, also one another user subscribed in that browser before. 409 `push_devices_limit`: the caller has 20 devices. 409 `push_off`: the server sends no notifications (no VAPID key).
+		 */
+		post: operations['register_device_api_v1_push_devices_post'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/v1/push/devices/{id}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post?: never;
+		/**
+		 * Receive no notifications on a device
+		 * @description Only its owner sees a device; other users' devices are not found (404).
+		 */
+		delete: operations['remove_device_api_v1_push_devices__id__delete'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/v1/push/devices/{id}/test': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/**
+		 * Send a device a test notification
+		 * @description Only its owner sees a device; other users' devices are not found (404). A device the push service no longer knows is forgotten (`gone`). 409 `push_off`: the server sends no notifications (no VAPID key).
+		 */
+		post: operations['test_device_api_v1_push_devices__id__test_post'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/v1/push/preferences': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/**
+		 * What the caller is told about
+		 * @description Every kind is on and titles are named until the caller changes it.
+		 */
+		get: operations['get_preferences_api_v1_push_preferences_get'];
+		/**
+		 * Choose what the caller is told about
+		 * @description A notification of a kind left out is not sent; documents waiting meanwhile are named in the next notification once `waiting` is on again.
+		 */
+		put: operations['set_preferences_api_v1_push_preferences_put'];
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/v1/mailboxes': {
 		parameters: {
 			query?: never;
@@ -6240,10 +6348,7 @@ export interface components {
 			| 'commercial_register'
 			| 'tax_number'
 			| 'contract_number'
-			| 'policy_number'
-			| 'membership_number'
 			| 'meter_number'
-			| 'loan_number'
 			| 'mandate_reference'
 			| 'license_plate'
 			| 'invoice_number'
@@ -8068,6 +8173,7 @@ export interface components {
 		 *       "has_password": true,
 		 *       "lekto_version": "0.8.0",
 		 *       "linked_accounts": [],
+		 *       "shortcut_url": "https://www.icloud.com/shortcuts/8d752558e38f4f64bf9c61faa4694a75",
 		 *       "token_scope": "read",
 		 *       "totp_enabled": false,
 		 *       "user": {
@@ -8106,6 +8212,11 @@ export interface components {
 			 * @description The version of Lekto that answers (its release).
 			 */
 			lekto_version: string;
+			/**
+			 * Shortcut Url
+			 * @description The link that adds the shortcut "An Lekto senden" for iPhone, iPad and Mac (`LEKTO_SHORTCUT_URL`); null: the server offers none.
+			 */
+			shortcut_url: string | null;
 		};
 		/** MemberDetails */
 		MemberDetails: {
@@ -9107,6 +9218,122 @@ export interface components {
 				[key: string]: unknown;
 			};
 		};
+		/**
+		 * PushDeviceIn
+		 * @example {
+		 *       "endpoint": "https://web.push.apple.com/QGuQyavXutnMH9Byyn6xHn",
+		 *       "keys": {
+		 *         "auth": "BTBZMqHH6r4Tts7J_aSIgg",
+		 *         "p256dh": "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4"
+		 *       },
+		 *       "locale": "de",
+		 *       "name": "iPhone"
+		 *     }
+		 */
+		PushDeviceIn: {
+			/**
+			 * Endpoint
+			 * @description The subscription's address at the push service (`PushSubscription.endpoint`).
+			 */
+			endpoint: string;
+			keys: components['schemas']['PushKeysIn'];
+			/**
+			 * Name
+			 * @description Which device it is.
+			 */
+			name: string;
+			/**
+			 * Locale
+			 * @description The language the device's notifications speak.
+			 * @enum {string}
+			 */
+			locale: 'de' | 'en';
+		};
+		/** PushDeviceOut */
+		PushDeviceOut: {
+			/**
+			 * Id
+			 * Format: uuid
+			 */
+			id: string;
+			/** Name */
+			name: string;
+			/** Locale */
+			locale: string;
+			/**
+			 * Endpoint
+			 * @description The address at the push service: a browser finds its own device by it.
+			 */
+			endpoint: string;
+			/**
+			 * Created At
+			 * Format: date-time
+			 */
+			created_at: string;
+			/**
+			 * Last Success At
+			 * @description When a message last reached the push service.
+			 */
+			last_success_at: string | null;
+		};
+		/** PushKeysIn */
+		PushKeysIn: {
+			/**
+			 * P256Dh
+			 * @description The browser's public key (base64url).
+			 */
+			p256dh: string;
+			/**
+			 * Auth
+			 * @description The browser's auth secret (base64url).
+			 */
+			auth: string;
+		};
+		/**
+		 * PushOutcome
+		 * @enum {string}
+		 */
+		PushOutcome: 'delivered' | 'gone' | 'failed';
+		/**
+		 * PushPreferencesBody
+		 * @example {
+		 *       "kinds": [
+		 *         "waiting",
+		 *         "webhook_disabled"
+		 *       ],
+		 *       "titles": true
+		 *     }
+		 */
+		PushPreferencesBody: {
+			/**
+			 * Kinds
+			 * @description What the caller is told about: `waiting` (documents wait in their inbox), `webhook_disabled` (one of their webhooks was switched off), and for admins `mailbox_failed` (a mailbox fails to fetch) and `job_failed` (a job was given up).
+			 */
+			kinds: ('waiting' | 'mailbox_failed' | 'webhook_disabled' | 'job_failed')[];
+			/**
+			 * Titles
+			 * @description Whether a notification names the documents' titles (it may show on a locked screen).
+			 */
+			titles: boolean;
+		};
+		/** PushSettingsOut */
+		PushSettingsOut: {
+			/**
+			 * Enabled
+			 * @description Whether the server sends notifications (a VAPID key).
+			 */
+			enabled: boolean;
+			/**
+			 * Public Key
+			 * @description The key a browser subscribes with (`applicationServerKey`: P-256, uncompressed, base64url); null without notifications.
+			 */
+			public_key: string | null;
+		};
+		/** PushTestOut */
+		PushTestOut: {
+			/** @description `delivered`: the push service took it; `gone`: it no longer knows the device, which is forgotten; `failed`: no answer or a refusal. */
+			outcome: components['schemas']['PushOutcome'];
+		};
 		/** QueuedOut */
 		QueuedOut: {
 			/**
@@ -9383,6 +9610,11 @@ export interface components {
 			| 'totp_off'
 			| 'code_invalid'
 			| 'read_only_token'
+			| 'upload_only_token'
+			| 'push_off'
+			| 'push_endpoint_refused'
+			| 'push_keys_invalid'
+			| 'push_devices_limit'
 			| 'csrf_missing'
 			| 'session_needed'
 			| 'oidc_mismatch'
@@ -11395,9 +11627,11 @@ export interface components {
 		};
 		/**
 		 * TokenScope
+		 * @description What an API token may do: read, read and write, or only upload documents (a shortcut
+		 *     on a phone that sends shared files; it reads nothing, not even what it uploaded).
 		 * @enum {string}
 		 */
-		TokenScope: 'read' | 'read_write';
+		TokenScope: 'read' | 'read_write' | 'upload';
 		/**
 		 * TotpSetupOut
 		 * @description Shown once. Confirm with a code to turn TOTP on.
@@ -28754,6 +28988,649 @@ export interface operations {
 					 *       "title": "Not Found",
 					 *       "status": 404,
 					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Conflict */
+			409: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Conflict",
+					 *       "status": 409,
+					 *       "detail": "duplicate of document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Content Too Large */
+			413: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Content Too Large",
+					 *       "status": 413,
+					 *       "detail": "the request body is larger than 1048576 bytes"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	push_settings_api_v1_push_get: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['PushSettingsOut'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	list_devices_api_v1_push_devices_get: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['PushDeviceOut'][];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	register_device_api_v1_push_devices_post: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['PushDeviceIn'];
+			};
+		};
+		responses: {
+			/** @description Successful Response */
+			201: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['PushDeviceOut'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Conflict */
+			409: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Conflict",
+					 *       "status": 409,
+					 *       "detail": "duplicate of document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Content Too Large */
+			413: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Content Too Large",
+					 *       "status": 413,
+					 *       "detail": "the request body is larger than 1048576 bytes"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	remove_device_api_v1_push_devices__id__delete: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			204: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	test_device_api_v1_push_devices__id__test_post: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['PushTestOut'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Conflict */
+			409: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Conflict",
+					 *       "status": 409,
+					 *       "detail": "duplicate of document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	get_preferences_api_v1_push_preferences_get: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['PushPreferencesBody'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	set_preferences_api_v1_push_preferences_put: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['PushPreferencesBody'];
+			};
+		};
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['PushPreferencesBody'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
 					 *     }
 					 */
 					'application/problem+json': components['schemas']['Problem'];

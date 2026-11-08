@@ -43,6 +43,7 @@ def make_app(
     mcp: bool = False,
     text_max: int = builders.DEFAULT_SETTINGS.mcp_text_max,
     ui_directory: Path | None = None,
+    shortcut_url: str | None = None,
 ) -> FastAPI:
     """The app as `composition.api` builds it from the shipped settings, with what a test
     changes."""
@@ -54,6 +55,7 @@ def make_app(
         stream_recheck_interval=recheck,
         text_max=text_max,
         ui_directory=ui_directory,
+        shortcut_url=shortcut_url,
     )
     mounts = [McpEndpoint(context, path=MCP_PATH)] if mcp else []
     return create_app(context, mounts)

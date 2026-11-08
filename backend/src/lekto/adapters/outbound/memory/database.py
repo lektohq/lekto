@@ -23,6 +23,7 @@ from lekto.core.domain.mail_intake import MailOrigin, MailRecord
 from lekto.core.domain.mail_rules import MailRule
 from lekto.core.domain.master_data import Contact, DocumentType, MasterData, Tag
 from lekto.core.domain.pipeline import NodeRun
+from lekto.core.domain.push import PushDevice, PushPreferences
 from lekto.core.domain.relations import Relation
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
@@ -118,6 +119,10 @@ def _token_keys(token: ApiToken) -> Iterable[Hashable]:
     return [("token", token.token_hash)]
 
 
+def _push_device_keys(device: PushDevice) -> Iterable[Hashable]:
+    return [("endpoint", device.endpoint)]
+
+
 def _external_identity_keys(identity: ExternalIdentity) -> Iterable[Hashable]:
     return [("subject", identity.issuer, identity.subject)]
 
@@ -137,6 +142,8 @@ DOCUMENTS = Table("document", _document_keys)
 CREDENTIALS = Table("credential", _no_keys)
 SESSIONS = Table("session", _session_keys)
 API_TOKENS = Table("API token", _token_keys)
+PUSH_DEVICES = Table("push device", _push_device_keys)
+PUSH_PREFERENCES: Table[PushPreferences] = Table("push preferences", _no_keys)
 EXTERNAL_IDENTITIES = Table("external identity", _external_identity_keys)
 LOGIN_FAILURES = Table("login failures", _no_keys)
 RULES = Table("rule", _no_keys)

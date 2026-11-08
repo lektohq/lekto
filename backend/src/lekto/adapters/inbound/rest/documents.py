@@ -22,7 +22,13 @@ from fastapi.responses import FileResponse
 from pydantic import ValidationError as PydanticValidationError
 from starlette.background import BackgroundTask
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, Authenticated, CurrentUser, Via
+from lekto.adapters.inbound.rest.auth import (
+    PROTECTED,
+    UPLOADS,
+    Authenticated,
+    CurrentUser,
+    Via,
+)
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.cursors import Cursor, decode_cursor, encode_cursor
 from lekto.adapters.inbound.rest.params import AllDocuments, AllInboxes, Listed
@@ -165,7 +171,7 @@ _UPLOAD_BODY = upload_body(
         },
         **problem_responses(400, 401, 403, 404, 409, 413, 415, 422),
     },
-    openapi_extra=_UPLOAD_BODY,
+    openapi_extra={**_UPLOAD_BODY, **UPLOADS},
 )
 async def upload(
     request: Request, response: Response, principal: Authenticated, context: Context

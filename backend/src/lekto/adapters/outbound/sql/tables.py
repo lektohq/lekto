@@ -764,6 +764,36 @@ sessions = Table(
     Column("version", Integer, nullable=False),
 )
 
+# The browsers a person receives notifications on (web push); a browser's address at its push
+# service is one row, whoever signed in there last.
+push_devices = Table(
+    "push_devices",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("user_id", Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("endpoint", Text, nullable=False, unique=True),
+    Column("p256dh", Text, nullable=False),
+    Column("auth", Text, nullable=False),
+    Column("name", Text, nullable=False),
+    Column("locale", Text, nullable=False),
+    Column("created_at", UtcDateTime, nullable=False),
+    Column("last_success_at", UtcDateTime, nullable=True),
+    Column("failures", Integer, nullable=False),
+    Column("version", Integer, nullable=False),
+)
+
+# What a person wants to be told about, and the documents that came to wait since their last
+# notification (ids, at most 50).
+push_preferences = Table(
+    "push_preferences",
+    metadata,
+    Column("user_id", Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("kinds", json_type(), nullable=False),
+    Column("titles", Boolean, nullable=False),
+    Column("pending", json_type(), nullable=False),
+    Column("version", Integer, nullable=False),
+)
+
 api_tokens = Table(
     "api_tokens",
     metadata,

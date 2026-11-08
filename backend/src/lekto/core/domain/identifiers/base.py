@@ -30,11 +30,8 @@ class IdentifierKind(StrEnum):
     COMMERCIAL_REGISTER = "commercial_register"  # Handelsregisternummer (HRB 12345)
     TAX_NUMBER = "tax_number"  # a company's Steuernummer
     # Point to what a series refers to: a contract, a policy, a meter.
-    CONTRACT_NUMBER = "contract_number"
-    POLICY_NUMBER = "policy_number"  # Versicherungsschein-, Policennummer
-    MEMBERSHIP_NUMBER = "membership_number"
+    CONTRACT_NUMBER = "contract_number"  # also policy, membership, loan numbers since #215
     METER_NUMBER = "meter_number"  # Zählernummer
-    LOAN_NUMBER = "loan_number"  # Darlehensnummer
     MANDATE_REFERENCE = "mandate_reference"  # SEPA Mandatsreferenz
     LICENSE_PLATE = "license_plate"  # Kfz-Kennzeichen
     # Mark the document itself.
@@ -77,20 +74,48 @@ WRITTEN_SEPARATORS = r"[\s./\u00ad-]*"
 """Between the characters of a number as a text writes it: separators, also several (two
 spaces, a line break and its indent of an OCR text) and soft hyphens, or none."""
 
+_MONTHS = r"(?:jan|feb|mär|maer|mar|apr|mai|may|jun|jul|aug|sep|okt|oct|nov|dez|dec)[a-zäöü]*\.?"
+_DATE = re.compile(
+    rf"(?P<day>\d{{1,2}})[./-](?P<month>\d{{1,2}})[./-](?:\d{{4}}|\d{{2}})"
+    rf"|\d{{4}}-(?P<iso_month>\d{{2}})-(?P<iso_day>\d{{2}})"
+    rf"|{_MONTHS}\s*(?:\d{{4}}|\d{{2}})"
+)
+
+
+def is_date(raw: str) -> bool:
+    """Whether `raw` is a date and nothing else (`14.03.2019`, `2019-03-14`, `Nov 2023`): never
+    a number, whatever its label (a reader takes a date beside "Personalnummer" for one)."""
+    found = _DATE.fullmatch(raw.strip().lower())
+    if found is None:
+        return False
+    day, month = found["day"] or found["iso_day"], found["month"] or found["iso_month"]
+    return day is None or (1 <= int(day) <= 31 and 1 <= int(month) <= 12)
+
+
+MASKED = re.compile(r"X{3,}|\*")
+"""A value with characters hidden (`XXXXXX123`, `****1234`), upper case: no number."""
+
+_FILLER = r"(?:bei|beim|von|vom|für|fuer|der|des|zu|zum|zur|at|with|for)"
+"""Words between a label and its verb ("Die Vertragsnummer bei Muster lautet 123"): never the
+start of a value."""
 _FIRST = (
-    r"(?:(?=[a-z./-]*\d)[a-z0-9][a-z0-9./-]*|[a-z]{1,4}(?:[./-][a-z]{1,4})*[./-]?(?![a-z0-9./-]))"
+    rf"(?:(?=[a-z./-]*\d)[a-z0-9][a-z0-9./-]*|(?!{_FILLER}(?![a-z0-9./-]))"
+    r"[a-z]{1,4}(?:[./-][a-z]{1,4})*[./-]?(?![a-z0-9./-]))"
 )
 """A value's first word: one with a digit, or short groups of letters (a prefix `DE`, `ABCD`,
 a reference's initials `SD-H/kr`), not a street or another word of the text (`Musterstraße 12
-12345` under "Versicherungs-Nr", `Rechnungsdatum` beside "Kundennummer")."""
+12345` under "Versicherungs-Nr", `Rechnungsdatum` beside "Kundennummer"), nor a filler word
+("bei", "von")."""
 _FURTHER = r"(?![a-z]{2,}\.)(?=[a-z./-]*\d)(?!(?=[0-9./-]*[a-z])[a-z0-9./-]+:)[a-z0-9./-]+"
 """A further word of a value: one with a digit that is no label of its own, neither an
 abbreviation (`Tel.1`) nor a word with letters before a colon (`Fax2:`); digits before a colon
 still count (`012 345 6789 0:` read off a tax number)."""
 _WORDS = rf"{_FIRST}(?: {_FURTHER})*"
-_BEFORE = r"\.?\s*[:.]?\s*(?:(?:lautet|lauten|ist|is)(?![a-z0-9])\s*:?\s*)?"
+_VERB = r"(?:lautet|lauten|ist|is)(?![a-z0-9])"
+_BEFORE = rf"\.?\s*[:.]?\s*(?:(?:{_FILLER} [^\s:]+ (?={_VERB}))?{_VERB}\s*:?\s*)?"
 """Between a label and its value: a colon or a dot, and the verb of a sentence ("Ihre
-Schaden-Nummer lautet 12-34-567/890123-X", "Your customer number is 4711")."""
+Schaden-Nummer lautet 12-34-567/890123-X", "Your customer number is 4711"), also after a
+filler and its word ("Die Vertragsnummer bei Muster lautet 123/456789-X-01")."""
 # A label, then the value: its first word, and further words that hold a digit (`DE 123 456
 # 789`, `123 456`), not the words after it (`DE123456789 Steuernummer`, `4711 Tel.1: 0621`).
 VALUE = rf"{_BEFORE}({_WORDS})"
@@ -176,21 +201,28 @@ def after_labels(kind: IdentifierKind, label: re.Pattern[str], text: str) -> Ite
 
 class LabelledNumber(IdentifierType):
     """A number found after its label (`labels`), compared without separators in upper case:
-    `shortest` to `longest` letters and digits, one a digit."""
+    `shortest` to `longest` letters and digits, at least `fewest_digits` of them digits."""
 
     labels: ClassVar[str]
     compounds: ClassVar[str] = ""  # words a label may end (`labelled`)
     value: ClassVar[str] = NUMBER_VALUE
     shortest: ClassVar[int] = 3
     longest: ClassVar[int] = 30
+    fewest_digits: ClassVar[int] = 1
 
     def __init__(self) -> None:
         self._label = labelled(self.labels, self.value, compounds=self.compounds)
         self._form = re.compile(rf"(?=[A-Z0-9]*\d)[A-Z0-9]{{{self.shortest},{self.longest}}}")
 
     def normalise(self, raw: str) -> str:
+        """Without separators, in upper case; none where a character is hidden (`MASKED`) or it
+        has fewer than `fewest_digits` digits."""
         value = SEPARATORS.sub("", raw.strip()).upper()
-        if not self._form.fullmatch(value):
+        if (
+            not self._form.fullmatch(value)
+            or MASKED.search(raw.upper())
+            or sum(char.isdigit() for char in value) < self.fewest_digits
+        ):
             raise ValidationError(because(ReasonCode.NOT_OF_KIND, kind=self.kind.value, value=raw))
         return value
 

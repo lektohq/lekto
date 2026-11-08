@@ -180,7 +180,7 @@ def extraction(**values: Any) -> JsonObject:
 
 
 def model(*answers: JsonObject | str, facts: JsonObject | str | None = None) -> FakeLanguageModel:
-    """Answers in turn; the last one again and again. The request for the facts (`facts-2`)
+    """Answers in turn; the last one again and again. The request for the facts (`facts-3`)
     it answers with `facts`, by default with none."""
     remaining = list(answers)
 
@@ -338,7 +338,7 @@ async def test_the_signal_asks_for_the_proposal_and_the_facts(world: World) -> N
         {"prompt": None, "completion": None, "request": "facts", "usage": {}},
     ]
     assert output(result)["facts"] == []
-    assert result.input["facts_prompt"] == "facts-2"
+    assert result.input["facts_prompt"] == "facts-3"
     assert output(result)["answer"] == proposal()
     kept = output(result)["proposal"]
     assert kept["sender"] == {"value": "Stadtwerke Musterstadt GmbH", "evidence": None}
@@ -2149,7 +2149,7 @@ async def test_the_holder_of_an_iban_stays_whichever_signal_stores_last(
 async def test_the_holder_the_model_tells_joins_the_rule_s(
     world: World, told: JsonObject, kept: Holder, model_first: bool
 ) -> None:
-    """The facts call asks whose the IBAN is (`facts-2`); what passes its check is merged with
+    """The facts call asks whose the IBAN is (`facts-3`); what passes its check is merged with
     the rule's holder, whichever signal stores last."""
     await seed(world)
     text = f"# Stadtwerke Musterstadt GmbH\nRechnung\n\nUnsere Bankverbindung: IBAN {IBAN}\n"

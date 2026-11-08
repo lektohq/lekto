@@ -46,7 +46,7 @@ def club_membership(day: date, seed: int = 0) -> Doc:
         document_type="Bescheinigung",
         title="Mitgliedschaft TSV Lena",
         facts=[
-            ("membership_number", TSV_MEMBER),
+            ("contract_number", TSV_MEMBER),
             ("creditor_id", TSV_CREDITOR),
             ("mandate_reference", "TSV-3317"),
         ],
@@ -94,7 +94,7 @@ def club_fee(day: date, seed: int = 0) -> Doc:
             "Bezugszeitraum": str(day.year),
         },
         facts=[
-            ("membership_number", TSV_MEMBER),
+            ("contract_number", TSV_MEMBER),
             ("invoice_number", f"B-{day.year}-3317"),
             ("creditor_id", TSV_CREDITOR),
             ("mandate_reference", "TSV-3317"),

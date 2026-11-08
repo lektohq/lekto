@@ -12,7 +12,9 @@
 	import Sun from '@lucide/svelte/icons/sun';
 	import SunMoon from '@lucide/svelte/icons/sun-moon';
 	import Users from '@lucide/svelte/icons/users';
+	import WifiOff from '@lucide/svelte/icons/wifi-off';
 	import { setMode, userPrefersMode } from 'mode-watcher';
+	import { online } from 'svelte/reactivity/window';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { API_DOCS, BASE } from '#lib/base.ts';
@@ -20,6 +22,7 @@
 	import HeaderSearch from '#lib/components/HeaderSearch.svelte';
 	import Logo from '#lib/components/Logo.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { buttonVariants } from '#lib/components/ui/button/index.ts';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
@@ -143,7 +146,9 @@
 <!-- A page that needs the room (the document view) marks itself `data-wide`: from the desktop
 	width on it fills the window, and only its own areas scroll. One that only needs the width
 	(the documents) marks itself `data-roomy`: as wide, and it scrolls as a page. -->
-<div class="flex min-h-screen flex-col lg:has-[[data-wide]]:h-dvh">
+<div
+	class="flex min-h-screen flex-col pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] lg:has-[[data-wide]]:h-dvh"
+>
 	<header class="sticky top-0 z-40 border-b bg-card">
 		<!-- Narrower gaps on a phone, and a little narrower below 380 pixels, so that the wordmark,
 		     the magnifier and the menu fit beside each other down to 360. -->
@@ -151,6 +156,12 @@
 			<a href={home()} class="relative rounded-md text-lg after:absolute after:-inset-y-1.5"
 				><Logo /></a
 			>
+			<!-- Without a connection (web/DESIGN.md, "App"); the pages say what they cannot load. -->
+			{#if online.current === false}
+				<Badge variant="muted" size="md" role="status"
+					><WifiOff aria-hidden="true" />{m.offline()}</Badge
+				>
+			{/if}
 
 			<!-- The menu in the header from lg (web/DESIGN.md, "Navigation"): the work, then
 			     administering and operating; below xl that second group behind "More" (German names
@@ -294,7 +305,10 @@
 					</Sheet.Trigger>
 					<!-- `data-[side=right]:` to beat the sheet's own width of three quarters, which
 					     left the theme's buttons no room on a phone (Tobi, 27.10.2026). -->
-					<Sheet.Content side="right" class="gap-2 overflow-y-auto p-4 data-[side=right]:w-80">
+					<Sheet.Content
+						side="right"
+						class="gap-2 overflow-y-auto p-4 pt-[max(1rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] data-[side=right]:w-80"
+					>
 						<Sheet.Header class="px-2">
 							<Sheet.Title><Logo class="text-lg" /></Sheet.Title>
 						</Sheet.Header>

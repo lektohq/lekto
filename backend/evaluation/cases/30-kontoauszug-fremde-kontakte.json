@@ -1,5 +1,5 @@
 {
-  "description": "Bank statement naming five other contacts, two with their IBAN. Those names are no contradiction. The two IBANs are third parties' on the statement (bookings, the payee named): no evidence of the bank, and training learns them only at the contacts, from their own letters. The statement's own account is the recipient's.",
+  "description": "Bank statement naming five other contacts, two with their IBAN. Those names are no contradiction. The two IBANs are third parties' on the statement (bookings, the payee named): no evidence of the bank, and training learns them only at the contacts, from their own letters. The statement's own account is the recipient's. The customer number in a booking is the payee's, not the bank's (#215).",
   "expected": {
     "lane": "green",
     "contact": "Sparkasse Musterstadt",
@@ -12,7 +12,8 @@
     "holders": [
       {"kind": "iban", "value": "DE89370400440532013000", "holder": "recipient"},
       {"kind": "iban", "value": "DE15250501800009930012", "holder": "third_party"},
-      {"kind": "iban", "value": "DE12250501800004471100", "holder": "third_party"}
+      {"kind": "iban", "value": "DE12250501800004471100", "holder": "third_party"},
+      {"kind": "customer_number", "value": "55501234", "holder": "third_party"}
     ]
   },
   "fake": {

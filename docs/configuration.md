@@ -11,7 +11,8 @@ take and what they do.
   [Sign-in and sessions](#sign-in-and-sessions) · [OpenID Connect](#openid-connect) ·
   [Webhooks](#webhooks) · [MCP](#mcp) · [Worker](#worker) · [OCR and mail](#ocr-and-mail) ·
   [Search](#search) · [Language model](#language-model) · [Embeddings](#embeddings) ·
-  [Vision model](#vision-model) · [Classification](#classification) · [Logos](#logos) ·
+  [Vision model](#vision-model) · [Classification](#classification) ·
+  [Notifications](#notifications) · [Logos](#logos) ·
   [Rules and templates](#rules-and-templates)
 - [The image](#the-image) · [The migration client](#the-migration-client)
 
@@ -119,6 +120,7 @@ Originals, archive PDFs, page images and the classifier's models.
 | `LEKTO_REQUEST_MAX_SIZE` | API | `1MiB` | size | Largest body of every other request (JSON); larger ones get `413` |
 | `LEKTO_UI_DIR` | API | –; image: `/opt/lekto/ui` | path | The built web UI (`web/build`), served below `/ui`; `/` leads there. Must contain `index.html`; unset serves the API only |
 | `LEKTO_FORWARDED_ALLOW_IPS` | API | –; required with `LEKTO_COOKIE_SECURE=true` | text | Reverse proxies whose `X-Forwarded-For` is trusted, comma-separated. Secure cookies mean a TLS-terminating proxy in front of Lekto: name its address, or the per-source throttle of sign-ins sees only the proxy. `*` only if the proxy sets the header itself, replacing what clients send |
+| `LEKTO_SHORTCUT_URL` | API | – | text | The iCloud link of the shortcut "An Lekto senden" for iPhone, iPad and Mac ([shortcut.md](shortcut.md)): the web UI offers to set it up there. `https://` only. Unset, the web UI shows nothing of the shortcut. The Compose examples' `.env.example` carries the current link |
 
 ## Sign-in and sessions
 
@@ -272,6 +274,18 @@ together or neither; off without them.
 | `LEKTO_CLASSIFIER_RETRAIN_AFTER` | both | `25` | 1–1,000,000 | Documents confirmed since the last model before it is trained again |
 | `LEKTO_CLASSIFIER_THRESHOLD` | Worker | `0.8` | more than 0, at most 1 | A prediction this sure names its contact, type or tag |
 | `LEKTO_NEIGHBOURS` | Worker | `5` | 0–20 | Similar confirmed documents that vote on a new one (needs the search index with embeddings); `0` turns them off |
+
+## Notifications
+
+Web push: notifications on the devices of people who switched them on (the installed app on
+iPhone and iPad, browsers elsewhere). Lekto encrypts each message for the device and sends it to
+the device's push service (Apple, Google, Mozilla, Microsoft): an outgoing connection, as for
+logos. Set both variables or neither; without them Lekto sends no notification.
+
+| Variable | Role | Default | Values | Meaning |
+| --- | --- | --- | --- | --- |
+| `LEKTO_PUSH_VAPID_PRIVATE_KEY` | both | – | text, *secret* | Lekto's key for the push services, 32 bytes base64url: `lekto vapid-key` prints a new one. Keep it: with another key, every device has to switch notifications on again |
+| `LEKTO_PUSH_SUBJECT` | both | – | text | How a push service reaches the operator: `mailto:admin@example.org` or an `https://` address |
 
 ## Logos
 

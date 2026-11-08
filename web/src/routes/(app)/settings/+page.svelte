@@ -11,7 +11,10 @@
 	import InfoHint from '#lib/components/InfoHint.svelte';
 	import ProfileForm from '#lib/components/ProfileForm.svelte';
 	import TabBar from '#lib/components/TabBar.svelte';
+	import NotificationsCard from '#lib/components/NotificationsCard.svelte';
+	import ShortcutCard from '#lib/components/ShortcutCard.svelte';
 	import TokensCard from '#lib/components/TokensCard.svelte';
+	import { appleDevice } from '#lib/install.svelte.ts';
 	import TotpCard from '#lib/components/TotpCard.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -40,9 +43,12 @@
 	type Oidc = components['schemas']['OidcInfo'];
 
 	const tab = $derived(settingsTab(page.url.searchParams));
+	// The shortcut for the share sheet exists for Apple's devices only.
+	const device = appleDevice();
 	const LABELS: Record<SettingsTab, () => string> = {
 		profile: m.profile_title,
 		'sign-in': m.settings_tab_sign_in,
+		notifications: m.notifications_tab,
 		tokens: m.token_title,
 		identifiers: m.profile_numbers
 	};
@@ -196,7 +202,14 @@
 						>
 					</Card.Content>
 				</Card.Root>
+			{:else if tab === 'notifications'}
+				<NotificationsCard />
 			{:else if tab === 'tokens'}
+				<!-- On iPhone, iPad and Mac the shortcut first, if the server names one (web/DESIGN.md,
+				     "Settings"). -->
+				{#if device && session.shortcutUrl}
+					<ShortcutCard {device} link={session.shortcutUrl} />
+				{/if}
 				<TokensCard />
 			{:else}
 				<ProfileForm data={profile} part="numbers" onsaved={saved} />

@@ -30,6 +30,7 @@ from tests.contracts.mail_records import (
 )
 from tests.contracts.mailboxes import MailboxRepositoryContract
 from tests.contracts.processing_facts import ProcessingFactsContract
+from tests.contracts.push import PushDeviceRepositoryContract, PushPreferencesRepositoryContract
 from tests.contracts.rules import RuleRepositoriesContract
 from tests.contracts.tasks import TaskRepositoryContract
 from tests.contracts.unit_of_work import UnitOfWorkContract
@@ -266,3 +267,11 @@ async def test_the_listener_connects_again_and_misses_nothing(
     await until(lambda: signal.live, what="the listener to connect again", timeout=10)
     assert await signal.wait(SOON)
     await wakeup.aclose()
+
+
+class TestPostgresPushDevices(PushDeviceRepositoryContract):
+    pass
+
+
+class TestPostgresPushPreferences(PushPreferencesRepositoryContract):
+    pass

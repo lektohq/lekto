@@ -110,13 +110,19 @@ HOLDER_KINDS = frozenset(
         IdentifierKind.CREDITOR_ID,
         IdentifierKind.VAT_ID,
         IdentifierKind.EMAIL_DOMAIN,
+        IdentifierKind.CUSTOMER_NUMBER,
     }
 )
 """The kinds of facts that have a holder: a contact's as often as another's (a VAT ID or an
-e-mail domain since 0.8: a parent company's, a payment service's, a portal's)."""
+e-mail domain since 0.8: a parent company's, a payment service's, a portal's; a customer
+number in a booking of a bank statement: the payee's, #215)."""
+
+BOOKED_HOLDER_KINDS = frozenset({IdentifierKind.CUSTOMER_NUMBER})
+"""The kinds with a holder only where they stand in bookings (`holders.booking_holder`):
+without one they are the document's contact's, as before they had holders."""
 
 MODEL_HOLDER_KINDS = frozenset({IdentifierKind.IBAN, IdentifierKind.CREDITOR_ID})
-"""The kinds whose holder the language model is asked for (`facts-2`); the others' the rule
+"""The kinds whose holder the language model is asked for (`facts-3`); the others' the rule
 tells alone (Tobi, 28.10.2026)."""
 
 SURE_HOLDER_KINDS = frozenset({IdentifierKind.EMAIL_DOMAIN})
@@ -137,10 +143,7 @@ ROLES: Mapping[IdentifierKind, FactRole] = {
     IdentifierKind.COMMERCIAL_REGISTER: FactRole.CONTACT,
     IdentifierKind.TAX_NUMBER: FactRole.CONTACT,
     IdentifierKind.CONTRACT_NUMBER: FactRole.TARGET,
-    IdentifierKind.POLICY_NUMBER: FactRole.TARGET,
-    IdentifierKind.MEMBERSHIP_NUMBER: FactRole.TARGET,
     IdentifierKind.METER_NUMBER: FactRole.TARGET,
-    IdentifierKind.LOAN_NUMBER: FactRole.TARGET,
     IdentifierKind.MANDATE_REFERENCE: FactRole.TARGET,
     IdentifierKind.LICENSE_PLATE: FactRole.TARGET,
     IdentifierKind.INVOICE_NUMBER: FactRole.OWN,

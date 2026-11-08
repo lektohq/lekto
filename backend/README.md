@@ -110,7 +110,8 @@ authenticate.
   changes or is reset (the caller's own session is renewed). Every sign-in starts a new session.
   Last use is written at most once a minute. The CSRF token of a session is derived from its
   token (HMAC), so nothing more is stored.
-- API tokens: `lekto_` plus 256 random bits, stored as SHA-256; scope `read` or `read_write`,
+- API tokens: `lekto_` plus 256 random bits, stored as SHA-256; scope `read`, `read_write` or
+  `upload` (only `POST /documents`: a shortcut that sends shared files from a phone),
   a name, optional expiry, last use. Shown once. They survive a password change unless the
   caller (or the admin resetting it) asks to revoke them, and are refused while the account is
   deactivated.
@@ -1440,7 +1441,9 @@ test calls every registered route without credentials and expects `401`. Request
 something need, with a session, the header `X-CSRF-Token` (from the sign-in answer or
 `GET /auth/me`) and, with a token, the scope `read_write`; otherwise `403`. A POST that only reads
 (`x-reads` in the API description: a search with its words in the body) is open to a `read`
-token; with a session it needs the header all the same. Changing sign-in
+token; with a session it needs the header all the same. A token of the scope `upload` reaches
+only the upload (`x-uploads`: `POST /documents`); everything else answers `403`
+(`upload_only_token`), reading too. Changing sign-in
 data needs a session, so a leaked API token cannot take over an account: the own password,
 TOTP, tokens, sessions and links (`/auth/*`), and the admin endpoints that create users with a
 password, reset passwords, turn TOTP off and remove links. Admins cannot reset their own
@@ -1902,6 +1905,35 @@ brings in and for whom.
   Rules), and the facts signal counts the sender of an attachment as evidence for a contact,
   as if it stood in the text (decision 16).
 
+## Notifications
+
+Web push (RFC 8030) to the devices a person switched notifications on for: the installed app on
+iPhone and iPad (iOS 16.4 and later), browsers elsewhere. Configured with
+`LEKTO_PUSH_VAPID_PRIVATE_KEY` and `LEKTO_PUSH_SUBJECT` (`docs/configuration.md`); without them
+`GET /push` answers `enabled: false` and devices are refused (`409 push_off`).
+
+- **Devices** (`/push/devices`): a browser's subscription, its address at its push service
+  (`endpoint`) and keys (`p256dh`, `auth`), a name and the language (`de`, `en`) its
+  notifications speak. Only addresses of a known push service are taken (Apple, Google, Mozilla,
+  Microsoft: `push_endpoint_refused`), at most 20 devices per person (`push_devices_limit`). The
+  same address again replaces the device, also one another person subscribed in that browser.
+  A device is its owner's alone (404 for anyone else); deleting a user deletes theirs.
+- **Sending** (`webpush` adapter): each message encrypted for the device (RFC 8291,
+  `aes128gcm`), the request signed with Lekto's key (VAPID, RFC 8292). A push service that no
+  longer knows the device (404, 410) or 20 failures in a row make Lekto forget it.
+- **When** (`services.push`, job `push.send`, 60 s of quiet after what caused it, one per person
+  and kind; Tobi, 06.11.2026): a document comes to wait in the person's inbox (yellow or red;
+  the editors of its space, `waiting`: how many wait, how many are new, up to three titles, the
+  document itself if it is one, the inbox's count as the badge), one of their webhooks is
+  switched off (`webhook_disabled`, to its owner), and for admins a mailbox starts failing to
+  fetch (`mailbox_failed`, once until it works again) or a job is given up (`job_failed`). The
+  documents noted meanwhile are named in the next notification if they still wait.
+  `/push/preferences` switches each kind off and the titles (they may show on a locked screen);
+  all are on until then.
+- **What a message says**: data only, its kind and parameters, the address to open and the
+  number for the app's icon; the service worker words it in the device's language. `POST
+  /push/devices/{id}/test` sends a test notification.
+
 ## MCP
 
 The API serves the Model Context Protocol (Streamable HTTP, stateless, JSON answers) at
@@ -1916,7 +1948,7 @@ so rights and rules are the same.
 
 Every tool has a class. A `read` tool only reads; a `write` tool changes, but nothing a person
 could not undo. A token with scope `read` is offered the read tools only, and a call of another
-tool is refused. Deleting, moving, reprocessing, reading with the VLM, uploading, rules,
+tool is refused; one with scope `upload` gets `403` for every request to the endpoint. Deleting, moving, reprocessing, reading with the VLM, uploading, rules,
 master data and managing Lekto are no tools: the client points the user to the web UI.
 
 | Tool | Class | Does |

@@ -35,16 +35,16 @@ K = IdentifierKind
     [
         ("Vertragsnummer: 123-456-789", K.CONTRACT_NUMBER, "123456789"),
         ("Contract No. AB-1234", K.CONTRACT_NUMBER, "AB1234"),
-        ("Versicherungsscheinnummer KV 1234567", K.POLICY_NUMBER, "KV1234567"),
-        ("Policennummer: 9988776", K.POLICY_NUMBER, "9988776"),
-        ("Mitgliedsnummer 004711", K.MEMBERSHIP_NUMBER, "004711"),
+        ("Versicherungsscheinnummer KV 1234567", K.CONTRACT_NUMBER, "KV1234567"),
+        ("Policennummer: 9988776", K.CONTRACT_NUMBER, "9988776"),
+        ("Mitgliedsnummer 004711", K.CONTRACT_NUMBER, "004711"),
         ("Zählernummer: 1ESY1234567", K.METER_NUMBER, "1ESY1234567"),
         (
             "Zählpunkt DE0001234567890000000000000000001",
             K.METER_NUMBER,
             "DE0001234567890000000000000000001",
         ),
-        ("Darlehensnummer 6001234567", K.LOAN_NUMBER, "6001234567"),
+        ("Darlehensnummer 6001234567", K.CONTRACT_NUMBER, "6001234567"),
         ("Mandatsreferenz: M-000123", K.MANDATE_REFERENCE, "M000123"),
         ("Kfz-Kennzeichen: M-AB 1234", K.LICENSE_PLATE, "MAB1234"),
         ("Kfz-Kennzeichen M AB 1234", K.LICENSE_PLATE, "MAB1234"),
@@ -71,9 +71,9 @@ K = IdentifierKind
         ("your letter of 18 June 2026", K.LETTER_DATE, "2026-06-18"),
         # A label at the end of a compound word.
         ("Bausparvertragsnummer 12345678", K.CONTRACT_NUMBER, "12345678"),
-        ("Hausratversicherungsnummer 12345", K.POLICY_NUMBER, "12345"),
-        ("Kfz-Versicherungsnummer KV-998877", K.POLICY_NUMBER, "KV998877"),
-        ("Vereinsmitgliedsnummer 4711", K.MEMBERSHIP_NUMBER, "4711"),
+        ("Hausratversicherungsnummer 123456", K.CONTRACT_NUMBER, "123456"),
+        ("Kfz-Versicherungsnummer KV-998877", K.CONTRACT_NUMBER, "KV998877"),
+        ("Vereinsmitgliedsnummer 4711", K.CONTRACT_NUMBER, "4711"),
         ("Stromzählernummer 1ESY1234567", K.METER_NUMBER, "1ESY1234567"),
         # A reference ends before a joining word or a date; parts joined by a dash between spaces.
         ("Az. 4 C 123/26 vom 12.10.2026", K.FILE_REFERENCE, "4C12326"),
@@ -90,8 +90,8 @@ def test_each_kind_is_found_and_normalised(text: str, kind: IdentifierKind, valu
 @pytest.mark.parametrize(
     ("text", "kind"),
     [
-        ("Rentenversicherungsnummer: 65 170839 J 003", K.POLICY_NUMBER),
-        ("Krankenversicherungsnummer A123456789", K.POLICY_NUMBER),
+        ("Rentenversicherungsnummer: 65 170839 J 003", K.CONTRACT_NUMBER),
+        ("Krankenversicherungsnummer A123456789", K.CONTRACT_NUMBER),
         ("Kundennummer 4711", K.CONTRACT_NUMBER),  # the customer number keeps its kind
         ("IBAN DE89 3704 0044 0532 0130 00", K.CREDITOR_ID),  # no letter in the business code
         ("Gläubiger-ID DE98ZZZ09999999998", K.CREDITOR_ID),  # the check digits do not fit
@@ -101,13 +101,13 @@ def test_each_kind_is_found_and_normalised(text: str, kind: IdentifierKind, valu
         ("Unser Schreiben vom 18.06.2026", K.LETTER_DATE),
         # A label is a whole word.
         ("Invoice November 2026", K.INVOICE_NUMBER),
-        ("Membership November 2026", K.MEMBERSHIP_NUMBER),
+        ("Membership November 2026", K.CONTRACT_NUMBER),
         ("Your refund 302-1234567-1234567", K.YOUR_REFERENCE),
         ("Case notes 12", K.TICKET_NUMBER),
         ("Azubi 2026", K.FILE_REFERENCE),
         # A person's insurance number, also hyphenated or with its check digit misread.
-        ("Sozial-Versicherungsnummer 12 345678 A 124", K.POLICY_NUMBER),
-        ("Sozialversicherungsnummer 12345678A124", K.POLICY_NUMBER),
+        ("Sozial-Versicherungsnummer 12 345678 A 124", K.CONTRACT_NUMBER),
+        ("Sozialversicherungsnummer 12345678A124", K.CONTRACT_NUMBER),
         # No plate: no letters, an authority's reference.
         ("Polizeiliches Kennzeichen 12345", K.LICENSE_PLATE),
         ("Unser Kennzeichen 123/45", K.LICENSE_PLATE),
@@ -182,10 +182,10 @@ def test_only_a_document_s_own_number_refers_after_ihre() -> None:
     }
 
 
-@pytest.mark.parametrize("kind", [K.CONTRACT_NUMBER, K.POLICY_NUMBER, K.MEMBERSHIP_NUMBER])
+@pytest.mark.parametrize("kind", [K.CONTRACT_NUMBER])
 def test_a_contact_s_customer_number_still_matches_what_it_was(kind: IdentifierKind) -> None:
-    """Until #145 a contract, policy or membership number was a customer number: a contact's
-    customer number of that value is still its identifier."""
+    """Until #145 a contract, policy or membership number was a customer number (a contract
+    number since #215): a contact's customer number of that value is still its identifier."""
     customer = Identifier.parse(K.CUSTOMER_NUMBER, "123-456-789")
     assert matches(customer, (kind, "123456789"))
     assert not matches(customer, (kind, "123456788"))

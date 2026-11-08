@@ -48,6 +48,10 @@ from lekto.adapters.outbound.sql.master_data import (
     SqlTagRepository,
 )
 from lekto.adapters.outbound.sql.processing_facts import SqlProcessingFacts
+from lekto.adapters.outbound.sql.push import (
+    SqlPushDeviceRepository,
+    SqlPushPreferencesRepository,
+)
 from lekto.adapters.outbound.sql.relations import SqlDocumentRelationRepository
 from lekto.adapters.outbound.sql.rules import SqlRuleApplicationRepository, SqlRuleRepository
 from lekto.adapters.outbound.sql.spaces import SqlSpaceRepository
@@ -131,6 +135,8 @@ class SqlUnitOfWork:
         self.credentials = SqlCredentialRepository(self._tx)
         self.sessions = SqlSessionRepository(self._tx)
         self.api_tokens = SqlApiTokenRepository(self._tx)
+        self.push_devices = SqlPushDeviceRepository(self._tx)
+        self.push_preferences = SqlPushPreferencesRepository(self._tx)
         self.external_identities = SqlExternalIdentityRepository(self._tx)
         self.login_failures = SqlLoginFailureRepository(self._tx)
 

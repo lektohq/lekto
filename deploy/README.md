@@ -128,6 +128,13 @@ with the user agent `Lekto/<version>`; a website learns that this Lekto fetched 
 logo service of a third party is asked. A proxy from the environment is not used for it. Switched
 off again, fetches still queued end without asking. Logos uploaded by an admin need no setting.
 
+With `LEKTO_PUSH_VAPID_PRIVATE_KEY` and `LEKTO_PUSH_SUBJECT` set (`lekto vapid-key` prints a
+key; in the image `docker compose exec lekto lekto-run lekto vapid-key`), Lekto sends
+notifications to the devices people switched them on for: HTTPS to the push services of the
+browsers only (Apple, Google, Mozilla, Microsoft; an address of another host is refused). Each
+message is encrypted for the device: the push service sees when and to which device, not what.
+Without the two variables Lekto sends none.
+
 Mailboxes (System › Eingangskanäle) are fetched over IMAP; the connection checks the server's
 certificate against the system's store. For a mail server with a certificate of your own
 authority, mount that certificate and point `SSL_CERT_FILE` at a bundle that holds it together
@@ -236,6 +243,11 @@ The web UI is at `/ui/` (`/` leads there). Lekto sets its cache headers: files b
 `/ui/_app/immutable/` carry a hash in their name and may be cached for a year, everything else
 (`no-cache`) is revalidated on every load, so an update shows at once. A proxy cache keeps these
 headers; it must not cache `/api/` (the API's answers are personal).
+
+Behind HTTPS the web UI installs as an app (the browser's "Install" or "Add to Home Screen"): its
+service worker (`/ui/service-worker.js`, revalidated like every other file) keeps the files of
+the web UI for a start without a connection, never an answer of the API. Over plain HTTP the
+browser offers no install and Lekto works as a website.
 
 Two paths must not be buffered or cut short by the proxy:
 

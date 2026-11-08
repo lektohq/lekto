@@ -173,7 +173,7 @@ phone the page scrolls.
 - **Header items:** logo (the owl's head before the wordmark "lekto", see
   [Logo and owl](#logo-and-owl)), menu, search (the field where the header has room,
   `searchPlaces`: from `2xl`, for admins from 1720 px; otherwise the magnifier), user menu
-  (avatar).
+  (avatar); while there is no connection, the badge "Offline" beside the logo ([App](#app)).
 - **User menu:** name and role, the admin switch "Alle Nutzer einbeziehen", language and appearance
   (`LanguageChoices`, `ThemeChoices`, each a `Segmented`), settings, API documentation, sign out;
   last, below a line, the version that runs ("Lekto 0.8.0", `text-xs`, muted, no item to
@@ -642,7 +642,8 @@ modal, over a dialog too.
 | `caution` (red)          | A risk or a failure                       |
 
 Toasts (`svelte-sonner`) confirm an action that has finished ("Gespeichert", "3 Dokumente
-eingereiht") or report an error of an action. **A toast never replaces a load error on the page.**
+eingereiht") or report an error of an action. One toast waits for the person instead: a new
+version of the app ([App](#app)). **A toast never replaces a load error on the page.**
 
 ### Help and tooltips
 
@@ -747,12 +748,13 @@ Destructive actions are in editors and on detail pages, not in list rows.
 ### Settings
 
 The settings (Tobi, 02.11.2026): the account card (name, user name, role), then a `TabBar`
-Profil · Anmeldung · API-Tokens · Kennungen bei Kontakten (`?tab=`; without it the first, after
+Profil · Anmeldung · Benachrichtigungen · API-Tokens · Kennungen bei Kontakten (`?tab=`; without it the first, after
 linking an account came back with an error the sign-in), the last with its count.
 
 - **Profil:** display name, other names, birth date, e-mail, own identifiers.
 - **Anmeldung:** password, second factor, single sign-on, sessions.
-- **API-Tokens:** the tokens.
+- **Benachrichtigungen:** this device, when, the locked screen, the devices ([App](#app)).
+- **API-Tokens:** on iPhone, iPad and Mac first the shortcut ([App](#app)), then the tokens.
 - **Kennungen bei Kontakten:** the identifiers at contacts, grouped by contact ("Lists").
 
 A tab with a form saves only its own part, and guards it ("Saving and leaving").
@@ -968,6 +970,80 @@ moves nothing beside it.
 Only `motion-safe`: the sliding pill of `Segmented`, the underline of `TabBar`, opening sheets and
 dialogs. Nothing moves on first show. Nothing grows over its neighbours on hover.
 
+## App
+
+Lekto installs as an app (Tobi, 06.11.2026): "Zum Home-Bildschirm" in Safari on the iPhone and
+iPad, "Zum Dock hinzufügen" in Safari on the Mac, "Installieren" in Chrome and Edge. It needs
+HTTPS (`localhost` aside); without it the browser offers no install and registers no service
+worker, and Lekto works as a website.
+
+- **Manifest** (`static/manifest.webmanifest`): "Lekto", starts at `/ui/`, scope `/` (the answer
+  of single sign-on below `/api` stays in the app), `standalone`. Icons, rendered from
+  `favicon.svg`: the owl's head alone at 192 and 512 px, a maskable one on the panel tone with
+  the owl inside the safe circle, and the favicon itself.
+- **The colour of the bars** (`theme-color`) is the header's ground, `--card`, light or dark as
+  the app shows itself: `static/theme.js` before the first paint, `lib/theme-color.ts` after.
+- **What the device keeps:** the service worker (`src/service-worker/`) keeps the files of one
+  version of the app and nothing else. Every request to the API goes to the network; documents,
+  pages, PDFs, thumbnails and lists never lie on the device (`lib/app-cache.ts`). A page comes
+  from the network; without one the kept page starts the app.
+- **Sharing to Lekto (Android):** the installed app stands in the share sheet (`share_target`:
+  PDF, images, mails, what "Hochladen" takes). The worker keeps the shared files under a random
+  id, at most an hour; the page `/share` hands them to the upload (into the personal space, as
+  "Hochladen" does) and goes on to the inbox, which shows what came of them. Taken files are gone
+  from the device; a share opened again says that nothing waits any more.
+- **Installing from the upload:** in the dialog "Hochladen", under the drop area and set off by a
+  line, one hint (`text-sm`, muted, with its icon): on Android in the browser, while the browser
+  offers the install, "Schneller aus dem Teilen-Menü: App installieren" (a link button that opens
+  the browser's own question). The installed app shows none.
+- **The shortcut (iPhone, iPad, Mac):** Safari has no share target; the shortcut "An Lekto
+  senden" (Tobi's, added through its iCloud link) sends shared files with a token that may only
+  upload. The server names the link (`LEKTO_SHORTCUT_URL`, in `GET /auth/me`); without one the
+  web UI shows nothing of the shortcut, neither card nor hint. Its card stands first in Settings › API-Tokens, on Apple devices
+  only, built like the tokens' card: title and a line of what it does; its action, "Einrichten",
+  stands under them (its other words are long).
+  Setting it up creates the token "Kurzbefehl · iPhone" (iPad, Mac) and shows, in a dialog, the
+  token and Lekto's address in the order the Shortcuts app asks for them, each with a copy
+  button, then "Zu Kurzbefehle hinzufügen" (the link) and "Ist gesichert". Once a token that only
+  uploads exists, the card says "Eingerichtet" (`green` badge), shows the three ways (share menu
+  on iPhone and iPad, share menu on the Mac, Finder's quick actions) and offers "Weiteres Gerät
+  einrichten". The dialog "Hochladen" on an Apple device without such a token carries the hint
+  "Schneller aus dem Teilen-Menü: Kurzbefehl einrichten", leading to that card; Android's hint
+  stands in its place there.
+- **Notifications** (Settings › Benachrichtigungen; Tobi, 06.11.2026), four cards:
+  - _Dieses Gerät_: "Benachrichtigungen einschalten" (the browser asks for leave on that tap);
+    once on, the `green` badge "An", "Test senden" and "Ausschalten". On an iPhone or iPad in
+    Safari a `tip` alert instead, the three steps into the app on the Home Screen; a browser
+    without push, or a server without a key, says so in one line. Blocked notifications get a
+    `warning` alert with the steps for this browser: the app in the Dock has settings of its own,
+    apart from Safari's; Chrome and Edge through the symbol in the address bar; macOS's own
+    leave; then reload.
+  - _Wann_: a switch per kind, taking effect at once: documents wait, a webhook was switched off,
+    for admins a mailbox fails and a job gave up.
+  - _Sperrbildschirm_: "Titel der Dokumente zeigen" (on), else only how many.
+  - _Geräte_: name, "dieses Gerät", when last delivered, removed through a trash button and a
+    confirmation, as the tokens are.
+- **A notification** is worded by the service worker in the device's language
+  (`lib/push-text.ts`): "3 Dokumente warten auf Dich" with up to three titles, or the name of the
+  mailbox or webhook. A tap opens the document if it is one, else the inbox or the page of what
+  it names, in an open window of the app if there is one. The app's icon carries the inbox's
+  count, set by a notification and kept by the open app.
+- **A new version:** a toast that stays until it is answered, "Neue Version bereit" with the
+  action "Neu laden"; its ✕ puts it off until the app starts again. It is the one toast that
+  waits for the person ("Alerts"). A page that already runs the new version (it was reloaded)
+  takes the new worker without a word.
+- **Safe areas:** the page reaches under the notch and the home indicator (`viewport-fit=cover`;
+  the status bar stays opaque, `apple-mobile-web-app-status-bar-style` `default`). The shell
+  keeps the side insets free; full-screen editors on the phone, bars stuck to the bottom, sheets
+  from below and the menu sheet, fixed buttons and toasts keep theirs
+  (`env(safe-area-inset-*)`, at least the padding they had).
+- **Offline:** while the device has no connection, the header shows the badge "Offline" beside
+  the logo (`Badge`, `muted`, `md`, `wifi-off`). `LoadProblem` says "Keine Verbindung …" in place
+  of its problem and tries again by itself once the device is back online. A start without a
+  connection ends on the error page with "Keine Verbindung", which loads again by itself.
+  Nothing is written offline: an action fails as it does without the server ("Der Server ist
+  nicht erreichbar.").
+
 ## Touch targets
 
 - **Phone (below `sm`):** every control is at least 44 × 44 px. A smaller visual element (the ✕ of
@@ -1093,6 +1169,10 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     ("Names of people");
   - `tests/messages-tone.test.ts`: German texts without "Sie" and without a lowercase "du", and
     "Nummer" alone only for the numbers of the document ("Fakt, Kennung, Nummer");
+  - `tests/app.test.ts`: the service worker keeps no answer of the API, only the app's own files;
+    the manifest starts below the base and names icons that exist in their sizes, one maskable;
+    the bars' colours are the tokens; every full-screen or bottom-edge surface keeps the safe
+    area free; the share target takes what an upload takes ("App");
   - `tests/no-raw-text.test.ts`: no raw text in markup; `tests/no-raw-choice.test.ts`: no raw
     checkbox or radio.
 

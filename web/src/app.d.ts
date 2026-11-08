@@ -1,7 +1,11 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 declare global {
 	namespace App {
-		// interface Error {}
+		interface Error {
+			message: string;
+			/** The page could not load because no answer came (`hooks.client.ts`). */
+			offline?: boolean;
+		}
 		// interface Locals {}
 		// interface PageData {}
 		interface PageState {

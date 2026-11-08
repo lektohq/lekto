@@ -1,0 +1,62 @@
+{
+	"id": "/ui/",
+	"name": "Lekto",
+	"short_name": "Lekto",
+	"start_url": "/ui/",
+	"scope": "/",
+	"display": "standalone",
+	"background_color": "#fafaf8",
+	"theme_color": "#ffffff",
+	"icons": [
+		{
+			"src": "/ui/icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/ui/icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/ui/icon-maskable-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		},
+		{
+			"src": "/ui/favicon.svg",
+			"sizes": "any",
+			"type": "image/svg+xml",
+			"purpose": "any"
+		}
+	],
+	"share_target": {
+		"action": "/ui/share",
+		"method": "POST",
+		"enctype": "multipart/form-data",
+		"params": {
+			"files": [
+				{
+					"name": "files",
+					"accept": [
+						"application/pdf",
+						"image/jpeg",
+						"image/png",
+						"image/tiff",
+						"message/rfc822",
+						".pdf",
+						".jpg",
+						".jpeg",
+						".png",
+						".tif",
+						".tiff",
+						".eml"
+					]
+				}
+			]
+		}
+	}
+}

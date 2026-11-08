@@ -1,0 +1,6 @@
+{
+	"extends": "$app/tsconfig/service-worker",
+	// The generated runtime of the texts (paraglide) is plain JS for the browser; the worker calls
+	// its messages with the locale given, so what it does with `window` never runs there.
+	"compilerOptions": { "strict": true, "checkJs": false }
+}

@@ -12,7 +12,12 @@ from dataclasses import replace
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.evidence import COLUMN_GAP, LINE_BREAK, normalise
 from lekto.core.domain.identifiers.base import Candidate, Key
-from lekto.core.domain.identifiers.registry import NAMING_KINDS, OWN_KINDS, TYPES
+from lekto.core.domain.identifiers.registry import (
+    NAMING_KINDS,
+    OWN_KINDS,
+    TYPES,
+    normalise_identifier,
+)
 
 _CONTAINED = 6
 """Characters a customer or personnel number has at least to count as part of a person's number
@@ -55,7 +60,7 @@ def _in_its_line(candidate: Candidate, columned: str) -> Candidate:
         return candidate
     raw = candidate.raw[: cut - start]
     try:
-        TYPES[candidate.kind].normalise(raw)
+        normalise_identifier(candidate.kind, raw)
     except ValidationError:
         return candidate
     return replace(candidate, raw=raw, span=(start, cut))
@@ -81,7 +86,7 @@ def places_in(text: str) -> dict[Key, int]:
         if candidate.span is None:
             continue
         with suppress(ValidationError):
-            key = (candidate.kind, TYPES[candidate.kind].normalise(candidate.raw))
+            key = (candidate.kind, normalise_identifier(candidate.kind, candidate.raw))
             places[key] = min(places.get(key, candidate.span[0]), candidate.span[0])
     return places
 
@@ -93,7 +98,7 @@ def referred_in(text: str) -> set[Key]:
     alone: dict[Key, bool] = {}
     for candidate in candidates_in(text):
         with suppress(ValidationError):
-            key = (candidate.kind, TYPES[candidate.kind].normalise(candidate.raw))
+            key = (candidate.kind, normalise_identifier(candidate.kind, candidate.raw))
             alone[key] = alone.get(key, False) or not candidate.refers
     return {key for key, own in alone.items() if not own}
 
@@ -107,7 +112,7 @@ def identifiers_from(candidates: Iterable[Candidate]) -> set[Key]:
     own_spans: list[tuple[int, int]] = []
     for candidate in candidates:
         with suppress(ValidationError):
-            key = (candidate.kind, TYPES[candidate.kind].normalise(candidate.raw))
+            key = (candidate.kind, normalise_identifier(candidate.kind, candidate.raw))
             if candidate.kind in NAMING_KINDS:
                 naming.append((key, candidate.span))
                 continue

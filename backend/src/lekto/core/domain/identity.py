@@ -215,12 +215,20 @@ def csrf_matches(session_token: str, candidate: str) -> bool:
 
 
 class TokenScope(StrEnum):
+    """What an API token may do: read, read and write, or only upload documents (a shortcut
+    on a phone that sends shared files; it reads nothing, not even what it uploaded)."""
+
     READ = "read"
     READ_WRITE = "read_write"
+    UPLOAD = "upload"
 
     @property
     def can_write(self) -> bool:
         return self is TokenScope.READ_WRITE
+
+    @property
+    def only_uploads(self) -> bool:
+        return self is TokenScope.UPLOAD
 
 
 @dataclass(kw_only=True)

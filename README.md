@@ -10,6 +10,12 @@
 
 # Lekto DMS
 
+> [!WARNING]
+> Lekto is in beta. Breaking changes can come with any release: in the REST API, the
+> configuration, the database and the stored data. Read the release notes before you update, and
+> keep a backup ([deploy/README.md](deploy/README.md)). Use it in non-production environments
+> only, not yet for documents you cannot afford to lose.
+
 **Lekto DMS** is a self-hosted, headless document management system. It reads every document,
 files it and finds it again, and it shows why it decided what it did. The name comes from
 *lector*, the reader; the owl in the logo reads with one eye and searches with the magnifier in
@@ -73,6 +79,7 @@ Development in the devcontainer: [.devcontainer/README.md](.devcontainer/README.
 | --- | --- |
 | [docs/configuration.md](docs/configuration.md) | Every `LEKTO_` variable: default, values, meaning |
 | [docs/templates.md](docs/templates.md) | Templates for titles, rules and webhook bodies |
+| [docs/shortcut.md](docs/shortcut.md) | The shortcut that sends shared files from iPhone, iPad and Mac |
 | [backend/README.md](backend/README.md) | Architecture, the REST API, processing, rules, search, webhooks, mail, MCP |
 | [deploy/README.md](deploy/README.md) | The image: roles, volumes, health, reverse proxy, backup, updating |
 | [docker/](docker/) | Compose examples with the published images |

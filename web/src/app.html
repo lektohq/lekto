@@ -2,12 +2,19 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- `viewport-fit=cover`: the installed app reaches under the notch and the home indicator;
+		     the bars keep the safe areas free (web/DESIGN.md, "App"). -->
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 		<meta name="color-scheme" content="light dark" />
 		<!-- No address of the app leaves it as a Referer, also behind a proxy or from `pnpm dev`. -->
 		<meta name="referrer" content="no-referrer" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.svg" type="image/svg+xml" />
 		<link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
+		<!-- The installed app (web/DESIGN.md, "App"); the bars' colour is set by theme.js. -->
+		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
+		<meta name="theme-color" content="#ffffff" />
+		<meta name="apple-mobile-web-app-title" content="Lekto" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 		<!-- Light or dark before the first paint; a file, not inline, for the content security policy. -->
 		<script src="%sveltekit.assets%/theme.js"></script>
 		%sveltekit.head%

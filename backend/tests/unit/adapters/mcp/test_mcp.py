@@ -21,6 +21,7 @@ from lekto.composition.container import build_memory_container, build_services
 from lekto.core.domain.classification import FieldCheck, checks_to_json
 from lekto.core.domain.documents import DocumentChanges
 from lekto.core.domain.fields import FieldType, Money
+from lekto.core.domain.identity import TokenScope
 from lekto.core.domain.ids import DocumentId, new_id, short_id
 from lekto.core.domain.master_data import TagScope
 from lekto.core.domain.pipeline import Node, NodeResult, Outcome
@@ -1006,3 +1007,20 @@ async def test_expected_list_names_the_series_one_may_read(api: Api, scene: Scen
     """Read only (#145): the scene's documents make no series."""
     found = data(await call(api, scene.headers["owner"], "expected_list"))
     assert found == {}
+
+
+async def test_an_upload_token_gets_no_tool(api: Api, scene: Scene) -> None:
+    """A token of the scope `upload` sends shared files from a phone; MCP is closed to it."""
+    _, token = await api.services.auth.create_api_token(
+        scene.owner.id, "shortcut", TokenScope.UPLOAD
+    )
+    response = await api.client.post(
+        f"{PREFIX}/mcp",
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json, text/event-stream",
+        },
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "this API token may only upload documents"

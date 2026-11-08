@@ -2670,6 +2670,82 @@ Stand: Plan mit Tobi abgestimmt, 06.11.2026; in Umsetzung. Mock: „Postfach-Sei
 - **PR 1 – nachträglich verarbeiten:** `mail_records` hält die Regel per ID (`rule_id`), wann eine Regel oder der Rückfall entschied (`decided_at`, später als `fetched_at`: nachträglich), die Schritte auf dem Server mit dem Grund eines abgelehnten (`steps`) und wann die Mail fehlte (`gone_at`), Revision 0068. `MailRecordRepository.waiting` liefert die wartenden Mails, `settle` schreibt nur, was aus einer Mail wurde (die Wartung kann den Kopf derweil vergessen). Der Abruf beurteilt wartende Mails nach dem Gespeicherten und ihren Flags von jetzt (ein `FETCH` je Ordner) und holt nur, was eine Regel nimmt, im Rahmen von `MAX_PER_RUN`. Der Probelauf liest die letzten 50 Mails und alle wartenden; die wartenden, die die Regel nähme, stehen zuerst („beim nächsten Abruf“).
 - **PR 2 – Seite des Postfachs:** API für die Mails eines Postfachs (Filter nach Ergebnis und Regel, Seiten) mit einer Zusammenfassung (Zahlen je Ergebnis, wartende Mails je Regel) und den Dokumenten einer Mail; die Seite `/system/mailboxes/{id}` nach dem Mock, gebaut wie die Seite eines Webhooks (Kopf, Hinweis, `Segmented` mit Zahlen, `Select` der Regel, Tabelle mit Seiten). DESIGN.md beschreibt sie.
 
+### Lekto als App: PWA, Teilen, Kurzbefehl, Push
+
+Stand: gebaut in der Nacht 06./07.11.2026 als #302–#309 (gestapelt, nicht gemergt); offene Punkte für Tobi in der Notiz von Claude. Plan mit Tobi abgestimmt am 06.11.2026, alle Fragen beantwortet. Mock: Leinwand „Lekto als App“ (https://claude.ai/artifact/TgYQUUsFQvWgWLfSKG3ZVt): 1A/1B Update-Hinweis als Toast oder Leiste, 1C Offline, 2 Hinweis im Upload-Dialog, 3A/3B Kurzbefehl einrichten auf iPhone und Mac, 4A Reiter Benachrichtigungen, 4B Sperrbildschirm und Badge.
+
+**Anlass (Tobi, 06.11.2026):** „Meinst Du wir kriegen es hin, eine PWA zu bauen? Das UI ist schon Mobile optimiert.“ Dazu: Dokumente vom Handy aus dem Teilen-Menü an Lekto schicken, und Push-Nachrichten, auch auf dem iPhone.
+
+**Befund (Claude, 06.11.2026):**
+- Die Web-UI ist eine SvelteKit-SPA unter `/ui` (`adapter-static`, Rückfall `index.html`); die API liefert sie aus, Dateien unter `_app/immutable/` dauerhaft cachebar, alles andere mit `no-cache`. Die CSP steht als Meta-Tag mit Hashes (`kit.csp`), `worker-src 'self'` gibt es schon (PDF.js).
+- SvelteKit bringt Service Worker selbst mit (`src/service-worker.ts`, `$service-worker`: die Dateien des Builds und eine Version). Keine neue Abhängigkeit.
+- Die Eule ist schon das Icon (`favicon.svg`, `apple-touch-icon.png`); `safe-area-inset` beachten bisher nur `ToTop` und der Beam.
+- Token-Scopes sind `read` und `read_write`; die Prüfung sitzt an einer Stelle (`rest/auth.py`: eine schreibende Anfrage braucht `can_write`, außer die Route liest nur, `READS`). Der Scope steht als Text in der Datenbank: ein neuer braucht keine Revision.
+- Ereignisse kommen über die Outbox an Abonnenten (`EventBus.subscribe`), wie bei Webhooks; Jobs lassen sich über `coalesce_key` zusammenfassen.
+- **iOS:** Safari kennt kein Web Share Target. Web Push gibt es ab iOS 16.4, nur für Web-Apps auf dem Home-Bildschirm, mit Erlaubnis nach einem Tippen; jede Push-Nachricht muss als Mitteilung erscheinen (keine stillen). Ein Badge am App-Icon geht (`setAppBadge`). Ein Apple-Entwicklerkonto braucht Web Push nicht. Eine installierte Web-App hat auf iOS ihre eigenen Cookies: man meldet sich dort einmal an.
+
+**Entscheidungen (Tobi, 06.11.2026):**
+1. **Vier Stufen:** PWA (installierbar, Update-Hinweis, Offline-Zustand); Share Target für Android; Kurzbefehl für iPhone, iPad und Mac; Web Push.
+2. **Teilen auf Apple-Geräten über einen Kurzbefehl.** Tobi hat einen und stellt ihn bereit. Ein Klick in Lekto installiert ihn in der Kurzbefehle-App; er wird auf iOS und macOS dort gezeigt, wo er hilft. Er lädt mit einem Token, das nur hochladen darf (neuer Scope `upload`).
+3. **Mail** als Weg vom Handy gibt es schon (ein Postfach, das Lekto abruft); nichts zu tun.
+4. **Keine native App** (kein Apple Developer Program, keine Share Extension).
+5. **Web Push selbst gebaut** auf `cryptography` und dem vorhandenen asynchronen HTTP-Client (RFC 8291 Verschlüsselung, RFC 8292 VAPID), kein `pywebpush` (neue Abhängigkeit, synchron über `requests`).
+6. **Sperrbildschirm:** Push-Nachrichten zeigen auch die Titel der Dokumente.
+7. **Offline** heißt: Die App startet und sagt klar, dass keine Verbindung besteht. Antworten der API (Dokumente, PDFs, Seiten) landen nie im Cache des Geräts.
+8. **Update-Hinweis als Toast** (Mock 1A): unten, bleibt, bis man tippt; „Neu laden“ oder X (bis zum nächsten Start).
+9. **Anlässe für Push:** „Dokumente warten auf Dich“ für alle; für Admins dazu ein Postfach mit Fehler, ein abgeschalteter Webhook, ein Job, der aufgab. Jeder Anlass einzeln abschaltbar.
+10. **Ruhe vor dem Senden:** 60 s.
+11. **Ein Tippen auf die Nachricht** öffnet bei genau einem Dokument dieses Dokument, sonst den Eingang.
+12. **Kurzbefehl** „An Lekto senden“ über den iCloud-Link https://www.icloud.com/shortcuts/8d752558e38f4f64bf9c61faa4694a75 (seit 07.11.2026: nimmt PDFs, Bilder und Dateien, wandelt HEIC in JPEG; zuvor …/042c55c8777f4262aec7f1dbb7bd4bbc nur PDFs); der Link kommt aus `LEKTO_SHORTCUT_URL` ohne Standardwert, ohne ihn zeigt die Web-UI nichts vom Kurzbefehl (Tobi, 07.11.2026); `docker/.env.example` liefert ihn mit); Karte im Reiter API-Tokens und Zeile im Upload-Dialog, beide nur auf Apple-Geräten.
+
+**Vorschlag:**
+
+*Stufe 1 – PWA*
+- **Manifest** `/ui/manifest.webmanifest`: Name „Lekto“, `start_url` `/ui/`, `scope` `/` (so bleibt der Rückweg von OpenID Connect über `/api/v1/auth/oidc/callback` in der App; auf einem iPhone zu prüfen), `display: standalone`, Icons 192 und 512 px, dazu eine `maskable`-Variante (die Eule auf Petrol mit Rand), gerendert wie `apple-touch-icon.png`. Theme-Farbe hell und dunkel über `<meta name="theme-color" media=…>`; `apple-mobile-web-app-title` und `-status-bar-style`.
+- **Service Worker** (`src/service-worker.ts`, Scope `/ui/`): legt beim Installieren die Dateien des Builds einer Version in einen Cache und löscht ältere. Er beantwortet nur `GET` auf diese Dateien aus dem Cache und eine Navigation ohne Netz mit der zwischengespeicherten `index.html`; alles andere, `/api` voran, geht unverändert ans Netz. Die Entscheidung „aus dem Cache oder nicht“ ist eine reine Funktion mit eigenem Test.
+- **Update-Hinweis:** Liegt eine neue Version bereit, sagt die App es und lädt auf ein Tippen neu (der neue Worker übernimmt erst dann). Form nach Mock.
+- **Offline-Zustand:** ohne Verbindung ein Hinweis im Kopf und `LoadProblem` mit eigenem Text („Keine Verbindung“) statt eines Fehlers; kommt die Verbindung zurück, lädt die Seite von selbst.
+- **Standalone-Feinschliff:** `viewport-fit=cover`; Kopf, Menü-Sheet, Dialoge, Sheets und untere Leisten halten die Safe Areas ein. Durchgesehen auf iPhone (Notch, Home-Leiste) und Android.
+- **API:** `.webmanifest` mit `application/manifest+json`; `service-worker.js` mit `no-cache` (gilt schon).
+- **DESIGN.md:** Abschnitt „App“ (Manifest, Update-Hinweis, Offline, Safe Areas) mit Guard-Tests (kein `/api` im Cache, Safe Areas an den festen Leisten).
+
+*Stufe 2 – Teilen auf Android (Share Target)*
+- Manifest `share_target`: `POST` `/ui/share`, `multipart/form-data`, Dateien PDF, Bilder, `.eml`.
+- Der Service Worker nimmt den Post an, legt die Dateien unter einer zufälligen ID in einen eigenen Cache und leitet auf `/ui/share?id=…` weiter (gebaut 07.11.2026: eine zufällige ID, die nichts nennt, wie „Keine Klardaten in Adressen“ es erlaubt; ein Service Worker kann nur weiterleiten, keinen History-State setzen; die Seite nimmt die ID danach aus der Adresse). Die Seite zeigt den Upload-Dialog mit den Dateien (Space wählen wie sonst), lädt über die API hoch und löscht die Dateien aus dem Cache, auch beim Abbrechen; liegengebliebene löscht der Worker nach einer Stunde. Ohne Anmeldung erst die Anmeldung, dann weiter.
+- **Hinweis im Upload-Dialog auf Android:** „Schneller aus dem Teilen-Menü: App installieren“ (über `beforeinstallprompt`); in der installierten App verschwindet er.
+
+*Stufe 3 – Kurzbefehl für iPhone, iPad und Mac*
+- **Scope `upload`:** darf nur `POST /api/v1/documents` (Route mit Marke `UPLOADS` wie `READS`); alles andere `403` mit eigenem Grund (`upload_only_token`). MCP nimmt solche Tokens nicht an. Die Tokens-Karte bietet drei Scopes.
+- **Der Kurzbefehl** (Tobi, geprüft von Claude am 06.11.2026: keine eigenen Werte darin): „An Lekto senden“ fragt beim Hinzufügen erst nach dem Token, dann nach der Lekto-URL (Importfragen, leer). Er lädt jede geteilte Datei mit `POST <URL>/api/v1/documents` (Formularfeld `file`, `Authorization: Bearer`) hoch, meldet „An Lekto gesendet“ und öffnet `<URL>/ui/documents/<id>`; bei einer Dublette (`409`, `existing_document_id`) „Liegt schon in Lekto“ und das vorhandene Dokument; sonst `detail` als Fehler. Er steht im Teilen-Menü, als Schnellaktion im Finder und auf der Watch. Er nimmt heute nur PDFs an.
+- **Karte „Kurzbefehl“** im Reiter API-Tokens, nur auf Apple-Geräten (iPhone, iPad, Mac): „Einrichten“ erzeugt ein `upload`-Token („Kurzbefehl · iPhone“), zeigt Token und Lekto-URL (ohne `/` am Ende, in der Reihenfolge der Importfragen) mit Kopierknöpfen und öffnet mit „Zu Kurzbefehle hinzufügen“ den iCloud-Link. Der Link steht als Konstante im Web; ein neuer Stand des Kurzbefehls bringt vermutlich einen neuen Link.
+- **Hinweis im Upload-Dialog auf Apple-Geräten:** „Schneller aus dem Teilen-Menü: Kurzbefehl einrichten“; er verschwindet, sobald der Nutzer ein `upload`-Token hat.
+- **Doku** `docs/shortcut.md`: einrichten, was der Kurzbefehl tut, Token widerrufen.
+
+*Stufe 4 – Web Push*
+- **Konfiguration:** `LEKTO_PUSH_VAPID_PRIVATE_KEY` (*secret*, P-256, base64url) und `LEKTO_PUSH_SUBJECT` (`mailto:` oder `https:`); ohne Schlüssel kein Push. `lekto vapid-key` erzeugt einen. Lekto spricht dann mit den Push-Diensten von Apple, Google und Mozilla: eine bewusste Entscheidung des Betreibers wie `LEKTO_LOGO_FETCH`, beschrieben in `deploy/README.md` (ausgehende Verbindungen) und `docs/configuration.md`.
+- **Geräte:** Tabelle `push_subscriptions` (Nutzer, Endpoint, Schlüssel `p256dh` und `auth`, Gerätename, angelegt, letzte Zustellung, Fehlschläge), Revision. Port `PushSubscriptionRepository` (Memory, SQL, Contract) und Port `PushSender` (Memory und Adapter `webpush`). Endpoints nur über HTTPS an bekannte Push-Dienste (Liste der Hosts, dazu nur öffentliche Adressen), sonst nimmt die API das Gerät nicht an: kein SSRF über ein erfundenes Gerät. `404`/`410` des Dienstes entfernt das Gerät.
+- **API:** `GET /push/key` (öffentlicher Schlüssel), `POST /push/devices`, `GET /push/devices` (die eigenen), `DELETE /push/devices/{id}`, `POST /push/devices/{id}/test`; Einstellungen je Nutzer (Anlässe, Titel auf dem Sperrbildschirm).
+- **Anlässe und Bündelung:** Ein Abonnent der Outbox merkt sich je Nutzer, dass etwas geschah, und reiht einen Job mit `coalesce_key` je Nutzer ein, der nach einer kurzen Ruhe läuft. Der Job liest den Stand (nicht die Ereignisse): „3 Dokumente warten auf Dich“ mit bis zu drei Titeln, den Badge mit der Zahl, und `Topic` je Nutzer, damit der Dienst eine noch nicht zugestellte ältere Nachricht ersetzt. Nichts wartet: keine Nachricht, nur der Badge auf 0. Es gelten die Rechte des Empfängers (sein Eingang). Übernommene Dokumente sind nicht neu und lösen nichts aus.
+- **Web:** Reiter „Benachrichtigungen“ in den Einstellungen: dieses Gerät (Einschalten fragt nach der Erlaubnis; im Safari-Tab auf dem iPhone stattdessen „Erst zum Home-Bildschirm hinzufügen“ mit den Schritten), die Geräte (Name, letzte Zustellung, Entfernen), Test, Anlässe, „Titel auf dem Sperrbildschirm“ (an). Der Service Worker zeigt die Nachricht (`push`), setzt den Badge und öffnet auf ein Tippen den Eingang bzw. das Dokument (`notificationclick`). Die offene App hält den Badge mit dem Zähler des Eingangs gleich.
+
+**PRs** (Reihenfolge; jeder mit Tests, OpenAPI und `gen:api` wo die API sich ändert, DESIGN.md wo die UI sich ändert):
+1. `feature/pwa` (`new-feature`): Manifest, Icons, Service Worker, Update-Hinweis, Offline-Zustand, DESIGN.md „App“; mit diesem Plan.
+2. `enhancement/safe-areas` (`enhancement`): Standalone-Feinschliff, Guard-Test.
+3. `feature/share-target` (`new-feature`): Stufe 2.
+4. `feature/upload-token` (`new-feature`): Scope `upload`.
+5. `feature/shortcut` (`new-feature`): Karte, Hinweis im Upload-Dialog, `docs/shortcut.md`.
+6. `feature/push-devices` (`new-feature`): Konfiguration, `lekto vapid-key`, Geräte, Port und Adapter `webpush`, API der Geräte und Test-Push.
+7. `feature/push-notify` (`new-feature`): Anlässe, Bündelung, Badge.
+8. `feature/push-settings` (`new-feature`): Reiter „Benachrichtigungen“, `push` und `notificationclick` im Service Worker.
+
+**Fragen, beantwortet (Tobi, 06.11.2026):**
+1. Update-Hinweis: Toast (Mock 1A).
+2. Anlässe: wie vorgeschlagen, für Admins dazu Postfach-Fehler, abgeschalteter Webhook, aufgegebener Job.
+3. Ruhe vor dem Senden: 60 s.
+4. Tippen auf die Nachricht: bei genau einem Dokument dieses Dokument.
+5. iCloud-Link: siehe Entscheidung 12.
+6. iCloud-Link statt signierter Datei, Karte in den Einstellungen und Zeile im Upload-Dialog: ja.
+
 ### M16 – Lesen
 
 - `PageRenderer` statt `PreviewRenderer`: alle Seiten als WebP-Derivate; Endpunkt `GET /documents/{id}/pages/{n}`.
@@ -2759,6 +2835,34 @@ Phase 3 aus `webhooks-und-auftraege.md`.
 **Fertig, wenn:** Ein externer Konsument übernimmt `propose` und `extract` für den Bewertungssatz, und die Lanes entstehen nach denselben Regeln wie mit dem internen Modell.
 
 **Modell:** Opus 5.5 · high.
+
+### Weniger Pflege der Kennungen (#215)
+
+Stand: Plan mit Tobi abgestimmt am 08.11.2026; PR 1 (#312) und PR 2 (#313) gemergt am 08.11.2026; PR 3 in Arbeit. Die Entscheidungen je Art stehen als Tabelle unten in Issue #215.
+
+**Anlass:** Der Reiter „Kennungen“ zeigte auf Prod am 29.10.2026 1.020 offene Kennungen (Tobi: „Ich pflege mich zu Tode“); am 08.11. waren es noch 311 (15 erlernt, 289 unbekannt, 7 Vorschläge).
+
+**Grundsatz (Tobi, 08.11.2026):** Eine Art, die nur auf den Kontakt zeigt, braucht es als Kennung nicht: den Kontakt erkennen Sprachmodell und Klassifikator auch. Gemessen mit dem Evaluationsset (48 Fälle, trainierter Lauf, Claude Sonnet 5.5): ohne die wegfallenden Arten Kontakt 46 von 48 richtig wie vorher, Lanes, Inhaber und Verknüpfungen gleich.
+
+**Entscheidungen (Tobi, 08.11.2026):**
+1. **Kennungen eines Kontakts, gelernt:** Kundennummer, Vertragsnummer, Personalnummer (mit Person, Vertragsnummer auch mit Thema).
+2. **Eine Vertragsnummer:** Versicherungsschein-, Mitglieds- und Darlehensnummer gehen in ihr auf; die Mindestzahl an Ziffern hängt am Label (6 nach einem Versicherungslabel, 4 sonst).
+3. **E-Mail-Domain:** nur von Hand (Logo, Inhaber), nicht gelernt; vorgeschlagen, wenn sie zum Namen des eigenen Kontakts passt und der noch keine hat.
+4. **IBAN:** nur noch für Personen (Profil, Kontoinhaber).
+5. **Keine Kennung eines Kontakts mehr**, nur Fakt am Dokument: USt-IdNr., Handelsregisternummer, Steuernummer, Gläubiger-ID, Kennzeichen, Zählernummer, Mandatsreferenz. Eine Migration entfernt ihren Bestand an Kontakten (gewünscht).
+6. **Inhaber:** nicht mehr für USt-IdNr. und Gläubiger-ID; neu für eine Kundennummer in einer Buchungszeile.
+7. **Reiter und Übersicht:** keine unbekannten Kennungen mehr (Option B); die Kachel zeigt nur Vorschläge und verschwindet ohne welche (Option A); „Empfohlene übernehmen“ bleibt; erlernte werden weiter im Reiter abgelehnt.
+8. **Lesen:** ein Datum ist nie eine Nummer; Kundennummer bis vor einen Schrägstrich mit Buchstaben, nicht maskiert, kein „Account number“ mit Bankwörtern daneben; ein Füllwort beginnt nie eine Nummer; Mindestziffern für Vertrags- (4) und Versicherungsscheinnummer (6); Zählernummer mindestens 6 Zeichen mit 4 Ziffern (kein OBIS-Code); der Name einer Domain passt nur, wenn die Namenswörter mindestens die Hälfte des Domainnamens ausmachen.
+9. **API** ohne Übergang: die Quelle `unknown` und die Arten `policy_number`, `membership_number`, `loan_number` entfallen.
+
+**PRs:**
+1. **Korrekturen beim Lesen** (`bugfix`, Entscheidung 8): nur Domain-Code, Tests nach den Fällen auf Prod mit erfundenen Werten; drei Sterne oder mehr gelten beim Normalisieren als Maskierung, nicht als Markdown.
+2. **Kundennummer in Buchungszeilen** (`bugfix`, Entscheidung 6): Inhaber nach der festen Regel wie bei der IBAN; ein Fall im Evaluationsset.
+3. **Eine Vertragsnummer** (`enhancement`, Entscheidung 2): Revision 0071 schreibt Kennungen an Kontakten und Profilen, Fakten, Entscheidungen zu Fakten, Belege von Verknüpfungen und Bedingungen von Regeln um und fasst Doppelte zusammen; Prompts, Web-Labels, `openapi.json`, Beispieldokumente, `.idea/fakten.md`.
+4. **Weniger Arten an Kontakten** (`enhancement`, Entscheidungen 3–6): Revision 0072 entfernt den Bestand; der Kontaktdialog bietet nur noch Kunden-, Vertrags-, Personalnummer und Domain; `.idea/fakten.md`, `.idea/architektur.md`.
+5. **Reiter und Übersicht** (`enhancement`, Entscheidungen 3 und 7): Quelle `unknown` entfällt in Domain, REST und Web; Domain-Vorschlag für den eigenen Kontakt; Kachel nur mit Vorschlägen; die Entscheidung „Offene Kennungen“ in `.idea/architektur.md` ersetzt. Schließt #215.
+
+Danach auf Prod nur auf Tobis Wort: ein Training, das erlernte Kennungen der wegfallenden Arten entfernt.
 
 ## Devcontainer
 

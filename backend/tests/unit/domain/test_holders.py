@@ -87,6 +87,24 @@ Buchungstag   Vorgang                                  Betrag
     }
 
 
+def test_a_customer_number_in_a_booking_is_the_payee_s() -> None:
+    text = """Kontoauszug 10/2026
+02.10.2026   Lastschrift Musterfunk GmbH KdNr 4711000815   -24,99 EUR
+05.10.2026   Lastschrift Versand Muster KD-NR. 81234 RE-NR. 99887   -10,00 EUR
+"""
+    found = kinds(holders_of(text))
+    assert found["4711000815"] == (HolderKind.THIRD_PARTY, None)
+    assert found["81234"] == (HolderKind.THIRD_PARTY, None)
+
+
+def test_a_customer_number_outside_bookings_tells_no_holder() -> None:
+    letter = "Stadtwerke Musterstadt GmbH\nIhre Kundennummer: 4711000815\nSehr geehrter Herr Nord,"
+    assert holders_of(letter) == {}
+    # Also in a booking: one place outside the bookings keeps it the document's.
+    both = letter + "\n02.10.2026   Abschlag KdNr 4711000815   -45,00 EUR\n"
+    assert holders_of(both) == {}
+
+
 def test_a_statement_with_the_payee_above_the_number() -> None:
     text = f"""Datum        Buchungstext                       Betrag
 03.10.2026   Hausmeisterdienst Weber            -80,00 EUR
@@ -238,7 +256,7 @@ def test_a_known_name_outside_a_booking_is_the_sender_s() -> None:
     assert kinds(holders_of(text)) == {UTILITY: (HolderKind.SENDER, "Stadtwerke Musterstadt GmbH")}
 
 
-# --- the holders the language model tells (`facts-2`) -----------------------------------------
+# --- the holders the language model tells (`facts-3`) -----------------------------------------
 
 STATEMENT = f"""Beispielbank   Kontoauszug 10/2026
 02.10.2026   Lastschrift   Stadtwerke Musterstadt   {spaced(UTILITY)}   -45,00 EUR
@@ -376,6 +394,7 @@ DOMAIN_PARTIES = Parties(
         UTILITY_PARTY,
         Party("Hausverwaltung Ost", ("Hausverwaltung Ost",)),
         Party("Stadtwerke Süd", ("Stadtwerke Süd",)),
+        Party("Hotel Inn", ("Hotel Inn",)),
     ],
 )
 
@@ -389,6 +408,9 @@ DOMAIN_PARTIES = Parties(
         ("stadtwerke-sued.de", "Stadtwerke Süd"),  # umlauts folded as in the names
         ("stadtwerke.de", None),  # two contacts as much: not to tell
         ("paypal.com", None),
+        ("hotel-inn.de", "Hotel Inn"),
+        # "inn" in "spinnerei", but three of fifteen letters: no domain of "Hotel Inn".
+        ("spinnerei-muster.de", None),
     ],
 )
 def test_a_domain_is_the_contact_s_whose_name_it_carries(domain: str, owner: str | None) -> None:

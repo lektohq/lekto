@@ -268,6 +268,11 @@ class ReasonCode(StrEnum):
     TOTP_OFF = "totp_off"
     CODE_INVALID = "code_invalid"
     READ_ONLY_TOKEN = "read_only_token"
+    UPLOAD_ONLY_TOKEN = "upload_only_token"
+    PUSH_OFF = "push_off"
+    PUSH_ENDPOINT_REFUSED = "push_endpoint_refused"
+    PUSH_KEYS_INVALID = "push_keys_invalid"
+    PUSH_DEVICES_LIMIT = "push_devices_limit"
     CSRF_MISSING = "csrf_missing"
     SESSION_NEEDED = "session_needed"
     OIDC_MISMATCH = "oidc_mismatch"
@@ -741,6 +746,11 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.TOTP_OFF: "TOTP is off",
     ReasonCode.CODE_INVALID: "the code is not valid",
     ReasonCode.READ_ONLY_TOKEN: "this API token may only read",
+    ReasonCode.UPLOAD_ONLY_TOKEN: "this API token may only upload documents",
+    ReasonCode.PUSH_OFF: "notifications are off on this server",
+    ReasonCode.PUSH_ENDPOINT_REFUSED: "the device's push address is no known push service's",
+    ReasonCode.PUSH_KEYS_INVALID: "the device's keys are not valid",
+    ReasonCode.PUSH_DEVICES_LIMIT: "at most 20 devices receive notifications",
     ReasonCode.CSRF_MISSING: "the header {header} is missing or wrong",
     ReasonCode.SESSION_NEEDED: "this needs a signed-in session, not an API token",
     ReasonCode.OIDC_MISMATCH: "the sign-in does not match the one started here",

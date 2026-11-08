@@ -13233,6 +13233,7 @@
             }
           }
         },
+        "x-uploads": true,
         "security": [
           {
             "session": []
@@ -20898,6 +20899,717 @@
                   "title": "Internal Server Error",
                   "status": 500,
                   "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Forbidden",
+                  "status": 403,
+                  "detail": "only editors and admins control the processing of this document"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/push": {
+      "get": {
+        "tags": [
+          "push"
+        ],
+        "summary": "Notifications on this server",
+        "description": "Whether the server sends notifications, and the key browsers subscribe with.",
+        "operationId": "push_settings_api_v1_push_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushSettingsOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unauthorized",
+                  "status": 401,
+                  "detail": "authentication is required"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Internal Server Error",
+                  "status": 500,
+                  "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/push/devices": {
+      "get": {
+        "tags": [
+          "push"
+        ],
+        "summary": "List the caller's devices",
+        "description": "The devices the caller receives notifications on, oldest first.",
+        "operationId": "list_devices_api_v1_push_devices_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PushDeviceOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Devices Api V1 Push Devices Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unauthorized",
+                  "status": 401,
+                  "detail": "authentication is required"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Internal Server Error",
+                  "status": 500,
+                  "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "token": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "push"
+        ],
+        "summary": "Receive notifications on a device",
+        "description": "A browser's subscription (`PushSubscription`): its address at the push service and its keys. The address must be one of a known push service (Apple, Google, Mozilla, Microsoft; 422 `push_endpoint_refused`), the keys valid (422 `push_keys_invalid`). The same address again replaces the device, also one another user subscribed in that browser before. 409 `push_devices_limit`: the caller has 20 devices. 409 `push_off`: the server sends no notifications (no VAPID key).",
+        "operationId": "register_device_api_v1_push_devices_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushDeviceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unauthorized",
+                  "status": 401,
+                  "detail": "authentication is required"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Conflict",
+                  "status": 409,
+                  "detail": "duplicate of document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": "from_node: Input should be 'ocr', 'parse', ..."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Internal Server Error",
+                  "status": 500,
+                  "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Content Too Large",
+                  "status": 413,
+                  "detail": "the request body is larger than 1048576 bytes"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Forbidden",
+                  "status": 403,
+                  "detail": "only editors and admins control the processing of this document"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/push/devices/{id}": {
+      "delete": {
+        "tags": [
+          "push"
+        ],
+        "summary": "Receive no notifications on a device",
+        "description": "Only its owner sees a device; other users' devices are not found (404).",
+        "operationId": "remove_device_api_v1_push_devices__id__delete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unauthorized",
+                  "status": 401,
+                  "detail": "authentication is required"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Not Found",
+                  "status": 404,
+                  "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": "from_node: Input should be 'ocr', 'parse', ..."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Internal Server Error",
+                  "status": 500,
+                  "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Forbidden",
+                  "status": 403,
+                  "detail": "only editors and admins control the processing of this document"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/push/devices/{id}/test": {
+      "post": {
+        "tags": [
+          "push"
+        ],
+        "summary": "Send a device a test notification",
+        "description": "Only its owner sees a device; other users' devices are not found (404). A device the push service no longer knows is forgotten (`gone`). 409 `push_off`: the server sends no notifications (no VAPID key).",
+        "operationId": "test_device_api_v1_push_devices__id__test_post",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushTestOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unauthorized",
+                  "status": 401,
+                  "detail": "authentication is required"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Not Found",
+                  "status": 404,
+                  "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Conflict",
+                  "status": 409,
+                  "detail": "duplicate of document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": "from_node: Input should be 'ocr', 'parse', ..."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Internal Server Error",
+                  "status": 500,
+                  "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Forbidden",
+                  "status": 403,
+                  "detail": "only editors and admins control the processing of this document"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/push/preferences": {
+      "get": {
+        "tags": [
+          "push"
+        ],
+        "summary": "What the caller is told about",
+        "description": "Every kind is on and titles are named until the caller changes it.",
+        "operationId": "get_preferences_api_v1_push_preferences_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushPreferencesBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unauthorized",
+                  "status": 401,
+                  "detail": "authentication is required"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Internal Server Error",
+                  "status": 500,
+                  "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "token": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "push"
+        ],
+        "summary": "Choose what the caller is told about",
+        "description": "A notification of a kind left out is not sent; documents waiting meanwhile are named in the next notification once `waiting` is on again.",
+        "operationId": "set_preferences_api_v1_push_preferences_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushPreferencesBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushPreferencesBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unauthorized",
+                  "status": 401,
+                  "detail": "authentication is required"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Conflict",
+                  "status": 409,
+                  "detail": "duplicate of document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": "from_node: Input should be 'ocr', 'parse', ..."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Internal Server Error",
+                  "status": 500,
+                  "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Content Too Large",
+                  "status": 413,
+                  "detail": "the request body is larger than 1048576 bytes"
                 }
               }
             }
@@ -31301,10 +32013,7 @@
           "commercial_register",
           "tax_number",
           "contract_number",
-          "policy_number",
-          "membership_number",
           "meter_number",
-          "loan_number",
           "mandate_reference",
           "license_plate",
           "invoice_number",
@@ -35479,6 +36188,18 @@
             "type": "string",
             "title": "Lekto Version",
             "description": "The version of Lekto that answers (its release)."
+          },
+          "shortcut_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shortcut Url",
+            "description": "The link that adds the shortcut \"An Lekto senden\" for iPhone, iPad and Mac (`LEKTO_SHORTCUT_URL`); null: the server offers none."
           }
         },
         "type": "object",
@@ -35491,7 +36212,8 @@
           "has_password",
           "totp_enabled",
           "linked_accounts",
-          "lekto_version"
+          "lekto_version",
+          "shortcut_url"
         ],
         "title": "Me",
         "examples": [
@@ -35500,6 +36222,7 @@
             "has_password": true,
             "lekto_version": "0.8.0",
             "linked_accounts": [],
+            "shortcut_url": "https://www.icloud.com/shortcuts/8d752558e38f4f64bf9c61faa4694a75",
             "token_scope": "read",
             "totp_enabled": false,
             "user": {
@@ -37371,6 +38094,215 @@
         "title": "ProposeContext",
         "description": "`signal_llm`'s request (`external.propose`): the context to propose the document's\nmetadata from. No prompt: the consumer makes its own. Lekto checks the answer as a\nlanguage model's: its structure at once (422), its values against the text and the other\nsignals; a contact turns green only with a second signal or hard evidence."
       },
+      "PushDeviceIn": {
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Endpoint",
+            "description": "The subscription's address at the push service (`PushSubscription.endpoint`)."
+          },
+          "keys": {
+            "$ref": "#/components/schemas/PushKeysIn"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Which device it is."
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "de",
+              "en"
+            ],
+            "title": "Locale",
+            "description": "The language the device's notifications speak."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "endpoint",
+          "keys",
+          "name",
+          "locale"
+        ],
+        "title": "PushDeviceIn",
+        "examples": [
+          {
+            "endpoint": "https://web.push.apple.com/QGuQyavXutnMH9Byyn6xHn",
+            "keys": {
+              "auth": "BTBZMqHH6r4Tts7J_aSIgg",
+              "p256dh": "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4"
+            },
+            "locale": "de",
+            "name": "iPhone"
+          }
+        ]
+      },
+      "PushDeviceOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "locale": {
+            "type": "string",
+            "title": "Locale"
+          },
+          "endpoint": {
+            "type": "string",
+            "title": "Endpoint",
+            "description": "The address at the push service: a browser finds its own device by it."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At",
+            "description": "When a message last reached the push service."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "locale",
+          "endpoint",
+          "created_at",
+          "last_success_at"
+        ],
+        "title": "PushDeviceOut"
+      },
+      "PushKeysIn": {
+        "properties": {
+          "p256dh": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "P256Dh",
+            "description": "The browser's public key (base64url)."
+          },
+          "auth": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Auth",
+            "description": "The browser's auth secret (base64url)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "p256dh",
+          "auth"
+        ],
+        "title": "PushKeysIn"
+      },
+      "PushOutcome": {
+        "type": "string",
+        "enum": [
+          "delivered",
+          "gone",
+          "failed"
+        ],
+        "title": "PushOutcome"
+      },
+      "PushPreferencesBody": {
+        "properties": {
+          "kinds": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "waiting",
+                "mailbox_failed",
+                "webhook_disabled",
+                "job_failed"
+              ]
+            },
+            "type": "array",
+            "title": "Kinds",
+            "description": "What the caller is told about: `waiting` (documents wait in their inbox), `webhook_disabled` (one of their webhooks was switched off), and for admins `mailbox_failed` (a mailbox fails to fetch) and `job_failed` (a job was given up)."
+          },
+          "titles": {
+            "type": "boolean",
+            "title": "Titles",
+            "description": "Whether a notification names the documents' titles (it may show on a locked screen)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kinds",
+          "titles"
+        ],
+        "title": "PushPreferencesBody",
+        "examples": [
+          {
+            "kinds": [
+              "waiting",
+              "webhook_disabled"
+            ],
+            "titles": true
+          }
+        ]
+      },
+      "PushSettingsOut": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Whether the server sends notifications (a VAPID key)."
+          },
+          "public_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Key",
+            "description": "The key a browser subscribes with (`applicationServerKey`: P-256, uncompressed, base64url); null without notifications."
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "public_key"
+        ],
+        "title": "PushSettingsOut"
+      },
+      "PushTestOut": {
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/PushOutcome",
+            "description": "`delivered`: the push service took it; `gone`: it no longer knows the device, which is forgotten; `failed`: no answer or a refusal."
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "title": "PushTestOut"
+      },
       "QueuedOut": {
         "properties": {
           "queued": {
@@ -37671,6 +38603,11 @@
           "totp_off",
           "code_invalid",
           "read_only_token",
+          "upload_only_token",
+          "push_off",
+          "push_endpoint_refused",
+          "push_keys_invalid",
+          "push_devices_limit",
           "csrf_missing",
           "session_needed",
           "oidc_mismatch",
@@ -41696,9 +42633,11 @@
         "type": "string",
         "enum": [
           "read",
-          "read_write"
+          "read_write",
+          "upload"
         ],
-        "title": "TokenScope"
+        "title": "TokenScope",
+        "description": "What an API token may do: read, read and write, or only upload documents (a shortcut\non a phone that sends shared files; it reads nothing, not even what it uploaded)."
       },
       "TotpSetupOut": {
         "properties": {
@@ -42950,7 +43889,7 @@
       "token": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Personal API token (`lekto_…`); scope `read` allows reading only: GET, and the POST operations marked `x-reads` (a search with its words in the body)."
+        "description": "Personal API token (`lekto_…`); scope `read` allows reading only: GET, and the POST operations marked `x-reads` (a search with its words in the body); scope `upload` allows only the operation marked `x-uploads` (`POST /documents`)."
       },
       "taskToken": {
         "type": "http",
@@ -43482,6 +44421,11 @@
     "totp_off": {},
     "code_invalid": {},
     "read_only_token": {},
+    "upload_only_token": {},
+    "push_off": {},
+    "push_endpoint_refused": {},
+    "push_keys_invalid": {},
+    "push_devices_limit": {},
     "csrf_missing": {
       "header": "text"
     },
@@ -43946,22 +44890,7 @@
       "person": false,
       "names_user": true
     },
-    "policy_number": {
-      "contact": true,
-      "person": false,
-      "names_user": true
-    },
-    "membership_number": {
-      "contact": true,
-      "person": false,
-      "names_user": true
-    },
     "meter_number": {
-      "contact": true,
-      "person": false,
-      "names_user": true
-    },
-    "loan_number": {
       "contact": true,
       "person": false,
       "names_user": true
@@ -44041,10 +44970,7 @@
     "commercial_register": "contact",
     "tax_number": "contact",
     "contract_number": "target",
-    "policy_number": "target",
-    "membership_number": "target",
     "meter_number": "target",
-    "loan_number": "target",
     "mandate_reference": "target",
     "license_plate": "target",
     "invoice_number": "own",

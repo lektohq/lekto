@@ -19,7 +19,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 
-from lekto.core.domain.document_facts import HOLDER_KINDS, HolderKind
+from lekto.core.domain.document_facts import BOOKED_HOLDER_KINDS, HOLDER_KINDS, HolderKind
 from lekto.core.domain.holders import foreign, held_by
 from lekto.core.domain.identifiers import IdentifierKind, IdentifierSource, Key
 from lekto.core.domain.ids import ContactId, DocumentId
@@ -100,7 +100,9 @@ def evaluate(contacts: Iterable[Contact], sightings: Iterable[Sighting]) -> Hold
         by_key[sighting.fact.key].append(sighting)
     names = {contact.id: contact.names() for contact in contacts}
     labels = {contact.id: contact.name for contact in contacts}
-    evaluation = HolderEvaluation({kind: Tally() for kind in sorted(HOLDER_KINDS)})
+    # A customer number's holder is told only in bookings: nothing to measure the rule by.
+    measured = HOLDER_KINDS - BOOKED_HOLDER_KINDS
+    evaluation = HolderEvaluation({kind: Tally() for kind in sorted(measured)})
     for contact in contacts:
         for identifier in contact.identifiers:
             if identifier.source not in _DECIDED:
@@ -123,7 +125,7 @@ def evaluate(contacts: Iterable[Contact], sightings: Iterable[Sighting]) -> Hold
                 documents,
             )
 
-            if identifier.kind in HOLDER_KINDS:
+            if identifier.kind in measured:
                 tally = evaluation.kinds[identifier.kind]
                 outcome = _count(tally, _rule(own, names[contact.id]), confirmed)
                 evaluation.cases.append(replace(case, measure=identifier.kind, outcome=outcome))

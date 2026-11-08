@@ -36,6 +36,8 @@ from lekto.adapters.outbound.memory.database import (
     MAIL_RULES,
     MAILBOXES,
     PROFILES,
+    PUSH_DEVICES,
+    PUSH_PREFERENCES,
     RULE_APPLICATIONS,
     RULES,
     SESSIONS,
@@ -68,6 +70,10 @@ from lekto.adapters.outbound.memory.mail_rules import MemoryMailRuleRepository
 from lekto.adapters.outbound.memory.mailboxes import MemoryMailboxRepository
 from lekto.adapters.outbound.memory.ordering import Rank, rank
 from lekto.adapters.outbound.memory.processing_facts import MemoryProcessingFacts, VerdictKey
+from lekto.adapters.outbound.memory.push import (
+    MemoryPushDeviceRepository,
+    MemoryPushPreferencesRepository,
+)
 from lekto.adapters.outbound.memory.rows import _REMOVED, MemoryRepository, _copy
 from lekto.adapters.outbound.memory.rules import (
     MemoryBulkOperationRepository,
@@ -182,6 +188,8 @@ class MemoryUnitOfWork:
         self.credentials = MemoryCredentialRepository(self, CREDENTIALS)
         self.sessions = MemorySessionRepository(self, SESSIONS)
         self.api_tokens = MemoryApiTokenRepository(self, API_TOKENS)
+        self.push_devices = MemoryPushDeviceRepository(self, PUSH_DEVICES)
+        self.push_preferences = MemoryPushPreferencesRepository(self, PUSH_PREFERENCES)
         self.external_identities = MemoryExternalIdentityRepository(self, EXTERNAL_IDENTITIES)
         self.login_failures = MemoryLoginFailureRepository(self, LOGIN_FAILURES)
 
@@ -432,6 +440,8 @@ class MemoryUserRepository(MemoryRepository[UserId, User]):
                 self._uow._write(CONTACTS, contact.id, updated)
         if self._uow._row(PROFILES, id) is not None:
             self._uow._write(PROFILES, id, _REMOVED)
+        if self._uow._row(PUSH_PREFERENCES, id) is not None:
+            self._uow._write(PUSH_PREFERENCES, id, _REMOVED)
         self._uow._write(self._table, id, _REMOVED)
 
 

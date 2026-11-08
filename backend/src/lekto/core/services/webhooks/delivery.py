@@ -67,6 +67,7 @@ from lekto.core.domain.ids import DocumentId, EventId, TaskId, UserId, WebhookId
 from lekto.core.domain.jobs import Job, RetryPolicy
 from lekto.core.domain.json_value import JsonObject, as_object
 from lekto.core.domain.permissions import in_reach
+from lekto.core.domain.push import PushKind
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.tasks import Task, TaskKind, TaskStatus
 from lekto.core.domain.templates import RULE
@@ -91,6 +92,7 @@ from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.ports.webhook_sender import WebhookRequest, WebhookResponse, WebhookSender
 from lekto.core.services._access import load_actor
 from lekto.core.services._jobs import JobRunner, lost
+from lekto.core.services._push_queue import queue_push
 from lekto.core.services._templates import document_json, event_values, webhook_values
 from lekto.core.services.objects import load_codes
 from lekto.core.services.tasks.settling import end_task
@@ -583,6 +585,14 @@ class WebhookDeliveryService:
                         switched_off = self._count(webhook, outcome, now)
                         if switched_off is not None:
                             await uow.webhooks.update(webhook)
+                        if switched_off:
+                            await queue_push(
+                                uow,
+                                now,
+                                [webhook.owner_id],
+                                PushKind.WEBHOOK_DISABLED,
+                                {"webhook_id": str(webhook.id), "name": webhook.name},
+                            )
                     if next_attempt is not None:
                         await uow.jobs.reschedule(
                             job, run_at=next_attempt, error=response.error or _status_text(response)

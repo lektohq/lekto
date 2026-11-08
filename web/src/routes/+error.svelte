@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { online } from 'svelte/reactivity/window';
 	import { page } from '$app/state';
 	import Logo from '#lib/components/Logo.svelte';
 	import Mascot from '#lib/components/Mascot.svelte';
@@ -8,9 +9,20 @@
 	import PageTitle from '#lib/components/page/PageTitle.svelte';
 
 	const notFound = $derived(page.status === 404);
+	// No answer and no connection (web/DESIGN.md, "App"): it says so and loads again by itself
+	// once the device is back online.
+	const offline = $derived(page.error?.offline === true && online.current === false);
+	let wasOffline = false;
+	$effect(() => {
+		if (offline) wasOffline = true;
+		else if (wasOffline && page.error?.offline) location.reload();
+	});
+	const title = $derived(
+		offline ? m.offline_title() : notFound ? m.error_not_found() : m.error_title()
+	);
 </script>
 
-<svelte:head><title>{notFound ? m.error_not_found() : m.error_title()}</title></svelte:head>
+<svelte:head><title>{title}</title></svelte:head>
 
 <main class="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-6 px-6">
 	<!-- A page that does not exist gets the owl in place of the logo; a real error keeps the
@@ -20,10 +32,10 @@
 	{:else}
 		<Logo class="text-xl" />
 	{/if}
-	<PageTitle>
-		{notFound ? m.error_not_found() : m.error_title()}
-	</PageTitle>
-	{#if !notFound && page.error?.message}
+	<PageTitle>{title}</PageTitle>
+	{#if offline}
+		<p class="text-muted-foreground">{m.offline_hint()}</p>
+	{:else if !notFound && page.error?.message}
 		<p class="text-muted-foreground">{page.error.message}</p>
 	{/if}
 	<div class="flex gap-3">
