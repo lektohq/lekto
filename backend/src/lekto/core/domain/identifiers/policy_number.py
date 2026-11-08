@@ -11,6 +11,7 @@ class PolicyNumber(LabelledNumber):
     kind = IdentifierKind.POLICY_NUMBER
     for_contacts = True
     names_user = True
+    fewest_digits = 6  # not the postcode on the line after its label, nor letters of an address
     # Not a person's number ("Sozialversicherungsnummer", "Renten-", "Krankenversicherungsnummer").
     compounds = rf"(?!(?:{_PERSONS})-?versicherungs){COMPOUND}"
     labels = (
