@@ -2836,6 +2836,34 @@ Phase 3 aus `webhooks-und-auftraege.md`.
 
 **Modell:** Opus 5.5 · high.
 
+### Weniger Pflege der Kennungen (#215)
+
+Stand: Plan mit Tobi abgestimmt am 08.11.2026; PR 1 in Arbeit. Die Entscheidungen je Art stehen als Tabelle unten in Issue #215.
+
+**Anlass:** Der Reiter „Kennungen“ zeigte auf Prod am 29.10.2026 1.020 offene Kennungen (Tobi: „Ich pflege mich zu Tode“); am 08.11. waren es noch 311 (15 erlernt, 289 unbekannt, 7 Vorschläge).
+
+**Grundsatz (Tobi, 08.11.2026):** Eine Art, die nur auf den Kontakt zeigt, braucht es als Kennung nicht: den Kontakt erkennen Sprachmodell und Klassifikator auch. Gemessen mit dem Evaluationsset (48 Fälle, trainierter Lauf, Claude Sonnet 5.5): ohne die wegfallenden Arten Kontakt 46 von 48 richtig wie vorher, Lanes, Inhaber und Verknüpfungen gleich.
+
+**Entscheidungen (Tobi, 08.11.2026):**
+1. **Kennungen eines Kontakts, gelernt:** Kundennummer, Vertragsnummer, Personalnummer (mit Person, Vertragsnummer auch mit Thema).
+2. **Eine Vertragsnummer:** Versicherungsschein-, Mitglieds- und Darlehensnummer gehen in ihr auf; die Mindestzahl an Ziffern hängt am Label (6 nach einem Versicherungslabel, 4 sonst).
+3. **E-Mail-Domain:** nur von Hand (Logo, Inhaber), nicht gelernt; vorgeschlagen, wenn sie zum Namen des eigenen Kontakts passt und der noch keine hat.
+4. **IBAN:** nur noch für Personen (Profil, Kontoinhaber).
+5. **Keine Kennung eines Kontakts mehr**, nur Fakt am Dokument: USt-IdNr., Handelsregisternummer, Steuernummer, Gläubiger-ID, Kennzeichen, Zählernummer, Mandatsreferenz. Eine Migration entfernt ihren Bestand an Kontakten (gewünscht).
+6. **Inhaber:** nicht mehr für USt-IdNr. und Gläubiger-ID; neu für eine Kundennummer in einer Buchungszeile.
+7. **Reiter und Übersicht:** keine unbekannten Kennungen mehr (Option B); die Kachel zeigt nur Vorschläge und verschwindet ohne welche (Option A); „Empfohlene übernehmen“ bleibt; erlernte werden weiter im Reiter abgelehnt.
+8. **Lesen:** ein Datum ist nie eine Nummer; Kundennummer bis vor einen Schrägstrich mit Buchstaben, nicht maskiert, kein „Account number“ mit Bankwörtern daneben; ein Füllwort beginnt nie eine Nummer; Mindestziffern für Vertrags- (4) und Versicherungsscheinnummer (6); Zählernummer mindestens 6 Zeichen mit 4 Ziffern (kein OBIS-Code); der Name einer Domain passt nur, wenn die Namenswörter mindestens die Hälfte des Domainnamens ausmachen.
+9. **API** ohne Übergang: die Quelle `unknown` und die Arten `policy_number`, `membership_number`, `loan_number` entfallen.
+
+**PRs:**
+1. **Korrekturen beim Lesen** (`bugfix`, Entscheidung 8): nur Domain-Code, Tests nach den Fällen auf Prod mit erfundenen Werten; drei Sterne oder mehr gelten beim Normalisieren als Maskierung, nicht als Markdown.
+2. **Kundennummer in Buchungszeilen** (`bugfix`, Entscheidung 6): Inhaber nach der festen Regel wie bei der IBAN; ein Fall im Evaluationsset.
+3. **Eine Vertragsnummer** (`enhancement`, Entscheidung 2): Revision 0071 schreibt Kennungen an Kontakten und Profilen, Fakten, Entscheidungen zu Fakten, Belege von Verknüpfungen und Bedingungen von Regeln um und fasst Doppelte zusammen; Prompts, Web-Labels, `openapi.json`, Beispieldokumente, `.idea/fakten.md`.
+4. **Weniger Arten an Kontakten** (`enhancement`, Entscheidungen 3–6): Revision 0072 entfernt den Bestand; der Kontaktdialog bietet nur noch Kunden-, Vertrags-, Personalnummer und Domain; `.idea/fakten.md`, `.idea/architektur.md`.
+5. **Reiter und Übersicht** (`enhancement`, Entscheidungen 3 und 7): Quelle `unknown` entfällt in Domain, REST und Web; Domain-Vorschlag für den eigenen Kontakt; Kachel nur mit Vorschlägen; die Entscheidung „Offene Kennungen“ in `.idea/architektur.md` ersetzt. Schließt #215.
+
+Danach auf Prod nur auf Tobis Wort: ein Training, das erlernte Kennungen der wegfallenden Arten entfernt.
+
 ## Devcontainer
 
 Entwickelt und getestet wird im Devcontainer; er startet alle Abhängigkeiten per Docker Compose mit.
