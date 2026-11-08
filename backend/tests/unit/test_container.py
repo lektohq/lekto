@@ -79,11 +79,12 @@ type Run = tuple[list[str], timedelta, dict[str, str]]
 
 
 class OcrRuns:
-    """Stands in for OCRmyPDF's process: keeps the command line, time limit and environment
-    of each run and fails it, so the engine stops there."""
+    """Stands in for OCRmyPDF's process: keeps the command line, time limit, environment and
+    memory limit of each run and fails it, so the engine stops there."""
 
     def __init__(self) -> None:
         self.runs: list[Run] = []
+        self.memory: list[int | None] = []
 
     async def __call__(
         self,
@@ -92,8 +93,10 @@ class OcrRuns:
         timeout: timedelta,
         env: dict[str, str] | None = None,
         tail: int = 0,
+        memory: int | None = None,
     ) -> Completed:
         self.runs.append((list(args), timeout, env or {}))
+        self.memory.append(memory)
         return Completed(returncode=15, stdout="", stderr="stopped by the test")
 
 
@@ -212,6 +215,7 @@ async def test_processing_adapters_follow_the_settings(tmp_path: Path, ocr_runs:
     configured = settings(
         ocr_languages="deu+eng+fra",
         ocr_timeout="120",
+        child_max_memory="1GiB",
         storage_path=tmp_path,
     )
     ocr = container.OCR_ENGINES["ocrmypdf"](configured)
@@ -220,6 +224,7 @@ async def test_processing_adapters_follow_the_settings(tmp_path: Path, ocr_runs:
     command, timeout, _ = await first_run(ocr, ocr_runs, tmp_path)
     assert command[command.index("--language") + 1] == "deu+eng+fra"
     assert timeout == timedelta(minutes=2)
+    assert ocr_runs.memory[-1] == 1024**3
     assert isinstance(container.PARSERS["layout"](configured), LayoutParser)
 
 
