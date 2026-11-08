@@ -250,6 +250,75 @@ def test_a_value_in_a_sentence_after_its_verb(text: str, kind: IdentifierKind, v
     assert identifiers_in(text) == {(kind, value)}
 
 
+@pytest.mark.parametrize(
+    ("kind", "raw"),
+    [
+        (PERSONNEL, "14.03.2019"),
+        (PERSONNEL, "Nov 2023"),
+        (PERSONNEL, "November 2023"),
+        (CUSTOMER, "2016-01-25"),
+        (IdentifierKind.CONTRACT_NUMBER, "07.05.19"),
+    ],
+)
+def test_a_date_is_never_a_number(kind: IdentifierKind, raw: str) -> None:
+    with pytest.raises(ValidationError):
+        normalise_identifier(kind, raw)
+
+
+def test_what_only_looks_like_a_date_is_a_number() -> None:
+    contract = IdentifierKind.CONTRACT_NUMBER
+    assert normalise_identifier(contract, "12.345.678/9") == "123456789"
+    assert normalise_identifier(contract, "12.34.5678") == "12345678"  # no month 34
+    assert normalise_identifier(IdentifierKind.LETTER_DATE, "18.06.2026") == "2026-06-18"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Personalnummer: 14.03.2019",
+        "Personal-Nr. Nov 2023",
+        "Dies ist die Service-PIN für die Kundennummer XXXXXX123 zum Brief",
+        "Kundennummer ****4711",
+        "Bank name Muster Bank Routing number 123456789 Account number 12345678901234567",
+        "Account number 12345678901234567 SWIFT code MUSTUS6S",
+        "Versicherungsschein-Nr. 12345 Musterstadt",  # the postcode on the next line
+        "Versicherungsnummer DV0124 Musterstadt",
+        "Zählernummer 1.8.0 (Bezug) kWh 2.8.0 (Lieferung) kWh",
+        "Vertragsnummer 332",
+        "Vertragskonto bei Muster",
+    ],
+)
+def test_what_a_reader_takes_for_a_number_but_is_none(text: str) -> None:
+    assert identifiers_in(text) == set()
+
+
+@pytest.mark.parametrize(
+    ("text", "kind", "value"),
+    [
+        # A booking adds the invoice after a slash: the customer number ends before it.
+        (
+            "Musterfunk GmbH Kundennummer 4711000815/RG 12345678 90 vom 19.11.21",
+            CUSTOMER,
+            "4711000815",
+        ),
+        ("Your account number: 4711-0815", CUSTOMER, "47110815"),
+        (
+            "Die Vertragsnummer bei Muster24 lautet 123/456789-X-01\n2. Kabelvertrag",
+            IdentifierKind.CONTRACT_NUMBER,
+            "123456789X01",
+        ),
+        ("Die Vertragsnummer bei Muster ist 12345.", IdentifierKind.CONTRACT_NUMBER, "12345"),
+        ("Vertragsnummer: AB1234", IdentifierKind.CONTRACT_NUMBER, "AB1234"),
+        ("Versicherungsschein-Nr. 123/456789-X-01", IdentifierKind.POLICY_NUMBER, "123456789X01"),
+        ("Zählernummer: 1ABC0123456789", IdentifierKind.METER_NUMBER, "1ABC0123456789"),
+    ],
+)
+def test_a_number_read_where_a_reader_went_wrong_before(
+    text: str, kind: IdentifierKind, value: str
+) -> None:
+    assert identifiers_in(text) == {(kind, value)}
+
+
 def test_no_personnel_number_without_label_or_value() -> None:
     assert identifiers_in("Supers Nr 4711, Nummer 12345") == set()
     assert identifiers_in("Personalnummer: siehe oben; Personalnummer 12") == set()

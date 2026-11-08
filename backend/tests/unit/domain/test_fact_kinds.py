@@ -71,7 +71,7 @@ K = IdentifierKind
         ("your letter of 18 June 2026", K.LETTER_DATE, "2026-06-18"),
         # A label at the end of a compound word.
         ("Bausparvertragsnummer 12345678", K.CONTRACT_NUMBER, "12345678"),
-        ("Hausratversicherungsnummer 12345", K.POLICY_NUMBER, "12345"),
+        ("Hausratversicherungsnummer 123456", K.POLICY_NUMBER, "123456"),
         ("Kfz-Versicherungsnummer KV-998877", K.POLICY_NUMBER, "KV998877"),
         ("Vereinsmitgliedsnummer 4711", K.MEMBERSHIP_NUMBER, "4711"),
         ("Stromzählernummer 1ESY1234567", K.METER_NUMBER, "1ESY1234567"),

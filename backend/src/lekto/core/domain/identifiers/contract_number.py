@@ -12,6 +12,7 @@ class ContractNumber(LabelledNumber):
     kind = IdentifierKind.CONTRACT_NUMBER
     for_contacts = True
     names_user = True
+    fewest_digits = 4  # not a short code of a form ("332")
     compounds = COMPOUND
     labels = (
         r"vertrags[-\s]*(?:nummer|nr|konto(?:[-\s]*(?:nummer|nr))?)|contract[-\s]*(?:no|number|id)"
