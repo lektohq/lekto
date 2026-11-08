@@ -9,7 +9,7 @@ from pathlib import Path
 
 import PIL
 import pypdfium2
-from PIL import Image, ImageOps, ImageSequence
+from PIL import ExifTags, Image, ImageSequence
 
 from lekto.adapters.outbound.imaging import flatten_on_white
 from lekto.adapters.outbound.pdfium.library import LOCK
@@ -51,7 +51,7 @@ class PdfiumPageRenderer:
                 pages = _pdf_pages(source, self._width)
                 renderer = f"pdfium {pypdfium2.PDFIUM_INFO.build}"
             else:
-                pages = _image_pages(source)
+                pages = _image_pages(source, self._width)
                 renderer = f"pillow {PIL.__version__}"
             count = 0
             with pages as images:
@@ -107,9 +107,25 @@ def _pdf_pages(source: Path, width: int) -> Iterator[Iterator[Image.Image]]:
             document.close()
 
 
+# How each EXIF orientation turns an image the right way up (as `ImageOps.exif_transpose`).
+_UPRIGHT = {
+    2: Image.Transpose.FLIP_LEFT_RIGHT,
+    3: Image.Transpose.ROTATE_180,
+    4: Image.Transpose.FLIP_TOP_BOTTOM,
+    5: Image.Transpose.TRANSPOSE,
+    6: Image.Transpose.ROTATE_270,
+    7: Image.Transpose.TRANSVERSE,
+    8: Image.Transpose.ROTATE_90,
+}
+_SIDEWAYS = (5, 6, 7, 8)  # orientations that swap width and height
+
+
 @contextmanager
-def _image_pages(source: Path) -> Iterator[Iterator[Image.Image]]:
-    """The frames of an image (a TIFF may have several), the right way up, on white."""
+def _image_pages(source: Path, width: int) -> Iterator[Iterator[Image.Image]]:
+    """The frames of an image (a TIFF may have several), the right way up, on white, at most
+    `width` wide. Each is made small first and turned and laid on white then: a file of a few
+    hundred kilobytes may hold a picture of 170 megapixels, of which every full-size copy took
+    another 700 MB. A JPEG is decoded at the smallest scale that still gives `width`."""
     try:
         opened = Image.open(source)
     except (OSError, Image.DecompressionBombError) as error:
@@ -120,8 +136,14 @@ def _image_pages(source: Path) -> Iterator[Iterator[Image.Image]]:
     def frames() -> Iterator[Image.Image]:
         try:
             for frame in ImageSequence.Iterator(opened):
-                upright = ImageOps.exif_transpose(frame) or frame
-                yield flatten_on_white(upright).convert("RGB")
+                orientation = frame.getexif().get(ExifTags.Base.Orientation, 1)
+                sideways = orientation in _SIDEWAYS
+                if opened.format == "JPEG":
+                    opened.draft(None, (1, width) if sideways else (width, 1))
+                small = _shrunk(frame, width, sideways=sideways)
+                if orientation in _UPRIGHT:
+                    small = small.transpose(_UPRIGHT[orientation])
+                yield flatten_on_white(small).convert("RGB")
         except OSError as error:
             raise UnprocessableDocumentError(
                 because(ReasonCode.IMAGE_UNREADABLE_DETAIL, detail=str(error))
@@ -131,6 +153,22 @@ def _image_pages(source: Path) -> Iterator[Iterator[Image.Image]]:
         yield frames()
     finally:
         opened.close()
+
+
+def _shrunk(frame: Image.Image, width: int, *, sideways: bool) -> Image.Image:
+    """`frame` no wider than `width` once upright (`sideways`: turned by a quarter). A palette
+    or bilevel image is converted first, so that it is not shrunk by its palette's nearest
+    colours."""
+    if frame.mode == "P":
+        frame = frame.convert("RGBA" if "transparency" in frame.info else "RGB")
+    elif frame.mode == "1":
+        frame = frame.convert("L")
+    across = frame.height if sideways else frame.width
+    if across <= width:
+        return frame
+    scale = width / across
+    size = (max(1, round(frame.width * scale)), max(1, round(frame.height * scale)))
+    return frame.resize(size, reducing_gap=3.0)
 
 
 def _fit(image: Image.Image, width: int) -> Image.Image:
