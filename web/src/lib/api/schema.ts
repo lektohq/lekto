@@ -805,7 +805,7 @@ export interface paths {
 		};
 		/**
 		 * The open identifiers
-		 * @description Admins only. Open are the identifiers no person has confirmed: those training learned at a contact (`learned`), and those of a contact's kind that confirmed documents with a contact show but no contact has, entered, learned or rejected (`unknown`). A person's value (a user's profile) is never open. The most documents first, then the newest. `recommended` keeps those whose documents recommend confirming or rejecting them (`recommendation`). To find words: `POST /search`.
+		 * @description Admins only. Open are the identifiers no person has confirmed: those training learned at a contact (`learned`), and suggestions (`suggested`): an e-mail domain whose name fits the contact of its documents while it has none, an IBAN its documents give to a person. A person's value (a user's profile) is never open. The most documents first, then the newest. `recommended` keeps those whose documents recommend confirming or rejecting them (`recommendation`). To find words: `POST /search`.
 		 */
 		get: operations['open_identifiers_api_v1_identifiers_open_get'];
 		put?: never;
@@ -845,7 +845,7 @@ export interface paths {
 		};
 		/**
 		 * How many identifiers are open
-		 * @description Admins only. Open are the identifiers no person has confirmed: those training learned at a contact (`learned`), and those of a contact's kind that confirmed documents with a contact show but no contact has, entered, learned or rejected (`unknown`). A person's value (a user's profile) is never open.
+		 * @description Admins only. Open are the identifiers no person has confirmed: those training learned at a contact (`learned`), and suggestions (`suggested`): an e-mail domain whose name fits the contact of its documents while it has none, an IBAN its documents give to a person. A person's value (a user's profile) is never open.
 		 */
 		get: operations['open_summary_api_v1_identifiers_open_summary_get'];
 		put?: never;
@@ -887,7 +887,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * Confirm or reject open identifiers
-		 * @description Admins only. Each decision is a change of its contact on its own: confirming enters the identifier there by hand (a learned one keeps its topic and user), rejecting takes a learned one out or notes an unknown one rejected, so training does not learn it again. One that cannot be done (no longer open, the contact unclear, another contact has it entered) says why in its outcome; the others are done all the same. In the order given.
+		 * @description Admins only. Each decision is a change of its contact on its own: confirming enters the identifier there by hand (a learned one keeps its topic and user), rejecting takes a learned one out or notes a suggested one rejected, so training does not learn it and Lekto does not suggest it again. One that cannot be done (no longer open, the contact unclear, another contact has it entered) says why in its outcome; the others are done all the same. In the order given.
 		 */
 		post: operations['decide_open_api_v1_identifiers_open_decisions_post'];
 		delete?: never;
@@ -8638,8 +8638,6 @@ export interface components {
 		OpenCountsOut: {
 			/** Learned */
 			learned: number;
-			/** Unknown */
-			unknown: number;
 			/** Suggested */
 			suggested: number;
 		};
@@ -8710,7 +8708,7 @@ export interface components {
 			 * @description As the newest of its documents writes it.
 			 */
 			written: string;
-			/** @description `learned`: training found it at `contacts[0]`; `unknown`: it stands in confirmed documents but at no contact, `contacts` are their contacts, the one with most documents first; `suggested`: a number with a holder (an IBAN, a creditor ID, a VAT ID, an e-mail domain) its documents name as another's, the contact's in `contacts[0]` or the person's in `person`. */
+			/** @description `learned`: training found it at `contacts[0]`; `suggested`: an e-mail domain whose name fits `contacts[0]`, the contact of its documents, which has none entered, or an IBAN its documents give to the person in `person`. */
 			source: components['schemas']['OpenSource'];
 			/** Contacts */
 			contacts: components['schemas']['OpenContactOut'][];
@@ -8812,7 +8810,7 @@ export interface components {
 		 * OpenSource
 		 * @enum {string}
 		 */
-		OpenSource: 'learned' | 'unknown' | 'suggested';
+		OpenSource: 'learned' | 'suggested';
 		/**
 		 * Operator
 		 * @enum {string}

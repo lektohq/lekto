@@ -7123,7 +7123,7 @@
           "identifiers"
         ],
         "summary": "The open identifiers",
-        "description": "Admins only. Open are the identifiers no person has confirmed: those training learned at a contact (`learned`), and those of a contact's kind that confirmed documents with a contact show but no contact has, entered, learned or rejected (`unknown`). A person's value (a user's profile) is never open. The most documents first, then the newest. `recommended` keeps those whose documents recommend confirming or rejecting them (`recommendation`). To find words: `POST /search`.",
+        "description": "Admins only. Open are the identifiers no person has confirmed: those training learned at a contact (`learned`), and suggestions (`suggested`): an e-mail domain whose name fits the contact of its documents while it has none, an IBAN its documents give to a person. A person's value (a user's profile) is never open. The most documents first, then the newest. `recommended` keeps those whose documents recommend confirming or rejecting them (`recommendation`). To find words: `POST /search`.",
         "operationId": "open_identifiers_api_v1_identifiers_open_get",
         "parameters": [
           {
@@ -7472,7 +7472,7 @@
           "identifiers"
         ],
         "summary": "How many identifiers are open",
-        "description": "Admins only. Open are the identifiers no person has confirmed: those training learned at a contact (`learned`), and those of a contact's kind that confirmed documents with a contact show but no contact has, entered, learned or rejected (`unknown`). A person's value (a user's profile) is never open.",
+        "description": "Admins only. Open are the identifiers no person has confirmed: those training learned at a contact (`learned`), and suggestions (`suggested`): an e-mail domain whose name fits the contact of its documents while it has none, an IBAN its documents give to a person. A person's value (a user's profile) is never open.",
         "operationId": "open_summary_api_v1_identifiers_open_summary_get",
         "responses": {
           "200": {
@@ -7680,7 +7680,7 @@
           "identifiers"
         ],
         "summary": "Confirm or reject open identifiers",
-        "description": "Admins only. Each decision is a change of its contact on its own: confirming enters the identifier there by hand (a learned one keeps its topic and user), rejecting takes a learned one out or notes an unknown one rejected, so training does not learn it again. One that cannot be done (no longer open, the contact unclear, another contact has it entered) says why in its outcome; the others are done all the same. In the order given.",
+        "description": "Admins only. Each decision is a change of its contact on its own: confirming enters the identifier there by hand (a learned one keeps its topic and user), rejecting takes a learned one out or notes a suggested one rejected, so training does not learn it and Lekto does not suggest it again. One that cannot be done (no longer open, the contact unclear, another contact has it entered) says why in its outcome; the others are done all the same. In the order given.",
         "operationId": "decide_open_api_v1_identifiers_open_decisions_post",
         "requestBody": {
           "content": {
@@ -37015,10 +37015,6 @@
             "type": "integer",
             "title": "Learned"
           },
-          "unknown": {
-            "type": "integer",
-            "title": "Unknown"
-          },
           "suggested": {
             "type": "integer",
             "title": "Suggested"
@@ -37027,7 +37023,6 @@
         "type": "object",
         "required": [
           "learned",
-          "unknown",
           "suggested"
         ],
         "title": "OpenCountsOut"
@@ -37145,7 +37140,7 @@
           },
           "source": {
             "$ref": "#/components/schemas/OpenSource",
-            "description": "`learned`: training found it at `contacts[0]`; `unknown`: it stands in confirmed documents but at no contact, `contacts` are their contacts, the one with most documents first; `suggested`: a number with a holder (an IBAN, a creditor ID, a VAT ID, an e-mail domain) its documents name as another's, the contact's in `contacts[0]` or the person's in `person`."
+            "description": "`learned`: training found it at `contacts[0]`; `suggested`: an e-mail domain whose name fits `contacts[0]`, the contact of its documents, which has none entered, or an IBAN its documents give to the person in `person`."
           },
           "contacts": {
             "items": {
@@ -37354,7 +37349,6 @@
         "type": "string",
         "enum": [
           "learned",
-          "unknown",
           "suggested"
         ],
         "title": "OpenSource"

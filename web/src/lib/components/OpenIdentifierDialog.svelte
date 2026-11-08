@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
@@ -13,10 +12,8 @@
 	import Loading from '#lib/components/Loading.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import Mark from '#lib/components/Mark.svelte';
-	import Select from '#lib/components/Select.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import * as Field from '#lib/components/ui/field/index.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { roleLabel, shown } from '#lib/facts.ts';
 	import { formatDate, formatNumber } from '#lib/i18n.ts';
@@ -34,9 +31,8 @@
 
 	// An open identifier opened from the list (web/DESIGN.md, "Lists": the title opens it):
 	// where it is open, where it stands in its newest documents (the text around it, the value
-	// marked), and the decision. A learned one is decided at its contact; for an unknown one the
-	// person picks among the contacts of its documents; a suggestion names its contact or the
-	// person whose profile takes it. "Übernehmen" is the primary action, "Verwerfen" the second
+	// marked), and the decision. A learned one is decided at its contact; a suggestion names its
+	// contact or the person whose profile takes it. "Übernehmen" is the primary action, "Verwerfen" the second
 	// way out at the start of the footer.
 	let {
 		open = $bindable(false),
@@ -57,7 +53,6 @@
 
 	let detail = $state<OpenDetail | null>(null);
 	let problem = $state<string | null>(null);
-	let contact = $state('');
 	const begin = latest();
 	const item = $derived(listed ?? detail?.identifier ?? null);
 
@@ -73,7 +68,6 @@
 			);
 			if (!current()) return;
 			detail = found;
-			contact ||= found.identifier.contacts[0]?.id ?? '';
 		} catch (error) {
 			if (!current()) return;
 			if (error instanceof ApiError && error.status === 404) {
@@ -87,7 +81,6 @@
 
 	$effect(() => {
 		if (!open || !wanted) return;
-		contact = untrack(() => listed)?.contacts[0]?.id ?? '';
 		void load(wanted);
 	});
 
@@ -109,20 +102,17 @@
 		if (item.source === 'learned') {
 			return m.open_learned_at({ contact: item.contacts[0]?.name ?? '', count });
 		}
-		if (item.source === 'suggested') {
-			const one = item.documents === 1;
-			if (item.person) {
-				const person = item.person.name;
-				return one
-					? m.open_suggested_person_one({ person })
-					: m.open_suggested_person({ person, count });
-			}
-			const contact = targetName(item);
+		const one = item.documents === 1;
+		if (item.person) {
+			const person = item.person.name;
 			return one
-				? m.open_suggested_contact_one({ contact })
-				: m.open_suggested_contact({ contact, count });
+				? m.open_suggested_person_one({ person })
+				: m.open_suggested_person({ person, count });
 		}
-		return item.documents === 1 ? m.open_unknown_in_one() : m.open_unknown_in({ count });
+		const contact = targetName(item);
+		return one
+			? m.open_suggested_contact_one({ contact })
+			: m.open_suggested_contact({ contact, count });
 	});
 
 	// On a phone the bar on top keeps room for the title: the verb alone, the text names whose.
@@ -136,7 +126,6 @@
 	const hint = $derived.by(() => {
 		if (!item) return '';
 		if (item.source === 'learned') return m.open_dialog_hint_learned();
-		if (item.source === 'unknown') return m.open_dialog_hint_unknown();
 		return item.person
 			? m.open_dialog_hint_suggested_person()
 			: m.open_dialog_hint_suggested_contact();
@@ -144,12 +133,7 @@
 
 	async function run(action: OpenAction) {
 		if (!item) return;
-		await decideOne({
-			kind: item.kind,
-			value: item.value,
-			action,
-			contact_id: item.source === 'unknown' && contact ? contact : null
-		});
+		await decideOne({ kind: item.kind, value: item.value, action, contact_id: null });
 		ondecided(action);
 	}
 </script>
@@ -173,16 +157,6 @@
 				</Badge>
 				<span class="text-muted-foreground">{reasonText(item.recommendation.reason)}</span>
 			</p>
-		{/if}
-		{#if item.source === 'unknown' && item.contacts.length > 1}
-			<Field.Field>
-				<Field.Label for="open-contact">{m.open_contact_label()}</Field.Label>
-				<Select
-					id="open-contact"
-					bind:value={contact}
-					options={item.contacts.map((entry) => ({ value: entry.id, label: entry.name }))}
-				/>
-			</Field.Field>
 		{/if}
 		<div class="flex flex-col gap-2">
 			<Eyebrow>{m.open_places()}</Eyebrow>
