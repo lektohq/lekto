@@ -142,14 +142,14 @@ describe('IdentifiersEditor, a user’s identifiers at contacts', () => {
 	const numbers = () => [
 		row('customer_number', 'K1', 'manual', null, null, 'utility'),
 		row('meter_number', 'Z2', 'learned', null, null, 'utility'),
-		row('policy_number', 'P3', 'learned', null, null, 'insurer'),
+		row('contract_number', 'P3', 'learned', null, null, 'insurer'),
 		row('customer_number', 'K4', 'rejected', null, null, 'insurer')
 	];
 	const group = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}`) });
 
 	it('groups them by contact, closed, with the kinds each holds', async () => {
 		const user = userEvent.setup();
-		editor(numbers(), { contacts, kinds: ['customer_number', 'policy_number', 'meter_number'] });
+		editor(numbers(), { contacts, kinds: ['customer_number', 'contract_number', 'meter_number'] });
 		const insurer = group('Hanse Versicherung');
 		const utility = group('Stadtwerke');
 		// By name; each names its kinds in their order and how many there are.
@@ -176,7 +176,7 @@ describe('IdentifiersEditor, a user’s identifiers at contacts', () => {
 
 	it('opens every contact a search finds something at', async () => {
 		const user = userEvent.setup();
-		editor(numbers(), { contacts, kinds: ['customer_number', 'policy_number', 'meter_number'] });
+		editor(numbers(), { contacts, kinds: ['customer_number', 'contract_number', 'meter_number'] });
 		await user.type(screen.getByLabelText(m.identifier_search()), 'P3');
 		expect(group('Hanse Versicherung').getAttribute('aria-expanded')).toBe('true');
 		expect(line(/P3/)).toBeTruthy();
@@ -185,7 +185,7 @@ describe('IdentifiersEditor, a user’s identifiers at contacts', () => {
 
 	it('shows them by source, with how many each has', async () => {
 		const user = userEvent.setup();
-		editor(numbers(), { contacts, kinds: ['customer_number', 'policy_number', 'meter_number'] });
+		editor(numbers(), { contacts, kinds: ['customer_number', 'contract_number', 'meter_number'] });
 		const sources = screen.getByRole('group', { name: m.numbers_source() });
 		const learned = within(sources).getByRole('button', { name: new RegExp(m.numbers_learned()) });
 		expect(learned.textContent).toContain('2');

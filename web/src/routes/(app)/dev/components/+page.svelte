@@ -83,7 +83,7 @@
 	let sampleNumbers = $state<IdentifierRow[]>([
 		row('customer_number', '200445118', 'manual', null, null, 'c1'),
 		row('meter_number', '1ESY1160447122', 'learned', null, null, 'c1'),
-		row('policy_number', 'HV-30-4418720', 'learned', null, null, 'c2'),
+		row('contract_number', 'HV-30-4418720', 'learned', null, null, 'c2'),
 		row('mandate_reference', 'HV4418720', 'rejected', null, null, 'c2')
 	]);
 	let formOpen = $state(false);
