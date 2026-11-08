@@ -21,6 +21,9 @@ from lekto.core.domain.periods import MONTH_NAMES, Period
 
 # Markdown markup that may sit inside a value (`**84,20 €**`, table pipes).
 _MARKUP = re.compile(r"[*_#|`>~]+")
+# Three stars or more hide characters (`****4711`, `**** **** 1234`): kept as letters a number
+# cannot have alone (`identifiers.MASKED`), not taken for markup; bold is two (`**4711**`).
+_STARS = re.compile(r"\*{3,}")
 # A word broken at the end of a line: `Rech-\nnung`.
 _HYPHENATION = re.compile(r"(?<=[^\W\d_])-[ \t]*\n[ \t]*(?=[^\W\d_])")
 _WHITESPACE = re.compile(r"\s+")
@@ -39,15 +42,16 @@ _UMLAUTS = str.maketrans(UMLAUTS)
 def normalise(text: str, *, columns: bool = False) -> str:
     """HTML entities as characters (texts parsed before 0.2.0 have `&amp;` and `&#124;`),
     compatibility forms unified (NFKC), lower case (case folding, so `ß` is `ss`),
-    hyphenation at line ends and Markdown markup removed, whitespace collapsed. With `columns`,
-    a gap between two columns of a line collapses to `COLUMN_GAP` and a line break to
-    `LINE_BREAK` instead of a space: the same text at the same places, telling where a value
-    must not run on into the next column or line."""
+    hyphenation at line ends and Markdown markup removed (three stars or more, which hide
+    characters, become `xxx`), whitespace collapsed. With `columns`, a gap between two columns
+    of a line collapses to `COLUMN_GAP` and a line break to `LINE_BREAK` instead of a space:
+    the same text at the same places, telling where a value must not run on into the next
+    column or line."""
     text = unicodedata.normalize("NFKC", html.unescape(text)).replace("­", "")
     text = _HYPHENATION.sub("", text)
     if columns:
         text = _COLUMN_GAP.sub(COLUMN_GAP, text)
-    text = _MARKUP.sub(" ", text)
+    text = _MARKUP.sub(" ", _STARS.sub("xxx", text))
     return _WHITESPACE.sub(_collapsed if columns else " ", text.casefold()).strip()
 
 

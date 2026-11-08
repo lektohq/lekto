@@ -12,6 +12,9 @@ class MeterNumber(LabelledNumber):
     kind = IdentifierKind.METER_NUMBER
     for_contacts = True
     names_user = True
+    # Not an OBIS code (`1.8.0`, the register a reading is of).
+    shortest = 6
+    fewest_digits = 4
     longest = 40
     compounds = COMPOUND
     labels = (
