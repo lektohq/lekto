@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from lekto.adapters.inbound.schemas import DocumentRefOut, ReasonOut
 from lekto.core.domain.changes import UNSET
@@ -136,7 +136,7 @@ class MailboxCreate(_Settings):
     port: int = Field(ge=1, le=65535)
     security: MailSecurity = Field(description=SECURITY_HELP)
     username: str = Field(min_length=1, max_length=MAX_USERNAME)
-    password: str = Field(
+    password: SecretStr = Field(
         min_length=1, max_length=MAX_PASSWORD, description="Stored encrypted, never shown again."
     )
 
@@ -152,7 +152,7 @@ class MailboxPatch(_Settings):
     port: int | None = Field(default=None, ge=1, le=65535)
     security: MailSecurity | None = Field(default=None, description=SECURITY_HELP)
     username: str | None = Field(default=None, min_length=1, max_length=MAX_USERNAME)
-    password: str | None = Field(
+    password: SecretStr | None = Field(
         default=None,
         min_length=1,
         max_length=MAX_PASSWORD,
@@ -279,7 +279,7 @@ class ConnectionTestBody(BaseModel):
     port: int = Field(ge=1, le=65535)
     security: MailSecurity = Field(description=SECURITY_HELP)
     username: str = Field(min_length=1, max_length=MAX_USERNAME)
-    password: str | None = Field(default=None, min_length=1, max_length=MAX_PASSWORD)
+    password: SecretStr | None = Field(default=None, min_length=1, max_length=MAX_PASSWORD)
     mailbox_id: UUID | None = Field(
         default=None, description="The mailbox being changed, for its stored password."
     )
