@@ -94,6 +94,8 @@ image, the reverse proxy and backups.
 | `LEKTO_DB_NAME` | both | – | text | Postgres only, required |
 | `LEKTO_DB_USER` | both | – | text | Postgres only, required |
 | `LEKTO_DB_PASSWORD` | both | – | text, *secret* | Postgres only, required |
+| `LEKTO_DB_SSLMODE` | both | – | `disable`, `allow`, `prefer`, `require`, `verify-ca`, `verify-full` | Postgres only: TLS to the database, as libpq's modes. Unset, the driver's default holds (`prefer`, or `PGSSLMODE`): encrypted if the server offers it, unchecked. For a database on another host, `verify-full` |
+| `LEKTO_DB_SSLROOTCERT` | both | – | path | Postgres only, with `verify-ca` or `verify-full`: the root certificate that signed the server's; unset, the system's trusted ones |
 
 ## Object store
 

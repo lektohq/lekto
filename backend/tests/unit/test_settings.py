@@ -204,6 +204,31 @@ def test_s3_requires_parameters(monkeypatch: pytest.MonkeyPatch) -> None:
         assert f"LEKTO_S3_{name} is required when LEKTO_STORAGE_TYPE=s3" in message
 
 
+def test_the_tls_mode_of_postgres(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    root = tmp_path / "root.crt"
+    root.write_text("a certificate")
+    set_env(
+        monkeypatch,
+        POSTGRES | {"LEKTO_DB_SSLMODE": "Verify-Full", "LEKTO_DB_SSLROOTCERT": str(root)},
+    )
+    settings = load_settings()
+    assert (settings.db_sslmode, settings.db_sslrootcert) == ("verify-full", root)
+
+
+def test_a_root_certificate_needs_a_checking_mode_and_a_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    missing = tmp_path / "root.crt"
+    values = POSTGRES | {"LEKTO_DB_SSLMODE": "require", "LEKTO_DB_SSLROOTCERT": str(missing)}
+    message = error_message(monkeypatch, values)
+    assert "LEKTO_DB_SSLROOTCERT needs LEKTO_DB_SSLMODE=verify-ca or verify-full" in message
+    assert f"LEKTO_DB_SSLROOTCERT: no file at {missing}" in message
+
+
+def test_an_unknown_tls_mode_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert "LEKTO_DB_SSLMODE" in error_message(monkeypatch, POSTGRES | {"LEKTO_DB_SSLMODE": "on"})
+
+
 def test_sqlite_ignores_postgres_parameters(monkeypatch: pytest.MonkeyPatch) -> None:
     set_env(monkeypatch, {"LEKTO_DB_HOST": "db"})
     assert load_settings().db_type == "sqlite"

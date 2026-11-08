@@ -126,6 +126,10 @@ class Settings(BaseSettings):
     db_name: str | None = None
     db_user: str | None = None
     db_password: SecretStr | None = None
+    db_sslmode: (
+        Literal["disable", "allow", "prefer", "require", "verify-ca", "verify-full"] | None
+    ) = None
+    db_sslrootcert: Path | None = None
 
     # Object store: local filesystem or S3 (first server: Garage).
     storage_type: Literal["filesystem", "s3"] = "filesystem"
@@ -349,6 +353,14 @@ class Settings(BaseSettings):
         problems: list[str] = []
         if self.db_type == "postgres":
             problems += _missing(self, "db_type", "db_host", "db_name", "db_user", "db_password")
+        if self.db_sslrootcert is not None:
+            if self.db_sslmode not in ("verify-ca", "verify-full"):
+                problems.append(
+                    f"{_env('db_sslrootcert')} needs {_env('db_sslmode')}=verify-ca or "
+                    "verify-full: only those check the server's certificate"
+                )
+            if not self.db_sslrootcert.is_file():
+                problems.append(f"{_env('db_sslrootcert')}: no file at {self.db_sslrootcert}")
         if self.storage_type == "s3":
             problems += _missing(
                 self,
