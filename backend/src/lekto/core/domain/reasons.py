@@ -1030,6 +1030,7 @@ class Action(StrEnum):
     CHANGE_UNCONFIRMED = "change_unconfirmed"
     GIVE_UPLOAD_METADATA = "give_upload_metadata"
     UPLOAD_FOR_OTHERS = "upload_for_others"
+    UPLOAD_AS_MIGRATION = "upload_as_migration"
     CONTROL_PROCESSING = "control_processing"
     READ_PROCESSING_LOG = "read_processing_log"
     READ_EXCHANGES = "read_exchanges"
@@ -1065,6 +1066,7 @@ ACTIONS: Mapping[Action, str] = {
     Action.CHANGE_UNCONFIRMED: "change a document without confirming it",
     Action.GIVE_UPLOAD_METADATA: "give metadata with an upload",
     Action.UPLOAD_FOR_OTHERS: "upload on behalf of another user",
+    Action.UPLOAD_AS_MIGRATION: "upload through the channel 'migration'",
     Action.CONTROL_PROCESSING: "control the processing of this document",
     Action.READ_PROCESSING_LOG: "read the processing log of this document",
     Action.READ_EXCHANGES: "read the model exchanges of this document",

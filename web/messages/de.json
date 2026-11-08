@@ -2875,6 +2875,7 @@
 	"action_change_unconfirmed": "ein Dokument ändern, ohne es zu bestätigen",
 	"action_give_upload_metadata": "beim Hochladen Metadaten mitgeben",
 	"action_upload_for_others": "im Namen eines anderen Nutzers hochladen",
+	"action_upload_as_migration": "über den Kanal „Migration“ hochladen",
 	"action_control_processing": "die Verarbeitung dieses Dokuments steuern",
 	"action_read_processing_log": "das Verarbeitungsprotokoll dieses Dokuments lesen",
 	"action_read_exchanges": "die Modellanfragen dieses Dokuments lesen",

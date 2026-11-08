@@ -547,6 +547,7 @@ const ACTIONS: Record<string, () => string> = {
 	change_unconfirmed: m.action_change_unconfirmed,
 	give_upload_metadata: m.action_give_upload_metadata,
 	upload_for_others: m.action_upload_for_others,
+	upload_as_migration: m.action_upload_as_migration,
 	control_processing: m.action_control_processing,
 	read_processing_log: m.action_read_processing_log,
 	read_exchanges: m.action_read_exchanges,

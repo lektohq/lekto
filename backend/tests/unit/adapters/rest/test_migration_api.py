@@ -240,6 +240,23 @@ async def test_only_admins_name_the_uploader_or_give_metadata(api: Api) -> None:
     assert (await upload(api, auth(user), uploaded_by=str(user.id))).status_code == 202
 
 
+async def test_only_admins_upload_through_the_channel_migration(api: Api) -> None:
+    """The channel tells where a document came from; a user's own upload is no migration, with
+    a session, an API token or an upload token alike."""
+    admin, user = await api.admin(), await api.user()
+    _, shortcut = await api.services.auth.create_api_token(user.id, "phone", TokenScope.UPLOAD)
+    for headers in (auth(user), bearer(shortcut)):
+        refused = await upload(api, headers, channel="migration")
+        assert refused.status_code == 403
+        reason = refused.json()["reason"]
+        assert (reason["code"], reason["params"]["action"]) == (
+            "admins_only",
+            "upload_as_migration",
+        )
+    taken = await upload(api, auth(admin), channel="migration")
+    assert taken.status_code == 202, taken.text
+
+
 async def test_an_uploader_who_is_gone_or_inactive_is_not_found(api: Api) -> None:
     admin, owner = await api.admin(), await api.user()
     unknown = await upload(api, auth(admin), uploaded_by=str(UUID(int=5)))
