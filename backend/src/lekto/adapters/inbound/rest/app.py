@@ -80,15 +80,26 @@ Authentication: a session cookie from `POST /auth/login` (web UI; changing reque
 the header `X-CSRF-Token`) or a personal API token as `Authorization: Bearer lekto_…`. Every
 endpoint needs one of them (401 without), except health, the sign-in endpoints (`POST
 /auth/login` and, below `/auth/oidc`, information, start and callback) and the answer to a task
-(`/external/tasks/{{id}}/result`, with the task's own token). A `read` token may only
-read (403). The own sign-in (password, sessions, TOTP, API tokens, provider links) and
-creating users or resetting their sign-in need a session; a token gets 403 there. Documents
-and spaces the caller may not see are "not found" (404), the same as ones that do not exist.
+(`/external/tasks/{{id}}/result`, with the task's own token).
+
+An API token has a scope:
+
+- `read`: reading only, that is GET and the POSTs marked `x-reads` (a search with its words in
+  the body, a dry run, a preview, a check). Anything else answers 403.
+- `upload`: only the upload marked `x-uploads` (`POST /documents`). Anything else answers 403,
+  reading too.
+- `read_write`: everything except what needs a session.
+
+A session is needed, and a token gets 403, for the own account (profile, password, sessions,
+TOTP, API tokens, provider links) and, for admins, for creating a user with a password or the
+role admin, resetting a user's sign-in and deleting a user. Documents and spaces the caller may
+not see are "not found" (404), the same as ones that do not exist.
 
 The same services are available to AI clients over MCP (Streamable HTTP, stateless) at
 `{MCP_PATH}`, with the same API tokens as bearer; it is not part of this OpenAPI document.
-Tools: `search`, `get_document`, `get_text`, `update_metadata` (needs a `read_write` token),
-`list_tags`.
+Tools are named `<area>_<verb>` (such as `documents_search` or `inbox_confirm`) and come in two
+classes: `read`, and `write`, which needs a `read_write` token. Some are for admins only.
+`tools/list` names the tools the caller may use.
 """
 
 
