@@ -1,23 +1,17 @@
-"""Where Lekto may connect when it fetches on behalf of data learned from documents: public
-addresses only, as a protection against server-side request forgery (SSRF).
+"""Which addresses are public: where Lekto may connect on behalf of what a person or a document
+names, as a protection against server-side request forgery (SSRF). The logo fetcher allows
+public addresses only; a webhook reaches others only if `LEKTO_WEBHOOK_PRIVATE_TARGETS` allows
+its owner.
 
-A domain learned from a document may name any host, also one that resolves to the local
-network, the machine itself or a cloud's metadata service. An address is public if Python
-counts it as globally reachable (`is_global`) and it is none of these besides: private,
-loopback, link-local, multicast, reserved, unspecified, shared (100.64.0.0/10, carrier-grade
-NAT), the 6to4 relays (192.88.99.0/24), unique local (fc00::/7), site-local, with a zone,
-IPv4-compatible (::a.b.c.d), 6to4 or Teredo. An IPv4 address inside an IPv6 one, mapped
-(::ffff:a.b.c.d) or behind the well-known NAT64 prefix (64:ff9b::/96), counts as that IPv4
-address.
+An address is public if Python counts it as globally reachable (`is_global`) and it is none of
+these besides: private, loopback, link-local, multicast, reserved, unspecified, shared
+(100.64.0.0/10, carrier-grade NAT), the 6to4 relays (192.88.99.0/24), unique local (fc00::/7),
+site-local, with a zone, IPv4-compatible (::a.b.c.d), 6to4 or Teredo. An IPv4 address inside an
+IPv6 one, mapped (::ffff:a.b.c.d) or behind the well-known NAT64 prefix (64:ff9b::/96), counts
+as that IPv4 address.
 """
 
-import asyncio
 import ipaddress
-import socket
-from collections.abc import Awaitable, Callable, Sequence
-
-type Resolver = Callable[[str], Awaitable[Sequence[str]]]
-"""The addresses (as text) a host name resolves to; OSError if it resolves to none."""
 
 _SHARED = ipaddress.IPv4Network("100.64.0.0/10")
 _SIXTOFOUR_RELAY = ipaddress.IPv4Network("192.88.99.0/24")
@@ -72,13 +66,3 @@ def literal(host: str) -> str | None:
         return str(ipaddress.ip_address(host))
     except ValueError:
         return None
-
-
-async def system_resolver(host: str) -> list[str]:
-    """The addresses the system's resolver gives `host` for HTTPS over TCP."""
-    loop = asyncio.get_running_loop()
-    found = await loop.getaddrinfo(host, 443, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP)
-    addresses = list(dict.fromkeys(str(info[4][0]) for info in found))
-    if not addresses:
-        raise OSError(f"{host} resolves to no address")
-    return addresses

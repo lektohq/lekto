@@ -2,7 +2,7 @@
 
 import pytest
 
-from lekto.adapters.outbound.logos import is_public, system_resolver
+from lekto.core.domain.addresses import is_public
 
 
 @pytest.mark.parametrize(
@@ -75,9 +75,3 @@ def test_refuses_what_is_not_public(address: str) -> None:
 )
 def test_lets_public_addresses_through(address: str) -> None:
     assert is_public(address)
-
-
-async def test_the_system_resolver_gives_an_address_as_it_is() -> None:
-    """Numeric hosts only: no name server is asked."""
-    assert await system_resolver("127.0.0.1") == ["127.0.0.1"]
-    assert await system_resolver("::1") == ["::1"]

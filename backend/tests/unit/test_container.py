@@ -11,7 +11,8 @@ import pytest
 
 from lekto.adapters.outbound.crypto import Argon2PasswordHasher, PyotpTotp
 from lekto.adapters.outbound.filesystem import FilesystemObjectStore
-from lekto.adapters.outbound.logos import HttpLogoFetcher, system_resolver
+from lekto.adapters.outbound.http_client.resolver import system_resolver
+from lekto.adapters.outbound.logos import HttpLogoFetcher
 from lekto.adapters.outbound.meilisearch import MeilisearchIndex
 from lekto.adapters.outbound.memory import FakeLogoFetcher, FakeOcr, FakeParser, ManualClock
 from lekto.adapters.outbound.ocrmypdf import OcrmypdfEngine
