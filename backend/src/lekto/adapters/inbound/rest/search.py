@@ -177,6 +177,7 @@ async def search_status(user: CurrentUser, indexing: Indexing) -> SearchStatusOu
     ),
     response_model=IndexCheckOut,
     responses=problem_responses(401, 403, 503),
+    openapi_extra=READS,
 )
 async def check_index(user: CurrentUser, indexing: Indexing) -> IndexCheckOut:
     return IndexCheckOut.of(await indexing.check(user))

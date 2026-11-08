@@ -11,7 +11,7 @@ from fastapi.routing import APIRoute, iter_route_contexts
 
 from lekto import __version__
 from lekto.adapters.inbound.rest import PREFIX
-from lekto.adapters.inbound.rest.auth import CSRF_HEADER
+from lekto.adapters.inbound.rest.auth import CSRF_HEADER, READS_KEY
 from lekto.adapters.outbound.memory import ManualClock
 from lekto.composition.container import build_memory_container, build_services
 from lekto.core.domain.errors import AuthenticationError
@@ -513,3 +513,38 @@ async def test_me_names_the_shortcut_the_server_offers() -> None:
     async with api.client:
         me = (await api.client.get(f"{PREFIX}/auth/me", headers=auth(user))).json()
     assert me["shortcut_url"] == link
+
+
+# Every POST that only reads (`.idea/architektur.md`, "Keine Klardaten in Adressen"): it stores
+# nothing, so a `read` token may call it. A new one that only reads belongs here.
+READING_POSTS = {
+    "/documents/search",
+    "/documents/{id}/search-places",
+    "/documents/{id}/dry-run",
+    "/identifiers/open/search",
+    "/identifiers/refs",
+    "/rules/{id}/apply/preview",
+    "/templates/preview",
+    "/mail-rules/dry-run",
+    "/search/check",
+}
+
+
+def test_the_posts_that_only_read_are_marked(api: Api) -> None:
+    operations = api.app.openapi()["paths"]
+    marked = {
+        path.removeprefix(PREFIX)
+        for path, methods in operations.items()
+        if methods.get("post", {}).get(READS_KEY)
+    }
+    assert marked == READING_POSTS
+
+
+@pytest.mark.parametrize("path", sorted(READING_POSTS))
+async def test_a_read_token_may_call_a_post_that_only_reads(api: Api, path: str) -> None:
+    admin = await api.admin()
+    _, token = await api.services.auth.create_api_token(admin.id, "reader", TokenScope.READ)
+    url = PREFIX + path.replace("{id}", "00000000-0000-0000-0000-000000000001")
+    answer = await api.client.post(url, json={}, headers=bearer(token))
+    if answer.status_code == 403:
+        assert answer.json()["reason"]["code"] != "read_only_token", path

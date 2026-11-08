@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
+from lekto.adapters.inbound.rest.auth import PROTECTED, READS, CurrentUser
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.mail_rules import (
@@ -72,6 +72,7 @@ async def create_mail_rule(
     ),
     response_model=list[DryRunMailOut],
     responses=problem_responses(401, 403, 404, 422),
+    openapi_extra=READS,
 )
 async def dry_run_mail_rule(
     body: MailRuleDryRun, user: CurrentUser, context: Context
