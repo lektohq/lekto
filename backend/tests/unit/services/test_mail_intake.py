@@ -8,10 +8,11 @@ from typing import Any
 
 import pytest
 
+from lekto.adapters.outbound.memory.mail_records import MemoryMailOriginRepository
 from lekto.adapters.outbound.memory.mail_server import MemoryMailSession
 from lekto.adapters.outbound.regex import RegexPatternMatcher
 from lekto.core.domain.condition_tree import Group
-from lekto.core.domain.documents import Channel
+from lekto.core.domain.documents import Channel, Document
 from lekto.core.domain.errors import PermissionDeniedError, ValidationError
 from lekto.core.domain.events import MailboxFetched
 from lekto.core.domain.identifiers import Identifier, IdentifierKind
@@ -27,7 +28,7 @@ from lekto.core.domain.mail import (
     MailSecurity,
     MailStep,
 )
-from lekto.core.domain.mail_intake import MailOutcome, MailParts, OriginRole, mail_limit
+from lekto.core.domain.mail_intake import MailOrigin, MailOutcome, MailParts, OriginRole, mail_limit
 from lekto.core.domain.mail_rules import (
     MailCondition,
     MailField,
@@ -341,6 +342,66 @@ async def test_fetch_now_brings_the_next_fetch_forward(world: World) -> None:
         document.original_filename for document in await world.documents.list_visible(person.id)
     ]
     assert names == ["Später.eml"]
+
+
+async def test_a_run_interrupted_within_a_mail_leaves_no_document_without_it(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The worker stops after the first file of a mail: the next run takes the mail again, the
+    file it has is the mail's own, and every document names the mail's one record."""
+    _, person, mailbox = await _setup(world)
+    service = world.mail_intake()
+    _deliver(world, mails.rich_mail())
+    receive = PipelineService.receive
+    calls = 0
+
+    async def stops_at_the_second(self: PipelineService, *args: Any, **kwargs: Any) -> Document:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("the worker stopped")
+        return await receive(self, *args, **kwargs)
+
+    monkeypatch.setattr(PipelineService, "receive", stops_at_the_second)
+    with pytest.raises(RuntimeError, match="stopped"):
+        await _fetch(world, service)
+    (first,) = await world.documents.list_visible(person.id)
+    async with world.uow() as uow:
+        assert await uow.mail_records.recent(mailbox.id, limit=5) == []
+        assert await uow.mail_origins.find(first.id) is not None
+
+    monkeypatch.setattr(PipelineService, "receive", receive)
+    world.clock.advance(LEASE)  # the stopped run's job comes again
+    await _fetch(world, service)
+
+    documents = await world.documents.list_visible(person.id)
+    assert len(documents) == 3
+    async with world.uow() as uow:
+        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        found = [await uow.mail_origins.find(document.id) for document in documents]
+    origins = [origin for origin in found if origin is not None]
+    assert (record.outcome, record.documents) == (MailOutcome.TAKEN, 3)
+    assert len(origins) == 3
+    assert {origin.record_id for origin in origins} == {record.id}
+    (cover,) = [o for o in origins if o.letter == 0 and o.role is OriginRole.COVER]
+    assert cover.related == ()  # the PDF the first run made is the mail's, not one Lekto had
+
+
+async def test_a_document_comes_with_its_mail_or_not_at_all(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The origin is written in the transaction that creates the document."""
+    _, person, _ = await _setup(world)
+    service = world.mail_intake()
+    _deliver(world, mails.plain_mail("Strom"))
+
+    async def fails(self: MemoryMailOriginRepository, origin: MailOrigin) -> None:
+        raise RuntimeError("the database went away")
+
+    monkeypatch.setattr(MemoryMailOriginRepository, "add", fails)
+    with pytest.raises(RuntimeError, match="went away"):
+        await _fetch(world, service)
+    assert await world.documents.list_visible(person.id) == []
 
 
 async def test_the_documents_of_a_mail_relate_and_stay_related(world: World) -> None:

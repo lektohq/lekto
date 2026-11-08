@@ -1879,9 +1879,12 @@ brings in and for whom.
   attachments become documents, then the letter itself as its `.eml`; an attachment Lekto has
   already is related instead. Everything goes through `PipelineService.receive` with the
   channel `mail`; the origin of each document (`mail_origins`: mailbox, rule, sender,
-  recipients, subject, dates, the chain of forwarders, importance, keywords, flag) stands
-  beside it (`GET /documents/{id}/origin`), and the documents of one mail relate to each other
-  (evidence `mail`, never dropped). Afterwards the rule's steps run on the mail on the server,
+  recipients, subject, dates, the chain of forwarders, importance, keywords, flag) is stored in
+  the transaction that creates the document and stands beside it
+  (`GET /documents/{id}/origin`), and the documents of one mail relate to each other (evidence
+  `mail`, never dropped). The record of a mail has an id made of mailbox, folder, UIDVALIDITY
+  and UID: a run interrupted within a mail leaves no record, the next takes the mail again, the
+  documents it has already are the mail's own, and the record counts the documents of both. Afterwards the rule's steps run on the mail on the server,
   in order; a step the server refuses is noted at the mailbox. A failure of the server ends
   the run and shows at the mailbox; a mail that cannot be taken is recorded as failed and the
   run goes on.

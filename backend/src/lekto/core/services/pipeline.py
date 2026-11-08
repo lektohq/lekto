@@ -4,7 +4,7 @@ import asyncio
 import copy
 import hashlib
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -115,6 +115,9 @@ from lekto.core.services.rules.running import corrected_fields, person_record, s
 from lekto.core.services.tasks.settling import Delegation, cancel_tasks
 
 log = logging.getLogger(__name__)
+
+type AlsoReceived = Callable[[UnitOfWork, Document], Awaitable[None]]
+"""What a caller of `receive` adds to the transaction that creates the document."""
 
 QUIET = "quiet"
 """Key of a relate job's payload: what it finds raises no events (the run over the stock)."""
@@ -324,6 +327,7 @@ class PipelineService:
         uploaded_by: UserId | None = None,
         imported: ImportedMetadata | None = None,
         via: ViaToken | None = None,
+        also: AlsoReceived | None = None,
     ) -> Document:
         """Store the original, then create the document, its first events and the jobs of the
         nodes after receiving in one transaction.
@@ -343,6 +347,8 @@ class PipelineService:
         system, for an active admin and the channel `migration` only; it is checked against the
         master data now and applied by the classification nodes instead of the language model.
         `via`: the API token the caller acts through, kept with their choice of `space`.
+        `also`: adds to the same transaction (the mail a document came with), so that the
+        document's nodes find it and both are stored or neither.
         """
         started = self._clock.now()
         sha256 = file.sha256
@@ -383,6 +389,7 @@ class PipelineService:
                 chosen=space is not None,
                 received=None if imported is None else imported.created_at,
                 via=via,
+                also=also,
             )
         except ConflictError:
             # The same file arrived twice at the same moment; the other upload won.
@@ -408,9 +415,11 @@ class PipelineService:
         chosen: bool,
         received: datetime | None = None,
         via: ViaToken | None = None,
+        also: AlsoReceived | None = None,
     ) -> Document:
         """`chosen`: the person chose the space (through the API token `via`); rules leave it.
-        `received`: when it came in, if not now (taken over from the source system)."""
+        `received`: when it came in, if not now (taken over from the source system). `also`: as
+        in `receive`."""
         now = self._clock.now()
         key = original_key(sha256)
         async with self._uow() as uow:
@@ -447,6 +456,8 @@ class PipelineService:
                         via=via,
                     )
                 )
+            if also is not None:
+                await also(uow, document)
             await enqueue_nodes(uow, document, document.processing.due(), now)
             await uow.outbox.add(document.pull_events())
             await uow.commit()
