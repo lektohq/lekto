@@ -157,9 +157,27 @@ USER vscode
 # gh cannot write their credentials.
 RUN mkdir -p /home/vscode/.claude /home/vscode/.config/gh
 
-# Claude Code CLI (native installer -> ~/.local/bin/claude). The VS Code
-# extension and the CLI share the login stored in the claude-config volume.
-RUN curl -fsSL https://claude.ai/install.sh | bash
+# Claude Code CLI for the terminal (~/.local/bin/claude); the VS Code extension brings its own
+# binary, and both share the login stored in the claude-config volume. Pinned (O-12): the
+# release's binary, checked against the checksum of its manifest, installs itself; Anthropic's
+# installer script would fetch the newest binary first. Renovate raises the version.
+# renovate: datasource=npm depName=@anthropic-ai/claude-code
+ARG CLAUDE_CODE_VERSION=2.1.312
+RUN set -eu; \
+    case "$(uname -m)" in \
+      aarch64) platform=linux-arm64 ;; \
+      x86_64) platform=linux-x64 ;; \
+      *) echo "no Claude Code for $(uname -m)" >&2; exit 1 ;; \
+    esac; \
+    release="https://downloads.claude.ai/claude-code-releases/${CLAUDE_CODE_VERSION}"; \
+    checksum="$(curl -fsSL "$release/manifest.json" | python3 -c \
+      'import json, sys; print(json.load(sys.stdin)["platforms"][sys.argv[1]]["checksum"])' \
+      "$platform")"; \
+    curl -fsSL "$release/$platform/claude" -o /tmp/claude; \
+    echo "$checksum  /tmp/claude" | sha256sum -c -; \
+    chmod +x /tmp/claude; \
+    /tmp/claude install "${CLAUDE_CODE_VERSION}"; \
+    rm /tmp/claude
 
 ENV CLAUDE_CONFIG_DIR=/home/vscode/.claude
 
