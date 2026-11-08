@@ -277,8 +277,11 @@ divider.
 - **`SearchField`**: every search input, in pickers, lists and pages alike. The header search and
   the document search are `SearchField`s inside a form.
 - **Dates:** `DateInput` (the bits-ui date picker: day, month and year to type, a calendar
-  beside them), in the UI language; its value is the API's day (`2026-10-26`). Not
-  `<input type="date">`, which follows the browser language. `PeriodInput` handles periods.
+  beside them), in the UI language; its value is the API's day (`2026-10-26`). With
+  `granularity="minute"` hour and minute follow, in the UI language too, and its value is the
+  local date and time (`2026-10-26T14:30`): when a document came in (Tobi, 08.11.2026). Not
+  `<input type="date">`, `"datetime-local"` or `"time"`, which follow the browser language;
+  `design-system.test.ts` keeps them out. `PeriodInput` handles periods.
 - **Tags of every kind:** `TagPicker`. One field with the chosen chips and a dashed "+ …" chip. The
   choice opens as a popover on desktop and as a sheet from the bottom on the phone.
 - **A topic as a value** (of a document, in a rule's action, on many documents, of an identifier):
@@ -1164,7 +1167,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     (`pressed`) only where each toggles on its own ("Tabs and switches"); every master data tab
     in the order tabs, search, filter row, list, with no paragraph before the list ("Master data
     tabs"); tooltips only through `ui/tooltip` ("Help and tooltips"); `Progress` only in the
-    selection bars of runs on many and the upload summary ("Choosing many"); the owl (`Mascot`,
+    selection bars of runs on many and the upload summary ("Choosing many"); dates and times
+    through `DateInput`, no native date or time field ("Fields"); the owl (`Mascot`,
     `EmptyNote` with `mascot`) only at its places ("Logo and owl");
   - `src/lib/tips.test.ts`: one box of help at a time, the next without delay; a tooltip opens on
     a focus Tab brought, not on one handed back;

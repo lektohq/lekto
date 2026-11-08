@@ -9,6 +9,7 @@
 		keywordOptions,
 		typedKeyword
 	} from '#lib/mail-traits.ts';
+	import DateInput from '#lib/components/DateInput.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import { namedOptions, withChoice } from '#lib/components/rules/options.ts';
 	import ValueInput from '#lib/components/rules/ValueInput.svelte';
@@ -338,9 +339,17 @@
 						class="w-28 shrink-0"
 					/>
 				{/if}
-				{#if kind === 'number' || kind === 'text' || kind === 'date'}
+				{#if kind === 'date'}
+					<DateInput
+						label={valueLabel}
+						{invalid}
+						value={single}
+						onchange={stepInput}
+						class="min-w-0 flex-1"
+					/>
+				{:else if kind === 'number' || kind === 'text'}
 					<Input
-						type={kind === 'number' ? 'number' : kind === 'date' ? 'date' : 'text'}
+						type={kind === 'number' ? 'number' : 'text'}
 						aria-label={valueLabel}
 						aria-invalid={invalid || undefined}
 						value={typeof condition.value === 'number' ? String(condition.value) : single}
@@ -349,12 +358,11 @@
 				{/if}
 			</div>
 		{:else if condition.field === 'document_date'}
-			<Input
-				type={single === '' || /^\d{4}-\d{2}-\d{2}$/.test(single) ? 'date' : 'text'}
-				aria-label={valueLabel}
-				aria-invalid={invalid || undefined}
+			<DateInput
+				label={valueLabel}
+				{invalid}
 				value={single}
-				oninput={(event) => (condition.value = event.currentTarget.value)}
+				onchange={(next) => (condition.value = next)}
 			/>
 		{:else if condition.field === 'field'}
 			<ValueInput

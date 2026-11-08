@@ -17,6 +17,23 @@ describe('DateInput', () => {
 		expect(screen.getByRole('button')).toBeTruthy();
 	});
 
+	it('adds hour and minute with granularity minute and writes them back', async () => {
+		const onchange = vi.fn();
+		render(DateInput, {
+			value: '2026-10-26T14:30',
+			label: 'Came in',
+			granularity: 'minute',
+			onchange
+		});
+		const field = screen.getByRole('group', { name: 'Came in' });
+		const hour = field.querySelector<HTMLElement>('[data-segment="hour"]');
+		expect(hour).toBeTruthy();
+		expect(field.querySelector('[data-segment="minute"]')?.textContent?.trim()).toBe('30');
+		hour?.focus();
+		await fireEvent.keyDown(hour as HTMLElement, { key: 'ArrowUp' });
+		expect(onchange).toHaveBeenLastCalledWith('2026-10-26T15:30');
+	});
+
 	it('shows the day picked in the calendar after a segment had the focus', async () => {
 		const onchange = vi.fn();
 		render(DateInput, { value: '2026-10-26', label: 'Document date', onchange });

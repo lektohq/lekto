@@ -9,10 +9,12 @@ const sources = import.meta.glob<string>('/src/**/*.svelte', {
 	eager: true
 });
 
-// The component itself, and the text input whose type is a prop.
+// The component itself, and the inputs whose type is a prop: the text input and the date input
+// that stands in for `DateInput` in component tests.
 const ALLOWED_FILES = new Set([
 	'/src/lib/components/ui/choice/choice-box.svelte',
-	'/src/lib/components/ui/input/input.svelte'
+	'/src/lib/components/ui/input/input.svelte',
+	'/src/lib/testing/FakeDateInput.svelte'
 ]);
 const CHOICE_TYPES = new Set(['checkbox', 'radio']);
 
