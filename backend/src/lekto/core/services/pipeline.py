@@ -472,8 +472,13 @@ class PipelineService:
         imported: ImportedMetadata | None,
     ) -> UserId:
         """Who is named as the document's uploader: the caller, or for an admin the user they
-        name."""
+        name. Only an admin brings documents in through the channel `migration`: it tells where
+        a document came from, and rules and statistics go by it."""
         caller = await load_actor(uow, actor)
+        if channel is Channel.MIGRATION and not caller.is_active_admin:
+            raise PermissionDeniedError(
+                because(ReasonCode.ADMINS_ONLY, action=Action.UPLOAD_AS_MIGRATION.value)
+            )
         if imported is not None:
             if channel is not Channel.MIGRATION:
                 raise ValidationError("metadata: only with the channel 'migration'")
