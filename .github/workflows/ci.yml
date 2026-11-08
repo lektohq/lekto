@@ -391,6 +391,9 @@ jobs:
               echo "Tests were skipped: a service or program is missing" >&2
               exit 1
             fi
+            # The pinned Claude Code (Dockerfile, CLAUDE_CODE_VERSION).
+            wanted=$(sed -n "s/^ARG CLAUDE_CODE_VERSION=//p" ../Dockerfile)
+            su vscode -c "/home/vscode/.local/bin/claude --version" | grep -q "^$wanted "
           '
       - name: Show service logs
         if: failure()
