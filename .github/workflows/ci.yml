@@ -392,6 +392,10 @@ jobs:
               exit 1
             fi
           '
+      - name: Check the pinned Claude Code in the dev container
+        run: |
+          wanted=$(sed -n 's/^ARG CLAUDE_CODE_VERSION=//p' Dockerfile)
+          $COMPOSE exec -T dev /home/vscode/.local/bin/claude --version | grep -q "^$wanted "
       - name: Show service logs
         if: failure()
         run: $COMPOSE logs
