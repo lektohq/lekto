@@ -435,6 +435,7 @@ class ReasonCode(StrEnum):
     MAILBOX_PAUSED = "mailbox_paused"
     MAIL_TOO_LARGE = "mail_too_large"
     MAIL_STEP_FAILED = "mail_step_failed"
+    MAIL_STEP_GONE = "mail_step_gone"
     MAIL_RULE_PERSON_GONE = "mail_rule_person_gone"
     MAIL_RULE_SPACE_UNREACHABLE = "mail_rule_space_unreachable"
     MAIL_RULE_TYPE_GONE = "mail_rule_type_gone"
@@ -984,6 +985,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.MAIL_STEP_FAILED: (
         "on the server, '{step:thing}' failed for the mail '{subject}': {detail}"
     ),
+    ReasonCode.MAIL_STEP_GONE: "the mail was no longer in its folder",
     ReasonCode.MAIL_RULE_PERSON_GONE: "the person it takes mails for is deleted or deactivated",
     ReasonCode.MAIL_RULE_SPACE_UNREACHABLE: (
         "its space is deleted, or the person it takes mails for no longer edits it"

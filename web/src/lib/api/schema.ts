@@ -9774,6 +9774,7 @@ export interface components {
 			| 'mailbox_paused'
 			| 'mail_too_large'
 			| 'mail_step_failed'
+			| 'mail_step_gone'
 			| 'mail_rule_person_gone'
 			| 'mail_rule_space_unreachable'
 			| 'mail_rule_type_gone'
