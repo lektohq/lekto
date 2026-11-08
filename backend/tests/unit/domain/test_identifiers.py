@@ -314,7 +314,7 @@ def test_what_a_reader_takes_for_a_number_but_is_none(text: str) -> None:
         ),
         ("Die Vertragsnummer bei Muster ist 12345.", IdentifierKind.CONTRACT_NUMBER, "12345"),
         ("Vertragsnummer: AB1234", IdentifierKind.CONTRACT_NUMBER, "AB1234"),
-        ("Versicherungsschein-Nr. 123/456789-X-01", IdentifierKind.POLICY_NUMBER, "123456789X01"),
+        ("Versicherungsschein-Nr. 123/456789-X-01", IdentifierKind.CONTRACT_NUMBER, "123456789X01"),
         ("Zählernummer: 1ABC0123456789", IdentifierKind.METER_NUMBER, "1ABC0123456789"),
     ],
 )
@@ -342,7 +342,6 @@ def test_a_key_index_tells_what_a_found_key_is_without_comparing_each() -> None:
         (DOMAIN, "neue-stadtwerke.example"),
         (CUSTOMER, "4711"),
         (IdentifierKind.CONTRACT_NUMBER, "4711"),
-        (IdentifierKind.POLICY_NUMBER, "4711"),
         (CUSTOMER, "47110"),
         (IdentifierKind.IBAN, "DE02120300000000202051"),
         (IdentifierKind.CREDITOR_ID, "DE02120300000000202051"),
@@ -516,10 +515,7 @@ def test_every_kind_has_its_type_and_says_whose_it_is() -> None:
     assert all(TYPES[kind].kind is kind for kind in IdentifierKind)
     contracts = {
         IdentifierKind.CONTRACT_NUMBER,
-        IdentifierKind.POLICY_NUMBER,
-        IdentifierKind.MEMBERSHIP_NUMBER,
         IdentifierKind.METER_NUMBER,
-        IdentifierKind.LOAN_NUMBER,
         IdentifierKind.MANDATE_REFERENCE,
         IdentifierKind.LICENSE_PLATE,
     }

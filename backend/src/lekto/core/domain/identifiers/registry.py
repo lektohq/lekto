@@ -21,14 +21,11 @@ from lekto.core.domain.identifiers.iban import Iban
 from lekto.core.domain.identifiers.invoice_number import InvoiceNumber
 from lekto.core.domain.identifiers.letter_date import LetterDate
 from lekto.core.domain.identifiers.license_plate import LicensePlate
-from lekto.core.domain.identifiers.loan_number import LoanNumber
 from lekto.core.domain.identifiers.mandate_reference import MandateReference
-from lekto.core.domain.identifiers.membership_number import MembershipNumber
 from lekto.core.domain.identifiers.meter_number import MeterNumber
 from lekto.core.domain.identifiers.order_number import OrderNumber
 from lekto.core.domain.identifiers.our_reference import OurReference
 from lekto.core.domain.identifiers.personnel_number import PersonnelNumber
-from lekto.core.domain.identifiers.policy_number import PolicyNumber
 from lekto.core.domain.identifiers.social_security_number import SocialSecurityNumber
 from lekto.core.domain.identifiers.tax_id import TaxId
 from lekto.core.domain.identifiers.tax_number import TaxNumber
@@ -53,10 +50,7 @@ TYPES: Mapping[IdentifierKind, IdentifierType] = {
         CommercialRegister(),
         TaxNumber(),
         ContractNumber(),
-        PolicyNumber(),
-        MembershipNumber(),
         MeterNumber(),
-        LoanNumber(),
         MandateReference(),
         LicensePlate(),
         InvoiceNumber(),

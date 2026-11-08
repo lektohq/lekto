@@ -63,20 +63,15 @@ class Identifier:
         return self.source is not IdentifierSource.REJECTED
 
 
-CUSTOMER_KINDS = frozenset(
-    {
-        IdentifierKind.CONTRACT_NUMBER,
-        IdentifierKind.POLICY_NUMBER,
-        IdentifierKind.MEMBERSHIP_NUMBER,
-    }
-)
+CUSTOMER_KINDS = frozenset({IdentifierKind.CONTRACT_NUMBER})
 """What a customer number was until #145 (its labels): a contact's customer number still
-matches a number of these kinds with its value."""
+matches a number of these kinds with its value (the contract number holds the policy and
+membership numbers since #215)."""
 
 
 def related_keys(key: Key) -> frozenset[Key]:
     """`key` and the values it is the same number as across the split of #145: a customer
-    number and the contract, policy and membership numbers of its value (`CUSTOMER_KINDS`)."""
+    number and the contract number of its value (`CUSTOMER_KINDS`)."""
     kind, value = key
     if kind is IdentifierKind.CUSTOMER_NUMBER:
         return frozenset({key, *((other, value) for other in CUSTOMER_KINDS)})
@@ -87,8 +82,8 @@ def related_keys(key: Key) -> frozenset[Key]:
 
 def matches(identifier: Identifier, found: Key) -> bool:
     """Whether a found value is the identifier (`IdentifierType.matches`: a domain also stands
-    for its subdomains); a contact's customer number is also the contract, policy or
-    membership number of its value (`CUSTOMER_KINDS`: the kind was one until #145)."""
+    for its subdomains); a contact's customer number is also the contract number of its value
+    (`CUSTOMER_KINDS`: the kind was one until #145)."""
     kind, value = found
     if identifier.kind is IdentifierKind.CUSTOMER_NUMBER and kind in CUSTOMER_KINDS:
         return value == identifier.value
