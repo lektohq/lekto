@@ -184,6 +184,9 @@ else
 fi
 check "page paths get the same page" test "$(curl -fsS "$ui/documents")" = "$page"
 check "a missing file is 404" test "$(curl -s -o /dev/null -w '%{http_code}' "$ui/missing.js")" = 404
+check "the API documentation loads Swagger UI from the web UI" \
+  bash -c "curl -fsS $(url all)/docs | grep -q 'src=\"/ui/swagger/swagger-ui-bundle.js\"'"
+check "the web UI ships Swagger UI" curl -fsS -o /dev/null "$ui/swagger/swagger-ui-bundle.js"
 check "/ leads to /ui/" \
   test "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$(origin all)/")" = "302 $ui/"
 check "/api/v1/health still answers JSON" \

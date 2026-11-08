@@ -48,6 +48,10 @@ For `pnpm dev`, start the API in `backend/` with `uv run lekto api` and
 The viewer uses the legacy build of `pdfjs-dist` (the normal one needs `Map.getOrInsertComputed`,
 missing in older browsers). The worker is bundled; the plugin `vite-pdfjs.js` serves and emits
 wasm, standard fonts and CMaps under `/ui/pdfjs/`.
+
+The API's documentation (`/api/v1/docs`) is Swagger UI from `swagger-ui-dist`: the plugin
+`vite-swagger.js` emits its script and style under `/ui/swagger/`, so the page loads nothing from
+a CDN; the API serves the page with a Content-Security-Policy of its own.
 The Content-Security-Policy (`vite.config.ts`) allows `worker-src 'self'` and `style-src-attr 'unsafe-inline'` (pdf.js sets style attributes);
 scripts, style elements and images stay `'self'` only: pdf.js draws on a canvas and creates no
 blob or data URLs, previews come from the API, the TOTP QR code is inline SVG (checked in the

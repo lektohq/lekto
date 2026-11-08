@@ -4,3 +4,8 @@ overrides:
   'layerchart>runed': 0.37.1
   '@codemirror/language': 6.12.4
   '@lezer/lr': 1.4.10
+
+# swagger-ui-dist depends on Scarf, whose install script reports the installation to scarf.sh:
+# never run it (08.11.2026).
+allowBuilds:
+  '@scarf/scarf': false
