@@ -17,8 +17,10 @@ from lekto.adapters.inbound.rest.auth import (
     clear_session_cookie,
     client_address,
     flow_cookie_name,
+    known_devices,
     optional_session,
     session_cookie_name,
+    set_device_cookie,
     set_flow_cookie,
     set_session_cookie,
 )
@@ -88,11 +90,18 @@ async def _json_body(request: Request) -> None:
         "`Secure`. With TOTP on, a correct password without `code` (or `recovery_code`) "
         "answers 401 with `second_factor_required: true`. A session this browser had ends. "
         "Failed attempts are counted per account and per address; too many answer 429 with "
-        "`Retry-After`."
+        "`Retry-After`. A browser that signed in here before is a known device of the account "
+        "(cookie `__Secure-lekto_device`, HTTP-only, sent only to this address; `lekto_device` "
+        "without `Secure` cookies): its attempts count apart from the account's, so failures "
+        "from elsewhere do not lock it out."
     ),
     response_model=SessionOut,
     responses={
-        200: {"headers": {"Set-Cookie": {"description": "The session cookie."}}},
+        200: {
+            "headers": {
+                "Set-Cookie": {"description": "The session cookie and the known device's cookie."}
+            }
+        },
         **problem_responses(401, 415, 422, 429),
     },
     dependencies=[Depends(_json_body)],
@@ -110,10 +119,12 @@ async def login(
         code=body.code or None,
         recovery_code=body.recovery_code or None,
         source=client_address(request),
+        devices=known_devices(request, context),
     )
     if previous is not None and previous.session is not None:
         await context.auth.logout(previous.session.id)  # the browser's former session
     set_session_cookie(response, context, signed_in)
+    set_device_cookie(response, context, signed_in)
     return _session_out(signed_in)
 
 

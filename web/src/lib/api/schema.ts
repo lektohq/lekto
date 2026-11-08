@@ -15,7 +15,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * Sign in with username and password
-		 * @description Starts a session: the cookie is HTTP-only, `SameSite=Lax` and, in production, `Secure`. With TOTP on, a correct password without `code` (or `recovery_code`) answers 401 with `second_factor_required: true`. A session this browser had ends. Failed attempts are counted per account and per address; too many answer 429 with `Retry-After`.
+		 * @description Starts a session: the cookie is HTTP-only, `SameSite=Lax` and, in production, `Secure`. With TOTP on, a correct password without `code` (or `recovery_code`) answers 401 with `second_factor_required: true`. A session this browser had ends. Failed attempts are counted per account and per address; too many answer 429 with `Retry-After`. A browser that signed in here before is a known device of the account (cookie `__Secure-lekto_device`, HTTP-only, sent only to this address; `lekto_device` without `Secure` cookies): its attempts count apart from the account's, so failures from elsewhere do not lock it out.
 		 */
 		post: operations['login_api_v1_auth_login_post'];
 		delete?: never;
@@ -12289,7 +12289,7 @@ export interface operations {
 			/** @description Successful Response */
 			200: {
 				headers: {
-					/** @description The session cookie. */
+					/** @description The session cookie and the known device's cookie. */
 					'Set-Cookie'?: unknown;
 					[name: string]: unknown;
 				};

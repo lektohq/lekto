@@ -15,6 +15,7 @@ from lekto.core.domain.identity import (
     ApiToken,
     Credential,
     ExternalIdentity,
+    KnownDevice,
     LoginFailures,
     LoginMethod,
     Session,
@@ -165,6 +166,62 @@ class IdentityRepositoriesContract:
                 for s in (keep, gone, others, old, idle)
             ]
             assert [s.id if s else None for s in remaining] == [keep.id, None, None, None, None]
+
+    # --- known devices --------------------------------------------------------------------------
+
+    async def test_known_devices_are_found_by_token_and_renewed(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        user = await a_user(uow_factory)
+        device, token = KnownDevice.issue(user_id=user.id, now=NOW)
+        async with uow_factory() as uow:
+            await uow.known_devices.add(device)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.known_devices.find_by_token(hash_token(token)) == device
+            assert await uow.known_devices.find_by_token(hash_token("other")) is None
+            await uow.known_devices.renew(device.id, device.expires_at + HOUR)
+            await uow.known_devices.renew(device.id, device.expires_at)  # never back
+            await uow.commit()
+        async with uow_factory() as uow:
+            found = await uow.known_devices.find_by_token(device.token_hash)
+            assert found is not None
+            assert found.expires_at == device.expires_at + HOUR
+            assert found.version == device.version  # renewing is no change
+
+    async def test_known_device_tokens_are_unique(self, uow_factory: UnitOfWorkFactory) -> None:
+        user = await a_user(uow_factory)
+        device, _ = KnownDevice.issue(user_id=user.id, now=NOW)
+        twin, _ = KnownDevice.issue(user_id=user.id, now=NOW)
+        twin.token_hash = device.token_hash
+        with pytest.raises(ConflictError):
+            async with uow_factory() as uow:
+                await uow.known_devices.add(device)
+                await uow.known_devices.add(twin)
+                await uow.commit()
+
+    async def test_known_devices_are_removed_per_user_and_purged(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        user, other = await a_user(uow_factory), await a_user(uow_factory)
+        first, _ = KnownDevice.issue(user_id=user.id, now=NOW)
+        second, _ = KnownDevice.issue(user_id=user.id, now=NOW)
+        kept, _ = KnownDevice.issue(user_id=other.id, now=NOW)
+        expired, _ = KnownDevice.issue(user_id=other.id, now=NOW - 400 * 24 * HOUR)
+        async with uow_factory() as uow:
+            for device in (first, second, kept, expired):
+                await uow.known_devices.add(device)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.known_devices.remove_for_user(user.id) == 2
+            assert await uow.known_devices.purge(now=NOW) == 1
+            await uow.commit()
+        async with uow_factory() as uow:
+            remaining = [
+                await uow.known_devices.find_by_token(d.token_hash)
+                for d in (first, second, kept, expired)
+            ]
+            assert [d.id if d else None for d in remaining] == [None, None, kept.id, None]
 
     # --- API tokens -----------------------------------------------------------------------------
 

@@ -29,6 +29,7 @@ from lekto.adapters.outbound.memory.database import (
     DOCUMENTS,
     EXTERNAL_IDENTITIES,
     FIELDS,
+    KNOWN_DEVICES,
     LENSES,
     LOGIN_FAILURES,
     MAIL_ORIGINS,
@@ -57,6 +58,7 @@ from lekto.adapters.outbound.memory.identity import (
     MemoryApiTokenRepository,
     MemoryCredentialRepository,
     MemoryExternalIdentityRepository,
+    MemoryKnownDeviceRepository,
     MemoryLoginFailureRepository,
     MemorySessionRepository,
 )
@@ -188,6 +190,7 @@ class MemoryUnitOfWork:
         self.credentials = MemoryCredentialRepository(self, CREDENTIALS)
         self.sessions = MemorySessionRepository(self, SESSIONS)
         self.api_tokens = MemoryApiTokenRepository(self, API_TOKENS)
+        self.known_devices = MemoryKnownDeviceRepository(self, KNOWN_DEVICES)
         self.push_devices = MemoryPushDeviceRepository(self, PUSH_DEVICES)
         self.push_preferences = MemoryPushPreferencesRepository(self, PUSH_PREFERENCES)
         self.external_identities = MemoryExternalIdentityRepository(self, EXTERNAL_IDENTITIES)

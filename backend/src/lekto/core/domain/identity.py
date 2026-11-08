@@ -9,7 +9,9 @@
   hashes are stored. They are high-entropy, so a fast hash suffices.
 - A user can be linked to accounts at an external identity provider (OIDC) by issuer and
   subject, never by e-mail address.
-- Failed sign-ins are counted per account and per source to slow down guessing.
+- Failed sign-ins are counted per account and per source to slow down guessing. A browser
+  that signed in with the password before (a known device) counts under itself instead of the
+  account, so guesses from elsewhere that block the account do not lock its owner out.
 """
 
 import base64
@@ -28,6 +30,7 @@ from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import (
     ApiTokenId,
     ExternalIdentityId,
+    KnownDeviceId,
     SessionId,
     UserId,
     new_id,
@@ -378,7 +381,10 @@ class ThrottleRule:
 
 
 # Per account (also for unknown usernames): back off from the sixth failure on, doubling from
-# one second to 15 minutes. No hard lock, so nobody can lock others out on purpose.
+# one second to 15 minutes. A blocked account refuses the right password too, so that neither
+# passwords nor TOTP codes can be guessed through it; whoever knows a username can keep it
+# blocked, which is why the account's known devices count apart (`device_key`), each by the
+# same rule.
 ACCOUNT_THROTTLE = ThrottleRule(
     free=5, window=timedelta(days=1), base=timedelta(seconds=1), limit=timedelta(minutes=15)
 )
@@ -390,6 +396,10 @@ SOURCE_THROTTLE = ThrottleRule(
 
 def account_key(username: str) -> str:
     return "account:" + name_key(username)
+
+
+def device_key(device: KnownDeviceId) -> str:
+    return f"device:{device}"
 
 
 def source_key(address: str) -> str:
@@ -448,6 +458,47 @@ class LoginFailures:
         self.failures = max(0, self.failures - 1)
         if rule.block(self.failures) is None:
             self.blocked_until = None
+
+
+KNOWN_DEVICE_LIFETIME = timedelta(days=365)
+"""How long a known device stays known after its last sign-in with the password."""
+KNOWN_DEVICES_PER_BROWSER = 5
+"""Accounts a browser stays known for at most (a household's browser); the oldest go first."""
+
+
+@dataclass(kw_only=True)
+class KnownDevice:
+    """A browser that signed in as the user with the password (OWASP's device cookies): its
+    sign-ins as that user count under the device rather than the account. Its token, which only
+    the browser keeps, is a random 256-bit value; only the hash is stored. Known until
+    `expires_at`; every sign-in through it moves that a lifetime ahead."""
+
+    id: KnownDeviceId
+    user_id: UserId
+    token_hash: str
+    created_at: datetime
+    expires_at: datetime
+    version: int = 1
+
+    def __post_init__(self) -> None:
+        self.created_at = require_utc(self.created_at, "created_at")
+        self.expires_at = require_utc(self.expires_at, "expires_at")
+
+    @classmethod
+    def issue(cls, *, user_id: UserId, now: datetime) -> tuple[Self, str]:
+        """A new known device and its token."""
+        token = new_token()
+        device = cls(
+            id=KnownDeviceId(new_id()),
+            user_id=user_id,
+            token_hash=hash_token(token),
+            created_at=now,
+            expires_at=now + KNOWN_DEVICE_LIFETIME,
+        )
+        return device, token
+
+    def is_valid(self, now: datetime) -> bool:
+        return now < self.expires_at
 
 
 def failure_id(key: str) -> uuid.UUID:

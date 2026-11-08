@@ -1,11 +1,12 @@
-"""Identity: stored credentials, sessions, API tokens and links to identity providers, all
-reached through the unit of work; and the cryptography they need.
+"""Identity: stored credentials, sessions, API tokens, known devices and links to identity
+providers, all reached through the unit of work; and the cryptography they need.
 
 Common rules for the repositories (as in `repository.py`): reads return copies; `update`
-checks the version; uniqueness (session and token hashes; issuer and subject of an external
-identity) raises ConflictError at the latest on commit. `touch` only moves a usage timestamp
-forward and does not count as a change: it neither checks nor increments the version, so
-concurrent requests never conflict on it. `remove` of something missing is a no-op.
+checks the version; uniqueness (session, token and device hashes; issuer and subject of an
+external identity) raises ConflictError at the latest on commit. `touch` and `renew` only move
+a timestamp forward and do not count as a change: they neither check nor increment the
+version, so concurrent requests never conflict on them. `remove` of something missing is a
+no-op.
 """
 
 from datetime import datetime, timedelta
@@ -15,12 +16,19 @@ from lekto.core.domain.identity import (
     ApiToken,
     Credential,
     ExternalIdentity,
+    KnownDevice,
     LoginFailures,
     OidcIdentity,
     Session,
     ThrottleRule,
 )
-from lekto.core.domain.ids import ApiTokenId, ExternalIdentityId, SessionId, UserId
+from lekto.core.domain.ids import (
+    ApiTokenId,
+    ExternalIdentityId,
+    KnownDeviceId,
+    SessionId,
+    UserId,
+)
 
 
 class CredentialRepository(Protocol):
@@ -72,6 +80,22 @@ class ApiTokenRepository(Protocol):
     async def remove(self, id: ApiTokenId) -> None: ...
 
     async def remove_for_user(self, user: UserId) -> int: ...
+
+
+class KnownDeviceRepository(Protocol):
+    async def add(self, device: KnownDevice) -> None: ...
+
+    async def find_by_token(self, token_hash: str) -> KnownDevice | None: ...
+
+    async def renew(self, id: KnownDeviceId, expires_at: datetime) -> None:
+        """Move the device's `expires_at` forward (never back)."""
+        ...
+
+    async def remove_for_user(self, user: UserId) -> int: ...
+
+    async def purge(self, *, now: datetime) -> int:
+        """Remove devices that expired (`expires_at <= now`); returns how many."""
+        ...
 
 
 class ExternalIdentityRepository(Protocol):

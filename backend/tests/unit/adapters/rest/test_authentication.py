@@ -152,6 +152,26 @@ async def test_too_many_failures_answer_429(api: Api) -> None:
     assert response.headers["retry-after"] == "1"
 
 
+async def test_a_known_browser_signs_in_while_guesses_block_the_account(api: Api) -> None:
+    await api.user("alice")
+    login = f"{PREFIX}/auth/login"
+    first = await api.client.post(login, json={"username": "alice", "password": PASSWORD})
+    [cookie] = [c for c in first.headers.get_list("set-cookie") if "lekto_device" in c]
+    assert cookie.startswith("__Secure-lekto_device=")
+    for attribute in ("HttpOnly", "Secure", "SameSite=strict", f"Path={login}", "Max-Age=31536000"):
+        assert attribute.lower() in cookie.lower(), attribute
+    device = cookie.split(";")[0].split("=", 1)[1]
+    async with api.new_client() as elsewhere:
+        for _ in range(6):
+            await elsewhere.post(login, json={"username": "alice", "password": "wrong password!"})
+        blocked = await elsewhere.post(login, json={"username": "alice", "password": PASSWORD})
+        assert blocked.status_code == 429
+    known = await api.client.post(login, json={"username": "alice", "password": PASSWORD})
+    assert known.status_code == 200, known.text
+    renewed = [c for c in known.headers.get_list("set-cookie") if "lekto_device" in c]
+    assert [c.split(";")[0] for c in renewed] == [f"__Secure-lekto_device={device}"]
+
+
 async def test_changes_with_a_session_need_the_csrf_token(api: Api) -> None:
     user = await api.user("alice")
     async with api.sign_in(user) as session:
