@@ -42,6 +42,7 @@ from lekto.core.domain.mail import (
     Mailbox,
     MailboxStatus,
     MailLogin,
+    MailStep,
     StepOutcome,
     password_context,
     step_flags,
@@ -292,6 +293,7 @@ class MailIntakeService:
         found = await session.search(folder, search)
         count.keywords.update(found.keywords)
         count.own_keywords = found.own_keywords and count.own_keywords is not False
+        await self._steps_due(session, mailbox, folder, found.uidvalidity, count)
         async with self._uow() as uow:
             known = await uow.mail_records.known_uids(mailbox.id, folder, found.uidvalidity)
         new = [uid for uid in found.uids if uid not in known]
@@ -379,11 +381,14 @@ class MailIntakeService:
             await self._settle(replace(decided, outcome=MailOutcome.FAILED, reason=error.reason))
             return 0
         documents = await self._documents(record)
-        outcome = MailOutcome.TAKEN if documents else MailOutcome.NOTHING
-        steps = await self._after(
-            session, record.folder, record.uid, decision, record.subject, count
+        taken = replace(
+            decided,
+            outcome=MailOutcome.TAKEN if documents else MailOutcome.NOTHING,
+            documents=documents,
+            steps_due=decision.after,
         )
-        await self._settle(replace(decided, outcome=outcome, documents=documents, steps=steps))
+        await self._settle(taken)
+        await self._run_steps(session, taken, count)
         return made
 
     async def _due(
@@ -515,11 +520,10 @@ class MailIntakeService:
             rule_id=decision.rule_id,
             documents=documents,
             decided_at=record.fetched_at,
+            steps_due=decision.after,
         )
         await self._keep(record)
-        steps = await self._after(session, folder, info.uid, decision, record.subject, count)
-        if steps:
-            await self._settle(replace(record, steps=steps))
+        await self._run_steps(session, record, count)
         return made
 
     async def _decide(
@@ -702,20 +706,63 @@ class MailIntakeService:
         async with self._uow() as uow:
             return len(await uow.mail_origins.of_record(record.id))
 
+    async def _run_steps(self, session: MailSession, record: MailRecord, count: _Count) -> None:
+        """Run the record's steps due on the server and store how each went."""
+        if not record.steps_due:
+            return
+        steps = await self._after(
+            session, record.folder, record.uid, record.steps_due, record.subject, count
+        )
+        await self._settle(replace(record, steps=steps, steps_due=()))
+
+    async def _steps_due(
+        self,
+        session: MailSession,
+        mailbox: Mailbox,
+        folder: str,
+        uidvalidity: int,
+        count: _Count,
+    ) -> None:
+        """Run the steps on the server that an interrupted fetch left due in `folder`. A mail
+        no longer there (or behind a new UIDVALIDITY) went with its last step if that moved it
+        or put it in the trash: all its steps count as done (Tobi, 08.11.2026; the last ran
+        before the fetch stopped, the others run before it). Else none of them could run."""
+        async with self._uow() as uow:
+            due = [r for r in await uow.mail_records.steps_due(mailbox.id) if r.folder == folder]
+        current = [record.uid for record in due if record.uidvalidity == uidvalidity]
+        present = {info.uid for info in await session.info(folder, current)} if current else set()
+        for record in due:
+            if record.uidvalidity == uidvalidity and record.uid in present:
+                await self._run_steps(session, record, count)
+                continue
+            last = record.steps_due[-1]
+            if last.action in (MailAction.MOVE, MailAction.TRASH):
+                steps = tuple(StepOutcome(step) for step in record.steps_due)
+            else:
+                gone = because(ReasonCode.MAIL_STEP_GONE)
+                steps = tuple(StepOutcome(step, gone) for step in record.steps_due)
+                count.step_failed = because(
+                    ReasonCode.MAIL_STEP_FAILED,
+                    step=f"mail_step:{record.steps_due[0].action.value}",
+                    subject=record.subject,
+                    detail=gone.text,
+                )
+            await self._settle(replace(record, steps=steps, steps_due=()))
+
     async def _after(
         self,
         session: MailSession,
         folder: str,
         uid: int,
-        decision: MailDecision,
+        steps: tuple[MailStep, ...],
         subject: str,
         count: _Count,
     ) -> tuple[StepOutcome, ...]:
-        """The decision's steps on the mail on the server, in order, each with why the server
-        refused it. A refused step (a keyword where it stores none) is noted at the mailbox, the
-        next ones go on; the mail stays taken."""
+        """The steps on the mail on the server, in order, each with why the server refused it.
+        A refused step (a keyword where it stores none) is noted at the mailbox, the next ones
+        go on; the mail stays taken."""
         done: list[StepOutcome] = []
-        for step in decision.after:
+        for step in steps:
             try:
                 match step.action:
                     case MailAction.MOVE:
