@@ -2,7 +2,13 @@ import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'svelte-sonner';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { type IdentifierRow, kindLabel, row } from '#lib/identifiers.ts';
+import {
+	IDENTIFIER_KINDS,
+	type IdentifierKind,
+	type IdentifierRow,
+	kindLabel,
+	row
+} from '#lib/identifiers.ts';
 import type { Tag } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
@@ -33,8 +39,18 @@ const WORK = {
 
 afterEach(() => phone.override(null));
 
+/** The editor with IBANs among its kinds, as a profile's offers them (a contact's no longer
+ * does since #215): the lines of an IBAN show how a value is printed. */
+const KINDS: readonly IdentifierKind[] = ['iban', ...IDENTIFIER_KINDS];
+
 function editor(rows: IdentifierRow[], extra: Record<string, unknown> = {}) {
-	const props = $state({ rows, topics: [WORK], opened: null as number | null, ...extra });
+	const props = $state({
+		rows,
+		topics: [WORK],
+		opened: null as number | null,
+		kinds: KINDS,
+		...extra
+	});
 	render(IdentifiersEditor, props);
 	return props;
 }

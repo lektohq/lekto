@@ -27,6 +27,8 @@ _LABEL = re.compile(
 class PersonnelNumber(IdentifierType):
     kind = IdentifierKind.PERSONNEL_NUMBER
     for_contacts = True
+    at_contacts = True
+    learned = True
     names_user = True
 
     def normalise(self, raw: str) -> str:

@@ -700,7 +700,7 @@ class UnitOfWorkContract:
     async def test_contact_identifiers(self, uow_factory: UnitOfWorkFactory) -> None:
         """Identifiers keep their source, change with the contact and go with it; kind and
         value are unique across contacts, also when rejected."""
-        iban = Identifier.parse(IdentifierKind.IBAN, "DE89 3704 0044 0532 0130 00")
+        iban = Identifier.parse(IdentifierKind.CONTRACT_NUMBER, "V-778899")  # was an IBAN
         domain = Identifier.parse(IdentifierKind.EMAIL_DOMAIN, "stadtwerke.example")
         contact = Contact.create(name="Stadtwerke", now=NOW, identifiers=[iban])
         contact.set_learned([domain])
@@ -757,11 +757,8 @@ class UnitOfWorkContract:
         personnel = Identifier(
             IdentifierKind.PERSONNEL_NUMBER, "12345", learned, None, anna.id, spaces
         )
-        iban = Identifier(
-            IdentifierKind.IBAN,
-            "DE89370400440532013000",
-            IdentifierSource.LEARNED,
-            learned_in=spaces,
+        iban = Identifier(  # a contract number that names nobody (an IBAN until #215)
+            IdentifierKind.CONTRACT_NUMBER, "V778899", IdentifierSource.LEARNED, learned_in=spaces
         )
         bobs = Identifier(IdentifierKind.CUSTOMER_NUMBER, "K0815", user_id=bob.id)
         contact = Contact.create(name="Employer", now=NOW, identifiers=[contract, bobs])
@@ -773,8 +770,8 @@ class UnitOfWorkContract:
             assert (await uow.contacts.get(contact.id)).identifiers == [
                 bobs,
                 contract,
-                iban,
                 personnel,
+                iban,
             ]
             await uow.users.remove(anna.id)
             await uow.commit()

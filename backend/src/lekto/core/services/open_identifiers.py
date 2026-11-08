@@ -19,7 +19,6 @@ from lekto.core.domain.errors import (
     ValidationError,
 )
 from lekto.core.domain.identifiers import (
-    CONTACT_KINDS,
     Identifier,
     IdentifierKind,
     IdentifierSource,
@@ -27,6 +26,7 @@ from lekto.core.domain.identifiers import (
 )
 from lekto.core.domain.ids import ContactId, UserId
 from lekto.core.domain.open_identifiers import (
+    OPEN_KINDS,
     OpenIdentifier,
     OpenSource,
     Recommendation,
@@ -55,9 +55,8 @@ class OpenAction(StrEnum):
 @dataclass(frozen=True, kw_only=True)
 class OpenDecision:
     """What a person decides about the open identifier of `kind` and `value`. `contact`: where;
-    without one, the learned one's contact, or the one contact an unknown one's documents
-    name (confirming one whose documents name several needs it; rejecting it notes it at the
-    one with most documents)."""
+    without one, the learned one's contact or the one a suggestion names (a learned one moves
+    to another contact with it)."""
 
     kind: IdentifierKind
     value: str
@@ -298,7 +297,7 @@ async def _open(
     """The open identifiers, the names of the contacts and the persons (`User.label`, as
     everywhere), and the identifiers training learned by key (each at one contact)."""
     contacts = await uow.contacts.list_all()
-    sightings = await uow.document_facts.sightings(CONTACT_KINDS)
+    sightings = await uow.document_facts.sightings(OPEN_KINDS)
     personal = await person_identifiers(uow)
     persons = await matching_persons(uow)
     declined = {

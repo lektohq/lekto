@@ -19,7 +19,7 @@ from lekto.core.domain.identifiers.identifier import (
     related_keys,
 )
 from lekto.core.domain.identifiers.reading import of_person
-from lekto.core.domain.identifiers.registry import CONTACT_KINDS, NAMING_KINDS
+from lekto.core.domain.identifiers.registry import LEARNED_KINDS, NAMING_KINDS
 from lekto.core.domain.ids import ContactId, SpaceId, TagId, UserId
 
 LEARN_FROM = 2
@@ -56,8 +56,9 @@ def mine_identifiers(
     in a social security number). A learned value points to a topic if all its documents carry
     that one; otherwise to none. It notes the spaces its documents lie in (`learned_in`); a
     customer or personnel number belongs to a user if every one of its documents is surely that
-    user's alone (`Confirmed.whose`). Only the kinds of contacts are learned (`CONTACT_KINDS`):
-    a person's numbers never become a contact's. A value that belongs to someone other than a
+    user's alone (`Confirmed.whose`). Only the kinds training learns are learned
+    (`LEARNED_KINDS`: customer, contract, personnel number): a person's numbers never become a
+    contact's. A value that belongs to someone other than a
     document's contact does not count in it (`Confirmed.foreign`); one a person holds in any of
     them is never learned (`Confirmed.personal`)."""
     holders: dict[tuple[IdentifierKind, str], list[Confirmed]] = defaultdict(list)
@@ -72,7 +73,7 @@ def mine_identifiers(
     for (kind, value), held in sorted(holders.items()):
         owners = {document.contact for document in held}
         if (
-            kind not in CONTACT_KINDS
+            kind not in LEARNED_KINDS
             or (kind, value) in skip
             or of_person((kind, value), persons)
             or len(held) < LEARN_FROM

@@ -16,8 +16,8 @@ from tests.unit.adapters.rest.support import Api
 
 URL = f"{PREFIX}/identifiers/open"
 CUSTOMER = (IdentifierKind.CUSTOMER_NUMBER, "20047718")
-VAT = (IdentifierKind.VAT_ID, "DE312456789")
-TEXT = "Kundennummer 20047718, USt-IdNr. DE312456789"
+SITE = (IdentifierKind.EMAIL_DOMAIN, "stadtwerke-nord.example")
+TEXT = "Kundennummer 20047718, service@stadtwerke-nord.example"
 
 
 async def seeded(api: Api, owner: User | None = None) -> Contact:
@@ -43,7 +43,7 @@ async def seeded(api: Api, owner: User | None = None) -> Contact:
                         written=value,
                         position=TEXT.index(value),
                     )
-                    for kind, value in (CUSTOMER, VAT)
+                    for kind, value in (CUSTOMER, SITE)
                 ],
             )
             await api.container.object_store.put(
@@ -91,23 +91,23 @@ async def test_admins_see_the_open_identifiers(api: Api) -> None:
     ]
     assert (page["total"], page["counts"], page["kinds"]) == (
         1,
-        {"learned": 1, "unknown": 1, "suggested": 0},
+        {"learned": 1, "suggested": 1},
         {"customer_number": 1},
     )
-    # The VAT ID has no holder yet (read before it had one): no recommendation.
-    assert (page["recommended"], page["to_confirm"]) == (1, 1)
+    # Over every source: the learned one and the domain suggested (it fits the contact's name).
+    assert (page["recommended"], page["to_confirm"]) == (2, 2)
     summary = await api.client.get(f"{URL}/summary", headers=auth(admin))
-    assert summary.json() == {"learned": 1, "unknown": 1, "suggested": 0}
+    assert summary.json() == {"learned": 1, "suggested": 1}
 
-    vat = api.container.refs.seal(VAT[1], context="vat_id")
-    detail = await api.client.get(f"{URL}/vat_id/{vat}", headers=auth(admin))
+    site = api.container.refs.seal(SITE[1], context="email_domain")
+    detail = await api.client.get(f"{URL}/email_domain/{site}", headers=auth(admin))
     assert detail.status_code == 200
-    assert detail.json()["identifier"]["ref"] == vat
+    assert detail.json()["identifier"]["ref"] == site
     (place, _) = detail.json()["places"]
     assert place["role"] == "contact"
     assert place["excerpt"] == {
-        "before": "Kundennummer 20047718, USt-IdNr. ",
-        "match": "DE312456789",
+        "before": "Kundennummer 20047718, service@",
+        "match": "stadtwerke-nord.example",
         "after": "",
     }
     # Where the pages show it, the fact's own place marked.
@@ -115,11 +115,12 @@ async def test_admins_see_the_open_identifiers(api: Api) -> None:
     assert occurrence["own"] is True
     (location,) = occurrence["locations"]
     assert location["page"] == 1
-    assert round(location["boxes"][0]["x"] * 80) == TEXT.index("DE312456789")
-    gone = api.container.refs.seal("DE1", context="vat_id")
-    missing = await api.client.get(f"{URL}/vat_id/{gone}", headers=auth(admin))
+    # The box is the word it stands in, the address.
+    assert round(location["boxes"][0]["x"] * 80) == TEXT.index("service@")
+    gone = api.container.refs.seal("nowhere.example", context="email_domain")
+    missing = await api.client.get(f"{URL}/email_domain/{gone}", headers=auth(admin))
     assert (missing.status_code, missing.json()["reason"]["code"]) == (404, "identifier_not_open")
-    for wrong in (f"customer_number/{vat}", "vat_id/DE312456789"):
+    for wrong in (f"customer_number/{site}", "email_domain/stadtwerke-nord.example"):
         refused = await api.client.get(f"{URL}/{wrong}", headers=auth(admin))
         assert (refused.status_code, refused.json()["reason"]["code"]) == (422, "ref_unknown")
 
@@ -195,14 +196,19 @@ async def test_the_recommended_are_confirmed_at_once(api: Api) -> None:
     contact = await seeded(api)
     admin = await api.admin()
     only = await api.client.get(URL, params={"recommended": True}, headers=auth(admin))
-    assert [item["value"] for item in only.json()["items"]] == [CUSTOMER[1]]
+    assert [item["value"] for item in only.json()["items"]] == [CUSTOMER[1], SITE[1]]
     done = await api.client.post(f"{URL}/recommended", headers=auth(admin))
     assert done.status_code == 200, done.text
     assert done.json() == [
-        {"kind": "customer_number", "value": CUSTOMER[1], "done": True, "reason": None}
+        {"kind": "customer_number", "value": CUSTOMER[1], "done": True, "reason": None},
+        {"kind": "email_domain", "value": SITE[1], "done": True, "reason": None},
     ]
     after = (await api.client.get(URL, headers=auth(admin))).json()
-    assert (after["counts"]["learned"], after["to_confirm"]) == (0, 0)
+    assert (after["counts"]["learned"], after["counts"]["suggested"], after["to_confirm"]) == (
+        0,
+        0,
+        0,
+    )
     async with api.container.unit_of_work() as uow:
         stored = await uow.contacts.get(contact.id)
     assert any(item.value == CUSTOMER[1] and item.source.value == "manual"

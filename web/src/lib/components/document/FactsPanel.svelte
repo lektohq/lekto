@@ -327,6 +327,9 @@
 				{#if stateLabel(fact.state)}
 					<span class="text-xs text-muted-foreground">{stateLabel(fact.state)}</span>
 				{/if}
+				{#if fact.holder}
+					<span class="text-xs text-muted-foreground">{holderLabel(fact.holder)}</span>
+				{/if}
 			</button>
 			{#if facts.editable}
 				<div class="pr-1.5">{@render decideButton(id, fact)}</div>

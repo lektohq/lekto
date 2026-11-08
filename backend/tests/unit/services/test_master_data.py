@@ -121,21 +121,21 @@ async def test_contact_aliases_and_type_descriptions(world: World) -> None:
     ).description is None
 
 
-IBAN = Identifier.parse(IdentifierKind.IBAN, "DE89 3704 0044 0532 0130 00")
+NUMBER = Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "K-4711")
 DOMAIN = Identifier.parse(IdentifierKind.EMAIL_DOMAIN, "stadtwerke.example")
 
 
 async def test_contact_identifiers(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
-    utility = await service.create_contact(admin.id, "Stadtwerke", identifiers=[IBAN])
+    utility = await service.create_contact(admin.id, "Stadtwerke", identifiers=[NUMBER])
     other = await service.create_contact(admin.id, "Bank")
-    assert utility.identifiers == [IBAN]
+    assert utility.identifiers == [NUMBER]
     # A value another contact entered by hand is a conflict.
     with pytest.raises(ConflictError):
-        await service.change_contact(admin.id, other.id, identifiers=[IBAN])
+        await service.change_contact(admin.id, other.id, identifiers=[NUMBER])
     with pytest.raises(ConflictError):
-        await service.create_contact(admin.id, "Other", identifiers=[IBAN])
+        await service.create_contact(admin.id, "Other", identifiers=[NUMBER])
     # Rejected and entered ones are replaced on their own.
     changed = await service.change_contact(admin.id, utility.id, rejected_identifiers=[DOMAIN])
     assert [item.source for item in changed.identifiers] == [MANUAL, REJECTED]
@@ -176,21 +176,21 @@ async def test_training_replaces_the_learned_identifiers(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
     utility = await service.create_contact(admin.id, "Stadtwerke")
-    bank = await service.create_contact(admin.id, "Bank", identifiers=[IBAN])
+    bank = await service.create_contact(admin.id, "Bank", identifiers=[NUMBER])
     learned = [Identifier(DOMAIN.kind, DOMAIN.value, LEARNED)]
-    taken = [Identifier(IBAN.kind, IBAN.value, LEARNED)]
+    taken = [Identifier(NUMBER.kind, NUMBER.value, LEARNED)]
     async with world.uow() as uow:
         assert await replace_learned_identifiers(uow, {utility.id: [*learned, *taken]}) == 1
         await uow.commit()
     async with world.uow() as uow:
         assert (await uow.contacts.get(utility.id)).identifiers == learned
-        assert (await uow.contacts.get(bank.id)).identifiers == [IBAN]
+        assert (await uow.contacts.get(bank.id)).identifiers == [NUMBER]
         # The value moves to another contact in one go.
         assert await replace_learned_identifiers(uow, {bank.id: learned}) == 1
         await uow.commit()
     async with world.uow() as uow:
         assert (await uow.contacts.get(utility.id)).identifiers == []
-        assert (await uow.contacts.get(bank.id)).identifiers == [IBAN, *learned]
+        assert (await uow.contacts.get(bank.id)).identifiers == [NUMBER, *learned]
 
 
 async def test_required_fields_and_title_patterns(world: World) -> None:

@@ -10,7 +10,7 @@ document names: for that person's profile (a kind a person has), or for that con
 landlord's IBAN in the bookings of a bank statement, a parent company's VAT ID)."""
 
 import re
-from collections import Counter, defaultdict
+from collections import defaultdict
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date
@@ -23,7 +23,7 @@ from lekto.core.domain.document_facts import (
     FactRole,
     HolderKind,
 )
-from lekto.core.domain.holders import Parties, foreign, held_by
+from lekto.core.domain.holders import Parties, Party, domain_owner, foreign, held_by
 from lekto.core.domain.identifiers import (
     CONTACT_KINDS,
     FREE_MAIL,
@@ -46,8 +46,10 @@ REACH = 120
 
 class OpenSource(StrEnum):
     LEARNED = "learned"
-    UNKNOWN = "unknown"
-    SUGGESTED = "suggested"  # a number with a holder a document names as another's
+    # A domain that fits its contact's name, an IBAN for a person's profile. (Unknown ones, of a
+    # contact's kind at no contact, were open too until #215: one-offs a decision changed
+    # nothing about.)
+    SUGGESTED = "suggested"
 
 
 class Recommendation(StrEnum):
@@ -112,6 +114,11 @@ class OpenIdentifier:
         return self.seen[0].dated if self.seen else None
 
 
+OPEN_KINDS = CONTACT_KINDS | (HOLDER_KINDS & PERSON_KINDS)
+"""The kinds whose sightings the open identifiers look at: a contact's (`CONTACT_KINDS`) and,
+for a person's profile, the IBAN (no contact's identifier since #215)."""
+
+
 def open_identifiers(
     contacts: Iterable[Contact],
     sightings: Iterable[Sighting],
@@ -122,9 +129,11 @@ def open_identifiers(
     """The open identifiers among `contacts` and the facts `sightings` in confirmed documents
     (`personal`: the persons' values), the most documents first, then the newest. With
     `persons`, an IBAN a document's recipient holds is suggested for one of them (named, or
-    the user whose personal space the document lies in; not one they `declined`), and an IBAN
-    or a creditor ID a document names as another contact's for that contact."""
+    the user whose personal space the document lies in; not one they `declined`); an e-mail
+    domain whose name fits the contact of its documents for that contact, while it has none
+    (`_domains`)."""
     contacts = list(contacts)
+    sightings = [item for item in sightings if item.fact.kind in OPEN_KINDS]
     seen = [item for item in sightings if item.fact.kind in CONTACT_KINDS]
     stated = KeyIndex((item, item) for contact in contacts for item in contact.identifiers)
     learned = KeyIndex(
@@ -148,27 +157,14 @@ def open_identifiers(
             if identifier.source is IdentifierSource.LEARNED:
                 seen_at = shown.get((contact.id, identifier.key), [])
                 found.append(_open(identifier.key, OpenSource.LEARNED, (contact.id,), seen_at))
-    names = {contact.id: contact.names() for contact in contacts}
-    for key, items in by_key.items():
-        kind, value = key
-        if (
-            stated.matching(key)
-            or of_person(key, personal)
-            or (kind is IdentifierKind.EMAIL_DOMAIN and value in FREE_MAIL)
-            or any(_held(item, HolderKind.RECIPIENT) for item in items)
-        ):
-            continue
-        # An IBAN or a creditor ID counts only where it is its contact's (`domain.holders`):
-        # not a payee's on a bank statement.
-        items = [item for item in items if not foreign(item.fact.holder, names[item.contact])]
-        if not items:
-            continue
-        counts = Counter(item.contact for item in items)
-        owners = tuple(sorted(counts, key=lambda contact: (-counts[contact], str(contact))))
-        found.append(_open(key, OpenSource.UNKNOWN, owners, items))
+    found += _domains(contacts, by_key, stated, personal)
+    held: dict[Key, list[Sighting]] = defaultdict(list)
+    for item in sightings:
+        held[item.fact.key].append(item)
     found += _suggested(
-        contacts, by_key, {item.key for item in found}, stated, personal, persons, declined or {}
+        held, {item.key for item in found}, stated, personal, persons, declined or {}
     )
+    names = {contact.id: contact.names() for contact in contacts}
     labels = {contact.id: contact.name for contact in contacts}
     found = [replace(item, recommended=_recommended(item, names, labels)) for item in found]
     return sorted(
@@ -182,8 +178,48 @@ def open_identifiers(
     )
 
 
-def _suggested(
+def _domains(
     contacts: Sequence[Contact],
+    by_key: Mapping[Key, Sequence[Sighting]],
+    stated: KeyIndex[Identifier],
+    personal: Collection[Key],
+) -> list[OpenIdentifier]:
+    """The e-mail domains to suggest for a contact (#215): one in its confirmed documents whose
+    name fits its name (`holders.domain_owner`: its words make up at least half of the domain's
+    name), while the contact has no domain entered; not one a contact has (entered or rejected),
+    a person's or a free mail provider's. A contact without a domain shows no logo and names no
+    sender by it: the suggestion is how one notices."""
+    parties = {
+        contact.id: Party(contact.name, tuple(contact.names()))
+        for contact in contacts
+        if not any(
+            item.kind is IdentifierKind.EMAIL_DOMAIN and item.source is IdentifierSource.MANUAL
+            for item in contact.identifiers
+        )
+    }
+    found = []
+    for key, items in by_key.items():
+        kind, value = key
+        if (
+            kind is not IdentifierKind.EMAIL_DOMAIN
+            or value in FREE_MAIL
+            or stated.matching(key)
+            or of_person(key, personal)
+        ):
+            continue
+        fitting = {
+            item.contact
+            for item in items
+            if item.contact in parties and domain_owner(value, [parties[item.contact]]) is not None
+        }
+        if len(fitting) == 1:
+            (contact,) = fitting
+            own = [item for item in items if item.contact == contact]
+            found.append(_open(key, OpenSource.SUGGESTED, (contact,), own))
+    return found
+
+
+def _suggested(
     by_key: Mapping[Key, Sequence[Sighting]],
     opened: Collection[Key],
     stated: KeyIndex[Identifier],
@@ -191,53 +227,29 @@ def _suggested(
     persons: Iterable[Person],
     declined: Mapping[UserId, Collection[Key]],
 ) -> list[OpenIdentifier]:
-    """The numbers with a holder open nowhere else whose holder a document names: a person (the
-    recipient's, of a kind a person has), else another contact than the document's."""
-    contact_names = {contact.id: Parties(contact_names=contact.names()) for contact in contacts}
+    """The numbers of a kind a person has (an IBAN) open nowhere else whose holder a document
+    names as its recipient: for that person's profile. (A number for another contact than the
+    document's, the landlord's IBAN in a bank statement's bookings, was suggested until #215:
+    no contact carries IBANs any more.)"""
     person_names = {
         person.user_id: Parties(person_names=[person.display_name or "", *person.aliases])
         for person in persons
     }
-    # The same name stands in many documents (the landlord in every statement): named once.
-    named_contacts: dict[str, ContactId | None] = {}
-
-    def contact_named(name: str) -> ContactId | None:
-        if name not in named_contacts:
-            named_contacts[name] = _contact_named(name, contact_names)
-        return named_contacts[name]
-
     found = []
     for key, items in by_key.items():
         if (
             key[0] not in HOLDER_KINDS
+            or key[0] not in PERSON_KINDS
             or key in opened
             or stated.matching(key)
             or of_person(key, personal)
         ):
             continue
         received = [item for item in items if _held(item, HolderKind.RECIPIENT)]
-        if received:
-            if key[0] not in PERSON_KINDS:
-                continue  # a person's e-mail domain or VAT ID: no number of their profile
-            users = {_recipient(item, person_names) for item in received}
-            user = users.pop() if len(users) == 1 else None
-            if user is not None and key not in declined.get(user, ()):
-                found.append(_open(key, OpenSource.SUGGESTED, (), received, person=user))
-            continue
-        named = [
-            (item, target)
-            for item in items
-            if (holder := item.fact.holder) is not None
-            and holder.name
-            and holder.kind in (HolderKind.SENDER, HolderKind.THIRD_PARTY)
-            and (target := contact_named(holder.name)) is not None
-            and target != item.contact
-        ]
-        targets = {target for _, target in named}
-        if len(targets) == 1:
-            found.append(
-                _open(key, OpenSource.SUGGESTED, (targets.pop(),), [item for item, _ in named])
-            )
+        users = {_recipient(item, person_names) for item in received}
+        user = users.pop() if len(users) == 1 else None
+        if user is not None and key not in declined.get(user, ()):
+            found.append(_open(key, OpenSource.SUGGESTED, (), received, person=user))
     return found
 
 
@@ -329,12 +341,6 @@ def _recipient(item: Sighting, persons: Mapping[UserId, Parties]) -> UserId | No
         named = [user for user, parties in persons.items() if parties.person(name)]
         return named[0] if len(named) == 1 else None
     return item.owner
-
-
-def _contact_named(name: str, contacts: Mapping[ContactId, Parties]) -> ContactId | None:
-    """The one contact `name` names; None for none or several."""
-    named = [contact for contact, parties in contacts.items() if parties.contact(name)]
-    return named[0] if len(named) == 1 else None
 
 
 def _held(item: Sighting, kind: HolderKind) -> bool:

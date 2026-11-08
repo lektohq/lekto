@@ -2838,7 +2838,7 @@ Phase 3 aus `webhooks-und-auftraege.md`.
 
 ### Weniger Pflege der Kennungen (#215)
 
-Stand: Plan mit Tobi abgestimmt am 08.11.2026; PR 1 (#312) und PR 2 (#313) gemergt am 08.11.2026; PR 3 in Arbeit. Die Entscheidungen je Art stehen als Tabelle unten in Issue #215.
+Stand: Plan mit Tobi abgestimmt am 08.11.2026; alle fünf PRs gemergt am 08.11.2026 (#312–#316), #215 geschlossen. Offen auf Prod, nur auf Tobis Wort: ein Training (entfernt erlernte Kennungen der weggefallenen Arten) und „Fakten neu lesen“ (die Lesekorrekturen für schon gelesene Dokumente). Die Entscheidungen je Art stehen als Tabelle unten in Issue #215.
 
 **Anlass:** Der Reiter „Kennungen“ zeigte auf Prod am 29.10.2026 1.020 offene Kennungen (Tobi: „Ich pflege mich zu Tode“); am 08.11. waren es noch 311 (15 erlernt, 289 unbekannt, 7 Vorschläge).
 

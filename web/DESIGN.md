@@ -693,7 +693,11 @@ from `sm`, three from `lg` when there are three). A tile is a `Card` (`md`): an 
 `Card.Title` (the place's name), the big number (`text-figure`, `tabular-nums`) with what it
 counts, badges in their tones (icon and word for a lane), one `text-meta` line of detail, and at
 its foot the way there, a `brand` link with an arrow ("Zum Posteingang"). Badges on a tile are
-not links. While a tile loads it shows a `Skeleton` in the place of the number.
+not links. While a tile loads it shows a `Skeleton` in the place of the number. A tile that
+reports only something to decide shows only while there is something (Tobi, 08.11.2026, #215:
+"Kennungen" with the suggestions alone, no to-do); the grid then takes the columns of the tiles
+shown, so none stands empty. Such a tile does not load inside itself: the page asks first and
+places it.
 
 ### Lenses
 
