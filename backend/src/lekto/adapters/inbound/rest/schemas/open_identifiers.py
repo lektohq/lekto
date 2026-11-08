@@ -70,11 +70,9 @@ class OpenIdentifierOut(BaseModel):
     )
     written: str = Field(description="As the newest of its documents writes it.")
     source: OpenSource = Field(
-        description="`learned`: training found it at `contacts[0]`; `unknown`: it stands in "
-        "confirmed documents but at no contact, `contacts` are their contacts, the one with "
-        "most documents first; `suggested`: a number with a holder (an IBAN, a creditor ID, "
-        "a VAT ID, an e-mail domain) its documents name as another's, the contact's in "
-        "`contacts[0]` or the person's in `person`."
+        description="`learned`: training found it at `contacts[0]`; `suggested`: an e-mail "
+        "domain whose name fits `contacts[0]`, the contact of its documents, which has none "
+        "entered, or an IBAN its documents give to the person in `person`."
     )
     contacts: list[OpenContactOut]
     person: OpenPersonOut | None = Field(
@@ -114,14 +112,12 @@ class OpenIdentifierOut(BaseModel):
 
 class OpenCountsOut(BaseModel):
     learned: int
-    unknown: int
     suggested: int
 
     @classmethod
     def of(cls, counts: Mapping[OpenSource, int]) -> "OpenCountsOut":
         return cls(
             learned=counts.get(OpenSource.LEARNED, 0),
-            unknown=counts.get(OpenSource.UNKNOWN, 0),
             suggested=counts.get(OpenSource.SUGGESTED, 0),
         )
 

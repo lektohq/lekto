@@ -29,9 +29,9 @@ router = APIRouter(prefix="/identifiers/open", tags=["identifiers"], dependencie
 
 _OPEN = (
     "Open are the identifiers no person has confirmed: those training learned at a contact "
-    "(`learned`), and those of a contact's kind that confirmed documents with a contact show but "
-    "no contact has, entered, learned or rejected (`unknown`). A person's value (a user's "
-    "profile) is never open."
+    "(`learned`), and suggestions (`suggested`): an e-mail domain whose name fits the contact "
+    "of its documents while it has none, an IBAN its documents give to a person. A person's "
+    "value (a user's profile) is never open."
 )
 
 
@@ -137,10 +137,10 @@ async def open_detail(
     description=(
         ADMINS_ONLY + " Each decision is a change of its contact on its own: confirming enters "
         "the identifier there by hand (a learned one keeps its topic and user), rejecting takes "
-        "a learned one out or notes an unknown one rejected, so training does not learn it "
-        "again. One that cannot be done (no longer open, the contact unclear, another contact "
-        "has it entered) says why in its outcome; the others are done all the same. In the "
-        "order given."
+        "a learned one out or notes a suggested one rejected, so training does not learn it "
+        "and Lekto does not suggest it again. One that cannot be done (no longer open, the "
+        "contact unclear, another contact has it entered) says why in its outcome; the others "
+        "are done all the same. In the order given."
     ),
     response_model=list[OutcomeOut],
     responses=problem_responses(401, 403, 422),

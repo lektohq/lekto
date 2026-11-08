@@ -69,8 +69,9 @@ async def confirmed(
 
 
 async def setting(world: World) -> tuple[User, Contact, Contact]:
-    """An admin, the utility that learned the customer number, and a bank; the domain stands in
-    a document of the utility only, the other customer number in documents of both."""
+    """An admin, the utility that learned the customer number, and a bank; the domain, which
+    fits the utility's name, stands in a document of the utility only, the other customer
+    number in documents of both (open nowhere since #215)."""
     admin = await world.user(role=Role.ADMIN)
     utility, bank = (Contact.create(name=name, now=NOW) for name in ("Stadtwerke", "Bank"))
     utility.set_learned([Identifier(*CUSTOMER, IdentifierSource.LEARNED)])
@@ -91,30 +92,26 @@ async def held(world: World, contact: Contact) -> dict[tuple[IdentifierKind, str
 
 
 async def test_an_admin_lists_the_open_identifiers(world: World) -> None:
-    admin, utility, bank = await setting(world)
+    admin, utility, _ = await setting(world)
     page = await world.open_identifiers.page(admin.id)
     assert [(item.key, item.source, len(item.seen)) for item in page.items] == [
-        (SHARED, OpenSource.UNKNOWN, 3),
         (CUSTOMER, OpenSource.LEARNED, 2),
-        (SITE, OpenSource.UNKNOWN, 1),
+        (SITE, OpenSource.SUGGESTED, 1),
     ]
-    assert page.items[0].contacts == (utility.id, bank.id)
-    assert page.counts == {
-        OpenSource.LEARNED: 1,
-        OpenSource.UNKNOWN: 2,
-        OpenSource.SUGGESTED: 0,
-    }
-    assert page.names == {utility.id: "Stadtwerke", bank.id: "Bank"}
+    assert page.items[1].contacts == (utility.id,)
+    assert page.counts == {OpenSource.LEARNED: 1, OpenSource.SUGGESTED: 1}
+    assert page.names == {utility.id: "Stadtwerke"}
 
     learned = await world.open_identifiers.page(admin.id, source=OpenSource.LEARNED)
     assert [item.key for item in learned.items] == [CUSTOMER]
     assert learned.counts == page.counts  # not narrowed by the source
-    words = await world.open_identifiers.page(admin.id, words="5566 7788")
-    assert [item.key for item in words.items] == [SHARED]
-    named = await world.open_identifiers.page(admin.id, words="bank")
-    assert [item.key for item in named.items] == [SHARED]
+    words = await world.open_identifiers.page(admin.id, words="stadtwerke-nord")
+    assert [item.key for item in words.items] == [SITE]
+    named = await world.open_identifiers.page(admin.id, words="stadtwerke")
+    assert [item.key for item in named.items] == [CUSTOMER, SITE]
+    assert (await world.open_identifiers.page(admin.id, words="5566 7788")).items == []
     paged = await world.open_identifiers.page(admin.id, offset=1, limit=1)
-    assert ([item.key for item in paged.items], paged.total) == ([CUSTOMER], 3)
+    assert ([item.key for item in paged.items], paged.total) == ([SITE], 2)
     assert await world.open_identifiers.summary(admin.id) == page.counts
 
     user = await world.user()
@@ -145,26 +142,30 @@ async def test_decisions_confirm_and_reject_one_by_one(world: World) -> None:
         [
             OpenDecision(kind=CUSTOMER[0], value=CUSTOMER[1], action=OpenAction.CONFIRM),
             OpenDecision(kind=SITE[0], value=SITE[1], action=OpenAction.CONFIRM),
-            # Its documents name two contacts: which one?
+            # Not open: at no contact, it is no longer suggested (#215).
             OpenDecision(kind=SHARED[0], value=SHARED[1], action=OpenAction.CONFIRM),
             OpenDecision(kind=CUSTOMER[0], value="99999999", action=OpenAction.REJECT),
         ],
     )
     assert [outcome.error is None for outcome in outcomes] == [True, True, False, False]
     assert outcomes[2].error is not None
-    assert outcomes[2].error.code is ReasonCode.IDENTIFIER_CONTACT_UNCLEAR
+    assert outcomes[2].error.code is ReasonCode.IDENTIFIER_NOT_OPEN
     assert outcomes[3].error is not None
     assert outcomes[3].error.code is ReasonCode.IDENTIFIER_NOT_OPEN
     assert await held(world, utility) == {CUSTOMER: "manual", SITE: "manual"}
-
-    # Rejected at the contact with most documents: training does not learn it again.
-    (rejected,) = await world.open_identifiers.decide(
-        admin.id, [OpenDecision(kind=SHARED[0], value=SHARED[1], action=OpenAction.REJECT)]
-    )
-    assert rejected.error is None
-    assert (await held(world, utility))[SHARED] == "rejected"
     assert await held(world, bank) == {}
     assert (await world.open_identifiers.page(admin.id)).items == []
+
+
+async def test_a_suggested_domain_rejected_is_not_suggested_again(world: World) -> None:
+    admin, utility, _ = await setting(world)
+    (rejected,) = await world.open_identifiers.decide(
+        admin.id, [OpenDecision(kind=SITE[0], value=SITE[1], action=OpenAction.REJECT)]
+    )
+    assert rejected.error is None
+    assert (await held(world, utility))[SITE] == "rejected"
+    page = await world.open_identifiers.page(admin.id)
+    assert [item.key for item in page.items] == [CUSTOMER]
 
 
 async def test_a_learned_one_is_rejected_or_moved_by_its_contact(world: World) -> None:
@@ -173,13 +174,11 @@ async def test_a_learned_one_is_rejected_or_moved_by_its_contact(world: World) -
         admin.id,
         [
             OpenDecision(kind=CUSTOMER[0], value=CUSTOMER[1], action=OpenAction.REJECT),
-            OpenDecision(
-                kind=SHARED[0], value=SHARED[1], action=OpenAction.CONFIRM, contact=bank.id
-            ),
+            OpenDecision(kind=SITE[0], value=SITE[1], action=OpenAction.CONFIRM, contact=bank.id),
         ],
     )
     assert await held(world, utility) == {CUSTOMER: "rejected"}
-    assert await held(world, bank) == {SHARED: "manual"}
+    assert await held(world, bank) == {SITE: "manual"}
     user = await world.user()
     with pytest.raises(PermissionDeniedError):
         await world.open_identifiers.decide(

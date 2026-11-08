@@ -34,15 +34,15 @@ const CUSTOMER = {
 		reason: { code: 'recommend_confirm', params: { count: 4, name: 'Stadtwerke Nord' } }
 	}
 };
-const IBAN = {
-	kind: 'iban',
-	value: 'DE02120300000000202051',
-	ref: 'REUwMg',
-	written: 'DE02 1203 0000 0000 2020 51',
-	source: 'unknown',
-	contacts: [UTILITY, BANK],
+const DOMAIN = {
+	kind: 'email_domain',
+	value: 'stadtwerke-nord.example',
+	ref: 'c3RhZHQ',
+	written: 'stadtwerke-nord.example',
+	source: 'suggested',
+	contacts: [UTILITY],
 	documents: 3,
-	last: '2026-09-30'
+	last: '2026-10-30'
 };
 
 const SUGGESTION = {
@@ -90,14 +90,14 @@ beforeEach(() => {
 			const items =
 				source === 'suggested'
 					? [SUGGESTION]
-					: [IBAN, CUSTOMER].filter(
+					: [DOMAIN, CUSTOMER].filter(
 							(item) =>
 								(!source || item.source === source) && (!advised || 'recommendation' in item)
 						);
 			return json({
 				items,
 				total: items.length,
-				counts: { learned: 1, unknown: 1, suggested: 1 },
+				counts: { learned: 1, suggested: 2 },
 				kinds: { customer_number: 1, iban: 1 },
 				recommended: 1,
 				to_confirm: confirmedRecommended > 0 ? 0 : 1
@@ -112,7 +112,7 @@ beforeEach(() => {
 				BANK
 			]);
 		}
-		const detailed = [CUSTOMER, IBAN, SUGGESTION].find(
+		const detailed = [CUSTOMER, DOMAIN, SUGGESTION].find(
 			(item) => url.pathname === `/api/v1/identifiers/open/${item.kind}/${item.ref}`
 		);
 		if (request.method === 'GET' && detailed && detailed !== CUSTOMER) {
@@ -172,9 +172,9 @@ describe('IdentifiersPanel', () => {
 		render(IdentifiersPanel);
 		const found = await rows();
 		expect(found).toHaveLength(2);
-		expect(found[0].textContent).toContain('DE02 1203 0000 0000 2020 51');
-		expect(found[0].textContent).toContain(m.open_contacts_many({ count: '2' }));
-		expect(found[0].textContent).toContain(m.open_unknown());
+		expect(found[0].textContent).toContain('stadtwerke-nord.example');
+		expect(found[0].textContent).toContain(UTILITY.name);
+		expect(found[0].textContent).toContain(m.open_suggested());
 		expect(found[1].textContent).toContain(UTILITY.name);
 		expect(found[1].textContent).toContain(m.open_learned());
 		const documents = within(found[1]).getByRole('link', {
@@ -184,7 +184,7 @@ describe('IdentifiersPanel', () => {
 		expect(documents.getAttribute('href')).toContain('fact=customer_number%3AMjAwNDc3MTg%3A');
 		// The logo comes from the contacts, which the list does not carry.
 		await vi.waitFor(() => expect(found[1].querySelector('img')?.getAttribute('src')).toBe(LOGO));
-		expect(found[0].querySelector('img')).toBeNull();
+		expect(found[0].querySelector('img')?.getAttribute('src')).toBe(LOGO);
 		// What the sources mean stands behind the info button beside them, not above the list.
 		expect(
 			screen.getByRole('button', { name: m.hint_about({ name: m.open_source() }) })
@@ -208,7 +208,7 @@ describe('IdentifiersPanel', () => {
 		);
 		expect(customer().textContent).toContain(usageLabel(4));
 		await user.click(
-			screen.getByRole('checkbox', { name: m.open_select({ value: IBAN.written }) })
+			screen.getByRole('checkbox', { name: m.open_select({ value: DOMAIN.written }) })
 		);
 		screen.getByRole('region', { name: m.selection_selected({ count: '1' }) });
 		// Chosen: the rows choose, the dialog waits.
@@ -223,7 +223,7 @@ describe('IdentifiersPanel', () => {
 	it('says what the documents recommend, why, and shows the recommended alone', async () => {
 		const user = userEvent.setup();
 		render(IdentifiersPanel);
-		const [iban, customer] = await rows();
+		const [domain, customer] = await rows();
 		expect(customer.textContent).toContain(m.open_advise_confirm());
 		// The reason, for a screen reader beside the badge and on hover; the badge's trigger
 		// takes the focus.
@@ -231,7 +231,7 @@ describe('IdentifiersPanel', () => {
 		expect(
 			within(customer).getByRole('button', { name: new RegExp(m.open_advise_confirm()) }).tagName
 		).toBe('BUTTON');
-		expect(within(iban).getByText(m.open_advise_none())).toBeTruthy();
+		expect(within(domain).getByText(m.open_advise_none())).toBeTruthy();
 		await user.click(screen.getByRole('button', { name: new RegExp(`^${m.open_recommended()}`) }));
 		await vi.waitFor(() => {
 			const last = fetchMock.mock.calls.at(-1)?.[0];
@@ -283,16 +283,18 @@ describe('IdentifiersPanel', () => {
 		expect(await request.clone().json()).toEqual({ q: 'nord' });
 	});
 
-	it('takes over the chosen ones, leaving out one without a clear contact', async () => {
+	it('takes over the chosen ones', async () => {
 		const user = userEvent.setup();
 		render(IdentifiersPanel);
 		await rows();
 		await user.click(screen.getByRole('checkbox', { name: m.open_select_all() }));
 		const bar = screen.getByRole('region', { name: m.selection_selected({ count: '2' }) });
-		expect(bar.textContent).toContain(m.open_skipped_one());
 		await user.click(within(bar).getByRole('button', { name: m.open_confirm() }));
 		await vi.waitFor(() =>
-			expect(decisions).toEqual([{ kind: 'customer_number', value: '20047718', action: 'confirm' }])
+			expect(decisions).toEqual([
+				{ kind: 'email_domain', value: 'stadtwerke-nord.example', action: 'confirm' },
+				{ kind: 'customer_number', value: '20047718', action: 'confirm' }
+			])
 		);
 		expect(screen.queryByRole('region', { name: /ausgewählt|selected/ })).toBeNull();
 	});
