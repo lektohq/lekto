@@ -8,9 +8,11 @@ images, mails), small images aside (logos, signatures); the rest stays and the h
 names it ("Nicht übernommen").
 """
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+from uuid import NAMESPACE_URL, uuid5
 
 from lekto.core.domain import media_types
 from lekto.core.domain.ids import (
@@ -133,6 +135,17 @@ KEPT_RECORDS = 500
 mail rule looks at the latest fifty, a rule switched on later takes the mails without a rule
 among them (Tobi, 06.11.2026: only these); the rest let go of it (`MailRecord.forget`) and stay
 only so that no mail is fetched twice."""
+
+
+_RECORDS = uuid5(NAMESPACE_URL, "https://github.com/tb1337/lekto-dms#mail-records")
+
+
+def record_id(mailbox: MailboxId, folder: str, uidvalidity: int, uid: int) -> MailRecordId:
+    """The id of the record of the mail at `uid` in `folder` under `uidvalidity`: the same at
+    every fetch of it. A mail taken again after an interrupted run keeps its record, and the
+    origins of the documents both runs made name that one record."""
+    key = json.dumps([str(mailbox), folder, uidvalidity, uid])
+    return MailRecordId(uuid5(_RECORDS, key))
 
 
 class MailOutcome(StrEnum):
