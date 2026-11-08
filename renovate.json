@@ -48,6 +48,15 @@
         "ghcr.io/tb1337/**"
       ],
       "enabled": false
+    },
+    {
+      "description": "Claude Code of the dev container",
+      "matchPackageNames": [
+        "@anthropic-ai/claude-code"
+      ],
+      "labels": [
+        "dev-deps"
+      ]
     }
   ],
   "lockFileMaintenance": {
@@ -55,5 +64,17 @@
     "schedule": [
       "* 0-5 1 * *"
     ]
-  }
+  },
+  "customManagers": [
+    {
+      "description": "Claude Code in the dev stage of the Dockerfile: the version after the `# renovate:` comment",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)Dockerfile$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nARG [A-Z_]+_VERSION=(?<currentValue>\\S+)"
+      ]
+    }
+  ]
 }
