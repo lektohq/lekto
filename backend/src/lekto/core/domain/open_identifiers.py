@@ -16,7 +16,13 @@ from dataclasses import dataclass, replace
 from datetime import date
 from enum import StrEnum
 
-from lekto.core.domain.document_facts import HOLDER_KINDS, DocumentFact, FactRole, HolderKind
+from lekto.core.domain.document_facts import (
+    BOOKED_HOLDER_KINDS,
+    HOLDER_KINDS,
+    DocumentFact,
+    FactRole,
+    HolderKind,
+)
 from lekto.core.domain.holders import Parties, foreign, held_by
 from lekto.core.domain.identifiers import (
     CONTACT_KINDS,
@@ -259,7 +265,8 @@ def _recommended(
     - to confirm one at its contact that stands in `RECOMMEND_FROM` documents of it or more, as
       a contact's or a contract's number (not an invoice's or a file's: they change with each
       document), at no other contact that holds it as its own, and, of a kind with a holder,
-      its contact's in each of them; a suggested one that as many documents name;
+      its contact's in each of them (a customer number: no other's in any); a suggested one
+      that as many documents name;
     - to reject a learned one that a document of its contact gives someone else (a person, a
       third party: in dev all 29 such were rejected), or that other contacts hold as theirs
       (a payment service's creditor ID).
@@ -302,8 +309,12 @@ def _recommended(
         return None
     if any(seen.fact.role not in _OF_CONTACTS for seen in own):
         return None
-    if held and any(
-        held_by(seen.fact.holder, names[contact]) is not HolderKind.SENDER for seen in own
+    if any(foreign(seen.fact.holder, names[contact]) for seen in own):
+        return None
+    if (
+        held
+        and item.kind not in BOOKED_HOLDER_KINDS
+        and any(held_by(seen.fact.holder, names[contact]) is not HolderKind.SENDER for seen in own)
     ):
         return None
     reason = because(ReasonCode.RECOMMEND_CONFIRM, count=len(mine), name=labels[contact])
