@@ -11,20 +11,13 @@ export type ContactNumberOut = components['schemas']['ContactNumberOut'];
 export type IdentifierKind = IdentifierIn['kind'];
 export type IdentifierSource = IdentifierOut['source'];
 
-/** The kinds of a contact's identifiers, in the order the contact dialog offers them. */
+/** The kinds of a contact's identifiers, in the order the contact dialog offers them: since
+ * #215 only those that tell more than the contact (the rest are numbers of the document). */
 export const IDENTIFIER_KINDS: readonly IdentifierKind[] = [
-	'iban',
-	'vat_id',
 	'customer_number',
 	'contract_number',
 	'personnel_number',
-	'email_domain',
-	'creditor_id',
-	'commercial_register',
-	'tax_number',
-	'meter_number',
-	'mandate_reference',
-	'license_plate'
+	'email_domain'
 ];
 
 /** The kinds of a person's own identifiers (a user's profile). */
@@ -41,13 +34,12 @@ export const PERSON_KINDS: readonly IdentifierKind[] = [
 export const NAMING_KINDS: readonly IdentifierKind[] = [
 	'customer_number',
 	'personnel_number',
-	'contract_number',
-	'meter_number',
-	'mandate_reference',
-	'license_plate'
+	'contract_number'
 ];
 
-/** The kinds of a document's numbers that are no contact's or person's identifier. */
+/** The kinds of a document's numbers that are no contact's identifier nor a person's alone: its
+ * own, a strand's, another document's, and since #215 those that only tell the contact or a
+ * contract. */
 export const NUMBER_KINDS: readonly IdentifierKind[] = [
 	'invoice_number',
 	'credit_note_number',
@@ -57,7 +49,15 @@ export const NUMBER_KINDS: readonly IdentifierKind[] = [
 	'claim_number',
 	'ticket_number',
 	'your_reference',
-	'letter_date'
+	'letter_date',
+	'iban',
+	'vat_id',
+	'commercial_register',
+	'tax_number',
+	'creditor_id',
+	'meter_number',
+	'mandate_reference',
+	'license_plate'
 ];
 
 /** The label of a kind as the log or a candidate names it; a kind this UI does not know stays

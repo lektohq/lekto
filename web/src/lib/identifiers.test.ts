@@ -25,15 +25,16 @@ const stored = [
 
 describe('identifiers', () => {
 	it('offers the kinds as the API names them', () => {
-		type Kinds = Record<string, { contact: boolean; person: boolean; names_user: boolean }>;
+		type Flag = 'contact' | 'person' | 'at_contact' | 'names_user';
+		type Kinds = Record<string, Record<Flag, boolean>>;
 		const kinds = (openapi as unknown as { 'x-identifier-kinds': Kinds })['x-identifier-kinds'];
-		const having = (flag: 'contact' | 'person' | 'names_user') =>
+		const having = (...flags: Flag[]) =>
 			Object.keys(kinds)
-				.filter((kind) => kinds[kind][flag])
+				.filter((kind) => flags.every((flag) => kinds[kind][flag]))
 				.sort();
-		expect([...IDENTIFIER_KINDS].sort()).toEqual(having('contact'));
+		expect([...IDENTIFIER_KINDS].sort()).toEqual(having('at_contact'));
 		expect([...PERSON_KINDS].sort()).toEqual(having('person'));
-		expect([...NAMING_KINDS].sort()).toEqual(having('names_user'));
+		expect([...NAMING_KINDS].sort()).toEqual(having('at_contact', 'names_user'));
 	});
 
 	it('sends the entered and the rejected ones, not the learned ones', () => {

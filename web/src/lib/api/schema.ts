@@ -4934,10 +4934,11 @@ export interface components {
 			| '-field';
 		/**
 		 * DocumentNumberOut
-		 * @description A fact kept for the document: a number that is no contact's or person's identifier, its
-		 *     own (invoice, credit note, order number), a strand's (file reference, "Unser Zeichen",
-		 *     claim, ticket) or another document's it refers to ("Ihre Rechnung Nr.", "Ihr Zeichen"); or
-		 *     one of another kind a person decided.
+		 * @description A fact kept for the document: a number that is no contact's identifier nor a person's
+		 *     alone, its own (invoice, credit note, order number), a strand's (file reference, "Unser
+		 *     Zeichen", claim, ticket), another document's it refers to ("Ihre Rechnung Nr.", "Ihr
+		 *     Zeichen") or, since #215, one that only tells the contact or a contract (VAT ID, IBAN,
+		 *     licence plate); or one of another kind a person decided.
 		 */
 		DocumentNumberOut: {
 			kind: components['schemas']['IdentifierKind'];
@@ -4964,6 +4965,8 @@ export interface components {
 			 * @description Where it stands in the text.
 			 */
 			spans: components['schemas']['SpanOut'][];
+			/** @description Whose it is where it stands (an IBAN), if told. */
+			holder?: components['schemas']['HolderOut'] | null;
 		};
 		/**
 		 * DocumentOutOfReach
@@ -6260,7 +6263,7 @@ export interface components {
 		};
 		/**
 		 * HolderOut
-		 * @description Whose an IBAN, a creditor ID, a VAT ID or an e-mail domain is where it stands.
+		 * @description Whose an IBAN, an e-mail domain or a customer number (in bookings) is where it stands.
 		 */
 		HolderOut: {
 			/** @description `sender`: the document's sender (its contact, if `name` is none or its name or an alias), `recipient`: a person it is addressed to, `third_party`: another party (a payee in a booking, a party of a list), `unclear`. */
