@@ -254,6 +254,11 @@ Two paths must not be buffered or cut short by the proxy:
 - `/api/v1/events`: server-sent events, minutes to hours.
 - `/api/v1/mcp`: MCP (Streamable HTTP, stateless; plain `POST`s with JSON answers).
 
+Uploads must not be cut short either: the proxy's body limit must allow `LEKTO_UPLOAD_MAX_SIZE`,
+and its time to read a request must allow the slowest upload. Traefik v3 stops reading a request
+after 60 seconds, the body included (`respondingTimeouts.readTimeout`); `compose.traefik.yml`
+sets 15 minutes, which takes 100 MiB from 1 Mbit/s on.
+
 For nginx:
 
 ```nginx
