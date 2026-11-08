@@ -12,10 +12,15 @@ Sign-in (`login`):
   one is refused with TooManyAttemptsError instead of AuthenticationError and does not count
   for the source again. So failures from an address that many users share (a proxy, NAT)
   never lock out those who know their password.
+- A browser that signed in with the password before keeps a known device's token (`devices`).
+  Its attempts as that user count under the device instead of the account, by the same rule:
+  someone who knows a username can keep the account blocked, but not its owner's browsers.
 - With TOTP on, a correct password without a code raises SecondFactorRequiredError; the caller
   sends password and code (or a recovery code) again. A wrong code counts as a failure.
-- Success starts a new session (never reuses one) and clears the account's failures. A password
-  hash made with older parameters is replaced.
+- Success starts a new session (never reuses one) and clears the failures of the account, or of
+  the known device the attempt counted under. It makes the browser a known device of the user,
+  or keeps it one for another `KNOWN_DEVICE_LIFETIME`. A password hash made with older
+  parameters is replaced.
 
 Sessions end after the idle time or the maximum age, at sign-out, and when the password
 changes (except the caller's own, which is renewed). API tokens survive a password change
@@ -25,7 +30,7 @@ unless the caller asks to revoke them. Deactivated users are rejected however th
 import logging
 import secrets
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 
 from lekto.core.domain.errors import (
@@ -40,9 +45,12 @@ from lekto.core.domain.errors import (
 )
 from lekto.core.domain.identity import (
     ACCOUNT_THROTTLE,
+    KNOWN_DEVICE_LIFETIME,
+    KNOWN_DEVICES_PER_BROWSER,
     SOURCE_THROTTLE,
     ApiToken,
     Credential,
+    KnownDevice,
     LoginMethod,
     Session,
     ThrottleRule,
@@ -52,6 +60,7 @@ from lekto.core.domain.identity import (
     account_key,
     check_new_password,
     csrf_token,
+    device_key,
     hash_token,
     new_recovery_codes,
     normalize_password,
@@ -83,12 +92,24 @@ class SessionPolicy:
 
 
 @dataclass(frozen=True)
+class _Known:
+    """The valid known devices a browser holds (token and device, in its order), and the one of
+    the user who signs in."""
+
+    held: tuple[tuple[str, KnownDevice], ...]
+    own: tuple[str, KnownDevice] | None
+
+
+@dataclass(frozen=True)
 class SignedIn:
-    """A new session. `token` goes to the client (cookie) and is not stored."""
+    """A new session. `token` goes to the client (cookie) and is not stored; so do `devices`
+    after a sign-in with the password: the tokens of the known devices the browser keeps, its
+    own for this user last."""
 
     user: User
     session: Session
     token: str
+    devices: tuple[str, ...] = ()
 
     @property
     def csrf_token(self) -> str:
@@ -164,10 +185,14 @@ class AuthService:
         code: str | None = None,
         recovery_code: str | None = None,
         source: str | None = None,
+        devices: Sequence[str] = (),
     ) -> SignedIn:
-        """Sign in with password and, if the account has TOTP, a code or a recovery code."""
+        """Sign in with password and, if the account has TOTP, a code or a recovery code.
+        `devices`: the tokens of known devices the browser keeps (`SignedIn.devices`)."""
         now = self._clock.now()
-        reserved, source_blocked = await self._reserve(_throttles(username, source), now)
+        known = await self._known_devices(username, devices, now)
+        own = None if known.own is None else known.own[1]
+        reserved, source_blocked = await self._reserve(_throttles(username, source, own), now)
 
         async with self._uow() as uow:
             user = await uow.users.find_by_username(username)
@@ -200,7 +225,21 @@ class AuthService:
             new_hash=new_hash,
             source_blocked=source_blocked,
             source=source,
+            known=known,
         )
+
+    async def _known_devices(self, username: str, tokens: Sequence[str], now: datetime) -> _Known:
+        """The valid known devices among the browser's tokens (the last few only), and the one
+        of the user named `username`, if any."""
+        held: list[tuple[str, KnownDevice]] = []
+        async with self._uow() as uow:
+            user = await uow.users.find_by_username(username)
+            for token in dict.fromkeys(tokens[-KNOWN_DEVICES_PER_BROWSER:]):
+                device = await uow.known_devices.find_by_token(hash_token(token))
+                if device is not None and device.is_valid(now):
+                    held.append((token, device))
+        own = next((each for each in held if user is not None and each[1].user_id == user.id), None)
+        return _Known(held=tuple(held), own=own)
 
     async def _complete_login(
         self,
@@ -214,6 +253,7 @@ class AuthService:
         new_hash: str | None,
         source_blocked: timedelta | None,
         source: str | None,
+        known: _Known,
     ) -> SignedIn:
         async with self._uow() as uow:
             user = await uow.users.get(user_id)
@@ -229,8 +269,9 @@ class AuthService:
                     credential.password_hash = new_hash
                 await uow.credentials.update(credential)
                 signed_in = await self._start_session(uow, user, LoginMethod.PASSWORD, now)
-                account, *others = reserved
-                await uow.login_failures.remove(account[0])  # success clears the account
+                signed_in = replace(signed_in, devices=await _keep_known(uow, user, known, now))
+                first, *others = reserved
+                await uow.login_failures.remove(first[0])  # clears the account or the device
                 await _release(uow, others)
                 await uow.commit()
         if not valid:
@@ -506,10 +547,10 @@ class AuthService:
     async def _reserve(
         self, throttles: Sequence[tuple[str, ThrottleRule]], now: datetime
     ) -> tuple[list[tuple[str, ThrottleRule]], timedelta | None]:
-        """Count the attempt before it is checked: under the account (TooManyAttemptsError
-        while it is blocked; nothing is counted then) and under the source, if given. Returns
-        what was counted, to be released if the attempt does not fail, and how long the source
-        stays blocked (then it is not counted)."""
+        """Count the attempt before it is checked: under the account or the known device
+        (TooManyAttemptsError while it is blocked; nothing is counted then) and under the
+        source, if given. Returns what was counted, to be released if the attempt does not
+        fail, and how long the source stays blocked (then it is not counted)."""
         (account, rule), *sources = throttles
         async with self._uow() as uow:
             wait = await uow.login_failures.reserve(account, rule, now)
@@ -530,12 +571,28 @@ def _turn_off_totp(credential: Credential) -> None:
     credential.recovery_codes = set()
 
 
-def _throttles(username: str, source: str | None) -> list[tuple[str, ThrottleRule]]:
-    """The account first, then the source."""
-    throttles = [(account_key(username), ACCOUNT_THROTTLE)]
+def _throttles(
+    username: str, source: str | None, device: KnownDevice | None = None
+) -> list[tuple[str, ThrottleRule]]:
+    """The account, or the user's known device the attempt comes from, first; then the source."""
+    first = account_key(username) if device is None else device_key(device.id)
+    throttles = [(first, ACCOUNT_THROTTLE)]
     if source:
         throttles.append((source_key(source), SOURCE_THROTTLE))
     return throttles
+
+
+async def _keep_known(uow: UnitOfWork, user: User, known: _Known, now: datetime) -> tuple[str, ...]:
+    """After a sign-in with the password: the browser stays, or becomes, a known device of
+    `user`. Returns the tokens it keeps: the other users' it held, then its own."""
+    if known.own is None:
+        device, token = KnownDevice.issue(user_id=user.id, now=now)
+        await uow.known_devices.add(device)
+    else:
+        token, device = known.own
+        await uow.known_devices.renew(device.id, now + KNOWN_DEVICE_LIFETIME)
+    others = [held for held, each in known.held if each.user_id != user.id]
+    return (*others, token)[-KNOWN_DEVICES_PER_BROWSER:]
 
 
 async def _release(uow: UnitOfWork, reserved: Sequence[tuple[str, ThrottleRule]]) -> None:

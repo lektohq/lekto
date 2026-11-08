@@ -10,7 +10,7 @@ from lekto.core.domain.errors import (
     SecondFactorRequiredError,
     ValidationError,
 )
-from lekto.core.domain.identity import ExternalIdentity, TokenScope
+from lekto.core.domain.identity import ExternalIdentity, TokenScope, hash_token
 from lekto.core.domain.ids import UserId, new_id
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import (
@@ -148,6 +148,8 @@ async def test_password_reset_by_an_admin(world: World) -> None:
     await world.users.reset_password(admin.id, user.id, NEW_PASSWORD)
     with pytest.raises(AuthenticationError):
         await world.auth.authenticate_session(signed_in.token)
+    async with world.uow() as uow:  # no browser stays a known device
+        assert await uow.known_devices.find_by_token(hash_token(signed_in.devices[0])) is None
     await world.auth.authenticate_token(token)
     await world.auth.login("alice", NEW_PASSWORD)
 
@@ -193,7 +195,7 @@ async def test_deleting_a_user_without_documents(world: World) -> None:
     shared = await world.spaces.create(friend.id, "Shared")
     await world.spaces.set_member(friend.id, shared.id, user.id, SpaceRole.READ)
     await world.auth.create_api_token(user.id, "cli", TokenScope.READ)
-    await world.auth.login("alice", PASSWORD)
+    [device] = (await world.auth.login("alice", PASSWORD)).devices
     async with world.uow() as uow:
         uploaded = builders.processed(user, shared)
         await uow.documents.add(uploaded)
@@ -209,6 +211,7 @@ async def test_deleting_a_user_without_documents(world: World) -> None:
         assert (await uow.documents.get(uploaded.id)).uploaded_by is None
         assert await uow.credentials.find(user.id) is None
         assert await uow.api_tokens.list_for(user.id) == []
+        assert await uow.known_devices.find_by_token(hash_token(device)) is None
     with pytest.raises(AuthenticationError):
         await world.auth.login("alice", PASSWORD)
     with pytest.raises(NotFoundError):

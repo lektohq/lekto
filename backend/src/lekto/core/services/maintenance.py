@@ -169,6 +169,7 @@ class MaintenanceService:
                 jobs = await uow.jobs.purge(before=before)
                 sessions = await uow.sessions.purge(now=now, idle_before=now - self._session_idle)
                 failures = await uow.login_failures.purge(before=now - _FAILURE_RETENTION)
+                devices = await uow.known_devices.purge(now=now)
                 deliveries = await uow.webhooks.purge_deliveries(before=before)
                 tasks = await uow.tasks.purge(before=before)
                 secrets = await _drop_expired_secrets(uow, now)
@@ -191,6 +192,7 @@ class MaintenanceService:
                 "events_removed": events,
                 "sessions_removed": sessions,
                 "login_failures_removed": failures,
+                "known_devices_removed": devices,
                 "webhook_deliveries_removed": deliveries,
                 "tasks_removed": tasks,
                 "webhook_secrets_dropped": secrets,
