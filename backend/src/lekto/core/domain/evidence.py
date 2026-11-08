@@ -28,8 +28,10 @@ _STARS = re.compile(r"\*{3,}")
 _HYPHENATION = re.compile(r"(?<=[^\W\d_])-[ \t]*\n[ \t]*(?=[^\W\d_])")
 _WHITESPACE = re.compile(r"\s+")
 # A gap between two columns of a line: the parser sets columns apart by two spaces or more and
-# the words of running text by one (`LayoutParser`); a tab stands between columns too.
-_COLUMN_GAP = re.compile(r"[ \t]{2,}|\t")
+# the words of running text by one (`LayoutParser`); a tab stands between columns too, and so
+# does the `|` between the cells of a Markdown table (a number in one cell does not run on
+# into the amount of the next).
+_COLUMN_GAP = re.compile(r"[ \t]*\|[ \t]*|[ \t]{2,}|\t")
 COLUMN_GAP = "\t"
 """Where `normalise(..., columns=True)` keeps a gap between two columns of a line."""
 LINE_BREAK = "\n"

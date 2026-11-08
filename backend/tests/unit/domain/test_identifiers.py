@@ -196,6 +196,11 @@ def test_a_number_ends_before_the_next_label(text: str) -> None:
     assert identifiers_in(text) == {(CUSTOMER, "40012345")}
 
 
+def test_a_number_ends_with_its_table_cell() -> None:
+    row = "| 18.03. | Lastschrift Musterfunk KdNr 5550-1234 | -44,99 EUR |"
+    assert identifiers_in(row) == {(CUSTOMER, "55501234")}
+
+
 def test_digits_before_a_colon_still_belong_to_the_number() -> None:
     text = "Steuernummer: 012 345 6789 0: USt-IdNr."
     assert identifiers_in(text) == {(IdentifierKind.TAX_NUMBER, "01234567890")}
