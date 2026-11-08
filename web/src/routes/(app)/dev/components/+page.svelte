@@ -72,6 +72,7 @@
 	let on = $state(true);
 	let picked = $state('one');
 	let day = $state('2026-10-26');
+	let moment = $state('2026-10-26T14:30');
 	let view = $state('grid');
 	let contact = $state('c1');
 	let folded = $state(false);
@@ -222,6 +223,15 @@
 		<Field.Field>
 			<Field.Label for="sample-date">{m.dev_sample_table_date()}</Field.Label>
 			<DateInput id="sample-date" label={m.dev_sample_table_date()} bind:value={day} />
+		</Field.Field>
+		<Field.Field>
+			<Field.Label for="sample-moment">{m.files_received_label()}</Field.Label>
+			<DateInput
+				id="sample-moment"
+				label={m.files_received_label()}
+				granularity="minute"
+				bind:value={moment}
+			/>
 		</Field.Field>
 		<Field.Field>
 			<Field.Label for="sample-text">{m.dev_sample_input()}</Field.Label>

@@ -5,9 +5,9 @@
 // toggles on its own, one order on the master data tabs, tooltips through `ui/tooltip`, a run's
 // progress in the selection bar, fields in the API's order, short lines under fields, a document's
 // pages through `DocumentPages`, a topic chosen through the tag picker, one height for fields,
-// the owl only at its places. An
-// exception needs its line in DESIGN.md ("Exceptions") and here; the
-// lists of exceptions may only shrink.
+// dates and times through `DateInput`, "Abbrechen" before the primary action, the owl only at its
+// places. An exception needs its line in DESIGN.md ("Exceptions") and here; the lists of
+// exceptions may only shrink.
 import { describe, expect, it } from 'vitest';
 import de from '../messages/de.json';
 import en from '../messages/en.json';
@@ -348,6 +348,44 @@ describe('the design system (web/DESIGN.md)', () => {
 					const height = /class="[^"]*\b(h-\d+)\b/.exec(element)?.[1];
 					if (height !== undefined && !(height === 'h-9' && PANELS.has(path)))
 						return `${element.split('\n')[0]} (${height})`;
+				}
+				return null;
+			})
+		).toEqual([]);
+	});
+
+	it('takes dates and times through DateInput, never a field in the language of the browser', () => {
+		// The stand-in of `DateInput` in the component tests (`lib/testing`) is no view.
+		expect(
+			offenders((source, path) =>
+				path.startsWith('/src/lib/testing/')
+					? null
+					: line(source, /\btype=[^\n]*?["'](?:date|datetime-local|time|month|week)["']/)
+			)
+		).toEqual([]);
+	});
+
+	it('puts "Abbrechen" before the primary action, never after it', () => {
+		// A footer reads "Abbrechen" (ghost), then the primary action (no variant): a primary
+		// button directly followed by a ghost one turns the order round.
+		expect(
+			offenders((source) => {
+				let from = 0;
+				let previous: { tag: string; end: number } | null = null;
+				for (const tag of tags(source, 'Button')) {
+					const start = source.indexOf(tag, from);
+					from = start + tag.length;
+					if (
+						previous &&
+						/^\s*$/.test(source.slice(previous.end, start)) &&
+						!/\bvariant=/.test(previous.tag) &&
+						/\bvariant="ghost"/.test(tag)
+					)
+						return previous.tag.split('\n')[0];
+					const close = /<\/Button\s*>/g;
+					close.lastIndex = from;
+					const closed = close.exec(source);
+					previous = closed ? { tag, end: closed.index + closed[0].length } : null;
 				}
 				return null;
 			})

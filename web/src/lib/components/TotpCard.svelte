@@ -86,9 +86,9 @@
 					</code>
 				</div>
 			</div>
-			<div class="flex gap-2">
-				<Button onclick={() => (confirming = true)}>{m.totp_confirm()}</Button>
+			<div class="flex justify-end gap-2">
 				<Button variant="ghost" onclick={() => (setup = null)}>{m.cancel()}</Button>
+				<Button onclick={() => (confirming = true)}>{m.totp_confirm()}</Button>
 			</div>
 		{:else if enabled}
 			<div class="flex flex-wrap gap-2">

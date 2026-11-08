@@ -4,7 +4,7 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
-	import { Input } from '#lib/components/ui/input/index.ts';
+	import DateInput from '#lib/components/DateInput.svelte';
 	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { localMinute } from '#lib/file-passport.ts';
@@ -70,10 +70,15 @@
 	</Popover.Trigger>
 	<Popover.Content collisionPadding={8} role="dialog" aria-labelledby="{id}-title" class="w-72">
 		<form class="flex flex-col gap-3" onsubmit={save}>
-			<label class="flex flex-col gap-1.5">
+			<div class="flex flex-col gap-1.5">
 				<span id="{id}-title" class="text-sm font-semibold">{m.files_received_label()}</span>
-				<Input type="datetime-local" bind:value={draft} max={latest} required />
-			</label>
+				<DateInput
+					label={m.files_received_label()}
+					granularity="minute"
+					bind:value={draft}
+					max={latest}
+				/>
+			</div>
 			{#if problem}
 				<Field.Error>{problem}</Field.Error>
 			{/if}
