@@ -66,6 +66,25 @@ async def test_a_file_that_is_no_image_is_unprocessable(tmp_path: Path) -> None:
     assert list(tmp_path.iterdir()) == []
 
 
+async def test_a_later_frame_over_the_limit_is_unprocessable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from lekto.core.domain.errors import UnprocessableDocumentError
+
+    source = tmp_path / "bomb.tiff"
+    Image.new("L", (100, 100), 255).save(
+        source,
+        save_all=True,
+        append_images=[Image.new("L", (300, 300), 255)],
+        compression="tiff_lzw",  # an uncompressed page is not checked by Pillow
+    )
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 20_000)  # page two is over it
+    target = tmp_path / "pages"
+    target.mkdir()
+    with pytest.raises(UnprocessableDocumentError, match="cannot be read"):
+        await PdfiumPageRenderer().render_pages(source, media_type=media_types.TIFF, target=target)
+
+
 @pytest.mark.parametrize(
     ("width", "height", "expected"),
     [
