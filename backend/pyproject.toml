@@ -137,6 +137,7 @@ modules = [
     "lekto.adapters.outbound.sql",
     "lekto.adapters.outbound.weasyprint",
     "lekto.adapters.outbound.webhooks",
+    "lekto.adapters.outbound.webpush",
     "lekto.adapters.outbound.zxing",
 ]
 ignore_imports = [
