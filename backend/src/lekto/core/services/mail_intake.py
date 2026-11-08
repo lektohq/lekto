@@ -25,7 +25,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from uuid import UUID
 
-from lekto.core.domain.documents import Channel
+from lekto.core.domain.documents import Channel, Document
 from lekto.core.domain.errors import (
     DomainError,
     DuplicateDocumentError,
@@ -33,7 +33,7 @@ from lekto.core.domain.errors import (
     ValidationError,
 )
 from lekto.core.domain.events import MailboxFetched
-from lekto.core.domain.ids import DocumentId, MailboxId, MailRecordId, UserId, new_id
+from lekto.core.domain.ids import DocumentId, MailboxId, UserId, new_id
 from lekto.core.domain.jobs import Job
 from lekto.core.domain.mail import (
     Fallback,
@@ -42,6 +42,7 @@ from lekto.core.domain.mail import (
     Mailbox,
     MailboxStatus,
     MailLogin,
+    MailStep,
     StepOutcome,
     password_context,
     step_flags,
@@ -56,6 +57,7 @@ from lekto.core.domain.mail_intake import (
     OriginRole,
     letters,
     mail_limit,
+    record_id,
     taken_names,
 )
 from lekto.core.domain.mail_message import MailMessage, address_line, read_mail
@@ -291,6 +293,7 @@ class MailIntakeService:
         found = await session.search(folder, search)
         count.keywords.update(found.keywords)
         count.own_keywords = found.own_keywords and count.own_keywords is not False
+        await self._steps_due(session, mailbox, folder, found.uidvalidity, count)
         async with self._uow() as uow:
             known = await uow.mail_records.known_uids(mailbox.id, folder, found.uidvalidity)
         new = [uid for uid in found.uids if uid not in known]
@@ -377,11 +380,15 @@ class MailIntakeService:
             )
             await self._settle(replace(decided, outcome=MailOutcome.FAILED, reason=error.reason))
             return 0
-        outcome = MailOutcome.TAKEN if made else MailOutcome.NOTHING
-        steps = await self._after(
-            session, record.folder, record.uid, decision, record.subject, count
+        documents = await self._documents(record)
+        taken = replace(
+            decided,
+            outcome=MailOutcome.TAKEN if documents else MailOutcome.NOTHING,
+            documents=documents,
+            steps_due=decision.after,
         )
-        await self._settle(replace(decided, outcome=outcome, documents=made, steps=steps))
+        await self._settle(taken)
+        await self._run_steps(session, taken, count)
         return made
 
     async def _due(
@@ -426,7 +433,7 @@ class MailIntakeService:
         """Take one mail; the number of documents it made, or None for a mail gone meanwhile
         (looked at next time, if it comes back)."""
         record = MailRecord(
-            id=MailRecordId(new_id()),
+            id=record_id(mailbox.id, folder, uidvalidity, info.uid),
             mailbox_id=mailbox.id,
             folder=folder,
             uidvalidity=uidvalidity,
@@ -505,19 +512,18 @@ class MailIntakeService:
                 )
             )
             return 0
-        outcome = MailOutcome.TAKEN if made else MailOutcome.NOTHING
+        documents = await self._documents(record)
         record = replace(
             record,
-            outcome=outcome,
+            outcome=MailOutcome.TAKEN if documents else MailOutcome.NOTHING,
             rule=decision.rule,
             rule_id=decision.rule_id,
-            documents=made,
+            documents=documents,
             decided_at=record.fetched_at,
+            steps_due=decision.after,
         )
         await self._keep(record)
-        steps = await self._after(session, folder, info.uid, decision, record.subject, count)
-        if steps:
-            await self._settle(replace(record, steps=steps))
+        await self._run_steps(session, record, count)
         return made
 
     async def _decide(
@@ -593,36 +599,26 @@ class MailIntakeService:
                         if len(part.data) > self._max_attachment:
                             continue
                         name = part.filename or f"attachment-{index + 1}"
-                        found = await self._receive(folder, part.data, name, decision)
+                        attachment = replace(origin, role=OriginRole.ATTACHMENT, filename=name)
+                        found = await self._receive(folder, part.data, name, decision, attachment)
                         if found is None:
                             continue
                         document, new = found
                         if new:
-                            await self._keep_origin(
-                                replace(
-                                    origin,
-                                    document_id=document,
-                                    role=OriginRole.ATTACHMENT,
-                                    filename=name,
-                                )
-                            )
                             made += 1
-                        else:
+                        elif not await self._made_for(record, document):
                             related.append(document)
                 if decision.parts in (MailParts.ALL, MailParts.TEXT):
                     name = f"{_stem(letter.message.subject)}.eml"
-                    found = await self._receive(folder, letter.message.raw, name, decision)
+                    cover = replace(
+                        origin,
+                        role=OriginRole.COVER,
+                        filename=name,
+                        related=tuple(related),
+                        body_type_id=decision.body_type_id,
+                    )
+                    found = await self._receive(folder, letter.message.raw, name, decision, cover)
                     if found is not None and found[1]:
-                        await self._keep_origin(
-                            replace(
-                                origin,
-                                document_id=found[0],
-                                role=OriginRole.COVER,
-                                filename=name,
-                                related=tuple(related),
-                                body_type_id=decision.body_type_id,
-                            )
-                        )
                         made += 1
         return made
 
@@ -657,10 +653,16 @@ class MailIntakeService:
         )
 
     async def _receive(
-        self, folder: Path, data: bytes, name: str, decision: MailDecision
+        self, folder: Path, data: bytes, name: str, decision: MailDecision, origin: MailOrigin
     ) -> tuple[DocumentId, bool] | None:
         """The document made of `data`, and whether it is new; for a file Lekto has already the
-        one the person reads (None where they read it not)."""
+        one the person reads (None where they read it not). A new document gets `origin` in
+        the transaction that creates it: its nodes find it, and no document is left without
+        it."""
+
+        async def keep_origin(uow: UnitOfWork, document: Document) -> None:
+            await uow.mail_origins.add(replace(origin, document_id=document.id))
+
         assert decision.user_id is not None, "a decision that takes names its person"
         path = folder / new_id().hex
         await asyncio.to_thread(path.write_bytes, data)
@@ -672,6 +674,7 @@ class MailIntakeService:
                 filename=name,
                 space=decision.space_id,
                 channel=Channel.MAIL,
+                also=keep_origin,
             )
         except DuplicateDocumentError as duplicate:
             existing = duplicate.existing
@@ -690,25 +693,76 @@ class MailIntakeService:
             await uow.mail_records.settle(record)
             await uow.commit()
 
-    async def _keep_origin(self, origin: MailOrigin) -> None:
+    async def _made_for(self, record: MailRecord, document: DocumentId) -> bool:
+        """Whether the mail of `record` made `document`: a run interrupted before it kept the
+        record did. Else the document is one Lekto had before, which the mail refers to."""
         async with self._uow() as uow:
-            await uow.mail_origins.add(origin)
-            await uow.commit()
+            origin = await uow.mail_origins.find(document)
+        return origin is not None and origin.record_id == record.id
+
+    async def _documents(self, record: MailRecord) -> int:
+        """The documents the mail of `record` made: also those of a run interrupted before it
+        kept the record."""
+        async with self._uow() as uow:
+            return len(await uow.mail_origins.of_record(record.id))
+
+    async def _run_steps(self, session: MailSession, record: MailRecord, count: _Count) -> None:
+        """Run the record's steps due on the server and store how each went."""
+        if not record.steps_due:
+            return
+        steps = await self._after(
+            session, record.folder, record.uid, record.steps_due, record.subject, count
+        )
+        await self._settle(replace(record, steps=steps, steps_due=()))
+
+    async def _steps_due(
+        self,
+        session: MailSession,
+        mailbox: Mailbox,
+        folder: str,
+        uidvalidity: int,
+        count: _Count,
+    ) -> None:
+        """Run the steps on the server that an interrupted fetch left due in `folder`. A mail
+        no longer there (or behind a new UIDVALIDITY) went with its last step if that moved it
+        or put it in the trash: all its steps count as done (Tobi, 08.11.2026; the last ran
+        before the fetch stopped, the others run before it). Else none of them could run."""
+        async with self._uow() as uow:
+            due = [r for r in await uow.mail_records.steps_due(mailbox.id) if r.folder == folder]
+        current = [record.uid for record in due if record.uidvalidity == uidvalidity]
+        present = {info.uid for info in await session.info(folder, current)} if current else set()
+        for record in due:
+            if record.uidvalidity == uidvalidity and record.uid in present:
+                await self._run_steps(session, record, count)
+                continue
+            last = record.steps_due[-1]
+            if last.action in (MailAction.MOVE, MailAction.TRASH):
+                steps = tuple(StepOutcome(step) for step in record.steps_due)
+            else:
+                gone = because(ReasonCode.MAIL_STEP_GONE)
+                steps = tuple(StepOutcome(step, gone) for step in record.steps_due)
+                count.step_failed = because(
+                    ReasonCode.MAIL_STEP_FAILED,
+                    step=f"mail_step:{record.steps_due[0].action.value}",
+                    subject=record.subject,
+                    detail=gone.text,
+                )
+            await self._settle(replace(record, steps=steps, steps_due=()))
 
     async def _after(
         self,
         session: MailSession,
         folder: str,
         uid: int,
-        decision: MailDecision,
+        steps: tuple[MailStep, ...],
         subject: str,
         count: _Count,
     ) -> tuple[StepOutcome, ...]:
-        """The decision's steps on the mail on the server, in order, each with why the server
-        refused it. A refused step (a keyword where it stores none) is noted at the mailbox, the
-        next ones go on; the mail stays taken."""
+        """The steps on the mail on the server, in order, each with why the server refused it.
+        A refused step (a keyword where it stores none) is noted at the mailbox, the next ones
+        go on; the mail stays taken."""
         done: list[StepOutcome] = []
-        for step in decision.after:
+        for step in steps:
             try:
                 match step.action:
                     case MailAction.MOVE:

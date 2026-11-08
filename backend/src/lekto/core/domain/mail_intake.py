@@ -8,9 +8,11 @@ images, mails), small images aside (logos, signatures); the rest stays and the h
 names it ("Nicht übernommen").
 """
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+from uuid import NAMESPACE_URL, uuid5
 
 from lekto.core.domain import media_types
 from lekto.core.domain.ids import (
@@ -135,6 +137,17 @@ among them (Tobi, 06.11.2026: only these); the rest let go of it (`MailRecord.fo
 only so that no mail is fetched twice."""
 
 
+_RECORDS = uuid5(NAMESPACE_URL, "https://github.com/tb1337/lekto-dms#mail-records")
+
+
+def record_id(mailbox: MailboxId, folder: str, uidvalidity: int, uid: int) -> MailRecordId:
+    """The id of the record of the mail at `uid` in `folder` under `uidvalidity`: the same at
+    every fetch of it. A mail taken again after an interrupted run keeps its record, and the
+    origins of the documents both runs made name that one record."""
+    key = json.dumps([str(mailbox), folder, uidvalidity, uid])
+    return MailRecordId(uuid5(_RECORDS, key))
+
+
 class MailOutcome(StrEnum):
     """What became of a fetched mail."""
 
@@ -191,6 +204,9 @@ class MailRecord:
     """The steps on the mail on the server, in order, each with why it failed (none: done)."""
     gone_at: datetime | None = None
     """When a fetch found it no longer in its folder while no rule had taken it."""
+    steps_due: tuple[MailStep, ...] = ()
+    """The steps on the server still to run: stored with what became of the mail, emptied when
+    they ran. A fetch interrupted in between leaves them to the next."""
 
     def __post_init__(self) -> None:
         require_utc(self.fetched_at, "fetched_at")
@@ -228,7 +244,17 @@ class MailRecord:
         )
 
 
-SETTLED = ("outcome", "reason", "rule", "rule_id", "documents", "decided_at", "steps", "gone_at")
+SETTLED = (
+    "outcome",
+    "reason",
+    "rule",
+    "rule_id",
+    "documents",
+    "decided_at",
+    "steps",
+    "gone_at",
+    "steps_due",
+)
 """What a record's `MailRecordRepository.settle` stores: what became of the mail."""
 
 
