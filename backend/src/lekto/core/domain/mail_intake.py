@@ -204,6 +204,9 @@ class MailRecord:
     """The steps on the mail on the server, in order, each with why it failed (none: done)."""
     gone_at: datetime | None = None
     """When a fetch found it no longer in its folder while no rule had taken it."""
+    steps_due: tuple[MailStep, ...] = ()
+    """The steps on the server still to run: stored with what became of the mail, emptied when
+    they ran. A fetch interrupted in between leaves them to the next."""
 
     def __post_init__(self) -> None:
         require_utc(self.fetched_at, "fetched_at")
@@ -241,7 +244,17 @@ class MailRecord:
         )
 
 
-SETTLED = ("outcome", "reason", "rule", "rule_id", "documents", "decided_at", "steps", "gone_at")
+SETTLED = (
+    "outcome",
+    "reason",
+    "rule",
+    "rule_id",
+    "documents",
+    "decided_at",
+    "steps",
+    "gone_at",
+    "steps_due",
+)
 """What a record's `MailRecordRepository.settle` stores: what became of the mail."""
 
 

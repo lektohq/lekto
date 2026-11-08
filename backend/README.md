@@ -1881,8 +1881,12 @@ brings in and for whom.
   (`GET /documents/{id}/origin`), and the documents of one mail relate to each other (evidence
   `mail`, never dropped). The record of a mail has an id made of mailbox, folder, UIDVALIDITY
   and UID: a run interrupted within a mail leaves no record, the next takes the mail again, the
-  documents it has already are the mail's own, and the record counts the documents of both. Afterwards the rule's steps run on the mail on the server,
-  in order; a step the server refuses is noted at the mailbox. A failure of the server ends
+  documents it has already are the mail's own, and the record counts the documents of both.
+  Afterwards the rule's steps run on the mail on the server, in order; a step the server
+  refuses is noted at the mailbox. The record keeps the steps due with what became of the mail
+  until they ran: a run interrupted before runs them at the next, first thing in the folder; a
+  mail gone from its folder meanwhile went with its last step if that moved it or put it in the
+  trash (all count as done), else its steps fail (`mail_step_gone`). A failure of the server ends
   the run and shows at the mailbox; a mail that cannot be taken is recorded as failed and the
   run goes on.
 - **Mails as documents** (port `MailRenderer`, adapter `adapters/outbound/weasyprint`): a

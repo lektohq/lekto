@@ -2812,6 +2812,7 @@
 	"reason_mailbox_paused": "Das Postfach ist pausiert. Aktiviere es, damit Lekto abholt.",
 	"reason_mail_too_large": "Die Mail „{subject}“ hat {size} MB; Lekto holt Mails bis {max} MB (LEKTO_UPLOAD_MAX_SIZE).",
 	"reason_mail_step_failed": "„{step}“ ging auf dem Server für die Mail „{subject}“ nicht: {detail}",
+	"reason_mail_step_gone": "Die Mail lag nicht mehr in ihrem Ordner.",
 	"thing_document": "Dokument",
 	"thing_contact": "Kontakt",
 	"thing_document_type": "Dokumenttyp",

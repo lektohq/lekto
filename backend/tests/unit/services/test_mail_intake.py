@@ -27,6 +27,7 @@ from lekto.core.domain.mail import (
     MailLogin,
     MailSecurity,
     MailStep,
+    StepOutcome,
 )
 from lekto.core.domain.mail_intake import MailOrigin, MailOutcome, MailParts, OriginRole, mail_limit
 from lekto.core.domain.mail_rules import (
@@ -529,6 +530,144 @@ async def test_the_steps_on_a_mail_go_in_order_and_a_refused_one_shows(world: Wo
     assert failed is not None and failed.code is ReasonCode.MAIL_STEP_FAILED
     assert (failed.params["step"], failed.params["subject"]) == ("mail_step:add_keyword", "Zweite")
     assert stored.status.step_failed_at is not None
+
+
+def _stops_once(monkeypatch: pytest.MonkeyPatch, name: str, *, after: bool = False) -> None:
+    """The worker stops at the session's step `name` once: before it, or after it was done."""
+    done = getattr(MemoryMailSession, name)
+    calls = 0
+
+    async def stops(self: MemoryMailSession, *args: Any, **kwargs: Any) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1 and after:
+            await done(self, *args, **kwargs)
+        if calls == 1:
+            raise RuntimeError("the worker stopped")
+        await done(self, *args, **kwargs)
+
+    monkeypatch.setattr(MemoryMailSession, name, stops)
+
+
+async def _again(world: World, service: MailIntakeService) -> None:
+    """The next fetch, once the stopped run's job comes again."""
+    world.clock.advance(LEASE)
+    await _fetch(world, service)
+
+
+async def test_the_next_fetch_runs_the_steps_a_stopped_one_left(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The worker stops after keeping the mail's record, before its steps on the server: the
+    record keeps them due, the next fetch runs them and takes the mail only once."""
+    admin, person, mailbox = await _setup(world, everything=False)
+    account = world.mail_server.servers[(LOGIN.host, LOGIN.port)][LOGIN.username]
+    account.add_folders("Erledigt")
+    steps = (MailStep(MailAction.READ), MailStep(MailAction.MOVE, "Erledigt"))
+    await _rule(world, admin, mailbox, user_id=person.id, after=steps)
+    _deliver(world, mails.plain_mail("Strom"))
+    service = world.mail_intake()
+    _stops_once(monkeypatch, "mark")
+    with pytest.raises(RuntimeError, match="stopped"):
+        await _fetch(world, service)
+    async with world.uow() as uow:
+        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+    assert (record.outcome, record.steps, record.steps_due) == (MailOutcome.TAKEN, (), steps)
+
+    await _again(world, service)
+    (moved,) = account.boxes["Erledigt"].mails
+    assert moved.seen and account.boxes["INBOX"].mails == []
+    async with world.uow() as uow:
+        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+    assert record.steps == tuple(StepOutcome(step) for step in steps)
+    assert record.steps_due == ()
+    assert len(await world.documents.list_visible(person.id)) == 1
+
+
+async def test_steps_left_due_count_as_done_when_the_mail_went_with_the_last(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The worker stops right after moving the mail: it is gone from its folder at the next
+    fetch, its last step moved it, so all its steps count as done (Tobi, 08.11.2026)."""
+    admin, person, mailbox = await _setup(world, everything=False)
+    account = world.mail_server.servers[(LOGIN.host, LOGIN.port)][LOGIN.username]
+    account.add_folders("Erledigt")
+    steps = (MailStep(MailAction.READ), MailStep(MailAction.MOVE, "Erledigt"))
+    await _rule(world, admin, mailbox, user_id=person.id, after=steps)
+    _deliver(world, mails.plain_mail("Strom"))
+    service = world.mail_intake()
+    _stops_once(monkeypatch, "move", after=True)
+    with pytest.raises(RuntimeError, match="stopped"):
+        await _fetch(world, service)
+    assert len(account.boxes["Erledigt"].mails) == 1
+
+    await _again(world, service)
+    async with world.uow() as uow:
+        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        stored = await uow.mailboxes.get(mailbox.id)
+    assert record.steps == tuple(StepOutcome(step) for step in steps)
+    assert record.steps_due == ()
+    assert stored.status.step_failed is None
+
+
+async def test_steps_left_due_fail_when_the_mail_is_gone_otherwise(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A mail the person deleted before the next fetch: its steps could not run, and the
+    mailbox says so."""
+    admin, person, mailbox = await _setup(world, everything=False)
+    account = world.mail_server.servers[(LOGIN.host, LOGIN.port)][LOGIN.username]
+    steps = (MailStep(MailAction.READ), MailStep(MailAction.FLAG, "blue"))
+    await _rule(world, admin, mailbox, user_id=person.id, after=steps)
+    _deliver(world, mails.plain_mail("Strom"))
+    service = world.mail_intake()
+    _stops_once(monkeypatch, "mark")
+    with pytest.raises(RuntimeError, match="stopped"):
+        await _fetch(world, service)
+    account.boxes["INBOX"].mails = []  # deleted by the person
+
+    await _again(world, service)
+    async with world.uow() as uow:
+        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        stored = await uow.mailboxes.get(mailbox.id)
+    assert [step.step for step in record.steps] == list(steps)
+    assert {step.failed.code for step in record.steps if step.failed} == {ReasonCode.MAIL_STEP_GONE}
+    assert len([step for step in record.steps if step.failed]) == 2
+    assert record.steps_due == ()
+    failed = stored.status.step_failed
+    assert failed is not None and failed.code is ReasonCode.MAIL_STEP_FAILED
+    assert failed.params["subject"] == "Strom"
+
+
+async def test_a_waiting_mail_a_rule_takes_keeps_its_outcome_and_steps_due(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A rule switched on later takes a waiting mail, and the worker stops before its steps:
+    the record says it was taken, with the steps due, and the next fetch runs them."""
+    admin, person, mailbox = await _setup(world, everything=False)
+    account = world.mail_server.servers[(LOGIN.host, LOGIN.port)][LOGIN.username]
+    _deliver(world, mails.plain_mail("Ihre Rechnung"))
+    service = world.mail_intake()
+    await _fetch(world, service)
+    rule = await _rule(
+        world, admin, mailbox, user_id=person.id, after=(MailStep(MailAction.READ),), enabled=False
+    )
+    world.clock.advance(LATER)
+    await world.mail_rules.change(admin.id, rule.id, MailRuleChanges(enabled=True))
+    _stops_once(monkeypatch, "mark")
+    with pytest.raises(RuntimeError, match="stopped"):
+        await drain(service)
+    async with world.uow() as uow:
+        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+    assert (record.outcome, record.documents) == (MailOutcome.TAKEN, 1)
+    assert record.steps_due == (MailStep(MailAction.READ),)
+
+    await _again(world, service)
+    (mail,) = account.boxes["INBOX"].mails
+    async with world.uow() as uow:
+        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+    assert mail.seen and record.steps == (StepOutcome(MailStep(MailAction.READ)),)
+    assert record.steps_due == ()
 
 
 async def test_a_rule_switched_on_later_takes_the_mails_no_rule_took(world: World) -> None:

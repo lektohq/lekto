@@ -214,6 +214,28 @@ class MailRecordRepositoryContract:
             async with uow_factory() as uow:
                 await uow.mail_records.settle(a_record(mailbox, 9))
 
+    async def test_steps_still_to_run(self, uow_factory: UnitOfWorkFactory) -> None:
+        mailbox = await a_mailbox(uow_factory)
+        other = await a_mailbox(uow_factory, "Work")
+        due = (MailStep(MailAction.READ), MailStep(MailAction.MOVE, "Archiv"))
+        later = a_record(mailbox, 2, steps_due=due[:1])
+        first = a_record(mailbox, 1, steps_due=due)
+        async with uow_factory() as uow:
+            for record in (later, first, a_record(mailbox, 3), a_record(other, 4, steps_due=due)):
+                await uow.mail_records.add(record)
+            await uow.commit()
+        async with uow_factory() as uow:
+            found = await uow.mail_records.steps_due(mailbox.id)
+            assert [record.uid for record in found] == [1, 2]
+            assert found[0].steps_due == due
+            done = tuple(StepOutcome(step) for step in due)
+            await uow.mail_records.settle(replace(first, steps=done, steps_due=()))
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert [r.uid for r in await uow.mail_records.steps_due(mailbox.id)] == [2]
+            stored = {r.uid: r for r in await uow.mail_records.recent(mailbox.id, limit=9)}
+            assert (stored[1].steps, stored[1].steps_due) == (done, ())
+
     async def test_a_page_of_the_log_and_its_counts(self, uow_factory: UnitOfWorkFactory) -> None:
         mailbox, other = await a_mailbox(uow_factory), await a_mailbox(uow_factory, "Other")
         rule = MailRuleId(new_id())
