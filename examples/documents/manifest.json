@@ -8536,7 +8536,7 @@
    },
    "facts": [
     {
-     "kind": "loan_number",
+     "kind": "contract_number",
      "value": "AF-24-0203318",
      "role": "target"
     },
@@ -8579,7 +8579,7 @@
    },
    "facts": [
     {
-     "kind": "loan_number",
+     "kind": "contract_number",
      "value": "AF-24-0203318",
      "role": "target"
     }
@@ -8618,7 +8618,7 @@
    },
    "facts": [
     {
-     "kind": "loan_number",
+     "kind": "contract_number",
      "value": "AF-24-0203318",
      "role": "target"
     }
@@ -12168,7 +12168,7 @@
      "role": "target"
     },
     {
-     "kind": "membership_number",
+     "kind": "contract_number",
      "value": "40871",
      "role": "target"
     },
@@ -12211,7 +12211,7 @@
    },
    "facts": [
     {
-     "kind": "membership_number",
+     "kind": "contract_number",
      "value": "40871",
      "role": "target"
     },
@@ -12326,7 +12326,7 @@
      "role": "target"
     },
     {
-     "kind": "membership_number",
+     "kind": "contract_number",
      "value": "40871",
      "role": "target"
     }
@@ -12365,7 +12365,7 @@
     },
     {
      "kind": "customer_number",
-     "value": "BW5-EG-links",
+     "value": "BW5-EG-0104",
      "role": "contact",
      "pattern": false
     }
@@ -12400,7 +12400,7 @@
    "facts": [
     {
      "kind": "customer_number",
-     "value": "BW5-EG-links",
+     "value": "BW5-EG-0104",
      "role": "contact",
      "pattern": false
     }
@@ -12440,7 +12440,7 @@
    "facts": [
     {
      "kind": "contract_number",
-     "value": "BW5-EG-links",
+     "value": "BW5-EG-0104",
      "role": "target"
     },
     {
@@ -12482,7 +12482,7 @@
    },
    "facts": [
     {
-     "kind": "policy_number",
+     "kind": "contract_number",
      "value": "HV-2025-4471182",
      "role": "target"
     },
@@ -12528,7 +12528,7 @@
    },
    "facts": [
     {
-     "kind": "policy_number",
+     "kind": "contract_number",
      "value": "PH-2019-0083317",
      "role": "target"
     },
@@ -12576,7 +12576,7 @@
    },
    "facts": [
     {
-     "kind": "policy_number",
+     "kind": "contract_number",
      "value": "PH-2019-0083317",
      "role": "target"
     },
@@ -12624,7 +12624,7 @@
    },
    "facts": [
     {
-     "kind": "policy_number",
+     "kind": "contract_number",
      "value": "HV-2025-4471182",
      "role": "target"
     },
@@ -12673,7 +12673,7 @@
    },
    "facts": [
     {
-     "kind": "policy_number",
+     "kind": "contract_number",
      "value": "PH-2019-0083317",
      "role": "target"
     },
@@ -12714,7 +12714,7 @@
    },
    "facts": [
     {
-     "kind": "policy_number",
+     "kind": "contract_number",
      "value": "HV-2025-4471182",
      "role": "target"
     },
@@ -12757,7 +12757,7 @@
      "role": "thread"
     },
     {
-     "kind": "policy_number",
+     "kind": "contract_number",
      "value": "HV-2025-4471182",
      "role": "target"
     },
@@ -12809,7 +12809,7 @@
      "role": "thread"
     },
     {
-     "kind": "policy_number",
+     "kind": "contract_number",
      "value": "HV-2025-4471182",
      "role": "target"
     },
@@ -12858,7 +12858,7 @@
    },
    "facts": [
     {
-     "kind": "policy_number",
+     "kind": "contract_number",
      "value": "KS-61-2207431",
      "role": "target"
     },
@@ -12907,7 +12907,7 @@
    },
    "facts": [
     {
-     "kind": "policy_number",
+     "kind": "contract_number",
      "value": "KS-61-2207431",
      "role": "target"
     },
@@ -12954,7 +12954,7 @@
    },
    "facts": [
     {
-     "kind": "policy_number",
+     "kind": "contract_number",
      "value": "KS-61-2207431",
      "role": "target"
     },
@@ -13810,7 +13810,7 @@
    "fields": {},
    "facts": [
     {
-     "kind": "membership_number",
+     "kind": "contract_number",
      "value": "1890-3317",
      "role": "target"
     },
@@ -13860,7 +13860,7 @@
    },
    "facts": [
     {
-     "kind": "membership_number",
+     "kind": "contract_number",
      "value": "1890-3317",
      "role": "target"
     },

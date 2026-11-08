@@ -256,7 +256,7 @@ def test_a_known_name_outside_a_booking_is_the_sender_s() -> None:
     assert kinds(holders_of(text)) == {UTILITY: (HolderKind.SENDER, "Stadtwerke Musterstadt GmbH")}
 
 
-# --- the holders the language model tells (`facts-2`) -----------------------------------------
+# --- the holders the language model tells (`facts-3`) -----------------------------------------
 
 STATEMENT = f"""Beispielbank   Kontoauszug 10/2026
 02.10.2026   Lastschrift   Stadtwerke Musterstadt   {spaced(UTILITY)}   -45,00 EUR

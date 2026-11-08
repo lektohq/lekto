@@ -177,7 +177,7 @@ async def test_a_contract_number_connects_only_with_a_relation_target(world: Wor
     insurer = await s.contact("Nord Versicherung")
     policy = await s.document_type("Police", target=True)
     bill = await s.document_type("Beitragsrechnung")
-    number = ((K.POLICY_NUMBER, "KV123456", FactRole.TARGET),)
+    number = ((K.CONTRACT_NUMBER, "KV123456", FactRole.TARGET),)
     first = await s.document(contact=insurer, kind=bill, dated=date(2026, 1, 5), facts=number)
     second = await s.document(contact=insurer, kind=bill, dated=date(2026, 2, 5), facts=number)
     # Two bills with the policy number: no relation between them.
@@ -395,13 +395,13 @@ async def test_two_relation_targets_are_not_related_by_a_customer_number(world: 
         contact=insurer,
         kind=policy,
         dated=date(2025, 1, 1),
-        facts=(customer, (K.POLICY_NUMBER, "KFZ1", FactRole.TARGET)),
+        facts=(customer, (K.CONTRACT_NUMBER, "KFZ1", FactRole.TARGET)),
     )
     house = await s.document(
         contact=insurer,
         kind=policy,
         dated=date(2025, 6, 1),
-        facts=(customer, (K.POLICY_NUMBER, "HAUS1", FactRole.TARGET)),
+        facts=(customer, (K.CONTRACT_NUMBER, "HAUS1", FactRole.TARGET)),
     )
     assert await s.relate(house) == []
 

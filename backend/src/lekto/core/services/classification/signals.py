@@ -108,7 +108,7 @@ MODEL_FACTS = "facts"
 (`facts-1`; `document_facts.ReadFact` as JSON, unchecked)."""
 MODEL_HOLDERS = "holders"
 """Key of the holders of the listed IBANs and creditor IDs the language model told, in the output
-of `signal_llm` (`facts-2`; `holders.ReadHolder` as JSON, unchecked)."""
+of `signal_llm` (`facts-3`; `holders.ReadHolder` as JSON, unchecked)."""
 FACTS_ERROR = "facts_error"
 """Why the language model read no facts, in the output of `signal_llm`."""
 FACTS_INPUT = "facts_prompt"
@@ -626,7 +626,7 @@ def model_facts(entries: Mapping[Node, NodeRun]) -> list[ReadFact] | None:
 
 
 def model_holders(entries: Mapping[Node, NodeRun]) -> list[ReadHolder] | None:
-    """The holders the language model told (`facts-2`), unchecked; None if it told none (no
+    """The holders the language model told (`facts-3`), unchecked; None if it told none (no
     model, an answer from before 0.8, or the call went wrong)."""
     entry = entries.get(Node.SIGNAL_LLM)
     if entry is None:

@@ -24,7 +24,7 @@ from lekto.core.domain.text import Shortened
 
 EXTRACT_PROMPT = "extract-6"
 PROPOSE_PROMPT = "propose-6"
-FACTS_PROMPT = "facts-2"
+FACTS_PROMPT = "facts-3"
 PROPOSE_SCHEMA = "proposal"
 EXTRACT_SCHEMA = "fields"
 FACTS_SCHEMA = "facts"
@@ -325,11 +325,11 @@ FACT_KINDS: dict[IdentifierKind, str] = {
     IdentifierKind.TAX_NUMBER: (
         "a tax number (Steuernummer): a company's, or the one the tax office gave the addressee"
     ),
-    IdentifierKind.CONTRACT_NUMBER: "a contract number",
-    IdentifierKind.POLICY_NUMBER: "an insurance policy number (Versicherungsscheinnummer)",
-    IdentifierKind.MEMBERSHIP_NUMBER: "a membership number",
+    IdentifierKind.CONTRACT_NUMBER: (
+        "the number of a running contract: a contract, an insurance policy "
+        "(Versicherungsscheinnummer), a membership or a loan"
+    ),
     IdentifierKind.METER_NUMBER: "a meter number or metering point (Zählernummer, Zählpunkt)",
-    IdentifierKind.LOAN_NUMBER: "a loan or credit number",
     IdentifierKind.MANDATE_REFERENCE: "a SEPA mandate reference",
     IdentifierKind.LICENSE_PLATE: "a car's licence plate",
     IdentifierKind.INVOICE_NUMBER: "the number of an invoice",
@@ -388,7 +388,7 @@ HOLDERS: dict[HolderKind, str] = {
     ),
     HolderKind.UNCLEAR: "the document does not tell",
 }
-"""Whose an IBAN or a creditor ID can be (`facts-2`), each with what it means."""
+"""Whose an IBAN or a creditor ID can be (`facts-3`), each with what it means."""
 
 HOLDERS_RULE = """\
 one entry per listed number, in the listed order: its kind and value as listed, its holder, \

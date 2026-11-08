@@ -102,7 +102,7 @@ def policy(
             "Vertragsbeginn": begin.isoformat(),
         },
         facts=[
-            ("policy_number", number),
+            ("contract_number", number),
             ("customer_number", HANSE_CUSTOMER),
             ("mandate_reference", number),
         ],
@@ -151,7 +151,7 @@ def premium_invoice(
             "Versicherungsnummer": number,
             "Bezugszeitraum": f"{period[0].isoformat()}/{period[1].isoformat()}",
         },
-        facts=[("policy_number", number), ("customer_number", customer), ("iban", MAX_IBAN)],
+        facts=[("contract_number", number), ("customer_number", customer), ("iban", MAX_IBAN)],
         download=f"Beitragsrechnung_{period[0].year}.pdf",
     )
 
@@ -173,7 +173,7 @@ def premium_adjustment(day: date, seed: int = 0) -> Doc:
         cls="premium-adjustment",
         document_type="Versicherung",
         title="Beitragsanpassung Haftpflicht 2026",
-        facts=[("policy_number", LIABILITY_POLICY), ("customer_number", HANSE_CUSTOMER)],
+        facts=[("contract_number", LIABILITY_POLICY), ("customer_number", HANSE_CUSTOMER)],
         fields={"Beitrag": money("84.20"), "Versicherungsnummer": LIABILITY_POLICY},
         seed=seed,
     )
@@ -232,7 +232,7 @@ def claim_report(day: date) -> Doc:
         "Schadenanzeige Fahrraddiebstahl",
         [page],
         fields={"Versicherungsnummer": HOUSEHOLD_POLICY},
-        facts=[("policy_number", HOUSEHOLD_POLICY), ("iban", MAX_IBAN)],
+        facts=[("contract_number", HOUSEHOLD_POLICY), ("iban", MAX_IBAN)],
         layout="form",
         download="Schadenanzeige.pdf",
     )
@@ -258,7 +258,7 @@ def claim_receipt(day: date, letter_day: date, seed: int = 0) -> Doc:
         title="Schaden Eingangsbestätigung",
         facts=[
             ("claim_number", CLAIM),
-            ("policy_number", HOUSEHOLD_POLICY),
+            ("contract_number", HOUSEHOLD_POLICY),
             ("our_reference", "SD-H/kr 2611"),
             ("letter_date", german(letter_day)),
         ],
@@ -296,7 +296,7 @@ def claim_settlement(day: date, seed: int = 0) -> Doc:
         title="Schadenregulierung Fahrrad",
         facts=[
             ("claim_number", CLAIM),
-            ("policy_number", HOUSEHOLD_POLICY),
+            ("contract_number", HOUSEHOLD_POLICY),
             ("our_reference", "SD-H/kr 2611"),
             ("iban", MAX_IBAN),
         ],
@@ -358,7 +358,7 @@ def car_policy(day: date, seed: int = 0) -> Doc:
         "Kfz-Versicherungsschein 2025",
         bill,
         fields={"Versicherungsnummer": CAR_POLICY, "Beitrag": money("486.30")},
-        facts=[("policy_number", CAR_POLICY), ("license_plate", LICENSE_PLATE), ("iban", MAX_IBAN)],
+        facts=[("contract_number", CAR_POLICY), ("license_plate", LICENSE_PLATE), ("iban", MAX_IBAN)],
         download=f"Versicherungsschein_{CAR_POLICY}.pdf",
     )
 
@@ -381,7 +381,7 @@ def no_claims_notice(day: date, seed: int = 0) -> Doc:
         cls="insurance-notice",
         document_type="Versicherung",
         title="SF-Einstufung 2026",
-        facts=[("policy_number", CAR_POLICY), ("license_plate", LICENSE_PLATE)],
+        facts=[("contract_number", CAR_POLICY), ("license_plate", LICENSE_PLATE)],
         fields={"Beitrag": money("471.20"), "Versicherungsnummer": CAR_POLICY},
         seed=seed,
     )
