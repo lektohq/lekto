@@ -376,7 +376,7 @@ export interface paths {
 		post?: never;
 		/**
 		 * Delete a user
-		 * @description Admins only. The body settles each space that stops it (`GET /users/{id}/removal`; one left open: 409 with `blocking_spaces`): the personal space's documents move into another space (`move_to`); a shared space the user alone edits goes if empty (`remove`), moves its documents and goes (`move_to`), or gets another editor (`editor`). Documents move as an admin moves them by hand. All or nothing. Removes the personal space with its rules, the user's memberships and sign-in data; the documents they uploaded stay, without uploader.
+		 * @description Admins only. The body settles each space that stops it (`GET /users/{id}/removal`; one left open: 409 with `blocking_spaces`): the personal space's documents move into another space (`move_to`); a shared space the user alone edits goes if empty (`remove`), moves its documents and goes (`move_to`), or gets another editor (`editor`). Documents move as an admin moves them by hand. All or nothing. Removes the personal space with its rules, the user's memberships and sign-in data; the documents they uploaded stay, without uploader. It cannot be undone: a token, above all a leaked one, takes no account away. Needs a session; API tokens are refused (403).
 		 */
 		delete: operations['delete_user_api_v1_users__id__delete'];
 		options?: never;

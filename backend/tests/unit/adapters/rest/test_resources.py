@@ -643,8 +643,10 @@ async def test_the_last_admin_stays(api: Api) -> None:
                 f"{PREFIX}/users/{admin.id}", json=body, headers=session.headers
             )
             assert response.status_code == 409, response.text
-    response = await api.client.delete(f"{PREFIX}/users/{admin.id}", headers=auth(admin))
-    assert response.status_code == 409
+        response = await session.client.delete(
+            f"{PREFIX}/users/{admin.id}", headers=session.headers
+        )
+        assert response.status_code == 409
 
 
 async def test_deleting_a_user_settles_the_spaces_that_stop_it(api: Api) -> None:
@@ -661,20 +663,22 @@ async def test_deleting_a_user_settles_the_spaces_that_stop_it(api: Api) -> None
         ["move_to"],
     )
     assert (await api.client.get(f"{url}/removal", headers=auth(anna))).status_code == 403
-    refused = await api.client.delete(url, headers=auth(admin))
-    assert refused.status_code == 409
-    assert [item["space_id"] for item in refused.json()["blocking_spaces"]] == [
-        blocking["space_id"]
-    ]
     target = (await api.client.get(f"{PREFIX}/users/{admin.id}", headers=auth(admin))).json()[
         "personal_space_id"
     ]
-    both = {"space_id": blocking["space_id"], "move_to": target, "remove": True}
-    unclear = await api.client.request("DELETE", url, json={"spaces": [both]}, headers=auth(admin))
-    assert unclear.status_code == 422
-    settle = {"spaces": [{"space_id": blocking["space_id"], "move_to": target}]}
-    deleted = await api.client.request("DELETE", url, json=settle, headers=auth(admin))
-    assert deleted.status_code == 204, deleted.text
+    async with api.sign_in(admin) as session:
+        client, csrf = session.client, session.headers
+        refused = await client.delete(url, headers=csrf)
+        assert refused.status_code == 409
+        assert [item["space_id"] for item in refused.json()["blocking_spaces"]] == [
+            blocking["space_id"]
+        ]
+        both = {"space_id": blocking["space_id"], "move_to": target, "remove": True}
+        unclear = await client.request("DELETE", url, json={"spaces": [both]}, headers=csrf)
+        assert unclear.status_code == 422
+        settle = {"spaces": [{"space_id": blocking["space_id"], "move_to": target}]}
+        deleted = await client.request("DELETE", url, json=settle, headers=csrf)
+        assert deleted.status_code == 204, deleted.text
     moved = await api.client.get(f"{PREFIX}/documents/{document}", headers=auth(admin))
     assert (moved.json()["space_id"], moved.json()["uploaded_by"]) == (target, None)
 

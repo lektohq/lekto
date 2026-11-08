@@ -323,6 +323,7 @@ async def test_expired_tokens_are_refused(api: Api) -> None:
         ("POST", f"/users/{UUID(int=1)}/password", {"password": NEW_PASSWORD}),
         ("DELETE", f"/users/{UUID(int=1)}/totp", None),
         ("DELETE", f"/users/{UUID(int=1)}/oidc", None),
+        ("DELETE", f"/users/{UUID(int=1)}", None),  # takes the account away, for good
     ],
 )
 async def test_tokens_cannot_manage_the_sign_in(
