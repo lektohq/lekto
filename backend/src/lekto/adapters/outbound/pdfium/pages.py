@@ -93,7 +93,8 @@ def _pdf_pages(source: Path, width: int) -> Iterator[Iterator[Image.Image]]:
             with LOCK:
                 page = document[index]
                 try:
-                    bitmap = page.render(scale=page_scale(*page.get_size(), width))
+                    across, high = page.get_size()
+                    bitmap = page.render(scale=page_scale(across, high, width))
                     image: Image.Image = bitmap.to_pil().convert("RGB")
                 finally:
                     page.close()
