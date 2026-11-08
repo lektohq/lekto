@@ -166,6 +166,26 @@ async def test_refs_name_a_value_without_showing_it(api: Api) -> None:
     assert (await api.client.get(f"{refs}/iban/{ref}")).status_code == 401
 
 
+async def test_only_admins_turn_a_persons_number_into_its_reference_and_back(api: Api) -> None:
+    """A reference in an address must tell nobody the value they could not find documents by:
+    a person's kinds, as the `fact` filter, only for admins."""
+    admin, user = await api.admin(), await api.user()
+    refs = f"{PREFIX}/identifiers/refs"
+    tax_id = {"kind": "tax_id", "value": "86095742719"}
+    made = await api.client.post(refs, json=tax_id, headers=auth(admin))
+    assert made.status_code == 200, made.text
+    ref = made.json()["ref"]
+    read = await api.client.get(f"{refs}/tax_id/{ref}", headers=auth(admin))
+    assert read.json()["value"] == "86095742719"
+    for response in (
+        await api.client.post(refs, json=tax_id, headers=auth(user)),
+        await api.client.get(f"{refs}/tax_id/{ref}", headers=auth(user)),
+    ):
+        assert response.status_code == 403, response.text
+        assert response.json()["reason"]["code"] == "fact_filter_of_person"
+        assert "86095742719" not in response.text
+
+
 async def test_decisions_come_back_one_by_one(api: Api) -> None:
     contact = await seeded(api)
     admin = await api.admin()
