@@ -23,9 +23,14 @@ def _compile(pattern: str, case_sensitive: bool) -> "regex.Pattern[str]":
     try:
         return regex.compile(pattern, flags)
     except regex.error as error:
-        raise ValidationError(
-            because(ReasonCode.PATTERN_INVALID, pattern=pattern, detail=str(error))
-        ) from None
+        detail = str(error)
+    except ValueError as error:  # flags that exclude one another, `(?au)`
+        detail = str(error)
+    except KeyError:  # `regex` fails so on the flag V1 beside the V0 it compiles with
+        detail = "the flag V1 is not supported: patterns follow the syntax of V0"
+    raise ValidationError(
+        because(ReasonCode.PATTERN_INVALID, pattern=pattern, detail=detail)
+    ) from None
 
 
 class RegexPatternMatcher:
