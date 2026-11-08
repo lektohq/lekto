@@ -32,7 +32,8 @@ Images are prepared before OCRmyPDF sees them (`prepare_image`):
   `PLAUSIBLE_PAGE` is scaled to the long edge of A4. The resolution is always passed on, since
   OCRmyPDF refuses images that state 96 dpi or less.
 - OCRmyPDF refuses transparency and some colour modes: transparent images are put on white,
-  CMYK and high bit depths are converted. All pages of a multi-page TIFF are kept.
+  CMYK and high bit depths are converted. All pages of a multi-page TIFF are kept, written one
+  at a time.
 
 OCRmyPDF's exit codes tell permanent problems (damaged or encrypted input) from others.
 
@@ -53,6 +54,7 @@ size, and the counts of all, content and unsure words. The work folder is one of
 
 import asyncio
 import importlib.metadata
+import io
 import logging
 import re
 import shutil
@@ -63,7 +65,7 @@ from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 
-from PIL import Image, ImageSequence
+from PIL import Image, ImageSequence, TiffImagePlugin
 
 from lekto.adapters.outbound.http_client import endpoint_of
 from lekto.adapters.outbound.imaging import flatten_on_white
@@ -381,23 +383,40 @@ def _empty_folder(path: Path) -> None:
 def prepare_image(source: Path, prepared: Path) -> tuple[Path, int]:
     """The image to give OCRmyPDF and its resolution. `source` itself if it can be used as it
     is, otherwise a TIFF written to `prepared`. UnprocessableDocumentError if the image cannot
-    be read."""
+    be read.
+
+    The pages of a multi-page TIFF are written one at a time: a G4 fax of a few megabytes holds
+    pages that Pillow keeps at a byte per pixel, about 8 MB each at A4 and 300 dpi, so holding
+    all of them at once took gigabytes."""
     try:
         with Image.open(source) as image:
             dpi = image_dpi(image.size, image.info.get("dpi"))
-            frames = [frame.copy() for frame in ImageSequence.Iterator(image)]
+            if getattr(image, "n_frames", 1) == 1:
+                ready = _ocr_ready(image)
+                if ready is image:
+                    return source, dpi
+                ready.save(prepared, "TIFF", dpi=(dpi, dpi), compression="tiff_lzw")
+                return prepared, dpi
+            with _PageWriter(str(prepared), new=True) as tiff:
+                for frame in ImageSequence.Iterator(image):
+                    _ocr_ready(frame).save(tiff, "TIFF", dpi=(dpi, dpi), compression="tiff_lzw")
+                    tiff.newFrame()
     except (OSError, ValueError, Image.DecompressionBombError) as error:
         raise UnprocessableDocumentError(
             because(ReasonCode.IMAGE_UNREADABLE_DETAIL, detail=str(error))
         ) from None
-    converted = [_ocr_ready(frame) for frame in frames]
-    if len(frames) == 1 and converted[0] is frames[0]:
-        return source, dpi
-    first, *rest = converted
-    first.save(
-        prepared, "TIFF", save_all=True, append_images=rest, dpi=(dpi, dpi), compression="tiff_lzw"
-    )
     return prepared, dpi
+
+
+class _PageWriter(TiffImagePlugin.AppendingTiffWriter):
+    """Pillow's own way of writing a TIFF page by page (`_save_all`), not in its documentation.
+    Given a path, it finishes and closes the file when the `with` block ends. Its `close` leaves
+    the writer itself open, so the garbage collector would call it again on the closed file."""
+
+    def close(self) -> None:
+        if not self.closed:
+            super().close()
+            io.BytesIO.close(self)
 
 
 def image_dpi(size: tuple[int, int], stated: object) -> int:
