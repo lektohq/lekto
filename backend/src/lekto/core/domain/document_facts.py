@@ -107,21 +107,20 @@ class Holder:
 HOLDER_KINDS = frozenset(
     {
         IdentifierKind.IBAN,
-        IdentifierKind.CREDITOR_ID,
-        IdentifierKind.VAT_ID,
         IdentifierKind.EMAIL_DOMAIN,
         IdentifierKind.CUSTOMER_NUMBER,
     }
 )
-"""The kinds of facts that have a holder: a contact's as often as another's (a VAT ID or an
-e-mail domain since 0.8: a parent company's, a payment service's, a portal's; a customer
-number in a booking of a bank statement: the payee's, #215)."""
+"""The kinds of facts that have a holder: a contact's as often as another's (an IBAN: whose
+account, a person's too; an e-mail domain since 0.8: a parent company's, a payment service's,
+a portal's; a customer number in a booking of a bank statement: the payee's, #215). VAT IDs and
+creditor IDs had one until #215: no contact's identifiers any more, nothing needs it."""
 
 BOOKED_HOLDER_KINDS = frozenset({IdentifierKind.CUSTOMER_NUMBER})
 """The kinds with a holder only where they stand in bookings (`holders.booking_holder`):
 without one they are the document's contact's, as before they had holders."""
 
-MODEL_HOLDER_KINDS = frozenset({IdentifierKind.IBAN, IdentifierKind.CREDITOR_ID})
+MODEL_HOLDER_KINDS = frozenset({IdentifierKind.IBAN})
 """The kinds whose holder the language model is asked for (`facts-3`); the others' the rule
 tells alone (Tobi, 28.10.2026)."""
 
@@ -161,10 +160,15 @@ ROLES: Mapping[IdentifierKind, FactRole] = {
 missing)."""
 
 NUMBER_KINDS = frozenset(
-    kind for kind in IdentifierKind if not (TYPES[kind].for_contacts or TYPES[kind].for_persons)
+    kind
+    for kind in IdentifierKind
+    if not TYPES[kind].at_contacts
+    and not (TYPES[kind].for_persons and not TYPES[kind].for_contacts)
 )
-"""The kinds of the numbers a document has of its own, of a strand or of another document it
-refers to: no contact's or person's identifiers (invoice number, file reference)."""
+"""The kinds of the numbers the facts report lists as the document's: no contact's identifiers
+and no person's alone. Its own, a strand's, another document's it refers to (invoice number,
+file reference), and since #215 the numbers that only tell its contact or a contract (VAT ID,
+IBAN, licence plate)."""
 
 
 def role_of(kind: IdentifierKind) -> FactRole:
@@ -202,7 +206,7 @@ class DocumentFact:
         if self.position is not None and self.position < 0:
             raise ValidationError("a fact's position is a character of the text")
         if self.holder is not None and self.kind not in HOLDER_KINDS:
-            raise ValidationError("only an IBAN, a creditor ID, a VAT ID or a domain has a holder")
+            raise ValidationError("only an IBAN, a domain or a customer number has a holder")
         if self.written is not None:
             object.__setattr__(self, "written", self.written[:MAX_WRITTEN])
 

@@ -107,7 +107,7 @@ MODEL_FACTS = "facts"
 """Key of the facts with their role the language model read, in the output of `signal_llm`
 (`facts-1`; `document_facts.ReadFact` as JSON, unchecked)."""
 MODEL_HOLDERS = "holders"
-"""Key of the holders of the listed IBANs and creditor IDs the language model told, in the output
+"""Key of the holders of the listed IBANs the language model told, in the output
 of `signal_llm` (`facts-3`; `holders.ReadHolder` as JSON, unchecked)."""
 FACTS_ERROR = "facts_error"
 """Why the language model read no facts, in the output of `signal_llm`."""
@@ -149,7 +149,7 @@ class FactsSignal:
     the document (`codes_key`); the OCR node drops them with a new archive. A code that cannot
     be read never fails the signal. The identifiers found are the document's facts, with
     where they come from (the text's patterns, a code), the role of their kind
-    (`domain.document_facts`) and whose an IBAN or a creditor ID is (`domain.holders`), kept
+    (`domain.document_facts`) and whose an IBAN is (`domain.holders`), kept
     with the result together with the facts the language model read as the log has them then
     (`kept_facts`; a person's decisions stay).
 
@@ -198,8 +198,8 @@ class FactsSignal:
         held = await asyncio.to_thread(
             facts_holders, text, facts, contacts, persons, codes or (), pages
         )
-        # An IBAN or a creditor ID of a person or a third party is no evidence of its contact
-        # here: a payee's IBAN on a bank statement (`domain.holders`).
+        # A number of a person or a third party is no evidence of its contact here: a payee's
+        # customer number on a bank statement, another party's domain (`domain.holders`).
         names = {str(contact.id): contact.names() for contact in contacts}
         evidence, elsewhere = [], []
         for item in as_list(output.get("identifiers")):
@@ -288,7 +288,7 @@ def facts_holders(
     codes: Sequence[Code],
     pages: Mapping[int, Sequence[LaidWord]],
 ) -> dict[Key, Holder]:
-    """Whose the IBANs, creditor IDs, VAT IDs and e-mail domains of `facts` are
+    """Whose the IBANs, e-mail domains and customer numbers of `facts` are
     (`domain.holders`): the persons by their names and numbers, the contacts by their names and
     aliases (and the domains a person gave them), a GiroCode by its payee, how far down its
     page a number stands from the words of the parsed text (`pages`)."""

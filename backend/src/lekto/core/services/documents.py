@@ -221,7 +221,8 @@ class DocumentFacts:
 
 @dataclass(frozen=True)
 class DocumentNumber:
-    """A fact of a kind no contact or person has (`NUMBER_KINDS`) and where it stands."""
+    """A fact of a kind that is no contact's identifier nor a person's alone (`NUMBER_KINDS`) and
+    where it stands."""
 
     fact: DocumentFact
     spans: tuple[Span, ...]
@@ -257,6 +258,14 @@ def _other_fact_shown(user: User, fact: DocumentFact) -> bool:
         fact.state.by_person
         and not person_only(fact.kind)
         and not (TYPES[fact.kind].for_persons and fact.role is FactRole.PERSON)
+    )
+
+
+def _number_shown(user: User, fact: DocumentFact) -> bool:
+    """Whether the facts report lists a fact among the document's numbers: an IBAN in the role
+    `person` (a user's own account) only to admins."""
+    return user.is_active_admin or not (
+        TYPES[fact.kind].for_persons and fact.role is FactRole.PERSON
     )
 
 
@@ -464,13 +473,13 @@ class DocumentService:
             numbers = tuple(
                 DocumentNumber(fact, identifier_spans(text, fact.kind, fact.value))
                 for fact in stored.values()
-                if fact.kind in NUMBER_KINDS
+                if fact.kind in NUMBER_KINDS and _number_shown(user, fact)
             )
             shown = {item.key for item in facts.identifiers}
             decided = tuple(
                 DocumentNumber(fact, identifier_spans(text, fact.kind, fact.value))
                 for fact in stored.values()
-                if fact.kind not in NUMBER_KINDS
+                if (fact.kind not in NUMBER_KINDS or not _number_shown(user, fact))
                 and fact.key not in shown
                 and _other_fact_shown(user, fact)
             )

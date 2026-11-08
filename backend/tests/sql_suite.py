@@ -3550,7 +3550,7 @@ class MigrationSuite:
             ],
             key=str,
         )
-        await migrate(empty_database)
+        await migrate(empty_database, "0055")  # 0072 drops tax numbers from contacts (#215)
         assert await stored() == expected
 
         await downgrade(empty_database, "0054")
@@ -3680,6 +3680,73 @@ class MigrationSuite:
         assert facts == [("contract_number", "444444", "corrected")]
         assert conditions["all"][0]["fact_kind"] == "contract_number"
         assert lens["facts"] == [{"kind": "contract_number", "value": "333333"}]
+
+    async def test_fewer_contact_kinds_after_revision_0072(self, empty_database: Database) -> None:
+        """Revision 0072 (#215): a contact keeps its customer, contract and personnel numbers and
+        the domains a person entered; the rest of its identifiers go, and VAT IDs and creditor IDs
+        lose their holders."""
+        await migrate(empty_database, "0071")
+        ids = {name: new_id() for name in ("anna", "space", "utility", "document")}
+        at = {"contact_id": ids["utility"]}
+        fact = {"document_id": ids["document"], "role": "contact", "origins": "pattern"}
+        held = {"holder": "sender", "holder_name": None, "holder_source": "rule"}
+        await _insert(
+            empty_database,
+            [
+                (
+                    t.users,
+                    {"id": ids["anna"], "username": "a", "username_key": "a", "role": "user"},
+                ),
+                (
+                    t.spaces,
+                    {
+                        "id": ids["space"],
+                        "name": "A",
+                        "name_key": "a",
+                        "personal_of": ids["anna"],
+                        "created_at": NOW,
+                        "version": 1,
+                    },
+                ),
+                (t.contacts, {"id": ids["utility"], "name": "Utility", "name_key": "utility"}),
+                *(
+                    (t.contact_identifiers, at | {"kind": kind, "value": value, "source": source})
+                    for kind, value, source in (
+                        ("customer_number", "K4711", "manual"),
+                        ("contract_number", "V778899", "learned"),
+                        ("personnel_number", "12345", "rejected"),
+                        ("email_domain", "utility.example", "manual"),
+                        ("email_domain", "portal.example", "learned"),
+                        ("iban", "DE89370400440532013000", "manual"),
+                        ("vat_id", "DE123456789", "learned"),
+                        ("tax_number", "2713100040", "rejected"),
+                        ("meter_number", "1ABC0123456789", "manual"),
+                    )
+                ),
+                (t.documents, {"id": ids["document"], "space_id": ids["space"]}),
+                (t.document_facts, fact | held | {"kind": "vat_id", "value": "DE123456789"}),
+                (
+                    t.document_facts,
+                    fact | held | {"kind": "iban", "value": "DE89370400440532013000"},
+                ),
+            ],
+        )
+        await migrate(empty_database)
+        async with empty_database.reading() as connection:
+            kept = await _read_all(
+                connection,
+                select(t.contact_identifiers.c.kind, t.contact_identifiers.c.value),
+            )
+            holders = await _read_all(
+                connection, select(t.document_facts.c.kind, t.document_facts.c.holder)
+            )
+        assert sorted(kept) == [
+            ("contract_number", "V778899"),
+            ("customer_number", "K4711"),
+            ("email_domain", "utility.example"),
+            ("personnel_number", "12345"),
+        ]
+        assert sorted(holders) == [("iban", "sender"), ("vat_id", None)]
 
     async def test_mail_rules_get_the_tree_with_revision_0062_and_back(
         self, empty_database: Database

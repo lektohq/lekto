@@ -50,7 +50,7 @@ class NamedContactOut(BaseModel):
 
 
 class HolderOut(BaseModel):
-    """Whose an IBAN, a creditor ID, a VAT ID or an e-mail domain is where it stands."""
+    """Whose an IBAN, an e-mail domain or a customer number (in bookings) is where it stands."""
 
     kind: HolderKind = Field(
         description=(
@@ -135,10 +135,11 @@ class FoundIdentifierOut(BaseModel):
 
 
 class DocumentNumberOut(BaseModel):
-    """A fact kept for the document: a number that is no contact's or person's identifier, its
-    own (invoice, credit note, order number), a strand's (file reference, "Unser Zeichen",
-    claim, ticket) or another document's it refers to ("Ihre Rechnung Nr.", "Ihr Zeichen"); or
-    one of another kind a person decided."""
+    """A fact kept for the document: a number that is no contact's identifier nor a person's
+    alone, its own (invoice, credit note, order number), a strand's (file reference, "Unser
+    Zeichen", claim, ticket), another document's it refers to ("Ihre Rechnung Nr.", "Ihr
+    Zeichen") or, since #215, one that only tells the contact or a contract (VAT ID, IBAN,
+    licence plate); or one of another kind a person decided."""
 
     kind: IdentifierKind
     value: str = Field(description="Normalised, as Lekto compares it.")
@@ -147,6 +148,9 @@ class DocumentNumberOut(BaseModel):
     origins: list[FactOrigin]
     state: FactState = Field(default=FactState.FOUND, description="As `FoundIdentifierOut.state`.")
     spans: list[SpanOut] = Field(description="Where it stands in the text.")
+    holder: HolderOut | None = Field(
+        default=None, description="Whose it is where it stands (an IBAN), if told."
+    )
 
     @classmethod
     def of(cls, item: DocumentNumber) -> "DocumentNumberOut":
@@ -158,6 +162,7 @@ class DocumentNumberOut(BaseModel):
             origins=sorted(item.fact.origins),
             state=item.fact.state,
             spans=[SpanOut.of(span) for span in item.spans],
+            holder=HolderOut.of(item.fact.holder),
         )
 
 
