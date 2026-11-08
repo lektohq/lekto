@@ -43,6 +43,16 @@ async def test_the_api_documentation_carries_lektos_favicon(api: Api) -> None:
     assert "oauth2RedirectUrl" not in response.text
 
 
+def test_the_description_names_the_scopes_and_the_tools_of_today(api: Api) -> None:
+    description = api.app.openapi()["info"]["description"]
+    for scope in ("`read`", "`upload`", "`read_write`"):
+        assert scope in description
+    for tool in ("`documents_search`", "`inbox_confirm`"):
+        assert tool in description
+    for gone in ("get_document", "get_text", "update_metadata", "list_tags"):
+        assert gone not in description
+
+
 def test_the_paths_known_outside_the_routes_are_routes(api: Api) -> None:
     """The access log filters and the OIDC redirect URI name these paths."""
     assert {HEALTH_PATH, OIDC_CALLBACK_PATH} <= set(api.app.openapi()["paths"])
