@@ -45,11 +45,11 @@ function signIn(role: 'admin' | 'user') {
 	} as never);
 }
 
-function routes(expected: Expected[] = []) {
+function routes(expected: Expected[] = [], suggested = 2) {
 	return fakeApi({
 		'GET /api/v1/expected': () => expected,
 		'GET /api/v1/jobs/summary': () => JOBS,
-		'GET /api/v1/identifiers/open/summary': () => ({ learned: 31, unknown: 17, suggested: 0 })
+		'GET /api/v1/identifiers/open/summary': () => ({ learned: 31, suggested })
 	});
 }
 
@@ -81,9 +81,11 @@ describe('Übersicht', () => {
 		expect(tile.textContent).toContain(m.overview_processing({ count: '1' }));
 		expect(within(tile).getByRole('link', { name: m.overview_inbox_go() })).toBeTruthy();
 
-		const identifiers = screen.getByRole('region', { name: m.master_identifiers() });
-		expect(await within(identifiers).findByText('48')).toBeTruthy();
-		expect(identifiers.textContent).toContain(m.overview_identifiers_learned({ count: '31' }));
+		// The suggestions alone: the learned ones work already (#215).
+		const identifiers = await screen.findByRole('region', { name: m.master_identifiers() });
+		expect(within(identifiers).getByText('2')).toBeTruthy();
+		expect(identifiers.textContent).toContain(m.overview_identifiers_suggestions());
+		expect(identifiers.textContent).not.toContain('31');
 		expect(
 			within(identifiers)
 				.getByRole('link', { name: m.overview_identifiers_go() })
@@ -93,6 +95,19 @@ describe('Übersicht', () => {
 		const system = screen.getByRole('region', { name: m.nav_system() });
 		expect(await within(system).findByText(m.overview_jobs_failed())).toBeTruthy();
 		expect(system.textContent).toContain(m.overview_jobs_due({ count: '3' }));
+	});
+
+	it('shows no identifiers without suggestions, the grid in two columns then', async () => {
+		signIn('admin');
+		const api = routes([], 0);
+		vi.stubGlobal('fetch', api);
+		const { container } = render(Page);
+		expect(await screen.findByText(m.overview_jobs_failed())).toBeTruthy();
+		await vi.waitFor(() =>
+			expect(calls(api).some((call) => call.includes('/identifiers/open/summary'))).toBe(true)
+		);
+		expect(screen.queryByRole('region', { name: m.master_identifiers() })).toBeNull();
+		expect(container.querySelector('.lg\\:grid-cols-3')).toBeNull();
 	});
 
 	it('leaves the identifiers to admins', async () => {

@@ -30,7 +30,6 @@
 	import { type IdentifierKind, kindLabel } from '#lib/identifiers.ts';
 	import { byId, type Contact } from '#lib/masterdata.svelte.ts';
 	import {
-		confirmable,
 		decide,
 		documentsHref,
 		rememberOpenRefs,
@@ -69,7 +68,7 @@
 	let toConfirm = $state(0);
 	let asking = $state(false);
 	let kind = $state('');
-	let counts = $state<OpenPage['counts']>({ learned: 0, unknown: 0, suggested: 0 });
+	let counts = $state<OpenPage['counts']>({ learned: 0, suggested: 0 });
 	let kinds = $state<OpenPage['kinds']>({});
 	let chosen = $state<Record<string, OpenIdentifier>>({});
 	let busy = $state(false);
@@ -138,7 +137,6 @@
 	const selection = $derived(Object.values(chosen));
 	// While some are chosen, a tap on a phone's row chooses it rather than opening it.
 	const choosing = $derived(selection.length > 0);
-	const skipped = $derived(selection.filter((item) => !confirmable(item)).length);
 	const pageChosen = $derived(
 		list.items.length > 0 && list.items.every((item) => openKey(item) in chosen)
 	);
@@ -198,7 +196,7 @@
 
 	async function decideChosen(action: OpenAction) {
 		if (busy) return;
-		const items = action === 'confirm' ? selection.filter(confirmable) : selection;
+		const items = selection;
 		if (items.length === 0) return;
 		busy = true;
 		try {
@@ -237,10 +235,7 @@
 	}
 
 	function contactText(item: OpenIdentifier): string {
-		if (item.source === 'suggested') return targetName(item);
-		return item.contacts.length === 1
-			? item.contacts[0].name
-			: m.open_contacts_many({ count: formatNumber(item.contacts.length) });
+		return targetName(item);
 	}
 
 	function whereText(item: OpenIdentifier): string {
@@ -259,9 +254,7 @@
 	{#if item.source === 'suggested'}
 		<Badge variant="primary">{m.open_suggested()}</Badge>
 	{:else}
-		<Badge variant={item.source === 'learned' ? 'note' : 'muted'}>
-			{item.source === 'learned' ? m.open_learned() : m.open_unknown()}
-		</Badge>
+		<Badge variant="note">{m.open_learned()}</Badge>
 	{/if}
 {/snippet}
 
@@ -292,16 +285,8 @@
 	{/if}
 {/snippet}
 
-{#snippet skippedHint()}
-	{skipped === 1 ? m.open_skipped_one() : m.open_skipped({ count: formatNumber(skipped) })}
-{/snippet}
-
 {#snippet bar()}
-	<SelectionBar
-		count={m.selection_selected({ count: formatNumber(selection.length) })}
-		{busy}
-		hint={skipped > 0 ? skippedHint : undefined}
-	>
+	<SelectionBar count={m.selection_selected({ count: formatNumber(selection.length) })} {busy}>
 		{#snippet trail()}
 			<Button variant="ghost" size="sm" disabled={busy} onclick={() => (chosen = {})}>
 				{m.open_selection_clear()}
@@ -311,11 +296,7 @@
 			<Button variant="outline" size="sm" disabled={busy} onclick={() => decideChosen('reject')}>
 				{m.open_reject()}
 			</Button>
-			<Button
-				size="sm"
-				disabled={busy || selection.length === skipped}
-				onclick={() => decideChosen('confirm')}
-			>
+			<Button size="sm" disabled={busy} onclick={() => decideChosen('confirm')}>
 				{m.open_confirm()}
 			</Button>
 		{/snippet}
@@ -335,7 +316,6 @@
 				options={[
 					{ value: '', label: m.open_all(), count: formatNumber(openTotal(counts)) },
 					{ value: 'learned', label: m.open_learned(), count: formatNumber(counts.learned) },
-					{ value: 'unknown', label: m.open_unknown(), count: formatNumber(counts.unknown) },
 					{
 						value: 'suggested',
 						label: m.open_suggestions(),
