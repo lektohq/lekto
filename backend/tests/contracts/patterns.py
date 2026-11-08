@@ -12,6 +12,15 @@ from lekto.core.ports.patterns import PatternMatcher
 # Catastrophic backtracking: exponential in the number of `a`s, since the `b` never matches.
 CATASTROPHIC = r"(a|aa)+$"
 NO_MATCH_SLOWLY = "a" * 40 + "b"
+# Repetitions that `regex` spells out to millions of items when it compiles them: seconds and
+# up to 2.7 GB. A comment, an inline flag or verbose whitespace does not part the last two.
+TOO_LARGE = ["((a{200}){200}){200}", "a{4000000}", "(a{1000})(?#x){1000}", "(?x)(a{1000}) {1000}"]
+REALISTIC = [
+    r"[A-Z]{2}\d{2}(?: ?\d{4}){4,7}",
+    r"Rechnung.{0,500}Betrag",
+    r"Nr\. \d{4,6}",
+    r"(?:\d{1,3}\.){3}\d{1,3}",
+]
 
 
 class PatternMatcherContract:
@@ -68,6 +77,30 @@ class PatternMatcherContract:
 
     def test_validate_accepts_a_valid_pattern(self, pattern_matcher: PatternMatcher) -> None:
         pattern_matcher.validate(r"Nr\. \d{4}")
+
+    @pytest.mark.parametrize("pattern", TOO_LARGE)
+    def test_validate_refuses_a_pattern_too_large_to_compile(
+        self, pattern_matcher: PatternMatcher, pattern: str
+    ) -> None:
+        started = time.monotonic()
+        with pytest.raises(ValidationError):
+            pattern_matcher.validate(pattern)
+        assert time.monotonic() - started < 1
+
+    @pytest.mark.parametrize("case_sensitive", [False, True])
+    async def test_a_pattern_too_large_to_compile_does_not_run(
+        self, pattern_matcher: PatternMatcher, case_sensitive: bool
+    ) -> None:
+        with pytest.raises(ValidationError):
+            await pattern_matcher.search(TOO_LARGE[0], "aaa", case_sensitive=case_sensitive)
+        with pytest.raises(ValidationError):
+            await pattern_matcher.find(TOO_LARGE[0], "aaa", case_sensitive=case_sensitive, limit=1)
+
+    @pytest.mark.parametrize("pattern", REALISTIC)
+    def test_validate_accepts_the_patterns_of_rules(
+        self, pattern_matcher: PatternMatcher, pattern: str
+    ) -> None:
+        pattern_matcher.validate(pattern)
 
     @pytest.mark.parametrize("case_sensitive", [False, True])
     async def test_catastrophic_backtracking_is_stopped(

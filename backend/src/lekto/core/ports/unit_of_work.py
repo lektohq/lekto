@@ -7,6 +7,7 @@ from lekto.core.ports.identity import (
     ApiTokenRepository,
     CredentialRepository,
     ExternalIdentityRepository,
+    KnownDeviceRepository,
     LoginFailureRepository,
     SessionRepository,
 )
@@ -119,6 +120,8 @@ class UnitOfWork(Protocol):
     def api_tokens(self) -> ApiTokenRepository: ...
     @property
     def external_identities(self) -> ExternalIdentityRepository: ...
+    @property
+    def known_devices(self) -> KnownDeviceRepository: ...
     @property
     def push_devices(self) -> PushDeviceRepository: ...
     @property

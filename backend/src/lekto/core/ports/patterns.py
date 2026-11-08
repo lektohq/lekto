@@ -1,8 +1,8 @@
 """Regular expressions of rules, with a time limit.
 
 Patterns come from users and run against whole document texts; a pattern with catastrophic
-backtracking must not block the worker or the API. First adapter: the `regex` package, which
-can stop a search after a time limit.
+backtracking must not block the worker or the API, nor may one whose repetitions make it huge to
+compile. First adapter: the `regex` package, which can stop a search after a time limit.
 """
 
 from typing import Protocol
@@ -10,12 +10,13 @@ from typing import Protocol
 
 class PatternMatcher(Protocol):
     def validate(self, pattern: str) -> None:
-        """ValidationError if `pattern` is no pattern this matcher can run."""
+        """ValidationError if `pattern` is no pattern this matcher can run: one it cannot read,
+        or one too large to compile (`pattern_too_large`)."""
         ...
 
     async def search(self, pattern: str, text: str, *, case_sensitive: bool) -> bool:
         """Whether `pattern` occurs anywhere in `text`. PatternTimeoutError if the search takes
-        longer than the configured limit; ValidationError if the pattern is invalid."""
+        longer than the configured limit; ValidationError if `validate` refuses the pattern."""
         ...
 
     async def find(

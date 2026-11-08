@@ -29,6 +29,7 @@ from lekto.adapters.outbound.sql.identity import (
     SqlApiTokenRepository,
     SqlCredentialRepository,
     SqlExternalIdentityRepository,
+    SqlKnownDeviceRepository,
     SqlLoginFailureRepository,
     SqlSessionRepository,
 )
@@ -135,6 +136,7 @@ class SqlUnitOfWork:
         self.credentials = SqlCredentialRepository(self._tx)
         self.sessions = SqlSessionRepository(self._tx)
         self.api_tokens = SqlApiTokenRepository(self._tx)
+        self.known_devices = SqlKnownDeviceRepository(self._tx)
         self.push_devices = SqlPushDeviceRepository(self._tx)
         self.push_preferences = SqlPushPreferencesRepository(self._tx)
         self.external_identities = SqlExternalIdentityRepository(self._tx)

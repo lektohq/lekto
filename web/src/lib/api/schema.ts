@@ -15,7 +15,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * Sign in with username and password
-		 * @description Starts a session: the cookie is HTTP-only, `SameSite=Lax` and, in production, `Secure`. With TOTP on, a correct password without `code` (or `recovery_code`) answers 401 with `second_factor_required: true`. A session this browser had ends. Failed attempts are counted per account and per address; too many answer 429 with `Retry-After`.
+		 * @description Starts a session: the cookie is HTTP-only, `SameSite=Lax` and, in production, `Secure`. With TOTP on, a correct password without `code` (or `recovery_code`) answers 401 with `second_factor_required: true`. A session this browser had ends. Failed attempts are counted per account and per address; too many answer 429 with `Retry-After`. A browser that signed in here before is a known device of the account (cookie `__Secure-lekto_device`, HTTP-only, sent only to this address; `lekto_device` without `Secure` cookies): its attempts count apart from the account's, so failures from elsewhere do not lock it out.
 		 */
 		post: operations['login_api_v1_auth_login_post'];
 		delete?: never;
@@ -376,7 +376,7 @@ export interface paths {
 		post?: never;
 		/**
 		 * Delete a user
-		 * @description Admins only. The body settles each space that stops it (`GET /users/{id}/removal`; one left open: 409 with `blocking_spaces`): the personal space's documents move into another space (`move_to`); a shared space the user alone edits goes if empty (`remove`), moves its documents and goes (`move_to`), or gets another editor (`editor`). Documents move as an admin moves them by hand. All or nothing. Removes the personal space with its rules, the user's memberships and sign-in data; the documents they uploaded stay, without uploader.
+		 * @description Admins only. The body settles each space that stops it (`GET /users/{id}/removal`; one left open: 409 with `blocking_spaces`): the personal space's documents move into another space (`move_to`); a shared space the user alone edits goes if empty (`remove`), moves its documents and goes (`move_to`), or gets another editor (`editor`). Documents move as an admin moves them by hand. All or nothing. Removes the personal space with its rules, the user's memberships and sign-in data; the documents they uploaded stay, without uploader. It cannot be undone: a token, above all a leaked one, takes no account away. Needs a session; API tokens are refused (403).
 		 */
 		delete: operations['delete_user_api_v1_users__id__delete'];
 		options?: never;
@@ -927,7 +927,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * The reference to a value
-		 * @description The reference to an identifier's value, for addresses that name it (the `fact` filter of the documents): the value goes in the body, the reference in the URL, so the value stays out of histories, bookmarks and logs. The same value (normalised) always gives the same reference while the instance's secret key stays. 422 for a value that is none of its kind.
+		 * @description The reference to an identifier's value, for addresses that name it (the `fact` filter of the documents): the value goes in the body, the reference in the URL, so the value stays out of histories, bookmarks and logs. The same value (normalised) always gives the same reference while the instance's secret key stays. 422 for a value that is none of its kind. A person's kinds (tax ID, social security, health insurance and child benefit numbers, personal e-mail addresses) only for admins (403), as the `fact` filter.
 		 */
 		post: operations['make_ref_api_v1_identifiers_refs_post'];
 		delete?: never;
@@ -945,7 +945,7 @@ export interface paths {
 		};
 		/**
 		 * The value of a reference
-		 * @description To show what a reference names. 422 for one that names no value of the kind.
+		 * @description To show what a reference names. 422 for one that names no value of the kind. A person's kinds only for admins (403), as `POST /identifiers/refs`.
 		 */
 		get: operations['read_ref_api_v1_identifiers_refs__kind___ref__get'];
 		put?: never;
@@ -9759,6 +9759,7 @@ export interface components {
 			| 'due_field_not_date'
 			| 'sort_field_invalid'
 			| 'pattern_invalid'
+			| 'pattern_too_large'
 			| 'search_no_embeddings'
 			| 'search_embed_timeout'
 			| 'search_embed_failed'
@@ -12288,7 +12289,7 @@ export interface operations {
 			/** @description Successful Response */
 			200: {
 				headers: {
-					/** @description The session cookie. */
+					/** @description The session cookie and the known device's cookie. */
 					'Set-Cookie'?: unknown;
 					[name: string]: unknown;
 				};
@@ -19365,6 +19366,23 @@ export interface operations {
 					 *       "title": "Unauthorized",
 					 *       "status": 401,
 					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
 					 *     }
 					 */
 					'application/problem+json': components['schemas']['Problem'];

@@ -13,7 +13,7 @@ from lekto.core.domain.entity import Identified
 from lekto.core.domain.events import DomainEvent
 from lekto.core.domain.fields import FieldDefinition
 from lekto.core.domain.first_runs import FieldVerdict, FirstRun
-from lekto.core.domain.identity import ApiToken, ExternalIdentity, Session, ViaToken
+from lekto.core.domain.identity import ApiToken, ExternalIdentity, KnownDevice, Session, ViaToken
 from lekto.core.domain.ids import DocumentId, EventId, JobId, UserId
 from lekto.core.domain.inbox import Confirmation
 from lekto.core.domain.jobs import Job
@@ -119,6 +119,10 @@ def _token_keys(token: ApiToken) -> Iterable[Hashable]:
     return [("token", token.token_hash)]
 
 
+def _known_device_keys(device: KnownDevice) -> Iterable[Hashable]:
+    return [("token", device.token_hash)]
+
+
 def _push_device_keys(device: PushDevice) -> Iterable[Hashable]:
     return [("endpoint", device.endpoint)]
 
@@ -142,6 +146,7 @@ DOCUMENTS = Table("document", _document_keys)
 CREDENTIALS = Table("credential", _no_keys)
 SESSIONS = Table("session", _session_keys)
 API_TOKENS = Table("API token", _token_keys)
+KNOWN_DEVICES = Table("known device", _known_device_keys)
 PUSH_DEVICES = Table("push device", _push_device_keys)
 PUSH_PREFERENCES: Table[PushPreferences] = Table("push preferences", _no_keys)
 EXTERNAL_IDENTITIES = Table("external identity", _external_identity_keys)

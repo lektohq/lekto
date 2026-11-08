@@ -140,13 +140,16 @@ class OcrmypdfEngine:
         jobs: int = 1,
         vision: VisionSettings | None = None,
         vision_timeout: timedelta,
+        memory: int | None = None,
     ) -> None:
         """`languages`: Tesseract language codes, e.g. `deu`, `eng`. `jobs`: CPU cores for
         the pages of one document. `vision`: the model that reads pages when asked to, all
-        pages of a document within `vision_timeout` (a setting, like `timeout`)."""
+        pages of a document within `vision_timeout` (a setting, like `timeout`). `memory`: the
+        address space OCRmyPDF and each program it starts may take (`run_process`)."""
         if not languages:
             raise ValueError("at least one OCR language is needed")
         self._languages = "+".join(languages)
+        self._memory = memory
         self._timeout = timeout
         self._jobs = jobs
         self._vision = vision
@@ -183,7 +186,7 @@ class OcrmypdfEngine:
                 assert self._vision is not None
                 await asyncio.to_thread(records.mkdir)
                 mode = ["--force-ocr", "--deskew", "--plugin", PLUGIN]
-                env = environment(self._vision, records)
+                env = await asyncio.to_thread(environment, self._vision, records)
                 timeout = self._vision_timeout
             elif unreadable:
                 mode = ["--force-ocr", "--deskew"]
@@ -351,6 +354,7 @@ class OcrmypdfEngine:
             timeout=timeout,
             env={**env, "TMPDIR": str(work)},
             tail=OUTPUT_KEPT,
+            memory=self._memory,
         )
         # Where it kept the files is no reason for anything.
         return replace(completed, stderr=_KEPT.sub("", completed.stderr))

@@ -43,6 +43,7 @@ def engine(
         timeout=timeout,
         vision=settings,
         vision_timeout=DEFAULT_SETTINGS.vlm_timeout,
+        memory=int(DEFAULT_SETTINGS.child_max_memory),  # as in production
     )
 
 

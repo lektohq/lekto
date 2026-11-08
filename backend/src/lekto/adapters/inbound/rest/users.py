@@ -11,7 +11,6 @@ from lekto.adapters.inbound.rest.auth import (
     Authenticated,
     CurrentUser,
     SessionPrincipal,
-    Via,
 )
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.params import ADMINS_ONLY, SESSION_ONLY_NOTE
@@ -226,14 +225,15 @@ async def removal(id: UUID, user: CurrentUser, context: Context) -> UserRemovalO
         "(`remove`), moves its documents and goes (`move_to`), or gets another editor "
         "(`editor`). Documents move as an admin moves them by hand. All or nothing. Removes "
         "the personal space with its rules, the user's memberships and sign-in data; the "
-        "documents they uploaded stay, without uploader."
+        "documents they uploaded stay, without uploader. It cannot be undone: a token, above "
+        "all a leaked one, takes no account away." + SESSION_ONLY_NOTE
     ),
     responses=problem_responses(401, 403, 404, 409, 422),
 )
 async def delete_user(
-    id: UUID, user: CurrentUser, via: Via, context: Context, body: UserRemovalIn | None = None
+    id: UUID, admin: SessionPrincipal, context: Context, body: UserRemovalIn | None = None
 ) -> None:
     settle = (
         {} if body is None else {SpaceId(item.space_id): item.settlement() for item in body.spaces}
     )
-    await context.users.delete_user(user, UserId(id), settle, via=via)
+    await context.users.delete_user(admin.id, UserId(id), settle)

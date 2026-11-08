@@ -95,11 +95,20 @@ authenticate.
   count per /64 network); the counts are
   in the database. Every attempt is counted atomically before it is checked (an upsert),
   blocking as if it fails, and taken back if it does not fail, so attempts that arrive
-  together cannot pass the throttle at once. A blocked account refuses every attempt (`429`), also a correct password, so
-  TOTP codes cannot be guessed. A blocked source refuses only wrong sign-ins (`429` instead of
-  `401`, not counted for the source again); a correct sign-in from there succeeds, so failures
-  from an address many users share (a proxy, NAT) lock nobody out. Success clears the
-  account's count.
+  together cannot pass the throttle at once. A blocked account refuses every attempt (`429`),
+  also a correct password, so TOTP codes cannot be guessed. A blocked source refuses only wrong
+  sign-ins (`429` instead of `401`, not counted for the source again); a correct sign-in from
+  there succeeds, so failures from an address many users share (a proxy, NAT) lock nobody out.
+- Known devices (OWASP's [device cookies](https://owasp.org/www-community/Slow_Down_Online_Guessing_Attacks_with_Device_Cookies)):
+  whoever knows a username could keep its account blocked with a wrong password every 15
+  minutes. So a sign-in with the password makes the browser a known device of the user (a
+  random token in the cookie `__Secure-lekto_device`, only its SHA-256 hash in
+  `known_devices`); its later attempts as that user count under the device, by the same rule,
+  not under the account. Guesses from elsewhere block the account but not its owner's
+  browsers; the second factor is asked all the same. A browser stays known for a year after its
+  last sign-in and for at most five users (the oldest go first); an admin's password reset and
+  deleting the user end all their devices. Success clears the count of the account, or of the
+  device the attempt counted under.
 - TOTP (RFC 6238, pyotp), optional per user: set up with a new secret, which takes effect when a
   code confirms it; then ten recovery codes (80 bits each) are shown once and stored as SHA-256
   hashes. Codes of the previous and next 30-second step are accepted, each step only once. The
@@ -1129,7 +1138,10 @@ where it is and edits where it goes (global: admins); every version names its sp
 
   `matches` takes `case_sensitive` (default false). Patterns run with the `regex` package
   (`adapters/outbound/regex`) in a thread with a time limit (`LEKTO_RULES_PATTERN_TIMEOUT`); a
-  pattern that times out does not match and is logged. All patterns of one run on one
+  pattern that times out does not match and is logged. A pattern whose counted repetitions add
+  up to more than 10 000 characters (`((a{200}){200}){200}`: eight million) is refused with
+  `pattern_too_large`, a stored one does not match: `regex` spells them out when it compiles,
+  which takes seconds and gigabytes and no time limit stops. All patterns of one run on one
   document get two seconds together, a preview page twenty; the patterns left do not match. The text is the parsed text without
   markup, at most `LEKTO_RULES_MAX_TEXT` characters; it is loaded only if a rule looks at it.
 - **Actions.** `set_space`, `set_contact`, `set_topic`, `set_document_type`, `set_title`,
@@ -1449,11 +1461,14 @@ seconds that their session or token still holds and end otherwise.
 
 The session cookie is `__Host-lekto_session`: HTTP-only, `Secure`, `SameSite=Lax`, `Path=/`, for
 `LEKTO_SESSION_MAX_AGE`; with `LEKTO_COOKIE_SECURE=false` it is `lekto_session` without
-`Secure`. Sign-in accepts JSON only, so a form on another site cannot sign anyone in.
+`Secure`. The known device's cookie is `__Secure-lekto_device` (`lekto_device`): the tokens of
+the browser's known devices joined by dots, HTTP-only, `SameSite=Strict`, sent only to
+`/api/v1/auth/login`, for a year; signing out leaves it. Sign-in accepts JSON only, so a form on
+another site cannot sign anyone in.
 
 | Endpoint | Purpose |
 | --- | --- |
-| `POST /auth/login` | Username, password, optional `code` or `recovery_code`; sets the cookie, returns the CSRF token |
+| `POST /auth/login` | Username, password, optional `code` or `recovery_code`; sets the session cookie and the known device's, returns the CSRF token |
 | `POST /auth/logout`, `GET /auth/me` | Sign out; who is calling and how |
 | `GET/PATCH /auth/me/profile` | The own profile: display name, aliases, birth date, e-mail, identifiers, the numbers at contacts (`numbers`, `declined_numbers`); what is given changes (a session; API tokens `403`) |
 | `POST /auth/password` | Change the own password: other sessions end, `revoke_tokens` optional |
@@ -1461,7 +1476,7 @@ The session cookie is `__Host-lekto_session`: HTTP-only, `Secure`, `SameSite=Lax
 | `POST /auth/totp`, `/totp/confirm`, `/totp/disable`, `/totp/recovery-codes` | TOTP |
 | `GET/POST /auth/tokens`, `DELETE /auth/tokens/{id}` | Own API tokens |
 | `GET /auth/oidc`, `/auth/oidc/login`, `/auth/oidc/callback`; `POST/DELETE /auth/oidc/link` | OpenID Connect |
-| `GET /users`, `GET/PATCH/DELETE /users/{id}`, `GET /users/{id}/removal` | Accounts: list (others see active users' names, display names and personal spaces), role and state, delete with the spaces it settles (admins) |
+| `GET /users`, `GET/PATCH/DELETE /users/{id}`, `GET /users/{id}/removal` | Accounts: list (others see active users' names, display names and personal spaces), role and state, delete with the spaces it settles (admins; deleting needs a session, a token cannot take an account away) |
 | `GET/PATCH /users/{id}/profile` | A user's profile (admins and the user themself, with a session; an admin's API token reads and sets only the display name and e-mail, as a migration does) |
 | `POST /users`, `POST /users/{id}/password`, `DELETE /users/{id}/totp`, `DELETE /users/{id}/oidc` | Create with password, reset password, turn TOTP off, remove links (admins, session only, not the own account) |
 | `/contacts`, `/document-types`, `/tags`, `/fields` (`GET`, `POST`, `GET/PATCH/DELETE /{id}`) | Master data: read by all, changed by admins, deleted only when unused. Contacts and types take `group_ids`, contacts `topic_ids` (the topics they enable) and identifiers with an optional `topic_id`; a contact shows each caller the identifiers they see (see Profiles). Fields: name, description, choices and scope change, the data type does not; removing a used choice or narrowing the scope past documents with values is `409`. The lists take `document_counts=true` (and `all_users` for admins): each item with `document_count`, the documents in the caller's reach that have it (a field: a value for it; a tag: see Tags), counted in one query (tags in a few: the parents' counts and the groups' come apart) |
@@ -1507,7 +1522,7 @@ The session cookie is `__Host-lekto_session`: HTTP-only, `Secure`, `SameSite=Lax
 | `GET/POST /webhooks`, `GET/PATCH/DELETE /webhooks/{id}` | Webhooks: the caller's own (admins read everybody's, `?owner=`); create (the answer shows the secret once), change, switch on or off, delete; see Webhooks |
 | `POST/DELETE /webhooks/{id}/secret`, `POST /webhooks/{id}/test`, `GET /webhooks/{id}/deliveries` | Renew the secret (the old one signs 24 hours longer; an unsigned webhook signs from then on) or stop signing, send a test request, the delivery log (`before`, `limit`) |
 | `GET/POST /lenses`, `GET/PATCH/DELETE /lenses/{id}`, `PUT /lenses/order` | Lenses, the caller's saved looks at the documents (only theirs; others' are `404`, also for admins): `filter` (the filters of `GET /documents` as lists, `document_period` `this_year`, `last_12_months` or `last_year` moves with the day, `facts` as `kind`, `ref` (the value's reference), `role` going in and with the `value` too coming out, the value kept normalised), `query`, `sort` (`relevance` only with `query`, `field` only without), `sort_field_id`, `grouping` (`none`, `month`, `due`, `document_type`, `contact`), `layout` (`grid`, `list`), `card_field_ids` (at most three), `due_field_id` (a date field); names unique per user, at most 100; deleted master data and fields are left out when a lens is read; `order` takes each lens once |
-| `POST /identifiers/refs`, `GET /identifiers/refs/{kind}/{ref}` | References to identifier values for addresses (the `fact` filter, an open identifier): the value goes in the body and comes back normalised with its `ref`, AES-SIV with a key derived from `LEKTO_SECRET_KEY`, the same for the same value while the key stays; reading one gives the value; `422` for a value that is none of its kind or a reference that names none |
+| `POST /identifiers/refs`, `GET /identifiers/refs/{kind}/{ref}` | References to identifier values for addresses (the `fact` filter, an open identifier): the value goes in the body and comes back normalised with its `ref`, AES-SIV with a key derived from `LEKTO_SECRET_KEY`, the same for the same value while the key stays; reading one gives the value; `422` for a value that is none of its kind or a reference that names none; a person's kinds (tax ID, social security, health insurance, child benefit numbers, personal e-mail addresses) only for admins, `403`, as the `fact` filter |
 | `GET /identifiers/places/{kind}/{ref}` | Where an identifier stands: the newest five documents within the caller's reach with it as a fact (none rejected), by document date, each with the text around it (`excerpt`) and `occurrences`, each place its pages show it (by page a box per line, from the words of the parsed text), the one the fact was read at `own`; a person's kinds only for admins. The places of `GET /identifiers/open/{kind}/{ref}` carry `occurrences` too |
 | `GET /documents/{id}/places/{kind}/{ref}` | Where an identifier stands in one document, as its fact (none rejected): the text around it and its `occurrences`; `404` for a document without such a fact or out of reach; a person's kinds only for admins |
 | `GET /rules/{id}/apply/hits/{document_id}` | Where a rule's text conditions (`contains`, `matches`) hit a document, on its pages, for who applies the rule and reads the document: a text as whole words, a pattern on the text with whitespace collapsed with the rules' time limit (`422` when it runs out); one entry per condition with its `value` and `occurrences` |

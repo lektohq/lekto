@@ -764,6 +764,19 @@ sessions = Table(
     Column("version", Integer, nullable=False),
 )
 
+# Browsers that signed in with the password (revision 0074): their failed sign-ins count under
+# the device, not the account; only the token's hash is stored.
+known_devices = Table(
+    "known_devices",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("user_id", Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("token_hash", String(64), nullable=False, unique=True),
+    Column("created_at", UtcDateTime, nullable=False),
+    Column("expires_at", UtcDateTime, nullable=False, index=True),
+    Column("version", Integer, nullable=False),
+)
+
 # The browsers a person receives notifications on (web push); a browser's address at its push
 # service is one row, whoever signed in there last.
 push_devices = Table(

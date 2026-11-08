@@ -17,7 +17,7 @@ from lekto.core.domain.errors import (
     PermissionDeniedError,
     ValidationError,
 )
-from lekto.core.domain.identity import Credential, ExternalIdentity, ViaToken, check_new_password
+from lekto.core.domain.identity import Credential, ExternalIdentity, check_new_password
 from lekto.core.domain.ids import DocumentId, SpaceId, UserId
 from lekto.core.domain.reasons import Action, ReasonCode, because
 from lekto.core.domain.rules import Rule
@@ -191,8 +191,8 @@ class UserService:
         self, actor: UserId, id: UserId, password: str, *, revoke_tokens: bool = False
     ) -> None:
         """Admins only, not for their own account (that is `AuthService.change_password`, which
-        needs the current password). All sessions of the user end; API tokens stay unless
-        `revoke_tokens`."""
+        needs the current password). All sessions of the user end and no browser stays a known
+        device of theirs; API tokens stay unless `revoke_tokens`."""
         _not_own(actor, id, Action.RESET_OWN_PASSWORD)
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.MANAGE_USERS)
@@ -212,6 +212,7 @@ class UserService:
                 credential.password_changed_at = now
                 await uow.credentials.update(credential)
             await uow.sessions.remove_for_user(id)
+            await uow.known_devices.remove_for_user(id)
             if revoke_tokens:
                 await uow.api_tokens.remove_for_user(id)
             await uow.commit()
@@ -254,16 +255,15 @@ class UserService:
         actor: UserId,
         id: UserId,
         settle: Mapping[SpaceId, Settlement] | None = None,
-        *,
-        via: ViaToken | None = None,
     ) -> None:
         """Admins only. A space that would stop it needs a decision in `settle` (Tobi,
         22.10.2026; `removal` lists them, UserDeletionBlockedError names those left open): the
         user's personal space while it holds documents moves them into another space
         (`move_to`); a shared space the user alone edits goes with the user if it is empty
         (`remove`), moves its documents (`move_to`) and goes, or gets another editor
-        (`editor`) and stays. Documents move as an admin moves them by hand (through the API
-        token `via`). All at once: nothing happens if one fails.
+        (`editor`) and stays. Documents move as an admin moves them by hand, signed in with a
+        session: an API token deletes no user (REST). All at once: nothing happens if one
+        fails.
 
         Removes the personal space with its rules, the user's memberships of other spaces,
         their webhooks, lenses and applications of rules, all their sign-in data and what they
@@ -308,7 +308,6 @@ class UserService:
                             now=now,
                             rules=self._rules,
                             prepared=prepared.get(document.id),
-                            via=via,
                         )
                 elif settlement.editor is not None:
                     editor = await uow.users.find(settlement.editor)
@@ -340,6 +339,7 @@ class UserService:
             await uow.lenses.remove_for_owner(id)
             await uow.sessions.remove_for_user(id)
             await uow.api_tokens.remove_for_user(id)
+            await uow.known_devices.remove_for_user(id)
             await uow.push_devices.remove_for_user(id)
             await uow.external_identities.remove_for_user(id)
             await uow.credentials.remove(id)

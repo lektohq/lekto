@@ -83,16 +83,21 @@ class WeasyPrintMailRenderer:
     """Sets each mail in a child process (`python -m lekto.adapters.outbound.weasyprint`) with a
     time limit: a mail's HTML comes from anyone, and WeasyPrint has no limit of its own, so a
     page built to take forever would hold the worker. `locale`: the language of the head
-    (`de`, else English); `timeout`: TimeoutError after it, the child killed."""
+    (`de`, else English); `timeout`: TimeoutError after it, the child killed; `memory`: the
+    address space the child may take (`run_process`)."""
 
-    def __init__(self, locale: str = "de", timeout: timedelta = DEFAULT_TIMEOUT) -> None:
+    def __init__(
+        self, locale: str = "de", timeout: timedelta = DEFAULT_TIMEOUT, memory: int | None = None
+    ) -> None:
         self._locale = locale
         self._timeout = timeout
+        self._memory = memory
 
     async def render(self, mail: Path, target: Path) -> RenderedMail:
         completed = await run_process(
             [sys.executable, "-m", CHILD, self._locale, str(mail), str(target)],
             timeout=self._timeout,
+            memory=self._memory,
         )
         if completed.returncode == NO_MAIL:
             raise UnprocessableDocumentError(because(ReasonCode.FILE_DAMAGED))

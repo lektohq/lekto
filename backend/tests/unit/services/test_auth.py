@@ -15,7 +15,13 @@ from lekto.core.domain.errors import (
     TooManyAttemptsError,
     ValidationError,
 )
-from lekto.core.domain.identity import TokenScope, csrf_token, hash_token
+from lekto.core.domain.identity import (
+    KNOWN_DEVICE_LIFETIME,
+    KNOWN_DEVICES_PER_BROWSER,
+    TokenScope,
+    csrf_token,
+    hash_token,
+)
 from lekto.core.domain.ids import ApiTokenId, new_id
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.identity import PasswordHasher
@@ -154,6 +160,101 @@ async def test_the_backoff_is_capped_at_fifteen_minutes(world: World) -> None:
     with pytest.raises(TooManyAttemptsError) as info:
         await world.auth.login("alice", PASSWORD)
     assert info.value.retry_after == timedelta(minutes=15)
+
+
+# --- known devices ------------------------------------------------------------------------------
+
+
+async def test_a_sign_in_with_the_password_makes_the_browser_a_known_device(world: World) -> None:
+    user = await world.account("alice")
+    signed_in = await world.auth.login("alice", PASSWORD)
+    [token] = signed_in.devices
+    async with world.uow() as uow:
+        device = await uow.known_devices.find_by_token(hash_token(token))
+    assert device is not None and device.user_id == user.id
+    assert device.expires_at == world.clock.now() + KNOWN_DEVICE_LIFETIME
+    world.clock.advance(timedelta(days=200))
+    again = await world.auth.login("alice", PASSWORD, devices=signed_in.devices)
+    assert again.devices == signed_in.devices  # the same device, known for a year again
+    async with world.uow() as uow:
+        renewed = await uow.known_devices.find_by_token(hash_token(token))
+    assert renewed is not None and renewed.expires_at == world.clock.now() + KNOWN_DEVICE_LIFETIME
+
+
+async def test_guesses_from_elsewhere_do_not_lock_out_a_known_device(world: World) -> None:
+    await world.account("alice")
+    known = (await world.auth.login("alice", PASSWORD)).devices
+    for _ in range(20):
+        with pytest.raises((AuthenticationError, TooManyAttemptsError)):
+            await world.auth.login("alice", "wrong password!")
+        world.clock.advance(timedelta(minutes=15))
+    with pytest.raises(AuthenticationError):
+        await world.auth.login("alice", "wrong password!")
+    with pytest.raises(TooManyAttemptsError):
+        await world.auth.login("alice", PASSWORD)  # an unknown browser
+    await world.auth.login("alice", PASSWORD, devices=known)
+    with pytest.raises(TooManyAttemptsError):
+        await world.auth.login("alice", PASSWORD)  # the account stays blocked
+
+
+async def test_a_known_device_backs_off_by_itself(world: World) -> None:
+    await world.account("alice")
+    known = (await world.auth.login("alice", PASSWORD)).devices
+    for _ in range(6):
+        with pytest.raises(AuthenticationError):
+            await world.auth.login("alice", "wrong password!", devices=known)
+    with pytest.raises(TooManyAttemptsError) as info:
+        await world.auth.login("alice", PASSWORD, devices=known)
+    assert info.value.retry_after == timedelta(seconds=1)
+    await world.auth.login("alice", PASSWORD)  # the account counted none of them
+
+
+async def test_a_device_known_for_another_user_counts_under_the_account(world: World) -> None:
+    await world.account("alice")
+    await world.account("bob")
+    bobs = (await world.auth.login("bob", PASSWORD)).devices
+    for _ in range(6):
+        with pytest.raises(AuthenticationError):
+            await world.auth.login("alice", "wrong password!", devices=bobs)
+    with pytest.raises(TooManyAttemptsError):
+        await world.auth.login("alice", PASSWORD, devices=bobs)
+    await world.auth.login("bob", PASSWORD, devices=bobs)  # Bob's device counted nothing
+
+
+async def test_a_known_device_still_needs_the_second_factor(world: World) -> None:
+    user = await world.account("alice")
+    secret, _ = await enable_totp(world, user)
+    code = world.totp.code(secret, world.clock.now())
+    known = (await world.auth.login("alice", PASSWORD, code=code)).devices
+    world.clock.advance(timedelta(seconds=30))
+    with pytest.raises(SecondFactorRequiredError):
+        await world.auth.login("alice", PASSWORD, devices=known)
+
+
+async def test_a_browser_keeps_the_devices_of_its_users(world: World) -> None:
+    await world.account("alice")
+    await world.account("bob")
+    alices = (await world.auth.login("alice", PASSWORD)).devices
+    both = (await world.auth.login("bob", PASSWORD, devices=alices)).devices
+    assert len(both) == 2 and both[0] == alices[0]
+    again = await world.auth.login("alice", PASSWORD, devices=(*both, "made-up"))
+    assert again.devices == (both[1], both[0])  # unknown tokens go, the own one comes last
+    held: tuple[str, ...] = ()
+    for number in range(KNOWN_DEVICES_PER_BROWSER + 1):
+        await world.account(f"user{number}")
+        held = (await world.auth.login(f"user{number}", PASSWORD, devices=held)).devices
+    assert len(held) == KNOWN_DEVICES_PER_BROWSER  # the oldest went
+
+
+async def test_a_device_unused_for_its_lifetime_is_known_no_longer(world: World) -> None:
+    await world.account("alice")
+    known = (await world.auth.login("alice", PASSWORD)).devices
+    world.clock.advance(KNOWN_DEVICE_LIFETIME)
+    for _ in range(6):
+        with pytest.raises(AuthenticationError):
+            await world.auth.login("alice", "wrong password!", devices=known)
+    with pytest.raises(TooManyAttemptsError):
+        await world.auth.login("alice", PASSWORD)  # counted under the account
 
 
 async def test_a_blocked_source_refuses_only_wrong_sign_ins(world: World) -> None:
