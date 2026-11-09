@@ -24,7 +24,7 @@ from lekto.adapters.inbound.mcp.tools.documents import (
 from lekto.core.domain.classification import SPACE
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import short_id
-from lekto.core.domain.inbox import InboxTab
+from lekto.core.domain.inbox import DONE_PERIOD, InboxTab
 
 INBOX_SIZE = 20
 """Documents one page of the inbox returns unless the client asks for more."""
@@ -62,7 +62,7 @@ def add_inbox_tools(tools: Tools, context: ApiContext) -> None:
         "inbox_list",
         "What waits for you, newest first: review (yellow: a person should check), intervene "
         "(red: processing failed), new (green, not seen yet), processing; done: what left it "
-        "in 14 days. Each with what is open and why. counts: per tab.",
+        f"in {DONE_PERIOD.days} days. Each with what is open and why. counts: per tab.",
     )
     async def inbox_list(
         ctx: Context,

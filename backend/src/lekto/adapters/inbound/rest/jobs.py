@@ -17,6 +17,7 @@ from lekto.adapters.inbound.rest.schemas.jobs import (
 )
 from lekto.core.domain.ids import JobId
 from lekto.core.domain.jobs import OPEN_STATES, JobState
+from lekto.core.ports.repository import PAGE_SIZE
 from lekto.core.services.jobs import PAGE_LIMIT
 
 router = APIRouter(prefix="/jobs", tags=["jobs"], dependencies=PROTECTED)
@@ -59,7 +60,7 @@ async def list_jobs(
     state: Annotated[list[JobState] | None, Query(description="Repeat for several.")] = None,
     kind: Annotated[str | None, Query(max_length=100)] = None,
     offset: Annotated[int, Query(ge=0)] = 0,
-    limit: Annotated[int, Query(ge=1, le=PAGE_LIMIT)] = 50,
+    limit: Annotated[int, Query(ge=1, le=PAGE_LIMIT)] = PAGE_SIZE,
 ) -> JobPageOut:
     page = await context.jobs.list(
         user,

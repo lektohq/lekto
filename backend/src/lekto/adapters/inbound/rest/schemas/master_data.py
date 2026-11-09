@@ -24,6 +24,7 @@ from lekto.core.domain.master_data import (
     TagScope,
 )
 from lekto.core.domain.tag_tree import TagTree
+from lekto.core.ports.images import LOGO_SIZE
 
 
 class MasterDataOut(BaseModel):
@@ -249,7 +250,8 @@ class LogoOut(BaseModel):
     )
     stored_at: datetime
     url: str = Field(
-        description="Where to get it (`GET /contacts/{id}/logo`, WebP up to 128 px), with its "
+        description=f"Where to get it (`GET /contacts/{{id}}/logo`, WebP up to {LOGO_SIZE} px), "
+        "with its "
         "version: a new logo has a new URL, so it may be cached.",
         examples=["/api/v1/contacts/01999d5e-1111-7c1e-b6a3-2f4d5e6f7a8b/logo?v=1792200000000000"],
     )

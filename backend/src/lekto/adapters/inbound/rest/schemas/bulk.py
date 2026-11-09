@@ -10,6 +10,7 @@ from lekto.adapters.inbound.rest.schemas.rules import SkippedOut
 from lekto.adapters.inbound.schemas import ReasonOut
 from lekto.core.domain.bulk import MAX_IDS, BulkAction, BulkKind, BulkOperation, BulkStatus
 from lekto.core.domain.ids import ContactId, DocumentTypeId, SpaceId, TagId
+from lekto.core.domain.lenses import MAX_QUERY_LENGTH
 from lekto.core.domain.pipeline import Node
 
 
@@ -80,7 +81,7 @@ class BulkRequest(BaseModel):
     q: str | None = Field(
         default=None,
         min_length=1,
-        max_length=500,
+        max_length=MAX_QUERY_LENGTH,
         description="Words of the search (`POST /documents/search`), not with `document_ids`.",
     )
     action: BulkActionIn
