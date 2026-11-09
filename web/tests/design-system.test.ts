@@ -709,6 +709,21 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(found).toEqual([]);
 	});
 
+	it('links inside DESIGN.md only to headings it has', async () => {
+		const design = (await import('../DESIGN.md?raw')).default;
+		const slug = (heading: string) =>
+			heading
+				.toLowerCase()
+				.replace(/[`*_]/g, '')
+				.replace(/[^\p{L}\p{N} -]/gu, '')
+				.replace(/ /g, '-');
+		const anchors = new Set(
+			[...design.matchAll(/^#{2,4} (.+)$/gm)].map((match) => slug(match[1].trim()))
+		);
+		const links = [...design.matchAll(/\]\(#([^)]+)\)/g)].map((match) => match[1]);
+		expect(links.filter((link) => !anchors.has(link))).toEqual([]);
+	});
+
 	it('shows the owl only where a moment is rare: sign-in, not found, nothing waiting, no document', () => {
 		expect(
 			offenders((source, path) => (MASCOT.has(path) ? null : line(source, /<Mascot\b/)))

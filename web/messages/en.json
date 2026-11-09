@@ -524,7 +524,6 @@
 	"lane_yellow": "Review",
 	"lane_red": "Action needed",
 	"lane_running": "Running",
-	"placeholder_text": "This area is coming soon.",
 	"error_title": "Something went wrong",
 	"error_not_found": "This page does not exist.",
 	"error_forbidden": "Not allowed.",
