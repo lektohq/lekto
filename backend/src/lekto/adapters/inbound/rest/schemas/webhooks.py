@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.rest.schemas.common import following_offset
 from lekto.adapters.inbound.schemas import ReasonOut
 from lekto.core.domain.documents import UNSET, Unset
 from lekto.core.domain.tasks import DEFAULT_TIMEOUT, MAX_TIMEOUT, MIN_TIMEOUT
@@ -358,11 +359,10 @@ class DeliveryPageOut(BaseModel):
 
     @classmethod
     def of(cls, page: DeliveriesPage, offset: int) -> "DeliveryPageOut":
-        end = offset + len(page.deliveries)
         return cls(
             items=[DeliveryOut.of_view(view) for view in page.deliveries],
             total=page.total,
-            next_offset=end if page.deliveries and end < page.total else None,
+            next_offset=following_offset(offset, len(page.deliveries), page.total),
         )
 
 

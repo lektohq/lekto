@@ -22,7 +22,13 @@ from lekto.adapters.inbound.rest import (
 )
 from lekto.adapters.inbound.rest.ui import UI_PREFIX
 from lekto.composition.bootstrap import ensure_first_admin
-from lekto.composition.container import Container, Services, build_container, build_services
+from lekto.composition.container import (
+    Container,
+    Services,
+    build_container,
+    build_services,
+    public_base,
+)
 from lekto.composition.settings import Settings
 from lekto.core.domain.ids import UserId
 
@@ -106,11 +112,7 @@ def api_context(container: Container, settings: Settings, services: Services) ->
         max_request_size=int(settings.request_max_size),
         events_poll_interval=settings.events_poll_interval,
         text_max=services.documents.text_max,
-        ui_url=(
-            None
-            if settings.public_url is None
-            else str(settings.public_url).rstrip("/") + UI_PREFIX
-        ),
+        ui_url=(None if (public := public_base(settings)) is None else public + UI_PREFIX),
         ui_directory=settings.ui_dir,
     )
 

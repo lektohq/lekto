@@ -7,7 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from lekto.adapters.inbound.rest.paths import logo_url
-from lekto.adapters.inbound.rest.schemas.common import Name, NameIn
+from lekto.adapters.inbound.rest.schemas.common import Name, NameIn, each_once
 from lekto.core.domain.appearance import MAX_ICON, ContactLogo, LogoSource, PaletteColor
 from lekto.core.domain.fields import FieldDefinition, FieldType
 from lekto.core.domain.identifiers import MAX_IDENTIFIERS, IdentifierKind, IdentifierSource
@@ -361,9 +361,7 @@ class DocumentTypeCreate(NameIn):
     @field_validator("fields")
     @classmethod
     def _each_once(cls, fields: list[FieldAssignmentIn]) -> list[FieldAssignmentIn]:
-        if len({item.field_id for item in fields}) != len(fields):
-            raise ValueError("each field once")
-        return fields
+        return each_once(fields, lambda item: item.field_id, "field")
 
 
 class DocumentTypePatch(BaseModel):
@@ -723,6 +721,4 @@ class FieldAssignmentsIn(BaseModel):
     @field_validator("fields")
     @classmethod
     def _each_once(cls, fields: list[FieldAssignmentIn]) -> list[FieldAssignmentIn]:
-        if len({item.field_id for item in fields}) != len(fields):
-            raise ValueError("each field once")
-        return fields
+        return each_once(fields, lambda item: item.field_id, "field")
