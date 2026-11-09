@@ -786,6 +786,18 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(links.filter((link) => !anchors.has(link))).toEqual([]);
 	});
 
+	it('tells nothing only on hover: no native title on a field, a cell or a code', () => {
+		// DESIGN.md, "Help and tooltips": information is never available only through hover.
+		expect(
+			offenders(
+				(source) =>
+					['Input', 'Table.Cell', 'code']
+						.flatMap((name) => tags(source, name))
+						.find((tag) => /\stitle=/.test(tag)) ?? null
+			)
+		).toEqual([]);
+	});
+
 	it('shows the owl only where a moment is rare: sign-in, not found, nothing waiting, no document', () => {
 		expect(
 			offenders((source, path) => (MASCOT.has(path) ? null : line(source, /<Mascot\b/)))
