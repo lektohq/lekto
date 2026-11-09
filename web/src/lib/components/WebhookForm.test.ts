@@ -6,18 +6,12 @@ import { m } from '#lib/paraglide/messages.js';
 import { choose, selectedValue } from '#lib/testing/select.ts';
 import { session } from '#lib/session.svelte.ts';
 import WebhookForm from './WebhookForm.svelte';
+import { json } from '#lib/testing/api.ts';
 
 type Webhook = components['schemas']['WebhookOut'];
 
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
 const sent: { method: string; path: string; body: unknown }[] = [];
-
-function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), {
-		status,
-		headers: { 'content-type': 'application/json' }
-	});
-}
 
 const stored: Webhook = {
 	id: 'hook',

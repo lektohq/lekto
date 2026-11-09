@@ -7,12 +7,9 @@ import { events } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import Page from './ClassifierTab.svelte';
+import { json } from '#lib/testing/api.ts';
 
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
-
-function json(status: number, body: unknown, type = 'application/json'): Response {
-	return new Response(JSON.stringify(body), { status, headers: { 'content-type': type } });
-}
 
 const trained = {
 	model: {
@@ -58,9 +55,9 @@ function answer(status: unknown = trained) {
 	return async (request: Request) => {
 		const path = new URL(request.url).pathname;
 		if (request.method === 'POST') return new Response(null, { status: 202 });
-		if (path === '/api/v1/classifier/models') return json(200, models);
-		if (path === '/api/v1/automation/signals') return json(200, signals);
-		return json(200, status);
+		if (path === '/api/v1/classifier/models') return json(models);
+		if (path === '/api/v1/automation/signals') return json(signals);
+		return json(status);
 	};
 }
 
@@ -162,11 +159,7 @@ describe('the classifier tab', () => {
 
 	it('says so when there is no classifier', async () => {
 		fetchMock.mockImplementation(async () =>
-			json(
-				503,
-				{ type: 'about:blank', title: 'Unavailable', status: 503 },
-				'application/problem+json'
-			)
+			json({ type: 'about:blank', title: 'Unavailable', status: 503 }, 503)
 		);
 		render(Page);
 		expect(await screen.findByText(m.classifier_not_configured())).toBeTruthy();
