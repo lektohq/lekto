@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { formatDate, formatMoney, regionalLocale } from './i18n.ts';
+import { getLocale, setLocale } from '#lib/paraglide/runtime.js';
+import {
+	browserZone,
+	formatDate,
+	formatMoment,
+	formatMoney,
+	listLocale,
+	quoted,
+	regionalLocale
+} from './i18n.ts';
 
 describe('regionalLocale', () => {
 	it("takes the browser's region for the UI language", () => {
@@ -50,5 +59,42 @@ describe('formatMoney', () => {
 
 	it('writes an unknown currency plainly instead of failing', () => {
 		expect(formatMoney('12.5', 'EURO')).toBe('12.50 EURO');
+	});
+});
+
+describe('one way to format', () => {
+	const before = getLocale();
+	const zone = process.env.TZ;
+	afterEach(() => {
+		setLocale(before, { reload: false });
+		process.env.TZ = zone;
+	});
+
+	it('writes a moment medium or short', () => {
+		process.env.TZ = 'Europe/Berlin';
+		setLocale('de', { reload: false });
+		expect(formatMoment('2026-11-05T13:03:00Z')).toBe(
+			formatDate('2026-11-05T13:03:00Z', { dateStyle: 'medium', timeStyle: 'short' })
+		);
+		expect(formatMoment('2026-11-05T13:03:00Z', 'short')).toBe('05.11.26, 14:03');
+	});
+
+	it('quotes as the language quotes', () => {
+		setLocale('de', { reload: false });
+		expect(quoted('Rechnungen')).toBe('„Rechnungen“');
+		setLocale('en', { reload: false });
+		expect(quoted('Invoices')).toBe('“Invoices”');
+	});
+
+	it('lists in the locale of dates and numbers', () => {
+		setLocale('de', { reload: false });
+		expect(listLocale()).toMatch(/^de-/);
+		expect(new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(['A', 'B', 'C'])).toBe(
+			'A, B und C'
+		);
+	});
+
+	it("names the browser's time zone", () => {
+		expect(browserZone()).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
 	});
 });

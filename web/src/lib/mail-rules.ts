@@ -13,6 +13,7 @@ import {
 	type MailField,
 	type MailOperator
 } from '#lib/mail-traits.ts';
+import { quoted } from '#lib/i18n.ts';
 import { folderLabel } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { mailOperatorLabel } from '#lib/rules/describe.ts';
@@ -376,7 +377,7 @@ export function conditionText(item: Pick<MailConditionNode, 'field' | 'op' | 'va
 function valueText(field: MailField, value: string): string {
 	switch (field) {
 		case 'folder':
-			return `„${folderLabel(value)}“`;
+			return quoted(folderLabel(value));
 		case 'importance':
 			return importanceLabel(value);
 		case 'flag':

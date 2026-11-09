@@ -1170,7 +1170,10 @@ names Erledigt, Prüfen, Eingreifen, In Verarbeitung.
 ### Formats
 
 Dates and numbers follow the UI language (`Intl`): `26.10.2026`, `123,45 €` in German. Durations
-are short and do not wrap ("4,2s", "1m 3s").
+are short and do not wrap ("4,2s", "1m 3s"). Every format comes from `lib/i18n.ts`, one way each:
+`formatMoment` (medium in lines, `short` in table rows), `formatPercent`, `listLocale` for lists,
+`browserZone`, `quoted` for a quoted name („…“, “…”); no component reads a locale or a time zone
+of its own, and no quotation mark stands in code.
 
 Identifiers stand as they are printed wherever they are shown: an IBAN in groups of four
 (`DE89 3704 0044 0532 0130 00`), whether the API sends it as kept or as written; other values as
@@ -1226,7 +1229,7 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     primary action, never after it ("Footers"); no height of its own on a `Button` or
     `IconButton` ("Buttons"); a box of tone (`bg-lane-yellow`, `bg-lane-red`, `bg-note` with a
     radius and padding) only as `Alert` ("Alerts"); a button in an alert in its variant, never in the
-    alert's tone ("Alerts"); the owl (`Mascot`, `EmptyNote` with `mascot`) only at its
+    alert's tone ("Alerts"); formats only through `lib/i18n.ts` ("Formats"); the owl (`Mascot`, `EmptyNote` with `mascot`) only at its
     places ("Logo and owl"); a dashed box of muted words only as `EmptyNote` ("States"); a lone
     radio only in `ChoiceCard` ("Checkboxes, radios, switches"); a pill of a chip only as `Chip`
     or `TagChip` ("Chips"); the phone's editor bar only in `PhoneEditorBar` ("Dialogs, sheets,

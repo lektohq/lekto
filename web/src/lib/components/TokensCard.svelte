@@ -15,6 +15,7 @@
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { describeError } from '#lib/errors.ts';
+	import { isoDayLocal } from '#lib/dates.ts';
 	import { formatDate } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import IconButton from '#lib/components/IconButton.svelte';
@@ -89,7 +90,7 @@
 		value,
 		label: SCOPE_LABELS[value]()
 	}));
-	const today = new Date().toLocaleDateString('sv');
+	const today = isoDayLocal(new Date());
 </script>
 
 <Card.Root>

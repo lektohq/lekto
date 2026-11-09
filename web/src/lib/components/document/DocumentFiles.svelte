@@ -34,7 +34,7 @@
 		type Step,
 		type StepKind
 	} from '#lib/file-passport.ts';
-	import { formatDate, formatNumber } from '#lib/i18n.ts';
+	import { formatDate, formatMoment, formatNumber } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { cn } from '#lib/utils.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
@@ -170,8 +170,7 @@
 		);
 	});
 
-	const when = (value: Date | string) =>
-		formatDate(value, { dateStyle: 'medium', timeStyle: 'short' });
+	const when = formatMoment;
 
 	/** What the file says of itself, then when it was made and changed. */
 	function passportRows(

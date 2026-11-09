@@ -4,7 +4,7 @@
  */
 import type { components } from '#lib/api/schema.ts';
 import { formatDuration } from '#lib/duration.ts';
-import { formatDate } from '#lib/i18n.ts';
+import { formatMoment } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 
 export type Job = components['schemas']['JobOut'];
@@ -111,7 +111,7 @@ export function jobRun(job: Job, now: Date): string {
 }
 
 function when(iso: string): string {
-	return formatDate(iso, { dateStyle: 'short', timeStyle: 'short' });
+	return formatMoment(iso, 'short');
 }
 
 /** Whether the workers seem to stand still: jobs are due, and none was started for two minutes
