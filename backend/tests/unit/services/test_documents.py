@@ -31,6 +31,7 @@ from lekto.core.domain.ids import (
 )
 from lekto.core.domain.inbox import InboxTab
 from lekto.core.domain.pipeline import PERSON_SPACE, Lane, Node
+from lekto.core.domain.reasons import Action, ReasonCode, because
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.repository import DocumentFilter
@@ -128,10 +129,14 @@ async def test_writer_updates_metadata(world: World, scene: Scene) -> None:
 
 
 async def test_reader_cannot_update(world: World, scene: Scene) -> None:
-    with pytest.raises(PermissionDeniedError):
+    # One code for a reader who changes a document, the action says which (review 0.12.2, C-13).
+    with pytest.raises(PermissionDeniedError) as refused:
         await world.documents.update_metadata(
             scene.reader.id, scene.document.id, DocumentChanges(title="Mine")
         )
+    assert refused.value.reason == because(
+        ReasonCode.EDITORS_ONLY, action=Action.CHANGE_DOCUMENT.value
+    )
     with pytest.raises(NotFoundError):
         await world.documents.update_metadata(
             scene.stranger.id, scene.document.id, DocumentChanges(title="Mine")

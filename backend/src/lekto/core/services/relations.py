@@ -21,13 +21,13 @@ from lekto.core.domain.first_runs import RELATIONS, Decision, FieldVerdict, Verd
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import DocumentId, DocumentTypeId, UserId
 from lekto.core.domain.permissions import can_edit_document, can_read_document
-from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.reasons import Action, ReasonCode, because
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState, ordered
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
-from lekto.core.services._access import load_actor, readable_document, writable_document
+from lekto.core.services._access import controllable_document, load_actor, readable_document
 
 RELATIONS_LOCK = "relations"
 """One change of relations at a time, Lekto's (`relating`) or a person's: two documents that
@@ -249,7 +249,7 @@ async def _pair(
     first, _ = await readable_document(uow, user, id)
     second, _ = await readable_document(uow, user, other)
     newer, older = (first, second) if _newer(first, second) == first.id else (second, first)
-    await writable_document(uow, user, newer.id)
+    await controllable_document(uow, user, newer.id, Action.RELATE_DOCUMENTS)
     return newer, older
 
 

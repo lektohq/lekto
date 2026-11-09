@@ -48,12 +48,12 @@ from lekto.core.domain.identifiers import (
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import DocumentId, UserId
 from lekto.core.domain.pipeline import ProcessingHistory
-from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.reasons import Action, ReasonCode, because
 from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
-from lekto.core.services._access import load_actor, writable_document
+from lekto.core.services._access import controllable_document, load_actor
 from lekto.core.services._identifiers import claim_identifiers
 from lekto.core.services.classification.kept_facts import TextFacts, facts_lock, refresh_facts
 from lekto.core.services.classification.signals import model_facts
@@ -116,7 +116,7 @@ async def decide_fact(
         # One store of the document's facts at a time: the signals' and a person's.
         await uow.lock(facts_lock(id))
         user = await load_actor(uow, actor)
-        document, _ = await writable_document(uow, user, id)
+        document, _ = await controllable_document(uow, user, id, Action.DECIDE_FACTS)
         if text is None:
             raise ConflictError(because(ReasonCode.NO_TEXT_YET))
         if person_only(decision.kind) and not user.is_active_admin:
