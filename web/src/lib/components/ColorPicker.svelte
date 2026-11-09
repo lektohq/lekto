@@ -5,7 +5,6 @@
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { isHex, isPalette, PALETTE, type PaletteColor } from '#lib/colors.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { cn } from '#lib/utils.ts';
 
 	// A colour of the palette, an own one or none: twelve swatches, and behind "More colours" the
 	// browser's colour picker with a field for `#rrggbb`.
@@ -134,7 +133,7 @@
 				value={own && value ? value : FALLBACK}
 				oninput={(event) => picked(event.currentTarget.value)}
 				aria-label={m.color_own_pick()}
-				class="h-9 w-11 cursor-pointer rounded-lg border bg-card p-0.5"
+				class="h-11 w-11 cursor-pointer rounded-lg border bg-card p-0.5"
 			/>
 			<Input
 				id="{id}-hex"
@@ -144,13 +143,13 @@
 				spellcheck={false}
 				aria-label={m.color_own_hex()}
 				aria-invalid={text !== '' && !isHex(text.startsWith('#') ? text : `#${text}`)}
-				class={cn('h-9 w-28 font-mono')}
+				class="w-28 font-mono"
 			/>
 			<p class="basis-full text-xs text-muted-foreground">{m.color_own_hint()}</p>
 		</div>
 	{:else}
 		<div>
-			<Button variant="ghost" size="sm" class="max-sm:h-11" onclick={openMore}>
+			<Button variant="ghost" size="sm" onclick={openMore}>
 				{m.color_more()}
 			</Button>
 		</div>

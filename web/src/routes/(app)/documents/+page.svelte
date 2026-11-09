@@ -841,14 +841,18 @@ row of filters, on a desktop narrow by the title. -->
 					/>
 				</div>
 				{#if lens && lookup}
-					<Button
+					<!-- Narrower, an icon with its name as tooltip (DESIGN.md, "Page frame"). -->
+					<IconButton
 						variant="outline"
-						class="max-lg:size-10 max-lg:px-0"
-						aria-label={m.lens_edit()}
+						class="lg:hidden"
+						label={m.lens_edit()}
 						onclick={() => edit(lens)}
 					>
 						<Pencil aria-hidden="true" />
-						<span class="max-lg:hidden">{m.lens_edit()}</span>
+					</IconButton>
+					<Button variant="outline" class="max-lg:hidden" onclick={() => edit(lens)}>
+						<Pencil aria-hidden="true" />
+						{m.lens_edit()}
 					</Button>
 				{/if}
 			</div>
