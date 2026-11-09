@@ -1,9 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { createRawSnippet } from 'svelte';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type Problem } from '#lib/api/problem.ts';
 import { m } from '#lib/paraglide/messages.js';
+import { phone } from '#lib/phone.svelte.ts';
 import FormDialog from './FormDialog.svelte';
 
 // A field that is told the error, as the dialogs' inputs are for `aria-invalid`.
@@ -62,5 +63,31 @@ describe('FormDialog', () => {
 		);
 		await user.click(screen.getByRole('button', { name: m.cancel() }));
 		await waitFor(() => expect(props.open).toBe(false));
+	});
+
+	describe('on a phone', () => {
+		afterEach(() => phone.override(null));
+
+		it('is a whole screen with the bar of the editors: cancel, title, submit', async () => {
+			phone.override(true);
+			const user = userEvent.setup();
+			const action = vi.fn(() => Promise.resolve());
+			const props = $state({
+				open: true,
+				title: 'Space',
+				submitLabel: 'Delete',
+				destructive: true,
+				action,
+				children
+			});
+			render(FormDialog, props);
+			const submit = await screen.findByRole('button', { name: 'Delete' });
+			expect(submit.className).toContain('text-destructive');
+			expect(screen.getByRole('button', { name: m.cancel() })).toBeTruthy();
+			expect(screen.getByRole('dialog').className).toContain('h-dvh');
+			await user.click(submit);
+			await waitFor(() => expect(props.open).toBe(false));
+			expect(action).toHaveBeenCalledOnce();
+		});
 	});
 });
