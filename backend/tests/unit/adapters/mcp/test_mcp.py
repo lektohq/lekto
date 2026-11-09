@@ -224,6 +224,9 @@ async def test_documents_list_lists_by_filters_and_counts_by_groups(api: Api, sc
     assert green["fields"] == {"Betrag": {"amount": "80.10", "currency": "EUR"}}
     yellow = data(await call(api, owner, "documents_list", lane="yellow"))
     assert {item["id"] for item in yellow["items"]} == shorts(scene.yellow)
+    # Every lane of REST's filter, `processing` too (`adapters/inbound/lanes.py`).
+    waiting = data(await call(api, owner, "documents_list", lane="processing"))
+    assert {item["id"] for item in waiting["items"]} == shorts(scene.processing)
     paged = data(await call(api, owner, "documents_list", limit=2))
     assert len(paged["items"]) == 2 and paged["next_offset"] == 2
     last = data(await call(api, owner, "documents_list", limit=2, offset=2))
