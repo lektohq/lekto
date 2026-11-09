@@ -1,9 +1,10 @@
 """Search results."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.rest.schemas.common import ms
 from lekto.adapters.inbound.rest.schemas.documents import ListedDocument
 from lekto.adapters.inbound.rest.schemas.open_identifiers import OccurrenceOut
 from lekto.adapters.inbound.schemas import ReasonOut
@@ -101,10 +102,6 @@ class SearchResultPage(BaseModel):
     )
 
 
-def _ms(value: timedelta) -> float:
-    return round(value.total_seconds() * 1000, 1)
-
-
 class IndexStatsOut(BaseModel):
     documents: int = Field(description="Documents in the index.")
     embedded: int = Field(description="Of them, those with vectors (of any model).")
@@ -122,7 +119,7 @@ class JobTimesOut(BaseModel):
     def of(cls, times: JobTimes | None) -> "JobTimesOut | None":
         if times is None:
             return None
-        return cls(count=times.count, median_ms=_ms(times.median), p90_ms=_ms(times.p90))
+        return cls(count=times.count, median_ms=ms(times.median), p90_ms=ms(times.p90))
 
 
 class SearchStatusOut(BaseModel):
@@ -161,10 +158,10 @@ class SearchStatusOut(BaseModel):
             ),
             running=status.running,
             queued=status.queued,
-            remaining_ms=None if status.remaining is None else _ms(status.remaining),
+            remaining_ms=None if status.remaining is None else ms(status.remaining),
             embedded_jobs=JobTimesOut.of(status.embedded),
             plain_jobs=JobTimesOut.of(status.plain),
-            per_section_ms=None if status.per_section is None else _ms(status.per_section),
+            per_section_ms=None if status.per_section is None else ms(status.per_section),
             model=status.model,
             dimensions=status.dimensions,
             since=status.since,
@@ -188,5 +185,5 @@ class IndexCheckOut(BaseModel):
             outdated=len(found.outdated),
             other_model=len(found.other_model),
             extra=len(found.extra),
-            took_ms=_ms(check.took),
+            took_ms=ms(check.took),
         )
