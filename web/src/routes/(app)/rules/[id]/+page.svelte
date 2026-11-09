@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { switchRule } from '#lib/rules/switch.ts';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
@@ -13,7 +14,6 @@
 	import TitlePatternBadge from '#lib/components/rules/TitlePatternBadge.svelte';
 	import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import { reportError } from '#lib/errors.ts';
 	import { formatDate } from '#lib/i18n.ts';
 	import { userName } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -78,19 +78,11 @@
 		() => void load(true)
 	);
 
-	async function switchRule(enabled: boolean) {
+	async function switchOne(enabled: boolean) {
 		if (!rule) return;
 		busy = true;
-		try {
-			rule = await unwrap(
-				api.PATCH('/api/v1/rules/{id}', { params: { path: { id: rule.id } }, body: { enabled } })
-			);
-			toast.success(enabled ? m.rule_switched_on() : m.rule_switched_off());
-		} catch (error) {
-			reportError(error);
-		} finally {
-			busy = false;
-		}
+		rule = (await switchRule(rule.id, enabled)) ?? rule;
+		busy = false;
 	}
 
 	async function remove() {
@@ -115,7 +107,7 @@
 		disabledReason={rule?.disabled_reason
 			? (reasonsText(rule.disabled_reasons, rule.disabled_reason) ?? '')
 			: null}
-		onswitch={switchRule}
+		onswitch={switchOne}
 		ondelete={() => (removing = true)}
 	>
 		{#snippet badges()}

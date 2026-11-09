@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { switchMailRule } from '#lib/rules/switch.ts';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
@@ -13,7 +14,7 @@
 	import RuleHeader from '#lib/components/rules/RuleHeader.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import { describeError, reportError } from '#lib/errors.ts';
+	import { describeError } from '#lib/errors.ts';
 	import { loadMailRuleLookup, namesOf, type MailRuleLookup } from '#lib/mail-rule-lookup.ts';
 	import type { MailRule } from '#lib/mail-rules.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -51,22 +52,11 @@
 		untrack(() => void load(wanted));
 	});
 
-	async function switchRule(enabled: boolean) {
+	async function switchOne(enabled: boolean) {
 		if (!rule) return;
 		busy = true;
-		try {
-			rule = await unwrap(
-				api.PATCH('/api/v1/mail-rules/{id}', {
-					params: { path: { id: rule.id } },
-					body: { enabled }
-				})
-			);
-			toast.success(enabled ? m.rule_switched_on() : m.rule_switched_off());
-		} catch (error) {
-			reportError(error);
-		} finally {
-			busy = false;
-		}
+		rule = (await switchMailRule(rule.id, enabled)) ?? rule;
+		busy = false;
 	}
 
 	async function remove() {
@@ -87,7 +77,7 @@
 		editHref="{BASE}/rules/mail/{id}/edit"
 		applyHref="{BASE}/rules/mail/{id}/apply"
 		disabledReason={rule?.disabled_reason ? reasonText(rule.disabled_reason) : null}
-		onswitch={switchRule}
+		onswitch={switchOne}
 		ondelete={() => (removing = true)}
 	>
 		{#snippet badges()}

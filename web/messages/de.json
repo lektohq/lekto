@@ -299,6 +299,8 @@
 	"mailbox_part_fetch": "Abruf",
 	"mailbox_short": "Postfach",
 	"mailbox_switch_on": "Postfach „{name}“ aktivieren",
+	"mailbox_switched_on": "Postfach aktiviert.",
+	"mailbox_switched_off": "Postfach pausiert.",
 	"mailbox_switch_off": "Postfach „{name}“ pausieren",
 	"mailbox_delete_title": "Postfach „{name}“ löschen",
 	"mailbox_delete_description": "Lekto holt aus diesem Postfach nichts mehr ab. Was es schon übernommen hat, bleibt.",
