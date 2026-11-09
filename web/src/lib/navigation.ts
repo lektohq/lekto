@@ -1,3 +1,4 @@
+import { BASE_API } from '#lib/api/base.ts';
 import { BASE as base } from '#lib/base.ts';
 
 const MAX_LENGTH = 2000;
@@ -40,5 +41,5 @@ export function loginHref(next: string): string {
 
 /** The start of signing in through the identity provider (a page of the API, not of the app). */
 export function oidcLoginHref(next: string): string {
-	return `/api/v1/auth/oidc/login?next=${encodeURIComponent(safeNext(next))}`;
+	return `${BASE_API}/auth/oidc/login?next=${encodeURIComponent(safeNext(next))}`;
 }
