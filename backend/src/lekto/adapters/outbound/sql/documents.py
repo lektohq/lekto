@@ -63,7 +63,7 @@ from lekto.core.ports.repository import (
     DocumentFilter,
     DocumentOrder,
     DocumentPosition,
-    FacetRow,
+    FacetBy,
     SortKey,
 )
 
@@ -132,46 +132,30 @@ class SqlDocumentRepository(SqlRepository[DocumentId, Document]):
     ) -> list[Document]:
         return await self._query([], filter, order=order, after=after, limit=limit, offset=offset)
 
-    async def facet_rows(self, filter: DocumentFilter, user: UserId | None) -> list[FacetRow]:
-        documents, tags = t.documents, t.document_tags
-        criteria = [*([] if user is None else [visible_to(user)]), *_matching(filter)]
-        rows = (
-            await self._tx.read(
-                select(
-                    documents.c.id,
-                    documents.c.contact_id,
-                    documents.c.document_type_id,
-                    documents.c.topic_id,
-                    documents.c.document_date,
-                ).where(*criteria)
-            )
-        ).all()
-        matching = select(documents.c.id).where(*criteria)
-        tagged: dict[UUID, set[TagId]] = {}
-        for link in (
-            await self._tx.read(
-                select(tags.c.document_id, tags.c.tag_id).where(tags.c.document_id.in_(matching))
-            )
-        ).all():
-            tagged.setdefault(link.document_id, set()).add(TagId(link.tag_id))
-        return [
-            FacetRow(
-                contact=None if row.contact_id is None else ContactId(row.contact_id),
-                document_type=(
-                    None if row.document_type_id is None else DocumentTypeId(row.document_type_id)
-                ),
-                topic=None if row.topic_id is None else TagId(row.topic_id),
-                tags=frozenset(tagged.get(row.id, ())),
-                document_date=row.document_date,
-            )
-            for row in rows
-        ]
-
     async def count(self, filter: DocumentFilter, user: UserId | None) -> int:
         documents = t.documents
         criteria = [*([] if user is None else [visible_to(user)]), *_matching(filter)]
         statement = select(func.count()).select_from(documents).where(*criteria)
         return int((await self._tx.read(statement)).scalar_one())
+
+    async def count_grouped(
+        self, filter: DocumentFilter, user: UserId | None, by: FacetBy
+    ) -> dict[UUID | date | None, int]:
+        documents = t.documents
+        column = {
+            FacetBy.CONTACT: documents.c.contact_id,
+            FacetBy.DOCUMENT_TYPE: documents.c.document_type_id,
+            FacetBy.TOPIC: documents.c.topic_id,
+            FacetBy.DOCUMENT_DATE: documents.c.document_date,
+        }[by]
+        criteria = [*([] if user is None else [visible_to(user)]), *_matching(filter)]
+        statement = (
+            select(column.label("key"), func.count().label("documents"))
+            .where(*criteria)
+            .group_by(column)
+        )
+        rows = (await self._tx.read(statement)).all()
+        return {row.key: int(row.documents) for row in rows}
 
     async def count_by(self, by: CountBy, user: UserId | None) -> dict[UUID, int]:
         documents = t.documents
@@ -207,12 +191,17 @@ class SqlDocumentRepository(SqlRepository[DocumentId, Document]):
         return {row.key: int(row.documents) for row in rows}
 
     async def count_tagged(
-        self, sets: Mapping[UUID, Collection[TagId]], user: UserId | None
+        self,
+        sets: Mapping[UUID, Collection[TagId]],
+        user: UserId | None,
+        filter: DocumentFilter | None = None,
     ) -> dict[UUID, int]:
         """One query per `KEYS_PER_QUERY` keys: each a count of the distinct documents among the
         rows of the key's tags."""
         documents, tags = t.documents, t.document_tags
         criteria: list[ColumnElement[bool]] = [] if user is None else [visible_to(user)]
+        if filter is not None:
+            criteria += _matching(filter)
         keys = list(sets)
         counts: dict[UUID, int] = {}
         for start in range(0, len(keys), KEYS_PER_QUERY):

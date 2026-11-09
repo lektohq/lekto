@@ -246,17 +246,6 @@ class DocumentFilter:
 
 
 @dataclass(frozen=True, kw_only=True)
-class FacetRow:
-    """What counts of the documents of a filter look at of one of them (`facet_rows`)."""
-
-    contact: ContactId | None
-    document_type: DocumentTypeId | None
-    topic: TagId | None
-    tags: frozenset[TagId]
-    document_date: date | None
-
-
-@dataclass(frozen=True, kw_only=True)
 class FilterView:
     """What a `DocumentFilter` looks at of a document: from a `Document` and the groups of its
     contact and type (`of`), or from what the search index holds of it."""
@@ -327,6 +316,16 @@ class DocumentOrder:
 
 
 NEWEST_FIRST = DocumentOrder()
+
+
+class FacetBy(StrEnum):
+    """What the documents of a filter are grouped by for their counts (`count_grouped`): the
+    one value each document has, or none."""
+
+    CONTACT = "contact"
+    DOCUMENT_TYPE = "document_type"
+    TOPIC = "topic"
+    DOCUMENT_DATE = "document_date"
 
 
 class CountBy(StrEnum):
@@ -425,15 +424,17 @@ class DocumentRepository(Repository[DocumentId, Document], Protocol):
         """As `query_visible`, over every document (for admins)."""
         ...
 
-    async def facet_rows(self, filter: DocumentFilter, user: UserId | None) -> list[FacetRow]:
-        """Of each document that matches `filter` and the user may read (as
-        `list_visible_to`; None: every document), what its counts look at: contact, type,
-        topic, tags, document date. In no order."""
-        ...
-
     async def count(self, filter: DocumentFilter, user: UserId | None) -> int:
         """How many documents match `filter` that the user may read (as `list_visible_to`;
-        None: every document): what `facet_rows` would return, counted alone."""
+        None: every document)."""
+        ...
+
+    async def count_grouped(
+        self, filter: DocumentFilter, user: UserId | None, by: FacetBy
+    ) -> dict[UUID | date | None, int]:
+        """How many documents that match `filter` and the user may read (as `count`) have each
+        contact, type, topic or document date (`by`), counted by the database; those without
+        one under None. Only values with documents."""
         ...
 
     async def count_by(self, by: CountBy, user: UserId | None) -> dict[UUID, int]:
@@ -443,11 +444,14 @@ class DocumentRepository(Repository[DocumentId, Document], Protocol):
         ...
 
     async def count_tagged(
-        self, sets: Mapping[UUID, Collection[TagId]], user: UserId | None
+        self,
+        sets: Mapping[UUID, Collection[TagId]],
+        user: UserId | None,
+        filter: DocumentFilter | None = None,
     ) -> dict[UUID, int]:
-        """For each key, how many documents the user may read (as `count_by`) carry a tag of
-        its set, each document once (the core gives a tag with its descendants). Only keys with
-        documents."""
+        """For each key, how many documents the user may read (as `count_by`; those that match
+        `filter`, if given) carry a tag of its set, each document once (the core gives a tag
+        with its descendants). Only keys with documents."""
         ...
 
     async def remove(self, id: DocumentId) -> None:
