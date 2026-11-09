@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Chip from '#lib/components/Chip.svelte';
 	import ChoiceCard from '#lib/components/ChoiceCard.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import Folder from '@lucide/svelte/icons/folder';
@@ -12,7 +13,6 @@
 	import { userName, type Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { unseenText } from '#lib/space-suggestion.ts';
-	import { cn } from '#lib/utils.ts';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 
@@ -121,12 +121,7 @@
 						{#if option.chips.length > 0}
 							<span class="flex flex-wrap gap-1.5">
 								{#each option.chips as chip, index (index)}
-									<span
-										class={cn(
-											'rounded-full px-2.5 py-0.5 text-xs',
-											chip.strong ? 'bg-panel text-brand' : 'bg-muted text-muted-foreground'
-										)}>{chip.text}</span
-									>
+									<Chip size="sm" variant={chip.strong ? 'selected' : 'neutral'}>{chip.text}</Chip>
 								{/each}
 							</span>
 						{/if}

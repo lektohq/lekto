@@ -340,7 +340,11 @@ shown (`aria-current="page"`, selected and bolder), the lenses on a phone. Its v
 | `selected` | What is chosen: active filters, a toggle that is on (`bg-panel`, text `brand`, a 1 px edge `primary/45`) |
 | `add`      | The dashed "+ Gruppe" / "+ Thema" / "+ Name" that opens a picker                                         |
 
-Tags and topics in their colours (`chipLook()`) are `TagChip`, drawn in the same shape. All chips
+Tags and topics in their colours (`chipLook()`) are `TagChip`, drawn in the same shape. The colours of the tags
+belong to the tags: a mark of another kind is a `Badge`. What a signal said about a value
+(`CandidateSources`, the options of `FilingBox`) is a `Chip size="sm"`: `selected` where it counts,
+`neutral` where the signal was not sure (Tobi, 09.11.2026). A count that is no state (the facts
+of a document) is a text link, not a pill in a lane's tone. All chips
 are pills, topics included. The field a chip stands in names its kind. `TagChips`, `GroupChips`,
 `FacetChips` and `ChipInput` render `Chip` or `TagChip`.
 
@@ -956,8 +960,8 @@ are.
 Fields stand in one order everywhere (Tobi, 03.11.2026): by their position, the same by name, as
 `GET /fields` lists them. The field dialog sets the position ("Reihenfolge", a number); the Felder
 tab, each group of the document view and every choice of fields keep the API's order and never
-sort by name again. A row in the Felder tab shows a position other than 0 as a small chip
-("Position 5") beside the data type.
+sort by name again. A row in the Felder tab shows a position other than 0 as a `Badge` (`muted`,
+"Position 5") beside the data type, and "von Hand" as the Tags tab does (Tobi, 09.11.2026).
 
 ### No plain data in addresses
 
