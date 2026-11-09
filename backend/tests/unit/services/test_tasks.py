@@ -12,6 +12,7 @@ from lekto.adapters.inbound.rest.schemas.outgoing import RuleAskBody
 from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import AuthenticationError, ConflictError
 from lekto.core.domain.ids import RuleId, TaskId, WebhookId, new_id
+from lekto.core.domain.links import Links
 from lekto.core.domain.pipeline import Node, NodeResult, NodeStatus, Outcome
 from lekto.core.domain.reasons import ReasonCode
 from lekto.core.domain.tasks import MAX_ANSWER_BYTES, Task, TaskKind, TaskStatus, TaskStep
@@ -119,7 +120,7 @@ class Flow:
 async def flow(
     world: World,
     *,
-    link_base: str | None = None,
+    links: Links | None = None,
     max_open_tasks: int = 4,
     body: BodyFormat = BodyFormat.THIN,
     body_template: str | None = None,
@@ -135,7 +136,7 @@ async def flow(
         body=body,
         body_template=body_template,
     )
-    asking = Asking(world.desk(link_base), created.webhook.id)
+    asking = Asking(world.desk(links), created.webhook.id)
     pipeline = builders.skip_classification(world.pipeline({Node.APPLY_RULES: asking}))
     return Flow(world, owner, created.webhook, pipeline)
 
@@ -378,7 +379,7 @@ async def test_a_body_that_cannot_be_made_fails_the_task_at_once(world: World) -
 
 async def test_without_a_public_url_no_task_can_be_sent(world: World) -> None:
     f = await flow(world)
-    desk = TaskDesk(world.cipher, builders.TEMPLATES, link_base=None)
+    desk = TaskDesk(world.cipher, builders.TEMPLATES, links=builders.NO_LINKS)
     f.pipeline.replace_executor(Node.APPLY_RULES, Asking(desk, f.webhook.id))
     document = await f.arrive()
     (task,) = await f.tasks(document)

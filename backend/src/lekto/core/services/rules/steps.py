@@ -30,6 +30,7 @@ from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldDefinition
 from lekto.core.domain.ids import FieldId, RuleId, UserId
 from lekto.core.domain.json_value import JsonObject, JsonValue
+from lekto.core.domain.links import Links
 from lekto.core.domain.permissions import in_reach
 from lekto.core.domain.pipeline import (
     CHOSEN_SPACE,
@@ -198,7 +199,7 @@ class Walker:
     origin: Provenance
     definitions: Mapping[FieldId, FieldDefinition]
     book: TaskBook | None
-    link_base: str | None
+    links: Links | None
     now: datetime
 
     async def walk(self, match: Match) -> Walk:
@@ -284,8 +285,8 @@ class Walker:
         webhook = await self.uow.webhooks.get(step.webhook_id)
         state = await self._after(match, actions, steps)
         request = TaskRequest(
-            document=await document_json(self.uow, state, self.link_base),
-            values=await webhook_values(self.uow, state, self.link_base, self.prepared.codes),
+            document=await document_json(self.uow, state, self.links),
+            values=await webhook_values(self.uow, state, self.links, self.prepared.codes),
             rule={"id": str(rule.id), "name": rule.definition.name},
             steps=dict(steps),
         )
@@ -422,7 +423,7 @@ async def run_rules(
     accept_conflicts: bool = False,
     applier: UserId | None = None,
     book: TaskBook | None = None,
-    link_base: str | None = None,
+    links: Links | None = None,
     now: datetime | None = None,
 ) -> RuleRun:
     """Evaluate `rules` on the document, walk the steps of those that match and plan their
@@ -430,7 +431,7 @@ async def run_rules(
     pattern results (`kept_before`: the facts before it, where a person decided one; else the
     facts are as now); only rules that become true with the change act. `applier`: who applies
     the rules to existing documents. `book`: what the tasks of the node's run brought, on
-    arrival; without it, no step asks (`link_base`: where consumers answer)."""
+    arrival; without it, no step asks (`links`: where consumers answer)."""
     kept = tuple(await uow.document_facts.of_document(document.id))
     patterns, problems = await field_patterns(matcher, rules, document, kept)
     loaded = await taxonomy(uow, [document, *([] if before is None else [before[0]])], rules)
@@ -472,7 +473,7 @@ async def run_rules(
         origin,
         definitions,
         book,
-        link_base,
+        links,
         now or document.updated_at,
     )
     walks = [await walker.walk(match) for match in matched]

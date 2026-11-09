@@ -15,12 +15,11 @@ from urllib.parse import urlencode
 from lekto.core.domain import media_types
 from lekto.core.domain.encoding import base64url, from_base64url
 from lekto.core.domain.ids import DocumentId
+from lekto.core.domain.links import TASK_FILE, Links
 from lekto.core.domain.tasks import Task
 from lekto.core.ports.identity import DecryptionError, SecretCipher
 from lekto.core.services.objects import page_key, structure_key
 
-EXTERNAL_TASKS_PATH = "/api/v1/external/tasks/"
-FILES_PATH = EXTERNAL_TASKS_PATH + "{id}/files/{name}"
 STRUCTURE = "content.json"
 _PAGE = re.compile(r"pages/([1-9][0-9]{0,4})\.webp")
 
@@ -30,14 +29,15 @@ def page_file(number: int) -> str:
     return f"pages/{number}.webp"
 
 
-def file_link(
-    link_base: str, cipher: SecretCipher, task: Task, name: str, expires: datetime
-) -> str:
-    """The signed link to the file `name` of `task`'s document, valid until `expires`."""
+def file_link(links: Links, cipher: SecretCipher, task: Task, name: str, expires: datetime) -> str:
+    """The signed link to the file `name` of `task`'s document, valid until `expires` (a task
+    with a contract has a callback, so there is a public URL)."""
     stamp = int(expires.timestamp())
     signature = base64url(cipher.encrypt(b"", context=_context(task, name, stamp)))
     query = urlencode({"expires": stamp, "signature": signature})
-    return link_base.rstrip("/") + FILES_PATH.format(id=task.id, name=name) + "?" + query
+    url = links.api(TASK_FILE.format(id=task.id, name=name))
+    assert url is not None, "a file link needs LEKTO_PUBLIC_URL"
+    return url + "?" + query
 
 
 def signed(cipher: SecretCipher, task: Task, name: str, expires: int, signature: str) -> bool:

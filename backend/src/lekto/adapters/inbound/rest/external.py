@@ -17,14 +17,13 @@ from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.problems import problem, problem_responses
 from lekto.core.domain.errors import AuthenticationError
 from lekto.core.domain.ids import TaskId
+from lekto.core.domain.links import TASK_FILE, TASK_RESULT
 from lekto.core.domain.tasks import MAX_ANSWER_BYTES
-from lekto.core.services.tasks.desk import CALLBACK_PATH
-from lekto.core.services.tasks.files import FILES_PATH
 from lekto.core.services.tasks.service import UNKNOWN_LINK, UNKNOWN_TOKEN
 
 PREFIX = "/external"
-ANSWER_PATH = CALLBACK_PATH.removeprefix("/api/v1")
-FILE_PATH = FILES_PATH.removeprefix("/api/v1").replace("{name}", "{name:path}")
+ANSWER_PATH = TASK_RESULT
+FILE_PATH = TASK_FILE.replace("{name}", "{name:path}")
 
 router = APIRouter(tags=["external"])
 

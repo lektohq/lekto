@@ -125,8 +125,8 @@ class PushMessage:
     push service still holds (at most 32 characters of `[A-Za-z0-9_-]`)."""
 
     kind: PushKind
+    url: str
     params: Mapping[str, object] = field(default_factory=dict)
-    url: str = "/ui/"
     badge: int | None = None
     tag: str | None = None
     topic: str | None = None

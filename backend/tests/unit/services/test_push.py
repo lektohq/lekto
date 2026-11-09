@@ -14,6 +14,7 @@ from lekto.core.domain.users import Role, User
 from lekto.core.services._jobs import JobRunner
 from lekto.core.services._push_queue import PUSH_DELAY, PUSH_JOB
 from lekto.core.services.push import PushService
+from tests import builders
 from tests.builders import UNCERTAIN, Returns, incoming
 from tests.contracts.push import AUTH
 from tests.unit.services.support import World
@@ -22,7 +23,7 @@ _numbers = itertools.count()
 
 
 def push(world: World, sender: FakePushSender) -> PushService:
-    return PushService(world.uow, world.clock, sender, world.inbox)
+    return PushService(world.uow, world.clock, sender, world.inbox, links=builders.LINKS)
 
 
 async def with_device(world: World, service: PushService, user: User, number: int = 0) -> None:
