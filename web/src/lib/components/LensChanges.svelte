@@ -1,5 +1,5 @@
 <script lang="ts">
-	import CircleAlert from '@lucide/svelte/icons/circle-alert';
+	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { m } from '#lib/paraglide/messages.js';
 
@@ -20,12 +20,8 @@
 	} = $props();
 </script>
 
-<div
-	role="status"
-	class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-lane-yellow-foreground/40 bg-lane-yellow px-4 py-2.5"
->
-	<CircleAlert class="size-4 shrink-0 text-lane-yellow-foreground" aria-hidden="true" />
-	<span class="min-w-0 flex-1 text-sm">{m.lens_changed()}</span>
+<Alert.Root variant="warning" role="status" class="flex flex-wrap items-center gap-x-3 gap-y-2">
+	<Alert.Description class="min-w-0 flex-1">{m.lens_changed()}</Alert.Description>
 	<div class="flex flex-wrap gap-2">
 		<Button variant="ghost" size="sm" disabled={busy} onclick={ondiscard}>
 			{m.lens_discard()}
@@ -37,4 +33,4 @@
 			{m.lens_save_into({ name })}
 		</Button>
 	</div>
-</div>
+</Alert.Root>
