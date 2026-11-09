@@ -6,6 +6,7 @@ import { unwrap } from '#lib/api/call.ts';
 import { reportError } from '#lib/errors.ts';
 import { WEBHOOK_EVENT_TYPES, type WebhookEventType } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
+import type { components } from '#lib/api/schema.ts';
 
 /** What the API takes of a webhook (`tests/api-limits.test.ts` holds them to `openapi.json`). */
 export const WEBHOOK_LIMITS = {
@@ -127,4 +128,12 @@ export function selectionVolume(
 		}
 	}
 	return total;
+}
+
+/** Whether Lekto switched the webhook off after repeated failed deliveries (a person who switched
+ * it off gives no reason). */
+export function switchedOffFailing(
+	webhook: Pick<components['schemas']['WebhookOut'], 'disabled_reasons'>
+): boolean {
+	return webhook.disabled_reasons.some((reason) => reason.code === 'webhook_failing');
 }

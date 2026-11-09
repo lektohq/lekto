@@ -466,6 +466,7 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	mail_rule_person_gone: entry(m.reason_mail_rule_person_gone),
 	mail_rule_space_unreachable: entry(m.reason_mail_rule_space_unreachable),
 	mail_rule_type_gone: entry(m.reason_mail_rule_type_gone),
+	webhook_failing: entry(m.reason_webhook_failing),
 	mail_rule_unreadable: entry(m.reason_mail_rule_unreadable)
 };
 

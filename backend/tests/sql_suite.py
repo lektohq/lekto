@@ -3915,6 +3915,50 @@ class MigrationSuite:
                 )
             assert columns["after"] is None
 
+    async def test_revision_0075_gives_a_switched_off_webhook_its_reason_and_back(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0075: the word `failing` of a webhook Lekto switched off becomes a reason
+        with its code (review 0.12.2, C-07); one switched by a person keeps none. The downgrade
+        writes the word back and restores the schema."""
+        await migrate(empty_database, "0074")
+        async with empty_database.reading() as connection:
+            schema = await connection.run_sync(_schema)
+        user, failing, active = new_id(), new_id(), new_id()
+        old = sa.table(
+            "webhooks",
+            *(
+                sa.column(c.name, sa.Text() if c.name == "disabled_reason" else c.type)
+                for c in t.webhooks.c
+            ),
+        )
+        hook = {
+            "owner_id": user,
+            "name": "Hook",
+            "url": "https://example.org/hook",
+            "event_types": [],
+            "failed_streak": 0,
+        }
+        await _insert(
+            empty_database,
+            [
+                (t.users, {"id": user, "username": "a", "username_key": "a", "role": "admin"}),
+                (old, hook | {"id": failing, "active": False, "disabled_reason": "failing"}),
+                (old, hook | {"id": active, "active": True, "disabled_reason": None}),
+            ],
+        )
+        await migrate(empty_database)
+        async with empty_database.reading() as connection:
+            rows = await connection.execute(select(t.webhooks.c.id, t.webhooks.c.disabled_reason))
+            found = {id: reason for id, reason in rows.all()}
+        assert found == {failing: {"code": "webhook_failing", "params": {}}, active: None}
+        await downgrade(empty_database, "0074")
+        async with empty_database.reading() as connection:
+            assert await connection.run_sync(_schema) == schema
+            rows = await connection.execute(select(old.c.id, old.c.disabled_reason))
+            back = {id: reason for id, reason in rows.all()}
+        assert back == {failing: "failing", active: None}
+
     async def test_revision_0067_turns_the_json_null_into_null(
         self, empty_database: Database
     ) -> None:

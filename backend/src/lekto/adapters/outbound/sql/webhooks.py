@@ -10,6 +10,7 @@ from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.repositories import SqlRepository, Values
 from lekto.core.domain.errors import NotFoundError
 from lekto.core.domain.ids import DeliveryId, DocumentId, EventId, UserId, WebhookId
+from lekto.core.domain.reasons import Reason
 from lekto.core.domain.webhooks import (
     BodyFormat,
     DeliveryOutcome,
@@ -153,7 +154,9 @@ class SqlWebhookRepository(SqlRepository[WebhookId, Webhook]):
             body=BodyFormat(row.body),
             body_template=row.body_template,
             active=row.active,
-            disabled_reason=row.disabled_reason,
+            disabled_reason=(
+                None if row.disabled_reason is None else Reason.from_json(row.disabled_reason)
+            ),
             failed_streak=row.failed_streak,
             previous_secret=None if row.previous_secret is None else bytes(row.previous_secret),
             previous_valid_until=row.previous_valid_until,
@@ -186,7 +189,9 @@ class SqlWebhookRepository(SqlRepository[WebhookId, Webhook]):
                 else int(entity.model_call.timeout.total_seconds())
             ),
             "active": entity.active,
-            "disabled_reason": entity.disabled_reason,
+            "disabled_reason": (
+                None if entity.disabled_reason is None else entity.disabled_reason.to_json()
+            ),
             "failed_streak": entity.failed_streak,
             "created_at": entity.created_at,
             "updated_at": entity.updated_at,

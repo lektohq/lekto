@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { switchedOffFailing } from '#lib/webhooks.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { onMount } from 'svelte';
 	import { api } from '#lib/api/client.ts';
@@ -88,7 +89,7 @@
 							{/if}
 						</span>
 						<span class="truncate font-mono text-sm text-muted-foreground">{hook.url}</span>
-						{#if hook.disabled_reason === 'failing'}
+						{#if switchedOffFailing(hook)}
 							<span class="text-sm text-destructive"
 								>{m.webhook_failing({ count: hook.failed_streak })}</span
 							>

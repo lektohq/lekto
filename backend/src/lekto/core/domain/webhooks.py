@@ -40,7 +40,7 @@ from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.events import DOCUMENT_EVENT_TYPES
 from lekto.core.domain.ids import DeliveryId, DocumentId, EventId, UserId, WebhookId, new_id
 from lekto.core.domain.json_value import JsonObject
-from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.reasons import Reason, ReasonCode, because
 from lekto.core.domain.tasks import DEFAULT_TIMEOUT, validate_timeout
 from lekto.core.domain.validation import (
     MAX_URL_LENGTH,
@@ -66,8 +66,6 @@ SECRET_PREFIX = "whsec_"
 SECRET_BYTES = 32
 MAX_NAME_LENGTH = 100
 MAX_ERROR_LENGTH = 300
-DISABLED_FAILING = "failing"
-"""`Webhook.disabled_reason` of a webhook that Lekto switched off after repeated failures."""
 
 SIGNATURE_VERSION = "v1"
 ID_HEADER = "webhook-id"
@@ -365,7 +363,8 @@ class Webhook:
     body: BodyFormat = BodyFormat.THIN
     body_template: str | None = None
     active: bool = True
-    disabled_reason: str | None = None
+    disabled_reason: Reason | None = None
+    """Why Lekto switched it off (`WEBHOOK_FAILING`); None while active or switched by a person."""
     failed_streak: int = 0
     previous_secret: bytes | None = field(default=None, repr=False)
     previous_valid_until: datetime | None = None
@@ -519,7 +518,7 @@ class Webhook:
         self.failed_streak += 1
         if self.active and self.failed_streak >= disable_after:
             self.active = False
-            self.disabled_reason = DISABLED_FAILING
+            self.disabled_reason = because(ReasonCode.WEBHOOK_FAILING)
             self.updated_at = now
             return True
         return False
