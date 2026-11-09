@@ -186,6 +186,8 @@ The image has a Docker `HEALTHCHECK` (every 30 s, 120 s to start): the API throu
 store that cannot be reached, is not) and the worker through its s6 service (up for at least ten
 seconds, so a crash loop shows, and past its wait for the schema). The worker has no endpoint of
 its own: a hung worker that is still a process is not detected. Compose `depends_on` can use `condition: service_healthy`.
+The check asks the API where `LEKTO_API_HOST` and `LEKTO_API_PORT` put it: on loopback when it
+listens on every address (`0.0.0.0`, `::`, the default), else on the address set.
 
 All services write to stdout/stderr of the container (`docker compose logs lekto`), as JSON by
 default; the health check's own requests are left out of the access log. s6's own messages (`s6-rc: info: …`) are there as well. If an init service fails (invalid
