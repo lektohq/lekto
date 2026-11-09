@@ -360,6 +360,25 @@ class _ModelStep:
         )
 
 
+@dataclass(frozen=True)
+class _Offer:
+    """What the language model is offered to choose from, and how many there were."""
+
+    contacts: int
+    candidates: int
+    types: int
+    tags: int
+    listed_tags: int
+    topic_names: list[str]
+    keys: dict[str, FieldDefinition]
+    typed: list[tuple[Listed, list[tuple[str, FieldDefinition]]]]
+    general: list[tuple[str, FieldDefinition]]
+    tag_names: list[str]
+    listed_contacts: list[Listed]
+    spaces: dict[str, "ListedSpace"]
+    schema: JsonObject
+
+
 class LlmSignal(_ModelStep):
     """The language model's proposal (`signal_llm`): one request for the sender and the
     recipient, the type, the topic (among those of the contacts listed), tags, date, a title
@@ -396,6 +415,72 @@ class LlmSignal(_ModelStep):
             return await self._answered(document, text, outside)
         if outside is not None and outside.sent:
             return ExternalCall(outside, None)
+        offer = await self._offer(document, text)
+        if outside is not None:
+            context = propose_context(
+                document,
+                text,
+                contacts=offer.listed_contacts,
+                document_types=offer.typed,
+                general=offer.general,
+                tags=offer.tag_names,
+                spaces=offer.spaces,
+                schema=offer.schema,
+            )
+            await keep_request(self._store, document, Node.SIGNAL_LLM, context.logged())
+            return ExternalCall(outside, context)
+        sent = shorten(text, self._policy.input_budget)
+        input = self._input(document, text, sent, PROPOSE_PROMPT) | {
+            "contacts": offer.contacts,
+            "contacts_listed": offer.candidates,
+            "document_types": offer.types,
+            "tags": offer.tags,
+            "tags_listed": offer.listed_tags,
+            "topics_listed": len(offer.topic_names),
+            "fields": {key: str(definition.id) for key, definition in offer.keys.items()},
+            "spaces": {key: str(space.id) for key, space in offer.spaces.items()},
+        }
+        try:
+            calls: list[ModelCall] = []
+            answer, answers = await self._ask(
+                document,
+                Node.SIGNAL_LLM,
+                sent,
+                propose_task(
+                    offer.listed_contacts,
+                    offer.typed,
+                    offer.general,
+                    offer.tag_names,
+                    [(key, space.prompt_label) for key, space in offer.spaces.items()],
+                    marker=document_marker(sent),
+                ),
+                offer.schema,
+                PROPOSE_SCHEMA,
+                lambda content: parse_propose(content, list(offer.keys), list(offer.spaces)),
+                calls=calls,
+            )
+        except _UnfitAnswerError as error:
+            return self._unfit(error, input)
+        chosen = {key: space.id for key, space in offer.spaces.items()}
+        read, asked, model_read, model_told = await self._facts(document, sent, calls)
+        output = _answered(answers, answer.raw) | read
+        output["tokens"] = [
+            *tokens_of(item.usage for item in answers),
+            *tokens_of((item.usage for item in asked), request=FACTS_SCHEMA),
+        ]
+        result = NodeResult(
+            outcome=Outcome.OK,
+            model_version=_model_version(answers[-1]),
+            input=input | {FACTS_INPUT: FACTS_PROMPT},
+            output=output
+            | {PROPOSAL: StoredProposal.of(answer, key_ids(offer.keys), chosen).to_json()},
+        )
+        return ModelFactsResult(result, await TextFacts.read(text), model_read, model_told)
+
+    async def _offer(self, document: Document, text: str) -> "_Offer":
+        """What the model may choose from for `document`: the contacts its text names, the
+        types with their fields, the tags and topics, the spaces, and the schema of the
+        answer."""
         async with self._uow() as uow:
             contacts = await uow.contacts.list_all()
             types = sorted(
@@ -452,65 +537,21 @@ class LlmSignal(_ModelStep):
             topic_names,
             list(spaces),
         )
-        if outside is not None:
-            context = propose_context(
-                document,
-                text,
-                contacts=listed_contacts,
-                document_types=typed,
-                general=general,
-                tags=tag_names,
-                spaces=spaces,
-                schema=schema,
-            )
-            await keep_request(self._store, document, Node.SIGNAL_LLM, context.logged())
-            return ExternalCall(outside, context)
-        sent = shorten(text, self._policy.input_budget)
-        input = self._input(document, text, sent, PROPOSE_PROMPT) | {
-            "contacts": len(contacts),
-            "contacts_listed": len(candidates),
-            "document_types": len(types),
-            "tags": len(tags),
-            "tags_listed": len(listed),
-            "topics_listed": len(topic_names),
-            "fields": {key: str(definition.id) for key, definition in keys.items()},
-            "spaces": {key: str(space.id) for key, space in spaces.items()},
-        }
-        try:
-            calls: list[ModelCall] = []
-            answer, answers = await self._ask(
-                document,
-                Node.SIGNAL_LLM,
-                sent,
-                propose_task(
-                    listed_contacts,
-                    typed,
-                    general,
-                    tag_names,
-                    [(key, space.prompt_label) for key, space in spaces.items()],
-                    marker=document_marker(sent),
-                ),
-                schema,
-                PROPOSE_SCHEMA,
-                lambda content: parse_propose(content, list(keys), list(spaces)),
-                calls=calls,
-            )
-        except _UnfitAnswerError as error:
-            return self._unfit(error, input)
-        chosen = {key: space.id for key, space in spaces.items()}
-        read, asked, model_read, model_told = await self._facts(document, sent, calls)
-        output = _answered(answers, answer.raw) | read
-        output["tokens"] = [
-            *tokens_of(item.usage for item in answers),
-            *tokens_of((item.usage for item in asked), request=FACTS_SCHEMA),
-        ]
-        result = NodeResult(
-            outcome=Outcome.OK,
-            model_version=_model_version(answers[-1]),
-            input=input | {FACTS_INPUT: FACTS_PROMPT},
-            output=output | {PROPOSAL: StoredProposal.of(answer, key_ids(keys), chosen).to_json()},
+        return _Offer(
+            contacts=len(contacts),
+            candidates=len(candidates),
+            types=len(types),
+            tags=len(tags),
+            listed_tags=len(listed),
+            topic_names=topic_names,
+            keys=keys,
+            typed=typed,
+            general=general,
+            tag_names=tag_names,
+            listed_contacts=listed_contacts,
+            spaces=spaces,
+            schema=schema,
         )
-        return ModelFactsResult(result, await TextFacts.read(text), model_read, model_told)
 
     async def _facts(
         self, document: Document, sent: Shortened, calls: list[ModelCall]
