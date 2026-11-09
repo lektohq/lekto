@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PhoneEditorBar, { FULL_SCREEN } from '#lib/components/PhoneEditorBar.svelte';
 	import type { Snippet } from 'svelte';
 	import AsyncForm from '#lib/components/AsyncForm.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -78,11 +79,7 @@
 	<Dialog.Content
 		{size}
 		showCloseButton={!phone.current}
-		class={cn(
-			'flex flex-col overflow-hidden',
-			phone.current &&
-				'top-0 left-0 h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 gap-0 rounded-none border-0 bg-background p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]'
-		)}
+		class={cn('flex flex-col overflow-hidden', phone.current && FULL_SCREEN)}
 	>
 		<AsyncForm
 			class={cn('flex min-h-0 flex-col gap-4', phone.current && 'flex-1 gap-0')}
@@ -92,32 +89,13 @@
 			{#snippet children({ busy, error })}
 				{#if phone.current}
 					<!-- On a phone the editor pattern of web/DESIGN.md: full screen, a bar on top. -->
-					<div
-						class="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-1 border-b bg-card px-1"
-					>
-						<Button
-							type="button"
-							variant="ghost"
-							class="justify-self-start px-3 text-base font-normal text-brand"
-							onclick={() => (open = false)}
-						>
-							{m.cancel()}
-						</Button>
-						<Dialog.Title class="max-w-[50vw] truncate text-base font-semibold"
-							>{title}</Dialog.Title
-						>
-						<Button
-							type="submit"
-							variant="ghost"
-							class={cn(
-								'justify-self-end px-3 text-base font-semibold',
-								destructive ? 'text-destructive' : 'text-brand'
-							)}
-							disabled={busy || disabled}
-						>
-							{submitLabel}
-						</Button>
-					</div>
+					<PhoneEditorBar
+						{title}
+						{submitLabel}
+						{destructive}
+						disabled={busy || disabled}
+						oncancel={() => (open = false)}
+					/>
 					<div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4">
 						{#if description}<p class="text-sm text-muted-foreground">{description}</p>{/if}
 						{@render fields(error)}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { BAR_ACTION } from '#lib/components/PhoneEditorBar.svelte';
 	import type { Snippet } from 'svelte';
 	import X from '@lucide/svelte/icons/x';
 	import IconButton from '#lib/components/IconButton.svelte';
@@ -58,7 +59,7 @@
 	{:else}
 		<Button
 			variant="ghost"
-			class="px-3 text-base font-semibold text-brand"
+			class={phone.current ? BAR_ACTION : undefined}
 			onclick={() => {
 				query = '';
 				open = false;

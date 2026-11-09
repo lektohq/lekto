@@ -496,6 +496,15 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('draws the bar of an editor on a phone once', () => {
+		// "Abbrechen", the title, the submit (DESIGN.md, "Dialogs, sheets, editors").
+		expect(
+			offenders((source, path) =>
+				path.endsWith('/PhoneEditorBar.svelte') ? null : line(source, /grid-cols-\[1fr_auto_1fr\]/)
+			)
+		).toEqual([]);
+	});
+
 	it('sizes buttons by their size, never by a height of their own', () => {
 		// `Button` takes a finger's 44 pixels on a phone by itself (DESIGN.md, "Buttons", "Touch
 		// targets"); `min-h-*` is no height of its own.

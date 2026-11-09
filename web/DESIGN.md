@@ -570,7 +570,9 @@ list pages the same way (see [Lists](#lists)).
   `class="max-w-*"` on dialog content is not used.
 - **Phone editor bar:** "Abbrechen" · title · "Speichern", fixed on top. The body scrolls. The
   action is a short verb there: a longer label of the desktop ("Ins Profil von Anna") becomes its
-  verb ("Übernehmen"), and the body names the rest (Tobi 29.10.2026).
+  verb ("Übernehmen"), and the body names the rest (Tobi 29.10.2026). It is `PhoneEditorBar`, in
+  `FormDialog` and `EditorShell` alike, with `FULL_SCREEN` for the dialog; a picker's "Fertig" on
+  a phone takes its `BAR_ACTION`.
 - **Sheet from the bottom:** `PhoneSheet`, on `ui/sheet` with `side="bottom"`: a grab handle,
   the title and its close button (an X, "Fertig") fixed on top, 85 % of the screen high;
   nothing takes the focus when it opens. The pickers (`SearchSelect`, `TagPickerDialog`) use
@@ -1212,7 +1214,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     radius and padding) only as `Alert` ("Alerts"); the owl (`Mascot`, `EmptyNote` with `mascot`) only at its
     places ("Logo and owl"); a dashed box of muted words only as `EmptyNote` ("States"); a lone
     radio only in `ChoiceCard` ("Checkboxes, radios, switches"); a pill of a chip only as `Chip`
-    or `TagChip` ("Chips"); spins, pulses and turns only `motion-safe` ("Motion");
+    or `TagChip` ("Chips"); the phone's editor bar only in `PhoneEditorBar` ("Dialogs, sheets,
+    editors"); spins, pulses and turns only `motion-safe` ("Motion");
   - `src/lib/tips.test.ts`: one box of help at a time, the next without delay; a tooltip opens on
     a focus Tab brought, not on one handed back;
   - `src/lib/via-token.test.ts`: every file that has a person's API token (`via_token`, a
