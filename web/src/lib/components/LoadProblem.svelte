@@ -11,9 +11,8 @@
 	let {
 		problem,
 		onretry,
-		buttonClass,
 		children
-	}: { problem: string; onretry?: () => void; buttonClass?: string; children?: Snippet } = $props();
+	}: { problem: string; onretry?: () => void; children?: Snippet } = $props();
 
 	const offline = $derived(online.current === false);
 	let wasOffline = false;
@@ -38,7 +37,7 @@
 	{#if onretry || children}
 		<div class="flex flex-wrap gap-2">
 			{#if onretry}
-				<Button variant="outline" class={buttonClass} onclick={onretry}>{m.retry()}</Button>
+				<Button variant="outline" onclick={onretry}>{m.retry()}</Button>
 			{/if}
 			{@render children?.()}
 		</div>

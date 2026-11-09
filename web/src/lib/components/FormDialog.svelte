@@ -98,7 +98,7 @@
 						<Button
 							type="button"
 							variant="ghost"
-							class="h-11 justify-self-start px-3 text-base font-normal text-brand"
+							class="justify-self-start px-3 text-base font-normal text-brand"
 							onclick={() => (open = false)}
 						>
 							{m.cancel()}
@@ -110,7 +110,7 @@
 							type="submit"
 							variant="ghost"
 							class={cn(
-								'h-11 justify-self-end px-3 text-base font-semibold',
+								'justify-self-end px-3 text-base font-semibold',
 								destructive ? 'text-destructive' : 'text-brand'
 							)}
 							disabled={busy || disabled}

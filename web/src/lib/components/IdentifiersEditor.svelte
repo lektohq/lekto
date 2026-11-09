@@ -460,7 +460,7 @@
 					<Plus class="size-5" aria-hidden="true" />
 				</IconButton>
 			{:else}
-				<Button type="button" variant="outline" class="h-10 shrink-0" onclick={add}>
+				<Button type="button" variant="outline" class="shrink-0" onclick={add}>
 					<Plus aria-hidden="true" />
 					{m.identifier_add_short()}
 				</Button>
