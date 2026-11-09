@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { formatDuration } from '#lib/duration.ts';
 import { m } from '#lib/paraglide/messages.js';
-import { calls, fakeApi } from '#lib/testing/documents.ts';
+import { calls, fakeApi } from '#lib/testing/api.ts';
 import AutomationTab from './AutomationTab.svelte';
 
 const lanes = (green: number, yellow: number, red: number) => ({ green, yellow, red });

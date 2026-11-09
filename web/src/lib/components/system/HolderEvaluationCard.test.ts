@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { kindLabel } from '#lib/identifiers.ts';
 import { m } from '#lib/paraglide/messages.js';
-import { fakeApi } from '#lib/testing/documents.ts';
+import { fakeApi } from '#lib/testing/api.ts';
 import { goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import HolderEvaluationCard from './HolderEvaluationCard.svelte';
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fakeApi } from '#lib/testing/documents.ts';
+import { fakeApi } from '#lib/testing/api.ts';
 import { BulkRun, POLL } from './bulk.svelte.ts';
 
 const operation = (status: string, done = 0) => ({

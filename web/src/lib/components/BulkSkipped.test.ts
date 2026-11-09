@@ -2,7 +2,8 @@ import { render, screen, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { reasonText, type Reason } from '#lib/reasons.ts';
-import { calls, documentOf, fakeApi } from '#lib/testing/documents.ts';
+import { documentOf } from '#lib/testing/documents.ts';
+import { calls, fakeApi } from '#lib/testing/api.ts';
 import BulkSkipped from './BulkSkipped.svelte';
 
 afterEach(() => vi.unstubAllGlobals());

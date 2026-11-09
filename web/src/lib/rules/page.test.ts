@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
-import { calls, fakeApi, json } from '#lib/testing/documents.ts';
+import { calls, fakeApi, json } from '#lib/testing/api.ts';
 import { RuleLoader } from './page.svelte.ts';
 
 afterEach(() => vi.unstubAllGlobals());
