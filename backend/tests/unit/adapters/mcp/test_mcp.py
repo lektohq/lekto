@@ -397,6 +397,26 @@ async def test_documents_update_tries_a_change_without_storing_it(api: Api, scen
     assert stored["title"] != "Probe"
 
 
+async def test_documents_update_names_a_space_a_rule_moves_it_to(api: Api, scene: Scene) -> None:
+    """What changed is what REST reports (`changed_fields`, review 0.12.2 A-01): a rule's move
+    to another space the caller reads too, by its name."""
+    owner = scene.headers["owner"]
+    household = await post(api, "/spaces", {"name": "Household"}, owner)
+    await post(
+        api,
+        "/rules",
+        {
+            "name": "ACME",
+            "conditions": {"all": [{"field": "contact", "op": "is", "value": scene.contact}]},
+            "actions": [{"type": "set_space", "space_id": household["id"]}],
+        },
+        owner,
+    )
+    id = await upload(api, owner)
+    tried = data(await call(api, owner, "documents_update", id=id, contact="ACME", dry_run=True))
+    assert tried["set"] == {"contact": "ACME", "space": "Household"}
+
+
 async def test_inbox_list_tells_what_waits_and_why(api: Api, scene: Scene) -> None:
     owner = scene.headers["owner"]
     inbox = data(await call(api, owner, "inbox_list"))
