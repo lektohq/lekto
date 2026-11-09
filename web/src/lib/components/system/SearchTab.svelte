@@ -15,7 +15,7 @@
 	import { formatDuration } from '#lib/duration.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { fileSize } from '#lib/file-passport.ts';
-	import { formatDate, formatNumber } from '#lib/i18n.ts';
+	import { formatDate, formatNumber, formatPercent } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { session } from '#lib/session.svelte.ts';
 	import { cn } from '#lib/utils.ts';
@@ -82,8 +82,6 @@
 
 	const share = (part: number, whole: number) =>
 		whole === 0 ? 1 : Math.min(1, Math.max(0, part / whole));
-	const percent = (value: number) =>
-		formatNumber(value, { style: 'percent', maximumFractionDigits: 0 });
 	const seconds = (ms: number) => formatDuration(ms / 1000);
 
 	const meaning = $derived(status?.model != null);
@@ -161,7 +159,7 @@
 								})}
 							</span>
 						</span>
-						<span class="text-figure tabular-nums">{percent(inIndex)}</span>
+						<span class="text-figure tabular-nums">{formatPercent(inIndex)}</span>
 					</div>
 					{@render bar(inIndex, m.search_in_index())}
 				</div>
@@ -177,7 +175,7 @@
 									})}
 								</span>
 							</span>
-							<span class="text-figure tabular-nums">{percent(embedded)}</span>
+							<span class="text-figure tabular-nums">{formatPercent(embedded)}</span>
 						</div>
 						{@render bar(embedded, m.search_meaning())}
 					</div>

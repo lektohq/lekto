@@ -29,7 +29,7 @@
 	import * as Table from '#lib/components/ui/table/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
 	import { events } from '#lib/events.svelte.ts';
-	import { formatDate, formatNumber } from '#lib/i18n.ts';
+	import { formatMoment, formatNumber } from '#lib/i18n.ts';
 	import {
 		failedSteps,
 		noteOf,
@@ -195,8 +195,6 @@
 		const ids = item.documents.map((document) => document.id);
 		openBeam(ids, ids[0], item.subject || m.mail_rule_no_subject());
 	}
-
-	const moment = (value: string) => formatDate(value, { dateStyle: 'short', timeStyle: 'short' });
 </script>
 
 <svelte:head>
@@ -305,7 +303,7 @@
 				{@const note = noteOf(item)}
 				<Table.Row class="align-top">
 					<Table.Cell class="pl-0 text-muted-foreground tabular-nums">
-						{moment(item.fetched_at)}
+						{formatMoment(item.fetched_at, 'short')}
 					</Table.Cell>
 					<Table.Cell class="max-w-[18rem] whitespace-normal">
 						{#if item.forgotten}

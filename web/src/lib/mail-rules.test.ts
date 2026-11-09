@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { getLocale, setLocale } from '#lib/paraglide/runtime.js';
 import { m } from '#lib/paraglide/messages.js';
 import {
 	addableSteps,
@@ -235,5 +236,17 @@ describe('the form of a mail rule', () => {
 				names
 			)
 		).toContain(m.mail_rule_every());
+	});
+});
+
+describe('a folder in words', () => {
+	const before = getLocale();
+	afterEach(() => setLocale(before, { reload: false }));
+
+	it('quotes the folder as the language quotes', () => {
+		setLocale('en', { reload: false });
+		expect(conditionText({ field: 'folder', op: 'is', value: 'Archive' })).toContain('“Archive”');
+		setLocale('de', { reload: false });
+		expect(conditionText({ field: 'folder', op: 'is', value: 'Archiv' })).toContain('„Archiv“');
 	});
 });

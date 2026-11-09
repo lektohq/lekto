@@ -4,7 +4,7 @@
  * API takes it.
  */
 import type { components } from '#lib/api/schema.ts';
-import { formatDate, formatMoment } from '#lib/i18n.ts';
+import { formatMoment } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { reasonText } from '#lib/reasons.ts';
 
@@ -101,14 +101,10 @@ export function summaryOf(mailbox: Mailbox): string {
 		intervalLabel(mailbox.interval_minutes)
 	];
 	const { last_attempt_at: tried, last_success_at: worked, mails, documents } = mailbox.status;
-	if (worked) parts.push(m.mail_last_success({ when: moment(worked) }));
-	else if (tried) parts.push(m.mail_last_attempt({ when: moment(tried) }));
+	if (worked) parts.push(m.mail_last_success({ when: formatMoment(worked) }));
+	else if (tried) parts.push(m.mail_last_attempt({ when: formatMoment(tried) }));
 	if (mails > 0) parts.push(m.mail_counts({ mails, documents }));
 	return parts.join(' · ');
-}
-
-function moment(value: string): string {
-	return formatDate(value, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 /** What the dialog of a mailbox holds. */
