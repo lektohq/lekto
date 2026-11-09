@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.schemas import ReasonOut
 from lekto.core.domain.documents import UNSET, Unset
 from lekto.core.domain.tasks import DEFAULT_TIMEOUT, MAX_TIMEOUT, MIN_TIMEOUT
 from lekto.core.domain.validation import MAX_URL_LENGTH
@@ -225,7 +226,13 @@ class WebhookOut(BaseModel):
     max_open_tasks: int = Field(description=OPEN_TASKS_HELP)
     model_call: WebhookModelCallOut | None = Field(description=MODEL_CALL_HELP)
     disabled_reason: str | None = Field(
-        description="`failing`: Lekto switched the webhook off after repeated failed deliveries."
+        description="Why Lekto switched the webhook off, in English (`disabled_reasons`)."
+    )
+    disabled_reasons: list[ReasonOut] = Field(
+        description=(
+            "Why Lekto switched the webhook off, with its code (`webhook_failing`: after "
+            "repeated failed deliveries); empty while active or switched by a person."
+        )
     )
     failed_streak: int = Field(description="Deliveries given up in a row since the last success.")
     previous_secret_valid_until: datetime | None = Field(
@@ -239,6 +246,7 @@ class WebhookOut(BaseModel):
 
     @classmethod
     def of(cls, webhook: Webhook) -> "WebhookOut":
+        reason = webhook.disabled_reason
         return cls(
             id=webhook.id,
             owner_id=webhook.owner_id,
@@ -252,7 +260,8 @@ class WebhookOut(BaseModel):
             body_template=webhook.body_template,
             max_open_tasks=webhook.max_open_tasks,
             model_call=WebhookModelCallOut.of(webhook.model_call),
-            disabled_reason=webhook.disabled_reason,
+            disabled_reason=None if reason is None else reason.text,
+            disabled_reasons=[] if reason is None else [ReasonOut.of(reason)],
             failed_streak=webhook.failed_streak,
             previous_secret_valid_until=webhook.previous_valid_until,
             created_at=webhook.created_at,

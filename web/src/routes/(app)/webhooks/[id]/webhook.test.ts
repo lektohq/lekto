@@ -31,6 +31,7 @@ const webhook = {
 	max_open_tasks: 4,
 	model_call: null,
 	disabled_reason: null,
+	disabled_reasons: [],
 	failed_streak: 0,
 	previous_secret_valid_until: null,
 	created_at: '2026-10-25T10:00:00Z',

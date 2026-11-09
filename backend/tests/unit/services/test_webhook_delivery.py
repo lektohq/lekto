@@ -26,10 +26,10 @@ from lekto.core.domain.jobs import Job, JobStatus
 from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.master_data import Contact, DocumentType
 from lekto.core.domain.pipeline import Lane
+from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.domain.webhooks import (
-    DISABLED_FAILING,
     RULE_SEND,
     TEST_EVENT,
     BodyFormat,
@@ -422,7 +422,11 @@ async def test_a_webhook_is_switched_off_after_repeated_failures_and_success_res
     assert (await world.webhooks.get(user.id, webhook.id)).active
     await deliver(404)
     off = await world.webhooks.get(user.id, webhook.id)
-    assert (off.active, off.disabled_reason, off.failed_streak) == (False, DISABLED_FAILING, 3)
+    assert (off.active, off.disabled_reason, off.failed_streak) == (
+        False,
+        because(ReasonCode.WEBHOOK_FAILING),
+        3,
+    )
     # Its owner hears of it (web push), once.
     (notice,) = [j for j in world.database.jobs.values() if j.kind == PUSH_JOB]
     assert notice.payload == {

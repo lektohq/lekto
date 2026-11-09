@@ -26,7 +26,8 @@ Two steps, both idempotent and safe to repeat (events arrive at least once):
    | anything else (3xx, other 4xx)                | given up at once                     |
 
    Repetitions wait `retry_delay`, doubling, at most `max_retry_delay`. After `disable_after`
-   given-up deliveries in a row the webhook is switched off (`disabled_reason` `failing`).
+   given-up deliveries in a row the webhook is switched off (`disabled_reason`, the code
+   `webhook_failing`).
 
 A task's request (`domain.tasks`, payload with `task_id`) goes the same way, with these
 differences: its body was made when the task was sent and waits encrypted with the task's token

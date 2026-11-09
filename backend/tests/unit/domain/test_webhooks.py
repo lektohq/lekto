@@ -7,9 +7,9 @@ import pytest
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.events import DOCUMENT_EVENT_TYPES
 from lekto.core.domain.ids import DocumentId, EventId, UserId, new_id
+from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.webhooks import (
     ALL_EVENTS,
-    DISABLED_FAILING,
     ID_HEADER,
     MAX_BODY_TEMPLATE,
     MAX_HEADER_VALUE,
@@ -169,7 +169,7 @@ def test_a_webhook_validates_its_fields() -> None:
 def test_change_updates_what_is_given_and_switching_on_clears_the_failures() -> None:
     webhook = hook()
     webhook.failed_streak = 3
-    webhook.active, webhook.disabled_reason = False, DISABLED_FAILING
+    webhook.active, webhook.disabled_reason = False, because(ReasonCode.WEBHOOK_FAILING)
     later = NOW + timedelta(hours=1)
     webhook.change(now=later, name="HA", event_types=["document.filed"])
     assert (webhook.name, webhook.event_types, webhook.updated_at) == (
@@ -200,7 +200,7 @@ def test_repeated_failures_switch_a_webhook_off_and_a_success_resets_the_count()
     for _ in range(2):
         assert not webhook.gave_up(disable_after=3, now=NOW)
     assert webhook.gave_up(disable_after=3, now=NOW)
-    assert not webhook.active and webhook.disabled_reason == DISABLED_FAILING
+    assert not webhook.active and webhook.disabled_reason == because(ReasonCode.WEBHOOK_FAILING)
 
 
 def test_a_delivery_keeps_only_a_short_error() -> None:
