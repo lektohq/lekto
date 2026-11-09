@@ -43,25 +43,25 @@ from lekto.core.domain.pipeline import (
 )
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.rule_planner import Mode, RuleReport, changed_fields
-from lekto.core.domain.rules import Rule, SetSpace, Trigger
+from lekto.core.domain.rules import Rule, Trigger
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.patterns import PatternMatcher
 from lekto.core.ports.templates import TemplateRenderer
 from lekto.core.ports.unit_of_work import UnitOfWork
-from lekto.core.services._access import space_label
 from lekto.core.services.rules.running import (
     Chain,
     Prepared,
     RuleRun,
     active_rules,
     apply_plan,
-    back_and_forth,
     checked_rules,
     corrected_fields,
     entry_beside,
     field_patterns,
+    following_rules,
+    looped,
     person_record,
     prepare,
     problem_output,
@@ -115,16 +115,7 @@ class ChangeRules:
     async def followers(self, uow: UnitOfWork, rules: Sequence[Rule]) -> list[Rule]:
         """The rules of the spaces `rules` may file a document into, and of the spaces those
         file it into (trigger `ingest`, `after_arrival`): prepared together with them."""
-        found: dict[object, Rule] = {}
-        for target in {
-            action.space_id
-            for rule in rules
-            for action in rule.definition.actions
-            if isinstance(action, SetSpace)
-        }:
-            for rule in await reachable_rules(uow, target, Trigger.INGEST, include_global=False):
-                found.setdefault(rule.id, rule)
-        return list(found.values())
+        return await following_rules(uow, rules)
 
     async def prepare(self, rules: Sequence[Rule], document: Document) -> Prepared:
         """Outside a transaction: the text and its patterns, if a rule needs them."""
@@ -195,7 +186,7 @@ class ChangeRules:
             chain.record(plan, document)
             if looping:
                 assert target is not None
-                problem = back_and_forth(await self._names(uow, [*visited, target]))
+                problem = await looped(uow, visited, target)
             if problem is not None:
                 output |= problem_output(problem)
             await uow.processing_log.append(
@@ -227,14 +218,6 @@ class ChangeRules:
                 )
             if looping or moved_to is None:
                 return steps
-
-    async def _names(self, uow: UnitOfWork, spaces: Sequence[SpaceId]) -> list[str]:
-        users = {user.id: user for user in await uow.users.list_all()}
-        names = []
-        for id in spaces:
-            space = await uow.spaces.find(id)
-            names.append(str(id) if space is None else space_label(space, users))
-        return names
 
     def space_chosen(
         self, document: Document, *, actor: User, now: datetime, via: ViaToken | None = None
