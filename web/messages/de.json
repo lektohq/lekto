@@ -2901,6 +2901,7 @@
 	"action_manage_mailboxes": "die Postfächer verwalten, aus denen Lekto abholt",
 	"rule_edit_generic": "Regel bearbeiten",
 	"rule_apply_generic": "Probelauf",
+	"document_generic": "Dokument",
 	"rule_generic": "Regel",
 	"webhook_generic": "Webhook",
 	"webhook_edit_generic": "Webhook bearbeiten",
