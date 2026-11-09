@@ -571,7 +571,7 @@ list pages the same way (see [Lists](#lists)).
 
 - **Scrolling:** a dialog's body scrolls in an area as wide as the dialog, with its own padding,
   so the scrollbar stands at the dialog's edge, never over a field; title, parts and footer stay
-  (`FormDialog`, `EditorShell`, the account dialog). A dialog with parts keeps one height.
+  (`FormDialog`, `EditorShell`). A dialog with parts keeps one height (`TALL`).
 - **Widths** come from the `size` prop (`sm` 384 px, `md` 512 px, `lg` 672 px, `xl` 768 px), a
   `FormDialog`'s too (`md` unless a form needs fields side by side, `lg`). A
   `class="max-w-*"` on dialog content is not used.
@@ -579,7 +579,9 @@ list pages the same way (see [Lists](#lists)).
   action is a short verb there: a longer label of the desktop ("Ins Profil von Anna") becomes its
   verb ("Übernehmen"), and the body names the rest (Tobi 29.10.2026). It is `PhoneEditorBar`, in
   `FormDialog` and `EditorShell` alike, with `FULL_SCREEN` for the dialog; a picker's "Fertig" on
-  a phone takes its `BAR_ACTION`.
+  a phone takes its `BAR_ACTION`. An editor whose parts save themselves (`EditorShell` without
+  `action`, the account dialog) has no form around them and no footer; its bar shows the title
+  and "Fertig".
 - **Sheet from the bottom:** `PhoneSheet`, on `ui/sheet` with `side="bottom"`: a grab handle,
   the title and its close button (an X, "Fertig") fixed on top, 85 % of the screen high;
   nothing takes the focus when it opens. The pickers (`SearchSelect`, `TagPickerDialog`) use
@@ -809,7 +811,8 @@ A tab with a form saves only its own part, and guards it ("Saving and leaving").
 The account dialog of the user management has the same parts for one account, a `Segmented`
 under its title: Konto (role, active, password, second factor, single sign-on, delete) · Profil ·
 Kennungen bei Kontakten, the last with its count. Each part keeps what was typed while another
-shows.
+shows. Its frame is `EditorShell` without an action of its own, so on a phone it takes the whole
+screen like every editor (Tobi, 09.11.2026).
 
 ### Intake channels
 

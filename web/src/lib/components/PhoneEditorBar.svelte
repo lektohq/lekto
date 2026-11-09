@@ -14,7 +14,9 @@
 	import { cn } from '#lib/utils.ts';
 
 	// The bar on top of an editor on a phone: "Abbrechen", the title, the submit of the form it
-	// stands in (in red where it deletes or ends something). It stands inside `Dialog.Content`.
+	// stands in (in red where it deletes or ends something). Without `submitLabel` the editor
+	// saves nothing of its own (its parts do): the title and "Fertig", which closes it. It stands
+	// inside `Dialog.Content`.
 	let {
 		title,
 		submitLabel,
@@ -23,7 +25,7 @@
 		oncancel
 	}: {
 		title: string;
-		submitLabel: string;
+		submitLabel?: string;
 		disabled?: boolean;
 		destructive?: boolean;
 		oncancel: () => void;
@@ -31,21 +33,36 @@
 </script>
 
 <div class="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-1 border-b bg-card px-1">
-	<Button
-		type="button"
-		variant="ghost"
-		class={cn(BAR_ACTION, 'justify-self-start font-normal')}
-		onclick={oncancel}
-	>
-		{m.cancel()}
-	</Button>
+	{#if submitLabel === undefined}
+		<span></span>
+	{:else}
+		<Button
+			type="button"
+			variant="ghost"
+			class={cn(BAR_ACTION, 'justify-self-start font-normal')}
+			onclick={oncancel}
+		>
+			{m.cancel()}
+		</Button>
+	{/if}
 	<Dialog.Title class="max-w-[50vw] truncate text-base font-semibold">{title}</Dialog.Title>
-	<Button
-		type="submit"
-		variant="ghost"
-		class={cn(BAR_ACTION, 'justify-self-end', destructive && 'text-destructive')}
-		{disabled}
-	>
-		{submitLabel}
-	</Button>
+	{#if submitLabel === undefined}
+		<Button
+			type="button"
+			variant="ghost"
+			class={cn(BAR_ACTION, 'justify-self-end')}
+			onclick={oncancel}
+		>
+			{m.picker_done()}
+		</Button>
+	{:else}
+		<Button
+			type="submit"
+			variant="ghost"
+			class={cn(BAR_ACTION, 'justify-self-end', destructive && 'text-destructive')}
+			{disabled}
+		>
+			{submitLabel}
+		</Button>
+	{/if}
 </div>

@@ -1,3 +1,10 @@
+<script lang="ts" module>
+	/** A tall editor with parts keeps this height whatever part shows (a contact's, an account's). */
+	export const TALL = 'h-[min(53.75rem,calc(100dvh-2rem))]';
+	/** The height of `fixed`. */
+	const FIXED = 'h-[min(46.25rem,calc(100dvh-2rem))]';
+</script>
+
 <script lang="ts">
 	import PhoneEditorBar, { FULL_SCREEN } from '#lib/components/PhoneEditorBar.svelte';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -18,13 +25,15 @@
 	// above the body when it throws. Deleting asks first (`ondelete`, only for an item that
 	// exists). A long editor has `tabs` under its
 	// title (Tobi, 20.10.2026): the caller shows the part of `tab`, the body starts at its top
-	// again, and the dialog keeps one height (`class`), on a phone they share its width.
+	// again, and the dialog keeps one height (`class`, `TALL`), on a phone they share its width.
+	// Without `action` it saves nothing of its own (the account dialog, whose parts each save
+	// themselves): no form around the body, no footer, "Fertig" in the phone's bar.
 	let {
 		open = $bindable(false),
 		title,
 		shortTitle = title,
 		description,
-		submitLabel,
+		submitLabel = '',
 		disabled = false,
 		action,
 		ondelete,
@@ -42,10 +51,10 @@
 		/** The title in the phone's bar: what is edited ("Contact"), not its name. */
 		shortTitle?: string;
 		description?: string;
-		submitLabel: string;
+		submitLabel?: string;
 		/** Saving is not possible yet (a name is missing). */
 		disabled?: boolean;
-		action: () => Promise<void>;
+		action?: () => Promise<void>;
 		ondelete?: () => Promise<void>;
 		deleteTitle?: string;
 		deleteDescription?: string;
@@ -69,98 +78,99 @@
 	});
 </script>
 
+{#snippet frame(busy: boolean, error: string | null)}
+	{#if phone.current}
+		<PhoneEditorBar
+			title={shortTitle}
+			submitLabel={action ? m.editor_save_short() : undefined}
+			disabled={busy || disabled}
+			oncancel={() => (open = false)}
+		/>
+	{:else}
+		<Dialog.Header class="shrink-0 px-4 pt-4 pr-12 pb-3">
+			<Dialog.Title>{title}</Dialog.Title>
+			{#if description}<Dialog.Description>{description}</Dialog.Description>{/if}
+		</Dialog.Header>
+	{/if}
+	{#if tabs}
+		<div class={cn('shrink-0 px-4 pb-3', phone.current && 'pt-3')}>
+			<Segmented
+				bind:value={tab}
+				options={tabs}
+				label={title}
+				equal={phone.current}
+				class={phone.current ? 'w-full' : ''}
+			/>
+		</div>
+	{/if}
+	{#if error}
+		<p class="shrink-0 border-b bg-destructive/5 px-4 py-2 text-sm text-destructive" role="alert">
+			{error}
+		</p>
+	{/if}
+	<div
+		bind:this={scroller}
+		class={cn(
+			'flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-4 pb-4',
+			phone.current && !tabs && 'pt-4'
+		)}
+	>
+		{#if phone.current && description}
+			<p class="text-sm text-muted-foreground">{description}</p>
+		{/if}
+		{@render body()}
+		{#if phone.current && ondelete}
+			<Button
+				type="button"
+				variant="outline"
+				class="mt-2 text-destructive"
+				onclick={() => (confirming = true)}
+			>
+				<Trash2 aria-hidden="true" />
+				{deleteTitle}
+			</Button>
+		{/if}
+	</div>
+	{#if !phone.current && action}
+		<div class="flex shrink-0 flex-wrap items-center gap-2 border-t bg-muted/50 p-4">
+			{#if ondelete}
+				<Button
+					type="button"
+					variant="ghost"
+					class="text-destructive hover:text-destructive"
+					aria-label={deleteTitle}
+					onclick={() => (confirming = true)}
+				>
+					<Trash2 aria-hidden="true" />
+					{m.delete_title()}
+				</Button>
+			{/if}
+			<div class="ml-auto flex gap-2">
+				<Button type="button" variant="ghost" onclick={() => (open = false)}>
+					{m.cancel()}
+				</Button>
+				<Button type="submit" disabled={busy || disabled}>{submitLabel}</Button>
+			</div>
+		</div>
+	{/if}
+{/snippet}
+
 <Dialog.Root bind:open>
 	<Dialog.Content
 		{size}
 		showCloseButton={!phone.current}
 		class={cn(
 			'flex flex-col gap-0 overflow-hidden p-0',
-			phone.current
-				? FULL_SCREEN
-				: cn('max-h-[calc(100dvh-2rem)]', fixed && 'h-[min(46.25rem,calc(100dvh-2rem))]', className)
+			phone.current ? FULL_SCREEN : cn('max-h-[calc(100dvh-2rem)]', fixed && FIXED, className)
 		)}
 	>
-		<AsyncForm class="flex min-h-0 flex-1 flex-col" {action} ondone={() => (open = false)}>
-			{#snippet children({ busy, error })}
-				{#if phone.current}
-					<PhoneEditorBar
-						title={shortTitle}
-						submitLabel={m.editor_save_short()}
-						disabled={busy || disabled}
-						oncancel={() => (open = false)}
-					/>
-				{:else}
-					<Dialog.Header class="shrink-0 px-4 pt-4 pr-12 pb-3">
-						<Dialog.Title>{title}</Dialog.Title>
-						{#if description}<Dialog.Description>{description}</Dialog.Description>{/if}
-					</Dialog.Header>
-				{/if}
-				{#if tabs}
-					<div class={cn('shrink-0 px-4 pb-3', phone.current && 'pt-3')}>
-						<Segmented
-							bind:value={tab}
-							options={tabs}
-							label={title}
-							equal={phone.current}
-							class={phone.current ? 'w-full' : ''}
-						/>
-					</div>
-				{/if}
-				{#if error}
-					<p
-						class="shrink-0 border-b bg-destructive/5 px-4 py-2 text-sm text-destructive"
-						role="alert"
-					>
-						{error}
-					</p>
-				{/if}
-				<div
-					bind:this={scroller}
-					class={cn(
-						'flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-4 pb-4',
-						phone.current && !tabs && 'pt-4'
-					)}
-				>
-					{#if phone.current && description}
-						<p class="text-sm text-muted-foreground">{description}</p>
-					{/if}
-					{@render body()}
-					{#if phone.current && ondelete}
-						<Button
-							type="button"
-							variant="outline"
-							class="mt-2 text-destructive"
-							onclick={() => (confirming = true)}
-						>
-							<Trash2 aria-hidden="true" />
-							{deleteTitle}
-						</Button>
-					{/if}
-				</div>
-				{#if !phone.current}
-					<div class="flex shrink-0 flex-wrap items-center gap-2 border-t bg-muted/50 p-4">
-						{#if ondelete}
-							<Button
-								type="button"
-								variant="ghost"
-								class="text-destructive hover:text-destructive"
-								aria-label={deleteTitle}
-								onclick={() => (confirming = true)}
-							>
-								<Trash2 aria-hidden="true" />
-								{m.delete_title()}
-							</Button>
-						{/if}
-						<div class="ml-auto flex gap-2">
-							<Button type="button" variant="ghost" onclick={() => (open = false)}>
-								{m.cancel()}
-							</Button>
-							<Button type="submit" disabled={busy || disabled}>{submitLabel}</Button>
-						</div>
-					</div>
-				{/if}
-			{/snippet}
-		</AsyncForm>
+		{#if action}
+			<AsyncForm class="flex min-h-0 flex-1 flex-col" {action} ondone={() => (open = false)}>
+				{#snippet children({ busy, error })}{@render frame(busy, error)}{/snippet}
+			</AsyncForm>
+		{:else}
+			<div class="flex min-h-0 flex-1 flex-col">{@render frame(false, null)}</div>
+		{/if}
 	</Dialog.Content>
 </Dialog.Root>
 
