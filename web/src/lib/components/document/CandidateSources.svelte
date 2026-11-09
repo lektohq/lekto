@@ -1,11 +1,13 @@
 <script lang="ts">
+	import Chip from '#lib/components/Chip.svelte';
 	import { openBeam } from '#lib/beam.svelte.ts';
 	import { sourceChips, type Candidate } from '#lib/candidates.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { cn } from '#lib/utils.ts';
 
-	// What each signal said about a value: a chip per signal, solid where it counts for the
-	// judge, dashed where the signal was not sure enough. The similar documents stand as their
+	// What each signal said about a value: a chip per signal (web/DESIGN.md, "Chips"), selected
+	// where it counts for the judge, neutral where the signal was not sure enough (said in words
+	// for a screen reader; dashed means "empty" or "add"). The similar documents stand as their
 	// numbers (web/DESIGN.md, "Beam"): a number shows its document in the Beam, paging through
 	// them all; the document checked stays where it is.
 	let { candidate, inverted = false }: { candidate: Candidate; inverted?: boolean } = $props();
@@ -15,16 +17,11 @@
 
 <span class="flex flex-wrap items-center gap-1">
 	{#each chips as chip, index (index)}
-		<span
+		<Chip
+			size="sm"
+			variant={chip.strong ? 'selected' : 'neutral'}
 			title={[chip.note, chip.quote && `„${chip.quote}“`].filter(Boolean).join(' ') || undefined}
-			class={cn(
-				'inline-flex items-center gap-1 rounded-full px-2 text-micro leading-5 whitespace-nowrap',
-				chip.strong
-					? inverted
-						? 'bg-background/15'
-						: 'bg-panel'
-					: 'border border-dashed border-current/40 opacity-80'
-			)}
+			class={cn('gap-1', inverted && 'border-transparent bg-background/15 text-current')}
 		>
 			{chip.text}
 			{#if chip.quote}<span class="sr-only">: „{chip.quote}“</span>{/if}
@@ -43,6 +40,6 @@
 					{number + 1}
 				</button>
 			{/each}
-		</span>
+		</Chip>
 	{/each}
 </span>
