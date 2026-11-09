@@ -12,6 +12,9 @@ const LOWERCASE_INFORMAL =
 	/\b(du|dich|dir|dein|deine|deinen|deinem|deiner|deines|deins|euch|euer|eure|euren|eurem|eurer)\b/;
 // The button word; "sichern" in a sentence ("Jetzt sichern": keep it safe) is another verb.
 const SICHERN = /\bSichern\b/;
+// Create is "Anlegen" (DESIGN.md, "Words"); "erstellen" only where nothing is created by a button.
+const ERSTELLEN = /\b[Ee]rstellen\b/;
+const ERSTELLEN_ALLOWED = new Set(['reason_archive_not_pdfa']);
 
 // Keys whose "Sie"/"Ihr" is not an address of the user. This list may only shrink.
 const FORMAL_ALLOWED = new Set([
@@ -44,6 +47,10 @@ describe('German texts', () => {
 
 	it('say "Speichern", not "Sichern"', () => {
 		expect(matching(SICHERN)).toEqual([]);
+	});
+
+	it('say "Anlegen", not "erstellen"', () => {
+		expect(matching(ERSTELLEN, ERSTELLEN_ALLOWED)).toEqual([]);
 	});
 
 	it('keep allowlisted keys that still need it', () => {
