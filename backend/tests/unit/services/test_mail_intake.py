@@ -1077,6 +1077,41 @@ async def test_a_rule_whose_space_or_type_is_gone_pauses_with_the_reason(world: 
     assert (record.outcome, record.rule) == (MailOutcome.TAKEN, None)  # by the fallback
 
 
+async def test_deleting_what_a_rule_names_pauses_it_at_once(world: World) -> None:
+    """Without a mail coming: a deleted space, type or person, or a deactivated person, pauses
+    the mail rules that name them in the same transaction (review 0.12.2, C-06)."""
+    admin, person, mailbox = await _setup(world)
+    leaving, gone = await world.user(), await world.user()
+    household = await world.spaces.create(
+        admin.id, "Haushalt", members={person.id: SpaceRole.EDIT, admin.id: SpaceRole.EDIT}
+    )
+    letter = DocumentType.create(name="E-Mail", now=world.clock.now())
+    async with world.uow() as uow:
+        await uow.document_types.add(letter)
+        await uow.commit()
+    await _rule(world, admin, mailbox, name="Space", user_id=person.id, space_id=household.id)
+    await _rule(world, admin, mailbox, name="Typ", user_id=person.id, text_type_id=letter.id)
+    await _rule(world, admin, mailbox, name="Inaktiv", user_id=leaving.id)
+    await _rule(world, admin, mailbox, name="Gelöscht", user_id=gone.id)
+    await _rule(world, admin, mailbox, name="Bleibt", user_id=person.id)
+    await world.spaces.delete(admin.id, household.id)
+    await world.master_data.delete_document_type(admin.id, letter.id)
+    await world.users.update(admin.id, leaving.id, active=False)
+    await world.users.delete_user(admin.id, gone.id)
+    async with world.uow() as uow:
+        reasons = {
+            rule.name: (rule.enabled, rule.disabled_reason and rule.disabled_reason.code)
+            for rule in await uow.mail_rules.of_mailbox(mailbox.id)
+        }
+    assert reasons == {
+        "Space": (False, ReasonCode.MAIL_RULE_SPACE_UNREACHABLE),
+        "Typ": (False, ReasonCode.MAIL_RULE_TYPE_GONE),
+        "Inaktiv": (False, ReasonCode.MAIL_RULE_PERSON_GONE),
+        "Gelöscht": (False, ReasonCode.MAIL_RULE_PERSON_GONE),
+        "Bleibt": (True, None),
+    }
+
+
 async def test_a_deactivated_fallback_person_takes_nothing(world: World) -> None:
     admin, person, mailbox = await _setup(world)
     await world.users.update(admin.id, person.id, active=False)
