@@ -235,7 +235,10 @@ Chips and badges are pills; a pill is never a button that starts an action.
 | `inline`  | text   | A button that reads as a word in a line  |
 
 On the phone every button is at least 44 px tall (see [Touch targets](#touch-targets)). The
-component handles this. Pages do not add `h-11` by hand.
+component handles this. Pages and components do not give a `Button` or `IconButton` a height of
+their own (`h-*`, `size-*`, also through a class constant); a size from the table does it, and
+`design-system.test.ts` refuses one. A button in a row of small things (the inbox's "Gesehen") is
+`sm`.
 
 **Icon buttons:** `IconButton` only. It takes a `label` (its tooltip and `aria-label`), a variant
 and a size (`default` 40 px, `sm` 32 px), optionally a shorter `hint` as tooltip. Spread a menu
@@ -296,7 +299,9 @@ divider.
   fields too (a rule's conditions and actions, an identifier opened in its list, a space member's
   role), and a `TagPicker` or `ChipInput` with one line of chips is as high. Only the narrow filter
   panel and the lens editor beside it (`FilterPanel`, `FactFilter`, `LensEditor`) have fields of
-  36 px (`h-9`). `design-system.test.ts` allows no other height on a field.
+  36 px (`h-9`). `design-system.test.ts` allows no other height on a field, also through
+  `class={…}`; a raw `<input>` with a type (the colour well of `ColorPicker`) takes `h-11` by
+  hand.
 
 ### Checkboxes, radios, switches
 
@@ -1171,9 +1176,9 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     tabs"); tooltips only through `ui/tooltip` ("Help and tooltips"); `Progress` only in the
     selection bars of runs on many and the upload summary ("Choosing many"); dates and times
     through `DateInput`, no native date or time field ("Fields"); "Abbrechen" before the
-    primary action, never after it ("Footers"); the owl (`Mascot`,
-    `EmptyNote` with `mascot`) only at its places ("Logo and owl"); spins, pulses and turns
-    only `motion-safe` ("Motion");
+    primary action, never after it ("Footers"); no height of its own on a `Button` or
+    `IconButton` ("Buttons"); the owl (`Mascot`, `EmptyNote` with `mascot`) only at its
+    places ("Logo and owl"); spins, pulses and turns only `motion-safe` ("Motion");
   - `src/lib/tips.test.ts`: one box of help at a time, the next without delay; a tooltip opens on
     a focus Tab brought, not on one handed back;
   - `src/lib/via-token.test.ts`: every file that has a person's API token (`via_token`, a

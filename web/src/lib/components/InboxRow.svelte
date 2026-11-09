@@ -52,7 +52,8 @@
 	);
 	// Waiting only for the space Lekto suggests: say which, and who would see it there.
 	const suggestion = $derived(onlySpace(item.open) ? suggestedSpace(item.open) : null);
-	const action = 'h-11 shrink-0 max-sm:w-11 max-sm:px-0 sm:h-9';
+	// Small beside the row; on a phone only the icon, as wide as a finger.
+	const action = 'shrink-0 max-sm:w-11 max-sm:px-0';
 </script>
 
 <DocumentRow
@@ -94,12 +95,24 @@
 	{/if}
 	{#snippet aside()}
 		{#if item.tab === 'new'}
-			<Button variant="outline" class={action} disabled={busy} onclick={() => onseen(document.id)}>
+			<Button
+				variant="outline"
+				size="sm"
+				class={action}
+				disabled={busy}
+				onclick={() => onseen(document.id)}
+			>
 				<Check aria-hidden="true" />
 				<span class="max-sm:sr-only">{m.inbox_seen()}</span>
 			</Button>
 		{:else if done?.how === 'seen'}
-			<Button variant="ghost" class={action} disabled={busy} onclick={() => onunseen(document.id)}>
+			<Button
+				variant="ghost"
+				size="sm"
+				class={action}
+				disabled={busy}
+				onclick={() => onunseen(document.id)}
+			>
 				<Undo2 aria-hidden="true" />
 				<span class="max-sm:sr-only">{m.inbox_unseen()}</span>
 			</Button>

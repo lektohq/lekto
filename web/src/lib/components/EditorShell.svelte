@@ -88,7 +88,7 @@
 						<Button
 							type="button"
 							variant="ghost"
-							class="h-11 justify-self-start px-3 text-base font-normal text-brand"
+							class="justify-self-start px-3 text-base font-normal text-brand"
 							onclick={() => (open = false)}
 						>
 							{m.cancel()}
@@ -99,7 +99,7 @@
 						<Button
 							type="submit"
 							variant="ghost"
-							class="h-11 justify-self-end px-3 text-base font-semibold text-brand"
+							class="justify-self-end px-3 text-base font-semibold text-brand"
 							disabled={busy || disabled}
 						>
 							{m.editor_save_short()}
@@ -145,7 +145,7 @@
 						<Button
 							type="button"
 							variant="outline"
-							class="mt-2 h-11 text-destructive"
+							class="mt-2 text-destructive"
 							onclick={() => (confirming = true)}
 						>
 							<Trash2 aria-hidden="true" />

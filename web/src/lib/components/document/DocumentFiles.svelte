@@ -308,7 +308,7 @@
 				<Button
 					variant="ghost"
 					size="sm"
-					class="-ml-2 h-7 w-fit px-2"
+					class="-ml-2 w-fit px-2"
 					onclick={() => copy(file.sha256)}
 				>
 					<Copy aria-hidden="true" />

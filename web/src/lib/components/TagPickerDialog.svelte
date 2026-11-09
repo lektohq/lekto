@@ -58,7 +58,7 @@
 	{:else}
 		<Button
 			variant="ghost"
-			class="h-11 px-3 text-base font-semibold text-brand"
+			class="px-3 text-base font-semibold text-brand"
 			onclick={() => {
 				query = '';
 				open = false;
