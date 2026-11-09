@@ -544,6 +544,18 @@ describe('the design system (web/DESIGN.md)', () => {
 					: line(source, /m\.rule_group_(?:not_)?(?:all|any)\(/)
 			)
 		).toEqual([]);
+		// One switch and one way to switch, for rules and mailboxes (`lib/rules/switch.ts`).
+		expect(
+			offenders((source, path) =>
+				path === own('RuleSwitch') ? null : line(source, /m\.rule_switch_(?:on|off)\(/)
+			)
+		).toEqual([]);
+		const switched = /m\.(?:rule|mailbox)_switched_(?:on|off)\(/;
+		expect(
+			[...Object.entries(sources), ...Object.entries(scripts)]
+				.filter(([path, source]) => !path.endsWith('/lib/rules/switch.ts') && switched.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
 		for (const form of ['RuleBuilder', 'MailRuleForm']) {
 			expect(sources[own(form)]).toMatch(/<ConditionGroup\b/);
 		}

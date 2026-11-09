@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { switchMailbox } from '#lib/rules/switch.ts';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import OctagonX from '@lucide/svelte/icons/octagon-x';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -18,7 +19,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
-	import { describeError, reportError } from '#lib/errors.ts';
+	import { describeError } from '#lib/errors.ts';
 	import { events } from '#lib/events.svelte.ts';
 	import { statusOf, type Mailbox, type StatusTone } from '#lib/mailboxes.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -70,21 +71,12 @@
 		open = true;
 	}
 
-	async function switchMailbox(mailbox: Mailbox, enabled: boolean) {
+	async function switchOne(mailbox: Mailbox, enabled: boolean) {
 		busy = mailbox.id;
-		try {
-			const changed = await unwrap(
-				api.PATCH('/api/v1/mailboxes/{id}', {
-					params: { path: { id: mailbox.id } },
-					body: { enabled }
-				})
-			);
+		const changed = await switchMailbox(mailbox.id, enabled);
+		if (changed)
 			mailboxes = (mailboxes ?? []).map((item) => (item.id === changed.id ? changed : item));
-		} catch (error) {
-			reportError(error);
-		} finally {
-			busy = null;
-		}
+		busy = null;
 	}
 </script>
 
@@ -126,7 +118,7 @@
 						<MailboxLines {mailbox} />
 					</div>
 					<Switch
-						bind:checked={() => mailbox.enabled, (enabled) => switchMailbox(mailbox, enabled)}
+						bind:checked={() => mailbox.enabled, (enabled) => switchOne(mailbox, enabled)}
 						disabled={busy === mailbox.id}
 						class="relative z-10"
 						aria-label={mailbox.enabled

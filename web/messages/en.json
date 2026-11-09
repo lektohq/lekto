@@ -299,6 +299,8 @@
 	"mailbox_part_fetch": "Fetching",
 	"mailbox_short": "Mailbox",
 	"mailbox_switch_on": "Activate mailbox “{name}”",
+	"mailbox_switched_on": "Mailbox activated.",
+	"mailbox_switched_off": "Mailbox paused.",
 	"mailbox_switch_off": "Pause mailbox “{name}”",
 	"mailbox_delete_title": "Delete mailbox “{name}”",
 	"mailbox_delete_description": "Lekto no longer fetches from this mailbox. What it has taken in stays.",

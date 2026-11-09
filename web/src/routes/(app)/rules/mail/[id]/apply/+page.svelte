@@ -1,7 +1,8 @@
 <script lang="ts">
+	import RuleSwitch from '#lib/components/rules/RuleSwitch.svelte';
+	import { switchMailRule } from '#lib/rules/switch.ts';
 	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { toast } from 'svelte-sonner';
 	import { page } from '$app/state';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
@@ -14,8 +15,7 @@
 	import SelectionBar from '#lib/components/SelectionBar.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
-	import { Switch } from '#lib/components/ui/switch/index.ts';
-	import { describeError, reportError } from '#lib/errors.ts';
+	import { describeError } from '#lib/errors.ts';
 	import { formatMoment } from '#lib/i18n.ts';
 	import { loadMailRuleLookup, namesOf, type MailRuleLookup } from '#lib/mail-rule-lookup.ts';
 	import {
@@ -69,30 +69,19 @@
 		untrack(() => void load(wanted));
 	});
 
-	async function switchRule(enabled: boolean) {
+	async function switchOne(enabled: boolean) {
 		if (!rule) return;
 		busy = true;
-		try {
-			rule = await unwrap(
-				api.PATCH('/api/v1/mail-rules/{id}', {
-					params: { path: { id: rule.id } },
-					body: { enabled }
-				})
-			);
-			toast.success(
-				enabled
-					? next.length === 1
-						? m.mail_rule_switched_on_fetch_one()
-						: next.length > 1
-							? m.mail_rule_switched_on_fetch({ count: next.length })
-							: m.rule_switched_on()
-					: m.rule_switched_off()
-			);
-		} catch (error) {
-			reportError(error);
-		} finally {
-			busy = false;
-		}
+		// Switched on, it says what it takes at the fetch that follows.
+		const said = !enabled
+			? undefined
+			: next.length === 1
+				? m.mail_rule_switched_on_fetch_one()
+				: next.length > 1
+					? m.mail_rule_switched_on_fetch({ count: next.length })
+					: undefined;
+		rule = (await switchMailRule(rule.id, enabled, said)) ?? rule;
+		busy = false;
 	}
 
 	function fold(key: string) {
@@ -123,12 +112,11 @@
 <svelte:head><title>{title} · {m.app_name()}</title></svelte:head>
 
 {#snippet switcher()}
-	<Switch
-		bind:checked={() => rule?.enabled ?? false, switchRule}
-		disabled={busy}
-		aria-label={rule?.enabled
-			? m.rule_switch_off({ name: rule.name })
-			: m.rule_switch_on({ name: rule?.name ?? '' })}
+	<RuleSwitch
+		name={rule?.name ?? ''}
+		enabled={rule?.enabled ?? false}
+		{busy}
+		onswitch={(enabled) => void switchOne(enabled)}
 	/>
 {/snippet}
 
@@ -147,7 +135,7 @@
 		{/snippet}
 		{#snippet actions()}
 			{#if rule && !rule.enabled}
-				<Button size="sm" disabled={busy} onclick={() => void switchRule(true)}>
+				<Button size="sm" disabled={busy} onclick={() => void switchOne(true)}>
 					{m.mail_rule_switch_on()}
 				</Button>
 			{/if}
