@@ -107,12 +107,6 @@ const PROGRESS = new Set([
 	'/src/lib/components/rules/RuleApplyBar.svelte',
 	'/src/lib/components/UploadSummary.svelte'
 ]);
-/** Icon buttons as high as the search beside them in the documents page's row below `lg` (44
- * pixels), until the search takes `SearchField` and its height (review 0.12.2, R-03 and K-06).
- * This list may only shrink. */
-const ROW_OF_44 = new Set(['/src/routes/(app)/documents/+page.svelte']);
-const OF_44 = 'size-11 shrink-0';
-
 /** Popovers drawn outside `ui/`: they use the component's shadow (DESIGN.md, "Radius, borders,
  * shadows"). This list may only shrink. */
 const POPOVERS = new Set([
@@ -345,6 +339,21 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(beam).toMatch(/<Sheet\.Content\b[\s\S]*?\sclass="[^"]*\bshadow-none\b/);
 	});
 
+	it('searches in SearchField only, as high as every field', () => {
+		// The header, the documents page, pickers and lists alike (DESIGN.md, "Fields"): one look,
+		// one height, the text size that keeps iOS from zooming.
+		expect(
+			offenders((source, path) =>
+				!path.endsWith('/SearchField.svelte') && /\stype="search"/.test(source)
+					? 'type="search"'
+					: null
+			)
+		).toEqual([]);
+		const field = sources['/src/lib/components/SearchField.svelte'];
+		expect(field).toMatch(/size === 'sm' \? 'h-9\b[^']*' : cn\(FIELD_HEIGHT\b/);
+		expect(field).toMatch(/\btext-base\b[^"]*\bsm:text-sm\b/);
+	});
+
 	it('keeps a label with help as high as one without', () => {
 		const hint = sources['/src/lib/components/InfoHint.svelte'];
 		expect(hint).toMatch(/<span class="-my-1 flex">\s*<InfoTip\b[^>]*size="sm"/);
@@ -408,7 +417,13 @@ describe('the design system (web/DESIGN.md)', () => {
 				const raw = tags(source, 'input').filter((tag) =>
 					/\stype="(?!file|search|hidden)/.test(tag)
 				);
-				for (const element of [...[...source.matchAll(field)].map(([match]) => match), ...raw]) {
+				// A `SearchField` may hold an `end`, so only its own tag counts.
+				const searches = tags(source, 'SearchField');
+				for (const element of [
+					...[...source.matchAll(field)].map(([match]) => match),
+					...searches,
+					...raw
+				]) {
 					const found = height(element);
 					// A raw field takes the one height by hand; a component field has it already.
 					const one = found === 'h-11' && element.startsWith('<input');
@@ -427,11 +442,7 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(
 			offenders((source, path) => {
 				if (path.includes('/components/ui/') || path.endsWith('/IconButton.svelte')) return null;
-				const tagged = ['Button', 'IconButton']
-					.flatMap((name) => tags(source, name))
-					.filter(
-						(tag) => !(ROW_OF_44.has(path) && tag.startsWith('<IconButton') && tag.includes(OF_44))
-					);
+				const tagged = ['Button', 'IconButton'].flatMap((name) => tags(source, name));
 				return (
 					tagged.find((tag) => {
 						// `class={action}` or `class={cn(action, …)}`: a constant of the same file.

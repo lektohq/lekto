@@ -6,7 +6,6 @@
 	import List from '@lucide/svelte/icons/list';
 	import Waypoints from '@lucide/svelte/icons/waypoints';
 	import StreamView from '#lib/components/documents/StreamView.svelte';
-	import SearchIcon from '@lucide/svelte/icons/search';
 	import Info from '@lucide/svelte/icons/info';
 	import ListChecks from '@lucide/svelte/icons/list-checks';
 	import X from '@lucide/svelte/icons/x';
@@ -104,7 +103,7 @@
 	import { selectionOf } from '#lib/selection.ts';
 	import PageTitle from '#lib/components/page/PageTitle.svelte';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
-	import { FIELD_FRAME } from '#lib/components/ui/field-look.ts';
+	import SearchField from '#lib/components/SearchField.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import Loading from '#lib/components/Loading.svelte';
 	import Upload from '@lucide/svelte/icons/upload';
@@ -679,40 +678,36 @@ row of filters, on a desktop narrow by the title. -->
 	{@const places = searchPlaces(session.isAdmin)}
 	<form
 		role="search"
-		class={cn(
-			FIELD_FRAME,
-			compact
-				? cn('h-10 w-64 pr-1 pl-3', places.title)
-				: cn('flex h-11 flex-1 pr-1.5 pl-3.5', places.phone)
-		)}
+		class={compact ? cn('w-64', places.title) : cn('flex min-w-0 flex-1', places.phone)}
 		onsubmit={(event) => {
 			event.preventDefault();
 			search(text.trim());
 		}}
 	>
-		<SearchIcon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-		<input
-			data-page-search
+		<SearchField
 			bind:value={text}
-			type="search"
-			aria-label={m.documents_search_label()}
+			class="flex-1"
+			label={m.documents_search_label()}
 			placeholder={lens ? m.header_search_in({ name: lens.name }) : m.search_placeholder()}
 			oninput={() => warmSearch()}
-			class="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
-		/>
-		{#if query}
-			<IconButton
-				type="button"
-				size="sm"
-				label={m.documents_search_clear()}
-				onclick={() => {
-					text = '';
-					search('');
-				}}
-			>
-				<X aria-hidden="true" />
-			</IconButton>
-		{/if}
+			data-page-search
+		>
+			{#snippet end()}
+				{#if query}
+					<IconButton
+						type="button"
+						size="sm"
+						label={m.documents_search_clear()}
+						onclick={() => {
+							text = '';
+							search('');
+						}}
+					>
+						<X aria-hidden="true" />
+					</IconButton>
+				{/if}
+			{/snippet}
+		</SearchField>
 	</form>
 {/snippet}
 
@@ -726,10 +721,8 @@ row of filters, on a desktop narrow by the title. -->
 		)}
 		onchange={sortBy}
 		{compact}
-		class={compact ? 'size-11 shrink-0' : undefined}
+		class={compact ? 'shrink-0' : undefined}
 	/>
-	<!-- 44 px in the row below `lg`, as the search beside it, until the search takes
-	     `SearchField` (review 0.12.2, R-03 and K-06; `ROW_OF_44` in the design guard). -->
 {/snippet}
 
 {#snippet lensLinks(variant: 'list' | 'chips')}
@@ -748,7 +741,7 @@ row of filters, on a desktop narrow by the title. -->
 {#snippet selectButton(compact: boolean)}
 	<IconButton
 		variant="outline"
-		class={cn(compact && 'size-11 shrink-0', selecting && 'border-primary bg-panel text-primary')}
+		class={cn(compact && 'shrink-0', selecting && 'border-primary bg-panel text-primary')}
 		label={m.bulk_mode()}
 		aria-pressed={selecting}
 		onclick={() => (selecting ? endSelecting() : (selecting = true))}
@@ -890,19 +883,25 @@ row of filters, on a desktop narrow by the title. -->
 				<div class="flex items-center justify-end gap-2 lg:hidden">
 					{@render searchForm(false)}
 					<Sheet.Root bind:open={filtersOpen}>
-						<Sheet.Trigger
-							class="relative grid size-11 shrink-0 place-items-center rounded-xl border border-input bg-background hover:bg-secondary lg:hidden"
-							aria-label={m.filters_open()}
-						>
-							<SlidersHorizontal class="size-4" aria-hidden="true" />
-							{#if activeFilters > 0}
-								<span
-									class="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-xs font-semibold text-primary-foreground tabular-nums"
-									aria-hidden="true"
+						<Sheet.Trigger>
+							{#snippet child({ props })}
+								<IconButton
+									{...props}
+									variant="outline"
+									class="relative shrink-0"
+									label={m.filters_open()}
 								>
-									{activeFilters}
-								</span>
-							{/if}
+									<SlidersHorizontal aria-hidden="true" />
+									{#if activeFilters > 0}
+										<span
+											class="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-xs font-semibold text-primary-foreground tabular-nums"
+											aria-hidden="true"
+										>
+											{activeFilters}
+										</span>
+									{/if}
+								</IconButton>
+							{/snippet}
 						</Sheet.Trigger>
 						<!-- Title and close stay at the top, reset and show at the bottom; between them
 						the filters scroll. -->
@@ -948,7 +947,7 @@ row of filters, on a desktop narrow by the title. -->
 								<IconButton
 									{...props}
 									variant="outline"
-									class="size-11 shrink-0"
+									class="shrink-0"
 									label={m.layout_current({ layout: LAYOUT_LABELS[layout]() })}
 									tooltip={false}
 								>

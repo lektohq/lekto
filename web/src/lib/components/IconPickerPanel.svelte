@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Input } from '#lib/components/ui/input/index.ts';
+	import SearchField from '#lib/components/SearchField.svelte';
 	import LucideIcon from '#lib/components/LucideIcon.svelte';
 	import { GRID_KEYS, nextTile } from '#lib/grid-keys.ts';
 	import { CURATED, CURATED_NAMES } from '#lib/icons/curated.ts';
@@ -66,12 +66,7 @@
 {/snippet}
 
 <div id="{id}-panel" class="flex flex-col gap-3 rounded-xl border bg-card p-3">
-	<Input
-		type="search"
-		bind:value={query}
-		placeholder={m.icon_search()}
-		aria-label={m.icon_search()}
-	/>
+	<SearchField bind:value={query} label={m.icon_search()} />
 	<!-- The arrows, Home and End bubble up from the tiles (buttons); the list takes no focus. -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="flex max-h-72 flex-col gap-4 overflow-y-auto pr-1" onkeydown={move}>
