@@ -12,7 +12,7 @@
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import { formatDuration } from '#lib/duration.ts';
 	import { describeError } from '#lib/errors.ts';
-	import { formatNumber } from '#lib/i18n.ts';
+	import { browserZone, formatNumber, formatPercent, listLocale } from '#lib/i18n.ts';
 	import { latest } from '#lib/latest.ts';
 	import { NODE_LABELS } from '#lib/node-labels.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -87,7 +87,7 @@
 		yellow: { label: m.lane_yellow(), color: 'var(--chart-2)' },
 		red: { label: m.lane_red(), color: 'var(--chart-3)' }
 	} satisfies Chart.ChartConfig;
-	const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+	const zone = browserZone();
 
 	let channels = $state<Channel[]>(['web', 'api', 'mail']);
 	let period = $state<Period>('12m');
@@ -130,14 +130,11 @@
 		}
 	}
 
-	const percent = (part: number, whole: number) =>
-		formatNumber(whole ? part / whole : 0, { style: 'percent', maximumFractionDigits: 0 });
+	const percent = (part: number, whole: number) => formatPercent(whole ? part / whole : 0);
 	const duration = (ms: number | null | undefined) =>
 		ms == null ? '–' : formatDuration(ms / 1000);
 	const list = (items: string[]) =>
-		new Intl.ListFormat(document.documentElement.lang || undefined, { type: 'conjunction' }).format(
-			items
-		);
+		new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(items);
 
 	const total = $derived(report ? report.lanes.green + report.lanes.yellow + report.lanes.red : 0);
 	const scope = $derived(

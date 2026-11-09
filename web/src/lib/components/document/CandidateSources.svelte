@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Chip from '#lib/components/Chip.svelte';
 	import { openBeam } from '#lib/beam.svelte.ts';
+	import { quoted } from '#lib/i18n.ts';
 	import { sourceChips, type Candidate } from '#lib/candidates.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { cn } from '#lib/utils.ts';
@@ -20,11 +21,11 @@
 		<Chip
 			size="sm"
 			variant={chip.strong ? 'selected' : 'neutral'}
-			title={[chip.note, chip.quote && `„${chip.quote}“`].filter(Boolean).join(' ') || undefined}
+			title={[chip.note, chip.quote && quoted(chip.quote)].filter(Boolean).join(' ') || undefined}
 			class={cn('gap-1', inverted && 'border-transparent bg-background/15 text-current')}
 		>
 			{chip.text}
-			{#if chip.quote}<span class="sr-only">: „{chip.quote}“</span>{/if}
+			{#if chip.quote}<span class="sr-only">: {quoted(chip.quote)}</span>{/if}
 			{#if chip.note}<span class="sr-only">({chip.note})</span>{/if}
 			{#if !chip.strong}<span class="sr-only">({m.candidate_weak()})</span>{/if}
 			{#each chip.documents as id, number (id)}
