@@ -20,6 +20,9 @@ import {
 	type RelativePeriod
 } from '#lib/filters.ts';
 
+/** What the API takes of a lens (`tests/api-limits.test.ts`): its name, the fields its cards show. */
+export const LENS_LIMITS = { name: 100, cardFields: 3 } as const;
+
 export type Lens = components['schemas']['LensOut'];
 export type LensFilter = components['schemas']['LensFilterBody'];
 /** The filters of a lens as it is read (each fact with its value) or as it is written. */

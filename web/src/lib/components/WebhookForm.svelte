@@ -21,7 +21,14 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { session } from '#lib/session.svelte.ts';
 	import { cn } from '#lib/utils.ts';
-	import { EVENT_LABELS, selectionVolume, volumeLevel, volumeText } from '#lib/webhooks.ts';
+	import { TIMEOUT_MINUTES } from '#lib/tasks.ts';
+	import {
+		EVENT_LABELS,
+		selectionVolume,
+		volumeLevel,
+		volumeText,
+		WEBHOOK_LIMITS
+	} from '#lib/webhooks.ts';
 	import VolumeMeter from '#lib/components/VolumeMeter.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import UnsavedGuard from '#lib/components/UnsavedGuard.svelte';
@@ -66,12 +73,14 @@
 	);
 	let body = $state<Body>(given?.body ?? 'thin');
 	let template = $state(given?.body_template ?? '');
-	let openTasks = $state(given?.max_open_tasks ?? 4);
+	let openTasks = $state(given?.max_open_tasks ?? WEBHOOK_LIMITS.openTasks.default);
 	// The model call the webhook answers instead of the language model ('' for none) and its
 	// time to answer, in minutes. Only admins give it, to an admin's webhook (the API checks the
 	// owner); one they see on another's webhook they may take away.
 	let modelCall = $state<ModelCall | ''>(given?.model_call?.kind ?? '');
-	let callMinutes = $state((given?.model_call?.timeout_seconds ?? 300) / 60);
+	let callMinutes = $state(
+		given?.model_call ? given.model_call.timeout_seconds / 60 : TIMEOUT_MINUTES.default
+	);
 	// The secret to show once, and where to go after it.
 	let secret = $state<{ webhook: string; value: string } | null>(null);
 	let savedId = $state<string | null>(null);
@@ -86,7 +95,10 @@
 			(!webhook || webhook.owner_id === session.user?.id || webhook.model_call !== null)
 	);
 	const callMinutesValid = $derived(
-		modelCall === '' || (Number.isFinite(callMinutes) && callMinutes >= 0.5 && callMinutes <= 1440)
+		modelCall === '' ||
+			(Number.isFinite(callMinutes) &&
+				callMinutes >= TIMEOUT_MINUTES.min &&
+				callMinutes <= TIMEOUT_MINUTES.max)
 	);
 
 	const triggers = $derived([
@@ -126,7 +138,11 @@
 			eventsMissing ||
 			!headersComplete ||
 			(body === 'template' && template.trim() === '') ||
-			!(Number.isInteger(openTasks) && openTasks >= 1 && openTasks <= 64) ||
+			!(
+				Number.isInteger(openTasks) &&
+				openTasks >= WEBHOOK_LIMITS.openTasks.min &&
+				openTasks <= WEBHOOK_LIMITS.openTasks.max
+			) ||
 			!callMinutesValid
 	);
 
@@ -214,7 +230,7 @@
 	{#snippet children({ busy, error })}
 		<Field.Field>
 			<Field.Label for="wh-name">{m.field_name()}</Field.Label>
-			<Input id="wh-name" bind:value={name} maxlength={100} required />
+			<Input id="wh-name" bind:value={name} maxlength={WEBHOOK_LIMITS.name} required />
 		</Field.Field>
 		<Field.Field>
 			<HintLabel
@@ -227,7 +243,7 @@
 				id="wh-url"
 				type="url"
 				bind:value={url}
-				maxlength={2000}
+				maxlength={WEBHOOK_LIMITS.url}
 				required
 				aria-describedby="wh-url-hint"
 			/>
@@ -295,7 +311,7 @@
 					bind:value={template}
 					label={m.webhook_body_template()}
 					purpose="webhook"
-					maxlength={10000}
+					maxlength={WEBHOOK_LIMITS.body}
 				/>
 			{/if}
 		</div>
@@ -310,7 +326,7 @@
 						aria-label={m.webhook_header_name()}
 						class="font-mono"
 						bind:value={header.name}
-						maxlength={100}
+						maxlength={WEBHOOK_LIMITS.headerName}
 						required
 					/>
 					<Input
@@ -320,7 +336,7 @@
 						class="font-mono"
 						placeholder={header.kept ? m.webhook_header_kept() : ''}
 						bind:value={header.value}
-						maxlength={4096}
+						maxlength={WEBHOOK_LIMITS.headerValue}
 					/>
 					<IconButton
 						type="button"
@@ -335,7 +351,7 @@
 				<Button
 					type="button"
 					variant="outline"
-					disabled={headers.length >= 20}
+					disabled={headers.length >= WEBHOOK_LIMITS.headers}
 					onclick={() => headers.push({ name: '', value: '', kept: false })}
 				>
 					<Plus aria-hidden="true" />
@@ -353,15 +369,20 @@
 			<Input
 				id="wh-open-tasks"
 				type="number"
-				min={1}
-				max={64}
+				min={WEBHOOK_LIMITS.openTasks.min}
+				max={WEBHOOK_LIMITS.openTasks.max}
 				step={1}
 				class="max-w-32"
 				bind:value={openTasks}
 				required
 				aria-describedby="wh-open-tasks-hint wh-open-tasks-rule"
 			/>
-			<Field.Description id="wh-open-tasks-rule">{m.webhook_open_tasks_rule()}</Field.Description>
+			<Field.Description id="wh-open-tasks-rule"
+				>{m.webhook_open_tasks_rule({
+					min: WEBHOOK_LIMITS.openTasks.min,
+					max: WEBHOOK_LIMITS.openTasks.max
+				})}</Field.Description
+			>
 		</Field.Field>
 		{#if showsModelCall}
 			<div class="flex flex-wrap items-end gap-3">
@@ -385,8 +406,8 @@
 						<Input
 							id="wh-model-call-time"
 							type="number"
-							min={0.5}
-							max={1440}
+							min={TIMEOUT_MINUTES.min}
+							max={TIMEOUT_MINUTES.max}
 							step={0.5}
 							aria-invalid={!callMinutesValid || undefined}
 							bind:value={callMinutes}

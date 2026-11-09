@@ -6,7 +6,7 @@ import type { Contact, Tag } from '#lib/masterdata.svelte.ts';
 export type Profile = components['schemas']['ProfileOut'];
 
 /** What the API takes of a profile (`tests/api-limits.test.ts` holds them to `openapi.json`). */
-export const PROFILE_LIMITS = { alias: 150, aliases: 10 } as const;
+export const PROFILE_LIMITS = { username: 150, displayName: 150, alias: 150, aliases: 10 } as const;
 
 /** A user's profile with what their identifiers at contacts need: the contacts, whose topics
  * they may point to. */

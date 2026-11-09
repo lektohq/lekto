@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { PROFILE_LIMITS } from '#lib/profile.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -141,11 +142,22 @@
 >
 	<Field.Field>
 		<Field.Label for="new-username">{m.login_username()}</Field.Label>
-		<Input id="new-username" bind:value={username} maxlength={150} autocomplete="off" required />
+		<Input
+			id="new-username"
+			bind:value={username}
+			maxlength={PROFILE_LIMITS.username}
+			autocomplete="off"
+			required
+		/>
 	</Field.Field>
 	<Field.Field>
 		<Field.Label for="new-display-name">{m.profile_display_name()}</Field.Label>
-		<Input id="new-display-name" bind:value={displayName} maxlength={150} autocomplete="off" />
+		<Input
+			id="new-display-name"
+			bind:value={displayName}
+			maxlength={PROFILE_LIMITS.displayName}
+			autocomplete="off"
+		/>
 		<Field.Description>{m.profile_display_name_hint()}</Field.Description>
 	</Field.Field>
 	<Field.Field>

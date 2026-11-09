@@ -55,7 +55,8 @@ export interface EditorOptions {
 	invalid?: boolean;
 	/** Why the template is invalid, read with the field. */
 	reason?: string | null;
-	maxlength?: number;
+	/** The longest template the API takes. */
+	maxlength: number;
 	autofocus?: boolean;
 }
 
@@ -272,7 +273,7 @@ function attributes(
 
 export function mountTemplateEditor(options: EditorOptions): EditorHandle {
 	const content = new Compartment();
-	const max = options.maxlength ?? 500;
+	const max = options.maxlength;
 	const host = document.createElement('div');
 	if (options.id) host.id = options.id;
 	options.parent.append(host);

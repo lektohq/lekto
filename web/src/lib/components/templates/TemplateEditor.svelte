@@ -43,7 +43,7 @@
 		label,
 		documentType = undefined,
 		fields,
-		maxlength = 500,
+		maxlength,
 		purpose = 'rule',
 		steps = [],
 		target = null,
@@ -54,7 +54,8 @@
 		label?: string;
 		documentType?: string | null;
 		fields: readonly FieldDefinition[];
-		maxlength?: number;
+		/** The longest template the API takes. */
+		maxlength: number;
 		/** A webhook's body: more values, rendered as it is (JSON). */
 		purpose?: TemplatePurpose;
 		/** A rule's step: the names of the steps before it that ask (`steps.<name>`). */

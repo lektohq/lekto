@@ -27,6 +27,7 @@
 		type IdentifierRow,
 		type IdentifierSource,
 		kindLabel,
+		IDENTIFIER_VALUE_MAX,
 		NAMING_KINDS,
 		printed,
 		row
@@ -353,7 +354,7 @@
 							bind:value={rows[index].value}
 							aria-label={m.identifier_value()}
 							aria-invalid={errors[item.key] ? true : undefined}
-							maxlength={100}
+							maxlength={IDENTIFIER_VALUE_MAX}
 							class="font-mono"
 							onkeydown={closeOnEnter}
 						/>

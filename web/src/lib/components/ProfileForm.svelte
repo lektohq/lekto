@@ -129,7 +129,7 @@
 			<Input
 				id="{uid}-name"
 				bind:value={displayName}
-				maxlength={150}
+				maxlength={PROFILE_LIMITS.displayName}
 				autocomplete="name"
 				aria-describedby="{uid}-name-hint"
 			/>

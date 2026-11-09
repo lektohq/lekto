@@ -94,7 +94,12 @@ afterEach(() => {
 
 describe('TemplateInput', () => {
 	it('is red with the reason when the server finds the template invalid', async () => {
-		render(TemplateInput, { id: 'title', label: 'Title', value: '{{ field.netto }}' });
+		render(TemplateInput, {
+			id: 'title',
+			maxlength: 500,
+			label: 'Title',
+			value: '{{ field.netto }}'
+		});
 		await waitFor(() => expect(screen.getByText('unknown value field.netto')).toBeTruthy());
 		expect(screen.getByLabelText('Title').getAttribute('aria-invalid')).toBe('true');
 		// Checked without a document: a rule's template may use every field.
@@ -126,7 +131,7 @@ describe('TemplateInput', () => {
 			}
 			return base(request);
 		});
-		const props = { id: 'title', label: 'Title' };
+		const props = { id: 'title', maxlength: 500, label: 'Title' };
 		const { rerender } = render(TemplateInput, { ...props, value: 'slow' });
 		await waitFor(() => expect(previews.at(-1)?.template).toBe('slow'));
 		await rerender({ ...props, value: 'fast' });
@@ -142,6 +147,7 @@ describe('TemplateInput', () => {
 		const user = userEvent.setup();
 		render(TemplateInput, {
 			id: 'title',
+			maxlength: 500,
 			label: 'Title',
 			value: '',
 			fields: [field('f3', 'Netto', 'netto', null)] as unknown as FieldDefinition[]
@@ -159,6 +165,7 @@ describe('TemplateInput', () => {
 		const user = userEvent.setup();
 		render(TemplateInput, {
 			id: 'pattern',
+			maxlength: 500,
 			label: m.master_title_pattern(),
 			documentType: PAYSLIP,
 			value: 'Lohn '
@@ -205,6 +212,7 @@ describe('TemplateInput', () => {
 		const user = userEvent.setup();
 		render(TemplateInput, {
 			id: 'pattern',
+			maxlength: 500,
 			label: m.master_title_pattern(),
 			documentType: null,
 			extraFields: ['f2'],
@@ -222,7 +230,12 @@ describe('TemplateInput', () => {
 
 	it('links the documentation of templates from the editor', async () => {
 		const user = userEvent.setup();
-		render(TemplateInput, { id: 'pattern', label: m.master_title_pattern(), value: '' });
+		render(TemplateInput, {
+			id: 'pattern',
+			maxlength: 500,
+			label: m.master_title_pattern(),
+			value: ''
+		});
 		await user.click(await screen.findByRole('button', { name: m.template_editor_open() }));
 		const sheet = await screen.findByRole('dialog');
 		const link = within(sheet).getByRole('link', { name: m.template_guide() });
@@ -233,7 +246,7 @@ describe('TemplateInput', () => {
 
 	it('drops the draft when the editor is cancelled', async () => {
 		const user = userEvent.setup();
-		render(TemplateInput, { id: 'reason', label: 'Reason', value: 'Check' });
+		render(TemplateInput, { id: 'reason', maxlength: 500, label: 'Reason', value: 'Check' });
 		await user.click(await screen.findByRole('button', { name: m.template_editor_open() }));
 		const sheet = await screen.findByRole('dialog');
 		const draft = (await within(sheet).findByLabelText(m.template_editor())) as HTMLTextAreaElement;
@@ -249,7 +262,9 @@ describe('a template that sets a field', () => {
 
 	it('is red when text that uses no value cannot be read as the field', async () => {
 		// `props`: a mount option is called `target` too.
-		render(TemplateInput, { props: { id: 'v', label: 'Value', value: 'zwölf', target: amount } });
+		render(TemplateInput, {
+			props: { id: 'v', maxlength: 500, label: 'Value', value: 'zwölf', target: amount }
+		});
 		const message = m.template_unreadable({ type: m.field_def_type_amount() });
 		await waitFor(() => expect(screen.getByText(message)).toBeTruthy());
 		expect(previews.at(-1)).toMatchObject({ template: 'zwölf', field_id: 'f1' });
@@ -260,6 +275,7 @@ describe('a template that sets a field', () => {
 		render(TemplateInput, {
 			props: {
 				id: 'v',
+				maxlength: 500,
 				label: 'Value',
 				value: '{{ field.la_brutto }}',
 				target: amount,
