@@ -92,7 +92,6 @@ from lekto.core.services._access import (
     load_lister,
     readable_document,
     readable_log,
-    writable_document,
 )
 from lekto.core.services._first_runs import keep_verdicts
 from lekto.core.services._moves import move_by_person
@@ -557,7 +556,9 @@ class DocumentService:
             )
             return
         async with self._uow() as uow:
-            document, _ = await writable_document(uow, await load_actor(uow, actor), id)
+            document, _ = await controllable_document(
+                uow, await load_actor(uow, actor), id, Action.DECIDE_FACTS
+            )
             candidates = await rules.rules(uow, document)
             candidates += await rules.followers(uow, candidates)
         prepared = await rules.prepare(candidates, document) if candidates else Prepared()
@@ -1048,13 +1049,15 @@ class DocumentService:
         prepared = Prepared()
         if rules is not None:
             async with self._uow() as uow:
-                document, _ = await writable_document(uow, await load_actor(uow, actor), id)
+                document, _ = await controllable_document(
+                    uow, await load_actor(uow, actor), id, Action.CHANGE_DOCUMENT
+                )
                 candidates = await rules.rules(uow, document)
                 candidates += await rules.followers(uow, candidates)
             prepared = await rules.prepare(candidates, document)
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
-            document, _ = await writable_document(uow, user, id)
+            document, _ = await controllable_document(uow, user, id, Action.CHANGE_DOCUMENT)
             if not confirm:
                 admin_only(user, Action.CHANGE_UNCONFIRMED)
                 if document.channel is not Channel.MIGRATION:

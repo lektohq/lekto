@@ -1043,6 +1043,9 @@ class Action(StrEnum):
     READ_EXCHANGES = "read_exchanges"
     REVIEW_DOCUMENT = "review_document"
     MOVE_DOCUMENT = "move_document"
+    CHANGE_DOCUMENT = "change_document"
+    DECIDE_FACTS = "decide_facts"
+    RELATE_DOCUMENTS = "relate_documents"
     DELETE_DOCUMENT = "delete_document"
     RESET_OWN_PASSWORD = "reset_own_password"
     TURN_OFF_OWN_TOTP = "turn_off_own_totp"
@@ -1079,6 +1082,9 @@ ACTIONS: Mapping[Action, str] = {
     Action.READ_EXCHANGES: "read the model exchanges of this document",
     Action.REVIEW_DOCUMENT: "review this document",
     Action.MOVE_DOCUMENT: "move this document",
+    Action.CHANGE_DOCUMENT: "change this document",
+    Action.DECIDE_FACTS: "decide the facts of this document",
+    Action.RELATE_DOCUMENTS: "relate this document to another",
     Action.DELETE_DOCUMENT: "delete this document",
     Action.RESET_OWN_PASSWORD: "reset their own password here",
     Action.TURN_OFF_OWN_TOTP: "turn off their own TOTP here",
