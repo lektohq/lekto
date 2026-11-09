@@ -27,7 +27,10 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		inboxDocument,
+		INBOX_PAGE_MAX,
+		INBOX_PLACES_MAX,
 		keepPlace,
+		laterReveals,
 		neighbours,
 		nextDecision,
 		type InboxPlace,
@@ -212,17 +215,23 @@
 		side = 'left';
 		await show({ ...view, left: 'pages' });
 		// The viewer lays its pages out after it is shown.
-		for (const wait of [300, 900, 1800]) setTimeout(() => viewer?.reveal(place), wait);
+		reveals.soon(() => viewer?.reveal(place));
 	}
 
 	async function loadInbox() {
 		try {
-			const listed = await unwrap(
-				api.GET('/api/v1/inbox', {
-					params: { query: { limit: 100, all_users: scope.query } }
-				})
-			);
-			const now = listed.items.map((item) => ({ id: item.document.id, tab: item.tab }));
+			// Page by page up to `INBOX_PLACES_MAX`: the open document may stand far back.
+			const now: InboxPlace[] = [];
+			let cursor: string | null = null;
+			do {
+				const listed: components['schemas']['InboxPage'] = await unwrap(
+					api.GET('/api/v1/inbox', {
+						params: { query: { limit: INBOX_PAGE_MAX, cursor, all_users: scope.query } }
+					})
+				);
+				now.push(...listed.items.map((item) => ({ id: item.document.id, tab: item.tab })));
+				cursor = listed.next_cursor;
+			} while (cursor !== null && now.length < INBOX_PLACES_MAX);
 			inboxPlaces = keepPlace(inboxPlaces ?? [], now, id);
 		} catch (error) {
 			reportError(error);
@@ -323,6 +332,14 @@
 		};
 	});
 
+	// Reveals that wait for the viewer's layout end with their document: another one opened in
+	// this page, or the page left (before the effects below that start them).
+	const reveals = laterReveals();
+	$effect(() => {
+		void id;
+		return reveals.drop;
+	});
+
 	/** Show a field's quote where it stands in the pane on the left. */
 	function reveal(place: Place) {
 		revealLeft(place);
@@ -337,8 +354,7 @@
 		if (view.left === 'text') void tick().then(() => textPane?.revealMark());
 		else if (place && !hidden) viewer?.reveal(place);
 		// The viewer lays its pages out once it is shown.
-		else if (place)
-			for (const wait of [300, 900, 1800]) setTimeout(() => viewer?.reveal(place), wait);
+		else if (place) reveals.soon(() => viewer?.reveal(place));
 	}
 
 	/** A pane's switch for its head; none on a phone, where the bar of four takes its place. */
@@ -379,7 +395,7 @@
 		if (tab !== 'document' || document === null || wanted === null) return;
 		untrack(() => {
 			const place: Place = { page: wanted, boxes: [] };
-			for (const wait of [300, 900, 1800]) setTimeout(() => viewer?.reveal(place), wait);
+			reveals.soon(() => viewer?.reveal(place));
 			void goto(pageHref(page.url, null), { replace: true, reset: false });
 		});
 	});
