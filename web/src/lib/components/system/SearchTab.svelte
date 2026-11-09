@@ -119,7 +119,7 @@
 		<span
 			class={cn(
 				'font-semibold tabular-nums',
-				mono ? 'pt-1 font-mono text-sm break-all' : 'text-xl'
+				mono ? 'pt-1 font-mono text-sm break-all' : 'text-lg'
 			)}
 		>
 			{value}
@@ -161,7 +161,7 @@
 								})}
 							</span>
 						</span>
-						<span class="text-2xl font-semibold tabular-nums">{percent(inIndex)}</span>
+						<span class="text-figure tabular-nums">{percent(inIndex)}</span>
 					</div>
 					{@render bar(inIndex, m.search_in_index())}
 				</div>
@@ -177,7 +177,7 @@
 									})}
 								</span>
 							</span>
-							<span class="text-2xl font-semibold tabular-nums">{percent(embedded)}</span>
+							<span class="text-figure tabular-nums">{percent(embedded)}</span>
 						</div>
 						{@render bar(embedded, m.search_meaning())}
 					</div>
@@ -302,7 +302,7 @@
 												: 'bg-surface'
 									)}
 								>
-									<span class="text-2xl font-semibold tabular-nums">{formatNumber(count)}</span>
+									<span class="text-figure tabular-nums">{formatNumber(count)}</span>
 									<span class="text-meta">{label}</span>
 								</div>
 							{/if}
