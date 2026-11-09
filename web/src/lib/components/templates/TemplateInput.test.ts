@@ -5,10 +5,10 @@ import type { FieldDefinition } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { TEMPLATES_GUIDE } from '#lib/templates/guide.ts';
 import TemplateInput from './TemplateInput.svelte';
-import { json } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 
 const PAYSLIP = '0199a6c4-0000-7000-8000-0000000000e1';
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 const previews: Record<string, unknown>[] = [];
 const listed: URL[] = [];
 
@@ -30,7 +30,7 @@ function field(id: string, name: string, key: string, types: string[] | null) {
 beforeEach(() => {
 	previews.length = 0;
 	listed.length = 0;
-	fetchMock.mockReset();
+	fetchMock = fakeApi();
 	fetchMock.mockImplementation(async (request) => {
 		const url = new URL(request.url);
 		if (url.pathname === '/api/v1/fields') {

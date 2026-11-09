@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { SHORTCUT_NAME } from '#lib/shortcut.ts';
-import { fakeApi } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 import ShortcutCard from './ShortcutCard.svelte';
 
 function token(scope: 'read' | 'read_write' | 'upload', name = 't') {
@@ -28,10 +28,7 @@ describe('ShortcutCard', () => {
 				'GET /api/v1/auth/tokens': () => [token('read_write')],
 				'POST /api/v1/auth/tokens': async (request) => {
 					created.push(await request.json());
-					return new Response(JSON.stringify({ ...token('upload', 'x'), token: 'lekto_secret' }), {
-						status: 201,
-						headers: { 'content-type': 'application/json' }
-					});
+					return json({ ...token('upload', 'x'), token: 'lekto_secret' }, 201);
 				}
 			})
 		);

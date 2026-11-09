@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fakeApi } from '#lib/testing/api.ts';
 import type { ApiDefinition } from '#lib/rules/model.ts';
 import { changeSwitchedOff, createSwitchedOff, GLOBAL } from './save.ts';
 
@@ -14,12 +15,7 @@ const rule = { id: 'r1', enabled: true, name: 'Telekom' };
 afterEach(() => vi.unstubAllGlobals());
 
 function stub() {
-	const fetch = vi.fn<(request: Request) => Promise<Response>>(
-		async () =>
-			new Response(JSON.stringify({ ...rule, enabled: false }), {
-				headers: { 'content-type': 'application/json' }
-			})
-	);
+	const fetch = fakeApi({}, () => ({ ...rule, enabled: false }));
 	vi.stubGlobal('fetch', fetch);
 	return fetch;
 }

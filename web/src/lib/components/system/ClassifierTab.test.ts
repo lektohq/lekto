@@ -7,9 +7,9 @@ import { events } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import Page from './ClassifierTab.svelte';
-import { json } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 
 const trained = {
 	model: {
@@ -68,7 +68,7 @@ beforeEach(() => {
 		expires_at: '2026-10-14T12:00:00Z',
 		csrf_token: 'token'
 	});
-	fetchMock.mockReset();
+	fetchMock = fakeApi();
 	vi.stubGlobal('fetch', fetchMock);
 });
 

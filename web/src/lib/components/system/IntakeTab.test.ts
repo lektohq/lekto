@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { json } from '#lib/testing/api.ts';
 import type { Mailbox } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
 import IntakeTab from './IntakeTab.svelte';
@@ -40,12 +41,7 @@ describe('IntakeTab', () => {
 	beforeEach(() => {
 		vi.stubGlobal(
 			'fetch',
-			vi.fn(
-				async () =>
-					new Response(JSON.stringify([MAILBOX]), {
-						headers: { 'content-type': 'application/json' }
-					})
-			)
+			vi.fn(async () => json([MAILBOX]))
 		);
 	});
 

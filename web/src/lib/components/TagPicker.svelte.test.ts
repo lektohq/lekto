@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fakeApi } from '#lib/testing/api.ts';
 import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 import type { Tag } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -31,10 +32,10 @@ const TAGS = [
 	tag('p1', ['Work'], null, 'topic')
 ];
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 
 beforeEach(() => {
-	fetchMock.mockReset();
+	fetchMock = fakeApi();
 	vi.stubGlobal('fetch', fetchMock);
 });
 

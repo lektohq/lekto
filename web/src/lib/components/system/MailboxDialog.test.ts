@@ -5,9 +5,9 @@ import type { ConnectionTest, Mailbox } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import MailboxDialog from './MailboxDialog.svelte';
-import { json } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 const sent: { method: string; path: string; body: unknown }[] = [];
 /** The routes that fail for a test, by path. */
 const failing = new Set<string>();
@@ -61,7 +61,7 @@ beforeEach(() => {
 	});
 	sent.length = 0;
 	failing.clear();
-	fetchMock.mockReset();
+	fetchMock = fakeApi();
 	fetchMock.mockImplementation(async (request) => {
 		const path = new URL(request.url).pathname;
 		const body = request.method === 'GET' ? null : await request.json().catch(() => null);
