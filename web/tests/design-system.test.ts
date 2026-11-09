@@ -71,9 +71,10 @@ const DOCUMENT_LINKS = new Set([
 const DOCUMENT_LINK = /documentHref\(|inboxDocument\(|BASE\}\/documents\/(?:\{|\$\{)/;
 
 /** Where a chip toggles on its own (DESIGN.md, "Tabs and switches"): several at once or none, the
- * channels of the automation and the quick picks of a period; the style guide shows it. One of a
- * few, always one, is `Segmented`. */
+ * channels of the automation, the quick picks of a period and the values of a filter; the style
+ * guide shows it. One of a few, always one, is `Segmented`. */
 const TOGGLE_CHIPS = new Set([
+	'/src/lib/components/FacetChips.svelte',
 	'/src/lib/components/PeriodFacet.svelte',
 	'/src/lib/components/system/AutomationTab.svelte',
 	'/src/routes/(app)/dev/components/+page.svelte'
@@ -125,12 +126,12 @@ const SHADOWS = new Set([
 
 /** Where a native title names the options of a picker (DESIGN.md, "Help and tooltips"): the
  * swatches of the colours, the icons, the months of a period, the paths of tags on the filter's
- * chips. This list may only shrink. */
+ * chips (a `TagChip` toggle). This list may only shrink. */
 const PICKER_TITLES = new Set([
 	'/src/lib/components/ColorPicker.svelte',
 	'/src/lib/components/IconPickerPanel.svelte',
 	'/src/lib/components/PeriodFacet.svelte',
-	'/src/lib/components/FacetChips.svelte'
+	'/src/lib/components/TagChip.svelte'
 ]);
 
 /** The master data tabs and what each shows below its search (DESIGN.md, "Master data tabs"). */
@@ -272,7 +273,9 @@ describe('the design system (web/DESIGN.md)', () => {
 			offenders((source, path) =>
 				TOGGLE_CHIPS.has(path)
 					? null
-					: (tags(source, 'Chip').find((tag) => /\spressed\b/.test(tag)) ?? null)
+					: ([...tags(source, 'Chip'), ...tags(source, 'TagChip')].find((tag) =>
+							/\spressed\b/.test(tag)
+						) ?? null)
 			)
 		).toEqual([]);
 	});
