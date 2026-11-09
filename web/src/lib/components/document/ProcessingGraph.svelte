@@ -142,7 +142,11 @@
 			</span>
 			<div class="flex items-center gap-2.5">
 				<look.icon
-					class={cn('size-4.5 shrink-0', TONE_TEXT[look.tone], look.spin && 'animate-spin')}
+					class={cn(
+						'size-4.5 shrink-0',
+						TONE_TEXT[look.tone],
+						look.spin && 'motion-safe:animate-spin'
+					)}
 					aria-hidden="true"
 					strokeWidth={2.2}
 				/>

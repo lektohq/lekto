@@ -66,7 +66,8 @@
 		green: MARK.green,
 		yellow: MARK.yellow,
 		red: MARK.red,
-		running: 'animate-pulse bg-lane-running ring-1 ring-inset ring-lane-running-foreground/35',
+		running:
+			'motion-safe:animate-pulse bg-lane-running ring-1 ring-inset ring-lane-running-foreground/35',
 		waiting:
 			'border border-dashed border-muted-foreground/60 bg-[repeating-linear-gradient(45deg,var(--color-muted)_0_4px,transparent_4px_8px)]',
 		carried: 'bg-muted ring-1 ring-inset ring-border'
@@ -75,7 +76,7 @@
 		green: STRIPE.green,
 		yellow: STRIPE.yellow,
 		red: STRIPE.red,
-		running: 'animate-pulse bg-lane-running-foreground/50',
+		running: 'motion-safe:animate-pulse bg-lane-running-foreground/50',
 		waiting: 'bg-muted-foreground/30',
 		carried: 'bg-muted-foreground/25'
 	};

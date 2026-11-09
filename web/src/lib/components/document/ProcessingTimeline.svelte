@@ -69,7 +69,8 @@
 		green: DOT.green,
 		yellow: DOT.yellow,
 		red: DOT.red,
-		running: 'animate-pulse border-[1.5px] border-lane-running-foreground bg-lane-running',
+		running:
+			'motion-safe:animate-pulse border-[1.5px] border-lane-running-foreground bg-lane-running',
 		waiting: 'border-2 border-dashed border-muted-foreground'
 	};
 	const rails: Record<Line, string> = {

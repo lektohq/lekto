@@ -37,7 +37,7 @@
 		switch (state.status) {
 			case 'running':
 			case 'delegated':
-				return 'animate-pulse bg-primary/50';
+				return 'motion-safe:animate-pulse bg-primary/50';
 			case 'skipped':
 				return 'bg-muted-foreground/25';
 			case 'waiting':
