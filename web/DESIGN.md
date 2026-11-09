@@ -822,7 +822,7 @@ screen like every editor (Tobi, 09.11.2026).
 ### Intake channels
 
 The page "System" has a tab "Eingangskanäle" for admins only (Tobi, 04.11.2026); other users do
-not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Postfach anlegen"
+not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Neues Postfach"
 (`default`) at its end, then the mailboxes as cards in a column (see [Lists](#lists)):
 
 - **The row of a mailbox:** its name opens its page (Tobi, 06.11.2026; the whole row is the
@@ -1138,6 +1138,8 @@ Every text a user reads is in `messages/en.json` and `messages/de.json` (`no-raw
 - Short sentences, active voice, no jargon a user does not know. Technical reasons from the API
   are translated (`x-reasons`).
 - Buttons are verbs or verb phrases ("Als gesehen markieren", not "Gesehen").
+  The one form of a noun: the action that creates in the head of a page or list is "Neue/r/s X"
+  ("Neue Regel", "Neuer Webhook", "Neues Postfach"; Tobi, 09.11.2026); elsewhere "Anlegen".
 
 ### Words
 
