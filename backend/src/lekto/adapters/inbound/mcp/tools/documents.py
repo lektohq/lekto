@@ -12,7 +12,7 @@ from mcp.server.mcpserver import Context, Image
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.context import ApiContext
-from lekto.adapters.inbound.mcp.names import Names
+from lekto.adapters.inbound.mcp.names import FORMER_ACCOUNT, Names
 from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
 from lekto.adapters.inbound.mcp.tools.spaces import space_name
@@ -182,6 +182,16 @@ class RetryOut(BaseModel):
     status: str
 
 
+# The values of a change, once for `ChangesIn` and the parameters of `documents_update` (the
+# tool's schema): plain aliases, so that the schema names no definitions of its own.
+TitleIn = Annotated[str, Field(min_length=1, max_length=MAX_TITLE, default_factory=lambda: UNSET)]
+NameIn = Annotated[str | None, Field(default_factory=lambda: UNSET)]
+TagsIn = Annotated[list[str], Field(default_factory=lambda: UNSET, max_length=50)]
+DateIn = Annotated[date | None, Field(default_factory=lambda: UNSET)]
+FieldsIn = Annotated[dict[str, Any], Field(default_factory=lambda: UNSET)]
+CreatedIn = Annotated[AwareDatetime, Field(default_factory=lambda: UNSET)]
+
+
 class ChangesIn(BaseModel):
     """A change of a document as `documents_update` takes it (and `inbox_confirm` in
     `changes`): what is left out is `UNSET` (pydantic neither checks a `default_factory`'s
@@ -189,14 +199,14 @@ class ChangesIn(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    title: Annotated[str, Field(min_length=1, max_length=MAX_TITLE, default_factory=lambda: UNSET)]
-    contact: Annotated[str | None, Field(default_factory=lambda: UNSET)]
-    document_type: Annotated[str | None, Field(default_factory=lambda: UNSET)]
-    topic: Annotated[str | None, Field(default_factory=lambda: UNSET)]
-    tags: Annotated[list[str], Field(default_factory=lambda: UNSET, max_length=50)]
-    document_date: Annotated[date | None, Field(default_factory=lambda: UNSET)]
-    fields: Annotated[dict[str, Any], Field(default_factory=lambda: UNSET)]
-    created_at: Annotated[AwareDatetime, Field(default_factory=lambda: UNSET)]
+    title: TitleIn
+    contact: NameIn
+    document_type: NameIn
+    topic: NameIn
+    tags: TagsIn
+    document_date: DateIn
+    fields: FieldsIn
+    created_at: CreatedIn
 
 
 def add_document_tools(tools: Tools, context: ApiContext) -> None:
@@ -386,21 +396,20 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
     async def documents_update(
         ctx: Context,
         id: str,
-        title: Annotated[
-            str, Field(min_length=1, max_length=MAX_TITLE, default_factory=lambda: UNSET)
-        ],
-        contact: Annotated[str | None, Field(default_factory=lambda: UNSET)],
-        document_type: Annotated[str | None, Field(default_factory=lambda: UNSET)],
-        topic: Annotated[str | None, Field(default_factory=lambda: UNSET)],
-        tags: Annotated[list[str], Field(default_factory=lambda: UNSET, max_length=50)],
-        document_date: Annotated[date | None, Field(default_factory=lambda: UNSET)],
-        fields: Annotated[dict[str, Any], Field(default_factory=lambda: UNSET)],
-        created_at: Annotated[AwareDatetime, Field(default_factory=lambda: UNSET)],
+        title: TitleIn,
+        contact: NameIn,
+        document_type: NameIn,
+        topic: NameIn,
+        tags: TagsIn,
+        document_date: DateIn,
+        fields: FieldsIn,
+        created_at: CreatedIn,
         dry_run: bool = False,
     ) -> str:
         principal = principal_of(ctx)
         user = principal.id
         names = await Names.load(context, user)
+        # The parameters were checked as `ChangesIn` checks its fields (the same aliases).
         given = ChangesIn.model_construct(
             title=title,
             contact=contact,
@@ -538,7 +547,7 @@ def log_out(entry: NodeRun, users: dict[UserId, str]) -> LogEntryOut:
         at=entry.started_at,
         reason=result.reason,
         model=result.model_version,
-        by=None if not isinstance(by, str) else users.get(UserId(UUID(by)), "a former account"),
+        by=None if not isinstance(by, str) else users.get(UserId(UUID(by)), FORMER_ACCOUNT),
         via_token=via.get("name") if isinstance(via, dict) else None,  # type: ignore[arg-type]
     )
 

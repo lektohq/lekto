@@ -141,6 +141,14 @@ class DocumentListSort(StrEnum):
         )
 
 
+# The list's keys are the search's and `field`: one key more must reach both (fails at import).
+if {key.value for key in DocumentListSort} != {key.value for key in DocumentSort} | {
+    "field",
+    "-field",
+}:
+    raise RuntimeError("DocumentListSort must hold the keys of DocumentSort and field")
+
+
 _UPLOAD_BODY = upload_body(
     "PDF, JPEG, PNG, TIFF or a mail (`.eml`); recognised by content.", **UploadFields.form_schema()
 )

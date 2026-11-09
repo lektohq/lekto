@@ -11,11 +11,17 @@ from mcp.server.mcpserver import Context
 from pydantic import BaseModel, Field
 
 from lekto.adapters.inbound.context import ApiContext
-from lekto.adapters.inbound.mcp.names import Names, similar_names
+from lekto.adapters.inbound.mcp.names import (
+    Names,
+    identifier_kind,
+    member_labels,
+    similar_names,
+    space_label,
+)
 from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
 from lekto.core.domain.errors import ValidationError
-from lekto.core.domain.identifiers import IdentifierKind, normalise_identifier
+from lekto.core.domain.identifiers import normalise_identifier
 from lekto.core.domain.ids import UserId, short_id
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.open_identifiers import OpenSource
@@ -119,7 +125,7 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
         ctx: Context, kind: str, value: Annotated[str, Field(min_length=1, max_length=200)]
     ) -> str:
         user = principal_of(ctx).id
-        chosen = _kind(kind)
+        chosen = identifier_kind(kind, "identifier")
         normal = normalise_identifier(chosen, value)
         holders = [
             contact.name
@@ -286,28 +292,11 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
         )
 
 
-def _kind(name: str) -> IdentifierKind:
-    try:
-        return IdentifierKind(name.strip().lower())
-    except ValueError:
-        alike = similar_names(name, [kind.value for kind in IdentifierKind])
-        hint = f"; similar: {', '.join(alike)}" if alike else ""
-        raise ValidationError(f"no kind of identifier named '{name}'{hint}") from None
-
-
 async def _spaces(context: ApiContext, user: UserId) -> dict[UUID, tuple[Space, str]]:
     """The caller's spaces with how they read them (a personal one by its person's name)."""
     spaces = await context.spaces.list_spaces(user)
-    people = await context.spaces.members(user, spaces)
-    return {
-        space.id: (
-            space,
-            people[space.personal_of].label
-            if space.personal_of is not None and space.personal_of in people
-            else space.name,
-        )
-        for space in spaces
-    }
+    people = await member_labels(context, user, spaces)
+    return {space.id: (space, space_label(space, people)) for space in spaces}
 
 
 def _rule(rule: Rule, spaces: dict[UUID, tuple[Space, str]]) -> RuleOut:
