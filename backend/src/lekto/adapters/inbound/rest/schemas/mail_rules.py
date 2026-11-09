@@ -13,7 +13,7 @@ from lekto.core.domain.condition_tree import MAX_CONDITIONS, MAX_DEPTH
 from lekto.core.domain.ids import DocumentTypeId, SpaceId, UserId
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.mail import MAX_FOLDER, MAX_STEPS, MailAction, MailStep
-from lekto.core.domain.mail_intake import MailOutcome, MailParts
+from lekto.core.domain.mail_intake import KEPT_RECORDS, MailOutcome, MailParts
 from lekto.core.domain.mail_rules import (
     MAX_PRIORITY,
     MAX_VALUE,
@@ -231,7 +231,7 @@ class DryRunMailOut(BaseModel):
         description=(
             "No rule took it yet: the next fetch gives it to the rule that decides it now (never "
             "to the fallback), as long as it lies in its folder and is among the mailbox's "
-            "latest 500."
+            f"latest {KEPT_RECORDS}."
         )
     )
 

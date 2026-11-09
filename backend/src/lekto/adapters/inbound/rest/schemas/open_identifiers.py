@@ -7,6 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.limits import in_words
 from lekto.adapters.inbound.rest.schemas.inbox import LocationOut
 from lekto.adapters.inbound.rest.schemas.refs import seal
 from lekto.adapters.inbound.schemas import ReasonOut
@@ -28,7 +29,7 @@ from lekto.core.services.open_identifiers import (
     OpenDetail,
     OpenPage,
 )
-from lekto.core.services.places import Place
+from lekto.core.services.places import PLACES, Place
 
 MAX_DECISIONS = 200
 
@@ -201,12 +202,16 @@ class PlaceOut(BaseModel):
 
 
 class PlacesOut(BaseModel):
-    places: list[PlaceOut] = Field(description="The newest documents first, at most five.")
+    places: list[PlaceOut] = Field(
+        description=f"The newest documents first, at most {in_words(PLACES)}."
+    )
 
 
 class OpenDetailOut(BaseModel):
     identifier: OpenIdentifierOut
-    places: list[PlaceOut] = Field(description="Where it stands in its newest documents (5).")
+    places: list[PlaceOut] = Field(
+        description=f"Where it stands in its newest documents ({PLACES})."
+    )
 
     @classmethod
     def of(cls, detail: OpenDetail, refs: RefCipher) -> "OpenDetailOut":

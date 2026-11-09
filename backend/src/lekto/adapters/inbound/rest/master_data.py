@@ -11,6 +11,7 @@ from uuid import UUID
 from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel
 
+from lekto.adapters.inbound.limits import in_words
 from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
 from lekto.adapters.inbound.rest.context import ApiContext, Context
 from lekto.adapters.inbound.rest.params import ADMINS_ONLY, CountAll, DocumentCounts
@@ -39,7 +40,8 @@ from lekto.core.domain.documents import UNSET, Unset
 from lekto.core.domain.identifiers import Identifier
 from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, TagId, UserId
 from lekto.core.domain.master_data import MasterData, TagScope
-from lekto.core.domain.tag_tree import TagTree
+from lekto.core.domain.tag_tree import MAX_LEVELS, TagTree
+from lekto.core.ports.images import LOGO_SIZE
 from lekto.core.ports.repository import CountBy
 from lekto.core.services.logos import LOGO_MAX_SIZE, LOGO_TYPE
 from lekto.core.services.master_data import MasterDataService
@@ -292,9 +294,12 @@ _LOGO_BODY = upload_body(
     "/{id}/logo",
     summary="Upload a contact's logo",
     description=(
-        ADMINS_ONLY + " One part `file`: a PNG, JPEG or WebP image of at most 1 MiB (413 "
+        ADMINS_ONLY
+        + f" One part `file`: a PNG, JPEG or WebP image of at most {LOGO_MAX_SIZE // 1024**2} MiB "
+        "(413 "
         "otherwise); another kind, SVG among them, is 415, an image that cannot be read 422. "
-        "Lekto keeps it scaled to fit 128 px as WebP, in place of any other logo; a fetched "
+        f"Lekto keeps it scaled to fit {LOGO_SIZE} px as WebP, in place of any other logo; a "
+        "fetched "
         "one never replaces it."
     ),
     response_model=ContactOut,
@@ -348,7 +353,7 @@ async def fetch_logo(id: UUID, user: CurrentUser, context: Context) -> Response:
     "/{id}/logo",
     summary="A contact's logo",
     description=(
-        "Everyone reads it (master data is global): WebP, up to 128 px. Unlike the API's "
+        f"Everyone reads it (master data is global): WebP, up to {LOGO_SIZE} px. Unlike the API's "
         "other answers it may be cached (`Cache-Control: private, max-age=86400`): its URL "
         "in `ContactOut.logo.url` carries its version. 404 without a logo."
     ),
@@ -476,7 +481,8 @@ async def get_tag(id: UUID, user: CurrentUser, context: Context) -> TagOut:
     summary="Change a tag",
     description=(
         ADMINS_ONLY + " Name, parent (of the same scope, not below the tag itself; at most "
-        "five levels), assignment, whether documents show it, icon and colour. The scope "
+        f"{in_words(MAX_LEVELS)} levels), assignment, whether documents show it, icon and colour. "
+        "The scope "
         "stays. A new name or parent brings the search index of the documents concerned up to "
         "date. After a new parent, a job leaves documents (for a group: contacts or document "
         "types) that carry the tag and one now above it only the one below; a topic needs "

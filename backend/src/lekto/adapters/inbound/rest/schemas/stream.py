@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from lekto.core.domain.documents import Document
 from lekto.core.domain.pipeline import Lane as DocumentLane
 from lekto.core.domain.series import Cadence, SeriesState
-from lekto.core.services.stream import Lane, LaneKind, Stream
+from lekto.core.services.stream import LIMIT, MAX_LANES, Lane, LaneKind, Stream
 
 
 class StreamDocumentOut(BaseModel):
@@ -67,7 +67,8 @@ class StreamLaneOut(BaseModel):
         description="Of a branch: the document of the series (or its target) it refers to."
     )
     folded: bool = Field(
-        description="Beyond 24 lanes of series and chains, the rest (with their branches): shown "
+        description=f"Beyond {MAX_LANES} lanes of series and chains, the rest (with their "
+        "branches): shown "
         "on demand."
     )
 
@@ -102,7 +103,7 @@ class StreamLaneOut(BaseModel):
 class StreamOut(BaseModel):
     lanes: list[StreamLaneOut]
     truncated: bool = Field(
-        description="More documents than a stream shows (500, the newest): a narrower filter "
+        description=f"More documents than a stream shows ({LIMIT}, the newest): a narrower filter "
         "shows it whole."
     )
 
