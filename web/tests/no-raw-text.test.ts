@@ -74,3 +74,23 @@ describe('markup', () => {
 		expect(findings('<p>{m.x()} · {m.app_name()}</p><p>42</p>')).toEqual([]);
 	});
 });
+
+// Quotation marks belong to the language (`m.rule_quoted`, `quoted` in `lib/i18n.ts`): no „…“ or
+// “…” in code, comments aside.
+const code = import.meta.glob<string>(
+	['/src/**/*.svelte', '/src/**/*.ts', '!/src/**/*.test.ts', '!/src/lib/paraglide/**'],
+	{ query: '?raw', import: 'default', eager: true }
+);
+
+describe('quotation marks', () => {
+	it('come from the messages, never from code', () => {
+		const found = Object.entries(code).flatMap(([path, source]) => {
+			const bare = source
+				.replace(/\/\*[\s\S]*?\*\//g, '')
+				.replace(/<!--[\s\S]*?-->/g, '')
+				.replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+			return /[„“”‚‘]/.test(bare) ? [path] : [];
+		});
+		expect(found).toEqual([]);
+	});
+});

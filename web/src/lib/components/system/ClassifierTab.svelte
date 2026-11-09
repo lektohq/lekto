@@ -14,7 +14,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { events } from '#lib/events.svelte.ts';
-	import { formatDate, formatNumber } from '#lib/i18n.ts';
+	import { browserZone, formatDate, formatMoment, formatNumber, formatPercent } from '#lib/i18n.ts';
 	import { NODE_LABELS } from '#lib/node-labels.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { session } from '#lib/session.svelte.ts';
@@ -41,7 +41,7 @@
 		contact: { label: m.field_contact(), color: 'var(--primary)' },
 		document_type: { label: m.field_document_type(), color: 'var(--chart-4)' }
 	} satisfies Chart.ChartConfig;
-	const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+	const zone = browserZone();
 
 	let status = $state<Status | null>(null);
 	let models = $state<Model[]>([]);
@@ -91,8 +91,7 @@
 	}
 
 	const percent = (value: number | null | undefined) =>
-		value == null ? '–' : formatNumber(value, { style: 'percent', maximumFractionDigits: 0 });
-	const when = (value: string) => formatDate(value, { dateStyle: 'medium', timeStyle: 'short' });
+		value == null ? '–' : formatPercent(value);
 
 	const measured = $derived(
 		models
@@ -196,7 +195,7 @@
 							<span class="text-meta text-muted-foreground">
 								{model.examples_until
 									? m.classifier_model_trained_until({
-											date: when(model.trained_at),
+											date: formatMoment(model.trained_at),
 											examples: formatNumber(model.examples),
 											until: formatDate(model.examples_until, {
 												day: 'numeric',
@@ -206,7 +205,7 @@
 											})
 										})
 									: m.classifier_model_trained({
-											date: when(model.trained_at),
+											date: formatMoment(model.trained_at),
 											examples: formatNumber(model.examples)
 										})}
 							</span>

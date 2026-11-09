@@ -5,6 +5,7 @@
  * its other texts (problem details) stay as the API sends them.
  */
 import { isIsoDay, localDay } from '#lib/dates.ts';
+import { m } from '#lib/paraglide/messages.js';
 import { getLocale, locales, setLocale, type Locale } from '#lib/paraglide/runtime.js';
 
 export { getLocale, locales, type Locale };
@@ -35,16 +36,32 @@ function formatLocale(): string {
 	return regionalLocale(getLocale());
 }
 
+/** The locale for lists ("A, B und C"), the same as for dates and numbers. */
+export function listLocale(): string {
+	return formatLocale();
+}
+
+/** The browser's time zone (`Europe/Berlin`), which the API needs to count by its days. */
+export function browserZone(): string {
+	return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+/** A text quoted as the language quotes („…“, “…”). */
+export function quoted(text: string): string {
+	return m.rule_quoted({ text });
+}
+
+/** A moment with its time: `medium` "5. Nov. 2026, 14:03", as the lists of fetches and origins
+ * show it; `short` "05.11.26, 14:03", for the rows of tables. */
+export function formatMoment(value: Date | string, style: 'medium' | 'short' = 'medium'): string {
+	return formatDate(value, { dateStyle: style, timeStyle: 'short' });
+}
+
 /**
  * A date (and optionally time) in the user's format. A day (`2026-10-01`) stays that calendar
  * day in every time zone; a moment is shown in the browser's time. Text that is no date comes
  * back as it is.
  */
-/** A moment with its time ("5. Nov. 2026, 14:03"), as the lists of fetches and origins show it. */
-export function formatMoment(value: Date | string): string {
-	return formatDate(value, { dateStyle: 'medium', timeStyle: 'short' });
-}
-
 export function formatDate(
 	value: Date | string,
 	options: Intl.DateTimeFormatOptions = { dateStyle: 'medium' }

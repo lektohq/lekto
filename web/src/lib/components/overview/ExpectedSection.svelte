@@ -7,7 +7,7 @@
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { describeError } from '#lib/errors.ts';
-	import { formatDate } from '#lib/i18n.ts';
+	import { browserZone, formatDate } from '#lib/i18n.ts';
 	import { labelOfKind } from '#lib/identifiers.ts';
 	import { openBeam } from '#lib/beam.svelte.ts';
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
@@ -31,7 +31,7 @@
 	let problem = $state<string | null>(null);
 	let attempt = $state(0);
 	// Overdue as the day is here.
-	const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+	const zone = browserZone();
 
 	$effect(() => {
 		const allUsers = scope.query;

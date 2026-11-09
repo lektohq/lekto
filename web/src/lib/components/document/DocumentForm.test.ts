@@ -328,7 +328,7 @@ describe('DocumentForm', () => {
 		expect(within(card).getAllByText(m.candidate_contradicted())).toHaveLength(1);
 		expect(within(card).getByText(m.candidate_named())).toBeTruthy();
 		// The model's quote is read out, not only shown on hover.
-		expect(within(card).getByText(': „Stadtwerk“')).toBeTruthy();
+		expect(within(card).getByText(`: ${m.rule_quoted({ text: 'Stadtwerk' })}`)).toBeTruthy();
 		expect(within(card).getByText(m.candidate_new())).toBeTruthy();
 		expect(within(card).getByText(m.candidate_neighbours({ votes: 2, found: 3 }))).toBeTruthy();
 		// A similar document shows in the Beam: a button, no link out of the document checked.

@@ -8,7 +8,7 @@ import type { components } from '#lib/api/schema.ts';
 import { fieldLabel } from '#lib/describe.ts';
 import { fieldTypeLabel, isFieldType } from '#lib/fields.ts';
 import { labelOfKind } from '#lib/identifiers.ts';
-import { formatDate, formatNumber, formatPercent, getLocale, regionalLocale } from '#lib/i18n.ts';
+import { formatDate, formatNumber, formatPercent, listLocale, quoted } from '#lib/i18n.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { NODE_LABELS } from '#lib/node-labels.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -570,14 +570,6 @@ const ACTIONS: Record<string, () => string> = {
 	turn_off_own_totp: m.action_turn_off_own_totp,
 	manage_mailboxes: m.action_manage_mailboxes
 };
-
-function listLocale(): string {
-	return regionalLocale(getLocale());
-}
-
-function quoted(text: string): string {
-	return m.rule_quoted({ text });
-}
 
 /** A field's value as a reason shows it: yes or no, not set, a name or text quoted as the
  * language quotes. */

@@ -682,6 +682,18 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(offenders((source) => line(source, /\bgap-4 sm:gap-6\b/))).toEqual([]);
 	});
 
+	it('formats in the language of the UI through lib/i18n.ts, never by a locale of its own', () => {
+		// DESIGN.md, "Formats": dates, numbers and lists follow the UI language.
+		const own =
+			/resolvedOptions\(\)\.timeZone|documentElement\.lang\b(?!\s*=)|toLocaleDateString\(/;
+		const allowed = new Set(['/src/lib/i18n.ts', '/src/lib/dates.ts']);
+		expect(
+			[...Object.entries(sources), ...Object.entries(scripts)]
+				.filter(([path, source]) => !allowed.has(path) && own.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
 	it('shows the owl only where a moment is rare: sign-in, not found, nothing waiting, no document', () => {
 		expect(
 			offenders((source, path) => (MASCOT.has(path) ? null : line(source, /<Mascot\b/)))
