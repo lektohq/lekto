@@ -14,6 +14,11 @@
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import Chip from '#lib/components/Chip.svelte';
+	import ChipInput from '#lib/components/ChipInput.svelte';
+	import { MASTER_LIMITS } from '#lib/masterdata-api.ts';
+	import MultiPicker from '#lib/components/MultiPicker.svelte';
+	import SearchField from '#lib/components/SearchField.svelte';
+	import SecretDialog from '#lib/components/SecretDialog.svelte';
 	import DateInput from '#lib/components/DateInput.svelte';
 	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import FoldedGroup from '#lib/components/FoldedGroup.svelte';
@@ -69,7 +74,13 @@
 	const BUTTONS = ['default', 'secondary', 'outline', 'ghost', 'destructive', 'link'] as const;
 	const TONES: Tone[] = ['green', 'yellow', 'red', 'running', 'muted', 'note', 'primary'];
 	const CHIPS = ['neutral', 'outline', 'selected', 'add'] as const;
-	const CARDS = ['row', 'sm', 'md', 'lg'] as const;
+	const CARDS = ['row', 'sm', 'md', 'lg', 'flush'] as const;
+	// Fields that hold several values or search.
+	let words = $state('');
+	let secret = $state<string | null>(null);
+	let aliases = $state<string[]>(['Stadtwerke', 'SWM']);
+	let folders = $state<string[]>(['INBOX']);
+	const FOLDERS = ['INBOX', 'Archiv', 'Rechnungen'].map((value) => ({ value, label: value }));
 	const DIALOGS = ['sm', 'md', 'lg', 'xl'] as const;
 	const ALERTS = ['default', 'note', 'tip', 'warning', 'caution'] as const;
 	/** The toggle chip, named by its prop. */
@@ -139,6 +150,7 @@
 				{m.dev_sample_button()}
 			</Button>
 			<Button size="sm" variant="outline">{m.dev_sample_button()}</Button>
+			<Button size="inline" variant="link">{m.dev_sample_button()}</Button>
 			<IconButton label={m.dev_sample_button()}><Pencil aria-hidden="true" /></IconButton>
 			<IconButton label={m.dev_sample_button()} variant="outline">
 				<Pencil aria-hidden="true" />
@@ -151,7 +163,7 @@
 
 	<section class="flex flex-col gap-3" aria-labelledby="dev-badges">
 		<SectionTitle id="dev-badges">{m.dev_section_badges()}</SectionTitle>
-		{#each ['sm', 'md'] as const as size (size)}
+		{#each ['sm', 'md', 'lg'] as const as size (size)}
 			<div class="flex flex-wrap items-center gap-2">
 				{#each TONES as tone (tone)}
 					<Badge variant={tone} {size}>{tone}</Badge>
@@ -250,6 +262,25 @@
 			<Field.Label for="sample-text">{m.dev_sample_input()}</Field.Label>
 			<Textarea id="sample-text" />
 		</Field.Field>
+		<SearchField bind:value={words} label={m.dev_sample_search_select()} />
+		<SearchField bind:value={words} label={m.dev_sample_search_select()} size="sm" />
+		<Field.Field>
+			<Field.Label id="sample-chips">{m.dev_sample_input()}</Field.Label>
+			<ChipInput
+				bind:values={aliases}
+				labelledby="sample-chips"
+				addLabel={m.dev_sample_button()}
+				inputLabel={m.dev_sample_input()}
+				maxlength={MASTER_LIMITS.alias}
+				max={MASTER_LIMITS.aliases}
+			/>
+		</Field.Field>
+		<MultiPicker
+			label={m.dev_sample_option()}
+			options={FOLDERS}
+			selected={folders}
+			onchange={(next) => (folders = next)}
+		/>
 		<Choice bind:checked>{m.dev_sample_option()}</Choice>
 		<div class="flex flex-col gap-2">
 			<Choice type="radio" name="sample" value="one" bind:group={radio}>
@@ -436,6 +467,15 @@
 				<Trash2 aria-hidden="true" />
 				{m.delete_title()}
 			</Button>
+			<Button variant="outline" onclick={() => (secret = 'lekto_example_0000000000')}>
+				{m.dev_sample_button()}
+			</Button>
+			<SecretDialog
+				{secret}
+				title={m.dev_section_dialogs()}
+				description={m.dev_sample_dialog_text()}
+				onclose={() => (secret = null)}
+			/>
 			<ConfirmDialog
 				bind:open={confirming}
 				title={m.delete_title()}
