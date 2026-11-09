@@ -3,10 +3,12 @@
  * retry when the CSRF token went stale, and a hook for an expired sign-in.
  */
 
+import { BASE_API } from '#lib/api/base.ts';
+
 export const CSRF_HEADER = 'X-CSRF-Token';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 // Answers 401 here are part of signing in or out, not an expired session to report.
-const SIGN_IN_PATHS = ['/api/v1/auth/login', '/api/v1/auth/me', '/api/v1/auth/logout'];
+const SIGN_IN_PATHS = ['login', 'me', 'logout'].map((path) => `${BASE_API}/auth/${path}`);
 
 export interface SessionHooks {
 	/** The CSRF token of the current session, if any. */
