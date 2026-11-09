@@ -132,7 +132,12 @@
 							<span
 								class={cn('inline-block align-middle', mark(cell.kind, row.open))}
 								role="img"
-								aria-label={`${NODE_LABELS[cell.signal]()}: ${word(cell.kind, row.open)}`}
+								aria-label={[
+									`${NODE_LABELS[cell.signal]()}: ${word(cell.kind, row.open)}`,
+									cell.title
+								]
+									.filter(Boolean)
+									.join(' – ')}
 							></span>
 						</Table.Cell>
 					{/each}
