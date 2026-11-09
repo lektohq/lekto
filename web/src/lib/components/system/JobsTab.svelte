@@ -231,8 +231,8 @@
 			{#each [['running', m.jobs_hint_running()], ['due', m.jobs_hint_due()], ['planned', m.jobs_hint_planned()], ['failed', m.jobs_hint_kept( { date: keptSince } )], ['done', m.jobs_hint_kept( { date: keptSince } )]] as const as [state, hint] (state)}
 				<div
 					class={cn(
-						cardVariants({ size: 'flush' }),
-						'flex flex-col gap-0.5 px-4 py-3.5',
+						cardVariants({ size: 'sm' }),
+						'flex flex-col gap-0.5',
 						state === 'failed' &&
 							all.failed > 0 &&
 							'border-lane-red-foreground/35 bg-lane-red text-lane-red-foreground',

@@ -5,11 +5,11 @@ import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import UserManage from './UserManage.svelte';
-import { json } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 
 vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 
 const account = {
 	id: 'bob',
@@ -41,7 +41,7 @@ beforeEach(() => {
 		expires_at: '2026-10-14T12:00:00Z',
 		csrf_token: 'token'
 	});
-	fetchMock.mockReset();
+	fetchMock = fakeApi();
 	fetchMock.mockImplementation(async (request) => {
 		const path = new URL(request.url).pathname;
 		if (request.method === 'PATCH') {

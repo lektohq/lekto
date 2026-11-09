@@ -52,7 +52,9 @@ test('a webhook is created, tested, changed and deleted', async ({ page }) => {
 	await expect(page.getByText('No deliveries yet.')).toBeVisible();
 	await page.getByRole('button', { name: 'Send test' }).click();
 	await expect(page.getByText(/^Test failed/)).toBeVisible();
-	await expect(page.getByRole('cell', { name: /Attempt 1/ })).toBeVisible();
+	// A test is sent once: its row says what came of it, the next row why.
+	await expect(page.getByRole('cell', { name: 'Gave up' })).toBeVisible();
+	await expect(page.getByRole('cell', { name: 'cannot connect' })).toBeVisible();
 
 	// Changed on the edit page: the stored header keeps its value, signing stops, a new name.
 	await page.getByRole('link', { name: 'Edit' }).click();

@@ -4,7 +4,7 @@ import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import TagsPanel from './TagsPanel.svelte';
-import { json } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 
 const nav = vi.hoisted(() => ({
 	url: new URL('http://lekto/ui/admin/master-data?tab=tags'),
@@ -19,7 +19,7 @@ vi.mock('$app/state', () => ({
 }));
 vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: nav.goto }));
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 
 function tag(id: string, path: string[], parent: string | null, scope: string, extra: object = {}) {
 	return {
@@ -53,7 +53,7 @@ beforeEach(() => {
 	nav.url = new URL('http://lekto/ui/admin/master-data?tab=tags');
 	nav.goto.mockReset();
 	localStorage.clear();
-	fetchMock.mockReset();
+	fetchMock = fakeApi();
 	fetchMock.mockImplementation(async (request) => {
 		const url = new URL(request.url);
 		if (url.pathname === '/api/v1/tags') {

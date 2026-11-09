@@ -6,11 +6,11 @@ import { m } from '#lib/paraglide/messages.js';
 import { choose, selectedValue } from '#lib/testing/select.ts';
 import { session } from '#lib/session.svelte.ts';
 import WebhookForm from './WebhookForm.svelte';
-import { json } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 
 type Webhook = components['schemas']['WebhookOut'];
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 const sent: { method: string; path: string; body: unknown }[] = [];
 
 const stored: Webhook = {
@@ -42,7 +42,7 @@ beforeEach(() => {
 		csrf_token: 'token'
 	});
 	sent.length = 0;
-	fetchMock.mockReset();
+	fetchMock = fakeApi();
 	fetchMock.mockImplementation(async (request) => {
 		const path = new URL(request.url).pathname;
 		const body = request.method === 'DELETE' ? null : await request.json().catch(() => null);

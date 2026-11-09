@@ -1,12 +1,14 @@
 import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fakeApi } from '#lib/testing/api.ts';
 import { formatDate, formatNumber } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { localMinute } from '#lib/file-passport.ts';
 import DocumentFiles from './DocumentFiles.svelte';
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let files: object = {};
+let fetchMock = fakeApi();
 
 const SHA = 'a'.repeat(64);
 const FILES = {
@@ -33,7 +35,11 @@ const FILES = {
 };
 
 beforeEach(() => {
-	fetchMock.mockReset();
+	files = FILES;
+	fetchMock = fakeApi({
+		'GET /api/v1/documents/doc-1/files': () => files,
+		'PATCH /api/v1/documents/doc-1': () => ({})
+	});
 	vi.stubGlobal('fetch', fetchMock);
 });
 
@@ -51,7 +57,7 @@ describe('DocumentFiles', () => {
 				]
 			}
 		};
-		fetchMock.mockImplementation(async () => Response.json({ ...FILES, original }));
+		files = { ...FILES, original };
 		render(DocumentFiles, { documentId: 'doc-1' });
 		const life = await screen.findByRole('list');
 		expect(
@@ -83,7 +89,7 @@ describe('DocumentFiles', () => {
 				entries: [{ source: 'xmp', key: 'pdfaid:part', value: '2' }]
 			}
 		};
-		fetchMock.mockImplementation(async () => Response.json({ ...FILES, archive }));
+		files = { ...FILES, archive };
 		render(DocumentFiles, { documentId: 'doc-1' });
 		const table = await screen.findByRole('table');
 		expect(table.querySelectorAll('col')).toHaveLength(3);
@@ -98,7 +104,7 @@ describe('DocumentFiles', () => {
 
 	it('ends the life with a review still to come, and says how long lay between the steps', async () => {
 		vi.useFakeTimers({ now: new Date('2026-07-09T10:12:00Z'), toFake: ['Date'] });
-		fetchMock.mockImplementation(async () => Response.json(FILES));
+		files = FILES;
 		render(DocumentFiles, {
 			documentId: 'doc-1',
 			document: {
@@ -135,7 +141,7 @@ describe('DocumentFiles', () => {
 	});
 
 	it('says how the first processing ended, whatever a person decided since', async () => {
-		fetchMock.mockImplementation(async () => Response.json(FILES));
+		files = FILES;
 		const document = {
 			lane: 'green' as const,
 			first_lane: 'yellow' as const,
@@ -152,9 +158,6 @@ describe('DocumentFiles', () => {
 	});
 
 	it('sets anew when the document came in, at its milestone', async () => {
-		fetchMock.mockImplementation(async (request) =>
-			request.method === 'PATCH' ? Response.json({}) : Response.json(FILES)
-		);
 		const onchanged = vi.fn();
 		render(DocumentFiles, { documentId: 'doc-1', editable: true, onchanged });
 		await userEvent.click(await screen.findByRole('button', { name: m.files_received_edit() }));
@@ -172,23 +175,20 @@ describe('DocumentFiles', () => {
 		const patch = fetchMock.mock.calls
 			.map(([request]) => request)
 			.find((r) => r.method === 'PATCH')!;
-		expect(new URL(patch.url).pathname).toBe('/api/v1/documents/doc-1');
 		expect(await patch.json()).toEqual({
 			created_at: new Date('2026-06-30T09:15').toISOString()
 		});
 	});
 
 	it('offers no pencil to someone who may not change the document', async () => {
-		fetchMock.mockImplementation(async () => Response.json(FILES));
+		files = FILES;
 		render(DocumentFiles, { documentId: 'doc-1' });
 		await screen.findByRole('list');
 		expect(screen.queryByRole('button', { name: m.files_received_edit() })).toBeNull();
 	});
 
 	it('says when a file’s metadata cannot be read', async () => {
-		fetchMock.mockImplementation(async () =>
-			Response.json({ ...FILES, original: { ...FILES.original, metadata: null } })
-		);
+		files = { ...FILES, original: { ...FILES.original, metadata: null } };
 		render(DocumentFiles, { documentId: 'doc-1' });
 		expect((await screen.findAllByText(m.files_unreadable())).length).toBeGreaterThan(0);
 	});

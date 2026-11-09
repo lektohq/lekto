@@ -4,6 +4,7 @@ import { scope } from '#lib/scope.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import { summaryOf } from '#lib/testing/documents.ts';
 import { badgeLabel, badgeText, badgeTone, inbox } from './inbox.svelte.ts';
+import { calls, fakeApi } from '#lib/testing/api.ts';
 
 const summary = summaryOf;
 
@@ -45,7 +46,7 @@ describe('inbox badge', () => {
 });
 
 describe('inbox summary', () => {
-	const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+	let api = fakeApi();
 
 	beforeEach(() => {
 		session.start({
@@ -54,14 +55,8 @@ describe('inbox summary', () => {
 			expires_at: '2026-10-18T12:00:00Z',
 			csrf_token: 'token'
 		});
-		fetchMock.mockReset();
-		fetchMock.mockImplementation(
-			async () =>
-				new Response(JSON.stringify(summary({ review: 1 })), {
-					headers: { 'content-type': 'application/json' }
-				})
-		);
-		vi.stubGlobal('fetch', fetchMock);
+		api = fakeApi({ 'GET /api/v1/inbox/summary': () => summary({ review: 1 }) });
+		vi.stubGlobal('fetch', api);
 	});
 
 	afterEach(() => {
@@ -74,9 +69,7 @@ describe('inbox summary', () => {
 	it('is fetched for the scope chosen', async () => {
 		scope.set(true);
 		await inbox.refresh();
-		const url = new URL(fetchMock.mock.calls[0][0].url);
-		expect(url.pathname).toBe('/api/v1/inbox/summary');
-		expect(url.searchParams.get('all_users')).toBe('true');
+		expect(calls(api)[0]).toBe('GET /api/v1/inbox/summary?all_users=true');
 		expect(inbox.open).toBe(1);
 		expect(inbox.summary?.worst_lane).toBe('yellow');
 	});
@@ -84,7 +77,7 @@ describe('inbox summary', () => {
 	it('keeps the last summary while the server cannot be reached', async () => {
 		await inbox.refresh();
 		expect(inbox.open).toBe(1);
-		fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+		api.mockRejectedValue(new TypeError('Failed to fetch'));
 		await expect(inbox.refresh()).resolves.toBeUndefined();
 		expect(inbox.open).toBe(1);
 	});
@@ -94,10 +87,10 @@ describe('inbox summary', () => {
 		try {
 			inbox.start();
 			await vi.runAllTimersAsync();
-			const before = fetchMock.mock.calls.length;
+			const before = api.mock.calls.length;
 			window.dispatchEvent(new Event('focus'));
 			await vi.runAllTimersAsync();
-			expect(fetchMock.mock.calls.length).toBe(before + 1);
+			expect(api.mock.calls.length).toBe(before + 1);
 		} finally {
 			vi.useRealTimers();
 		}

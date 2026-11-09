@@ -81,6 +81,12 @@ async function chooseLabel(field: Locator, label: string) {
 	await field.page().getByRole('option', { name: label, exact: true }).click();
 }
 
+/** Add an action of `label` through the menu of "Add action". */
+async function addAction(page: Page, label: string) {
+	await page.getByRole('button', { name: 'Add action' }).click();
+	await page.getByRole('menuitem', { name: label, exact: true }).click();
+}
+
 async function signIn(page: Page) {
 	await page.goto('/ui/login');
 	await page.getByLabel('Username').fill(ADMIN);
@@ -120,8 +126,12 @@ test('a rule is built, dry-run, applied, changed and deleted', async ({ page }) 
 	await group.getByRole('button', { name: 'Add condition' }).click();
 	await choose(group.getByRole('combobox', { name: 'Subject' }).last(), 'text');
 	await group.getByRole('textbox', { name: 'Value' }).last().fill(NAME);
-	await choose(page.getByRole('combobox', { name: 'Add action' }), 'add_tags');
-	await page.getByRole('group', { name: 'Add tags' }).getByLabel(`${NAME} tag`).check();
+	await addAction(page, 'Add tags');
+	// The tags of an action come from the tag picker, as at a document.
+	await page.getByRole('button', { name: 'Add a tag' }).click();
+	const picker = page.getByRole('dialog', { name: 'Tags' });
+	await picker.getByRole('checkbox', { name: `${NAME} tag` }).check();
+	await picker.getByRole('button', { name: 'Done' }).click();
 	let previews = 0;
 	page.on('request', (request) => {
 		if (request.url().endsWith('/apply/preview')) previews++;

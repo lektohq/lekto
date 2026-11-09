@@ -4,7 +4,7 @@ import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import MasterDataList from './MasterDataList.svelte';
-import { json } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 
 const nav = vi.hoisted(() => ({
 	url: new URL('http://lekto/ui/admin/master-data?tab=contacts'),
@@ -19,7 +19,7 @@ vi.mock('$app/state', () => ({
 }));
 vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: nav.goto }));
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 
 const tag = (id: string, path: string[], parent: string | null, scope: string) => ({
 	id,
@@ -67,7 +67,7 @@ const CONTACTS = [
 beforeEach(() => {
 	nav.url = new URL('http://lekto/ui/admin/master-data?tab=contacts');
 	nav.goto.mockReset();
-	fetchMock.mockReset();
+	fetchMock = fakeApi();
 	fetchMock.mockImplementation(async (request) => {
 		const path = new URL(request.url).pathname;
 		if (path === '/api/v1/contacts') return json(CONTACTS);

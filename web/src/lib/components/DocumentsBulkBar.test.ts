@@ -7,7 +7,7 @@ import { NODE_LABELS } from '#lib/node-labels.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { forgetPipeline } from '#lib/pipeline.ts';
 import { choose } from '#lib/testing/select.ts';
-import { fakeApi } from '#lib/testing/documents.ts';
+import { fakeApi } from '#lib/testing/api.ts';
 import { BulkRun } from '#lib/bulk.svelte.ts';
 import DocumentsBulkBar from './DocumentsBulkBar.svelte';
 

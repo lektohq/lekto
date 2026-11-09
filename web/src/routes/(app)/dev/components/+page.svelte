@@ -15,6 +15,18 @@
 	import Pagination from '#lib/components/Pagination.svelte';
 	import Chip from '#lib/components/Chip.svelte';
 	import ChipInput from '#lib/components/ChipInput.svelte';
+	import ColorPicker from '#lib/components/ColorPicker.svelte';
+	import DetailList from '#lib/components/DetailList.svelte';
+	import DocumentRow from '#lib/components/DocumentRow.svelte';
+	import EditorShell from '#lib/components/EditorShell.svelte';
+	import FilterSection from '#lib/components/FilterSection.svelte';
+	import HintLabel from '#lib/components/HintLabel.svelte';
+	import IconPicker from '#lib/components/IconPicker.svelte';
+	import PeriodInput from '#lib/components/PeriodInput.svelte';
+	import PhoneSheet from '#lib/components/PhoneSheet.svelte';
+	import SortMenu from '#lib/components/SortMenu.svelte';
+	import TagPicker from '#lib/components/TagPicker.svelte';
+	import type { components } from '#lib/api/schema.ts';
 	import { MASTER_LIMITS } from '#lib/masterdata-api.ts';
 	import MultiPicker from '#lib/components/MultiPicker.svelte';
 	import SearchField from '#lib/components/SearchField.svelte';
@@ -78,6 +90,57 @@
 	// Fields that hold several values or search.
 	let words = $state('');
 	let secret = $state<string | null>(null);
+	// The rest of the parts, each once (web/DESIGN.md, Principle 1: every part has its sample).
+	type SampleTag = components['schemas']['TagOut'];
+	const TAGS: SampleTag[] = ['Haushalt', 'Versicherung', 'Steuer'].map((name, index) => ({
+		id: `tag-${index}`,
+		name,
+		created_at: '2026-10-01T08:00:00Z',
+		scope: 'document',
+		parent_id: null,
+		path: [name],
+		assignment: 'auto',
+		shown: true,
+		icon: null,
+		color: null
+	}));
+	let tagIds = $state<string[]>(['tag-0']);
+	let color = $state<string | null>(null);
+	let icon = $state<string | null>(null);
+	let period = $state({ start: '2026-09-01', end: '2026-09-30' });
+	let sort = $state('date');
+	const SORTS = [
+		{ value: 'date', label: m.dev_sample_table_date() },
+		{ value: 'title', label: m.dev_sample_table_title() }
+	];
+	let sheet = $state(false);
+	let editing = $state(false);
+	let editorTab = $state('one');
+	let removing = $state(false);
+	const SAMPLE_DOCUMENT: components['schemas']['DocumentDetails'] = {
+		id: 'sample-document',
+		title: m.dev_sample_document(),
+		original_filename: 'sample.pdf',
+		media_type: 'application/pdf',
+		channel: 'web',
+		sha256: '0'.repeat(64),
+		uploaded_by: 'sample-user',
+		space_id: 'sample-space',
+		access: 'edit',
+		contact_id: null,
+		document_type_id: null,
+		topic_id: null,
+		tag_ids: [],
+		document_date: '2026-07-31',
+		fields: {},
+		lane: 'yellow',
+		first_lane: 'yellow',
+		page_count: 2,
+		confirmed_at: null,
+		processing: { status: 'completed', run: 1, vision: false, nodes: [] },
+		created_at: '2026-08-01T08:00:00Z',
+		updated_at: '2026-08-01T08:00:00Z'
+	} as components['schemas']['DocumentDetails'];
 	let aliases = $state<string[]>(['Stadtwerke', 'SWM']);
 	let folders = $state<string[]>(['INBOX']);
 	const FOLDERS = ['INBOX', 'Archiv', 'Rechnungen'].map((value) => ({ value, label: value }));
@@ -281,6 +344,33 @@
 			selected={folders}
 			onchange={(next) => (folders = next)}
 		/>
+		<Field.Field>
+			<HintLabel label={m.dev_sample_input()} hint={m.dev_sample_info_text()} for="sample-hinted" />
+			<Input id="sample-hinted" />
+		</Field.Field>
+		<Field.Field>
+			<Field.Label for="sample-tags">{m.dev_section_chips()}</Field.Label>
+			<TagPicker
+				id="sample-tags"
+				label={m.dev_section_chips()}
+				title={m.dev_section_chips()}
+				scope="document"
+				tags={TAGS}
+				selected={tagIds}
+				onchange={(next) => (tagIds = next)}
+			/>
+		</Field.Field>
+		<Field.Field>
+			<Field.Label for="sample-period">{m.dev_sample_table_date()}</Field.Label>
+			<PeriodInput
+				id="sample-period"
+				label={m.dev_sample_table_date()}
+				value={period}
+				onchange={(next) => (period = next)}
+			/>
+		</Field.Field>
+		<ColorPicker id="sample-color" bind:value={color} />
+		<IconPicker id="sample-icon" bind:value={icon} />
 		<Choice bind:checked>{m.dev_sample_option()}</Choice>
 		<div class="flex flex-col gap-2">
 			<Choice type="radio" name="sample" value="one" bind:group={radio}>
@@ -431,6 +521,27 @@
 			onchange={(next) => (page = next)}
 			onsize={(next) => (size = next)}
 		/>
+		<SortMenu
+			options={SORTS}
+			value={sort}
+			short={{ key: m.dev_sample_table_date(), direction: 'down' }}
+			onchange={(next) => (sort = next)}
+		/>
+		<DetailList
+			class="max-w-md"
+			rows={[
+				[m.dev_sample_table_title(), m.dev_sample_document()],
+				[m.dev_sample_table_date(), formatDate('2026-07-31')]
+			]}
+		/>
+		<div class="max-w-xs">
+			<FilterSection title={m.dev_section_chips()} summary={TAGS[0].name}>
+				<p class="pb-3 text-sm text-muted-foreground">{m.dev_sample_text()}</p>
+			</FilterSection>
+		</div>
+		<div class="max-w-2xl">
+			<DocumentRow document={SAMPLE_DOCUMENT} lookup={null} href="#dev-states" />
+		</div>
 		<EmptyNote compact>
 			{m.dev_sample_empty()}
 			{#snippet action()}
@@ -467,6 +578,44 @@
 				<Trash2 aria-hidden="true" />
 				{m.delete_title()}
 			</Button>
+			<Button variant="outline" onclick={() => (editing = true)}
+				>{m.dev_sample_open_dialog()}</Button
+			>
+			<EditorShell
+				bind:open={editing}
+				title={m.dev_sample_dialog_title()}
+				tabs={[
+					{ value: 'one', label: m.dev_sample_tab_one() },
+					{ value: 'two', label: m.dev_sample_tab_two() }
+				]}
+				bind:tab={editorTab}
+				action={async () => {}}
+			>
+				<p class="text-sm">{m.dev_sample_dialog_text()}</p>
+			</EditorShell>
+			<Button variant="outline" onclick={() => (removing = true)}
+				>{m.dev_sample_destructive()}</Button
+			>
+			<FormDialog
+				bind:open={removing}
+				title={m.dev_sample_destructive()}
+				submitLabel={m.dev_sample_destructive()}
+				destructive
+				action={async () => {}}
+			>
+				{#snippet children(error)}
+					<p class="text-sm">{error ?? m.dev_sample_dialog_text()}</p>
+				{/snippet}
+			</FormDialog>
+			<Button variant="outline" onclick={() => (sheet = true)}>{m.dev_sample_option()}</Button>
+			<PhoneSheet bind:open={sheet} title={m.dev_sample_option()}>
+				{#snippet close()}
+					<Button variant="ghost" size="sm" onclick={() => (sheet = false)}
+						>{m.dev_sample_toast()}</Button
+					>
+				{/snippet}
+				<p class="p-4 text-sm">{m.dev_sample_text()}</p>
+			</PhoneSheet>
 			<Button variant="outline" onclick={() => (secret = 'lekto_example_0000000000')}>
 				{m.dev_sample_button()}
 			</Button>

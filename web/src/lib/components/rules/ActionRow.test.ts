@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fakeApi, json } from '#lib/testing/api.ts';
 import type { FieldDefinition, Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { newAction, newModel } from '#lib/rules/model.ts';
@@ -45,8 +46,8 @@ describe('filing into a space', () => {
 
 describe('a template of an action', () => {
 	it('names the fields of the rule without asking for them again', async () => {
-		const fetchMock = vi.fn<(request: Request) => Promise<Response>>(async () =>
-			Response.json({ used: [], rendered: null, missing: null, error: null, values: null })
+		const fetchMock = fakeApi({}, () =>
+			json({ used: [], rendered: null, missing: null, error: null, values: null })
 		);
 		vi.stubGlobal('fetch', fetchMock);
 		const action = newAction('set_title');
@@ -113,7 +114,7 @@ describe('setting a field that is not text', () => {
 		vi.stubGlobal(
 			'fetch',
 			vi.fn(async () =>
-				Response.json({ used: [], rendered: null, missing: null, error: null, values: null })
+				json({ used: [], rendered: null, missing: null, error: null, values: null })
 			)
 		);
 		render(ActionRow, { action, lookup, targets, onremove: vi.fn() });

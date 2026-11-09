@@ -8,7 +8,7 @@ import { m } from '#lib/paraglide/messages.js';
 import type { GraphNode } from '#lib/pipeline.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import DocumentProcessing from './DocumentProcessing.svelte';
-import { json } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 
 type Document = components['schemas']['DocumentDetails'];
 
@@ -22,7 +22,7 @@ vi.mock('$app/state', async () => ({
 	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
 }));
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 
 const graph: GraphNode[] = [
 	{ node: 'receive', requires: [], waits_for: [] },
@@ -165,7 +165,7 @@ async function openTip(button: HTMLElement): Promise<HTMLElement> {
 }
 
 beforeEach(() => {
-	fetchMock.mockReset();
+	fetchMock = fakeApi();
 	serve([proposed, judged], { signal_llm: [exchange] });
 	vi.stubGlobal('fetch', fetchMock);
 	vi.mocked(goto).mockClear();
@@ -297,15 +297,15 @@ describe('DocumentProcessing', () => {
 		const matrix = await screen.findByRole('table');
 		expect(within(matrix).getByText('Schwälmer Brotladen')).toBeTruthy();
 		expect(
-			// The mark names the value too, for a screen reader (not only on hover).
-			within(matrix).getByRole('img', {
+			// The mark names the value too, and opens it on a click or a tap (not only on hover).
+			within(matrix).getByRole('button', {
 				name: (name) => name.startsWith(`${m.node_signal_llm()}: ${m.matrix_suggests()} – `)
 			})
 		).toBeTruthy();
 		// The neighbours name JUKO without a proof in the text: another value, not against it
 		// (the 0.5.0 contact rule).
 		expect(
-			within(matrix).getByRole('img', {
+			within(matrix).getByRole('button', {
 				name: (name) => name.startsWith(`${m.node_signal_neighbours()}: ${m.matrix_other()} – `)
 			})
 		).toBeTruthy();

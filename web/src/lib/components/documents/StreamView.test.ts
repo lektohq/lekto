@@ -5,7 +5,7 @@ import { goto } from '$app/navigation';
 import { apiQuery, NO_FILTERS } from '#lib/filters.ts';
 import { formatNumber } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
-import { calls, fakeApi } from '#lib/testing/documents.ts';
+import { calls, fakeApi } from '#lib/testing/api.ts';
 import StreamView from './StreamView.svelte';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));

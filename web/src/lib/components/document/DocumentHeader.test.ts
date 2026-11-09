@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fakeApi, json } from '#lib/testing/api.ts';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import type { GraphNode } from '#lib/pipeline.ts';
@@ -17,7 +18,7 @@ type Document = components['schemas']['DocumentDetails'];
 
 const OWNER = 'user-1';
 const VISION = { model: 'claude-sonnet', endpoint: 'chat.example' };
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 
 const graph: GraphNode[] = [
 	{ node: 'receive', requires: [], waits_for: [] },
@@ -80,8 +81,8 @@ beforeEach(() => {
 		expires_at: '2026-10-15T12:00:00Z',
 		csrf_token: 'token'
 	});
-	fetchMock.mockReset();
-	fetchMock.mockImplementation(async () => new Response('{}', { status: 202 }));
+	fetchMock = fakeApi();
+	fetchMock.mockImplementation(async () => json({}, 202));
 	vi.stubGlobal('fetch', fetchMock);
 });
 
