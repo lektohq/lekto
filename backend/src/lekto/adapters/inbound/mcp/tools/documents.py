@@ -17,7 +17,7 @@ from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
 from lekto.adapters.inbound.mcp.tools.spaces import space_name
 from lekto.adapters.inbound.schemas import FieldJson, RuleReportOut, field_json
-from lekto.core.domain.classification import field_id_of
+from lekto.core.domain.classification import CheckField, field_id_of
 from lekto.core.domain.document_facts import FactState
 from lekto.core.domain.documents import (
     MAX_TITLE,
@@ -26,6 +26,7 @@ from lekto.core.domain.documents import (
     Document,
     DocumentChanges,
     Unset,
+    changed_fields,
 )
 from lekto.core.domain.fields import FieldValue, field_from_json, field_to_json
 from lekto.core.domain.ids import DocumentId, FieldId, UserId, short_id
@@ -422,7 +423,7 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
             out = UpdateOut(id=short_id(change.document.id), filed_away=True, dry_run=tried)
             return compact(out)
         assert change.before is not None  # a change the caller still reads
-        out = update_out(change.before, change.document, change.access, names)
+        out = await update_out(context, user, change.before, change.document, change.access, names)
         out.dry_run = tried
         if change.rules is not None:
             out.rules = [RuleReportOut.of(report) for report in change.rules.plan.reports]
@@ -585,36 +586,48 @@ def changes_of(given: ChangesIn, names: Names) -> DocumentChanges:
     )
 
 
-def update_out(before: Document, after: Document, access: SpaceRole, names: Names) -> UpdateOut:
-    """What changed from `before` to `after`, by name: what is set, and what is removed."""
+async def update_out(
+    context: ApiContext,
+    user: UserId,
+    before: Document,
+    after: Document,
+    access: SpaceRole,
+    names: Names,
+) -> UpdateOut:
+    """What changed from `before` to `after` (`changed_fields`, as REST reports it), by name:
+    what is set, and what is removed; a space by how the caller reads it."""
     out = UpdateOut(id=short_id(after.id), access=access)
-    values: dict[str, tuple[JsonValue, JsonValue]] = {
-        "title": (before.title, after.title),
-        "contact": (names.contact(before.contact_id), names.contact(after.contact_id)),
-        "document_type": (
-            names.document_type(before.document_type_id),
-            names.document_type(after.document_type_id),
-        ),
-        "topic": (names.topic(before.topic_id), names.topic(after.topic_id)),
-        "tags": (
-            list[JsonValue](names.tag_names(before.tag_ids)),
-            list[JsonValue](names.tag_names(after.tag_ids)),
-        ),
-        "document_date": (_iso(before.document_date), _iso(after.document_date)),
-    }
-    for id in sorted({*before.fields, *after.fields}, key=names.field_name):
-        values[names.field_name(id)] = (
-            _field(before.fields.get(id)),
-            _field(after.fields.get(id)),
-        )
-    for name, (old, new) in values.items():
-        if old == new:
-            continue
+    for key in changed_fields(before, after):
+        name, new = await _changed(context, user, key, after, names)
         if new is None or new == []:
             out.removed.append(name)
         else:
             out.set[name] = new
     return out
+
+
+async def _changed(
+    context: ApiContext, user: UserId, key: str, after: Document, names: Names
+) -> tuple[str, JsonValue]:
+    """The name of a changed field and its value after the change."""
+    match key:
+        case CheckField.TITLE:
+            return key, after.title
+        case CheckField.CONTACT:
+            return key, names.contact(after.contact_id)
+        case CheckField.DOCUMENT_TYPE:
+            return key, names.document_type(after.document_type_id)
+        case CheckField.TOPIC:
+            return key, names.topic(after.topic_id)
+        case CheckField.TAGS:
+            return key, list[JsonValue](names.tag_names(after.tag_ids))
+        case CheckField.DOCUMENT_DATE:
+            return key, _iso(after.document_date)
+        case CheckField.SPACE:
+            return key, await space_name(context, user, after.space_id)
+    field = field_id_of(key)
+    assert field is not None, key  # `changed_fields` names nothing else
+    return names.field_name(field), _field(after.fields.get(field))
 
 
 def _iso(value: date | None) -> str | None:
