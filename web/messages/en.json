@@ -1271,7 +1271,7 @@
 	"webhook_signed_hint": "With a secret, shown once: the receiver checks the webhook-signature header with it. Without one, the receiver checks a header of its own, such as a token.",
 	"webhook_open_tasks": "Tasks at a time",
 	"webhook_open_tasks_hint": "How many requests that expect an answer (a rule step that asks) the webhook takes at the same time. More wait in Lekto; their time to answer starts when they are sent.",
-	"webhook_open_tasks_rule": "1 to 64.",
+	"webhook_open_tasks_rule": "{min} to {max}.",
 	"webhook_model_call": "Model call",
 	"webhook_model_call_none": "None",
 	"webhook_model_call_propose": "Model call: proposal",

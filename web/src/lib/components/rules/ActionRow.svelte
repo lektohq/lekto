@@ -20,6 +20,7 @@
 		canAddGroup,
 		defaultValue,
 		isTemplated,
+		LIMITS,
 		newCondition,
 		type ActionNode,
 		type ConditionNode,
@@ -27,6 +28,7 @@
 		type RuleModel
 	} from '#lib/rules/model.ts';
 	import { session } from '#lib/session.svelte.ts';
+	import { TIMEOUT_MINUTES } from '#lib/tasks.ts';
 	import TagPicker from '#lib/components/TagPicker.svelte';
 
 	// One step: an action, a step that asks a webhook, or a condition. `targets` are where the
@@ -165,6 +167,7 @@
 				{invalid}
 				fields={lookup.fields}
 				{steps}
+				maxlength={LIMITS.text}
 				bind:value={action.template}
 			/>
 		{:else if action.type === 'add_tags' || action.type === 'remove_tags'}
@@ -219,6 +222,7 @@
 				{invalid}
 				fields={lookup.fields}
 				{steps}
+				maxlength={LIMITS.text}
 				bind:value={action.reason}
 			/>
 		{:else if action.type === 'ask_webhook'}
@@ -228,7 +232,7 @@
 					<Input
 						id="ask-name-{action.key}"
 						class="font-mono"
-						maxlength={50}
+						maxlength={LIMITS.stepName}
 						aria-invalid={invalid || undefined}
 						bind:value={action.name}
 					/>
@@ -247,8 +251,8 @@
 					<Input
 						id="ask-timeout-{action.key}"
 						type="number"
-						min={0.5}
-						max={1440}
+						min={TIMEOUT_MINUTES.min}
+						max={TIMEOUT_MINUTES.max}
 						step={0.5}
 						value={String(action.timeout_seconds / 60)}
 						oninput={(event) => {
