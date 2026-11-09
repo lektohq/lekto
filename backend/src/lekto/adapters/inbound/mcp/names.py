@@ -3,7 +3,7 @@ client has no other way to learn IDs), and give names. A name matches regardless
 unknown one is an error that names similar ones, so the client need not list them first."""
 
 import difflib
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from uuid import UUID
 
@@ -15,6 +15,7 @@ from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, TagId, Use
 from lekto.core.domain.master_data import TagScope
 from lekto.core.domain.sorting import sort_key
 from lekto.core.domain.spaces import Space
+from lekto.core.domain.spaces import space_label as space_label
 from lekto.core.domain.validation import name_key
 
 SIMILAR = 3
@@ -133,10 +134,3 @@ async def member_labels(
     """How the caller reads the members of `spaces`, by their ids."""
     members = await context.spaces.members(user, list(spaces))
     return {id: person.label for id, person in members.items()}
-
-
-def space_label(space: Space, people: Mapping[UserId, str]) -> str:
-    """How the caller reads a space: a personal one by its person's name (`member_labels`)."""
-    if space.personal_of is not None and space.personal_of in people:
-        return people[space.personal_of]
-    return space.name

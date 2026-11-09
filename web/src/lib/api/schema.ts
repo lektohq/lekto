@@ -985,7 +985,7 @@ export interface paths {
 		};
 		/**
 		 * List spaces
-		 * @description The spaces the caller is a member of, their personal space first among them by its `personal_of`, admins too; with `all_users` every space (admins only). An admin's rights reach every space either way.
+		 * @description The spaces the caller is a member of, admins too, their personal space among them (`personal_of`); with `all_users` every space (admins only). An admin's rights reach every space either way. By how they read: a personal space by its person's name, case and accents aside.
 		 */
 		get: operations['list_spaces_api_v1_spaces_get'];
 		put?: never;

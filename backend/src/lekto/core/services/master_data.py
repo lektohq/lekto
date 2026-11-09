@@ -11,7 +11,13 @@ from lekto.core.domain.errors import (
     ValidationError,
 )
 from lekto.core.domain.fields import FieldDefinition, FieldType, field_order
-from lekto.core.domain.identifiers import Identifier, IdentifierSource, Key
+from lekto.core.domain.identifiers import (
+    Identifier,
+    IdentifierKind,
+    IdentifierSource,
+    Key,
+    normalise_identifier,
+)
 from lekto.core.domain.ids import ContactId, DocumentId, DocumentTypeId, FieldId, TagId, UserId
 from lekto.core.domain.jobs import Job, RetryPolicy
 from lekto.core.domain.master_data import (
@@ -697,6 +703,17 @@ class MasterDataService:
         return changed
 
     # --- reading (every signed-in user) ----------------------------------------------------------
+
+    async def holders_of(self, actor: UserId, kind: IdentifierKind, value: str) -> list[Contact]:
+        """The contacts that hold the identifier `value` of `kind` (normalised here), by name,
+        each as the caller sees it (`list_contacts`): a number of a person, or one learned in a
+        space, only for those who may see it."""
+        normal = normalise_identifier(kind, value)
+        return [
+            contact
+            for contact in await self.list_contacts(actor)
+            if any(item.kind is kind and item.value == normal for item in contact.identifiers)
+        ]
 
     async def list_contacts(self, actor: UserId) -> list[Contact]:
         """By name, each with the identifiers the caller sees (`identifiers.seen_by`): a
