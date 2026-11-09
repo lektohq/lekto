@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fakeApi, json } from '#lib/testing/api.ts';
 import {
 	descendants,
 	durationSeconds,
@@ -167,13 +168,12 @@ describe('the pipeline of the installation', () => {
 
 	it('is asked for once, and again only after a failure', async () => {
 		let fail = true;
-		const fetch = vi.fn(async () =>
-			fail
-				? new Response(null, { status: 503 })
-				: new Response(JSON.stringify({ nodes: GRAPH, vision: null }), {
-						headers: { 'content-type': 'application/json' }
-					})
-		);
+		const fetch = fakeApi({
+			'GET /api/v1/pipeline': () =>
+				fail
+					? json({ type: 'about:blank', title: 'Unavailable', status: 503 }, 503)
+					: { nodes: GRAPH, vision: null }
+		});
 		vi.stubGlobal('fetch', fetch);
 		await expect(pipeline()).rejects.toBeTruthy();
 		fail = false;
