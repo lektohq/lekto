@@ -16,7 +16,7 @@ services:
       LEKTO_FORWARDED_ALLOW_IPS: "*"
 
   nginx:
-    image: nginx:stable-alpine
+    image: nginx:1.30.6-alpine
     restart: unless-stopped
     ports:
       - 80:80
