@@ -8,7 +8,11 @@
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Upload from '@lucide/svelte/icons/upload';
 	import { toast } from 'svelte-sonner';
+	import AlertDot from '#lib/components/AlertDot.svelte';
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
+	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
+	import LoadProblem from '#lib/components/LoadProblem.svelte';
+	import Pagination from '#lib/components/Pagination.svelte';
 	import Chip from '#lib/components/Chip.svelte';
 	import DateInput from '#lib/components/DateInput.svelte';
 	import EmptyNote from '#lib/components/EmptyNote.svelte';
@@ -51,6 +55,11 @@
 	// The living style guide of web/DESIGN.md: every component of the design system in its
 	// variants and sizes, as the pages use them. Names of variants are shown as the code spells
 	// them; sample data, not translated, stands for user content.
+	// A page of a log and a question before deleting, to see them here.
+	let page = $state(2);
+	let size = $state(25);
+	let confirming = $state(false);
+
 	const rows = [
 		{ title: 'Stadtwerke · Abschlag', date: new Date(2026, 9, 1), lane: 'green' as const },
 		{ title: 'Hausrat · Beitrag 2027', date: new Date(2026, 8, 28), lane: 'yellow' as const },
@@ -373,7 +382,24 @@
 
 	<section class="flex flex-col gap-4" aria-labelledby="dev-states">
 		<SectionTitle id="dev-states">{m.dev_section_states()}</SectionTitle>
+		<SectionTitle size="card" tip={{ name: m.dev_section_states(), text: m.dev_sample_empty() }}>
+			{m.dev_section_states()}
+		</SectionTitle>
 		<Loading />
+		<LoadProblem problem={m.error_network()} onretry={() => toast.info(m.dev_sample_button())} />
+		<span class="flex items-center gap-2 text-sm">
+			{m.dev_section_states()}
+			<AlertDot label={m.error_network()} />
+			<AlertDot tone="yellow" label={m.error_network()} />
+		</span>
+		<Pagination
+			{page}
+			total={240}
+			{size}
+			table="jobs"
+			onchange={(next) => (page = next)}
+			onsize={(next) => (size = next)}
+		/>
 		<EmptyNote compact>
 			{m.dev_sample_empty()}
 			{#snippet action()}
@@ -406,6 +432,17 @@
 	<section class="flex flex-col gap-3" aria-labelledby="dev-dialogs">
 		<SectionTitle id="dev-dialogs">{m.dev_section_dialogs()}</SectionTitle>
 		<div class="flex flex-wrap gap-3">
+			<Button variant="outline" onclick={() => (confirming = true)}>
+				<Trash2 aria-hidden="true" />
+				{m.delete_title()}
+			</Button>
+			<ConfirmDialog
+				bind:open={confirming}
+				title={m.delete_title()}
+				description={m.dev_sample_empty()}
+				confirmLabel={m.delete_title()}
+				onconfirm={async () => {}}
+			/>
 			{#each DIALOGS as size (size)}
 				<Dialog.Root>
 					<Dialog.Trigger>

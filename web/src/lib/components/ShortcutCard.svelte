@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { cardVariants } from '#lib/components/ui/card/index.ts';
+	import { cn } from '#lib/utils.ts';
 	import Check from '@lucide/svelte/icons/check';
 	import Copy from '@lucide/svelte/icons/copy';
 	import { api } from '#lib/api/client.ts';
@@ -85,7 +87,7 @@
 		{#if ready}
 			<ul class="grid gap-2 text-sm sm:grid-cols-3">
 				{#each ways as way (way.title)}
-					<li class="rounded-lg border border-dashed p-3 text-muted-foreground">
+					<li class={cn(cardVariants({ size: 'sm' }), 'text-muted-foreground')}>
 						<span class="block font-medium text-foreground">{way.title}</span>
 						{way.path}
 					</li>

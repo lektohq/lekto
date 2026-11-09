@@ -9,7 +9,6 @@
 	import { ApiError } from '#lib/api/problem.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
-	import InfoTip from '#lib/components/InfoTip.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { formatDuration } from '#lib/duration.ts';
@@ -90,15 +89,6 @@
 	const since = $derived(status ? formatDate(status.since, { dateStyle: 'medium' }) : '');
 </script>
 
-{#snippet heading(text: string, about: string)}
-	<div class="flex items-center gap-1">
-		<SectionTitle size="card">{text}</SectionTitle>
-		<InfoTip label={m.hint_about({ name: text })} size="sm" class="w-80">
-			<p>{about}</p>
-		</InfoTip>
-	</div>
-{/snippet}
-
 {#snippet bar(value: number, label: string)}
 	<div
 		role="progressbar"
@@ -137,7 +127,11 @@
 		<div class="flex flex-wrap gap-6">
 			<Card.Root as="section" size="lg" class="flex min-w-0 flex-[2_1_520px] flex-col gap-5">
 				<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-					{@render heading(m.search_state_title(), m.search_state_info())}
+					<SectionTitle
+						size="card"
+						tip={{ name: m.search_state_title(), text: m.search_state_info() }}
+						>{m.search_state_title()}</SectionTitle
+					>
 					{#if status.index.indexing}
 						<Badge variant="note" size="md">
 							<span
@@ -206,7 +200,9 @@
 			</Card.Root>
 
 			<Card.Root as="section" size="lg" class="flex min-w-0 flex-[1_1_280px] flex-col gap-2.5">
-				{@render heading(m.search_open_title(), m.search_open_info())}
+				<SectionTitle size="card" tip={{ name: m.search_open_title(), text: m.search_open_info() }}
+					>{m.search_open_title()}</SectionTitle
+				>
 				<div class="flex items-baseline gap-2">
 					<span class="text-figure tabular-nums">
 						{formatNumber(status.queued + status.running)}
@@ -240,7 +236,11 @@
 
 		<Card.Root as="section" size="lg">
 			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-				{@render heading(m.search_durations_title(), m.search_durations_info())}
+				<SectionTitle
+					size="card"
+					tip={{ name: m.search_durations_title(), text: m.search_durations_info() }}
+					>{m.search_durations_title()}</SectionTitle
+				>
 				<span class="text-meta text-muted-foreground">
 					{m.search_durations_since({ date: since })}
 				</span>
@@ -278,7 +278,11 @@
 		{#if session.isAdmin}
 			<Card.Root as="section" size="lg" class="flex flex-col gap-4">
 				<div class="flex flex-wrap items-center justify-between gap-3">
-					{@render heading(m.search_check_title(), m.search_check_info())}
+					<SectionTitle
+						size="card"
+						tip={{ name: m.search_check_title(), text: m.search_check_info() }}
+						>{m.search_check_title()}</SectionTitle
+					>
 					<Button variant="outline" disabled={checking} onclick={runCheck}>
 						<ListChecks aria-hidden="true" />{m.search_check_button()}
 					</Button>
@@ -311,7 +315,11 @@
 
 			<Card.Root as="section" size="lg" class="flex flex-col gap-4">
 				<div class="flex flex-wrap items-center justify-between gap-3">
-					{@render heading(m.search_reindex_title(), m.search_reindex_info())}
+					<SectionTitle
+						size="card"
+						tip={{ name: m.search_reindex_title(), text: m.search_reindex_info() }}
+						>{m.search_reindex_title()}</SectionTitle
+					>
 					<Button
 						variant="outline"
 						disabled={status.index.indexing}

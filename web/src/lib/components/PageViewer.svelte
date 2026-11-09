@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { cardVariants } from '#lib/components/ui/card/index.ts';
 	import Columns2 from '@lucide/svelte/icons/columns-2';
 	import File from '@lucide/svelte/icons/file';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
@@ -312,7 +313,12 @@
 
 <svelte:window onscroll={follow} />
 
-<div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border bg-surface">
+<div
+	class={cn(
+		cardVariants({ size: 'flush' }),
+		'flex min-h-0 flex-1 flex-col overflow-hidden bg-surface'
+	)}
+>
 	<div
 		role="toolbar"
 		aria-label={m.pdf_toolbar()}

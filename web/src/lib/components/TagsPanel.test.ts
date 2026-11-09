@@ -4,6 +4,7 @@ import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import TagsPanel from './TagsPanel.svelte';
+import { json } from '#lib/testing/api.ts';
 
 const nav = vi.hoisted(() => ({
 	url: new URL('http://lekto/ui/admin/master-data?tab=tags'),
@@ -47,10 +48,6 @@ const TAGS = [
 	tag('y1', ['Bills'], null, 'document_type', { document_type_count: 1 }),
 	tag('p1', ['Work'], null, 'topic', { contact_count: 1, document_count: 4 })
 ];
-
-function json(body: unknown) {
-	return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
-}
 
 beforeEach(() => {
 	nav.url = new URL('http://lekto/ui/admin/master-data?tab=tags');

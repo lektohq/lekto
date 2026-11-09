@@ -146,7 +146,7 @@
 <FormDialog
 	bind:open={creating}
 	title={m.token_new()}
-	submitLabel={m.token_create()}
+	submitLabel={m.create()}
 	disabled={name.trim() === ''}
 	action={create}
 >

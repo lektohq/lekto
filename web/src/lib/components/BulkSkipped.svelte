@@ -8,6 +8,7 @@
 	import { formatNumber } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { reasonText } from '#lib/reasons.ts';
+	import { session } from '#lib/session.svelte.ts';
 
 	// The documents an action on many or a rule's application left as they were, each with why
 	// ("Details" of its toast): the first `SHOWN` by title (one the caller no longer reads by its
@@ -22,24 +23,34 @@
 
 	const SHOWN = 50;
 	let titles = $state<Record<string, string | null>>({});
-	// Each document is asked for once: noted before its answer, so that an answer arriving (it
-	// writes `titles`) does not have the rows still waiting asked for again. Not reactive: the
-	// effect that fills it must not run again for it.
-	// eslint-disable-next-line svelte/prefer-svelte-reactivity
-	const asked = new Set<string>();
 
 	const rows = $derived(operation?.skipped.slice(0, SHOWN) ?? []);
 	const more = $derived(Math.max(0, (operation?.skipped.length ?? 0) - SHOWN));
 
+	// The titles of the rows in one request (the list takes up to 100 ids, every lane); a
+	// document it does not bring, gone or not readable, shows by its reason alone. An admin sees
+	// every user's titles, as the action reached them.
 	$effect(() => {
-		for (const { document_id: id } of rows) {
-			if (asked.has(id)) continue;
-			asked.add(id);
-			void api
-				.GET('/api/v1/documents/{id}', { params: { path: { id } } })
-				.then(({ data }) => (titles[id] = data?.title ?? null))
-				.catch(() => (titles[id] = null));
-		}
+		const ids = rows.map((row) => row.document_id);
+		if (ids.length === 0) return;
+		let current = true;
+		api
+			.GET('/api/v1/documents', {
+				params: {
+					query: { ids, limit: SHOWN, all_users: session.isAdmin || undefined }
+				}
+			})
+			.then(({ data }) => {
+				if (!current) return;
+				const found = new Map((data?.items ?? []).map((item) => [item.id, item.title]));
+				titles = Object.fromEntries(ids.map((id) => [id, found.get(id) ?? null]));
+			})
+			.catch(() => {
+				if (current) titles = Object.fromEntries(ids.map((id) => [id, null]));
+			});
+		return () => {
+			current = false;
+		};
 	});
 </script>
 

@@ -180,7 +180,9 @@ phone the page scrolls.
   `searchPlaces`: from `2xl`, for admins from 1720 px; otherwise the magnifier), user menu
   (avatar, round, its name as tooltip); while there is no connection, the badge "Offline" beside the logo ([App](#app)).
 - **User menu:** name and role, the admin switch "Alle Nutzer einbeziehen", language and appearance
-  (`LanguageChoices`, `ThemeChoices`, each a `Segmented`), settings, API documentation, sign out;
+  (`LanguageChoices`, `ThemeChoices`: radio groups of the menu, so that its arrow keys go through
+  them; in the phone's sheet each a `Segmented`; the appearances listed once, `THEME_OPTIONS` in
+  `lib/theme.ts`), settings, API documentation, sign out;
   last, below a line, the version that runs ("Lekto 0.8.0", `text-xs`, muted, no item to
   choose; `lekto_version` of `GET /auth/me`). On the phone (below `sm`) the sheet holds all of
   it, the version at its end: the header shows only logo, magnifier and menu button.
@@ -384,9 +386,10 @@ Two components that **look different on purpose**:
 - **`TabBar`**: the tabs of a page (inbox lanes, document, master data, system, settings). Links that change
   the URL. **Underline tabs:** text in `muted-foreground`, the current tab in `foreground` with a
   2 px `brand` underline. A bottom border runs across the bar. It scrolls sideways on the phone
-  with a fade at the cut edge. Counts and dots sit beside the label.
+  with a fade at the cut edge. Counts and dots sit beside the label; a dot is `AlertDot` (8 px,
+  red or yellow), always with its words for a screen reader.
 - **`Segmented`**: a choice of how to show something (pages, grid/list/stream, text/pages,
-  form/facts, the period of the automation, language, appearance, the grouping of a lens; the
+  form/facts, the period of the automation, language and appearance in the phone's sheet, the grouping of a lens; the
   parts of a long dialog under its title: a contact's, an account's), which
   part of a list shows (the open identifiers by source, the identifiers at contacts by source, the tags by kind, the jobs by state, the
   deliveries by outcome; with counts), and in a form a choice among two or
@@ -694,7 +697,7 @@ version of the app ([App](#app)). **A toast never replaces a load error on the p
   once its pages are drawn anew at another zoom, and keeps it so. Its left border and the
   backdrop set it off. `design-system.test.ts` keeps the shadow away.
 - **Help of a field or section:** `InfoTip` or `HintLabel`, an info button beside the label that
-  opens the text. The visible text stays what one needs to read the view. Help text holds at most
+  opens the text; the title of a section or card with help is `SectionTitle` with `tip`. The visible text stays what one needs to read the view. Help text holds at most
   about 200 characters. Longer explanations belong in the documentation.
 - **Tooltip** (`ui/tooltip`): the name of an icon button (through `IconButton`), the names of the
   options of `Segmented`, the inbox mark of a card. A native `title=` attribute is used only for
@@ -819,7 +822,7 @@ screen like every editor (Tobi, 09.11.2026).
 ### Intake channels
 
 The page "System" has a tab "Eingangskanäle" for admins only (Tobi, 04.11.2026); other users do
-not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Postfach anlegen"
+not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Neues Postfach"
 (`default`) at its end, then the mailboxes as cards in a column (see [Lists](#lists)):
 
 - **The row of a mailbox:** its name opens its page (Tobi, 06.11.2026; the whole row is the
@@ -1138,6 +1141,8 @@ Every text a user reads is in `messages/en.json` and `messages/de.json` (`no-raw
 - Short sentences, active voice, no jargon a user does not know. Technical reasons from the API
   are translated (`x-reasons`).
 - Buttons are verbs or verb phrases ("Als gesehen markieren", not "Gesehen").
+  The one form of a noun: the action that creates in the head of a page or list is "Neue/r/s X"
+  ("Neue Regel", "Neuer Webhook", "Neues Postfach"; Tobi, 09.11.2026); elsewhere "Anlegen".
 
 ### Words
 

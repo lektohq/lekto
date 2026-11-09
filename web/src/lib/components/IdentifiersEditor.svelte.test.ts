@@ -140,6 +140,15 @@ describe('IdentifiersEditor', () => {
 		expect(screen.getByLabelText(m.identifier_value()).getAttribute('aria-invalid')).toBe('true');
 	});
 
+	it('says what the API refused in a closed line too, not by colour alone', () => {
+		const refused = row('iban', 'DE00 1234');
+		editor([refused], { errors: { [refused.key]: "'DE00 1234' is not a valid IBAN" } });
+		expect(
+			screen.getByText("'DE00 1234' is not a valid IBAN", { selector: '.sr-only' })
+		).toBeTruthy();
+		expect(screen.queryByRole('alert')).toBeNull();
+	});
+
 	it('says so when there is none, and adds with a round button on a phone', async () => {
 		phone.override(true);
 		const user = userEvent.setup();

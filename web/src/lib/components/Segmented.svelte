@@ -17,6 +17,7 @@
 </script>
 
 <script lang="ts">
+	import AlertDot from '#lib/components/AlertDot.svelte';
 	import SteadyText from '#lib/components/SteadyText.svelte';
 	import { slidingPill } from '#lib/sliding-pill.ts';
 	import { cn } from '#lib/utils.ts';
@@ -130,8 +131,7 @@
 			<span class="text-xs font-normal text-muted-foreground tabular-nums">{option.count}</span>
 		{/if}
 		{#if option.alert}
-			<span class="size-[7px] rounded-full bg-destructive" aria-hidden="true"></span>
-			<span class="sr-only">{option.alert}</span>
+			<AlertDot label={option.alert} />
 		{/if}
 	</button>
 {/snippet}

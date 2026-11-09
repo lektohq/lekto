@@ -220,7 +220,10 @@
 						>
 							{#each groups as tag (tag.id)}<TagChip {tag} group size="sm" />{/each}
 							{#each notesOf(item) as note (note.text)}
-								<span title={note.title}>{note.text}</span>
+								<span class="min-w-0 truncate" title={note.title}
+									>{note.text}{#if note.title}: <code class="font-mono text-xs">{note.title}</code
+										>{/if}</span
+								>
 							{/each}
 						</span>
 					{/if}
