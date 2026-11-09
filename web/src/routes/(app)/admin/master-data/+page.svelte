@@ -61,7 +61,7 @@
 
 <svelte:head><title>{m.nav_master_data()} · {m.app_name()}</title></svelte:head>
 
-<div class="flex flex-col gap-4 sm:gap-6">
+<div class="flex flex-col gap-6">
 	<PageHeader title={m.nav_master_data()}>
 		{#snippet actions()}
 			{#if tab === 'identifiers'}
