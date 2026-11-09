@@ -24,11 +24,12 @@ from lekto_migration.state import DocumentRow, State
 
 MIGRATED = ("done", "duplicate", "uploaded")
 _WORD = re.compile(r"\w{2,}")
-# What the first bytes of a file say it is.
+# What the first bytes of a file say it is; a copy of `lekto.core.domain.media_types` (the
+# client does not import Lekto), kept equal by a parity test in the backend. A PDF is found by
+# `%PDF-` anywhere in the head, below.
 MAGIC = (
-    (b"%PDF", "application/pdf"),
     (b"\xff\xd8\xff", "image/jpeg"),
-    (b"\x89PNG", "image/png"),
+    (b"\x89PNG\r\n\x1a\n", "image/png"),
     (b"II*\x00", "image/tiff"),
     (b"MM\x00*", "image/tiff"),
 )

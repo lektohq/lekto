@@ -4,7 +4,14 @@ import openapi from '../../openapi.json';
 import de from '../../messages/de.json';
 import en from '../../messages/en.json';
 import { getLocale, setLocale } from '#lib/paraglide/runtime.js';
-import { REASONS, outputReasonText, reasonText, reasonsText, type Reason } from './reasons.ts';
+import {
+	ACTIONS,
+	REASONS,
+	outputReasonText,
+	reasonText,
+	reasonsText,
+	type Reason
+} from './reasons.ts';
 
 const catalog = (openapi as unknown as { 'x-reasons': Record<string, Record<string, string>> })[
 	'x-reasons'
@@ -15,6 +22,13 @@ afterEach(() => setLocale(before, { reload: false }));
 function placeholders(text: string): string[] {
 	return [...text.matchAll(/\{(\w+)\}/g)].map((match) => match[1]);
 }
+
+describe('the actions of the API', () => {
+	it('each have a text, and no text is left without its action', () => {
+		const actions = (openapi as unknown as { 'x-actions': string[] })['x-actions'];
+		expect(Object.keys(ACTIONS).sort()).toEqual([...actions].sort());
+	});
+});
 
 describe('the reasons of the API', () => {
 	it('each have a message, with only the parameters the API gives, written as it says', () => {

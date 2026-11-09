@@ -536,7 +536,7 @@ const THINGS: Record<string, () => string> = {
 };
 
 /** What only some may do (the kind `action`, the API's `Action`), in the user's language. */
-const ACTIONS: Record<string, () => string> = {
+export const ACTIONS: Record<string, () => string> = {
 	manage_users: m.action_manage_users,
 	change_master_data: m.action_change_master_data,
 	see_all_inboxes: m.action_see_all_inboxes,
@@ -550,6 +550,10 @@ const ACTIONS: Record<string, () => string> = {
 	retry_jobs: m.action_retry_jobs,
 	check_index: m.action_check_index,
 	reparse_all: m.action_reparse_all,
+	relate_all: m.action_relate_all,
+	render_pages_all: m.action_render_pages_all,
+	read_facts_all: m.action_read_facts_all,
+	fetch_logos_all: m.action_fetch_logos_all,
 	make_global_rules: m.action_make_global_rules,
 	change_global_rules: m.action_change_global_rules,
 	make_space_rules: m.action_make_space_rules,

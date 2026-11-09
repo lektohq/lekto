@@ -9,38 +9,6 @@ from typing import Self
 
 from lekto.core.domain.errors import ValidationError
 
-MONTH_NAMES: dict[str, tuple[str, ...]] = {
-    "de": (
-        "Januar",
-        "Februar",
-        "März",
-        "April",
-        "Mai",
-        "Juni",
-        "Juli",
-        "August",
-        "September",
-        "Oktober",
-        "November",
-        "Dezember",
-    ),
-    "en": (
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
-    ),
-}
-"""The names of the months, by language, January first."""
-
 _DAY = r"\d{4}-\d{2}-\d{2}"
 _NOTATION = re.compile(
     rf"(?P<day>{_DAY})|(?P<start>{_DAY})/(?P<end>{_DAY})"

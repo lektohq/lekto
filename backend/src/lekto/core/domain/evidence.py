@@ -17,7 +17,15 @@ from functools import cached_property
 from itertools import pairwise
 
 from lekto.core.domain.errors import ValidationError
-from lekto.core.domain.periods import MONTH_NAMES, Period
+from lekto.core.domain.periods import Period
+from lekto.core.domain.vocabulary import (
+    CURRENCY_WORDS,
+    MONTH_NAMES,
+    OTHER_MONTH_SPELLINGS,
+    SPAN_WORDS,
+    TRUTH_WORDS,
+    WEEK_WORDS,
+)
 
 # Markdown markup that may sit inside a value (`**84,20 €**`, table pipes).
 _MARKUP = re.compile(r"[*_#|`>~]+")
@@ -78,21 +86,6 @@ def fold_umlauts(text: str) -> str:
 
 # --- dates ------------------------------------------------------------------------------------
 
-# Other ways to write the months than their names: Austrian, without umlauts, abbreviated.
-_OTHER_SPELLINGS = (
-    ("jänner", "jaenner", "jan"),
-    ("feb",),
-    ("maerz", "mär", "mrz", "mar"),
-    ("apr",),
-    (),
-    ("jun",),
-    ("jul",),
-    ("aug",),
-    ("sept", "sep"),
-    ("okt", "oct"),
-    ("nov",),
-    ("dez", "dec"),
-)
 _MONTHS = {
     **{
         name.casefold(): number
@@ -101,7 +94,7 @@ _MONTHS = {
     },
     **{
         spelling: number
-        for number, spellings in enumerate(_OTHER_SPELLINGS, 1)
+        for number, spellings in enumerate(OTHER_MONTH_SPELLINGS, 1)
         for spelling in spellings
     },
 }
@@ -160,10 +153,16 @@ def nearest(days: Iterable[date], received: date) -> date:
 
 # --- periods ------------------------------------------------------------------------------------
 
+
+def _words(words: tuple[str, ...]) -> str:
+    """Words as alternatives of a pattern, the longest first (`bis zum` before `bis`)."""
+    return "|".join(re.escape(word) for word in sorted(words, key=len, reverse=True))
+
+
 # Between the ends of a span: `01.09.2026 - 30.09.2026`, `1. bis 30. September 2026`.
-_TO = r"\s*(?:-|\u2013|\u2014|bis(?: zum| einschl(?:ießlich|\.)?)?|to|until|through)\s*"
+_TO = rf"\s*(?:-|\u2013|\u2014|{_words(SPAN_WORDS)})\s*"
 _YEAR = r"((?:19|20)\d{2})"
-_WEEK_WORD = r"(?:kw|kalenderwoche|calendar week|week|wk)\.?"
+_WEEK_WORD = rf"(?:{_words(WEEK_WORDS)})\.?"
 # A month, week or quarter with its year, or without one (`für September`, `KW 38`).
 _PERIOD_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     # September 2026, Sept. 2026, september, 2026
@@ -352,12 +351,11 @@ def read_period(
 # --- numbers ----------------------------------------------------------------------------------
 
 # Digits with separators between them: `1.234,56`, `1,234.56`, `1 234,56`, `1'234.56`, `84,20`.
-_TRUTH = {"true": True, "yes": True, "ja": True, "false": False, "no": False, "nein": False}
 
 
 def truth_value(text: str) -> bool | None:
     """Yes or no as a document or a model writes it (German, English); None for other text."""
-    return _TRUTH.get(text.strip().casefold())
+    return TRUTH_WORDS.get(text.strip().casefold())
 
 
 _NUMBER = re.compile(r"(?<![\d])\d(?:[\d]|[.,'](?=\d)| (?=\d{3}(?!\d)))*")
@@ -438,26 +436,6 @@ def _beside_currency(text: str, start: int, end: int) -> bool:
 
 # --- currencies -------------------------------------------------------------------------------
 
-_CURRENCY_SIGNS = {
-    "€": {"EUR"},
-    "euro": {"EUR"},
-    "euros": {"EUR"},
-    "$": {"USD"},
-    "us$": {"USD"},
-    "dollar": {"USD"},
-    "dollars": {"USD"},
-    "£": {"GBP"},
-    "pfund": {"GBP"},
-    "¥": {"JPY", "CNY"},
-    "fr.": {"CHF"},
-    "sfr.": {"CHF"},
-    "sfr": {"CHF"},
-    "franken": {"CHF"},
-    "kč": {"CZK"},
-    "zł": {"PLN"},
-    "kr": {"SEK", "NOK", "DKK"},
-    "kr.": {"SEK", "NOK", "DKK"},
-}
 # Active ISO 4217 codes; other three-letter words (BIS, DEN, SIE) are no currency.
 _ISO_4217_CODES = """
     AED AFN ALL AMD ANG AOA ARS AUD AWG AZN BAM BBD BDT BGN BHD BIF BMD BND BOB BRL
@@ -484,9 +462,9 @@ def currencies_in(text: str) -> set[str]:
     found: set[str] = set()
     for match in _WORD.finditer(text):
         word = match.group()
-        found.update(_CURRENCY_SIGNS.get(word, ()))
+        found.update(CURRENCY_WORDS.get(word, ()))
         bare = word.rstrip(".")
-        found.update(_CURRENCY_SIGNS.get(bare, ()))
+        found.update(CURRENCY_WORDS.get(bare, ()))
         if bare.upper() in _ISO_4217:
             found.add(bare.upper())
     if "us$" in text:
