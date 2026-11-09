@@ -2,10 +2,11 @@
 name: Release
 
 # The images of a release, published on ghcr.io when the release is published: `lekto` (all
-# roles) and `lekto-migration` (the migration client). The CI checked code and image before the
-# merge, so nothing is tested again and no layer cache is used: each image and architecture
-# builds on a runner of its own and is pushed by digest, then one manifest per image gets the
-# tags (`.github/scripts/image_tags.py`: the version, `beta` or `stable`, `latest`).
+# roles) and `lekto-migration` (the migration client). No layer cache is used: each image and
+# architecture builds on a runner of its own; `lekto` is first loaded and tested with
+# `deploy/test-image.sh` (the very artifact, with its version: the CI tested the image of the pull
+# request, not the merge), then pushed by digest from the same build. Then one manifest per image
+# gets the tags (`.github/scripts/image_tags.py`: the version, `beta` or `stable`, `latest`).
 # By hand (`workflow_dispatch`) the images of a published release are built again.
 # Last, a published release whose `lekto` image got `latest` tells the homelab
 # its version by `repository_dispatch` (repository in the secret `HOMELAB_DISPATCH_REPO`); the
@@ -69,7 +70,7 @@ jobs:
     name: 🏗️ ${{ matrix.image.name }} (${{ matrix.platform.arch }})
     needs: tags
     runs-on: ${{ matrix.platform.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 40
     permissions:
       contents: read
       packages: write
@@ -103,6 +104,22 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: 🧪 Build and test the image
+        if: matrix.image.name == 'lekto'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.file }}
+          target: ${{ matrix.image.target }}
+          platforms: linux/${{ matrix.platform.arch }}
+          build-args: LEKTO_VERSION=${{ needs.tags.outputs.version }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.tags.outputs.revision }}
+          load: true
+          tags: lekto:release
+      - name: 🧪 Test the image
+        if: matrix.image.name == 'lekto'
+        run: deploy/test-image.sh lekto:release
       - name: 🚀 Build and push by digest
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
