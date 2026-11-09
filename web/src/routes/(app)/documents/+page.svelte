@@ -726,7 +726,10 @@ row of filters, on a desktop narrow by the title. -->
 		)}
 		onchange={sortBy}
 		{compact}
+		class={compact ? 'size-11 shrink-0' : undefined}
 	/>
+	<!-- 44 px in the row below `lg`, as the search beside it, until the search takes
+	     `SearchField` (review 0.12.2, R-03 and K-06; `ROW_OF_44` in the design guard). -->
 {/snippet}
 
 {#snippet lensLinks(variant: 'list' | 'chips')}

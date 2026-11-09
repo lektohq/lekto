@@ -2,7 +2,8 @@
 	export interface ChipItem {
 		id: string;
 		label: string;
-		/** The tooltip, e.g. the path of a tag. */
+		/** A tag's path as the native title (web/DESIGN.md, "Help and tooltips": the names of
+		 * options in pickers); none for a plain value, whose label is all it has. */
 		title?: string;
 		count: number | null;
 		/** A tag's colour (palette name or `#rrggbb`), as its chip shows it elsewhere. */
@@ -66,7 +67,7 @@
 				<button
 					type="button"
 					aria-pressed={active}
-					title={item.title ?? item.label}
+					title={item.title}
 					{style}
 					class={cn(
 						// A chosen chip's own ring takes the place of the faint one.

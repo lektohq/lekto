@@ -113,6 +113,16 @@ const PROGRESS = new Set([
 const ROW_OF_44 = new Set(['/src/routes/(app)/documents/+page.svelte']);
 const OF_44 = 'size-11 shrink-0';
 
+/** Where a native title names the options of a picker (DESIGN.md, "Help and tooltips"): the
+ * swatches of the colours, the icons, the months of a period, the paths of tags on the filter's
+ * chips. This list may only shrink. */
+const PICKER_TITLES = new Set([
+	'/src/lib/components/ColorPicker.svelte',
+	'/src/lib/components/IconPickerPanel.svelte',
+	'/src/lib/components/PeriodFacet.svelte',
+	'/src/lib/components/FacetChips.svelte'
+]);
+
 /** The master data tabs and what each shows below its search (DESIGN.md, "Master data tabs"). */
 const MASTER_PAGE = '/src/routes/(app)/admin/master-data/+page.svelte';
 const MASTER_PANELS = ['MasterDataList', 'TagsPanel', 'FieldsPanel', 'IdentifiersPanel'];
@@ -207,10 +217,11 @@ describe('the design system (web/DESIGN.md)', () => {
 
 	it('names buttons by tooltips, not by native titles', () => {
 		expect(
-			offenders((source) => {
-				const tagged = ['Button', 'IconButton', 'DropdownMenu.Trigger'].flatMap((name) =>
-					tags(source, name)
-				);
+			offenders((source, path) => {
+				const names = ['Button', 'IconButton', 'DropdownMenu.Trigger'];
+				// `tags` tells the case apart: `button` is the raw element, not `Button`.
+				if (!PICKER_TITLES.has(path)) names.push('button');
+				const tagged = names.flatMap((name) => tags(source, name));
 				return tagged.find((tag) => /\stitle=/.test(tag)) ?? null;
 			})
 		).toEqual([]);
@@ -286,7 +297,11 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(
 			offenders((source, path) => {
 				if (path.includes('/components/ui/') || path.endsWith('/IconButton.svelte')) return null;
-				return tags(source, 'Button').find((tag) => /size="icon/.test(tag)) ?? null;
+				// Also a trigger or link drawn by `buttonVariants` with an icon size.
+				return (
+					tags(source, 'Button').find((tag) => /size="icon/.test(tag)) ??
+					line(source, /buttonVariants\(\{[^}]*\bsize:[^,}]*'icon/)
+				);
 			})
 		).toEqual([]);
 	});

@@ -3,6 +3,7 @@
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
+	import IconButton from '#lib/components/IconButton.svelte';
 	import { buttonVariants } from '#lib/components/ui/button/index.ts';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -30,17 +31,24 @@
 </script>
 
 <DropdownMenu.Root>
-	<DropdownMenu.Trigger
-		class={cn(
-			buttonVariants({ variant: 'outline', size: compact ? 'icon' : 'default' }),
-			compact && 'size-11',
-			className
-		)}
-		aria-label={m.sort_current({ label: current })}
-	>
-		{#if compact}
-			<ArrowUpDown class="size-4" aria-hidden="true" />
-		{:else}
+	{#if compact}
+		<DropdownMenu.Trigger>
+			{#snippet child({ props })}
+				<IconButton
+					{...props}
+					variant="outline"
+					class={className}
+					label={m.sort_current({ label: current })}
+				>
+					<ArrowUpDown aria-hidden="true" />
+				</IconButton>
+			{/snippet}
+		</DropdownMenu.Trigger>
+	{:else}
+		<DropdownMenu.Trigger
+			class={cn(buttonVariants({ variant: 'outline' }), className)}
+			aria-label={m.sort_current({ label: current })}
+		>
 			<span class="whitespace-nowrap">{short.key}</span>
 			{#if short.direction === 'down'}
 				<ArrowDown class="size-3.5 text-muted-foreground" aria-hidden="true" />
@@ -48,8 +56,8 @@
 				<ArrowUp class="size-3.5 text-muted-foreground" aria-hidden="true" />
 			{/if}
 			<ChevronDown class="size-3.5 text-muted-foreground" aria-hidden="true" />
-		{/if}
-	</DropdownMenu.Trigger>
+		</DropdownMenu.Trigger>
+	{/if}
 	<DropdownMenu.Content align="end" class="w-64">
 		<DropdownMenu.Group>
 			<DropdownMenu.GroupHeading>{m.sort_label()}</DropdownMenu.GroupHeading>
