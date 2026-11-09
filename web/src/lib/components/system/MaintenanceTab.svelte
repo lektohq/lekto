@@ -141,12 +141,9 @@
 	{:else}
 		<Card.Root as="section" size="flush" class="px-5 py-1 sm:px-6">
 			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3.5">
-				<div class="flex items-center gap-1">
-					<SectionTitle size="card">{m.maintenance_title()}</SectionTitle>
-					<InfoTip label={m.hint_about({ name: m.maintenance_title() })} size="sm" class="w-80">
-						<p>{m.maintenance_info()}</p>
-					</InfoTip>
-				</div>
+				<SectionTitle size="card" tip={{ name: m.maintenance_title(), text: m.maintenance_info() }}>
+					{m.maintenance_title()}
+				</SectionTitle>
 				{#if !session.isAdmin}
 					<span class="text-meta text-muted-foreground">{m.maintenance_admins_only()}</span>
 				{/if}

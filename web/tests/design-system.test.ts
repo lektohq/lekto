@@ -733,6 +733,16 @@ describe('the design system (web/DESIGN.md)', () => {
 			);
 	});
 
+	it('gives a section title its help through SectionTitle tip', () => {
+		expect(
+			offenders((source, path) =>
+				path.endsWith('/SectionTitle.svelte')
+					? null
+					: (/<\/SectionTitle>\s*<InfoTip\b/.exec(source)?.[0] ?? null)
+			)
+		).toEqual([]);
+	});
+
 	it('shows the owl only where a moment is rare: sign-in, not found, nothing waiting, no document', () => {
 		expect(
 			offenders((source, path) => (MASCOT.has(path) ? null : line(source, /<Mascot\b/)))
