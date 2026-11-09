@@ -342,8 +342,9 @@ LOGO_FETCHERS: dict[str, Factory[LogoFetcher]] = {
 
 def redirect_uri(settings: Settings) -> str:
     """Where the provider sends the browser back: the API's OIDC callback."""
-    assert settings.public_url is not None
-    return str(settings.public_url).rstrip("/") + OIDC_CALLBACK_PATH
+    public = public_base(settings)
+    assert public is not None
+    return public + OIDC_CALLBACK_PATH
 
 
 def oidc_provider(settings: Settings) -> OidcProvider:
@@ -661,10 +662,15 @@ def policy_of(settings: Settings) -> ClassificationPolicy:
     )
 
 
+def public_base(settings: Settings) -> str | None:
+    """`LEKTO_PUBLIC_URL` without a slash at its end, what every absolute link starts with;
+    None when it is not set."""
+    return None if settings.public_url is None else str(settings.public_url).rstrip("/")
+
+
 def links_of(settings: Settings) -> Links:
     """Where the core's links lead: `LEKTO_PUBLIC_URL`, the API's and the web UI's prefixes."""
-    public = None if settings.public_url is None else str(settings.public_url)
-    return Links(public=public, api_prefix=API_PREFIX, ui_prefix=UI_PREFIX)
+    return Links(public=public_base(settings), api_prefix=API_PREFIX, ui_prefix=UI_PREFIX)
 
 
 def webhook_policy_of(settings: Settings) -> WebhookPolicy:
@@ -780,6 +786,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
     facts = FactsSignal(uow, store, container.codes)
     inbox = InboxService(uow, clock)
     links = links_of(settings)
+    webhook_policy = webhook_policy_of(settings)
     desk = TaskDesk(container.cipher, container.templates, links=links)
     executors: dict[Node, NodeExecutor] = {
         Node.OCR: OcrNode(store, container.ocr, container.mail_renderer),
@@ -897,7 +904,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
             uow,
             clock,
             container.cipher,
-            webhook_policy_of(settings),
+            webhook_policy,
             container.templates,
             retention=settings.retention,
         ),
@@ -915,7 +922,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
             clock,
             container.cipher,
             container.webhook_sender,
-            webhook_policy_of(settings),
+            webhook_policy,
             container.templates,
             links=links,
             store=store,

@@ -28,7 +28,7 @@ import hmac
 import json
 import re
 import secrets
-from collections.abc import Collection, Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
@@ -212,6 +212,16 @@ def validate_header_value(name: str, value: str) -> str:
             because(ReasonCode.HEADER_VALUE_INVALID, name=name, max=MAX_HEADER_VALUE)
         )
     return value
+
+
+def header_values(pairs: Sequence[tuple[str, str]]) -> dict[str, str]:
+    """A webhook's own headers from the pairs given, in their order, names and values checked
+    (`validate_header_names`: none twice, ignoring case; `validate_header_value`)."""
+    names = validate_header_names(name for name, _ in pairs)
+    return {
+        name: validate_header_value(name, value)
+        for name, (_, value) in zip(names, pairs, strict=True)
+    }
 
 
 def headers_to_bytes(headers: Mapping[str, str]) -> bytes:

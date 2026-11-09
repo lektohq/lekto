@@ -451,7 +451,7 @@ async def test_own_headers_go_with_the_request_and_an_unsigned_one_has_no_signat
         url=URL,
         event_types=["*"],
         signed=False,
-        headers={"Authorization": "Bearer t0ken", "User-Agent": "Mine"},
+        headers=[("Authorization", "Bearer t0ken"), ("User-Agent", "Mine")],
     )
     service = world.webhook_delivery()
     await queue(world, document, service)
@@ -471,7 +471,7 @@ async def test_header_values_that_cannot_be_decrypted_give_up_without_sending(
     user = await world.user()
     document = await seed(world, user)
     created = await world.webhooks.create(
-        user.id, name="HA", url=URL, event_types=["*"], headers={"X-Token": "a"}
+        user.id, name="HA", url=URL, event_types=["*"], headers=[("X-Token", "a")]
     )
     async with world.uow() as uow:
         webhook = await uow.webhooks.get(created.webhook.id)

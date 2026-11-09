@@ -12,15 +12,12 @@ from lekto.adapters.inbound.rest.schemas.webhooks import (
     DeliveryOut,
     DeliveryPageOut,
     DeliverySummaryOut,
-    HeaderIn,
     WebhookCreate,
     WebhookCreated,
     WebhookOut,
     WebhookPatch,
 )
-from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import UserId, WebhookId
-from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.webhooks import DeliveryOutcome
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE
 from lekto.core.services.webhooks.policy import TEST_REQUESTS, TEST_WINDOW
@@ -78,7 +75,7 @@ async def create_webhook(
         event_types=body.event_types,
         active=body.active,
         signed=body.signed,
-        headers=_headers(body.headers),
+        headers=[(header.name, header.value) for header in body.headers],
         body=body.body,
         body_template=body.body_template,
         max_open_tasks=body.max_open_tasks,
@@ -236,13 +233,3 @@ async def delivery_summary(
 )
 async def test_webhook(id: UUID, user: CurrentUser, context: Context) -> DeliveryOut:
     return DeliveryOut.of(await context.webhook_delivery.send_test(user, WebhookId(id)))
-
-
-def _headers(headers: list[HeaderIn]) -> dict[str, str]:
-    """The headers as the service takes them; a name given twice is refused there."""
-    found: dict[str, str] = {}
-    for header in headers:
-        if header.name in found:
-            raise ValidationError(because(ReasonCode.HEADER_TWICE, name=header.name))
-        found[header.name] = header.value
-    return found

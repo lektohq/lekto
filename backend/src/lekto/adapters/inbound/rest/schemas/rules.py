@@ -24,6 +24,7 @@ from lekto.adapters.inbound.schemas import (
 from lekto.core.domain.document_facts import FactRole
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.json_value import JsonValue
+from lekto.core.domain.reasons import Reason
 from lekto.core.domain.rules import (
     DEFAULT_PRIORITY,
     MAX_ACTIONS,
@@ -776,6 +777,10 @@ class SkippedOut(BaseModel):
     reason: str = Field(description="Why, in English.")
     reasons: list[ReasonOut] = Field(default_factory=list, description="The same with its code.")
 
+    @classmethod
+    def of(cls, id: UUID, reason: Reason) -> "SkippedOut":
+        return cls(document_id=id, reason=reason.text, reasons=[ReasonOut.of(reason)])
+
 
 class RuleApplicationOut(BaseModel):
     id: UUID
@@ -804,10 +809,7 @@ class RuleApplicationOut(BaseModel):
             done=application.position,
             applied=application.applied,
             unchanged=application.unchanged,
-            skipped=[
-                SkippedOut(document_id=id, reason=reason.text, reasons=[ReasonOut.of(reason)])
-                for id, reason in application.skipped
-            ],
+            skipped=[SkippedOut.of(id, reason) for id, reason in application.skipped],
             error=application.error,
             created_at=application.created_at,
             finished_at=application.finished_at,
