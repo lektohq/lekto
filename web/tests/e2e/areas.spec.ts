@@ -29,13 +29,13 @@ test('every area opens, and the dialogs create things', async ({ page }) => {
 		['/ui/documents', 'Documents'],
 		['/ui/', 'Overview'],
 		['/ui/inbox', 'Inbox'],
-		['/ui/documents?q=invoice', 'Documents'],
 		['/ui/rules', 'Rules'],
 		['/ui/spaces', 'Spaces'],
 		['/ui/webhooks', 'Webhooks'],
 		['/ui/admin/users', 'Users'],
 		['/ui/admin/master-data', 'Master data'],
-		['/ui/settings', 'Settings']
+		['/ui/settings', 'Settings'],
+		['/ui/system', 'System']
 	];
 	for (const [path, heading] of headings) {
 		await page.goto(path);
