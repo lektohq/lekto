@@ -646,7 +646,7 @@
 		<PaneHead {end}>
 			{#if reviewing && undecided > 0}
 				<Badge variant="yellow">
-					<span class="size-[7px] rounded-full bg-lane-yellow-foreground" aria-hidden="true"></span>
+					<TriangleAlert aria-hidden="true" strokeWidth={2.2} />
 					{undecided === 1 ? m.review_undecided_one() : m.review_undecided({ count: undecided })}
 				</Badge>
 			{/if}
@@ -1052,7 +1052,7 @@
 						<SectionTitle size="card" level={3} class="mb-1">{m.dryrun_rules()}</SectionTitle>
 						<ul class="flex flex-col gap-2">
 							{#each preview.rules as rule (rule.rule_id)}
-								<li class="rounded-xl border p-3">
+								<li class={cardVariants({ size: 'sm' })}>
 									<span class="font-medium">{rule.name}</span>
 									<div class="mt-1">
 										<RuleEffects

@@ -694,6 +694,68 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('asks before a destructive action in a dialog of size md', () => {
+		expect(
+			offenders((source, path) =>
+				path.includes('/components/ui/')
+					? null
+					: (tags(source, 'AlertDialog.Content').find((tag) => !/\ssize="md"/.test(tag)) ?? null)
+			)
+		).toEqual([]);
+	});
+
+	it('lists the appearances once', () => {
+		const named = /m\.theme_(?:light|dark|system)\b/;
+		expect(
+			[...Object.entries(sources), ...Object.entries(scripts)]
+				.filter(([path, source]) => path !== '/src/lib/theme.ts' && named.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
+	it('draws a dot of alert only as AlertDot, with its words', () => {
+		expect(
+			offenders((source, path) =>
+				path.endsWith('/AlertDot.svelte')
+					? null
+					: line(source, /size-\[7px\]|size-2 (?:shrink-0 )?rounded-full bg-destructive/)
+			)
+		).toEqual([]);
+	});
+
+	it("gives the date picker's arrows and days and the rows of choice lists a finger's size", () => {
+		const picker = sources['/src/lib/components/DateInput.svelte'];
+		for (const part of ['PrevButton', 'NextButton', 'Day'])
+			expect(picker).toMatch(new RegExp(`<DatePicker\\.${part}\\b[^>]*\\bmax-sm:size-11\\b`));
+		for (const list of ['MultiPicker', 'FacetList', 'FacetPicker'])
+			expect(sources[`/src/lib/components/${list}.svelte`]).toMatch(
+				/<label\b[^>]*\bmax-sm:min-h-11\b/
+			);
+	});
+
+	it('gives a section title its help through SectionTitle tip', () => {
+		expect(
+			offenders((source, path) =>
+				path.endsWith('/SectionTitle.svelte')
+					? null
+					: (/<\/SectionTitle>\s*<InfoTip\b/.exec(source)?.[0] ?? null)
+			)
+		).toEqual([]);
+	});
+
+	it('answers a fake API in tests through lib/testing/api.ts, never by a json of its own', () => {
+		const tests = import.meta.glob<string>('/src/**/*.test.ts', {
+			query: '?raw',
+			import: 'default',
+			eager: true
+		});
+		expect(
+			Object.entries(tests)
+				.filter(([, source]) => /\bfunction json\(/.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
 	it('writes the API prefix once, beside the typed calls that need it as their type', () => {
 		// `BASE_API` in `lib/api/base.ts`; `api.GET('/api/v1/…')` keeps the literal, which
 		// openapi-fetch reads as the path's type.

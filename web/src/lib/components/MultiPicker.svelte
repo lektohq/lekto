@@ -68,7 +68,7 @@
 		{#each shown as option (option.value)}
 			<li>
 				<label
-					class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-secondary"
+					class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-secondary max-sm:min-h-11"
 				>
 					<ChoiceBox
 						checked={selected.includes(option.value)}

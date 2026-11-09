@@ -208,7 +208,7 @@
 						<li>{@render toggle()}</li>
 					{/if}
 					{#if shown(lane)}
-						<li class={[cardVariants({ size: 'flush' }), 'p-3', lane.kind === 'branch' && 'ml-4']}>
+						<li class={[cardVariants({ size: 'sm' }), lane.kind === 'branch' && 'ml-4']}>
 							<p class="flex items-center gap-1 text-sm font-semibold">
 								{#if lane.kind === 'branch'}
 									<CornerDownRight class="size-4 text-muted-foreground" aria-hidden="true" />

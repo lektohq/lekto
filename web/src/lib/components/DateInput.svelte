@@ -130,14 +130,14 @@
 				{#snippet children({ months, weekdays })}
 					<DatePicker.Header class="flex items-center justify-between gap-2 pb-2">
 						<DatePicker.PrevButton
-							class="grid size-8 place-items-center rounded-lg hover:bg-secondary"
+							class="grid size-8 place-items-center rounded-lg hover:bg-secondary max-sm:size-11"
 							aria-label={m.date_previous_month()}
 						>
 							<ChevronLeft class="size-4" aria-hidden="true" />
 						</DatePicker.PrevButton>
 						<DatePicker.Heading class="text-sm font-medium" />
 						<DatePicker.NextButton
-							class="grid size-8 place-items-center rounded-lg hover:bg-secondary"
+							class="grid size-8 place-items-center rounded-lg hover:bg-secondary max-sm:size-11"
 							aria-label={m.date_next_month()}
 						>
 							<ChevronRight class="size-4" aria-hidden="true" />
@@ -148,7 +148,9 @@
 							<DatePicker.GridHead>
 								<DatePicker.GridRow class="flex">
 									{#each weekdays as day, index (index)}
-										<DatePicker.HeadCell class="w-9 text-xs font-normal text-muted-foreground">
+										<DatePicker.HeadCell
+											class="w-9 text-xs font-normal text-muted-foreground max-sm:w-11"
+										>
 											{day}
 										</DatePicker.HeadCell>
 									{/each}
@@ -160,7 +162,7 @@
 										{#each week as date (date.toString())}
 											<DatePicker.Cell {date} month={month.value} class="p-0">
 												<DatePicker.Day
-													class="grid size-9 place-items-center rounded-lg text-sm tabular-nums hover:bg-secondary data-disabled:pointer-events-none data-disabled:opacity-40 data-outside-month:text-muted-foreground/60 data-selected:bg-primary data-selected:font-medium data-selected:text-primary-foreground data-today:ring-1 data-today:ring-primary/40"
+													class="grid size-9 place-items-center rounded-lg text-sm tabular-nums hover:bg-secondary data-disabled:pointer-events-none data-disabled:opacity-40 data-outside-month:text-muted-foreground/60 data-selected:bg-primary data-selected:font-medium data-selected:text-primary-foreground data-today:ring-1 data-today:ring-primary/40 max-sm:size-11"
 												/>
 											</DatePicker.Cell>
 										{/each}

@@ -92,7 +92,7 @@
 			</div>
 		{:else if enabled}
 			<div class="flex flex-wrap gap-2">
-				<Button variant="outline" onclick={() => (renewing = true)}>{m.totp_new_codes()}</Button>
+				<Button variant="outline" onclick={() => (renewing = true)}>{m.totp_renew_codes()}</Button>
 				<Button variant="outline" onclick={() => (disabling = true)}>{m.totp_disable()}</Button>
 			</div>
 		{:else}
@@ -122,7 +122,7 @@
 	bind:open={renewing}
 	title={m.totp_new_codes()}
 	description={m.totp_new_codes_hint()}
-	submitLabel={m.totp_new_codes()}
+	submitLabel={m.totp_renew_codes()}
 	onsubmit={renew}
 />
 <SecretDialog

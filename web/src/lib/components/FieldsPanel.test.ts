@@ -8,18 +8,12 @@ import { scope } from '#lib/scope.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import WithDialogs from '#lib/testing/WithDialogs.svelte';
 import FieldsPanel from './FieldsPanel.svelte';
+import { json } from '#lib/testing/api.ts';
 
 const INVOICE = '0199a6c4-0000-7000-8000-0000000000e1';
 const REMINDER = '0199a6c4-0000-7000-8000-0000000000e2';
 
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
-
-function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), {
-		status,
-		headers: { 'content-type': 'application/json' }
-	});
-}
 
 beforeEach(() => {
 	session.start({

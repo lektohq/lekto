@@ -70,7 +70,7 @@
 <div
 	class={cn(
 		'flex flex-col gap-3 rounded-2xl border p-3',
-		own ? 'bg-card' : 'border-dashed bg-secondary/40',
+		own ? 'bg-card' : 'bg-secondary/40',
 		top && 'border-0 p-0',
 		error && 'border-destructive'
 	)}

@@ -38,7 +38,7 @@
 </script>
 
 <AlertDialog.Root bind:open>
-	<AlertDialog.Content>
+	<AlertDialog.Content size="md">
 		<AlertDialog.Header>
 			<AlertDialog.Title>{title}</AlertDialog.Title>
 			<AlertDialog.Description>{description}</AlertDialog.Description>
