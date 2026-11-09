@@ -14,7 +14,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
-	import * as Table from '#lib/components/ui/table/index.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { formatDate } from '#lib/i18n.ts';
 	import { userLabel } from '#lib/masterdata.svelte.ts';
@@ -94,42 +94,40 @@
 	{:else if !users}
 		<Loading />
 	{:else}
-		<Table.Root>
-			<Table.Header>
-				<Table.Row>
-					<Table.Head>{m.login_username()}</Table.Head>
-					<Table.Head>{m.user_role()}</Table.Head>
-					<Table.Head>{m.user_state()}</Table.Head>
-					<Table.Head>{m.user_created_at()}</Table.Head>
-					<Table.Head><span class="sr-only">{m.user_manage()}</span></Table.Head>
-				</Table.Row>
-			</Table.Header>
-			<Table.Body>
-				{#each users as user (user.id)}
-					<Table.Row>
-						<Table.Cell>
-							<span class="font-medium">{user.username}</span>
-							{#if user.display_name}
-								<span class="block text-xs text-muted-foreground">{user.display_name}</span>
-							{/if}
-						</Table.Cell>
-						<Table.Cell>{user.role === 'admin' ? m.role_admin() : m.role_user()}</Table.Cell>
-						<Table.Cell>
+		<ul class="flex flex-col gap-2">
+			{#each users as user (user.id)}
+				<!-- The name opens the account's editor and takes the whole row; the pencil stands
+				above it (web/DESIGN.md, "Lists"). -->
+				<Card.Root as="li" size="row" class="relative flex flex-wrap items-center gap-3">
+					<div class="flex min-w-0 flex-1 flex-col gap-1">
+						<span class="flex flex-wrap items-center gap-2">
+							<button
+								type="button"
+								class="truncate text-left font-medium after:absolute after:inset-0 hover:underline"
+								onclick={() => (managing = user.id)}>{userLabel(user)}</button
+							>
 							<Badge variant={user.active ? 'green' : 'muted'}>
 								{user.active ? m.user_active() : m.user_inactive()}
 							</Badge>
-						</Table.Cell>
-						<Table.Cell>{user.created_at ? formatDate(user.created_at) : '–'}</Table.Cell>
-						<Table.Cell class="w-px py-1">
-							<EditButton
-								label={m.user_manage_named({ name: userLabel(user) })}
-								onclick={() => (managing = user.id)}
-							/>
-						</Table.Cell>
-					</Table.Row>
-				{/each}
-			</Table.Body>
-		</Table.Root>
+						</span>
+						<span class="truncate text-sm text-muted-foreground">
+							{[
+								userLabel(user) === user.username ? null : user.username,
+								user.role === 'admin' ? m.role_admin() : m.role_user(),
+								user.created_at ? m.user_created_on({ date: formatDate(user.created_at) }) : null
+							]
+								.filter(Boolean)
+								.join(' · ')}
+						</span>
+					</div>
+					<EditButton
+						class="relative z-10"
+						label={m.user_manage_named({ name: userLabel(user) })}
+						onclick={() => (managing = user.id)}
+					/>
+				</Card.Root>
+			{/each}
+		</ul>
 	{/if}
 </div>
 
