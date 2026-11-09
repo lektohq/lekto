@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query
 
+from lekto.adapters.inbound.limits import in_words
 from lekto.adapters.inbound.rest.auth import PROTECTED, READS, Authenticated, CurrentUser
 from lekto.adapters.inbound.rest.context import ApiContext, Context
 from lekto.adapters.inbound.rest.params import ADMINS_ONLY
@@ -23,7 +24,8 @@ from lekto.adapters.inbound.rest.schemas.refs import MAX_REF, RefIn, RefOut, ope
 from lekto.core.domain.identifiers import IdentifierKind, normalise_identifier
 from lekto.core.domain.ids import UserId
 from lekto.core.domain.open_identifiers import OpenSource
-from lekto.core.ports.repository import PAGE_LIMIT
+from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE
+from lekto.core.services.places import PLACES
 
 router = APIRouter(prefix="/identifiers/open", tags=["identifiers"], dependencies=PROTECTED)
 
@@ -50,7 +52,7 @@ class _Listing:
         kind: IdentifierKind | None = None,
         recommended: bool = False,
         offset: Annotated[int, Query(ge=0)] = 0,
-        limit: Annotated[int, Query(ge=0, le=PAGE_LIMIT)] = 50,
+        limit: Annotated[int, Query(ge=0, le=PAGE_LIMIT)] = PAGE_SIZE,
     ) -> None:
         self.source, self.kind, self.recommended = source, kind, recommended
         self.offset, self.limit = offset, limit
@@ -115,7 +117,8 @@ async def open_summary(user: CurrentUser, context: Context) -> OpenCountsOut:
     summary="An open identifier and where it stands",
     description=(
         ADMINS_ONLY + " The open identifier of `kind` with the value of `ref` (its `ref` in the "
-        "list) and where it stands in its five newest documents. 404 if it is not open, 422 "
+        f"list) and where it stands in its {in_words(PLACES)} newest documents. 404 if it is not "
+        "open, 422 "
         "for a reference that names no value of the kind."
     ),
     response_model=OpenDetailOut,
@@ -230,7 +233,8 @@ places_router = APIRouter(
     summary="Where an identifier stands",
     description=(
         "The newest documents within the caller's reach that have the value of `ref` of `kind` "
-        "as a fact (none a person rejected), by document date, at most five: the text around "
+        f"as a fact (none a person rejected), by document date, at most {in_words(PLACES)}: the "
+        "text around "
         "it and each place their pages show it, the one the fact was read at as `own`. A "
         "person's kinds only for admins (403, as the `fact` filter); 422 for a reference that "
         "names no value of the kind."

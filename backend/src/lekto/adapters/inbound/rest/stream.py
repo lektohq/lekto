@@ -7,6 +7,7 @@ from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.params import AllDocuments, Filter
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.stream import StreamOut
+from lekto.core.services.stream import LIMIT, MAX_LANES
 
 router = APIRouter(prefix="/documents", tags=["documents"], dependencies=PROTECTED)
 
@@ -21,7 +22,8 @@ router = APIRouter(prefix="/documents", tags=["documents"], dependencies=PROTECT
         "target its documents refer to at its start and the document it expects next; branches "
         "(documents that refer to one of a series or to its target, with the chain of theirs); "
         "chains of documents related only among themselves; and the rest in one lane. At most "
-        "the 500 newest documents (`truncated`); beyond 24 lanes of series and chains the rest "
+        f"the {LIMIT} newest documents (`truncated`); beyond {MAX_LANES} lanes of series and "
+        "chains the rest "
         "come folded."
     ),
     response_model=StreamOut,

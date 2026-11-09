@@ -86,7 +86,7 @@ from lekto.core.domain.ids import (
     UserId,
 )
 from lekto.core.domain.imports import ImportedMetadata, ImportedReview
-from lekto.core.domain.inbox import InboxTab
+from lekto.core.domain.inbox import DONE_PERIOD, InboxTab
 from lekto.core.domain.pipeline import Node
 from lekto.core.ports.pages import PAGE_MEDIA_TYPE
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE, DocumentOrder, SortKey
@@ -846,7 +846,8 @@ async def confirm(
         "(`review`), red (`intervene`), and new ones, which went green without a person's "
         "decision and are not seen by the caller since (`PUT /documents/{id}/seen`); each with "
         "its open nodes and fields. Documents in spaces the caller only reads never stand "
-        "there. `tab` takes one of them, or `done`: what left the inbox in the last 14 days, "
+        "there. `tab` takes one of them, or `done`: what left the inbox in the last "
+        f"{DONE_PERIOD.days} days, "
         "with how (confirmed out of yellow or red, or seen), when and by whom, newest first by "
         "when it left (a `cursor` whose document is no longer done: 422). With "
         "`all_users` (admins, others: 403) every user's inbox, with the caller's own seen. "

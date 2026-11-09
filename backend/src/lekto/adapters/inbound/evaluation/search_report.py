@@ -1,6 +1,7 @@
 """The Markdown report of a search evaluation."""
 
 from lekto.adapters.inbound.evaluation.search import (
+    CUTOFF,
     FLOORS,
     KINDS_AT,
     NONSENSE,
@@ -21,7 +22,8 @@ def render_search(run: SearchRun, queries: QuerySet, info: SearchRunInfo) -> str
         f"- Index: {info.index}",
         *(f"- {name}: `{value}`" for name, value in info.settings.items()),
         f"- Documents: {run.documents}, queries: {len(queries.cases)}",
-        "- Result per query: the first expected case among the first 10 hits. Hit@k: the share of "
+        f"- Result per query: the first expected case among the first {CUTOFF} hits. Hit@k: the "
+        "share of "
         "queries found within the first k hits; MRR: mean of 1/rank (0 if not found); R-prec: "
         "mean share of the expected cases among the first n hits, n the number expected; Ties: "
         "queries where chance decides between an expected case and another at the top (same "

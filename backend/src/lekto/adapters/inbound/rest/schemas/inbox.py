@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from lekto.adapters.inbound.rest.schemas.documents import DocumentDetails, DocumentPatch
 from lekto.adapters.inbound.schemas import ReasonOut
 from lekto.core.domain.classification import Candidate, CandidateSource, FieldCheck
-from lekto.core.domain.inbox import Departure, Done, InboxTab
+from lekto.core.domain.inbox import DONE_PERIOD, Departure, Done, InboxTab
 from lekto.core.domain.labels import LABEL_LINES, LabelCheck, LabelOutcome
 from lekto.core.domain.locations import Box, Location
 from lekto.core.domain.pipeline import Lane, Node, Outcome
@@ -361,7 +361,7 @@ class InboxItemOut(BaseModel):
         description=(
             "Where it stands: `new` (green by itself, not seen by the caller since it became "
             "new), `review` (yellow), `intervene` (red), `processing` (no lane yet), `done` "
-            "(left the caller's inbox in the last 14 days)."
+            f"(left the caller's inbox in the last {DONE_PERIOD.days} days)."
         )
     )
     open: list[OpenNodeOut]

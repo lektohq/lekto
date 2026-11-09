@@ -19,6 +19,7 @@ from lekto.core.domain.aggregates import Aggregate, GroupBy, GroupKey
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldType
 from lekto.core.domain.ids import FieldId, LensId, UserId, short_id
+from lekto.core.domain.lenses import MAX_QUERY_LENGTH
 from lekto.core.domain.periods import Period
 from lekto.core.domain.pipeline import Lane
 from lekto.core.ports.repository import DocumentFilter
@@ -81,7 +82,7 @@ def add_listing_tools(tools: Tools, context: ApiContext) -> None:
         lane: LaneName | None = None,
         document_date_from: date | None = None,
         document_date_to: date | None = None,
-        query: Annotated[str | None, Field(min_length=1, max_length=500)] = None,
+        query: Annotated[str | None, Field(min_length=1, max_length=MAX_QUERY_LENGTH)] = None,
         lens: str | None = None,
         group_by: GroupName | None = None,
         sum: str | None = None,
