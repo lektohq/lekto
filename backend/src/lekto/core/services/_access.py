@@ -113,21 +113,13 @@ async def readable_document(uow: UnitOfWork, user: User, id: DocumentId) -> tupl
     return document, space
 
 
-async def writable_document(uow: UnitOfWork, user: User, id: DocumentId) -> tuple[Document, Space]:
-    """The document and its space, if `user` edits it (`can_edit_document`); NotFoundError if
-    they cannot read it, PermissionDeniedError if they only read it."""
-    document, space = await readable_document(uow, user, id)
-    if not can_edit_document(user, document, space):
-        raise PermissionDeniedError(because(ReasonCode.NO_WRITE_ACCESS_TO_DOCUMENT, id=str(id)))
-    return document, space
-
-
 async def controllable_document(
     uow: UnitOfWork, user: User, id: DocumentId, action: Action
 ) -> tuple[Document, Space]:
     """The document and its space, if `user` edits it (`can_edit_document`: an editor of its
     space or an admin); NotFoundError if they cannot read it, PermissionDeniedError ("only
-    editors and admins <action>") if they only read it."""
+    editors and admins <action>") if they only read it: one code for every change of a
+    document, the action says which (review 0.12.2, C-13)."""
     document, space = await readable_document(uow, user, id)
     if not can_edit_document(user, document, space):
         raise PermissionDeniedError(because(ReasonCode.EDITORS_ONLY, action=action.value))
