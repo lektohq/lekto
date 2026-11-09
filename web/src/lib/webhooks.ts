@@ -7,6 +7,17 @@ import { reportError } from '#lib/errors.ts';
 import { WEBHOOK_EVENT_TYPES, type WebhookEventType } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 
+/** What the API takes of a webhook (`tests/api-limits.test.ts` holds them to `openapi.json`). */
+export const WEBHOOK_LIMITS = {
+	name: 100,
+	url: 2000,
+	body: 10_000,
+	headers: 20,
+	headerName: 100,
+	headerValue: 4096,
+	openTasks: { min: 1, max: 64, default: 4 }
+} as const;
+
 /** Send a test event through the webhook; the outcome is a toast. */
 export async function sendTest(id: string): Promise<void> {
 	try {

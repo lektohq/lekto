@@ -267,7 +267,7 @@
 {#snippet nameField()}
 	<Field.Field>
 		<Field.Label for="{uid}-name">{m.field_name()}</Field.Label>
-		<Input id="{uid}-name" bind:value={name} maxlength={200} required />
+		<Input id="{uid}-name" bind:value={name} maxlength={MASTER_LIMITS.name} required />
 	</Field.Field>
 {/snippet}
 
@@ -504,7 +504,7 @@
 					id="{uid}-description"
 					bind:value={description}
 					rows={3}
-					maxlength={300}
+					maxlength={MASTER_LIMITS.description}
 					aria-describedby="{uid}-description-hint"
 				/>
 			</Field.Field>
@@ -518,6 +518,7 @@
 					id="{uid}-title-pattern"
 					bind:value={titlePattern}
 					label={m.master_title_pattern()}
+					maxlength={MASTER_LIMITS.titlePattern}
 					documentType={initial?.id ?? null}
 					extraFields={initial ? [] : assigned.map((item) => item.id)}
 				/>

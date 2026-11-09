@@ -1,3 +1,8 @@
+<script lang="ts" module>
+	/** The longest code the API takes (`CodeIn`, `tests/api-limits.test.ts`). */
+	export const CODE_MAX = 64;
+</script>
+
 <script lang="ts">
 	import FormDialog from '#lib/components/FormDialog.svelte';
 	import * as Field from '#lib/components/ui/field/index.ts';
@@ -46,7 +51,7 @@
 				bind:value={code}
 				inputmode="numeric"
 				autocomplete="one-time-code"
-				maxlength={64}
+				maxlength={CODE_MAX}
 				required
 				aria-invalid={error ? true : undefined}
 			/>

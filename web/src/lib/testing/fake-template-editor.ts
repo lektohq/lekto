@@ -11,7 +11,7 @@ export function mountTemplateEditor(options: EditorOptions): EditorHandle {
 	if (options.label) area.setAttribute('aria-label', options.label);
 	if (options.invalid) area.setAttribute('aria-invalid', 'true');
 	if (options.reason) area.setAttribute('aria-description', options.reason);
-	area.maxLength = options.maxlength ?? 500;
+	area.maxLength = options.maxlength;
 	area.addEventListener('input', () => options.onchange(area.value));
 	options.parent.append(area);
 	if (options.autofocus) area.focus();

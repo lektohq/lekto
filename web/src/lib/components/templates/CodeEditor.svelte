@@ -18,7 +18,7 @@
 		invalid = false,
 		large = false,
 		autofocus = false,
-		maxlength = 500,
+		maxlength,
 		purpose = 'rule',
 		steps = [],
 		class: className = ''
@@ -33,7 +33,8 @@
 		invalid?: boolean;
 		large?: boolean;
 		autofocus?: boolean;
-		maxlength?: number;
+		/** The longest template the API takes. */
+		maxlength: number;
 		/** A webhook's body sees more values (`templateNames`). */
 		purpose?: TemplatePurpose;
 		/** A rule's step: the names of the steps before it that ask (`steps.<name>`). */
