@@ -21,6 +21,8 @@ _UNQUOTED = re.compile(r"(\S*)(.*)", re.DOTALL)
 
 
 def read_env_file(path: Path) -> dict[str, str]:
+    """The `KEY=value` lines of `path`, read as a shell reads them. `lekto_migration.config`
+    keeps a copy (the client does not import Lekto); a parity test keeps both equal."""
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as error:
