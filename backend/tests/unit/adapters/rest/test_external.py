@@ -11,6 +11,7 @@ from lekto.core.domain.pipeline import Node
 from lekto.core.domain.tasks import MAX_ANSWER_BYTES, Task, TaskKind, TaskStatus, TaskStep
 from lekto.core.services.objects import structure_key
 from lekto.core.services.tasks.files import file_link
+from tests import builders
 from tests.api import auth, bearer
 from tests.unit.adapters.rest.support import Api, upload
 
@@ -105,10 +106,8 @@ async def test_a_file_of_the_document_by_its_signed_link(api: Api) -> None:
     await api.container.object_store.put(
         structure_key(task.document_id), b'{"pages": []}', content_type="application/json"
     )
-    link = file_link(
-        "https://lekto.example.org", api.container.cipher, task, "content.json", task.deadline
-    )
-    path = link.removeprefix("https://lekto.example.org")
+    link = file_link(builders.LINKS, api.container.cipher, task, "content.json", task.deadline)
+    path = link.removeprefix(builders.PUBLIC_URL)
     response = await api.client.get(path)
     assert (response.status_code, response.content) == (200, b'{"pages": []}')
     assert response.headers["content-type"] == "application/json"

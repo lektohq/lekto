@@ -9,6 +9,7 @@ from lekto.core.domain.documents import Document
 from lekto.core.domain.fields import FieldDefinition, field_to_json
 from lekto.core.domain.ids import DocumentTypeId, EventId
 from lekto.core.domain.json_value import JsonObject, JsonValue
+from lekto.core.domain.links import DOCUMENT, Links
 from lekto.core.domain.templates import EVENT, TemplateValue, template_values
 from lekto.core.ports.unit_of_work import UnitOfWork
 from lekto.core.services._access import space_label
@@ -47,11 +48,9 @@ async def document_values(
     )
 
 
-def document_link(link_base: str | None, document: Document) -> str | None:
+def document_link(links: Links | None, document: Document) -> str | None:
     """Where a person opens the document in the web UI; None without `LEKTO_PUBLIC_URL`."""
-    if link_base is None:
-        return None
-    return f"{link_base.rstrip('/')}/ui/documents/{document.id}"
+    return None if links is None else links.ui_absolute(DOCUMENT.format(id=document.id))
 
 
 def event_values(event_id: EventId, type: str, occurred_at: datetime) -> dict[str, TemplateValue]:
@@ -66,7 +65,7 @@ def event_values(event_id: EventId, type: str, occurred_at: datetime) -> dict[st
 
 
 async def webhook_values(
-    uow: UnitOfWork, document: Document, link_base: str | None, codes: Iterable[Code] = ()
+    uow: UnitOfWork, document: Document, links: Links | None, codes: Iterable[Code] = ()
 ) -> dict[str, TemplateValue]:
     """The values a webhook's template sees of `document`: those of a rule's template (the fields
     of its type, `codes` for `facts.girocode`), its id, lane and link."""
@@ -77,12 +76,12 @@ async def webhook_values(
     values["document_id"] = str(document.id)
     if document.lane is not None:
         values["lane"] = document.lane.value
-    if (link := document_link(link_base, document)) is not None:
+    if (link := document_link(links, document)) is not None:
         values["link"] = link
     return values
 
 
-async def document_json(uow: UnitOfWork, document: Document, link_base: str | None) -> JsonObject:
+async def document_json(uow: UnitOfWork, document: Document, links: Links | None) -> JsonObject:
     """The document as a webhook's `full` body shows it: ids with names, the fields of its type
     with a value (by key, in their JSON form), its lane and link."""
     contact = None if document.contact_id is None else await uow.contacts.find(document.contact_id)
@@ -127,5 +126,5 @@ async def document_json(uow: UnitOfWork, document: Document, link_base: str | No
         "channel": document.channel.value,
         "pages": document.page_count,
         "fields": fields,
-        "link": document_link(link_base, document),
+        "link": document_link(links, document),
     }

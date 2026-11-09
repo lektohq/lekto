@@ -26,6 +26,9 @@ from tests.contracts.push import PushSenderContract, a_device
 SUBJECT = "mailto:admin@example.org"
 
 
+TEST_MESSAGE = PushMessage(kind=PushKind.TEST, url="/ui/")
+
+
 def answering(status: int, seen: list[httpx2.Request] | None = None) -> httpx2.MockTransport:
     def handle(request: httpx2.Request) -> httpx2.Response:
         if seen is not None:
@@ -86,7 +89,7 @@ async def test_it_posts_an_encrypted_body_with_its_headers() -> None:
         private_key=new_private_key(), subject=SUBJECT, transport=answering(201, seen)
     )
     message = PushMessage(
-        kind=PushKind.WAITING, params={"count": 3}, topic="waiting", ttl_seconds=60
+        kind=PushKind.WAITING, url="/ui/", params={"count": 3}, topic="waiting", ttl_seconds=60
     )
     result = await sender.send(a_device(UserId(new_id())), message)
     assert result.outcome is PushOutcome.DELIVERED
@@ -114,7 +117,7 @@ async def test_the_answer_decides_the_outcome(status: int, outcome: PushOutcome)
     sender = WebPushSender(
         private_key=new_private_key(), subject=SUBJECT, transport=answering(status)
     )
-    result = await sender.send(a_device(UserId(new_id())), PushMessage(kind=PushKind.TEST))
+    result = await sender.send(a_device(UserId(new_id())), TEST_MESSAGE)
     assert (result.outcome, result.status_code) == (outcome, status)
 
 
@@ -125,7 +128,7 @@ async def test_a_failure_on_the_way_does_not_name_the_address() -> None:
     sender = WebPushSender(
         private_key=new_private_key(), subject=SUBJECT, transport=httpx2.MockTransport(broken)
     )
-    result = await sender.send(a_device(UserId(new_id())), PushMessage(kind=PushKind.TEST))
+    result = await sender.send(a_device(UserId(new_id())), TEST_MESSAGE)
     assert result.outcome is PushOutcome.FAILED and result.status_code is None
     assert result.error and "QGx1" not in result.error and "apple" not in result.error
 

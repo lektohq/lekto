@@ -36,6 +36,7 @@ from lekto.core.domain.ids import (
     UserId,
     new_id,
 )
+from lekto.core.domain.links import Links
 from lekto.core.domain.permissions import space_role
 from lekto.core.domain.reasons import Action, ReasonCode, because
 from lekto.core.domain.rules import (
@@ -111,16 +112,16 @@ class RuleService:
         templates: TemplateRenderer,
         patterns: PatternMatcher,
         *,
-        link_base: str | None = None,
+        links: Links | None = None,
         store: ObjectStore | None = None,
     ) -> None:
-        """`link_base` (`LEKTO_PUBLIC_URL`): the link to a document a webhook's template sees;
+        """`links` (`LEKTO_PUBLIC_URL`): the link to a document a webhook's template sees;
         `store`: where the codes on its pages are (`facts.girocode` in a preview)."""
         self._uow = uow
         self._clock = clock
         self._templates = templates
         self._patterns = patterns
-        self._link_base = link_base
+        self._links = links
         self._store = store
 
     async def list_rules(
@@ -244,7 +245,7 @@ class RuleService:
             if found is None:
                 values = None
             elif webhook:
-                values = await webhook_values(uow, found, self._link_base, codes)
+                values = await webhook_values(uow, found, self._links, codes)
             else:
                 values = await document_values(uow, found, kind, applying, codes)
         written = None if values is None else self._written(values)
@@ -340,7 +341,7 @@ class RuleService:
     def _check_asks(self, definition: RuleDefinition) -> None:
         """A step that asks needs `LEKTO_PUBLIC_URL`: the consumer answers there
         (ValidationError)."""
-        if definition.asks and self._link_base is None:
+        if definition.asks and (self._links is None or self._links.public is None):
             raise ValidationError(
                 "a step that asks a webhook needs LEKTO_PUBLIC_URL: its consumer answers there"
             )

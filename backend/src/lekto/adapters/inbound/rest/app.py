@@ -67,10 +67,10 @@ from lekto.adapters.inbound.rest.ui import UI_PREFIX, ui_routes
 from lekto.adapters.inbound.waiting import dispatch_events
 from lekto.core.domain.document_facts import ROLES as FACT_ROLES
 from lekto.core.domain.identifiers import catalog as identifier_kinds
+from lekto.core.domain.links import TASK_RESULT
 from lekto.core.domain.mail_rules import OPERATORS as MAIL_OPERATORS
 from lekto.core.domain.reasons import catalog as reasons_catalog
 from lekto.core.ports.wakeup import Channel
-from lekto.core.services.tasks.desk import CALLBACK_PATH
 
 __all__ = ["PREFIX", "create_app"]
 
@@ -198,7 +198,7 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
         exempt={
             ("POST", f"{PREFIX}/documents"),
             ("PUT", master_data.LOGO_PATH),
-            ("POST", CALLBACK_PATH),
+            ("POST", PREFIX + TASK_RESULT),
         },
     )
     app.add_middleware(

@@ -66,6 +66,7 @@ from lekto.core.domain.events import (
 from lekto.core.domain.ids import DocumentId, EventId, TaskId, UserId, WebhookId, new_id
 from lekto.core.domain.jobs import Job, RetryPolicy
 from lekto.core.domain.json_value import JsonObject, as_object
+from lekto.core.domain.links import Links
 from lekto.core.domain.permissions import in_reach
 from lekto.core.domain.push import PushKind
 from lekto.core.domain.reasons import ReasonCode, because
@@ -135,10 +136,10 @@ class WebhookDeliveryService:
         policy: WebhookPolicy,
         templates: TemplateRenderer,
         *,
-        link_base: str | None = None,
+        links: Links | None = None,
         store: ObjectStore | None = None,
     ) -> None:
-        """`templates` renders the bodies of webhooks with a template; `link_base`
+        """`templates` renders the bodies of webhooks with a template; `links`
         (`LEKTO_PUBLIC_URL`) makes the link to a document in the web UI; `store`: where the
         codes on its pages are (`facts.girocode`)."""
         self._uow = uow
@@ -147,7 +148,7 @@ class WebhookDeliveryService:
         self._sender = sender
         self._policy = policy
         self._templates = templates
-        self._link_base = link_base
+        self._links = links
         self._store = store
         self._retry = RetryPolicy(
             max_attempts=self._policy.max_attempts,
@@ -495,11 +496,7 @@ class WebhookDeliveryService:
             document = await uow.documents.find(document_id)
         match webhook.body:
             case BodyFormat.THIN | BodyFormat.FULL:
-                data = (
-                    None
-                    if document is None
-                    else await document_json(uow, document, self._link_base)
-                )
+                data = None if document is None else await document_json(uow, document, self._links)
                 return event_body(
                     event_id=event_id,
                     type=event_type,
@@ -515,7 +512,7 @@ class WebhookDeliveryService:
             codes: tuple[Code, ...] = ()
             if self._store is not None and "fact" in webhook.body_template:
                 codes = await load_codes(self._store, document.id) or ()
-            values |= await webhook_values(uow, document, self._link_base, codes)
+            values |= await webhook_values(uow, document, self._links, codes)
         elif document_id is not None:
             values["document_id"] = str(document_id)
         if rule is not None:

@@ -314,7 +314,7 @@ async def test_a_file_the_document_lacks_is_not_found(world: World) -> None:
         task = await uow.tasks.get(id)
     assert task.deadline is not None
     # Signed as Lekto signs, for a page the document does not have.
-    beyond = urlsplit(file_link("https://x", world.cipher, task, "pages/3.webp", task.deadline))
+    beyond = urlsplit(file_link(builders.LINKS, world.cipher, task, "pages/3.webp", task.deadline))
     query = {key: values[0] for key, values in parse_qs(beyond.query).items()}
     with pytest.raises(NotFoundError):
         await world.tasks.file(id, "pages/3.webp", int(query["expires"]), query["signature"])
