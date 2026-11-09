@@ -6,6 +6,7 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import Tag from '@lucide/svelte/icons/tag';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import Upload from '@lucide/svelte/icons/upload';
 	import { toast } from 'svelte-sonner';
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
 	import Chip from '#lib/components/Chip.svelte';
@@ -372,6 +373,11 @@
 			{/snippet}
 		</EmptyNote>
 		<EmptyNote compact mascot>{m.inbox_empty()}</EmptyNote>
+		<EmptyNote compact class="border-primary">
+			{#snippet icon()}<Upload class="size-9 text-brand" aria-hidden="true" />{/snippet}
+			<span class="block text-lg font-semibold text-foreground">{m.upload_drop_overlay()}</span>
+			<span class="mt-1 block text-sm">{m.upload_drop_overlay_hint()}</span>
+		</EmptyNote>
 		<div class="flex max-w-xl flex-col gap-3">
 			{#each ALERTS as variant (variant)}
 				<Alert.Root {variant}>
