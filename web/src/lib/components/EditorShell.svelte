@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PhoneEditorBar, { FULL_SCREEN } from '#lib/components/PhoneEditorBar.svelte';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import type { Snippet } from 'svelte';
 	import AsyncForm from '#lib/components/AsyncForm.svelte';
@@ -75,36 +76,19 @@
 		class={cn(
 			'flex flex-col gap-0 overflow-hidden p-0',
 			phone.current
-				? 'top-0 left-0 h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]'
+				? FULL_SCREEN
 				: cn('max-h-[calc(100dvh-2rem)]', fixed && 'h-[min(46.25rem,calc(100dvh-2rem))]', className)
 		)}
 	>
 		<AsyncForm class="flex min-h-0 flex-1 flex-col" {action} ondone={() => (open = false)}>
 			{#snippet children({ busy, error })}
 				{#if phone.current}
-					<div
-						class="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-1 border-b bg-card px-1"
-					>
-						<Button
-							type="button"
-							variant="ghost"
-							class="justify-self-start px-3 text-base font-normal text-brand"
-							onclick={() => (open = false)}
-						>
-							{m.cancel()}
-						</Button>
-						<Dialog.Title class="max-w-[50vw] truncate text-base font-semibold"
-							>{shortTitle}</Dialog.Title
-						>
-						<Button
-							type="submit"
-							variant="ghost"
-							class="justify-self-end px-3 text-base font-semibold text-brand"
-							disabled={busy || disabled}
-						>
-							{m.editor_save_short()}
-						</Button>
-					</div>
+					<PhoneEditorBar
+						title={shortTitle}
+						submitLabel={m.editor_save_short()}
+						disabled={busy || disabled}
+						oncancel={() => (open = false)}
+					/>
 				{:else}
 					<Dialog.Header class="shrink-0 px-4 pt-4 pr-12 pb-3">
 						<Dialog.Title>{title}</Dialog.Title>
