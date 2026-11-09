@@ -11,6 +11,7 @@ from lekto.core.domain.documents import Document
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import ContactId, DocumentId, DocumentTypeId, UserId
 from lekto.core.domain.periods import Period
+from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.reasons import Action
 from lekto.core.domain.series import Dated, Series, SeriesKey, SeriesState, series_of
 from lekto.core.ports.clock import Clock
@@ -142,23 +143,17 @@ def number(facts: Sequence[DocumentFact]) -> tuple[IdentifierKind, str] | None:
 async def _dated(uow: UnitOfWork, user: UserId | None) -> list[Document]:
     """The documents with contact, type and date, of `user`'s reach (None: all), through
     processing."""
+    # Filtered by the repository, so that only the documents of a series are read (review
+    # 0.12.2, C-11): with a lane (through processing), contact, type and date.
+    wanted = DocumentFilter(lanes=frozenset(Lane), dated=True)
     found: list[Document] = []
     after: DocumentPosition | None = None
     while True:
         if user is None:
-            page = await uow.documents.query(DocumentFilter(), after=after, limit=PAGE)
+            page = await uow.documents.query(wanted, after=after, limit=PAGE)
         else:
-            page = await uow.documents.query_visible(
-                user, DocumentFilter(), after=after, limit=PAGE
-            )
-        found += [
-            item
-            for item in page
-            if item.lane is not None
-            and item.contact_id is not None
-            and item.document_type_id is not None
-            and item.document_date is not None
-        ]
+            page = await uow.documents.query_visible(user, wanted, after=after, limit=PAGE)
+        found += page
         if len(page) < PAGE:
             return found
         after = DocumentPosition.after(page[-1].id)
