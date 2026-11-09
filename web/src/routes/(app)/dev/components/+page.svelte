@@ -35,6 +35,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Choice } from '#lib/components/ui/choice/index.ts';
+	import ChoiceCard from '#lib/components/ChoiceCard.svelte';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
@@ -247,6 +248,14 @@
 				{m.dev_sample_option()} 2
 			</Choice>
 		</div>
+		<div class="grid gap-2 sm:grid-cols-2">
+			{#each ['one', 'two'] as value, index (value)}
+				<ChoiceCard name="sample-card" {value} bind:group={radio}>
+					<span class="text-sm font-medium">{m.dev_sample_option()} {index + 1}</span>
+					<span class="text-sm text-muted-foreground">{m.dev_sample_dialog_text()}</span>
+				</ChoiceCard>
+			{/each}
+		</div>
 		<span class="flex items-center gap-2 text-sm">
 			<Switch bind:checked={on} aria-label={m.dev_sample_option()} />
 			{m.dev_sample_option()}
@@ -334,7 +343,7 @@
 	<section class="flex flex-col gap-3" aria-labelledby="dev-selection">
 		<SectionTitle id="dev-selection">{m.dev_section_selection()}</SectionTitle>
 		<SelectionBar count={m.selection_selected({ count: '3' })}>
-			{#snippet hint()}{m.dev_sample_hint()}{/snippet}
+			{#snippet hint()}{m.dev_sample_dialog_text()}{/snippet}
 			{#snippet trail()}
 				<Button variant="ghost" size="sm">{m.dev_sample_secondary()}</Button>
 			{/snippet}

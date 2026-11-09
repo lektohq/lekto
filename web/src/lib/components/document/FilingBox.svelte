@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ChoiceCard from '#lib/components/ChoiceCard.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import Folder from '@lucide/svelte/icons/folder';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
@@ -12,7 +13,6 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { unseenText } from '#lib/space-suggestion.ts';
 	import { cn } from '#lib/utils.ts';
-	import { Choice, ChoiceBox } from '#lib/components/ui/choice/index.ts';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 
@@ -105,20 +105,12 @@
 		<fieldset class="flex flex-col gap-2" disabled={!editable}>
 			<legend class="mb-2 text-xs font-medium text-muted-foreground">{m.filing_question()}</legend>
 			{#each filing.options as option (option.value)}
-				<label
-					class={cn(
-						'flex items-start gap-3 rounded-xl border bg-card p-3.5 has-[input[type=radio]:checked]:border-primary has-[input[type=radio]:checked]:ring-1 has-[input[type=radio]:checked]:ring-primary',
-						option.choosable ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'
-					)}
+				<ChoiceCard
+					name="filing"
+					value={option.value}
+					bind:group={choice}
+					disabled={!option.choosable}
 				>
-					<ChoiceBox
-						type="radio"
-						name="filing"
-						value={option.value}
-						bind:group={choice}
-						disabled={!option.choosable}
-						class="mt-1"
-					/>
 					<span class="flex min-w-0 flex-col gap-1.5">
 						<span class="flex flex-wrap items-center gap-2">
 							<span class="font-semibold">{option.title}</span>
@@ -142,25 +134,23 @@
 							{option.choosable ? option.consequence : m.filing_unavailable()}
 						</span>
 					</span>
-				</label>
+				</ChoiceCard>
 			{/each}
 			{#if otherOptions.length > 0}
-				<div
-					class="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3.5 has-[input[type=radio]:checked]:border-primary has-[input[type=radio]:checked]:ring-1 has-[input[type=radio]:checked]:ring-primary"
-				>
-					<Choice type="radio" name="filing" value="other" bind:group={choice} class="text-base">
+				<ChoiceCard name="filing" value="other" bind:group={choice}>
+					<span class="flex flex-wrap items-center gap-x-3 gap-y-2">
 						<span class="font-semibold">{m.filing_other()}</span>
-					</Choice>
-					<div class="ml-auto min-w-[12rem] flex-1">
-						<Select
-							id="filing-other"
-							value={other}
-							options={choices}
-							aria-label={m.filing_other()}
-							onchange={pickOther}
-						/>
-					</div>
-				</div>
+						<span class="ml-auto min-w-[12rem] flex-1">
+							<Select
+								id="filing-other"
+								value={other}
+								options={choices}
+								aria-label={m.filing_other()}
+								onchange={pickOther}
+							/>
+						</span>
+					</span>
+				</ChoiceCard>
 			{/if}
 		</fieldset>
 	</section>
