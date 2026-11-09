@@ -243,4 +243,12 @@ describe('spaces', () => {
 			within(dialog).getByRole('button', { name: m.members_remove({ name: 'otto' }) })
 		).toBeTruthy();
 	});
+
+	it('opens the editor by the name of a space one edits, not of one one reads', async () => {
+		start([HOUSE, ANNA, TOBI]);
+		const own = await screen.findByRole('region', { name: m.spaces_own() });
+		await userEvent.click(within(own).getByRole('button', { name: 'Haushalt' }));
+		expect(await screen.findByRole('dialog')).toBeTruthy();
+		expect(within(own).queryByRole('button', { name: 'anna' })).toBeNull();
+	});
 });

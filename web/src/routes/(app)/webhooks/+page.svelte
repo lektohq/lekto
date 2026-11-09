@@ -58,7 +58,15 @@
 	{:else if !hooks}
 		<Loading />
 	{:else if hooks.length === 0}
-		<EmptyNote>{m.webhook_none()}</EmptyNote>
+		<EmptyNote>
+			{m.webhook_none()}
+			{#snippet action()}
+				<a href="{BASE}/webhooks/new" class={cn(buttonVariants({ variant: 'outline' }))}>
+					<Plus aria-hidden="true" />
+					{m.webhook_new()}
+				</a>
+			{/snippet}
+		</EmptyNote>
 	{:else}
 		<ul class="flex flex-col gap-2">
 			{#each hooks as hook (hook.id)}

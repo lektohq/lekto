@@ -158,7 +158,15 @@
 	{:else if !rules}
 		<Loading />
 	{:else if rules.length === 0}
-		<EmptyNote>{m.rules_none()}</EmptyNote>
+		<EmptyNote>
+			{m.rules_none()}
+			{#snippet action()}
+				<a href="{BASE}/rules/new" class={cn(buttonVariants({ variant: 'outline' }))}>
+					<Plus aria-hidden="true" />
+					{m.rules_new()}
+				</a>
+			{/snippet}
+		</EmptyNote>
 	{:else}
 		<ul class="flex flex-col gap-2">
 			{#each rules as rule (rule.id)}
