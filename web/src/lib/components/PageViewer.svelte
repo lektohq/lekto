@@ -25,6 +25,8 @@
 	} from '#lib/viewer/zoom.ts';
 	import { Separator } from '#lib/components/ui/separator/index.ts';
 	import IconButton from '#lib/components/IconButton.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import * as Tooltip from '#lib/components/ui/tooltip/index.ts';
 	import Loading from '#lib/components/Loading.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 
@@ -319,15 +321,23 @@
 		<IconButton onclick={() => zoomTo(zoom / 1.25, center())} label={m.pdf_zoom_out()}>
 			<Minus aria-hidden="true" />
 		</IconButton>
-		<button
-			type="button"
-			class="min-w-14 rounded-full px-2 py-1.5 text-center text-sm tabular-nums hover:bg-accent"
-			aria-label={m.pdf_zoom_reset()}
-			title={m.pdf_zoom_reset()}
-			onclick={() => choose('two')}
-		>
-			{Math.round(zoom * 100)} %
-		</button>
+		<!-- The zoom as a button that resets it: its name as tooltip, the percent as its face. -->
+		<Tooltip.Root>
+			<Tooltip.Trigger>
+				{#snippet child({ props })}
+					<Button
+						{...props}
+						variant="ghost"
+						class="min-w-14 px-2 tabular-nums"
+						aria-label={m.pdf_zoom_reset()}
+						onclick={() => choose('two')}
+					>
+						{Math.round(zoom * 100)} %
+					</Button>
+				{/snippet}
+			</Tooltip.Trigger>
+			<Tooltip.Content>{m.pdf_zoom_reset()}</Tooltip.Content>
+		</Tooltip.Root>
 		<IconButton onclick={() => zoomTo(zoom * 1.25, center())} label={m.pdf_zoom_in()}>
 			<Plus aria-hidden="true" />
 		</IconButton>
