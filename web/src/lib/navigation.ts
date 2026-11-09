@@ -1,3 +1,4 @@
+import { BASE_API } from '#lib/api/base.ts';
 import { BASE as base } from '#lib/base.ts';
 
 const MAX_LENGTH = 2000;
