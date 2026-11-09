@@ -77,7 +77,8 @@ describe('editor', () => {
 			onchange: (value) => changes.push(value),
 			completions: lists,
 			id: 'title',
-			label: 'Title'
+			label: 'Title',
+			maxlength: 500
 		});
 		// In a shadow root, where CodeMirror's styles are a constructed sheet, not a <style>.
 		const root = parent.querySelector('#title')?.shadowRoot;

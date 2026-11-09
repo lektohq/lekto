@@ -26,7 +26,7 @@
 		extraFields = [],
 		fields: given = undefined,
 		invalid = false,
-		maxlength = 500,
+		maxlength,
 		purpose = 'rule',
 		steps = [],
 		target = null
@@ -40,7 +40,8 @@
 		/** Every field definition, when the page has them; fetched otherwise. */
 		fields?: readonly FieldDefinition[];
 		invalid?: boolean;
-		maxlength?: number;
+		/** The longest template the API takes. */
+		maxlength: number;
 		/** A webhook's body: more values, rendered as it is, and it has to make JSON. */
 		purpose?: TemplatePurpose;
 		/** A rule's step: the names of the steps before it that ask (`steps.<name>`). */
