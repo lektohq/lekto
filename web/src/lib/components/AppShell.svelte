@@ -13,6 +13,7 @@
 	import SunMoon from '@lucide/svelte/icons/sun-moon';
 	import Users from '@lucide/svelte/icons/users';
 	import WifiOff from '@lucide/svelte/icons/wifi-off';
+	import { mergeProps } from 'bits-ui';
 	import { setMode, userPrefersMode } from 'mode-watcher';
 	import { online } from 'svelte/reactivity/window';
 	import { goto } from '$app/navigation';
@@ -23,7 +24,8 @@
 	import Logo from '#lib/components/Logo.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import { buttonVariants } from '#lib/components/ui/button/index.ts';
+	import IconButton from '#lib/components/IconButton.svelte';
+	import * as Tooltip from '#lib/components/ui/tooltip/index.ts';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
@@ -54,6 +56,9 @@
 	const workSections = $derived(sections.filter((section) => section.group === 'work'));
 	const setupSections = $derived(sections.filter((section) => section.group === 'setup'));
 	const username = $derived(session.user ? userLabel(session.user) : '');
+	const accountName = $derived(
+		scope.allUsers ? m.account_menu_all_users({ username }) : m.account_menu({ username })
+	);
 	let menuOpen = $state(false);
 	// A document opened from the inbox belongs to the inbox.
 	const currentPath = $derived(
@@ -210,32 +215,40 @@
 				<!-- The field where there is room, else a magnifier to the documents page's own
 				     field (`header-search.ts`). -->
 				<HeaderSearch class={searchPlaces(session.isAdmin).field} />
-				<a
+				<IconButton
 					href="{BASE}/documents#search"
-					class={cn(
-						buttonVariants({ variant: 'ghost', size: 'icon' }),
-						searchPlaces(session.isAdmin).icon
-					)}
-					aria-label={m.header_search_label()}
+					class={searchPlaces(session.isAdmin).icon}
+					label={m.header_search_label()}
+					side="bottom"
 				>
 					<SearchIcon aria-hidden="true" />
-				</a>
+				</IconButton>
 				<!-- On a phone the header holds only the magnifier and the menu: language, theme and
 				     the account are in the sheet (Tobi, 26.10.2026). Wider, language and theme are in
 				     the account's menu (web/DESIGN.md, "Navigation"). -->
 				{#if !phone.current}
 					<DropdownMenu.Root>
-						<DropdownMenu.Trigger
-							class={cn(
-								buttonVariants({ size: 'icon' }),
-								'relative font-semibold uppercase [&]:text-md'
-							)}
-							aria-label={scope.allUsers
-								? m.account_menu_all_users({ username })
-								: m.account_menu({ username })}
-						>
-							{username.slice(0, 1)}
-							{#if scope.allUsers}{@render allUsersMark()}{/if}
+						<!-- The account as an avatar: round, its initial, its name as tooltip
+						     (web/DESIGN.md, "Navigation"). -->
+						<DropdownMenu.Trigger>
+							{#snippet child({ props: menu })}
+								<Tooltip.Root>
+									<Tooltip.Trigger>
+										{#snippet child({ props: tip })}
+											<button
+												{...mergeProps(menu, tip)}
+												type="button"
+												class="relative grid size-10 shrink-0 place-items-center rounded-full bg-primary text-md font-semibold text-primary-foreground uppercase outline-none select-none hover:bg-primary/80 focus-visible:ring-3 focus-visible:ring-ring/50"
+												aria-label={accountName}
+											>
+												{username.slice(0, 1)}
+												{#if scope.allUsers}{@render allUsersMark()}{/if}
+											</button>
+										{/snippet}
+									</Tooltip.Trigger>
+									<Tooltip.Content side="bottom">{accountName}</Tooltip.Content>
+								</Tooltip.Root>
+							{/snippet}
 						</DropdownMenu.Trigger>
 						<DropdownMenu.Content align="end" class="w-64">
 							<DropdownMenu.Label class="flex flex-col gap-0.5">
@@ -296,12 +309,18 @@
 				<!-- The menu below xl, at the outer right where the thumb is; the sheet opens from
 				     the right. On a phone it holds the account too (Tobi, 26.10.2026, variant A). -->
 				<Sheet.Root bind:open={menuOpen}>
-					<Sheet.Trigger
-						class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'relative lg:hidden')}
-						aria-label={phone.current && scope.allUsers ? m.nav_open_all_users() : m.nav_open()}
-					>
-						<Menu aria-hidden="true" />
-						{#if phone.current && scope.allUsers}{@render allUsersMark()}{/if}
+					<Sheet.Trigger>
+						{#snippet child({ props })}
+							<IconButton
+								{...props}
+								class="relative lg:hidden"
+								label={phone.current && scope.allUsers ? m.nav_open_all_users() : m.nav_open()}
+								side="bottom"
+							>
+								<Menu aria-hidden="true" />
+								{#if phone.current && scope.allUsers}{@render allUsersMark()}{/if}
+							</IconButton>
+						{/snippet}
 					</Sheet.Trigger>
 					<!-- `data-[side=right]:` to beat the sheet's own width of three quarters, which
 					     left the theme's buttons no room on a phone (Tobi, 27.10.2026). -->

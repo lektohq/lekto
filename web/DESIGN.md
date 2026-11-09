@@ -111,7 +111,8 @@ All radii come from `--radius`. `rounded-3xl`, `rounded-4xl` and arbitrary radii
 borders mean "empty" or "add": `EmptyNote` and the dashed "+ …" chip.
 
 **Shadows:** cards have none. Popovers, menus and dialogs use the component's shadow. Marks on a
-page image use `.mark-glass`; a pinned page of the viewer uses `shadow-pinned`. No other shadows.
+page image use `.mark-glass`; a pinned page of the viewer uses `shadow-pinned`; "Nach oben"
+(`ToTop`), which floats over the content, `shadow-lg` (Tobi, 09.11.2026). No other shadows.
 
 **Dividers:** `ui/separator`, not hand-built `h-px`/`w-px` elements.
 
@@ -173,7 +174,7 @@ phone the page scrolls.
 - **Header items:** logo (the owl's head before the wordmark "lekto", see
   [Logo and owl](#logo-and-owl)), menu, search (the field where the header has room,
   `searchPlaces`: from `2xl`, for admins from 1720 px; otherwise the magnifier), user menu
-  (avatar); while there is no connection, the badge "Offline" beside the logo ([App](#app)).
+  (avatar, round, its name as tooltip); while there is no connection, the badge "Offline" beside the logo ([App](#app)).
 - **User menu:** name and role, the admin switch "Alle Nutzer einbeziehen", language and appearance
   (`LanguageChoices`, `ThemeChoices`, each a `Segmented`), settings, API documentation, sign out;
   last, below a line, the version that runs ("Lekto 0.8.0", `text-xs`, muted, no item to
@@ -243,7 +244,8 @@ their own (`h-*`, `size-*`, also through a class constant); a size from the tabl
 **Icon buttons:** `IconButton` only. It takes a `label` (its tooltip and `aria-label`), a variant
 and a size (`default` 40 px, `sm` 32 px), optionally a shorter `hint` as tooltip. Spread a menu
 trigger's props on it to open a menu. Icon buttons are rectangles like every button. There is
-no round "+". Plain `<button>`s are allowed only for whole-row targets and chips, never as
+no round "+". The account's avatar in the header is no icon button: round as every avatar, its
+initial on `primary`, its name as a `ui/tooltip` (Tobi, 09.11.2026). Plain `<button>`s are allowed only for whole-row targets and chips, never as
 look-alikes of `Button`.
 
 **Menus:** several actions of one object go into a menu: "…" for the rest, "Herunterladen" for
@@ -664,7 +666,8 @@ version of the app ([App](#app)). **A toast never replaces a load error on the p
 - **Tooltip** (`ui/tooltip`): the name of an icon button (through `IconButton`), the names of the
   options of `Segmented`, the inbox mark of a card. A native `title=` attribute is used only for
   text that is cut off (a truncated name, "+3" for the rest of the tags) and for the names of
-  options in pickers (swatches, icons, months, tag paths), never on buttons.
+  options in pickers (swatches, icons, months, the path of a tag on a filter's chip), never on
+  buttons; a document's title in the Beam's link (`BeamTitle`) shows itself and has none.
 - Information is never available only through hover. On the phone a tooltip's content must also be
   reachable another way (label, sheet, detail).
 - **One box at a time** (Tobi, 31.10.2026): a tooltip or an info tip that opens closes the one
@@ -1168,7 +1171,7 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
   - `tests/design-system.test.ts`: font sizes, radii, shadows and colours from the tokens only
     (no arbitrary values, no Tailwind palette) outside the exceptions; `<h1>` only in
     `PageTitle`; `<table>` only in `ui/table`; no `title=` on `Button`, `IconButton` or a menu
-    trigger; no `max-w-*` on dialog content or a `FormDialog`; icon buttons only through `IconButton`; the eye
+    trigger, nor on a raw `<button>` outside the pickers; no `max-w-*` on dialog content or a `FormDialog`; icon buttons only through `IconButton`; the eye
     `scan-eye` only where it shows a document in the Beam, a link to one document only from a
     card of a list, the Beam and the navigation of the inbox ("Beam"); a toggled `Chip`
     (`pressed`) only where each toggles on its own ("Tabs and switches"); every master data tab

@@ -321,11 +321,12 @@
 			{/if}
 			{#if manageable}
 				<DropdownMenu.Root>
-					<DropdownMenu.Trigger
-						class={cn(buttonVariants({ variant: 'outline', size: 'icon' }))}
-						aria-label={m.doc_more()}
-					>
-						<Ellipsis aria-hidden="true" />
+					<DropdownMenu.Trigger>
+						{#snippet child({ props })}
+							<IconButton {...props} variant="outline" label={m.doc_more()}>
+								<Ellipsis aria-hidden="true" />
+							</IconButton>
+						{/snippet}
 					</DropdownMenu.Trigger>
 					<DropdownMenu.Content align="end" class="w-60">
 						{#if status === 'failed'}
