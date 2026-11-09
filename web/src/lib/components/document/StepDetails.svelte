@@ -217,7 +217,7 @@
 									alt=""
 									loading="lazy"
 									decoding="async"
-									class="h-24 w-auto max-w-20 rounded-md border bg-surface object-contain transition-shadow group-hover:shadow-md"
+									class="h-24 w-auto max-w-20 rounded-md border bg-surface object-contain group-hover:border-primary"
 								/>
 								<span class="text-micro text-muted-foreground"
 									>{m.details_page_short({ page: String(number) })}</span
