@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import openapi from '../openapi.json';
 import { CODE_MAX } from '#lib/components/CodeDialog.svelte';
+import { INBOX_PAGE_MAX } from '#lib/document-view.ts';
 import { IDENTIFIER_VALUE_MAX } from '#lib/identifiers.ts';
 import { LENS_LIMITS } from '#lib/lenses.ts';
 import { LIMITS as MAILBOX_LIMITS } from '#lib/mailboxes.ts';
@@ -171,6 +172,10 @@ describe('the limits of the forms', () => {
 
 	it('selects as many documents by id as the list takes', () => {
 		expect(MAX_SELECTED).toBe(param('/api/v1/documents', 'get', 'ids').maxItems);
+	});
+
+	it('reads the inbox in pages as large as it takes', () => {
+		expect(INBOX_PAGE_MAX).toBe(param('/api/v1/inbox', 'get', 'limit').maximum);
 	});
 
 	it('types no limit into a component: each comes from its constant', () => {

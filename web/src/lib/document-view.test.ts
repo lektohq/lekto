@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	shortIdOf,
 	keepsForm,
@@ -6,6 +6,8 @@ import {
 	byPage,
 	inboxDocument,
 	keepPlace,
+	laterReveals,
+	REVEAL_WAITS,
 	marksOf,
 	neighbours,
 	nextDecision,
@@ -326,5 +328,32 @@ describe('a short id', () => {
 		expect(shortIdOf('01a19889-c51a-7602-b24a-54229b653410')).toBeNull();
 		expect(shortIdOf('1234')).toBeNull();
 		expect(shortIdOf('9b65341x')).toBeNull();
+	});
+});
+
+describe('laterReveals', () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it('reveals after each wait, and only the latest place', () => {
+		vi.useFakeTimers();
+		const reveals = laterReveals();
+		const seen: string[] = [];
+		reveals.soon(() => seen.push('A'));
+		vi.advanceTimersByTime(REVEAL_WAITS[0]);
+		reveals.soon(() => seen.push('B'));
+		vi.advanceTimersByTime(REVEAL_WAITS.at(-1)!);
+		expect(seen).toEqual(['A', ...REVEAL_WAITS.map(() => 'B')]);
+	});
+
+	it('reveals nothing once dropped: another document, or the page left', () => {
+		vi.useFakeTimers();
+		const reveals = laterReveals();
+		const seen: string[] = [];
+		reveals.soon(() => seen.push('A'));
+		reveals.drop();
+		vi.advanceTimersByTime(2000);
+		expect(seen).toEqual([]);
 	});
 });

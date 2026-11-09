@@ -332,3 +332,31 @@ export function byPage(places: readonly Place[]): Place[] {
 	}
 	return [...pages.values()].sort((a, b) => a.page - b.page);
 }
+
+/** The inbox is read in pages of the most `GET /inbox` takes (`tests/api-limits.test.ts`). */
+export const INBOX_PAGE_MAX = 200;
+/** How far previous/next looks into the inbox: a migration may leave thousands waiting, and
+ * reading them all on every document opened would cost more than it helps; a document further
+ * back is opened from the inbox's own list. */
+export const INBOX_PLACES_MAX = 1000;
+
+/** How long the viewer may take to lay out its pages once shown: a place is revealed again
+ * after each of these waits, in milliseconds. */
+export const REVEAL_WAITS = [300, 900, 1800] as const;
+
+/** Reveals that wait for the viewer's layout. `soon` drops the ones of before; `drop` drops
+ * all, when another document opens or the page is left, so none lands in the wrong viewer. */
+export function laterReveals() {
+	let timers: ReturnType<typeof setTimeout>[] = [];
+	function drop() {
+		for (const timer of timers) clearTimeout(timer);
+		timers = [];
+	}
+	return {
+		soon(reveal: () => void) {
+			drop();
+			timers = REVEAL_WAITS.map((wait) => setTimeout(reveal, wait));
+		},
+		drop
+	};
+}
