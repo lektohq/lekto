@@ -646,7 +646,7 @@
 		<PaneHead {end}>
 			{#if reviewing && undecided > 0}
 				<Badge variant="yellow">
-					<span class="size-[7px] rounded-full bg-lane-yellow-foreground" aria-hidden="true"></span>
+					<TriangleAlert aria-hidden="true" strokeWidth={2.2} />
 					{undecided === 1 ? m.review_undecided_one() : m.review_undecided({ count: undecided })}
 				</Badge>
 			{/if}

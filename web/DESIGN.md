@@ -386,7 +386,8 @@ Two components that **look different on purpose**:
 - **`TabBar`**: the tabs of a page (inbox lanes, document, master data, system, settings). Links that change
   the URL. **Underline tabs:** text in `muted-foreground`, the current tab in `foreground` with a
   2 px `brand` underline. A bottom border runs across the bar. It scrolls sideways on the phone
-  with a fade at the cut edge. Counts and dots sit beside the label.
+  with a fade at the cut edge. Counts and dots sit beside the label; a dot is `AlertDot` (8 px,
+  red or yellow), always with its words for a screen reader.
 - **`Segmented`**: a choice of how to show something (pages, grid/list/stream, text/pages,
   form/facts, the period of the automation, language and appearance in the phone's sheet, the grouping of a lens; the
   parts of a long dialog under its title: a contact's, an account's), which
