@@ -4,6 +4,9 @@ import { ApiError } from '#lib/api/problem.ts';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 
+/** The longest value of an identifier the API takes (`tests/api-limits.test.ts`). */
+export const IDENTIFIER_VALUE_MAX = 100;
+
 export type IdentifierIn = components['schemas']['IdentifierIn'];
 export type IdentifierOut = components['schemas']['IdentifierOut'];
 export type ContactNumberIn = components['schemas']['ContactNumberIn'];

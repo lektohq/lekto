@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { MASTER_LIMITS } from '#lib/masterdata-api.ts';
 	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
@@ -149,7 +150,7 @@
 	{#if tab === 'general'}
 		<Field.Field>
 			<Field.Label for="field-def-name">{m.field_name()}</Field.Label>
-			<Input id="field-def-name" bind:value={name} maxlength={200} required />
+			<Input id="field-def-name" bind:value={name} maxlength={MASTER_LIMITS.name} required />
 			{#if initial}
 				<!-- The key templates use, from the saved name (a new name renames it in templates). -->
 				<div class="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
@@ -182,7 +183,7 @@
 				id="field-def-description"
 				bind:value={description}
 				rows={3}
-				maxlength={300}
+				maxlength={MASTER_LIMITS.description}
 				aria-describedby="field-def-description-hint"
 			/>
 		</Field.Field>
@@ -195,8 +196,8 @@
 			<Input
 				id="field-def-position"
 				type="number"
-				min={-9999}
-				max={9999}
+				min={MASTER_LIMITS.position.min}
+				max={MASTER_LIMITS.position.max}
 				step={1}
 				bind:value={position}
 				class="w-32"

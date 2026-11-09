@@ -2,7 +2,7 @@
 	import Trash from '@lucide/svelte/icons/trash-2';
 	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
-	import { tokenChanges, tokensChanged } from '#lib/tokens.svelte.ts';
+	import { TOKEN_NAME_MAX, tokenChanges, tokensChanged } from '#lib/tokens.svelte.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
@@ -151,7 +151,7 @@
 >
 	<Field.Field>
 		<Field.Label for="token-name">{m.field_name()}</Field.Label>
-		<Input id="token-name" bind:value={name} maxlength={100} required />
+		<Input id="token-name" bind:value={name} maxlength={TOKEN_NAME_MAX} required />
 	</Field.Field>
 	<Field.Field>
 		<Field.Label for="token-scope">{m.token_scope()}</Field.Label>

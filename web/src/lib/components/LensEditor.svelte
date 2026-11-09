@@ -32,7 +32,7 @@
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { fieldTypeLabel } from '#lib/fields.ts';
 	import { isFiltered } from '#lib/filters.ts';
-	import { filtersOf, type Grouping, type Lens } from '#lib/lenses.ts';
+	import { filtersOf, type Grouping, type Lens, LENS_LIMITS } from '#lib/lenses.ts';
 	import { LIST_SORTS, sortLabel } from '#lib/listing.ts';
 	import type { Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -64,7 +64,6 @@
 		ondeleted: (id: string) => void;
 	} = $props();
 
-	const MAX_FIELDS = 3;
 	const GROUPINGS: { value: Grouping; label: () => string }[] = [
 		{ value: 'none', label: m.lens_grouping_none },
 		{ value: 'month', label: m.lens_grouping_month },
@@ -210,7 +209,7 @@
 		<div class="flex min-w-0 flex-col gap-5">
 			<Field.Field>
 				<Field.Label for="lens-name">{m.lens_name()}</Field.Label>
-				<Input id="lens-name" bind:value={name} maxlength={100} required />
+				<Input id="lens-name" bind:value={name} maxlength={LENS_LIMITS.name} required />
 			</Field.Field>
 
 			<div class="flex flex-col gap-2">
@@ -329,7 +328,7 @@
 						</li>
 					{/each}
 				</ol>
-				{#if cardIds.length < MAX_FIELDS}
+				{#if cardIds.length < LENS_LIMITS.cardFields}
 					<Select
 						aria-label={m.lens_field_add()}
 						value=""
