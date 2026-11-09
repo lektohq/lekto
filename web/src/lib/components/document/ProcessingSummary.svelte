@@ -59,7 +59,7 @@
 			{
 				count: counts.running,
 				label: counts.running === 1 ? m.run_count_running_one() : m.run_count_running(),
-				dot: 'animate-pulse border-[1.5px] border-lane-running-foreground bg-lane-running'
+				dot: 'motion-safe:animate-pulse border-[1.5px] border-lane-running-foreground bg-lane-running'
 			},
 			{
 				count: counts.waiting,
@@ -87,7 +87,7 @@
 	<div class="flex flex-wrap items-start gap-x-3.5 gap-y-3">
 		<span class={cn('grid size-10 shrink-0 place-items-center rounded-xl', tiles[headline.tone])}>
 			<Icon
-				class={cn('size-5', headline.tone === 'running' && 'animate-spin')}
+				class={cn('size-5', headline.tone === 'running' && 'motion-safe:animate-spin')}
 				aria-hidden="true"
 				strokeWidth={2.2}
 			/>

@@ -516,7 +516,10 @@
 									class="inline-flex min-h-11 items-center gap-1.5 text-left font-medium sm:min-h-0"
 								>
 									<ChevronDown
-										class={cn('size-4 transition-transform', !openCustom && '-rotate-90')}
+										class={cn(
+											'size-4 motion-safe:transition-transform',
+											!openCustom && '-rotate-90'
+										)}
 										aria-hidden="true"
 									/>
 									{m.automation_custom_fields()}
