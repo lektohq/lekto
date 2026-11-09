@@ -34,8 +34,9 @@
 	// The pages of a document side by side, wrapping into rows: the zoom decides how many stand
 	// in a row (`viewer/zoom.ts`). Ctrl or ⌘ with the wheel, a pinch, the buttons and the keys
 	// + − 0 zoom around the pointer; a double click enlarges a page and goes back. `marks` are
-	// drawn over the pages (boxes are fractions of a page), `reveal` scrolls to one. What a page
-	// shows comes from `page`; `onshow` tells when a page comes near the view, `onsettle` when
+	// drawn over the pages (boxes are fractions of a page), `reveal` scrolls to one, once the
+	// pages stand when the file is still loading. What a page shows comes from `page`; `onshow`
+	// tells when a page comes near the view, `onsettle` when
 	// the zoom has come to rest, with the pages in view (to be drawn anew at their size);
 	// `onpage` the page in the upper third of the view, as the toolbar counts it.
 	let {
@@ -90,6 +91,9 @@
 	let back: Layout = 'two';
 	let fitted = false;
 	let width = 0;
+	// A place to reveal that came before its page stood (the file still loading); revealed once
+	// the first fit has laid the pages out.
+	let wanted: Place | null = null;
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	const nodes = new Map<number, HTMLElement>();
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
@@ -144,6 +148,7 @@
 		void tick().then(() => {
 			observe();
 			follow();
+			if (wanted) reveal(wanted);
 		});
 	});
 
@@ -212,7 +217,9 @@
 	/** Scroll so that the place stands in the upper third of the view, and in sight sideways. */
 	export function reveal(place: Place) {
 		const node = nodes.get(place.page);
-		if (!container || !node) return;
+		// Before the pages stand, the place waits for them.
+		wanted = fitted && node ? null : place;
+		if (!container || !node || !fitted) return;
 		const box = place.boxes[0];
 		const rect = node.getBoundingClientRect();
 		const seen = view();
