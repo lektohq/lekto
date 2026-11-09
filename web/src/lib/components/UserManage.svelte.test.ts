@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import UserManage from './UserManage.svelte';
 
@@ -58,6 +59,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	phone.override(null);
 	session.clear();
 	vi.unstubAllGlobals();
 });
@@ -81,5 +83,22 @@ describe('UserManage', () => {
 		await user.click(screen.getByRole('button', { name: new RegExp(`^${m.profile_title()}`) }));
 		expect(name.closest('.hidden')).toBeNull();
 		expect(name.value).toBe('Bob Example');
+	});
+
+	it('is a whole screen on a phone, as every editor, closed with "Fertig"', async () => {
+		phone.override(true);
+		const user = userEvent.setup();
+		const props = $state({ open: true, userId: 'bob', onchanged: vi.fn() });
+		render(UserManage, props);
+		await screen.findByRole('group', { name: 'bob' });
+		const dialog = screen.getByRole('dialog');
+		expect(dialog.className).toContain('h-dvh');
+		// Each part saves itself: no form around them, no "Speichern" in the bar.
+		expect(dialog.querySelector('form form')).toBeNull();
+		const bar = dialog.firstElementChild!.firstElementChild!;
+		expect(bar.textContent).toContain(m.picker_done());
+		expect(bar.querySelector('button[type="submit"]')).toBeNull();
+		await user.click(screen.getByRole('button', { name: m.picker_done() }));
+		expect(props.open).toBe(false);
 	});
 });

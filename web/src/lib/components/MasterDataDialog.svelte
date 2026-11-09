@@ -9,7 +9,7 @@
 	import ChipInput from '#lib/components/ChipInput.svelte';
 	import ContactLogoEditor from '#lib/components/ContactLogoEditor.svelte';
 	import IconPicker from '#lib/components/IconPicker.svelte';
-	import EditorShell from '#lib/components/EditorShell.svelte';
+	import EditorShell, { TALL } from '#lib/components/EditorShell.svelte';
 	import HintLabel from '#lib/components/HintLabel.svelte';
 	import InfoHint from '#lib/components/InfoHint.svelte';
 	import TagChip from '#lib/components/TagChip.svelte';
@@ -283,7 +283,7 @@
 	{deleteDescription}
 	{tabs}
 	bind:tab
-	class={tabs ? 'h-[min(53.75rem,calc(100dvh-2rem))]' : undefined}
+	class={tabs ? TALL : undefined}
 >
 	{#if part === 'general'}
 		{#if extra === 'tag' && chooseScope}
