@@ -455,6 +455,22 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('says that nothing is there only with EmptyNote', () => {
+		// A dashed box of muted words (DESIGN.md, "States"); `size="sm"` inside a dialog.
+		const classes = /\sclass=(?:"[^"]*"|\{[^}]*\})/g;
+		const empty = (value: string) =>
+			/\bborder-dashed\b/.test(value) &&
+			/\brounded-(?:xl|2xl)\b/.test(value) &&
+			/\btext-muted-foreground\b/.test(value);
+		expect(
+			offenders((source, path) =>
+				path.endsWith('/EmptyNote.svelte')
+					? null
+					: ([...source.matchAll(classes)].map(([found]) => found).find(empty) ?? null)
+			)
+		).toEqual([]);
+	});
+
 	it('sizes buttons by their size, never by a height of their own', () => {
 		// `Button` takes a finger's 44 pixels on a phone by itself (DESIGN.md, "Buttons", "Touch
 		// targets"); `min-h-*` is no height of its own.

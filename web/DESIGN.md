@@ -737,13 +737,15 @@ switch of the scope (Tobi, 28.10.2026). The chips show none.
 
 Every view that loads has these four states. Each looks the same everywhere:
 
-| State     | Component                                                              | Notes                                                                                            |
-| --------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Loading   | `Skeleton` in the shape of the content, or `Loading` (`role="status"`) | The page header stays                                                                            |
-| Empty     | `EmptyNote` (dashed box, `action` for the way)                         | Says what would be here and how it gets here; a link or button to that action where there is one |
-| Drop here | `EmptyNote` with `icon`, `border-primary`                              | The inbox while files are dragged over it: where they go (Tobi, 09.11.2026)                      |
-| Error     | `LoadProblem` (`role="alert"`, "Erneut versuchen")                     | On the page, not as a toast. A detail page keeps its header and back link                        |
-| Not found | `LoadProblem` with the way back                                        | Never a dead end                                                                                 |
+| State        | Component                                                              | Notes                                                                                            |
+| ------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Loading      | `Skeleton` in the shape of the content, or `Loading` (`role="status"`) | The page header stays                                                                            |
+| Empty        | `EmptyNote` (dashed box, `action` for the way)                         | Says what would be here and how it gets here; a link or button to that action where there is one |
+| Empty, small | `EmptyNote size="sm"`                                                  | Inside a dialog or beside a field: no identifiers yet, nothing assigned                          |
+| Drop files   | `EmptyNote compact` with `icon` and `action`                           | The upload dialog's drop zone; `border-primary` while files are over it                          |
+| Drop here    | `EmptyNote` with `icon`, `border-primary`                              | The inbox while files are dragged over it: where they go (Tobi, 09.11.2026)                      |
+| Error        | `LoadProblem` (`role="alert"`, "Erneut versuchen")                     | On the page, not as a toast. A detail page keeps its header and back link                        |
+| Not found    | `LoadProblem` with the way back                                        | Never a dead end                                                                                 |
 
 Two empty notes carry the owl ([Logo and owl](#logo-and-owl)).
 
@@ -1203,7 +1205,7 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     primary action, never after it ("Footers"); no height of its own on a `Button` or
     `IconButton` ("Buttons"); a box of tone (`bg-lane-yellow`, `bg-lane-red`, `bg-note` with a
     radius and padding) only as `Alert` ("Alerts"); the owl (`Mascot`, `EmptyNote` with `mascot`) only at its
-    places ("Logo and owl"); spins, pulses and turns only `motion-safe` ("Motion");
+    places ("Logo and owl"); a dashed box of muted words only as `EmptyNote` ("States"); spins, pulses and turns only `motion-safe` ("Motion");
   - `src/lib/tips.test.ts`: one box of help at a time, the next without delay; a tooltip opens on
     a focus Tab brought, not on one handed back;
   - `src/lib/via-token.test.ts`: every file that has a person's API token (`via_token`, a

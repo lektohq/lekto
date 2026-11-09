@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import Download from '@lucide/svelte/icons/download';
 	import Upload from '@lucide/svelte/icons/upload';
 	import Zap from '@lucide/svelte/icons/zap';
@@ -63,7 +64,8 @@
 			<Dialog.Description>{m.upload_hint()}</Dialog.Description>
 		</Dialog.Header>
 
-		<div
+		<EmptyNote
+			compact
 			role="presentation"
 			ondragover={(event) => {
 				event.preventDefault();
@@ -72,16 +74,15 @@
 			}}
 			ondragleave={() => (over = false)}
 			ondrop={drop}
-			class={cn(
-				'flex flex-col items-center gap-3 rounded-2xl border border-dashed px-6 py-10 text-center text-muted-foreground transition-colors',
-				over && 'border-primary bg-secondary'
-			)}
+			class={cn('transition-colors', over && 'border-primary bg-secondary')}
 		>
-			<Upload class="size-7" aria-hidden="true" />
-			<p class="max-sm:hidden">{m.upload_drop()}</p>
-			<Button variant="outline" onclick={() => input?.click()}>
-				{m.upload_choose()}
-			</Button>
+			{#snippet icon()}<Upload class="size-7" aria-hidden="true" />{/snippet}
+			<span class="max-sm:hidden">{m.upload_drop()}</span>
+			{#snippet action()}
+				<Button variant="outline" onclick={() => input?.click()}>
+					{m.upload_choose()}
+				</Button>
+			{/snippet}
 			<input
 				bind:this={input}
 				type="file"
@@ -92,7 +93,7 @@
 				aria-label={m.upload_choose()}
 				onchange={chosen}
 			/>
-		</div>
+		</EmptyNote>
 		{#if apple && !shortcutReady}
 			<p class="flex items-center gap-2.5 border-t pt-4 text-sm text-muted-foreground">
 				<Zap class="size-4 shrink-0" aria-hidden="true" />
