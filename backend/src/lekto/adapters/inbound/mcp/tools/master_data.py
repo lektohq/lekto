@@ -15,7 +15,7 @@ from lekto.core.domain.identifiers import IdentifierSource
 from lekto.core.domain.ids import TagId
 from lekto.core.domain.master_data import Contact, TagScope
 from lekto.core.domain.tag_tree import TagTree
-from lekto.core.ports.repository import DocumentFilter
+from lekto.core.ports.repository import CountBy
 
 PATH_SEPARATOR = " / "
 type Scope = Literal["document", "contact", "document_type", "topic"]
@@ -90,7 +90,7 @@ def add_master_data_tools(tools: Tools, context: ApiContext) -> None:
     ) -> str:
         user = principal_of(ctx).id
         names = await Names.load(context, user)
-        counts = (await context.documents.facets(user, DocumentFilter())).contacts
+        counts = await context.documents.document_counts(user, CountBy.CONTACT)
         wanted = None if query is None else query.casefold()
         return compact(
             ContactsOut(
@@ -112,7 +112,7 @@ def add_master_data_tools(tools: Tools, context: ApiContext) -> None:
         user = principal_of(ctx).id
         names = await Names.load(context, user)
         contact = await context.master_data.get_contact(user, names.find_contact(name))
-        counts = (await context.documents.facets(user, DocumentFilter())).contacts
+        counts = await context.documents.document_counts(user, CountBy.CONTACT)
         out = _contact(contact, names, counts.get(contact.id, 0))
         out.identifiers = [
             IdentifierOut(
@@ -135,7 +135,7 @@ def add_master_data_tools(tools: Tools, context: ApiContext) -> None:
     async def document_types_list(ctx: Context) -> str:
         user = principal_of(ctx).id
         names = await Names.load(context, user)
-        counts = (await context.documents.facets(user, DocumentFilter())).document_types
+        counts = await context.documents.document_counts(user, CountBy.DOCUMENT_TYPE)
         fields = list(names.fields.values())
         return compact(
             DocumentTypesOut(

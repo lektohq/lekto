@@ -539,6 +539,27 @@ async def test_master_data_are_read_by_name(api: Api, scene: Scene) -> None:
     assert theirs == {"name": "ACME", "documents": 0}
 
 
+async def test_master_data_count_without_the_facets(
+    api: Api, scene: Scene, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A count per contact or type is one grouped count, not every facet of every document."""
+
+    async def no_facets(*args: object, **kwargs: object) -> None:
+        raise AssertionError("facets asked for")
+
+    monkeypatch.setattr(api.services.documents, "facets", no_facets)
+    owner, admin = scene.headers["owner"], await api.admin()
+    await api.services.master_data.create_document_type(admin.id, "Rechnung")
+    data(await call(api, owner, "documents_update", id=scene.green, contact="ACME"))
+    assert {"name": "ACME", "documents": 1} in data(await call(api, owner, "contacts_list"))[
+        "contacts"
+    ]
+    assert data(await call(api, owner, "contacts_get", name="ACME"))["documents"] == 1
+    assert data(await call(api, owner, "document_types_list"))["document_types"] == [
+        {"name": "Rechnung", "documents": 0}
+    ]
+
+
 async def test_spaces_and_lenses_are_read_by_name(api: Api, scene: Scene) -> None:
     owner = scene.headers["owner"]
     spaces = data(await call(api, owner, "spaces_list"))["spaces"]
