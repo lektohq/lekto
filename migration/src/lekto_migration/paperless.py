@@ -40,6 +40,9 @@ DOCUMENT_FIELDS = ",".join(
 # Things Lekto has no counterpart for; only counted.
 COUNTED = ("saved_views", "workflows", "mail_rules", "mail_accounts", "share_links", "trash")
 
+CONTENT_BLOCK = 100
+"""Documents one request for their texts names (`contents`)."""
+
 
 class PaperlessError(Exception):
     pass
@@ -180,11 +183,17 @@ class Paperless:
         return snapshot
 
     async def contents(self, ids: set[int]) -> dict[int, str]:
-        """The text Paperless recognised, by document; read only for the comparison."""
+        """The text Paperless recognised of the documents `ids`, by document, asked for in
+        blocks of `CONTENT_BLOCK` (`id__in`); read only for the comparison."""
         found: dict[int, str] = {}
-        async for item in self.pages("/api/documents/", ordering="id", fields="id,content"):
-            if int(item["id"]) in ids:
-                found[int(item["id"])] = str(item.get("content") or "")
+        chosen = sorted(ids)
+        for start in range(0, len(chosen), CONTENT_BLOCK):
+            block = ",".join(str(id) for id in chosen[start : start + CONTENT_BLOCK])
+            async for item in self.pages(
+                "/api/documents/", ordering="id", fields="id,content", id__in=block
+            ):
+                if int(item["id"]) in ids:
+                    found[int(item["id"])] = str(item.get("content") or "")
         return found
 
     async def download_original(self, id: int, target: Path) -> Download:

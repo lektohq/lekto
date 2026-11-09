@@ -106,6 +106,10 @@ MEMBERS = "{members}"  # in `space_name`: every member of a shared space with th
 SHARES = "{shares}"  # before 0.5, when a space had an owner; now an error
 
 
+MAX_REVIEW_REASON = 500
+"""The longest reason for a review, as Lekto takes it (`imports.MAX_REVIEW_REASON`)."""
+
+
 def norm(name: str) -> str:
     """Names are compared without case and surrounding space, as Lekto does."""
     return name.strip().casefold()
@@ -415,9 +419,9 @@ def _review(raw: Any, where: str, problems: list[str]) -> str | None:
         return None
     if raw is True:
         return ""
-    if isinstance(raw, str) and raw.strip() and len(raw) <= 500:
+    if isinstance(raw, str) and raw.strip() and len(raw) <= MAX_REVIEW_REASON:
         return raw.strip()
-    problems.append(f"{where}.review: true, or a reason of up to 500 characters")
+    problems.append(f"{where}.review: true, or a reason of up to {MAX_REVIEW_REASON} characters")
     return None
 
 

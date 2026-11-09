@@ -380,7 +380,8 @@ async def _files(
                 except PaperlessError as error:
                     found.append({"id": item.id, "title": item.title, "problem": str(error)})
                     return
-                head = path.read_bytes()[:HEAD]
+                with path.open("rb") as file:
+                    head = file.read(HEAD)
                 digest = download.sha256
         entry: dict[str, Any] = {"id": item.id, "title": item.title, "sha256": digest}
         kept = checksum(documents[item.id])
