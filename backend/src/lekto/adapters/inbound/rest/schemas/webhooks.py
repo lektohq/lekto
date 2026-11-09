@@ -308,6 +308,14 @@ class DeliveryOut(BaseModel):
     )
     status_code: int | None = Field(description="The receiver's HTTP status, if it answered.")
     error: str | None = Field(description="Why the attempt failed; the answer body is not kept.")
+    reason: ReasonOut | None = Field(
+        description=(
+            "Why Lekto did not send it, with its code (`delivery_webhook_off`, "
+            "`delivery_owner_inactive`, `delivery_document_unavailable`, "
+            "`delivery_owner_no_admin`, `delivery_webhook_deleted`, `delivery_secret_unusable`); "
+            "null for an answer or a transport error (`error` says it)."
+        )
+    )
     next_attempt_at: datetime | None
     document: DeliveryDocumentOut | None = Field(
         description="The document of the event, if the caller may read it."
@@ -340,6 +348,7 @@ class DeliveryOut(BaseModel):
             outcome=delivery.outcome,
             status_code=delivery.status_code,
             error=delivery.error,
+            reason=None if delivery.reason is None else ReasonOut.of(delivery.reason),
             next_attempt_at=delivery.next_attempt_at,
             document=(
                 None

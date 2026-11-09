@@ -662,11 +662,17 @@ async def test_a_switched_off_webhook_or_deactivated_owner_or_vanished_document_
 
     assert await run_all(service) == 3
     assert world.sender.requests == []
-    reasons = [(await log(world, h))[0].error for h in hooks]
-    assert reasons == [
+    rows = [(await log(world, h))[0] for h in hooks]
+    assert [row.error for row in rows] == [
         "the webhook is switched off",
         "the owner's account is not active",
         "the document is not available to the owner",
+    ]
+    # With their codes, for clients that say them in their language (review 0.12.2, C-07).
+    assert [row.reason for row in rows] == [
+        because(ReasonCode.DELIVERY_WEBHOOK_OFF),
+        because(ReasonCode.DELIVERY_OWNER_INACTIVE),
+        because(ReasonCode.DELIVERY_DOCUMENT_UNAVAILABLE),
     ]
 
 

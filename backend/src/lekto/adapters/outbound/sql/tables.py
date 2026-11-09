@@ -1076,6 +1076,7 @@ webhook_deliveries = Table(
     Column("status_code", Integer, nullable=True),
     Column("error", Text, nullable=True),
     Column("next_attempt_at", UtcDateTime, nullable=True),
+    Column("reason", json_type(), nullable=True),
     Index(None, "webhook_id", "id"),
     Index(None, "started_at"),
 )
