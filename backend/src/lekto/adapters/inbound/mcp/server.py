@@ -14,6 +14,7 @@ from mcp.server.mcpserver import MCPServer
 
 from lekto import __version__
 from lekto.adapters.inbound.context import ApiContext
+from lekto.adapters.inbound.limits import MAX_SELECTED
 from lekto.adapters.inbound.mcp.registry import Tools, ToolSpec, Visibility
 from lekto.adapters.inbound.mcp.tools import add_tools
 
@@ -35,7 +36,8 @@ def instructions(ui_url: str | None) -> str:
     link = (
         "Name a document by its title."
         if ui_url is None
-        else f"Link to a document: {ui_url}/documents/<id>; to several (up to 100), so the "
+        else f"Link to a document: {ui_url}/documents/<id>; to several (up to {MAX_SELECTED}), so "
+        "the "
         f"person sees exactly them: {ui_url}/documents?ids=<id>,<id>"
     )
     return INSTRUCTIONS.format(link=link)

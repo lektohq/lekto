@@ -11,6 +11,7 @@ from uuid import UUID
 from fastapi import Depends, Query
 from fastapi.exceptions import RequestValidationError
 
+from lekto.adapters.inbound.limits import MAX_SELECTED
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.schemas.refs import opened
 from lekto.core.domain.document_facts import FactCriterion, FactRole
@@ -31,8 +32,6 @@ MAX_IDS = 50
 """Ids of one kind a filter names at most."""
 MAX_FACTS = 5
 """Facts a filter names at most."""
-MAX_SELECTED = 100
-"""Documents the list names by id at most (`ids`)."""
 
 
 class LaneFilter(StrEnum):
