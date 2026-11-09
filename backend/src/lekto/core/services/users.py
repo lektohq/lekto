@@ -34,10 +34,11 @@ from lekto.core.domain.users import (
 )
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.identity import PasswordHasher
-from lekto.core.ports.repository import DocumentFilter, DocumentPosition
+from lekto.core.ports.repository import DocumentFilter
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import load_actor, require_admin
-from lekto.core.services._moves import move_by_person
+from lekto.core.services._moves import check_receiver, move_by_person
+from lekto.core.services._pages import documents_in
 from lekto.core.services.profiles import USER_NAMES_LOCK, check_display_name, check_username
 from lekto.core.services.rules.changes import ChangeRules
 from lekto.core.services.rules.references import (
@@ -456,20 +457,7 @@ async def _blocking(uow: UnitOfWork, id: UserId) -> list[tuple[BlockingSpace, Sp
 
 async def _documents_in(uow: UnitOfWork, space: SpaceId) -> list[Document]:
     """Every document in the space, whoever may read it."""
-    found: list[Document] = []
-    within = DocumentFilter(spaces=frozenset({space}))
-    while True:
-        page = await uow.documents.query(
-            within,
-            after=DocumentPosition.after(found[-1].id if found else None),
-            limit=_PAGE,
-        )
-        found.extend(page)
-        if len(page) < _PAGE:
-            return found
-
-
-_PAGE = 500
+    return await documents_in(uow, DocumentFilter(spaces=frozenset({space})))
 
 
 async def _move_target(uow: UnitOfWork, id: SpaceId, leaving: set[SpaceId]) -> Space:
@@ -478,10 +466,7 @@ async def _move_target(uow: UnitOfWork, id: SpaceId, leaving: set[SpaceId]) -> S
     target = await uow.spaces.find(id)
     if target is None or target.id in leaving:
         raise NotFoundError("space", id)
-    if target.personal_of is not None:
-        receiver = await uow.users.find(target.personal_of)
-        if receiver is None or not receiver.active:
-            raise NotFoundError("space", id)
+    await check_receiver(uow, target)
     return target
 
 
