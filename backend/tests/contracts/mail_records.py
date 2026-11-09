@@ -440,21 +440,27 @@ class MailRuleRepositoryContract:
         )
         full.pause(because(ReasonCode.MAIL_RULE_TYPE_GONE), now=NOW + HOUR)
         later, earlier = rule(first, "b", 5), rule(first, "A", 5)
+        # Umlauts as their letters, whatever the database's collation says (A-10).
+        umlauts = [rule(first, name, 5) for name in ("zahnarzt", "Öl", "öko", "Ärzte")]
         other = rule(
             second, "Other", 0, parts=MailParts.NOTHING, after=(MailStep(MailAction.TRASH),)
         )
         async with uow_factory() as uow:
-            for item in (later, other, full, earlier):
+            for item in (later, other, full, earlier, *umlauts):
                 await uow.mail_rules.add(item)
             await uow.commit()
         async with uow_factory() as uow:
             assert await uow.mail_rules.get(full.id) == full
             assert [item.name for item in await uow.mail_rules.of_mailbox(first.id)] == [
                 "A",
+                "Ärzte",
                 "b",
+                "öko",
+                "Öl",
+                "zahnarzt",
                 "Strom",
             ]
-            assert len(await uow.mail_rules.list_all()) == 4
+            assert len(await uow.mail_rules.list_all()) == 8
             stored = await uow.mail_rules.get(other.id)
             stored.change(MailRuleChanges(name="Renamed"), now=NOW + HOUR)
             await uow.mail_rules.update(stored)

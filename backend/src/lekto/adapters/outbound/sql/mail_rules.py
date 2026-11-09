@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import Row, func, select
+from sqlalchemy import Row, select
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.repositories import SqlRepository, Values
@@ -13,6 +13,7 @@ from lekto.core.domain.mail_rules import (
     MailRule,
     conditions_from_json,
     conditions_to_json,
+    rule_order,
     steps_from_json,
     steps_to_json,
 )
@@ -31,12 +32,13 @@ class SqlMailRuleRepository(SqlRepository[MailRuleId, MailRule]):
 
     async def _ordered(self, where: Any) -> list[MailRule]:
         table = self.table
-        query = select(table).order_by(
-            table.c.mailbox_id, table.c.priority.desc(), func.lower(table.c.name), table.c.id
-        )
+        query = select(table)
         if where is not None:
             query = query.where(where)
-        return [self._entity(row) for row in await self._tx.read(query)]
+        # Ordered here, not by the database: its collation would sort names otherwise than
+        # `rule_order`, which decides which rule takes a mail (review 0.12.2, A-10).
+        rules = [self._entity(row) for row in await self._tx.read(query)]
+        return sorted(rules, key=lambda rule: (str(rule.mailbox_id), *rule_order(rule)))
 
     def _entity(self, row: Row[Any]) -> MailRule:
         enabled: bool = row.enabled
