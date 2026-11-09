@@ -15,7 +15,7 @@ services:
       LEKTO_PUBLIC_URL: ${LEKTO_PUBLIC_URL:-http://localhost:8000}
 
   agent:
-    image: python:3.13-alpine
+    image: python:3.13.18-alpine
     restart: unless-stopped
     command: ["python", "-u", "/app/consumer.py"]
     volumes:

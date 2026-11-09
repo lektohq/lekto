@@ -14,7 +14,7 @@ services:
       LEKTO_FORWARDED_ALLOW_IPS: "*"
 
   caddy:
-    image: caddy:2
+    image: caddy:2.11.7
     restart: unless-stopped
     command: caddy reverse-proxy --from ${DOMAIN:?set DOMAIN in .env} --to lekto:8000
     ports:

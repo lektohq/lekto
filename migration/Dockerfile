@@ -44,6 +44,9 @@ LABEL org.opencontainers.image.title="Lekto migration" \
       org.opencontainers.image.licenses="GPL-3.0-only" \
       org.opencontainers.image.version="$LEKTO_VERSION"
 
+# Owned by the user that runs, so that a named volume mounted there starts writable (a volume
+# takes the owner of the image's directory the first time).
+RUN install -d -o 1000 -g 1000 /work
 WORKDIR /work
 USER 1000:1000
 ENTRYPOINT ["lekto-migration"]

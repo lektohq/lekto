@@ -13,11 +13,20 @@ import os
 import sys
 import urllib.request
 
+# Where the API listens (LEKTO_API_HOST, LEKTO_API_PORT): every address is asked on loopback,
+# one address of its own there.
 port = os.environ.get("LEKTO_API_PORT", "8000")
+host = os.environ.get("LEKTO_API_HOST", "").strip()
+if host in ("", "0.0.0.0"):
+    host = "127.0.0.1"
+elif host == "::":
+    host = "::1"
+if ":" in host:
+    host = f"[{host}]"
 # No proxy for the check, whatever the environment says.
 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 try:
-    with opener.open(f"http://127.0.0.1:{port}/api/v1/health", timeout=8) as response:
+    with opener.open(f"http://{host}:{port}/api/v1/health", timeout=8) as response:
         sys.exit(0 if response.status == 200 else 1)
 except Exception as error:
     print(f"API not healthy: {error}", file=sys.stderr)

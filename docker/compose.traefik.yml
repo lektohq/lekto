@@ -22,7 +22,7 @@ services:
       traefik.http.services.lekto.loadbalancer.server.port: "8000"
 
   traefik:
-    image: traefik:v3
+    image: traefik:v3.7.16
     restart: unless-stopped
     command:
       - --providers.docker=true
