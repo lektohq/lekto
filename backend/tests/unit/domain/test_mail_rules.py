@@ -148,6 +148,9 @@ def test_the_first_by_priority_then_name_decides() -> None:
     paused.pause(because(ReasonCode.MAIL_RULE_PERSON_GONE), now=NOW)
     assert first_match([late, paused, early], FACTS) is early
     assert first_match([], FACTS) is None
+    # An umlaut sorts as its letter, as every list shows names (DIN 5007, A-10).
+    bank, doctors = rule("Bank", priority=5), rule("Ärzte", priority=5)
+    assert first_match([bank, doctors], FACTS) is doctors
 
 
 def test_what_a_rule_must_name() -> None:
