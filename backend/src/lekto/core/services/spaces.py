@@ -10,7 +10,11 @@ from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import load_actor, load_lister, visible_space
-from lekto.core.services.rules.references import disable_rules, refers_to
+from lekto.core.services.rules.references import (
+    disable_rules,
+    pause_mail_rules_into,
+    refers_to,
+)
 
 
 class SpaceService:
@@ -60,6 +64,7 @@ class SpaceService:
                 because(ReasonCode.RULE_DISABLED_DELETED, kind="space", name=space.name),
                 refers_to(lambda refs: refs.spaces, id),
             )
+            await pause_mail_rules_into(uow, self._clock.now(), id)
             await uow.commit()
 
     async def create(
