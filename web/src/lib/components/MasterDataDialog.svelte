@@ -22,7 +22,7 @@
 	import { describeError } from '#lib/errors.ts';
 	import { changesOf, type IdentifierRow, refusedRow, rowsOf } from '#lib/identifiers.ts';
 	import { latest } from '#lib/latest.ts';
-	import { type Extra, type Item, type Values } from '#lib/masterdata-api.ts';
+	import { type Extra, type Item, MASTER_LIMITS, type Values } from '#lib/masterdata-api.ts';
 	import type {
 		Contact,
 		FieldDefinition,
@@ -488,6 +488,8 @@
 					describedby="{uid}-aliases-hint"
 					addLabel={m.alias_add()}
 					inputLabel={m.alias_input()}
+					maxlength={MASTER_LIMITS.alias}
+					max={MASTER_LIMITS.aliases}
 				/>
 			</Field.Field>
 		{:else if extra === 'description'}

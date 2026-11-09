@@ -8,13 +8,17 @@
 	// Values as chips in a field (a contact's other spellings; Tobi, 20.10.2026): each with its
 	// ✕, then a dashed chip that turns into a small input. Enter adds what was typed and stays for
 	// the next, leaving the input adds it too; pasted lines become one chip each; a value there
-	// already (in any case) is not added again; Escape leaves the input and not the dialog.
+	// already (in any case) is not added again; Escape leaves the input and not the dialog. It
+	// takes what the API takes: `maxlength` per value, `max` values (the dashed chip goes at the
+	// limit); what does not fit stays in the input.
 	let {
 		values = $bindable([]),
 		labelledby,
 		describedby,
 		addLabel,
-		inputLabel
+		inputLabel,
+		maxlength,
+		max
 	}: {
 		values?: string[];
 		labelledby?: string;
@@ -23,6 +27,10 @@
 		addLabel: string;
 		/** The input's name and placeholder ("New spelling"). */
 		inputLabel: string;
+		/** The longest value the API takes. */
+		maxlength: number;
+		/** The most values the API takes. */
+		max: number;
 	} = $props();
 
 	let adding = $state(false);
@@ -35,16 +43,16 @@
 		input?.focus();
 	}
 
-	function commit() {
-		values = addChips(values, draft);
-		draft = '';
+	function add(text: string) {
+		({ values, left: draft } = addChips(values, text, { maxlength, max }));
+		if (values.length >= max) adding = false;
 	}
 
 	function keydown(event: KeyboardEvent) {
 		if (event.key === 'Enter') {
 			// Not the editor's form: Enter adds the chip.
 			event.preventDefault();
-			commit();
+			add(draft);
 		} else if (event.key === 'Escape') {
 			event.preventDefault();
 			event.stopPropagation();
@@ -57,8 +65,7 @@
 		const text = event.clipboardData?.getData('text') ?? '';
 		if (!text.includes('\n')) return;
 		event.preventDefault();
-		values = addChips(values, `${draft}${text}`);
-		draft = '';
+		add(`${draft}${text}`);
 	}
 </script>
 
@@ -80,16 +87,16 @@
 			bind:value={draft}
 			aria-label={inputLabel}
 			placeholder={inputLabel}
-			maxlength={200}
+			{maxlength}
 			class="h-8 w-52 max-w-full rounded-full border border-ring bg-card px-3 text-base outline-none sm:text-sm"
 			onkeydown={keydown}
 			onpaste={paste}
 			onblur={() => {
-				commit();
+				add(draft);
 				adding = false;
 			}}
 		/>
-	{:else}
+	{:else if values.length < max}
 		<Chip variant="add" onclick={start}>
 			{#snippet icon()}<Plus class="size-4 shrink-0" aria-hidden="true" />{/snippet}
 			{addLabel}
