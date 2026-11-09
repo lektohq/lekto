@@ -30,8 +30,8 @@ const scripts = import.meta.glob<string>(
 
 /** Files whose markup may break a rule, by rule, each for the reason DESIGN.md gives. */
 const EXCEPTIONS = {
-	// The wordmark's size on the sign-in page: the logo scales with its font size.
-	fontSize: new Set(['/src/routes/login/+page.svelte']),
+	// The wordmark's size on the sign-in and the error page: the logo scales with its font size.
+	fontSize: new Set(['/src/routes/login/+page.svelte', '/src/routes/+error.svelte']),
 	// The sign-in page's fields: larger, alone on the page, the code to type in large digits.
 	fieldHeight: new Set(['/src/routes/login/+page.svelte']),
 	// Paper, logos and the QR code are drawn for white; the overlays of shadcn's dialogs.
@@ -113,6 +113,22 @@ const PROGRESS = new Set([
 const ROW_OF_44 = new Set(['/src/routes/(app)/documents/+page.svelte']);
 const OF_44 = 'size-11 shrink-0';
 
+/** Popovers drawn outside `ui/`: they use the component's shadow (DESIGN.md, "Radius, borders,
+ * shadows"). This list may only shrink. */
+const POPOVERS = new Set([
+	'/src/lib/components/InfoTip.svelte',
+	'/src/lib/components/DateInput.svelte',
+	'/src/lib/components/Select.svelte'
+]);
+
+/** The shadows DESIGN.md names besides them: the chosen option's pill of `Segmented`, the paper
+ * of the viewer's pages, "Nach oben" floating over the content (Tobi, 09.11.2026). */
+const SHADOWS = new Set([
+	'/src/lib/components/Segmented.svelte',
+	'/src/lib/components/PageViewer.svelte',
+	'/src/lib/components/ToTop.svelte'
+]);
+
 /** Where a native title names the options of a picker (DESIGN.md, "Help and tooltips"): the
  * swatches of the colours, the icons, the months of a period, the paths of tags on the filter's
  * chips. This list may only shrink. */
@@ -165,10 +181,10 @@ function tags(source: string, name: string): string[] {
 
 describe('the design system (web/DESIGN.md)', () => {
 	it('takes font sizes from the type scale only', () => {
+		// Neither an arbitrary size nor a step of Tailwind's beyond the scale (`text-xl` and up).
+		const outside = /\btext-(?:\[\d[\d.]*(?:px|rem|em)\]|xl|[2-9]xl)\b/;
 		expect(
-			offenders((source, path) =>
-				EXCEPTIONS.fontSize.has(path) ? null : line(source, /\btext-\[\d[\d.]*(?:px|rem|em)\]/)
-			)
+			offenders((source, path) => (EXCEPTIONS.fontSize.has(path) ? null : line(source, outside)))
 		).toEqual([]);
 	});
 
@@ -176,8 +192,15 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(offenders((source) => line(source, /\brounded-(?:3xl|4xl|\[)/))).toEqual([]);
 	});
 
-	it('takes shadows from the tokens only', () => {
+	it('takes shadows from the tokens only, and the few DESIGN.md names', () => {
 		expect(offenders((source) => line(source, /\bshadow-\[/))).toEqual([]);
+		expect(
+			offenders((source, path) =>
+				path.includes('/components/ui/') || POPOVERS.has(path) || SHADOWS.has(path)
+					? null
+					: line(source, /\bshadow-(?:xs|sm|md|lg|xl|2xl)\b/)
+			)
+		).toEqual([]);
 	});
 
 	it('moves only where motion is wanted: spins, pulses and turns are motion-safe', () => {

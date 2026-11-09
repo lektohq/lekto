@@ -262,12 +262,11 @@
 		class="fixed inset-0 z-50 grid place-items-center bg-background/85 p-6 backdrop-blur-sm"
 		ondragleave={() => (dragging = false)}
 	>
-		<div
-			class="pointer-events-none flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-primary bg-card px-12 py-16 text-center shadow-lg"
-		>
-			<Upload class="size-9 text-brand" aria-hidden="true" />
-			<p class="text-xl font-semibold">{m.upload_drop_overlay()}</p>
-			<p class="text-sm text-muted-foreground">{m.upload_drop_overlay_hint()}</p>
-		</div>
+		<!-- The dashed box that says where things go (web/DESIGN.md, "States"). -->
+		<EmptyNote class="pointer-events-none max-w-xl border-primary">
+			{#snippet icon()}<Upload class="size-9 text-brand" aria-hidden="true" />{/snippet}
+			<span class="block text-lg font-semibold text-foreground">{m.upload_drop_overlay()}</span>
+			<span class="mt-1 block text-sm">{m.upload_drop_overlay_hint()}</span>
+		</EmptyNote>
 	</div>
 {/if}
