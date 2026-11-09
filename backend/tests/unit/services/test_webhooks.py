@@ -13,10 +13,9 @@ from lekto.core.domain.errors import (
     ValidationError,
 )
 from lekto.core.domain.ids import DocumentId, EventId, WebhookId, new_id
-from lekto.core.domain.reasons import ReasonCode
+from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.users import Role
 from lekto.core.domain.webhooks import (
-    DISABLED_FAILING,
     BodyFormat,
     DeliveryOutcome,
     ModelCallKind,
@@ -195,7 +194,7 @@ async def test_the_owner_changes_and_switches_off_and_on(world: World) -> None:
         webhook = await uow.webhooks.get(hook.id)
         webhook.active, webhook.disabled_reason, webhook.failed_streak = (
             False,
-            DISABLED_FAILING,
+            because(ReasonCode.WEBHOOK_FAILING),
             20,
         )
         await uow.webhooks.update(webhook)

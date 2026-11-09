@@ -38802,6 +38802,7 @@
           "mail_rule_person_gone",
           "mail_rule_space_unreachable",
           "mail_rule_type_gone",
+          "webhook_failing",
           "mail_rule_unreadable"
         ],
         "title": "ReasonCode"
@@ -43221,7 +43222,15 @@
               }
             ],
             "title": "Disabled Reason",
-            "description": "`failing`: Lekto switched the webhook off after repeated failed deliveries."
+            "description": "Why Lekto switched the webhook off, in English (`disabled_reasons`)."
+          },
+          "disabled_reasons": {
+            "items": {
+              "$ref": "#/components/schemas/ReasonOut"
+            },
+            "type": "array",
+            "title": "Disabled Reasons",
+            "description": "Why Lekto switched the webhook off, with its code (`webhook_failing`: after repeated failed deliveries); empty while active or switched by a person."
           },
           "failed_streak": {
             "type": "integer",
@@ -43282,6 +43291,7 @@
           "max_open_tasks",
           "model_call",
           "disabled_reason",
+          "disabled_reasons",
           "failed_streak",
           "previous_secret_valid_until",
           "created_at",
@@ -43414,7 +43424,15 @@
               }
             ],
             "title": "Disabled Reason",
-            "description": "`failing`: Lekto switched the webhook off after repeated failed deliveries."
+            "description": "Why Lekto switched the webhook off, in English (`disabled_reasons`)."
+          },
+          "disabled_reasons": {
+            "items": {
+              "$ref": "#/components/schemas/ReasonOut"
+            },
+            "type": "array",
+            "title": "Disabled Reasons",
+            "description": "Why Lekto switched the webhook off, with its code (`webhook_failing`: after repeated failed deliveries); empty while active or switched by a person."
           },
           "failed_streak": {
             "type": "integer",
@@ -43460,6 +43478,7 @@
           "max_open_tasks",
           "model_call",
           "disabled_reason",
+          "disabled_reasons",
           "failed_streak",
           "previous_secret_valid_until",
           "created_at",
@@ -44855,6 +44874,7 @@
     "mail_rule_person_gone": {},
     "mail_rule_space_unreachable": {},
     "mail_rule_type_gone": {},
+    "webhook_failing": {},
     "mail_rule_unreadable": {
       "detail": "text"
     }

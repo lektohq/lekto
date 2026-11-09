@@ -9782,6 +9782,7 @@ export interface components {
 			| 'mail_rule_person_gone'
 			| 'mail_rule_space_unreachable'
 			| 'mail_rule_type_gone'
+			| 'webhook_failing'
 			| 'mail_rule_unreadable';
 		/**
 		 * ReasonOut
@@ -11936,9 +11937,14 @@ export interface components {
 			model_call: components['schemas']['WebhookModelCallOut'] | null;
 			/**
 			 * Disabled Reason
-			 * @description `failing`: Lekto switched the webhook off after repeated failed deliveries.
+			 * @description Why Lekto switched the webhook off, in English (`disabled_reasons`).
 			 */
 			disabled_reason: string | null;
+			/**
+			 * Disabled Reasons
+			 * @description Why Lekto switched the webhook off, with its code (`webhook_failing`: after repeated failed deliveries); empty while active or switched by a person.
+			 */
+			disabled_reasons: components['schemas']['ReasonOut'][];
 			/**
 			 * Failed Streak
 			 * @description Deliveries given up in a row since the last success.
@@ -12028,9 +12034,14 @@ export interface components {
 			model_call: components['schemas']['WebhookModelCallOut'] | null;
 			/**
 			 * Disabled Reason
-			 * @description `failing`: Lekto switched the webhook off after repeated failed deliveries.
+			 * @description Why Lekto switched the webhook off, in English (`disabled_reasons`).
 			 */
 			disabled_reason: string | null;
+			/**
+			 * Disabled Reasons
+			 * @description Why Lekto switched the webhook off, with its code (`webhook_failing`: after repeated failed deliveries); empty while active or switched by a person.
+			 */
+			disabled_reasons: components['schemas']['ReasonOut'][];
 			/**
 			 * Failed Streak
 			 * @description Deliveries given up in a row since the last success.
