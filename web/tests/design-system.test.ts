@@ -483,6 +483,19 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('draws a chip only as Chip or TagChip', () => {
+		// A pill of 24 or 32 pixels as a link or a label (DESIGN.md, "Chips").
+		const pill = (tag: string) =>
+			/\brounded-full\b/.test(tag) && /\bh-(?:6|8)\b/.test(tag) && /\bpx-(?:2|3)\b/.test(tag);
+		expect(
+			offenders((source, path) =>
+				path.includes('/components/ui/') || /\/(?:Tag)?Chip\.svelte$/.test(path)
+					? null
+					: ([...tags(source, 'a'), ...tags(source, 'span')].find(pill) ?? null)
+			)
+		).toEqual([]);
+	});
+
 	it('sizes buttons by their size, never by a height of their own', () => {
 		// `Button` takes a finger's 44 pixels on a phone by itself (DESIGN.md, "Buttons", "Touch
 		// targets"); `min-h-*` is no height of its own.

@@ -16,12 +16,15 @@
 	// what is chosen (an active filter), `add` the dashed "+ …" that opens a picker. With
 	// `pressed` it is a toggle (`aria-pressed`): on, it takes the selected look and a bolder name
 	// at the width it has off, so that the chips beside it stay (web/DESIGN.md, "Steady layout");
-	// with `onremove` it has a ✕.
+	// with `onremove` it has a ✕. With `href` it is a link in the look of a toggle, `current` the
+	// chosen one (`aria-current`): the lenses on a phone.
 	// Tags and topics in their colours are `TagChip`, drawn in the same shape.
 	let {
 		variant = 'neutral',
 		size = 'md',
 		pressed,
+		href,
+		current = false,
 		onclick,
 		onremove,
 		removeLabel = '',
@@ -34,6 +37,9 @@
 		size?: 'sm' | 'md';
 		/** A toggle: on or off. */
 		pressed?: boolean;
+		/** A link chip; `current` marks the one shown. */
+		href?: string;
+		current?: boolean;
 		onclick?: (event: MouseEvent) => void;
 		onremove?: () => void;
 		removeLabel?: string;
@@ -43,14 +49,16 @@
 		[key: string]: unknown;
 	} = $props();
 
-	const toggle = $derived(pressed !== undefined);
+	const link = $derived(href !== undefined);
+	const toggle = $derived(pressed !== undefined || link);
+	const on = $derived(link ? current : pressed);
 	const look = $derived(
 		cn(
 			'inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-full whitespace-nowrap transition-colors',
 			size === 'sm' ? 'h-6 px-2 text-xs' : 'h-8 px-3 text-sm',
 			onremove && (size === 'sm' ? 'pr-0.5' : 'pr-1'),
 			toggle
-				? pressed
+				? on
 					? 'border border-primary/45 bg-panel text-brand'
 					: 'border bg-card hover:bg-secondary'
 				: {
@@ -67,13 +75,22 @@
 	);
 </script>
 
-{#if toggle || variant === 'add' || onclick}
+{#snippet steady()}
+	<span class={cn('steady-weight min-w-0', on && 'font-medium')} {@attach steadyText}
+		><span class="truncate">{@render children()}</span></span
+	>
+{/snippet}
+
+{#if link}
+	<a {href} aria-current={current ? 'page' : undefined} {onclick} class={look} {...rest}>
+		{@render icon?.()}
+		{@render steady()}
+	</a>
+{:else if toggle || variant === 'add' || onclick}
 	<button type="button" aria-pressed={pressed} {onclick} class={look} {...rest}>
 		{@render icon?.()}
 		{#if toggle}
-			<span class={cn('steady-weight min-w-0', pressed && 'font-medium')} {@attach steadyText}
-				><span class="truncate">{@render children()}</span></span
-			>
+			{@render steady()}
 		{:else}
 			<span class="min-w-0 truncate">{@render children()}</span>
 		{/if}
