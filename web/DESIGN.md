@@ -679,7 +679,8 @@ Every box that tells something with a tone is an `Alert`, never one drawn by han
 its steps and rules, a space others do not see, the cut stream, the sign-in error, the search
 note of the documents list. One look: `rounded-xl`, `px-3.5 py-3`, the variant's icon (a `note`
 always `Info`); text and buttons in the body, with `class` for a row (`flex flex-wrap
-items-center`). A note that is no warning passes `role="status"` (it changes) or `role="note"`
+items-center`). A button in an alert is a `Button` of its variants, never coloured in the alert's
+tone (Tobi, 09.11.2026); its action is the primary one. A note that is no warning passes `role="status"` (it changes) or `role="note"`
 (it stands), since `Alert` is `role="alert"` by default. Not a hint and so no `Alert`: the
 figures of the search check, tiles in the tones of the lanes.
 
@@ -1222,7 +1223,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     height of a field ("Fields"); "Abbrechen" before the
     primary action, never after it ("Footers"); no height of its own on a `Button` or
     `IconButton` ("Buttons"); a box of tone (`bg-lane-yellow`, `bg-lane-red`, `bg-note` with a
-    radius and padding) only as `Alert` ("Alerts"); the owl (`Mascot`, `EmptyNote` with `mascot`) only at its
+    radius and padding) only as `Alert` ("Alerts"); a button in an alert in its variant, never in the
+    alert's tone ("Alerts"); the owl (`Mascot`, `EmptyNote` with `mascot`) only at its
     places ("Logo and owl"); a dashed box of muted words only as `EmptyNote` ("States"); a lone
     radio only in `ChoiceCard` ("Checkboxes, radios, switches"); a pill of a chip only as `Chip`
     or `TagChip` ("Chips"); the phone's editor bar only in `PhoneEditorBar` ("Dialogs, sheets,
