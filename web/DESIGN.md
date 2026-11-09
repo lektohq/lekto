@@ -316,6 +316,10 @@ divider.
 - **`Choice` / `ChoiceBox`** (`ui/choice`): every checkbox and radio. A native input
   (`appearance-none`), drawn from the tokens: `border-input`, checked in `primary`.
   `no-raw-choice.test.ts` enforces it.
+- **`ChoiceCard`**: one answer of a choice among a few as a card, the radio at its start, what
+  the answer is and does beside it (the kind of a new tag, the types a field applies to, where a
+  document goes). `rounded-xl`, `p-3`; chosen, `border-primary` and `bg-panel`, a border, no ring
+  (Tobi, 09.11.2026). A lone radio (`ChoiceBox type="radio"`) stands only in it.
 - **`Switch`**: on/off that takes effect at once (a rule active, a webhook active, a setting). A
   switch is never shown together with a badge that says the same thing.
 - **`ColorPicker`**: its own `radiogroup` of swatches. **`IconPicker`**: the Lucide picker.
@@ -1205,7 +1209,9 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     primary action, never after it ("Footers"); no height of its own on a `Button` or
     `IconButton` ("Buttons"); a box of tone (`bg-lane-yellow`, `bg-lane-red`, `bg-note` with a
     radius and padding) only as `Alert` ("Alerts"); the owl (`Mascot`, `EmptyNote` with `mascot`) only at its
-    places ("Logo and owl"); a dashed box of muted words only as `EmptyNote` ("States"); spins, pulses and turns only `motion-safe` ("Motion");
+    places ("Logo and owl"); a dashed box of muted words only as `EmptyNote` ("States"); a lone
+    radio only in `ChoiceCard` ("Checkboxes, radios, switches"); spins, pulses and turns only
+    `motion-safe` ("Motion");
   - `src/lib/tips.test.ts`: one box of help at a time, the next without delay; a tooltip opens on
     a focus Tab brought, not on one handed back;
   - `src/lib/via-token.test.ts`: every file that has a person's API token (`via_token`, a

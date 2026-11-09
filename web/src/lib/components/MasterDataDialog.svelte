@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ChoiceCard from '#lib/components/ChoiceCard.svelte';
 	import { untrack } from 'svelte';
 	import Workflow from '@lucide/svelte/icons/workflow';
 	import { api } from '#lib/api/client.ts';
@@ -33,8 +34,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { phone } from '#lib/phone.svelte.ts';
 	import { below, ofScope, pathLabel } from '#lib/tags.ts';
-	import { cn } from '#lib/utils.ts';
-	import { Choice, ChoiceBox } from '#lib/components/ui/choice/index.ts';
+	import { Choice } from '#lib/components/ui/choice/index.ts';
 
 	/** The kinds of tag a new one can be, each with an example. */
 	const KIND_CARDS: { scope: TagScope; title: () => string; example: () => string }[] = [
@@ -294,25 +294,15 @@
 				</div>
 				<div class="grid gap-2 sm:grid-cols-2">
 					{#each KIND_CARDS as card (card.scope)}
-						<label
-							class={cn(
-								'flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-secondary/60',
-								kind === card.scope && 'border-primary bg-primary/10 hover:bg-primary/10'
-							)}
+						<ChoiceCard
+							name="{uid}-kind"
+							value={card.scope}
+							checked={kind === card.scope}
+							onchange={() => chooseKind(card.scope)}
 						>
-							<ChoiceBox
-								type="radio"
-								name="{uid}-kind"
-								value={card.scope}
-								checked={kind === card.scope}
-								onchange={() => chooseKind(card.scope)}
-								class="mt-0.5"
-							/>
-							<span class="flex flex-col gap-0.5">
-								<span class="text-sm font-medium">{card.title()}</span>
-								<span class="text-sm text-muted-foreground">{card.example()}</span>
-							</span>
-						</label>
+							<span class="text-sm font-medium">{card.title()}</span>
+							<span class="text-sm text-muted-foreground">{card.example()}</span>
+						</ChoiceCard>
 					{/each}
 				</div>
 			</fieldset>
