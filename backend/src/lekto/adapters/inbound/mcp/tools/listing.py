@@ -5,12 +5,13 @@ answered by the server, not by adding up a hundred answers)."""
 from dataclasses import replace
 from datetime import date
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 
 from mcp.server.mcpserver import Context
 from pydantic import BaseModel, Field
 
 from lekto.adapters.inbound.context import ApiContext
+from lekto.adapters.inbound.lanes import LANES, LaneFilter
 from lekto.adapters.inbound.mcp.names import Names, find
 from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
@@ -21,7 +22,6 @@ from lekto.core.domain.fields import FieldType
 from lekto.core.domain.ids import FieldId, LensId, UserId, short_id
 from lekto.core.domain.lenses import MAX_QUERY_LENGTH
 from lekto.core.domain.periods import Period
-from lekto.core.domain.pipeline import Lane
 from lekto.core.ports.repository import DocumentFilter
 
 LIST_SIZE = 20
@@ -31,7 +31,8 @@ LIST_MAX = 50
 type LaneName = Literal["green", "yellow", "red", "processing"]
 type GroupName = Literal["year", "month", "contact", "document_type", "topic", "tag"]
 
-_LANES: dict[str, Lane | None] = {"green": Lane.GREEN, "yellow": Lane.YELLOW, "red": Lane.RED}
+if set(get_args(LaneName.__value__)) != {lane.value for lane in LaneFilter}:
+    raise RuntimeError("LaneName must name every LaneFilter")  # one lane more reaches both
 
 
 class ListItem(BaseModel):
@@ -103,7 +104,7 @@ def add_listing_tools(tools: Tools, context: ApiContext) -> None:
         if topics:
             filter = replace(filter, topics=frozenset(names.find_topic(t) for t in topics))
         if lane is not None:
-            filter = replace(filter, lanes=frozenset({_LANES.get(lane)}))
+            filter = replace(filter, lanes=frozenset({LANES[LaneFilter(lane)]}))
         if document_date_from is not None or document_date_to is not None:
             period = Period(document_date_from or date.min, document_date_to or date.max)
             filter = replace(filter, document_dates=period)

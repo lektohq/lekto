@@ -4,13 +4,13 @@ document counts; and how their descriptions say who may call them."""
 
 from dataclasses import replace
 from datetime import date
-from enum import StrEnum
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, Query
 from fastapi.exceptions import RequestValidationError
 
+from lekto.adapters.inbound.lanes import LANES, LaneFilter
 from lekto.adapters.inbound.limits import MAX_SELECTED
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.schemas.refs import opened
@@ -19,9 +19,7 @@ from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, SpaceId, TagId, id_reference
 from lekto.core.domain.periods import Period
-from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.domain.search import PROCESSING, lane_value
 from lekto.core.ports.identity import RefCipher
 from lekto.core.ports.repository import DocumentFilter
 
@@ -33,20 +31,6 @@ MAX_IDS = 50
 MAX_FACTS = 5
 """Facts a filter names at most."""
 
-
-class LaneFilter(StrEnum):
-    """A lane, or `processing`: documents that have no lane yet."""
-
-    GREEN = Lane.GREEN.value
-    YELLOW = Lane.YELLOW.value
-    RED = Lane.RED.value
-    PROCESSING = PROCESSING
-
-
-# Every lane, and none, as the API names it (a lane without a member fails here, at import).
-_LANES: dict[LaneFilter, Lane | None] = {
-    LaneFilter(lane_value(lane)): lane for lane in (*Lane, None)
-}
 
 type Ids = Annotated[list[UUID] | None, Query(max_length=MAX_IDS)]
 
@@ -103,7 +87,7 @@ def document_filter(
         document_type_groups=either(document_type_group_id),
         topics=frozenset(TagId(id) for id in topic_id) if topic_id else None,
         spaces=frozenset(SpaceId(id) for id in space_id) if space_id else None,
-        lanes=None if not lane else frozenset(_LANES[item] for item in lane),
+        lanes=None if not lane else frozenset(LANES[item] for item in lane),
         field=None if field_id is None else FieldId(field_id),
         document_dates=_dates(document_date_from, document_date_to),
         facts=tuple(_fact(item, context.refs) for item in dict.fromkeys(fact or ())),
