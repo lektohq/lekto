@@ -281,8 +281,11 @@ divider.
   `noneLabel` where a value must be chosen (a rule's contact or type). A popover on desktop; on the phone a sheet from the bottom (`PhoneSheet`) named by
   its `title` ("Kontakt wählen"), with a close button and rows of 48 px; a choice closes it
   (Tobi, 28.10.2026). Admins can create from the search (`CreateOffer`).
-- **`SearchField`**: every search input, in pickers, lists and pages alike. The header search and
-  the document search are `SearchField`s inside a form.
+- **`SearchField`**: every search input, in pickers, lists and pages alike; no other `type="search"`.
+  The header search and the document search are `SearchField`s inside a form, with their end (the
+  key `/`, the × that clears) in the snippet `end`. As high as every field (`FIELD_HEIGHT`, also in
+  the header, which stays 64 px); `size="sm"` (36 px) only in the narrow filter panel (Tobi,
+  09.11.2026). The buttons beside it keep their 40 px and stand centred, as beside every field.
 - **Dates:** `DateInput` (the bits-ui date picker: day, month and year to type, a calendar
   beside them), in the UI language; its value is the API's day (`2026-10-26`). With
   `granularity="minute"` hour and minute follow, in the UI language too, and its value is the
@@ -302,8 +305,8 @@ divider.
 - **One height** (Tobi, 03.11.2026): every field is 44 px high (`FIELD_HEIGHT`), in a row of
   fields too (a rule's conditions and actions, an identifier opened in its list, a space member's
   role), and a `TagPicker` or `ChipInput` with one line of chips is as high. Only the narrow filter
-  panel and the lens editor beside it (`FilterPanel`, `FactFilter`, `LensEditor`) have fields of
-  36 px (`h-9`). `design-system.test.ts` allows no other height on a field, also through
+  panel and the lens editor beside it (`FilterPanel`, `FactFilter`, `LensEditor`, the search of a
+  facet as `SearchField size="sm"`) have fields of 36 px (`h-9`). `design-system.test.ts` allows no other height on a field, also through
   `class={…}`; a raw `<input>` with a type (the colour well of `ColorPicker`) takes `h-11` by
   hand.
 
@@ -1181,7 +1184,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     in the order tabs, search, filter row, list, with no paragraph before the list ("Master data
     tabs"); tooltips only through `ui/tooltip` ("Help and tooltips"); `Progress` only in the
     selection bars of runs on many and the upload summary ("Choosing many"); dates and times
-    through `DateInput`, no native date or time field ("Fields"); "Abbrechen" before the
+    through `DateInput`, no native date or time field, every search through `SearchField` at the
+    height of a field ("Fields"); "Abbrechen" before the
     primary action, never after it ("Footers"); no height of its own on a `Button` or
     `IconButton` ("Buttons"); the owl (`Mascot`, `EmptyNote` with `mascot`) only at its
     places ("Logo and owl"); spins, pulses and turns only `motion-safe` ("Motion");
