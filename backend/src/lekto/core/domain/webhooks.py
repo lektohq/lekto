@@ -563,6 +563,8 @@ class WebhookDelivery:
     status_code: int | None = None
     error: str | None = None
     next_attempt_at: datetime | None = None
+    reason: Reason | None = None
+    """Why it was not sent, with its code (`error` is its text); none for an answer."""
 
     def __post_init__(self) -> None:
         self.started_at = require_utc(self.started_at, "started_at")
@@ -586,6 +588,7 @@ class WebhookDelivery:
         status_code: int | None = None,
         error: str | None = None,
         next_attempt_at: datetime | None = None,
+        reason: Reason | None = None,
     ) -> "WebhookDelivery":
         """A new attempt, with an id of its own."""
         return cls(
@@ -601,4 +604,5 @@ class WebhookDelivery:
             status_code=status_code,
             error=error,
             next_attempt_at=next_attempt_at,
+            reason=reason,
         )

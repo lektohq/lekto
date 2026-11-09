@@ -8,7 +8,7 @@ from sqlalchemy import Row, delete, func, insert, select
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.repositories import SqlRepository, Values
-from lekto.core.domain.errors import NotFoundError
+from lekto.core.domain.errors import NotFoundError, ValidationError
 from lekto.core.domain.ids import DeliveryId, DocumentId, EventId, UserId, WebhookId
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.webhooks import (
@@ -91,6 +91,7 @@ class SqlWebhookRepository(SqlRepository[WebhookId, Webhook]):
                 status_code=delivery.status_code,
                 error=delivery.error,
                 next_attempt_at=delivery.next_attempt_at,
+                reason=None if delivery.reason is None else delivery.reason.to_json(),
             )
         )
 
@@ -221,4 +222,15 @@ def _delivery(row: Row[Any]) -> WebhookDelivery:
         status_code=row.status_code,
         error=row.error,
         next_attempt_at=row.next_attempt_at,
+        reason=_reason(row.reason),
     )
+
+
+def _reason(data: Any) -> Reason | None:
+    """A delivery's reason; none for one a newer version wrote (its `error` still says it)."""
+    if data is None:
+        return None
+    try:
+        return Reason.from_json(data)
+    except ValidationError:
+        return None
