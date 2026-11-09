@@ -1203,17 +1203,18 @@ it off ("von Tobi über Token „Claude“"). Guard: `src/lib/via-token.test.ts`
 
 Allowed outside the token rules, each for a stated reason:
 
-| Where                                                                   | What                                   | Why                                                                  |
-| ----------------------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------- |
-| `PageViewer`, `DocumentThumb`, `CodeThumb`, `ContactAvatar`, `TotpCard` | `bg-white`                             | Paper, logos and the QR code are drawn for white                     |
-| Overlays of `ui/dialog`, `ui/alert-dialog`, `ui/sheet`                  | `bg-black/*`                           | The dimmed page behind a dialog, as shadcn draws it                  |
-| The sign-in page, the error page                                        | a font size beyond the scale           | The wordmark scales with its font size                               |
-| The sign-in page                                                        | taller fields                          | Alone on the page; the code to type in large digits                  |
-| `DocumentFiles`                                                         | `hsl()` from data                      | The fingerprint colour comes from the file's hash                    |
-| `PageViewer`, `ProcessingBand`, charts                                  | `style=` with computed sizes           | Sizes come from data (zoom, durations, bars)                         |
-| `lib/templates/codemirror.ts`                                           | its own theme                          | The editor sits in a shadow root that the page's styles do not reach |
-| `.lc-tooltip-*` in `app.css`                                            | LayerChart override                    | The library's tooltip ground is otherwise transparent                |
-| `ui/*`                                                                  | shadcn internals (`data-[…]` variants) | Primitives; their look follows this document                         |
+| Where                                                                   | What                                   | Why                                                                                 |
+| ----------------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------- |
+| `PageViewer`, `DocumentThumb`, `CodeThumb`, `ContactAvatar`, `TotpCard` | `bg-white`                             | Paper, logos and the QR code are drawn for white                                    |
+| Overlays of `ui/dialog`, `ui/alert-dialog`, `ui/sheet`                  | `bg-black/*`                           | The dimmed page behind a dialog, as shadcn draws it                                 |
+| The sign-in page, the error page                                        | a font size beyond the scale           | The wordmark scales with its font size                                              |
+| The sign-in page                                                        | taller fields                          | Alone on the page; the code to type in large digits                                 |
+| `DocumentFiles`                                                         | `hsl()` from data                      | The fingerprint colour comes from the file's hash                                   |
+| `PageViewer`, `ProcessingBand`, charts                                  | `style=` with computed sizes           | Sizes come from data (zoom, durations, bars)                                        |
+| `lib/templates/codemirror.ts`                                           | its own theme                          | The editor sits in a shadow root that the page's styles do not reach                |
+| `.lc-tooltip-*` in `app.css`                                            | LayerChart override                    | The library's tooltip ground is otherwise transparent                               |
+| `ui/*`                                                                  | shadcn internals (`data-[…]` variants) | Primitives; their look follows this document                                        |
+| `FilterSection`, `Lenses`, `SelectionBar`, the maintenance list         | `Card size="flush"` with side padding  | Their rows or buttons pad themselves top and bottom; only the sides are the frame's |
 
 A new exception needs a row here and its entry in `tests/design-system.test.ts` (`EXCEPTIONS`).
 
@@ -1237,7 +1238,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     primary action, never after it ("Footers"); no height of its own on a `Button` or
     `IconButton` ("Buttons"); a box of tone (`bg-lane-yellow`, `bg-lane-red`, `bg-note` with a
     radius and padding) only as `Alert` ("Alerts"); a button in an alert in its variant, never in the
-    alert's tone ("Alerts"); formats only through `lib/i18n.ts` ("Formats"); the owl (`Mascot`, `EmptyNote` with `mascot`) only at its
+    alert's tone ("Alerts"); formats only through `lib/i18n.ts` ("Formats"); no native `title` on a field, a cell or a code ("Help and tooltips"); no own padding on a
+    `flush` card outside the exceptions ("Spacing and layout"); the owl (`Mascot`, `EmptyNote` with `mascot`) only at its
     places ("Logo and owl"); a dashed box of muted words only as `EmptyNote` ("States"); a lone
     radio only in `ChoiceCard` ("Checkboxes, radios, switches"); a pill of a chip only as `Chip`
     or `TagChip` ("Chips"); the phone's editor bar only in `PhoneEditorBar` ("Dialogs, sheets,
