@@ -40,5 +40,5 @@ export function loginHref(next: string): string {
 
 /** The start of signing in through the identity provider (a page of the API, not of the app). */
 export function oidcLoginHref(next: string): string {
-	return `/api/v1/auth/oidc/login?next=${encodeURIComponent(safeNext(next))}`;
+	return `${BASE_API}/auth/oidc/login?next=${encodeURIComponent(safeNext(next))}`;
 }
