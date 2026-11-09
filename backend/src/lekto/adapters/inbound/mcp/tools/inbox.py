@@ -151,7 +151,8 @@ def add_inbox_tools(tools: Tools, context: ApiContext) -> None:
         )
         if view is None:
             return compact(UpdateOut(id=short_id(document), filed_away=True))
-        return compact(update_out(before, view.document, view.access, names))
+        out = await update_out(context, user, before, view.document, view.access, names)
+        return compact(out)
 
     @tools.write(
         "inbox_mark_seen",

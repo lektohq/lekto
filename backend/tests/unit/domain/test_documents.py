@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import UTC, date, datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -8,6 +9,7 @@ from lekto.core.domain.documents import (
     Document,
     DocumentChanges,
     Sha256,
+    changed_fields,
     checked_fields,
     confirms,
 )
@@ -21,7 +23,7 @@ from lekto.core.domain.events import (
     NodeCompleted,
 )
 from lekto.core.domain.fields import FieldDefinition, FieldType
-from lekto.core.domain.ids import ContactId, DocumentTypeId, TagId, new_id
+from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, SpaceId, TagId, new_id
 from lekto.core.domain.pipeline import Node
 from tests import builders
 from tests.builders import FAILED, NOW, OK, UNCERTAIN
@@ -284,3 +286,24 @@ def test_delete_records_deleted() -> None:
 
 def test_ok_result_constant_is_ok() -> None:
     assert OK.reason is None
+
+
+def test_a_change_names_what_it_set_and_removed_in_one_order() -> None:
+    """What REST and MCP report of a change (review 0.12.2, A-01): the fields in their order,
+    the space, then the custom fields."""
+    owner = builders.user()
+    before = builders.document(owner, builders.space(owner))
+    amount, note = FieldId(new_id()), FieldId(new_id())
+    before.fields = {note: "paid"}
+    after = deepcopy(before)
+    assert changed_fields(before, after) == []
+    after.title = "Strom"
+    after.tag_ids = {TagId(new_id())}
+    after.space_id = SpaceId(new_id())
+    after.fields = {amount: "84,20"}  # one set, one removed
+    assert changed_fields(before, after) == [
+        "title",
+        "tags",
+        "space",
+        *sorted([f"field:{amount}", f"field:{note}"]),
+    ]

@@ -71,8 +71,14 @@ from lekto.adapters.inbound.rest.schemas.open_identifiers import PlaceOut
 from lekto.adapters.inbound.rest.schemas.refs import MAX_REF, opened
 from lekto.adapters.inbound.rest.upload import read_upload, upload_body
 from lekto.adapters.inbound.schemas import RuleReportOut
-from lekto.core.domain.classification import CHANGE_FIELDS, SPACE, field_id_of, field_key
-from lekto.core.domain.documents import UNSET, Channel, Document, DocumentChanges, Unset
+from lekto.core.domain.classification import field_id_of
+from lekto.core.domain.documents import (
+    UNSET,
+    Channel,
+    DocumentChanges,
+    Unset,
+    changed_fields,
+)
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldDefinition, field_from_json
 from lekto.core.domain.identifiers import IdentifierKind
@@ -399,7 +405,7 @@ async def preview_change(
     readable = change.access is not None
     return DocumentPreviewOut(
         document=DocumentDetails.of(change.document, change.access) if change.access else None,
-        changed=_differences(change.before, change.document) if change.before else [],
+        changed=changed_fields(change.before, change.document) if change.before else [],
         rules=(
             None
             if change.rules is None
@@ -904,17 +910,6 @@ async def mark_all_seen(
 ) -> InboxSeenOut:
     marked = await context.inbox.mark_all_seen(user, all_users=all_users, via=via)
     return InboxSeenOut(marked=marked)
-
-
-def _differences(before: Document, after: Document) -> list[str]:
-    fields: dict[str, tuple[object, object]] = {
-        name: (getattr(before, attribute), getattr(after, attribute))
-        for name, attribute in CHANGE_FIELDS.items()
-    }
-    fields[SPACE] = (before.space_id, after.space_id)
-    for field in sorted(set(before.fields) | set(after.fields)):
-        fields[field_key(field)] = (before.fields.get(field), after.fields.get(field))
-    return [name for name, (old, new) in fields.items() if old != new]
 
 
 def _changed(change: MetadataChange) -> DocumentChanged | DocumentOutOfReach:

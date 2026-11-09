@@ -17,9 +17,11 @@ from lekto.core.domain.classification import (
     CUSTOM_FIELDS,
     DOCUMENT_DATE,
     DOCUMENT_TYPE,
+    SPACE,
     TAGS,
     TITLE,
     TOPIC,
+    field_key,
 )
 from lekto.core.domain.errors import InvalidTransitionError, NotFoundError, ValidationError
 from lekto.core.domain.events import (
@@ -814,6 +816,20 @@ def _definition(
         return definitions[field_id]
     except KeyError:
         raise NotFoundError("field", field_id) from None
+
+
+def changed_fields(before: Document, after: Document) -> list[str]:
+    """What a change set or removed, by the names of checks: the fields of `CHANGE_FIELDS` in
+    their order, the space, then the custom fields (`field_key`) by id. What REST and MCP report
+    of a change; a field a later version adds reaches both."""
+    values: dict[str, tuple[object, object]] = {
+        name: (getattr(before, attribute), getattr(after, attribute))
+        for name, attribute in CHANGE_FIELDS.items()
+    }
+    values[SPACE] = (before.space_id, after.space_id)
+    for id in sorted({*before.fields, *after.fields}, key=str):
+        values[field_key(id)] = (before.fields.get(id), after.fields.get(id))
+    return [name for name, (old, new) in values.items() if old != new]
 
 
 def file_title(filename: str) -> str:
