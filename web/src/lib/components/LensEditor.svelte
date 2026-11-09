@@ -13,6 +13,7 @@
 </script>
 
 <script lang="ts">
+	import Chip from '#lib/components/Chip.svelte';
 	import ArrowDown from '@lucide/svelte/icons/arrow-down';
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
 	import GripVertical from '@lucide/svelte/icons/grip-vertical';
@@ -216,16 +217,12 @@
 				<span class="text-sm font-medium">{m.lens_filter()}</span>
 				<div class="flex flex-wrap gap-2">
 					{#if filter.document_period}
-						<span
-							class="inline-flex h-8 items-center rounded-full border border-primary/40 bg-panel px-3 text-sm text-brand"
-						>
+						<Chip variant="selected">
 							{m.lens_period_moving({ period: PERIODS[filter.document_period]() })}
-						</span>
+						</Chip>
 					{/if}
 					{#if query}
-						<span class="inline-flex h-8 items-center rounded-full border px-3 text-sm">
-							{m.lens_query({ words: query })}
-						</span>
+						<Chip>{m.lens_query({ words: query })}</Chip>
 					{/if}
 				</div>
 				<ActiveFilters filters={shown} {lookup} readonly />
