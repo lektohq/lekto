@@ -186,6 +186,8 @@
 					{#snippet icon()}<Tag class="size-3.5" aria-hidden="true" />{/snippet}
 					{m.dev_sample_chip()}
 				</Chip>
+				<Chip {size} href="#dev-chips" current>{m.dev_sample_chip()}</Chip>
+				<Chip {size} href="#dev-chips">{m.dev_sample_chip()}</Chip>
 			</div>
 		{/each}
 	</section>
