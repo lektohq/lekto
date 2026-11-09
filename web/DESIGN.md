@@ -180,7 +180,9 @@ phone the page scrolls.
   `searchPlaces`: from `2xl`, for admins from 1720 px; otherwise the magnifier), user menu
   (avatar, round, its name as tooltip); while there is no connection, the badge "Offline" beside the logo ([App](#app)).
 - **User menu:** name and role, the admin switch "Alle Nutzer einbeziehen", language and appearance
-  (`LanguageChoices`, `ThemeChoices`, each a `Segmented`), settings, API documentation, sign out;
+  (`LanguageChoices`, `ThemeChoices`: radio groups of the menu, so that its arrow keys go through
+  them; in the phone's sheet each a `Segmented`; the appearances listed once, `THEME_OPTIONS` in
+  `lib/theme.ts`), settings, API documentation, sign out;
   last, below a line, the version that runs ("Lekto 0.8.0", `text-xs`, muted, no item to
   choose; `lekto_version` of `GET /auth/me`). On the phone (below `sm`) the sheet holds all of
   it, the version at its end: the header shows only logo, magnifier and menu button.
@@ -386,7 +388,7 @@ Two components that **look different on purpose**:
   2 px `brand` underline. A bottom border runs across the bar. It scrolls sideways on the phone
   with a fade at the cut edge. Counts and dots sit beside the label.
 - **`Segmented`**: a choice of how to show something (pages, grid/list/stream, text/pages,
-  form/facts, the period of the automation, language, appearance, the grouping of a lens; the
+  form/facts, the period of the automation, language and appearance in the phone's sheet, the grouping of a lens; the
   parts of a long dialog under its title: a contact's, an account's), which
   part of a list shows (the open identifiers by source, the identifiers at contacts by source, the tags by kind, the jobs by state, the
   deliveries by outcome; with counts), and in a form a choice among two or

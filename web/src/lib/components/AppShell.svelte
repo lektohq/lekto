@@ -6,10 +6,7 @@
 	import Languages from '@lucide/svelte/icons/languages';
 	import LogOut from '@lucide/svelte/icons/log-out';
 	import Menu from '@lucide/svelte/icons/menu';
-	import Monitor from '@lucide/svelte/icons/monitor';
-	import Moon from '@lucide/svelte/icons/moon';
 	import SearchIcon from '@lucide/svelte/icons/search';
-	import Sun from '@lucide/svelte/icons/sun';
 	import SunMoon from '@lucide/svelte/icons/sun-moon';
 	import Users from '@lucide/svelte/icons/users';
 	import WifiOff from '@lucide/svelte/icons/wifi-off';
@@ -36,6 +33,7 @@
 	import { BADGE_TONES, badgeLabel, badgeText, badgeTone, inbox } from '#lib/inbox.svelte.ts';
 	import { userLabel } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
+	import { THEME_OPTIONS } from '#lib/theme.ts';
 	import { canListAllUsers } from '#lib/permissions.ts';
 	import { phone } from '#lib/phone.svelte.ts';
 	import { scope } from '#lib/scope.svelte.ts';
@@ -89,11 +87,11 @@
 		value: locale,
 		label: LANGUAGE_NAMES[locale]
 	}));
-	const themeOptions = [
-		{ value: 'light', label: m.theme_light(), icon: Sun },
-		{ value: 'dark', label: m.theme_dark(), icon: Moon },
-		{ value: 'system', label: m.theme_system(), icon: Monitor }
-	];
+	const themeOptions = THEME_OPTIONS.map(({ value, label, icon }) => ({
+		value,
+		label: label(),
+		icon
+	}));
 
 	async function open(section: Section) {
 		menuOpen = false;
