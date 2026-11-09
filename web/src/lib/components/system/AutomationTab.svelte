@@ -7,7 +7,6 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import { fieldLabel } from '#lib/describe.ts';
-	import InfoTip from '#lib/components/InfoTip.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import { formatDuration } from '#lib/duration.ts';
@@ -243,15 +242,6 @@
 		`${Math.max(least, (100 * (ms ?? 0)) / longest).toFixed(1)}%`;
 </script>
 
-{#snippet heading(text: string, about: string)}
-	<div class="flex items-center gap-1">
-		<SectionTitle size="card">{text}</SectionTitle>
-		<InfoTip label={m.hint_about({ name: text })} size="sm" class="w-80">
-			<p>{about}</p>
-		</InfoTip>
-	</div>
-{/snippet}
-
 {#snippet verdictBar(field: Field, height: string)}
 	<div
 		role="img"
@@ -307,7 +297,11 @@
 		<div class="flex flex-wrap gap-6">
 			<Card.Root as="section" size="lg" class="flex min-w-0 flex-[2_1_520px] flex-col gap-4">
 				<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-					{@render heading(m.automation_first_title(), m.automation_first_info())}
+					<SectionTitle
+						size="card"
+						tip={{ name: m.automation_first_title(), text: m.automation_first_info() }}
+						>{m.automation_first_title()}</SectionTitle
+					>
 					<span class="text-meta text-muted-foreground">{scope}</span>
 				</div>
 				{#if total === 0}
@@ -349,7 +343,11 @@
 			</Card.Root>
 
 			<Card.Root as="section" size="lg" class="flex min-w-0 flex-[1_1_260px] flex-col">
-				{@render heading(m.automation_duration_title(), m.automation_duration_info())}
+				<SectionTitle
+					size="card"
+					tip={{ name: m.automation_duration_title(), text: m.automation_duration_info() }}
+					>{m.automation_duration_title()}</SectionTitle
+				>
 				<span class="text-meta text-muted-foreground">{m.automation_duration_hint()}</span>
 				<div class="mt-4 flex items-baseline gap-2">
 					<span class="text-figure tabular-nums">
@@ -374,7 +372,11 @@
 		{#if flows.length}
 			<Card.Root as="section" size="lg">
 				<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-					{@render heading(m.automation_flow_title(), m.automation_flow_info())}
+					<SectionTitle
+						size="card"
+						tip={{ name: m.automation_flow_title(), text: m.automation_flow_info() }}
+						>{m.automation_flow_title()}</SectionTitle
+					>
 					<span class="text-meta text-muted-foreground">{m.automation_flow_hint()}</span>
 				</div>
 				<div class="mt-4 flex flex-col gap-4">
@@ -406,7 +408,11 @@
 
 		<Card.Root as="section" size="lg">
 			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-				{@render heading(m.automation_months_title(), m.automation_months_info())}
+				<SectionTitle
+					size="card"
+					tip={{ name: m.automation_months_title(), text: m.automation_months_info() }}
+					>{m.automation_months_title()}</SectionTitle
+				>
 				<span class="text-meta text-muted-foreground">
 					{#if shares.length > 1}
 						{m.automation_months_share({
@@ -451,7 +457,11 @@
 
 		<Card.Root as="section" size="lg">
 			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-				{@render heading(m.automation_hits_title(), m.automation_hits_info())}
+				<SectionTitle
+					size="card"
+					tip={{ name: m.automation_hits_title(), text: m.automation_hits_info() }}
+					>{m.automation_hits_title()}</SectionTitle
+				>
 				<span class="text-meta text-muted-foreground">{m.automation_hits_hint()}</span>
 			</div>
 			<p class="mt-2 max-w-3xl text-meta text-muted-foreground">
@@ -580,7 +590,11 @@
 		{#if report.steps.length}
 			<Card.Root as="section" size="lg">
 				<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-					{@render heading(m.automation_steps_title(), m.automation_steps_info())}
+					<SectionTitle
+						size="card"
+						tip={{ name: m.automation_steps_title(), text: m.automation_steps_info() }}
+						>{m.automation_steps_title()}</SectionTitle
+					>
 					<span class="text-meta text-muted-foreground">{m.automation_steps_hint()}</span>
 				</div>
 				<div class="mt-3 flex flex-wrap gap-x-[18px] gap-y-2 text-meta text-muted-foreground">

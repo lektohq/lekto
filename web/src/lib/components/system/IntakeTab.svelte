@@ -8,7 +8,6 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import EditButton from '#lib/components/EditButton.svelte';
 	import EmptyNote from '#lib/components/EmptyNote.svelte';
-	import InfoTip from '#lib/components/InfoTip.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import Loading from '#lib/components/Loading.svelte';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
@@ -82,12 +81,13 @@
 
 <section class="flex flex-col gap-3" aria-labelledby="intake-mail">
 	<div class="flex flex-wrap items-center justify-between gap-2">
-		<div class="flex items-center gap-1">
-			<SectionTitle size="card" id="intake-mail">{m.intake_mail()}</SectionTitle>
-			<InfoTip label={m.hint_about({ name: m.intake_mail() })} size="sm" class="w-80">
-				<p>{m.intake_mail_info()}</p>
-			</InfoTip>
-		</div>
+		<SectionTitle
+			size="card"
+			id="intake-mail"
+			tip={{ name: m.intake_mail(), text: m.intake_mail_info() }}
+		>
+			{m.intake_mail()}
+		</SectionTitle>
 		<Button onclick={create}>
 			<Plus aria-hidden="true" />
 			{m.mailbox_new()}

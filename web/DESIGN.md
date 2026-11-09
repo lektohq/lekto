@@ -697,7 +697,7 @@ version of the app ([App](#app)). **A toast never replaces a load error on the p
   once its pages are drawn anew at another zoom, and keeps it so. Its left border and the
   backdrop set it off. `design-system.test.ts` keeps the shadow away.
 - **Help of a field or section:** `InfoTip` or `HintLabel`, an info button beside the label that
-  opens the text. The visible text stays what one needs to read the view. Help text holds at most
+  opens the text; the title of a section or card with help is `SectionTitle` with `tip`. The visible text stays what one needs to read the view. Help text holds at most
   about 200 characters. Longer explanations belong in the documentation.
 - **Tooltip** (`ui/tooltip`): the name of an icon button (through `IconButton`), the names of the
   options of `Segmented`, the inbox mark of a card. A native `title=` attribute is used only for
