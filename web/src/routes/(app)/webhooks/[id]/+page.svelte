@@ -28,7 +28,7 @@
 	import { canManageWebhook } from '#lib/permissions.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import { cn } from '#lib/utils.ts';
-	import { eventLabel, sendTest } from '#lib/webhooks.ts';
+	import { eventLabel, sendTest, switchedOffFailing } from '#lib/webhooks.ts';
 	import type { Tone } from '#lib/tones.ts';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { toast } from 'svelte-sonner';
@@ -247,7 +247,7 @@
 					{/if}
 				</span>
 				<span class="font-mono text-sm break-all text-muted-foreground">{webhook.url}</span>
-				{#if webhook.disabled_reason === 'failing'}
+				{#if switchedOffFailing(webhook)}
 					<span class="text-sm text-destructive">
 						{m.webhook_failing({ count: webhook.failed_streak })}
 					</span>

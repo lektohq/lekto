@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { WEBHOOK_EVENT_TYPES } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
-import { eventLabel, selectionVolume, volumeLevel, volumeText } from './webhooks.ts';
+import {
+	eventLabel,
+	selectionVolume,
+	switchedOffFailing,
+	volumeLevel,
+	volumeText
+} from './webhooks.ts';
 
 describe('how often webhook events come for one document', () => {
 	it('says it in words and as a level for every event', () => {
@@ -31,5 +37,13 @@ describe('how often webhook events come for one document', () => {
 		expect(eventLabel('rule.send')).toBe(m.event_rule_send());
 		expect(eventLabel('external.propose')).toBe(m.webhook_model_call_propose());
 		expect(eventLabel('something.new')).toBe('something.new');
+	});
+});
+
+describe('a webhook switched off', () => {
+	it('was switched off by Lekto when its reason says so, not by a person', () => {
+		const failing = { code: 'webhook_failing', params: {}, text: '' };
+		expect(switchedOffFailing({ disabled_reasons: [failing] as never })).toBe(true);
+		expect(switchedOffFailing({ disabled_reasons: [] })).toBe(false);
 	});
 });
