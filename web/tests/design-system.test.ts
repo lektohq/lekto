@@ -435,6 +435,26 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('draws a box of tone only as an Alert', () => {
+		// A hint with a tone, its radius and its padding: `ui/alert` (DESIGN.md, "Alerts").
+		const classes = /\sclass=(?:"[^"]*"|\{[^}]*\})/g;
+		const tone = /\bbg-(?:lane-yellow|lane-red|note)\b/;
+		const box = (value: string) =>
+			/\brounded-(?:lg|xl|2xl)\b/.test(value) && /\bpx-\d/.test(value) && /\bpy-\d/.test(value);
+		expect(
+			offenders((source, path) => {
+				// The search check's figures are tiles in the lanes' tones, no hints.
+				if (path.includes('/components/ui/') || path.endsWith('/system/SearchTab.svelte'))
+					return null;
+				return (
+					[...source.matchAll(classes)]
+						.map(([found]) => found)
+						.find((found) => tone.test(found) && box(found)) ?? null
+				);
+			})
+		).toEqual([]);
+	});
+
 	it('sizes buttons by their size, never by a height of their own', () => {
 		// `Button` takes a finger's 44 pixels on a phone by itself (DESIGN.md, "Buttons", "Touch
 		// targets"); `min-h-*` is no height of its own.

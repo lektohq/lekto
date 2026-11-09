@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { Separator } from '#lib/components/ui/separator/index.ts';
+	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import PanelLeftClose from '@lucide/svelte/icons/panel-left-close';
 	import PanelLeftOpen from '@lucide/svelte/icons/panel-left-open';
@@ -998,22 +1000,23 @@ row of filters, on a desktop narrow by the title. -->
 						onclearselection={clearSelection}
 					/>
 				{:else if lookupError}
-					<p class="text-destructive" role="alert">{lookupError}</p>
+					<LoadProblem problem={lookupError} onretry={() => void pageLookup.load()} />
 				{/if}
 			</div>
 
 			{#if meaning && searching && searchNote.slow}
 				<p class="text-sm text-muted-foreground" aria-live="polite">{m.search_slow()}</p>
 			{:else if note}
-				<div
-					class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border bg-card px-3 py-2 text-sm text-muted-foreground"
+				<Alert.Root
+					role="status"
 					aria-live="polite"
+					class="flex flex-wrap items-center gap-x-3 gap-y-2"
 				>
-					<Info class="size-4 shrink-0" aria-hidden="true" />
-					<p class="min-w-0 flex-1">
+					<Info aria-hidden="true" />
+					<Alert.Description class="min-w-0 flex-1">
 						{reasonText(note.reason)}
 						{#if note.pending}{m.search_meaning_pending()}{/if}
-					</p>
+					</Alert.Description>
 					{#if note.ready}
 						<Button
 							variant="outline"
@@ -1026,7 +1029,7 @@ row of filters, on a desktop narrow by the title. -->
 							{m.search_with_meaning()}
 						</Button>
 					{/if}
-				</div>
+				</Alert.Root>
 			{/if}
 
 			{#if showBar && !phone.current}{@render bulkBar()}{/if}
@@ -1083,7 +1086,7 @@ row of filters, on a desktop narrow by the title. -->
 											{formatNumber(group.items.length)}
 										</span>
 									{/if}
-									<span aria-hidden="true" class="h-px flex-1 bg-border"></span>
+									<Separator decorative class="flex-1" />
 								</SectionTitle>
 							{/if}
 							{#if layout === 'grid'}

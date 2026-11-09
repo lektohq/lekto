@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import CalendarClock from '@lucide/svelte/icons/calendar-clock';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import ChevronUp from '@lucide/svelte/icons/chevron-up';
@@ -196,9 +197,9 @@
 {:else}
 	<div class="flex flex-col gap-3">
 		{#if stream.truncated}
-			<p class="rounded-xl bg-lane-yellow px-3 py-2 text-sm text-lane-yellow-foreground">
-				{m.stream_truncated()}
-			</p>
+			<Alert.Root variant="warning" role="status">
+				<Alert.Description>{m.stream_truncated()}</Alert.Description>
+			</Alert.Root>
 		{/if}
 		{#if phone.current}
 			<ul class="flex flex-col gap-3" aria-label={m.stream_lanes()}>

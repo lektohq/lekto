@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Globe from '@lucide/svelte/icons/globe';
 	import Layers from '@lucide/svelte/icons/layers';
@@ -653,17 +654,12 @@
 	{/if}
 	<div class="relative flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto bg-surface p-3.5">
 		{#if reviewing}
-			<div
-				class="flex items-start gap-2.5 rounded-xl bg-lane-yellow px-3.5 py-3 text-lane-yellow-foreground"
-			>
-				<TriangleAlert class="mt-0.5 size-[18px] shrink-0" aria-hidden="true" strokeWidth={2.2} />
-				<div class="flex flex-col gap-0.5">
-					<p class="font-semibold">{m.review_banner_title()}</p>
-					{#if located}<p class="text-sm">
-							{phone.current ? m.review_banner_hint_phone() : m.review_banner_hint()}
-						</p>{/if}
-				</div>
-			</div>
+			<Alert.Root variant="warning" role="status">
+				<Alert.Title>{m.review_banner_title()}</Alert.Title>
+				{#if located}<Alert.Description>
+						{phone.current ? m.review_banner_hint_phone() : m.review_banner_hint()}
+					</Alert.Description>{/if}
+			</Alert.Root>
 		{:else if located}
 			<p class="px-1 text-sm text-muted-foreground">
 				{phone.current ? m.review_banner_hint_phone() : m.review_banner_hint()}
@@ -671,36 +667,38 @@
 		{/if}
 
 		{#if reviewing && failedNode}
-			<div class="flex flex-col gap-3 rounded-2xl border border-destructive/40 bg-card p-4">
-				<p class="font-medium">{m.review_failed()}</p>
-				{#if failedNode.reason}
-					<p class="text-sm">
-						{reasonsText(failedNode.reasons, failedNode.reason, labelled(lookup))}
-					</p>
-				{/if}
-				{#if editable}
-					<div>
+			<Alert.Root variant="caution" role="status">
+				<Alert.Title>{m.review_failed()}</Alert.Title>
+				<Alert.Description class="flex flex-col items-start gap-3">
+					{#if failedNode.reason}
+						<p>{reasonsText(failedNode.reasons, failedNode.reason, labelled(lookup))}</p>
+					{/if}
+					{#if editable}
 						<Button type="button" variant="outline" disabled={busy} onclick={retry}>
 							<RotateCcw aria-hidden="true" />
 							{m.retry_node()}
 						</Button>
-					</div>
-				{/if}
-			</div>
+					{/if}
+				</Alert.Description>
+			</Alert.Root>
 		{/if}
 
 		{#if reviewing}
 			{#each nodeNotes as note (note.node)}
-				<p class="rounded-xl border bg-card px-4 py-3 text-sm">
-					<span class="font-medium">{NODE_LABELS[note.node]()}:</span>
-					{reasonsText(note.reasons, note.reason, labelled(lookup))}
-				</p>
+				<Alert.Root role="note">
+					<Alert.Description>
+						<span class="font-medium text-foreground">{NODE_LABELS[note.node]()}:</span>
+						{reasonsText(note.reasons, note.reason, labelled(lookup))}
+					</Alert.Description>
+				</Alert.Root>
 			{/each}
 			{#each ruleNotes as note (note.field)}
-				<p class="rounded-xl border bg-card px-4 py-3 text-sm">
-					<span class="font-medium">{fieldLabel(note.field, lookup)}:</span>
-					{reasonsText(note.reasons, note.reason, { field: (name) => fieldLabel(name, lookup) })}
-				</p>
+				<Alert.Root role="note">
+					<Alert.Description>
+						<span class="font-medium text-foreground">{fieldLabel(note.field, lookup)}:</span>
+						{reasonsText(note.reasons, note.reason, { field: (name) => fieldLabel(name, lookup) })}
+					</Alert.Description>
+				</Alert.Root>
 			{/each}
 		{/if}
 
