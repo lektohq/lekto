@@ -1706,7 +1706,7 @@ export interface paths {
 		};
 		/**
 		 * The recognised text of a document
-		 * @description Needs read access. The text read from the archive, plain text as it is set (the pages apart by a form feed on a line of its own; a document parsed before 0.2 has Markdown until it is read again), in pieces of at most `LEKTO_MCP_TEXT_MAX` characters; continue with `next_offset`. 409 while the document has no text yet (it is not parsed), 422 for a larger `limit`.
+		 * @description Needs read access. The text read from the archive, plain text as it is set (the pages apart by a form feed on a line of its own; a document parsed before 0.2 has Markdown until it is read again), in pieces of at most `LEKTO_MCP_TEXT_MAX` characters (a larger `limit` gives as many); continue with `next_offset`. 409 while the document has no text yet (it is not parsed).
 		 */
 		get: operations['document_text_api_v1_documents__id__text_get'];
 		put?: never;
