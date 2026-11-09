@@ -173,7 +173,8 @@ class DocumentFilter:
     descendants). `lanes`: one of them, where None stands for documents still in processing.
     `confirmed`: whether a person set or confirmed the metadata (`Document.confirmed_at`).
     `labelled`: whether a person confirmed the metadata or decided the space (the classifier's
-    examples; not in the search index).
+    examples; not in the search index). `dated`: contact, type and document date are set (the
+    documents a series can have; not in the search index).
     `field`: a value for it is set. `document_dates`: the document date lies in the period (a
     document without one does not match). `facts`: the document has a fact that matches each
     (`FactCriterion`; none a person rejected). `ids`: the document's id ends with one of them
@@ -189,6 +190,7 @@ class DocumentFilter:
     lanes: frozenset[Lane | None] | None = None
     confirmed: bool | None = None
     labelled: bool | None = None
+    dated: bool = False
     field: FieldId | None = None
     document_dates: Period | None = None
     facts: tuple[FactCriterion, ...] = ()
@@ -222,6 +224,14 @@ class DocumentFilter:
             and (self.lanes is None or view.lane in self.lanes)
             and (self.confirmed is None or view.confirmed is self.confirmed)
             and (self.labelled is None or view.labelled is self.labelled)
+            and (
+                not self.dated
+                or (
+                    view.contact is not None
+                    and view.document_type is not None
+                    and view.document_date is not None
+                )
+            )
             and (self.field is None or self.field in view.fields)
             and all(criterion.token in view.facts for criterion in self.facts)
             and (self.ids is None or (view.id is not None and ends_with(view.id, self.ids)))
