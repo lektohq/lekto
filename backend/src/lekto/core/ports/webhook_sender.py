@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Protocol
 
+from lekto.core.domain.reasons import Reason
+
 
 @dataclass(frozen=True, kw_only=True)
 class WebhookRequest:
@@ -35,6 +37,8 @@ class WebhookResponse:
     duration_ms: int
     error: str | None = None
     refused: bool = False
+    reason: Reason | None = None
+    """Why Lekto did not send it, with its code (`error` is its text); none for an answer."""
 
 
 class WebhookSender(Protocol):

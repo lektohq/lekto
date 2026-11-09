@@ -70,7 +70,7 @@ from lekto.core.domain.json_value import JsonObject, as_object
 from lekto.core.domain.links import Links
 from lekto.core.domain.permissions import in_reach
 from lekto.core.domain.push import PushKind
-from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.reasons import Reason, ReasonCode, because
 from lekto.core.domain.tasks import Task, TaskKind, TaskStatus
 from lekto.core.domain.templates import RULE
 from lekto.core.domain.users import User
@@ -315,7 +315,7 @@ class WebhookDeliveryService:
             private = await self._private(uow, webhook)
         attempt = job.tries
         if reason is not None:
-            response = WebhookResponse(status_code=None, duration_ms=0, error=reason)
+            response = _not_sent(reason)
             await self._settle_attempt(
                 job,
                 webhook_id,
@@ -369,12 +369,10 @@ class WebhookDeliveryService:
             return
         attempt = job.tries
         if webhook is None:
-            response = WebhookResponse(
-                status_code=None, duration_ms=0, error="the webhook was deleted"
-            )
+            response = _not_sent(because(ReasonCode.DELIVERY_WEBHOOK_DELETED))
             outcome = DeliveryOutcome.GAVE_UP
         elif reason is not None:
-            response = WebhookResponse(status_code=None, duration_ms=0, error=reason)
+            response = _not_sent(reason)
             outcome = DeliveryOutcome.DROPPED
         else:
             try:
@@ -765,31 +763,34 @@ async def _owners_who_may_read(
     return allowed
 
 
-DOCUMENT_UNAVAILABLE = "the document is not available to the owner"
-
-
 MODEL_CALLS = frozenset({TaskKind.PROPOSE.value, TaskKind.EXTRACT.value})
 
 
 async def _reason_to_drop(
     uow: UnitOfWork, webhook: Webhook, event_type: str, document_id: DocumentId | None
-) -> str | None:
+) -> Reason | None:
     """Why the request must not be sent now; None if it may."""
     if not webhook.active:
-        return "the webhook is switched off"
+        return because(ReasonCode.DELIVERY_WEBHOOK_OFF)
     owner = await uow.users.find(webhook.owner_id)
     if owner is None or not owner.active:
-        return "the owner's account is not active"
+        return because(ReasonCode.DELIVERY_OWNER_INACTIVE)
     if event_type == DocumentDeleted.type or document_id is None:
         return None  # the readers were fixed with the event
     document = await uow.documents.find(document_id)
+    unavailable = because(ReasonCode.DELIVERY_DOCUMENT_UNAVAILABLE)
     if document is None:
-        return DOCUMENT_UNAVAILABLE
+        return unavailable
     if event_type in MODEL_CALLS:  # the webhook of a model call sees every document, an admin's
-        return None if owner.is_active_admin else "the owner is no admin any more"
+        return None if owner.is_active_admin else because(ReasonCode.DELIVERY_OWNER_NO_ADMIN)
     if not await _may_read(uow, owner, document):
-        return DOCUMENT_UNAVAILABLE  # the same words: gone and hidden must not be told apart
+        return unavailable  # the same reason: gone and hidden must not be told apart
     return None
+
+
+def _not_sent(reason: Reason) -> WebhookResponse:
+    """The answer of a request Lekto did not send, and why."""
+    return WebhookResponse(status_code=None, duration_ms=0, error=reason.text, reason=reason)
 
 
 async def _may_read(uow: UnitOfWork, user: User, document: Document) -> bool:
@@ -807,11 +808,7 @@ def _unusable_secret(webhook_id: WebhookId) -> WebhookResponse:
     """The answer of a request that was not sent: the webhook's secret or header values cannot
     be decrypted."""
     log.error("webhook secret unusable", extra={"webhook_id": str(webhook_id)})
-    return WebhookResponse(
-        status_code=None,
-        duration_ms=0,
-        error="the secret or the header values cannot be used (was the secret key changed?)",
-    )
+    return _not_sent(because(ReasonCode.DELIVERY_SECRET_UNUSABLE))
 
 
 def _is_success(response: WebhookResponse) -> bool:
@@ -850,4 +847,5 @@ def _row(
         status_code=response.status_code,
         error=response.error,
         next_attempt_at=next_attempt,
+        reason=response.reason,
     )

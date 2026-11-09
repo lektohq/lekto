@@ -467,6 +467,12 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	mail_rule_space_unreachable: entry(m.reason_mail_rule_space_unreachable),
 	mail_rule_type_gone: entry(m.reason_mail_rule_type_gone),
 	webhook_failing: entry(m.reason_webhook_failing),
+	delivery_webhook_off: entry(m.reason_delivery_webhook_off),
+	delivery_owner_inactive: entry(m.reason_delivery_owner_inactive),
+	delivery_document_unavailable: entry(m.reason_delivery_document_unavailable),
+	delivery_owner_no_admin: entry(m.reason_delivery_owner_no_admin),
+	delivery_webhook_deleted: entry(m.reason_delivery_webhook_deleted),
+	delivery_secret_unusable: entry(m.reason_delivery_secret_unusable),
 	mail_rule_unreadable: entry(m.reason_mail_rule_unreadable)
 };
 

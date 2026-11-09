@@ -50,6 +50,7 @@ const delivery = (changes: Partial<Delivery>): Delivery => ({
 	outcome: 'delivered',
 	status_code: 200,
 	error: null,
+	reason: null,
 	next_attempt_at: null,
 	document: { id: 'doc1', title: 'Stadtwerke – Abschlag' },
 	document_hidden: false,

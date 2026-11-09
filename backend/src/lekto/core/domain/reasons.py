@@ -443,6 +443,12 @@ class ReasonCode(StrEnum):
     MAIL_RULE_SPACE_UNREACHABLE = "mail_rule_space_unreachable"
     MAIL_RULE_TYPE_GONE = "mail_rule_type_gone"
     WEBHOOK_FAILING = "webhook_failing"
+    DELIVERY_WEBHOOK_OFF = "delivery_webhook_off"
+    DELIVERY_OWNER_INACTIVE = "delivery_owner_inactive"
+    DELIVERY_DOCUMENT_UNAVAILABLE = "delivery_document_unavailable"
+    DELIVERY_OWNER_NO_ADMIN = "delivery_owner_no_admin"
+    DELIVERY_WEBHOOK_DELETED = "delivery_webhook_deleted"
+    DELIVERY_SECRET_UNUSABLE = "delivery_secret_unusable"
     MAIL_RULE_UNREADABLE = "mail_rule_unreadable"
 
 
@@ -1005,6 +1011,14 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ),
     ReasonCode.MAIL_RULE_TYPE_GONE: "the document type of the mail text is deleted",
     ReasonCode.WEBHOOK_FAILING: "Lekto switched it off after repeated failed deliveries",
+    ReasonCode.DELIVERY_WEBHOOK_OFF: "the webhook is switched off",
+    ReasonCode.DELIVERY_OWNER_INACTIVE: "the owner's account is not active",
+    ReasonCode.DELIVERY_DOCUMENT_UNAVAILABLE: "the document is not available to the owner",
+    ReasonCode.DELIVERY_OWNER_NO_ADMIN: "the owner is no admin any more",
+    ReasonCode.DELIVERY_WEBHOOK_DELETED: "the webhook was deleted",
+    ReasonCode.DELIVERY_SECRET_UNUSABLE: (
+        "the secret or the header values cannot be used (was the secret key changed?)"
+    ),
     ReasonCode.MAIL_RULE_UNREADABLE: (
         "its stored conditions or steps cannot be read: {detail}; edit it and save it with "
         "both anew"

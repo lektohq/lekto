@@ -4438,6 +4438,8 @@ export interface components {
 			 * @description Why the attempt failed; the answer body is not kept.
 			 */
 			error: string | null;
+			/** @description Why Lekto did not send it, with its code (`delivery_webhook_off`, `delivery_owner_inactive`, `delivery_document_unavailable`, `delivery_owner_no_admin`, `delivery_webhook_deleted`, `delivery_secret_unusable`); null for an answer or a transport error (`error` says it). */
+			reason: components['schemas']['ReasonOut'] | null;
 			/** Next Attempt At */
 			next_attempt_at: string | null;
 			/** @description The document of the event, if the caller may read it. */
@@ -9783,6 +9785,12 @@ export interface components {
 			| 'mail_rule_space_unreachable'
 			| 'mail_rule_type_gone'
 			| 'webhook_failing'
+			| 'delivery_webhook_off'
+			| 'delivery_owner_inactive'
+			| 'delivery_document_unavailable'
+			| 'delivery_owner_no_admin'
+			| 'delivery_webhook_deleted'
+			| 'delivery_secret_unusable'
 			| 'mail_rule_unreadable';
 		/**
 		 * ReasonOut
