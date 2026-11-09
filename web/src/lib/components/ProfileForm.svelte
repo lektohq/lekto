@@ -19,7 +19,7 @@
 		rowsOf
 	} from '#lib/identifiers.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import type { Profile, ProfileData } from '#lib/profile.ts';
+	import { type Profile, type ProfileData, PROFILE_LIMITS } from '#lib/profile.ts';
 	import DateInput from '#lib/components/DateInput.svelte';
 
 	// A user's profile (Tobi, 21.10.2026): the display name others see, and what only the user
@@ -147,6 +147,8 @@
 				describedby="{uid}-aliases-hint"
 				addLabel={m.profile_alias_chip()}
 				inputLabel={m.profile_alias_input()}
+				maxlength={PROFILE_LIMITS.alias}
+				max={PROFILE_LIMITS.aliases}
 			/>
 		</Field.Field>
 		<div class="grid gap-4 sm:grid-cols-2">
