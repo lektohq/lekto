@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AlertDot from '#lib/components/AlertDot.svelte';
 	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -302,7 +303,7 @@
 					<Badge variant="outline">{userName(users ?? [], item.user_id)}</Badge>
 				{/if}
 				{#if errors[item.key]}
-					<span class="size-[7px] shrink-0 rounded-full bg-destructive" aria-hidden="true"></span>
+					<AlertDot label={errors[item.key]} />
 				{/if}
 			</button>
 			{#if item.source === 'manual'}

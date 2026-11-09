@@ -713,6 +713,16 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('draws a dot of alert only as AlertDot, with its words', () => {
+		expect(
+			offenders((source, path) =>
+				path.endsWith('/AlertDot.svelte')
+					? null
+					: line(source, /size-\[7px\]|size-2 (?:shrink-0 )?rounded-full bg-destructive/)
+			)
+		).toEqual([]);
+	});
+
 	it('shows the owl only where a moment is rare: sign-in, not found, nothing waiting, no document', () => {
 		expect(
 			offenders((source, path) => (MASCOT.has(path) ? null : line(source, /<Mascot\b/)))
