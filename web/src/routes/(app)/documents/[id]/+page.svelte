@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { toast } from 'svelte-sonner';
+	import { leaveDocument } from '#lib/way-back.ts';
+	import PageTitle from '#lib/components/page/PageTitle.svelte';
 	import File from '@lucide/svelte/icons/file';
 	import ListChecks from '@lucide/svelte/icons/list-checks';
 	import SquarePen from '@lucide/svelte/icons/square-pen';
@@ -86,6 +89,8 @@
 	const tab = $derived(tabOf(page.url));
 	const view = $derived(viewOf(page.url));
 	const fromInbox = $derived(page.url.searchParams.get('from') === 'inbox');
+	/** Leaving the document (deleted, handed over): the event of its deletion changes nothing. */
+	let leaving = false;
 	let document = $state<Document | null>(null);
 	let review = $state<Review | null>(null);
 	// The names the view shows; a load that fails says so in a toast.
@@ -319,7 +324,12 @@
 		const stop = events.subscribe((event) => {
 			if (event.document_id !== id) return;
 			if (event.type === 'document.deleted') {
-				void goto(fromInbox ? `${BASE}/inbox` : `${BASE}/documents`);
+				// Deleted elsewhere: back the way the person came, as after their own deletion;
+				// that one leaves by itself (`leaving`).
+				if (leaving) return;
+				leaving = true;
+				toast.info(m.beam_gone());
+				void leaveDocument(fromInbox);
 				return;
 			}
 			reload();
@@ -444,8 +454,10 @@
 <!-- From the desktop width on the view fills the window; only its cards scroll. -->
 <div class="flex flex-col gap-4 lg:h-full lg:min-h-0" data-wide>
 	{#if problem || !document}
-		<!-- While it loads or when it cannot, the way back stays. -->
+		<!-- While it loads or when it cannot, the way back and a title stay (one page title on every
+		page, web/DESIGN.md "Headings"). -->
 		<DocumentBackLink inbox={Boolean(inbox)} />
+		<PageTitle>{m.document_generic()}</PageTitle>
 	{/if}
 	{#if problem}
 		<LoadProblem
@@ -465,6 +477,7 @@
 			{vision}
 			{reading}
 			onchanged={load}
+			onleave={() => (leaving = true)}
 		/>
 
 		{#if advice}

@@ -28,7 +28,7 @@
 
 <svelte:head><title>{LABELS[tab]()} · {m.nav_system()} · {m.app_name()}</title></svelte:head>
 
-<div class="flex flex-col gap-4 sm:gap-6">
+<div class="flex flex-col gap-6">
 	<PageHeader title={m.nav_system()} />
 	<TabBar
 		label={m.system_tabs()}

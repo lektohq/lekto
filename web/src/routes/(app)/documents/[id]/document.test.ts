@@ -126,6 +126,42 @@ describe('a short id', () => {
 	});
 });
 
+describe('the frame of the page', () => {
+	it('keeps one title while the document loads and when it cannot be found', async () => {
+		serve(() => documentOf(), {
+			'GET /api/v1/documents/doc-1': () =>
+				json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+		});
+		render(Page);
+		expect(screen.getByRole('heading', { level: 1, name: m.document_generic() })).toBeTruthy();
+		expect(await screen.findByText(m.document_not_found())).toBeTruthy();
+		expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+	});
+
+	it('leaves a document deleted elsewhere the way the person came, once', async () => {
+		serve(() => documentOf({ lane: 'green' }));
+		render(Page);
+		await screen.findByRole('heading', { level: 1, name: documentOf().title });
+		emit?.('document.deleted', { document_id: 'doc-1' });
+		emit?.('document.deleted', { document_id: 'doc-1' });
+		await waitFor(() => expect(goto).toHaveBeenCalled());
+		expect(vi.mocked(goto).mock.calls).toEqual([
+			['/ui/documents', { state: { words: '' }, persistState: true }]
+		]);
+	});
+
+	it('leaves a document deleted elsewhere for the inbox it came from', async () => {
+		goTo('/ui/documents/doc-1?from=inbox', { id: 'doc-1' });
+		serve(() => documentOf({ lane: 'green' }), {
+			'GET /api/v1/inbox': () => ({ items: [], next_cursor: null })
+		});
+		render(Page);
+		await screen.findByRole('heading', { level: 1, name: documentOf().title });
+		emit?.('document.deleted', { document_id: 'doc-1' });
+		await waitFor(() => expect(goto).toHaveBeenCalledWith('/ui/inbox'));
+	});
+});
+
 describe('the document view and seen', () => {
 	it('reports seen when it opens, and refreshes the counter', async () => {
 		const api = serve(() => documentOf({ lane: 'green' }));

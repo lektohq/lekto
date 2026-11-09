@@ -650,6 +650,21 @@ describe('the design system (web/DESIGN.md)', () => {
 		}
 	});
 
+	it('spaces every page by gap-6 on every width, the document page by gap-4', () => {
+		const frame = /^<div class="flex flex-col (gap-\d+)[^"]*"/m;
+		expect(
+			offenders((source, path) => {
+				if (!path.startsWith('/src/routes/(app)/') || !path.endsWith('/+page.svelte')) return null;
+				if (path === '/src/routes/(app)/dev/components/+page.svelte') return null;
+				const gap = frame.exec(source)?.[1];
+				if (gap === undefined) return null;
+				const wanted = path === '/src/routes/(app)/documents/[id]/+page.svelte' ? 'gap-4' : 'gap-6';
+				return gap === wanted ? null : `page frame ${gap}`;
+			})
+		).toEqual([]);
+		expect(offenders((source) => line(source, /\bgap-4 sm:gap-6\b/))).toEqual([]);
+	});
+
 	it('shows the owl only where a moment is rare: sign-in, not found, nothing waiting, no document', () => {
 		expect(
 			offenders((source, path) => (MASCOT.has(path) ? null : line(source, /<Mascot\b/)))

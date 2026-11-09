@@ -121,8 +121,9 @@ of the viewer's pages `shadow-sm`, "Nach oben" (`ToTop`), which floats over the 
 
 ## Spacing and layout
 
-- **Page:** `flex flex-col gap-6` from the header down. Sections inside a page use `gap-3` between
-  their title and content.
+- **Page:** `flex flex-col gap-6` from the header down, on every width. The document page is the
+  one exception: it keeps `gap-4`, since it fills the window and its panes need the height
+  (Tobi, 09.11.2026). Sections inside a page use `gap-3` between their title and content.
 - **Card padding:** `Card` sizes only: `row` = `p-4` (an item of a list), `sm` = `p-3.5` (dense
   panels: facts, relations), `md` = `p-5` (default), `lg` = `px-5 py-4`, `sm:px-6` (the sections
   of the system page), `flush` (the card's rows or parts pad themselves). Hand-built paddings
@@ -1225,7 +1226,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     places ("Logo and owl"); a dashed box of muted words only as `EmptyNote` ("States"); a lone
     radio only in `ChoiceCard` ("Checkboxes, radios, switches"); a pill of a chip only as `Chip`
     or `TagChip` ("Chips"); the phone's editor bar only in `PhoneEditorBar` ("Dialogs, sheets,
-    editors"); spins, pulses and turns only `motion-safe` ("Motion");
+    editors"); spins, pulses and turns only `motion-safe` ("Motion"); every page frame
+    `flex flex-col gap-6`, the document page `gap-4` ("Spacing and layout");
   - `src/lib/tips.test.ts`: one box of help at a time, the next without delay; a tooltip opens on
     a focus Tab brought, not on one handed back;
   - `src/lib/via-token.test.ts`: every file that has a person's API token (`via_token`, a
