@@ -98,6 +98,8 @@ class ApiContext:
     # Characters of a document's text one answer holds at most (REST `/text`, MCP
     # `documents_text`).
     text_max: int
+    """The most characters of a document's text one piece holds (`DocumentService.text_max`),
+    for the descriptions that name it."""
     # Where browsers reach the web UI (`LEKTO_PUBLIC_URL` and `/ui`), for links MCP clients give
     # the user; None without `LEKTO_PUBLIC_URL`.
     ui_url: str | None = None

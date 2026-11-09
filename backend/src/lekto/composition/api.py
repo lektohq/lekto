@@ -105,7 +105,7 @@ def api_context(container: Container, settings: Settings, services: Services) ->
         max_upload_size=int(settings.upload_max_size),
         max_request_size=int(settings.request_max_size),
         events_poll_interval=settings.events_poll_interval,
-        text_max=settings.mcp_text_max,
+        text_max=services.documents.text_max,
         ui_url=(
             None
             if settings.public_url is None

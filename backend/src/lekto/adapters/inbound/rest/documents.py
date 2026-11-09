@@ -519,8 +519,8 @@ async def _download(
         "Needs read access. The text read from the archive, plain text as it is set (the "
         "pages apart by a form feed on a line of its own; a document parsed before 0.2 has "
         "Markdown until it is read again), in pieces of at most `LEKTO_MCP_TEXT_MAX` "
-        "characters; continue with `next_offset`. 409 while the document has no text yet (it "
-        "is not parsed), 422 for a larger `limit`."
+        "characters (a larger `limit` gives as many); continue with `next_offset`. 409 while "
+        "the document has no text yet (it is not parsed)."
     ),
     response_model=DocumentTextOut,
     responses=problem_responses(401, 404, 409, 422),
@@ -534,10 +534,6 @@ async def document_text(
         int | None, Query(ge=1, description="Characters; without it, as many as one answer holds.")
     ] = None,
 ) -> DocumentTextOut:
-    if limit is None:
-        limit = context.text_max
-    elif limit > context.text_max:
-        raise ValidationError(f"limit is at most {context.text_max} characters")
     piece = await context.documents.read_text(user, DocumentId(id), offset=offset, limit=limit)
     return DocumentTextOut(
         text=piece.text,

@@ -34,7 +34,7 @@ from lekto.core.domain.pipeline import PERSON_SPACE, Lane, Node
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.repository import DocumentFilter
-from lekto.core.services.documents import DocumentFile, FileInfo
+from lekto.core.services.documents import DocumentFile, DocumentService, FileInfo
 from lekto.core.services.objects import (
     archive_key,
     exchanges_key,
@@ -378,6 +378,22 @@ async def test_the_text_is_read_in_pieces(world: World, scene: Scene) -> None:
         await world.documents.read_text(scene.owner.id, scene.document.id, offset=-1, limit=10)
     with pytest.raises(ValidationError):
         await world.documents.read_text(scene.owner.id, scene.document.id, limit=0)
+
+
+async def test_a_piece_of_text_holds_at_most_what_the_service_allows(
+    world: World, scene: Scene
+) -> None:
+    """None or a larger limit give a whole piece, for REST and MCP alike (review 0.12.2, A-04)."""
+    await world.object_store.put(
+        text_key(scene.document.id), b"0123456789", content_type="text/markdown"
+    )
+    documents = DocumentService(world.uow, world.clock, world.object_store, text_max=4)
+    assert documents.text_max == 4
+    for limit in (None, 4, 5, 1000):
+        piece = await documents.read_text(scene.reader.id, scene.document.id, limit=limit)
+        assert (piece.text, piece.next_offset) == ("0123", 4)
+    smaller = await documents.read_text(scene.reader.id, scene.document.id, offset=8, limit=1)
+    assert (smaller.text, smaller.next_offset) == ("8", 9)
 
 
 async def test_the_text_is_for_readers_only(world: World, scene: Scene) -> None:

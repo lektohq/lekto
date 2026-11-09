@@ -33,6 +33,7 @@ from lekto.adapters.outbound.crypto import decode_key
 from lekto.adapters.outbound.liquid import parse_locale
 from lekto.adapters.outbound.webpush.sender import private_key_of as vapid_key_of
 from lekto.composition.errors import ConfigurationError
+from lekto.core.services.documents import TEXT_MAX
 
 ENV_PREFIX = "LEKTO_"
 FILE_SUFFIX = "_FILE"
@@ -196,7 +197,7 @@ class Settings(BaseSettings):
     # MCP: the endpoint `/api/v1/mcp` of the API (tools for AI clients, API tokens as bearer),
     # and the most characters one `documents_text` call returns.
     mcp_enabled: bool = True
-    mcp_text_max: Annotated[int, Field(ge=1000, le=1_000_000)] = 20_000
+    mcp_text_max: Annotated[int, Field(ge=1000, le=1_000_000)] = TEXT_MAX
 
     # Worker: background jobs, event delivery and cleanup.
     worker_concurrency: Annotated[int, Field(ge=1, le=64)] = 2
