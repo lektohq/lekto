@@ -4,11 +4,11 @@ import type { components } from '#lib/api/schema.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import StepDetails, { type DetailContext } from './StepDetails.svelte';
-import { json } from '#lib/testing/api.ts';
+import { calls, fakeApi } from '#lib/testing/api.ts';
 
 type LogEntry = components['schemas']['LogEntry'];
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 
 const JUKO = '0199a6c4-0000-7000-8000-0000000000c2';
 const ANNA = '0199a6c4-0000-7000-8000-0000000000a1';
@@ -57,10 +57,16 @@ const entry = (node: string, run: number, output: Record<string, unknown>) =>
 	({ node, run, output }) as unknown as LogEntry;
 
 beforeEach(() => {
-	fetchMock.mockReset();
-	fetchMock.mockImplementation(async () =>
-		json({ text: 'first\n\f\nsecond page', offset: 0, total_length: 18, next_offset: null })
-	);
+	const text = () => ({
+		text: 'first\n\f\nsecond page',
+		offset: 0,
+		total_length: 18,
+		next_offset: null
+	});
+	fetchMock = fakeApi({
+		'GET /api/v1/documents/doc-1/text': text,
+		'GET /api/v1/documents/doc-2/text': text
+	});
 	vi.stubGlobal('fetch', fetchMock);
 });
 
@@ -142,7 +148,7 @@ describe('StepDetails', () => {
 		// Another document: its text.
 		await rerender({ ...props, context: { ...context, documentId: 'doc-2' } });
 		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-		expect(new URL(fetchMock.mock.calls[1][0].url).pathname).toBe('/api/v1/documents/doc-2/text');
+		expect(calls(fetchMock)[1]).toMatch(/^GET \/api\/v1\/documents\/doc-2\/text/);
 	});
 
 	it("draws the classifier's classes against its threshold", () => {

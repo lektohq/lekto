@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { calls, fakeApi } from '#lib/testing/api.ts';
 import type { Facts } from '#lib/facts.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
@@ -108,7 +109,7 @@ const FACTS: Facts = {
 	]
 };
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 
 function props(overrides: Record<string, unknown> = {}) {
 	return {
@@ -124,8 +125,8 @@ function props(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
-	fetchMock.mockReset();
-	fetchMock.mockImplementation(async () => new Response('{}', { status: 200 }));
+	// Every change succeeds; the panel reloads through `onchanged`.
+	fetchMock = fakeApi();
 	vi.stubGlobal('fetch', fetchMock);
 });
 
@@ -230,7 +231,7 @@ describe('FactsPanel', () => {
 		await user.click(within(form).getByRole('button', { name: m.facts_attach() }));
 		await waitFor(() => expect(onchanged).toHaveBeenCalled());
 		const [request] = fetchMock.mock.calls[0];
-		expect(new URL(request.url).pathname).toBe(`/api/v1/contacts/${UTILITY}/identifiers`);
+		expect(calls(fetchMock)[0]).toBe(`POST /api/v1/contacts/${UTILITY}/identifiers`);
 		expect(await request.json()).toEqual({ kind: 'customer_number', value: '20047718' });
 	});
 

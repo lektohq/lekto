@@ -1,19 +1,19 @@
 import { render, screen, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fakeApi } from '#lib/testing/api.ts';
 import { events } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import DocumentText from './DocumentText.svelte';
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let answer: object = {};
+let fetchMock = fakeApi();
 
 const TEXT =
 	'Gesamtbrutto (EBeschV)      6.767,00\nSteuer-Brutto, EZ           3.544,50\n\f\nSeite zwei';
 
 beforeEach(() => {
-	fetchMock.mockReset();
-	fetchMock.mockImplementation(async () =>
-		Response.json({ text: TEXT, offset: 0, total_length: TEXT.length, next_offset: null })
-	);
+	answer = { text: TEXT, offset: 0, total_length: TEXT.length, next_offset: null };
+	fetchMock = fakeApi({ 'GET /api/v1/documents/doc-1/text': () => answer });
 	vi.stubGlobal('fetch', fetchMock);
 });
 
@@ -101,14 +101,12 @@ describe('DocumentText', () => {
 			const top = page ? tops[page] : 0;
 			return { top, bottom: page ? top + 400 : 800, left: 0, right: 400 } as DOMRect;
 		});
-		fetchMock.mockImplementation(async () =>
-			Response.json({
-				text: 'eins\n\f\nzwei\n\f\ndrei',
-				offset: 0,
-				total_length: 17,
-				next_offset: null
-			})
-		);
+		answer = {
+			text: 'eins\n\f\nzwei\n\f\ndrei',
+			offset: 0,
+			total_length: 17,
+			next_offset: null
+		};
 		const onpage = vi.fn();
 		render(DocumentText, { documentId: 'doc-1', onpage });
 		await screen.findByRole('region', { name: m.content_page({ page: 3 }) });
