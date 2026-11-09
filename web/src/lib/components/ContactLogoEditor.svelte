@@ -108,11 +108,8 @@
 {/snippet}
 
 {#snippet actions()}
-	<!-- Beside the name (a phone): small pills without icons, as in the draft, each taking a tap
-	     of 44 pixels (32 and 6 above and below). -->
-	{@const pill = beside
-		? 'relative h-8 rounded-full px-3 text-meta after:absolute after:inset-x-0 after:-inset-y-1.5'
-		: ''}
+	<!-- Beside the name (a phone): small buttons without icons; `size="sm"` takes a tap of 44
+	     pixels there by itself (32 and 6 above and below). -->
 	<div class="flex flex-wrap items-center gap-2">
 		<input
 			bind:this={input}
@@ -123,7 +120,7 @@
 			tabindex="-1"
 			aria-hidden="true"
 		/>
-		<Button variant="outline" size="sm" class={pill} disabled={busy} onclick={() => input?.click()}>
+		<Button variant="outline" size="sm" disabled={busy} onclick={() => input?.click()}>
 			{#if !beside}<Upload aria-hidden="true" />{/if}
 			{m.logo_upload()}
 		</Button>
@@ -132,7 +129,6 @@
 			<Button
 				variant={beside ? 'outline' : 'ghost'}
 				size="sm"
-				class={pill}
 				aria-label={beside ? m.logo_fetch() : undefined}
 				disabled={busy}
 				onclick={() =>
@@ -149,7 +145,6 @@
 			<Button
 				variant="ghost"
 				size="sm"
-				class={pill}
 				disabled={busy}
 				onclick={() =>
 					run(async () => {
