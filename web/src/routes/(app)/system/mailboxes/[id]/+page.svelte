@@ -274,9 +274,12 @@
 	<Card.Root as="section" size="lg" aria-labelledby="mailbox-log">
 		<div class="flex items-center gap-1">
 			<SectionTitle id="mailbox-log" size="card">{m.mailbox_log()}</SectionTitle>
-			<InfoTip label={m.hint_about({ name: m.mailbox_log() })} size="sm" class="w-80">
-				<p>{m.mailbox_log_info({ kept: formatNumber(summary?.kept ?? 500) })}</p>
-			</InfoTip>
+			<!-- The tip names how many the log keeps, which the summary brings: shown with it. -->
+			{#if summary}
+				<InfoTip label={m.hint_about({ name: m.mailbox_log() })} size="sm" class="w-80">
+					<p>{m.mailbox_log_info({ kept: formatNumber(summary.kept) })}</p>
+				</InfoTip>
+			{/if}
 		</div>
 		{#if mails.error && !mails.loaded}
 			<div class="mt-3">
