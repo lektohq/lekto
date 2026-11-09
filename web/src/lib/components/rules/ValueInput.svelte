@@ -7,7 +7,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { isMoney, isPeriod } from '#lib/fields.ts';
 	import PeriodInput from '#lib/components/PeriodInput.svelte';
-	import type { Value } from '#lib/rules/model.ts';
+	import { LIMITS, type Value } from '#lib/rules/model.ts';
 	import DateInput from '#lib/components/DateInput.svelte';
 
 	// One value of a field in its JSON form: text, number and date as text, yes/no as a
@@ -78,6 +78,7 @@
 		{fields}
 		{steps}
 		target={field}
+		maxlength={LIMITS.text}
 		bind:value={() => text, (next) => onchange(next)}
 	/>
 {:else if template && field}
@@ -101,6 +102,7 @@
 				{fields}
 				{steps}
 				target={field}
+				maxlength={LIMITS.text}
 				bind:value={() => text, (next) => onchange(next)}
 			/>
 			<p class="text-sm text-muted-foreground">{m.rule_value_template_hint()}</p>
