@@ -1,4 +1,5 @@
 <script lang="ts">
+	import InfoTip from '#lib/components/InfoTip.svelte';
 	import RuleRow from '#lib/components/rules/RuleRow.svelte';
 	import X from '@lucide/svelte/icons/x';
 	import MultiPicker from '#lib/components/MultiPicker.svelte';
@@ -226,11 +227,13 @@
 			aria-label={m.rule_step_path()}
 			aria-invalid={invalid || undefined}
 			placeholder={steps?.length ? `${steps[0]}.` : ''}
-			title={m.rule_step_path_hint()}
 			value={condition.path ?? ''}
 			oninput={(event) => (condition.path = event.currentTarget.value.trim())}
 			class="w-full font-mono sm:w-44"
 		/>
+		<InfoTip label={m.hint_about({ name: m.rule_step_path() })} size="sm" class="w-80">
+			<p>{m.rule_step_path_hint()}</p>
+		</InfoTip>
 	{/if}
 	{#if condition.field === 'fact'}
 		<!-- Its kind and its role, any role unless one is chosen; a person's for admins. -->

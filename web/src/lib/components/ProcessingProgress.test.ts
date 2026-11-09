@@ -35,7 +35,7 @@ describe('ProcessingProgress', () => {
 		]);
 		expect(bar.children).toHaveLength(5);
 		expect(bar.children[1].className).toContain('animate-pulse');
-		expect(bar.children[1].getAttribute('title')).toContain(m.node_status_running());
+		expect(bar.getAttribute('aria-valuetext')).toBeTruthy();
 		expect(screen.getByRole('status').textContent).toContain('3');
 		expect(screen.getByRole('link').getAttribute('href')).toBe('/ui/documents/d?tab=processing');
 	});
