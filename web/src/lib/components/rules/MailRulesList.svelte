@@ -1,14 +1,11 @@
 <script lang="ts">
+	import { switchMailRule } from '#lib/rules/switch.ts';
 	import Plus from '@lucide/svelte/icons/plus';
-	import { toast } from 'svelte-sonner';
-	import { api } from '#lib/api/client.ts';
-	import { unwrap } from '#lib/api/call.ts';
 	import { BASE } from '#lib/base.ts';
 	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import RuleListRow from '#lib/components/rules/RuleListRow.svelte';
 	import { buttonVariants } from '#lib/components/ui/button/index.ts';
-	import { reportError } from '#lib/errors.ts';
 	import { namesOf, type MailRuleLookup } from '#lib/mail-rule-lookup.ts';
 	import { summaryOf, type MailRule } from '#lib/mail-rules.ts';
 	import type { Mailbox } from '#lib/mailboxes.ts';
@@ -37,22 +34,11 @@
 
 	const mailboxHref = (mailbox: Mailbox) => `${BASE}/system/mailboxes/${mailbox.id}`;
 
-	async function switchRule(rule: MailRule, enabled: boolean) {
+	async function switchOne(rule: MailRule, enabled: boolean) {
 		busy = rule.id;
-		try {
-			const changed = await unwrap(
-				api.PATCH('/api/v1/mail-rules/{id}', {
-					params: { path: { id: rule.id } },
-					body: { enabled }
-				})
-			);
-			rules = rules.map((entry) => (entry.id === changed.id ? changed : entry));
-			toast.success(enabled ? m.rule_switched_on() : m.rule_switched_off());
-		} catch (error) {
-			reportError(error);
-		} finally {
-			busy = null;
-		}
+		const changed = await switchMailRule(rule.id, enabled);
+		if (changed) rules = rules.map((entry) => (entry.id === changed.id ? changed : entry));
+		busy = null;
 	}
 </script>
 
@@ -93,7 +79,7 @@
 							enabled={rule.enabled}
 							busy={busy === rule.id}
 							disabledReason={rule.disabled_reason ? reasonText(rule.disabled_reason) : null}
-							onswitch={(enabled) => switchRule(rule, enabled)}
+							onswitch={(enabled) => switchOne(rule, enabled)}
 						>
 							{#snippet summary()}{summaryOf(rule, names)}{/snippet}
 						</RuleListRow>
