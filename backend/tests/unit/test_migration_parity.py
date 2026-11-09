@@ -64,7 +64,9 @@ HEADS = [
 ]
 
 
-@pytest.mark.parametrize("head", HEADS + [p.read_bytes()[:1024] for p in sorted(SAMPLES.iterdir())])
+@pytest.mark.parametrize(
+    "head", HEADS + [p.read_bytes()[:1024] for p in sorted(SAMPLES.iterdir()) if p.is_file()]
+)
 def test_the_client_takes_a_file_as_lekto_does(head: bytes) -> None:
     assert check.kind_of(head) == media_types.detect(head)
 
