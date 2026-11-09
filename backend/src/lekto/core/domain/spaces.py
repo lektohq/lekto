@@ -121,3 +121,11 @@ class Space:
                 raise ValidationError(because(ReasonCode.PERSONAL_SPACE_EDITOR))
         elif not any(role.can_edit for role in members.values()):
             raise ValidationError(because(ReasonCode.SPACE_NEEDS_EDITOR))
+
+
+def space_label(space: Space, people: Mapping[UserId, str]) -> str:
+    """How a person reads a space: a personal one by its person's name (`people`, by id),
+    another by its own name."""
+    if space.personal_of is not None and space.personal_of in people:
+        return people[space.personal_of]
+    return space.name

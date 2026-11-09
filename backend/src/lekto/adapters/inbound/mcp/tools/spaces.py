@@ -73,7 +73,7 @@ def add_space_tools(tools: Tools, context: ApiContext) -> None:
                             if id != user
                         ],
                     )
-                    for space in sorted(spaces, key=lambda space: space_label(space, people))
+                    for space in spaces
                 ]
             )
         )

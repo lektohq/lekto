@@ -13,7 +13,6 @@ from lekto.adapters.inbound.rest.schemas.spaces import MemberIn, SpaceCreate, Sp
 from lekto.core.domain.documents import UNSET
 from lekto.core.domain.ids import SpaceId, UserId
 from lekto.core.domain.permissions import space_role
-from lekto.core.domain.sorting import sort_key
 from lekto.core.domain.spaces import Space
 from lekto.core.services.auth import Principal
 
@@ -26,9 +25,10 @@ EDITORS = "Editors of the space and admins."
     "",
     summary="List spaces",
     description=(
-        "The spaces the caller is a member of, their personal space first among them by its "
-        "`personal_of`, admins too; with `all_users` every space (admins only). An admin's "
-        "rights reach every space either way."
+        "The spaces the caller is a member of, admins too, their personal space among them "
+        "(`personal_of`); with `all_users` every space (admins only). An admin's rights reach "
+        "every space either way. By how they read: a personal space by its person's name, "
+        "case and accents aside."
     ),
     response_model=list[SpaceOut],
     responses=problem_responses(401, 403, 422),
@@ -36,8 +36,7 @@ EDITORS = "Editors of the space and admins."
 async def list_spaces(
     principal: Authenticated, context: Context, all_users: AllSpaces = False
 ) -> list[SpaceOut]:
-    found = await context.spaces.list_spaces(principal.id, all_users)
-    spaces = sorted(found, key=lambda d: sort_key(d.name))
+    spaces = await context.spaces.list_spaces(principal.id, all_users)
     people = await context.spaces.members(principal.id, spaces)
     return [SpaceOut.of(space, principal.user, people) for space in spaces]
 
