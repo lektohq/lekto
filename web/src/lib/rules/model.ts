@@ -22,6 +22,7 @@ import {
 import { isMoney, isPeriod } from '#lib/fields.ts';
 import { isKeyword, MAIL_FIELD_OPERATORS, MAIL_TEXT_FIELDS } from '#lib/mail-traits.ts';
 import { readPeriod, writePeriod } from '#lib/periods.ts';
+import { TIMEOUT } from '#lib/tasks.ts';
 
 type Schemas = components['schemas'];
 
@@ -106,7 +107,8 @@ export const LIMITS = {
 	pattern: 200,
 	name: 200,
 	priorityMin: 0,
-	priorityMax: 1000
+	priorityMax: 1000,
+	stepName: 50
 } as const;
 
 export const DEFAULT_PRIORITY = 100;
@@ -234,7 +236,6 @@ export const STEP_NAME = /^[a-z][a-z0-9_]{0,49}$/;
 /** What a step condition looks at: a step's name, then keys of its answer. */
 export const STEP_PATH = /^[a-z][a-z0-9_]{0,49}(\.[A-Za-z0-9_-]{1,100})*$/;
 export const MISSING: readonly Missing[] = ['red', 'yellow', 'continue'];
-export const TIMEOUT = { min: 30, max: 86_400, default: 300 } as const;
 
 // --- from and to the API ------------------------------------------------------------------
 

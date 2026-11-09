@@ -1271,7 +1271,7 @@
 	"webhook_signed_hint": "Mit einem Geheimnis, das einmal angezeigt wird: Der Empfänger prüft damit den Header webhook-signature. Ohne prüft der Empfänger einen eigenen Header, etwa ein Token.",
 	"webhook_open_tasks": "Aufträge gleichzeitig",
 	"webhook_open_tasks_hint": "Wie viele Anfragen, die eine Antwort erwarten (eine Regel fragt), der Webhook gleichzeitig annimmt. Weitere warten in Lekto; ihre Frist beginnt beim Versand.",
-	"webhook_open_tasks_rule": "1 bis 64.",
+	"webhook_open_tasks_rule": "{min} bis {max}.",
 	"webhook_model_call": "Modellaufruf",
 	"webhook_model_call_none": "Keiner",
 	"webhook_model_call_propose": "Modellaufruf: Vorschlag",
