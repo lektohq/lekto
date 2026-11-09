@@ -1,3 +1,5 @@
+import { pageCount } from '#lib/pagination.ts';
+
 /** A list that loads page by page ("load more"), with loading, empty and error states. */
 export interface Page<T> {
 	items: T[];
@@ -115,7 +117,7 @@ export class Pager<T> {
 	}
 
 	get pages(): number {
-		return Math.max(1, Math.ceil(this.total / this.size));
+		return pageCount(this.total, this.size);
 	}
 
 	get empty(): boolean {

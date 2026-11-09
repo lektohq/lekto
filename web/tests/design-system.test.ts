@@ -694,6 +694,21 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('writes the API prefix once, beside the typed calls that need it as their type', () => {
+		// `BASE_API` in `lib/api/base.ts`; `api.GET('/api/v1/…')` keeps the literal, which
+		// openapi-fetch reads as the path's type.
+		const found = [...Object.entries(sources), ...Object.entries(scripts)].flatMap(
+			([path, source]) => {
+				if (path === '/src/lib/api/base.ts' || path === '/src/lib/api/schema.ts') return [];
+				const bare = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
+				return [...bare.matchAll(/['"`]\/api\/v1/g)]
+					.filter((hit) => !/\.(?:GET|POST|PUT|PATCH|DELETE)\(\s*$/.test(bare.slice(0, hit.index)))
+					.map(() => path);
+			}
+		);
+		expect(found).toEqual([]);
+	});
+
 	it('shows the owl only where a moment is rare: sign-in, not found, nothing waiting, no document', () => {
 		expect(
 			offenders((source, path) => (MASCOT.has(path) ? null : line(source, /<Mascot\b/)))
