@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ChoiceCard from '#lib/components/ChoiceCard.svelte';
 	import { MASTER_LIMITS } from '#lib/masterdata-api.ts';
 	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
@@ -16,8 +17,6 @@
 	import { FIELD_TYPES, fieldTypeLabel } from '#lib/fields.ts';
 	import type { FieldDefinition, MasterData } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { cn } from '#lib/utils.ts';
-	import { ChoiceBox } from '#lib/components/ui/choice/index.ts';
 
 	type DataType = components['schemas']['FieldType'];
 
@@ -241,23 +240,18 @@
 				<span id="field-def-scope-label" class="text-sm font-medium">{m.field_def_scope()}</span>
 				<InfoHint text={m.field_def_required_hint()} about={m.field_def_scope()} />
 			</div>
-			<!-- Every type or certain ones, as the kind of a new tag is chosen. -->
+			<!-- Every type or certain ones, as the kind of a new tag is chosen (`ChoiceCard`). -->
 			<div class="grid gap-2 sm:grid-cols-2">
 				{#each [true, false] as every (every)}
-					<label
-						class={cn(
-							'flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors hover:bg-secondary/60',
-							global === every && 'border-primary bg-primary/10 hover:bg-primary/10'
-						)}
+					<ChoiceCard
+						name="field-def-scope"
+						checked={global === every}
+						onchange={() => (global = every)}
 					>
-						<ChoiceBox
-							type="radio"
-							name="field-def-scope"
-							checked={global === every}
-							onchange={() => (global = every)}
-						/>
-						{every ? m.field_def_scope_global() : m.field_def_scope_some()}
-					</label>
+						<span class="text-sm font-medium">
+							{every ? m.field_def_scope_global() : m.field_def_scope_some()}
+						</span>
+					</ChoiceCard>
 				{/each}
 			</div>
 			{#if global}
