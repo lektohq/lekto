@@ -1,4 +1,6 @@
 <script lang="ts">
+	import RuleSwitch from '#lib/components/rules/RuleSwitch.svelte';
+	import { switchRule } from '#lib/rules/switch.ts';
 	import { onDestroy, untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
@@ -22,7 +24,6 @@
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
 	import { openBeam } from '#lib/beam.svelte.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
 	import { workersStill, type JobsSummary } from '#lib/jobs.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -204,16 +205,10 @@
 		);
 	}
 
-	async function switchRule(enabled: boolean) {
+	async function switchOne(enabled: boolean) {
 		busy = true;
-		try {
-			await setEnabled(enabled);
-			toast.success(enabled ? m.rule_switched_on() : m.rule_switched_off());
-		} catch (error) {
-			reportError(error);
-		} finally {
-			busy = false;
-		}
+		rule = (await switchRule(id, enabled)) ?? rule;
+		busy = false;
 	}
 
 	async function apply(switchOn: boolean) {
@@ -331,12 +326,11 @@
 >
 
 {#snippet switcher()}
-	<Switch
-		bind:checked={() => rule?.enabled ?? false, switchRule}
-		disabled={busy}
-		aria-label={rule?.enabled
-			? m.rule_switch_off({ name: rule.name })
-			: m.rule_switch_on({ name: rule?.name ?? '' })}
+	<RuleSwitch
+		name={rule?.name ?? ''}
+		enabled={rule?.enabled ?? false}
+		{busy}
+		onswitch={(enabled) => void switchOne(enabled)}
 	/>
 {/snippet}
 

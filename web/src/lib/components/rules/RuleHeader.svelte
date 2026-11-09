@@ -6,7 +6,7 @@
 	import IconButton from '#lib/components/IconButton.svelte';
 	import PageHeader from '#lib/components/page/PageHeader.svelte';
 	import { buttonVariants } from '#lib/components/ui/button/index.ts';
-	import { Switch } from '#lib/components/ui/switch/index.ts';
+	import RuleSwitch from '#lib/components/rules/RuleSwitch.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { cn } from '#lib/utils.ts';
 
@@ -49,13 +49,7 @@
 	{#snippet actions()}
 		{#if rule}
 			{#if canChange}
-				<Switch
-					bind:checked={() => rule?.enabled ?? false, onswitch}
-					disabled={busy}
-					aria-label={rule.enabled
-						? m.rule_switch_off({ name: rule.name })
-						: m.rule_switch_on({ name: rule.name })}
-				/>
+				<RuleSwitch name={rule.name} enabled={rule.enabled} {busy} {onswitch} />
 				<a href={editHref} class={cn(buttonVariants({ variant: 'outline' }))}>
 					<Pencil aria-hidden="true" />
 					{m.rule_edit()}

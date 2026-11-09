@@ -8,7 +8,6 @@
 	import { loadMailRuleLookup, type MailRuleLookup } from '#lib/mail-rule-lookup.ts';
 	import type { MailRule } from '#lib/mail-rules.ts';
 	import { untrack } from 'svelte';
-	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
@@ -19,13 +18,14 @@
 	import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { buttonVariants } from '#lib/components/ui/button/index.ts';
-	import { describeError, reportError } from '#lib/errors.ts';
+	import { describeError } from '#lib/errors.ts';
 	import type { Space, UserName } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { reasonsText } from '#lib/reasons.ts';
 	import { scope } from '#lib/scope.svelte.ts';
 	import { canChangeRule } from '#lib/permissions.ts';
 	import { TRIGGER_LABELS } from '#lib/rules/describe.ts';
+	import { switchRule } from '#lib/rules/switch.ts';
 	import { placeLabel, placeOf } from '#lib/rules/places.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import { cn } from '#lib/utils.ts';
@@ -105,19 +105,11 @@
 		untrack(() => void load());
 	});
 
-	async function switchRule(rule: Rule, enabled: boolean) {
+	async function switchOne(rule: Rule, enabled: boolean) {
 		busy = rule.id;
-		try {
-			const changed = await unwrap(
-				api.PATCH('/api/v1/rules/{id}', { params: { path: { id: rule.id } }, body: { enabled } })
-			);
-			rules = (rules ?? []).map((entry) => (entry.id === changed.id ? changed : entry));
-			toast.success(enabled ? m.rule_switched_on() : m.rule_switched_off());
-		} catch (error) {
-			reportError(error);
-		} finally {
-			busy = null;
-		}
+		const changed = await switchRule(rule.id, enabled);
+		if (changed) rules = (rules ?? []).map((entry) => (entry.id === changed.id ? changed : entry));
+		busy = null;
 	}
 </script>
 
@@ -174,7 +166,7 @@
 					disabledReason={rule.disabled_reason
 						? (reasonsText(rule.disabled_reasons, rule.disabled_reason) ?? '')
 						: null}
-					onswitch={(enabled) => switchRule(rule, enabled)}
+					onswitch={(enabled) => switchOne(rule, enabled)}
 				>
 					{#snippet badges()}
 						<Badge variant="note">{placeName(rule)}</Badge>

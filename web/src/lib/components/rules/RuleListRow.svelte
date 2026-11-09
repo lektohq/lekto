@@ -3,7 +3,7 @@
 	import EditButton from '#lib/components/EditButton.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import { Switch } from '#lib/components/ui/switch/index.ts';
+	import RuleSwitch from '#lib/components/rules/RuleSwitch.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 
 	// The row of a rule in a list, the same for document and mail rules (web/DESIGN.md, "Lists",
@@ -53,12 +53,7 @@
 		{/if}
 	</div>
 	{#if canChange}
-		<Switch
-			bind:checked={() => enabled, onswitch}
-			disabled={busy}
-			class="relative z-10"
-			aria-label={enabled ? m.rule_switch_off({ name }) : m.rule_switch_on({ name })}
-		/>
+		<RuleSwitch {name} {enabled} {busy} {onswitch} class="relative z-10" />
 		<EditButton class="relative z-10" label={m.rule_edit_title({ name })} href={editHref} />
 	{:else}
 		<Badge variant={enabled ? 'green' : 'muted'}>{enabled ? m.rule_on() : m.rule_off()}</Badge>
