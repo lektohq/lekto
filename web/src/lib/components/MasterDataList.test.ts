@@ -4,6 +4,7 @@ import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import MasterDataList from './MasterDataList.svelte';
+import { json } from '#lib/testing/api.ts';
 
 const nav = vi.hoisted(() => ({
 	url: new URL('http://lekto/ui/admin/master-data?tab=contacts'),
@@ -62,10 +63,6 @@ const CONTACTS = [
 	}),
 	contact('c3', 'Stadtwerke', { aliases: ['SWM'] })
 ];
-
-function json(body: unknown) {
-	return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
-}
 
 beforeEach(() => {
 	nav.url = new URL('http://lekto/ui/admin/master-data?tab=contacts');

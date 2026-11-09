@@ -5,18 +5,12 @@ import type { ConnectionTest, Mailbox } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import MailboxDialog from './MailboxDialog.svelte';
+import { json } from '#lib/testing/api.ts';
 
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
 const sent: { method: string; path: string; body: unknown }[] = [];
 /** The routes that fail for a test, by path. */
 const failing = new Set<string>();
-
-function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), {
-		status,
-		headers: { 'content-type': 'application/json' }
-	});
-}
 
 const STORED: Mailbox = {
 	id: 'm1',

@@ -4,6 +4,7 @@ import type { components } from '#lib/api/schema.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import StepDetails, { type DetailContext } from './StepDetails.svelte';
+import { json } from '#lib/testing/api.ts';
 
 type LogEntry = components['schemas']['LogEntry'];
 
@@ -54,13 +55,6 @@ const context: DetailContext = {
 
 const entry = (node: string, run: number, output: Record<string, unknown>) =>
 	({ node, run, output }) as unknown as LogEntry;
-
-function json(body: unknown): Response {
-	return new Response(JSON.stringify(body), {
-		status: 200,
-		headers: { 'content-type': 'application/json' }
-	});
-}
 
 beforeEach(() => {
 	fetchMock.mockReset();

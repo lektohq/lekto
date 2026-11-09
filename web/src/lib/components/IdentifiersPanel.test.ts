@@ -7,6 +7,7 @@ import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import { fakeBack, goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import IdentifiersPanel from './IdentifiersPanel.svelte';
+import { json } from '#lib/testing/api.ts';
 
 vi.mock('$app/navigation', async () => ({
 	beforeNavigate: vi.fn(),
@@ -60,13 +61,6 @@ const SUGGESTION = {
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
 let decisions: unknown[] = [];
 let confirmedRecommended = 0;
-
-function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), {
-		status,
-		headers: { 'content-type': 'application/json' }
-	});
-}
 
 beforeEach(() => {
 	goTo('/ui/admin/master-data?tab=identifiers');

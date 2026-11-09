@@ -743,6 +743,19 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('answers a fake API in tests through lib/testing/api.ts, never by a json of its own', () => {
+		const tests = import.meta.glob<string>('/src/**/*.test.ts', {
+			query: '?raw',
+			import: 'default',
+			eager: true
+		});
+		expect(
+			Object.entries(tests)
+				.filter(([, source]) => /\bfunction json\(/.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
 	it('shows the owl only where a moment is rare: sign-in, not found, nothing waiting, no document', () => {
 		expect(
 			offenders((source, path) => (MASCOT.has(path) ? null : line(source, /<Mascot\b/)))
