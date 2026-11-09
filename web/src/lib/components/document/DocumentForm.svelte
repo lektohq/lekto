@@ -795,13 +795,10 @@
 					class="mt-1.5"
 				/>
 				{#if factsChip}
-					<a
-						href={factsHref}
-						class="mt-1.5 inline-flex w-fit items-center gap-1.5 rounded-full bg-lane-green px-2.5 py-1 text-xs font-medium text-lane-green-foreground hover:underline"
-					>
-						<ListChecks class="size-3.5" aria-hidden="true" />
+					<Button variant="link" size="inline" href={factsHref} class="mt-1.5 w-fit">
+						<ListChecks aria-hidden="true" />
 						{factsChip}
-					</a>
+					</Button>
 				{/if}
 			</FieldShell>
 			{#if showsTopic}
