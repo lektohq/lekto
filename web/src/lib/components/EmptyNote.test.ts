@@ -16,4 +16,12 @@ describe('EmptyNote', () => {
 		const owl = render(EmptyNote, { children: words, icon, mascot: true });
 		expect(owl.queryByTestId('icon')).toBeNull();
 	});
+
+	it('is smaller inside a dialog and hands its attributes to the box', () => {
+		const { container } = render(EmptyNote, { children: words, size: 'sm', role: 'presentation' });
+		const box = container.firstElementChild!;
+		expect(box.classList).toContain('py-6');
+		expect(box.classList).not.toContain('py-16');
+		expect(box.getAttribute('role')).toBe('presentation');
+	});
 });

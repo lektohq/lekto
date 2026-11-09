@@ -13,6 +13,8 @@
 </script>
 
 <script lang="ts">
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 	import X from '@lucide/svelte/icons/x';
 	import { buttonVariants } from '#lib/components/ui/button/index.ts';
@@ -68,11 +70,9 @@
 
 <div class="flex flex-col gap-2" role="group" aria-label={label}>
 	{#if rows.length === 0}
-		<p class="rounded-xl border border-dashed px-3 py-2.5 text-sm text-muted-foreground">
-			{emptyLabel}
-		</p>
+		<EmptyNote size="sm">{emptyLabel}</EmptyNote>
 	{:else}
-		<ul class="flex flex-col divide-y rounded-xl border">
+		<Card.Root as="ul" size="flush" class="flex flex-col divide-y">
 			{#each rows as item (item.id)}
 				{@const name = nameOf(item.id)}
 				<li class="flex items-center gap-3 px-3 py-1.5">
@@ -96,7 +96,7 @@
 					</IconButton>
 				</li>
 			{/each}
-		</ul>
+		</Card.Root>
 	{/if}
 	{#if free.length > 0}
 		<Popover.Root bind:open>
