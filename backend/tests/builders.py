@@ -13,6 +13,7 @@ from lekto.composition.container import (
     classifier_policy_of,
     event_retry_of,
     indexing_policy_of,
+    links_of,
     neighbours_policy_of,
     policy_of,
     retry_policy_of,
@@ -51,6 +52,11 @@ TEMPLATES = LiquidTemplateRenderer(
     locale=DEFAULT_SETTINGS.template_locale, currency=DEFAULT_SETTINGS.default_currency
 )
 THRESHOLDS = thresholds_of(DEFAULT_SETTINGS)
+PUBLIC_URL = "https://lekto.example.org"
+LINKS = links_of(DEFAULT_SETTINGS.model_copy(update={"public_url": PUBLIC_URL}))
+"""Where the core's links lead in tests: a public URL, the shipped prefixes."""
+NO_LINKS = links_of(DEFAULT_SETTINGS)
+"""Without `LEKTO_PUBLIC_URL`."""
 CLASSIFICATION = policy_of(DEFAULT_SETTINGS)
 CLASSIFIER = classifier_policy_of(DEFAULT_SETTINGS)
 INDEXING = indexing_policy_of(DEFAULT_SETTINGS)

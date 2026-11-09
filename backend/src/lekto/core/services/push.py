@@ -19,6 +19,16 @@ from lekto.core.domain.ids import PushDeviceId, UserId, new_id
 from lekto.core.domain.inbox import InboxTab
 from lekto.core.domain.jobs import Job
 from lekto.core.domain.json_value import JsonObject
+from lekto.core.domain.links import (
+    DOCUMENT,
+    HOME,
+    INBOX,
+    JOBS,
+    MAILBOX,
+    NOTIFICATIONS,
+    WEBHOOK,
+    Links,
+)
 from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.push import (
     ADMIN_KINDS,
@@ -57,7 +67,11 @@ class PushService:
         clock: Clock,
         sender: PushSender | None,
         inbox: InboxService,
+        *,
+        links: Links,
     ) -> None:
+        """`links`: the pages of the web UI a notification opens."""
+        self._links = links
         self._uow = uow
         self._clock = clock
         self._sender = sender
@@ -139,7 +153,7 @@ class PushService:
             if kind in ADMIN_KINDS and not person.is_admin:
                 return None
             if kind is not PushKind.WAITING:
-                return _notice(kind, params)
+                return _notice(self._links, kind, params)
             pending = preferences.pending
             if pending:
                 preferences.pending = ()
@@ -164,7 +178,7 @@ class PushService:
                 "new": len(still),
                 "titles": [d.title for d in still[:TITLES]] if preferences.titles else [],
             },
-            url=f"/ui/documents/{one}" if one is not None else "/ui/inbox",
+            url=self._links.ui(DOCUMENT.format(id=one) if one is not None else INBOX),
             badge=summary.open,
             tag="lekto-waiting",
             topic="waiting",
@@ -236,7 +250,7 @@ class PushService:
         async with self._uow() as uow:
             device = await self._own(uow, actor, id)
         message = PushMessage(
-            kind=PushKind.TEST, url="/ui/settings?tab=notifications", tag="lekto-test"
+            kind=PushKind.TEST, url=self._links.ui(NOTIFICATIONS), tag="lekto-test"
         )
         return await self.deliver(device, message)
 
@@ -289,17 +303,17 @@ class PushService:
         return device
 
 
-def _notice(kind: PushKind, params: JsonObject) -> PushMessage:
+def _notice(links: Links, kind: PushKind, params: JsonObject) -> PushMessage:
     """A notification about one thing: a mailbox, a webhook, jobs."""
     match kind:
         case PushKind.MAILBOX_FAILED:
-            url = f"/ui/system/mailboxes/{params.get('mailbox_id', '')}"
+            path = MAILBOX.format(id=params.get("mailbox_id", ""))
         case PushKind.WEBHOOK_DISABLED:
-            url = f"/ui/webhooks/{params.get('webhook_id', '')}"
+            path = WEBHOOK.format(id=params.get("webhook_id", ""))
         case PushKind.JOB_FAILED:
-            url = "/ui/system?tab=jobs"
+            path = JOBS
         case _:
-            url = "/ui/"
+            path = HOME
     return PushMessage(
-        kind=kind, params=params, url=url, tag=f"lekto-{kind.value}", topic=kind.value
+        kind=kind, params=params, url=links.ui(path), tag=f"lekto-{kind.value}", topic=kind.value
     )

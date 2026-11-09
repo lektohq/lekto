@@ -14,6 +14,8 @@ from pydantic import SecretStr
 
 from lekto import __version__
 from lekto.adapters.inbound.rest import OIDC_CALLBACK_PATH
+from lekto.adapters.inbound.rest.paths import PREFIX as API_PREFIX
+from lekto.adapters.inbound.rest.ui import UI_PREFIX
 from lekto.adapters.outbound.crypto import (
     AesGcmCipher,
     AesSivRefCipher,
@@ -70,6 +72,7 @@ from lekto.composition.database import open_database
 from lekto.composition.errors import AdapterNotAvailableError
 from lekto.composition.settings import Settings
 from lekto.core.domain.jobs import WORK_LEASE_MARGIN, RetryPolicy
+from lekto.core.domain.links import Links
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.verdict import Thresholds
 from lekto.core.domain.webhooks import PrivateTargets
@@ -658,6 +661,12 @@ def policy_of(settings: Settings) -> ClassificationPolicy:
     )
 
 
+def links_of(settings: Settings) -> Links:
+    """Where the core's links lead: `LEKTO_PUBLIC_URL`, the API's and the web UI's prefixes."""
+    public = None if settings.public_url is None else str(settings.public_url)
+    return Links(public=public, api_prefix=API_PREFIX, ui_prefix=UI_PREFIX)
+
+
 def webhook_policy_of(settings: Settings) -> WebhookPolicy:
     return WebhookPolicy(
         per_user=settings.webhooks_per_user,
@@ -770,8 +779,8 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
     index, embeddings = container.search_index, container.embeddings
     facts = FactsSignal(uow, store, container.codes)
     inbox = InboxService(uow, clock)
-    public_url = None if settings.public_url is None else str(settings.public_url)
-    desk = TaskDesk(container.cipher, container.templates, link_base=public_url)
+    links = links_of(settings)
+    desk = TaskDesk(container.cipher, container.templates, links=links)
     executors: dict[Node, NodeExecutor] = {
         Node.OCR: OcrNode(store, container.ocr, container.mail_renderer),
         Node.PAGES: PagesNode(store, container.pages, container.mail_renderer),
@@ -795,7 +804,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
             container.templates,
             max_text=settings.rules_max_text,
             desk=desk,
-            link_base=public_url,
+            links=links,
         ),
         Node.FILE: FileNode(),
     }
@@ -881,7 +890,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
             clock,
             container.templates,
             container.patterns,
-            link_base=None if settings.public_url is None else str(settings.public_url),
+            links=links,
             store=store,
         ),
         webhooks=WebhookService(
@@ -893,7 +902,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
             retention=settings.retention,
         ),
         lenses=LensService(uow, clock),
-        push=PushService(uow, clock, container.push_sender, inbox),
+        push=PushService(uow, clock, container.push_sender, inbox, links=links),
         mailboxes=MailboxService(uow, clock, container.cipher, container.mail_server),
         relations=RelationService(uow, clock),
         expected=ExpectedService(uow, clock),
@@ -908,7 +917,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
             container.webhook_sender,
             webhook_policy_of(settings),
             container.templates,
-            link_base=None if settings.public_url is None else str(settings.public_url),
+            links=links,
             store=store,
         ),
         rule_applications=RuleApplicationService(
