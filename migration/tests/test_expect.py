@@ -292,6 +292,9 @@ def test_a_mail_is_taken_over() -> None:
         (b"Subject: only one\n\nText", None),
         (b"%PDF-1.7\n", "application/pdf"),
         (b"PK\x03\x04", None),
+        # As Lekto: a PDF needs its dash, a PNG its whole signature.
+        (b"%PDF1", None),
+        (b"\x89PNGxxxx", None),
     ],
 )
 def test_the_kind_of_a_file(head: bytes, kind: str | None) -> None:
