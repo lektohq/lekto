@@ -346,7 +346,10 @@ belong to the tags: a mark of another kind is a `Badge`. What a signal said abou
 `neutral` where the signal was not sure (Tobi, 09.11.2026). A count that is no state (the facts
 of a document) is a text link, not a pill in a lane's tone. All chips
 are pills, topics included. The field a chip stands in names its kind. `TagChips`, `GroupChips`,
-`FacetChips` and `ChipInput` render `Chip` or `TagChip`.
+`FacetChips` and `ChipInput` render `Chip` or `TagChip`. A filter's value (`FacetChips`) is a toggle (`pressed`):
+a plain one a `Chip`, a tag, topic or group a `TagChip` in its colour, chosen with a 2 px ring of
+`primary` around it (its colour stays readable) and a bolder name; 24 px (`sm`) on a desktop,
+32 px (`md`) with a finger's 44 px on a phone, the rows `gap-y-3` apart (Tobi, 09.11.2026).
 
 ### Badges
 
