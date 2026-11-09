@@ -100,6 +100,7 @@ The scale is defined in `@theme`. Use these steps only:
 | Role                                                     | Class                       | Token                         |
 | -------------------------------------------------------- | --------------------------- | ----------------------------- |
 | Buttons, inputs, selects, text areas, menus, popovers    | `rounded-xl`                | `--radius-xl`                 |
+| Alerts (`ui/alert`)                                      | `rounded-xl`                | `--radius-xl`                 |
 | Cards, dialogs, sheets, panes, empty notes               | `rounded-2xl`               | `--radius-2xl`                |
 | Chips, badges, `Segmented`, switches, avatars            | `rounded-full`              |                               |
 | Small marks inside a component (code thumb, bar segment) | `rounded-md` / `rounded-sm` | `--radius-md` / `--radius-sm` |
@@ -656,6 +657,15 @@ modal, over a dialog too.
 | `warning` (yellow)       | Something to check before going on        |
 | `caution` (red)          | A risk or a failure                       |
 
+Every box that tells something with a tone is an `Alert`, never one drawn by hand (Tobi,
+09.11.2026): the lens changed, the review banner and a failed step of a document, the notes of
+its steps and rules, a space others do not see, the cut stream, the sign-in error, the search
+note of the documents list. One look: `rounded-xl`, `px-3.5 py-3`, the variant's icon (a `note`
+always `Info`); text and buttons in the body, with `class` for a row (`flex flex-wrap
+items-center`). A note that is no warning passes `role="status"` (it changes) or `role="note"`
+(it stands), since `Alert` is `role="alert"` by default. Not a hint and so no `Alert`: the
+figures of the search check, tiles in the tones of the lanes.
+
 Toasts (`svelte-sonner`) confirm an action that has finished ("Gespeichert", "3 Dokumente
 eingereiht") or report an error of an action. One toast waits for the person instead: a new
 version of the app ([App](#app)). **A toast never replaces a load error on the page.**
@@ -1191,7 +1201,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     through `DateInput`, no native date or time field, every search through `SearchField` at the
     height of a field ("Fields"); "Abbrechen" before the
     primary action, never after it ("Footers"); no height of its own on a `Button` or
-    `IconButton` ("Buttons"); the owl (`Mascot`, `EmptyNote` with `mascot`) only at its
+    `IconButton` ("Buttons"); a box of tone (`bg-lane-yellow`, `bg-lane-red`, `bg-note` with a
+    radius and padding) only as `Alert` ("Alerts"); the owl (`Mascot`, `EmptyNote` with `mascot`) only at its
     places ("Logo and owl"); spins, pulses and turns only `motion-safe` ("Motion");
   - `src/lib/tips.test.ts`: one box of help at a time, the next without delay; a tooltip opens on
     a focus Tab brought, not on one handed back;

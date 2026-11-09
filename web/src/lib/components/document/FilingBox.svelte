@@ -1,7 +1,7 @@
 <script lang="ts">
+	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import Folder from '@lucide/svelte/icons/folder';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
-	import Users from '@lucide/svelte/icons/users';
 	import type { components } from '#lib/api/schema.ts';
 	import FieldGroup from '#lib/components/document/FieldGroup.svelte';
 	import Select from '#lib/components/Select.svelte';
@@ -72,13 +72,9 @@
 
 {#snippet note()}
 	{#if warning}
-		<p
-			class="flex items-start gap-2.5 rounded-xl bg-note px-3.5 py-3 text-sm text-note-foreground"
-			data-testid="filing-unseen"
-		>
-			<Users class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-			<span>{warning}</span>
-		</p>
+		<Alert.Root variant="note" role="note" data-testid="filing-unseen">
+			<Alert.Description>{warning}</Alert.Description>
+		</Alert.Root>
 	{/if}
 {/snippet}
 

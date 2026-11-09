@@ -1,6 +1,6 @@
 <script lang="ts">
+	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import KeyRound from '@lucide/svelte/icons/key-round';
-	import OctagonX from '@lucide/svelte/icons/octagon-x';
 	import { tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { api } from '#lib/api/client.ts';
@@ -186,14 +186,9 @@
 					{/if}
 
 					{#if message}
-						<div
-							id="login-error"
-							role="alert"
-							class="flex items-start gap-2.5 rounded-xl bg-lane-red px-4 py-3.5 text-sm text-lane-red-foreground"
-						>
-							<OctagonX class="mt-px size-[18px] shrink-0" aria-hidden="true" />
-							<span>{message}</span>
-						</div>
+						<Alert.Root id="login-error" variant="caution">
+							<Alert.Description>{message}</Alert.Description>
+						</Alert.Root>
 					{/if}
 
 					<!-- Not disabled while busy: the focus stays on the button. -->
