@@ -8,6 +8,7 @@
 	import { loadMailRuleLookup, type MailRuleLookup } from '#lib/mail-rule-lookup.ts';
 	import type { MailRule } from '#lib/mail-rules.ts';
 	import { untrack } from 'svelte';
+	import { latest } from '#lib/latest.ts';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
@@ -43,15 +44,20 @@
 	// What a mail rule names (every space: admins read them all, whoever is a member).
 	let mailLookup = $state<MailRuleLookup | null>(null);
 
+	// Its own count, as `load`: an answer overtaken by a later load is dropped.
+	const nextMail = latest();
+
 	async function loadMail() {
 		if (!session.isAdmin) return;
+		const current = nextMail();
 		try {
-			[mailRules, mailLookup] = await Promise.all([
+			const found = await Promise.all([
 				unwrap(api.GET('/api/v1/mail-rules')),
 				loadMailRuleLookup()
 			]);
+			if (current()) [mailRules, mailLookup] = found;
 		} catch (error) {
-			problem = describeError(error);
+			if (current()) problem = describeError(error);
 		}
 	}
 
