@@ -723,6 +723,16 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it("gives the date picker's arrows and days and the rows of choice lists a finger's size", () => {
+		const picker = sources['/src/lib/components/DateInput.svelte'];
+		for (const part of ['PrevButton', 'NextButton', 'Day'])
+			expect(picker).toMatch(new RegExp(`<DatePicker\\.${part}\\b[^>]*\\bmax-sm:size-11\\b`));
+		for (const list of ['MultiPicker', 'FacetList', 'FacetPicker'])
+			expect(sources[`/src/lib/components/${list}.svelte`]).toMatch(
+				/<label\b[^>]*\bmax-sm:min-h-11\b/
+			);
+	});
+
 	it('shows the owl only where a moment is rare: sign-in, not found, nothing waiting, no document', () => {
 		expect(
 			offenders((source, path) => (MASCOT.has(path) ? null : line(source, /<Mascot\b/)))
