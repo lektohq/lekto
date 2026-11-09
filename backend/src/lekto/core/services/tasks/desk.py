@@ -24,6 +24,7 @@ from lekto.core.domain.errors import MissingValueError, ValidationError
 from lekto.core.domain.identity import hash_token, new_token
 from lekto.core.domain.ids import EventId
 from lekto.core.domain.json_value import JsonObject
+from lekto.core.domain.links import TASK_RESULT, Links
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.tasks import TOKEN_PREFIX, Task, TaskKind, TaskStatus, TaskStep
@@ -42,12 +43,11 @@ TASKS_LOCK = "tasks"
 nodes never take the same room."""
 EXPIRE_JOB = "tasks.expire"
 """Job kind that ends a task at its deadline if no answer came; payload: `task_id`."""
-CALLBACK_PATH = "/api/v1/external/tasks/{id}/result"
 
 
-def callback_url(link_base: str, task: Task) -> str:
-    """Where the consumer answers the task (`LEKTO_PUBLIC_URL` and `CALLBACK_PATH`)."""
-    return link_base.rstrip("/") + CALLBACK_PATH.format(id=task.id)
+def callback_url(links: Links, task: Task) -> str | None:
+    """Where the consumer answers the task (`links.TASK_RESULT`); None without a public URL."""
+    return links.api(TASK_RESULT.format(id=task.id))
 
 
 class Contract(Protocol):
@@ -95,14 +95,11 @@ class Ask:
 
 
 class TaskDesk:
-    def __init__(
-        self, cipher: SecretCipher, templates: TemplateRenderer, *, link_base: str | None
-    ) -> None:
-        """`link_base`: `LEKTO_PUBLIC_URL`, where consumers answer; without it no task can be
-        sent."""
+    def __init__(self, cipher: SecretCipher, templates: TemplateRenderer, *, links: Links) -> None:
+        """`links`: where consumers answer; without a public URL no task can be sent."""
         self._cipher = cipher
         self._templates = templates
-        self._link_base = link_base
+        self._links = links
 
     async def place(
         self,
@@ -154,7 +151,7 @@ class TaskDesk:
         token = new_token(TOKEN_PREFIX)
         ends = now + task.timeout
         deadline = ends.strftime("%Y-%m-%dT%H:%M:%SZ")
-        callback = None if self._link_base is None else callback_url(self._link_base, task)
+        callback = callback_url(self._links, task)
         body = (
             "LEKTO_PUBLIC_URL is not set: the consumer would not know where to answer"
             if callback is None
@@ -203,8 +200,7 @@ class TaskDesk:
         request = ask.request
         webhook = ask.webhook
         if request.contract is not None:
-            assert self._link_base is not None  # there is a callback
-            link_base = self._link_base
+            links = self._links
             named: JsonObject = {
                 "id": about["id"],
                 "kind": task.kind.value,
@@ -215,7 +211,7 @@ class TaskDesk:
                 "token": token,
             }
             made = request.contract.body(
-                named, lambda name: file_link(link_base, self._cipher, task, name, ends)
+                named, lambda name: file_link(links, self._cipher, task, name, ends)
             )
             return json.dumps(made, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         if webhook.body is not BodyFormat.TEMPLATE:

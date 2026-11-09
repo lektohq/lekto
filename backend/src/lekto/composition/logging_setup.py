@@ -10,8 +10,9 @@ import sys
 import structlog
 
 from lekto.adapters.inbound.rest import HEALTH_PATH, OIDC_CALLBACK_PATH
+from lekto.adapters.inbound.rest.paths import PREFIX
 from lekto.composition.settings import Settings
-from lekto.core.services.tasks.files import EXTERNAL_TASKS_PATH
+from lekto.core.domain.links import TASKS
 
 HTTP_CLIENT_LOGGERS = ("httpx", "httpx2", "httpcore")
 CHATTY_LOGGERS = ("fontTools",)
@@ -75,7 +76,7 @@ class DropHealthChecks(logging.Filter):
         return _request_path(record) != HEALTH_PATH
 
 
-SECRET_QUERIES = (OIDC_CALLBACK_PATH, EXTERNAL_TASKS_PATH)
+SECRET_QUERIES = (OIDC_CALLBACK_PATH, PREFIX + TASKS)
 """Paths whose query holds a secret: the OIDC callback's the authorization code and state, the
 link to a file of a model call its signature."""
 

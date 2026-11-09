@@ -20,6 +20,7 @@ from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldDefinition
 from lekto.core.domain.ids import DocumentTypeId, FieldId, SpaceId
 from lekto.core.domain.json_value import JsonObject, JsonValue, as_list
+from lekto.core.domain.links import Links
 from lekto.core.domain.mail_intake import OriginRole
 from lekto.core.domain.pipeline import RULES, TRIGGER, Node, NodeResult, NodeRun, Outcome
 from lekto.core.domain.reasons import Reason, ReasonCode, because, reasons_to_json
@@ -87,9 +88,9 @@ class ApplyRulesNode:
         *,
         max_text: int,
         desk: TaskDesk | None = None,
-        link_base: str | None = None,
+        links: Links | None = None,
     ) -> None:
-        """`desk`: places the tasks of steps that ask (without, no rule asks); `link_base`
+        """`desk`: places the tasks of steps that ask (without, no rule asks); `links`
         (`LEKTO_PUBLIC_URL`): the document's link in what a step asks with."""
         self._uow = uow
         self._store = store
@@ -97,7 +98,7 @@ class ApplyRulesNode:
         self._templates = templates
         self._max_text = max_text
         self._desk = desk
-        self._link_base = link_base
+        self._links = links
 
     async def run(self, document: Document) -> "RulesResult":
         async with self._uow() as uow:
@@ -113,7 +114,7 @@ class ApplyRulesNode:
             self._matcher,
             self._templates,
             desk=self._desk if asks else None,
-            link_base=self._link_base,
+            links=self._links,
         )
 
 
@@ -138,7 +139,7 @@ class RulesResult:
     matcher: PatternMatcher
     templates: TemplateRenderer
     desk: TaskDesk | None = None
-    link_base: str | None = None
+    links: Links | None = None
 
     async def apply(
         self, uow: UnitOfWork, document: Document, now: datetime
@@ -219,7 +220,7 @@ class RulesResult:
                 definitions=definitions,
                 locked=origin.person,
                 book=book,
-                link_base=self.link_base,
+                links=self.links,
                 now=now,
             )
             output = _merged(output, run.output())

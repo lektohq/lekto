@@ -160,6 +160,6 @@ class PushSenderContract:
 
     async def test_a_message_is_delivered_and_nothing_raises(self, sender: PushSender) -> None:
         device = a_device(UserId(new_id()))
-        result = await sender.send(device, PushMessage(kind=PushKind.TEST))
+        result = await sender.send(device, PushMessage(kind=PushKind.TEST, url="/ui/"))
         assert result.outcome is PushOutcome.DELIVERED
         assert result.error is None

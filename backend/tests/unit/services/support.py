@@ -20,6 +20,7 @@ from lekto.adapters.outbound.memory import (
 )
 from lekto.core.domain.documents import Document
 from lekto.core.domain.events import DomainEvent
+from lekto.core.domain.links import Links
 from lekto.core.domain.pipeline import NODES, Node, NodeResult
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import Role, User
@@ -45,7 +46,7 @@ from lekto.core.services.webhooks import WebhookDeliveryService, WebhookPolicy, 
 from tests import builders
 from tests.builders import PlaceholderNode
 
-LINK_BASE = "https://lekto.example.org"
+LINK_BASE = builders.PUBLIC_URL
 """`LEKTO_PUBLIC_URL` of the services that need it."""
 
 
@@ -194,7 +195,7 @@ class World:
             self.sender,
             policy or builders.WEBHOOKS,
             builders.TEMPLATES,
-            link_base=LINK_BASE,
+            links=builders.LINKS,
             store=self.object_store,
         )
 
@@ -202,9 +203,9 @@ class World:
     def tasks(self) -> TaskService:
         return TaskService(self.uow, self.clock, self.cipher, self.object_store)
 
-    def desk(self, link_base: str | None = None) -> TaskDesk:
-        """Places tasks; without `link_base` at `LINK_BASE`."""
-        return TaskDesk(self.cipher, builders.TEMPLATES, link_base=link_base or LINK_BASE)
+    def desk(self, links: Links | None = None) -> TaskDesk:
+        """Places tasks; without `links` at `builders.LINKS`."""
+        return TaskDesk(self.cipher, builders.TEMPLATES, links=links or builders.LINKS)
 
     def pipeline(
         self,
