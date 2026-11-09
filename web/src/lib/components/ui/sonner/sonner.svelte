@@ -22,7 +22,7 @@
 	{...restProps}
 >
 	{#snippet loadingIcon()}
-		<Loader2Icon class="size-4 animate-spin" />
+		<Loader2Icon class="size-4 motion-safe:animate-spin" />
 	{/snippet}
 	{#snippet successIcon()}
 		<CircleCheckIcon class="size-4" />

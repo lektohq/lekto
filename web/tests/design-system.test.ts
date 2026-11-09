@@ -164,6 +164,19 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(offenders((source) => line(source, /\bshadow-\[/))).toEqual([]);
 	});
 
+	it('moves only where motion is wanted: spins, pulses and turns are motion-safe', () => {
+		// DESIGN.md, "Motion"; the shadcn primitives in ui/ too.
+		const spins = /(?<![\w:-])animate-(?:spin|pulse|ping|bounce)\b/;
+		// A turn may instead be stopped for reduced motion in the same string.
+		const turns = /(?<![\w:-])transition-transform\b(?![^'"\n]*motion-reduce:transition-none)/;
+		const found = offenders((source) => line(source, spins) ?? line(source, turns));
+		for (const [path, source] of Object.entries(scripts)) {
+			const hit = line(source, spins) ?? line(source, turns);
+			if (hit !== null) found.push(`${path}: ${hit.trim().slice(0, 120)}`);
+		}
+		expect(found).toEqual([]);
+	});
+
 	it('takes colours from the tokens, not from the palette of Tailwind', () => {
 		expect(
 			offenders((source, path) => (EXCEPTIONS.palette.has(path) ? null : line(source, PALETTE)))

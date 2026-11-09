@@ -31,7 +31,10 @@
 				<span class="max-w-[50%] truncate text-xs font-semibold text-brand">{summary}</span>
 			{/if}
 			<ChevronDown
-				class={['size-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180']}
+				class={[
+					'size-4 shrink-0 text-muted-foreground motion-safe:transition-transform',
+					open && 'rotate-180'
+				]}
 				aria-hidden="true"
 			/>
 		</button>

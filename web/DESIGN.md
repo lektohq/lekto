@@ -976,6 +976,8 @@ moves nothing beside it.
 
 Only `motion-safe`: the sliding pill of `Segmented`, the underline of `TabBar`, opening sheets and
 dialogs. Nothing moves on first show. Nothing grows over its neighbours on hover.
+A spinner, a pulse of what runs and a turning chevron are `motion-safe:` too (or stop with
+`motion-reduce:transition-none`); `tests/design-system.test.ts` refuses one without.
 
 ## App
 
@@ -1170,7 +1172,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     selection bars of runs on many and the upload summary ("Choosing many"); dates and times
     through `DateInput`, no native date or time field ("Fields"); "Abbrechen" before the
     primary action, never after it ("Footers"); the owl (`Mascot`,
-    `EmptyNote` with `mascot`) only at its places ("Logo and owl");
+    `EmptyNote` with `mascot`) only at its places ("Logo and owl"); spins, pulses and turns
+    only `motion-safe` ("Motion");
   - `src/lib/tips.test.ts`: one box of help at a time, the next without delay; a tooltip opens on
     a focus Tab brought, not on one handed back;
   - `src/lib/via-token.test.ts`: every file that has a person's API token (`via_token`, a
