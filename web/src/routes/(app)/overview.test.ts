@@ -6,7 +6,7 @@ import { formatDate } from '#lib/i18n.ts';
 import { inbox } from '#lib/inbox.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi } from '#lib/testing/documents.ts';
+import { calls, fakeApi } from '#lib/testing/api.ts';
 import Page from './+page.svelte';
 
 type Expected = components['schemas']['ExpectedOut'];

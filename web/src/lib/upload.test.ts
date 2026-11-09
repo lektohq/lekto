@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { intakeOf } from '#lib/intake.ts';
 import { session } from '#lib/session.svelte.ts';
-import { json } from '#lib/testing/documents.ts';
+import { json } from '#lib/testing/api.ts';
 import { PARALLEL, Uploads } from './upload.svelte.ts';
 
 const pdf = (name: string) => new File(['%PDF-1.7'], name, { type: 'application/pdf' });

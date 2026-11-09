@@ -8,15 +8,8 @@ import { events } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
-import {
-	calls,
-	documentOf,
-	fakeApi,
-	inboxItem,
-	json,
-	OWNER,
-	summaryOf
-} from '#lib/testing/documents.ts';
+import { documentOf, inboxItem, OWNER, summaryOf } from '#lib/testing/documents.ts';
+import { calls, fakeApi, json } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fakeApi, json } from '#lib/testing/documents.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 import { PageLookup } from './lookup.svelte.ts';
 
 afterEach(() => vi.unstubAllGlobals());

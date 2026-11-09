@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
-import { fakeApi } from '#lib/testing/documents.ts';
+import { fakeApi } from '#lib/testing/api.ts';
 import { choose } from '#lib/testing/select.ts';
 import FactFilter from './FactFilter.svelte';
 

@@ -6,7 +6,8 @@ import { inbox } from '#lib/inbox.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { session, type User } from '#lib/session.svelte.ts';
-import { calls, fakeApi, inboxItem, json, OWNER, summaryOf } from '#lib/testing/documents.ts';
+import { inboxItem, OWNER, summaryOf } from '#lib/testing/documents.ts';
+import { calls, fakeApi, json } from '#lib/testing/api.ts';
 import { uploads } from '#lib/upload.svelte.ts';
 import Page from './+page.svelte';
 
