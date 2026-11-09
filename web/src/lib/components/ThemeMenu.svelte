@@ -4,20 +4,21 @@
 	import { mode } from 'mode-watcher';
 	import ThemeChoices from '#lib/components/ThemeChoices.svelte';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.ts';
-	import { buttonVariants } from '#lib/components/ui/button/index.ts';
+	import IconButton from '#lib/components/IconButton.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 </script>
 
 <DropdownMenu.Root>
-	<DropdownMenu.Trigger
-		class={buttonVariants({ variant: 'secondary', size: 'icon' })}
-		aria-label={m.theme_label()}
-	>
-		{#if mode.current === 'dark'}
-			<Moon aria-hidden="true" />
-		{:else}
-			<Sun aria-hidden="true" />
-		{/if}
+	<DropdownMenu.Trigger>
+		{#snippet child({ props })}
+			<IconButton {...props} variant="secondary" label={m.theme_label()}>
+				{#if mode.current === 'dark'}
+					<Moon aria-hidden="true" />
+				{:else}
+					<Sun aria-hidden="true" />
+				{/if}
+			</IconButton>
+		{/snippet}
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end" class="w-48">
 		<ThemeChoices />

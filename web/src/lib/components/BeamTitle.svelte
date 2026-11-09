@@ -16,7 +16,7 @@
 	}: {
 		/** What it shows: a document's title, or the value it is found by. */
 		title: string;
-		/** Its name for a screen reader and the native title; by default „{title}“ ansehen. */
+		/** Its name for a screen reader; by default „{title}“ ansehen. The visible text is the title. */
 		label?: string;
 		mono?: boolean;
 		disabled?: boolean;
@@ -34,7 +34,6 @@
 		className
 	)}
 	aria-label={name}
-	title={name}
 	{disabled}
 	onclick={onview}
 >

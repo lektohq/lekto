@@ -13,8 +13,10 @@ beforeEach(() => {
 	vi.spyOn(window, 'getComputedStyle').mockReturnValue({
 		paddingLeft: '12px',
 		paddingRight: '12px',
-		columnGap: '12px'
-	} as CSSStyleDeclaration);
+		columnGap: '12px',
+		// Finding a button by its name reads styles too.
+		getPropertyValue: () => ''
+	} as unknown as CSSStyleDeclaration);
 	// Zooming looks for the page under the pointer.
 	document.elementFromPoint ??= () => null;
 	vi.stubGlobal(
@@ -39,7 +41,7 @@ describe('PageViewer', () => {
 	it('zooms with + and − but leaves the browser its shortcuts with Ctrl, ⌘ or Alt', async () => {
 		render(PageViewer, { sizes: [{ width: 600, height: 800 }], label: 'PDF', page });
 		const view = screen.getByRole('document');
-		const zoom = () => screen.getByTitle(m.pdf_zoom_reset()).textContent?.trim();
+		const zoom = () => screen.getByRole('button', { name: m.pdf_zoom_reset() }).textContent?.trim();
 		const before = zoom();
 		await fireEvent.keyDown(view, { key: '+', ctrlKey: true });
 		await fireEvent.keyDown(view, { key: '-', metaKey: true });
