@@ -107,6 +107,12 @@ const PROGRESS = new Set([
 	'/src/lib/components/rules/RuleApplyBar.svelte',
 	'/src/lib/components/UploadSummary.svelte'
 ]);
+/** Icon buttons as high as the search beside them in the documents page's row below `lg` (44
+ * pixels), until the search takes `SearchField` and its height (review 0.12.2, R-03 and K-06).
+ * This list may only shrink. */
+const ROW_OF_44 = new Set(['/src/routes/(app)/documents/+page.svelte']);
+const OF_44 = 'size-11 shrink-0';
+
 /** The master data tabs and what each shows below its search (DESIGN.md, "Master data tabs"). */
 const MASTER_PAGE = '/src/routes/(app)/admin/master-data/+page.svelte';
 const MASTER_PANELS = ['MasterDataList', 'TagsPanel', 'FieldsPanel', 'IdentifiersPanel'];
@@ -354,15 +360,50 @@ describe('the design system (web/DESIGN.md)', () => {
 
 	it('keeps every field at one height, lower only in the narrow filter panel', () => {
 		const field = /<(?:Select|Input|SearchSelect|DateInput|Textarea)\b[\s\S]*?\/>/g;
+		// `class="h-9"` and `class={cn('h-9 …')}` alike.
+		const height = (element: string) => /\sclass=(?:"[^"]*|\{[^}]*)\b(h-\d+)\b/.exec(element)?.[1];
 		expect(
 			offenders((source, path) => {
-				if (EXCEPTIONS.fieldHeight.has(path)) return null;
-				for (const [element] of source.matchAll(field)) {
-					const height = /class="[^"]*\b(h-\d+)\b/.exec(element)?.[1];
-					if (height !== undefined && !(height === 'h-9' && PANELS.has(path)))
-						return `${element.split('\n')[0]} (${height})`;
+				if (EXCEPTIONS.fieldHeight.has(path) || path.includes('/components/ui/')) return null;
+				// A raw field with a type of its own; a file, a search or a hidden one is no field of
+				// a form, and the draft of ChipInput (no type) is a chip.
+				const raw = tags(source, 'input').filter((tag) =>
+					/\stype="(?!file|search|hidden)/.test(tag)
+				);
+				for (const element of [...[...source.matchAll(field)].map(([match]) => match), ...raw]) {
+					const found = height(element);
+					// A raw field takes the one height by hand; a component field has it already.
+					const one = found === 'h-11' && element.startsWith('<input');
+					if (found !== undefined && !one && !(found === 'h-9' && PANELS.has(path)))
+						return `${element.split('\n')[0]} (${found})`;
 				}
 				return null;
+			})
+		).toEqual([]);
+	});
+
+	it('sizes buttons by their size, never by a height of their own', () => {
+		// `Button` takes a finger's 44 pixels on a phone by itself (DESIGN.md, "Buttons", "Touch
+		// targets"); `min-h-*` is no height of its own.
+		const own = /(?<![\w-])(?:max-sm:|sm:|md:|lg:|max-lg:)?(?:h|size)-\d/;
+		expect(
+			offenders((source, path) => {
+				if (path.includes('/components/ui/') || path.endsWith('/IconButton.svelte')) return null;
+				const tagged = ['Button', 'IconButton']
+					.flatMap((name) => tags(source, name))
+					.filter(
+						(tag) => !(ROW_OF_44.has(path) && tag.startsWith('<IconButton') && tag.includes(OF_44))
+					);
+				return (
+					tagged.find((tag) => {
+						// `class={action}` or `class={cn(action, …)}`: a constant of the same file.
+						const named = /\sclass=\{(?:cn\()?(\w+)/.exec(tag)?.[1];
+						const constant =
+							named && new RegExp(`(?:const|@const) ${named} =([^;}]*)`).exec(source)?.[1];
+						const own_class = /\sclass=(?:"[^"]*"|\{[^}]*\})/.exec(tag)?.[0] ?? '';
+						return own.test(own_class) || own.test(constant ?? '');
+					}) ?? null
+				);
 			})
 		).toEqual([]);
 	});

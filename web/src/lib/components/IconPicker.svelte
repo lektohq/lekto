@@ -51,7 +51,6 @@
 			bind:ref={toggle}
 			variant="outline"
 			size="sm"
-			class="max-sm:h-11"
 			aria-expanded={open}
 			aria-controls={open ? `${id}-panel` : undefined}
 			aria-describedby="{id}-value"
@@ -60,7 +59,7 @@
 			{open ? m.icon_done() : m.icon_choose()}
 		</Button>
 		{#if value}
-			<Button variant="ghost" size="sm" class="max-sm:h-11" onclick={() => choose(null)}>
+			<Button variant="ghost" size="sm" onclick={() => choose(null)}>
 				{m.icon_remove()}
 			</Button>
 		{/if}

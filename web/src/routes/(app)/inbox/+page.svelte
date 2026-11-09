@@ -177,7 +177,7 @@
 <div class="flex flex-col gap-6">
 	<PageHeader title={m.nav_inbox()} subtitle={m.upload_page_hint()} subtitleClass="max-sm:hidden">
 		{#snippet actions()}
-			<Button class="h-11 sm:h-10" onclick={() => (uploadOpen = true)}>
+			<Button onclick={() => (uploadOpen = true)}>
 				<Upload aria-hidden="true" />
 				{m.upload_title()}
 			</Button>
@@ -199,7 +199,7 @@
 			class="min-w-0 flex-1 basis-80"
 		/>
 		{#if (tab === null || tab === 'new') && fresh > 0}
-			<Button variant="ghost" class="h-11 sm:h-9" onclick={() => (askAll = true)}>
+			<Button variant="ghost" onclick={() => (askAll = true)}>
 				<CheckCheck aria-hidden="true" />
 				{m.inbox_all_seen()}
 			</Button>
@@ -207,11 +207,7 @@
 	</div>
 
 	{#if list.error}
-		<LoadProblem
-			problem={describeError(list.error)}
-			onretry={() => list.reload()}
-			buttonClass="h-11 sm:h-9"
-		/>
+		<LoadProblem problem={describeError(list.error)} onretry={() => list.reload()} />
 	{:else if list.empty}
 		<!-- The owl only when nothing at all waits (web/DESIGN.md, "Logo and owl"). -->
 		<EmptyNote mascot={!tab}>{EMPTY[tab ?? 'all']()}</EmptyNote>
@@ -241,7 +237,7 @@
 		{/if}
 		{#if list.hasMore}
 			<div class="flex justify-center">
-				<Button variant="outline" class="h-11 sm:h-9" disabled={list.loading} onclick={more}>
+				<Button variant="outline" disabled={list.loading} onclick={more}>
 					{m.load_more()}
 				</Button>
 			</div>

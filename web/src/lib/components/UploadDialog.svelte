@@ -79,7 +79,7 @@
 		>
 			<Upload class="size-7" aria-hidden="true" />
 			<p class="max-sm:hidden">{m.upload_drop()}</p>
-			<Button variant="outline" class="h-11 sm:h-10" onclick={() => input?.click()}>
+			<Button variant="outline" onclick={() => input?.click()}>
 				{m.upload_choose()}
 			</Button>
 			<input
