@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi } from '#lib/testing/documents.ts';
+import { calls, fakeApi, json } from '#lib/testing/documents.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import { choose } from '#lib/testing/select.ts';
 import Page from './+page.svelte';
@@ -142,6 +142,19 @@ describe('the page of a webhook', () => {
 		).toBeTruthy();
 		expect(bodies).toEqual([{ active: true }]);
 		expect(screen.queryByText(m.webhook_failing({ count: 12 }))).toBeNull();
+	});
+
+	it('shows one problem for a webhook that is not there, and asks for no deliveries', async () => {
+		const api = fakeApi({
+			'GET /api/v1/webhooks/hook': () =>
+				json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+		});
+		vi.stubGlobal('fetch', api);
+		render(Page);
+		expect(await screen.findByRole('alert')).toBeTruthy();
+		expect(screen.getAllByRole('alert')).toHaveLength(1);
+		expect(screen.queryByText(m.webhook_log())).toBeNull();
+		expect(calls(api).filter((call) => call.includes('/deliveries'))).toEqual([]);
 	});
 
 	it('shows the deliveries with their documents, counted by outcome', async () => {

@@ -19,14 +19,13 @@
 	import * as Table from '#lib/components/ui/table/index.ts';
 	import { openBeam } from '#lib/beam.svelte.ts';
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
-	import Pagination from '#lib/components/Pagination.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
 	import Select from '#lib/components/Select.svelte';
-	import * as Card from '#lib/components/ui/card/index.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { formatDate, formatNumber } from '#lib/i18n.ts';
 	import { rememberedPageSize } from '#lib/page-size.ts';
-	import { Pager } from '#lib/paging.svelte.ts';
+	import { SummaryPager } from '#lib/summary-pager.svelte.ts';
+	import LogCard from '#lib/components/LogCard.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { canManageWebhook } from '#lib/permissions.ts';
 	import { session } from '#lib/session.svelte.ts';
@@ -37,7 +36,6 @@
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
 	import PageHeader from '#lib/components/page/PageHeader.svelte';
-	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import Loading from '#lib/components/Loading.svelte';
 
@@ -75,9 +73,6 @@
 	};
 	let view = $state<View>('all');
 	let eventType = $state('');
-	let summary = $state<Summary | null>(null);
-	// The summary of the latest page asked for wins over one that comes late.
-	let asked = 0;
 
 	function counted(found: Summary, shown: View): number {
 		const problems = found.retrying + found.gave_up + found.dropped;
@@ -86,11 +81,10 @@
 		return problems + found.delivered;
 	}
 
-	const deliveries = new Pager<Delivery>(async (offset, limit) => {
-		const ask = ++asked;
+	const log = new SummaryPager<Delivery, Summary>(async (offset, limit) => {
 		const path = { id };
 		const event_type = eventType || undefined;
-		const [found, counts] = await Promise.all([
+		const [found, summary] = await Promise.all([
 			unwrap(
 				api.GET('/api/v1/webhooks/{id}/deliveries', {
 					params: { path, query: { outcome: OUTCOMES[view], event_type, offset, limit } }
@@ -102,9 +96,10 @@
 				})
 			)
 		]);
-		if (ask === asked) summary = counts;
-		return { items: found.items, total: found.total };
+		return { items: found.items, total: found.total, summary };
 	}, rememberedPageSize('deliveries'));
+	const deliveries = log.pager;
+	const summary = $derived(log.summary);
 
 	function show(next: string) {
 		view = next as View;
@@ -135,15 +130,18 @@
 	const filtered = $derived(view !== 'all' || eventType !== '');
 	const NUMBER = 'text-right tabular-nums';
 
-	async function load(wanted: string) {
+	/** Load the webhook; whether it is there. */
+	async function load(wanted: string): Promise<boolean> {
 		problem = null;
 		try {
 			const hook = await unwrap(
 				api.GET('/api/v1/webhooks/{id}', { params: { path: { id: wanted } } })
 			);
 			if (wanted === id) webhook = hook;
+			return wanted === id;
 		} catch (error) {
 			if (wanted === id) problem = describeError(error);
+			return false;
 		}
 	}
 
@@ -156,14 +154,16 @@
 	$effect(() => {
 		const wanted = id;
 		webhook = null;
-		// Only the webhook starts the page over, not the choice it reads while it loads.
+		// Only the webhook starts the page over, not the choice it reads while it loads. Its log
+		// follows the webhook: one that is not there has one problem on the page, not two.
 		untrack(() => {
 			view = 'all';
 			eventType = '';
-			summary = null;
-			void deliveries.reload();
+			log.summary = null;
 		});
-		void load(wanted);
+		void load(wanted).then((found) => {
+			if (found) untrack(() => void log.reset());
+		});
 	});
 
 	async function test() {
@@ -226,7 +226,7 @@
 					class={cn(buttonVariants({ variant: 'outline' }))}
 				>
 					<Pencil aria-hidden="true" />
-					{m.webhook_edit_do()}
+					{m.edit_do()}
 				</a>
 				<Button variant="outline" disabled={busy} onclick={test}>
 					<Send aria-hidden="true" />
@@ -280,7 +280,7 @@
 		<Loading />
 	{/if}
 
-	{#if summary && summary.event_types.length > 0}
+	{#if webhook && summary && summary.event_types.length > 0}
 		<div class="flex flex-wrap items-center justify-between gap-3">
 			<Segmented label={m.webhook_log()} value={view} onchange={show} options={views} />
 			<Select
@@ -293,122 +293,97 @@
 		</div>
 	{/if}
 
-	<Card.Root as="section" size="lg" aria-labelledby="webhook-deliveries">
-		<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-			<SectionTitle id="webhook-deliveries" size="card">{m.webhook_log()}</SectionTitle>
-			{#if keptSince}
-				<span class="text-meta text-muted-foreground">
-					{m.delivery_kept_since({ date: keptSince })}
-				</span>
-			{/if}
-		</div>
-		{#if deliveries.error && !deliveries.loaded}
-			<div class="mt-3">
-				<LoadProblem
-					problem={describeError(deliveries.error)}
-					onretry={() => deliveries.reload()}
-				/>
-			</div>
-		{:else if deliveries.empty}
-			<p class="mt-3 text-muted-foreground">
-				{filtered ? m.delivery_none_chosen() : m.delivery_none()}
-			</p>
-		{:else if deliveries.items.length}
-			<div class="mt-3">
-				<Table.Root class="min-w-[760px] text-meta">
-					<Table.Header>
-						<Table.Row class="text-xs text-muted-foreground">
-							<Table.Head class="pl-0">{m.delivery_time()}</Table.Head>
-							<Table.Head>{m.delivery_event()}</Table.Head>
-							<Table.Head>{m.jobs_col_document()}</Table.Head>
-							<Table.Head>{m.log_outcome()}</Table.Head>
-							<Table.Head class={NUMBER}>{m.delivery_status()}</Table.Head>
-							<Table.Head class={cn(NUMBER, 'pr-0')}>{m.log_duration()}</Table.Head>
-						</Table.Row>
-					</Table.Header>
-					<Table.Body>
-						{#each deliveries.items as delivery (delivery.id)}
-							<Table.Row class={cn(delivery.error && 'border-b-0')}>
-								<Table.Cell class="pl-0 text-muted-foreground tabular-nums">
-									{formatDate(delivery.started_at, { dateStyle: 'short', timeStyle: 'medium' })}
-								</Table.Cell>
-								<Table.Cell>
-									<span class="font-medium">{eventLabel(delivery.event_type)}</span>
-									{#if delivery.attempt > 1}
-										<span class="block text-xs text-muted-foreground">
-											{m.delivery_attempt({ attempt: delivery.attempt })}
-										</span>
-									{/if}
-								</Table.Cell>
-								<Table.Cell class="max-w-[20rem] truncate">
-									{#if delivery.document}
-										{@const shown = delivery.document}
-										<BeamTitle
-											title={shown.title}
-											class="max-w-full"
-											onview={() =>
-												openBeam(
-													deliveries.items.flatMap((each) =>
-														each.document ? [each.document.id] : []
-													),
-													shown.id,
-													m.webhook_log()
-												)}
-										/>
-									{:else if delivery.document_hidden}
-										<span class="text-muted-foreground italic">{m.jobs_hidden_document()}</span>
-									{:else}
-										<span class="text-muted-foreground">–</span>
-									{/if}
-								</Table.Cell>
-								<Table.Cell>
-									<Badge variant={OUTCOME_TONE[delivery.outcome]}>
-										{outcomeLabel[delivery.outcome]()}
-									</Badge>
-									{#if delivery.next_attempt_at}
-										<span class="block text-xs text-muted-foreground">
-											{m.delivery_next({
-												time: formatDate(delivery.next_attempt_at, {
-													timeStyle: 'short',
-													dateStyle: 'short'
-												})
-											})}
-										</span>
-									{/if}
-								</Table.Cell>
-								<Table.Cell class={NUMBER}>{delivery.status_code ?? '–'}</Table.Cell>
-								<Table.Cell class={cn(NUMBER, 'pr-0 text-muted-foreground')}>
-									{m.delivery_duration({ ms: formatNumber(delivery.duration_ms) })}
-								</Table.Cell>
-							</Table.Row>
-							{#if delivery.error}
-								<Table.Row>
-									<Table.Cell
-										colspan={6}
-										class="pt-0 pl-0 text-xs whitespace-normal text-lane-red-foreground"
-									>
-										{delivery.reason ? reasonText(delivery.reason) : delivery.error}
-									</Table.Cell>
-								</Table.Row>
-							{/if}
-						{/each}
-					</Table.Body>
-				</Table.Root>
-			</div>
-			<div class="mt-4">
-				<Pagination
-					page={deliveries.page}
-					total={deliveries.total}
-					size={deliveries.size}
-					table="deliveries"
-					onchange={(next) => deliveries.go(next)}
-					onsize={(next) => deliveries.resize(next)}
-				/>
-			</div>
-		{:else}
-			<Loading class="mt-3" />
-		{/if}
-	</Card.Root>
+	{#if webhook}
+		<LogCard
+			id="webhook-deliveries"
+			title={m.webhook_log()}
+			pager={deliveries}
+			{filtered}
+			none={m.delivery_none()}
+			noneChosen={m.delivery_none_chosen()}
+			table="deliveries"
+			tableClass="min-w-[760px] text-meta"
+		>
+			{#snippet aside()}
+				{#if keptSince}
+					<span class="text-meta text-muted-foreground">
+						{m.delivery_kept_since({ date: keptSince })}
+					</span>
+				{/if}
+			{/snippet}
+			{#snippet head()}
+				<Table.Head class="pl-0">{m.delivery_time()}</Table.Head>
+				<Table.Head>{m.delivery_event()}</Table.Head>
+				<Table.Head>{m.jobs_col_document()}</Table.Head>
+				<Table.Head>{m.log_outcome()}</Table.Head>
+				<Table.Head class={NUMBER}>{m.delivery_status()}</Table.Head>
+				<Table.Head class={cn(NUMBER, 'pr-0')}>{m.log_duration()}</Table.Head>
+			{/snippet}
+			{#snippet row(delivery)}
+				<Table.Row class={cn(delivery.error && 'border-b-0')}>
+					<Table.Cell class="pl-0 text-muted-foreground tabular-nums">
+						{formatDate(delivery.started_at, { dateStyle: 'short', timeStyle: 'medium' })}
+					</Table.Cell>
+					<Table.Cell>
+						<span class="font-medium">{eventLabel(delivery.event_type)}</span>
+						{#if delivery.attempt > 1}
+							<span class="block text-xs text-muted-foreground">
+								{m.delivery_attempt({ attempt: delivery.attempt })}
+							</span>
+						{/if}
+					</Table.Cell>
+					<Table.Cell class="max-w-[20rem] truncate">
+						{#if delivery.document}
+							{@const shown = delivery.document}
+							<BeamTitle
+								title={shown.title}
+								class="max-w-full"
+								onview={() =>
+									openBeam(
+										deliveries.items.flatMap((each) => (each.document ? [each.document.id] : [])),
+										shown.id,
+										m.webhook_log()
+									)}
+							/>
+						{:else if delivery.document_hidden}
+							<span class="text-muted-foreground italic">{m.jobs_hidden_document()}</span>
+						{:else}
+							<span class="text-muted-foreground">–</span>
+						{/if}
+					</Table.Cell>
+					<Table.Cell>
+						<Badge variant={OUTCOME_TONE[delivery.outcome]}>
+							{outcomeLabel[delivery.outcome]()}
+						</Badge>
+						{#if delivery.next_attempt_at}
+							<span class="block text-xs text-muted-foreground">
+								{m.delivery_next({
+									time: formatDate(delivery.next_attempt_at, {
+										timeStyle: 'short',
+										dateStyle: 'short'
+									})
+								})}
+							</span>
+						{/if}
+					</Table.Cell>
+					<Table.Cell class={NUMBER}>{delivery.status_code ?? '–'}</Table.Cell>
+					<Table.Cell class={cn(NUMBER, 'pr-0 text-muted-foreground')}>
+						{m.delivery_duration({ ms: formatNumber(delivery.duration_ms) })}
+					</Table.Cell>
+				</Table.Row>
+				{#if delivery.error}
+					<Table.Row>
+						<Table.Cell
+							colspan={6}
+							class="pt-0 pl-0 text-xs whitespace-normal text-lane-red-foreground"
+						>
+							{delivery.reason ? reasonText(delivery.reason) : delivery.error}
+						</Table.Cell>
+					</Table.Row>
+				{/if}
+			{/snippet}
+		</LogCard>
+	{/if}
 </div>
 
 <ConfirmDialog
