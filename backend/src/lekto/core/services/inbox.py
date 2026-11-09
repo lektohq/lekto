@@ -75,6 +75,7 @@ from lekto.core.ports.clock import Clock
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE, InboxPosition
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import (
+    edited_spaces,
     load_actor,
     load_lister,
     readable_document,
@@ -555,13 +556,7 @@ async def in_inbox(
     """Those of `documents` that stand open in `viewer`'s inbox (with `all_users`, an admin's:
     of every user), for marking them in lists and search: one query for the viewer's seen marks
     of the new ones."""
-    edited: set[SpaceId] = set()
-    if not all_users:
-        edited = {
-            space.id
-            for space in await uow.spaces.list_accessible(viewer)
-            if space.role_of(viewer) is SpaceRole.EDIT
-        }
+    edited = set() if all_users else await edited_spaces(uow, viewer)
     theirs = [document for document in documents if all_users or document.space_id in edited]
     new = [item.id for item in theirs if item.lane is Lane.GREEN and item.new_at is not None]
     seen = await uow.inbox.seen(viewer, new) if new else {}

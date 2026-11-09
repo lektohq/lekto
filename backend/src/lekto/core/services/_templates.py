@@ -11,6 +11,7 @@ from lekto.core.domain.ids import DocumentTypeId, EventId
 from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.links import DOCUMENT, Links
 from lekto.core.domain.templates import EVENT, TemplateValue, template_values
+from lekto.core.domain.webhooks import webhook_timestamp
 from lekto.core.ports.unit_of_work import UnitOfWork
 from lekto.core.services._access import space_label
 
@@ -59,7 +60,7 @@ def event_values(event_id: EventId, type: str, occurred_at: datetime) -> dict[st
         EVENT: {
             "id": str(event_id),
             "type": type,
-            "occurred_at": occurred_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "occurred_at": webhook_timestamp(occurred_at),
         }
     }
 
