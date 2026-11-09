@@ -543,6 +543,23 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('keeps the buttons in an alert in their variant, never in its tone', () => {
+		// DESIGN.md, "Alerts": a button in an alert is a Button of its variants.
+		const tone =
+			/(?<![\w-])(?:hover:)?(?:bg|text)-(?:note|lane|primary|destructive|caution|warning)/;
+		expect(
+			offenders((source) => {
+				for (const [, inside] of source.matchAll(/<Alert\.Root\b([\s\S]*?)<\/Alert\.Root>/g)) {
+					const tinted = ['Button', 'IconButton']
+						.flatMap((name) => tags(inside, name))
+						.find((tag) => tone.test(/\sclass=(?:"[^"]*"|\{[^}]*\})/.exec(tag)?.[0] ?? ''));
+					if (tinted) return tinted;
+				}
+				return null;
+			})
+		).toEqual([]);
+	});
+
 	it('takes dates and times through DateInput, never a field in the language of the browser', () => {
 		// The stand-in of `DateInput` in the component tests (`lib/testing`) is no view.
 		expect(
