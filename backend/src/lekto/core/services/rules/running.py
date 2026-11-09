@@ -161,6 +161,33 @@ def back_and_forth(names: Sequence[str]) -> Reason:
     return because(ReasonCode.RULES_BACK_AND_FORTH, spaces=list(names))
 
 
+async def looped(uow: UnitOfWork, visited: Sequence[SpaceId], target: SpaceId) -> Reason:
+    """`back_and_forth` for a chain through `visited` that would come to `target` again, the
+    spaces by how a person reads them (review 0.12.2, C-04)."""
+    users = {user.id: user for user in await uow.users.list_all()}
+    names = []
+    for id in [*visited, target]:
+        space = await uow.spaces.find(id)
+        names.append(str(id) if space is None else space_label(space, users))
+    return back_and_forth(names)
+
+
+async def following_rules(uow: UnitOfWork, rules: Sequence[Rule]) -> list[Rule]:
+    """The rules of the spaces `rules` may file a document into, and of the spaces those file it
+    into: they run after them (trigger `ingest`, `ChangeRules.after_arrival`), so their patterns
+    are prepared with them."""
+    found: dict[RuleId, Rule] = {}
+    for target in {
+        action.space_id
+        for rule in rules
+        for action in rule.definition.actions
+        if isinstance(action, SetSpace)
+    }:
+        for rule in await reachable_rules(uow, target, Trigger.INGEST, include_global=False):
+            found.setdefault(rule.id, rule)
+    return list(found.values())
+
+
 def problem_output(problem: Reason) -> JsonObject:
     """Why the rules' change did not apply, for a log entry's output: in English (`problem`)
     and with its code (`problem_reason`)."""

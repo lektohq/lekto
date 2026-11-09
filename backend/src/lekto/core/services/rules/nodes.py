@@ -31,7 +31,7 @@ from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.patterns import PatternMatcher
 from lekto.core.ports.templates import TemplateRenderer
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
-from lekto.core.services._access import field_definitions, space_label
+from lekto.core.services._access import field_definitions
 from lekto.core.services.inbox import MODEL_NODES, latest_entries
 from lekto.core.services.rules.running import (
     SENDS,
@@ -43,9 +43,9 @@ from lekto.core.services.rules.running import (
     Send,
     active_rules,
     apply_plan,
-    back_and_forth,
     checked_rules,
     deliverable,
+    looped,
     prepare,
     provenance,
     queue_sends,
@@ -233,7 +233,7 @@ class RulesResult:
             reasons += run.reviews
             target = run.plan.space
             if target is not None and target != document.space_id and target in visited:
-                reasons.append(back_and_forth(await _names(uow, [*visited, target])))
+                reasons.append(await looped(uow, visited, target))
                 problem = await apply_plan(
                     uow, document, replace(run.plan, space=None), definitions, now, arrive=not probe
                 )
@@ -366,15 +366,6 @@ def _merged(output: JsonObject, more: JsonObject) -> JsonObject:
         if key in more:
             merged[key] = [*as_list(output.get(key)), *as_list(more[key])]
     return merged
-
-
-async def _names(uow: UnitOfWork, spaces: Sequence[SpaceId]) -> list[str]:
-    users = {user.id: user for user in await uow.users.list_all()}
-    names = []
-    for id in spaces:
-        space = await uow.spaces.find(id)
-        names.append(str(id) if space is None else space_label(space, users))
-    return names
 
 
 def _waiting_for_hand(
