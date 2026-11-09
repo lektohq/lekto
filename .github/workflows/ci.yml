@@ -32,9 +32,11 @@ jobs:
   # runs the checks again only where they write a cache: `backend` (mypy) when the lock file
   # changed, `devcontainer` (layers) when its inputs or the lock file changed. Everything else was checked in the pull request, `image` too (it writes no cache).
   # `image` looks at what goes into the runtime image besides the code (Dockerfile, deploy/
-  # without the Markdown files, the lock file, the web UI without its tests), not at the
-  # backend's code: its tests cover that. `web` runs for changes below web/; on main only when
-  # its lock file changed (to write the pnpm cache).
+  # without the Markdown files, the lock file, the web UI without its tests) and at the backend's
+  # parts that work with the image's Debian programs (settings and startup, OCR, PDF, pictures,
+  # system checks); the rest of the backend's code its tests cover. The release tests the image it
+  # publishes once more (release.yml). `web` runs for changes below web/; on main only when its
+  # lock file changed (to write the pnpm cache).
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -76,7 +78,10 @@ jobs:
           # The Compose examples, the release's tag script and the workflows.
           release="^docker/|^\.github/(scripts|workflows)/"
           image="^(Dockerfile|\.dockerignore)$|^\.devcontainer/|$ci"
-          runtime="^(Dockerfile|\.dockerignore)$|^deploy/|^web/|^\.github/workflows/ci\.yml$"
+          # The backend's parts that shape how the image behaves with its Debian programs: settings
+          # and startup, OCR, PDF and pictures, the system checks (review 0.12.2, O-13).
+          image_backend='^backend/src/lekto/(composition|adapters/outbound/(ocrmypdf|weasyprint|pdfium|pikepdf|pillow|zxing|system))/'
+          runtime="^(Dockerfile|\.dockerignore)$|^deploy/|^web/|^\.github/workflows/ci\.yml$|$image_backend"
           # The runtime image's inputs. Documentation, the UI's tests and the API description (the
           # web job builds the client; its types leave nothing in the build) do not change it.
           not_in_image='^web/tests/|\.test\.ts$|^web/(openapi\.json|src/lib/api/schema\.ts|playwright\.config\.ts)$'
@@ -181,7 +186,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.release == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - name: Tag script
@@ -199,6 +204,23 @@ jobs:
             check -f compose.postgres.yml -f "compose.$extension.yml"
           done
           check -f compose.yml -f compose.migration.yml --profile migration
+      # The S3 example's Garage bootstrap is a copy of the dev container's (review 0.12.2, O-05):
+      # it runs here, twice, as a user's `up` would run it on every start.
+      - name: Garage of the S3 example
+        working-directory: docker
+        run: |
+          sed -i '/^\(GARAGE_RPC_SECRET\|GARAGE_ADMIN_TOKEN\|LEKTO_S3_ACCESS_KEY_ID\|LEKTO_S3_SECRET_ACCESS_KEY\)=/d' .env
+          {
+            echo "GARAGE_RPC_SECRET=$(openssl rand -hex 32)"
+            echo "GARAGE_ADMIN_TOKEN=$(openssl rand -hex 16)"
+            echo "LEKTO_S3_ACCESS_KEY_ID=GK$(openssl rand -hex 12)"
+            echo "LEKTO_S3_SECRET_ACCESS_KEY=$(openssl rand -hex 32)"
+          } >> .env
+          compose() { docker compose -f compose.postgres.yml -f compose.s3.yml "$@"; }
+          compose up -d garage
+          compose run --rm garage-init
+          compose run --rm garage-init
+          compose down -v
       - name: Workflows
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
 
