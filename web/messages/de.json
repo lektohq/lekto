@@ -524,7 +524,6 @@
 	"lane_yellow": "Prüfen",
 	"lane_red": "Eingreifen",
 	"lane_running": "Läuft",
-	"placeholder_text": "Dieser Bereich folgt in Kürze.",
 	"error_title": "Etwas ist schiefgelaufen",
 	"error_not_found": "Diese Seite gibt es nicht.",
 	"error_forbidden": "Keine Berechtigung.",
