@@ -199,7 +199,6 @@
 	"rules_kind_documents": "Dokumente",
 	"rules_kind_mail": "Mails",
 	"mail_rules_no_mailbox": "Noch kein Postfach. Mail-Regeln gehören zu einem Postfach.",
-	"mail_rules_to_mailboxes": "Postfach anlegen",
 	"mail_rules_mailbox": "Postfach „{name}“",
 	"mail_rules_to_mailbox": "Postfach ansehen",
 	"mail_rules_new_for": "Neue Regel für Postfach „{name}“",

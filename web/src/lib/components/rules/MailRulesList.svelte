@@ -46,7 +46,10 @@
 	<EmptyNote>
 		{m.mail_rules_no_mailbox()}
 		{#snippet action()}
-			<a href="{BASE}/system?tab=intake" class={textLink}>{m.mail_rules_to_mailboxes()}</a>
+			<a href="{BASE}/system?tab=intake" class={cn(buttonVariants({ variant: 'outline' }))}>
+				<Plus aria-hidden="true" />
+				{m.mailbox_new()}
+			</a>
 		{/snippet}
 	</EmptyNote>
 {:else}
