@@ -505,6 +505,19 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('keeps the colours of the tags to the tags', () => {
+		// A tag's colour says which tag it is (DESIGN.md, "Chips"): only `chipLook()` and the colour
+		// picker name them; a mark of another kind is a `Badge`.
+		expect(
+			[...Object.entries(sources), ...Object.entries(scripts)]
+				.filter(
+					([path, source]) =>
+						!/\/(?:colors\.ts|ColorPicker\.svelte)$/.test(path) && /\(--tag-/.test(source)
+				)
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
 	it('sizes buttons by their size, never by a height of their own', () => {
 		// `Button` takes a finger's 44 pixels on a phone by itself (DESIGN.md, "Buttons", "Touch
 		// targets"); `min-h-*` is no height of its own.

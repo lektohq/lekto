@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import { BASE } from '#lib/base.ts';
@@ -94,20 +95,14 @@
 			>
 				<span class="flex max-w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
 					<span class="break-words">{field.name}</span>
-					<span class="rounded-md bg-secondary px-1.5 text-xs leading-5 text-muted-foreground">
-						{fieldTypeLabel(field.data_type)}
-					</span>
+					<Badge variant="muted">{fieldTypeLabel(field.data_type)}</Badge>
 					{#if field.assignment === 'manual'}
-						<span
-							class="rounded-md bg-(--tag-orange) px-1.5 text-xs leading-5 text-(--tag-orange-foreground)"
-						>
-							{m.field_def_manual_short()}
-						</span>
+						<Badge variant="muted">{m.field_def_manual_short()}</Badge>
 					{/if}
 					{#if field.position !== 0}
-						<span class="rounded-md bg-secondary px-1.5 text-xs leading-5 text-muted-foreground">
+						<Badge variant="muted">
 							{m.field_def_position_short({ position: formatNumber(field.position) })}
-						</span>
+						</Badge>
 					{/if}
 					{#if !phone.current}
 						<code class="font-mono text-xs text-muted-foreground" title={m.field_def_key_hint()}
