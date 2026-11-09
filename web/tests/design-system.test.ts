@@ -471,6 +471,18 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('draws a card of a choice only as ChoiceCard', () => {
+		// A radio alone is the start of a card (DESIGN.md, "Checkboxes, radios, switches"): one
+		// look for chosen, a border and the panel, no ring.
+		expect(
+			offenders((source, path) =>
+				path.includes('/components/ui/') || path.endsWith('/ChoiceCard.svelte')
+					? null
+					: (tags(source, 'ChoiceBox').find((tag) => /\stype="radio"/.test(tag)) ?? null)
+			)
+		).toEqual([]);
+	});
+
 	it('sizes buttons by their size, never by a height of their own', () => {
 		// `Button` takes a finger's 44 pixels on a phone by itself (DESIGN.md, "Buttons", "Touch
 		// targets"); `min-h-*` is no height of its own.
