@@ -75,7 +75,7 @@ from lekto.core.ports.repository import (
     DocumentFilter,
     DocumentOrder,
     DocumentPosition,
-    FacetRow,
+    FacetBy,
     SortKey,
     TagSets,
 )
@@ -1918,7 +1918,7 @@ class UnitOfWorkContract:
             assert await count(CountBy.CONTACT, None) == {contact.id: 3}
             assert await count(CountBy.FIELD, None) == {note.id: 2}
 
-    async def test_facet_rows_follow_the_filter_and_the_reach(
+    async def test_counts_by_value_follow_the_filter_and_the_reach(
         self, uow_factory: UnitOfWorkFactory
     ) -> None:
         owner, space = await owner_with_space(uow_factory)
@@ -1948,35 +1948,50 @@ class UnitOfWorkContract:
                 await uow.documents.add(document)
             await uow.commit()
 
-        first = FacetRow(
-            contact=contact.id,
-            document_type=invoice.id,
-            topic=topic.id,
-            tags=frozenset({tax.id, paid.id}),
-            document_date=date(2026, 9, 30),
-        )
-        second = FacetRow(
-            contact=None, document_type=None, topic=None, tags=frozenset({tax.id}),
-            document_date=None,
-        )  # fmt: skip
+        mine, september = documents[0], date(2026, 9, 30)
         async with uow_factory() as uow:
-            rows = uow.documents.facet_rows
-            # Within the owner's reach: their own two, the stranger's space is not shared.
-            assert sorted(await rows(DocumentFilter(), owner.id), key=repr) == sorted(
-                [first, second], key=repr
-            )
+            grouped = uow.documents.count_grouped
+            # Within the owner's reach: their own two, the stranger's space is not shared; the
+            # documents without a value under None.
+            assert await grouped(DocumentFilter(), owner.id, FacetBy.CONTACT) == {
+                contact.id: 1,
+                None: 1,
+            }
+            assert await grouped(DocumentFilter(), None, FacetBy.CONTACT) == {
+                contact.id: 2,
+                None: 1,
+            }
+            assert await grouped(DocumentFilter(), owner.id, FacetBy.DOCUMENT_TYPE) == {
+                invoice.id: 1,
+                None: 1,
+            }
+            assert await grouped(DocumentFilter(), owner.id, FacetBy.TOPIC) == {
+                topic.id: 1,
+                None: 1,
+            }
+            assert await grouped(DocumentFilter(), owner.id, FacetBy.DOCUMENT_DATE) == {
+                september: 1,
+                None: 1,
+            }
             by_contact = DocumentFilter(contacts=frozenset({contact.id}))
-            assert await rows(by_contact, owner.id) == [first]
-            assert len(await rows(by_contact, None)) == 2  # every document
+            assert await grouped(by_contact, owner.id, FacetBy.DOCUMENT_DATE) == {september: 1}
             in_september = DocumentFilter(document_dates=Period.month(2026, 9))
-            assert await rows(in_september, owner.id) == [first]
-            # Counted alone: the same documents as the rows.
+            assert await grouped(in_september, None, FacetBy.CONTACT) == {contact.id: 1}
+            # A tag set counts each document once, within the filter and the reach.
+            sets: dict[UUID, Collection[TagId]] = {tax.id: [tax.id, paid.id], paid.id: [paid.id]}
+            tagged = uow.documents.count_tagged
+            assert await tagged(sets, owner.id) == {tax.id: 2, paid.id: 1}
+            assert await tagged(sets, None) == {tax.id: 3, paid.id: 1}
+            assert await tagged(sets, None, by_contact) == {tax.id: 2, paid.id: 1}
+            assert await tagged(sets, owner.id, in_september) == {tax.id: 1, paid.id: 1}
+            # Counted alone: the same documents.
             count = uow.documents.count
             assert await count(DocumentFilter(), owner.id) == 2
             assert await count(DocumentFilter(), None) == 3
             assert await count(by_contact, owner.id) == 1
             assert await count(by_contact, None) == 2
             assert await count(in_september, owner.id) == 1
+            assert mine.contact_id == contact.id
 
     async def test_removing_a_document_removes_its_processing_log(
         self, uow_factory: UnitOfWorkFactory
