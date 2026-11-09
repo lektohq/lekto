@@ -50,6 +50,7 @@ from lekto.core.domain.rules import DEFAULT_PRIORITY as DEFAULT_PRIORITY
 from lekto.core.domain.rules import MAX_PRIORITY as MAX_PRIORITY
 from lekto.core.domain.rules import MIN_PRIORITY as MIN_PRIORITY
 from lekto.core.domain.rules import check_priority
+from lekto.core.domain.sorting import sort_key
 from lekto.core.domain.validation import require_name, require_utc
 
 
@@ -347,11 +348,13 @@ def record_facts(record: MailRecord) -> MailFacts:
     )
 
 
+def rule_order(rule: MailRule) -> tuple[int, str, str]:
+    """The order in which a mailbox's rules are asked, and listed: by priority (higher first),
+    the same priority by name as every list sorts names (`sort_key`, DIN 5007), then by id."""
+    return (-rule.priority, sort_key(rule.name), str(rule.id))
+
+
 def first_match(rules: list[MailRule], facts: MailFacts) -> MailRule | None:
-    """The first active rule that matches, by priority (higher first), the same priority by
-    name."""
-    ordered = sorted(
-        (rule for rule in rules if rule.enabled),
-        key=lambda rule: (-rule.priority, rule.name.casefold()),
-    )
+    """The first active rule that matches, in `rule_order`."""
+    ordered = sorted((rule for rule in rules if rule.enabled), key=rule_order)
     return next((rule for rule in ordered if rule.matches(facts)), None)
