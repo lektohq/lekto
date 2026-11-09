@@ -1,5 +1,6 @@
 <script lang="ts">
 	import RuleSwitch from '#lib/components/rules/RuleSwitch.svelte';
+	import { RuleLoader } from '#lib/rules/page.svelte.ts';
 	import { switchMailRule } from '#lib/rules/switch.ts';
 	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -15,7 +16,6 @@
 	import SelectionBar from '#lib/components/SelectionBar.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
-	import { describeError } from '#lib/errors.ts';
 	import { formatMoment } from '#lib/i18n.ts';
 	import { loadMailRuleLookup, namesOf, type MailRuleLookup } from '#lib/mail-rule-lookup.ts';
 	import {
@@ -39,34 +39,31 @@
 	const id = $derived(page.params.id ?? '');
 	const saved = $derived(page.url.searchParams.has('saved'));
 	let rule = $state<MailRule | null>(null);
-	let lookup = $state<MailRuleLookup | null>(null);
+	const loader = new RuleLoader<MailRuleLookup>(loadMailRuleLookup);
+	const lookup = $derived(loader.lookup);
 	let mails = $state<DryRunMail[] | null>(null);
-	let problem = $state<string | null>(null);
 	let busy = $state(false);
 	/** The groups folded away, by key. */
 	const folded = new SvelteSet<string>();
 
-	async function load(wanted: string) {
-		problem = null;
-		try {
-			const [found, loaded] = await Promise.all([
-				unwrap(api.GET('/api/v1/mail-rules/{id}', { params: { path: { id: wanted } } })),
-				lookup ?? loadMailRuleLookup()
-			]);
-			[rule, lookup] = [found, loaded];
-			mails = await unwrap(
-				api.POST('/api/v1/mail-rules/dry-run', {
-					body: dryRunBody(found)
-				})
-			);
-		} catch (error) {
-			problem = describeError(error);
-		}
-	}
-
+	// The rule, then what it would do; another rule in the URL drops both of the one before.
 	$effect(() => {
 		const wanted = id;
-		untrack(() => void load(wanted));
+		untrack(() => {
+			[rule, mails] = [null, null];
+			void loader.load(
+				async () => {
+					const found = await unwrap(
+						api.GET('/api/v1/mail-rules/{id}', { params: { path: { id: wanted } } })
+					);
+					const run = await unwrap(
+						api.POST('/api/v1/mail-rules/dry-run', { body: dryRunBody(found) })
+					);
+					return { found, run };
+				},
+				({ found, run }) => ([rule, mails] = [found, run])
+			);
+		});
 	});
 
 	async function switchOne(enabled: boolean) {
@@ -171,8 +168,8 @@
 		subtitle={saved ? m.mail_rule_saved_hint() : m.mail_rule_apply_hint()}
 	/>
 
-	{#if problem}
-		<LoadProblem {problem} onretry={() => void load(id)} />
+	{#if loader.problem}
+		<LoadProblem problem={loader.problem} onretry={() => loader.retry()} />
 	{:else if !rule || !mails || !names}
 		<Loading />
 	{:else if mails.length === 0}

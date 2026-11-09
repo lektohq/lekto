@@ -58,4 +58,19 @@ describe('the loader of a rule page', () => {
 		expect(loader.problem).toBeNull();
 		expect(then).toHaveBeenCalledOnce();
 	});
+
+	it('takes the master data of its kind, and drops a late answer there too', async () => {
+		const own = vi.fn(async () => ({ mailboxes: ['Haushalt'] }));
+		const loader = new RuleLoader(own);
+		let release = () => {};
+		const slow = new Promise<string>((resolve) => (release = () => resolve('slow')));
+		const then = vi.fn();
+		const first = loader.load(() => slow, then);
+		await loader.load(() => Promise.resolve('fast'), then);
+		release();
+		await first;
+		expect(then).toHaveBeenCalledOnce();
+		expect(then).toHaveBeenCalledWith('fast', { mailboxes: ['Haushalt'] });
+		expect(own).toHaveBeenCalledTimes(2); // both started before one had loaded it
+	});
 });

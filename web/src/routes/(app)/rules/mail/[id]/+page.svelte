@@ -14,19 +14,19 @@
 	import RuleHeader from '#lib/components/rules/RuleHeader.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import { describeError } from '#lib/errors.ts';
 	import { loadMailRuleLookup, namesOf, type MailRuleLookup } from '#lib/mail-rule-lookup.ts';
 	import type { MailRule } from '#lib/mail-rules.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { reasonText } from '#lib/reasons.ts';
+	import { RuleLoader } from '#lib/rules/page.svelte.ts';
 
 	// A mail rule's page, as a document rule's (Tobi, 05.11.2026): its name, the switch,
 	// "Bearbeiten", "Probelauf" and delete in the head; its mailbox and priority below; the rule
 	// to read.
 	const id = $derived(page.params.id ?? '');
 	let rule = $state<MailRule | null>(null);
-	let lookup = $state<MailRuleLookup | null>(null);
-	let problem = $state<string | null>(null);
+	const loader = new RuleLoader<MailRuleLookup>(loadMailRuleLookup);
+	const lookup = $derived(loader.lookup);
 	let busy = $state(false);
 	let removing = $state(false);
 
@@ -34,22 +34,16 @@
 		lookup?.mailboxes.find((entry) => entry.id === rule?.mailbox_id)?.name ?? m.rule_unknown()
 	);
 
-	async function load(wanted: string) {
-		problem = null;
-		try {
-			const [found, loaded] = await Promise.all([
-				unwrap(api.GET('/api/v1/mail-rules/{id}', { params: { path: { id: wanted } } })),
-				lookup ?? loadMailRuleLookup()
-			]);
-			[rule, lookup] = [found, loaded];
-		} catch (error) {
-			problem = describeError(error);
-		}
-	}
-
+	// Another rule in the URL: the one before goes at once, a late answer for it is dropped.
 	$effect(() => {
 		const wanted = id;
-		untrack(() => void load(wanted));
+		untrack(() => {
+			rule = null;
+			void loader.load(
+				() => unwrap(api.GET('/api/v1/mail-rules/{id}', { params: { path: { id: wanted } } })),
+				(found) => (rule = found)
+			);
+		});
 	});
 
 	async function switchOne(enabled: boolean) {
@@ -85,8 +79,8 @@
 		{/snippet}
 	</RuleHeader>
 
-	{#if problem}
-		<LoadProblem {problem} onretry={() => void load(id)} />
+	{#if loader.problem}
+		<LoadProblem problem={loader.problem} onretry={() => loader.retry()} />
 	{:else if !rule || !lookup}
 		<Loading />
 	{:else}
