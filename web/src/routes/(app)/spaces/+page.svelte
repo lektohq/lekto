@@ -167,11 +167,22 @@
 {#snippet row(space: Space)}
 	{@const Icon = space.personal_of === null ? Archive : UserRound}
 	{@const members = memberLine(space)}
-	<Card.Root as="li" size="row" class="flex flex-wrap items-center gap-3">
+	{@const editable = canDescribeSpace(space, session.user)}
+	<!-- Where the space can be edited, its name opens the editor and takes the whole row; the
+	buttons stand above it (web/DESIGN.md, "Lists"). -->
+	<Card.Root as="li" size="row" class="relative flex flex-wrap items-center gap-3">
 		<Icon class="size-5 text-muted-foreground" aria-hidden="true" />
 		<div class="flex min-w-0 flex-1 flex-col gap-1">
 			<span class="flex flex-wrap items-center gap-2 font-medium">
-				<span class="truncate">{label(space)}</span>
+				{#if editable}
+					<button
+						type="button"
+						class="truncate text-left after:absolute after:inset-0 hover:underline"
+						onclick={() => (editing = space)}>{label(space)}</button
+					>
+				{:else}
+					<span class="truncate">{label(space)}</span>
+				{/if}
 				{#if space.personal_of !== null && space.personal_of !== me}
 					<Badge variant="note">{m.space_personal()}</Badge>
 				{/if}
@@ -186,7 +197,7 @@
 				{members ? m.space_members_line({ names: members }) : m.space_only_you()}
 			</span>
 		</div>
-		<div class="flex gap-1">
+		<div class="relative z-10 flex gap-1">
 			{#if canChooseMembers(space, session.user)}
 				<IconButton
 					label={m.space_members({ name: label(space) })}
@@ -201,8 +212,12 @@
 				</IconButton>
 			{/if}
 		</div>
-		{#if canDescribeSpace(space, session.user)}
-			<EditButton label={m.space_edit({ name: label(space) })} onclick={() => (editing = space)} />
+		{#if editable}
+			<EditButton
+				class="relative z-10"
+				label={m.space_edit({ name: label(space) })}
+				onclick={() => (editing = space)}
+			/>
 		{/if}
 	</Card.Root>
 {/snippet}
