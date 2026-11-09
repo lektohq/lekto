@@ -828,6 +828,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
         store,
         metadata=container.metadata,
         rules=change_rules,
+        text_max=settings.mcp_text_max,
     )
     pipeline = PipelineService(
         uow,

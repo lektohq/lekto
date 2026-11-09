@@ -12,6 +12,7 @@ import pytest
 
 from lekto.adapters.inbound.rest.schemas.documents import UploadFields
 from lekto.composition.container import build_memory_container, build_services
+from lekto.composition.settings import Settings
 from lekto.core.domain.documents import Sha256
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.exchanges import ModelCall, RunExchange, exchanges_to_json
@@ -345,11 +346,12 @@ async def test_the_text_is_read_in_pieces(api: Api) -> None:
 
 
 async def test_one_piece_of_text_holds_what_the_setting_allows() -> None:
-    """`LEKTO_MCP_TEXT_MAX` limits a piece over REST as over MCP."""
+    """`LEKTO_MCP_TEXT_MAX` limits a piece over REST as over MCP: a larger `limit` gives a
+    whole piece, the rest follows from `next_offset`."""
     container = build_memory_container()
-    services = build_services(container)
+    services = build_services(container, Settings.model_construct(mcp_text_max=4))
     builders.skip_classification(services.pipeline)
-    app = make_app(container, services, text_max=4)
+    app = make_app(container, services)
     owner = await services.users.bootstrap_admin("root", PASSWORD)
     assert owner is not None
     await issue_token(services.auth, owner)
@@ -360,9 +362,9 @@ async def test_one_piece_of_text_holds_what_the_setting_allows() -> None:
         await builders.drain(services.pipeline)
         url = f"{response.json()['status_url']}/text"
         piece = (await client.get(url, headers=auth(owner))).json()
-        too_long = await client.get(url, params={"limit": 5}, headers=auth(owner))
+        larger = (await client.get(url, params={"limit": 5}, headers=auth(owner))).json()
     assert (len(piece["text"]), piece["next_offset"]) == (4, 4)
-    assert too_long.status_code == 422
+    assert larger == piece
 
 
 async def test_the_structure_is_served_as_stored(api: Api) -> None:

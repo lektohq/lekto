@@ -121,6 +121,10 @@ from lekto.core.services.tasks.settling import cancel_tasks
 log = logging.getLogger(__name__)
 
 _SHOWN_ALIKE = 5
+
+TEXT_MAX = 20_000
+"""The most characters of a document's text one piece holds, unless set otherwise
+(`LEKTO_MCP_TEXT_MAX`)."""
 """Documents an ambiguous short id names at most in its error."""
 AGGREGATE_MAX = 10_000
 """Documents `DocumentService.aggregate` counts at most, as many as an action on many takes."""
@@ -381,14 +385,22 @@ class DocumentService:
         *,
         rules: ChangeRules | None = None,
         metadata: MetadataReader | None = None,
+        text_max: int = TEXT_MAX,
     ) -> None:
         """`rules`: run the change rules when a person changes a document's metadata;
-        `metadata` reads what its files say about themselves."""
+        `metadata` reads what its files say about themselves; `text_max`: the most characters
+        of a document's text one piece holds (`read_text`)."""
+        self._text_max = text_max
         self._uow = uow
         self._clock = clock
         self._store = object_store
         self._rules = rules
         self._metadata = metadata
+
+    @property
+    def text_max(self) -> int:
+        """The most characters of a document's text one piece holds."""
+        return self._text_max
 
     @property
     def _object_store(self) -> ObjectStore:
@@ -410,13 +422,16 @@ class DocumentService:
         return DocumentView(document, access)
 
     async def read_text(
-        self, actor: UserId, id: DocumentId, *, offset: int = 0, limit: int
+        self, actor: UserId, id: DocumentId, *, offset: int = 0, limit: int | None = None
     ) -> DocumentText:
-        """`limit` characters of the document's text from `offset`. NotFoundError if the
-        caller may not read the document; ValidationError for a negative offset or a limit
-        below 1; ConflictError while the document has no text yet (it is not parsed)."""
-        if offset < 0 or limit < 1:
+        """`limit` characters of the document's text from `offset`; none or more than a piece
+        holds (`text_max`) give a whole piece, the rest follows from `next_offset`, for REST and
+        MCP alike. NotFoundError if the caller may not read the document; ValidationError for a
+        negative offset or a limit below 1; ConflictError while the document has no text yet
+        (it is not parsed)."""
+        if offset < 0 or (limit is not None and limit < 1):
             raise ValidationError("offset must be 0 or more and limit 1 or more")
+        limit = self._text_max if limit is None else min(limit, self._text_max)
         store = self._object_store
         async with self._uow() as uow:
             await readable_document(uow, await load_actor(uow, actor), id)
