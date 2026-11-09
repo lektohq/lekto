@@ -5,14 +5,11 @@ import { goto } from '$app/navigation';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import Page from './+page.svelte';
+import { json } from '#lib/testing/api.ts';
 
 vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
 
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
-
-function json(status: number, body: unknown, type = 'application/json'): Response {
-	return new Response(JSON.stringify(body), { status, headers: { 'content-type': type } });
-}
 
 const signedIn = {
 	user: { id: '0199a6c4-0000-7000-8000-000000000001', username: 'tobi', role: 'admin' },
@@ -24,16 +21,11 @@ const signedIn = {
 // Fresh each time: a response body can be read once.
 const secondFactor = () =>
 	json(
-		401,
 		{ type: 'about:blank', title: 'Unauthorized', status: 401, second_factor_required: true },
-		'application/problem+json'
+		401
 	);
 const refused = () =>
-	json(
-		401,
-		{ type: 'about:blank', title: 'Unauthorized', status: 401, detail: 'Wrong.' },
-		'application/problem+json'
-	);
+	json({ type: 'about:blank', title: 'Unauthorized', status: 401, detail: 'Wrong.' }, 401);
 
 async function bodyOf(call: number): Promise<Record<string, unknown>> {
 	return JSON.parse(await fetchMock.mock.calls[call][0].clone().text());
@@ -60,7 +52,7 @@ async function enterPassword() {
 
 describe('sign-in page', () => {
 	it('signs in and returns to the page the user came from', async () => {
-		fetchMock.mockResolvedValueOnce(json(200, signedIn));
+		fetchMock.mockResolvedValueOnce(json(signedIn));
 		render(Page, { data: { next: '/ui/inbox', oidc: null, error: null } });
 
 		await enterPassword();
@@ -85,7 +77,7 @@ describe('sign-in page', () => {
 	});
 
 	it('asks for the second factor, then signs in with the code', async () => {
-		fetchMock.mockResolvedValueOnce(secondFactor()).mockResolvedValueOnce(json(200, signedIn));
+		fetchMock.mockResolvedValueOnce(secondFactor()).mockResolvedValueOnce(json(signedIn));
 		render(Page, { data: { next: '/ui/', oidc: null, error: null } });
 
 		const user = await enterPassword();
@@ -138,14 +130,13 @@ describe('sign-in page', () => {
 	it('shows the detail of other refusals', async () => {
 		fetchMock.mockResolvedValueOnce(
 			json(
-				503,
 				{
 					type: 'about:blank',
 					title: 'Service Unavailable',
 					status: 503,
 					detail: 'database: down'
 				},
-				'application/problem+json'
+				503
 			)
 		);
 		render(Page, { data: { next: '/ui/', oidc: null, error: null } });

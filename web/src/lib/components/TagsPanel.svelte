@@ -49,7 +49,7 @@
 	import Segmented, { type Segment } from '#lib/components/Segmented.svelte';
 	import { formatNumber } from '#lib/i18n.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import IconButton from '#lib/components/IconButton.svelte';
+	import IconButton, { ICON_BUTTON_ROOM } from '#lib/components/IconButton.svelte';
 
 	// Every kind of tag in one place: a bar of the kinds with how many tags the search finds in
 	// each (the kind in the URL), one section per kind with
@@ -244,7 +244,7 @@
 					class="flex min-h-12 items-center gap-2 bg-muted/60 py-1 pr-1.5 pl-1 sm:gap-2.5 sm:pr-2.5"
 				>
 					{#if forcedOpen}
-						<span class="size-11 shrink-0 sm:size-8" aria-hidden="true"></span>
+						<span class="{ICON_BUTTON_ROOM.sm} shrink-0" aria-hidden="true"></span>
 					{:else}
 						<IconButton
 							size="sm"
@@ -314,7 +314,7 @@
 												{/if}
 											</IconButton>
 										{:else}
-											<span class="size-11 shrink-0 sm:size-8" aria-hidden="true"></span>
+											<span class="{ICON_BUTTON_ROOM.sm} shrink-0" aria-hidden="true"></span>
 										{/if}
 									{/snippet}
 									<span class="flex max-w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1">

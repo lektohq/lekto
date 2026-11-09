@@ -12,6 +12,7 @@
 </script>
 
 <script lang="ts">
+	import AlertDot from '#lib/components/AlertDot.svelte';
 	import SteadyText from '#lib/components/SteadyText.svelte';
 	import { slidingPill } from '#lib/sliding-pill.ts';
 	import { cn } from '#lib/utils.ts';
@@ -103,11 +104,7 @@
 				<span class="text-xs font-normal text-muted-foreground tabular-nums">{tab.count}</span>
 			{/if}
 			{#if tab.marker}
-				<span
-					class="size-2 rounded-full border-[1.5px] border-lane-yellow-foreground bg-lane-yellow"
-					aria-hidden="true"
-				></span>
-				<span class="sr-only">{tab.marker}</span>
+				<AlertDot tone="yellow" label={tab.marker} />
 			{/if}
 		</a>
 	{/each}

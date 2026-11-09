@@ -5,18 +5,12 @@ import type { FieldDefinition } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { TEMPLATES_GUIDE } from '#lib/templates/guide.ts';
 import TemplateInput from './TemplateInput.svelte';
+import { json } from '#lib/testing/api.ts';
 
 const PAYSLIP = '0199a6c4-0000-7000-8000-0000000000e1';
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
 const previews: Record<string, unknown>[] = [];
 const listed: URL[] = [];
-
-function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), {
-		status,
-		headers: { 'content-type': 'application/json' }
-	});
-}
 
 function field(id: string, name: string, key: string, types: string[] | null) {
 	return {

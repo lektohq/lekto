@@ -2,7 +2,6 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { NODE_LABELS } from '#lib/node-labels.ts';
 	import { progress, type NodeState, type Processing } from '#lib/pipeline.ts';
-	import { delegatedLabel } from '#lib/step-look.ts';
 	import { cn } from '#lib/utils.ts';
 
 	// How far the processing of a document is: a segment per node of the graph, in its order,
@@ -50,25 +49,6 @@
 						: 'bg-primary';
 		}
 	}
-
-	function stateLabel(state: NodeState): string {
-		switch (state.status) {
-			case 'waiting':
-				return m.node_status_waiting();
-			case 'running':
-				return m.node_status_running();
-			case 'delegated':
-				return delegatedLabel(state);
-			case 'skipped':
-				return m.node_status_skipped();
-			case 'done':
-				return state.outcome === 'failed'
-					? m.outcome_failed()
-					: state.outcome === 'uncertain'
-						? m.outcome_uncertain()
-						: m.outcome_ok();
-		}
-	}
 </script>
 
 {#snippet bar()}
@@ -82,10 +62,7 @@
 		class={cn('flex w-full gap-0.5', compact ? 'h-1' : 'h-1.5')}
 	>
 		{#each processing.nodes as state (state.node)}
-			<span
-				class={cn('h-full min-w-1 flex-1 rounded-full transition-colors', tone(state))}
-				title="{NODE_LABELS[state.node]()}: {stateLabel(state)}"
-			></span>
+			<span class={cn('h-full min-w-1 flex-1 rounded-full transition-colors', tone(state))}></span>
 		{/each}
 	</span>
 {/snippet}

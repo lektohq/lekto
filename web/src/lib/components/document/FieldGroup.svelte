@@ -29,7 +29,7 @@
 
 <section
 	aria-labelledby={id}
-	class={cn(cardVariants({ size: 'flush' }), 'flex flex-col gap-1.5 px-4 pt-3.5 pb-3', className)}
+	class={cn(cardVariants({ size: 'sm' }), 'flex flex-col gap-1.5', className)}
 	{...rest}
 >
 	<div class="mb-0.5 flex items-center gap-2.5 border-b border-muted pb-2.5">

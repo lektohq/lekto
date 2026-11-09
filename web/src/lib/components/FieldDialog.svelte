@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { cardVariants } from '#lib/components/ui/card/index.ts';
+	import { cn } from '#lib/utils.ts';
 	import ChoiceCard from '#lib/components/ChoiceCard.svelte';
 	import { MASTER_LIMITS } from '#lib/masterdata-api.ts';
 	import { toast } from 'svelte-sonner';
@@ -255,7 +257,9 @@
 				{/each}
 			</div>
 			{#if global}
-				<div class="mt-1 flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5">
+				<div
+					class={cn(cardVariants({ size: 'sm' }), 'mt-1 flex items-center justify-between gap-3')}
+				>
 					<span id="field-def-required-label" class="text-sm">
 						{m.field_def_required_everywhere()}
 					</span>

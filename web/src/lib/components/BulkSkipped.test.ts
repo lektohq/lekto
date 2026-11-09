@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { reasonText, type Reason } from '#lib/reasons.ts';
-import { documentOf, fakeApi } from '#lib/testing/documents.ts';
+import { calls, documentOf, fakeApi } from '#lib/testing/documents.ts';
 import BulkSkipped from './BulkSkipped.svelte';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -11,13 +11,14 @@ const reason = (code: Reason['code'], params: Reason['params'] = {}): Reason => 
 
 describe('the skipped documents of an action on many', () => {
 	it('names each by title with why, and one no longer readable by its reason alone', async () => {
-		vi.stubGlobal(
-			'fetch',
-			fakeApi({
-				'GET /api/v1/documents/d1': () => documentOf({ id: 'd1', title: 'Strom 2026' }),
-				'GET /api/v1/documents/d2': () => new Response(null, { status: 404 })
+		const api = fakeApi({
+			'GET /api/v1/documents': () => ({
+				items: [documentOf({ id: 'd1', title: 'Strom 2026' })],
+				next_cursor: null,
+				total: 1
 			})
-		);
+		});
+		vi.stubGlobal('fetch', api);
 		const busy = reason('being_processed', { id: 'd1' });
 		const gone = reason('skip_not_available');
 		render(BulkSkipped, {
@@ -32,20 +33,21 @@ describe('the skipped documents of an action on many', () => {
 		const dialog = await screen.findByRole('dialog', { name: m.bulk_details_title() });
 		await within(dialog).findByRole('button', { name: m.beam_open_named({ title: 'Strom 2026' }) });
 		expect(dialog.textContent).toContain(reasonText(busy));
-		await vi.waitFor(() => expect(dialog.textContent).toContain(m.bulk_unknown_document()));
+		expect(dialog.textContent).toContain(m.bulk_unknown_document());
 		expect(dialog.textContent).toContain(reasonText(gone));
 	});
 
-	it('asks for each document once, however the answers come in', async () => {
+	it('asks for all titles in one request', async () => {
 		const ids = ['d1', 'd2', 'd3', 'd4'];
-		const api = fakeApi(
-			Object.fromEntries(
-				ids.map((id) => [
-					`GET /api/v1/documents/${id}`,
-					() => documentOf({ id, title: `Dokument ${id}` })
-				])
-			)
-		);
+		const api = fakeApi({
+			'GET /api/v1/documents': (_request, url) => ({
+				items: url.searchParams
+					.getAll('ids')
+					.map((id) => documentOf({ id, title: `Dokument ${id}` })),
+				next_cursor: null,
+				total: ids.length
+			})
+		});
 		vi.stubGlobal('fetch', api);
 		render(BulkSkipped, {
 			operation: {
@@ -58,7 +60,8 @@ describe('the skipped documents of an action on many', () => {
 			await within(dialog).findByRole('button', {
 				name: m.beam_open_named({ title: `Dokument ${id}` })
 			});
-		const asked = api.mock.calls.map(([request]) => new URL(request.url).pathname).sort();
-		expect(asked).toEqual(ids.map((id) => `/api/v1/documents/${id}`));
+		const asked = calls(api);
+		expect(asked).toHaveLength(1);
+		expect(asked[0]).toBe('GET /api/v1/documents?ids=d1&ids=d2&ids=d3&ids=d4&limit=50');
 	});
 });

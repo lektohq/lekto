@@ -76,7 +76,7 @@
 			{#each shown as item (item.id)}
 				<li>
 					<label
-						class="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-lg px-1.5 text-sm hover:bg-secondary"
+						class="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-lg px-1.5 text-sm hover:bg-secondary max-sm:min-h-11"
 					>
 						<ChoiceBox
 							checked={selected.includes(item.id)}

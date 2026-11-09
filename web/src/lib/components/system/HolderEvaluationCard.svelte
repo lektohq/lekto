@@ -3,7 +3,6 @@
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
-	import InfoTip from '#lib/components/InfoTip.svelte';
 	import HolderCasesDialog from '#lib/components/system/HolderCasesDialog.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import Loading from '#lib/components/Loading.svelte';
@@ -120,12 +119,9 @@
 
 <Card.Root as="section" size="lg" class="flex flex-col gap-3">
 	<div class="flex flex-col gap-1">
-		<div class="flex items-center gap-1">
-			<SectionTitle size="card">{m.holders_title()}</SectionTitle>
-			<InfoTip label={m.hint_about({ name: m.holders_title() })} size="sm" class="w-80">
-				<p>{m.holders_info()}</p>
-			</InfoTip>
-		</div>
+		<SectionTitle size="card" tip={{ name: m.holders_title(), text: m.holders_info() }}>
+			{m.holders_title()}
+		</SectionTitle>
 		<p class="text-meta text-muted-foreground">{m.holders_hint()}</p>
 	</div>
 	{#if problem}
