@@ -18,8 +18,6 @@
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import Loading from '#lib/components/Loading.svelte';
 	import PageHeader from '#lib/components/page/PageHeader.svelte';
-	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
-	import Pagination from '#lib/components/Pagination.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import StatusBadge from '#lib/components/StatusBadge.svelte';
@@ -28,7 +26,6 @@
 	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
-	import * as Card from '#lib/components/ui/card/index.ts';
 	import * as Table from '#lib/components/ui/table/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
 	import { events } from '#lib/events.svelte.ts';
@@ -51,7 +48,8 @@
 	} from '#lib/mail-log.ts';
 	import { folderLabel, statusOf, type Mailbox, type StatusTone } from '#lib/mailboxes.ts';
 	import { rememberedPageSize } from '#lib/page-size.ts';
-	import { Pager } from '#lib/paging.svelte.ts';
+	import { SummaryPager } from '#lib/summary-pager.svelte.ts';
+	import LogCard from '#lib/components/LogCard.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { cn } from '#lib/utils.ts';
 
@@ -69,7 +67,6 @@
 	let fetching = $state(false);
 	let view = $state<MailView>('all');
 	let rule = $state('');
-	let summary = $state<MailSummary | null>(null);
 
 	// A state with its icon; "not fetched yet" is a plain fact (web/DESIGN.md, "Badges").
 	const ICONS: Partial<Record<StatusTone, typeof CircleCheck>> = {
@@ -78,13 +75,10 @@
 	};
 	const status = $derived(mailbox ? statusOf(mailbox) : null);
 
-	// The summary of the latest page asked for wins over one that comes late.
-	let asked = 0;
-	const mails = new Pager<MailItem>(async (offset, limit) => {
-		const ask = ++asked;
+	const log = new SummaryPager<MailItem, MailSummary>(async (offset, limit) => {
 		const path = { id };
 		const rule_id = rule || undefined;
-		const [found, counts] = await Promise.all([
+		const [found, summary] = await Promise.all([
 			unwrap(
 				api.GET('/api/v1/mailboxes/{id}/mails', {
 					params: { path, query: { outcome: VIEW_OUTCOMES[view], rule_id, offset, limit } }
@@ -94,9 +88,10 @@
 				api.GET('/api/v1/mailboxes/{id}/mails/summary', { params: { path, query: { rule_id } } })
 			)
 		]);
-		if (ask === asked) summary = counts;
-		return { items: found.items, total: found.total };
+		return { items: found.items, total: found.total, summary };
 	}, rememberedPageSize('mails'));
+	const mails = log.pager;
+	const summary = $derived(log.summary);
 
 	const views = $derived(
 		VIEWS.map((value) => ({
@@ -113,29 +108,34 @@
 	const filtered = $derived(view !== 'all' || rule !== '');
 	const NUMBER = 'text-right tabular-nums';
 
-	async function load(wanted: string) {
+	/** Load the mailbox; whether it is there. */
+	async function load(wanted: string): Promise<boolean> {
 		problem = null;
 		try {
 			const found = await unwrap(
 				api.GET('/api/v1/mailboxes/{id}', { params: { path: { id: wanted } } })
 			);
 			if (wanted === id) mailbox = found;
+			return wanted === id;
 		} catch (error) {
 			if (wanted === id) problem = describeError(error);
+			return false;
 		}
 	}
 
 	$effect(() => {
 		const wanted = id;
 		mailbox = null;
-		// Only the mailbox starts the page over, not the choice it reads while it loads.
+		// Only the mailbox starts the page over, not the choice it reads while it loads. Its log
+		// follows the mailbox: one that is not there has one problem on the page, not two.
 		untrack(() => {
 			view = 'all';
 			rule = '';
-			summary = null;
-			void mails.reload();
+			log.summary = null;
 		});
-		void load(wanted);
+		void load(wanted).then((found) => {
+			if (found) untrack(() => void log.reset());
+		});
 	});
 
 	// Live (Tobi, 06.11.2026): the end of a fetch of this mailbox shows what became of its mails
@@ -144,16 +144,18 @@
 		const wanted = id;
 		return events.on('mailbox.fetched', (event) => {
 			if (event.mailbox_id !== wanted) return;
-			void load(wanted);
-			void mails.refresh();
+			void load(wanted).then((found) => {
+				if (found) void mails.refresh();
+			});
 		});
 	});
 
 	$effect(() => {
 		if (events.generation === 0) return;
 		untrack(() => {
-			void load(id);
-			void mails.refresh();
+			void load(id).then((found) => {
+				if (found) void mails.refresh();
+			});
 		});
 	});
 
@@ -180,8 +182,7 @@
 	}
 
 	async function saved() {
-		await load(id);
-		await mails.reload();
+		if (await load(id)) await mails.reload();
 	}
 
 	async function remove() {
@@ -211,7 +212,7 @@
 			{#if mailbox}
 				<Button variant="outline" onclick={() => (editing = true)}>
 					<Pencil aria-hidden="true" />
-					{m.webhook_edit_do()}
+					{m.edit_do()}
 				</Button>
 				{#if mailbox.enabled}
 					<Button variant="outline" disabled={fetching} onclick={fetchNow}>
@@ -256,7 +257,7 @@
 		</Alert.Root>
 	{/if}
 
-	{#if summary}
+	{#if mailbox && summary}
 		<div class="flex flex-wrap items-center justify-between gap-3">
 			<Segmented label={m.mailbox_log()} value={view} onchange={show} options={views} />
 			{#if summary.rules.length > 0}
@@ -271,125 +272,105 @@
 		</div>
 	{/if}
 
-	<Card.Root as="section" size="lg" aria-labelledby="mailbox-log">
-		<div class="flex items-center gap-1">
-			<SectionTitle id="mailbox-log" size="card">{m.mailbox_log()}</SectionTitle>
-			<!-- The tip names how many the log keeps, which the summary brings: shown with it. -->
-			{#if summary}
-				<InfoTip label={m.hint_about({ name: m.mailbox_log() })} size="sm" class="w-80">
-					<p>{m.mailbox_log_info({ kept: formatNumber(summary.kept) })}</p>
-				</InfoTip>
-			{/if}
-		</div>
-		{#if mails.error && !mails.loaded}
-			<div class="mt-3">
-				<LoadProblem problem={describeError(mails.error)} onretry={() => mails.reload()} />
-			</div>
-		{:else if mails.empty}
-			<p class="mt-3 text-muted-foreground">
-				{filtered ? m.mailbox_mails_none_chosen() : m.mailbox_mails_none()}
-			</p>
-		{:else if mails.items.length}
-			<div class="mt-3">
-				<Table.Root class="min-w-[900px] text-meta">
-					<Table.Header>
-						<Table.Row class="text-xs text-muted-foreground">
-							<Table.Head class="pl-0">{m.mailbox_col_fetched()}</Table.Head>
-							<Table.Head>{m.mailbox_col_mail()}</Table.Head>
-							<Table.Head>{m.mailbox_col_folder()}</Table.Head>
-							<Table.Head>{m.mailbox_col_result()}</Table.Head>
-							<Table.Head class={NUMBER}>{m.mailbox_col_documents()}</Table.Head>
-							<Table.Head class="pr-0">{m.mailbox_col_server()}</Table.Head>
-						</Table.Row>
-					</Table.Header>
-					<Table.Body>
-						{#each mails.items as item (item.id)}
-							{@const shown = viewOf(item.outcome)}
-							{@const taken = takenText(item)}
-							{@const note = noteOf(item)}
-							<Table.Row class="align-top">
-								<Table.Cell class="pl-0 text-muted-foreground tabular-nums">
-									{moment(item.fetched_at)}
-								</Table.Cell>
-								<Table.Cell class="max-w-[18rem] whitespace-normal">
-									{#if item.forgotten}
-										<span class="text-muted-foreground">{m.mailbox_forgotten()}</span>
-									{:else}
-										<span class="block truncate font-medium">
-											{item.subject || m.mail_rule_no_subject()}
-										</span>
-										<span class="block truncate text-xs text-muted-foreground">{item.sender}</span>
-									{/if}
-								</Table.Cell>
-								<Table.Cell>{folderLabel(item.folder)}</Table.Cell>
-								<Table.Cell class="whitespace-normal">
-									{#if shown !== 'all'}
-										<Badge variant={VIEW_TONE[shown]}>{VIEW_LABELS[shown]()}</Badge>
-									{/if}
-									{#if taken}
-										<span class="block text-xs text-muted-foreground">{taken}</span>
-									{/if}
-									{#if note}
-										<span
-											class={cn(
-												'block text-xs',
-												item.next_rule ? 'text-lane-yellow-foreground' : 'text-muted-foreground'
-											)}
-										>
-											{note}
-										</span>
-									{/if}
-								</Table.Cell>
-								<Table.Cell class={NUMBER}>
-									{#if item.documents.length}
-										<button
-											type="button"
-											class={cn(buttonVariants({ variant: 'link', size: 'inline' }))}
-											aria-label={m.mailbox_documents_open({
-												subject: item.subject || m.mail_rule_no_subject()
-											})}
-											onclick={() => documents(item)}
-										>
-											{formatNumber(item.documents.length)}
-										</button>
-									{:else}
-										<span class="text-muted-foreground">–</span>
-									{/if}
-									{#if item.documents_hidden}
-										<span class="block text-xs text-muted-foreground">
-											{m.mailbox_hidden_documents({ count: item.documents_hidden })}
-										</span>
-									{/if}
-								</Table.Cell>
-								<Table.Cell class="pr-0 whitespace-normal">
-									{#if item.steps.length}
-										{stepsDone(item)}
-										{#each failedSteps(item) as failed (failed)}
-											<span class="block text-xs text-lane-yellow-foreground">{failed}</span>
-										{/each}
-									{:else}
-										<span class="text-muted-foreground">–</span>
-									{/if}
-								</Table.Cell>
-							</Table.Row>
-						{/each}
-					</Table.Body>
-				</Table.Root>
-			</div>
-			<div class="mt-4">
-				<Pagination
-					page={mails.page}
-					total={mails.total}
-					size={mails.size}
-					table="mails"
-					onchange={(next) => mails.go(next)}
-					onsize={(next) => mails.resize(next)}
-				/>
-			</div>
-		{:else}
-			<Loading class="mt-3" />
-		{/if}
-	</Card.Root>
+	{#if mailbox}
+		<LogCard
+			id="mailbox-log"
+			title={m.mailbox_log()}
+			pager={mails}
+			{filtered}
+			none={m.mailbox_mails_none()}
+			noneChosen={m.mailbox_mails_none_chosen()}
+			table="mails"
+			tableClass="min-w-[900px] text-meta"
+		>
+			{#snippet tip()}
+				<!-- The tip names how many the log keeps, which the summary brings: shown with it. -->
+				{#if summary}
+					<InfoTip label={m.hint_about({ name: m.mailbox_log() })} size="sm" class="w-80">
+						<p>{m.mailbox_log_info({ kept: formatNumber(summary.kept) })}</p>
+					</InfoTip>
+				{/if}
+			{/snippet}
+			{#snippet head()}
+				<Table.Head class="pl-0">{m.mailbox_col_fetched()}</Table.Head>
+				<Table.Head>{m.mailbox_col_mail()}</Table.Head>
+				<Table.Head>{m.mailbox_col_folder()}</Table.Head>
+				<Table.Head>{m.mailbox_col_result()}</Table.Head>
+				<Table.Head class={NUMBER}>{m.mailbox_col_documents()}</Table.Head>
+				<Table.Head class="pr-0">{m.mailbox_col_server()}</Table.Head>
+			{/snippet}
+			{#snippet row(item)}
+				{@const shown = viewOf(item.outcome)}
+				{@const taken = takenText(item)}
+				{@const note = noteOf(item)}
+				<Table.Row class="align-top">
+					<Table.Cell class="pl-0 text-muted-foreground tabular-nums">
+						{moment(item.fetched_at)}
+					</Table.Cell>
+					<Table.Cell class="max-w-[18rem] whitespace-normal">
+						{#if item.forgotten}
+							<span class="text-muted-foreground">{m.mailbox_forgotten()}</span>
+						{:else}
+							<span class="block truncate font-medium">
+								{item.subject || m.mail_rule_no_subject()}
+							</span>
+							<span class="block truncate text-xs text-muted-foreground">{item.sender}</span>
+						{/if}
+					</Table.Cell>
+					<Table.Cell>{folderLabel(item.folder)}</Table.Cell>
+					<Table.Cell class="whitespace-normal">
+						{#if shown !== 'all'}
+							<Badge variant={VIEW_TONE[shown]}>{VIEW_LABELS[shown]()}</Badge>
+						{/if}
+						{#if taken}
+							<span class="block text-xs text-muted-foreground">{taken}</span>
+						{/if}
+						{#if note}
+							<span
+								class={cn(
+									'block text-xs',
+									item.next_rule ? 'text-lane-yellow-foreground' : 'text-muted-foreground'
+								)}
+							>
+								{note}
+							</span>
+						{/if}
+					</Table.Cell>
+					<Table.Cell class={NUMBER}>
+						{#if item.documents.length}
+							<button
+								type="button"
+								class={cn(buttonVariants({ variant: 'link', size: 'inline' }))}
+								aria-label={m.mailbox_documents_open({
+									subject: item.subject || m.mail_rule_no_subject()
+								})}
+								onclick={() => documents(item)}
+							>
+								{formatNumber(item.documents.length)}
+							</button>
+						{:else}
+							<span class="text-muted-foreground">–</span>
+						{/if}
+						{#if item.documents_hidden}
+							<span class="block text-xs text-muted-foreground">
+								{m.mailbox_hidden_documents({ count: item.documents_hidden })}
+							</span>
+						{/if}
+					</Table.Cell>
+					<Table.Cell class="pr-0 whitespace-normal">
+						{#if item.steps.length}
+							{stepsDone(item)}
+							{#each failedSteps(item) as failed (failed)}
+								<span class="block text-xs text-lane-yellow-foreground">{failed}</span>
+							{/each}
+						{:else}
+							<span class="text-muted-foreground">–</span>
+						{/if}
+					</Table.Cell>
+				</Table.Row>
+			{/snippet}
+		</LogCard>
+	{/if}
 </div>
 
 <MailboxDialog bind:open={editing} {mailbox} onsaved={saved} />

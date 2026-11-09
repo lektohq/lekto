@@ -1,11 +1,13 @@
-// The page of a mailbox: the tip of its log names how many mails Lekto keeps, as the API says.
-import { render, screen } from '@testing-library/svelte';
+// The page of a mailbox: its log page by page, the tip of its log names how many mails Lekto
+// keeps, as the API says; a mailbox that is not there has one problem on the page.
+import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MailItem } from '#lib/mail-log.ts';
 import type { Mailbox } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { fakeApi } from '#lib/testing/documents.ts';
+import { calls, fakeApi, json } from '#lib/testing/documents.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
 
@@ -44,6 +46,30 @@ const MAILBOX: Mailbox = {
 	},
 	created_at: '2026-11-04T10:00:00Z',
 	updated_at: '2026-11-04T10:00:00Z'
+};
+
+const MAIL: MailItem = {
+	id: 'mail-1',
+	folder: 'INBOX',
+	subject: 'Rechnung Oktober',
+	sender: 'stadtwerke@example.test',
+	sent_at: null,
+	arrived_at: '2026-11-04T09:00:00Z',
+	fetched_at: '2026-11-04T09:05:00Z',
+	size: 2048,
+	outcome: 'taken',
+	reason: null,
+	rule: 'Rechnungen',
+	rule_id: 'r1',
+	decided_at: '2026-11-04T09:05:00Z',
+	later: false,
+	documents: [{ id: 'doc-1', title: 'Stadtwerke – Oktober' }],
+	documents_hidden: 0,
+	steps: [],
+	gone_at: null,
+	forgotten: false,
+	waiting: false,
+	next_rule: null
 };
 
 const tip = () => screen.queryByRole('button', { name: m.hint_about({ name: m.mailbox_log() }) });
@@ -99,5 +125,38 @@ describe('the page of a mailbox', () => {
 		render(Page);
 		expect(await screen.findByText(m.mailbox_log())).toBeTruthy();
 		expect(tip()).toBeNull();
+	});
+
+	it('shows the mails it fetched, a page of them', async () => {
+		vi.stubGlobal(
+			'fetch',
+			fakeApi({
+				'GET /api/v1/mailboxes/m1': () => MAILBOX,
+				'GET /api/v1/mailboxes/m1/mails': () => ({ items: [MAIL], total: 1, next_offset: null }),
+				'GET /api/v1/mailboxes/m1/mails/summary': () => ({
+					counts: { taken: 1 },
+					rules: [],
+					waiting: [],
+					kept: 500
+				})
+			})
+		);
+		render(Page);
+		const table = await screen.findByRole('table');
+		expect(within(table).getByText('Rechnung Oktober')).toBeTruthy();
+		expect(within(table).getByText('stadtwerke@example.test')).toBeTruthy();
+	});
+
+	it('shows one problem for a mailbox that is not there, and asks for no log', async () => {
+		const api = fakeApi({
+			'GET /api/v1/mailboxes/m1': () =>
+				json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+		});
+		vi.stubGlobal('fetch', api);
+		render(Page);
+		expect(await screen.findByRole('alert')).toBeTruthy();
+		expect(screen.getAllByRole('alert')).toHaveLength(1);
+		expect(screen.queryByText(m.mailbox_log())).toBeNull();
+		expect(calls(api).filter((call) => call.includes('/mails'))).toEqual([]);
 	});
 });
