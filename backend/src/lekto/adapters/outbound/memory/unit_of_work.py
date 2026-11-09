@@ -11,7 +11,7 @@ import dataclasses
 from collections import Counter
 from collections.abc import Callable, Collection, Hashable, Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from types import TracebackType
 from typing import Any, Self, cast
 from uuid import UUID
@@ -132,7 +132,7 @@ from lekto.core.ports.repository import (
     DocumentFilter,
     DocumentOrder,
     DocumentPosition,
-    FacetRow,
+    FacetBy,
     FilterView,
 )
 from lekto.core.ports.wakeup import Channel
@@ -531,27 +531,32 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
             every, filter, self._groups(), order=order, after=after, limit=limit, offset=offset
         )
 
-    async def facet_rows(self, filter: DocumentFilter, user: UserId | None) -> list[FacetRow]:
+    async def _matching(self, filter: DocumentFilter, user: UserId | None) -> list[Document]:
         documents = (
             [_copy(row) for row in self._all()]
             if user is None
             else await self.list_visible_to(user)
         )
         groups = self._groups()
-        return [
-            FacetRow(
-                contact=document.contact_id,
-                document_type=document.document_type_id,
-                topic=document.topic_id,
-                tags=frozenset(document.tag_ids),
-                document_date=document.document_date,
-            )
-            for document in documents
-            if filter.matches(groups.view(document))
-        ]
+        return [document for document in documents if filter.matches(groups.view(document))]
 
     async def count(self, filter: DocumentFilter, user: UserId | None) -> int:
-        return len(await self.facet_rows(filter, user))
+        return len(await self._matching(filter, user))
+
+    async def count_grouped(
+        self, filter: DocumentFilter, user: UserId | None, by: FacetBy
+    ) -> dict[UUID | date | None, int]:
+        attribute = {
+            FacetBy.CONTACT: "contact_id",
+            FacetBy.DOCUMENT_TYPE: "document_type_id",
+            FacetBy.TOPIC: "topic_id",
+            FacetBy.DOCUMENT_DATE: "document_date",
+        }[by]
+        counts: dict[UUID | date | None, int] = {}
+        for document in await self._matching(filter, user):
+            key = getattr(document, attribute)
+            counts[key] = counts.get(key, 0) + 1
+        return counts
 
     def _groups(self) -> "_Groups":
         return _Groups(
@@ -561,13 +566,12 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
         )
 
     async def count_tagged(
-        self, sets: Mapping[UUID, Collection[TagId]], user: UserId | None
+        self,
+        sets: Mapping[UUID, Collection[TagId]],
+        user: UserId | None,
+        filter: DocumentFilter | None = None,
     ) -> dict[UUID, int]:
-        documents = (
-            [_copy(row) for row in self._all()]
-            if user is None
-            else await self.list_visible_to(user)
-        )
+        documents = await self._matching(filter or DocumentFilter(), user)
         counts = {
             key: sum(bool(document.tag_ids & set(tags)) for document in documents)
             for key, tags in sets.items()
