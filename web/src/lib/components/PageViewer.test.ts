@@ -50,4 +50,27 @@ describe('PageViewer', () => {
 		await fireEvent.keyDown(view, { key: '+' });
 		expect(zoom()).not.toBe(before);
 	});
+	it('reveals a place asked for while the file still loads once its pages stand', async () => {
+		const scroll = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
+		const place = { page: 2, boxes: [{ x: 0.1, y: 0.5, width: 0.2, height: 0.05 }] };
+		const { component, rerender } = render(PageViewer, {
+			sizes: [],
+			loading: true,
+			label: 'PDF',
+			page
+		});
+		component.reveal(place);
+		expect(scroll).not.toHaveBeenCalled();
+		await rerender({
+			sizes: [
+				{ width: 600, height: 800 },
+				{ width: 600, height: 800 }
+			],
+			loading: false
+		});
+		await vi.waitFor(() => expect(scroll).toHaveBeenCalledOnce());
+		// Revealed once: a later fit does not scroll there again.
+		await rerender({ sizes: [{ width: 600, height: 800 }] });
+		expect(scroll).toHaveBeenCalledOnce();
+	});
 });
