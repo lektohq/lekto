@@ -4,10 +4,11 @@ import hashlib
 import json
 import logging
 from collections import Counter
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 from lekto.core.domain import media_types
@@ -47,7 +48,7 @@ from lekto.core.domain.ids import (
     id_reference,
 )
 from lekto.core.domain.locations import Box, Location
-from lekto.core.domain.master_data import Assignment
+from lekto.core.domain.master_data import Assignment, TagScope
 from lekto.core.domain.permissions import (
     can_edit_document,
     can_hand_over,
@@ -61,6 +62,7 @@ from lekto.core.domain.pipeline import Node, NodeRun
 from lekto.core.domain.reasons import Action, ReasonCode, because
 from lekto.core.domain.rule_planner import changed_fields
 from lekto.core.domain.spaces import Space, SpaceRole
+from lekto.core.domain.tag_tree import TagTree
 from lekto.core.domain.text_places import TextPlaces
 from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
@@ -75,7 +77,7 @@ from lekto.core.ports.repository import (
     DocumentFilter,
     DocumentOrder,
     DocumentPosition,
-    FacetRow,
+    FacetBy,
     SortKey,
 )
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
@@ -880,42 +882,59 @@ class DocumentService:
             )
             user = None if all_users else actor
             tree = await tag_tree(uow)
-            found: dict[DocumentFilter, list[FacetRow]] = {}
+            documents = uow.documents
 
-            async def rows(criteria: DocumentFilter) -> list[FacetRow]:
-                criteria = expand(criteria, tree)
-                if criteria not in found:
-                    found[criteria] = await uow.documents.facet_rows(criteria, user)
-                return found[criteria]
+            # Counted by the database, never row by row (review 0.12.2, A-11): each either-or
+            # part without its own choice, so that it tells what one more would add.
+            async def grouped(criteria: DocumentFilter, by: FacetBy) -> dict[Any, int]:
+                return await documents.count_grouped(expand(criteria, tree), user, by)
 
-            whole = await rows(filter)
-            by_contact = await rows(replace(filter, contacts=None))
-            by_type = await rows(replace(filter, document_types=None))
-            by_topic = await rows(replace(filter, topics=None))
-            by_date = await rows(replace(filter, document_dates=None))
-            by_contact_group = await rows(replace(filter, contact_groups=()))
-            by_type_group = await rows(replace(filter, document_type_groups=()))
+            whole = expand(filter, tree)
+            total = await documents.count(whole, user)
+            contacts = await grouped(replace(filter, contacts=None), FacetBy.CONTACT)
+            types = await grouped(replace(filter, document_types=None), FacetBy.DOCUMENT_TYPE)
+            topics = await grouped(replace(filter, topics=None), FacetBy.TOPIC)
+            days = await grouped(replace(filter, document_dates=None), FacetBy.DOCUMENT_DATE)
+            in_contact_groups = await grouped(replace(filter, contact_groups=()), FacetBy.CONTACT)
+            in_type_groups = await grouped(
+                replace(filter, document_type_groups=()), FacetBy.DOCUMENT_TYPE
+            )
+            # A tag with the tags below it, each document once; tags combine as all-of, so
+            # they count with the whole filter.
+            below: dict[UUID, Collection[TagId]] = {
+                tag.id: tree.with_descendants([tag.id]) for tag in tree.of_scope(TagScope.DOCUMENT)
+            }
+            tags = await documents.count_tagged(below, user, whole)
             contact_groups = {item.id: item.group_ids for item in await uow.contacts.list_all()}
             type_groups = {item.id: item.group_ids for item in await uow.document_types.list_all()}
-        dates = [row.document_date for row in by_date]
+        months: Counter[str] = Counter()
+        for day, count in days.items():
+            if day is not None:
+                months[f"{day.year:04d}-{day.month:02d}"] += count
         return DocumentFacets(
-            total=len(whole),
-            contacts=dict(Counter(row.contact for row in by_contact)),
-            document_types=dict(Counter(row.document_type for row in by_type)),
-            contact_groups=tree.holders(
-                contact_groups.get(row.contact, frozenset())
-                for row in by_contact_group
-                if row.contact is not None
+            total=total,
+            contacts=contacts,
+            document_types=types,
+            contact_groups=_held(
+                tree,
+                [
+                    (contact_groups.get(id, frozenset()), count)
+                    for id, count in in_contact_groups.items()
+                    if id is not None
+                ],
             ),
-            document_type_groups=tree.holders(
-                type_groups.get(row.document_type, frozenset())
-                for row in by_type_group
-                if row.document_type is not None
+            document_type_groups=_held(
+                tree,
+                [
+                    (type_groups.get(id, frozenset()), count)
+                    for id, count in in_type_groups.items()
+                    if id is not None
+                ],
             ),
-            topics=tree.holders([row.topic] for row in by_topic if row.topic is not None),
-            tags=tree.holders(row.tags for row in whole),
-            months=dict(Counter(f"{day.year:04d}-{day.month:02d}" for day in dates if day)),
-            undated=sum(1 for day in dates if day is None),
+            topics=_held(tree, [([id], count) for id, count in topics.items() if id is not None]),
+            tags={TagId(id): count for id, count in tags.items()},
+            months=dict(months),
+            undated=days.get(None, 0),
         )
 
     async def list_visible(self, actor: UserId) -> list[Document]:
@@ -1200,3 +1219,13 @@ async def _manual(uow: UnitOfWork, before: Document, after: Document) -> frozens
 async def _save(uow: UnitOfWork, document: Document) -> None:
     await uow.documents.update(document)
     await uow.outbox.add(document.pull_events())
+
+
+def _held(tree: TagTree, members: Iterable[tuple[Iterable[TagId], int]]) -> dict[TagId, int]:
+    """As `TagTree.holders`, for members counted together: each set of tags (a contact's groups,
+    a type's, a topic) with how many documents have it, each document once per tag."""
+    counts: dict[TagId, int] = {}
+    for tags, count in members:
+        for id in tree.with_ancestors(tags):
+            counts[id] = counts.get(id, 0) + count
+    return counts
