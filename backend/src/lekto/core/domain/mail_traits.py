@@ -17,6 +17,8 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
+from lekto.core.domain.errors import ValidationError
+
 
 class Importance(StrEnum):
     HIGH = "high"
@@ -40,6 +42,22 @@ FLAGGED = "\\Flagged"
 SEEN = "\\Seen"
 COLOR_BITS = ("$MailFlagBit0", "$MailFlagBit1", "$MailFlagBit2")
 MAX_KEYWORD = 100
+MAX_MAIL_TEXT = 500
+"""The longest text a condition on a mail's sender, recipients or subject compares."""
+
+_TEXT_OPERATORS = frozenset({"contains", "is", "starts_with", "ends_with"})
+MAIL_OPERATORS: Mapping[str, frozenset[str]] = {
+    "sender": _TEXT_OPERATORS,
+    "recipient": _TEXT_OPERATORS,
+    "to": _TEXT_OPERATORS,
+    "cc": _TEXT_OPERATORS,
+    "subject": _TEXT_OPERATORS,
+    "importance": frozenset({"is"}),
+    "keyword": frozenset({"contains", "present", "missing"}),
+    "flag": frozenset({"is", "present", "missing"}),
+}
+"""The operators of each field of a mail both kinds of rule look at; mail rules add the folder and
+the attachments, document rules the mailbox. A rule's own enums are built from this."""
 _COLORS = tuple(FlagColor)
 _BITS = frozenset(bit.casefold() for bit in COLOR_BITS)
 _UNSHOWN = frozenset(
@@ -230,3 +248,24 @@ def is_keyword(value: str) -> bool:
         and value.isascii()
         and all(32 < ord(char) < 127 and char not in '(){ %*"\\]' for char in value)
     )
+
+
+def check_mail_value(field: str, value: object, *, label: str) -> None:
+    """Check the value a condition (or a step) compares a mail's `field` with: a text of 1 to
+    `MAX_MAIL_TEXT` characters, an importance, a flag's colour or a keyword. `label` names it in
+    the message (`flag`, `mail_flag`, `add_keyword`)."""
+    if not isinstance(value, str):
+        raise ValidationError(f"{label}: expected text, got {value!r}")
+    match field:
+        case "importance":
+            if value not in {item.value for item in Importance}:
+                raise ValidationError(f"{label}: high, normal or low")
+        case "flag":
+            if value not in {item.value for item in FlagColor}:
+                raise ValidationError(f"{label}: a colour, not {value!r}")
+        case "keyword":
+            if not is_keyword(value):
+                raise ValidationError(f"{label}: not one IMAP can carry: {value!r}")
+        case _:
+            if not value.strip() or len(value) > MAX_MAIL_TEXT:
+                raise ValidationError(f"{label}: a value of 1 to {MAX_MAIL_TEXT} characters")
