@@ -4,8 +4,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import ChipInput from './ChipInput.svelte';
 
-function field(values: string[]) {
-	const props = $state({ values, addLabel: 'Schreibweise', inputLabel: 'Neue Schreibweise' });
+function field(values: string[], { maxlength = 200, max = 100 } = {}) {
+	const props = $state({
+		values,
+		addLabel: 'Schreibweise',
+		inputLabel: 'Neue Schreibweise',
+		maxlength,
+		max
+	});
 	render(ChipInput, props);
 	return props;
 }
@@ -47,5 +53,26 @@ describe('ChipInput', () => {
 		expect(screen.queryByLabelText('Neue Schreibweise')).toBeNull();
 		expect(outside.mock.results.map((result) => result.value)).not.toContain('Escape');
 		document.removeEventListener('keydown', outside);
+	});
+
+	it('takes values as long and as many as the API does; what does not fit stays typed', async () => {
+		const user = userEvent.setup();
+		const props = field(['Nord AG'], { maxlength: 10, max: 3 });
+		await user.click(screen.getByRole('button', { name: 'Schreibweise' }));
+		const input = screen.getByLabelText('Neue Schreibweise') as HTMLInputElement;
+		expect(input.maxLength).toBe(10);
+		await fireEvent.paste(input, {
+			clipboardData: { getData: () => 'Nord Lebensversicherung\nNord KV\nNord Bank\nNord Rente' }
+		});
+		// Too long, and beyond three: not added, but left in the input to see and shorten.
+		expect(props.values).toEqual(['Nord AG', 'Nord KV', 'Nord Bank']);
+		// At the limit the field takes no more: no input, no dashed chip.
+		expect(screen.queryByLabelText('Neue Schreibweise')).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Schreibweise' })).toBeNull();
+		await user.click(screen.getByRole('button', { name: m.alias_remove({ name: 'Nord KV' }) }));
+		await user.click(screen.getByRole('button', { name: 'Schreibweise' }));
+		expect((screen.getByLabelText('Neue Schreibweise') as HTMLInputElement).value).toBe(
+			'Nord Lebensversicherung Nord Rente'
+		);
 	});
 });

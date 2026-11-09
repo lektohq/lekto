@@ -6,6 +6,9 @@ import type { IdentifierIn, IdentifierOut } from '#lib/identifiers.ts';
 import type { Contact, MasterData, Tag, TagScope } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 
+/** What the API takes of master data (`tests/api-limits.test.ts` holds them to `openapi.json`). */
+export const MASTER_LIMITS = { alias: 200, aliases: 100 } as const;
+
 export type TagKind = 'tags' | 'contact-groups' | 'type-groups' | 'topics';
 export type SimpleKind = 'contacts' | 'document-types' | TagKind;
 
