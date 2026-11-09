@@ -9,12 +9,11 @@ from mcp.server.mcpserver import Context
 from pydantic import BaseModel
 
 from lekto.adapters.inbound.context import ApiContext
-from lekto.adapters.inbound.mcp.names import Names
+from lekto.adapters.inbound.mcp.names import FORMER_ACCOUNT, Names, member_labels, space_label
 from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
 from lekto.core.domain.ids import SpaceId, UserId
 from lekto.core.domain.lenses import Lens
-from lekto.core.domain.spaces import Space
 
 
 class MemberOut(BaseModel):
@@ -59,24 +58,22 @@ def add_space_tools(tools: Tools, context: ApiContext) -> None:
     async def spaces_list(ctx: Context) -> str:
         user = principal_of(ctx).id
         spaces = await context.spaces.list_spaces(user)
-        people = {
-            id: person.label for id, person in (await context.spaces.members(user, spaces)).items()
-        }
+        people = await member_labels(context, user, spaces)
         return compact(
             SpacesOut(
                 spaces=[
                     SpaceOut(
-                        name=_label(space, people),
+                        name=space_label(space, people),
                         personal=True if space.personal_of is not None else None,
                         description=space.description,
                         role=None if (role := space.role_of(user)) is None else role.value,
                         members=[
-                            MemberOut(name=people.get(id, "a former account"), role=role.value)
+                            MemberOut(name=people.get(id, FORMER_ACCOUNT), role=role.value)
                             for id, role in space.members.items()
                             if id != user
                         ],
                     )
-                    for space in sorted(spaces, key=lambda space: _label(space, people))
+                    for space in sorted(spaces, key=lambda space: space_label(space, people))
                 ]
             )
         )
@@ -96,16 +93,7 @@ def add_space_tools(tools: Tools, context: ApiContext) -> None:
 async def space_name(context: ApiContext, user: UserId, id: SpaceId) -> str:
     """How the caller reads the space `id`: a personal one by its person's name."""
     space = await context.spaces.get(user, id)
-    people = {
-        person: item.label for person, item in (await context.spaces.members(user, [space])).items()
-    }
-    return _label(space, people)
-
-
-def _label(space: Space, people: dict[UserId, str]) -> str:
-    if space.personal_of is not None and space.personal_of in people:
-        return people[space.personal_of]
-    return space.name
+    return space_label(space, await member_labels(context, user, [space]))
 
 
 def _lens(lens: Lens, names: Names) -> LensOut:

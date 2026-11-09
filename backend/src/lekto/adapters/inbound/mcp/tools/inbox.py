@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from pydantic import ValidationError as PydanticValidationError
 
 from lekto.adapters.inbound.context import ApiContext
-from lekto.adapters.inbound.mcp.names import Names
+from lekto.adapters.inbound.mcp.names import FORMER_ACCOUNT, Names
 from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
 from lekto.adapters.inbound.mcp.tools.documents import (
@@ -99,7 +99,7 @@ def add_inbox_tools(tools: Tools, context: ApiContext) -> None:
                             else DoneOut(
                                 how=item.state.done.how.value,
                                 at=item.state.done.at,
-                                by=people.get(item.state.done.by, "a former account"),
+                                by=people.get(item.state.done.by, FORMER_ACCOUNT),
                                 via_token=(
                                     None
                                     if item.state.done.via is None
