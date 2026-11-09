@@ -50,7 +50,12 @@ from lekto.core.services._tags import tag_tree
 from lekto.core.services.indexing import REFRESH_JOB, RefreshKind, refresh_payload
 from lekto.core.services.logos import drop_logo, queue_logo_fetch
 from lekto.core.services.rules.management import renamed_field, uses_field
-from lekto.core.services.rules.references import disable_rules, misfits, refers_to
+from lekto.core.services.rules.references import (
+    disable_rules,
+    misfits,
+    pause_mail_rules_typing,
+    refers_to,
+)
 
 log = logging.getLogger(__name__)
 
@@ -780,6 +785,7 @@ class MasterDataService:
             if rule is not None:
                 rule.delete(self._now())
                 await uow.rules.update(rule)
+            await pause_mail_rules_typing(uow, self._now(), id)
 
         await self._delete(
             actor,

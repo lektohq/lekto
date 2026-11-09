@@ -11,8 +11,9 @@ A rule takes the mail's attachments and text, the attachments, the text, or noth
 person, into a space they edit (else their personal one); the text gets a fixed document type
 or Lekto determines it; on the server steps follow in order (`mail.MailStep`: read or unread,
 flagged or not, keywords added or removed), and at most one last that moves the mail to a
-folder or to the trash. A rule whose person, space or type is gone or out of reach is paused with
-that reason when a mail would need it.
+folder or to the trash. A rule whose person, space or type is deleted (or the person
+deactivated) is paused with that reason at once (`services.rules.references`); one that is out of
+reach otherwise (the person lost the right to the space) when a mail would need it.
 
 A stored rule is read as a valid one: its conditions and steps check themselves as they are
 built (`conditions_from_json`, `steps_from_json`). One that cannot be read any more (a limit

@@ -40,7 +40,12 @@ from lekto.core.services._access import load_actor, require_admin
 from lekto.core.services._moves import move_by_person
 from lekto.core.services.profiles import USER_NAMES_LOCK, check_display_name, check_username
 from lekto.core.services.rules.changes import ChangeRules
-from lekto.core.services.rules.references import disable_rules, refers_to
+from lekto.core.services.rules.references import (
+    disable_rules,
+    pause_mail_rules_into,
+    pause_mail_rules_of_person,
+    refers_to,
+)
 from lekto.core.services.rules.running import Prepared
 from lekto.core.services.tasks.settling import drop_queued
 from lekto.core.services.webhooks.management import disable_sending_rules
@@ -180,6 +185,7 @@ class UserService:
                 await uow.users.update(user)
                 if not new_active:
                     await uow.sessions.remove_for_user(id)
+                    await pause_mail_rules_of_person(uow, self._clock.now(), id)
                 await uow.commit()
                 log.info(
                     "account changed",
@@ -330,6 +336,8 @@ class UserService:
                     else because(ReasonCode.RULE_DISABLED_DELETED, kind="space", name=gone.name),
                     refers_to(lambda refs: refs.spaces, space_id),
                 )
+                await pause_mail_rules_into(uow, now, space_id)
+            await pause_mail_rules_of_person(uow, now, id)
             await uow.rules.remove_applications_by(id)
             webhooks = await uow.webhooks.list_for_owner(id)
             await disable_sending_rules(uow, webhooks, now)

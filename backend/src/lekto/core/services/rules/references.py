@@ -6,6 +6,11 @@ person deleting it would have to change rules they may not see or should not hav
 affected rules are disabled, with the reason, in the same unit of work. Enabling such a rule
 checks its references again.
 
+Mail rules go the same way (review 0.12.2, C-06): deleting a document type, a space or a
+person, or deactivating a person, pauses the mail rules that name them, with the reason, in the
+same unit of work (`pause_mail_rules`), so that the list shows them paused at once. Intake still
+pauses a rule that cannot take a mail when one comes (a person who lost the right to a space).
+
 Tags are the exception (0.3): a tag in use, by a rule too, is not deleted. Only admins delete
 tags, and they see every rule.
 """
@@ -15,8 +20,9 @@ from datetime import datetime
 
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldDefinition
-from lekto.core.domain.ids import FieldId
-from lekto.core.domain.reasons import Reason
+from lekto.core.domain.ids import DocumentTypeId, FieldId, SpaceId, UserId
+from lekto.core.domain.mail_rules import MailRule
+from lekto.core.domain.reasons import Reason, ReasonCode, because
 from lekto.core.domain.rules import References, Rule, check_fields
 from lekto.core.ports.unit_of_work import UnitOfWork
 
@@ -33,6 +39,46 @@ async def disable_rules(
             await uow.rules.update(rule)
             count += 1
     return count
+
+
+async def pause_mail_rules(
+    uow: UnitOfWork, now: datetime, reason: Reason, affected: Callable[[MailRule], bool]
+) -> int:
+    """Pause every enabled mail rule for which `affected` holds; returns how many."""
+    count = 0
+    for rule in await uow.mail_rules.list_all():
+        if rule.enabled and affected(rule):
+            rule.pause(reason, now=now)
+            await uow.mail_rules.update(rule)
+            count += 1
+    return count
+
+
+async def pause_mail_rules_of_person(uow: UnitOfWork, now: datetime, person: UserId) -> int:
+    """The mail rules that take mails for a person who is deleted or deactivated."""
+    return await pause_mail_rules(
+        uow, now, because(ReasonCode.MAIL_RULE_PERSON_GONE), lambda rule: rule.user_id == person
+    )
+
+
+async def pause_mail_rules_into(uow: UnitOfWork, now: datetime, space: SpaceId) -> int:
+    """The mail rules that file into a space that is deleted."""
+    return await pause_mail_rules(
+        uow,
+        now,
+        because(ReasonCode.MAIL_RULE_SPACE_UNREACHABLE),
+        lambda rule: rule.space_id == space,
+    )
+
+
+async def pause_mail_rules_typing(uow: UnitOfWork, now: datetime, type_id: DocumentTypeId) -> int:
+    """The mail rules that give a mail's text a document type that is deleted."""
+    return await pause_mail_rules(
+        uow,
+        now,
+        because(ReasonCode.MAIL_RULE_TYPE_GONE),
+        lambda rule: rule.text_type_id == type_id,
+    )
 
 
 def refers_to(
