@@ -113,6 +113,37 @@ describe('the page of a webhook', () => {
 		localStorage.clear();
 	});
 
+	it('switches the webhook in its head at once, and switching on clears its failures', async () => {
+		const failing = {
+			...webhook,
+			active: false,
+			failed_streak: 12,
+			disabled_reasons: [{ code: 'webhook_failing', params: {} }]
+		};
+		const bodies: unknown[] = [];
+		const api = fakeApi({
+			'GET /api/v1/webhooks/hook': () => failing,
+			'GET /api/v1/webhooks/hook/deliveries/summary': () => summary,
+			'GET /api/v1/webhooks/hook/deliveries': () => page([], 0),
+			'PATCH /api/v1/webhooks/hook': async (request) => {
+				bodies.push(await request.json());
+				return { ...webhook, active: true };
+			}
+		});
+		vi.stubGlobal('fetch', api);
+		render(Page);
+		const toggle = await screen.findByRole('switch', {
+			name: m.webhook_switch_on({ name: 'Test' })
+		});
+		expect(screen.getByText(m.webhook_failing({ count: 12 }))).toBeTruthy();
+		await userEvent.click(toggle);
+		expect(
+			await screen.findByRole('switch', { name: m.webhook_switch_off({ name: 'Test' }) })
+		).toBeTruthy();
+		expect(bodies).toEqual([{ active: true }]);
+		expect(screen.queryByText(m.webhook_failing({ count: 12 }))).toBeNull();
+	});
+
 	it('shows the deliveries with their documents, counted by outcome', async () => {
 		const api = routes();
 		vi.stubGlobal('fetch', api);

@@ -1275,7 +1275,6 @@
 	"webhook_volume_total_exact": "Deliveries per document with this choice: {count}.",
 	"webhook_volume_total_range": "Deliveries per document with this choice: about {least}⁠–⁠{most}.",
 	"webhook_volume_steps": "Of them {least}⁠–⁠{most} from the processing steps; every reprocessing sends them again.",
-	"webhook_active": "Active",
 	"webhook_signed": "Sign requests",
 	"webhook_signed_hint": "With a secret, shown once: the receiver checks the webhook-signature header with it. Without one, the receiver checks a header of its own, such as a token.",
 	"webhook_open_tasks": "Tasks at a time",
@@ -1304,8 +1303,6 @@
 	"webhook_body_template_hint": "Your own JSON from a template, such as a notification for Home Assistant. The filter json writes a value as JSON.",
 	"webhook_deleted": "Webhook deleted",
 	"webhook_none": "No webhooks yet. A webhook reports Lekto's events to another system, such as Home Assistant.",
-	"webhook_on": "Active",
-	"webhook_off": "Paused",
 	"webhook_failing": "{count} failed deliveries in a row",
 	"webhook_test": "Send test",
 	"webhook_test_ok": "Test delivered (HTTP {status})",
@@ -3045,5 +3042,9 @@
 	"back_to": "Back to {place}",
 	"beam_place_position": "Place {current} of {total}",
 	"identifier_whence": "Where was it learned?",
-	"identifier_whence_none": "No document you can see holds this identifier."
+	"identifier_whence_none": "No document you can see holds this identifier.",
+	"webhook_switch_on": "Activate webhook “{name}”",
+	"webhook_switch_off": "Pause webhook “{name}”",
+	"webhook_switched_on": "Webhook activated.",
+	"webhook_switched_off": "Webhook paused."
 }

@@ -13,6 +13,8 @@
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import SecretDialog from '#lib/components/SecretDialog.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Switch } from '#lib/components/ui/switch/index.ts';
+	import { switchWebhook } from '#lib/rules/switch.ts';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
 	import * as Table from '#lib/components/ui/table/index.ts';
 	import { openBeam } from '#lib/beam.svelte.ts';
@@ -56,6 +58,15 @@
 	let renewing = $state(false);
 	let secret = $state<string | null>(null);
 	let busy = $state(false);
+	let switching = $state(false);
+
+	async function switchThis(active: boolean) {
+		if (!webhook) return;
+		switching = true;
+		const changed = await switchWebhook(webhook.id, active);
+		if (changed) webhook = changed;
+		switching = false;
+	}
 
 	const OUTCOMES: Record<View, Outcome[] | undefined> = {
 		all: undefined,
@@ -203,6 +214,13 @@
 	>
 		{#snippet actions()}
 			{#if webhook && canManageWebhook(webhook, session.user)}
+				<Switch
+					bind:checked={() => webhook?.active ?? false, switchThis}
+					disabled={switching}
+					aria-label={webhook.active
+						? m.webhook_switch_off({ name: webhook.name })
+						: m.webhook_switch_on({ name: webhook.name })}
+				/>
 				<a
 					href="{BASE}/webhooks/{webhook.id}/edit"
 					class={cn(buttonVariants({ variant: 'outline' }))}
@@ -232,21 +250,20 @@
 		{/snippet}
 		{#snippet below()}
 			{#if webhook}
-				<span class="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-					<Badge variant={webhook.active ? 'green' : 'muted'}>
-						{webhook.active ? m.webhook_on() : m.webhook_off()}
-					</Badge>
-					{#if !webhook.signed}
-						<Badge variant="yellow">{m.webhook_unsigned()}</Badge>
-					{/if}
-					{#if webhook.model_call}
-						<Badge variant="note">
-							{webhook.model_call.kind === 'propose'
-								? m.webhook_model_call_propose()
-								: m.webhook_model_call_extract()}
-						</Badge>
-					{/if}
-				</span>
+				{#if !webhook.signed || webhook.model_call}
+					<span class="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+						{#if !webhook.signed}
+							<Badge variant="yellow">{m.webhook_unsigned()}</Badge>
+						{/if}
+						{#if webhook.model_call}
+							<Badge variant="note">
+								{webhook.model_call.kind === 'propose'
+									? m.webhook_model_call_propose()
+									: m.webhook_model_call_extract()}
+							</Badge>
+						{/if}
+					</span>
+				{/if}
 				<span class="font-mono text-sm break-all text-muted-foreground">{webhook.url}</span>
 				{#if switchedOffFailing(webhook)}
 					<span class="text-sm text-destructive">

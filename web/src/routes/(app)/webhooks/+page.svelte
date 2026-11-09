@@ -10,6 +10,8 @@
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import EditButton from '#lib/components/EditButton.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import { Switch } from '#lib/components/ui/switch/index.ts';
+	import { switchWebhook } from '#lib/rules/switch.ts';
 	import { buttonVariants } from '#lib/components/ui/button/index.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { userName, type UserName } from '#lib/masterdata.svelte.ts';
@@ -26,6 +28,15 @@
 	let users = $state<UserName[]>([]);
 	let problem = $state<string | null>(null);
 	const ownerName = (id: string) => userName(users, id);
+	// The webhook being switched, its switch disabled meanwhile.
+	let busy = $state<string | null>(null);
+
+	async function switchOne(hook: Webhook, active: boolean) {
+		busy = hook.id;
+		const changed = await switchWebhook(hook.id, active);
+		if (changed && hooks) hooks = hooks.map((one) => (one.id === changed.id ? changed : one));
+		busy = null;
+	}
 
 	async function load() {
 		try {
@@ -70,7 +81,7 @@
 	{:else}
 		<ul class="flex flex-col gap-2">
 			{#each hooks as hook (hook.id)}
-				<!-- The name's link takes the whole row; the pencil stands above it. -->
+				<!-- The name's link takes the whole row; the switch and the pencil stand above it. -->
 				<Card.Root as="li" size="row" class="relative flex flex-wrap items-center gap-3">
 					<div class="flex min-w-0 flex-1 flex-col gap-1">
 						<span class="flex flex-wrap items-center gap-2">
@@ -79,9 +90,6 @@
 								class="truncate font-medium after:absolute after:inset-0 hover:underline"
 								>{hook.name}</a
 							>
-							<Badge variant={hook.active ? 'green' : 'muted'}>
-								{hook.active ? m.webhook_on() : m.webhook_off()}
-							</Badge>
 							{#if !hook.signed}
 								<Badge variant="yellow">{m.webhook_unsigned()}</Badge>
 							{/if}
@@ -103,6 +111,14 @@
 							>
 						{/if}
 					</div>
+					<Switch
+						class="relative z-10"
+						bind:checked={() => hook.active, (active) => switchOne(hook, active)}
+						disabled={busy === hook.id}
+						aria-label={hook.active
+							? m.webhook_switch_off({ name: hook.name })
+							: m.webhook_switch_on({ name: hook.name })}
+					/>
 					<EditButton
 						class="relative z-10"
 						label={m.webhook_edit_named({ name: hook.name })}

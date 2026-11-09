@@ -904,8 +904,9 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Pos
   and without up and down; a line under them says Lekto goes through them in order. A step the
   server refused shows at the mailbox as a line in `lane-yellow-foreground` ("Am …: … ging
   nicht"), as a mail left out does. A rule is switched on and off by `RuleSwitch` ("… aktivieren",
-  "… pausieren") through `lib/rules/switch.ts`, which also switches a mailbox: a toast says what
-  happened ("Regel aktiviert.", "Postfach pausiert."; the dry run of a mail rule says what it
+  "… pausieren") through `lib/rules/switch.ts`, which also switches a mailbox and a webhook (in
+  their rows and the head of their page; their forms have no field for it): a toast says what
+  happened ("Regel aktiviert.", "Postfach pausiert.", "Webhook pausiert."; the dry run of a mail rule says what it
   takes at the next fetch). Words of their own only where the thing differs (a mail's fields,
   what a mail rule takes).
 - **A mail's fields** (Tobi, 05.11.2026), the same in mail rules and as "Mail: …" in document
@@ -1214,7 +1215,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     `scan-eye` only where it shows a document in the Beam, a link to one document only from a
     card of a list, the Beam and the navigation of the inbox ("Beam"); a toggled `Chip`
     (`pressed`) only where each toggles on its own ("Tabs and switches"); a rule's switch only
-    through `RuleSwitch`, its toast only from `lib/rules/switch.ts` ("Mail rules"); every master data tab
+    through `RuleSwitch`, its toast and those of a mailbox and a webhook only from
+    `lib/rules/switch.ts` ("Mail rules"); every master data tab
     in the order tabs, search, filter row, list, with no paragraph before the list ("Master data
     tabs"); tooltips only through `ui/tooltip` ("Help and tooltips"); `Progress` only in the
     selection bars of runs on many and the upload summary ("Choosing many"); dates and times
