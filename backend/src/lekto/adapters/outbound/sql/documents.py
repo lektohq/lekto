@@ -663,6 +663,12 @@ def _matching(filter: DocumentFilter) -> list[ColumnElement[bool]]:
     if filter.confirmed is not None:
         confirmed = documents.c.confirmed_at
         criteria.append(confirmed.is_not(None) if filter.confirmed else confirmed.is_(None))
+    if filter.dated:
+        criteria += [
+            documents.c.contact_id.is_not(None),
+            documents.c.document_type_id.is_not(None),
+            documents.c.document_date.is_not(None),
+        ]
     if filter.labelled is not None:
         labelled = or_(
             documents.c.confirmed_at.is_not(None), documents.c.space_confirmed_at.is_not(None)
