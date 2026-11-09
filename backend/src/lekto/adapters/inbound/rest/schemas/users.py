@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from lekto.adapters.inbound.problems import BlockingSpaceOut
 from lekto.adapters.inbound.rest.schemas.account import LinkOut, Password, UserOut
+from lekto.adapters.inbound.rest.schemas.common import each_once
 from lekto.core.domain.ids import SpaceId, UserId
 from lekto.core.domain.users import MAX_DISPLAY_NAME, MAX_USERNAME, Role, Settle, Settlement
 
@@ -134,6 +135,4 @@ class UserRemovalIn(BaseModel):
     @field_validator("spaces")
     @classmethod
     def _each_once(cls, spaces: list[SpaceSettlementIn]) -> list[SpaceSettlementIn]:
-        if len({item.space_id for item in spaces}) != len(spaces):
-            raise ValueError("each space once")
-        return spaces
+        return each_once(spaces, lambda item: item.space_id, "space")

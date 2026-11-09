@@ -34,12 +34,11 @@ from lekto.core.domain.webhooks import (
     ModelCallRole,
     Webhook,
     WebhookDelivery,
+    header_values,
     headers_from_bytes,
     headers_to_bytes,
     names_private_address,
     new_secret,
-    validate_header_names,
-    validate_header_value,
 )
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.identity import DecryptionError, SecretCipher
@@ -131,7 +130,7 @@ class WebhookService:
         event_types: Collection[str],
         active: bool = True,
         signed: bool = True,
-        headers: Mapping[str, str] | None = None,
+        headers: Sequence[tuple[str, str]] | None = None,
         body: BodyFormat = BodyFormat.THIN,
         body_template: str | None = None,
         max_open_tasks: int = DEFAULT_OPEN_TASKS,
@@ -163,7 +162,7 @@ class WebhookService:
                 active=active,
                 max_open_tasks=max_open_tasks,
             )
-            given = dict(headers or {})
+            given = header_values(headers or [])
             webhook.set_headers(given, self._encrypt_headers(id, given), now=now)
             webhook.set_body(body, await self._checked(uow, body, body_template), now=now)
             if model_call is not None:
@@ -354,13 +353,10 @@ class WebhookService:
         return self._cipher.encrypt(secret.encode("ascii"), context=secret_context(id))
 
     def _encrypt_headers(self, id: WebhookId, headers: Mapping[str, str]) -> bytes | None:
-        """The values encrypted, None without headers. ValidationError for a bad name or
-        value."""
-        names = validate_header_names(headers)
-        values = {name: validate_header_value(name, headers[name]) for name in names}
-        if not values:
+        """The values (checked by `header_values`) encrypted, None without headers."""
+        if not headers:
             return None
-        return self._cipher.encrypt(headers_to_bytes(values), context=headers_context(id))
+        return self._cipher.encrypt(headers_to_bytes(dict(headers)), context=headers_context(id))
 
     def _merge_headers(
         self, webhook: Webhook, headers: Sequence[tuple[str, str | None]]
@@ -377,16 +373,14 @@ class WebhookService:
             except (DecryptionError, ValueError):
                 stored = {}  # unreadable (another secret key): every value must be given anew
             known = {name.lower(): value for name, value in stored.items()}
-        merged: dict[str, str] = {}
+        resolved: list[tuple[str, str]] = []
         for name, value in headers:
             if value is None:
                 value = known.get(name.lower())
                 if value is None:
                     raise ValidationError(because(ReasonCode.HEADER_VALUE_MISSING, name=name))
-            if name in merged:
-                raise ValidationError(because(ReasonCode.HEADER_TWICE, name=name))
-            merged[name] = value
-        return merged
+            resolved.append((name, value))
+        return header_values(resolved)
 
 
 async def disable_sending_rules(

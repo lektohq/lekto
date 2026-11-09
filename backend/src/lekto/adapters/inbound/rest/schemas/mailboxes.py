@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
+from lekto.adapters.inbound.rest.schemas.common import following_offset
 from lekto.adapters.inbound.schemas import DocumentRefOut, ReasonOut
 from lekto.core.domain.changes import UNSET
 from lekto.core.domain.ids import DocumentTypeId, UserId
@@ -408,11 +409,10 @@ class MailPageOut(BaseModel):
 
     @classmethod
     def of(cls, page: MailsPage, offset: int) -> "MailPageOut":
-        end = offset + len(page.mails)
         return cls(
             items=[MailOut.of(view) for view in page.mails],
             total=page.total,
-            next_offset=end if page.mails and end < page.total else None,
+            next_offset=following_offset(offset, len(page.mails), page.total),
         )
 
 

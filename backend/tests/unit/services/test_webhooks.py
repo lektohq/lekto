@@ -270,7 +270,7 @@ async def test_header_values_are_stored_encrypted_and_kept_by_name(world: World)
         name="HA",
         url=URL,
         event_types=["*"],
-        headers={"Authorization": "Bearer t0ken", "X-Tenant": "home"},
+        headers=[("Authorization", "Bearer t0ken"), ("X-Tenant", "home")],
     )
     hook = created.webhook
     assert hook.header_names == ("Authorization", "X-Tenant")
@@ -296,7 +296,12 @@ async def test_header_values_are_stored_encrypted_and_kept_by_name(world: World)
 
 async def test_reserved_or_broken_headers_are_refused(world: World) -> None:
     user = await world.user()
-    for headers in ({"Webhook-Signature": "x"}, {"Lekto-Task-Token": "x"}, {"X": "a\nb"}):
+    for headers in (
+        [("Webhook-Signature", "x")],
+        [("Lekto-Task-Token", "x")],
+        [("X", "a\nb")],
+        [("X-Token", "a"), ("x-token", "b")],  # twice, ignoring case
+    ):
         with pytest.raises(ValidationError):
             await world.webhooks.create(
                 user.id, name="x", url=URL, event_types=["*"], headers=headers
@@ -308,7 +313,7 @@ async def test_header_values_that_cannot_be_decrypted_must_be_given_anew(world: 
     user = await world.user()
     hook = (
         await world.webhooks.create(
-            user.id, name="x", url=URL, event_types=["*"], headers={"X-Token": "a"}
+            user.id, name="x", url=URL, event_types=["*"], headers=[("X-Token", "a")]
         )
     ).webhook
     async with world.uow() as uow:

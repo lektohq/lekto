@@ -7,7 +7,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.rest.schemas.documents import ReprocessNode
 from lekto.adapters.inbound.rest.schemas.rules import SkippedOut
-from lekto.adapters.inbound.schemas import ReasonOut
 from lekto.core.domain.bulk import MAX_IDS, BulkAction, BulkKind, BulkOperation, BulkStatus
 from lekto.core.domain.ids import ContactId, DocumentTypeId, SpaceId, TagId
 from lekto.core.domain.lenses import MAX_QUERY_LENGTH
@@ -112,10 +111,7 @@ class BulkOperationOut(BaseModel):
             done=operation.position,
             changed=operation.changed,
             unchanged=operation.unchanged,
-            skipped=[
-                SkippedOut(document_id=id, reason=reason.text, reasons=[ReasonOut.of(reason)])
-                for id, reason in operation.skipped
-            ],
+            skipped=[SkippedOut.of(id, reason) for id, reason in operation.skipped],
             error=operation.error,
             created_at=operation.created_at,
             finished_at=operation.finished_at,

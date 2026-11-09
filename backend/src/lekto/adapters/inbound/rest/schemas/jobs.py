@@ -1,10 +1,11 @@
 """The background jobs: counts by kind and state, the jobs themselves, their durations."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from lekto.adapters.inbound.rest.schemas.common import following_offset, ms
 from lekto.core.domain.jobs import JobState
 from lekto.core.domain.pipeline import Node
 from lekto.core.services.jobs import (
@@ -135,16 +136,11 @@ class JobPageOut(BaseModel):
 
     @classmethod
     def of(cls, page: JobsPage, offset: int) -> "JobPageOut":
-        end = offset + len(page.jobs)
         return cls(
             items=[JobOut.of(view) for view in page.jobs],
             total=page.total,
-            next_offset=end if page.jobs and end < page.total else None,
+            next_offset=following_offset(offset, len(page.jobs), page.total),
         )
-
-
-def _ms(value: timedelta) -> float:
-    return round(value.total_seconds() * 1000, 1)
 
 
 class KindDurationsOut(BaseModel):
@@ -160,10 +156,10 @@ class KindDurationsOut(BaseModel):
         return cls(
             kind=durations.kind,
             count=durations.count,
-            wait_median_ms=_ms(durations.wait_median),
-            wait_p90_ms=_ms(durations.wait_p90),
-            run_median_ms=_ms(durations.run_median),
-            run_p90_ms=_ms(durations.run_p90),
+            wait_median_ms=ms(durations.wait_median),
+            wait_p90_ms=ms(durations.wait_p90),
+            run_median_ms=ms(durations.run_median),
+            run_p90_ms=ms(durations.run_p90),
         )
 
 

@@ -7,6 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from lekto.adapters.inbound.rest.schemas.common import ms
 from lekto.adapters.inbound.rest.schemas.refs import seal
 from lekto.core.domain.documents import Channel
 from lekto.core.domain.first_runs import Verdict
@@ -187,7 +188,7 @@ def _lanes(lanes: Mapping[Lane, int]) -> LanesOut:
 
 
 def _ms(value: timedelta | None) -> float | None:
-    return None if value is None else round(value.total_seconds() * 1000, 1)
+    return None if value is None else ms(value)
 
 
 class TallyOut(BaseModel):
