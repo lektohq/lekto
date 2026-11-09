@@ -297,15 +297,15 @@ describe('DocumentProcessing', () => {
 		const matrix = await screen.findByRole('table');
 		expect(within(matrix).getByText('Schwälmer Brotladen')).toBeTruthy();
 		expect(
-			// The mark names the value too, for a screen reader (not only on hover).
-			within(matrix).getByRole('img', {
+			// The mark names the value too, and opens it on a click or a tap (not only on hover).
+			within(matrix).getByRole('button', {
 				name: (name) => name.startsWith(`${m.node_signal_llm()}: ${m.matrix_suggests()} – `)
 			})
 		).toBeTruthy();
 		// The neighbours name JUKO without a proof in the text: another value, not against it
 		// (the 0.5.0 contact rule).
 		expect(
-			within(matrix).getByRole('img', {
+			within(matrix).getByRole('button', {
 				name: (name) => name.startsWith(`${m.node_signal_neighbours()}: ${m.matrix_other()} – `)
 			})
 		).toBeTruthy();
