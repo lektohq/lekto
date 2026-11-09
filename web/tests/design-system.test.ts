@@ -694,6 +694,16 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('asks before a destructive action in a dialog of size md', () => {
+		expect(
+			offenders((source, path) =>
+				path.includes('/components/ui/')
+					? null
+					: (tags(source, 'AlertDialog.Content').find((tag) => !/\ssize="md"/.test(tag)) ?? null)
+			)
+		).toEqual([]);
+	});
+
 	it('shows the owl only where a moment is rare: sign-in, not found, nothing waiting, no document', () => {
 		expect(
 			offenders((source, path) => (MASCOT.has(path) ? null : line(source, /<Mascot\b/)))
