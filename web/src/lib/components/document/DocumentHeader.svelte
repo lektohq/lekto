@@ -59,7 +59,8 @@
 		inbox,
 		vision = null,
 		reading = null,
-		onchanged
+		onchanged,
+		onleave
 	}: {
 		document: Document;
 		lookup: Lookup | null;
@@ -74,6 +75,9 @@
 		reading?: Reading | null;
 		/** After an action that changed the document. */
 		onchanged: () => void;
+		/** The document leaves the person's hands (deleted, handed over), just before the view
+		 * goes back. */
+		onleave?: () => void;
 	} = $props();
 
 	let confirmDelete = $state(false);
@@ -212,6 +216,7 @@
 		if (!into || into.role !== 'edit') {
 			toast.success(receiver ? m.move_handed_over({ name: userLabel(receiver) }) : m.move_done());
 			moveOpen = false;
+			onleave?.();
 			await leaveDocument(Boolean(inbox));
 			return;
 		}
@@ -222,6 +227,7 @@
 	async function remove() {
 		await unwrap(api.DELETE('/api/v1/documents/{id}', { params: { path: { id: document.id } } }));
 		toast.success(m.delete_done());
+		onleave?.();
 		await leaveDocument(Boolean(inbox));
 	}
 </script>
