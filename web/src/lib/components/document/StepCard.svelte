@@ -85,7 +85,7 @@
 			class={cn(
 				'mt-0.5 size-4 shrink-0',
 				TONE_TEXT[look.tone],
-				look.spin && 'animate-spin',
+				look.spin && 'motion-safe:animate-spin',
 				carried !== null && 'opacity-60'
 			)}
 			aria-hidden="true"
