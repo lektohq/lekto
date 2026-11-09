@@ -5,7 +5,8 @@ from lekto.core.domain.errors import ConflictError, NotFoundError, PermissionDen
 from lekto.core.domain.ids import SpaceId, UserId
 from lekto.core.domain.permissions import can_choose_members, can_manage_space
 from lekto.core.domain.reasons import Action, ReasonCode, because
-from lekto.core.domain.spaces import Space, SpaceRole
+from lekto.core.domain.sorting import sort_key
+from lekto.core.domain.spaces import Space, SpaceRole, space_label
 from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
@@ -26,12 +27,18 @@ class SpaceService:
         """The spaces the user is a member of, admins too; with `all_users` (admins only)
         every space. An admin's rights reach every space either way; the list follows the
         reach the admin chose, as the lists of documents, inboxes and rules do (Tobi,
-        22.10.2026)."""
+        22.10.2026). By how they read (`space_label`: a personal space by its person's name),
+        as every list sorts names (`sort_key`), for REST and MCP alike."""
         async with self._uow() as uow:
             await load_lister(uow, actor, all_users, Action.LIST_ALL_SPACES)
             if all_users:
-                return await uow.spaces.list_all()
-            return await uow.spaces.list_accessible(actor)
+                spaces = await uow.spaces.list_all()
+            else:
+                spaces = await uow.spaces.list_accessible(actor)
+            people = {user.id: user.label for user in await uow.users.list_all()}
+        return sorted(
+            spaces, key=lambda space: (sort_key(space_label(space, people)), str(space.id))
+        )
 
     async def members(self, actor: UserId, spaces: Iterable[Space]) -> dict[UserId, User]:
         """The members of `spaces`, which the service gave the caller, by id: their names,
