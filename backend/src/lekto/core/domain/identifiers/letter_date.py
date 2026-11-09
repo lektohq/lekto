@@ -15,8 +15,8 @@ from lekto.core.domain.identifiers.base import (
     after_labels,
     labelled,
 )
-from lekto.core.domain.periods import MONTH_NAMES
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.vocabulary import MONTH_NAMES
 
 _MONTH = "|".join(name.casefold() for names in MONTH_NAMES.values() for name in names)
 _DATE = (

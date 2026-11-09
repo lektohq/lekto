@@ -73,11 +73,12 @@ from lekto.core.domain.fields import FieldValue, Money, Url
 from lekto.core.domain.ids import ContactId, DocumentId, DocumentTypeId, TagId, UserId
 from lekto.core.domain.jobs import OPEN_STATES, FinishedJob, Job, JobState, RetryPolicy
 from lekto.core.domain.json_value import JsonObject
-from lekto.core.domain.periods import MONTH_NAMES, Period, PeriodKind
+from lekto.core.domain.periods import Period, PeriodKind
 from lekto.core.domain.pipeline import SIGNALS
 from lekto.core.domain.reasons import Action
 from lekto.core.domain.search import LAYOUT, EmbeddingStamp, IndexDocument, IndexState
 from lekto.core.domain.statistics import median, percentile
+from lekto.core.domain.vocabulary import MONTH_NAMES, WEEK_ABBREVIATION
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.embeddings import Embeddings
 from lekto.core.ports.object_store import ObjectStore
@@ -883,7 +884,7 @@ def _period_text(period: Period) -> str:
     match period.kind:
         case PeriodKind.WEEK:
             year, week = period.iso_week
-            words.append(f"KW {week} {year}")
+            words.append(f"{WEEK_ABBREVIATION} {week} {year}")
         case PeriodKind.MONTH:
             names = {names[start.month - 1] for names in MONTH_NAMES.values()}
             words += [f"{name} {start.year}" for name in sorted(names)]
