@@ -365,7 +365,7 @@
 				</span>
 				<Separator class="my-4" />
 				<div class="flex items-baseline gap-2">
-					<span class="text-xl font-semibold tabular-nums">{duration(report.work.median_ms)}</span>
+					<span class="text-lg font-semibold tabular-nums">{duration(report.work.median_ms)}</span>
 					<span class="text-meta text-muted-foreground">{m.automation_work()}</span>
 				</div>
 				<span class="text-meta text-muted-foreground">
