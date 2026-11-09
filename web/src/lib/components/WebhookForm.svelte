@@ -66,7 +66,6 @@
 		given ? given.event_types.length === 0 || given.event_types.includes('*') : true
 	);
 	let types = $state<string[]>(given ? given.event_types.filter((type) => type !== '*') : []);
-	let active = $state(given?.active ?? true);
 	let signed = $state(given?.signed ?? true);
 	let headers = $state<Header[]>(
 		(given?.headers ?? []).map((header) => ({ name: header, value: '', kept: true }))
@@ -186,7 +185,6 @@
 						name: name.trim(),
 						url: url.trim(),
 						event_types,
-						active,
 						...content,
 						...(headersChanged ? { headers: headerBody() } : {})
 					}
@@ -206,7 +204,8 @@
 						name: name.trim(),
 						url: url.trim(),
 						event_types,
-						active,
+						// A new webhook starts on; its switch pauses it.
+						active: true,
 						signed,
 						...content,
 						headers: headers.map((header) => ({ name: header.name.trim(), value: header.value }))
@@ -422,7 +421,6 @@
 			</Choice>
 			<InfoHint text={m.webhook_signed_hint()} about={m.webhook_signed()} id="wh-signed-hint" />
 		</div>
-		<Choice bind:checked={active} class="font-medium">{m.webhook_active()}</Choice>
 		<div class="flex flex-col gap-3 border-t pt-4">
 			{#if error}<Field.Error>{error}</Field.Error>{/if}
 			<div class="flex flex-wrap justify-end gap-2">
