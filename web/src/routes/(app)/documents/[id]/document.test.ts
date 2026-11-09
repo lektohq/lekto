@@ -188,10 +188,26 @@ describe('the document view and seen', () => {
 		render(Page);
 		await waitFor(() => expect(seen(api)).toHaveLength(1));
 		const order = calls(api);
-		expect(order.indexOf('GET /api/v1/inbox?limit=100')).toBeLessThan(
+		expect(order.indexOf('GET /api/v1/inbox?limit=200')).toBeLessThan(
 			order.indexOf('PUT /api/v1/documents/doc-1/seen')
 		);
 		expect(await screen.findByText(m.doc_inbox_position({ position: 2, total: 2 }))).toBeTruthy();
+	});
+
+	it('finds its place in the inbox beyond the first page', async () => {
+		goTo('/ui/documents/doc-1?from=inbox&tab=properties', { id: 'doc-1' });
+		const first = Array.from({ length: 200 }, (_, n) => inboxItem('new', { id: `doc-a${n}` }));
+		const api = serve(() => documentOf({ lane: 'green' }), {
+			'GET /api/v1/inbox': (_, url) =>
+				url.searchParams.get('cursor') === 'page-2'
+					? { items: [inboxItem('new', { id: 'doc-1' })], next_cursor: null }
+					: { items: first, next_cursor: 'page-2' }
+		});
+		render(Page);
+		expect(
+			await screen.findByText(m.doc_inbox_position({ position: 201, total: 201 }))
+		).toBeTruthy();
+		expect(calls(api)).toContain('GET /api/v1/inbox?limit=200&cursor=page-2');
 	});
 });
 
