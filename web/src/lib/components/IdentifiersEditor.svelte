@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import Plus from '@lucide/svelte/icons/plus';
 	import X from '@lucide/svelte/icons/x';
@@ -469,9 +470,7 @@
 	</div>
 
 	{#if rows.length === 0}
-		<p class="rounded-2xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-			{m.identifier_none()}
-		</p>
+		<EmptyNote size="sm">{m.identifier_none()}</EmptyNote>
 	{:else if (contacts ? byContact : groups).length === 0}
 		<p class="px-1 py-2 text-sm text-muted-foreground">{m.assignment_none_found()}</p>
 	{/if}
