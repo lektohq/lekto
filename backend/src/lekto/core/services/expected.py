@@ -15,11 +15,10 @@ from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.reasons import Action
 from lekto.core.domain.series import Dated, Series, SeriesKey, SeriesState, series_of
 from lekto.core.ports.clock import Clock
-from lekto.core.ports.repository import DocumentFilter, DocumentPosition
+from lekto.core.ports.repository import DocumentFilter
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import load_lister
-
-PAGE = 500
+from lekto.core.services._pages import documents_in
 
 
 @dataclass(frozen=True)
@@ -146,17 +145,7 @@ async def _dated(uow: UnitOfWork, user: UserId | None) -> list[Document]:
     # Filtered by the repository, so that only the documents of a series are read (review
     # 0.12.2, C-11): with a lane (through processing), contact, type and date.
     wanted = DocumentFilter(lanes=frozenset(Lane), dated=True)
-    found: list[Document] = []
-    after: DocumentPosition | None = None
-    while True:
-        if user is None:
-            page = await uow.documents.query(wanted, after=after, limit=PAGE)
-        else:
-            page = await uow.documents.query_visible(user, wanted, after=after, limit=PAGE)
-        found += page
-        if len(page) < PAGE:
-            return found
-        after = DocumentPosition.after(page[-1].id)
+    return await documents_in(uow, wanted, visible_to=user)
 
 
 def period_of(document: Document) -> Period | None:

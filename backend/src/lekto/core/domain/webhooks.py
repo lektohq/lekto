@@ -75,6 +75,11 @@ SIGNATURE_HEADER = "webhook-signature"
 MAX_BODY_TEMPLATE = 10_000
 
 
+def webhook_timestamp(moment: datetime) -> str:
+    """A moment as webhooks and model calls write it: UTC to the second, `2026-11-09T12:00:00Z`."""
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 class BodyFormat(StrEnum):
     THIN = "thin"  # the event: type, id, time, document id
     FULL = "full"  # the event and the document as it is
@@ -293,7 +298,7 @@ def event_body(
     payload: JsonObject = {
         "id": str(event_id),
         "type": type,
-        "occurred_at": occurred_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "occurred_at": webhook_timestamp(occurred_at),
         "document_id": None if document_id is None else str(document_id),
     }
     if rule is not None:

@@ -42,9 +42,7 @@ from lekto.core.domain.jobs import Job, RetryPolicy
 from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.permissions import (
     can_file_into,
-    can_hand_over,
     document_access,
-    space_role,
 )
 from lekto.core.domain.pipeline import (
     CHOSEN_SPACE,
@@ -96,6 +94,7 @@ from lekto.core.services._jobs import (
     payload_document,
     retrying,
 )
+from lekto.core.services._moves import move_target
 from lekto.core.services._pages import document_pages
 from lekto.core.services.documents import DocumentView
 from lekto.core.services.inbox import (
@@ -736,16 +735,7 @@ class PipelineService:
     async def _move_target(self, uow: UnitOfWork, user: User, source: Space, id: SpaceId) -> Space:
         """The space `user` moves a document of `source` into on confirming it (as
         `DocumentService.move`)."""
-        target = await uow.spaces.find(id)
-        if target is None or not (space_role(user, target) or can_hand_over(user, target)):
-            raise NotFoundError("space", id)
-        if not (can_file_into(user, target) or can_hand_over(user, target)):
-            raise SpaceWriteDeniedError(target.id, target.name)
-        if target.personal_of is not None and target.role_of(user.id) is None:
-            receiver = await uow.users.find(target.personal_of)
-            if receiver is None or not receiver.active:
-                raise NotFoundError("space", id)
-        return target
+        return await move_target(uow, user, id)
 
     async def _restart(self, uow: UnitOfWork, document: Document) -> None:
         """Store the document's new run: the tasks of the runs before end (a late answer is

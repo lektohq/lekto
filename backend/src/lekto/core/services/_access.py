@@ -389,3 +389,12 @@ def of_a_person(criterion: FactCriterion) -> bool:
     return (criterion.kind is not None and person_only(criterion.kind)) or (
         criterion.role is FactRole.PERSON
     )
+
+
+async def edited_spaces(uow: UnitOfWork, user: UserId) -> set[SpaceId]:
+    """The spaces `user` is an editor of, without the rights of an admin."""
+    return {
+        space.id
+        for space in await uow.spaces.list_accessible(user)
+        if space.role_of(user) is SpaceRole.EDIT
+    }
