@@ -1052,7 +1052,7 @@
 						<SectionTitle size="card" level={3} class="mb-1">{m.dryrun_rules()}</SectionTitle>
 						<ul class="flex flex-col gap-2">
 							{#each preview.rules as rule (rule.rule_id)}
-								<li class="rounded-xl border p-3">
+								<li class={cardVariants({ size: 'sm' })}>
 									<span class="font-medium">{rule.name}</span>
 									<div class="mt-1">
 										<RuleEffects

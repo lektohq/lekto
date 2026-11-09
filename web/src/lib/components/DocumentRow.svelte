@@ -51,9 +51,9 @@
 </script>
 
 <Card.Root
-	size="flush"
+	size="row"
 	class={cn(
-		'flex items-center gap-3 p-3 transition-colors has-[>a:hover]:border-primary has-[>label:hover]:border-primary',
+		'flex items-center gap-3 transition-colors has-[>a:hover]:border-primary has-[>label:hover]:border-primary',
 		chosen && 'border-primary bg-panel'
 	)}
 >
