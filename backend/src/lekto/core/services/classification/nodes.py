@@ -904,16 +904,7 @@ class FieldsNode(_ModelStep):
             )
         entries = ProcessingHistory(log).signals()
         proposal = model_proposal(entries)
-        given: dict[FieldId, Proposal] = {}
-        if proposal is not None:
-            same_type = document_type is not None and _same_name(
-                proposal.document_type, document_type.name
-            )
-            for definition in definitions:
-                if definition.is_read and (definition.is_global or same_type):
-                    given[definition.id] = proposal.fields.get(
-                        definition.id, Proposal(value=None, evidence=None)
-                    )
+        given = _taken_over(proposal, definitions, document_type)
         missing = [item for item in definitions if item.is_read and item.id not in given]
         answers: list[StructuredAnswer] = []
         text = (
@@ -985,6 +976,47 @@ class FieldsNode(_ModelStep):
             except _UnfitAnswerError as error:
                 return self._unfit(error, input)
             given |= {keys[key].id: value for key, value in proposals.items()}
+        checks = await self._checked(document, log, definitions, given, unread, text, proposal)
+        values: dict[FieldId, object] = {}
+        for check, definition in zip(checks, definitions, strict=True):
+            if check.ok and check.value is not None:
+                values[definition.id] = field_from_json(definition, check.value)
+        title = _title(document, proposal, log)
+        changes = DocumentChanges(fields=values)
+        if title is not None and title.value is not None:
+            changes = replace(changes, title=str(title.value))
+        raw: JsonObject = {str(id): value.to_json() for id, value in given.items()}
+        all_checks = [*checks, *([title] if title is not None else [])]
+        model_version = (
+            external
+            or (_model_version(answers[-1]) if answers else None)
+            or (entries[Node.SIGNAL_LLM].result.model_version if taken_over else None)
+        )
+        uncertain = [check for check in checks if not check.ok]
+        result = NodeResult(
+            outcome=Outcome.UNCERTAIN if uncertain else Outcome.OK,
+            reasons=node_reasons(uncertain),
+            confidence=min((check.confidence for check in checks), default=1.0),
+            model_version=model_version,
+            input=input,
+            output=_answered(answers, {"fields": raw})
+            | ({"attempts": 1} if external else {})
+            | {CHECKS: checks_to_json(all_checks)},
+        )
+        return MetadataResult(result, changes)
+
+    async def _checked(
+        self,
+        document: Document,
+        log: Sequence[NodeRun],
+        definitions: Sequence[FieldDefinition],
+        given: Mapping[FieldId, Proposal],
+        unread: set[FieldId],
+        text: str,
+        proposal: StoredProposal | None,
+    ) -> list[FieldCheck]:
+        """The check of each field's value: against the text and its rules, where its quote
+        stands, how well its page was read, and its label."""
         facts = await asyncio.to_thread(DocumentText.read, text)
         language = _text_value(proposal.language) if proposal else None
         checks = [
@@ -1026,34 +1058,26 @@ class FieldsNode(_ModelStep):
             else check
             for check, definition in zip(checks, definitions, strict=True)
         ]
-        checks = await _labelled(self._store, document, checks, definitions, given)
-        values: dict[FieldId, object] = {}
-        for check, definition in zip(checks, definitions, strict=True):
-            if check.ok and check.value is not None:
-                values[definition.id] = field_from_json(definition, check.value)
-        title = _title(document, proposal, log)
-        changes = DocumentChanges(fields=values)
-        if title is not None and title.value is not None:
-            changes = replace(changes, title=str(title.value))
-        raw: JsonObject = {str(id): value.to_json() for id, value in given.items()}
-        all_checks = [*checks, *([title] if title is not None else [])]
-        model_version = (
-            external
-            or (_model_version(answers[-1]) if answers else None)
-            or (entries[Node.SIGNAL_LLM].result.model_version if taken_over else None)
-        )
-        uncertain = [check for check in checks if not check.ok]
-        result = NodeResult(
-            outcome=Outcome.UNCERTAIN if uncertain else Outcome.OK,
-            reasons=node_reasons(uncertain),
-            confidence=min((check.confidence for check in checks), default=1.0),
-            model_version=model_version,
-            input=input,
-            output=_answered(answers, {"fields": raw})
-            | ({"attempts": 1} if external else {})
-            | {CHECKS: checks_to_json(all_checks)},
-        )
-        return MetadataResult(result, changes)
+        return await _labelled(self._store, document, checks, definitions, given)
+
+
+def _taken_over(
+    proposal: StoredProposal | None,
+    definitions: Sequence[FieldDefinition],
+    document_type: DocumentType | None,
+) -> dict[FieldId, Proposal]:
+    """The values of the language model's proposal for the fields it was asked for: every
+    global field, and the type's own when it proposed the type the document has."""
+    given: dict[FieldId, Proposal] = {}
+    if proposal is None:
+        return given
+    same_type = document_type is not None and _same_name(proposal.document_type, document_type.name)
+    for definition in definitions:
+        if definition.is_read and (definition.is_global or same_type):
+            given[definition.id] = proposal.fields.get(
+                definition.id, Proposal(value=None, evidence=None)
+            )
+    return given
 
 
 def _title(

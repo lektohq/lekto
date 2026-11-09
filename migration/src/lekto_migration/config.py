@@ -37,7 +37,9 @@ _UNQUOTED = re.compile(r"(\S*)(.*)", re.DOTALL)
 def env_file(path: Path, environ: Mapping[str, str]) -> dict[str, str]:
     """`--env-file`: the environment with the `LEKTO_` variables of a file of `KEY=value` lines
     (read as a shell reads them with `set -a; . FILE`) in place of its own, as `lekto
-    --env-file` does: for the development instance in the devcontainer."""
+    --env-file` does: for the development instance in the devcontainer. A copy of the reading
+    in `lekto.composition.env_file` (the client does not import Lekto), kept equal by a parity
+    test in the backend."""
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as error:
