@@ -8,12 +8,12 @@ import { scope } from '#lib/scope.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import WithDialogs from '#lib/testing/WithDialogs.svelte';
 import FieldsPanel from './FieldsPanel.svelte';
-import { json } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 
 const INVOICE = '0199a6c4-0000-7000-8000-0000000000e1';
 const REMINDER = '0199a6c4-0000-7000-8000-0000000000e2';
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 
 beforeEach(() => {
 	session.start({
@@ -22,7 +22,7 @@ beforeEach(() => {
 		expires_at: '2026-10-14T12:00:00Z',
 		csrf_token: 'token'
 	});
-	fetchMock.mockReset();
+	fetchMock = fakeApi();
 	fetchMock.mockImplementation(async (request) => {
 		const path = new URL(request.url).pathname;
 		if (request.method === 'GET' && path === '/api/v1/fields') {

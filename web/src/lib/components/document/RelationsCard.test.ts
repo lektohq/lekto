@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fakeApi, json } from '#lib/testing/api.ts';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { kindLabel } from '#lib/identifiers.ts';
@@ -49,12 +50,10 @@ const accepted: Relations = {
 };
 
 describe('RelationsCard', () => {
-	const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
-	const json = (body: unknown) =>
-		new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
+	let fetchMock = fakeApi();
 
 	beforeEach(() => {
-		fetchMock.mockReset();
+		fetchMock = fakeApi();
 		fetchMock.mockImplementation(async (request) =>
 			json(request.method === 'POST' ? accepted : suggested)
 		);

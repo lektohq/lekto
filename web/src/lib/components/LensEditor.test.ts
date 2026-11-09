@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { json } from '#lib/testing/api.ts';
 import type { Lens } from '#lib/lenses.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -69,10 +70,7 @@ function api() {
 			const parsed = body ? JSON.parse(body) : null;
 			requests.push({ method: request.method, path: new URL(request.url).pathname, body: parsed });
 			if (request.method === 'DELETE') return new Response(null, { status: 204 });
-			return new Response(JSON.stringify({ ...LENS, ...parsed }), {
-				status: request.method === 'POST' ? 201 : 200,
-				headers: { 'content-type': 'application/json' }
-			});
+			return json({ ...LENS, ...parsed }, request.method === 'POST' ? 201 : 200);
 		})
 	);
 }

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import userEvent from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fakeApi, json } from '#lib/testing/api.ts';
 import type { components } from '#lib/api/schema.ts';
 import type { Mark, Review } from '#lib/document-view.ts';
 import type { Item } from '#lib/masterdata-api.ts';
@@ -144,7 +145,7 @@ const review = {
 	]
 } as unknown as Review;
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 
 // A popover moves the focus into itself a moment after it opened (in jsdom onto its frame, as
 // jsdom lays nothing out), and one that closed leaves a moment later, its focus trap holding the
@@ -184,7 +185,7 @@ beforeEach(async () => {
 		expires_at: '2026-10-09T12:00:00Z',
 		csrf_token: 'token'
 	});
-	fetchMock.mockReset();
+	fetchMock = fakeApi();
 	vi.stubGlobal('fetch', fetchMock);
 });
 
@@ -660,12 +661,7 @@ describe('DocumentForm', () => {
 		});
 
 		it('suggests the hand-over with what speaks for it, and warns above "Confirm"', async () => {
-			fetchMock.mockResolvedValue(
-				new Response(JSON.stringify({ id: 'doc-1', access: null }), {
-					status: 202,
-					headers: { 'content-type': 'application/json' }
-				})
-			);
+			fetchMock.mockResolvedValue(json({ id: 'doc-1', access: null }, 202));
 			const success = vi.spyOn(toast, 'success');
 			render(
 				DocumentForm,
@@ -743,12 +739,7 @@ describe('DocumentForm', () => {
 		});
 
 		it('hands over through "Another space" and says whom it went to', async () => {
-			fetchMock.mockResolvedValue(
-				new Response(JSON.stringify({ id: 'doc-1', access: null }), {
-					status: 202,
-					headers: { 'content-type': 'application/json' }
-				})
-			);
+			fetchMock.mockResolvedValue(json({ id: 'doc-1', access: null }, 202));
 			const success = vi.spyOn(toast, 'success');
 			const onconfirmed = vi.fn();
 			render(
@@ -1104,12 +1095,6 @@ describe('the topic', () => {
 		// Taken, it is no suggestion any more.
 		expect(within(topicCard()).queryByText('only one signal names it')).toBeNull();
 	});
-
-	const json = (body: unknown) =>
-		new Response(JSON.stringify(body), {
-			status: 200,
-			headers: { 'content-type': 'application/json' }
-		});
 	const PREVIEW = { changed: [], rules: null, visibility: null, document: null };
 	// The dry run of the form's change: what it sends; the dialog is closed again.
 	const sentPatch = async () => {

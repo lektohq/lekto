@@ -758,7 +758,11 @@ describe('the design system (web/DESIGN.md)', () => {
 		});
 		expect(
 			Object.entries(tests)
-				.filter(([, source]) => /\bfunction json\(/.test(source))
+				.filter(
+					([, source]) =>
+						/\bfunction json\(/.test(source) ||
+						/Response\.json\(|new Response\(JSON\.stringify\(/.test(source)
+				)
 				.map(([path]) => path)
 		).toEqual([]);
 	});

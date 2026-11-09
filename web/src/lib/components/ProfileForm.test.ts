@@ -5,11 +5,11 @@ import { m } from '#lib/paraglide/messages.js';
 import type { ProfileData } from '#lib/profile.ts';
 import { session } from '#lib/session.svelte.ts';
 import ProfileForm from './ProfileForm.svelte';
-import { json } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 
 vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 const sent: { path: string; body: unknown }[] = [];
 
 const stored = {
@@ -59,7 +59,7 @@ beforeEach(() => {
 		csrf_token: 'token'
 	});
 	sent.length = 0;
-	fetchMock.mockReset();
+	fetchMock = fakeApi();
 	fetchMock.mockImplementation(async (request) => {
 		const path = new URL(request.url).pathname;
 		if (request.method === 'PATCH') {

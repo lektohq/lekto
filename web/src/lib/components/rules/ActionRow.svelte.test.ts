@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { json } from '#lib/testing/api.ts';
 import type { FieldDefinition, Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { newAction, type SetFieldNode } from '#lib/rules/model.ts';
@@ -25,7 +26,7 @@ describe('the switch between a fixed value and a template', () => {
 		vi.stubGlobal(
 			'fetch',
 			vi.fn(async () =>
-				Response.json({ used: [], rendered: null, missing: null, error: null, values: null })
+				json({ used: [], rendered: null, missing: null, error: null, values: null })
 			)
 		);
 		const user = userEvent.setup();

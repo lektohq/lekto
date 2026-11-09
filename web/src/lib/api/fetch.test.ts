@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { json } from '#lib/testing/api.ts';
 import { apiFetch, CSRF_HEADER, isChange, setSessionHooks, type SessionHooks } from './fetch.ts';
 
 const ORIGIN = location.origin;
@@ -7,10 +8,7 @@ const STALE = `the header ${CSRF_HEADER} is missing or wrong`;
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
 
 function problem(status: number, detail: string): Response {
-	return new Response(JSON.stringify({ type: 'about:blank', title: 'Error', status, detail }), {
-		status,
-		headers: { 'content-type': 'application/problem+json' }
-	});
+	return json({ type: 'about:blank', title: 'Error', status, detail }, status);
 }
 
 function hooks(overrides: Partial<SessionHooks> = {}): SessionHooks {

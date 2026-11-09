@@ -14,13 +14,13 @@ type Route = (request: Request, url: URL) => Answer;
 
 /**
  * A fetch that answers by `METHOD /path` (`GET /api/v1/inbox`): JSON of what the route returns,
- * or its response. Without a route a GET answers an empty list (the master data), anything
- * else 204. Stub it with `vi.stubGlobal('fetch', …)`.
+ * or its response. Without a route `otherwise` answers, if given; else a GET answers an empty
+ * list (the master data), anything else 204. Stub it with `vi.stubGlobal('fetch', …)`.
  */
-export function fakeApi(routes: Record<string, Route> = {}) {
+export function fakeApi(routes: Record<string, Route> = {}, otherwise?: Route) {
 	return vi.fn(async (request: Request) => {
 		const url = new URL(request.url);
-		const route = routes[`${request.method} ${url.pathname}`];
+		const route = routes[`${request.method} ${url.pathname}`] ?? otherwise;
 		if (!route) return request.method === 'GET' ? json([]) : new Response(null, { status: 204 });
 		const answer = await route(request, url);
 		return answer instanceof Response ? answer : json(answer);

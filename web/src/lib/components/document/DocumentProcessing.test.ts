@@ -8,7 +8,7 @@ import { m } from '#lib/paraglide/messages.js';
 import type { GraphNode } from '#lib/pipeline.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import DocumentProcessing from './DocumentProcessing.svelte';
-import { json } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 
 type Document = components['schemas']['DocumentDetails'];
 
@@ -22,7 +22,7 @@ vi.mock('$app/state', async () => ({
 	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
 }));
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 
 const graph: GraphNode[] = [
 	{ node: 'receive', requires: [], waits_for: [] },
@@ -165,7 +165,7 @@ async function openTip(button: HTMLElement): Promise<HTMLElement> {
 }
 
 beforeEach(() => {
-	fetchMock.mockReset();
+	fetchMock = fakeApi();
 	serve([proposed, judged], { signal_llm: [exchange] });
 	vi.stubGlobal('fetch', fetchMock);
 	vi.mocked(goto).mockClear();
