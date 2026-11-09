@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AlertDot from '#lib/components/AlertDot.svelte';
 	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -44,7 +45,7 @@
 	import { phone } from '#lib/phone.svelte.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import Eyebrow from '#lib/components/page/Eyebrow.svelte';
-	import IconButton from '#lib/components/IconButton.svelte';
+	import IconButton, { ICON_BUTTON_ROOM } from '#lib/components/IconButton.svelte';
 
 	// A contact's identifiers, one line each under their kind (Tobi, 20.10.2026): the value, a
 	// mark if learned or rejected, the topic it points to. A line opens with its arrow, one at a
@@ -302,7 +303,7 @@
 					<Badge variant="outline">{userName(users ?? [], item.user_id)}</Badge>
 				{/if}
 				{#if errors[item.key]}
-					<span class="size-[7px] shrink-0 rounded-full bg-destructive" aria-hidden="true"></span>
+					<AlertDot label={errors[item.key]} />
 				{/if}
 			</button>
 			{#if item.source === 'manual'}
@@ -317,7 +318,7 @@
 					<X aria-hidden="true" />
 				</IconButton>
 			{:else}
-				<span class="size-9 shrink-0" aria-hidden="true"></span>
+				<span class="{ICON_BUTTON_ROOM.default} shrink-0" aria-hidden="true"></span>
 			{/if}
 		</div>
 		{#if open}

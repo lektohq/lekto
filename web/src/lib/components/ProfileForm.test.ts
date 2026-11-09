@@ -5,18 +5,12 @@ import { m } from '#lib/paraglide/messages.js';
 import type { ProfileData } from '#lib/profile.ts';
 import { session } from '#lib/session.svelte.ts';
 import ProfileForm from './ProfileForm.svelte';
+import { json } from '#lib/testing/api.ts';
 
 vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
 
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
 const sent: { path: string; body: unknown }[] = [];
-
-function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), {
-		status,
-		headers: { 'content-type': 'application/json' }
-	});
-}
 
 const stored = {
 	user_id: 'anna',

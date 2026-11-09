@@ -87,17 +87,19 @@ test('sign in with TOTP, navigate, reload, sign out', async ({ page }) => {
 });
 
 test('an ended session leads to the sign-in with the way back', async ({ page, context }) => {
-	await page.goto('/ui/login?next=%2Fui%2Fsearch');
+	await page.goto('/ui/login?next=%2Fui%2Fwebhooks');
 	await page.getByLabel('Username').fill(USERNAME);
 	await page.getByLabel('Password').fill(PASSWORD);
 	await page.getByRole('button', { name: 'Sign in' }).click();
 	await page.getByLabel('Six-digit code').fill(await freshCode());
 	await page.getByRole('button', { name: 'Sign in' }).click();
-	await expect(page).toHaveURL(/\/ui\/search$/);
+	await expect(page).toHaveURL(/\/ui\/webhooks$/);
+	// The page itself, not a page "not found" at that address.
+	await expect(page.getByRole('heading', { level: 1, name: 'Webhooks' })).toBeVisible();
 
 	// The session ends behind the app's back (another tab, expiry): the next start of the app
 	// finds no session and returns to this page after signing in.
 	await context.clearCookies();
 	await page.reload();
-	await expect(page).toHaveURL(/\/ui\/login\?next=%2Fui%2Fsearch$/);
+	await expect(page).toHaveURL(/\/ui\/login\?next=%2Fui%2Fwebhooks$/);
 });

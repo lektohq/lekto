@@ -105,9 +105,7 @@
 						</Badge>
 					{/if}
 					{#if !phone.current}
-						<code class="font-mono text-xs text-muted-foreground" title={m.field_def_key_hint()}
-							>{`field.${field.key}`}</code
-						>
+						<code class="font-mono text-xs text-muted-foreground">{`field.${field.key}`}</code>
 					{/if}
 				</span>
 				<span class="text-sm text-muted-foreground">{scopeText(field)}</span>

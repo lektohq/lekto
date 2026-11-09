@@ -8,7 +8,6 @@
 	import { ApiError } from '#lib/api/problem.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import { fieldLabel } from '#lib/describe.ts';
-	import InfoTip from '#lib/components/InfoTip.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -165,15 +164,6 @@
 	const anySignal = $derived((signals?.signals ?? []).some((item) => item.hits + item.misses > 0));
 </script>
 
-{#snippet heading(text: string, about: string)}
-	<div class="flex items-center gap-1">
-		<SectionTitle size="card">{text}</SectionTitle>
-		<InfoTip label={m.hint_about({ name: text })} size="sm" class="w-80">
-			<p>{about}</p>
-		</InfoTip>
-	</div>
-{/snippet}
-
 <div class="flex flex-col gap-6">
 	{#if unavailable}
 		<p class="text-muted-foreground">{m.classifier_not_configured()}</p>
@@ -188,10 +178,13 @@
 					<div class="flex flex-col gap-0.5">
 						{#if status.model}
 							{@const model = status.model}
-							{@render heading(
-								m.classifier_model_title({ number: model.number }),
-								m.classifier_model_info()
-							)}
+							<SectionTitle
+								size="card"
+								tip={{
+									name: m.classifier_model_title({ number: model.number }),
+									text: m.classifier_model_info()
+								}}>{m.classifier_model_title({ number: model.number })}</SectionTitle
+							>
 							<span class="text-meta text-muted-foreground">
 								{model.examples_until
 									? m.classifier_model_trained_until({
@@ -210,7 +203,11 @@
 										})}
 							</span>
 						{:else}
-							{@render heading(m.classifier_no_model(), m.classifier_model_info())}
+							<SectionTitle
+								size="card"
+								tip={{ name: m.classifier_no_model(), text: m.classifier_model_info() }}
+								>{m.classifier_no_model()}</SectionTitle
+							>
 						{/if}
 					</div>
 					{#if session.isAdmin}
@@ -269,7 +266,11 @@
 			</Card.Root>
 
 			<Card.Root as="section" size="lg" class="flex min-w-0 flex-[1_1_280px] flex-col gap-3">
-				{@render heading(m.classifier_next_title(), m.classifier_next_info())}
+				<SectionTitle
+					size="card"
+					tip={{ name: m.classifier_next_title(), text: m.classifier_next_info() }}
+					>{m.classifier_next_title()}</SectionTitle
+				>
 				<div class="flex items-baseline gap-2">
 					<span class="text-figure tabular-nums">
 						{formatNumber(done)}
@@ -308,7 +309,11 @@
 
 		<Card.Root as="section" size="lg">
 			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-				{@render heading(m.classifier_history_title(), m.classifier_history_info())}
+				<SectionTitle
+					size="card"
+					tip={{ name: m.classifier_history_title(), text: m.classifier_history_info() }}
+					>{m.classifier_history_title()}</SectionTitle
+				>
 				<span class="text-meta text-muted-foreground">{m.classifier_history_hint()}</span>
 			</div>
 			{#if measured.length < 2}
@@ -385,7 +390,11 @@
 
 		<Card.Root as="section" size="lg">
 			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-				{@render heading(m.classifier_signals_title(), m.classifier_signals_info())}
+				<SectionTitle
+					size="card"
+					tip={{ name: m.classifier_signals_title(), text: m.classifier_signals_info() }}
+					>{m.classifier_signals_title()}</SectionTitle
+				>
 				<span class="text-meta text-muted-foreground">{m.classifier_signals_hint()}</span>
 			</div>
 			{#if !anySignal}

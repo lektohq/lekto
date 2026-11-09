@@ -5,7 +5,6 @@
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
-	import InfoTip from '#lib/components/InfoTip.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
@@ -203,15 +202,6 @@
 	const NUMBER = 'text-right tabular-nums';
 </script>
 
-{#snippet heading(text: string, about: string)}
-	<div class="flex items-center gap-1">
-		<SectionTitle size="card">{text}</SectionTitle>
-		<InfoTip label={m.hint_about({ name: text })} size="sm" class="w-80">
-			<p>{about}</p>
-		</InfoTip>
-	</div>
-{/snippet}
-
 <div class="flex flex-col gap-6">
 	{#if problem && !summary}
 		<LoadProblem {problem} onretry={loadSummary} />
@@ -284,7 +274,7 @@
 
 		<Card.Root as="section" size="lg">
 			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-				{@render heading(title, info)}
+				<SectionTitle size="card" tip={{ name: title, text: info }}>{title}</SectionTitle>
 				{#if view === 'open'}
 					<span class="text-meta text-muted-foreground">{m.jobs_order_note()}</span>
 				{:else}
@@ -406,7 +396,11 @@
 		{#if view === 'done'}
 			<Card.Root as="section" size="lg">
 				<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-					{@render heading(m.jobs_durations_title(), m.jobs_durations_info())}
+					<SectionTitle
+						size="card"
+						tip={{ name: m.jobs_durations_title(), text: m.jobs_durations_info() }}
+						>{m.jobs_durations_title()}</SectionTitle
+					>
 					<span class="text-meta text-muted-foreground">
 						{m.jobs_kept_since({ date: keptSince })}
 					</span>

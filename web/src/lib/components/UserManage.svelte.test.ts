@@ -5,14 +5,11 @@ import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import UserManage from './UserManage.svelte';
+import { json } from '#lib/testing/api.ts';
 
 vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
 
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
-
-function json(body: unknown) {
-	return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
-}
 
 const account = {
 	id: 'bob',

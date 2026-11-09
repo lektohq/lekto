@@ -1,3 +1,9 @@
+<script lang="ts" module>
+	/** The room of an icon button by its size, for a placeholder that stands in its place in a
+	 * row without one, so that the rows line up. */
+	export const ICON_BUTTON_ROOM = { default: 'size-10 max-sm:size-11', sm: 'size-8' } as const;
+</script>
+
 <script lang="ts">
 	import { mergeProps } from 'bits-ui';
 	import type { Snippet } from 'svelte';
