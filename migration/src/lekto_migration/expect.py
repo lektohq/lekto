@@ -21,6 +21,7 @@ from urllib.parse import urlsplit
 from lekto_migration.directory import Directory
 from lekto_migration.mapping import (
     EDIT,
+    NAME_LIMIT,
     access_of,
     convert_value,
     document_date,
@@ -43,7 +44,6 @@ from lekto_migration.plan import (
 )
 
 SUPPORTED = ("application/pdf", "image/jpeg", "image/png", "image/tiff", "message/rfc822")
-NAME_LIMIT = 200
 # The targets a document holds several of, by the attribute of `Expected`.
 GROUPS = {"tag": "tags", "contact_group": "contact_groups", "type_group": "type_groups"}
 NAMED = ("contact", "document_type", "topic", "space")

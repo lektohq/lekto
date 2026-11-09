@@ -7,16 +7,13 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 from urllib.parse import urlsplit
 
+from lekto_migration.plan import norm as norm
+
 TITLE_LIMIT = 500
 NAME_LIMIT = 200
 
 READ, EDIT = "read", "edit"  # the roles of a space's members
 _MONEY = re.compile(r"(?P<currency>[A-Za-z]{3})?\s*(?P<amount>[-+]?\d+(?:\.\d+)?)")
-
-
-def norm(name: str) -> str:
-    """Names are compared without case and surrounding space, as Lekto does."""
-    return name.strip().casefold()
 
 
 @dataclass(frozen=True)
