@@ -1255,7 +1255,7 @@
 	"event_rule_send": "Rule sends",
 	"event_rule_ask": "Rule asks",
 	"webhook_saved": "Webhook saved",
-	"webhook_edit_do": "Edit",
+	"edit_do": "Edit",
 	"webhook_new": "New webhook",
 	"webhook_url": "Target URL",
 	"webhook_url_hint": "Receives a POST for every event.",
