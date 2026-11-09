@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { MASTER_LIMITS } from '#lib/masterdata-api.ts';
 	import FormDialog from '#lib/components/FormDialog.svelte';
 	import HintLabel from '#lib/components/HintLabel.svelte';
 	import * as Field from '#lib/components/ui/field/index.ts';
@@ -62,7 +63,7 @@
 				<Input
 					id="space-dialog-name"
 					bind:value={name}
-					maxlength={200}
+					maxlength={MASTER_LIMITS.name}
 					required
 					aria-invalid={error ? true : undefined}
 				/>
@@ -79,7 +80,7 @@
 				id="space-dialog-description"
 				bind:value={description}
 				rows={3}
-				maxlength={300}
+				maxlength={MASTER_LIMITS.description}
 				aria-describedby="space-dialog-description-hint"
 			/>
 		</Field.Field>
