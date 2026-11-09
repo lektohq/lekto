@@ -9,7 +9,13 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import { ApiError } from '#lib/api/problem.ts';
 	import type { components } from '#lib/api/schema.ts';
-	import { beamTo, closeBeam, type BeamSource, type ValueSource } from '#lib/beam.svelte.ts';
+	import {
+		beamTo,
+		closeBeam,
+		leaveBeam,
+		type BeamSource,
+		type ValueSource
+	} from '#lib/beam.svelte.ts';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import Loading from '#lib/components/Loading.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
@@ -326,7 +332,7 @@
 
 	function open() {
 		if (!beam || !id) return;
-		void jumpTo(beam.inbox ? inboxDocument(id) : documentHref(id), beam.from);
+		void jumpTo(beam.inbox ? inboxDocument(id) : documentHref(id), beam.from, leaveBeam());
 	}
 </script>
 

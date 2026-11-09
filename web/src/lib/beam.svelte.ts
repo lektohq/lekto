@@ -6,7 +6,7 @@
  */
 import { page } from '$app/state';
 import type { IdentifierKind } from '#lib/identifiers.ts';
-import { dropEntry, pushEntry, replaceEntry } from '#lib/history-state.ts';
+import { dropEntry, leaveEntry, pushEntry, replaceEntry } from '#lib/history-state.ts';
 
 /** Where the places the Beam marks come from: an open identifier's detail
  * (`GET /identifiers/open/{kind}/{ref}`), the places of any identifier
@@ -65,4 +65,10 @@ export function beamTo(index: number): void {
 /** Close the Beam. */
 export function closeBeam(): void {
 	dropEntry('beam');
+}
+
+/** Leave the Beam for a document: whether the jump takes the Beam's history entry (the way back
+ * then leads to the place without it). */
+export function leaveBeam(): boolean {
+	return leaveEntry('beam');
 }
