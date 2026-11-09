@@ -959,7 +959,7 @@ async def test_documents_update_needs_a_read_write_token_and_write_access(
     no_write = await call(
         api, scene.headers["reader"], "documents_update", id=scene.green, title="X"
     )
-    assert "no write access" in error(no_write)
+    assert "only editors and admins change this document" in error(no_write)
     hidden = await call(
         api, scene.headers["stranger"], "documents_update", id=scene.green, title="X"
     )
