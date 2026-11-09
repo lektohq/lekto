@@ -4,7 +4,10 @@ it (`DocumentService.move`, deleting a user who leaves documents behind)."""
 from datetime import datetime
 
 from lekto.core.domain.documents import Document
+from lekto.core.domain.errors import NotFoundError, SpaceWriteDeniedError
 from lekto.core.domain.identity import ViaToken
+from lekto.core.domain.ids import SpaceId
+from lekto.core.domain.permissions import can_file_into, can_hand_over, space_role
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
 from lekto.core.ports.unit_of_work import UnitOfWork
@@ -52,3 +55,27 @@ async def move_by_person(
         )
     await uow.documents.update(document)
     await uow.outbox.add(document.pull_events())
+
+
+async def move_target(uow: UnitOfWork, user: User, id: SpaceId) -> Space:
+    """The space `user` moves a document they edit into, by hand or on confirming it: one they
+    edit, or another active user's personal space (handed over). NotFoundError for a space they
+    neither see nor hand over to, SpaceWriteDeniedError for one they only read (review 0.12.2,
+    C-03)."""
+    target = await uow.spaces.find(id)
+    if target is None or not (space_role(user, target) or can_hand_over(user, target)):
+        raise NotFoundError("space", id)
+    if not (can_file_into(user, target) or can_hand_over(user, target)):
+        raise SpaceWriteDeniedError(target.id, target.name)
+    await check_receiver(uow, target, by=user)
+    return target
+
+
+async def check_receiver(uow: UnitOfWork, target: Space, *, by: User | None = None) -> None:
+    """NotFoundError if `target` is the personal space of a user who is gone or deactivated: no
+    document is handed over to them (unless `by` is a member of the space)."""
+    if target.personal_of is None or (by is not None and target.role_of(by.id) is not None):
+        return
+    receiver = await uow.users.find(target.personal_of)
+    if receiver is None or not receiver.active:
+        raise NotFoundError("space", target.id)

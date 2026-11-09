@@ -29,7 +29,13 @@ from lekto.core.domain.pipeline import Node
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.tasks import TOKEN_PREFIX, Task, TaskKind, TaskStatus, TaskStep
 from lekto.core.domain.templates import RULE, STEPS, TASK, TemplateValue, json_value
-from lekto.core.domain.webhooks import BodyFormat, Webhook, event_body, rendered_body
+from lekto.core.domain.webhooks import (
+    BodyFormat,
+    Webhook,
+    event_body,
+    rendered_body,
+    webhook_timestamp,
+)
 from lekto.core.ports.identity import SecretCipher
 from lekto.core.ports.templates import TemplateRenderer
 from lekto.core.ports.unit_of_work import UnitOfWork
@@ -150,7 +156,7 @@ class TaskDesk:
     ) -> None:
         token = new_token(TOKEN_PREFIX)
         ends = now + task.timeout
-        deadline = ends.strftime("%Y-%m-%dT%H:%M:%SZ")
+        deadline = webhook_timestamp(ends)
         callback = callback_url(self._links, task)
         body = (
             "LEKTO_PUBLIC_URL is not set: the consumer would not know where to answer"
@@ -195,7 +201,7 @@ class TaskDesk:
             "id": str(task.id),
             "callback": callback,
             "token": token,
-            "deadline": ends.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "deadline": webhook_timestamp(ends),
         }
         request = ask.request
         webhook = ask.webhook

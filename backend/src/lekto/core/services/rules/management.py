@@ -37,7 +37,7 @@ from lekto.core.domain.ids import (
     new_id,
 )
 from lekto.core.domain.links import Links
-from lekto.core.domain.permissions import space_role
+from lekto.core.domain.permissions import can_file_into, space_role
 from lekto.core.domain.reasons import Action, ReasonCode, because
 from lekto.core.domain.rules import (
     MAX_TEXT,
@@ -53,7 +53,6 @@ from lekto.core.domain.rules import (
     check_fields,
     is_template,
 )
-from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.templates import (
     FIELD,
     NAMES,
@@ -75,6 +74,7 @@ from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import (
     admin_only,
     check_rule_facts,
+    edited_spaces,
     field_definitions,
     load_actor,
     load_lister,
@@ -553,8 +553,7 @@ async def _place(
 
 async def _edits(uow: UnitOfWork, user: User, space: SpaceId) -> bool:
     found = await uow.spaces.find(space)
-    role = None if found is None else space_role(user, found)
-    return role is not None and role.can_edit
+    return found is not None and can_file_into(user, found)
 
 
 async def _edited_space(uow: UnitOfWork, user: User, id: SpaceId) -> None:
@@ -572,8 +571,4 @@ async def _edited_space(uow: UnitOfWork, user: User, id: SpaceId) -> None:
 
 async def _edited_spaces(uow: UnitOfWork, user: User) -> list[SpaceId]:
     """The spaces the user edits (without the rights of an admin)."""
-    return [
-        space.id
-        for space in await uow.spaces.list_accessible(user.id)
-        if space.role_of(user.id) is SpaceRole.EDIT
-    ]
+    return sorted(await edited_spaces(uow, user.id), key=str)

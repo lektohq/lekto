@@ -27,7 +27,6 @@ from lekto.core.domain.documents import Channel, Document, DocumentChanges, conf
 from lekto.core.domain.errors import (
     ConflictError,
     NotFoundError,
-    SpaceWriteDeniedError,
     UnprocessableDocumentError,
     ValidationError,
 )
@@ -51,12 +50,9 @@ from lekto.core.domain.locations import Box, Location
 from lekto.core.domain.master_data import Assignment, TagScope
 from lekto.core.domain.permissions import (
     can_edit_document,
-    can_hand_over,
-    can_move_document,
     can_read_document,
     document_access,
     in_reach,
-    space_role,
 )
 from lekto.core.domain.pipeline import Node, NodeRun
 from lekto.core.domain.reasons import Action, ReasonCode, because
@@ -94,7 +90,7 @@ from lekto.core.services._access import (
     readable_log,
 )
 from lekto.core.services._first_runs import keep_verdicts
-from lekto.core.services._moves import move_by_person
+from lekto.core.services._moves import move_by_person, move_target
 from lekto.core.services._tags import expand, expanded, tag_counts, tag_tree
 from lekto.core.services.fact_decisions import FactDecision, decide_fact
 from lekto.core.services.inbox import Review, in_inbox, node_reviews, open_nodes
@@ -1140,17 +1136,9 @@ class DocumentService:
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             document, source = await controllable_document(uow, user, id, Action.MOVE_DOCUMENT)
-            target = await uow.spaces.find(space)
-            if target is None or not (space_role(user, target) or can_hand_over(user, target)):
-                raise NotFoundError("space", space)
-            if not can_move_document(user, document, source, target):
-                raise SpaceWriteDeniedError(target.id, target.name)
+            target = await move_target(uow, user, space)
             if target.id == source.id:
                 return
-            if target.personal_of is not None and target.role_of(user.id) is None:
-                receiver = await uow.users.find(target.personal_of)
-                if receiver is None or not receiver.active:
-                    raise NotFoundError("space", space)
             now = self._clock.now()
             before = copy.deepcopy(document)
             await move_by_person(

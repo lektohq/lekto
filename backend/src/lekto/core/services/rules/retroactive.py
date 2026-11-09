@@ -37,7 +37,7 @@ from lekto.core.domain.ids import DocumentId, RuleApplicationId, RuleId, SpaceId
 from lekto.core.domain.jobs import Job
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.occurrences import Occurrence
-from lekto.core.domain.permissions import can_edit_document, space_role
+from lekto.core.domain.permissions import can_edit_document, can_file_into
 from lekto.core.domain.pipeline import (
     ACTOR,
     RULES_APPLY,
@@ -621,8 +621,7 @@ async def _applicable_rule(uow: UnitOfWork, user: User, id: RuleId) -> Rule:
     check_rule_facts(user, rule.definition)
     if rule.space_id is not None:
         space = await uow.spaces.find(rule.space_id)
-        role = None if space is None else space_role(user, space)
-        if role is None or not role.can_edit:
+        if space is None or not can_file_into(user, space):
             raise PermissionDeniedError(because(ReasonCode.SPACE_RULE_APPLY))
     return rule
 
