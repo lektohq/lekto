@@ -1275,7 +1275,6 @@
 	"webhook_volume_total_exact": "Zustellungen je Dokument mit dieser Auswahl: {count}.",
 	"webhook_volume_total_range": "Zustellungen je Dokument mit dieser Auswahl: etwa {least}⁠–⁠{most}.",
 	"webhook_volume_steps": "Davon {least}⁠–⁠{most} aus den Schritten der Verarbeitung; jede Neuverarbeitung bringt sie noch einmal.",
-	"webhook_active": "Aktiv",
 	"webhook_signed": "Anfragen signieren",
 	"webhook_signed_hint": "Mit einem Geheimnis, das einmal angezeigt wird: Der Empfänger prüft damit den Header webhook-signature. Ohne prüft der Empfänger einen eigenen Header, etwa ein Token.",
 	"webhook_open_tasks": "Aufträge gleichzeitig",
@@ -1304,8 +1303,6 @@
 	"webhook_body_template_hint": "Eigenes JSON aus einem Template, etwa eine Benachrichtigung für Home Assistant. Der Filter json schreibt einen Wert als JSON.",
 	"webhook_deleted": "Webhook gelöscht",
 	"webhook_none": "Noch keine Webhooks. Ein Webhook meldet Ereignisse von Lekto an ein anderes System, etwa Home Assistant.",
-	"webhook_on": "Aktiv",
-	"webhook_off": "Pausiert",
 	"webhook_failing": "{count} Zustellungen in Folge fehlgeschlagen",
 	"webhook_test": "Test senden",
 	"webhook_test_ok": "Test zugestellt (HTTP {status})",
@@ -3045,5 +3042,9 @@
 	"back_to": "Zurück zu {place}",
 	"beam_place_position": "Fundstelle {current} von {total}",
 	"identifier_whence": "Woher gelernt?",
-	"identifier_whence_none": "Kein Dokument, das Du siehst, enthält diese Kennung."
+	"identifier_whence_none": "Kein Dokument, das Du siehst, enthält diese Kennung.",
+	"webhook_switch_on": "Webhook „{name}“ aktivieren",
+	"webhook_switch_off": "Webhook „{name}“ pausieren",
+	"webhook_switched_on": "Webhook aktiviert.",
+	"webhook_switched_off": "Webhook pausiert."
 }

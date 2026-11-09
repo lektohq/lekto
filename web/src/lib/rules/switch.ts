@@ -8,8 +8,9 @@ import type { Mailbox } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
 
 type Rule = components['schemas']['RuleOut'];
+type Webhook = components['schemas']['WebhookOut'];
 
-// Switching a rule or a mailbox on and off, the one way (web/DESIGN.md, "Mail rules": one set of
+// Switching a rule, a mailbox or a webhook on and off, the one way (web/DESIGN.md, "Mail rules": one set of
 // parts and words for every rule): the change, a toast that says what happened, an error as
 // every error. The caller keeps what comes back (null: it failed and was reported) and shows
 // itself busy meanwhile.
@@ -52,5 +53,14 @@ export function switchMailbox(id: string, enabled: boolean): Promise<Mailbox | n
 		() =>
 			unwrap(api.PATCH('/api/v1/mailboxes/{id}', { params: { path: { id } }, body: { enabled } })),
 		enabled ? m.mailbox_switched_on() : m.mailbox_switched_off()
+	);
+}
+
+/** A webhook on or off; switching on clears its failures. */
+export function switchWebhook(id: string, active: boolean): Promise<Webhook | null> {
+	return switched(
+		() =>
+			unwrap(api.PATCH('/api/v1/webhooks/{id}', { params: { path: { id } }, body: { active } })),
+		active ? m.webhook_switched_on() : m.webhook_switched_off()
 	);
 }
