@@ -97,6 +97,3 @@ export function summaryOf(counts: Partial<Summary> = {}): Summary {
 		...counts
 	};
 }
-
-// The fake API moved to `lib/testing/api.ts`; the document helpers' tests import it from here too.
-export { calls, fakeApi, json } from '#lib/testing/api.ts';

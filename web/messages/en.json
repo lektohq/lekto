@@ -199,7 +199,6 @@
 	"rules_kind_documents": "Documents",
 	"rules_kind_mail": "Mails",
 	"mail_rules_no_mailbox": "No mailbox yet. Mail rules belong to a mailbox.",
-	"mail_rules_to_mailboxes": "Create mailbox",
 	"mail_rules_mailbox": "Mailbox “{name}”",
 	"mail_rules_to_mailbox": "View mailbox",
 	"mail_rules_new_for": "New rule for mailbox “{name}”",

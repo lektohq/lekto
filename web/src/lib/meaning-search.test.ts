@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { calls, fakeApi } from '#lib/testing/api.ts';
 import { forgetMeaningSearch, warmSearch } from './meaning-search.ts';
 
 afterEach(() => {
@@ -7,22 +8,20 @@ afterEach(() => {
 });
 
 function stub(meaning: boolean) {
-	const fetch = vi.fn(async (request: Request) =>
-		new URL(request.url).pathname === '/api/v1/pipeline'
-			? new Response(
-					JSON.stringify({ nodes: [], vision: null, logo_fetch: false, meaning_search: meaning }),
-					{
-						headers: { 'content-type': 'application/json' }
-					}
-				)
-			: new Response(null, { status: 204 })
-	);
-	vi.stubGlobal('fetch', fetch);
-	return fetch;
+	const api = fakeApi({
+		'GET /api/v1/pipeline': () => ({
+			nodes: [],
+			vision: null,
+			logo_fetch: false,
+			meaning_search: meaning
+		})
+	});
+	vi.stubGlobal('fetch', api);
+	return api;
 }
 
-const warmed = (fetch: ReturnType<typeof stub>) =>
-	fetch.mock.calls.filter(([request]) => new URL(request.url).pathname.endsWith('/search/warm'));
+const warmed = (api: ReturnType<typeof stub>) =>
+	calls(api).filter((call) => call === 'POST /api/v1/documents/search/warm');
 
 describe('warming the search', () => {
 	it('asks the API at most once a minute', async () => {
@@ -31,7 +30,6 @@ describe('warming the search', () => {
 		warmSearch(1_030_000);
 		warmSearch(1_060_000);
 		await vi.waitFor(() => expect(warmed(fetch)).toHaveLength(2));
-		expect(warmed(fetch)[0][0].method).toBe('POST');
 	});
 
 	it('does nothing without a search by meaning', async () => {

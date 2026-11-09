@@ -7,7 +7,7 @@ import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import { fakeBack, goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import IdentifiersPanel from './IdentifiersPanel.svelte';
-import { json } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 
 vi.mock('$app/navigation', async () => ({
 	beforeNavigate: vi.fn(),
@@ -58,7 +58,7 @@ const SUGGESTION = {
 	last: '2026-10-31'
 };
 
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 let decisions: unknown[] = [];
 let confirmedRecommended = 0;
 
@@ -73,7 +73,7 @@ beforeEach(() => {
 	});
 	decisions = [];
 	confirmedRecommended = 0;
-	fetchMock.mockReset();
+	fetchMock = fakeApi();
 	fetchMock.mockImplementation(async (request) => {
 		const url = new URL(request.url);
 		const searched =

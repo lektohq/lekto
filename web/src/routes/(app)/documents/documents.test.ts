@@ -18,7 +18,8 @@ import { NO_FILTERS } from '#lib/filters.ts';
 import { formatNumber } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi, listedOf, OWNER } from '#lib/testing/documents.ts';
+import { listedOf, OWNER } from '#lib/testing/documents.ts';
+import { calls, fakeApi } from '#lib/testing/api.ts';
 import Page from './+page.svelte';
 
 class FakeSource {

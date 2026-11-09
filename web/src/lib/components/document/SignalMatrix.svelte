@@ -1,4 +1,5 @@
 <script lang="ts">
+	import InfoTip from '#lib/components/InfoTip.svelte';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import { NODE_LABELS } from '#lib/node-labels.ts';
@@ -128,17 +129,29 @@
 						</span>
 					</Table.Head>
 					{#each row.cells as cell (cell.signal)}
-						<Table.Cell class="py-2.5 text-center" title={cell.title}>
-							<span
-								class={cn('inline-block align-middle', mark(cell.kind, row.open))}
-								role="img"
-								aria-label={[
-									`${NODE_LABELS[cell.signal]()}: ${word(cell.kind, row.open)}`,
-									cell.title
-								]
-									.filter(Boolean)
-									.join(' – ')}
-							></span>
+						{@const said = `${NODE_LABELS[cell.signal]()}: ${word(cell.kind, row.open)}`}
+						<Table.Cell class="py-2.5 text-center">
+							{#if cell.title}
+								<!-- What the signal said, on a click or a tap as well as on hover. -->
+								<InfoTip
+									label={`${said} – ${cell.title}`}
+									size="sm"
+									class="w-72"
+									buttonClass="relative inline-flex align-middle after:absolute after:-inset-2"
+								>
+									{#snippet trigger()}
+										<span class={cn('inline-block', mark(cell.kind, row.open))} aria-hidden="true"
+										></span>
+									{/snippet}
+									<p>{cell.title}</p>
+								</InfoTip>
+							{:else}
+								<span
+									class={cn('inline-block align-middle', mark(cell.kind, row.open))}
+									role="img"
+									aria-label={said}
+								></span>
+							{/if}
 						</Table.Cell>
 					{/each}
 				</Table.Row>

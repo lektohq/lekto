@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { calls, fakeApi, json } from '#lib/testing/api.ts';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import OriginCard from './OriginCard.svelte';
@@ -27,16 +28,16 @@ const attachment: Origin = {
 };
 
 describe('OriginCard', () => {
-	const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
 	let answer: Origin = attachment;
+	let api = fakeApi();
 
 	beforeEach(() => {
-		fetchMock.mockReset();
-		fetchMock.mockImplementation(
-			async () =>
-				new Response(JSON.stringify(answer), { headers: { 'content-type': 'application/json' } })
+		api = fakeApi(
+			Object.fromEntries(
+				['d1', 'd2', 'd3'].map((id) => [`GET /api/v1/documents/${id}/origin`, () => answer])
+			)
 		);
-		vi.stubGlobal('fetch', fetchMock);
+		vi.stubGlobal('fetch', api);
 	});
 
 	afterEach(() => {
@@ -58,8 +59,7 @@ describe('OriginCard', () => {
 		expect(screen.getByText(m.mail_importance_high())).toBeTruthy();
 		expect(screen.getByText('Lekto, $label1')).toBeTruthy();
 		expect(screen.getByText(m.mail_flag_green())).toBeTruthy();
-		const [request] = fetchMock.mock.calls[0];
-		expect(new URL(request.url).pathname).toBe('/api/v1/documents/d1/origin');
+		expect(calls(api)).toEqual(['GET /api/v1/documents/d1/origin']);
 	});
 
 	it('leaves out what the mail had not or Lekto did not know', async () => {
@@ -81,12 +81,18 @@ describe('OriginCard', () => {
 	it('shows nothing for a document no mail brought', async () => {
 		answer = { mail: null };
 		render(OriginCard, { props: { documentId: 'd2' } });
-		await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+		await vi.waitFor(() => expect(api).toHaveBeenCalled());
 		await vi.waitFor(() => expect(screen.queryByText(m.origin_title())).toBeNull());
 	});
 
 	it('keeps a load error on the card, with a way to try again', async () => {
-		fetchMock.mockImplementation(async () => new Response('down', { status: 503 }));
+		vi.stubGlobal(
+			'fetch',
+			fakeApi({
+				'GET /api/v1/documents/d4/origin': () =>
+					json({ type: 'about:blank', title: 'Unavailable', status: 503 }, 503)
+			})
+		);
 		render(OriginCard, { props: { documentId: 'd4' } });
 		expect(await screen.findByRole('alert')).toBeTruthy();
 		expect(screen.getByText(m.origin_title())).toBeTruthy();

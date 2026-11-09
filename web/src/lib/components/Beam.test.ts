@@ -6,7 +6,8 @@ import { goto } from '$app/navigation';
 import { fieldLabel } from '#lib/describe.ts';
 import { kindLabel } from '#lib/identifiers.ts';
 import { m } from '#lib/paraglide/messages.js';
-import { calls, documentOf, fakeApi, processingOf } from '#lib/testing/documents.ts';
+import { documentOf, processingOf } from '#lib/testing/documents.ts';
+import { calls, fakeApi } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Beam from './Beam.svelte';
 

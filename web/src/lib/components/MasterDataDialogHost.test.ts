@@ -8,11 +8,11 @@ import { phone } from '#lib/phone.svelte.ts';
 import { choose, optionsOf, selectedValue } from '#lib/testing/select.ts';
 import { session } from '#lib/session.svelte.ts';
 import WithDialogs from '#lib/testing/WithDialogs.svelte';
-import { json } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 
 const PAYSLIP = '0199a6c4-0000-7000-8000-0000000000e1';
 const RULE = '0199a6c4-0000-7000-8000-0000000000f1';
-const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
+let fetchMock = fakeApi();
 
 function tag(id: string, path: string[], parent: string | null, scope = 'document') {
 	return {
@@ -67,7 +67,7 @@ beforeEach(() => {
 		expires_at: '2026-10-15T12:00:00Z',
 		csrf_token: 'token'
 	});
-	fetchMock.mockReset();
+	fetchMock = fakeApi();
 	fetchMock.mockImplementation(async (request) => {
 		const path = new URL(request.url).pathname;
 		if (path === `/api/v1/document-types/${PAYSLIP}`) {

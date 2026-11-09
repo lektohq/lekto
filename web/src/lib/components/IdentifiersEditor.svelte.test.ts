@@ -12,7 +12,7 @@ import {
 import type { Tag } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
-import { calls, fakeApi } from '#lib/testing/documents.ts';
+import { calls, fakeApi } from '#lib/testing/api.ts';
 import { goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import IdentifiersEditor from './IdentifiersEditor.svelte';
 

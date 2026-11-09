@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
-import { fakeApi } from '#lib/testing/documents.ts';
+import { fakeApi } from '#lib/testing/api.ts';
 import ReceiptEdit from './ReceiptEdit.svelte';
 
 describe('setting when a document came in', () => {

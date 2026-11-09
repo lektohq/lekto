@@ -34,6 +34,13 @@ const EXCEPTIONS = {
 	fontSize: new Set(['/src/routes/login/+page.svelte', '/src/routes/+error.svelte']),
 	// The sign-in page's fields: larger, alone on the page, the code to type in large digits.
 	fieldHeight: new Set(['/src/routes/login/+page.svelte']),
+	// Frames whose rows or buttons pad themselves top and bottom; the frame pads the sides.
+	flushPadding: new Set([
+		'/src/lib/components/FilterSection.svelte',
+		'/src/lib/components/Lenses.svelte',
+		'/src/lib/components/SelectionBar.svelte',
+		'/src/lib/components/system/MaintenanceTab.svelte'
+	]),
 	// Paper, logos and the QR code are drawn for white; the overlays of shadcn's dialogs.
 	palette: new Set([
 		'/src/lib/components/document/CodeThumb.svelte',
@@ -751,7 +758,11 @@ describe('the design system (web/DESIGN.md)', () => {
 		});
 		expect(
 			Object.entries(tests)
-				.filter(([, source]) => /\bfunction json\(/.test(source))
+				.filter(
+					([, source]) =>
+						/\bfunction json\(/.test(source) ||
+						/Response\.json\(|new Response\(JSON\.stringify\(/.test(source)
+				)
 				.map(([path]) => path)
 		).toEqual([]);
 	});
@@ -784,6 +795,39 @@ describe('the design system (web/DESIGN.md)', () => {
 		);
 		const links = [...design.matchAll(/\]\(#([^)]+)\)/g)].map((match) => match[1]);
 		expect(links.filter((link) => !anchors.has(link))).toEqual([]);
+	});
+
+	it('tells nothing only on hover: no native title on a field, a cell or a code', () => {
+		// DESIGN.md, "Help and tooltips": information is never available only through hover.
+		expect(
+			offenders(
+				(source) =>
+					['Input', 'Table.Cell', 'code']
+						.flatMap((name) => tags(source, name))
+						.find((tag) => /\stitle=/.test(tag)) ?? null
+			)
+		).toEqual([]);
+	});
+
+	it('pads a card by its size, never a flush card by hand', () => {
+		// DESIGN.md, "Spacing and layout": `Card` sizes only; `flush` is for a card whose rows pad.
+		const padding = /(?<![\w-])(?:sm:|max-sm:)?p[xytrbl]?-\d/;
+		expect(
+			offenders((source, path) => {
+				if (path.includes('/components/ui/') || EXCEPTIONS.flushPadding.has(path)) return null;
+				const card = tags(source, 'Card.Root').find(
+					(tag) =>
+						/\ssize="flush"/.test(tag) &&
+						padding.test(/\sclass=(?:"[^"]*"|\{[^}]*\})/.exec(tag)?.[0] ?? '')
+				);
+				if (card) return card;
+				return (
+					[...source.matchAll(/cardVariants\(\{\s*size:\s*'flush'\s*\}\),([^)]*)/g)].find((hit) =>
+						padding.test(hit[1])
+					)?.[0] ?? null
+				);
+			})
+		).toEqual([]);
 	});
 
 	it('shows the owl only where a moment is rare: sign-in, not found, nothing waiting, no document', () => {
