@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { reasonText } from '#lib/reasons.ts';
 	import KeyRound from '@lucide/svelte/icons/key-round';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Send from '@lucide/svelte/icons/send';
@@ -369,7 +370,7 @@
 										colspan={6}
 										class="pt-0 pl-0 text-xs whitespace-normal text-lane-red-foreground"
 									>
-										{delivery.error}
+										{delivery.reason ? reasonText(delivery.reason) : delivery.error}
 									</Table.Cell>
 								</Table.Row>
 							{/if}

@@ -3959,6 +3959,26 @@ class MigrationSuite:
             back = {id: reason for id, reason in rows.all()}
         assert back == {failing: "failing", active: None}
 
+    async def test_the_reasons_of_deliveries_of_revision_0076_come_and_go(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0076: a delivery Lekto did not send keeps why with its code; the downgrade
+        drops it."""
+        await migrate(empty_database, "0075")
+        async with empty_database.reading() as connection:
+            schema = await connection.run_sync(_schema)
+        await migrate(empty_database)
+        async with empty_database.reading() as connection:
+            columns = await connection.run_sync(
+                lambda sync: {
+                    item["name"] for item in sa.inspect(sync).get_columns("webhook_deliveries")
+                }
+            )
+        assert "reason" in columns
+        await downgrade(empty_database, "0075")
+        async with empty_database.reading() as connection:
+            assert await connection.run_sync(_schema) == schema
+
     async def test_revision_0067_turns_the_json_null_into_null(
         self, empty_database: Database
     ) -> None:
@@ -4229,7 +4249,7 @@ async def _node_names(database: Database, *, old: bool) -> dict[str, Any]:
         document, log = await _only_rows(connection, documents, log_table)
         job, event = await _only_rows(connection, _before_0037(t.jobs), t.outbox)
         webhook, delivery = await _only_rows(
-            connection, _before_0043(t.webhooks), t.webhook_deliveries
+            connection, _before_0043(t.webhooks), _before_0076(t.webhook_deliveries)
         )
     return {
         "document": (
@@ -4268,6 +4288,15 @@ def _drawer(table: sa.TableClause) -> sa.TableClause:
 
 # The columns of `documents` revision 0030 added for the inbox.
 _INBOX_COLUMNS = frozenset({"new_at", "processing_baseline", "processing_decided"})
+
+
+def _before_0076(table: sa.Table) -> sa.TableClause:
+    """`table` as the revisions before 0076 had it: no reason of a delivery."""
+    added = {"webhook_deliveries": {"reason"}}
+    return sa.table(
+        table.name,
+        *(sa.column(c.name, c.type) for c in table.c if c.name not in added.get(table.name, ())),
+    )
 
 
 def _before_0054(table: sa.Table) -> sa.TableClause:

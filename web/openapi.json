@@ -28099,6 +28099,17 @@
             "title": "Error",
             "description": "Why the attempt failed; the answer body is not kept."
           },
+          "reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasonOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why Lekto did not send it, with its code (`delivery_webhook_off`, `delivery_owner_inactive`, `delivery_document_unavailable`, `delivery_owner_no_admin`, `delivery_webhook_deleted`, `delivery_secret_unusable`); null for an answer or a transport error (`error` says it)."
+          },
           "next_attempt_at": {
             "anyOf": [
               {
@@ -28141,6 +28152,7 @@
           "outcome",
           "status_code",
           "error",
+          "reason",
           "next_attempt_at",
           "document",
           "document_hidden"
@@ -38803,6 +38815,12 @@
           "mail_rule_space_unreachable",
           "mail_rule_type_gone",
           "webhook_failing",
+          "delivery_webhook_off",
+          "delivery_owner_inactive",
+          "delivery_document_unavailable",
+          "delivery_owner_no_admin",
+          "delivery_webhook_deleted",
+          "delivery_secret_unusable",
           "mail_rule_unreadable"
         ],
         "title": "ReasonCode"
@@ -44875,6 +44893,12 @@
     "mail_rule_space_unreachable": {},
     "mail_rule_type_gone": {},
     "webhook_failing": {},
+    "delivery_webhook_off": {},
+    "delivery_owner_inactive": {},
+    "delivery_document_unavailable": {},
+    "delivery_owner_no_admin": {},
+    "delivery_webhook_deleted": {},
+    "delivery_secret_unusable": {},
     "mail_rule_unreadable": {
       "detail": "text"
     }
