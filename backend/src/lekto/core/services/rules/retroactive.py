@@ -56,8 +56,6 @@ from lekto.core.domain.rules import (
     RuleApplication,
     RuleDefinition,
     RuleScope,
-    SetSpace,
-    Trigger,
 )
 from lekto.core.domain.text_hits import MAX_HITS, collapsed, contained
 from lekto.core.domain.text_places import TextPlaces
@@ -91,10 +89,10 @@ from lekto.core.services.rules.running import (
     checked_rules,
     deliverable,
     entry_beside,
+    following_rules,
     prepare,
     provenance,
     queue_sends,
-    reachable_rules,
 )
 from lekto.core.services.rules.steps import run_rules
 
@@ -217,7 +215,7 @@ class RuleApplicationService:
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             rule = await _applicable_rule(uow, user, id)
-            following = await _following(uow, rule)
+            following = await following_rules(uow, [rule])
             wanted = prefilter(rule.definition.conditions, await tag_tree(uow), _looked_at(rule))
             if wanted is None:
                 return ApplyPreview(rule, (), None, 0, 0)
@@ -458,7 +456,7 @@ class RuleApplicationService:
             rule = replace(
                 rule, current=await uow.rules.get_version(rule.id, application.rule_version)
             )
-            following = await _following(uow, rule)
+            following = await following_rules(uow, [rule])
         prepared = Prepared()
         if document is not None:
             prepared = await prepare(
@@ -631,20 +629,6 @@ def _not_asking(definition: RuleDefinition) -> None:
     InvalidTransitionError."""
     if definition.asks:
         raise InvalidTransitionError(because(ReasonCode.RULE_ASKS_ON_ARRIVAL, rule=definition.name))
-
-
-async def _following(uow: UnitOfWork, rule: Rule) -> list[Rule]:
-    """The rules of the spaces the rule may file a document into, and of the spaces those file
-    it into: they run after it (`ChangeRules.after_arrival`), so their patterns are prepared
-    with it."""
-    found: dict[RuleId, Rule] = {}
-    for action in rule.definition.actions:
-        if isinstance(action, SetSpace):
-            for item in await reachable_rules(
-                uow, action.space_id, Trigger.INGEST, include_global=False
-            ):
-                found.setdefault(item.id, item)
-    return list(found.values())
 
 
 async def _candidate(uow: UnitOfWork, user: User, rule: Rule, document: Document) -> bool:
