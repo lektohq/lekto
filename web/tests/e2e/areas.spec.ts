@@ -75,10 +75,10 @@ test('every area opens, and the dialogs create things', async ({ page }) => {
 	await expect(page.getByText(NAME)).toHaveCount(0);
 
 	// Settings: an API token (shown once), then revoked.
-	await page.goto('/ui/settings');
+	await page.goto('/ui/settings?tab=tokens');
 	await page.getByRole('button', { name: 'New token' }).click();
 	await page.getByRole('textbox', { name: 'Name', exact: true }).fill(NAME);
-	await page.getByRole('button', { name: 'Create token' }).click();
+	await page.getByRole('button', { name: 'Create', exact: true }).click();
 	await expect(page.getByTestId('secret')).toContainText('lekto_');
 	await page.getByRole('button', { name: 'I have stored it' }).click();
 	await page.getByRole('button', { name: `Revoke ${NAME}` }).click();
