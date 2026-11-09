@@ -349,7 +349,7 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
             user,
             await context.documents.resolve(user, id),
             offset=offset,
-            limit=min(limit, text_max),
+            limit=limit,
         )
         return compact(
             TextOut(

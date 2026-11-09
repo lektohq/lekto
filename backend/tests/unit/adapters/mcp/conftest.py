@@ -8,6 +8,7 @@ import pytest
 
 from lekto.adapters.outbound.memory import ManualClock
 from lekto.composition.container import build_memory_container, build_services
+from lekto.composition.settings import Settings
 from lekto.core.domain.ids import DocumentId
 from lekto.core.services.objects import text_key
 from tests import builders
@@ -21,9 +22,10 @@ async def api() -> AsyncIterator[Api]:
 
     clock = ManualClock(builders.NOW)
     container = build_memory_container(clock)
-    services = build_services(container)
+    # A piece of text holds 100 characters (`LEKTO_MCP_TEXT_MAX`).
+    services = build_services(container, Settings.model_construct(mcp_text_max=100))
     builders.skip_classification(services.pipeline)
-    app = make_app(container, services, mcp=True, text_max=100)
+    app = make_app(container, services, mcp=True)
     async with running(app):
         transport = httpx2.ASGITransport(app=app)
         async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
