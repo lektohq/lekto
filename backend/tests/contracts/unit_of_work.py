@@ -1307,6 +1307,30 @@ class UnitOfWorkContract:
             assert await uow.documents.count_confirmed(after=NOW) == 1
             assert await uow.documents.count_all() == 3
 
+    async def test_dated_documents(self, uow_factory: UnitOfWorkFactory) -> None:
+        """`dated`: contact, type and document date are set, the documents a series can have
+        (review 0.12.2, C-11)."""
+        owner, home = await owner_with_space(uow_factory)
+        contact = Contact.create(name="Stadtwerke", now=NOW)
+        kind = DocumentType.create(name="Rechnung", now=NOW)
+        full, no_date, no_type, bare = (builders.processed(owner, home) for _ in range(4))
+        for document in (full, no_date, no_type):
+            document.contact_id = contact.id
+        for document in (full, no_date):
+            document.document_type_id = kind.id
+        for document in (full, no_type):
+            document.document_date = date(2026, 3, 1)
+        async with uow_factory() as uow:
+            await uow.contacts.add(contact)
+            await uow.document_types.add(kind)
+            for document in (full, no_date, no_type, bare):
+                await uow.documents.add(document)
+            await uow.commit()
+        async with uow_factory() as uow:
+            dated = await uow.documents.query(DocumentFilter(dated=True), limit=9)
+            assert [item.id for item in dated] == [full.id]
+            assert len(await uow.documents.query(DocumentFilter(), limit=9)) == 4
+
     async def test_decided_spaces(self, uow_factory: UnitOfWorkFactory) -> None:
         """When a person decided a document's space is kept; such documents are labelled (the
         classifier's examples) and count as decisions; the decided spaces of the confirmed
