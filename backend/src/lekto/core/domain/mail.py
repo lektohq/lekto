@@ -23,8 +23,8 @@ from lekto.core.domain.mail_traits import (
     FLAGGED,
     SEEN,
     FlagColor,
+    check_mail_value,
     flag_bits,
-    is_keyword,
 )
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.validation import require_utc
@@ -117,11 +117,9 @@ class MailStep:
         value = None if self.value is None else self.value.strip()
         match self.action:
             case MailAction.FLAG:
-                if value not in {item.value for item in FlagColor}:
-                    raise ValidationError(f"flag: a colour, not {value!r}")
+                check_mail_value("flag", value, label="flag")
             case MailAction.ADD_KEYWORD | MailAction.REMOVE_KEYWORD:
-                if value is None or not is_keyword(value):
-                    raise ValidationError(f"{self.action}: not a keyword IMAP can carry")
+                check_mail_value("keyword", value, label=self.action.value)
             case MailAction.MOVE:
                 if not value or len(value) > MAX_FOLDER:
                     raise ValidationError("move: the folder to move the mail to")
