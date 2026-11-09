@@ -8,9 +8,9 @@ from typing import Any
 
 from lekto_migration.directory import Directory
 from lekto_migration.expect import Expected
+from lekto_migration.plan import MAX_REVIEW_REASON
 
 METADATA_LIMIT = 45_000  # bytes of the metadata field (Lekto allows 48 KiB)
-MAX_REVIEW_REASON = 500
 
 
 @dataclass

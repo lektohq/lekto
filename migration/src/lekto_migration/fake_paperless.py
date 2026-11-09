@@ -84,6 +84,9 @@ class FakePaperless:
         items: list[dict[str, Any]] | None = getattr(self.archive, name, None)
         if items is None:
             return httpx2.Response(404, headers=headers)
+        if "id__in" in query:  # as Paperless filters a list by ids
+            wanted = {int(id) for id in query["id__in"][0].split(",")}
+            items = [item for item in items if int(item["id"]) in wanted]
         page = int(query.get("page", ["1"])[0])
         size = min(int(query.get("page_size", ["25"])[0]), self.archive.page_size_limit)
         window = items[(page - 1) * size : page * size]
