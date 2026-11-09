@@ -16,7 +16,6 @@ from lekto.core.domain.mail import MAX_FOLDER, MAX_STEPS, MailAction, MailStep
 from lekto.core.domain.mail_intake import KEPT_RECORDS, MailOutcome, MailParts
 from lekto.core.domain.mail_rules import (
     MAX_PRIORITY,
-    MAX_VALUE,
     MIN_PRIORITY,
     MailConditions,
     MailField,
@@ -26,6 +25,7 @@ from lekto.core.domain.mail_rules import (
     conditions_from_json,
     conditions_to_json,
 )
+from lekto.core.domain.mail_traits import MAX_MAIL_TEXT
 from lekto.core.domain.validation import MAX_NAME
 from lekto.core.services.mail_rules import Decider, DryRunMail
 
@@ -52,7 +52,7 @@ CONDITIONS_HELP = (
 )
 
 
-MAX_CONDITION_VALUE = max(MAX_VALUE, MAX_FOLDER)
+MAX_CONDITION_VALUE = max(MAX_MAIL_TEXT, MAX_FOLDER)
 """A condition's value at most, before the domain checks it by its field (a folder's name may
 be longer than a text)."""
 

@@ -36,22 +36,20 @@ from lekto.core.domain.mail import MAX_FOLDER, MailAction, MailStep, check_steps
 from lekto.core.domain.mail_intake import MailDecision, MailParts, MailRecord, letters
 from lekto.core.domain.mail_message import MailMessage, address_texts
 from lekto.core.domain.mail_traits import (
-    FlagColor,
-    Importance,
+    MAIL_OPERATORS,
     MailHead,
     MailMarks,
+    check_mail_value,
     flag_holds,
     importance_holds,
-    is_keyword,
     keyword_holds,
 )
 from lekto.core.domain.reasons import Reason, ReasonCode
 from lekto.core.domain.rules import DEFAULT_PRIORITY as DEFAULT_PRIORITY
 from lekto.core.domain.rules import MAX_PRIORITY as MAX_PRIORITY
 from lekto.core.domain.rules import MIN_PRIORITY as MIN_PRIORITY
+from lekto.core.domain.rules import check_priority
 from lekto.core.domain.validation import require_name, require_utc
-
-MAX_VALUE = 500
 
 
 class MailField(StrEnum):
@@ -76,21 +74,15 @@ class MailOperator(StrEnum):
     MISSING = "missing"
 
 
-_TEXT = frozenset(
-    {MailOperator.CONTAINS, MailOperator.IS, MailOperator.STARTS_WITH, MailOperator.ENDS_WITH}
-)
-_THERE = frozenset({MailOperator.PRESENT, MailOperator.MISSING})
+_OWN_OPERATORS: dict[MailField, frozenset[str]] = {
+    MailField.FOLDER: frozenset({"is"}),
+    MailField.ATTACHMENTS: frozenset({"present", "missing"}),
+}
 OPERATORS: dict[MailField, frozenset[MailOperator]] = {
-    MailField.SENDER: _TEXT,
-    MailField.RECIPIENT: _TEXT,
-    MailField.TO: _TEXT,
-    MailField.CC: _TEXT,
-    MailField.SUBJECT: _TEXT,
-    MailField.FOLDER: frozenset({MailOperator.IS}),
-    MailField.ATTACHMENTS: _THERE,
-    MailField.IMPORTANCE: frozenset({MailOperator.IS}),
-    MailField.KEYWORD: _THERE | {MailOperator.CONTAINS},
-    MailField.FLAG: _THERE | {MailOperator.IS},
+    field: frozenset(
+        MailOperator(op) for op in _OWN_OPERATORS.get(field) or MAIL_OPERATORS[field.value]
+    )
+    for field in MailField
 }
 
 
@@ -117,20 +109,11 @@ class MailCondition:
                 raise ValidationError(f"'{self.op}' takes no value")
             return
         value = (self.value or "").strip()
-        match self.field:
-            case MailField.IMPORTANCE:
-                if value not in {item.value for item in Importance}:
-                    raise ValidationError("importance: high, normal or low")
-            case MailField.FLAG:
-                if value not in {item.value for item in FlagColor}:
-                    raise ValidationError(f"flag: a colour, not {value!r}")
-            case MailField.KEYWORD:
-                if not is_keyword(value):
-                    raise ValidationError(f"keyword: not one IMAP can carry: {value!r}")
-            case _:
-                limit = MAX_FOLDER if self.field is MailField.FOLDER else MAX_VALUE
-                if not value or len(value) > limit:
-                    raise ValidationError(f"{self.field}: a value of 1 to {limit} characters")
+        if self.field is MailField.FOLDER:
+            if not value or len(value) > MAX_FOLDER:
+                raise ValidationError(f"folder: a value of 1 to {MAX_FOLDER} characters")
+        else:
+            check_mail_value(self.field.value, value, label=self.field.value)
         object.__setattr__(self, "value", value)
 
     def holds(self, facts: MailFacts) -> bool:
@@ -319,12 +302,7 @@ class MailRule:
 
     def _check(self) -> None:
         self.name = require_name(self.name, "rule name")
-        if (
-            isinstance(self.priority, bool)
-            or not isinstance(self.priority, int)
-            or not MIN_PRIORITY <= self.priority <= MAX_PRIORITY
-        ):
-            raise ValidationError(f"priority: a whole number from {MIN_PRIORITY} to {MAX_PRIORITY}")
+        check_priority(self.priority)
         if self.conditions is not None:
             check_limits([self.conditions])
         takes = self.parts is not MailParts.NOTHING

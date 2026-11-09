@@ -72,7 +72,7 @@ from lekto.core.domain.ids import (
     new_id,
 )
 from lekto.core.domain.json_value import JsonValue, require_date, require_uuid
-from lekto.core.domain.mail_traits import FlagColor, Importance, is_keyword
+from lekto.core.domain.mail_traits import MAIL_OPERATORS, check_mail_value
 from lekto.core.domain.master_data import DocumentType, TagScope
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.tasks import DEFAULT_TIMEOUT, validate_timeout
@@ -139,7 +139,6 @@ class Operator(StrEnum):
 
 _REFERENCE_OPERATORS = frozenset({Operator.IS, Operator.IN, Operator.PRESENT, Operator.MISSING})
 _TAG_OPERATORS = frozenset({Operator.CONTAINS, Operator.IN, Operator.PRESENT, Operator.MISSING})
-_MAIL_TEXT = frozenset({Operator.CONTAINS, Operator.IS, Operator.STARTS_WITH, Operator.ENDS_WITH})
 MAIL_FIELDS = frozenset(
     {
         ConditionField.MAIL_MAILBOX,
@@ -182,14 +181,9 @@ _FIELD_OPERATORS: dict[ConditionField, frozenset[Operator]] = {
     ),
     ConditionField.RELATION: _REFERENCE_OPERATORS,
     ConditionField.MAIL_MAILBOX: _REFERENCE_OPERATORS,
-    ConditionField.MAIL_SENDER: _MAIL_TEXT,
-    ConditionField.MAIL_RECIPIENT: _MAIL_TEXT,
-    ConditionField.MAIL_TO: _MAIL_TEXT,
-    ConditionField.MAIL_CC: _MAIL_TEXT,
-    ConditionField.MAIL_SUBJECT: _MAIL_TEXT,
-    ConditionField.MAIL_IMPORTANCE: frozenset({Operator.IS}),
-    ConditionField.MAIL_KEYWORD: frozenset({Operator.CONTAINS, Operator.PRESENT, Operator.MISSING}),
-    ConditionField.MAIL_FLAG: frozenset({Operator.IS, Operator.PRESENT, Operator.MISSING}),
+} | {
+    ConditionField(f"mail_{name}"): frozenset(Operator(op) for op in ops)
+    for name, ops in MAIL_OPERATORS.items()
 }
 TAG_FIELDS: dict[ConditionField, TagScope] = {
     ConditionField.TAGS: TagScope.DOCUMENT,
@@ -337,24 +331,8 @@ class Condition:
                 _step_value(self.op, value)
             case ConditionField.FACT:
                 _text(value, MAX_PATTERN if self.op is Operator.MATCHES else MAX_TEXT)
-            case (
-                ConditionField.MAIL_SENDER
-                | ConditionField.MAIL_RECIPIENT
-                | ConditionField.MAIL_TO
-                | ConditionField.MAIL_CC
-            ):
-                _text(value, MAX_TEXT)
-            case ConditionField.MAIL_IMPORTANCE:
-                if value not in {item.value for item in Importance}:
-                    raise ValidationError("mail_importance: high, normal or low")
-            case ConditionField.MAIL_FLAG:
-                if value not in {item.value for item in FlagColor}:
-                    raise ValidationError(f"mail_flag: a colour, not {value!r}")
-            case ConditionField.MAIL_KEYWORD:
-                if not isinstance(value, str) or not is_keyword(value):
-                    raise ValidationError(f"mail_keyword: not one IMAP can carry: {value!r}")
-            case ConditionField.MAIL_SUBJECT:
-                _text(value, MAX_TEXT)
+            case field if field in MAIL_FIELDS and field is not ConditionField.MAIL_MAILBOX:
+                check_mail_value(field.value.removeprefix("mail_"), value, label=field.value)
 
     @property
     def target(self) -> str:
@@ -609,14 +587,7 @@ class RuleDefinition:
     def __post_init__(self) -> None:
         name = require_name(self.name, "rule name")
         object.__setattr__(self, "name", name)
-        if (
-            isinstance(self.priority, bool)
-            or not isinstance(self.priority, int)
-            or not MIN_PRIORITY <= self.priority <= MAX_PRIORITY
-        ):
-            raise ValidationError(
-                f"priority must be a whole number from {MIN_PRIORITY} to {MAX_PRIORITY}"
-            )
+        check_priority(self.priority)
         if not self.triggers:
             raise ValidationError("a rule needs at least one trigger")
         check_limits([self.conditions, *(step.conditions for step in self.step_conditions)])
@@ -1137,6 +1108,19 @@ class RuleApplication:
 
 
 # --- helpers ----------------------------------------------------------------------------------
+
+
+def check_priority(priority: object) -> None:
+    """A rule's priority, of document and mail rules alike: a whole number from `MIN_PRIORITY`
+    to `MAX_PRIORITY`."""
+    if (
+        isinstance(priority, bool)
+        or not isinstance(priority, int)
+        or not MIN_PRIORITY <= priority <= MAX_PRIORITY
+    ):
+        raise ValidationError(
+            f"priority must be a whole number from {MIN_PRIORITY} to {MAX_PRIORITY}"
+        )
 
 
 def _text(value: JsonValue, limit: int) -> str:
