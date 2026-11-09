@@ -8,13 +8,11 @@ from mcp.server.mcpserver import Context
 from pydantic import Field
 
 from lekto.adapters.inbound.context import ApiContext
-from lekto.adapters.inbound.mcp.names import Names, similar_names
+from lekto.adapters.inbound.mcp.names import Names, identifier_kind
 from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
 from lekto.adapters.inbound.mcp.tools.documents import FactsOut, facts_out
 from lekto.core.domain.document_facts import FactRole
-from lekto.core.domain.errors import ValidationError
-from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import short_id
 from lekto.core.services.fact_decisions import FactAction, FactDecision
 
@@ -43,7 +41,7 @@ def add_fact_tools(tools: Tools, context: ApiContext) -> None:
         document = await context.documents.resolve(user, id)
         decision = FactDecision(
             action=FactAction(action),
-            kind=_kind(kind),
+            kind=identifier_kind(kind, "fact"),
             value=value,
             role=role,
             new_value=new_value,
@@ -52,14 +50,3 @@ def add_fact_tools(tools: Tools, context: ApiContext) -> None:
         names = await Names.load(context, user)
         report = await context.documents.facts(user, document)
         return compact(FactsOut(id=short_id(document), facts=facts_out(report, names)))
-
-
-def _kind(name: str) -> IdentifierKind:
-    """The kind of fact `name` names; an error with similar ones for none (the kinds are many,
-    their names in the schema would cost every conversation)."""
-    try:
-        return IdentifierKind(name.strip().lower())
-    except ValueError:
-        alike = similar_names(name, [kind.value for kind in IdentifierKind])
-        hint = f"; similar: {', '.join(alike)}" if alike else ""
-        raise ValidationError(f"no kind of fact named '{name}'{hint}") from None

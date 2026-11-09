@@ -3,20 +3,24 @@ client has no other way to learn IDs), and give names. A name matches regardless
 unknown one is an error that names similar ones, so the client need not list them first."""
 
 import difflib
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from uuid import UUID
 
 from lekto.adapters.inbound.context import ApiContext
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldDefinition
+from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, TagId, UserId
 from lekto.core.domain.master_data import TagScope
 from lekto.core.domain.sorting import sort_key
+from lekto.core.domain.spaces import Space
 from lekto.core.domain.validation import name_key
 
 SIMILAR = 3
 """Names an error suggests at most."""
+FORMER_ACCOUNT = "a former account"
+"""How the tools name a person whose account is gone."""
 _CONTAINED = 3
 """Characters a name has at least to be suggested for standing in the one asked for or it."""
 
@@ -109,3 +113,30 @@ def similar_names(name: str, names: Iterable[str]) -> list[str]:
     )
     alike = [keyed[key] for key in difflib.get_close_matches(wanted, keyed, n=SIMILAR)]
     return list(dict.fromkeys(containing + alike))[:SIMILAR]
+
+
+def identifier_kind(name: str, what: str) -> IdentifierKind:
+    """The kind of identifier `name` names; an error with similar ones for none, naming it a
+    kind of `what` (a fact, an identifier): the kinds are many, their names in a tool's schema
+    would cost every conversation."""
+    try:
+        return IdentifierKind(name.strip().lower())
+    except ValueError:
+        alike = similar_names(name, [kind.value for kind in IdentifierKind])
+        hint = f"; similar: {', '.join(alike)}" if alike else ""
+        raise ValidationError(f"no kind of {what} named '{name}'{hint}") from None
+
+
+async def member_labels(
+    context: ApiContext, user: UserId, spaces: Iterable[Space]
+) -> dict[UserId, str]:
+    """How the caller reads the members of `spaces`, by their ids."""
+    members = await context.spaces.members(user, list(spaces))
+    return {id: person.label for id, person in members.items()}
+
+
+def space_label(space: Space, people: Mapping[UserId, str]) -> str:
+    """How the caller reads a space: a personal one by its person's name (`member_labels`)."""
+    if space.personal_of is not None and space.personal_of in people:
+        return people[space.personal_of]
+    return space.name
