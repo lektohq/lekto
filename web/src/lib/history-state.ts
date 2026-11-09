@@ -46,6 +46,14 @@ export function dropEntry(key: Key): void {
 	void goto(page.url.href, { shallow: true, replace: true, state, persistState: true });
 }
 
+/** Leave the entry of `key` for good (a jump replaces it): whether this page pushed it, so that
+ * the jump may take its place; a restored one is the page's own entry and stays. */
+export function leaveEntry(key: Key): boolean {
+	const own = pushed[key] === true && page.state[key] !== undefined;
+	pushed[key] = false;
+	return own;
+}
+
 /**
  * `key` of the history entry as one object while what it holds stays the same. Each change of
  * the entry (the Beam opening over a dialog, the back button closing it) restores every key as a

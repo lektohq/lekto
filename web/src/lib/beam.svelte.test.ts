@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
 import { goTo, testPage } from '#lib/testing/page-state.svelte.ts';
-import { beamTo, closeBeam, openBeam } from './beam.svelte.ts';
+import { beamTo, closeBeam, leaveBeam, openBeam } from './beam.svelte.ts';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('$app/state', async () => ({
@@ -36,5 +36,16 @@ describe('the state of the Beam', () => {
 		expect(goto).toHaveBeenCalledTimes(2);
 		closeBeam();
 		expect(back).toHaveBeenCalledOnce();
+	});
+
+	it('lets a jump take the entry it opened in, not one a reload restored', () => {
+		goTo('/ui/documents');
+		openBeam(['a'], 'a', 'Dokumente');
+		testPage.state = { beam: { ids: ['a'], index: 0, from: 'Dokumente' } };
+		expect(leaveBeam()).toBe(true);
+		// Left once: the entry is gone, a second jump does not take another.
+		expect(leaveBeam()).toBe(false);
+		goTo('/ui/documents', {}, { beam: { ids: ['a'], index: 0, from: 'Dokumente' } });
+		expect(leaveBeam()).toBe(false);
 	});
 });

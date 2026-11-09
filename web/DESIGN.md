@@ -660,7 +660,7 @@ modal, over a dialog too.
   the first with a halo: why it is yellow, on the page.
 - **Over a dialog:** a dialog that opens the Beam keeps its state in the history entry too, so
   the back button closes the Beam, then the dialog, and the way back from a document returns to
-  both. The Beam lies over the dialog, which stays where it is, on a phone as on a desktop: it
+  the dialog. The Beam lies over the dialog, which stays where it is, on a phone as on a desktop: it
   is the top layer (`z-[60]` over the dialogs' `z-50`, tooltips `z-[70]` over it), whichever
   of them was mounted last. Its backdrop dims without blur, so neither the dialog's blur nor its
   own blurs the pages.
@@ -950,8 +950,10 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Neu
 - **After a jump** (the Beam's "Dokument öffnen", later a dialog's link): the new history entry
   names where it came from (`way-back.ts`, `page.state.from`). The document's `BackLink` then
   reads "Zurück zu {place}" and goes back in the history, one step, as the back button does: to
-  the place as it was, its dialog and Beam open. Leaving a document (deleted, handed over) takes
-  the same way.
+  the place as it was, its dialog open. The Beam's jump takes the Beam's own history entry
+  (`leaveBeam`), so link and back button both return without the Beam (Tobi, 09.11.2026); a
+  Beam a reload restored is the place's own entry, and the jump goes on top of it. Leaving a
+  document (deleted, handed over) takes the same way.
 
 ### Master data tabs
 

@@ -8,6 +8,7 @@ import { kindLabel } from '#lib/identifiers.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { documentOf, processingOf } from '#lib/testing/documents.ts';
 import { calls, fakeApi } from '#lib/testing/api.ts';
+import { openBeam } from '#lib/beam.svelte.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Beam from './Beam.svelte';
 
@@ -200,6 +201,20 @@ describe('Beam', () => {
 		expect(goto).toHaveBeenLastCalledWith('/ui/documents/a', {
 			state: { from: { label: 'Dokumente' } },
 			persistState: true
+		});
+	});
+
+	it('opens the document in place of the Beam it opened, so the way back leaves it closed', async () => {
+		goTo(LIST);
+		openBeam(['a', 'b'], 'a', 'Dokumente');
+		goTo(LIST, {}, { beam: beam(0) });
+		render(Beam);
+		await screen.findByRole('dialog', { name: 'Stromrechnung März' });
+		await userEvent.click(screen.getByRole('button', { name: m.beam_open_document() }));
+		expect(goto).toHaveBeenLastCalledWith('/ui/documents/a', {
+			state: { from: { label: 'Dokumente' } },
+			persistState: true,
+			replace: true
 		});
 	});
 
