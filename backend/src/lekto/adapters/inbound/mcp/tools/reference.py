@@ -128,9 +128,7 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
         chosen = identifier_kind(kind, "identifier")
         normal = normalise_identifier(chosen, value)
         holders = [
-            contact.name
-            for contact in await context.master_data.list_contacts(user)
-            if any(item.kind is chosen and item.value == normal for item in contact.identifiers)
+            contact.name for contact in await context.master_data.holders_of(user, chosen, normal)
         ]
         places = await context.documents.identifier_places(user, chosen, normal)
         return compact(

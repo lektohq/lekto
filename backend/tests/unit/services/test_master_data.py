@@ -22,7 +22,7 @@ from lekto.core.domain.rules import (
     RuleDefinition,
     RuleScope,
 )
-from lekto.core.domain.users import Role
+from lekto.core.domain.users import Role, User
 from lekto.core.services import master_data
 from lekto.core.services.master_data import learn_alias, replace_learned_identifiers
 from tests import builders
@@ -664,3 +664,32 @@ async def test_a_document_type_comes_with_its_fields_or_not_at_all(world: World)
         )
     async with world.uow() as uow:
         assert await uow.document_types.find_by_name("Mahnung") is None
+
+
+async def test_holders_of_an_identifier_are_those_the_caller_sees(world: World) -> None:
+    """Whose an identifier is, in the service for REST and MCP alike (review 0.12.2, A-12): a
+    value as written finds its normal form; a person's number only for admins and the person."""
+    admin, anna, bob = (
+        await world.user(role=Role.ADMIN),
+        await world.user("anna"),
+        await world.user("bob"),
+    )
+    utility = await world.master_data.create_contact(admin.id, "Stadtwerke")
+    employer = await world.master_data.create_contact(admin.id, "Arbeitgeber")
+    kind = IdentifierKind.CUSTOMER_NUMBER
+    async with world.uow() as uow:
+        for contact, number, user in ((utility, "KD20047718", None), (employer, "P4711", anna.id)):
+            stored = await uow.contacts.get(contact.id)
+            stored.set_identifiers([Identifier(kind, number, user_id=user)])
+            await uow.contacts.update(stored)
+        await uow.commit()
+
+    async def holders(user: User, written: str) -> list[str]:
+        return [
+            contact.name for contact in await world.master_data.holders_of(user.id, kind, written)
+        ]
+
+    assert await holders(bob, " kd-20 047 718 ") == ["Stadtwerke"]
+    assert await holders(admin, "p-4711") == ["Arbeitgeber"]
+    assert await holders(anna, "p-4711") == ["Arbeitgeber"]
+    assert await holders(bob, "p-4711") == []

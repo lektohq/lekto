@@ -192,3 +192,15 @@ async def test_members_leave_a_space_themselves(world: World) -> None:
     with pytest.raises(ValidationError):
         await world.spaces.remove_member(owner.id, home.id, owner.id)
     assert other.id not in (await world.spaces.remove_member(other.id, home.id, other.id)).members
+
+
+async def test_spaces_are_listed_as_they_read(world: World) -> None:
+    """By how they read, a personal space by its person's name, umlauts as their letters: for
+    REST and MCP alike (review 0.12.2, A-12)."""
+    zoe = await world.user("zoe")
+    for name in ("öko", "Bank", "Ärzte"):
+        await world.spaces.create(zoe.id, name)
+    personal = await world.personal_space(zoe)
+    listed = await world.spaces.list_spaces(zoe.id)
+    assert [space.name for space in listed if space.id != personal.id] == ["Ärzte", "Bank", "öko"]
+    assert listed[-1].id == personal.id  # "zoe" comes last
