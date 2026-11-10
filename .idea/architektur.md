@@ -140,7 +140,7 @@ Drei Speicher mit klarer Aufgabe: Datenbank für Metadaten, Objektspeicher für 
 - Zwei gleichwertige Adapter: S3 (erster Server: Garage) oder lokales Dateisystem.
 - Lekto nutzt keine Speicher-Events. Ereignisse entstehen ausschließlich in der Outbox; so bleibt der Adapter frei tauschbar (Garage und Dateisystem kennen keine Events).
 - Originale unveränderlich, Objekt-Key = SHA-256 des Inhalts; Dubletten werden darüber erkannt. Jede Datei gibt es einmal je Installation, global eindeutig (Tobi, 22.10.2026: eine Installation ist ein eigenes Ökosystem, in dem Leute gemeinsam archivieren; bis 0.4 je Besitzer, am 21.10.2026 kurz je Space). Liegt sie schon in Lekto, wird ein Upload abgelehnt: mit Link, wenn der Einstellende das Dokument lesen darf; sonst erfährt er nur, dass es sie gibt („Diese Datei liegt schon in Lekto, in einem Space, den du nicht siehst“, ohne Namen des Space und ohne Mitglieder). Verschieben, Übergeben, Bestätigen und Regeln treffen nie auf eine Dublette.
-- **Fassungen** (Tobi, 10.11.2026, Umsetzungsplan „Fassungen, Datei ersetzen, PDF bearbeiten“): Ein Dokument hat Fassungen seines Originals; eine neue Fassung (Datei ersetzt, PDF bearbeitet) kommt dazu, keine wird überschrieben. Jede Fassung ist ein Original wie oben, auch für Dubletten; frühere lassen sich ansehen. Die Derivate gehören zur aktuellen Fassung. Nach einer neuen Fassung läuft die Verarbeitung neu, und das Dokument kommt zur Prüfung in den Posteingang; was eine Person entschieden hat, bleibt.
+- **Fassungen** (Tobi, 10.11.2026, Umsetzungsplan „Fassungen, Datei ersetzen, PDF bearbeiten“): Ein Dokument hat Fassungen seines Originals; eine neue Fassung (Datei ersetzt, PDF bearbeitet) kommt dazu, keine wird überschrieben. Jede Fassung ist ein Original wie oben, auch für Dubletten; frühere lassen sich ansehen. Die Derivate gehören zur aktuellen Fassung. Nach einer neuen Fassung läuft die Verarbeitung neu, und das Dokument kommt zur Prüfung in den Posteingang; was eine Person entschieden hat, bleibt. Ein Trennblatt trennt einen Stapel beim Eingang (der Stapel bleibt Fassung 1, die Teile werden Fassung 2 und neue Dokumente); Dokumente zusammenführen gibt die Fassungen der Quellen dem Ziel, die Quellen werden gelöscht, ihre Beziehungen zeigen aufs Ziel (Tobi, 10.11.2026, Umsetzungsplan „Trennblatt und Zusammenführen“).
 - Daneben die Derivate: Archiv-PDF mit Textlayer, der ausgelesene Text (`content.txt`, Klartext wie gesetzt) mit seiner Struktur (`content.json`: Seiten, Zeilen und Wörter mit Boxen), die Codes der Seiten (`codes.json`), Seitenbilder und Vorschau, die Anfragen an das Sprachmodell; dazu die Modelle des Klassifikators (`classifier/model-<n>.npz`) und die Logos der Kontakte (`contacts/<id>/logo.webp`).
 
 **Suche (Meilisearch)**
@@ -226,12 +226,14 @@ Zielbild (Tobi, 25.10.2026, `webhooks-und-auftraege.md`, M20/M21, noch nicht umg
 Die Verarbeitung ist ein Graph aus Knoten; jeder Knoten ist ein Job mit Wiederholung, Knoten ohne gegenseitige Abhängigkeit laufen parallel, und das Ergebnis landet in einer von drei Lanes.
 
 ```
-receive ─┬─► pages ──────────────────────────────────────────────────────────┐
-         └─► ocr ─► parse ─┬─► signal_llm ────────┐                            │
-                           ├─► signal_classifier ─┤                            │
-                           ├─► signal_neighbours ─┼─► judge ─► fields ─► relate ─► apply_rules ─► file
-                           └─► signal_facts ──────┘
+receive ─► separate ─┬─► pages ──────────────────────────────────────────────────────────┐
+                     └─► ocr ─► parse ─┬─► signal_llm ────────┐                            │
+                                       ├─► signal_classifier ─┤                            │
+                                       ├─► signal_neighbours ─┼─► judge ─► fields ─► relate ─► apply_rules ─► file
+                                       └─► signal_facts ──────┘
 ```
+
+`separate` (geplant, Umsetzungsplan „Trennblatt und Zusammenführen“) trennt einen Stapel beim Eingang an Trennblättern; ohne Trennblatt, nach einer neuen Fassung und bei der Migration ist er sofort fertig.
 
 **Drei Ebenen**
 
