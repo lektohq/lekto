@@ -19,6 +19,14 @@ export function isRuleField(field: string): boolean {
 	return (RULE_FIELDS as readonly string[]).includes(field);
 }
 
+/** What a new version of the file reads where a person confirmed something else (the reason
+ * `new_version_differs`): the field keeps the confirmed value, this is shown beside it. Null
+ * for any other check. */
+export function readAnew(check: Check): unknown {
+	const differs = check.reasons?.some((reason) => reason.code === 'new_version_differs');
+	return differs ? (check.suggestion ?? null) : null;
+}
+
 export function fieldId(field: string): string | null {
 	return field.startsWith('field:') ? field.slice('field:'.length) : null;
 }

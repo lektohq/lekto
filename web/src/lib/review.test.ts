@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { initialValue } from './review.ts';
+import { initialValue, readAnew } from './review.ts';
 import type { components } from '#lib/api/schema.ts';
 
 type Document = components['schemas']['DocumentDetails'];
@@ -26,5 +26,16 @@ describe('review decisions', () => {
 		expect(initialValue(check('tags', ['t1']), document, fields)).toEqual(['t1']);
 		expect(initialValue(check('field:a1', '2026-03-31'), document, fields)).toBe('2026-03-31');
 		expect(initialValue(check('document_date', null), document, fields)).toBe('');
+	});
+
+	it('names what a new version reads where it differs from the confirmed value', () => {
+		const differs = (suggestion: unknown) =>
+			({
+				...check('contact', suggestion),
+				reasons: [{ code: 'new_version_differs', params: {} }]
+			}) as unknown as Check;
+		expect(readAnew(differs('c2'))).toBe('c2');
+		expect(readAnew(differs(null))).toBeNull();
+		expect(readAnew(check('contact', 'c2'))).toBeNull();
 	});
 });

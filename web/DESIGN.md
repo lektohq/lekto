@@ -1260,7 +1260,11 @@ overwritten. The files tab lists them (`DocumentVersions`), the current one with
 place of the current one with "Neue Fassung hochladen" (`secondary`, `sm`, in the card's head),
 asked with a `ConfirmDialog` that is not destructive (the current file stays); processing runs
 again, keeps what a person confirmed, and the document waits in the inbox ("Die Datei hat sich
-geändert: prüfe, was Lekto darin liest."). The same upload (`VersionUpload`) stands in the
+geändert: prüfe, was Lekto darin liest."). Where the new version reads something else than was
+confirmed (Tobi 10.11.2026), the field keeps the confirmed value and its card says so ("In der
+neuen Fassung steht hier etwas anderes.") with a line "Neu gelesen: …" (the label muted, as
+"Antwort des Modells"); confirming keeps the value, taking the new one means setting it. The
+title's note in the review has the same line, the title in quotes. The same upload (`VersionUpload`) stands in the
 document's menu "…", beside "PDF bearbeiten" (see [Page stack](#page-stack)). A version split
 off another document says so: "Abgetrennt aus „…“".
 
