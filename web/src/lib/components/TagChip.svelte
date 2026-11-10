@@ -44,6 +44,7 @@
 	import type { Snippet } from 'svelte';
 	import { CHIP_REMOVE } from '#lib/components/Chip.svelte';
 	import { steadyText } from '#lib/steady-text.ts';
+	import { TONE_FILL } from '#lib/tones.ts';
 
 	// A tag as a chip: its icon and own name in its colour, the path as tooltip and, where
 	// `interactive`, on a tap (a phone has no hover); a group outlined, a topic with an edge;
@@ -53,7 +54,9 @@
 	// With `pressed` it is a toggle, a filter's value (`FacetChips`): chosen, a ring of the
 	// primary colour around it keeps its own colour readable, and its name turns bolder at the
 	// width it has unchosen (web/DESIGN.md, "Chips", "Steady layout"); `end` follows the name (a
-	// count), `title` names it beyond its name (a tag's path).
+	// count), `title` names it beyond its name (a tag's path). With `change` it shows a change
+	// of the tags (web/DESIGN.md, "Change preview"): an added tag green, a removed one red and
+	// struck through, each in the lane's tone instead of its own colour.
 	let {
 		tag,
 		group = false,
@@ -68,7 +71,8 @@
 		pressed,
 		onclick,
 		title,
-		end
+		end,
+		change
 	}: {
 		tag: Pick<Tag, 'id' | 'name' | 'path'> & Partial<Pick<Tag, 'icon' | 'color'>>;
 		group?: boolean;
@@ -86,11 +90,12 @@
 		onclick?: () => void;
 		title?: string;
 		end?: Snippet;
+		change?: 'added' | 'removed';
 	} = $props();
 
 	const path = $derived(pathLabel(tag));
 	const nested = $derived(tag.path.length > 1);
-	const style = $derived(chipStyle(tag.color));
+	const style = $derived(change ? null : chipStyle(tag.color));
 </script>
 
 {#if pressed !== undefined}
@@ -123,7 +128,9 @@
 {:else}
 	<span
 		class={cn(
-			chipLook(topic ? 'topic' : group ? 'group' : 'tag', tag.color),
+			change
+				? cn(chipLook('tag', null), 'font-medium', TONE_FILL[change === 'added' ? 'green' : 'red'])
+				: chipLook(topic ? 'topic' : group ? 'group' : 'tag', tag.color),
 			size === 'sm' ? 'h-6 px-2 text-xs' : 'h-8 pl-3 text-sm',
 			size === 'md' && (onremove ? 'pr-1' : 'pr-3')
 		)}
@@ -165,7 +172,7 @@
 				</Popover.Content>
 			</Popover.Root>
 		{:else}
-			<span class="min-w-0 truncate">{tag.name}</span>
+			<span class={cn('min-w-0 truncate', change === 'removed' && 'line-through')}>{tag.name}</span>
 		{/if}
 		{#if onremove}
 			<button type="button" class={CHIP_REMOVE} aria-label={removeLabel} onclick={onremove}>

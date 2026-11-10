@@ -19,8 +19,8 @@
 	type Member = components['schemas']['MemberOut'];
 
 	// What a change of a document would do, before it is saved (web/DESIGN.md, "Change preview"):
-	// each changed field with its value before and after (a removed tag struck through, an added
-	// one as it is), the rules it sets off, and who sees the document then: one quiet line while
+	// each changed field with its value before and after (a removed tag red and struck through,
+	// an added one green), the rules it sets off, and who sees the document then: one quiet line while
 	// that stays as it was, the space and the people with who is new and who no longer sees it
 	// when it changes.
 	let { before, preview, lookup }: { before: Document; preview: Preview; lookup: Lookup | null } =
@@ -117,13 +117,21 @@
 {#snippet tagsChange()}
 	<span class="flex flex-wrap gap-1.5">
 		{#each removedTags as id (id)}
-			<span class="line-through opacity-60">
-				<span class="sr-only">{m.dryrun_removed()}</span>
-				<TagChip tag={tag(id)} size="sm" />
-			</span>
+			<span
+				><span class="sr-only">{m.dryrun_removed()}</span><TagChip
+					tag={tag(id)}
+					size="sm"
+					change="removed"
+				/></span
+			>
 		{/each}
 		{#each addedTags as id (id)}
-			<span><span class="sr-only">{m.dryrun_added()}</span><TagChip tag={tag(id)} size="sm" /></span
+			<span
+				><span class="sr-only">{m.dryrun_added()}</span><TagChip
+					tag={tag(id)}
+					size="sm"
+					change="added"
+				/></span
 			>
 		{/each}
 	</span>
