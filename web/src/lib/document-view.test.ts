@@ -5,7 +5,9 @@ import {
 	fieldEvidence,
 	byPage,
 	inboxDocument,
+	dropPlace,
 	keepPlace,
+	keepPlaces,
 	laterReveals,
 	REVEAL_WAITS,
 	marksOf,
@@ -355,5 +357,31 @@ describe('laterReveals', () => {
 		reveals.drop();
 		vi.advanceTimersByTime(2000);
 		expect(seen).toEqual([]);
+	});
+});
+
+describe('the places one steps through', () => {
+	const ids = (places: { id: string }[] | null) => places?.map((place) => place.id);
+	const of = (...names: string[]) => names.map((id) => ({ id }));
+
+	it('keeps every place that left where it stood, in the order read anew', () => {
+		const all = () => true;
+		expect(ids(keepPlaces(of('a', 'b', 'c'), of('b', 'c'), all))).toEqual(['a', 'b', 'c']);
+		expect(ids(keepPlaces(of('a', 'b', 'c'), of('c', 'b'), all))).toEqual(['a', 'c', 'b']);
+		// Two that left one after the other stay in their order.
+		expect(ids(keepPlaces(of('a', 'b', 'c', 'd'), of('d'), all))).toEqual(['a', 'b', 'c', 'd']);
+		expect(ids(keepPlaces(of('a', 'b'), of('x', 'b'), all))).toEqual(['a', 'x', 'b']);
+	});
+
+	it('keeps only what it is told to', () => {
+		expect(ids(keepPlaces(of('a', 'b', 'c'), of('c'), (place) => place.id !== 'a'))).toEqual([
+			'b',
+			'c'
+		]);
+	});
+
+	it('drops a place that is gone', () => {
+		expect(ids(dropPlace(of('a', 'b'), 'a'))).toEqual(['b']);
+		expect(dropPlace(null, 'a')).toBeNull();
 	});
 });

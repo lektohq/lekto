@@ -283,23 +283,46 @@ export interface InboxPlace {
 }
 
 /**
- * The inbox (or the document list) anew, with `id` kept where it stood before: the open document
- * may leave it while it is shown (seen when it opened, confirmed, a tag of the list's filter
- * removed), and the way to the documents before and after it stays.
+ * The places one steps through (the inbox, the document list; web/DESIGN.md, "Navigation between
+ * list and detail") read anew: `now` in its order, with each place of `before` that `keeps` and
+ * that `now` lacks put back after the nearest place before it that is still there (first if none
+ * is). The inbox keeps only the open document (it may leave while shown: seen, confirmed), the
+ * list every document it held (a tag of its filter removed: one steps back to it).
  */
+export function keepPlaces<Place extends { id: string }>(
+	before: readonly Place[],
+	now: readonly Place[],
+	keeps: (place: Place) => boolean
+): Place[] {
+	const places = [...now];
+	const ids = new Set(places.map((place) => place.id));
+	for (const [index, place] of before.entries()) {
+		if (ids.has(place.id) || !keeps(place)) continue;
+		let at = 0;
+		for (let back = index - 1; back >= 0 && at === 0; back--) {
+			at = places.findIndex((item) => item.id === before[back].id) + 1;
+		}
+		places.splice(at, 0, place);
+		ids.add(place.id);
+	}
+	return places;
+}
+
+/** The inbox anew, with the open document `id` kept where it stood before (`keepPlaces`). */
 export function keepPlace<Place extends { id: string }>(
 	before: readonly Place[],
 	now: readonly Place[],
 	id: string
 ): Place[] {
-	const kept = before.findIndex((place) => place.id === id);
-	if (kept < 0 || now.some((place) => place.id === id)) return [...now];
-	// After the nearest document before it that is still there; first if none is.
-	let at = 0;
-	for (let index = kept - 1; index >= 0 && at === 0; index--) {
-		at = now.findIndex((place) => place.id === before[index].id) + 1;
-	}
-	return [...now.slice(0, at), before[kept], ...now.slice(at)];
+	return keepPlaces(before, now, (place) => place.id === id);
+}
+
+/** The places without a document that is gone (deleted, or out of reach). */
+export function dropPlace<Place extends { id: string }>(
+	places: readonly Place[] | null,
+	id: string
+): Place[] | null {
+	return places?.filter((place) => place.id !== id) ?? null;
 }
 
 /**
