@@ -2836,6 +2836,52 @@ Phase 3 aus `webhooks-und-auftraege.md`.
 
 **Modell:** Opus 5.5 · high.
 
+### Fassungen, Datei ersetzen, PDF bearbeiten
+
+Stand: Plan mit Tobi abgestimmt am 10.11.2026 (alle Fragen beantwortet). Mock nach DESIGN.md (Version 2) abgenommen am 10.11.2026: https://claude.ai/artifact/EAkLkSHtqnkViENZbePdaH
+
+**Anlass (Tobi, 10.11.2026):** Die Entgeltbescheinigung 2022/11 der INTER ist ein PDF mit drei Abrechnungen (Rückrechnung September, Rückrechnung Oktober, November). „Wir bräuchten eine Funktion, das PDF aufzusplitten. Hilfsweise muss es die Funktion geben, das PDF einfach durch ein neues zu ersetzen.“
+
+**Befund (Claude, 10.11.2026):**
+- Ein Original liegt unter `originals/<sha256>`, einmal je Installation; über den Hash erkennt Lekto Dubletten. Die Derivate eines Dokuments liegen unter `documents/<id>/` (Archiv-PDF, Text, Struktur, Codes, Seitenbilder, Vorschau) und werden bei jedem Lauf neu geschrieben.
+- Das Dokument trägt `sha256`, `original_filename` und `media_type` seines einen Originals.
+- pikepdf ist schon eine Abhängigkeit (Reiter „Dateien“): Seiten wählen, drehen (`/Rotate`) und neu zusammensetzen geht verlustfrei, ohne neu zu rendern.
+- „Neu verarbeiten ab einem Knoten“ verwirft die Ergebnisse ab dort. Was eine Person entschieden hat, hält heute die Bestätigung im Posteingang fest (`Processing.decided`) und das Protokoll ihrer Änderungen.
+
+**Entscheidungen (Tobi, 10.11.2026):**
+1. **Fassungen:** Ein Dokument hat Fassungen seines Originals (1, 2, …), jede unveränderlich, mit wer, wann und warum (ersetzt, bearbeitet). Frühere Fassungen lassen sich ansehen (ihr Original). Kein Original wird überschrieben.
+2. **Datei ersetzen** („Neue Fassung hochladen“) gibt es für sich; es ist auch der Weg, auf dem eine Bearbeitung das Dokument ersetzt.
+3. **PDF bearbeiten:** ein Dialog mit den Seiten als Stapel: umsortieren, drehen, löschen, in Teile trennen. Je Teil „ersetzt dieses Dokument“ (höchstens einer) oder „neues Dokument“ (im selben Space, Herkunft „aufgeteilt aus …“).
+4. **Danach läuft die Verarbeitung immer neu, und jedes Ergebnis landet im Posteingang zur Prüfung**, auch wenn es sicher wäre: ein eigener Grund „Datei geändert“.
+5. **Was eine Person entschieden hat, bleibt** beim ersetzten Dokument (Kontakt, Typ, Titel, Tags, bestätigte Felder; Space, Beziehungen, Verlauf ohnehin). Der Lauf liest neu und schlägt Abweichungen vor; die Prüfung zeigt sie vorher → neu.
+6. **Ohne ersetzenden Teil** wird das Ausgangsdokument gelöscht, sobald die neuen angelegt sind, in einem Vorgang.
+7. **Dubletten** gelten auch für frühere Fassungen: Der alte Stapel noch einmal hochgeladen heißt „gibt es schon (Fassung 1 von …)“.
+8. **Bilder als Original** (JPEG, PNG, TIFF): Die Bearbeitung arbeitet auf ihren Seiten; das Ergebnis ist ein PDF.
+9. **Nicht im ersten Schritt:** Zuschneiden, Filter, Seiten aus anderen Dokumenten dazuholen, Dokumente zusammenführen.
+
+**Bedienung (Entwurf, Mock folgt):**
+- Dokumentansicht, Menü „…“: „PDF bearbeiten“ und „Neue Fassung hochladen“. Reiter „Dateien“: die Fassungen, jede zum Ansehen.
+- Dialog „PDF bearbeiten“ (Desktop groß, am Handy Vollbild): die Seiten als Raster von Vorschaubildern. Wählen per Klick, mit Umschalt oder Strg mehrere, am Handy durch langes Drücken. Umsortieren durch Ziehen oder mit der Tastatur. Eine Leiste für die Auswahl: links drehen, rechts drehen, löschen, „als neues Dokument“. Zwischen zwei Seiten setzt ein Klick einen Schnitt. Rückgängig und Wiederholen. Gespeichert wird erst mit „Übernehmen“.
+- Abschluss: die Teile mit ihren Seiten, je Teil „ersetzt dieses Dokument“ oder „neues Dokument“; der Hinweis, dass alle in den Posteingang kommen und das Ausgangsdokument ohne ersetzenden Teil gelöscht wird.
+
+**Gestalt nach DESIGN.md (Mock Version 2, abgenommen):**
+- Der Dialog ist ein `EditorShell` (`xl`), Titel „„<Titel>“ bearbeiten“; am Handy Vollbild mit `PhoneEditorBar` („Abbrechen · Titel · Weiter“).
+- Gewählte Seiten wie bei „Choosing many“: `ChoiceBox` an der Kachel, gewählt `bg-panel` mit `border-primary`; die Aktionen in der `SelectionBar` (`outline`, `sm`; am Handy unten, die Aktionen teilen sich die Breite).
+- Die Teile als `Badge` (`muted`); je Teil ein `Segmented` „Ersetzt „<Titel>“ | Neues Dokument“; der Hinweis als `Alert` (`note`). Fassungen: `Badge` `primary` „Aktuell“, „Ansehen“ als Zeilenaktion, „Neue Fassung hochladen“ `secondary`.
+- Neu in DESIGN.md mit PR 4: die Seiten-Kachel (`PageTile`: Papier mit `shadow-sm`, „Seite n“, ein Raster mit einem Tab-Stopp wie der Icon-Picker, Strg + Pfeil verschiebt), der Schnitt (`PageCut`: die Lücke als Umschalter „Nach Seite n trennen“, 24 px, am Handy 44 px; gesetzt eine Linie in `primary` mit Schere), der mehrstufige Dialog („Zurück“ `ghost` am Anfang der Fußzeile; am Handy „Zurück“ statt „Abbrechen“ in der Leiste) und im Glossar „Fassung“ (Version).
+
+**API (Entwurf):**
+- `GET /documents/{id}/versions`, `GET /documents/{id}/versions/{n}/original`.
+- `POST /documents/{id}/versions`: eine Datei als neue Fassung.
+- `POST /documents/{id}/edit` mit `parts: [{pages: [{page, rotate}], replaces}]`; Antwort: die Dokumente danach.
+- Rechte wie beim Neu-Verarbeiten: Bearbeiter des Space und Admins.
+
+**PRs:**
+1. **Fassungen** (`new-feature`): Tabelle der Fassungen (Revision), das Original je Fassung, die aktuelle am Dokument; Dubletten über alle Fassungen; Löschen nimmt alle mit; Lesen über die API; der Reiter „Dateien“ zeigt die Fassungen.
+2. **Datei ersetzen** (`new-feature`): `POST …/versions`; ein Lauf ab Empfang, der die Entscheidungen einer Person als Werte behält; der Grund „Datei geändert“ hält das Dokument im Posteingang; die Prüfung zeigt vorher → neu; „Neue Fassung hochladen“ in der Web-UI.
+3. **Bearbeiten im Backend** (`new-feature`): die Teile aus dem Original (pikepdf; Bilder zu PDF), der ersetzende Teil über PR 2, neue Dokumente mit Herkunft, das Ausgangsdokument gelöscht ohne ersetzenden Teil; alles ein Vorgang.
+4. **Dialog „PDF bearbeiten“** (`new-feature`) nach dem Mock, mit DESIGN.md.
+
 ### Weniger Pflege der Kennungen (#215)
 
 Stand: Plan mit Tobi abgestimmt am 08.11.2026; alle fünf PRs gemergt am 08.11.2026 (#312–#316), #215 geschlossen. Offen auf Prod, nur auf Tobis Wort: ein Training (entfernt erlernte Kennungen der weggefallenen Arten) und „Fakten neu lesen“ (die Lesekorrekturen für schon gelesene Dokumente). Die Entscheidungen je Art stehen als Tabelle unten in Issue #215.
