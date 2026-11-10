@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 # lekto-migration: the migration client (Paperless-ngx to Lekto) as an image of its own, built
-# and published with each release (`.github/workflows/release.yml`). Build context: `migration/`.
+# and published with a release that changed `migration/` (`.github/workflows/release.yml`; else the
+# previous release's image gets its tags). Build context: `migration/`.
 #
 #   docker build -t lekto-migration:local migration
 #   docker run --rm -it -v "$PWD:/work" --env-file .env lekto-migration:local plan

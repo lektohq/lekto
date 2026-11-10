@@ -3,12 +3,16 @@
     python3 .github/scripts/image_tags.py v0.6.0 < released.txt
 
 The tags of the published releases come one per line on stdin (the release itself among them).
-Writes `version=…` and `tags=…` (space-separated) for `$GITHUB_OUTPUT`.
+Writes `version=…`, `tags=…` (space-separated) and `previous=…` for `$GITHUB_OUTPUT`.
 
 Every release gets its version without the `v` (`0.6.0`). A beta is a version below 1.0 or one
 with a pre-release after Semver (`1.2.0-beta.1`); it gets `beta`, a stable release `stable`.
 `latest` follows the newest stable release, and the newest beta while there is none. A channel
 tag only moves forward: an older release built again takes no tag from a newer one.
+
+`previous` is the tag of the newest published release below this one (empty for the first): an
+image whose sources did not change since then (`lekto-migration`) is not built again, its image
+of that release gets this release's tags.
 """
 
 import re
@@ -75,13 +79,30 @@ def image_tags(tag: str, released: Iterable[str]) -> list[str]:
     return tags
 
 
+def previous_release(tag: str, released: Iterable[str]) -> str | None:
+    """The tag of the newest published release below `tag`, as it was written; None for none."""
+    version = Version(tag)
+    below: dict[Version, str] = {}
+    for line in released:
+        if line.strip():
+            try:
+                found = Version(line)
+            except ValueError:
+                continue
+            if found < version:
+                below[found] = line.strip()
+    return below[max(below)] if below else None
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print(__doc__, file=sys.stderr)
         return 2
-    tags = image_tags(sys.argv[1], sys.stdin)
+    released = sys.stdin.read().splitlines()
+    tags = image_tags(sys.argv[1], released)
     print(f"version={tags[0]}")
     print(f"tags={' '.join(tags)}")
+    print(f"previous={previous_release(sys.argv[1], released) or ''}")
     return 0
 
 
