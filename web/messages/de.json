@@ -928,6 +928,7 @@
 	"inbox_badge_new": "{count} neu",
 	"inbox_badge_processing": "{count} in Verarbeitung",
 	"in_inbox": "Im Posteingang",
+	"review_read_anew": "Neu gelesen",
 	"review_proposed": "Antwort des Modells",
 	"review_evidence": "Zitat",
 	"review_new_name": "Gibt es noch nicht",
