@@ -2857,11 +2857,12 @@ Stand: Plan mit Tobi abgestimmt am 10.11.2026 (alle Fragen beantwortet). Mock na
 6. **Ohne ersetzenden Teil** wird das Ausgangsdokument gelöscht, sobald die neuen angelegt sind, in einem Vorgang.
 7. **Dubletten** gelten auch für frühere Fassungen: Der alte Stapel noch einmal hochgeladen heißt „gibt es schon (Fassung 1 von …)“.
 8. **Bilder als Original** (JPEG, PNG, TIFF): Die Bearbeitung arbeitet auf ihren Seiten; das Ergebnis ist ein PDF.
-9. **Nicht im ersten Schritt:** Zuschneiden, Filter, Seiten aus anderen Dokumenten dazuholen, Dokumente zusammenführen.
+9. **Dokument hinzufügen** (Tobi, 10.11.2026): Im Dialog lässt sich eine Datei vom Gerät hinzufügen (PDF oder Bild, wie beim Hochladen), etwa vergessene Seiten. Ihre Seiten kommen hinter die gewählte Seite, ohne Auswahl ans Ende des Stapels, und lassen sich wie alle anderen sortieren, drehen, löschen und trennen. Die Datei wird kein eigenes Original; ihre Seiten gehen in die Teile ein, in denen sie landen.
+10. **Nicht im ersten Schritt:** Zuschneiden, Filter, Seiten aus anderen Lekto-Dokumenten dazuholen, Dokumente zusammenführen.
 
 **Bedienung (Entwurf, Mock folgt):**
 - Dokumentansicht, Menü „…“: „PDF bearbeiten“ und „Neue Fassung hochladen“. Reiter „Dateien“: die Fassungen, jede zum Ansehen.
-- Dialog „PDF bearbeiten“ (Desktop groß, am Handy Vollbild): die Seiten als Raster von Vorschaubildern. Wählen per Klick, mit Umschalt oder Strg mehrere, am Handy durch langes Drücken. Umsortieren durch Ziehen oder mit der Tastatur. Eine Leiste für die Auswahl: links drehen, rechts drehen, löschen, „als neues Dokument“. Zwischen zwei Seiten setzt ein Klick einen Schnitt. Rückgängig und Wiederholen. Gespeichert wird erst mit „Übernehmen“.
+- Dialog „PDF bearbeiten“ (Desktop groß, am Handy Vollbild): die Seiten als Raster von Vorschaubildern. Wählen per Klick, mit Umschalt oder Strg mehrere, am Handy durch langes Drücken. Umsortieren durch Ziehen oder mit der Tastatur. Eine Leiste für die Auswahl: links drehen, rechts drehen, löschen, „als neues Dokument“. Über dem Stapel „Dokument hinzufügen“ (eine Datei vom Gerät, siehe Entscheidung 9). Zwischen zwei Seiten setzt ein Klick einen Schnitt. Rückgängig und Wiederholen. Gespeichert wird erst mit „Übernehmen“.
 - Abschluss: die Teile mit ihren Seiten, je Teil „ersetzt dieses Dokument“ oder „neues Dokument“; der Hinweis, dass alle in den Posteingang kommen und das Ausgangsdokument ohne ersetzenden Teil gelöscht wird.
 
 **Gestalt nach DESIGN.md (Mock Version 2, abgenommen):**
@@ -2873,13 +2874,13 @@ Stand: Plan mit Tobi abgestimmt am 10.11.2026 (alle Fragen beantwortet). Mock na
 **API (Entwurf):**
 - `GET /documents/{id}/versions`, `GET /documents/{id}/versions/{n}/original`.
 - `POST /documents/{id}/versions`: eine Datei als neue Fassung.
-- `POST /documents/{id}/edit` mit `parts: [{pages: [{page, rotate}], replaces}]`; Antwort: die Dokumente danach.
+- `POST /documents/{id}/edit` mit `parts: [{pages: [{source, page, rotate}], replaces}]` und den hinzugefügten Dateien (multipart; `source` nennt das Original oder eine hinzugefügte Datei); Antwort: die Dokumente danach.
 - Rechte wie beim Neu-Verarbeiten: Bearbeiter des Space und Admins.
 
 **PRs:**
 1. **Fassungen** (`new-feature`): Tabelle der Fassungen (Revision), das Original je Fassung, die aktuelle am Dokument; Dubletten über alle Fassungen; Löschen nimmt alle mit; Lesen über die API; der Reiter „Dateien“ zeigt die Fassungen.
 2. **Datei ersetzen** (`new-feature`): `POST …/versions`; ein Lauf ab Empfang, der die Entscheidungen einer Person als Werte behält; der Grund „Datei geändert“ hält das Dokument im Posteingang; die Prüfung zeigt vorher → neu; „Neue Fassung hochladen“ in der Web-UI.
-3. **Bearbeiten im Backend** (`new-feature`): die Teile aus dem Original (pikepdf; Bilder zu PDF), der ersetzende Teil über PR 2, neue Dokumente mit Herkunft, das Ausgangsdokument gelöscht ohne ersetzenden Teil; alles ein Vorgang.
+3. **Bearbeiten im Backend** (`new-feature`): die Teile aus dem Original und den hinzugefügten Dateien (pikepdf; Bilder zu PDF), der ersetzende Teil über PR 2, neue Dokumente mit Herkunft, das Ausgangsdokument gelöscht ohne ersetzenden Teil; alles ein Vorgang.
 4. **Dialog „PDF bearbeiten“** (`new-feature`) nach dem Mock, mit DESIGN.md.
 
 ### Weniger Pflege der Kennungen (#215)
