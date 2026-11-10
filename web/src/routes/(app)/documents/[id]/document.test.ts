@@ -164,8 +164,11 @@ describe('the document view and seen', () => {
 		await waitFor(() => expect(calls(api)).toContain('GET /api/v1/inbox/summary'));
 		// Further loads of the same document report nothing new.
 		emit?.('document.updated', { document_id: 'doc-1', fields: ['title'] });
-		await waitFor(() =>
-			expect(calls(api).filter((call) => call === 'GET /api/v1/documents/doc-1')).toHaveLength(2)
+		// The load waits for the burst to end (300 ms); a busy runner takes longer than a second.
+		await waitFor(
+			() =>
+				expect(calls(api).filter((call) => call === 'GET /api/v1/documents/doc-1')).toHaveLength(2),
+			{ timeout: 3000 }
 		);
 		expect(seen(api)).toHaveLength(1);
 	});
