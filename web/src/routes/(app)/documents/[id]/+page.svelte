@@ -714,6 +714,7 @@
 			<DocumentFiles
 				documentId={id}
 				document={document ?? undefined}
+				title={document?.title}
 				{lookup}
 				{editable}
 				onchanged={load}

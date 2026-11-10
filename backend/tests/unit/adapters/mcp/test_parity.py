@@ -96,6 +96,7 @@ ENDPOINTS: dict[str, str | Excluded] = {
     "DELETE /documents/{id}": WEB_UI,
     "POST /documents/{id}/move": WEB_UI,
     "POST /documents/{id}/reprocess": WEB_UI,
+    "POST /documents/{id}/versions": Excluded.UPLOAD,
     "POST /documents/{id}/retry": "documents_retry",
     "POST /documents/{id}/vision": Excluded.VLM,
     "POST /documents/{id}/dry-run": "documents_update",

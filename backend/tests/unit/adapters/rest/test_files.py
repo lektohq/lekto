@@ -4,7 +4,7 @@ import hashlib
 
 from tests.api import auth
 from tests.builders import SAMPLES
-from tests.unit.adapters.rest.support import DOCUMENTS, FILENAME, Api, upload
+from tests.unit.adapters.rest.support import DOCUMENTS, FILENAME, Api, file_part, upload
 
 
 async def test_the_original_and_the_archive_with_their_metadata(api: Api) -> None:
@@ -59,4 +59,37 @@ async def test_the_versions_of_the_original_and_the_file_of_one(api: Api) -> Non
     assert missing.status_code == 404
     assert missing.json()["reason"]["code"] == "version_not_found"
     hidden = await api.client.get(f"{url}/versions/1/original", headers=auth(other))
+    assert hidden.status_code == 404
+
+
+async def test_a_new_version_replaces_the_file_and_runs_anew(api: Api) -> None:
+    owner, other = await api.user(), await api.user()
+    url = f"{DOCUMENTS}/{await upload(api, auth(owner))}"
+    pdf = b"%PDF-1.7 the better scan"
+    response = await api.client.post(
+        f"{url}/versions", files=file_part("better.pdf", pdf), headers=auth(owner)
+    )
+    assert response.status_code == 202, response.text
+    assert response.json()["original_filename"] == "better.pdf"
+    await api.drain()
+    files = (await api.client.get(f"{url}/files", headers=auth(owner))).json()
+    assert [(item["number"], item["kind"], item["current"]) for item in files["versions"]] == [
+        (1, "received", False),
+        (2, "replaced", True),
+    ]
+    again = await api.client.post(
+        f"{url}/versions",
+        files=file_part("again.pdf", (SAMPLES / "scan.pdf").read_bytes()),
+        headers=auth(owner),
+    )
+    assert again.status_code == 409
+    assert again.json()["reason"]["code"] == "duplicate_of_version"
+    mail = b"From: a@example.org\r\nSubject: Hi\r\n\r\nHello\r\n"
+    refused = await api.client.post(
+        f"{url}/versions", files=file_part("m.eml", mail), headers=auth(owner)
+    )
+    assert refused.status_code == 415
+    hidden = await api.client.post(
+        f"{url}/versions", files=file_part("x.pdf", b"%PDF-1.7 x"), headers=auth(other)
+    )
     assert hidden.status_code == 404

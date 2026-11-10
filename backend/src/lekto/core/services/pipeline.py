@@ -68,6 +68,7 @@ from lekto.core.domain.rule_planner import changed_fields
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
 from lekto.core.domain.validation import require_name
+from lekto.core.domain.versions import DocumentVersion, VersionKind
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.ocr import VisionModel
@@ -108,7 +109,7 @@ from lekto.core.services.inbox import (
     suggested_spaces,
 )
 from lekto.core.services.master_data import learn_alias
-from lekto.core.services.objects import original_key
+from lekto.core.services.objects import derivative_keys, original_key
 from lekto.core.services.relating import RELATE_JOB, queue_relate, relate
 from lekto.core.services.relations import RELATIONS_LOCK, relation_events
 from lekto.core.services.rules.running import corrected_fields, person_record, space_choice
@@ -141,6 +142,12 @@ class DeferredResult(Protocol):
     async def apply(
         self, uow: UnitOfWork, document: Document, now: datetime
     ) -> NodeResult | Delegation: ...
+
+
+VERSION_MEDIA_TYPES: tuple[str, ...] = tuple(
+    kind for kind in media_types.SUPPORTED if kind != media_types.EML
+)
+"""What a new version of a document's original may be: what an upload takes but a mail."""
 
 
 @dataclass(frozen=True)
@@ -541,6 +548,76 @@ class PipelineService:
             document, _ = await controllable_document(uow, user, id, Action.CONTROL_PROCESSING)
             access = await access_to(uow, user, document)
             document.reprocess_from(node, self._clock.now())
+            await self._restart(uow, document)
+        return DocumentView(document, access)
+
+    async def new_version(
+        self, actor: UserId, id: DocumentId, file: IncomingFile, *, filename: str
+    ) -> DocumentView:
+        """Editors and admins: put `file` in the place of the document's original as its next
+        version (`domain.versions`, kind `replaced`); the earlier ones stay. Processing runs
+        again from OCR, keeps what a person confirmed and ends in the inbox
+        (`Document.new_version`). UnsupportedMediaTypeError for a type Lekto does not take,
+        DuplicateDocumentError for a file in Lekto already (any version of any document),
+        InvalidTransitionError while it is processed."""
+        return await self.add_version(actor, id, file, filename=filename, kind=VersionKind.REPLACED)
+
+    async def add_version(
+        self,
+        actor: UserId,
+        id: DocumentId,
+        file: IncomingFile,
+        *,
+        filename: str,
+        kind: VersionKind,
+        detail: JsonObject | None = None,
+    ) -> DocumentView:
+        """`new_version` for a version of `kind` with `detail` (an edit names what it was made
+        from)."""
+        sha256 = file.sha256
+        media_type = media_types.detect(await asyncio.to_thread(_head, file.path))
+        # A mail is a way in, not a version of a document's original.
+        if media_type is None or media_type not in VERSION_MEDIA_TYPES:
+            raise UnsupportedMediaTypeError(
+                f"unsupported file type; supported: {', '.join(VERSION_MEDIA_TYPES)}"
+            )
+        async with self._uow() as uow:
+            user = await load_actor(uow, actor)
+            await controllable_document(uow, user, id, Action.CONTROL_PROCESSING)
+            if (error := await duplicate_of(uow, user, sha256)) is not None:
+                raise error
+        key = original_key(sha256)
+        now = self._clock.now()
+        async with self._uow() as uow:
+            await uow.lock(key)
+            if not await self._store.exists(key):
+                await self._store.upload(key, file.path, content_type=media_type)
+            # Check again: rights, a duplicate or its processing may have changed meanwhile.
+            user = await load_actor(uow, actor)
+            document, _ = await controllable_document(uow, user, id, Action.CONTROL_PROCESSING)
+            access = await access_to(uow, user, document)
+            if (error := await duplicate_of(uow, user, sha256)) is not None:
+                raise error
+            versions = await uow.document_versions.of_document(id)
+            pages = document.page_count
+            document.new_version(sha256, filename, media_type, now)
+            await uow.document_versions.add(
+                DocumentVersion(
+                    document_id=id,
+                    number=max((item.number for item in versions), default=0) + 1,
+                    sha256=sha256,
+                    original_filename=document.original_filename,
+                    media_type=media_type,
+                    kind=kind,
+                    created_at=now,
+                    created_by=actor,
+                    detail=detail or {},
+                )
+            )
+            # The earlier version's derivatives go before the new run's jobs are seen: page
+            # images beyond the new page count would stay otherwise.
+            for derivative in derivative_keys(id, pages):
+                await self._store.delete(derivative)
             await self._restart(uow, document)
         return DocumentView(document, access)
 

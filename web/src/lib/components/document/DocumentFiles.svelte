@@ -60,12 +60,15 @@
 	let {
 		documentId,
 		document,
+		title,
 		lookup = null,
 		editable = false,
 		onchanged
 	}: {
 		documentId: string;
 		document?: Reviewed;
+		/** The document's title, named when its file is replaced. */
+		title?: string;
 		/** Names the people who made the versions. */
 		lookup?: Lookup | null;
 		editable?: boolean;
@@ -488,7 +491,17 @@
 					{/if}
 				</div>
 
-				<DocumentVersions {documentId} versions={files.versions} {lookup} />
+				<DocumentVersions
+					{documentId}
+					title={title ?? files.original_filename}
+					versions={files.versions}
+					{lookup}
+					{editable}
+					onchanged={() => {
+						void load();
+						onchanged?.();
+					}}
+				/>
 
 				<Card.Root as="section" size="row" aria-labelledby="files-all" class="flex flex-col gap-3">
 					<div class="flex flex-wrap items-center gap-x-3 gap-y-2">

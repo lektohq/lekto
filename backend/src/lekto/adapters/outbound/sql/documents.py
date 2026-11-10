@@ -390,6 +390,7 @@ class SqlDocumentRepository(SqlRepository[DocumentId, Document]):
                         for node, state in row.processing_nodes.items()
                     },
                     vision=row.processing_vision,
+                    new_version=row.processing_new_version,
                     baseline=row.processing_baseline,
                     decided=row.processing_decided,
                 ),
@@ -428,6 +429,7 @@ class SqlDocumentRepository(SqlRepository[DocumentId, Document]):
                 node.value: _node_json(state) for node, state in processing.nodes.items()
             },
             "processing_vision": processing.vision,
+            "processing_new_version": processing.new_version,
             "processing_baseline": processing.baseline,
             "processing_decided": processing.decided,
             "created_at": entity.created_at,

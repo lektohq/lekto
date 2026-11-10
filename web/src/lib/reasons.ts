@@ -269,6 +269,8 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	open_fields: entry(m.reason_open_fields, { fields: 'fields' }),
 	duplicate_of: entry(m.reason_duplicate_of),
 	duplicate_of_version: entry(m.reason_duplicate_of_version, { version: 'number' }),
+	new_version: entry(m.reason_new_version),
+	new_version_differs: entry(m.reason_new_version_differs),
 	duplicate_unseen: entry(m.reason_duplicate_unseen),
 	no_text_yet: entry(m.reason_no_text_yet),
 	no_structure_yet: entry(m.reason_no_structure_yet),
