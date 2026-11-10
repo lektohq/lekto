@@ -1,4 +1,11 @@
+import { configure } from '@testing-library/svelte';
 import { vi } from 'vitest';
+
+// How long `waitFor` and `find*` wait for what a test expects: a busy runner (a CI shard, a full
+// run beside the dev instance) takes longer than the default second for a dialog to close or a
+// reload after a burst of events (300 ms) to land. A test that passes does not wait longer; the
+// deadline counts only for one that would fail. Not per test (Tobi, 10.11.2026).
+configure({ asyncUtilTimeout: 10_000 });
 
 // jsdom lacks a few browser APIs the components use.
 
