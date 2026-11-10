@@ -50,6 +50,7 @@
 	import Eyebrow from '#lib/components/page/Eyebrow.svelte';
 	import PageHeader from '#lib/components/page/PageHeader.svelte';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
+	import Stepper from '#lib/components/Stepper.svelte';
 	import VolumeMeter from '#lib/components/VolumeMeter.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -157,6 +158,7 @@
 	let on = $state(true);
 	let picked = $state('one');
 	let day = $state('2026-10-26');
+	let step = $state(2);
 	let moment = $state('2026-10-26T14:30');
 	let view = $state('grid');
 	let contact = $state('c1');
@@ -282,6 +284,29 @@
 			<BeamTitle title={m.dev_sample_document()} onview={() => toast(m.dev_sample_document())} />
 			<BeamTitle title={VALUE} mono onview={() => toast(m.dev_sample_document())} />
 		</div>
+	</section>
+
+	<section class="flex max-w-md flex-col gap-3" aria-labelledby="dev-stepper">
+		<SectionTitle id="dev-stepper">{m.dev_section_stepper()}</SectionTitle>
+		<Stepper
+			side="start"
+			label={m.dev_section_stepper()}
+			text={m.beam_position({ current: step, total: 31 })}
+			previous={step > 1 ? () => (step -= 1) : null}
+			next={step < 31 ? () => (step += 1) : null}
+			previousLabel={m.doc_previous()}
+			nextLabel={m.doc_next()}
+		/>
+		<Stepper
+			class="self-end"
+			side="end"
+			label={m.dev_section_stepper()}
+			text={m.beam_position({ current: step, total: 31 })}
+			previous={step > 1 ? () => (step -= 1) : null}
+			next={step < 31 ? () => (step += 1) : null}
+			previousLabel={m.doc_previous()}
+			nextLabel={m.doc_next()}
+		/>
 	</section>
 
 	<section class="flex max-w-sm flex-col gap-4" aria-labelledby="dev-fields">
