@@ -107,7 +107,6 @@ afterEach(() => {
 
 // The icon picker's panel is loaded when it opens; under a full parallel run that can take a
 // while.
-const LOADED = { timeout: 5000 };
 
 /** The choice of a tag field, wider than a phone a popover: placed by measuring, which jsdom
  * does not, it counts as hidden and has no computed name; its title names it. */
@@ -377,7 +376,7 @@ describe('looks', () => {
 		masterDataDialogs.open('tags', TAGS[1] as Item);
 		expect(await screen.findByDisplayValue('Health')).toBeTruthy();
 		await user.click(screen.getByRole('button', { name: m.icon_choose() }));
-		await user.click(await screen.findByTitle('piggy-bank', {}, LOADED));
+		await user.click(await screen.findByTitle('piggy-bank'));
 		await user.click(screen.getByRole('radio', { name: m.color_teal() }));
 		const preview = document.querySelector('[data-color="teal"]');
 		expect(preview?.textContent?.trim()).toBe('Health');

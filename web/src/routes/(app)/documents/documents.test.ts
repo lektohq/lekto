@@ -348,7 +348,7 @@ describe('the archive page', () => {
 		expect(
 			screen.queryByRole('checkbox', { name: m.bulk_select_document({ title: 'Gas' }) })
 		).toBeNull();
-	}, 15_000);
+	});
 
 	it('chooses a document by a tap on it, and deletes after asking with the number', async () => {
 		const sent: unknown[] = [];

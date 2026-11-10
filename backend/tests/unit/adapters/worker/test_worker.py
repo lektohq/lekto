@@ -11,6 +11,7 @@ import pytest
 
 from lekto.adapters.inbound.worker import Worker
 from lekto.adapters.outbound.memory import MemoryEventBus, MemorySearchIndex
+from lekto.adapters.outbound.memory.clock import ManualClock
 from lekto.adapters.outbound.memory.unit_of_work import MemoryJobQueue
 from lekto.composition.container import Container, Services, build_memory_container
 from lekto.composition.container import build_services as build_all_services
@@ -332,15 +333,19 @@ async def test_a_job_due_later_runs_on_time_without_polling(
 
 
 async def test_an_expired_lease_is_taken_up_again() -> None:
-    container = build_memory_container()
+    # The clock moves only when told: the lease holds however slow the runner is (with the
+    # system clock, a busy runner let it run out before the first look, 08.11.2026).
+    clock = ManualClock()
+    container = build_memory_container(clock=clock)
     job = await enqueue_removal(container, timedelta(0))
     async with container.unit_of_work() as uow:
-        claimed = await uow.jobs.claim(now=container.clock.now(), lease=timedelta(milliseconds=300))
+        claimed = await uow.jobs.claim(now=clock.now(), lease=timedelta(milliseconds=300))
         await uow.commit()
     assert claimed is not None and claimed.id == job
     async with running(worker(container, build_services(container))):
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.2)
         assert await status(container, job) is JobStatus.RUNNING, "held by its lease"
+        clock.advance(timedelta(seconds=1))
         await until(lambda: finished(container, job), timeout=3)
     async with container.unit_of_work() as uow:
         assert (await uow.jobs.get(job)).attempts == 2

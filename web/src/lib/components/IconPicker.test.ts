@@ -7,7 +7,6 @@ import IconPicker from './IconPicker.svelte';
 
 // The icon picker's panel is loaded when it opens; under a full parallel run that can take a
 // while.
-const LOADED = { timeout: 5000 };
 
 describe('IconPicker', () => {
 	afterEach(() => vi.restoreAllMocks());
@@ -18,7 +17,7 @@ describe('IconPicker', () => {
 		expect(screen.getByText(m.icon_none())).toBeTruthy();
 		await user.click(screen.getByRole('button', { name: m.icon_choose() }));
 		// The panel loads when the picker opens.
-		expect(await screen.findByRole('region', { name: m.icon_area_money() }, LOADED)).toBeTruthy();
+		expect(await screen.findByRole('region', { name: m.icon_area_money() })).toBeTruthy();
 		expect(screen.getAllByRole('button', { pressed: false }).length).toBeGreaterThanOrEqual(170);
 		await user.click(screen.getByTitle('piggy-bank'));
 		expect(screen.getByText('piggy-bank')).toBeTruthy();
@@ -31,7 +30,7 @@ describe('IconPicker', () => {
 		const user = userEvent.setup();
 		render(IconPicker, { id: 'icon', value: 'house' });
 		await user.click(screen.getByRole('button', { name: m.icon_choose() }));
-		await user.type(await screen.findByRole('searchbox', {}, LOADED), 'rocket');
+		await user.type(await screen.findByRole('searchbox'), 'rocket');
 		expect(screen.queryByRole('region')).toBeNull();
 		expect(screen.getByTitle('rocket')).toBeTruthy();
 		await user.clear(screen.getByRole('searchbox'));
@@ -42,26 +41,35 @@ describe('IconPicker', () => {
 		expect(screen.getByText(m.icon_none())).toBeTruthy();
 	});
 
-	// Walks the grid of all icons key by key: up to three seconds alone, longer while every
-	// worker runs a test beside it.
 	it('is one tab stop whose arrows move by rows, Enter choosing', async () => {
-		// Six tiles to a row: jsdom lays nothing out.
+		// Six tiles to a row, each grid 1000 px below the one before: jsdom lays nothing out. Laid
+		// out once, when first asked: a key asks every tile, and asking every tile for its place
+		// among all of them on each call kept a busy runner busy for seconds (10.11.2026).
+		const boxes = new WeakMap<Element, DOMRect>();
 		vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
 			this: HTMLElement
 		) {
-			const tiles = [...(this.parentElement?.children ?? [])];
-			const grids = [...document.querySelectorAll('[data-icon-tile]')].map(
-				(tile) => tile.parentElement
-			);
-			const grid = [...new Set(grids)].indexOf(this.parentElement);
-			const index = tiles.indexOf(this);
-			const top = grid * 1000 + Math.floor(index / 6) * 44;
-			return { top, left: (index % 6) * 44, width: 40, height: 40 } as DOMRect;
+			if (!boxes.has(this)) {
+				const grids = new Set(
+					[...document.querySelectorAll('[data-icon-tile]')].map((tile) => tile.parentElement)
+				);
+				[...grids].forEach((grid, row) =>
+					[...(grid?.children ?? [])].forEach((tile, index) =>
+						boxes.set(tile, {
+							top: row * 1000 + Math.floor(index / 6) * 44,
+							left: (index % 6) * 44,
+							width: 40,
+							height: 40
+						} as DOMRect)
+					)
+				);
+			}
+			return boxes.get(this) ?? ({ top: 0, left: 0, width: 0, height: 0 } as DOMRect);
 		});
 		const user = userEvent.setup();
 		render(IconPicker, { id: 'icon', value: 'files' });
 		await user.click(screen.getByRole('button', { name: m.icon_choose() }));
-		const chosen = await screen.findByTitle('files', {}, LOADED);
+		const chosen = await screen.findByTitle('files');
 		const tiles = [...document.querySelectorAll<HTMLElement>('[data-icon-tile]')];
 		expect(tiles.filter((tile) => tile.tabIndex === 0)).toEqual([chosen]);
 		await user.click(screen.getByRole('searchbox'));
@@ -90,7 +98,7 @@ describe('IconPicker', () => {
 		await user.keyboard('{Control>}{Home}{/Control}{Enter}');
 		expect(screen.getByText(CURATED_NAMES[0])).toBeTruthy();
 		expect(document.activeElement).toBe(screen.getByRole('button', { name: m.icon_choose() }));
-	}, 15_000);
+	});
 
 	it('marks an unknown name with a stand-in', async () => {
 		render(IconPicker, { id: 'icon', value: 'gone-icon' });
