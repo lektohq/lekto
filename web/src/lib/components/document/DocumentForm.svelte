@@ -65,7 +65,8 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { labelled, reasonsText } from '#lib/reasons.ts';
 	import { phone } from '#lib/phone.svelte.ts';
-	import { fieldId, initialValue, isRuleField, type ReviewValue } from '#lib/review.ts';
+	import { quoted } from '#lib/i18n.ts';
+	import { fieldId, initialValue, isRuleField, readAnew, type ReviewValue } from '#lib/review.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import { suggestedSpace, unseenBy, unseenHere } from '#lib/space-suggestion.ts';
 	import { cn } from '#lib/utils.ts';
@@ -696,6 +697,10 @@
 					<Alert.Description>
 						<span class="font-medium text-foreground">{fieldLabel(note.field, lookup)}:</span>
 						{reasonsText(note.reasons, note.reason, { field: (name) => fieldLabel(name, lookup) })}
+						{#if typeof readAnew(note) === 'string'}
+							<span class="text-muted-foreground">{m.review_read_anew()}:</span>
+							{quoted(String(readAnew(note)))}
+						{/if}
 					</Alert.Description>
 				</Alert.Root>
 			{/each}
