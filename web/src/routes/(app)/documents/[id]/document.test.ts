@@ -8,9 +8,10 @@ import { events } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
-import { documentOf, inboxItem, OWNER, summaryOf } from '#lib/testing/documents.ts';
+import { documentOf, inboxItem, listedOf, OWNER, summaryOf } from '#lib/testing/documents.ts';
 import { calls, fakeApi, json } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
+import { returnTo } from '#lib/return-to.svelte.ts';
 import Page from './+page.svelte';
 
 type Document = components['schemas']['DocumentDetails'];
@@ -510,5 +511,42 @@ describe('the document tab', () => {
 			replace: true,
 			reset: false
 		});
+	});
+});
+
+describe('opened from the document list', () => {
+	// Before the list was shown in this tab: `returnTo` keeps it from then on.
+	it('knows no neighbours without the list in this tab', async () => {
+		goTo('/ui/documents/doc-1?from=list', { id: 'doc-1' });
+		const api = serve(() => documentOf({ lane: 'green' }));
+		render(Page);
+		await screen.findByRole('heading', { level: 1 });
+		expect(calls(api).some((call) => call.startsWith('GET /api/v1/documents?'))).toBe(false);
+		expect(screen.queryByRole('navigation', { name: m.doc_list_nav() })).toBeNull();
+	});
+	it("shows its place among the list's documents, and keeps it once it left the filter", async () => {
+		returnTo.rememberDocuments({ pathname: '/ui/documents', search: '?tag=t1&sort=title' }, '');
+		goTo('/ui/documents/doc-1?from=list', { id: 'doc-1' });
+		let ids = ['doc-0', 'doc-1', 'doc-2'];
+		const api = serve(() => documentOf({ lane: 'green' }), {
+			'GET /api/v1/documents': () => ({
+				items: ids.map((id) => listedOf({ id })),
+				next_cursor: null
+			})
+		});
+		render(Page);
+		expect(await screen.findByText(m.doc_list_position({ position: 2, total: 3 }))).toBeTruthy();
+		expect(calls(api)).toContain('GET /api/v1/documents?tag_id=t1&sort=title&limit=200');
+		const nav = screen.getByRole('navigation', { name: m.doc_list_nav() });
+		expect(within(nav).getByRole('link', { name: m.doc_next() }).getAttribute('href')).toBe(
+			'/ui/documents/doc-2?from=list'
+		);
+		// Saved without the tag: no longer in the list, still between its neighbours.
+		ids = ['doc-0', 'doc-2'];
+		emit?.('document.updated', { document_id: 'doc-1', fields: ['tags'] });
+		await waitFor(() =>
+			expect(calls(api).filter((call) => call.startsWith('GET /api/v1/documents?'))).toHaveLength(2)
+		);
+		expect(await screen.findByText(m.doc_list_position({ position: 2, total: 3 }))).toBeTruthy();
 	});
 });

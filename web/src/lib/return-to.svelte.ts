@@ -15,6 +15,11 @@ export const returnTo = {
 	get documents(): string {
 		return documents ?? `${BASE}/documents`;
 	},
+	/** The list as it was left, with its words; null before the list was shown in this tab
+	 * (after a reload): then a document knows no neighbours there (`lib/list-places.ts`). */
+	get list(): { url: string; words: string } | null {
+		return documents === null ? null : { url: documents, words };
+	},
 	/** The history entry of the way back: the words the list searched for. */
 	get state(): App.PageState {
 		return { words };

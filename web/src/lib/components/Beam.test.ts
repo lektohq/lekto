@@ -218,6 +218,14 @@ describe('Beam', () => {
 		});
 	});
 
+	it("opens a document of the document list with the list's neighbours", async () => {
+		goTo(LIST, {}, { beam: { ...beam(0), list: true } });
+		render(Beam);
+		await screen.findByRole('dialog', { name: 'Stromrechnung März' });
+		await userEvent.click(screen.getByRole('button', { name: m.beam_open_document() }));
+		expect(vi.mocked(goto).mock.lastCall?.[0]).toBe('/ui/documents/a?from=list');
+	});
+
 	it('opens a document of the inbox there, with its neighbours', async () => {
 		goTo('/ui/inbox', {}, { beam: { ...beam(0), from: 'Eingang', inbox: true } });
 		render(Beam);

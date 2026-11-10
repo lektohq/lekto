@@ -38,6 +38,8 @@ export interface BeamState {
 	from: string;
 	/** Opened from the inbox: "Dokument öffnen" opens it there, with its neighbours. */
 	inbox?: boolean;
+	/** Opened from the document list: "Dokument öffnen" opens it with the list's neighbours. */
+	list?: boolean;
 	/** Where the marked places come from; without, the pages are shown from the first. */
 	source?: BeamSource;
 }
@@ -47,7 +49,7 @@ export function openBeam(
 	ids: readonly string[],
 	id: string,
 	from: string,
-	options: { inbox?: boolean; source?: BeamSource } = {}
+	options: { inbox?: boolean; list?: boolean; source?: BeamSource } = {}
 ): void {
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	const unique = [...new Set(ids)];
