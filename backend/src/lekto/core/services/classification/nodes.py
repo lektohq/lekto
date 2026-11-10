@@ -797,6 +797,16 @@ class JudgeNode:
         date_check = _readable(
             date_check, reading, self._policy.poor_reading, _date_shown(date_check.value)
         )
+        # A new version of the original keeps what a person confirmed (`_kept`).
+        contact = _kept(contact, document, _id_json(document.contact_id))
+        kind = _kept(kind, document, _id_json(document.document_type_id))
+        topic = _kept(topic, document, _id_json(document.topic_id))
+        date_check = _kept(
+            date_check,
+            document,
+            None if document.document_date is None else document.document_date.isoformat(),
+        )
+        tagged = _kept_tags(tagged, document)
         checks = [contact, kind, topic, tagged, date_check, *([space] if space else [])]
         # A topic set is one of the contact's; a contact set that does not enable the
         # document's topic clears it (`checked_changes`).
@@ -807,7 +817,7 @@ class JudgeNode:
             document_date=_applied(date_check, date.fromisoformat),
         )
         # Tags are added: those the document has (set by its owner) stay.
-        add_tags = frozenset(_by_id(tags, value).id for value in as_list(tagged.value))
+        add_tags = frozenset(_by_id(tags, value).id for value in as_list(tagged.value) if tagged.ok)
         uncertain = [check for check in checks if not check.ok]
         output: JsonObject = {CHECKS: checks_to_json(checks)}
         if space is not None and persons:
@@ -977,6 +987,17 @@ class FieldsNode(_ModelStep):
                 return self._unfit(error, input)
             given |= {keys[key].id: value for key, value in proposals.items()}
         checks = await self._checked(document, log, definitions, given, unread, text, proposal)
+        # A new version of the original keeps what a person confirmed (`_kept`).
+        checks = [
+            _kept(
+                check,
+                document,
+                None
+                if definition.id not in document.fields
+                else field_to_json(document.fields[definition.id]),
+            )
+            for check, definition in zip(checks, definitions, strict=True)
+        ]
         values: dict[FieldId, object] = {}
         for check, definition in zip(checks, definitions, strict=True):
             if check.ok and check.value is not None:
@@ -1714,6 +1735,45 @@ def _listed_contacts(contacts: Sequence[Contact], facts: DocumentText, limit: in
 
 def _by_id[T: Contact | DocumentType | Tag](items: Sequence[T], id: JsonValue) -> T:
     return next(item for item in items if str(item.id) == id)
+
+
+def _kept(check: FieldCheck, document: Document, current: JsonValue | None) -> FieldCheck:
+    """In a run that reads a new version of the original (`Processing.new_version`), what a
+    person confirmed stays (Tobi, 10.11.2026): a value read the same is OK, one read
+    differently or not at all is not applied but suggested, uncertain, for the inbox to decide.
+    A value nobody confirmed, or no value, goes as in any run."""
+    if not document.processing.new_version or document.confirmed_at is None or current is None:
+        return check
+    if check.ok and check.value == current:
+        return check
+    return replace(
+        check,
+        outcome=Outcome.UNCERTAIN,
+        value=None,
+        suggestion=check.value if check.ok else check.suggestion,
+        reasons=(because(ReasonCode.NEW_VERSION_DIFFERS),),
+    )
+
+
+def _kept_tags(check: FieldCheck, document: Document) -> FieldCheck:
+    """As `_kept` for the tags: in a new version's run tags a person confirmed are not added
+    to; tags read beyond them are suggested."""
+    if not document.processing.new_version or document.confirmed_at is None:
+        return check
+    read = {str(item) for item in as_list(check.value)} if check.ok else set()
+    if read <= {str(tag) for tag in document.tag_ids}:
+        return check
+    return replace(
+        check,
+        outcome=Outcome.UNCERTAIN,
+        value=None,
+        suggestion=check.value,
+        reasons=(because(ReasonCode.NEW_VERSION_DIFFERS),),
+    )
+
+
+def _id_json(id: UUID | None) -> str | None:
+    return None if id is None else str(id)
 
 
 def _applied[T](check: FieldCheck, convert: Callable[[str], T]) -> T | Unset:

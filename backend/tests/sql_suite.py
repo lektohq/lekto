@@ -4290,6 +4290,15 @@ def _drawer(table: sa.TableClause) -> sa.TableClause:
 _INBOX_COLUMNS = frozenset({"new_at", "processing_baseline", "processing_decided"})
 
 
+def _before_0077(table: sa.Table) -> sa.TableClause:
+    """`table` as the revisions before 0077 had it: no run that reads a new version."""
+    added = {"documents": {"processing_new_version"}}
+    return sa.table(
+        table.name,
+        *(sa.column(c.name, c.type) for c in table.c if c.name not in added.get(table.name, ())),
+    )
+
+
 def _before_0076(table: sa.Table) -> sa.TableClause:
     """`table` as the revisions before 0076 had it: no reason of a delivery."""
     added = {"webhook_deliveries": {"reason"}}
@@ -4305,7 +4314,7 @@ def _before_0054(table: sa.Table) -> sa.TableClause:
         table.name,
         *(
             sa.column(c.name, c.type)
-            for c in table.c
+            for c in _before_0077(table).c
             if c.name not in {"via_token_id", "via_token_name"}
         ),
     )

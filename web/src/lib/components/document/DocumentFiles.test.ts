@@ -240,4 +240,39 @@ describe('DocumentFiles', () => {
 		expect(within(rows[1]).queryByText(m.version_current())).toBeNull();
 		expect(rows[1].textContent).toContain(m.version_received());
 	});
+
+	it('replaces the file with a new version after asking, for an editor only', async () => {
+		const posted: string[] = [];
+		fetchMock = fakeApi({
+			'GET /api/v1/documents/doc-1/files': () => files,
+			'POST /api/v1/documents/doc-1/versions': (request) => {
+				posted.push(request.headers.get('content-type') ?? '');
+				return { id: 'doc-1' };
+			}
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		const onchanged = vi.fn();
+		const user = userEvent.setup();
+		render(DocumentFiles, { documentId: 'doc-1', title: '2022/11', editable: true, onchanged });
+		const card = await screen.findByRole('region', { name: m.files_versions() });
+		await user.click(within(card).getByRole('button', { name: m.version_upload() }));
+		const picker = card.querySelector('input[type="file"]') as HTMLInputElement;
+		await user.upload(
+			picker,
+			new File(['%PDF-1.7 nov'], 'november.pdf', { type: 'application/pdf' })
+		);
+		const dialog = await screen.findByRole('alertdialog', {
+			name: m.version_replace_title({ title: '2022/11', file: 'november.pdf' })
+		});
+		expect(dialog.textContent).toContain(m.version_replace_text({ number: '1' }));
+		await user.click(within(dialog).getByRole('button', { name: m.version_replace() }));
+		await vi.waitFor(() => expect(onchanged).toHaveBeenCalledOnce());
+		expect(posted[0]).toContain('multipart/form-data');
+	});
+
+	it('offers no new version to who may not change the document', async () => {
+		render(DocumentFiles, { documentId: 'doc-1', title: '2022/11' });
+		const card = await screen.findByRole('region', { name: m.files_versions() });
+		expect(within(card).queryByRole('button', { name: m.version_upload() })).toBeNull();
+	});
 });

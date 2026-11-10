@@ -358,6 +358,8 @@ documents = Table(
     Column("processing_nodes", json_type(), nullable=False, server_default="{}"),
     # The current run reads the pages with the vision language model (`Processing.vision`).
     Column("processing_vision", Boolean, nullable=False, server_default=false()),
+    # The current run reads a new version of the original (`Processing.new_version`).
+    Column("processing_new_version", Boolean, nullable=False, server_default=false()),
     # What decides whether the current run makes the document new (`Processing.baseline`,
     # `Processing.decided`); runs started before revision 0030 have no baseline.
     Column("processing_baseline", Text, nullable=True),

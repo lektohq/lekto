@@ -243,6 +243,8 @@ class ReasonCode(StrEnum):
     MODEL_CALL_ADMINS = "model_call_admins"
     OPEN_FIELDS = "open_fields"
     DUPLICATE_OF = "duplicate_of"
+    NEW_VERSION = "new_version"
+    NEW_VERSION_DIFFERS = "new_version_differs"
     DUPLICATE_OF_VERSION = "duplicate_of_version"
     DUPLICATE_UNSEEN = "duplicate_unseen"
     NO_TEXT_YET = "no_text_yet"
@@ -731,6 +733,8 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.MODEL_CALL_ADMINS: "only an admin's webhook serves as a model call",
     ReasonCode.OPEN_FIELDS: "decide the open fields first: {fields:fields}",
     ReasonCode.DUPLICATE_OF: "duplicate of document {id}",
+    ReasonCode.NEW_VERSION: "a new version of the file: check what it reads",
+    ReasonCode.NEW_VERSION_DIFFERS: "the new version reads it differently",
     ReasonCode.DUPLICATE_OF_VERSION: "duplicate of version {version:number} of document {id}",
     ReasonCode.DUPLICATE_UNSEEN: "the file lies in Lekto already, in a space you cannot see",
     ReasonCode.NO_TEXT_YET: "document has no text yet",

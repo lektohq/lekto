@@ -275,6 +275,10 @@ class RulesResult:
             output[SENDS_REFUSED] = reasons_to_json(refused)
             if not document.processing.decided:
                 reasons += refused
+        # A new version of the original ends in the inbox, whatever it reads, until a person
+        # confirmed it there (Tobi, 10.11.2026).
+        if document.processing.new_version and not document.processing.decided:
+            reasons.append(because(ReasonCode.NEW_VERSION))
         if reasons:
             result = NodeResult(
                 outcome=Outcome.UNCERTAIN,

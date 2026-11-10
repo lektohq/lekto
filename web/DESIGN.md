@@ -1206,7 +1206,11 @@ names Erledigt, Prüfen, Eingreifen, In Verarbeitung.
 **Fassung** (Version, Tobi 10.11.2026): one original of a document. A document has versions 1,
 2, …; a new one comes in when a person replaces the file or edits the pages, none is
 overwritten. The files tab lists them (`DocumentVersions`), the current one with `Badge`
-`primary` "Aktuell".
+`primary` "Aktuell", each with "Herunterladen" (`ghost`, `sm`). An editor puts a new file in the
+place of the current one with "Neue Fassung hochladen" (`secondary`, `sm`, in the card's head),
+asked with a `ConfirmDialog` that is not destructive (the current file stays); processing runs
+again, keeps what a person confirmed, and the document waits in the inbox ("Eine neue Fassung
+der Datei: prüfe, was sie liest.").
 
 **Fakt, Kennung, Nummer** (Tobi, 02.11.2026): three words, each for one thing.
 

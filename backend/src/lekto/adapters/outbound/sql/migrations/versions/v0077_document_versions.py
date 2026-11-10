@@ -10,9 +10,11 @@ pages; none is overwritten. `document_versions` keeps them all, gone with their 
 document keeps naming its current one (`documents.sha256`, `original_filename`, `media_type`).
 Every existing document gets its first version: its original as it came in, by who uploaded it.
 Every file exists once per installation, the earlier versions' too (a unique index).
+`documents.processing_new_version` tells a run that reads a new version
+(`Processing.new_version`); none does yet.
 
-The downgrade drops the table: a document keeps its current original, the earlier ones are
-forgotten (their files stay in the store until removed by hand).
+The downgrade drops the table and the column: a document keeps its current original, the
+earlier ones are forgotten (their files stay in the store until removed by hand).
 """
 
 from collections.abc import Sequence
@@ -29,6 +31,12 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    op.add_column(
+        "documents",
+        sa.Column(
+            "processing_new_version", sa.Boolean(), server_default=sa.false(), nullable=False
+        ),
+    )
     op.create_table(
         "document_versions",
         sa.Column("document_id", sa.Uuid(), nullable=False),
@@ -67,5 +75,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Not a batch operation: on SQLite, it would copy the table.
+    op.drop_column("documents", "processing_new_version")
     op.drop_index(op.f("ix_document_versions_sha256"), table_name="document_versions")
     op.drop_table("document_versions")

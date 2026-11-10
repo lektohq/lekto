@@ -231,6 +231,38 @@ async def upload(
     return DocumentAccepted(id=document.id, status_url=url)
 
 
+_VERSION_BODY = upload_body("PDF, JPEG, PNG or TIFF; recognised by content.")
+
+
+@router.post(
+    "/{id}/versions",
+    status_code=202,
+    summary="Replace a document's file with a new version",
+    description=(
+        EDITORS + ". The file becomes the next version of the document's original; the earlier "
+        "ones stay (`GET /documents/{id}/files`). Processing runs again from OCR: what a person "
+        "confirmed stays, what the new version reads differently is suggested, and the "
+        "document waits in the inbox for a review. 409 for a file in Lekto already (any "
+        "version of any document) and while the document is processed; 415 for a mail or "
+        "another type."
+    ),
+    response_model=DocumentDetails,
+    responses=problem_responses(400, 401, 403, 404, 409, 413, 415, 422),
+    openapi_extra=_VERSION_BODY,
+)
+async def new_version(
+    id: UUID, request: Request, user: CurrentUser, context: Context
+) -> DocumentDetails:
+    received = await read_upload(request, max_size=context.max_upload_size)
+    try:
+        view = await context.pipeline.new_version(
+            user, DocumentId(id), received.file, filename=received.filename
+        )
+    finally:
+        await asyncio.shield(asyncio.to_thread(received.file.path.unlink, missing_ok=True))
+    return _details(view)
+
+
 @router.get(
     "",
     summary="List documents",
