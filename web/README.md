@@ -17,12 +17,16 @@ Run in `web/` (Node 24, pnpm as pinned in `package.json`):
 ```sh
 pnpm install
 pnpm dev             # Vite on :5173, /api proxied to the API on :8000
-pnpm lint && pnpm format:check
+pnpm lint && pnpm format:check   # ESLint caches its results in node_modules/.cache/eslint
 pnpm check           # svelte-check
 pnpm test            # Vitest (CI)
 pnpm build           # static app in build/
 pnpm e2e             # Playwright smoke test against a running API (local only)
 ```
+
+`pnpm lint` checks only files whose content changed since its last run. Its rules read types, so a
+change of a type can make another, unchanged file wrong without ESLint noticing: CI starts without
+the cache and checks everything; locally `rm -rf node_modules/.cache/eslint` does the same.
 
 The smoke tests (`tests/e2e`) run against the API serving the built UI. `smoke.spec.ts` creates a
 user through the admin of the environment, signs in with password and TOTP, navigates, reloads and
