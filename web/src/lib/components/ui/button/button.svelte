@@ -32,6 +32,8 @@
 					"size-6 rounded-md in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
 				'icon-sm': 'size-8 rounded-lg in-data-[slot=button-group]:rounded-lg',
 				'icon-lg': 'size-12',
+				/** An action of a phone's selection bar of four or more: its icon over its word. */
+				stack: "h-14 flex-col gap-1 px-1 text-xs [&_svg:not([class*='size-'])]:size-4.5",
 				/** A text action inside running text (`link`): no height, no padding. */
 				inline: 'h-auto gap-1 p-0'
 			}

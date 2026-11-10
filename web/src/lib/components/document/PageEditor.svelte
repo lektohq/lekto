@@ -18,6 +18,7 @@
 	import PageTile from '#lib/components/pages/PageTile.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
 	import SelectionBar from '#lib/components/SelectionBar.svelte';
+	import SidewaysRow from '#lib/components/SidewaysRow.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -25,6 +26,7 @@
 	import { pageImageHref } from '#lib/document-view.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { GRID_KEYS, nextTile } from '#lib/grid-keys.ts';
+	import { listLocale } from '#lib/i18n.ts';
 	import {
 		History,
 		addPages,
@@ -78,6 +80,8 @@
 	let adding = $state(false);
 	let picker = $state<HTMLInputElement | null>(null);
 	let grid = $state<HTMLElement | null>(null);
+	/** The number the next version gets, once the document's versions are known. */
+	let nextVersion = $state<number | null>(null);
 
 	const count = $derived(document.page_count ?? 0);
 	const parts = $derived(partsOf(stack));
@@ -102,7 +106,14 @@
 		step = 'pages';
 		replacing = 0;
 		added = [];
+		nextVersion = null;
 		sync();
+		void api
+			.GET('/api/v1/documents/{id}/files', { params: { path: { id: document.id } } })
+			.then(({ data }) => {
+				if (data) nextVersion = data.versions.length + 1;
+			})
+			.catch(() => {});
 	}
 
 	function sync() {
@@ -317,21 +328,195 @@
 	}
 
 	const selected = $derived(
-		chosen.size === 1 ? m.page_edit_chosen_one() : m.page_edit_chosen({ count: chosen.size })
+		chosen.size === 0
+			? m.page_edit_none()
+			: chosen.size === 1
+				? m.page_edit_chosen_one()
+				: m.page_edit_chosen({ count: chosen.size })
 	);
 	const pagesOf = ([first, last]: [number, number]) =>
 		first === last
 			? m.page_edit_part_page({ page: String(first) })
 			: m.page_edit_part_pages({ first: String(first), last: String(last) });
+	const pageCount = $derived(
+		stack.length === 1 ? m.page_edit_pages_one() : m.page_edit_pages({ count: stack.length })
+	);
+	const partCount = $derived(
+		parts.length === 1 ? m.page_edit_parts_one() : m.page_edit_parts_count({ count: parts.length })
+	);
+	/** What becomes of each part, in words (the note of the second step). */
+	const outcome = $derived.by(() => {
+		const runs =
+			parts.length === 1
+				? m.page_edit_inbox_one()
+				: parts.length === 2
+					? m.page_edit_inbox_two()
+					: m.page_edit_inbox();
+		const fresh = parts.map((_, index) => index).filter((index) => index !== replacing);
+		const names = new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(
+			fresh.map((index) => String(index + 1))
+		);
+		const kept =
+			replacing === null
+				? m.page_edit_deleted({ title: document.title })
+				: nextVersion === null
+					? m.page_edit_kept_any({ part: String(replacing + 1), title: document.title })
+					: m.page_edit_kept({
+							part: String(replacing + 1),
+							version: String(nextVersion),
+							title: document.title
+						});
+		const others =
+			fresh.length === 0 || replacing === null
+				? ''
+				: fresh.length === 1
+					? m.page_edit_new_one({ part: names })
+					: m.page_edit_new_many({ parts: names });
+		return [runs, kept, others].filter(Boolean).join(' ');
+	});
 </script>
+
+{#snippet pageActions()}
+	{@const size = phone.current ? 'stack' : 'sm'}
+	{@const none = chosen.size === 0}
+	<Button
+		type="button"
+		variant="outline"
+		{size}
+		disabled={none}
+		onclick={() => act((s, k) => turn(s, k, -90))}
+	>
+		<RotateCcw aria-hidden="true" />
+		{phone.current ? m.page_edit_left_short() : m.page_edit_left()}
+	</Button>
+	<Button
+		type="button"
+		variant="outline"
+		{size}
+		disabled={none}
+		onclick={() => act((s, k) => turn(s, k, 90))}
+	>
+		<RotateCw aria-hidden="true" />
+		{phone.current ? m.page_edit_right_short() : m.page_edit_right()}
+	</Button>
+	<Button type="button" variant="outline" {size} disabled={none} onclick={() => act(remove, false)}>
+		<Trash2 aria-hidden="true" />
+		{m.page_edit_remove()}
+	</Button>
+	<Button
+		type="button"
+		variant="outline"
+		{size}
+		disabled={none}
+		onclick={() => act(splitOff, false)}
+	>
+		<FileOutput aria-hidden="true" />
+		{phone.current ? m.page_edit_split_short() : m.page_edit_split()}
+	</Button>
+{/snippet}
+
+{#snippet bar()}
+	<SelectionBar count={selected} inDialog>
+		{#snippet trail()}
+			{#if chosen.size > 0}
+				<Button type="button" variant="ghost" size="sm" onclick={() => (chosen = new Set())}>
+					{m.page_edit_clear()}
+				</Button>
+			{/if}
+		{/snippet}
+		{#snippet actions()}{@render pageActions()}{/snippet}
+	</SelectionBar>
+{/snippet}
+
+{#snippet tools()}
+	<div class="flex items-center gap-2">
+		{#if !phone.current}
+			<SidewaysRow label={m.page_edit_parts()} class="flex-1">
+				{@render partBadges()}
+			</SidewaysRow>
+		{/if}
+		<Button
+			type="button"
+			variant="outline"
+			size={phone.current ? 'default' : 'sm'}
+			disabled={adding}
+			onclick={() => picker?.click()}
+		>
+			<FilePlus aria-hidden="true" />
+			{m.page_edit_add()}
+		</Button>
+		{#if phone.current}<span class="flex-1"></span>{/if}
+		<input
+			bind:this={picker}
+			type="file"
+			accept="application/pdf,image/jpeg,image/png,image/tiff"
+			class="hidden"
+			aria-hidden="true"
+			tabindex="-1"
+			onchange={(event) => {
+				const file = event.currentTarget.files?.[0];
+				event.currentTarget.value = '';
+				if (file) void add(file);
+			}}
+		/>
+		<IconButton
+			size={phone.current ? 'default' : 'sm'}
+			label={m.page_edit_undo()}
+			disabled={!canUndo}
+			onclick={undo}
+		>
+			<Undo2 aria-hidden="true" />
+		</IconButton>
+		<IconButton
+			size={phone.current ? 'default' : 'sm'}
+			label={m.page_edit_redo()}
+			disabled={!canRedo}
+			onclick={redo}
+		>
+			<Redo2 aria-hidden="true" />
+		</IconButton>
+	</div>
+	{#if phone.current}
+		<SidewaysRow label={m.page_edit_parts()}>
+			<span class="mr-1 text-meta text-muted-foreground">{pageCount}</span>
+			{@render partBadges()}
+		</SidewaysRow>
+	{:else}
+		{@render bar()}
+	{/if}
+{/snippet}
+
+{#snippet partBadges()}
+	{#each ranges as range, index (index)}
+		<Badge variant="muted">
+			{m.page_edit_part({ number: String(index + 1) })} · {pagesOf(range)}
+		</Badge>
+	{/each}
+{/snippet}
+
+{#snippet phoneBottom()}
+	{#if chosen.size > 0}
+		{@render bar()}
+	{:else}
+		<p
+			class="border-t bg-card px-4 pt-3 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] text-sm text-muted-foreground"
+		>
+			{m.page_edit_phone_hint()}
+		</p>
+	{/if}
+{/snippet}
 
 <EditorShell
 	bind:open
 	{title}
 	shortTitle={m.page_edit_short()}
-	description={step === 'pages'
-		? m.page_edit_pages_hint({ count: stack.length })
-		: m.page_edit_parts_hint({ count: parts.length })}
+	description={phone.current
+		? step === 'parts'
+			? m.page_edit_parts_hint()
+			: undefined
+		: step === 'pages'
+			? `${pageCount} · ${partCount}`
+			: m.page_edit_parts_hint()}
 	size="xl"
 	fixed
 	stay={step === 'pages'}
@@ -344,87 +529,11 @@
 	shortSubmitLabel={step === 'pages' ? m.page_edit_next() : m.page_edit_apply()}
 	disabled={nothing || adding}
 	action={submit}
+	top={step === 'pages' ? tools : undefined}
+	bottom={step === 'pages' && phone.current ? phoneBottom : undefined}
+	footNote={step === 'pages' ? m.page_edit_keys() : undefined}
 >
 	{#if step === 'pages'}
-		<div class="flex flex-wrap items-center gap-2">
-			<div class="flex flex-1 flex-wrap gap-1.5" aria-label={m.page_edit_parts()}>
-				{#each ranges as range, index (index)}
-					<Badge variant="muted">
-						{m.page_edit_part({ number: String(index + 1) })} · {pagesOf(range)}
-					</Badge>
-				{/each}
-			</div>
-			<Button
-				type="button"
-				variant="outline"
-				size="sm"
-				disabled={adding}
-				onclick={() => picker?.click()}
-			>
-				<FilePlus aria-hidden="true" />
-				{m.page_edit_add()}
-			</Button>
-			<input
-				bind:this={picker}
-				type="file"
-				accept="application/pdf,image/jpeg,image/png,image/tiff"
-				class="hidden"
-				aria-hidden="true"
-				tabindex="-1"
-				onchange={(event) => {
-					const file = event.currentTarget.files?.[0];
-					event.currentTarget.value = '';
-					if (file) void add(file);
-				}}
-			/>
-			<IconButton size="sm" label={m.page_edit_undo()} disabled={!canUndo} onclick={undo}>
-				<Undo2 aria-hidden="true" />
-			</IconButton>
-			<IconButton size="sm" label={m.page_edit_redo()} disabled={!canRedo} onclick={redo}>
-				<Redo2 aria-hidden="true" />
-			</IconButton>
-		</div>
-
-		{#snippet bar()}
-			<SelectionBar count={selected} inDialog>
-				{#snippet trail()}
-					<Button type="button" variant="ghost" size="sm" onclick={() => (chosen = new Set())}>
-						{m.page_edit_clear()}
-					</Button>
-				{/snippet}
-				{#snippet actions()}
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						onclick={() => act((s, k) => turn(s, k, -90))}
-					>
-						<RotateCcw aria-hidden="true" />
-						{phone.current ? m.page_edit_left_short() : m.page_edit_left()}
-					</Button>
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						onclick={() => act((s, k) => turn(s, k, 90))}
-					>
-						<RotateCw aria-hidden="true" />
-						{phone.current ? m.page_edit_right_short() : m.page_edit_right()}
-					</Button>
-					<Button type="button" variant="outline" size="sm" onclick={() => act(remove, false)}>
-						<Trash2 aria-hidden="true" />
-						{m.page_edit_remove()}
-					</Button>
-					<Button type="button" variant="outline" size="sm" onclick={() => act(splitOff, false)}>
-						<FileOutput aria-hidden="true" />
-						{phone.current ? m.page_edit_split_short() : m.page_edit_split()}
-					</Button>
-				{/snippet}
-			</SelectionBar>
-		{/snippet}
-
-		{#if chosen.size > 0 && !phone.current}{@render bar()}{/if}
-
 		<!-- The clicks after a move or a long press are swallowed before the tiles see them. -->
 		<div
 			bind:this={grid}
@@ -466,48 +575,40 @@
 				</div>
 			{/each}
 		</div>
-		<p class="text-meta text-muted-foreground">{m.page_edit_legend()}</p>
-
-		{#if chosen.size > 0 && phone.current}{@render bar()}{/if}
 	{:else}
 		{#each parts as part, index (index)}
-			<Card.Root size="row" class="flex items-start gap-3">
-				<div class="flex shrink-0 gap-1" aria-hidden="true">
-					{#each part.slice(0, 2) as page (page.key)}
-						<PageImage src={page.image} class="max-h-14 max-w-11 rounded-sm border bg-card" />
-					{/each}
+			<Card.Root
+				size="row"
+				class={phone.current ? 'flex flex-col gap-3' : 'flex items-center gap-3'}
+			>
+				<div class="flex min-w-0 flex-1 items-center gap-3">
+					<div class="flex shrink-0 gap-1" aria-hidden="true">
+						{#each part.slice(0, 2) as page (page.key)}
+							<PageImage src={page.image} class="max-h-14 max-w-11 rounded-sm border bg-card" />
+						{/each}
+					</div>
+					<span class="font-medium">{m.page_edit_part({ number: String(index + 1) })}</span>
+					<Badge variant="muted">{pagesOf(ranges[index])}</Badge>
 				</div>
-				<div class="flex min-w-0 flex-col gap-2">
-					<span class="flex flex-wrap items-center gap-2 font-medium">
-						{m.page_edit_part({ number: String(index + 1) })}
-						<Badge variant="muted">{pagesOf(ranges[index])}</Badge>
-					</span>
-					<Segmented
-						size="sm"
-						label={m.page_edit_part({ number: String(index + 1) })}
-						value={replacing === index ? 'replace' : 'new'}
-						options={[
-							{ value: 'replace', label: m.page_edit_replaces({ title: document.title }) },
-							{ value: 'new', label: m.page_edit_new() }
-						]}
-						onchange={(value) => {
-							if (value === 'replace') replacing = index;
-							else if (replacing === index) replacing = null;
-						}}
-					/>
-				</div>
+				<Segmented
+					size="sm"
+					equal={phone.current}
+					class={phone.current ? 'w-full' : ''}
+					label={m.page_edit_part({ number: String(index + 1) })}
+					value={replacing === index ? 'replace' : 'new'}
+					options={[
+						{ value: 'replace', label: m.page_edit_version() },
+						{ value: 'new', label: m.page_edit_new() }
+					]}
+					onchange={(value) => {
+						if (value === 'replace') replacing = index;
+						else if (replacing === index) replacing = null;
+					}}
+				/>
 			</Card.Root>
 		{/each}
 		<Alert.Root variant="note">
-			<Alert.Description>
-				{m.page_edit_inbox()}
-				{replacing === null
-					? m.page_edit_deleted({ title: document.title })
-					: m.page_edit_kept({
-							title: document.title,
-							part: String(replacing + 1)
-						})}
-			</Alert.Description>
+			<Alert.Description>{outcome}</Alert.Description>
 		</Alert.Root>
 	{/if}
 </EditorShell>

@@ -9,10 +9,10 @@
 	// the bar's name), a hint in words (`hint`: how far the choice reaches, what an action leaves
 	// out), what stands between them and the actions (`trail`: "Auswahl aufheben", a chooser) and
 	// the actions. On a desktop it stands above the list with the card look in `bg-panel` and
-	// sticks below the header (64 px tall: `top-20`), in a dialog at the top of its body
-	// (`inDialog`). On a phone it sticks to the bottom of the
-	// screen in `bg-card` with a line above: `trail` follows the count, the hint is a line of its
-	// own and the actions share the width.
+	// sticks below the header (64 px tall: `top-20`). In a dialog (`inDialog`) it stands in a
+	// fixed part of the dialog, which does not scroll: above the body, on a phone below it. On a
+	// phone it sticks to the bottom of the screen in `bg-card` with a line above: `trail` follows
+	// the count, the hint is a line of its own and the actions share the width.
 	let {
 		count,
 		busy = false,
@@ -39,11 +39,14 @@
 	class={cn(
 		'flex flex-wrap items-center gap-x-3 gap-y-2',
 		phone.current
-			? 'sticky bottom-0 z-10 -mx-4 border-t bg-card px-4 pt-2 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))]'
+			? cn(
+					'border-t bg-card px-4 pt-2 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))]',
+					!inDialog && 'sticky bottom-0 z-10 -mx-4'
+				)
 			: cn(
 					cardVariants({ size: 'flush' }),
-					'sticky z-10 bg-panel py-1.5 pr-2',
-					inDialog ? 'top-0' : 'top-20',
+					'bg-panel py-1.5 pr-2',
+					!inDialog && 'sticky top-20 z-10',
 					lead ? 'pl-1.5' : 'pl-4'
 				)
 	)}

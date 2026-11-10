@@ -30,7 +30,10 @@
 	// themselves): no form around the body, no footer, "Fertig" in the phone's bar. An editor of
 	// several steps (web/DESIGN.md, "Dialogs"): the submit of a step before the last leads on
 	// (`stay`: it does not close), and a later step has `back`: "Zurück" at the start of the
-	// footer, on a phone instead of "Abbrechen" in the bar.
+	// footer, on a phone instead of "Abbrechen" in the bar. An editor whose body is a field of
+	// things to work on (the pages of "PDF bearbeiten") keeps its tools in place: `top` stands
+	// fixed under the title, `bottom` fixed under the body, and only the body scrolls;
+	// `footNote` says at the start of the footer how it is worked (the keyboard).
 	let {
 		open = $bindable(false),
 		title,
@@ -50,6 +53,9 @@
 		stay = false,
 		back,
 		shortSubmitLabel,
+		top,
+		bottom,
+		footNote,
 		children: body
 	}: {
 		open?: boolean;
@@ -78,6 +84,12 @@
 		back?: () => void;
 		/** The submit in the phone's bar, a short verb ("Weiter"); default "Speichern". */
 		shortSubmitLabel?: string;
+		/** Fixed under the title: tools, the parts of a selection. */
+		top?: Snippet;
+		/** Fixed under the body (a phone's selection bar). */
+		bottom?: Snippet;
+		/** At the start of the desktop footer, muted: how the body is worked. */
+		footNote?: string;
 		children: Snippet;
 	} = $props();
 
@@ -122,11 +134,19 @@
 			{error}
 		</p>
 	{/if}
+	{#if top}
+		<div
+			class={cn('flex shrink-0 flex-col gap-3 border-b bg-card px-4 pb-3', phone.current && 'pt-3')}
+		>
+			{@render top()}
+		</div>
+	{/if}
 	<div
 		bind:this={scroller}
 		class={cn(
 			'flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-4 pb-4',
-			phone.current && !tabs && 'pt-4'
+			((phone.current && !tabs) || top) && 'pt-4',
+			top && 'bg-background'
 		)}
 	>
 		{#if phone.current && description}
@@ -145,8 +165,14 @@
 			</Button>
 		{/if}
 	</div>
+	{#if bottom}
+		<div class="shrink-0">{@render bottom()}</div>
+	{/if}
 	{#if !phone.current && action}
 		<div class="flex shrink-0 flex-wrap items-center gap-2 border-t bg-muted/50 p-4">
+			{#if footNote}
+				<p class="min-w-0 flex-1 text-meta text-muted-foreground">{footNote}</p>
+			{/if}
 			{#if back}
 				<Button type="button" variant="ghost" disabled={busy} onclick={back}>
 					{m.editor_back()}

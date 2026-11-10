@@ -234,12 +234,13 @@ Chips and badges are pills; a pill is never a button that starts an action.
 | `destructive` | Delete, remove, revoke                                            |
 | `link`        | Text actions inside running text ("Alle anzeigen")                |
 
-| Size      | Height | Use                                      |
-| --------- | ------ | ---------------------------------------- |
-| `default` | 40 px  | Pages, headers, toolbars, dialog footers |
-| `sm`      | 32 px  | Rows and cards (desktop)                 |
-| `lg`      | 48 px  | The sign-in page only                    |
-| `inline`  | text   | A button that reads as a word in a line  |
+| Size      | Height | Use                                                                                                    |
+| --------- | ------ | ------------------------------------------------------------------------------------------------------ |
+| `default` | 40 px  | Pages, headers, toolbars, dialog footers                                                               |
+| `sm`      | 32 px  | Rows and cards (desktop)                                                                               |
+| `lg`      | 48 px  | The sign-in page only                                                                                  |
+| `stack`   | 56 px  | Its icon over its word: the actions of a phone's selection bar of four (the pages of "PDF bearbeiten") |
+| `inline`  | text   | A button that reads as a word in a line                                                                |
 
 On the phone every button is at least 44 px tall (see [Touch targets](#touch-targets)). The
 component handles this. Pages and components do not give a `Button` or `IconButton` a height of
@@ -370,9 +371,14 @@ other pair of arrows is a `Stepper`.
 ### Page stack
 
 "PDF bearbeiten" (`PageEditor`, Tobi 10.11.2026) shows a document's pages as a stack to edit:
-choose, turn, remove, reorder, cut into parts, and add the pages of a file from the device
-("Dokument hinzufügen", `outline`, `sm`, above the stack beside "Rückgängig" and "Wiederholen",
-`IconButton` `sm`). Above them the parts as `Badge` `muted` ("Teil 2 · S. 3–4").
+choose, turn, remove, reorder, cut into parts, and add the pages of a file from the device. Its
+tools stand fixed under the title (`EditorShell` `top`), only the stack scrolls: the parts as
+`Badge` `muted` in a `SidewaysRow` ("Teil 2 · S. 3–4"), "Dokument hinzufügen" (`outline`),
+"Rückgängig" and "Wiederholen" (`IconButton`), all `sm` on a desktop; below them the selection
+bar. On a phone the tools are `default`, the parts a row of their own after the number of pages,
+and the selection bar stands fixed under the stack (`EditorShell` `bottom`); while nothing is
+chosen a line there says how to choose, move and cut. The description under the title says
+"12 Seiten · 3 Teile"; the footer starts with how the keyboard works it (`footNote`).
 
 - **Page tile** (`PageTile`): the paper of a page (its image with `shadow-sm`) in a square, turned
   as it will be, its place below ("Seite 3", `text-meta`, muted), a `ChoiceBox` at the top left.
@@ -386,15 +392,17 @@ choose, turn, remove, reorder, cut into parts, and add the pages of a file from 
   (`aria-pressed`), 24 px wide, 44 px on a phone. Set, a line in `primary` with the scissors on a
   `primary` circle; unset, the scissors faint (`muted-foreground` at half strength), so nothing
   depends on hover. A page being dragged shows where it lands as the line of that gap. It is no
-  tab stop: the keyboard cuts with Enter on a page. A line below the stack says how to cut.
-- **Choosing** uses `SelectionBar` (`inDialog`): "n Seiten gewählt", "Auswahl aufheben", then
-  "Links drehen", "Rechts drehen", "Löschen", "Als neues Dokument" (`outline`, `sm`; on the phone
-  "Links", "Rechts", "Löschen", "Abtrennen", sharing the width at the bottom).
+  tab stop: the keyboard cuts with Enter on a page; the footer says how.
+- **Choosing** uses `SelectionBar` (`inDialog`), always there on a desktop: "n Seiten gewählt"
+  ("Keine Seite gewählt"), "Auswahl aufheben" while some are, then "Links drehen", "Rechts
+  drehen", "Löschen", "Als neues Dokument" (`outline`, `sm`, disabled while none is chosen). On
+  the phone "Links", "Rechts", "Löschen", "Abtrennen" (`stack`: icon over word) share the width.
 - **The parts**, the second step: a `Card` (`row`) per part with its first two pages, "Teil n"
-  and its pages as `Badge` `muted`, and a `Segmented` (`sm`) "Ersetzt „…“ | Neues Dokument"; at
-  most one part replaces the document (choosing it lets go of another). Below them an `Alert`
-  `note`: every result runs anew and waits in the inbox, and what becomes of the document (a new
-  version, or deleted where no part replaces it).
+  and its pages as `Badge` `muted`, and a `Segmented` (`sm`) "Neue Fassung | Neues Dokument" at
+  its end (on a phone below, `equal`, the full width); at most one part replaces the document
+  (choosing it lets go of another). Below them an `Alert` `note`: every result runs anew and waits
+  in the inbox, which part becomes which version of the document ("Teil 1 wird Fassung 3 von
+  „…“") or that it is deleted where no part replaces it, and which parts become new documents.
 
 ### Badges
 
@@ -414,7 +422,9 @@ choose, turn, remove, reorder, cut into parts, and add the pages of a file from 
 
 Sizes: `sm` 20 px (in rows, `text-xs`, the default), `md` 24 px (in headers), `lg` 28 px (the
 lane of a document in its row or head). `LaneBadge` is `Badge` with the lane tone. Hand-built
-pills are not used.
+pills are not used. A row of badges that has to stay one line (the parts of "PDF bearbeiten") is
+`SidewaysRow`: wider than the room, it scrolls sideways with a fade at the cut edge, as the
+`TabBar` does, and never widens the page.
 
 `VolumeMeter` shows how loud something is as three rising bars (`muted-foreground` on `border`),
 always beside a text that says it in words (`aria-hidden`): how often a webhook event comes for
@@ -482,8 +492,10 @@ row is `bg-panel` with `border-primary` (a border, no ring). While something is 
 **selection bar** (`SelectionBar`) names how many and what an action will leave out, then
 "Auswahl aufheben" (`ghost`) and the actions (`outline`, the primary `default` last), all `sm`.
 It has the card look through `cardVariants`: on desktop it stands above the list in `bg-panel`
-and sticks below the header (`top-20`; in a dialog at the top of its body, `inDialog`); on the phone it sticks to the bottom of the screen
+and sticks below the header (`top-20`); on the phone it sticks to the bottom of the screen
 (`bg-card`, a line above), the hint as a line of its own and its two actions sharing the width.
+In a dialog (`inDialog`) it stands in a fixed part of the dialog that does not scroll: above the
+body, on a phone below it.
 One item is still decided in its dialog, opened from its title: the actions stay out of the
 row. The open identifiers are a `ui/table` on a desktop; on a phone they are rows built as the
 rows of the master data (`MasterRow`): the value as the title with the badge of its source,
@@ -648,6 +660,10 @@ list pages the same way (see [Lists](#lists)).
   Dokumente") and takes effect only in the last ("Übernehmen"). A later step has "Zurück"
   (`ghost`) at the start of the footer, apart from "Abbrechen" and the primary action; on the
   phone "Zurück" stands instead of "Abbrechen" in the bar. Going back keeps what was done.
+- **A field to work on:** an editor whose body is a field of things to work on ("PDF
+  bearbeiten") keeps its tools in place: `EditorShell` `top` stands fixed under the title (a line
+  below, `bg-card`), `bottom` fixed under the body, and only the body scrolls, on `bg-background`.
+  `footNote` says at the start of the desktop footer how the body is worked (`text-meta`, muted).
 - **A second way out:** `FormDialog` takes `alternative`, an action that finishes the dialog
   as well, without asking (rejecting an open identifier beside taking it over): `outline` at the
   start of the footer; on the phone below the fields.

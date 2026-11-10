@@ -63,11 +63,11 @@ describe('PageEditor', () => {
 		await user.click(screen.getByRole('button', { name: m.page_edit_next_parts({ count: 2 }) }));
 		// The first part replaces it at first; the second takes over.
 		const replaces = screen.getAllByRole('button', {
-			name: m.page_edit_replaces({ title: '2022/11' })
+			name: m.page_edit_version()
 		});
 		await user.click(replaces[1]);
 		expect(
-			screen.getByText(m.page_edit_kept({ title: '2022/11', part: '2' }), { exact: false })
+			screen.getByText(m.page_edit_kept_any({ title: '2022/11', part: '2' }), { exact: false })
 		).toBeTruthy();
 		await user.click(screen.getByRole('button', { name: m.page_edit_apply() }));
 		expect(parts()).toEqual([
