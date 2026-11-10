@@ -2,7 +2,7 @@
 
 import unittest
 
-from image_tags import Version, image_tags
+from image_tags import Version, image_tags, previous_release
 
 
 class VersionTest(unittest.TestCase):
@@ -64,3 +64,18 @@ class ImageTagsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PreviousReleaseTest(unittest.TestCase):
+    def test_is_the_newest_release_below(self) -> None:
+        released = ["v0.12.1", "v0.14.0", "v0.13.0", "v0.15.0", "nightly"]
+        self.assertEqual(previous_release("v0.14.1", released), "v0.14.0")
+        self.assertEqual(previous_release("v0.15.0", released), "v0.14.0")
+
+    def test_counts_pre_releases_by_semver(self) -> None:
+        released = ["v1.0.0-rc.1", "v0.9.0"]
+        self.assertEqual(previous_release("v1.0.0", released), "v1.0.0-rc.1")
+        self.assertEqual(previous_release("v1.0.0-rc.1", released), "v0.9.0")
+
+    def test_is_none_for_the_first(self) -> None:
+        self.assertIsNone(previous_release("v0.1.0", ["v0.1.0"]))
