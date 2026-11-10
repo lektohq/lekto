@@ -55,8 +55,8 @@ describe('ChangePreview', () => {
 			lookup,
 			preview: previewOf({ document: after, changed: ['tags', `field:${NET}`] })
 		});
-		expect(screen.getByText('Review').closest('.line-through')).not.toBeNull();
-		expect(screen.getByText('Steuer').closest('.line-through')).toBeNull();
+		expect(screen.getByText('Review').className).toContain('line-through');
+		expect(screen.getByText('Steuer').className).not.toContain('line-through');
 		expect(screen.getByText('Netto')).toBeTruthy();
 		expect(screen.getByText(formatMoney('4152.02', 'EUR')).className).toContain('line-through');
 		expect(screen.getByText(formatMoney('4772.70', 'EUR'))).toBeTruthy();

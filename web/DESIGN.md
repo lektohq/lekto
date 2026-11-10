@@ -563,8 +563,8 @@ it shows more than words (chips, a value before and after).
 **Change preview** (`ChangePreview`, Tobi 10.11.2026): what saving a document's form would do,
 in the dialog "Was die Änderung bewirkt" (`md`) before "Speichern". Each changed field as a row
 of a `DetailList`: its value before (muted, struck through; "Nicht gesetzt" when it had none),
-an arrow, its value after; tags as `TagChip`s, a removed one struck through, an added one as it
-is. Then the rules that run ("Regel, die ausgeführt wird", "Regeln, die ausgeführt werden"),
+an arrow, its value after; tags as `TagChip`s with `change` (as in the mock Tobi chose): a
+removed one in red and struck through, an added one in green. Then the rules that run ("Regel, die ausgeführt wird", "Regeln, die ausgeführt werden"),
 each in a `sm` card. Who sees the document then: while that stays as it was, one muted line
 ("Sichtbar bleibt es für Anna Leider."); when it changes, "Wer es danach sieht" with the space
 before and after and the people, a new one with `Badge` `note` "neu", one who no longer sees it
