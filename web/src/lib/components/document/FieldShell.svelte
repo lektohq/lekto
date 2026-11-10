@@ -14,6 +14,7 @@
 	import type { Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { reasonsText } from '#lib/reasons.ts';
+	import { readAnew } from '#lib/review.ts';
 	import TypeIcon from '#lib/components/TypeIcon.svelte';
 	import { cn } from '#lib/utils.ts';
 	import { cardVariants } from '#lib/components/ui/card/index.ts';
@@ -76,6 +77,9 @@
 			? reasonsText(check.reasons, check.reason, { field: (name) => fieldLabel(name, lookup) })
 			: null
 	);
+	// A new version that reads something else than a person confirmed: the field keeps the
+	// confirmed value, the card names the new reading.
+	const anew = $derived(check ? readAnew(check) : null);
 	const card = $derived(review && evidence?.open === true);
 	const calm = $derived(!card && advice && evidence !== undefined);
 	const kind = $derived(check ? provenance(check) : null);
@@ -187,6 +191,12 @@
 			<label id={labelId} for={inputId} class="font-semibold">{@render labelText()}</label>
 		</div>
 		{#if reason}<p class="text-sm">{reason}</p>{/if}
+		{#if anew !== null}
+			<p class="text-sm">
+				<span class="text-muted-foreground">{m.review_read_anew()}:</span>
+				{describeValue(anew, lookup)}
+			</p>
+		{/if}
 		{#if check.candidates?.length}
 			<CandidateList candidates={check.candidates} onpick={pick} {lead} />
 		{/if}

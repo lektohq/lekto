@@ -15,7 +15,14 @@ from lekto.adapters.outbound.memory import FakeLanguageModel, FakeOcr, FakeParse
 from lekto.adapters.outbound.memory.processing import FAKE_PDF
 from lekto.adapters.outbound.ocrmypdf.hocr import hocr_words
 from lekto.adapters.outbound.regex import RegexPatternMatcher
-from lekto.core.domain.classification import TITLE, FieldCheck, checks_from_json, field_key
+from lekto.core.domain.classification import (
+    CHECKS,
+    TITLE,
+    FieldCheck,
+    checks_from_json,
+    checks_to_json,
+    field_key,
+)
 from lekto.core.domain.document_facts import (
     FactOrigin,
     FactRole,
@@ -42,7 +49,7 @@ from lekto.core.domain.pipeline import (
     ProcessingStatus,
 )
 from lekto.core.domain.reading import PageReading, PageWords, reading_to_json, readings_to_json
-from lekto.core.domain.reasons import written
+from lekto.core.domain.reasons import ReasonCode, written
 from lekto.core.domain.users import Role
 from lekto.core.domain.verdict import Thresholds
 from lekto.core.ports.llm import StructuredRequest
@@ -1821,6 +1828,31 @@ async def test_a_title_of_its_own_stays_but_the_machine_s_is_replaced(world: Wor
     title = await titled(world, document)
     assert title is not None
     assert title.value == "Stromrechnung März 2026"
+
+
+async def test_a_new_version_keeps_the_machine_s_title_a_person_confirmed(world: World) -> None:
+    """In a new version's run the title stays as any confirmed value; the one read now is
+    suggested (Umsetzungsplan "Fassungen, Datei ersetzen, PDF bearbeiten", decision 5)."""
+    seeded = await seed(world)
+    document, _ = await signalled(world, proposal(), seeded.types["Rechnung"])
+    earlier = FieldCheck(
+        field=TITLE, outcome=Outcome.OK, confidence=1, proposed="Entgelt", value="Entgelt"
+    )
+    await record(
+        world,
+        document,
+        Node.FIELDS,
+        NodeResult(outcome=Outcome.OK, output={CHECKS: checks_to_json([earlier])}),
+    )
+    document.title, document.confirmed_at = "Entgelt", NOW
+    document.processing.new_version = True
+    outcome = await fields_step(world, model(extraction())).run(document)
+    assert isinstance(outcome, MetadataResult)
+    title = checks(outcome.result)[TITLE]
+    assert (title.ok, title.value, title.suggestion) == (False, None, "Stromrechnung März 2026")
+    assert outcome.changes.title is UNSET
+    assert outcome.result.outcome is Outcome.UNCERTAIN
+    assert [reason.code for reason in outcome.result.reasons] == [ReasonCode.NEW_VERSION_DIFFERS]
 
 
 # --- through the pipeline ---------------------------------------------------------------------
