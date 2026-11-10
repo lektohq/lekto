@@ -25,7 +25,13 @@
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
-	import { documentApi, inboxDocument, tabHref, type Neighbours } from '#lib/document-view.ts';
+	import {
+		documentApi,
+		inboxDocument,
+		listDocument,
+		tabHref,
+		type Neighbours
+	} from '#lib/document-view.ts';
 	import { reportError } from '#lib/errors.ts';
 	import { readersLaterText, visibleText, type Viewer } from '#lib/filing.ts';
 	import { formatDate } from '#lib/i18n.ts';
@@ -47,8 +53,8 @@
 	type Document = components['schemas']['DocumentDetails'];
 	type ReprocessNode = components['schemas']['ReprocessNode'];
 
-	// The head of the document view: the way back (to the inbox, with the place among the
-	// documents there, or to the documents), title, lane and file, and what one can do with it.
+	// The head of the document view: the way back (to the inbox or to the document list, with
+	// the place among the documents there), title, lane and file, and what one can do with it.
 	// Contact, type, topic and tags are in the form beside the pages, not here (Tobi,
 	// 20.10.2026).
 	let {
@@ -57,6 +63,7 @@
 		graph,
 		archive,
 		inbox,
+		list = null,
 		vision = null,
 		reading = null,
 		onchanged,
@@ -69,6 +76,8 @@
 		archive: boolean;
 		/** Opened from the inbox: the documents before and after this one. */
 		inbox: Neighbours | null;
+		/** Opened from the document list: the documents before and after this one. */
+		list?: Neighbours | null;
 		/** The vision language model documents can be read with, if one is configured. */
 		vision?: Vision | null;
 		/** How the document's text was read, and whether the model is advised. */
@@ -118,7 +127,6 @@
 			.filter((node): node is ReprocessNode => node !== 'receive')
 			.map((node) => ({ value: node, label: NODE_LABELS[node]() }))
 	);
-	const inboxHref = (id: string) => inboxDocument(id);
 	// Sending the pages to the vision model is the person's decision, here or from the advice.
 	const readable = $derived(manageable && visionAvailable(vision, graph, document.processing));
 	const advice = $derived(adviceText(reading));
@@ -236,21 +244,19 @@
 	<div class="flex min-h-9 flex-wrap items-center gap-3">
 		<DocumentBackLink inbox={Boolean(inbox)} />
 		{#if inbox && inbox.position !== null}
-			<nav aria-label={m.doc_inbox_nav()} class="ml-auto flex items-center gap-1">
-				<span class="mr-1.5 text-sm text-muted-foreground">
-					{m.doc_inbox_position({ position: inbox.position, total: inbox.total })}
-				</span>
-				{#if inbox.previous}
-					<IconButton href={inboxHref(inbox.previous)} variant="outline" label={m.doc_previous()}>
-						<ChevronLeft aria-hidden="true" />
-					</IconButton>
-				{/if}
-				{#if inbox.next}
-					<IconButton href={inboxHref(inbox.next)} variant="outline" label={m.doc_next()}>
-						<ChevronRight aria-hidden="true" />
-					</IconButton>
-				{/if}
-			</nav>
+			{@render among(
+				inbox,
+				m.doc_inbox_nav(),
+				m.doc_inbox_position({ position: inbox.position, total: inbox.total }),
+				inboxDocument
+			)}
+		{:else if list && list.position !== null}
+			{@render among(
+				list,
+				m.doc_list_nav(),
+				m.doc_list_position({ position: list.position, total: list.total }),
+				listDocument
+			)}
 		{/if}
 	</div>
 
@@ -431,3 +437,21 @@
 		{/if}
 	</ReprocessFields>
 </FormDialog>
+
+<!-- Where the document stands among those of the place it was opened from, with the ones before
+     and after it (the inbox, the document list). -->
+{#snippet among(place: Neighbours, label: string, position: string, href: (id: string) => string)}
+	<nav aria-label={label} class="ml-auto flex items-center gap-1">
+		<span class="mr-1.5 text-sm text-muted-foreground">{position}</span>
+		{#if place.previous}
+			<IconButton href={href(place.previous)} variant="outline" label={m.doc_previous()}>
+				<ChevronLeft aria-hidden="true" />
+			</IconButton>
+		{/if}
+		{#if place.next}
+			<IconButton href={href(place.next)} variant="outline" label={m.doc_next()}>
+				<ChevronRight aria-hidden="true" />
+			</IconButton>
+		{/if}
+	</nav>
+{/snippet}

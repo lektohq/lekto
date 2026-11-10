@@ -100,6 +100,7 @@
 	import { cn } from '#lib/utils.ts';
 	import { onChange } from '#lib/watch.svelte.ts';
 	import { openBeam } from '#lib/beam.svelte.ts';
+	import { listDocument } from '#lib/document-view.ts';
 	import { returnTo } from '#lib/return-to.svelte.ts';
 	import { gotoSearching, stateWords } from '#lib/words.ts';
 	import { selectionOf } from '#lib/selection.ts';
@@ -446,7 +447,7 @@
 	function view(id: string) {
 		const ids = list.items.map((item) => item.document.id);
 		const source = searching ? { kind: 'search' as const, words: query } : undefined;
-		openBeam(ids, id, lens?.name ?? m.nav_documents(), source ? { source } : {});
+		openBeam(ids, id, lens?.name ?? m.nav_documents(), { list: true, ...(source && { source }) });
 	}
 
 	function selection(): BulkSelection {
@@ -1101,6 +1102,7 @@ row of filters, on a desktop narrow by the title. -->
 												fields={linesOf(item)}
 												chosen={selecting && isChosen(item.document.id)}
 												onchoose={selecting ? (on) => choose(item.document.id, on) : undefined}
+												href={listDocument(item.document.id)}
 												onview={() => view(item.document.id)}
 											>
 												{@render snippetLine(item)}
@@ -1118,6 +1120,7 @@ row of filters, on a desktop narrow by the title. -->
 												fields={linesOf(item)}
 												chosen={selecting && isChosen(item.document.id)}
 												onchoose={selecting ? (on) => choose(item.document.id, on) : undefined}
+												href={listDocument(item.document.id)}
 												onview={() => view(item.document.id)}
 											>
 												{@render snippetLine(item)}

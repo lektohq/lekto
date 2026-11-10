@@ -943,6 +943,13 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Neu
   (see "No plain data in addresses"). A detail page reached from a list carries that URL and
   entry back (`from`), and its `BackLink` returns there. The inbox's previous/next works the same
   way.
+- **Previous/next from the document list** (Tobi, 10.11.2026): a document opened from the list
+  (a double click, or "Dokument öffnen" in the Beam; `?from=list`) shows "Dokument 4 von 33"
+  with previous/next in its head, as one from the inbox shows its place there: the list's own
+  documents in its order (filters, lens, sort, words; `lib/list-places.ts`). One that leaves the
+  list while shown (a tag of the filter removed) keeps its place, so next goes on from it. Saving
+  stays on the document. Without the list in this tab (after a reload) it shows neither. Only
+  the document list; other lists open the Beam, which pages through them itself.
 - Detail pages of the same kind offer the same actions in the same place: header actions (edit,
   primary action). A single destructive action stands there as an `IconButton` (rule, webhook);
   where there are more actions, a "…" menu holds the rest (delete last, in `destructive`).
