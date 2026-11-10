@@ -1,8 +1,6 @@
 <script lang="ts">
 	import Waypoints from '@lucide/svelte/icons/waypoints';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
-	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
-	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import Download from '@lucide/svelte/icons/download';
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import FolderInput from '@lucide/svelte/icons/folder-input';
@@ -46,6 +44,7 @@
 	import { Choice } from '#lib/components/ui/choice/index.ts';
 	import DocumentBackLink from '#lib/components/document/DocumentBackLink.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
+	import Stepper from '#lib/components/Stepper.svelte';
 	import PageTitle from '#lib/components/page/PageTitle.svelte';
 	import { leaveDocument } from '#lib/way-back.ts';
 	import FormDialog from '#lib/components/FormDialog.svelte';
@@ -439,19 +438,16 @@
 </FormDialog>
 
 <!-- Where the document stands among those of the place it was opened from, with the ones before
-     and after it (the inbox, the document list). -->
+     and after it (the inbox, the document list): at the end of the row, the arrows at the edge. -->
 {#snippet among(place: Neighbours, label: string, position: string, href: (id: string) => string)}
-	<nav aria-label={label} class="ml-auto flex items-center gap-1">
-		<span class="mr-1.5 text-sm text-muted-foreground">{position}</span>
-		{#if place.previous}
-			<IconButton href={href(place.previous)} variant="outline" label={m.doc_previous()}>
-				<ChevronLeft aria-hidden="true" />
-			</IconButton>
-		{/if}
-		{#if place.next}
-			<IconButton href={href(place.next)} variant="outline" label={m.doc_next()}>
-				<ChevronRight aria-hidden="true" />
-			</IconButton>
-		{/if}
-	</nav>
+	<Stepper
+		class="ml-auto"
+		side="end"
+		{label}
+		text={position}
+		previous={place.previous ? href(place.previous) : null}
+		next={place.next ? href(place.next) : null}
+		previousLabel={m.doc_previous()}
+		nextLabel={m.doc_next()}
+	/>
 {/snippet}

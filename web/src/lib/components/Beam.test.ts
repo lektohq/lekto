@@ -176,12 +176,9 @@ describe('Beam', () => {
 			'/api/v1/documents/a/pages/1',
 			'/api/v1/documents/a/pages/2'
 		]);
-		expect(screen.getByRole('button', { name: m.beam_previous() })).toHaveProperty(
-			'disabled',
-			true
-		);
+		expect(screen.getByRole('button', { name: m.doc_previous() })).toHaveProperty('disabled', true);
 		// The next one in the same history entry, the words kept.
-		await userEvent.click(screen.getByRole('button', { name: m.beam_next() }));
+		await userEvent.click(screen.getByRole('button', { name: m.doc_next() }));
 		expect(goto).toHaveBeenLastCalledWith('http://lekto/ui/documents?tag=t1', {
 			shallow: true,
 			replace: true,
