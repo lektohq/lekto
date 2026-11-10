@@ -60,8 +60,10 @@ docker build -t lekto-migration:local migration
 ```
 
 Publishing a release on GitHub runs `.github/workflows/release.yml`: it builds `lekto` and
-`lekto-migration` (amd64, arm64) with the version from the tag and pushes them to ghcr.io; the tags
-(version, `beta`/`stable`, `latest`) come from `.github/scripts/image_tags.py`
+`lekto-migration` (amd64, arm64) with the version from the tag and pushes them to ghcr.io;
+`lekto-migration` only when `migration/` changed since the previous release (else that release's
+image gets the tags); the tags (version, `beta`/`stable`, `latest`) come from
+`.github/scripts/image_tags.py`
 (`python3 -m unittest discover -s .github/scripts`). For a release that got `latest`, a last job
 tells the homelab its version (`repository_dispatch`, secrets `HOMELAB_DISPATCH_REPO` and
 `HOMELAB_DISPATCH_TOKEN`; see `deploy/README.md`). The repository carries the version `0.0.0.dev0`.
