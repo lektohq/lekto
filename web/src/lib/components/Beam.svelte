@@ -1,7 +1,5 @@
 <script lang="ts">
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
-	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
-	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import X from '@lucide/svelte/icons/x';
 	import { toast } from 'svelte-sonner';
 	import { page } from '$app/state';
@@ -17,6 +15,7 @@
 		type ValueSource
 	} from '#lib/beam.svelte.ts';
 	import IconButton from '#lib/components/IconButton.svelte';
+	import Stepper from '#lib/components/Stepper.svelte';
 	import Loading from '#lib/components/Loading.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import DocumentPages from '#lib/components/document/DocumentPages.svelte';
@@ -380,31 +379,18 @@
 			</Sheet.Close>
 		</div>
 		{#if beam && beam.ids.length > 1}
-			<div class="flex shrink-0 items-center gap-2 px-4 pb-3 sm:px-5">
-				<IconButton
-					variant="outline"
-					size="sm"
-					label={m.beam_previous()}
-					disabled={beam.index === 0}
-					onclick={() => beamTo(beam.index - 1)}
-				>
-					<ChevronLeft aria-hidden="true" />
-				</IconButton>
-				<span class="min-w-28 text-center text-sm tabular-nums" aria-live="polite">
-					{beam.source?.kind === 'open' || beam.source?.kind === 'places'
-						? m.beam_place_position({ current: beam.index + 1, total: beam.ids.length })
-						: m.beam_position({ current: beam.index + 1, total: beam.ids.length })}
-				</span>
-				<IconButton
-					variant="outline"
-					size="sm"
-					label={m.beam_next()}
-					disabled={beam.index === beam.ids.length - 1}
-					onclick={() => beamTo(beam.index + 1)}
-				>
-					<ChevronRight aria-hidden="true" />
-				</IconButton>
-			</div>
+			<Stepper
+				class="shrink-0 px-4 pb-3 sm:px-5"
+				side="start"
+				label={m.beam_documents()}
+				text={beam.source?.kind === 'open' || beam.source?.kind === 'places'
+					? m.beam_place_position({ current: beam.index + 1, total: beam.ids.length })
+					: m.beam_position({ current: beam.index + 1, total: beam.ids.length })}
+				previous={beam.index > 0 ? () => beamTo(beam!.index - 1) : null}
+				next={beam.index < beam.ids.length - 1 ? () => beamTo(beam!.index + 1) : null}
+				previousLabel={m.doc_previous()}
+				nextLabel={m.doc_next()}
+			/>
 		{/if}
 		<div class="flex min-h-0 flex-1 flex-col border-t bg-surface p-3">
 			{#if problem}
