@@ -27,7 +27,10 @@
 	// title (Tobi, 20.10.2026): the caller shows the part of `tab`, the body starts at its top
 	// again, and the dialog keeps one height (`class`, `TALL`), on a phone they share its width.
 	// Without `action` it saves nothing of its own (the account dialog, whose parts each save
-	// themselves): no form around the body, no footer, "Fertig" in the phone's bar.
+	// themselves): no form around the body, no footer, "Fertig" in the phone's bar. An editor of
+	// several steps (web/DESIGN.md, "Dialogs"): the submit of a step before the last leads on
+	// (`stay`: it does not close), and a later step has `back`: "Zurück" at the start of the
+	// footer, on a phone instead of "Abbrechen" in the bar.
 	let {
 		open = $bindable(false),
 		title,
@@ -44,6 +47,9 @@
 		fixed = false,
 		tabs,
 		tab = $bindable(''),
+		stay = false,
+		back,
+		shortSubmitLabel,
 		children: body
 	}: {
 		open?: boolean;
@@ -66,10 +72,17 @@
 		size?: 'md' | 'lg' | 'xl';
 		tabs?: readonly Segment[];
 		tab?: string;
+		/** The submit leads to the next step: the editor stays open. */
+		stay?: boolean;
+		/** Back to the step before ("Zurück"). */
+		back?: () => void;
+		/** The submit in the phone's bar, a short verb ("Weiter"); default "Speichern". */
+		shortSubmitLabel?: string;
 		children: Snippet;
 	} = $props();
 
 	let confirming = $state(false);
+	let staying = false;
 	let scroller = $state<HTMLElement | null>(null);
 
 	$effect(() => {
@@ -82,9 +95,10 @@
 	{#if phone.current}
 		<PhoneEditorBar
 			title={shortTitle}
-			submitLabel={action ? m.editor_save_short() : undefined}
+			submitLabel={action ? (shortSubmitLabel ?? m.editor_save_short()) : undefined}
 			disabled={busy || disabled}
-			oncancel={() => (open = false)}
+			cancelLabel={back ? m.editor_back() : undefined}
+			oncancel={back ?? (() => (open = false))}
 		/>
 	{:else}
 		<Dialog.Header class="shrink-0 px-4 pt-4 pr-12 pb-3">
@@ -133,6 +147,11 @@
 	</div>
 	{#if !phone.current && action}
 		<div class="flex shrink-0 flex-wrap items-center gap-2 border-t bg-muted/50 p-4">
+			{#if back}
+				<Button type="button" variant="ghost" disabled={busy} onclick={back}>
+					{m.editor_back()}
+				</Button>
+			{/if}
 			{#if ondelete}
 				<Button
 					type="button"
@@ -165,7 +184,17 @@
 		)}
 	>
 		{#if action}
-			<AsyncForm class="flex min-h-0 flex-1 flex-col" {action} ondone={() => (open = false)}>
+			<AsyncForm
+				class="flex min-h-0 flex-1 flex-col"
+				action={async () => {
+					// As it was when the step was submitted: the step may change meanwhile.
+					staying = stay;
+					await action?.();
+				}}
+				ondone={() => {
+					if (!staying) open = false;
+				}}
+			>
 				{#snippet children({ busy, error })}{@render frame(busy, error)}{/snippet}
 			</AsyncForm>
 		{:else}

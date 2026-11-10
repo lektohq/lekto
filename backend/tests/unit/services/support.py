@@ -10,6 +10,7 @@ from lekto.adapters.outbound.memory import (
     FakeImageNormaliser,
     FakeOidcProvider,
     FakePageComposer,
+    FakePageRenderer,
     FakePasswordHasher,
     FakeTotp,
     FakeWebhookSender,
@@ -154,7 +155,12 @@ class World:
     @property
     def editing(self) -> EditingService:
         return EditingService(
-            self.uow, self.clock, self.object_store, self.composer, pipeline_version="test"
+            self.uow,
+            self.clock,
+            self.object_store,
+            self.composer,
+            FakePageRenderer(pages=2),
+            pipeline_version="test",
         )
 
     @property
