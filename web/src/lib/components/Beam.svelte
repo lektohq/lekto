@@ -25,7 +25,7 @@
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
 	import { documentHref } from '#lib/candidates.ts';
 	import { fieldLabel } from '#lib/describe.ts';
-	import { inboxDocument, marksOf, type Mark } from '#lib/document-view.ts';
+	import { inboxDocument, listDocument, marksOf, type Mark } from '#lib/document-view.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { formatDate } from '#lib/i18n.ts';
 	import { kindLabel } from '#lib/identifiers.ts';
@@ -332,7 +332,8 @@
 
 	function open() {
 		if (!beam || !id) return;
-		void jumpTo(beam.inbox ? inboxDocument(id) : documentHref(id), beam.from, leaveBeam());
+		const href = beam.inbox ? inboxDocument(id) : beam.list ? listDocument(id) : documentHref(id);
+		void jumpTo(href, beam.from, leaveBeam());
 	}
 </script>
 

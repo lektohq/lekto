@@ -1760,6 +1760,8 @@
 	"page_image": "Seite {number}",
 	"doc_inbox_nav": "Dokumente im Posteingang",
 	"doc_inbox_position": "{position} von {total} im Posteingang",
+	"doc_list_nav": "Dokumente der Liste",
+	"doc_list_position": "Dokument {position} von {total}",
 	"doc_previous": "Vorheriges Dokument",
 	"doc_next": "Nächstes Dokument",
 	"doc_received": "eingegangen am {date}",

@@ -135,7 +135,10 @@ describe('the archive page', () => {
 		await user.keyboard('{Enter}');
 		expect(goto).toHaveBeenLastCalledWith('http://lekto/ui/documents', {
 			shallow: true,
-			state: { words: '', beam: { ids: ['d1', 'd2'], index: 1, from: m.nav_documents() } },
+			state: {
+				words: '',
+				beam: { ids: ['d1', 'd2'], index: 1, list: true, from: m.nav_documents() }
+			},
 			persistState: true
 		});
 	});
@@ -168,7 +171,7 @@ describe('the archive page', () => {
 			shallow: true,
 			state: {
 				words: 'Strom',
-				beam: { ids: ['d1', 'd2'], index: 1, from: m.nav_documents(), source }
+				beam: { ids: ['d1', 'd2'], index: 1, list: true, from: m.nav_documents(), source }
 			},
 			persistState: true
 		});
