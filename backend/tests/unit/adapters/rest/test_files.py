@@ -41,3 +41,22 @@ async def test_files_need_read_access(api: Api) -> None:
     url = f"{DOCUMENTS}/{await upload(api, auth(owner))}"
     response = await api.client.get(f"{url}/files", headers=auth(other))
     assert response.status_code == 404
+
+
+async def test_the_versions_of_the_original_and_the_file_of_one(api: Api) -> None:
+    owner, other = await api.user(), await api.user()
+    url = f"{DOCUMENTS}/{await upload(api, auth(owner))}"
+    files = (await api.client.get(f"{url}/files", headers=auth(owner))).json()
+    [version] = files["versions"]
+    assert version["number"] == 1 and version["current"] is True
+    assert (version["original_filename"], version["kind"]) == (FILENAME, "received")
+    assert version["created_by"] == str(owner.id)
+    response = await api.client.get(f"{url}/versions/1/original", headers=auth(owner))
+    assert response.status_code == 200, response.text
+    assert response.content == (SAMPLES / "scan.pdf").read_bytes()
+    assert response.headers["content-disposition"].startswith("attachment")
+    missing = await api.client.get(f"{url}/versions/2/original", headers=auth(owner))
+    assert missing.status_code == 404
+    assert missing.json()["reason"]["code"] == "version_not_found"
+    hidden = await api.client.get(f"{url}/versions/1/original", headers=auth(other))
+    assert hidden.status_code == 404

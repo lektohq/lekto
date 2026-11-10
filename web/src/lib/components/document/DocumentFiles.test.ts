@@ -31,7 +31,19 @@ const FILES = {
 			entries: [{ source: 'info', key: 'Producer', value: 'Scanner 2.1' }]
 		}
 	},
-	archive: null
+	archive: null,
+	versions: [
+		{
+			number: 1,
+			current: true,
+			original_filename: 'scan-2026-07-03.pdf',
+			media_type: 'application/pdf',
+			kind: 'received',
+			created_at: '2026-07-03T08:40:36Z',
+			created_by: null,
+			detail: {}
+		}
+	]
 };
 
 beforeEach(() => {
@@ -59,7 +71,9 @@ describe('DocumentFiles', () => {
 		};
 		files = { ...FILES, original };
 		render(DocumentFiles, { documentId: 'doc-1' });
-		const life = await screen.findByRole('list');
+		const life = within(await screen.findByRole('region', { name: m.files_life() })).getByRole(
+			'list'
+		);
 		expect(
 			within(life)
 				.getAllByRole('listitem')
@@ -115,7 +129,9 @@ describe('DocumentFiles', () => {
 				processing: { status: 'review', run: 1, vision: false, nodes: [] }
 			}
 		});
-		const life = await screen.findByRole('list');
+		const life = within(await screen.findByRole('region', { name: m.files_life() })).getByRole(
+			'list'
+		);
 		const steps = within(life).getAllByRole('listitem');
 		expect(steps.map((step) => step.querySelector('.font-semibold')?.textContent?.trim())).toEqual([
 			m.files_step_added(),
@@ -183,7 +199,7 @@ describe('DocumentFiles', () => {
 	it('offers no pencil to someone who may not change the document', async () => {
 		files = FILES;
 		render(DocumentFiles, { documentId: 'doc-1' });
-		await screen.findByRole('list');
+		await screen.findByRole('region', { name: m.files_life() });
 		expect(screen.queryByRole('button', { name: m.files_received_edit() })).toBeNull();
 	});
 
@@ -191,5 +207,37 @@ describe('DocumentFiles', () => {
 		files = { ...FILES, original: { ...FILES.original, metadata: null } };
 		render(DocumentFiles, { documentId: 'doc-1' });
 		expect((await screen.findAllByText(m.files_unreadable())).length).toBeGreaterThan(0);
+	});
+
+	it('lists the versions of the original, the current one first and marked', async () => {
+		const lookup = { users: [{ id: 'u-1', username: 'tobi', display_name: 'Tobias Schulz' }] };
+		files = {
+			...FILES,
+			versions: [
+				{ ...FILES.versions[0], current: false },
+				{
+					number: 2,
+					current: true,
+					original_filename: 'november.pdf',
+					media_type: 'application/pdf',
+					kind: 'edited',
+					created_at: '2026-11-10T14:42:00Z',
+					created_by: 'u-1',
+					detail: { from: 1, pages: [5, 6] }
+				}
+			]
+		};
+		render(DocumentFiles, { documentId: 'doc-1', lookup: lookup as never });
+		const card = await screen.findByRole('region', { name: m.files_versions() });
+		const rows = within(card).getAllByRole('listitem');
+		expect(rows.map((row) => row.textContent)).toEqual([
+			expect.stringContaining(m.version_number({ number: '2' })),
+			expect.stringContaining(m.version_number({ number: '1' }))
+		]);
+		expect(within(rows[0]).getByText(m.version_current())).toBeTruthy();
+		expect(rows[0].textContent).toContain(m.version_edited({ from: '1' }));
+		expect(rows[0].textContent).toContain('Tobias Schulz');
+		expect(within(rows[1]).queryByText(m.version_current())).toBeNull();
+		expect(rows[1].textContent).toContain(m.version_received());
 	});
 });

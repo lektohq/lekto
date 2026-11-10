@@ -243,6 +243,7 @@ class ReasonCode(StrEnum):
     MODEL_CALL_ADMINS = "model_call_admins"
     OPEN_FIELDS = "open_fields"
     DUPLICATE_OF = "duplicate_of"
+    DUPLICATE_OF_VERSION = "duplicate_of_version"
     DUPLICATE_UNSEEN = "duplicate_unseen"
     NO_TEXT_YET = "no_text_yet"
     NO_STRUCTURE_YET = "no_structure_yet"
@@ -283,6 +284,7 @@ class ReasonCode(StrEnum):
     # the rest of the problems, rules disabled and skipped
     NOT_FOUND = "not_found"
     PAGE_NOT_FOUND = "page_not_found"
+    VERSION_NOT_FOUND = "version_not_found"
     FILE_NOT_FOUND = "file_not_found"
     RULE_VERSION_NOT_FOUND = "rule_version_not_found"
     NAME_EMPTY = "name_empty"
@@ -729,6 +731,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.MODEL_CALL_ADMINS: "only an admin's webhook serves as a model call",
     ReasonCode.OPEN_FIELDS: "decide the open fields first: {fields:fields}",
     ReasonCode.DUPLICATE_OF: "duplicate of document {id}",
+    ReasonCode.DUPLICATE_OF_VERSION: "duplicate of version {version:number} of document {id}",
     ReasonCode.DUPLICATE_UNSEEN: "the file lies in Lekto already, in a space you cannot see",
     ReasonCode.NO_TEXT_YET: "document has no text yet",
     ReasonCode.NO_STRUCTURE_YET: "document has no structure yet",
@@ -770,6 +773,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.OIDC_PASSWORD_FIRST: "set a password first; without it you could not sign in",
     ReasonCode.NOT_FOUND: "{kind:thing} {id} not found",
     ReasonCode.PAGE_NOT_FOUND: "page {page:number} of document {id} not found",
+    ReasonCode.VERSION_NOT_FOUND: "version {number:number} of document {id} not found",
     ReasonCode.FILE_NOT_FOUND: "{file:thing} of document {id} not found",
     ReasonCode.RULE_VERSION_NOT_FOUND: "version {number:number} of rule {id} not found",
     ReasonCode.NAME_EMPTY: "{what:thing} must not be empty",
