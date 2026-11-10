@@ -23,13 +23,7 @@
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
-	import {
-		documentApi,
-		inboxDocument,
-		listDocument,
-		tabHref,
-		type Neighbours
-	} from '#lib/document-view.ts';
+	import { documentApi, tabHref, type Neighbours } from '#lib/document-view.ts';
 	import { reportError } from '#lib/errors.ts';
 	import { readersLaterText, visibleText, type Viewer } from '#lib/filing.ts';
 	import { formatDate } from '#lib/i18n.ts';
@@ -44,7 +38,7 @@
 	import { Choice } from '#lib/components/ui/choice/index.ts';
 	import DocumentBackLink from '#lib/components/document/DocumentBackLink.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
-	import Stepper from '#lib/components/Stepper.svelte';
+	import DocumentPlace from '#lib/components/document/DocumentPlace.svelte';
 	import PageTitle from '#lib/components/page/PageTitle.svelte';
 	import { leaveDocument } from '#lib/way-back.ts';
 	import FormDialog from '#lib/components/FormDialog.svelte';
@@ -242,21 +236,7 @@
 <div class="flex flex-col gap-3.5">
 	<div class="flex min-h-9 flex-wrap items-center gap-3">
 		<DocumentBackLink inbox={Boolean(inbox)} />
-		{#if inbox && inbox.position !== null}
-			{@render among(
-				inbox,
-				m.doc_inbox_nav(),
-				m.doc_inbox_position({ position: inbox.position, total: inbox.total }),
-				inboxDocument
-			)}
-		{:else if list && list.position !== null}
-			{@render among(
-				list,
-				m.doc_list_nav(),
-				m.doc_list_position({ position: list.position, total: list.total }),
-				listDocument
-			)}
-		{/if}
+		<DocumentPlace {inbox} {list} />
 	</div>
 
 	<header class="flex flex-wrap items-start justify-between gap-4">
@@ -436,18 +416,3 @@
 		{/if}
 	</ReprocessFields>
 </FormDialog>
-
-<!-- Where the document stands among those of the place it was opened from, with the ones before
-     and after it (the inbox, the document list): at the end of the row, the arrows at the edge. -->
-{#snippet among(place: Neighbours, label: string, position: string, href: (id: string) => string)}
-	<Stepper
-		class="ml-auto"
-		side="end"
-		{label}
-		text={position}
-		previous={place.previous ? href(place.previous) : null}
-		next={place.next ? href(place.next) : null}
-		previousLabel={m.doc_previous()}
-		nextLabel={m.doc_next()}
-	/>
-{/snippet}
