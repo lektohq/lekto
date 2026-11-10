@@ -3,6 +3,8 @@
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import Download from '@lucide/svelte/icons/download';
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
+	import FilePenLine from '@lucide/svelte/icons/file-pen-line';
+	import FileUp from '@lucide/svelte/icons/file-up';
 	import FolderInput from '@lucide/svelte/icons/folder-input';
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
@@ -42,6 +44,8 @@
 	import PageTitle from '#lib/components/page/PageTitle.svelte';
 	import { leaveDocument } from '#lib/way-back.ts';
 	import FormDialog from '#lib/components/FormDialog.svelte';
+	import PageEditor from '#lib/components/document/PageEditor.svelte';
+	import VersionUpload from '#lib/components/document/VersionUpload.svelte';
 
 	type Document = components['schemas']['DocumentDetails'];
 	type ReprocessNode = components['schemas']['ReprocessNode'];
@@ -91,6 +95,8 @@
 	let target = $state('');
 	let fromNode = $state<ReprocessNode>('ocr');
 	let busy = $state(false);
+	let editing = $state(false);
+	let upload = $state<ReturnType<typeof VersionUpload> | null>(null);
 
 	const base = $derived(documentApi(document.id));
 	const user = $derived(session.user);
@@ -128,6 +134,21 @@
 	const askVision = $derived(fromNode === 'ocr' && (reading?.vision ?? false));
 	const withVision = $derived(askVision && readable && visionAgain);
 	const visionRunning = $derived(document.processing.vision && running.running.includes('ocr'));
+	// A file of pages, not a mail, while it is not processed: its pages are edited or its file
+	// replaced (a new version).
+	const fileOfPages = $derived(
+		manageable && status !== 'processing' && document.media_type !== 'message/rfc822'
+	);
+
+	async function edited(result: components['schemas']['EditedDocuments']) {
+		toast.success(m.page_edit_done());
+		if (result.deleted) {
+			onleave?.();
+			await leaveDocument(Boolean(inbox));
+		} else {
+			onchanged();
+		}
+	}
 
 	/** Ask whether the vision model shall read the document (also from the advice). */
 	export function startVision() {
@@ -332,6 +353,18 @@
 								{m.reprocess_title()}
 							</DropdownMenu.Item>
 						{/if}
+						{#if fileOfPages && document.page_count}
+							<DropdownMenu.Item disabled={busy} onSelect={() => (editing = true)}>
+								<FilePenLine aria-hidden="true" />
+								{m.page_edit_menu()}
+							</DropdownMenu.Item>
+						{/if}
+						{#if fileOfPages}
+							<DropdownMenu.Item disabled={busy} onSelect={() => upload?.start()}>
+								<FileUp aria-hidden="true" />
+								{m.version_upload()}
+							</DropdownMenu.Item>
+						{/if}
 						{#if readable}
 							<DropdownMenu.Item disabled={busy} onSelect={startVision}>
 								<ScanText aria-hidden="true" />
@@ -353,6 +386,11 @@
 		</div>
 	</header>
 </div>
+
+{#if manageable}
+	<PageEditor bind:open={editing} {document} onedited={edited} />
+	<VersionUpload bind:this={upload} documentId={document.id} title={document.title} {onchanged} />
+{/if}
 
 <ConfirmDialog
 	bind:open={confirmDelete}

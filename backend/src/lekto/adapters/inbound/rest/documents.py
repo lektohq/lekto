@@ -6,6 +6,7 @@ the list leaves them out, filters and pages only ever see readable ones.
 """
 
 import asyncio
+import base64
 import os
 import tempfile
 from collections.abc import Awaitable, Callable, Mapping
@@ -61,6 +62,7 @@ from lekto.adapters.inbound.rest.schemas.editing import (
     PARTS,
     PARTS_LIMIT,
     EditedDocuments,
+    PagePreviews,
     parts_schema,
 )
 from lekto.adapters.inbound.rest.schemas.facts import FactDecisionIn, FactsOut
@@ -269,6 +271,36 @@ async def new_version(
     finally:
         await asyncio.shield(asyncio.to_thread(received.file.path.unlink, missing_ok=True))
     return _details(view)
+
+
+_PREVIEW_BODY = upload_body("PDF, JPEG, PNG or TIFF; recognised by content.")
+
+
+@router.post(
+    "/{id}/edit/pages",
+    summary="Show the pages of a file to add to an edit",
+    description=(
+        EDITORS + ", before they add a file to an edit of the document's pages (`POST "
+        "/documents/{id}/edit`): its pages as small images. Nothing is stored. 415 for a file "
+        "that is no PDF or image; 422 for one whose pages cannot be read."
+    ),
+    response_model=PagePreviews,
+    responses=problem_responses(400, 401, 403, 404, 413, 415, 422),
+    openapi_extra=_PREVIEW_BODY,
+)
+async def preview_pages(
+    id: UUID, request: Request, user: CurrentUser, context: Context
+) -> PagePreviews:
+    received = await read_upload(request, max_size=context.max_upload_size)
+    try:
+        images = await context.editing.preview(user, DocumentId(id), received.file)
+    finally:
+        await asyncio.shield(asyncio.to_thread(received.file.path.unlink, missing_ok=True))
+    return PagePreviews(
+        pages=[
+            f"data:{PAGE_MEDIA_TYPE};base64,{base64.b64encode(image).decode()}" for image in images
+        ]
+    )
 
 
 _EDIT_BODY = {

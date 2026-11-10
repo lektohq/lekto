@@ -15,19 +15,23 @@
 
 	// The bar on top of an editor on a phone: "Abbrechen", the title, the submit of the form it
 	// stands in (in red where it deletes or ends something). Without `submitLabel` the editor
-	// saves nothing of its own (its parts do): the title and "Fertig", which closes it. It stands
-	// inside `Dialog.Content`.
+	// saves nothing of its own (its parts do): the title and "Fertig", which closes it. A later
+	// step of an editor of several says "Zurück" instead of "Abbrechen" (`cancelLabel`). It
+	// stands inside `Dialog.Content`.
 	let {
 		title,
 		submitLabel,
 		disabled = false,
 		destructive = false,
+		cancelLabel,
 		oncancel
 	}: {
 		title: string;
 		submitLabel?: string;
 		disabled?: boolean;
 		destructive?: boolean;
+		/** Instead of "Abbrechen": "Zurück" in a later step. */
+		cancelLabel?: string;
 		oncancel: () => void;
 	} = $props();
 </script>
@@ -42,7 +46,7 @@
 			class={cn(BAR_ACTION, 'justify-self-start font-normal')}
 			onclick={oncancel}
 		>
-			{m.cancel()}
+			{cancelLabel ?? m.cancel()}
 		</Button>
 	{/if}
 	<Dialog.Title class="max-w-[50vw] truncate text-base font-semibold">{title}</Dialog.Title>

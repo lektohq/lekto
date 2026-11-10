@@ -42,6 +42,7 @@ from lekto.core.domain.versions import DocumentVersion, VersionKind
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.composer import PageComposer, PageSource
 from lekto.core.ports.object_store import ObjectStore
+from lekto.core.ports.pages import PageRenderer
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import access_to, controllable_document, load_actor
 from lekto.core.services._jobs import enqueue_nodes
@@ -89,14 +90,36 @@ class EditingService:
         clock: Clock,
         object_store: ObjectStore,
         composer: PageComposer,
+        thumbnails: PageRenderer,
         *,
         pipeline_version: str,
     ) -> None:
+        """`thumbnails`: renders the small pages of a file a person is about to add."""
         self._uow = uow
         self._clock = clock
         self._store = object_store
         self._composer = composer
+        self._thumbnails = thumbnails
         self._version = pipeline_version
+
+    async def preview(self, actor: UserId, id: DocumentId, file: IncomingFile) -> list[bytes]:
+        """Editors and admins, before they add `file` to an edit of the document: its pages as
+        small WebP images, in their order; nothing is stored. UnsupportedMediaTypeError unless
+        a PDF or an image; UnprocessableDocumentError if its pages cannot be read."""
+        kind = await _kind(file.path)
+        async with self._uow() as uow:
+            user = await load_actor(uow, actor)
+            await controllable_document(uow, user, id, Action.EDIT_PAGES)
+        async with work_directory() as work:
+            target = work / "pages"
+            await asyncio.to_thread(target.mkdir)
+            rendered = await self._thumbnails.render_pages(
+                file.path, media_type=kind, target=target
+            )
+            return [
+                await asyncio.to_thread((target / f"{number}.webp").read_bytes)
+                for number in range(1, rendered.pages + 1)
+            ]
 
     async def edit(
         self,

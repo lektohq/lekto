@@ -6,7 +6,7 @@ from typing import Any
 
 from lekto.adapters.outbound.memory import fake_pdf
 from tests.api import auth
-from tests.unit.adapters.rest.support import DOCUMENTS, Api, upload
+from tests.unit.adapters.rest.support import DOCUMENTS, Api, file_part, upload
 
 
 def form(parts: Any, *files: tuple[str, bytes]) -> dict[str, Any]:
@@ -97,4 +97,25 @@ async def test_parts_that_do_not_fit_are_refused(api: Api) -> None:
     refused = await api.client.post(url, **form(added, ("m.eml", mail)), headers=auth(owner))
     assert refused.status_code == 415
     hidden = await api.client.post(url, **form(turned), headers=auth(stranger))
+    assert hidden.status_code == 404
+
+
+async def test_the_pages_of_a_file_to_add_are_shown_not_stored(api: Api) -> None:
+    owner, stranger = await api.user(), await api.user()
+    id = await upload(api, auth(owner))
+    url = f"{DOCUMENTS}/{id}/edit/pages"
+    before = api.container.object_store.keys()  # type: ignore[attr-defined]
+    response = await api.client.post(
+        url, files=file_part("more.pdf", fake_pdf(1, "more")), headers=auth(owner)
+    )
+    assert response.status_code == 200, response.text
+    [page] = response.json()["pages"]
+    assert page.startswith("data:image/webp;base64,")
+    assert api.container.object_store.keys() == before  # type: ignore[attr-defined]
+    mail = b"From: a@example.org\r\nSubject: Hi\r\n\r\nHello\r\n"
+    refused = await api.client.post(url, files=file_part("m.eml", mail), headers=auth(owner))
+    assert refused.status_code == 415
+    hidden = await api.client.post(
+        url, files=file_part("more.pdf", fake_pdf(1, "more")), headers=auth(stranger)
+    )
     assert hidden.status_code == 404

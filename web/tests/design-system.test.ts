@@ -128,6 +128,7 @@ const POPOVERS = new Set([
 const SHADOWS = new Set([
 	'/src/lib/components/Segmented.svelte',
 	'/src/lib/components/PageViewer.svelte',
+	'/src/lib/components/pages/PageTile.svelte',
 	'/src/lib/components/ToTop.svelte'
 ]);
 

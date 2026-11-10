@@ -267,6 +267,19 @@ async def test_every_result_waits_in_the_inbox_and_what_was_confirmed_stays(
     assert new.channel is Channel.API
 
 
+async def test_the_pages_of_a_file_to_add_are_shown_before(world: World) -> None:
+    owner, document = await received(world)
+    stranger = await world.user()
+    before = world.object_store.keys()
+    pages = await world.editing.preview(owner.id, document.id, incoming(FORGOTTEN))
+    assert len(pages) == 2 and all(page.startswith(b"RIFF") for page in pages)
+    assert world.object_store.keys() == before
+    with pytest.raises(NotFoundError):
+        await world.editing.preview(stranger.id, document.id, incoming(FORGOTTEN))
+    with pytest.raises(UnsupportedMediaTypeError):
+        await world.editing.preview(owner.id, document.id, incoming(b"From: a@b.c\r\n\r\nx"))
+
+
 async def test_an_edit_is_logged(world: World, caplog: pytest.LogCaptureFixture) -> None:
     """With the level of the service (the tests run quieter), the record is made."""
     owner, document = await received(world)

@@ -78,3 +78,9 @@ class EditedDocuments(BaseModel):
         )
     )
     deleted: bool = Field(description="No part replaced the document, and it is deleted.")
+
+
+class PagePreviews(BaseModel):
+    pages: list[str] = Field(
+        description="Each page of the file in its order, small, as a `data:` URL of a WebP image."
+    )

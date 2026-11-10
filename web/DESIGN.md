@@ -114,7 +114,7 @@ borders mean "empty" or "add": `EmptyNote` and the dashed "+ …" chip.
 **Shadows:** cards have none. Popovers, menus and dialogs use the component's shadow. Marks on a
 page image use `.mark-glass`; a pinned page of the viewer uses `shadow-pinned`. Three more, each
 for what it sets apart (Tobi, 09.11.2026): the chosen option's pill of `Segmented` and the paper
-of the viewer's pages `shadow-sm`, "Nach oben" (`ToTop`), which floats over the content,
+of the viewer's pages and of a page tile (`PageTile`) `shadow-sm`, "Nach oben" (`ToTop`), which floats over the content,
 `shadow-lg`. No other shadows; a hover shows a border, not a shadow.
 
 **Dividers:** `ui/separator`, not hand-built `h-px`/`w-px` elements.
@@ -367,6 +367,35 @@ disabled, never gone. A step is a link (a document of the inbox or the list) or 
 Beam, also on ← →). A list's pages are `Pagination`, a calendar's months `DateInput`'s own; any
 other pair of arrows is a `Stepper`.
 
+### Page stack
+
+"PDF bearbeiten" (`PageEditor`, Tobi 10.11.2026) shows a document's pages as a stack to edit:
+choose, turn, remove, reorder, cut into parts, and add the pages of a file from the device
+("Dokument hinzufügen", `outline`, `sm`, above the stack beside "Rückgängig" and "Wiederholen",
+`IconButton` `sm`). Above them the parts as `Badge` `muted` ("Teil 2 · S. 3–4").
+
+- **Page tile** (`PageTile`): the paper of a page (its image with `shadow-sm`) in a square, turned
+  as it will be, its place below ("Seite 3", `text-meta`, muted), a `ChoiceBox` at the top left.
+  The tile is the label of its box: a click or a tap anywhere chooses it, with Shift up to here;
+  chosen, it has the chosen look of "Choosing many" (`bg-panel`, `border-primary`). The tiles are
+  a grid with one tab stop (the boxes, `grid-keys.ts`, as the icon picker): the arrows, Home and
+  End move the focus, Space chooses, Ctrl + arrow moves the page, Enter cuts after it. A mouse
+  moves a page by dragging it (the chosen ones together where it is chosen); a finger rests on
+  it first (400 ms), then drags; resting without moving chooses it.
+- **Page cut** (`PageCut`): the gap between two tiles is a toggle "Nach Seite n trennen"
+  (`aria-pressed`), 24 px wide, 44 px on a phone. Set, a line in `primary` with the scissors on a
+  `primary` circle; unset, the scissors faint (`muted-foreground` at half strength), so nothing
+  depends on hover. A page being dragged shows where it lands as the line of that gap. It is no
+  tab stop: the keyboard cuts with Enter on a page. A line below the stack says how to cut.
+- **Choosing** uses `SelectionBar` (`inDialog`): "n Seiten gewählt", "Auswahl aufheben", then
+  "Links drehen", "Rechts drehen", "Löschen", "Als neues Dokument" (`outline`, `sm`; on the phone
+  "Links", "Rechts", "Löschen", "Abtrennen", sharing the width at the bottom).
+- **The parts**, the second step: a `Card` (`row`) per part with its first two pages, "Teil n"
+  and its pages as `Badge` `muted`, and a `Segmented` (`sm`) "Ersetzt „…“ | Neues Dokument"; at
+  most one part replaces the document (choosing it lets go of another). Below them an `Alert`
+  `note`: every result runs anew and waits in the inbox, and what becomes of the document (a new
+  version, or deleted where no part replaces it).
+
 ### Badges
 
 `Badge` (`ui/badge`) shows a state or a short fact. It is never a button. Its tones come from
@@ -453,7 +482,7 @@ row is `bg-panel` with `border-primary` (a border, no ring). While something is 
 **selection bar** (`SelectionBar`) names how many and what an action will leave out, then
 "Auswahl aufheben" (`ghost`) and the actions (`outline`, the primary `default` last), all `sm`.
 It has the card look through `cardVariants`: on desktop it stands above the list in `bg-panel`
-and sticks below the header (`top-20`); on the phone it sticks to the bottom of the screen
+and sticks below the header (`top-20`; in a dialog at the top of its body, `inDialog`); on the phone it sticks to the bottom of the screen
 (`bg-card`, a line above), the hint as a line of its own and its two actions sharing the width.
 One item is still decided in its dialog, opened from its title: the actions stay out of the
 row. The open identifiers are a `ui/table` on a desktop; on a phone they are rows built as the
@@ -614,6 +643,11 @@ list pages the same way (see [Lists](#lists)).
   the title and its close button (an X, "Fertig") fixed on top, 85 % of the screen high;
   nothing takes the focus when it opens. The pickers (`SearchSelect`, `TagPickerDialog`) use
   it; its classes are written nowhere else.
+- **Steps:** an editor of several steps (`EditorShell` with `stay` and `back`, "PDF bearbeiten")
+  leads on with its primary action ("Weiter", which may say what follows: "Weiter: 3
+  Dokumente") and takes effect only in the last ("Übernehmen"). A later step has "Zurück"
+  (`ghost`) at the start of the footer, apart from "Abbrechen" and the primary action; on the
+  phone "Zurück" stands instead of "Abbrechen" in the bar. Going back keeps what was done.
 - **A second way out:** `FormDialog` takes `alternative`, an action that finishes the dialog
   as well, without asking (rejecting an open identifier beside taking it over): `outline` at the
   start of the footer; on the phone below the fields.
@@ -1209,8 +1243,10 @@ overwritten. The files tab lists them (`DocumentVersions`), the current one with
 `primary` "Aktuell", each with "Herunterladen" (`ghost`, `sm`). An editor puts a new file in the
 place of the current one with "Neue Fassung hochladen" (`secondary`, `sm`, in the card's head),
 asked with a `ConfirmDialog` that is not destructive (the current file stays); processing runs
-again, keeps what a person confirmed, and the document waits in the inbox ("Eine neue Fassung
-der Datei: prüfe, was sie liest.").
+again, keeps what a person confirmed, and the document waits in the inbox ("Die Datei hat sich
+geändert: prüfe, was Lekto darin liest."). The same upload (`VersionUpload`) stands in the
+document's menu "…", beside "PDF bearbeiten" (see [Page stack](#page-stack)). A version split
+off another document says so: "Abgetrennt aus „…“".
 
 **Fakt, Kennung, Nummer** (Tobi, 02.11.2026): three words, each for one thing.
 
