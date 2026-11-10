@@ -20,9 +20,7 @@ describe('InfoHint', () => {
 		expect(screen.getAllByText('Die Dokumente gehören auch zu diesen Gruppen.')).toHaveLength(1);
 		await user.click(button);
 		expect(
-			await screen.findAllByText('Die Dokumente gehören auch zu diesen Gruppen.', undefined, {
-				timeout: 2000
-			})
+			await screen.findAllByText('Die Dokumente gehören auch zu diesen Gruppen.')
 		).toHaveLength(2);
 	});
 });

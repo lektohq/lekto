@@ -145,7 +145,7 @@ describe('FieldsPanel', () => {
 			required: false,
 			required_document_type_ids: [REMINDER]
 		});
-	}, 15_000);
+	});
 
 	it('makes a field of every type required in each document', async () => {
 		render(WithDialogs, { component: FieldsPanel });
