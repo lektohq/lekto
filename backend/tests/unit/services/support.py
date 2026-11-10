@@ -9,6 +9,8 @@ from lekto.adapters.outbound.memory import (
     FakeCipher,
     FakeImageNormaliser,
     FakeOidcProvider,
+    FakePageComposer,
+    FakePageRenderer,
     FakePasswordHasher,
     FakeTotp,
     FakeWebhookSender,
@@ -28,6 +30,7 @@ from lekto.core.ports.logos import LogoFetcher
 from lekto.core.ports.ocr import VisionModel
 from lekto.core.services.auth import AuthService
 from lekto.core.services.documents import DocumentService
+from lekto.core.services.editing import EditingService
 from lekto.core.services.inbox import InboxService
 from lekto.core.services.lenses import LensService
 from lekto.core.services.logos import LogoService
@@ -83,6 +86,7 @@ class World:
     sender: FakeWebhookSender = field(default_factory=FakeWebhookSender)
     mail_server: MemoryMailServer = field(default_factory=MemoryMailServer)
     images: FakeImageNormaliser = field(default_factory=FakeImageNormaliser)
+    composer: FakePageComposer = field(default_factory=FakePageComposer)
     normalise_batch: int = NORMALISE_BATCH
 
     @property
@@ -147,6 +151,17 @@ class World:
     @property
     def documents(self) -> DocumentService:
         return DocumentService(self.uow, self.clock, self.object_store)
+
+    @property
+    def editing(self) -> EditingService:
+        return EditingService(
+            self.uow,
+            self.clock,
+            self.object_store,
+            self.composer,
+            FakePageRenderer(pages=2),
+            pipeline_version="test",
+        )
 
     @property
     def inbox(self) -> InboxService:

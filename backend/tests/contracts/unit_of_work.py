@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 from collections.abc import Awaitable, Callable, Collection
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
@@ -21,7 +22,7 @@ from lekto.core.domain.document_facts import (
     HolderSource,
     role_of,
 )
-from lekto.core.domain.documents import Document, DocumentChanges
+from lekto.core.domain.documents import Document, DocumentChanges, Sha256
 from lekto.core.domain.errors import (
     ConcurrencyError,
     ConflictError,
@@ -69,6 +70,7 @@ from lekto.core.domain.rules import (
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import User
 from lekto.core.domain.verdict import KnownLabels
+from lekto.core.domain.versions import DocumentVersion, VersionKind
 from lekto.core.ports.repository import (
     NEWEST_FIRST,
     CountBy,
@@ -1163,6 +1165,59 @@ class UnitOfWorkContract:
             await uow.commit()
         async with uow_factory() as uow:
             assert await uow.document_facts.of_document(document.id) == [iban, vat]
+
+    async def test_versions_of_a_document(self, uow_factory: UnitOfWorkFactory) -> None:
+        """A document's versions in their order; a file once per installation across all
+        versions; a number once per document; gone with their document."""
+        owner, space = await owner_with_space(uow_factory)
+        document, other = builders.processed(owner, space), builders.processed(owner, space)
+        first = DocumentVersion(
+            document_id=document.id,
+            number=1,
+            sha256=document.sha256,
+            original_filename="stack.pdf",
+            media_type="application/pdf",
+            kind=VersionKind.RECEIVED,
+            created_at=NOW,
+            created_by=owner.id,
+        )
+        second = replace(
+            first,
+            number=2,
+            sha256=Sha256(hashlib.sha256(b"part").hexdigest()),
+            original_filename="part.pdf",
+            kind=VersionKind.EDITED,
+            created_at=NOW + timedelta(minutes=1),
+            detail={"from": 1, "pages": [5, 6]},
+        )
+        async with uow_factory() as uow:
+            await uow.documents.add(document)
+            await uow.documents.add(other)
+            await uow.document_versions.add(second)
+            await uow.document_versions.add(first)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.document_versions.of_document(document.id) == [first, second]
+            assert await uow.document_versions.of_document(other.id) == []
+            assert await uow.document_versions.find_by_sha256(second.sha256) == second
+            assert await uow.document_versions.find_by_sha256(other.sha256) is None
+        for clash in (
+            replace(second, document_id=other.id, number=1),  # the file of another version
+            replace(first, sha256=other.sha256),  # the number again
+        ):
+            with pytest.raises(ConflictError):
+                async with uow_factory() as uow:
+                    await uow.document_versions.add(clash)
+                    await uow.commit()
+        async with uow_factory() as uow:
+            await uow.documents.remove(document.id)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.document_versions.of_document(document.id) == []
+            assert await uow.document_versions.find_by_sha256(first.sha256) is None
+            # Gone with it: its files may come in again.
+            await uow.document_versions.add(replace(second, document_id=other.id, number=1))
+            await uow.commit()
 
     async def test_relations_between_documents(self, uow_factory: UnitOfWorkFactory) -> None:
         """A relation from the newer to the older document: found from either end, replaced in

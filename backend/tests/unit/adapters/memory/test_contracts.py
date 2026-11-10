@@ -19,6 +19,7 @@ from lekto.adapters.outbound.memory import (
     FakeMetadataReader,
     FakeOcr,
     FakeOidcProvider,
+    FakePageComposer,
     FakePageRenderer,
     FakeParser,
     FakePasswordHasher,
@@ -73,6 +74,7 @@ from tests.contracts.processing import (
     CodeReaderContract,
     MetadataReaderContract,
     OcrContract,
+    PageComposerContract,
     PageRendererContract,
     ParserContract,
     TextLocatorContract,
@@ -269,6 +271,15 @@ class TestFakeTextLocator(TextLocatorContract):
 
 
 class TestFakePageRenderer(PageRendererContract):
+    pass
+
+
+@pytest.fixture
+def page_composer() -> FakePageComposer:
+    return FakePageComposer()
+
+
+class TestFakePageComposer(PageComposerContract):
     pass
 
 

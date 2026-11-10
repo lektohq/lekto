@@ -59,6 +59,7 @@ from lekto.adapters.outbound.sql.spaces import SqlSpaceRepository
 from lekto.adapters.outbound.sql.tasks import SqlTaskRepository
 from lekto.adapters.outbound.sql.transaction import Transaction
 from lekto.adapters.outbound.sql.users import SqlProfileRepository, SqlUserRepository
+from lekto.adapters.outbound.sql.versions import SqlDocumentVersionRepository
 from lekto.adapters.outbound.sql.webhooks import SqlWebhookRepository
 from lekto.core.domain.events import DomainEvent
 from lekto.core.ports.wakeup import Channel
@@ -119,6 +120,7 @@ class SqlUnitOfWork:
         self.processing_facts = SqlProcessingFacts(self._tx)
         self.document_facts = SqlDocumentFactRepository(self._tx)
         self.document_relations = SqlDocumentRelationRepository(self._tx)
+        self.document_versions = SqlDocumentVersionRepository(self._tx)
         self.inbox = SqlInboxRepository(self._tx, self.documents)
         self.rules = SqlRuleRepository(self._tx)
         self.rule_applications = SqlRuleApplicationRepository(self._tx)

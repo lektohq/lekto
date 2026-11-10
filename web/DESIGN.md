@@ -114,7 +114,7 @@ borders mean "empty" or "add": `EmptyNote` and the dashed "+ …" chip.
 **Shadows:** cards have none. Popovers, menus and dialogs use the component's shadow. Marks on a
 page image use `.mark-glass`; a pinned page of the viewer uses `shadow-pinned`. Three more, each
 for what it sets apart (Tobi, 09.11.2026): the chosen option's pill of `Segmented` and the paper
-of the viewer's pages `shadow-sm`, "Nach oben" (`ToTop`), which floats over the content,
+of the viewer's pages and of a page tile (`PageTile`) `shadow-sm`, "Nach oben" (`ToTop`), which floats over the content,
 `shadow-lg`. No other shadows; a hover shows a border, not a shadow.
 
 **Dividers:** `ui/separator`, not hand-built `h-px`/`w-px` elements.
@@ -234,12 +234,13 @@ Chips and badges are pills; a pill is never a button that starts an action.
 | `destructive` | Delete, remove, revoke                                            |
 | `link`        | Text actions inside running text ("Alle anzeigen")                |
 
-| Size      | Height | Use                                      |
-| --------- | ------ | ---------------------------------------- |
-| `default` | 40 px  | Pages, headers, toolbars, dialog footers |
-| `sm`      | 32 px  | Rows and cards (desktop)                 |
-| `lg`      | 48 px  | The sign-in page only                    |
-| `inline`  | text   | A button that reads as a word in a line  |
+| Size      | Height | Use                                                                                                    |
+| --------- | ------ | ------------------------------------------------------------------------------------------------------ |
+| `default` | 40 px  | Pages, headers, toolbars, dialog footers                                                               |
+| `sm`      | 32 px  | Rows and cards (desktop)                                                                               |
+| `lg`      | 48 px  | The sign-in page only                                                                                  |
+| `stack`   | 56 px  | Its icon over its word: the actions of a phone's selection bar of four (the pages of "PDF bearbeiten") |
+| `inline`  | text   | A button that reads as a word in a line                                                                |
 
 On the phone every button is at least 44 px tall (see [Touch targets](#touch-targets)). The
 component handles this. Pages and components do not give a `Button` or `IconButton` a height of
@@ -367,6 +368,42 @@ disabled, never gone. A step is a link (a document of the inbox or the list) or 
 Beam, also on ← →). A list's pages are `Pagination`, a calendar's months `DateInput`'s own; any
 other pair of arrows is a `Stepper`.
 
+### Page stack
+
+"PDF bearbeiten" (`PageEditor`, Tobi 10.11.2026) shows a document's pages as a stack to edit:
+choose, turn, remove, reorder, cut into parts, and add the pages of a file from the device. Its
+tools stand fixed under the title (`EditorShell` `top`), only the stack scrolls: the parts as
+`Badge` `muted` in a `SidewaysRow` ("Teil 2 · S. 3–4"), "Dokument hinzufügen" (`outline`),
+"Rückgängig" and "Wiederholen" (`IconButton`), all `sm` on a desktop; below them the selection
+bar. On a phone the tools are `default`, the parts a row of their own after the number of pages,
+and the selection bar stands fixed under the stack (`EditorShell` `bottom`); while nothing is
+chosen a line there says how to choose, move and cut. The description under the title says
+"12 Seiten · 3 Teile"; the footer starts with how the keyboard works it (`footNote`).
+
+- **Page tile** (`PageTile`): the paper of a page (its image with `shadow-sm`) in a square, turned
+  as it will be, its place below ("Seite 3", `text-meta`, muted), a `ChoiceBox` at the top left.
+  The tile is the label of its box: a click or a tap anywhere chooses it, with Shift up to here;
+  chosen, it has the chosen look of "Choosing many" (`bg-panel`, `border-primary`). The tiles are
+  a grid with one tab stop (the boxes, `grid-keys.ts`, as the icon picker): the arrows, Home and
+  End move the focus, Space chooses, Ctrl + arrow moves the page, Enter cuts after it. A mouse
+  moves a page by dragging it (the chosen ones together where it is chosen); a finger rests on
+  it first (400 ms), then drags; resting without moving chooses it.
+- **Page cut** (`PageCut`): the gap between two tiles is a toggle "Nach Seite n trennen"
+  (`aria-pressed`), 24 px wide, 44 px on a phone. Set, a line in `primary` with the scissors on a
+  `primary` circle; unset, the scissors faint (`muted-foreground` at half strength), so nothing
+  depends on hover. A page being dragged shows where it lands as the line of that gap. It is no
+  tab stop: the keyboard cuts with Enter on a page; the footer says how.
+- **Choosing** uses `SelectionBar` (`inDialog`), always there on a desktop: "n Seiten gewählt"
+  ("Keine Seite gewählt"), "Auswahl aufheben" while some are, then "Links drehen", "Rechts
+  drehen", "Löschen", "Als neues Dokument" (`outline`, `sm`, disabled while none is chosen). On
+  the phone "Links", "Rechts", "Löschen", "Abtrennen" (`stack`: icon over word) share the width.
+- **The parts**, the second step: a `Card` (`row`) per part with its first two pages, "Teil n"
+  and its pages as `Badge` `muted`, and a `Segmented` (`sm`) "Neue Fassung | Neues Dokument" at
+  its end (on a phone below, `equal`, the full width); at most one part replaces the document
+  (choosing it lets go of another). Below them an `Alert` `note`: every result runs anew and waits
+  in the inbox, which part becomes which version of the document ("Teil 1 wird Fassung 3 von
+  „…“") or that it is deleted where no part replaces it, and which parts become new documents.
+
 ### Badges
 
 `Badge` (`ui/badge`) shows a state or a short fact. It is never a button. Its tones come from
@@ -385,7 +422,9 @@ other pair of arrows is a `Stepper`.
 
 Sizes: `sm` 20 px (in rows, `text-xs`, the default), `md` 24 px (in headers), `lg` 28 px (the
 lane of a document in its row or head). `LaneBadge` is `Badge` with the lane tone. Hand-built
-pills are not used.
+pills are not used. A row of badges that has to stay one line (the parts of "PDF bearbeiten") is
+`SidewaysRow`: wider than the room, it scrolls sideways with a fade at the cut edge, as the
+`TabBar` does, and never widens the page.
 
 `VolumeMeter` shows how loud something is as three rising bars (`muted-foreground` on `border`),
 always beside a text that says it in words (`aria-hidden`): how often a webhook event comes for
@@ -455,6 +494,8 @@ row is `bg-panel` with `border-primary` (a border, no ring). While something is 
 It has the card look through `cardVariants`: on desktop it stands above the list in `bg-panel`
 and sticks below the header (`top-20`); on the phone it sticks to the bottom of the screen
 (`bg-card`, a line above), the hint as a line of its own and its two actions sharing the width.
+In a dialog (`inDialog`) it stands in a fixed part of the dialog that does not scroll: above the
+body, on a phone below it.
 One item is still decided in its dialog, opened from its title: the actions stay out of the
 row. The open identifiers are a `ui/table` on a desktop; on a phone they are rows built as the
 rows of the master data (`MasterRow`): the value as the title with the badge of its source,
@@ -614,6 +655,15 @@ list pages the same way (see [Lists](#lists)).
   the title and its close button (an X, "Fertig") fixed on top, 85 % of the screen high;
   nothing takes the focus when it opens. The pickers (`SearchSelect`, `TagPickerDialog`) use
   it; its classes are written nowhere else.
+- **Steps:** an editor of several steps (`EditorShell` with `stay` and `back`, "PDF bearbeiten")
+  leads on with its primary action ("Weiter", which may say what follows: "Weiter: 3
+  Dokumente") and takes effect only in the last ("Übernehmen"). A later step has "Zurück"
+  (`ghost`) at the start of the footer, apart from "Abbrechen" and the primary action; on the
+  phone "Zurück" stands instead of "Abbrechen" in the bar. Going back keeps what was done.
+- **A field to work on:** an editor whose body is a field of things to work on ("PDF
+  bearbeiten") keeps its tools in place: `EditorShell` `top` stands fixed under the title (a line
+  below, `bg-card`), `bottom` fixed under the body, and only the body scrolls, on `bg-background`.
+  `footNote` says at the start of the desktop footer how the body is worked (`text-meta`, muted).
 - **A second way out:** `FormDialog` takes `alternative`, an action that finishes the dialog
   as well, without asking (rejecting an open identifier beside taking it over): `outline` at the
   start of the footer; on the phone below the fields.
@@ -1202,6 +1252,17 @@ Other terms are translated: Posteingang (Inbox), Dokumente (Documents), Erwartet
 Regeln (Rules), Stammdaten (Master data), Nutzer (Users), Kontakt, Dokumenttyp, Tag, Thema
 (Topic), Gruppe (Group), Feld (Field), Fakt (Fact), Kennung (Identifier), Bezug (Relation), Lane
 names Erledigt, Prüfen, Eingreifen, In Verarbeitung.
+
+**Fassung** (Version, Tobi 10.11.2026): one original of a document. A document has versions 1,
+2, …; a new one comes in when a person replaces the file or edits the pages, none is
+overwritten. The files tab lists them (`DocumentVersions`), the current one with `Badge`
+`primary` "Aktuell", each with "Herunterladen" (`ghost`, `sm`). An editor puts a new file in the
+place of the current one with "Neue Fassung hochladen" (`secondary`, `sm`, in the card's head),
+asked with a `ConfirmDialog` that is not destructive (the current file stays); processing runs
+again, keeps what a person confirmed, and the document waits in the inbox ("Die Datei hat sich
+geändert: prüfe, was Lekto darin liest."). The same upload (`VersionUpload`) stands in the
+document's menu "…", beside "PDF bearbeiten" (see [Page stack](#page-stack)). A version split
+off another document says so: "Abgetrennt aus „…“".
 
 **Fakt, Kennung, Nummer** (Tobi, 02.11.2026): three words, each for one thing.
 

@@ -6,9 +6,10 @@ the list leaves them out, filters and pages only ever see readable ones.
 """
 
 import asyncio
+import base64
 import os
 import tempfile
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC
 from enum import StrEnum
 from pathlib import Path
@@ -57,6 +58,13 @@ from lekto.adapters.inbound.rest.schemas.documents import (
     UploadFields,
     VisibilityOut,
 )
+from lekto.adapters.inbound.rest.schemas.editing import (
+    PARTS,
+    PARTS_LIMIT,
+    EditedDocuments,
+    PagePreviews,
+    parts_schema,
+)
 from lekto.adapters.inbound.rest.schemas.facts import FactDecisionIn, FactsOut
 from lekto.adapters.inbound.rest.schemas.files import DocumentFilesOut
 from lekto.adapters.inbound.rest.schemas.inbox import (
@@ -69,7 +77,7 @@ from lekto.adapters.inbound.rest.schemas.inbox import (
 )
 from lekto.adapters.inbound.rest.schemas.open_identifiers import PlaceOut
 from lekto.adapters.inbound.rest.schemas.refs import MAX_REF, opened
-from lekto.adapters.inbound.rest.upload import read_upload, upload_body
+from lekto.adapters.inbound.rest.upload import read_upload, read_uploads, upload_body
 from lekto.adapters.inbound.schemas import RuleReportOut
 from lekto.core.domain.classification import field_id_of
 from lekto.core.domain.documents import (
@@ -79,6 +87,7 @@ from lekto.core.domain.documents import (
     Unset,
     changed_fields,
 )
+from lekto.core.domain.editing import MAX_ADDED
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldDefinition, field_from_json
 from lekto.core.domain.identifiers import IdentifierKind
@@ -96,7 +105,8 @@ from lekto.core.domain.inbox import DONE_PERIOD, InboxTab
 from lekto.core.domain.pipeline import Node
 from lekto.core.ports.pages import PAGE_MEDIA_TYPE
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE, DocumentOrder, SortKey
-from lekto.core.services.documents import DocumentFile, DocumentView, MetadataChange
+from lekto.core.services.documents import DocumentFile, DocumentView, FileInfo, MetadataChange
+from lekto.core.services.editing import AddedFile
 
 router = APIRouter(prefix="/documents", tags=["documents"], dependencies=PROTECTED)
 
@@ -229,6 +239,160 @@ async def upload(
     url = str(request.url_for("get_document", id=document.id).path)
     response.headers["Location"] = url
     return DocumentAccepted(id=document.id, status_url=url)
+
+
+_VERSION_BODY = upload_body("PDF, JPEG, PNG or TIFF; recognised by content.")
+
+
+@router.post(
+    "/{id}/versions",
+    status_code=202,
+    summary="Replace a document's file with a new version",
+    description=(
+        EDITORS + ". The file becomes the next version of the document's original; the earlier "
+        "ones stay (`GET /documents/{id}/files`). Processing runs again from OCR: what a person "
+        "confirmed stays, what the new version reads differently is suggested, and the "
+        "document waits in the inbox for a review. 409 for a file in Lekto already (any "
+        "version of any document) and while the document is processed; 415 for a mail or "
+        "another type."
+    ),
+    response_model=DocumentDetails,
+    responses=problem_responses(400, 401, 403, 404, 409, 413, 415, 422),
+    openapi_extra=_VERSION_BODY,
+)
+async def new_version(
+    id: UUID, request: Request, user: CurrentUser, context: Context
+) -> DocumentDetails:
+    received = await read_upload(request, max_size=context.max_upload_size)
+    try:
+        view = await context.pipeline.new_version(
+            user, DocumentId(id), received.file, filename=received.filename
+        )
+    finally:
+        await asyncio.shield(asyncio.to_thread(received.file.path.unlink, missing_ok=True))
+    return _details(view)
+
+
+_PREVIEW_BODY = upload_body("PDF, JPEG, PNG or TIFF; recognised by content.")
+
+
+@router.post(
+    "/{id}/edit/pages",
+    summary="Show the pages of a file to add to an edit",
+    description=(
+        EDITORS + ", before they add a file to an edit of the document's pages (`POST "
+        "/documents/{id}/edit`): its pages as small images. Nothing is stored. 415 for a file "
+        "that is no PDF or image; 422 for one whose pages cannot be read."
+    ),
+    response_model=PagePreviews,
+    responses=problem_responses(400, 401, 403, 404, 413, 415, 422),
+    openapi_extra=_PREVIEW_BODY,
+)
+async def preview_pages(
+    id: UUID, request: Request, user: CurrentUser, context: Context
+) -> PagePreviews:
+    received = await read_upload(request, max_size=context.max_upload_size)
+    try:
+        images = await context.editing.preview(user, DocumentId(id), received.file)
+    finally:
+        await asyncio.shield(asyncio.to_thread(received.file.path.unlink, missing_ok=True))
+    return PagePreviews(
+        pages=[
+            f"data:{PAGE_MEDIA_TYPE};base64,{base64.b64encode(image).decode()}" for image in images
+        ]
+    )
+
+
+_EDIT_BODY = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "multipart/form-data": {
+                "schema": {
+                    "type": "object",
+                    "required": ["parts"],
+                    "properties": {
+                        "parts": {
+                            "type": "string",
+                            "contentMediaType": "application/json",
+                            "contentSchema": parts_schema(),
+                            "description": (
+                                f"JSON of the parts, up to {PARTS_LIMIT // 1024} KiB: each a "
+                                "list of pages, and whether it replaces the document."
+                            ),
+                        },
+                        "files": {
+                            "type": "array",
+                            "maxItems": MAX_ADDED,
+                            "items": {"type": "string", "format": "binary"},
+                            "description": (
+                                "Files whose pages the parts take (sources 1, 2, …): PDF, "
+                                "JPEG, PNG or TIFF, recognised by content. They become no "
+                                "originals of their own; together within the upload limit."
+                            ),
+                        },
+                    },
+                }
+            }
+        },
+    }
+}
+
+
+@router.post(
+    "/{id}/edit",
+    status_code=202,
+    summary="Edit a document's pages",
+    description=(
+        EDITORS + ". Puts parts together from the pages of the document's original and of the "
+        "files sent along: turned, in another order, without some, split into several. The "
+        "part that `replaces` the document becomes its next version (as `POST "
+        "/documents/{id}/versions`); every other part becomes a new document in its space, "
+        "with its uploader and receipt; without a part that replaces it, the document is "
+        "deleted. All of it happens at once, and each document is processed again and waits "
+        "in the inbox. 409 while the document is processed or if its file changed meanwhile; "
+        "415 for a mail (its pages are no file) and for a file that is no PDF or image; 422 "
+        "for parts that do not fit the pages (a page twice, one a source does not have, more "
+        "than one part that replaces the document, or no change)."
+    ),
+    response_model=EditedDocuments,
+    responses=problem_responses(400, 401, 403, 404, 409, 413, 415, 422),
+    openapi_extra=_EDIT_BODY,
+)
+async def edit_pages(
+    id: UUID, request: Request, user: CurrentUser, context: Context
+) -> EditedDocuments:
+    received = await read_uploads(
+        request,
+        max_size=context.max_upload_size,
+        file_field="files",
+        max_files=MAX_ADDED,
+        fields=("parts",),
+        limits={"parts": PARTS_LIMIT},
+    )
+    try:
+        if "parts" not in received.fields:
+            raise RequestValidationError(
+                [{"type": "missing", "loc": ("body", "parts"), "msg": "Field required"}]
+            )
+        try:
+            parts = PARTS.validate_json(received.fields["parts"])
+        except PydanticValidationError as error:
+            # The form is the body: its errors read as those of a JSON body.
+            raise RequestValidationError(
+                [{**item, "loc": ("body", "parts", *item["loc"])} for item in error.errors()]
+            ) from None
+        result = await context.editing.edit(
+            user,
+            DocumentId(id),
+            [part.to_domain() for part in parts],
+            [AddedFile(item.file, item.filename) for item in received.files],
+        )
+    finally:
+        await received.remove()
+    return EditedDocuments(
+        documents=[_details(view) for view in result.documents], deleted=result.deleted
+    )
 
 
 @router.get(
@@ -454,6 +618,9 @@ async def delete_document(id: UUID, user: CurrentUser, context: Context) -> None
     await context.documents.delete(user, DocumentId(id))
 
 
+_BINARY = {"type": "string", "format": "binary"}
+
+
 def _file_route(file: DocumentFile, summary: str, media: str, disposition: str) -> None:
     @router.get(
         f"/{{id}}/{file.value}",
@@ -462,7 +629,7 @@ def _file_route(file: DocumentFile, summary: str, media: str, disposition: str) 
         description="Needs read access. 404 while the file does not exist (yet).",
         response_class=FileResponse,
         responses={
-            200: {"content": {media: {"schema": {"type": "string", "format": "binary"}}}},
+            200: {"content": {media: {"schema": _BINARY}}},
             **problem_responses(401, 404, 422),
         },
     )
@@ -471,6 +638,31 @@ def _file_route(file: DocumentFile, summary: str, media: str, disposition: str) 
 
 
 _file_route(DocumentFile.ORIGINAL, "The original file", "application/octet-stream", "attachment")
+
+
+@router.get(
+    "/{id}/versions/{number}/original",
+    summary="The original of a version of the document",
+    description=(
+        "Needs read access. The file of version `number` (from 1) of the document's original, "
+        "an earlier one included (`GET /documents/{id}/files` lists them). 404 for a version "
+        "the document does not have."
+    ),
+    response_class=FileResponse,
+    responses={
+        200: {"content": {"application/octet-stream": {"schema": _BINARY}}},
+        **problem_responses(401, 404, 422),
+    },
+)
+async def version_original(
+    id: UUID, number: Annotated[int, FastApiPath(ge=1)], user: CurrentUser, context: Context
+) -> FileResponse:
+    return await _sent(
+        lambda target: context.documents.download_version(user, DocumentId(id), number, target),
+        "attachment",
+    )
+
+
 _file_route(
     DocumentFile.ARCHIVE, "The archive PDF (PDF/A with text layer)", "application/pdf", "inline"
 )
@@ -505,11 +697,19 @@ async def _download(
     *,
     page: int = 1,
 ) -> FileResponse:
+    return await _sent(
+        lambda target: context.documents.download(user, id, file, target, page=page),
+        disposition,
+    )
+
+
+async def _sent(write: Callable[[Path], Awaitable[FileInfo]], disposition: str) -> FileResponse:
+    """The file `write` puts at a temporary path, removed once sent (or when it fails)."""
     descriptor, name = await asyncio.to_thread(tempfile.mkstemp, prefix="lekto-download-")
     os.close(descriptor)
     path = Path(name)
     try:
-        info = await context.documents.download(user, id, file, path, page=page)
+        info = await write(path)
     except BaseException:
         await asyncio.shield(asyncio.to_thread(path.unlink, missing_ok=True))
         raise

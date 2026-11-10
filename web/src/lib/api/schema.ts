@@ -1509,6 +1509,66 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/v1/documents/{id}/versions': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/**
+		 * Replace a document's file with a new version
+		 * @description Editors of the document's space and admins. The file becomes the next version of the document's original; the earlier ones stay (`GET /documents/{id}/files`). Processing runs again from OCR: what a person confirmed stays, what the new version reads differently is suggested, and the document waits in the inbox for a review. 409 for a file in Lekto already (any version of any document) and while the document is processed; 415 for a mail or another type.
+		 */
+		post: operations['new_version_api_v1_documents__id__versions_post'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/v1/documents/{id}/edit/pages': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/**
+		 * Show the pages of a file to add to an edit
+		 * @description Editors of the document's space and admins, before they add a file to an edit of the document's pages (`POST /documents/{id}/edit`): its pages as small images. Nothing is stored. 415 for a file that is no PDF or image; 422 for one whose pages cannot be read.
+		 */
+		post: operations['preview_pages_api_v1_documents__id__edit_pages_post'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/v1/documents/{id}/edit': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/**
+		 * Edit a document's pages
+		 * @description Editors of the document's space and admins. Puts parts together from the pages of the document's original and of the files sent along: turned, in another order, without some, split into several. The part that `replaces` the document becomes its next version (as `POST /documents/{id}/versions`); every other part becomes a new document in its space, with its uploader and receipt; without a part that replaces it, the document is deleted. All of it happens at once, and each document is processed again and waits in the inbox. 409 while the document is processed or if its file changed meanwhile; 415 for a mail (its pages are no file) and for a file that is no PDF or image; 422 for parts that do not fit the pages (a page twice, one a source does not have, more than one part that replaces the document, or no change).
+		 */
+		post: operations['edit_pages_api_v1_documents__id__edit_post'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/v1/documents/count': {
 		parameters: {
 			query?: never;
@@ -1629,6 +1689,26 @@ export interface paths {
 		 * @description Needs read access. 404 while the file does not exist (yet).
 		 */
 		get: operations['get_document_original_api_v1_documents__id__original_get'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/v1/documents/{id}/versions/{number}/original': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/**
+		 * The original of a version of the document
+		 * @description Needs read access. The file of version `number` (from 1) of the document's original, an earlier one included (`GET /documents/{id}/files` lists them). 404 for a version the document does not have.
+		 */
+		get: operations['version_original_api_v1_documents__id__versions__number__original_get'];
 		put?: never;
 		post?: never;
 		delete?: never;
@@ -4895,7 +4975,19 @@ export interface components {
 		 *         "size": 10812334
 		 *       },
 		 *       "original_filename": "scan-2026-07-03.pdf",
-		 *       "page_count": 2
+		 *       "page_count": 2,
+		 *       "versions": [
+		 *         {
+		 *           "created_at": "2026-07-03T08:40:36Z",
+		 *           "created_by": "01999d5e-4444-7c1e-b6a3-2f4d5e6f7a8b",
+		 *           "current": true,
+		 *           "detail": {},
+		 *           "kind": "received",
+		 *           "media_type": "application/pdf",
+		 *           "number": 1,
+		 *           "original_filename": "scan-2026-07-03.pdf"
+		 *         }
+		 *       ]
 		 *     }
 		 */
 		DocumentFilesOut: {
@@ -4918,6 +5010,11 @@ export interface components {
 			original: components['schemas']['StoredFileOut'];
 			/** @description Null while there is none. */
 			archive: components['schemas']['StoredFileOut'] | null;
+			/**
+			 * Versions
+			 * @description The versions of the original, the first first; the last is the current one.
+			 */
+			versions: components['schemas']['DocumentVersionOut'][];
 		};
 		/**
 		 * DocumentListSort
@@ -5212,6 +5309,39 @@ export interface components {
 			relation_target?: boolean | null;
 		};
 		/**
+		 * DocumentVersionOut
+		 * @description A version of the document's original: its number (from 1), whether it is the current
+		 *     one, its file, how and when it came, by whom (null where nobody is known), and what it was
+		 *     made from (an edit: the version and its pages). Its file:
+		 *     `GET /documents/{id}/versions/{number}/original`.
+		 */
+		DocumentVersionOut: {
+			/** Number */
+			number: number;
+			/** Current */
+			current: boolean;
+			/** Original Filename */
+			original_filename: string;
+			/** Media Type */
+			media_type: string;
+			/** @description `received`: how the document came in; `replaced`: a person put another file in its place; `edited`: a person edited its pages; `split`: the first version, pages a person split off another document. */
+			kind: components['schemas']['VersionKindOut'];
+			/**
+			 * Created At
+			 * Format: date-time
+			 */
+			created_at: string;
+			/** Created By */
+			created_by: string | null;
+			/**
+			 * Detail
+			 * @description What it was made from. `edited` and `split`: `pages`, each with its `source` (0 the edited version, 1, 2, … the files in `added`, by name), `page` and `rotate`; `edited` also `from`, the version edited, and `split_off`, the documents split off in the same edit; `split` also `document`, `title` and `version`, the document it was split off (which may be gone since) and its version then.
+			 */
+			detail: {
+				[key: string]: unknown;
+			};
+		};
+		/**
 		 * DryRunMailOut
 		 * @description A mail fetched lately, and what would become of it with the rule.
 		 */
@@ -5264,6 +5394,19 @@ export interface components {
 			 * @description No rule took it yet: the next fetch gives it to the rule that decides it now (never to the fallback), as long as it lies in its folder and is among the mailbox's latest 500.
 			 */
 			waiting: boolean;
+		};
+		/** EditedDocuments */
+		EditedDocuments: {
+			/**
+			 * Documents
+			 * @description In the order of the parts: the document where a part replaces it, a new one for each other part. Each is processed again and waits in the inbox.
+			 */
+			documents: components['schemas']['DocumentDetails'][];
+			/**
+			 * Deleted
+			 * @description No part replaced the document, and it is deleted.
+			 */
+			deleted: boolean;
 		};
 		/**
 		 * EventBody
@@ -8857,6 +9000,14 @@ export interface components {
 			/** @description Why it was not done. */
 			reason: components['schemas']['ReasonOut'] | null;
 		};
+		/** PagePreviews */
+		PagePreviews: {
+			/**
+			 * Pages
+			 * @description Each page of the file in its order, small, as a `data:` URL of a WebP image.
+			 */
+			pages: string[];
+		};
 		/** PageReadingOut */
 		PageReadingOut: {
 			/**
@@ -9589,6 +9740,9 @@ export interface components {
 			| 'model_call_admins'
 			| 'open_fields'
 			| 'duplicate_of'
+			| 'new_version'
+			| 'new_version_differs'
+			| 'duplicate_of_version'
 			| 'duplicate_unseen'
 			| 'no_text_yet'
 			| 'no_structure_yet'
@@ -9628,6 +9782,7 @@ export interface components {
 			| 'oidc_password_first'
 			| 'not_found'
 			| 'page_not_found'
+			| 'version_not_found'
 			| 'file_not_found'
 			| 'rule_version_not_found'
 			| 'name_empty'
@@ -11802,6 +11957,11 @@ export interface components {
 			 */
 			added: number;
 		};
+		/**
+		 * VersionKindOut
+		 * @enum {string}
+		 */
+		VersionKindOut: 'received' | 'replaced' | 'edited' | 'split';
 		/**
 		 * VisibilityOut
 		 * @description Who sees the document: the members of its space; readers only once it is green.
@@ -23401,6 +23561,543 @@ export interface operations {
 			};
 		};
 	};
+	new_version_api_v1_documents__id__versions_post: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'multipart/form-data': {
+					/**
+					 * Format: binary
+					 * @description PDF, JPEG, PNG or TIFF; recognised by content.
+					 */
+					file: string;
+				};
+			};
+		};
+		responses: {
+			/** @description Successful Response */
+			202: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['DocumentDetails'];
+				};
+			};
+			/** @description Bad Request */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Bad Request",
+					 *       "status": 400,
+					 *       "detail": "expected multipart/form-data with a boundary"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Conflict */
+			409: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Conflict",
+					 *       "status": 409,
+					 *       "detail": "duplicate of document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Content Too Large */
+			413: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Content Too Large",
+					 *       "status": 413,
+					 *       "detail": "the request body is larger than 1048576 bytes"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unsupported Media Type */
+			415: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unsupported Media Type",
+					 *       "status": 415,
+					 *       "detail": "unsupported file type"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	preview_pages_api_v1_documents__id__edit_pages_post: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'multipart/form-data': {
+					/**
+					 * Format: binary
+					 * @description PDF, JPEG, PNG or TIFF; recognised by content.
+					 */
+					file: string;
+				};
+			};
+		};
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['PagePreviews'];
+				};
+			};
+			/** @description Bad Request */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Bad Request",
+					 *       "status": 400,
+					 *       "detail": "expected multipart/form-data with a boundary"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Content Too Large */
+			413: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Content Too Large",
+					 *       "status": 413,
+					 *       "detail": "the request body is larger than 1048576 bytes"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unsupported Media Type */
+			415: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unsupported Media Type",
+					 *       "status": 415,
+					 *       "detail": "unsupported file type"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	edit_pages_api_v1_documents__id__edit_post: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'multipart/form-data': {
+					/** @description JSON of the parts, up to 256 KiB: each a list of pages, and whether it replaces the document. */
+					parts: string;
+					/** @description Files whose pages the parts take (sources 1, 2, …): PDF, JPEG, PNG or TIFF, recognised by content. They become no originals of their own; together within the upload limit. */
+					files?: string[];
+				};
+			};
+		};
+		responses: {
+			/** @description Successful Response */
+			202: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['EditedDocuments'];
+				};
+			};
+			/** @description Bad Request */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Bad Request",
+					 *       "status": 400,
+					 *       "detail": "expected multipart/form-data with a boundary"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Conflict */
+			409: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Conflict",
+					 *       "status": 409,
+					 *       "detail": "duplicate of document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Content Too Large */
+			413: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Content Too Large",
+					 *       "status": 413,
+					 *       "detail": "the request body is larger than 1048576 bytes"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unsupported Media Type */
+			415: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unsupported Media Type",
+					 *       "status": 415,
+					 *       "detail": "unsupported file type"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
 	count_documents_api_v1_documents_count_get: {
 		parameters: {
 			query?: {
@@ -24254,6 +24951,97 @@ export interface operations {
 			header?: never;
 			path: {
 				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/octet-stream': string;
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	version_original_api_v1_documents__id__versions__number__original_get: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: string;
+				number: number;
 			};
 			cookie?: never;
 		};

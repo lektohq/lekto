@@ -71,6 +71,7 @@ from lekto.core.domain.spaces import Space
 from lekto.core.domain.tasks import Task
 from lekto.core.domain.users import User
 from lekto.core.domain.verdict import KnownLabels
+from lekto.core.domain.versions import DocumentVersion
 from lekto.core.domain.webhooks import DeliveryOutcome, Webhook, WebhookDelivery
 
 
@@ -490,6 +491,23 @@ class DocumentRepository(Repository[DocumentId, Document], Protocol):
     ) -> bool:
         """Whether any document matches all given criteria, regardless of who may read it
         (for checks before deleting what documents refer to). At least one is required."""
+        ...
+
+
+class DocumentVersionRepository(Protocol):
+    """The versions of each document's original (`domain.versions`), gone with their document."""
+
+    async def add(self, version: DocumentVersion) -> None:
+        """ConflictError if the document has this number already, or any document a version
+        with this file (every file exists once per installation)."""
+        ...
+
+    async def of_document(self, document: DocumentId) -> list[DocumentVersion]:
+        """The document's versions, the first first."""
+        ...
+
+    async def find_by_sha256(self, sha256: Sha256) -> DocumentVersion | None:
+        """The version whose original is this file, of any document."""
         ...
 
 

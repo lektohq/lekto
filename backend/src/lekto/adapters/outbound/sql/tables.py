@@ -358,6 +358,8 @@ documents = Table(
     Column("processing_nodes", json_type(), nullable=False, server_default="{}"),
     # The current run reads the pages with the vision language model (`Processing.vision`).
     Column("processing_vision", Boolean, nullable=False, server_default=false()),
+    # The current run reads a new version of the original (`Processing.new_version`).
+    Column("processing_new_version", Boolean, nullable=False, server_default=false()),
     # What decides whether the current run makes the document new (`Processing.baseline`,
     # `Processing.decided`); runs started before revision 0030 have no baseline.
     Column("processing_baseline", Text, nullable=True),
@@ -451,6 +453,24 @@ document_relations = Table(
     Column("decided_by", Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
     Column("decided_at", UtcDateTime, nullable=True),
     *_via_token(),
+)
+
+# The versions of each document's original (`domain.versions`): every one an original as
+# `documents.sha256` names the current one's; gone with the document.
+document_versions = Table(
+    "document_versions",
+    metadata,
+    Column("document_id", Uuid, ForeignKey("documents.id", ondelete="CASCADE"), primary_key=True),
+    Column("number", Integer, primary_key=True),
+    Column("sha256", String(64), nullable=False),
+    Column("original_filename", Text, nullable=False),
+    Column("media_type", Text, nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("created_at", UtcDateTime, nullable=False),
+    Column("created_by", Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+    Column("detail", json_type(), nullable=False, server_default="{}"),
+    # Every file exists once per installation, the earlier versions' too.
+    Index(None, "sha256", unique=True),
 )
 
 processing_log = Table(

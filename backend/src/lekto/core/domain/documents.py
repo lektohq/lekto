@@ -296,10 +296,14 @@ class Document:
         channel: Channel = Channel.API,
         received: datetime | None = None,
         space_chosen: bool = False,
+        edited: bool = False,
     ) -> Self:
         """A newly received document. The receive node (hash, duplicate check, storage) is done;
         the nodes after it are due. `received`: when it came in, if not now (a migration takes
-        over the source system's date). `space_chosen`: a person chose its space on upload."""
+        over the source system's date, a part split off another document that one's).
+        `space_chosen`: a person chose its space on upload. `edited`: its file is pages a person
+        split off another document (`domain.editing`): its run ends in the inbox, as one of a
+        new version (`Processing.new_version`)."""
         if result.outcome is Outcome.FAILED:
             raise ValidationError("a document whose receive node failed is not created")
         filename = require_name(original_filename, "original filename", max_length=None)
@@ -317,6 +321,7 @@ class Document:
             created_at=now if received is None else received_at(received, now),
             updated_at=now,
         )
+        document.processing.new_version = edited
         document._record(DocumentReceived(document_id=document.id, occurred_at=now))
         document.record_result(Node.RECEIVE, 1, result, now)
         return document
@@ -464,7 +469,28 @@ class Document:
             if signal in CURRENT_SIGNALS or processing.nodes[signal].status is NodeStatus.SKIPPED
         }
         processing.vision = False
+        processing.new_version = False
         return self._reset({node, *signals}, now)
+
+    def new_version(
+        self, sha256: Sha256, original_filename: str, media_type: str, now: datetime
+    ) -> tuple[Node, ...]:
+        """A new version of its original came in (a person replaced the file or edited the
+        pages, `domain.versions`): it names that file now, and processing runs every node after
+        receiving again (the pages too, which run beside OCR), in a run that keeps what a person
+        confirmed and ends in the inbox (`Processing.new_version`). Also after a failure: the
+        new file may be what helps. InvalidTransitionError while it is processed; returns the
+        nodes that are due now."""
+        if self.processing.status is ProcessingStatus.PROCESSING:
+            raise InvalidTransitionError(because(ReasonCode.BEING_PROCESSED, id=str(self.id)))
+        filename = require_name(original_filename, "original filename", max_length=None)
+        kind = require_name(media_type, "media type", max_length=None)
+        self.sha256, self.original_filename, self.media_type = sha256, filename, kind
+        self.page_count = None
+        self.processing.vision = False
+        due = self._reset(Node.RECEIVE.descendants, now)
+        self.processing.new_version = True
+        return due
 
     def read_with_vision(self, now: datetime) -> tuple[Node, ...]:
         """A person asked that the vision language model read the pages: process again from

@@ -14,6 +14,8 @@
 	import type { components } from '#lib/api/schema.ts';
 	import { copyText } from '#lib/clipboard.ts';
 	import DetailList from '#lib/components/DetailList.svelte';
+	import DocumentVersions from '#lib/components/document/DocumentVersions.svelte';
+	import type { Lookup } from '#lib/masterdata.svelte.ts';
 	import Segmented from '#lib/components/Segmented.svelte';
 	import ReceiptEdit from '#lib/components/document/ReceiptEdit.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -58,11 +60,17 @@
 	let {
 		documentId,
 		document,
+		title,
+		lookup = null,
 		editable = false,
 		onchanged
 	}: {
 		documentId: string;
 		document?: Reviewed;
+		/** The document's title, named when its file is replaced. */
+		title?: string;
+		/** Names the people who made the versions. */
+		lookup?: Lookup | null;
 		editable?: boolean;
 		onchanged?: () => void;
 	} = $props();
@@ -482,6 +490,18 @@
 						</Card.Root>
 					{/if}
 				</div>
+
+				<DocumentVersions
+					{documentId}
+					title={title ?? files.original_filename}
+					versions={files.versions}
+					{lookup}
+					{editable}
+					onchanged={() => {
+						void load();
+						onchanged?.();
+					}}
+				/>
 
 				<Card.Root as="section" size="row" aria-labelledby="files-all" class="flex flex-col gap-3">
 					<div class="flex flex-wrap items-center gap-x-3 gap-y-2">

@@ -1,5 +1,6 @@
-"""Contracts of the processing ports: OCR, parser, page renderer, text locator. The samples
-are in `tests/samples` (`builders.SAMPLES`, see `make_samples.py`)."""
+"""Contracts of the processing ports: OCR, parser, page renderer, text locator, code reader,
+metadata reader, page composer. The samples are in `tests/samples` (`builders.SAMPLES`, see
+`make_samples.py`)."""
 
 import json
 from pathlib import Path
@@ -8,9 +9,11 @@ import pytest
 
 from lekto.core.domain import media_types
 from lekto.core.domain.codes import giro_code
+from lekto.core.domain.editing import PagePick
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.locations import Location
 from lekto.core.ports.codes import CodeReader
+from lekto.core.ports.composer import PageComposer, PageSource
 from lekto.core.ports.locator import TextLocator
 from lekto.core.ports.metadata import MetadataReader
 from lekto.core.ports.ocr import Ocr
@@ -257,3 +260,51 @@ class MetadataReaderContract:
     ) -> None:
         with pytest.raises(UnprocessableDocumentError):
             await metadata_reader.read_metadata((SAMPLES / name).read_bytes())
+
+
+SCAN = PageSource(SAMPLES / "scan.pdf", media_types.PDF)
+PHOTO = PageSource(SAMPLES / "photo.jpg", media_types.JPEG)
+
+
+class PageComposerContract:
+    """Needs the fixture `page_composer`."""
+
+    async def test_counts_the_pages_of_a_pdf_and_an_image(
+        self, page_composer: PageComposer
+    ) -> None:
+        assert await page_composer.count_pages(SCAN) == 1
+        assert await page_composer.count_pages(PHOTO) == 1
+
+    async def test_puts_pages_of_pdfs_and_images_together(
+        self, page_composer: PageComposer, tmp_path: Path
+    ) -> None:
+        target = tmp_path / "part.pdf"
+        picks = [PagePick(1, 1), PagePick(0, 1, rotate=90)]
+        await page_composer.compose([SCAN, PHOTO], picks, target)
+        assert target.read_bytes().startswith(b"%PDF-")
+        assert await page_composer.count_pages(PageSource(target, media_types.PDF)) == 2
+        assert sorted(path.name for path in tmp_path.iterdir()) == ["part.pdf"]
+
+    async def test_every_file_is_new(self, page_composer: PageComposer, tmp_path: Path) -> None:
+        first, second = tmp_path / "first.pdf", tmp_path / "second.pdf"
+        await page_composer.compose([SCAN], [PagePick(0, 1)], first)
+        await page_composer.compose([SCAN], [PagePick(0, 1)], second)
+        assert first.read_bytes() != second.read_bytes()
+
+    async def test_a_page_a_source_does_not_have_is_an_error(
+        self, page_composer: PageComposer, tmp_path: Path
+    ) -> None:
+        target = tmp_path / "part.pdf"
+        for pick in (PagePick(0, 2), PagePick(1, 1)):
+            with pytest.raises(ValueError):
+                await page_composer.compose([SCAN], [pick], target)
+        assert not target.exists()
+
+    async def test_a_damaged_file_is_unprocessable(
+        self, page_composer: PageComposer, tmp_path: Path
+    ) -> None:
+        damaged = PageSource(SAMPLES / "damaged.pdf", media_types.PDF)
+        with pytest.raises(UnprocessableDocumentError):
+            await page_composer.count_pages(damaged)
+        with pytest.raises(UnprocessableDocumentError):
+            await page_composer.compose([damaged], [PagePick(0, 1)], tmp_path / "part.pdf")

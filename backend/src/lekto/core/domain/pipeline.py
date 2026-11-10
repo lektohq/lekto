@@ -200,8 +200,9 @@ values a person sets off), in its input."""
 TRIGGER_APPLY = "apply"
 TRIGGER_MOVE = "move"
 TRIGGER_UPLOAD = "upload"
+TRIGGER_EDIT = "edit"
 """What a person set off: applying a rule to documents they chose, moving a document, uploading
-it into a space they chose."""
+it into a space they chose, splitting pages off a document into its space (`domain.editing`)."""
 ACTOR = "actor"
 """Key of the person who set off an entry (a change, a rule applied on request, a space they
 chose), in its input."""
@@ -356,6 +357,10 @@ class Processing:
     earlier run are recognised as stale. `nodes` holds the state of every node in the current
     run. `vision`: a person asked that this run read the pages with the vision language model
     (`Document.read_with_vision`); a retry keeps it, another reprocessing does not.
+    `new_version`: the run reads a new version of the original (`Document.new_version`), or the
+    first of pages split off another document (`Document.receive`, `edited`): what a person
+    confirmed stays, what reads differently is suggested, and the run ends in the inbox; a
+    retry keeps it, another reprocessing does not.
 
     What decides whether the run makes the document new when it ends green (the inbox,
     `Document.new_at`; Tobi, 18.10.2026): `decided`, a person decided in this run (confirmed
@@ -371,6 +376,7 @@ class Processing:
     run: int
     nodes: dict[Node, NodeState]
     vision: bool = False
+    new_version: bool = False
     baseline: str | None = None
     decided: bool = False
 
