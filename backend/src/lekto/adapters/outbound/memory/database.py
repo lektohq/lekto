@@ -28,6 +28,7 @@ from lekto.core.domain.relations import Relation
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
 from lekto.core.domain.validation import name_key
+from lekto.core.domain.versions import DocumentVersion
 from lekto.core.ports.wakeup import Channel
 
 
@@ -46,6 +47,23 @@ class RelationRow:
     id: UUID
     relation: Relation
     version: int
+
+
+@dataclass
+class VersionRow:
+    """A version of a document's original (a row keyed by `version_row_id`)."""
+
+    id: UUID
+    version: DocumentVersion
+
+
+def version_row_id(document: DocumentId, number: int) -> UUID:
+    """The key of the row of version `number` of `document`."""
+    return uuid5(NAMESPACE_URL, f"lekto:version:{document}:{number}")
+
+
+def _version_keys(row: VersionRow) -> Iterable[Hashable]:
+    return [("sha256", row.version.sha256)]
 
 
 def relation_row_id(newer: DocumentId, older: DocumentId) -> UUID:
@@ -157,6 +175,7 @@ RULE_APPLICATIONS = Table("rule application", _no_keys)
 BULK_OPERATIONS = Table("bulk operation", _no_keys)
 DOCUMENT_FACTS = Table[FactsRow]("document facts", _no_keys)
 DOCUMENT_RELATIONS = Table[RelationRow]("document relation", _no_keys)
+DOCUMENT_VERSIONS = Table[VersionRow]("document version", _version_keys)
 CLASSIFIER_MODELS = Table("classifier model", _classifier_model_keys)
 WEBHOOKS = Table("webhook", _no_keys)
 WEBHOOK_DELIVERIES = Table("webhook delivery", _no_keys)

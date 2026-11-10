@@ -21,6 +21,7 @@ from lekto.core.ports.repository import (
     DocumentRelationRepository,
     DocumentRepository,
     DocumentTypeRepository,
+    DocumentVersionRepository,
     FieldDefinitionRepository,
     InboxRepository,
     LensRepository,
@@ -84,6 +85,8 @@ class UnitOfWork(Protocol):
 
     @property
     def document_relations(self) -> DocumentRelationRepository: ...
+    @property
+    def document_versions(self) -> DocumentVersionRepository: ...
     @property
     def inbox(self) -> InboxRepository: ...
     @property

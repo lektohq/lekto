@@ -26,6 +26,7 @@ from lekto.adapters.outbound.memory.database import (
     DOCUMENT_FACTS,
     DOCUMENT_RELATIONS,
     DOCUMENT_TYPES,
+    DOCUMENT_VERSIONS,
     DOCUMENTS,
     EXTERNAL_IDENTITIES,
     FIELDS,
@@ -52,7 +53,9 @@ from lekto.adapters.outbound.memory.database import (
     RelationRow,
     SeenMark,
     Table,
+    VersionRow,
     relation_row_id,
+    version_row_id,
 )
 from lekto.adapters.outbound.memory.identity import (
     MemoryApiTokenRepository,
@@ -126,6 +129,7 @@ from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
 from lekto.core.domain.validation import name_key, require_utc
 from lekto.core.domain.verdict import KnownLabels
+from lekto.core.domain.versions import DocumentVersion
 from lekto.core.ports.repository import (
     NEWEST_FIRST,
     CountBy,
@@ -173,6 +177,7 @@ class MemoryUnitOfWork:
         self.processing_facts = MemoryProcessingFacts(self)
         self.document_facts = MemoryDocumentFactRepository(self)
         self.document_relations = MemoryDocumentRelationRepository(self)
+        self.document_versions = MemoryDocumentVersionRepository(self)
         self.inbox = MemoryInboxRepository(self)
         self.rules = MemoryRuleRepository(self, RULES)
         self.rule_applications = MemoryRuleApplicationRepository(self, RULE_APPLICATIONS)
@@ -481,6 +486,13 @@ class MemorySpaceRepository(MemoryRepository[SpaceId, Space]):
 
 
 class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
+    async def remove(self, id: DocumentId) -> None:
+        """With its versions, as the SQL schema's ON DELETE CASCADE."""
+        await super().remove(id)
+        for row in self._uow._rows(DOCUMENT_VERSIONS):
+            if row.version.document_id == id:
+                self._uow._write(DOCUMENT_VERSIONS, row.id, _REMOVED)
+
     async def find_by_sha256(self, sha256: Sha256) -> Document | None:
         return next((_copy(row) for row in self._all() if row.sha256 == sha256), None)
 
@@ -676,6 +688,38 @@ class MemoryProcessingLog:
             return []
         entries = [*self._uow._db.processing_log, *self._uow._log]
         return [entry for entry in entries if entry.document_id == document]
+
+
+class MemoryDocumentVersionRepository:
+    def __init__(self, uow: MemoryUnitOfWork) -> None:
+        self._uow = uow
+
+    async def add(self, version: DocumentVersion) -> None:
+        self._uow._check_open()
+        id = version_row_id(version.document_id, version.number)
+        if self._uow._row(DOCUMENT_VERSIONS, id) not in (None, _REMOVED):
+            raise ConflictError(f"document version already exists: {version.number}")
+        self._uow._write(DOCUMENT_VERSIONS, id, VersionRow(id, version))
+
+    async def of_document(self, document: DocumentId) -> list[DocumentVersion]:
+        self._uow._check_open()
+        found = [
+            row.version
+            for row in self._uow._rows(DOCUMENT_VERSIONS)
+            if row.version.document_id == document
+        ]
+        return sorted(found, key=lambda item: item.number)
+
+    async def find_by_sha256(self, sha256: Sha256) -> DocumentVersion | None:
+        self._uow._check_open()
+        return next(
+            (
+                row.version
+                for row in self._uow._rows(DOCUMENT_VERSIONS)
+                if row.version.sha256 == sha256
+            ),
+            None,
+        )
 
 
 class MemoryDocumentRelationRepository:

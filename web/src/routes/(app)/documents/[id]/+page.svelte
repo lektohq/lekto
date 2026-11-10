@@ -711,7 +711,13 @@
 				</div>
 			</div>
 		{:else if tab === 'properties'}
-			<DocumentFiles documentId={id} document={document ?? undefined} {editable} onchanged={load} />
+			<DocumentFiles
+				documentId={id}
+				document={document ?? undefined}
+				{lookup}
+				{editable}
+				onchanged={load}
+			/>
 		{:else if tab === 'processing'}
 			<div class="lg:min-h-0 lg:flex-1">
 				<DocumentProcessing

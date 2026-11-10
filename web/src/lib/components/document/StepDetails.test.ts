@@ -45,7 +45,8 @@ const context: DetailContext = {
 		media_type: 'application/pdf',
 		page_count: 2,
 		original: stored('PDF', null, 373_000),
-		archive: stored('PDF', '2B', 412_000)
+		archive: stored('PDF', '2B', 412_000),
+		versions: []
 	},
 	poor: [2],
 	thresholds: { contacts: 0.8 },

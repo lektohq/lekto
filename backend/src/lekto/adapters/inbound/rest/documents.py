@@ -8,7 +8,7 @@ the list leaves them out, filters and pages only ever see readable ones.
 import asyncio
 import os
 import tempfile
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC
 from enum import StrEnum
 from pathlib import Path
@@ -96,7 +96,7 @@ from lekto.core.domain.inbox import DONE_PERIOD, InboxTab
 from lekto.core.domain.pipeline import Node
 from lekto.core.ports.pages import PAGE_MEDIA_TYPE
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE, DocumentOrder, SortKey
-from lekto.core.services.documents import DocumentFile, DocumentView, MetadataChange
+from lekto.core.services.documents import DocumentFile, DocumentView, FileInfo, MetadataChange
 
 router = APIRouter(prefix="/documents", tags=["documents"], dependencies=PROTECTED)
 
@@ -454,6 +454,9 @@ async def delete_document(id: UUID, user: CurrentUser, context: Context) -> None
     await context.documents.delete(user, DocumentId(id))
 
 
+_BINARY = {"type": "string", "format": "binary"}
+
+
 def _file_route(file: DocumentFile, summary: str, media: str, disposition: str) -> None:
     @router.get(
         f"/{{id}}/{file.value}",
@@ -462,7 +465,7 @@ def _file_route(file: DocumentFile, summary: str, media: str, disposition: str) 
         description="Needs read access. 404 while the file does not exist (yet).",
         response_class=FileResponse,
         responses={
-            200: {"content": {media: {"schema": {"type": "string", "format": "binary"}}}},
+            200: {"content": {media: {"schema": _BINARY}}},
             **problem_responses(401, 404, 422),
         },
     )
@@ -471,6 +474,31 @@ def _file_route(file: DocumentFile, summary: str, media: str, disposition: str) 
 
 
 _file_route(DocumentFile.ORIGINAL, "The original file", "application/octet-stream", "attachment")
+
+
+@router.get(
+    "/{id}/versions/{number}/original",
+    summary="The original of a version of the document",
+    description=(
+        "Needs read access. The file of version `number` (from 1) of the document's original, "
+        "an earlier one included (`GET /documents/{id}/files` lists them). 404 for a version "
+        "the document does not have."
+    ),
+    response_class=FileResponse,
+    responses={
+        200: {"content": {"application/octet-stream": {"schema": _BINARY}}},
+        **problem_responses(401, 404, 422),
+    },
+)
+async def version_original(
+    id: UUID, number: Annotated[int, FastApiPath(ge=1)], user: CurrentUser, context: Context
+) -> FileResponse:
+    return await _sent(
+        lambda target: context.documents.download_version(user, DocumentId(id), number, target),
+        "attachment",
+    )
+
+
 _file_route(
     DocumentFile.ARCHIVE, "The archive PDF (PDF/A with text layer)", "application/pdf", "inline"
 )
@@ -505,11 +533,19 @@ async def _download(
     *,
     page: int = 1,
 ) -> FileResponse:
+    return await _sent(
+        lambda target: context.documents.download(user, id, file, target, page=page),
+        disposition,
+    )
+
+
+async def _sent(write: Callable[[Path], Awaitable[FileInfo]], disposition: str) -> FileResponse:
+    """The file `write` puts at a temporary path, removed once sent (or when it fails)."""
     descriptor, name = await asyncio.to_thread(tempfile.mkstemp, prefix="lekto-download-")
     os.close(descriptor)
     path = Path(name)
     try:
-        info = await context.documents.download(user, id, file, path, page=page)
+        info = await write(path)
     except BaseException:
         await asyncio.shield(asyncio.to_thread(path.unlink, missing_ok=True))
         raise

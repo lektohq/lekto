@@ -2,6 +2,7 @@
 
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
+from datetime import datetime
 from uuid import UUID
 
 from lekto.core.domain.classification import CHECKS
@@ -29,6 +30,7 @@ from lekto.core.domain.reasons import Action, ReasonCode, because
 from lekto.core.domain.rules import ConditionField, RuleDefinition
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import User
+from lekto.core.domain.versions import DocumentVersion, VersionKind
 from lekto.core.ports.repository import DocumentFilter
 from lekto.core.ports.unit_of_work import UnitOfWork
 from lekto.core.services._tags import tag_tree
@@ -156,10 +158,31 @@ async def duplicate_of(
     installation): it names the document if `user` may read it; one in a space they cannot
     see stays unnamed. None for a new file."""
     existing = await uow.documents.find_by_sha256(sha256)
+    number = None
     if existing is None:
-        return None
+        # An earlier version of a document has this file (Tobi, 10.11.2026).
+        version = await uow.document_versions.find_by_sha256(sha256)
+        if version is None:
+            return None
+        existing, number = await uow.documents.get(version.document_id), version.number
     space = await uow.spaces.get(existing.space_id)
-    return DuplicateDocumentError(existing.id if can_read_document(user, existing, space) else None)
+    if not can_read_document(user, existing, space):
+        return DuplicateDocumentError(None)
+    return DuplicateDocumentError(existing.id, version=number)
+
+
+def first_version(document: Document, now: datetime) -> DocumentVersion:
+    """Version 1 of a document's original: the file as it came in, by its uploader."""
+    return DocumentVersion(
+        document_id=document.id,
+        number=1,
+        sha256=document.sha256,
+        original_filename=document.original_filename,
+        media_type=document.media_type,
+        kind=VersionKind.RECEIVED,
+        created_at=now,
+        created_by=document.uploaded_by,
+    )
 
 
 def contact_topics_lock(contact: ContactId) -> str:

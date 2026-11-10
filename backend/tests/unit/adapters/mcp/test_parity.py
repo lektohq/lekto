@@ -106,6 +106,7 @@ ENDPOINTS: dict[str, str | Excluded] = {
     "GET /documents/{id}/reading": "documents_get",
     "GET /documents/{id}/review": "documents_get",
     "GET /documents/{id}/original": BROWSER,
+    "GET /documents/{id}/versions/{number}/original": BROWSER,
     "GET /documents/{id}/archive": BROWSER,
     "GET /documents/{id}/preview": BROWSER,
     "GET /documents/{id}/structure": BROWSER,

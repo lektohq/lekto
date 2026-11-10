@@ -78,6 +78,7 @@ from lekto.core.services._access import (
     controllable_document,
     duplicate_of,
     field_definitions,
+    first_version,
     load_actor,
     require_admin,
     visible_space,
@@ -442,6 +443,7 @@ class PipelineService:
                 space_chosen=chosen,
             )
             await uow.documents.add(document)
+            await uow.document_versions.add(first_version(document, now))
             await self._log(uow, document.id, Node.RECEIVE, 1, result, started, now)
             if chosen:
                 await uow.processing_log.append(

@@ -61,6 +61,7 @@ from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.tag_tree import TagTree
 from lekto.core.domain.text_places import TextPlaces
 from lekto.core.domain.users import User
+from lekto.core.domain.versions import DocumentVersion
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.metadata import FileMetadata, MetadataReader
 from lekto.core.ports.object_store import ObjectStore
@@ -339,11 +340,14 @@ class StoredFile:
 
 @dataclass(frozen=True, kw_only=True)
 class DocumentFiles:
-    """A document's files: the original, and the archive once there is one."""
+    """A document's files: the original, the archive once there is one, and the versions of
+    the original."""
 
     document: Document
     original: StoredFile
     archive: StoredFile | None
+    # Its versions, the first first; the last is the current one.
+    versions: tuple[DocumentVersion, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -820,11 +824,31 @@ class DocumentService:
         store = self._object_store
         async with self._uow() as uow:
             document, _ = await readable_document(uow, await load_actor(uow, actor), id)
+            versions = tuple(await uow.document_versions.of_document(id))
         original = await self._stored(original_key(document.sha256))
         archive = None
         if await store.exists(archive_key(id)):
             archive = await self._stored(archive_key(id))
-        return DocumentFiles(document=document, original=original, archive=archive)
+        return DocumentFiles(
+            document=document, original=original, archive=archive, versions=versions
+        )
+
+    async def download_version(
+        self, actor: UserId, id: DocumentId, number: int, target: Path
+    ) -> FileInfo:
+        """Write the original of version `number` of a readable document to `target`.
+        NotFoundError if the caller may not read the document or it has no such version."""
+        async with self._uow() as uow:
+            await readable_document(uow, await load_actor(uow, actor), id)
+            versions = await uow.document_versions.of_document(id)
+        version = next((item for item in versions if item.number == number), None)
+        key = None if version is None else original_key(version.sha256)
+        if version is None or key is None or not await self._object_store.exists(key):
+            raise NotFoundError(
+                "version", id, because(ReasonCode.VERSION_NOT_FOUND, number=number, id=str(id))
+            )
+        await self._object_store.download(key, target)
+        return FileInfo(version.media_type, version.original_filename)
 
     async def _stored(self, key: str) -> StoredFile:
         data = await self._object_store.get(key)
@@ -1166,18 +1190,24 @@ class DocumentService:
 
     async def delete(self, actor: UserId, id: DocumentId) -> None:
         """Editors and admins. Removes the metadata and queues the removal of its files
-        (derivatives, and the original unless another document has the same file). Its tasks
-        end (a late answer is refused)."""
+        (derivatives, and the originals of all its versions unless another document has the
+        same file). Its tasks end (a late answer is refused)."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             document, _ = await controllable_document(uow, user, id, Action.DELETE_DOCUMENT)
             document.delete(self._clock.now(), await _readers(uow, document))
             await cancel_tasks(uow, id, self._clock.now())
+            # The originals of its earlier versions go with it, as its current one.
+            earlier = tuple(
+                version.sha256
+                for version in await uow.document_versions.of_document(id)
+                if version.sha256 != document.sha256
+            )
             await uow.documents.remove(id)
             await uow.outbox.add(document.pull_events())
             await uow.jobs.enqueue(
                 REMOVE_FILES_JOB,
-                RemoveFiles(id, document.sha256, document.page_count).to_json(),
+                RemoveFiles(id, document.sha256, document.page_count, earlier).to_json(),
                 run_at=self._clock.now(),
             )
             await uow.commit()

@@ -1,9 +1,13 @@
 """A document's files as they are stored, and what they say about themselves."""
 
 from datetime import datetime
+from enum import StrEnum
+from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.core.domain.versions import DocumentVersion
 from lekto.core.ports.metadata import FileMetadata, MetadataSource
 from lekto.core.services.documents import DocumentFiles, StoredFile
 
@@ -62,6 +66,44 @@ class StoredFileOut(BaseModel):
         )
 
 
+class VersionKindOut(StrEnum):
+    RECEIVED = "received"
+    REPLACED = "replaced"
+    EDITED = "edited"
+
+
+class DocumentVersionOut(BaseModel):
+    """A version of the document's original: its number (from 1), whether it is the current
+    one, its file, how and when it came, by whom (null where nobody is known), and what it was
+    made from (an edit: the version and its pages). Its file:
+    `GET /documents/{id}/versions/{number}/original`."""
+
+    number: int
+    current: bool
+    original_filename: str
+    media_type: str
+    kind: VersionKindOut = Field(
+        description="`received`: how the document came in; `replaced`: a person put another "
+        "file in its place; `edited`: a person edited its pages."
+    )
+    created_at: datetime
+    created_by: UUID | None
+    detail: dict[str, Any]
+
+    @classmethod
+    def of(cls, version: DocumentVersion, *, current: bool) -> "DocumentVersionOut":
+        return cls(
+            number=version.number,
+            current=current,
+            original_filename=version.original_filename,
+            media_type=version.media_type,
+            kind=VersionKindOut(version.kind.value),
+            created_at=version.created_at,
+            created_by=version.created_by,
+            detail=dict(version.detail),
+        )
+
+
 class DocumentFilesOut(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
@@ -91,6 +133,18 @@ class DocumentFilesOut(BaseModel):
                         },
                     },
                     "archive": None,
+                    "versions": [
+                        {
+                            "number": 1,
+                            "current": True,
+                            "original_filename": "scan-2026-07-03.pdf",
+                            "media_type": "application/pdf",
+                            "kind": "received",
+                            "created_at": "2026-07-03T08:40:36Z",
+                            "created_by": "01999d5e-4444-7c1e-b6a3-2f4d5e6f7a8b",
+                            "detail": {},
+                        }
+                    ],
                 }
             ]
         }
@@ -103,6 +157,9 @@ class DocumentFilesOut(BaseModel):
     page_count: int | None
     original: StoredFileOut
     archive: StoredFileOut | None = Field(description="Null while there is none.")
+    versions: list[DocumentVersionOut] = Field(
+        description="The versions of the original, the first first; the last is the current one."
+    )
 
     @classmethod
     def of(cls, files: DocumentFiles) -> "DocumentFilesOut":
@@ -115,4 +172,8 @@ class DocumentFilesOut(BaseModel):
             page_count=document.page_count,
             original=StoredFileOut.of(files.original),
             archive=None if files.archive is None else StoredFileOut.of(files.archive),
+            versions=[
+                DocumentVersionOut.of(version, current=index == len(files.versions) - 1)
+                for index, version in enumerate(files.versions)
+            ],
         )

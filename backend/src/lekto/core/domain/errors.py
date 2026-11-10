@@ -81,15 +81,19 @@ class ConflictError(DomainError):
 class DuplicateDocumentError(ConflictError):
     """The same file lies in Lekto already: every file exists once per installation. `existing`
     names the document if the caller may read it, else None (it lies in a space they cannot
-    see)."""
+    see); `version` the number of its earlier version that has the file, None for the current
+    one."""
 
-    def __init__(self, existing: UUID | None) -> None:
-        super().__init__(
-            _because("DUPLICATE_UNSEEN")
-            if existing is None
-            else _because("DUPLICATE_OF", id=str(existing))
-        )
+    def __init__(self, existing: UUID | None, *, version: int | None = None) -> None:
+        if existing is None:
+            reason = _because("DUPLICATE_UNSEEN")
+        elif version is None:
+            reason = _because("DUPLICATE_OF", id=str(existing))
+        else:
+            reason = _because("DUPLICATE_OF_VERSION", id=str(existing), version=version)
+        super().__init__(reason)
         self.existing = existing
+        self.version = version
 
 
 class ConcurrencyError(ConflictError):

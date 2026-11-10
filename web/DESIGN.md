@@ -1203,6 +1203,11 @@ Regeln (Rules), Stammdaten (Master data), Nutzer (Users), Kontakt, Dokumenttyp, 
 (Topic), Gruppe (Group), Feld (Field), Fakt (Fact), Kennung (Identifier), Bezug (Relation), Lane
 names Erledigt, Prüfen, Eingreifen, In Verarbeitung.
 
+**Fassung** (Version, Tobi 10.11.2026): one original of a document. A document has versions 1,
+2, …; a new one comes in when a person replaces the file or edits the pages, none is
+overwritten. The files tab lists them (`DocumentVersions`), the current one with `Badge`
+`primary` "Aktuell".
+
 **Fakt, Kennung, Nummer** (Tobi, 02.11.2026): three words, each for one thing.
 
 - A **Fakt** (fact) is anything Lekto reads in one document: names, identifiers, numbers, dates.

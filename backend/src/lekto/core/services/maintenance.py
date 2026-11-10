@@ -46,11 +46,15 @@ class RemoveFiles:
     document_id: DocumentId
     sha256: Sha256
     page_count: int | None
+    # The originals of its earlier versions (`domain.versions`); jobs queued before them have
+    # none.
+    earlier: tuple[Sha256, ...] = ()
 
     def to_json(self) -> JsonObject:
         return document_payload(self.document_id) | {
             "sha256": self.sha256.hex,
             "page_count": self.page_count,
+            "earlier": [sha256.hex for sha256 in self.earlier],
         }
 
     @classmethod
@@ -59,7 +63,20 @@ class RemoveFiles:
         pages = payload.get("page_count")
         if pages is not None and as_int(pages) is None:
             raise ValueError(f"page_count {pages!r}")
-        return cls(payload_document(payload), Sha256(str(payload["sha256"])), as_int(pages))
+        earlier = payload.get("earlier", [])
+        if not isinstance(earlier, list):
+            raise ValueError(f"earlier {earlier!r}")
+        return cls(
+            payload_document(payload),
+            Sha256(str(payload["sha256"])),
+            as_int(pages),
+            tuple(Sha256(str(item)) for item in earlier),
+        )
+
+    @property
+    def originals(self) -> tuple[Sha256, ...]:
+        """The originals of all its versions, the current one first."""
+        return (self.sha256, *self.earlier)
 
 
 # Removing the files of a deleted document: five attempts, waiting a minute, doubling.
@@ -132,16 +149,26 @@ class MaintenanceService:
             await self._jobs.invalid(job, error)
             return
         assert self._store is not None, "removing files needs the object store"
-        document, sha256, pages = files.document_id, files.sha256, files.page_count
-        original = original_key(sha256)
+        document, pages = files.document_id, files.page_count
+        kept: list[Sha256] = []
         try:
             for key in derivative_keys(document, pages):
                 await self._store.delete(key)
+            # One original at a time under the lock of its key, which an upload of the same
+            # file takes too; a retry after a failure deletes what is left.
+            for sha256 in files.originals:
+                original = original_key(sha256)
+                async with self._uow() as uow:
+                    await uow.lock(original)
+                    # Another document came in with the same file meanwhile: it stays.
+                    if await uow.documents.exists(sha256=sha256) or (
+                        await uow.document_versions.find_by_sha256(sha256) is not None
+                    ):
+                        kept.append(sha256)
+                    else:
+                        await self._store.delete(original)
+                    await uow.commit()
             async with self._uow() as uow:
-                await uow.lock(original)
-                shared = await uow.documents.exists(sha256=sha256)
-                if not shared:
-                    await self._store.delete(original)
                 await uow.jobs.complete(job, now=self._clock.now())
                 await uow.commit()
         except ConcurrencyError:
@@ -156,7 +183,11 @@ class MaintenanceService:
             return
         log.info(
             "files of a deleted document removed",
-            extra={"document_id": str(document), "original_removed": not shared},
+            extra={
+                "document_id": str(document),
+                "originals_removed": len(files.originals) - len(kept),
+                "originals_kept": len(kept),
+            },
         )
 
     async def _cleanup(self, job: Job) -> None:

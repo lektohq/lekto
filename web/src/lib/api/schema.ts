@@ -1637,6 +1637,26 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/v1/documents/{id}/versions/{number}/original': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/**
+		 * The original of a version of the document
+		 * @description Needs read access. The file of version `number` (from 1) of the document's original, an earlier one included (`GET /documents/{id}/files` lists them). 404 for a version the document does not have.
+		 */
+		get: operations['version_original_api_v1_documents__id__versions__number__original_get'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/v1/documents/{id}/archive': {
 		parameters: {
 			query?: never;
@@ -4895,7 +4915,19 @@ export interface components {
 		 *         "size": 10812334
 		 *       },
 		 *       "original_filename": "scan-2026-07-03.pdf",
-		 *       "page_count": 2
+		 *       "page_count": 2,
+		 *       "versions": [
+		 *         {
+		 *           "created_at": "2026-07-03T08:40:36Z",
+		 *           "created_by": "01999d5e-4444-7c1e-b6a3-2f4d5e6f7a8b",
+		 *           "current": true,
+		 *           "detail": {},
+		 *           "kind": "received",
+		 *           "media_type": "application/pdf",
+		 *           "number": 1,
+		 *           "original_filename": "scan-2026-07-03.pdf"
+		 *         }
+		 *       ]
 		 *     }
 		 */
 		DocumentFilesOut: {
@@ -4918,6 +4950,11 @@ export interface components {
 			original: components['schemas']['StoredFileOut'];
 			/** @description Null while there is none. */
 			archive: components['schemas']['StoredFileOut'] | null;
+			/**
+			 * Versions
+			 * @description The versions of the original, the first first; the last is the current one.
+			 */
+			versions: components['schemas']['DocumentVersionOut'][];
 		};
 		/**
 		 * DocumentListSort
@@ -5210,6 +5247,36 @@ export interface components {
 			icon?: string | null;
 			/** Relation Target */
 			relation_target?: boolean | null;
+		};
+		/**
+		 * DocumentVersionOut
+		 * @description A version of the document's original: its number (from 1), whether it is the current
+		 *     one, its file, how and when it came, by whom (null where nobody is known), and what it was
+		 *     made from (an edit: the version and its pages). Its file:
+		 *     `GET /documents/{id}/versions/{number}/original`.
+		 */
+		DocumentVersionOut: {
+			/** Number */
+			number: number;
+			/** Current */
+			current: boolean;
+			/** Original Filename */
+			original_filename: string;
+			/** Media Type */
+			media_type: string;
+			/** @description `received`: how the document came in; `replaced`: a person put another file in its place; `edited`: a person edited its pages. */
+			kind: components['schemas']['VersionKindOut'];
+			/**
+			 * Created At
+			 * Format: date-time
+			 */
+			created_at: string;
+			/** Created By */
+			created_by: string | null;
+			/** Detail */
+			detail: {
+				[key: string]: unknown;
+			};
 		};
 		/**
 		 * DryRunMailOut
@@ -9589,6 +9656,7 @@ export interface components {
 			| 'model_call_admins'
 			| 'open_fields'
 			| 'duplicate_of'
+			| 'duplicate_of_version'
 			| 'duplicate_unseen'
 			| 'no_text_yet'
 			| 'no_structure_yet'
@@ -9628,6 +9696,7 @@ export interface components {
 			| 'oidc_password_first'
 			| 'not_found'
 			| 'page_not_found'
+			| 'version_not_found'
 			| 'file_not_found'
 			| 'rule_version_not_found'
 			| 'name_empty'
@@ -11802,6 +11871,11 @@ export interface components {
 			 */
 			added: number;
 		};
+		/**
+		 * VersionKindOut
+		 * @enum {string}
+		 */
+		VersionKindOut: 'received' | 'replaced' | 'edited';
 		/**
 		 * VisibilityOut
 		 * @description Who sees the document: the members of its space; readers only once it is green.
@@ -24254,6 +24328,97 @@ export interface operations {
 			header?: never;
 			path: {
 				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/octet-stream': string;
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Not Found */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Not Found",
+					 *       "status": 404,
+					 *       "detail": "document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b not found"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	version_original_api_v1_documents__id__versions__number__original_get: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: string;
+				number: number;
 			};
 			cookie?: never;
 		};
