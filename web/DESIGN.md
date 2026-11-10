@@ -557,7 +557,18 @@ value, where a table would be too much: the origin of a mail (`OriginCard`), wha
 itself (`DocumentFiles`). A `<dl>` as a grid: the labels in a column of 7.5 rem,
 `text-muted-foreground`, the values beside them breaking where they must (`break-words`),
 `text-sm`, `gap-x-3 gap-y-1.5`. A fact without a value is left out, not shown empty. The card
-around it gives the padding (`px-1 pb-1` in a `sm` card, `px-4 pb-4` otherwise).
+around it gives the padding (`px-1 pb-1` in a `sm` card, `px-4 pb-4` otherwise). A value is text, or a snippet where
+it shows more than words (chips, a value before and after).
+
+**Change preview** (`ChangePreview`, Tobi 10.11.2026): what saving a document's form would do,
+in the dialog "Was die Änderung bewirkt" (`md`) before "Speichern". Each changed field as a row
+of a `DetailList`: its value before (muted, struck through; "Nicht gesetzt" when it had none),
+an arrow, its value after; tags as `TagChip`s with `change` (as in the mock Tobi chose): a
+removed one in red and struck through, an added one in green. Then the rules that run ("Regel, die ausgeführt wird", "Regeln, die ausgeführt werden"),
+each in a `sm` card. Who sees the document then: while that stays as it was, one muted line
+("Sichtbar bleibt es für Anna Leider."); when it changes, "Wer es danach sieht" with the space
+before and after and the people, a new one with `Badge` `note` "neu", one who no longer sees it
+struck through with `Badge` `muted` "sieht es nicht mehr".
 
 ### Tables
 

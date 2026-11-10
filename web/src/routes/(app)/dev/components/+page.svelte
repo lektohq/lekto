@@ -17,6 +17,7 @@
 	import ChipInput from '#lib/components/ChipInput.svelte';
 	import ColorPicker from '#lib/components/ColorPicker.svelte';
 	import DetailList from '#lib/components/DetailList.svelte';
+	import ChangePreview from '#lib/components/document/ChangePreview.svelte';
 	import DocumentRow from '#lib/components/DocumentRow.svelte';
 	import EditorShell from '#lib/components/EditorShell.svelte';
 	import FilterSection from '#lib/components/FilterSection.svelte';
@@ -559,6 +560,18 @@
 				[m.dev_sample_table_date(), formatDate('2026-07-31')]
 			]}
 		/>
+		<div class="max-w-md">
+			<ChangePreview
+				before={SAMPLE_DOCUMENT}
+				preview={{
+					document: { ...SAMPLE_DOCUMENT, title: m.dev_sample_text() },
+					changed: ['title'],
+					rules: [],
+					visibility: null
+				}}
+				lookup={null}
+			/>
+		</div>
 		<div class="max-w-xs">
 			<FilterSection title={m.dev_section_chips()} summary={TAGS[0].name}>
 				<p class="pb-3 text-sm text-muted-foreground">{m.dev_sample_text()}</p>

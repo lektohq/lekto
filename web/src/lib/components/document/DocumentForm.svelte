@@ -24,14 +24,14 @@
 	import SearchSelect, { type SearchOption } from '#lib/components/SearchSelect.svelte';
 	import GroupChips from '#lib/components/GroupChips.svelte';
 	import FieldValueInput from '#lib/components/FieldValueInput.svelte';
-	import RuleEffects from '#lib/components/rules/RuleEffects.svelte';
+	import ChangePreview from '#lib/components/document/ChangePreview.svelte';
 	import TagPicker from '#lib/components/TagPicker.svelte';
 	import TypeIcon from '#lib/components/TypeIcon.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
-	import { describeValue, fieldLabel } from '#lib/describe.ts';
+	import { fieldLabel } from '#lib/describe.ts';
 	import {
 		fieldEvidence,
 		keepsForm,
@@ -72,7 +72,6 @@
 	import { above, normalise, ofScope } from '#lib/tags.ts';
 	import { Choice } from '#lib/components/ui/choice/index.ts';
 	import { cardVariants } from '#lib/components/ui/card/index.ts';
-	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import UnsavedGuard from '#lib/components/UnsavedGuard.svelte';
 	import DateInput from '#lib/components/DateInput.svelte';
@@ -1032,58 +1031,14 @@
 </form>
 
 <Dialog.Root open={preview !== null} onOpenChange={(open) => !open && (preview = null)}>
-	<Dialog.Content size="lg">
+	<Dialog.Content size="md">
 		<Dialog.Header>
 			<Dialog.Title>{m.dryrun_title()}</Dialog.Title>
 			<Dialog.Description>{m.dryrun_hint()}</Dialog.Description>
 		</Dialog.Header>
 		{#if preview}
-			<div class="flex max-h-[60vh] flex-col gap-4 overflow-auto text-sm">
-				<section>
-					<SectionTitle size="card" level={3} class="mb-1">{m.dryrun_changes()}</SectionTitle>
-					<ul class="flex flex-col gap-1">
-						{#each preview.changed as field (field)}
-							<li><span class="text-muted-foreground">{fieldLabel(field, lookup)}</span></li>
-						{/each}
-					</ul>
-				</section>
-				{#if preview.rules && preview.rules.length > 0}
-					<section>
-						<SectionTitle size="card" level={3} class="mb-1">{m.dryrun_rules()}</SectionTitle>
-						<ul class="flex flex-col gap-2">
-							{#each preview.rules as rule (rule.rule_id)}
-								<li class={cardVariants({ size: 'sm' })}>
-									<span class="font-medium">{rule.name}</span>
-									<div class="mt-1">
-										<RuleEffects
-											effects={rule.applied}
-											notes={rule.notes}
-											sends={rule.sends}
-											{lookup}
-										/>
-									</div>
-								</li>
-							{/each}
-						</ul>
-					</section>
-				{/if}
-				{#if preview.visibility}
-					<section>
-						<SectionTitle size="card" level={3} class="mb-1">{m.dryrun_visible()}</SectionTitle>
-						<p>
-							{m.dryrun_space({ space: describeValue(preview.visibility.space_id, lookup) })}
-						</p>
-						<p class="text-muted-foreground">
-							{preview.visibility.members
-								.map((member) =>
-									member.role === 'read'
-										? m.space_member_reads({ name: describeValue(member.user_id, lookup) })
-										: describeValue(member.user_id, lookup)
-								)
-								.join(', ')}
-						</p>
-					</section>
-				{/if}
+			<div class="max-h-[60vh] overflow-auto">
+				<ChangePreview before={document} {preview} {lookup} />
 			</div>
 		{/if}
 		<Dialog.Footer>
