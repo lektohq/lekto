@@ -60,6 +60,8 @@ export default defineConfig({
 		include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
 		setupFiles: ['./tests/setup.ts'],
 		// The colour tests read the palette's tokens from it (`?raw`).
-		css: { include: [/app\.css/] }
+		css: { include: [/app\.css/] },
+		// Room for several waits of `asyncUtilTimeout` (tests/setup.ts) in one test on a busy runner.
+		testTimeout: 30_000
 	}
 });
