@@ -423,8 +423,9 @@ describe('DocumentForm', () => {
 	});
 
 	it('confirms every open field at once and goes on to the next document', async () => {
+		// The dry run says nothing would change: the dialog shows no rows.
 		fetchMock.mockResolvedValue(
-			new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })
+			json({ changed: [], rules: null, visibility: null, document: null })
 		);
 		const onconfirmed = vi.fn();
 		render(DocumentForm, props({ onconfirmed }));
@@ -452,8 +453,9 @@ describe('DocumentForm', () => {
 	});
 
 	it('does not save while a period is written in a way it cannot read', async () => {
+		// The dry run says nothing would change: the dialog shows no rows.
 		fetchMock.mockResolvedValue(
-			new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })
+			json({ changed: [], rules: null, visibility: null, document: null })
 		);
 		const PERIOD = '0199a6c4-0000-7000-8000-0000000000f3';
 		const withPeriod = {
@@ -847,8 +849,9 @@ describe('DocumentForm', () => {
 	});
 
 	it("after a corrected type sends no suggestion of the old type as the person's value", async () => {
+		// The dry run says nothing would change: the dialog shows no rows.
 		fetchMock.mockResolvedValue(
-			new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })
+			json({ changed: [], rules: null, visibility: null, document: null })
 		);
 		const OTHER = '0199a6c4-0000-7000-8000-0000000000e2';
 		const typed = {
@@ -880,8 +883,9 @@ describe('DocumentForm', () => {
 	});
 
 	it('keeps a value entered by hand when the type is corrected', async () => {
+		// The dry run says nothing would change: the dialog shows no rows.
 		fetchMock.mockResolvedValue(
-			new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })
+			json({ changed: [], rules: null, visibility: null, document: null })
 		);
 		const OTHER = '0199a6c4-0000-7000-8000-0000000000e2';
 		const ASN = '0199a6c4-0000-7000-8000-0000000000f9';
