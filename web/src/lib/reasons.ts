@@ -574,6 +574,7 @@ export const ACTIONS: Record<string, () => string> = {
 	decide_facts: m.action_decide_facts,
 	relate_documents: m.action_relate_documents,
 	delete_document: m.action_delete_document,
+	edit_pages: m.action_edit_pages,
 	reset_own_password: m.action_reset_own_password,
 	turn_off_own_totp: m.action_turn_off_own_totp,
 	manage_mailboxes: m.action_manage_mailboxes

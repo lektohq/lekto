@@ -6,6 +6,7 @@ import logging
 from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -1195,22 +1196,29 @@ class DocumentService:
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             document, _ = await controllable_document(uow, user, id, Action.DELETE_DOCUMENT)
-            document.delete(self._clock.now(), await _readers(uow, document))
-            await cancel_tasks(uow, id, self._clock.now())
-            # The originals of its earlier versions go with it, as its current one.
-            earlier = tuple(
-                version.sha256
-                for version in await uow.document_versions.of_document(id)
-                if version.sha256 != document.sha256
-            )
-            await uow.documents.remove(id)
-            await uow.outbox.add(document.pull_events())
-            await uow.jobs.enqueue(
-                REMOVE_FILES_JOB,
-                RemoveFiles(id, document.sha256, document.page_count, earlier).to_json(),
-                run_at=self._clock.now(),
-            )
+            await delete_document(uow, document, self._clock.now())
             await uow.commit()
+
+
+async def delete_document(uow: UnitOfWork, document: Document, now: datetime) -> None:
+    """Remove `document` in the transaction of `uow`: its deletion is recorded for those who
+    may read it, its tasks end, and the removal of its files is queued (derivatives, and the
+    originals of all its versions unless another document has the same file)."""
+    document.delete(now, await _readers(uow, document))
+    await cancel_tasks(uow, document.id, now)
+    # The originals of its earlier versions go with it, as its current one.
+    earlier = tuple(
+        version.sha256
+        for version in await uow.document_versions.of_document(document.id)
+        if version.sha256 != document.sha256
+    )
+    await uow.documents.remove(document.id)
+    await uow.outbox.add(document.pull_events())
+    await uow.jobs.enqueue(
+        REMOVE_FILES_JOB,
+        RemoveFiles(document.id, document.sha256, document.page_count, earlier).to_json(),
+        run_at=now,
+    )
 
 
 async def _readers(uow: UnitOfWork, document: Document) -> list[UserId]:

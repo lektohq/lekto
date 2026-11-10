@@ -36,6 +36,7 @@ from lekto.adapters.outbound.memory import (
     FakeMailRenderer,
     FakeMetadataReader,
     FakeOcr,
+    FakePageComposer,
     FakePageRenderer,
     FakeParser,
     FakePasswordHasher,
@@ -57,7 +58,7 @@ from lekto.adapters.outbound.ocrmypdf.vision import VisionSettings
 from lekto.adapters.outbound.oidc import AuthlibOidcProvider
 from lekto.adapters.outbound.openai_compat import OpenAiCompatEmbeddings, OpenAiCompatLanguageModel
 from lekto.adapters.outbound.pdfium import LayoutParser, PdfiumPageRenderer, PdfiumTextLocator
-from lekto.adapters.outbound.pikepdf import FileMetadataReader
+from lekto.adapters.outbound.pikepdf import FileMetadataReader, PikepdfPageComposer
 from lekto.adapters.outbound.pillow import PillowImageNormaliser
 from lekto.adapters.outbound.regex import RegexPatternMatcher
 from lekto.adapters.outbound.s3 import S3ObjectStore
@@ -79,6 +80,7 @@ from lekto.core.domain.webhooks import PrivateTargets
 from lekto.core.ports.classifier import Classifier
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.codes import CodeReader
+from lekto.core.ports.composer import PageComposer
 from lekto.core.ports.embeddings import Embeddings
 from lekto.core.ports.event_bus import DELIVERY_DELAY, DELIVERY_MAX_DELAY, EventBus
 from lekto.core.ports.identity import (
@@ -123,6 +125,7 @@ from lekto.core.services.classification.signals import (
 )
 from lekto.core.services.classifier import ClassifierPolicy, ClassifierService
 from lekto.core.services.documents import DocumentService
+from lekto.core.services.editing import EditingService
 from lekto.core.services.expected import ExpectedService
 from lekto.core.services.imports import ImportedFieldsNode, ImportedJudgeNode, ImportedSignal
 from lekto.core.services.inbox import InboxService
@@ -331,6 +334,7 @@ PAGE_RENDERERS: dict[str, Factory[PageRenderer]] = {"pdfium": lambda _: PdfiumPa
 TEXT_LOCATORS: dict[str, Factory[TextLocator]] = {"pdfium": lambda _: PdfiumTextLocator()}
 CODE_READERS: dict[str, Factory[CodeReader]] = {"zxing": lambda _: ZxingCodeReader()}
 METADATA_READERS: dict[str, Factory[MetadataReader]] = {"pikepdf": lambda _: FileMetadataReader()}
+PAGE_COMPOSERS: dict[str, Factory[PageComposer]] = {"pikepdf": lambda _: PikepdfPageComposer()}
 IMAGE_NORMALISERS: dict[str, Factory[ImageNormaliser]] = {
     "pillow": lambda _: PillowImageNormaliser()
 }
@@ -393,6 +397,7 @@ class Container:
     locator: TextLocator
     codes: CodeReader
     metadata: MetadataReader
+    composer: PageComposer
     images: ImageNormaliser
     password_hasher: PasswordHasher
     cipher: SecretCipher
@@ -464,6 +469,7 @@ def build_container(settings: Settings) -> Container:
         locator=_select("locator", "pdfium", TEXT_LOCATORS, settings),
         codes=_select("codes", "zxing", CODE_READERS, settings),
         metadata=_select("metadata", "pikepdf", METADATA_READERS, settings),
+        composer=_select("composer", "pikepdf", PAGE_COMPOSERS, settings),
         images=_select("images", "pillow", IMAGE_NORMALISERS, settings),
         password_hasher=Argon2PasswordHasher(),
         cipher=secret_cipher(settings),
@@ -528,6 +534,7 @@ def build_memory_container(
         locator=FakeTextLocator(),
         codes=FakeCodeReader(),
         metadata=FakeMetadataReader(),
+        composer=FakePageComposer(),
         images=FakeImageNormaliser(),
         password_hasher=FakePasswordHasher(),
         cipher=FakeCipher(),
@@ -578,6 +585,7 @@ class Services:
     documents: DocumentService
     inbox: InboxService
     pipeline: PipelineService
+    editing: EditingService
     maintenance: MaintenanceService
     jobs: JobsService
     automation: AutomationService
@@ -940,6 +948,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
         documents=documents,
         inbox=inbox,
         pipeline=pipeline,
+        editing=EditingService(uow, clock, store, container.composer, pipeline_version=__version__),
         mail_rules=MailRuleService(uow, clock),
         mail_intake=MailIntakeService(
             uow,

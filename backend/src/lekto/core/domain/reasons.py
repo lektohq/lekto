@@ -733,8 +733,8 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.MODEL_CALL_ADMINS: "only an admin's webhook serves as a model call",
     ReasonCode.OPEN_FIELDS: "decide the open fields first: {fields:fields}",
     ReasonCode.DUPLICATE_OF: "duplicate of document {id}",
-    ReasonCode.NEW_VERSION: "a new version of the file: check what it reads",
-    ReasonCode.NEW_VERSION_DIFFERS: "the new version reads it differently",
+    ReasonCode.NEW_VERSION: "the file changed: check what Lekto reads in it",
+    ReasonCode.NEW_VERSION_DIFFERS: "the new version says something else here",
     ReasonCode.DUPLICATE_OF_VERSION: "duplicate of version {version:number} of document {id}",
     ReasonCode.DUPLICATE_UNSEEN: "the file lies in Lekto already, in a space you cannot see",
     ReasonCode.NO_TEXT_YET: "document has no text yet",
@@ -1071,6 +1071,7 @@ class Action(StrEnum):
     DECIDE_FACTS = "decide_facts"
     RELATE_DOCUMENTS = "relate_documents"
     DELETE_DOCUMENT = "delete_document"
+    EDIT_PAGES = "edit_pages"
     RESET_OWN_PASSWORD = "reset_own_password"
     TURN_OFF_OWN_TOTP = "turn_off_own_totp"
     MANAGE_MAILBOXES = "manage_mailboxes"
@@ -1110,6 +1111,7 @@ ACTIONS: Mapping[Action, str] = {
     Action.DECIDE_FACTS: "decide the facts of this document",
     Action.RELATE_DOCUMENTS: "relate this document to another",
     Action.DELETE_DOCUMENT: "delete this document",
+    Action.EDIT_PAGES: "edit the pages of this document",
     Action.RESET_OWN_PASSWORD: "reset their own password here",
     Action.TURN_OFF_OWN_TOTP: "turn off their own TOTP here",
     Action.MANAGE_MAILBOXES: "manage the mailboxes Lekto fetches from",

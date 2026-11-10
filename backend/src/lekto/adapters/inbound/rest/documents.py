@@ -57,6 +57,12 @@ from lekto.adapters.inbound.rest.schemas.documents import (
     UploadFields,
     VisibilityOut,
 )
+from lekto.adapters.inbound.rest.schemas.editing import (
+    PARTS,
+    PARTS_LIMIT,
+    EditedDocuments,
+    parts_schema,
+)
 from lekto.adapters.inbound.rest.schemas.facts import FactDecisionIn, FactsOut
 from lekto.adapters.inbound.rest.schemas.files import DocumentFilesOut
 from lekto.adapters.inbound.rest.schemas.inbox import (
@@ -69,7 +75,7 @@ from lekto.adapters.inbound.rest.schemas.inbox import (
 )
 from lekto.adapters.inbound.rest.schemas.open_identifiers import PlaceOut
 from lekto.adapters.inbound.rest.schemas.refs import MAX_REF, opened
-from lekto.adapters.inbound.rest.upload import read_upload, upload_body
+from lekto.adapters.inbound.rest.upload import read_upload, read_uploads, upload_body
 from lekto.adapters.inbound.schemas import RuleReportOut
 from lekto.core.domain.classification import field_id_of
 from lekto.core.domain.documents import (
@@ -79,6 +85,7 @@ from lekto.core.domain.documents import (
     Unset,
     changed_fields,
 )
+from lekto.core.domain.editing import MAX_ADDED
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldDefinition, field_from_json
 from lekto.core.domain.identifiers import IdentifierKind
@@ -97,6 +104,7 @@ from lekto.core.domain.pipeline import Node
 from lekto.core.ports.pages import PAGE_MEDIA_TYPE
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE, DocumentOrder, SortKey
 from lekto.core.services.documents import DocumentFile, DocumentView, FileInfo, MetadataChange
+from lekto.core.services.editing import AddedFile
 
 router = APIRouter(prefix="/documents", tags=["documents"], dependencies=PROTECTED)
 
@@ -261,6 +269,98 @@ async def new_version(
     finally:
         await asyncio.shield(asyncio.to_thread(received.file.path.unlink, missing_ok=True))
     return _details(view)
+
+
+_EDIT_BODY = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "multipart/form-data": {
+                "schema": {
+                    "type": "object",
+                    "required": ["parts"],
+                    "properties": {
+                        "parts": {
+                            "type": "string",
+                            "contentMediaType": "application/json",
+                            "contentSchema": parts_schema(),
+                            "description": (
+                                f"JSON of the parts, up to {PARTS_LIMIT // 1024} KiB: each a "
+                                "list of pages, and whether it replaces the document."
+                            ),
+                        },
+                        "files": {
+                            "type": "array",
+                            "maxItems": MAX_ADDED,
+                            "items": {"type": "string", "format": "binary"},
+                            "description": (
+                                "Files whose pages the parts take (sources 1, 2, …): PDF, "
+                                "JPEG, PNG or TIFF, recognised by content. They become no "
+                                "originals of their own; together within the upload limit."
+                            ),
+                        },
+                    },
+                }
+            }
+        },
+    }
+}
+
+
+@router.post(
+    "/{id}/edit",
+    status_code=202,
+    summary="Edit a document's pages",
+    description=(
+        EDITORS + ". Puts parts together from the pages of the document's original and of the "
+        "files sent along: turned, in another order, without some, split into several. The "
+        "part that `replaces` the document becomes its next version (as `POST "
+        "/documents/{id}/versions`); every other part becomes a new document in its space, "
+        "with its uploader and receipt; without a part that replaces it, the document is "
+        "deleted. All of it happens at once, and each document is processed again and waits "
+        "in the inbox. 409 while the document is processed or if its file changed meanwhile; "
+        "415 for a mail (its pages are no file) and for a file that is no PDF or image; 422 "
+        "for parts that do not fit the pages (a page twice, one a source does not have, more "
+        "than one part that replaces the document, or no change)."
+    ),
+    response_model=EditedDocuments,
+    responses=problem_responses(400, 401, 403, 404, 409, 413, 415, 422),
+    openapi_extra=_EDIT_BODY,
+)
+async def edit_pages(
+    id: UUID, request: Request, user: CurrentUser, context: Context
+) -> EditedDocuments:
+    received = await read_uploads(
+        request,
+        max_size=context.max_upload_size,
+        file_field="files",
+        max_files=MAX_ADDED,
+        fields=("parts",),
+        limits={"parts": PARTS_LIMIT},
+    )
+    try:
+        if "parts" not in received.fields:
+            raise RequestValidationError(
+                [{"type": "missing", "loc": ("body", "parts"), "msg": "Field required"}]
+            )
+        try:
+            parts = PARTS.validate_json(received.fields["parts"])
+        except PydanticValidationError as error:
+            # The form is the body: its errors read as those of a JSON body.
+            raise RequestValidationError(
+                [{**item, "loc": ("body", "parts", *item["loc"])} for item in error.errors()]
+            ) from None
+        result = await context.editing.edit(
+            user,
+            DocumentId(id),
+            [part.to_domain() for part in parts],
+            [AddedFile(item.file, item.filename) for item in received.files],
+        )
+    finally:
+        await received.remove()
+    return EditedDocuments(
+        documents=[_details(view) for view in result.documents], deleted=result.deleted
+    )
 
 
 @router.get(

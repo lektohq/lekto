@@ -42,3 +42,7 @@ class MemoryObjectStore:
             return self._objects[check_key(key)][1]
         except KeyError:
             raise NotFoundError("object", key) from None
+
+    def keys(self, prefix: str = "") -> list[str]:
+        """The keys stored under `prefix`, sorted (for tests)."""
+        return sorted(key for key in self._objects if key.startswith(prefix))

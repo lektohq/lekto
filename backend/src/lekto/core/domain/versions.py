@@ -19,13 +19,14 @@ class VersionKind(StrEnum):
     RECEIVED = "received"  # how the document came in
     REPLACED = "replaced"  # a person put another file in its place
     EDITED = "edited"  # a person edited its pages
+    SPLIT = "split"  # its first: pages a person split off another document (`domain.editing`)
 
 
 @dataclass(frozen=True, kw_only=True)
 class DocumentVersion:
     """Version `number` (from 1) of the original of `document_id`. `created_by`: who made it
     (the uploader for the first; None where nobody is known). `detail`: what it was made from
-    (an edit: the version and its pages)."""
+    (an edit: the version and its pages, `domain.editing`)."""
 
     document_id: DocumentId
     number: int
