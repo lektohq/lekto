@@ -1760,6 +1760,8 @@
 	"page_image": "Page {number}",
 	"doc_inbox_nav": "Inbox documents",
 	"doc_inbox_position": "{position} of {total} in the inbox",
+	"doc_list_nav": "Documents of the list",
+	"doc_list_position": "Document {position} of {total}",
 	"doc_previous": "Previous document",
 	"doc_next": "Next document",
 	"doc_received": "received {date}",

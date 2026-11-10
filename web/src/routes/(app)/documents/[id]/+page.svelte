@@ -63,6 +63,8 @@
 	import { canEdit } from '#lib/permissions.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { scope } from '#lib/scope.svelte.ts';
+	import { returnTo } from '#lib/return-to.svelte.ts';
+	import { listPlaces as placesOfList } from '#lib/list-places.ts';
 	import { hasText, pipeline, type GraphNode } from '#lib/pipeline.ts';
 	import { phone } from '#lib/phone.svelte.ts';
 	import { session } from '#lib/session.svelte.ts';
@@ -89,6 +91,8 @@
 	const tab = $derived(tabOf(page.url));
 	const view = $derived(viewOf(page.url));
 	const fromInbox = $derived(page.url.searchParams.get('from') === 'inbox');
+	// Opened from the document list: previous/next among its documents (`lib/list-places.ts`).
+	const fromList = $derived(page.url.searchParams.get('from') === 'list');
 	/** Leaving the document (deleted, handed over): the event of its deletion changes nothing. */
 	let leaving = false;
 	let document = $state<Document | null>(null);
@@ -105,6 +109,8 @@
 	// The open documents of the inbox, in its order, opened from there.
 	let inboxPlaces = $state<InboxPlace[] | null>(null);
 	let inboxReady: Promise<void> = Promise.resolve();
+	// The documents of the list, in its order, opened from there.
+	let listPlaces = $state<{ id: string }[] | null>(null);
 	let problem = $state<unknown>(null);
 	// Each pane on the right marks what it holds in the one on the left: the form its fields'
 	// quotes, on the pages (`marks`) and in the text (`fieldQuotes`); the facts where they
@@ -131,6 +137,14 @@
 		fromInbox && inboxPlaces
 			? neighbours(
 					inboxPlaces.map((place) => place.id),
+					id
+				)
+			: null
+	);
+	const listed = $derived(
+		fromList && listPlaces
+			? neighbours(
+					listPlaces.map((place) => place.id),
 					id
 				)
 			: null
@@ -243,6 +257,21 @@
 		}
 	}
 
+	async function loadList() {
+		const source = returnTo.list;
+		if (!source) return;
+		try {
+			const now = await placesOfList(source.url, source.words, scope.allUsers);
+			listPlaces = keepPlace(
+				listPlaces ?? [],
+				now.map((item) => ({ id: item })),
+				id
+			);
+		} catch (error) {
+			reportError(error);
+		}
+	}
+
 	// Opening the view counts as seen (a read through the API does not), from anywhere: the
 	// inbox, the archive, a search, a link. Seen while the document is processed does not count
 	// (it is not new yet), so it is reported again when the open document turns green. Opened
@@ -294,6 +323,7 @@
 		void events.generation;
 		void scope.allUsers;
 		if (fromInbox) untrack(() => (inboxReady = loadInbox()));
+		if (fromList) untrack(() => void loadList());
 	});
 
 	// Again after a master data dialog saved here (a contact opened from its facts): names,
@@ -321,6 +351,7 @@
 		// A run sends a burst of events: the document is loaded once after it (issue #75).
 		const reload = coalesced(() => void load());
 		const reloadInbox = coalesced(() => void loadInbox());
+		const reloadList = coalesced(() => void loadList());
 		const stop = events.subscribe((event) => {
 			if (event.document_id !== id) return;
 			if (event.type === 'document.deleted') {
@@ -334,11 +365,14 @@
 			}
 			reload();
 			if (fromInbox && !NODE_EVENTS.has(event.type)) reloadInbox();
+			// Saved here, it may have left the list's filter: it keeps its place there.
+			if (fromList && !NODE_EVENTS.has(event.type)) reloadList();
 		});
 		return () => {
 			stop();
 			reload.cancel();
 			reloadInbox.cancel();
+			reloadList.cancel();
 		};
 	});
 
@@ -474,6 +508,7 @@
 			{graph}
 			{archive}
 			{inbox}
+			list={listed}
 			{vision}
 			{reading}
 			onchanged={load}

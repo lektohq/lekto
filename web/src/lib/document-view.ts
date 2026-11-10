@@ -283,15 +283,15 @@ export interface InboxPlace {
 }
 
 /**
- * The inbox anew, with `id` kept where it stood before: the open document may leave the inbox
- * while it is shown (seen when it opened, confirmed), and the way to the documents before and
- * after it stays.
+ * The inbox (or the document list) anew, with `id` kept where it stood before: the open document
+ * may leave it while it is shown (seen when it opened, confirmed, a tag of the list's filter
+ * removed), and the way to the documents before and after it stays.
  */
-export function keepPlace(
-	before: readonly InboxPlace[],
-	now: readonly InboxPlace[],
+export function keepPlace<Place extends { id: string }>(
+	before: readonly Place[],
+	now: readonly Place[],
 	id: string
-): InboxPlace[] {
+): Place[] {
 	const kept = before.findIndex((place) => place.id === id);
 	if (kept < 0 || now.some((place) => place.id === id)) return [...now];
 	// After the nearest document before it that is still there; first if none is.
@@ -319,6 +319,12 @@ export function nextDecision(places: readonly InboxPlace[], id: string): string 
 /** A document opened from the inbox: its neighbours are the inbox's. */
 export function inboxDocument(id: string): string {
 	return `${documentHref(id)}?from=inbox`;
+}
+
+/** A document opened from the document list: its neighbours are the list's
+ * (`lib/list-places.ts`). */
+export function listDocument(id: string): string {
+	return `${documentHref(id)}?from=list`;
 }
 
 /** The places of a quote by page: one per page, with the boxes of every place on it, in
