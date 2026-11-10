@@ -241,6 +241,49 @@ describe('the document view and seen', () => {
 	});
 });
 
+describe('the inbox while one document is open', () => {
+	it('drops another document once it left the inbox, read anew', async () => {
+		goTo('/ui/documents/doc-1?from=inbox', { id: 'doc-1' });
+		let items = ['doc-1', 'doc-2', 'doc-3'];
+		const api = serve(() => documentOf({ lane: 'green' }), {
+			'GET /api/v1/inbox': () => ({
+				items: items.map((id) => inboxItem('review', { id })),
+				next_cursor: null
+			})
+		});
+		render(Page);
+		expect(await screen.findByText(m.doc_inbox_position({ position: 1, total: 3 }))).toBeTruthy();
+		const read = () => calls(api).filter((call) => call.startsWith('GET /api/v1/inbox?')).length;
+		const before = read();
+		// Someone confirmed doc-2 elsewhere: it turned green.
+		items = ['doc-1', 'doc-3'];
+		emit?.('document.lane_changed', { document_id: 'doc-2', old: 'yellow', new: 'green' });
+		expect(await screen.findByText(m.doc_inbox_position({ position: 1, total: 2 }))).toBeTruthy();
+		expect(read()).toBe(before + 1);
+		// A document outside the inbox changes: nothing to read.
+		emit?.('document.updated', { document_id: 'doc-elsewhere', fields: ['title'] });
+		emit?.('document.node_completed', { document_id: 'doc-3', node: 'ocr' });
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(read()).toBe(before + 1);
+	});
+
+	it('drops a deleted one without reading the inbox', async () => {
+		goTo('/ui/documents/doc-1?from=inbox', { id: 'doc-1' });
+		const api = serve(() => documentOf({ lane: 'green' }), {
+			'GET /api/v1/inbox': () => ({
+				items: ['doc-1', 'doc-2'].map((id) => inboxItem('review', { id })),
+				next_cursor: null
+			})
+		});
+		render(Page);
+		expect(await screen.findByText(m.doc_inbox_position({ position: 1, total: 2 }))).toBeTruthy();
+		const read = calls(api).filter((call) => call.startsWith('GET /api/v1/inbox?')).length;
+		emit?.('document.deleted', { document_id: 'doc-2' });
+		expect(await screen.findByText(m.doc_inbox_position({ position: 1, total: 1 }))).toBeTruthy();
+		expect(calls(api).filter((call) => call.startsWith('GET /api/v1/inbox?'))).toHaveLength(read);
+	});
+});
+
 describe('confirming from the inbox', () => {
 	it('opens next the document that waits for a decision', async () => {
 		goTo('/ui/documents/doc-1?from=inbox', { id: 'doc-1' });
@@ -548,5 +591,69 @@ describe('opened from the document list', () => {
 			expect(calls(api).filter((call) => call.startsWith('GET /api/v1/documents?'))).toHaveLength(2)
 		);
 		expect(await screen.findByText(m.doc_list_position({ position: 2, total: 3 }))).toBeTruthy();
+	});
+
+	it('steps back to a document that left the list while one stepped on from it', async () => {
+		returnTo.rememberDocuments({ pathname: '/ui/documents', search: '?tag=t1' }, '');
+		goTo('/ui/documents/doc-1?from=list', { id: 'doc-1' });
+		let ids = ['doc-1', 'doc-2', 'doc-3'];
+		serve(() => documentOf({ lane: 'green' }), {
+			...documentRoutes('doc-2', () => documentOf({ id: 'doc-2', lane: 'green' })),
+			'GET /api/v1/documents': () => ({
+				items: ids.map((id) => listedOf({ id })),
+				next_cursor: null
+			})
+		});
+		render(Page);
+		expect(await screen.findByText(m.doc_list_position({ position: 1, total: 3 }))).toBeTruthy();
+		// Saved without the tag, then on to the next one.
+		ids = ['doc-2', 'doc-3'];
+		goTo('/ui/documents/doc-2?from=list', { id: 'doc-2' });
+		expect(await screen.findByText(m.doc_list_position({ position: 2, total: 3 }))).toBeTruthy();
+		const nav = screen.getByRole('navigation', { name: m.doc_list_nav() });
+		expect(within(nav).getByRole('link', { name: m.doc_previous() }).getAttribute('href')).toBe(
+			'/ui/documents/doc-1?from=list'
+		);
+	});
+
+	it('leaves out a document deleted meanwhile, at once', async () => {
+		returnTo.rememberDocuments({ pathname: '/ui/documents', search: '?tag=t2' }, '');
+		goTo('/ui/documents/doc-1?from=list', { id: 'doc-1' });
+		serve(() => documentOf({ lane: 'green' }), {
+			'GET /api/v1/documents': () => ({
+				items: ['doc-1', 'doc-2', 'doc-3'].map((id) => listedOf({ id })),
+				next_cursor: null
+			})
+		});
+		render(Page);
+		expect(await screen.findByText(m.doc_list_position({ position: 1, total: 3 }))).toBeTruthy();
+		emit?.('document.deleted', { document_id: 'doc-2' });
+		expect(await screen.findByText(m.doc_list_position({ position: 1, total: 2 }))).toBeTruthy();
+		const nav = screen.getByRole('navigation', { name: m.doc_list_nav() });
+		expect(within(nav).getByRole('link', { name: m.doc_next() }).getAttribute('href')).toBe(
+			'/ui/documents/doc-3?from=list'
+		);
+	});
+
+	it('steps on from a document found gone', async () => {
+		returnTo.rememberDocuments({ pathname: '/ui/documents', search: '?tag=t3' }, '');
+		goTo('/ui/documents/doc-1?from=list', { id: 'doc-1' });
+		serve(() => documentOf({ lane: 'green' }), {
+			'GET /api/v1/documents/doc-2': () =>
+				json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404),
+			'GET /api/v1/documents': () => ({
+				items: ['doc-1', 'doc-2', 'doc-3'].map((id) => listedOf({ id })),
+				next_cursor: null
+			})
+		});
+		render(Page);
+		expect(await screen.findByText(m.doc_list_position({ position: 1, total: 3 }))).toBeTruthy();
+		goTo('/ui/documents/doc-2?from=list', { id: 'doc-2' });
+		expect(await screen.findByText(m.document_not_found())).toBeTruthy();
+		const nav = screen.getByRole('navigation', { name: m.doc_list_nav() });
+		expect(within(nav).getByText(m.doc_list_position({ position: 2, total: 3 }))).toBeTruthy();
+		expect(within(nav).getByRole('link', { name: m.doc_next() }).getAttribute('href')).toBe(
+			'/ui/documents/doc-3?from=list'
+		);
 	});
 });

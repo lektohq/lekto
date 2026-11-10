@@ -970,8 +970,14 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Neu
 - **Previous/next from the document list** (Tobi, 10.11.2026): a document opened from the list
   (a double click, or "Dokument öffnen" in the Beam; `?from=list`) shows the `Stepper` "Dokument 4 von 33 ‹ ›"
   with previous/next in its head, as one from the inbox shows its place there: the list's own
-  documents in its order (filters, lens, sort, words; `lib/list-places.ts`). One that leaves the
-  list while shown (a tag of the filter removed) keeps its place, so next goes on from it. Saving
+  documents in its order (filters, lens, sort, words; `lib/list-places.ts`). Every document the
+  list held keeps its place while one steps through it (a tag of the filter removed): next goes
+  on from it, and previous comes back to it, until the list is shown again. One deleted meanwhile
+  leaves at once (its event, without reading the list anew); one found gone when opened shows
+  the stepper still and is left out once one steps on. In the inbox only the open document keeps
+  its place: another that leaves the inbox (confirmed, filed, moved, deleted, by anyone) leaves
+  the stepper at once, the inbox read anew on its event, since whether it holds a document is the
+  server's to say (`keepPlaces`, `dropPlace` in `lib/document-view.ts`, `DocumentPlace`). Saving
   stays on the document. Without the list in this tab (after a reload) it shows neither. Only
   the document list; other lists open the Beam, which pages through them itself.
 - Detail pages of the same kind offer the same actions in the same place: header actions (edit,

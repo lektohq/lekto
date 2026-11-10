@@ -32,7 +32,9 @@
 		inboxDocument,
 		INBOX_PAGE_MAX,
 		INBOX_PLACES_MAX,
+		dropPlace,
 		keepPlace,
+		keepPlaces,
 		laterReveals,
 		neighbours,
 		nextDecision,
@@ -56,7 +58,7 @@
 	} from '#lib/document-view.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
 	import { coalesced } from '#lib/coalesce.ts';
-	import { events, NODE_EVENTS } from '#lib/events.svelte.ts';
+	import { events, NODE_EVENTS, type DocumentEvent } from '#lib/events.svelte.ts';
 	import { inbox as inboxSummary } from '#lib/inbox.svelte.ts';
 	import { PageLookup } from '#lib/lookup.svelte.ts';
 	import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
@@ -78,6 +80,7 @@
 	} from '#lib/facts.ts';
 	import { adviceText, visionAvailable, type Reading, type Vision } from '#lib/vision.ts';
 	import { onChange } from '#lib/watch.svelte.ts';
+	import DocumentPlace from '#lib/components/document/DocumentPlace.svelte';
 	import DocumentBackLink from '#lib/components/document/DocumentBackLink.svelte';
 	import Loading from '#lib/components/Loading.svelte';
 
@@ -109,8 +112,14 @@
 	// The open documents of the inbox, in its order, opened from there.
 	let inboxPlaces = $state<InboxPlace[] | null>(null);
 	let inboxReady: Promise<void> = Promise.resolve();
-	// The documents of the list, in its order, opened from there.
+	// The documents of the list, in its order, opened from there; and the reach they were read
+	// in (an admin's switch makes it another list).
 	let listPlaces = $state<{ id: string }[] | null>(null);
+	let listReach: boolean | null = null;
+	// Documents of the list found gone when opened (out of reach, no event said so): left out
+	// once one steps on from them. Plain bookkeeping: nothing in the markup reads it.
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	const gone = new Set<string>();
 	let problem = $state<unknown>(null);
 	// Each pane on the right marks what it holds in the one on the left: the form its fields'
 	// quotes, on the pages (`marks`) and in the text (`fieldQuotes`); the facts where they
@@ -196,6 +205,8 @@
 			}
 		} catch (error) {
 			if (wanted === id && request === latest) problem = error;
+			// Gone, though the list held it: left out once one steps on from it.
+			if (error instanceof ApiError && error.status === 404) gone.add(wanted);
 		}
 	}
 
@@ -260,13 +271,17 @@
 	async function loadList() {
 		const source = returnTo.list;
 		if (!source) return;
+		const reach = scope.allUsers;
 		try {
-			const now = await placesOfList(source.url, source.words, scope.allUsers);
-			listPlaces = keepPlace(
-				listPlaces ?? [],
+			const now = await placesOfList(source.url, source.words, reach);
+			// Every document the list held keeps its place while one steps through it (a tag of
+			// its filter removed, Tobi 10.11.2026), but one found gone; another reach starts anew.
+			listPlaces = keepPlaces(
+				listReach === reach ? (listPlaces ?? []) : [],
 				now.map((item) => ({ id: item })),
-				id
+				(place) => place.id === id || !gone.has(place.id)
 			);
+			listReach = reach;
 		} catch (error) {
 			reportError(error);
 		}
@@ -353,7 +368,10 @@
 		const reloadInbox = coalesced(() => void loadInbox());
 		const reloadList = coalesced(() => void loadList());
 		const stop = events.subscribe((event) => {
-			if (event.document_id !== id) return;
+			if (event.document_id !== id) {
+				otherDocument(event);
+				return;
+			}
 			if (event.type === 'document.deleted') {
 				// Deleted elsewhere: back the way the person came, as after their own deletion;
 				// that one leaves by itself (`leaving`).
@@ -368,6 +386,21 @@
 			// Saved here, it may have left the list's filter: it keeps its place there.
 			if (fromList && !NODE_EVENTS.has(event.type)) reloadList();
 		});
+		/** Another document of the inbox or the list: a deleted one leaves both at once; one of
+		 * the inbox that changed may have left it, which the inbox read anew says (whether it
+		 * holds a document is the server's to say, for this person). */
+		function otherDocument(event: DocumentEvent) {
+			if (event.type === 'document.deleted') {
+				inboxPlaces = dropPlace(inboxPlaces, event.document_id);
+				listPlaces = dropPlace(listPlaces, event.document_id);
+			} else if (
+				fromInbox &&
+				!NODE_EVENTS.has(event.type) &&
+				inboxPlaces?.some((place) => place.id === event.document_id)
+			) {
+				reloadInbox();
+			}
+		}
 		return () => {
 			stop();
 			reload.cancel();
@@ -459,7 +492,7 @@
 	async function confirmed(next: string | null) {
 		// It waits for no decision any more, whatever the next list says.
 		const left = id;
-		inboxPlaces = inboxPlaces?.filter((place) => place.id !== left) ?? null;
+		inboxPlaces = dropPlace(inboxPlaces, left);
 		await goto(next ? inboxDocument(next) : `${BASE}/inbox`);
 	}
 
@@ -490,7 +523,10 @@
 	{#if problem || !document}
 		<!-- While it loads or when it cannot, the way back and a title stay (one page title on every
 		page, web/DESIGN.md "Headings"). -->
-		<DocumentBackLink inbox={Boolean(inbox)} />
+		<div class="flex min-h-9 flex-wrap items-center gap-3">
+			<DocumentBackLink inbox={Boolean(inbox)} />
+			<DocumentPlace {inbox} list={listed} />
+		</div>
 		<PageTitle>{m.document_generic()}</PageTitle>
 	{/if}
 	{#if problem}
