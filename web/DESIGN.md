@@ -354,6 +354,19 @@ a plain one a `Chip`, a tag, topic or group a `TagChip` in its colour, chosen wi
 `primary` around it (its colour stays readable) and a bolder name; 24 px (`sm`) on a desktop,
 32 px (`md`) with a finger's 44 px on a phone, the rows `gap-y-3` apart (Tobi, 09.11.2026).
 
+### Stepper
+
+`Stepper` steps back and forth through a row of things and says where one stands: "Dokument 2
+von 31" through the documents of the Beam, of the inbox and of the document list, "Fundstelle 2
+von 5" through the places of the Beam (Tobi, 10.11.2026). The two arrows (`IconButton`,
+`outline`, `sm`) stand together at the edge the stepper stands at, the text (`text-sm`, muted,
+tabular figures) on the other side: `side="start"` "‹ › Text" where it starts a row (the Beam),
+`side="end"` "Text ‹ ›" where it ends one (the head of a document). So the arrows stay where
+they are however long the text grows while one pages. At the first and the last the arrow is
+disabled, never gone. A step is a link (a document of the inbox or the list) or an action (the
+Beam, also on ← →). A list's pages are `Pagination`, a calendar's months `DateInput`'s own; any
+other pair of arrows is a `Stepper`.
+
 ### Badges
 
 `Badge` (`ui/badge`) shows a state or a short fact. It is never a button. Its tones come from
@@ -607,7 +620,7 @@ app shell, on `ui/sheet` with `side="right"`: 640 px on a desktop, the whole scr
 modal, over a dialog too.
 
 - **It only shows:** the eyebrow "Beam", the title, a line with contact · type · date; then,
-  with more than one document, the arrows and "Dokument 2 von 24" (keys ← →); the pages exactly as the
+  with more than one document, the `Stepper` "‹ › Dokument 2 von 24" (keys ← →); the pages exactly as the
   document view shows them, only in another window (Tobi, 03.11.2026): one component for both,
   `DocumentPages` (the archive PDF once it exists, the page images until then, the original PDF
   before those; marks on the archive only; before, its page images re-rastered every page at
@@ -944,7 +957,7 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Neu
   entry back (`from`), and its `BackLink` returns there. The inbox's previous/next works the same
   way.
 - **Previous/next from the document list** (Tobi, 10.11.2026): a document opened from the list
-  (a double click, or "Dokument öffnen" in the Beam; `?from=list`) shows "Dokument 4 von 33"
+  (a double click, or "Dokument öffnen" in the Beam; `?from=list`) shows the `Stepper` "Dokument 4 von 33 ‹ ›"
   with previous/next in its head, as one from the inbox shows its place there: the list's own
   documents in its order (filters, lens, sort, words; `lib/list-places.ts`). One that leaves the
   list while shown (a tag of the filter removed) keeps its place, so next goes on from it. Saving
@@ -1254,6 +1267,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     or `TagChip` ("Chips"); the phone's editor bar only in `PhoneEditorBar` ("Dialogs, sheets,
     editors"); spins, pulses and turns only `motion-safe` ("Motion"); every page frame
     `flex flex-col gap-6`, the document page `gap-4` ("Spacing and layout");
+    a pair of arrows back and forth only as `Stepper`, `Pagination` or in `DateInput`
+    ("Stepper");
   - `src/lib/tips.test.ts`: one box of help at a time, the next without delay; a tooltip opens on
     a focus Tab brought, not on one handed back;
   - `src/lib/via-token.test.ts`: every file that has a person's API token (`via_token`, a

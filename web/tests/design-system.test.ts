@@ -842,4 +842,21 @@ describe('the design system (web/DESIGN.md)', () => {
 			)
 		).toEqual([]);
 	});
+
+	it('pages back and forth with a pair of arrows only through Stepper, Pagination and DateInput', () => {
+		// A list's pages (`Pagination`) and a calendar's months (`DateInput`) have their own; every
+		// "2 von 31" with previous and next is a `Stepper` ("Stepper").
+		const own = new Set([
+			'/src/lib/components/Stepper.svelte',
+			'/src/lib/components/Pagination.svelte',
+			'/src/lib/components/DateInput.svelte'
+		]);
+		expect(
+			offenders((source, path) =>
+				own.has(path) || !/icons\/chevron-right['"]/.test(source)
+					? null
+					: line(source, /icons\/chevron-left['"]/)
+			)
+		).toEqual([]);
+	});
 });
