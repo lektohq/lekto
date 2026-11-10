@@ -29,8 +29,8 @@ Images are prepared before OCRmyPDF sees them (`prepare_image`):
 - The page size follows from the resolution. Photos often state none, or 72 dpi, which gives
   pages of several feet; tiny or huge pages are hard to read and the layout analysis of the
   parser takes their text for a picture. An image whose stated resolution gives a page outside
-  `PLAUSIBLE_PAGE` is scaled to the long edge of A4. The resolution is always passed on, since
-  OCRmyPDF refuses images that state 96 dpi or less.
+  `imaging.PLAUSIBLE_PAGE` is scaled to the long edge of A4 (`imaging.image_dpi`). The
+  resolution is always passed on, since OCRmyPDF refuses images that state 96 dpi or less.
 - OCRmyPDF refuses transparency and some colour modes: transparent images are put on white,
   CMYK and high bit depths are converted. All pages of a multi-page TIFF are kept, written one
   at a time.
@@ -68,7 +68,7 @@ from pathlib import Path
 from PIL import Image, ImageSequence, TiffImagePlugin
 
 from lekto.adapters.outbound.http_client import endpoint_of
-from lekto.adapters.outbound.imaging import flatten_on_white
+from lekto.adapters.outbound.imaging import flatten_on_white, image_dpi
 from lekto.adapters.outbound.ocrmypdf.hocr import read_hocr
 from lekto.adapters.outbound.ocrmypdf.vision import (
     PROMPT,
@@ -128,9 +128,6 @@ _NOTE_MAX = 300
 # thousands, and Ghostscript names why PDF/A failed far before the end (a font with CID 0 some
 # 6,600 characters before it); the reasons and the colour check read it.
 OUTPUT_KEPT = 256_000
-
-A4_LONG_EDGE = 11.69  # inches
-PLAUSIBLE_PAGE = (3.0, 17.0)  # long edge in inches: from a receipt to A3
 
 
 class OcrmypdfEngine:
@@ -417,16 +414,6 @@ class _PageWriter(TiffImagePlugin.AppendingTiffWriter):
         if not self.closed:
             super().close()
             io.BytesIO.close(self)
-
-
-def image_dpi(size: tuple[int, int], stated: object) -> int:
-    """The resolution for an image of `size` pixels that states `stated` (Pillow's `dpi`)."""
-    long_edge = max(size)
-    if isinstance(stated, tuple) and stated:
-        resolution = min(float(value) for value in stated)
-        if resolution > 0 and PLAUSIBLE_PAGE[0] <= long_edge / resolution <= PLAUSIBLE_PAGE[1]:
-            return max(1, round(resolution))
-    return max(1, round(long_edge / A4_LONG_EDGE))
 
 
 def pdfa_reasons(stderr: str) -> str:

@@ -1,4 +1,4 @@
-"""Stand-ins for OCR, parser, page renderer, text locator and code reader: fast,
+"""Stand-ins for OCR, parser, page renderer, text locator, code reader and page composer: fast,
 deterministic, no external programs.
 
 They follow the contracts without real recognition: the archive is a minimal PDF that names the
@@ -9,12 +9,15 @@ image counts as damaged.
 """
 
 import asyncio
+import hashlib
 import json
+import uuid
 from collections.abc import Sequence
 from pathlib import Path
 
 from lekto.core.domain import media_types
 from lekto.core.domain.codes import Code
+from lekto.core.domain.editing import PagePick
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.exchanges import ModelCall
 from lekto.core.domain.json_value import JsonObject
@@ -22,6 +25,7 @@ from lekto.core.domain.locations import Box, Location
 from lekto.core.domain.reading import PageReading, PageWords
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.codes import CodeReading
+from lekto.core.ports.composer import PageSource
 from lekto.core.ports.mail_renderer import RenderedMail
 from lekto.core.ports.metadata import FileMetadata, MetadataEntry, MetadataSource
 from lekto.core.ports.ocr import OcrResult, VisionModel, VisionReading
@@ -182,6 +186,49 @@ class FakePageRenderer:
             await asyncio.to_thread((target / f"{number}.webp").write_bytes, FAKE_WEBP)
         await asyncio.to_thread((target / PREVIEW_FILE).write_bytes, FAKE_WEBP)
         return RenderedPages(pages=self.pages, renderer="fake-pages 1")
+
+
+FAKE_PAGE = b"% fake page"
+"""How a fake PDF marks each of its pages (`fake_pdf`, `FakePageComposer`)."""
+
+
+def fake_pdf(pages: int, label: str = "") -> bytes:
+    """A fake PDF of `pages` pages that `FakePageComposer` counts; `label` makes it unique."""
+    lines = [b"%PDF-1.7", f"% {label}".encode(), *([FAKE_PAGE] * pages), b"%%EOF"]
+    return b"\n".join(lines) + b"\n"
+
+
+class FakePageComposer:
+    """Counts the pages a fake PDF marks (`FAKE_PAGE`; any other file it can read has one), and
+    writes a fake PDF with a page line for every page picked: the source's hash, the page and the
+    turn. A random line makes every file new."""
+
+    def __init__(self) -> None:
+        self.calls: list[list[PagePick]] = []
+
+    async def count_pages(self, source: PageSource) -> int:
+        return _fake_pages(await asyncio.to_thread(source.path.read_bytes))
+
+    async def compose(
+        self, sources: Sequence[PageSource], pages: Sequence[PagePick], target: Path
+    ) -> None:
+        self.calls.append(list(pages))
+        lines = [b"%PDF-1.7", f"% lekto fake composition {uuid.uuid4().hex}".encode()]
+        for pick in pages:
+            if not 0 <= pick.source < len(sources):
+                raise ValueError(f"there is no source {pick.source}")
+            data = await asyncio.to_thread(sources[pick.source].path.read_bytes)
+            if pick.page > _fake_pages(data):
+                raise ValueError(f"source {pick.source} has no page {pick.page}")
+            name = hashlib.sha256(data).hexdigest()[:12]
+            lines.append(FAKE_PAGE + f" {name} {pick.page} {pick.rotate}".encode())
+        lines.append(b"%%EOF")
+        await asyncio.to_thread(target.write_bytes, b"\n".join(lines) + b"\n")
+
+
+def _fake_pages(data: bytes) -> int:
+    _check(data)
+    return max(1, sum(line.startswith(FAKE_PAGE) for line in data.splitlines()))
 
 
 class FakeTextLocator:

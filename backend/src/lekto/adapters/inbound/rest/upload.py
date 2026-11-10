@@ -1,10 +1,12 @@
-"""Streaming multipart upload: the file part goes to a temporary file in chunks and is hashed
+"""Streaming multipart upload: each file part goes to a temporary file in chunks and is hashed
 on the way, so an upload is never held in memory. The size limit is enforced while receiving:
-early by `Content-Length`, otherwise as soon as the file part, or the whole body, grows beyond
-it (the body may exceed the file limit by `_OVERHEAD` for framing and fields).
+early by `Content-Length`, otherwise as soon as the file parts, or the whole body, grow beyond
+it (the body may exceed the file limit by `_OVERHEAD` for framing and small fields, and by the
+limits of larger ones).
 
-Expected form: one part `file` with a filename, and optional small text fields; only the
-fields the caller names are kept, others are skipped.
+Expected form: file parts of one name with a filename (`read_upload`: one part `file`;
+`read_uploads`: up to a number of parts of a name of the caller's), and optional text fields;
+only the fields the caller names are kept, others are skipped.
 """
 
 import asyncio
@@ -29,7 +31,7 @@ if TYPE_CHECKING:
 
 FILE_FIELD = "file"
 _FIELD_LIMIT = 1024  # bytes of a text field
-_OVERHEAD = 64 * 1024  # bytes of multipart framing and text fields beyond the file
+_OVERHEAD = 64 * 1024  # bytes of multipart framing and small text fields beyond the files
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _MAX_FILENAME = 255
 
@@ -51,6 +53,23 @@ class Upload:
     fields: dict[str, str]
 
 
+@dataclass(frozen=True)
+class ReceivedFile:
+    file: IncomingFile
+    filename: str
+
+
+@dataclass
+class Uploads:
+    files: list[ReceivedFile]
+    fields: dict[str, str]
+
+    async def remove(self) -> None:
+        """Remove the temporary files."""
+        for item in self.files:
+            await asyncio.shield(asyncio.to_thread(item.file.path.unlink, missing_ok=True))
+
+
 async def read_upload(
     request: Request,
     *,
@@ -58,66 +77,111 @@ async def read_upload(
     fields: Collection[str] = (),
     limits: Mapping[str, int] | None = None,
 ) -> Upload:
-    """Read the multipart body of `request`, keeping the text fields named in `fields` (each up
-    to 1 KiB, or its limit in `limits`, which must stay well below `_OVERHEAD`). The caller
-    removes `upload.file.path` when done; on error nothing is left behind."""
+    """Read the multipart body of `request` with one file part `file`, keeping the text fields
+    named in `fields` (each up to 1 KiB, or its limit in `limits`). The caller removes
+    `upload.file.path` when done; on error nothing is left behind."""
+    uploads = await read_uploads(
+        request,
+        max_size=max_size,
+        file_field=FILE_FIELD,
+        max_files=1,
+        fields=fields,
+        limits=limits,
+    )
+    if not uploads.files:
+        raise MalformedUploadError(f"the form has no file part '{FILE_FIELD}'")
+    (received,) = uploads.files
+    return Upload(file=received.file, filename=received.filename, fields=uploads.fields)
+
+
+async def read_uploads(
+    request: Request,
+    *,
+    max_size: int,
+    file_field: str,
+    max_files: int,
+    fields: Collection[str] = (),
+    limits: Mapping[str, int] | None = None,
+) -> Uploads:
+    """Read the multipart body of `request`: up to `max_files` file parts named `file_field`,
+    `max_size` bytes together, and the text fields named in `fields` (each up to 1 KiB, or its
+    limit in `limits`). The caller removes the files when done (`Uploads.remove`); on error
+    nothing is left behind."""
     content_type, options = parse_options_header(request.headers.get("content-type"))
     boundary = options.get(b"boundary")
     if content_type != b"multipart/form-data" or not boundary:
         raise MalformedUploadError("expected multipart/form-data with a boundary")
+    limits = dict(limits or {})
+    body_limit = max_size + _OVERHEAD + sum(limits.values())
     length = request.headers.get("content-length")
-    if length is not None and length.isdigit() and int(length) > max_size + _OVERHEAD:
+    if length is not None and length.isdigit() and int(length) > body_limit:
         raise UploadTooLargeError(max_size)
-
-    descriptor, name = await asyncio.to_thread(tempfile.mkstemp, prefix="lekto-upload-")
-    path = Path(name)
+    state = _State(file_field, max_files, max_size, frozenset(fields), limits)
     try:
-        with os.fdopen(descriptor, "wb") as target:
-            state = _State(target, max_size, frozenset(fields), dict(limits or {}))
-            parser = MultipartParser(boundary, cast("MultipartCallbacks", state.callbacks()))
-            received = 0
-            async for chunk in request.stream():
-                received += len(chunk)
-                if received > max_size + _OVERHEAD:
-                    raise UploadTooLargeError(max_size)
-                try:
-                    parser.write(chunk)
-                except MultipartParseError as error:
-                    raise MalformedUploadError(f"invalid multipart body: {error}") from None
-                state.check()
-                await state.flush()
+        parser = MultipartParser(boundary, cast("MultipartCallbacks", state.callbacks()))
+        received = 0
+        async for chunk in request.stream():
+            received += len(chunk)
+            if received > body_limit:
+                raise UploadTooLargeError(max_size)
+            try:
+                parser.write(chunk)
+            except MultipartParseError as error:
+                raise MalformedUploadError(f"invalid multipart body: {error}") from None
+            state.check()
+            await state.flush()
         if not state.finished:
             raise MalformedUploadError("the multipart body is incomplete")
-        if state.filename is None:
-            raise MalformedUploadError(f"the form has no file part '{FILE_FIELD}'")
-        return Upload(
-            file=IncomingFile(path=path, sha256=Sha256(state.digest.hexdigest()), size=state.size),
-            filename=state.filename,
+        await state.flush()
+        await state.close()
+        return Uploads(
+            files=[
+                ReceivedFile(
+                    file=IncomingFile(
+                        path=cast(Path, item.path),
+                        sha256=Sha256(item.digest.hexdigest()),
+                        size=item.size,
+                    ),
+                    filename=item.filename,
+                )
+                for item in state.files
+            ],
             fields=state.fields,
         )
     except BaseException:
-        await asyncio.shield(asyncio.to_thread(path.unlink, missing_ok=True))
+        await asyncio.shield(state.discard())
         raise
+
+
+@dataclass
+class _File:
+    """A file part: its name, and the temporary file it goes to once data comes."""
+
+    filename: str
+    digest: Any = field(default_factory=hashlib.sha256)
+    size: int = 0
+    path: Path | None = None
+    target: BinaryIO | None = None
 
 
 @dataclass
 class _State:
     """Collects the parser's callbacks; the file data is written between parser calls."""
 
-    target: BinaryIO
+    file_field: str
+    max_files: int
     max_size: int
     wanted: frozenset[str]
     limits: dict[str, int]
-    digest: Any = field(default_factory=hashlib.sha256)
-    size: int = 0
-    filename: str | None = None
+    size: int = 0  # of all files
+    files: list[_File] = field(default_factory=list)
     fields: dict[str, str] = field(default_factory=dict)
     finished: bool = False
-    _pending: list[bytes] = field(default_factory=list)
+    _pending: list[tuple[_File, bytes]] = field(default_factory=list)
     _headers: dict[str, str] = field(default_factory=dict)
     _header_field: bytearray = field(default_factory=bytearray)
     _header_value: bytearray = field(default_factory=bytearray)
-    _part: str | None = None  # "file", the name of a text field, or None (ignored part)
+    _part: str | _File | None = None  # a file, the name of a text field, or None (ignored)
     _value: bytearray = field(default_factory=bytearray)
     _error: Exception | None = None
 
@@ -138,9 +202,28 @@ class _State:
             raise self._error
 
     async def flush(self) -> None:
-        if self._pending:
-            data, self._pending = b"".join(self._pending), []
-            await asyncio.to_thread(self.target.write, data)
+        """Write what came, each file's to its temporary file (made for every file part, also
+        one without data)."""
+        for item in self.files:
+            if item.target is None:
+                descriptor, name = await asyncio.to_thread(tempfile.mkstemp, prefix="lekto-upload-")
+                item.path = Path(name)
+                item.target = os.fdopen(descriptor, "wb")
+        pending, self._pending = self._pending, []
+        for item, data in pending:
+            assert item.target is not None
+            await asyncio.to_thread(item.target.write, data)
+
+    async def close(self) -> None:
+        for item in self.files:
+            if item.target is not None and not item.target.closed:
+                await asyncio.to_thread(item.target.close)
+
+    async def discard(self) -> None:
+        await self.close()
+        for item in self.files:
+            if item.path is not None:
+                await asyncio.to_thread(item.path.unlink, missing_ok=True)
 
     def _part_begin(self) -> None:
         self._headers = {}
@@ -166,13 +249,19 @@ class _State:
             self._fail(MalformedUploadError("a part has no form-data name"))
             return
         name = options[b"name"].decode("utf-8", errors="replace")
-        if name == FILE_FIELD:
-            if self.filename is not None:
-                self._fail(MalformedUploadError("only one file per upload"))
+        if name == self.file_field:
+            if len(self.files) >= self.max_files:
+                self._fail(
+                    MalformedUploadError(
+                        "only one file per upload"
+                        if self.max_files == 1
+                        else f"at most {self.max_files} files"
+                    )
+                )
                 return
             raw = options.get(b"filename", b"").decode("utf-8", errors="replace")
-            self.filename = clean_filename(raw)
-            self._part = FILE_FIELD
+            self.files.append(_File(clean_filename(raw)))
+            self._part = self.files[-1]
         elif b"filename" in options or name not in self.wanted:
             self._part = None  # other files and unknown fields are skipped
         else:
@@ -182,20 +271,21 @@ class _State:
         if self._part is None or self._error is not None:
             return
         chunk = data[start:end]
-        if self._part == FILE_FIELD:
+        if isinstance(self._part, _File):
             self.size += len(chunk)
             if self.size > self.max_size:
                 self._fail(UploadTooLargeError(self.max_size))
                 return
-            self.digest.update(chunk)
-            self._pending.append(chunk)
+            self._part.size += len(chunk)
+            self._part.digest.update(chunk)
+            self._pending.append((self._part, chunk))
         else:
             self._value += chunk
             if len(self._value) > self.limits.get(self._part, _FIELD_LIMIT):
                 self._fail(MalformedUploadError(f"the field '{self._part}' is too long"))
 
     def _part_end(self) -> None:
-        if self._part not in (None, FILE_FIELD):
+        if isinstance(self._part, str):
             self.fields[self._part] = self._value.decode("utf-8", errors="replace")
 
     def _end(self) -> None:

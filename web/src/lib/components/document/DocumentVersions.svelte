@@ -47,6 +47,8 @@
 		if (version.kind === 'replaced') return m.version_replaced();
 		if (version.kind === 'edited')
 			return m.version_edited({ from: String(version.detail.from ?? '') });
+		if (version.kind === 'split')
+			return m.version_split({ title: String(version.detail.title ?? '') });
 		return m.version_received();
 	};
 

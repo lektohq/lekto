@@ -70,6 +70,7 @@ class VersionKindOut(StrEnum):
     RECEIVED = "received"
     REPLACED = "replaced"
     EDITED = "edited"
+    SPLIT = "split"
 
 
 class DocumentVersionOut(BaseModel):
@@ -84,11 +85,20 @@ class DocumentVersionOut(BaseModel):
     media_type: str
     kind: VersionKindOut = Field(
         description="`received`: how the document came in; `replaced`: a person put another "
-        "file in its place; `edited`: a person edited its pages."
+        "file in its place; `edited`: a person edited its pages; `split`: the first version, "
+        "pages a person split off another document."
     )
     created_at: datetime
     created_by: UUID | None
-    detail: dict[str, Any]
+    detail: dict[str, Any] = Field(
+        description=(
+            "What it was made from. `edited` and `split`: `pages`, each with its `source` (0 "
+            "the edited version, 1, 2, … the files in `added`, by name), `page` and `rotate`; "
+            "`edited` also `from`, the version edited, and `split_off`, the documents split off "
+            "in the same edit; `split` also `document`, `title` and `version`, the document "
+            "it was split off (which may be gone since) and its version then."
+        )
+    )
 
     @classmethod
     def of(cls, version: DocumentVersion, *, current: bool) -> "DocumentVersionOut":

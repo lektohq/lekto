@@ -296,10 +296,14 @@ class Document:
         channel: Channel = Channel.API,
         received: datetime | None = None,
         space_chosen: bool = False,
+        edited: bool = False,
     ) -> Self:
         """A newly received document. The receive node (hash, duplicate check, storage) is done;
         the nodes after it are due. `received`: when it came in, if not now (a migration takes
-        over the source system's date). `space_chosen`: a person chose its space on upload."""
+        over the source system's date, a part split off another document that one's).
+        `space_chosen`: a person chose its space on upload. `edited`: its file is pages a person
+        split off another document (`domain.editing`): its run ends in the inbox, as one of a
+        new version (`Processing.new_version`)."""
         if result.outcome is Outcome.FAILED:
             raise ValidationError("a document whose receive node failed is not created")
         filename = require_name(original_filename, "original filename", max_length=None)
@@ -317,6 +321,7 @@ class Document:
             created_at=now if received is None else received_at(received, now),
             updated_at=now,
         )
+        document.processing.new_version = edited
         document._record(DocumentReceived(document_id=document.id, occurred_at=now))
         document.record_result(Node.RECEIVE, 1, result, now)
         return document

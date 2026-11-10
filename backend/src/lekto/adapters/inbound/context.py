@@ -20,6 +20,7 @@ from lekto.core.services.automation import AutomationService
 from lekto.core.services.bulk import BulkService
 from lekto.core.services.classifier import ClassifierService
 from lekto.core.services.documents import DocumentService
+from lekto.core.services.editing import EditingService
 from lekto.core.services.expected import ExpectedService
 from lekto.core.services.inbox import InboxService
 from lekto.core.services.indexing import IndexingService
@@ -61,6 +62,7 @@ class ApiContext:
     open_identifiers: OpenIdentifierService
     logos: LogoService
     pipeline: PipelineService
+    editing: EditingService
     documents: DocumentService
     inbox: InboxService
     rules: RuleService

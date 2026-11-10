@@ -30,9 +30,11 @@ from lekto.adapters.outbound.memory.processing import (
     FakeMailRenderer,
     FakeMetadataReader,
     FakeOcr,
+    FakePageComposer,
     FakePageRenderer,
     FakeParser,
     FakeTextLocator,
+    fake_pdf,
 )
 from lekto.adapters.outbound.memory.push import FakePushSender
 from lekto.adapters.outbound.memory.search_index import MemorySearchIndex
@@ -56,6 +58,7 @@ __all__ = [
     "FakeMetadataReader",
     "FakeOcr",
     "FakeOidcProvider",
+    "FakePageComposer",
     "FakePageRenderer",
     "FakeParser",
     "FakePasswordHasher",
@@ -73,4 +76,5 @@ __all__ = [
     "MemoryUnitOfWork",
     "MemoryUnitOfWorkFactory",
     "MemoryWakeup",
+    "fake_pdf",
 ]

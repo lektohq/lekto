@@ -7,7 +7,8 @@ from pathlib import Path
 import pytest
 from PIL import Image, ImageSequence
 
-from lekto.adapters.outbound.ocrmypdf.engine import image_dpi, prepare_image
+from lekto.adapters.outbound.imaging import image_dpi
+from lekto.adapters.outbound.ocrmypdf.engine import prepare_image
 from lekto.core.domain.errors import UnprocessableDocumentError
 from tests.builders import SAMPLES
 
