@@ -1013,7 +1013,7 @@ class FieldsNode(_ModelStep):
             or (_model_version(answers[-1]) if answers else None)
             or (entries[Node.SIGNAL_LLM].result.model_version if taken_over else None)
         )
-        uncertain = [check for check in checks if not check.ok]
+        uncertain = [check for check in all_checks if not check.ok]
         result = NodeResult(
             outcome=Outcome.UNCERTAIN if uncertain else Outcome.OK,
             reasons=node_reasons(uncertain),
@@ -1106,15 +1106,17 @@ def _title(
 ) -> FieldCheck | None:
     """The title check: the model's title; None if the document has a title of its own (a
     person's or a rule's), or the model gave none. A type's title pattern is a rule
-    (`rules.title_rule`): it replaces this title when the rules run."""
+    (`rules.title_rule`): it replaces this title when the rules run. In a new version's run
+    the machine's title a person confirmed stays, as any value (`_kept`)."""
     if not has_machine_title(document, log):
         return None
     proposed = _text_value(proposal.title) if proposal else None
     if not proposed:
         return None
-    return FieldCheck(
+    check = FieldCheck(
         field=TITLE, outcome=Outcome.OK, confidence=1, proposed=proposed, value=proposed
     )
+    return _kept(check, document, document.title)
 
 
 def _text_value(value: object) -> str | None:
