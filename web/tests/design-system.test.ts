@@ -72,7 +72,7 @@ const DOCUMENT_LINKS = new Set([
 	'/src/lib/components/documents/StreamView.svelte',
 	'/src/lib/components/Beam.svelte',
 	'/src/lib/components/InboxMark.svelte',
-	'/src/lib/components/document/DocumentHeader.svelte',
+	'/src/lib/components/document/DocumentPlace.svelte',
 	'/src/routes/(app)/documents/[id]/+page.svelte'
 ]);
 const DOCUMENT_LINK = /documentHref\(|inboxDocument\(|BASE\}\/documents\/(?:\{|\$\{)/;
