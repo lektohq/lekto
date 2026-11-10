@@ -17,7 +17,7 @@
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "pnpm paraglide && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc -p src/service-worker",
-		"lint": "eslint .",
+		"lint": "eslint --cache --cache-strategy content --cache-location node_modules/.cache/eslint/ .",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"test": "vitest run",
