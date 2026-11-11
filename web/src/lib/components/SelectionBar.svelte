@@ -1,3 +1,8 @@
+<script lang="ts" module>
+	/** Where the bar of a desktop sticks: below the header (64 px), with room (`top-20`). */
+	export const SELECTION_TOP = 80;
+</script>
+
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { cardVariants } from '#lib/components/ui/card/index.ts';
@@ -9,7 +14,7 @@
 	// the bar's name), a hint in words (`hint`: how far the choice reaches, what an action leaves
 	// out), what stands between them and the actions (`trail`: "Auswahl aufheben", a chooser) and
 	// the actions. On a desktop it stands above the list with the card look in `bg-panel` and
-	// sticks below the header (64 px tall: `top-20`). In a dialog (`inDialog`) it stands in a
+	// sticks below the header (64 px tall: `top-20`, `SELECTION_TOP`), above a sticky band. In a dialog (`inDialog`) it stands in a
 	// fixed part of the dialog, which does not scroll: above the body, on a phone below it. On a
 	// phone it sticks to the bottom of the screen in `bg-card` with a line above: `trail` follows
 	// the count, the hint is a line of its own and the actions share the width.
@@ -20,7 +25,8 @@
 		trail,
 		hint,
 		actions,
-		inDialog = false
+		inDialog = false,
+		height = $bindable(0)
 	}: {
 		/** How many are chosen, in words ("3 ausgewählt"). */
 		count: string;
@@ -32,6 +38,8 @@
 		actions?: Snippet;
 		/** It stands in the scrolling body of a dialog, not on a page. */
 		inDialog?: boolean;
+		/** Its height as it stands, for what sticks below it (web/DESIGN.md, "Sticky heads"). */
+		height?: number;
 	} = $props();
 </script>
 
@@ -46,13 +54,14 @@
 			: cn(
 					cardVariants({ size: 'flush' }),
 					'bg-panel py-1.5 pr-2',
-					!inDialog && 'sticky top-20 z-10',
+					!inDialog && 'sticky top-20 z-30',
 					lead ? 'pl-1.5' : 'pl-4'
 				)
 	)}
 	role="region"
 	aria-label={count}
 	aria-busy={busy || undefined}
+	bind:offsetHeight={height}
 >
 	{@render lead?.()}
 	<span class={cn('font-medium', phone.current && 'flex-1')}>{count}</span>
