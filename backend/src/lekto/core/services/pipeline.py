@@ -571,34 +571,43 @@ class PipelineService:
             )
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
-            await controllable_document(uow, user, id, Action.CONTROL_PROCESSING)
+            document, _ = await controllable_document(uow, user, id, Action.CONTROL_PROCESSING)
+            document.require_idle()
             if (error := await duplicate_of(uow, user, sha256)) is not None:
                 raise error
         key = original_key(sha256)
         now = self._clock.now()
         async with self._uow() as uow:
             await uow.lock(key)
-            if not await self._store.exists(key):
+            # A file there already may be another's (a deleted document's, its files not removed
+            # yet); one this call stores goes again, under the lock, if the version is not.
+            stored = not await self._store.exists(key)
+            if stored:
                 await self._store.upload(key, file.path, content_type=media_type)
-            # Check again: rights, a duplicate or its processing may have changed meanwhile.
-            user = await load_actor(uow, actor)
-            document, _ = await controllable_document(uow, user, id, Action.CONTROL_PROCESSING)
-            access = await access_to(uow, user, document)
-            if (error := await duplicate_of(uow, user, sha256)) is not None:
-                raise error
-            stale = await store_new_version(
-                uow,
-                document,
-                sha256,
-                filename=filename,
-                media_type=media_type,
-                kind=VersionKind.REPLACED,
-                created_by=actor,
-                detail={},
-                now=now,
-            )
-            await delete_derivatives(self._store, stale)
-            await uow.commit()
+            try:
+                # Check again: rights, a duplicate or its processing may have changed meanwhile.
+                user = await load_actor(uow, actor)
+                document, _ = await controllable_document(uow, user, id, Action.CONTROL_PROCESSING)
+                access = await access_to(uow, user, document)
+                if (error := await duplicate_of(uow, user, sha256)) is not None:
+                    raise error
+                stale = await store_new_version(
+                    uow,
+                    document,
+                    sha256,
+                    filename=filename,
+                    media_type=media_type,
+                    kind=VersionKind.REPLACED,
+                    created_by=actor,
+                    detail={},
+                    now=now,
+                )
+                await delete_derivatives(self._store, stale)
+                await uow.commit()
+            except BaseException:
+                if stored:
+                    await asyncio.shield(self._store.delete(key))
+                raise
         return DocumentView(document, access)
 
     async def read_with_vision(self, actor: UserId, id: DocumentId) -> DocumentView:

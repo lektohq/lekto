@@ -30,7 +30,6 @@ from lekto.core.domain.documents import Document, Sha256
 from lekto.core.domain.editing import MAX_ADDED, MAX_MERGED, EditPart, check_parts
 from lekto.core.domain.errors import (
     ConcurrencyError,
-    InvalidTransitionError,
     UnsupportedMediaTypeError,
     ValidationError,
 )
@@ -38,9 +37,8 @@ from lekto.core.domain.ids import DocumentId, UserId
 from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.pipeline import (
     TRIGGER_EDIT,
-    ProcessingStatus,
 )
-from lekto.core.domain.reasons import Action, ReasonCode, because
+from lekto.core.domain.reasons import Action
 from lekto.core.domain.users import User
 from lekto.core.domain.versions import VersionKind
 from lekto.core.ports.clock import Clock
@@ -393,8 +391,7 @@ async def _move_relations(
 def _require_editable(document: Document) -> None:
     """InvalidTransitionError while the document is processed; UnsupportedMediaTypeError for a
     mail, whose pages are set from it, not a file of pages."""
-    if document.processing.status is ProcessingStatus.PROCESSING:
-        raise InvalidTransitionError(because(ReasonCode.BEING_PROCESSED, id=str(document.id)))
+    document.require_idle()
     if document.media_type not in VERSION_MEDIA_TYPES:
         raise UnsupportedMediaTypeError("the pages of a mail cannot be edited")
 
