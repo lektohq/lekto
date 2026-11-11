@@ -19,8 +19,9 @@ from lekto.core.domain.pipeline import Node
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState
 from lekto.core.domain.users import User
 from lekto.core.domain.versions import VersionKind
+from lekto.core.services import editing
 from lekto.core.services.editing import MOVED
-from lekto.core.services.objects import original_key, page_key
+from lekto.core.services.objects import archive_key, derivative_keys, original_key, page_key
 from tests.builders import HOUR, NOW, incoming
 from tests.unit.services.support import World
 from tests.unit.services.test_editing import STACK, part, received
@@ -130,6 +131,28 @@ async def test_a_merge_needs_a_part_that_continues_the_target(world: World) -> N
     assert world.object_store.keys() == before
     for document in (stack, scan):
         assert (await world.documents.get(owner.id, document.id)).sha256 == document.sha256
+
+
+async def test_a_merge_that_fails_leaves_the_target_s_derivatives(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """They go only when nothing but the commit is left to fail: here deleting the other
+    document fails after the target got its new version."""
+    owner, stack, scan = await two(world)
+    for key in derivative_keys(stack.id, 3):
+        await world.object_store.put(key, b"x", content_type="x")
+
+    async def fails(*_: object) -> None:
+        raise RuntimeError("the database went away")
+
+    monkeypatch.setattr(editing, "delete_document", fails)
+    with pytest.raises(RuntimeError):
+        await world.editing.edit(
+            owner.id, stack.id, [part(1, 2, (1, 1), replaces=True)], documents=[scan.id]
+        )
+    assert await world.object_store.exists(archive_key(stack.id))
+    assert await world.object_store.exists(page_key(stack.id, 3))
+    assert (await world.documents.get(owner.id, stack.id)).sha256 == stack.sha256
 
 
 async def test_a_merge_takes_a_page_of_every_document(world: World) -> None:

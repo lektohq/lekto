@@ -49,7 +49,7 @@ from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.pages import PageRenderer
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import access_to, controllable_document, load_actor
-from lekto.core.services._intake import store_new_version, store_part
+from lekto.core.services._intake import delete_derivatives, store_new_version, store_part
 from lekto.core.services.documents import DocumentView, delete_document
 from lekto.core.services.nodes import work_directory
 from lekto.core.services.objects import original_key
@@ -244,6 +244,7 @@ class EditingService:
                         await self._split_off(uow, actor, document, item, number, current, added)
                     )
             replacing = next((item for item in parts if item.part.replaces), None)
+            stale: list[str] = []
             if replacing is None:  # not in a merge (`check_parts`)
                 await delete_document(uow, document, now)
             else:
@@ -263,7 +264,7 @@ class EditingService:
                         for item in found
                     ]
                 kind = VersionKind.MERGED if others else VersionKind.EDITED
-                await self._replace(uow, actor, document, replacing, kind, detail, now)
+                stale = await self._replace(uow, actor, document, replacing, kind, detail, now)
                 going = {item.id for item in others}
                 for other in others:
                     await _move_relations(uow, other.id, document.id, going)
@@ -273,6 +274,7 @@ class EditingService:
             views = tuple(
                 [DocumentView(item, await access_to(uow, user, item)) for item in documents]
             )
+            await delete_derivatives(self._store, stale)
             await uow.commit()
         return EditResult(
             documents=views,
@@ -347,11 +349,11 @@ class EditingService:
         kind: VersionKind,
         detail: JsonObject,
         now: datetime,
-    ) -> None:
-        """The part as the document's next version (as `PipelineService.new_version`)."""
-        await store_new_version(
+    ) -> list[str]:
+        """The part as the document's next version (as `PipelineService.new_version`); returns
+        the keys of the earlier version's derivatives (`store_new_version`)."""
+        return await store_new_version(
             uow,
-            self._store,
             document,
             item.file.sha256,
             filename=f"{document.file_title}.pdf",

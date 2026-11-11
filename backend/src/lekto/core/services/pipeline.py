@@ -84,7 +84,7 @@ from lekto.core.services._access import (
     visible_space,
 )
 from lekto.core.services._first_runs import keep_first_run, keep_verdicts
-from lekto.core.services._intake import store_new_version, store_received
+from lekto.core.services._intake import delete_derivatives, store_new_version, store_received
 from lekto.core.services._jobs import (
     NODE_JOB,
     STORE_ATTEMPTS,
@@ -586,9 +586,8 @@ class PipelineService:
             access = await access_to(uow, user, document)
             if (error := await duplicate_of(uow, user, sha256)) is not None:
                 raise error
-            await store_new_version(
+            stale = await store_new_version(
                 uow,
-                self._store,
                 document,
                 sha256,
                 filename=filename,
@@ -598,6 +597,7 @@ class PipelineService:
                 detail={},
                 now=now,
             )
+            await delete_derivatives(self._store, stale)
             await uow.commit()
         return DocumentView(document, access)
 
