@@ -3,6 +3,7 @@
 off and merges documents, `services.separating` splits a stack at its sheets): one place for
 each, so that a change of how a document comes in reaches every way."""
 
+from collections.abc import Sequence
 from dataclasses import replace
 from datetime import datetime
 
@@ -142,7 +143,6 @@ async def store_part(
 
 async def store_new_version(
     uow: UnitOfWork,
-    store: ObjectStore,
     document: Document,
     sha256: Sha256,
     *,
@@ -152,9 +152,14 @@ async def store_new_version(
     created_by: UserId,
     detail: JsonObject,
     now: datetime,
-) -> None:
+) -> list[str]:
     """Make the file `sha256` the document's original as its next version, numbered after its
-    last (`Document.new_version`), and start its run anew: the tasks of the runs before end."""
+    last (`Document.new_version`), and start its run anew: the tasks of the runs before end.
+
+    Returns the keys of the earlier version's derivatives. The caller deletes them
+    (`delete_derivatives`) when nothing but the commit is left to fail: before, a failed
+    transaction would leave the document as it was without its archive, text and pages; after,
+    the new run's jobs would be seen, and page images beyond the new page count stay."""
     versions = await uow.document_versions.of_document(document.id)
     pages = document.page_count
     document.new_version(sha256, filename, media_type, now)
@@ -171,11 +176,14 @@ async def store_new_version(
             detail=detail,
         )
     )
-    # The earlier version's derivatives go before the new run's jobs are seen: page images
-    # beyond the new page count would stay otherwise.
-    for derivative in derivative_keys(document.id, pages):
-        await store.delete(derivative)
     await cancel_tasks(uow, document.id, now)
     await uow.documents.update(document)
     await enqueue_nodes(uow, document, document.processing.due(), now)
     await uow.outbox.add(document.pull_events())
+    return derivative_keys(document.id, pages)
+
+
+async def delete_derivatives(store: ObjectStore, keys: Sequence[str]) -> None:
+    """Delete the derivatives `store_new_version` returned."""
+    for key in keys:
+        await store.delete(key)

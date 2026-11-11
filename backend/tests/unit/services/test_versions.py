@@ -7,10 +7,12 @@ from pathlib import Path
 
 import pytest
 
+from lekto.adapters.outbound.memory.unit_of_work import MemoryDocumentRepository
 from lekto.adapters.outbound.regex import RegexPatternMatcher
 from lekto.core.domain.classification import FieldCheck
 from lekto.core.domain.documents import Document, DocumentChanges, Sha256
 from lekto.core.domain.errors import (
+    ConcurrencyError,
     DuplicateDocumentError,
     InvalidTransitionError,
     NotFoundError,
@@ -151,6 +153,29 @@ async def test_a_new_version_takes_the_original_s_place_and_runs_anew(world: Wor
         (1, VersionKind.RECEIVED, owner.id),
         (2, VersionKind.REPLACED, owner.id),
     ]
+
+
+async def test_a_new_version_that_is_not_stored_leaves_the_derivatives(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """They go only when nothing but the commit is left to fail."""
+    owner = await world.user()
+    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
+    await world.drain()
+    for key in derivative_keys(document.id, 1):
+        await world.object_store.put(key, b"x", content_type="x")
+
+    async def changed_meanwhile(*_: object) -> None:
+        raise ConcurrencyError("a person edited the document meanwhile")
+
+    monkeypatch.setattr(MemoryDocumentRepository, "update", changed_meanwhile)
+    with pytest.raises(ConcurrencyError):
+        await world.pipeline().new_version(
+            owner.id, document.id, incoming(PART), filename="november.pdf"
+        )
+    assert await world.object_store.exists(archive_key(document.id))
+    assert await world.object_store.exists(page_key(document.id, 1))
+    assert (await world.documents.get(owner.id, document.id)).sha256 == document.sha256
 
 
 async def test_a_new_version_helps_a_document_that_failed(world: World) -> None:
