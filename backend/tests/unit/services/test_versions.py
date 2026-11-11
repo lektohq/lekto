@@ -7,10 +7,12 @@ from pathlib import Path
 
 import pytest
 
+from lekto.adapters.outbound.memory.unit_of_work import MemoryDocumentRepository
 from lekto.adapters.outbound.regex import RegexPatternMatcher
 from lekto.core.domain.classification import FieldCheck
 from lekto.core.domain.documents import Document, DocumentChanges, Sha256
 from lekto.core.domain.errors import (
+    ConcurrencyError,
     DuplicateDocumentError,
     InvalidTransitionError,
     NotFoundError,
@@ -153,6 +155,31 @@ async def test_a_new_version_takes_the_original_s_place_and_runs_anew(world: Wor
     ]
 
 
+async def test_a_new_version_that_is_not_stored_leaves_the_derivatives(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """They go only when nothing but the commit is left to fail."""
+    owner = await world.user()
+    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
+    await world.drain()
+    for key in derivative_keys(document.id, 1):
+        await world.object_store.put(key, b"x", content_type="x")
+
+    async def changed_meanwhile(*_: object) -> None:
+        raise ConcurrencyError("a person edited the document meanwhile")
+
+    monkeypatch.setattr(MemoryDocumentRepository, "update", changed_meanwhile)
+    with pytest.raises(ConcurrencyError):
+        await world.pipeline().new_version(
+            owner.id, document.id, incoming(PART), filename="november.pdf"
+        )
+    assert await world.object_store.exists(archive_key(document.id))
+    assert await world.object_store.exists(page_key(document.id, 1))
+    assert (await world.documents.get(owner.id, document.id)).sha256 == document.sha256
+    # No version names the new file: it goes again.
+    assert not await world.object_store.exists(original_key(Sha256.of(PART)))
+
+
 async def test_a_new_version_helps_a_document_that_failed(world: World) -> None:
     owner = await world.user()
     pipeline = world.pipeline({Node.PAGES: Returns(FAILED)})
@@ -176,6 +203,8 @@ async def test_a_new_version_must_be_a_new_file_of_a_kind_a_document_has(world: 
         await world.pipeline().new_version(
             owner.id, document.id, incoming(b"%PDF-1.7 new"), filename="new.pdf"
         )
+    # Asked before its file is stored: nothing is left behind.
+    assert not await world.object_store.exists(original_key(Sha256.of(b"%PDF-1.7 new")))
     await world.drain()
     for file in (STACK, PART):  # its own, another document's
         with pytest.raises(DuplicateDocumentError):
@@ -249,6 +278,18 @@ async def test_a_new_version_s_run_keeps_confirmed_values_and_suggests_what_diff
     assert [reason.code for reason in differs.reasons] == [ReasonCode.NEW_VERSION_DIFFERS]
     unread = _kept(check_of(None, ok=False, suggestion="c-3"), document, "c-1")
     assert (unread.ok, unread.suggestion) == (False, "c-3")
+    # Read the same, but uncertain (a quote missing, say): the person confirmed that value; the
+    # check's own reasons stay, as remarks.
+    doubted = FieldCheck(
+        field="contact",
+        outcome=Outcome.UNCERTAIN,
+        confidence=0.4,
+        suggestion="c-1",
+        reasons=(because(ReasonCode.QUOTE_MISSING),),
+    )
+    agreed = _kept(doubted, document, "c-1")
+    assert (agreed.ok, agreed.value, agreed.suggestion) == (True, "c-1", None)
+    assert [reason.code for reason in agreed.reasons] == [ReasonCode.QUOTE_MISSING]
     # Nothing confirmed there, no value, or not a new version's run: as in any run.
     assert _kept(other, document, None) == other
     document.processing.new_version = False

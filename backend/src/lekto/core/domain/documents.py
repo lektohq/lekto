@@ -475,6 +475,12 @@ class Document:
         processing.new_version = False
         return self._reset({node, *signals}, now)
 
+    def require_idle(self) -> None:
+        """InvalidTransitionError while it is processed: a new version of its original waits
+        until the run is over (checked before its file is stored, too)."""
+        if self.processing.status is ProcessingStatus.PROCESSING:
+            raise InvalidTransitionError(because(ReasonCode.BEING_PROCESSED, id=str(self.id)))
+
     def new_version(
         self, sha256: Sha256, original_filename: str, media_type: str, now: datetime
     ) -> tuple[Node, ...]:
@@ -484,8 +490,7 @@ class Document:
         confirmed and ends in the inbox (`Processing.new_version`). Also after a failure: the
         new file may be what helps. InvalidTransitionError while it is processed; returns the
         nodes that are due now."""
-        if self.processing.status is ProcessingStatus.PROCESSING:
-            raise InvalidTransitionError(because(ReasonCode.BEING_PROCESSED, id=str(self.id)))
+        self.require_idle()
         filename = require_name(original_filename, "original filename", max_length=None)
         kind = require_name(media_type, "media type", max_length=None)
         self.sha256, self.original_filename, self.media_type = sha256, filename, kind

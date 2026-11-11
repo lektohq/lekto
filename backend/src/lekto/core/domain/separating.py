@@ -5,10 +5,16 @@ sheets are left out.
 
 A sheet is a page with a code whose whole text is one of the separator codes, in any case
 (`PATCHT` by default, as Paperless prints it). Pages between two sheets make a part; no part is
-empty (two sheets in a row, one at the start or end).
+empty (two sheets in a row, one at the start or end). A file of more than `MAX_STACK_PAGES`
+pages is no stack.
 """
 
 from collections.abc import Collection, Iterable
+
+MAX_STACK_PAGES = 200
+"""Pages a stack has at most. A longer file is no stack of scanned papers (a book, a file made
+on a computer), and reading the codes of each of its pages would hold its processing up for
+minutes: the node does not look through it."""
 
 
 def is_separator(text: str, separators: Collection[str]) -> bool:

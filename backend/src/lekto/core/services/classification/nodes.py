@@ -987,7 +987,8 @@ class FieldsNode(_ModelStep):
                 return self._unfit(error, input)
             given |= {keys[key].id: value for key, value in proposals.items()}
         checks = await self._checked(document, log, definitions, given, unread, text, proposal)
-        # A new version of the original keeps what a person confirmed (`_kept`).
+        # A new version of the original keeps what a person confirmed (`_kept`); a field set by
+        # hand is never read, its value stays anyway.
         checks = [
             _kept(
                 check,
@@ -996,6 +997,8 @@ class FieldsNode(_ModelStep):
                 if definition.id not in document.fields
                 else field_to_json(document.fields[definition.id]),
             )
+            if definition.is_read
+            else check
             for check, definition in zip(checks, definitions, strict=True)
         ]
         values: dict[FieldId, object] = {}
@@ -1741,13 +1744,16 @@ def _by_id[T: Contact | DocumentType | Tag](items: Sequence[T], id: JsonValue) -
 
 def _kept(check: FieldCheck, document: Document, current: JsonValue | None) -> FieldCheck:
     """In a run that reads a new version of the original (`Processing.new_version`), what a
-    person confirmed stays (Tobi, 10.11.2026): a value read the same is OK, one read
+    person confirmed stays (Tobi, 10.11.2026): a value read the same is OK, also where its check
+    was uncertain (its reasons stay, as remarks: the person confirmed that value); one read
     differently or not at all is not applied but suggested, uncertain, for the inbox to decide.
     A value nobody confirmed, or no value, goes as in any run."""
     if not document.processing.new_version or document.confirmed_at is None or current is None:
         return check
     if check.ok and check.value == current:
         return check
+    if not check.ok and check.suggestion == current:
+        return replace(check, outcome=Outcome.OK, value=current, suggestion=None)
     return replace(
         check,
         outcome=Outcome.UNCERTAIN,

@@ -59,6 +59,11 @@ describe('separationOf', () => {
 			how: 'edited'
 		});
 		expect(separationOf({ not_looked: 'mail' })).toEqual({ kind: 'mail' });
+		expect(separationOf({ not_looked: 'too_long', pages: 412, max: 200 })).toEqual({
+			kind: 'too_long',
+			pages: 412,
+			max: 200
+		});
 	});
 
 	it('says nothing where the entry does not tell', () => {

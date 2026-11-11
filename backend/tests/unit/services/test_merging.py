@@ -14,13 +14,16 @@ from lekto.core.domain.errors import (
     UnsupportedMediaTypeError,
     ValidationError,
 )
+from lekto.core.domain.events import DocumentUpdated
+from lekto.core.domain.first_runs import RELATIONS
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState
 from lekto.core.domain.users import User
 from lekto.core.domain.versions import VersionKind
+from lekto.core.services import editing
 from lekto.core.services.editing import MOVED
-from lekto.core.services.objects import original_key, page_key
+from lekto.core.services.objects import archive_key, derivative_keys, original_key, page_key
 from tests.builders import HOUR, NOW, incoming
 from tests.unit.services.support import World
 from tests.unit.services.test_editing import STACK, part, received
@@ -113,10 +116,24 @@ async def test_the_target_may_be_another_of_them(world: World) -> None:
         (3, VersionKind.MERGED),
     ]
     assert versions[1].sha256 == stack.sha256
-    assert versions[2].detail["documents"] == [
+    sources = [
         {"document": str(stack.id), "title": "stack", "version": 2},
         {"document": str(scan.id), "title": "scan_0412", "version": 1},
     ]
+    # Source 0, the stack's pages, is the scan's version 2 now.
+    assert versions[2].detail["from"] == 2
+    assert versions[2].detail["documents"] == sources
+    # So for the part split off: its pages name their sources as the merged version does.
+    async with world.uow() as uow:
+        (first,) = await uow.document_versions.of_document(split.id)
+    assert first.detail == {
+        "pages": [{"source": 1, "page": 2, "rotate": 0}],
+        "added": [],
+        "document": str(scan.id),
+        "title": "scan_0412",
+        "version": 2,
+        "documents": sources,
+    }
 
 
 async def test_a_merge_needs_a_part_that_continues_the_target(world: World) -> None:
@@ -130,6 +147,38 @@ async def test_a_merge_needs_a_part_that_continues_the_target(world: World) -> N
     assert world.object_store.keys() == before
     for document in (stack, scan):
         assert (await world.documents.get(owner.id, document.id)).sha256 == document.sha256
+
+
+async def test_a_merge_that_fails_leaves_the_target_s_derivatives(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """They go only when nothing but the commit is left to fail: here deleting the other
+    document fails after the target got its new version."""
+    owner, stack, scan = await two(world)
+    for key in derivative_keys(stack.id, 3):
+        await world.object_store.put(key, b"x", content_type="x")
+
+    async def fails(*_: object) -> None:
+        raise RuntimeError("the database went away")
+
+    monkeypatch.setattr(editing, "delete_document", fails)
+    with pytest.raises(RuntimeError):
+        await world.editing.edit(
+            owner.id, stack.id, [part(1, 2, (1, 1), replaces=True)], documents=[scan.id]
+        )
+    assert await world.object_store.exists(archive_key(stack.id))
+    assert await world.object_store.exists(page_key(stack.id, 3))
+    assert (await world.documents.get(owner.id, stack.id)).sha256 == stack.sha256
+
+
+async def test_a_merge_takes_a_page_of_every_document(world: World) -> None:
+    """One whose pages all left the stack is no part of the merge: it would go for nothing."""
+    owner, stack, scan = await two(world)
+    with pytest.raises(ValidationError, match="none of source 1"):
+        await world.editing.edit(
+            owner.id, stack.id, [part(1, 2, 3, replaces=True)], documents=[scan.id]
+        )
+    assert (await world.documents.get(owner.id, scan.id)).sha256 == scan.sha256
 
 
 async def test_the_relations_of_a_merged_document_name_the_target(world: World) -> None:
@@ -150,6 +199,13 @@ async def test_the_relations_of_a_merged_document_name_the_target(world: World) 
     assert sorted((item.newer, item.older) for item in found) == sorted(
         [(reply.id, stack.id), (stack.id, letter.id)]
     )
+    # Both ends of the relation that moved hear of it, as of any change of relations.
+    told = {
+        (event.document_id, event.related)
+        for event in world.events()
+        if isinstance(event, DocumentUpdated) and event.fields == (RELATIONS,)
+    }
+    assert told == {(reply.id, stack.id), (stack.id, reply.id)}
 
 
 async def test_who_may_merge_and_what(world: World) -> None:
