@@ -11,10 +11,14 @@ empty (two sheets in a row, one at the start or end).
 from collections.abc import Collection, Iterable
 
 
+def is_separator(text: str, separators: Collection[str]) -> bool:
+    """Whether a code's whole `text` is one of the separator codes, in any case."""
+    return text.casefold() in {separator.casefold() for separator in separators}
+
+
 def separator_pages(codes: Iterable[tuple[int, str]], separators: Collection[str]) -> list[int]:
     """The pages (from 1, in order) that carry a separator code, of `codes` (page, text)."""
-    wanted = {separator.casefold() for separator in separators}
-    return sorted({page for page, text in codes if text.casefold() in wanted})
+    return sorted({page for page, text in codes if is_separator(text, separators)})
 
 
 def separated_parts(pages: int, sheets: Collection[int]) -> list[tuple[int, ...]]:

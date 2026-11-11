@@ -717,7 +717,8 @@ modal, over a dialog too.
   an identifier, a relation, a rule's dry run (Probelauf), the cases behind a number of the
   holders' evaluation, the similar documents of the processing, the overview's expected
   documents, the jobs, a webhook's deliveries, the existing document of a duplicate upload, the
-  documents a bulk action skipped and the document a version was split off. The Beam pages through what stands beside it.
+  documents a bulk action skipped, the document a version was split off and the documents a
+  stack was separated into or a part came from. The Beam pages through what stands beside it.
 - **Lists of documents carry no eye:** a card or row (the documents, the inbox, search hits)
   and a chip of the stream is the button itself (`DocumentLink`, `viewOrOpen`): a click, a tap
   or Enter shows the document in the Beam, a double click or a long press (a phone) opens it; a
@@ -1294,7 +1295,16 @@ version 1 and says of version 2 "Am Trennblatt getrennt: S. 1–3 von Fassung 1"
 are documents of their own, split off it. The processing step is "Trennung", its line "2
 Trennblätter (S. 4 und 8): 3 Teile", "Kein Trennblatt", or why it did not look: "Teil eines
 getrennten Stapels", "Von Hand abgetrennt", "Nicht bei einer neuen Fassung", "Nicht bei der
-Migration", "Nicht bei E-Mails", "Ausgeschaltet".
+Migration", "Nicht bei E-Mails", "Ausgeschaltet". Its details (Tobi 11.11.2026, after a mock;
+the step stays a card of its own, not part of "Annahme"): rows for the codes it looked for
+(mono), the sheets it found with the format of their code and the other codes it read (format
+and page, never their text: a payment's QR code); the stack as a row of pages
+(`SeparationDetails`), the sheets hatched, each part under a bracket with "Teil 1", and below
+where the parts went, "Teil 1 · S. 1–4 → Fassung 2 dieses Dokuments", the others by their title
+now (`BeamTitle`) with their lane. A part of a stack says "Herkunft: Teil 2 von 2 aus" and the
+stack's title, and shows the stack with its own pages marked ("dieses Dokument"); pages a person
+split off say "Mit „PDF bearbeiten“ abgetrennt aus"; a document without a sheet shows its pages
+with a dot where a code was read; where the step did not look, a row "Warum" says why.
 A merge says "Zusammengeführt aus Fassung 1 und „…“", and a version that came along from a merged
 document says where from before how it came: "Aus „…“ (dort Fassung 1) · Eingegangen".
 

@@ -3,6 +3,7 @@
 	import type { components } from '#lib/api/schema.ts';
 	import FactRows from '#lib/components/document/FactRows.svelte';
 	import SignalSummary from '#lib/components/document/SignalSummary.svelte';
+	import SeparationRows from '#lib/components/document/SeparationRows.svelte';
 	import StepDetails, { type DetailContext } from '#lib/components/document/StepDetails.svelte';
 	import TokenInfo from '#lib/components/document/TokenInfo.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -11,6 +12,7 @@
 	import type { Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { labelled, reasonsText } from '#lib/reasons.ts';
+	import { separationOf } from '#lib/separation.ts';
 	import { object, person } from '#lib/signals.ts';
 	import { drawsDetails, drawsFacts } from '#lib/step-details.ts';
 	import { YELLOW_ACTION } from '#lib/step-look.ts';
@@ -85,6 +87,7 @@
 			{@const usage = usageOf(entry.output)}
 			{@const settled = overruled(entry, index === step.done.entries.length - 1)}
 			{@const actor = actorOf(entry)}
+			{@const separation = entry.node === 'separate' ? separationOf(entry.output) : null}
 			<div class="flex flex-col gap-1.5 text-sm" data-run={entry.run}>
 				<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground">
 					<span>
@@ -133,6 +136,8 @@
 					{/if}
 					{#if drawsFacts(entry)}
 						<FactRows output={object(entry.output)} {lookup} />
+					{:else if separation}
+						<SeparationRows {separation} />
 					{:else if !drawsDetails(entry)}
 						<SignalSummary {entry} {lookup} />
 					{/if}

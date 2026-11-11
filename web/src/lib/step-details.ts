@@ -30,7 +30,14 @@ type LogEntry = components['schemas']['LogEntry'];
 type Json = Record<string, unknown>;
 
 /** The steps whose details are drawn here rather than as rows. */
-const DRAWN: readonly Node[] = ['ocr', 'pages', 'parse', 'signal_classifier', 'signal_neighbours'];
+const DRAWN: readonly Node[] = [
+	'separate',
+	'ocr',
+	'pages',
+	'parse',
+	'signal_classifier',
+	'signal_neighbours'
+];
 
 const abstained = (entry: LogEntry) => text(object(entry.output).abstained) !== null;
 

@@ -147,18 +147,23 @@ const NOT_LOOKED: Record<string, () => string> = {
 function separated(output: Json): string | null {
 	if (typeof output.not_looked === 'string') return NOT_LOOKED[output.not_looked]?.() ?? null;
 	if (!Array.isArray(output.sheets)) return null;
-	const sheets = output.sheets.map((page) => formatNumber(count(page)));
-	if (sheets.length === 0) return m.summary_no_separator();
-	const pages = new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(sheets);
-	const found =
-		sheets.length === 1
-			? m.summary_sheets_one({ pages })
-			: m.summary_sheets({ count: formatNumber(sheets.length), pages });
+	if (output.sheets.length === 0) return m.summary_no_separator();
+	const found = summaryOfSheets(output.sheets.map(count));
 	const parts = count(output.parts);
 	if (parts === 0) return found;
 	const made =
 		parts === 1 ? m.summary_parts_one() : m.summary_parts({ count: formatNumber(parts) });
 	return `${found}: ${made}`;
+}
+
+/** The separator sheets on `sheets` (pages): "2 Trennblätter (S. 4 und 8)". */
+export function summaryOfSheets(sheets: readonly number[]): string {
+	const pages = new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(
+		sheets.map((page) => formatNumber(page))
+	);
+	return sheets.length === 1
+		? m.summary_sheets_one({ pages })
+		: m.summary_sheets({ count: formatNumber(sheets.length), pages });
 }
 
 function recognised(output: Json): string {

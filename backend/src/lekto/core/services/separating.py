@@ -19,11 +19,12 @@ in the inbox. If the stack is deleted before the result is stored, the parts' fi
 
 import asyncio
 import logging
-from collections.abc import Collection
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass, replace
 from datetime import datetime
 
 from lekto.core.domain import media_types
+from lekto.core.domain.codes import Code
 from lekto.core.domain.documents import Channel, Document
 from lekto.core.domain.editing import ORIGINAL, PagePick
 from lekto.core.domain.ids import UserId
@@ -37,7 +38,7 @@ from lekto.core.domain.pipeline import (
     ProcessingHistory,
 )
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.domain.separating import separated_parts, separator_pages
+from lekto.core.domain.separating import is_separator, separated_parts, separator_pages
 from lekto.core.domain.versions import DocumentVersion, VersionKind
 from lekto.core.ports.codes import CodeReader
 from lekto.core.ports.composer import PageComposer, PageSource
@@ -58,10 +59,21 @@ versions it made."""
 SPLIT_OFF = "split_off"
 """Key of the documents made of the parts after the first, in the node's output and the detail
 of the stack's version 2 (as `EditingService` writes it)."""
+SEPARATORS = "separators"
+"""Key of the separator codes looked for, in the node's output."""
+CODES = "codes"
+"""Key of the codes read on the pages, in the node's output: each with its `page`, `format` and
+whether it is a separator sheet's (`separator`), once per page and format; not their text, which
+may be anything (a payment's QR code)."""
+STACK_PAGES = "stack_pages"
+"""Key of how many pages the stack had, in the detail of a part's version and in the output of
+its run."""
 NOT_LOOKED = "not_looked"
 """Key of why the node did not look for sheets, in its output: `off` (no separator codes), `mail`
-(an e-mail), `migration`, `new_version`, `part` (a part of a stack split at its sheets) or
-`split` (pages a person split off another document)."""
+(an e-mail), `migration`, `new_version` (with the `version` and its `kind`), `part` (a part of a
+stack split at its sheets: `from` and `title` name the stack, `pages` are its pages there, with
+the stack's `sheets` and `stack_pages`) or `split` (pages a person split off another document:
+`from` and `title`)."""
 
 
 @dataclass(frozen=True)
@@ -96,7 +108,7 @@ class SeparateNode:
     async def run(self, document: Document) -> "NodeResult | Separation":
         not_looked = await self._not_looked(document)
         if not_looked is not None:
-            return NodeResult(outcome=Outcome.OK, output={NOT_LOOKED: not_looked})
+            return NodeResult(outcome=Outcome.OK, output=not_looked)
         async with work_directory() as work:
             original = work / ORIGINAL_FILE
             await self._store.download(original_key(document.sha256), original)
@@ -111,7 +123,12 @@ class SeparateNode:
             sheets = separator_pages(
                 ((code.page, code.text) for code in reading.codes), self._separators
             )
-            found: JsonObject = {SHEETS: list(sheets), "pages": pages}
+            found: JsonObject = {
+                SHEETS: list(sheets),
+                "pages": pages,
+                SEPARATORS: [code for code in sorted(self._separators)],
+                CODES: _codes(reading.codes, self._separators),
+            }
             if not sheets:
                 return NodeResult(outcome=Outcome.OK, model_version=reading.reader, output=found)
             pieces = separated_parts(pages, sheets)
@@ -135,6 +152,7 @@ class SeparateNode:
                 sheets=tuple(sheets),
                 pages=pages,
                 parts=tuple(parts),
+                found=found,
             )
             try:
                 for part in parts:
@@ -145,24 +163,54 @@ class SeparateNode:
                 raise
         return separation
 
-    async def _not_looked(self, document: Document) -> str | None:
-        """Why the node does not look for sheets in the document (`NOT_LOOKED`); None for a
-        stack that came in as it is (see the module)."""
+    async def _not_looked(self, document: Document) -> JsonObject | None:
+        """Why the node does not look for sheets in the document, as its output (`NOT_LOOKED`);
+        None for a stack that came in as it is (see the module)."""
         if not self._separators:
-            return "off"
+            return {NOT_LOOKED: "off"}
         if document.media_type not in VERSION_MEDIA_TYPES:
-            return "mail"
+            return {NOT_LOOKED: "mail"}
         if document.channel is Channel.MIGRATION:
-            return "migration"
+            return {NOT_LOOKED: "migration"}
         async with self._uow() as uow:
             versions = await uow.document_versions.of_document(document.id)
-        first = versions[0] if versions else None
-        if first is not None and first.kind is VersionKind.SPLIT:
-            return "part" if SHEETS in first.detail else "split"
-        kinds = [version.kind for version in versions]
-        if document.processing.new_version or kinds != [VersionKind.RECEIVED]:
-            return "new_version"
+        if versions and versions[0].kind is VersionKind.SPLIT:
+            return _split_from(versions[0].detail)
+        if document.processing.new_version or [item.kind for item in versions] != [
+            VersionKind.RECEIVED
+        ]:
+            last = versions[-1] if versions else None
+            if last is None:
+                return {NOT_LOOKED: "new_version"}
+            return {NOT_LOOKED: "new_version", "version": last.number, "kind": last.kind.value}
         return None
+
+
+def _split_from(detail: JsonObject) -> JsonObject:
+    """What the node says of pages split off another document (`NOT_LOOKED`), from the detail of
+    their first version: a part of a stack, or pages a person split off."""
+    if SHEETS not in detail:
+        return {NOT_LOOKED: "split", "from": detail.get("document"), "title": detail.get("title")}
+    picks = detail.get("pages")
+    pages = (
+        [pick.get("page") for pick in picks if isinstance(pick, dict)]
+        if isinstance(picks, list)
+        else []
+    )
+    return {
+        NOT_LOOKED: "part",
+        "from": detail.get("document"),
+        "title": detail.get("title"),
+        "pages": pages,
+        SHEETS: detail.get(SHEETS),
+        STACK_PAGES: detail.get(STACK_PAGES),
+    }
+
+
+def _codes(codes: Iterable[Code], separators: Collection[str]) -> list[JsonValue]:
+    """The codes read (`CODES`), by page."""
+    seen = sorted({(code.page, code.format, is_separator(code.text, separators)) for code in codes})
+    return [{"page": page, "format": kind, "separator": sheet} for page, kind, sheet in seen]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -176,6 +224,8 @@ class Separation:
     sheets: tuple[int, ...]
     pages: int
     parts: tuple[_Part, ...]
+    # What the node found (`SHEETS`, `SEPARATORS`, `CODES`), for its output.
+    found: JsonObject
 
     async def apply(self, uow: UnitOfWork, document: Document, now: datetime) -> NodeResult:
         first, *others = self.parts
@@ -229,8 +279,7 @@ class Separation:
             outcome=Outcome.OK,
             model_version=self.reader,
             output={
-                SHEETS: list(self.sheets),
-                "pages": self.pages,
+                **self.found,
                 "parts": len(self.parts),
                 "version": current + 1,
                 SPLIT_OFF: split_off,
@@ -292,6 +341,7 @@ class Separation:
                     "title": stack.title,
                     "version": 1,
                     SHEETS: list(self.sheets),
+                    STACK_PAGES: self.pages,
                 },
             )
         )
