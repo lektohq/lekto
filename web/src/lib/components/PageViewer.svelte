@@ -176,7 +176,29 @@
 		const shift = shiftFor(anchor, node.getBoundingClientRect());
 		container.scrollLeft += shift.x;
 		if (scrollsItself()) container.scrollTop += shift.y;
-		else window.scrollBy(0, shift.y);
+		else scrollOutside(shift.y, false);
+	}
+
+	/** Scroll by `top` where the viewer does not scroll itself: on a page the window, which
+	 * scrolls the page with it (the document view on a phone); in a dialog (the Beam) the
+	 * nearest part of it that scrolls, if any, never the page behind it, which jumped with
+	 * every Beam that revealed a place (Tobi, 11.11.2026). */
+	function scrollOutside(top: number, smooth: boolean) {
+		if (!container) return;
+		const behavior = smooth ? 'smooth' : 'auto';
+		const dialog = container.closest('[role="dialog"]');
+		if (!dialog) {
+			window.scrollBy({ top, behavior });
+			return;
+		}
+		for (let node = container.parentElement; node; node = node.parentElement) {
+			const scrolls = ['auto', 'scroll'].includes(getComputedStyle(node).overflowY);
+			if (scrolls && node.scrollHeight > node.clientHeight + 1) {
+				node.scrollBy({ top, behavior });
+				return;
+			}
+			if (node === dialog) return;
+		}
 	}
 
 	function choose(next: Layout) {
@@ -232,7 +254,7 @@
 			container.scrollBy({ left, top, behavior: 'smooth' });
 		} else {
 			if (left) container.scrollBy({ left, behavior: 'smooth' });
-			window.scrollBy({ top: y - window.innerHeight / 3, behavior: 'smooth' });
+			scrollOutside(y - window.innerHeight / 3, true);
 		}
 	}
 
