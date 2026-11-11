@@ -219,6 +219,22 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(found).toEqual([]);
 	});
 
+	it('sticks things only below the header, at its offsets', () => {
+		// DESIGN.md, "Sticky heads": right below it, on the line of the tools, with room, or
+		// where the page says for the title of a group; the header itself at the top.
+		const offsets = new Set(['16', '18', '20', '(--group-top)']);
+		const sticky = /\bsticky\b[^'"`\n]*?(?<![\w-])top-([\w()-]+)/g;
+		expect(
+			offenders((source, path) => {
+				for (const match of source.matchAll(sticky)) {
+					const header = match[1] === '0' && path === '/src/lib/components/AppShell.svelte';
+					if (!header && !offsets.has(match[1])) return match[0];
+				}
+				return null;
+			})
+		).toEqual([]);
+	});
+
 	it('takes colours from the tokens, not from the palette of Tailwind', () => {
 		expect(
 			offenders((source, path) => (EXCEPTIONS.palette.has(path) ? null : line(source, PALETTE)))

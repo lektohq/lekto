@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { Separator } from '#lib/components/ui/separator/index.ts';
 	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import PanelLeftClose from '@lucide/svelte/icons/panel-left-close';
@@ -12,7 +11,7 @@
 	import ListChecks from '@lucide/svelte/icons/list-checks';
 	import X from '@lucide/svelte/icons/x';
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
-	import { SvelteMap } from 'svelte/reactivity';
+	import { MediaQuery, SvelteMap } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 	import { page } from '$app/state';
 	import { api } from '#lib/api/client.ts';
@@ -33,6 +32,11 @@
 	import { BulkRun, type BulkSelection } from '#lib/bulk.svelte.ts';
 	import { MAX_DOCUMENTS, MAX_HITS } from '#lib/bulk.ts';
 	import { phone } from '#lib/phone.svelte.ts';
+	import { desktop } from '#lib/desktop.svelte.ts';
+	import { offerPageSearch } from '#lib/page-search.ts';
+	import { aside, HEADER, type Aside } from '#lib/sticky-head.ts';
+	import { SELECTION_TOP } from '#lib/components/SelectionBar.svelte';
+	import GroupTitle from '#lib/components/documents/GroupTitle.svelte';
 	import FilterPanel from '#lib/components/FilterPanel.svelte';
 	import InboxMark from '#lib/components/InboxMark.svelte';
 	import LensChanges from '#lib/components/LensChanges.svelte';
@@ -108,7 +112,6 @@
 	import { gotoSearching, stateWords } from '#lib/words.ts';
 	import { selectionOf } from '#lib/selection.ts';
 	import PageTitle from '#lib/components/page/PageTitle.svelte';
-	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import SearchField from '#lib/components/SearchField.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import Loading from '#lib/components/Loading.svelte';
@@ -591,14 +594,10 @@
 		void pageLookup.load();
 		void loadLenses();
 		void meaningSearch().then((value) => (meaning = value));
-		// Opened from the search icon of a narrow header: the field takes the focus.
-		if (location.hash === '#search') {
-			void tick().then(() => {
-				// The field that shows at this width (`header-search.ts`).
-				const fields = document.querySelectorAll<HTMLInputElement>('[data-page-search]');
-				[...fields].find((field) => field.offsetParent !== null)?.focus();
-			});
-		}
+		// The magnifier of a narrow header shows the page's own field (`page-search.ts`); opened
+		// from it on another page, the field takes the focus at once.
+		const withdrawSearch = offerPageSearch(showSearch);
+		if (location.hash === '#search') void tick().then(showSearch);
 		// Events are thin: fetch the list again, at most once in a while.
 		const refresh = coalesced(() => {
 			void list.refresh();
@@ -615,6 +614,7 @@
 			stop();
 			stopMeaning();
 			searchNote.dispose();
+			withdrawSearch();
 		};
 	});
 
@@ -712,7 +712,65 @@
 			(id) => lookup?.fields.find((field) => field.id === id) ?? []
 		)
 	);
+
+	// The head that stays (web/DESIGN.md, "Sticky heads"). From the desktop on the tools stand
+	// beside the title and, once the page moves, on the line below the header, with a band
+	// behind it across the list; below the desktop their row steps aside while the page scrolls
+	// down and comes back as it scrolls up (`sticky-head.ts`). The group titles stick on that
+	// line, or below the row; while the selection bar of a desktop stands, it owns the line and
+	// the titles stick below it.
+	// Below `xl` the sort and "Lens bearbeiten" are icons, so that the title of a group keeps
+	// room beside the tools on their line.
+	const roomy = new MediaQuery('(width >= 80rem)');
+	let pageHead = $state<HTMLElement | null>(null);
+	let toolRow = $state<HTMLElement | null>(null);
+	let toolsWidth = $state(0);
+	let toolRowHeight = $state(0);
+	let barHeight = $state(0);
+	let moved = $state(false);
+	let rowStuck = $state(false);
+	let rowAside = $state<Aside>({ hidden: false, anchor: 0 });
+	const barOnTop = $derived(showBar && !phone.current);
+	const groupTop = $derived(
+		barOnTop
+			? SELECTION_TOP + barHeight + 8
+			: desktop.current
+				? HEADER + 8
+				: rowAside.hidden
+					? HEADER
+					: HEADER + toolRowHeight
+	);
+
+	function scrolled() {
+		// The band once the head of the page (title, count, lenses) has gone below the header:
+		// earlier it would hide what of it passes the line (a long count of hits).
+		moved = (pageHead?.getBoundingClientRect().bottom ?? 0) <= HEADER;
+		const row = toolRow?.offsetParent ? toolRow : null;
+		rowStuck = row !== null && row.getBoundingClientRect().top <= HEADER + 0.5;
+		// Never while one types in it.
+		const busy = row?.contains(document.activeElement) ?? false;
+		rowAside = busy
+			? { hidden: false, anchor: window.scrollY }
+			: aside(rowAside, window.scrollY, rowStuck);
+	}
+
+	/** The page's own search field takes the focus: below the desktop its row comes back, on a
+	 * desktop the page goes up to it by the title. */
+	function showSearch() {
+		const field = [...document.querySelectorAll<HTMLInputElement>('[data-page-search]')].find(
+			(each) => each.offsetParent !== null
+		);
+		if (!field) return;
+		rowAside = { hidden: false, anchor: window.scrollY };
+		if (desktop.current && window.scrollY > 0) {
+			const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+			window.scrollTo({ top: 0, behavior: still ? 'auto' : 'smooth' });
+		}
+		field.focus({ preventScroll: true });
+	}
 </script>
+
+<svelte:window onscroll={scrolled} />
 
 <svelte:head><title>{m.nav_documents()} · {m.app_name()}</title></svelte:head>
 
@@ -821,6 +879,7 @@ row of filters, on a desktop narrow by the title. -->
 		onclear={letGo}
 		onend={endSelecting}
 		{merge}
+		bind:height={barHeight}
 	/>
 {/snippet}
 
@@ -831,9 +890,51 @@ row of filters, on a desktop narrow by the title. -->
 {/snippet}
 
 <div class="flex flex-col gap-6" data-roomy>
-	<div class="flex flex-col gap-3">
-		<!-- As high as the head of every other page (`PageHeader`). -->
-		<div class="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 max-sm:min-h-11">
+	<!-- From the desktop on (web/DESIGN.md, "Sticky heads"): once the head of the page has gone
+	below the header, a band behind the line below it, across the list. The tools beside the title stay on that
+	line; while the selection bar owns it, they scroll away with the title. Neither takes room. -->
+	<div class="sticky top-16 z-20 -mb-6 hidden h-0 lg:block" aria-hidden="true">
+		<div
+			class={['absolute right-0 border-b bg-background', collapsed ? 'left-0' : 'left-80']}
+			class:invisible={!moved}
+			style:height={`${barOnTop ? groupTop - HEADER : HEADER - 8}px`}
+		></div>
+	</div>
+	<div class={['z-30 -mb-6 hidden h-0 lg:block', barOnTop ? 'relative' : 'sticky top-18']}>
+		<div
+			bind:clientWidth={toolsWidth}
+			class="absolute top-0 right-0 flex items-center gap-2 bg-background pl-3"
+		>
+			{#if !streaming}{@render sortMenu(!roomy.current)}{@render selectButton(false)}{/if}
+			<Segmented
+				names="hidden"
+				label={m.layout_label()}
+				value={layout}
+				options={[
+					{ value: 'grid', label: m.layout_grid(), icon: LayoutGrid },
+					{ value: 'list', label: m.layout_list(), icon: List },
+					{ value: 'stream', label: m.layout_stream(), icon: Waypoints }
+				]}
+				onchange={(next) => show(next as Layout)}
+			/>
+			{#if lens && lookup && roomy.current}
+				<Button variant="outline" onclick={() => edit(lens)}>
+					<Pencil aria-hidden="true" />
+					{m.lens_edit()}
+				</Button>
+			{:else if lens && lookup}
+				<IconButton variant="outline" label={m.lens_edit()} onclick={() => edit(lens)}>
+					<Pencil aria-hidden="true" />
+				</IconButton>
+			{/if}
+		</div>
+	</div>
+	<div bind:this={pageHead} class="flex flex-col gap-3" style:--tools-width={`${toolsWidth}px`}>
+		<!-- As high as the head of every other page (`PageHeader`); on a desktop the tools above
+		stand at its end. -->
+		<div
+			class="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 max-sm:min-h-11 lg:pr-(--tools-width)"
+		>
 			<!-- Collapses the filters beside the list; collapsed, it counts the active ones. -->
 			<IconButton
 				variant="outline"
@@ -878,23 +979,10 @@ row of filters, on a desktop narrow by the title. -->
 				</p>
 			{/if}
 			<div class="ml-auto flex items-center gap-2">
-				<div class="hidden items-center gap-2 lg:flex">
-					{@render searchForm(true)}
-					{#if !streaming}{@render sortMenu(false)}{@render selectButton(false)}{/if}
-					<Segmented
-						names="hidden"
-						label={m.layout_label()}
-						value={layout}
-						options={[
-							{ value: 'grid', label: m.layout_grid(), icon: LayoutGrid },
-							{ value: 'list', label: m.layout_list(), icon: List },
-							{ value: 'stream', label: m.layout_stream(), icon: Waypoints }
-						]}
-						onchange={(next) => show(next as Layout)}
-					/>
-				</div>
+				{@render searchForm(true)}
 				{#if lens && lookup}
-					<!-- Narrower, an icon with its name as tooltip (DESIGN.md, "Page frame"). -->
+					<!-- Narrower, an icon with its name as tooltip (DESIGN.md, "Page frame"); on a
+					desktop a button among the tools. -->
 					<IconButton
 						variant="outline"
 						class="lg:hidden"
@@ -903,10 +991,6 @@ row of filters, on a desktop narrow by the title. -->
 					>
 						<Pencil aria-hidden="true" />
 					</IconButton>
-					<Button variant="outline" class="max-lg:hidden" onclick={() => edit(lens)}>
-						<Pencil aria-hidden="true" />
-						{m.lens_edit()}
-					</Button>
 				{/if}
 			</div>
 		</div>
@@ -926,112 +1010,120 @@ row of filters, on a desktop narrow by the title. -->
 				</div>
 			</aside>
 		{/if}
-		<div class="flex min-w-0 flex-1 flex-col gap-6">
-			<!-- Empty on a desktop without filters, words or changes: then it takes no room, and
+		<div class="flex min-w-0 flex-1 flex-col gap-6" style:--group-top={`${groupTop}px`}>
+			<!-- Below the desktop the filters, sort and layout stand in a row, on a phone beside
+			the page's own search (the header has only a magnifier there). It sticks below the
+			header, steps aside while the page scrolls down and comes back as it scrolls up
+			(web/DESIGN.md, "Sticky heads"); not while the selection bar of a tablet owns the line. -->
+			<div
+				bind:this={toolRow}
+				bind:offsetHeight={toolRowHeight}
+				class={[
+					'-mx-4 -my-2 flex items-center justify-end gap-2 bg-background px-4 py-2 sm:-mx-8 sm:px-8 lg:hidden',
+					rowStuck && !rowAside.hidden ? 'border-b' : 'border-b border-transparent',
+					!barOnTop && 'sticky top-16 z-30 motion-safe:transition-transform',
+					rowAside.hidden && '-translate-y-full'
+				]}
+			>
+				{@render searchForm(false)}
+				<Sheet.Root bind:open={filtersOpen}>
+					<Sheet.Trigger>
+						{#snippet child({ props })}
+							<IconButton
+								{...props}
+								variant="outline"
+								class="relative shrink-0"
+								label={m.filters_open()}
+							>
+								<SlidersHorizontal aria-hidden="true" />
+								{#if activeFilters > 0}
+									<span
+										class="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-xs font-semibold text-primary-foreground tabular-nums"
+										aria-hidden="true"
+									>
+										{activeFilters}
+									</span>
+								{/if}
+							</IconButton>
+						{/snippet}
+					</Sheet.Trigger>
+					<!-- Title and close stay at the top, reset and show at the bottom; between them
+					the filters scroll. -->
+					<Sheet.Content
+						side="bottom"
+						showCloseButton={false}
+						class="max-h-[85dvh] gap-0 rounded-t-2xl"
+					>
+						<Sheet.Header class="flex-row items-center justify-between border-b py-2 pr-2 pl-4">
+							<Sheet.Title>{m.filters_title()}</Sheet.Title>
+							<Sheet.Close>
+								{#snippet child({ props })}
+									<IconButton {...props} label={m.close()}>
+										<X aria-hidden="true" />
+									</IconButton>
+								{/snippet}
+							</Sheet.Close>
+						</Sheet.Header>
+						<div class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+							{@render filterPanel()}
+						</div>
+						<Sheet.Footer class="flex-row border-t py-3">
+							<Button
+								variant="ghost"
+								disabled={!isFiltered(filters)}
+								onclick={() => change(NO_FILTERS)}
+							>
+								{m.filters_reset()}
+							</Button>
+							<Button class="flex-1" onclick={() => (filtersOpen = false)}>
+								{shownCount === null
+									? m.filters_show_all()
+									: m.filters_show({ count: formatNumber(shownCount) })}
+							</Button>
+						</Sheet.Footer>
+					</Sheet.Content>
+				</Sheet.Root>
+				{#if !streaming}{@render sortMenu(true)}{@render selectButton(true)}{/if}
+				<!-- The layout as a menu that shows the current one, as the sort beside it. -->
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger>
+						{#snippet child({ props })}
+							<IconButton
+								{...props}
+								variant="outline"
+								class="shrink-0"
+								label={m.layout_current({ layout: LAYOUT_LABELS[layout]() })}
+								tooltip={false}
+							>
+								{#if layout === 'list'}
+									<List aria-hidden="true" />
+								{:else if layout === 'stream'}
+									<Waypoints aria-hidden="true" />
+								{:else}
+									<LayoutGrid aria-hidden="true" />
+								{/if}
+							</IconButton>
+						{/snippet}
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content align="end" class="w-48">
+						<DropdownMenu.RadioGroup value={layout} onValueChange={(next) => show(next as Layout)}>
+							{#each LAYOUTS as option (option)}
+								<DropdownMenu.RadioItem value={option}>
+									{LAYOUT_LABELS[option]()}
+								</DropdownMenu.RadioItem>
+							{/each}
+						</DropdownMenu.RadioGroup>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
+			</div>
+			<!-- Empty without filters, words or changes: then it takes no room, and on a desktop
 			the list stands level with the lenses. -->
 			<div
 				class={[
-					'flex flex-col gap-3',
-					!(changed || query || isFiltered(filters) || lookupError) && 'lg:hidden'
+					'flex flex-col gap-3 max-lg:-mt-3',
+					!(changed || query || isFiltered(filters) || lookupError) && 'hidden'
 				]}
 			>
-				<!-- Below the desktop the filters, sort and layout stand in a row, on a phone beside
-				the page's own search (the header has only a magnifier there). -->
-				<div class="flex items-center justify-end gap-2 lg:hidden">
-					{@render searchForm(false)}
-					<Sheet.Root bind:open={filtersOpen}>
-						<Sheet.Trigger>
-							{#snippet child({ props })}
-								<IconButton
-									{...props}
-									variant="outline"
-									class="relative shrink-0"
-									label={m.filters_open()}
-								>
-									<SlidersHorizontal aria-hidden="true" />
-									{#if activeFilters > 0}
-										<span
-											class="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-xs font-semibold text-primary-foreground tabular-nums"
-											aria-hidden="true"
-										>
-											{activeFilters}
-										</span>
-									{/if}
-								</IconButton>
-							{/snippet}
-						</Sheet.Trigger>
-						<!-- Title and close stay at the top, reset and show at the bottom; between them
-						the filters scroll. -->
-						<Sheet.Content
-							side="bottom"
-							showCloseButton={false}
-							class="max-h-[85dvh] gap-0 rounded-t-2xl"
-						>
-							<Sheet.Header class="flex-row items-center justify-between border-b py-2 pr-2 pl-4">
-								<Sheet.Title>{m.filters_title()}</Sheet.Title>
-								<Sheet.Close>
-									{#snippet child({ props })}
-										<IconButton {...props} label={m.close()}>
-											<X aria-hidden="true" />
-										</IconButton>
-									{/snippet}
-								</Sheet.Close>
-							</Sheet.Header>
-							<div class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-								{@render filterPanel()}
-							</div>
-							<Sheet.Footer class="flex-row border-t py-3">
-								<Button
-									variant="ghost"
-									disabled={!isFiltered(filters)}
-									onclick={() => change(NO_FILTERS)}
-								>
-									{m.filters_reset()}
-								</Button>
-								<Button class="flex-1" onclick={() => (filtersOpen = false)}>
-									{shownCount === null
-										? m.filters_show_all()
-										: m.filters_show({ count: formatNumber(shownCount) })}
-								</Button>
-							</Sheet.Footer>
-						</Sheet.Content>
-					</Sheet.Root>
-					{#if !streaming}{@render sortMenu(true)}{@render selectButton(true)}{/if}
-					<!-- The layout as a menu that shows the current one, as the sort beside it. -->
-					<DropdownMenu.Root>
-						<DropdownMenu.Trigger>
-							{#snippet child({ props })}
-								<IconButton
-									{...props}
-									variant="outline"
-									class="shrink-0"
-									label={m.layout_current({ layout: LAYOUT_LABELS[layout]() })}
-									tooltip={false}
-								>
-									{#if layout === 'list'}
-										<List aria-hidden="true" />
-									{:else if layout === 'stream'}
-										<Waypoints aria-hidden="true" />
-									{:else}
-										<LayoutGrid aria-hidden="true" />
-									{/if}
-								</IconButton>
-							{/snippet}
-						</DropdownMenu.Trigger>
-						<DropdownMenu.Content align="end" class="w-48">
-							<DropdownMenu.RadioGroup
-								value={layout}
-								onValueChange={(next) => show(next as Layout)}
-							>
-								{#each LAYOUTS as option (option)}
-									<DropdownMenu.RadioItem value={option}>
-										{LAYOUT_LABELS[option]()}
-									</DropdownMenu.RadioItem>
-								{/each}
-							</DropdownMenu.RadioGroup>
-						</DropdownMenu.Content>
-					</DropdownMenu.Root>
-				</div>
 				{#if lens && changed}
 					<LensChanges
 						name={lens.name}
@@ -1127,22 +1219,12 @@ row of filters, on a desktop narrow by the title. -->
 					{#each groups as group (group.key)}
 						<section class="flex flex-col gap-3" aria-label={group.label ?? undefined}>
 							{#if group.label !== null}
-								<SectionTitle
-									size="card"
-									class={[
-										'flex items-center gap-3',
-										group.tone === 'overdue' && 'text-lane-red-foreground',
-										group.tone === 'soon' && 'text-lane-yellow-foreground'
-									]}
+								<GroupTitle
+									tone={group.tone}
+									count={lens ? formatNumber(group.items.length) : null}
 								>
 									{group.label}
-									{#if lens}
-										<span class="text-sm font-normal text-muted-foreground tabular-nums">
-											{formatNumber(group.items.length)}
-										</span>
-									{/if}
-									<Separator decorative class="flex-1" />
-								</SectionTitle>
+								</GroupTitle>
 							{/if}
 							{#if layout === 'grid'}
 								<ul

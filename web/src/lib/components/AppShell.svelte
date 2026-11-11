@@ -28,6 +28,7 @@
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { reportError } from '#lib/errors.ts';
 	import { searchPlaces } from '#lib/header-search.ts';
+	import { showPageSearch } from '#lib/page-search.ts';
 	import { changeLanguage, getLocale, LANGUAGE_NAMES, locales, type Locale } from '#lib/i18n.ts';
 	import { home, loginHref } from '#lib/navigation.ts';
 	import { BADGE_TONES, badgeLabel, badgeText, badgeTone, inbox } from '#lib/inbox.svelte.ts';
@@ -211,13 +212,17 @@
 
 			<div class="ml-auto flex items-center gap-1.5 max-[380px]:gap-1 sm:gap-2">
 				<!-- The field where there is room, else a magnifier to the documents page's own
-				     field (`header-search.ts`). -->
+				     field (`header-search.ts`); on that page it shows the field rather than opening
+				     the page anew (`page-search.ts`). -->
 				<HeaderSearch class={searchPlaces(session.isAdmin).field} />
 				<IconButton
 					href="{BASE}/documents#search"
 					class={searchPlaces(session.isAdmin).icon}
 					label={m.header_search_label()}
 					side="bottom"
+					onclick={(event: MouseEvent) => {
+						if (showPageSearch()) event.preventDefault();
+					}}
 				>
 					<SearchIcon aria-hidden="true" />
 				</IconButton>

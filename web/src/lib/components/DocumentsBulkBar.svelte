@@ -56,7 +56,8 @@
 		onall,
 		onclear,
 		onend,
-		merge = null
+		merge = null,
+		height = $bindable(0)
 	}: {
 		/** How many documents are chosen. */
 		count: number;
@@ -78,6 +79,8 @@
 		onclear: () => void;
 		/** End the selection mode. */
 		onend: () => void;
+		/** The bar's height as it stands (`SelectionBar`). */
+		height?: number;
 		/** Merging the chosen documents: why it cannot be now (null: it can), and its start. */
 		merge?: { blocked: string | null; start: () => void } | null;
 	} = $props();
@@ -248,6 +251,7 @@
 	trail={phone.current && !running ? chooser : undefined}
 	hint={running ? progressHint : all || count === 0 || limit !== null ? reach : undefined}
 	actions={running ? undefined : actions}
+	bind:height
 />
 
 <!-- What to choose at once: the page, every hit, none; and the end of the mode. -->
