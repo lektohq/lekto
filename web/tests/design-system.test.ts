@@ -307,6 +307,21 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('puts a destructive action of a menu last, behind a line', () => {
+		expect(
+			offenders((source) => {
+				for (const match of source.matchAll(/<DropdownMenu\.Item\s+variant="destructive"/g)) {
+					const before = source.slice(0, match.index);
+					const after = source.slice(match.index);
+					const behindLine = /<DropdownMenu\.Separator \/>\s*(?:\{\/if\}\s*)?$/.test(before);
+					const last = /^[\s\S]*?<\/DropdownMenu\.Item>\s*<\/DropdownMenu\.Content>/.test(after);
+					if (!behindLine || !last) return match[0];
+				}
+				return null;
+			})
+		).toEqual([]);
+	});
+
 	it('opens a choice by searching through PickerShell, a sheet on a phone', () => {
 		expect(
 			offenders((source, path) =>

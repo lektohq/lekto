@@ -142,6 +142,10 @@
 	const fileOfPages = $derived(
 		manageable && status !== 'processing' && document.media_type !== 'message/rfc822'
 	);
+	// "Löschen" stands last in the menu, behind a line when anything stands before it.
+	const actions = $derived(
+		status === 'failed' || (status !== 'processing' && nodes.length > 0) || fileOfPages || readable
+	);
 
 	async function edited(result: components['schemas']['EditedDocuments'], target: string | null) {
 		toast.success(result.merged.length > 0 ? m.merge_done() : m.page_edit_done());
@@ -381,6 +385,9 @@
 									</span>
 								{/if}
 							</DropdownMenu.Item>
+						{/if}
+						{#if actions}
+							<DropdownMenu.Separator />
 						{/if}
 						<DropdownMenu.Item variant="destructive" onSelect={() => (confirmDelete = true)}>
 							<Trash2 aria-hidden="true" />
