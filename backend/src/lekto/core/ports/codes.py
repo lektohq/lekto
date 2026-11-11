@@ -18,7 +18,9 @@ class CodeReader(Protocol):
 
     Reading runs outside the event loop (adapters use a thread)."""
 
-    async def read_codes(self, source: Path) -> CodeReading:
-        """The codes on the pages of the PDF `source` (the archive), in page order, each with
-        its box on the page as shown. UnprocessableDocumentError if the file cannot be read."""
+    async def read_codes(self, source: Path, *, every_page: bool = False) -> CodeReading:
+        """The codes on the pages of the PDF `source` (the archive, or an original looked
+        through for separator sheets), in page order, each with its box on the page as shown;
+        with `every_page`, beyond the reader's limit. UnprocessableDocumentError if the file
+        cannot be read."""
         ...

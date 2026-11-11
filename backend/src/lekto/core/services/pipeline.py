@@ -8,7 +8,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from lekto.core.domain import media_types
 from lekto.core.domain.classification import CLASSIFIER_LABELS, SPACE
@@ -142,6 +142,14 @@ class DeferredResult(Protocol):
     async def apply(
         self, uow: UnitOfWork, document: Document, now: datetime
     ) -> NodeResult | Delegation: ...
+
+
+@runtime_checkable
+class Discardable(Protocol):
+    """A deferred result that stored files before it is stored itself (the parts of a stack,
+    `services.separating`): if its run is over first (the document was deleted), they go."""
+
+    async def discard(self) -> None: ...
 
 
 VERSION_MEDIA_TYPES: tuple[str, ...] = tuple(
@@ -1233,6 +1241,8 @@ class PipelineService:
             ):
                 await uow.jobs.complete(job, now=now)
                 await uow.commit()
+                if isinstance(outcome, Discardable):
+                    await outcome.discard()
                 return
             if isinstance(outcome, NodeResult):
                 result = outcome

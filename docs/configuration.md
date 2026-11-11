@@ -193,6 +193,7 @@ Background jobs, the delivery of events and the cleanup.
 | --- | --- | --- | --- | --- |
 | `LEKTO_OCR_LANGUAGES` | Worker | `deu+eng` | text | Tesseract languages, joined by `+`; the image has German and English |
 | `LEKTO_OCR_TIMEOUT` | Worker | `600` | duration | Time per document for OCR (OCRmyPDF) |
+| `LEKTO_SEPARATOR_CODES` | Worker | `PATCHT` | text | Codes of separator sheets, comma-separated: a page with a bar or QR code whose whole text is one of them (in any case) splits a stack that comes in there, and is left out; empty: stacks are never split. Not for the migration, new versions or reprocessing |
 | `LEKTO_MAIL_RENDER_TIMEOUT` | Worker | `120` | duration | Time per mail for setting it as a PDF (WeasyPrint, in a child process) |
 | `LEKTO_CHILD_MAX_MEMORY` | Worker | `2GiB` | size | Address space each program Lekto starts may take: OCRmyPDF with Ghostscript and Tesseract, the mail renderer. A document that needs more fails its step instead of the worker; documents need less than 1 GiB |
 | `LEKTO_MAIL_TIMEOUT` | both | `30` | duration | Time for connecting to a mail server (IMAP) and for each of its answers; the API tests connections, the worker fetches |

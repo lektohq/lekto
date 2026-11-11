@@ -4,7 +4,7 @@
  */
 import type { components } from '#lib/api/schema.ts';
 import { describeValue, fieldLabel } from '#lib/describe.ts';
-import { formatDate, formatNumber } from '#lib/i18n.ts';
+import { formatDate, formatNumber, listLocale } from '#lib/i18n.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { labelled, outputReasonText, reasonsText } from '#lib/reasons.ts';
@@ -100,6 +100,8 @@ export function stepSummary(
 	switch (node) {
 		case 'receive':
 			return formatDate(entry.started_at, { dateStyle: 'short', timeStyle: 'short' });
+		case 'separate':
+			return separated(output);
 		case 'ocr':
 			return recognised(output);
 		case 'pages':
@@ -129,6 +131,24 @@ export function stepSummary(
 		default:
 			return null;
 	}
+}
+
+/** The separator sheets a stack was split at, and into how many parts; null where none was
+ * looked for (a migration, a new version). */
+function separated(output: Json): string | null {
+	if (!Array.isArray(output.sheets)) return null;
+	const sheets = output.sheets.map((page) => formatNumber(count(page)));
+	if (sheets.length === 0) return m.summary_no_separator();
+	const pages = new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(sheets);
+	const found =
+		sheets.length === 1
+			? m.summary_sheets_one({ pages })
+			: m.summary_sheets({ count: formatNumber(sheets.length), pages });
+	const parts = count(output.parts);
+	if (parts === 0) return found;
+	const made =
+		parts === 1 ? m.summary_parts_one() : m.summary_parts({ count: formatNumber(parts) });
+	return `${found}: ${made}`;
 }
 
 function recognised(output: Json): string {

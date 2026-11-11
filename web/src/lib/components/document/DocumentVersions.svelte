@@ -44,8 +44,26 @@
 			return m.version_edited({ from: String(version.detail.from ?? '') });
 		if (version.kind === 'split')
 			return m.version_split({ title: String(version.detail.title ?? '') });
+		if (version.kind === 'separated')
+			return m.version_separated({
+				pages: pagesOf(version.detail.pages),
+				from: String(version.detail.from ?? '')
+			});
 		return m.version_received();
 	};
+
+	/** The pages a version was made of, of one source: "S. 1–3" (a part of a stack is a run). */
+	function pagesOf(picks: unknown): string {
+		const pages = Array.isArray(picks)
+			? picks.map((pick) => Number((pick as { page?: unknown }).page)).filter(Number.isFinite)
+			: [];
+		if (pages.length === 0) return '';
+		const first = String(Math.min(...pages));
+		const last = String(Math.max(...pages));
+		return first === last
+			? m.page_edit_part_page({ page: first })
+			: m.page_edit_part_pages({ first, last });
+	}
 
 	function download(number: number) {
 		const link = window.document.createElement('a');

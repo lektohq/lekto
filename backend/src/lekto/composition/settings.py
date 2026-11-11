@@ -214,6 +214,9 @@ class Settings(BaseSettings):
     # the archive's text layer as it is set (PDFium), which needs no settings.
     ocr_languages: Annotated[str, Field(pattern=r"^[a-z_]+(\+[a-z_]+)*$")] = "deu+eng"
     ocr_timeout: Seconds = timedelta(minutes=10)
+    # Separator sheets: a page with a code whose whole text is one of these (comma-separated,
+    # any case) splits a stack that comes in there; empty: stacks are never split.
+    separator_codes: Annotated[str, Field(max_length=1000)] = "PATCHT"
     # A mail is set as a PDF (WeasyPrint) in a child process with a time limit: its HTML comes
     # from anyone, and WeasyPrint has no limit of its own.
     mail_render_timeout: Seconds = timedelta(minutes=2)

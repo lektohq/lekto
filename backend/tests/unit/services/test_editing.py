@@ -73,7 +73,7 @@ async def test_a_part_replaces_the_document_and_the_others_become_new_documents(
     edited, new = (view.document for view in result.documents)
     assert edited.id == document.id
     assert edited.sha256 != document.sha256 and edited.original_filename == "stack.pdf"
-    assert edited.processing.new_version and set(edited.processing.due()) == {Node.OCR, Node.PAGES}
+    assert edited.processing.new_version and edited.processing.due() == (Node.SEPARATE,)
     # The new one lies in the same space, came in as the document did, and a person chose
     # its space; it runs from the start and ends in the inbox too.
     assert (new.space_id, new.uploaded_by, new.channel) == (

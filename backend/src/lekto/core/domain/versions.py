@@ -1,8 +1,9 @@
 """Versions of a document's original (`.idea/architektur.md`, "Fassungen"; Umsetzungsplan
-"Fassungen, Datei ersetzen, PDF bearbeiten"): a document has versions 1, 2, …, each an original
-that never changes. A new version comes in when a person replaces the file or edits the pages;
-none is overwritten. The document carries its current one's hash, name and media type; the
-derivatives (archive PDF, text, pages) are the current version's."""
+"Fassungen, Datei ersetzen, PDF bearbeiten", "Trennblatt und Zusammenführen"): a document has
+versions 1, 2, …, each an original that never changes. A new version comes in when a person
+replaces the file or edits the pages, or when the stack it came in as is split at its separator
+sheets; none is overwritten. The document carries its current one's hash, name and media type;
+the derivatives (archive PDF, text, pages) are the current version's."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -19,7 +20,8 @@ class VersionKind(StrEnum):
     RECEIVED = "received"  # how the document came in
     REPLACED = "replaced"  # a person put another file in its place
     EDITED = "edited"  # a person edited its pages
-    SPLIT = "split"  # its first: pages a person split off another document (`domain.editing`)
+    SPLIT = "split"  # its first: pages split off another document (`domain.editing`, a stack)
+    SEPARATED = "separated"  # the first part of the stack it came in as (`domain.separating`)
 
 
 @dataclass(frozen=True, kw_only=True)

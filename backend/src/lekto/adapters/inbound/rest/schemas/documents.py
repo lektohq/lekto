@@ -30,9 +30,11 @@ from lekto.core.services.documents import DocumentFacets
 from lekto.core.services.objects import EXCHANGE_NODES
 
 ReprocessNode = StrEnum(  # type: ignore[misc]
-    "ReprocessNode", {node.name: node.value for node in Node if node is not Node.RECEIVE}
+    "ReprocessNode",
+    {node.name: node.value for node in Node if node not in (Node.RECEIVE, Node.SEPARATE)},
 )
-"""Nodes processing can restart from; receiving cannot be repeated."""
+"""Nodes processing can restart from; receiving and separating (only when a document comes in)
+cannot be repeated."""
 
 ExchangeNode = StrEnum(  # type: ignore[misc]
     "ExchangeNode", {node.name: node.value for node in EXCHANGE_NODES}

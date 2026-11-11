@@ -236,7 +236,7 @@ async def test_stop_lets_running_jobs_finish() -> None:
     log = await services.documents.processing_log(user.id, document.id)
     nodes = [entry.node for entry in log]
     assert Node.OCR in nodes and Node.PARSE not in nodes  # nothing new after stop
-    assert set(nodes) <= {Node.RECEIVE, Node.OCR, Node.PAGES}
+    assert set(nodes) <= {Node.RECEIVE, Node.SEPARATE, Node.OCR, Node.PAGES}
 
 
 async def test_jobs_still_running_after_the_timeout_are_released() -> None:
@@ -249,9 +249,10 @@ async def test_jobs_still_running_after_the_timeout_are_released() -> None:
     )
     async with running(worker(container, services, shutdown_timeout=FAST)):
         await node.started.wait()
-    async with container.unit_of_work() as uow:
-        job = await uow.jobs.claim(now=container.clock.now(), lease=FAST, kinds=[NODE_JOB])
-    assert job is not None
+    async with container.unit_of_work() as uow:  # the pages may wait too
+        now = container.clock.now()
+        claimed = [await uow.jobs.claim(now=now, lease=FAST, kinds=[NODE_JOB]) for _ in "12"]
+    (job,) = [job for job in claimed if job is not None and job.payload["node"] == Node.OCR]
     assert (job.attempts, job.last_error) == (2, "interrupted: the worker stopped")
 
 

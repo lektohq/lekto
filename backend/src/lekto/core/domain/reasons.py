@@ -156,6 +156,7 @@ class ReasonCode(StrEnum):
     VISION_READ = "vision_read"
     VISION_NOT_CONFIGURED = "vision_not_configured"
     NO_TEXT = "no_text"
+    ONLY_SEPARATOR_SHEETS = "only_separator_sheets"
     ANSWER_UNFIT = "answer_unfit"
     NOTHING_RECOGNISED = "nothing_recognised"
     MASTER_DATA_CHANGED = "master_data_changed"
@@ -252,6 +253,7 @@ class ReasonCode(StrEnum):
     BEING_PROCESSED = "being_processed"
     ONLY_FAILED_RETRIED = "only_failed_retried"
     RECEIVE_NOT_REPEATABLE = "receive_not_repeatable"
+    SEPARATE_NOT_REPEATABLE = "separate_not_repeatable"
     NOT_WAITING_FOR_CONFIRMATION = "not_waiting_for_confirmation"
     STILL_RUNNING = "still_running"
     NO_TEXT_TO_EXTRACT = "no_text_to_extract"
@@ -628,6 +630,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
         "a person asked for the vision language model, but none is configured"
     ),
     ReasonCode.NO_TEXT: "no text recognised: the pages are blank or hold only pictures",
+    ReasonCode.ONLY_SEPARATOR_SHEETS: "every page is a separator sheet: nothing was split",
     ReasonCode.ANSWER_UNFIT: "the model's answer does not fit the schema: {detail}",
     ReasonCode.NOTHING_RECOGNISED: "nothing recognised: no contact, document type or date",
     ReasonCode.MASTER_DATA_CHANGED: (
@@ -742,6 +745,9 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.BEING_PROCESSED: "document {id} is being processed",
     ReasonCode.ONLY_FAILED_RETRIED: "document {id}: only failed processing is retried",
     ReasonCode.RECEIVE_NOT_REPEATABLE: "the receive node cannot be repeated",
+    ReasonCode.SEPARATE_NOT_REPEATABLE: (
+        "separator sheets are looked for only when a document comes in"
+    ),
     ReasonCode.NOT_WAITING_FOR_CONFIRMATION: "document {id} is not waiting for confirmation",
     ReasonCode.STILL_RUNNING: "document {id}: {nodes:nodes} is still running; confirm afterwards",
     ReasonCode.NO_TEXT_TO_EXTRACT: "document {id} has no text to extract from",

@@ -3,7 +3,8 @@ PDFium.
 
 Each page is rendered in grey at `DPI` (small codes need it: a matrix code of a franking mark
 has modules of a third of a millimetre), its long edge at most `MAX_EDGE` pixels, and zxing-cpp
-reads every format it knows from it. A long document is read as far as `max_pages`. Rendering
+reads every format it knows from it. A long document is read as far as `max_pages`, unless
+every page is asked for (separator sheets). Rendering
 goes through the process-wide PDFium lock; the copy of the pixels and decoding do not need it. A
 result zxing-cpp marks invalid, or with no text, is left out; the same code twice on a page
 counts once.
@@ -38,10 +39,10 @@ class ZxingCodeReader:
             f"pdfium {pypdfium2.PDFIUM_INFO.build}"
         )
 
-    async def read_codes(self, source: Path) -> CodeReading:
-        return await asyncio.to_thread(self._read, source)
+    async def read_codes(self, source: Path, *, every_page: bool = False) -> CodeReading:
+        return await asyncio.to_thread(self._read, source, every_page)
 
-    def _read(self, source: Path) -> CodeReading:
+    def _read(self, source: Path, every_page: bool) -> CodeReading:
         try:
             with LOCK:
                 document = pypdfium2.PdfDocument(source)
@@ -52,7 +53,7 @@ class ZxingCodeReader:
             ) from None
         codes: list[Code] = []
         try:
-            pages = min(total, self._max_pages)
+            pages = total if every_page else min(total, self._max_pages)
             for index in range(pages):
                 image = _render(document, index)
                 codes.extend(_codes_of(image, index + 1))
