@@ -381,7 +381,9 @@ chosen a line there says how to choose, move and cut. The description under the 
 "12 Seiten · 3 Teile"; the footer starts with how the keyboard works it (`footNote`).
 
 - **Page tile** (`PageTile`): the paper of a page (its image with `shadow-sm`) in a square, turned
-  as it will be, its place below ("Seite 3", `text-meta`, muted), a `ChoiceBox` at the top left.
+  as it will be, its place below ("Seite 3", `text-meta`) as a `BeamTitle` that shows it in the
+  Beam among the parts (out of the tab order: B on a page does the same), a `ChoiceBox` at the
+  top left.
   The tile is the label of its box: a click or a tap anywhere chooses it, with Shift up to here;
   chosen, it has the chosen look of "Choosing many" (`bg-panel`, `border-primary`). The tiles are
   a grid with one tab stop (the boxes, `grid-keys.ts`, as the icon picker): the arrows, Home and
@@ -400,7 +402,7 @@ chosen a line there says how to choose, move and cut. The description under the 
   one line; nothing comes or goes as the choice changes. On the phone "Auswählen" follows the
   count and the tools share the width (`stack`: icon over word).
 - **The parts**, the second step: a `Card` (`row`) per part with its first two pages, "Teil n"
-  and its pages as `Badge` `muted`, and a `Segmented` (`sm`) "Neue Fassung | Neues Dokument" at
+  (a `BeamTitle`: the part in the Beam) and its pages as `Badge` `muted`, and a `Segmented` (`sm`) "Neue Fassung | Neues Dokument" at
   its end (on a phone below, `equal`, the full width); at most one part replaces the document
   (choosing it lets go of another). Below them an `Alert` `note`: every result runs anew and waits
   in the inbox, which part becomes which version of the document ("Teil 1 wird Fassung 3 von
@@ -715,8 +717,15 @@ modal, over a dialog too.
   before those; marks on the archive only; before, its page images re-rastered every page at
   each step of a zoom), one page to a row at the start; buttons, Ctrl/⌘ with the wheel, pinch,
   double click, + − 0; `design-system.test.ts` keeps `PdfViewer` and `PageImages` inside
-  `DocumentPages`; at the bottom "Dokument öffnen", on a phone across the width.
-  Editing happens in the document view.
+  `DocumentPages` (and the parts below); at the bottom "Dokument öffnen", on a phone across the
+  width. Editing happens in the document view.
+- **The parts of an edit** (Tobi, 11.11.2026): from "PDF bearbeiten" it shows the parts before
+  they are stored, in the same sheet, head, paging and viewer (`showPages`): each part's pages as
+  they are to be (turned, in their order, an added file's too, as large as page images;
+  `PageImages`), "Teil 2" and its pages in the head (in the second step also what it becomes),
+  "Teil 2 von 3" to page through the parts, and nothing to open. The history entry names the
+  parts by a key only; their images stay in memory, so a reload closes it, as the edit is gone
+  then too.
 - **Opening it: one way everywhere** (Tobi, 31.10.2026). Wherever Lekto names a document, its
   title opens it in the Beam: the eye (`scan-eye`) before the title, both one button in the
   brand colour, medium weight, one line, cut (`BeamTitle`); a value that stands for documents
@@ -726,7 +735,8 @@ modal, over a dialog too.
   holders' evaluation, the similar documents of the processing, the overview's expected
   documents, the jobs, a webhook's deliveries, the existing document of a duplicate upload, the
   documents a bulk action skipped, the document a version was split off and the documents a
-  stack was separated into or a part came from. The Beam pages through what stands beside it.
+  stack was separated into or a part came from; in "PDF bearbeiten" a page's place below its tile
+  and a part's name. The Beam pages through what stands beside it.
 - **Lists of documents carry no eye:** a card or row (the documents, the inbox, search hits)
   and a chip of the stream is the button itself (`DocumentLink`, `viewOrOpen`): a click, a tap
   or Enter shows the document in the Beam, a double click or a long press (a phone) opens it; a

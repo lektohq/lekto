@@ -8,9 +8,11 @@
 	import { ApiError } from '#lib/api/problem.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import {
+		beamCount,
 		beamTo,
 		closeBeam,
 		leaveBeam,
+		partsOf,
 		type BeamSource,
 		type ValueSource
 	} from '#lib/beam.svelte.ts';
@@ -19,6 +21,7 @@
 	import Loading from '#lib/components/Loading.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import DocumentPages from '#lib/components/document/DocumentPages.svelte';
+	import PageImages from '#lib/components/document/PageImages.svelte';
 	import Eyebrow from '#lib/components/page/Eyebrow.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
@@ -57,6 +60,11 @@
 
 	const beam = $derived(page.state.beam ?? null);
 	const id = $derived(beam ? (beam.ids[beam.index] ?? null) : null);
+	// The parts of an edit before they are stored (`showPages`), in place of documents: the same
+	// head, paging and viewer, their pages as they are to be, and nothing to open.
+	const parts = $derived(beam?.parts ? partsOf(beam.parts) : null);
+	const part = $derived(parts && beam ? (parts[beam.index] ?? null) : null);
+	let partPages = $state<PageImages | null>(null);
 	let document = $state<Document | null>(null);
 	let names = $state<{ contact: string | null; type: string | null }>({
 		contact: null,
@@ -308,6 +316,20 @@
 		return () => clearTimeout(timer);
 	});
 
+	// An entry whose parts are gone (a reload; the edit is gone too) closes.
+	$effect(() => {
+		if (beam?.parts && !parts) closeBeam();
+	});
+
+	// To the page of the part it was opened at, once its pages stand.
+	$effect(() => {
+		const shown = partPages;
+		const first = beam?.page ?? 1;
+		if (!part || !shown || first <= 1) return;
+		const timer = setTimeout(() => shown.reveal({ page: first, boxes: [] }), 120);
+		return () => clearTimeout(timer);
+	});
+
 	const meta = $derived(
 		document
 			? [
@@ -375,10 +397,10 @@
 			<div class="min-w-0 flex-1">
 				<Eyebrow>{m.beam_name()}</Eyebrow>
 				<Sheet.Title class="truncate text-base font-semibold">
-					{document?.title ?? '…'}
+					{part ? part.title : (document?.title ?? '…')}
 				</Sheet.Title>
 				<Sheet.Description class="truncate text-sm text-muted-foreground">
-					{meta}
+					{part ? part.meta : meta}
 				</Sheet.Description>
 			</div>
 			<Sheet.Close>
@@ -389,22 +411,35 @@
 				{/snippet}
 			</Sheet.Close>
 		</div>
-		{#if beam && beam.ids.length > 1}
+		{#if beam && beamCount(beam) > 1}
+			{@const total = beamCount(beam)}
 			<Stepper
 				class="shrink-0 px-4 pb-3 sm:px-5"
 				side="start"
-				label={m.beam_documents()}
-				text={beam.source?.kind === 'open' || beam.source?.kind === 'places'
-					? m.beam_place_position({ current: beam.index + 1, total: beam.ids.length })
-					: m.beam_position({ current: beam.index + 1, total: beam.ids.length })}
+				label={parts ? m.beam_parts() : m.beam_documents()}
+				text={parts
+					? m.beam_part_position({ current: beam.index + 1, total })
+					: beam.source?.kind === 'open' || beam.source?.kind === 'places'
+						? m.beam_place_position({ current: beam.index + 1, total })
+						: m.beam_position({ current: beam.index + 1, total })}
 				previous={beam.index > 0 ? () => beamTo(beam!.index - 1) : null}
-				next={beam.index < beam.ids.length - 1 ? () => beamTo(beam!.index + 1) : null}
+				next={beam.index < total - 1 ? () => beamTo(beam!.index + 1) : null}
 				previousLabel={m.doc_previous()}
 				nextLabel={m.doc_next()}
 			/>
 		{/if}
 		<div class="flex min-h-0 flex-1 flex-col border-t bg-surface p-3">
-			{#if problem}
+			{#if part}
+				{#key beam?.index}
+					<PageImages
+						bind:this={partPages}
+						pages={part.pages}
+						label={m.beam_pages({ title: part.title })}
+						note={null}
+						start="one"
+					/>
+				{/key}
+			{:else if problem}
 				<LoadProblem {problem} onretry={() => id && load(id)} />
 			{:else if !document}
 				<Loading class="py-16 text-center" />
@@ -421,13 +456,15 @@
 				/>
 			{/if}
 		</div>
-		<div
-			class="flex shrink-0 justify-end border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5"
-		>
-			<Button variant="outline" class="max-sm:w-full" disabled={!document} onclick={open}>
-				{m.beam_open_document()}
-				<ArrowRight aria-hidden="true" />
-			</Button>
-		</div>
+		{#if !part}
+			<div
+				class="flex shrink-0 justify-end border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5"
+			>
+				<Button variant="outline" class="max-sm:w-full" disabled={!document} onclick={open}>
+					{m.beam_open_document()}
+					<ArrowRight aria-hidden="true" />
+				</Button>
+			</div>
+		{/if}
 	</Sheet.Content>
 </Sheet.Root>

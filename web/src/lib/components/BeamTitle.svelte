@@ -11,6 +11,7 @@
 		label,
 		mono = false,
 		disabled = false,
+		tabindex = undefined,
 		class: className,
 		onview
 	}: {
@@ -20,6 +21,8 @@
 		label?: string;
 		mono?: boolean;
 		disabled?: boolean;
+		/** Out of the tab order where a key does the same (a page tile: B). */
+		tabindex?: number;
 		class?: string;
 		onview: () => void;
 	} = $props();
@@ -35,6 +38,7 @@
 	)}
 	aria-label={name}
 	{disabled}
+	{tabindex}
 	onclick={onview}
 >
 	<ScanEye class="size-4 shrink-0" aria-hidden="true" />

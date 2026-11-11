@@ -3,7 +3,13 @@
 	import type { components } from '#lib/api/schema.ts';
 	import PageImages from '#lib/components/document/PageImages.svelte';
 	import PdfViewer from '#lib/components/PdfViewer.svelte';
-	import { hasArchive, viewerSources, type Mark, type Place } from '#lib/document-view.ts';
+	import {
+		hasArchive,
+		pageImageHref,
+		viewerSources,
+		type Mark,
+		type Place
+	} from '#lib/document-view.ts';
 	import type { Layout } from '#lib/viewer/zoom.ts';
 
 	// A document's pages, the one way the document view and the Beam show them (Tobi, 03.11.2026):
@@ -55,8 +61,9 @@
 		/>
 	{:else}
 		<PageImages
-			documentId={document.id}
-			pageCount={document.page_count}
+			pages={Array.from({ length: document.page_count }, (_, index) => ({
+				src: pageImageHref(document.id, index + 1)
+			}))}
 			{label}
 			{start}
 			{end}

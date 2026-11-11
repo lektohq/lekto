@@ -2,6 +2,7 @@
  * The document view: its tabs, what the model said about each field (and where its quote
  * stands on the page), and the place of a document among those waiting in the inbox.
  */
+import type { Turn } from '#lib/page-edit.ts';
 import type { components } from '#lib/api/schema.ts';
 import { BASE_API } from '#lib/api/base.ts';
 import { documentHref } from '#lib/candidates.ts';
@@ -164,6 +165,13 @@ export function shortIdOf(id: string): string | null {
 
 export function documentApi(id: string): string {
 	return `${BASE_API}/documents/${encodeURIComponent(id)}`;
+}
+
+/** A page to show as an image (`PageImages`): a page image of the API, or a `data:` URL of an
+ * added file's page, turned clockwise as it is to be. */
+export interface ShownPage {
+	src: string;
+	turn?: Turn;
 }
 
 /** The image of a page of the document. */
