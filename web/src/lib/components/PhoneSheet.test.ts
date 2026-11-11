@@ -35,8 +35,10 @@ afterEach(() => vi.useRealTimers());
 
 describe('PhoneSheet', () => {
 	it('closes when its head is pulled down far enough', async () => {
-		const { onOpenChange, head } = sheet();
+		const { onOpenChange, dialog, head } = sheet();
 		pull(head, 160);
+		// It slides out on its own; the closing animation would carry it back up.
+		await waitFor(() => expect(dialog.getAttribute('style')).toContain('animation: none'));
 		await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
 		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 	});
