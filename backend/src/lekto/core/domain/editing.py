@@ -63,12 +63,15 @@ class EditPart:
             raise ValidationError("parts: every part has pages")
 
 
-def check_parts(parts: Sequence[EditPart], counts: Sequence[int], *, merging: bool = False) -> None:
-    """ValidationError unless `parts` edit sources of `counts` pages each (the original first):
-    at least one part, at most one that replaces the document (in a merge, exactly one), every
-    page one its source has and in one place only, and a change: the one part that replaces the
-    document with the original's pages in their order, unturned, changes nothing (a merge
-    always changes, its other documents go)."""
+def check_parts(parts: Sequence[EditPart], counts: Sequence[int], *, merged: int = 0) -> None:
+    """ValidationError unless `parts` edit sources of `counts` pages each (the original first,
+    the `merged` other documents of a merge last): at least one part, at most one that replaces
+    the document (in a merge, exactly one), every page one its source has and in one place only,
+    a page of every other document (one none is taken of is no part of the merge, and would go
+    for nothing), and a change: the one part that replaces the document with the original's
+    pages in their order, unturned, changes nothing (a merge always changes, its other
+    documents go)."""
+    merging = merged > 0
     if not parts:
         raise ValidationError("parts: at least one")
     replacing = sum(part.replaces for part in parts)
@@ -88,6 +91,10 @@ def check_parts(parts: Sequence[EditPart], counts: Sequence[int], *, merging: bo
             if (pick.source, pick.page) in seen:
                 raise ValidationError(f"pages: page {pick.page} of source {pick.source} twice")
             seen.add((pick.source, pick.page))
+    taken = {source for source, _ in seen}
+    for source in range(len(counts) - merged, len(counts)):
+        if source not in taken:
+            raise ValidationError(f"pages: none of source {source}, a document merged")
     unchanged = tuple(PagePick(ORIGINAL, number) for number in range(1, counts[ORIGINAL] + 1))
     if not merging and len(parts) == 1 and parts[0].replaces and parts[0].pages == unchanged:
         raise ValidationError("parts: nothing changed")

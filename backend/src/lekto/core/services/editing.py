@@ -148,8 +148,9 @@ class EditingService:
         and store them (see the module). With `documents`, the part that replaces makes the
         next version of `target`, the document or one of them (the document by default).
         ValidationError for parts that do not fit the pages (`check_parts`; a merge needs a
-        part that replaces), more than `MAX_ADDED` files or `MAX_MERGED` documents, a document
-        twice (or the document among `documents`), or a target that is none of them;
+        part that replaces and a page of every document), more than `MAX_ADDED` files or
+        `MAX_MERGED` documents, a document twice (or the document among `documents`), or a
+        target that is none of them;
         UnsupportedMediaTypeError for an added file that is no PDF or image, and for a mail,
         whose pages are not a file; UnprocessableDocumentError for a file whose pages cannot
         be read; InvalidTransitionError while one of them is processed; ConcurrencyError if a
@@ -183,7 +184,7 @@ class EditingService:
                 *originals[1:],
             ]
             counts = [await self._composer.count_pages(source) for source in sources]
-            check_parts(parts, counts, merging=bool(documents))
+            check_parts(parts, counts, merged=len(documents))
             made = []
             for number, part in enumerate(parts, start=1):
                 target_file = work / f"part-{number}.pdf"
