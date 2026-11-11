@@ -1794,6 +1794,7 @@
 	"version_replaced": "File replaced",
 	"version_edited": "Edited from version {from}",
 	"version_split": "Split off “{title}”",
+	"version_split_from": "Split off",
 	"version_separated": "Split at a separator sheet: {pages} of version {from}",
 	"version_merged": "Merged from {sources}",
 	"version_merged_self": "version {version}",

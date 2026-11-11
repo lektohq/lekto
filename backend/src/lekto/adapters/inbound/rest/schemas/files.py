@@ -1,5 +1,6 @@
 """A document's files as they are stored, and what they say about themselves."""
 
+from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -7,7 +8,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from lekto.core.domain.versions import DocumentVersion
+from lekto.core.domain.ids import DocumentId
+from lekto.core.domain.versions import DocumentVersion, VersionKind
 from lekto.core.ports.metadata import FileMetadata, MetadataSource
 from lekto.core.services.documents import DocumentFiles, StoredFile
 
@@ -75,6 +77,11 @@ class VersionKindOut(StrEnum):
     MERGED = "merged"
 
 
+class VersionOriginOut(BaseModel):
+    id: UUID
+    title: str = Field(description="Its title now.")
+
+
 class DocumentVersionOut(BaseModel):
     """A version of the document's original: its number (from 1), whether it is the current
     one, its file, how and when it came, by whom (null where nobody is known), and what it was
@@ -110,9 +117,21 @@ class DocumentVersionOut(BaseModel):
             "`moved`, the `document`, `title` and `version` it was there."
         )
     )
+    origin: VersionOriginOut | None = Field(
+        description="`split`: the document it was split off as it is now (`detail.title` is "
+        "its title then); null where it is gone, the caller may not read it, or for another "
+        "kind.",
+    )
 
     @classmethod
-    def of(cls, version: DocumentVersion, *, current: bool) -> "DocumentVersionOut":
+    def of(
+        cls, version: DocumentVersion, *, current: bool, origins: Mapping[DocumentId, str]
+    ) -> "DocumentVersionOut":
+        named = version.detail.get("document")
+        origin = None
+        if version.kind is VersionKind.SPLIT and isinstance(named, str):
+            title = origins.get(DocumentId(UUID(named)))
+            origin = None if title is None else VersionOriginOut(id=UUID(named), title=title)
         return cls(
             number=version.number,
             current=current,
@@ -122,6 +141,7 @@ class DocumentVersionOut(BaseModel):
             created_at=version.created_at,
             created_by=version.created_by,
             detail=dict(version.detail),
+            origin=origin,
         )
 
 
@@ -164,6 +184,7 @@ class DocumentFilesOut(BaseModel):
                             "created_at": "2026-07-03T08:40:36Z",
                             "created_by": "01999d5e-4444-7c1e-b6a3-2f4d5e6f7a8b",
                             "detail": {},
+                            "origin": None,
                         }
                     ],
                 }
@@ -194,7 +215,11 @@ class DocumentFilesOut(BaseModel):
             original=StoredFileOut.of(files.original),
             archive=None if files.archive is None else StoredFileOut.of(files.archive),
             versions=[
-                DocumentVersionOut.of(version, current=index == len(files.versions) - 1)
+                DocumentVersionOut.of(
+                    version,
+                    current=index == len(files.versions) - 1,
+                    origins=files.origins,
+                )
                 for index, version in enumerate(files.versions)
             ],
         )

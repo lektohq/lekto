@@ -50,6 +50,33 @@ async def test_a_part_replaces_the_document_another_becomes_one(api: Api) -> Non
     split = (await api.client.get(f"{DOCUMENTS}/{new['id']}/files", headers=auth(owner))).json()
     [first] = split["versions"]
     assert (first["kind"], first["detail"]["document"]) == ("split", id)
+    assert first["origin"] == {"id": id, "title": edited["title"]}
+    assert files["versions"][0]["origin"] is None
+
+
+async def test_a_split_names_its_origin_by_its_title_now_if_readable(api: Api) -> None:
+    owner = await api.user()
+    id = await upload(api, auth(owner))
+    parts = [{"pages": [{"page": 1}], "replaces": True}, {"pages": [{"source": 1, "page": 1}]}]
+    response = await api.client.post(
+        f"{DOCUMENTS}/{id}/edit",
+        **form(parts, ("more.pdf", fake_pdf(1, "more"))),
+        headers=auth(owner),
+    )
+    new = response.json()["documents"][1]["id"]
+    await api.drain()
+    renamed = await api.client.patch(
+        f"{DOCUMENTS}/{id}", json={"title": "Zeugenladung"}, headers=auth(owner)
+    )
+    assert renamed.status_code == 200, renamed.text
+    files = (await api.client.get(f"{DOCUMENTS}/{new}/files", headers=auth(owner))).json()
+    [first] = files["versions"]
+    assert first["origin"] == {"id": id, "title": "Zeugenladung"}
+    assert first["detail"]["title"] != "Zeugenladung"
+    deleted = await api.client.delete(f"{DOCUMENTS}/{id}", headers=auth(owner))
+    assert deleted.status_code == 204, deleted.text
+    files = (await api.client.get(f"{DOCUMENTS}/{new}/files", headers=auth(owner))).json()
+    assert files["versions"][0]["origin"] is None
 
 
 async def test_without_a_part_that_replaces_it_the_document_is_gone(api: Api) -> None:

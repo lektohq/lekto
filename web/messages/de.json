@@ -1794,6 +1794,7 @@
 	"version_replaced": "Datei ersetzt",
 	"version_edited": "Bearbeitet aus Fassung {from}",
 	"version_split": "Abgetrennt aus „{title}“",
+	"version_split_from": "Abgetrennt aus",
 	"version_separated": "Am Trennblatt getrennt: {pages} von Fassung {from}",
 	"version_merged": "Zusammengeführt aus {sources}",
 	"version_merged_self": "Fassung {version}",

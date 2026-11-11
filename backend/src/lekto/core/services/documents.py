@@ -62,7 +62,7 @@ from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.tag_tree import TagTree
 from lekto.core.domain.text_places import TextPlaces
 from lekto.core.domain.users import User
-from lekto.core.domain.versions import DocumentVersion
+from lekto.core.domain.versions import DocumentVersion, VersionKind
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.metadata import FileMetadata, MetadataReader
 from lekto.core.ports.object_store import ObjectStore
@@ -282,6 +282,23 @@ async def _check_sortable(uow: UnitOfWork, order: DocumentOrder) -> None:
         raise ValidationError(because(ReasonCode.SORT_FIELD_INVALID))
 
 
+async def _origins(
+    uow: UnitOfWork, user: User, versions: Iterable[DocumentVersion]
+) -> dict[DocumentId, str]:
+    """The documents `versions` were split off by their title now, those `user` may read: the
+    title a split version keeps is the one of then, a stack's often its file name."""
+    found: dict[DocumentId, str] = {}
+    for version in versions:
+        named = version.detail.get("document")
+        if version.kind is not VersionKind.SPLIT or not isinstance(named, str):
+            continue
+        origin = await uow.documents.find(DocumentId(UUID(named)))
+        space = None if origin is None else await uow.spaces.find(origin.space_id)
+        if origin is not None and space is not None and can_read_document(user, origin, space):
+            found[origin.id] = origin.title
+    return found
+
+
 async def _position(
     uow: UnitOfWork, user: User, order: DocumentOrder, after: DocumentId | None, *, everyone: bool
 ) -> DocumentPosition | None:
@@ -349,6 +366,9 @@ class DocumentFiles:
     archive: StoredFile | None
     # Its versions, the first first; the last is the current one.
     versions: tuple[DocumentVersion, ...] = ()
+    # The documents its versions were split off (`VersionKind.SPLIT`) by their title now, those
+    # the caller may read.
+    origins: Mapping[DocumentId, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -824,14 +844,20 @@ class DocumentService:
         the caller may not read the document."""
         store = self._object_store
         async with self._uow() as uow:
-            document, _ = await readable_document(uow, await load_actor(uow, actor), id)
+            user = await load_actor(uow, actor)
+            document, _ = await readable_document(uow, user, id)
             versions = tuple(await uow.document_versions.of_document(id))
+            origins = await _origins(uow, user, versions)
         original = await self._stored(original_key(document.sha256))
         archive = None
         if await store.exists(archive_key(id)):
             archive = await self._stored(archive_key(id))
         return DocumentFiles(
-            document=document, original=original, archive=archive, versions=versions
+            document=document,
+            original=original,
+            archive=archive,
+            versions=versions,
+            origins=origins,
         )
 
     async def download_version(

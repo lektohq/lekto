@@ -716,8 +716,8 @@ modal, over a dialog too.
   document directly: into the document from the Beam ("Dokument öffnen"). So the Fundstellen of
   an identifier, a relation, a rule's dry run (Probelauf), the cases behind a number of the
   holders' evaluation, the similar documents of the processing, the overview's expected
-  documents, the jobs, a webhook's deliveries, the existing document of a duplicate upload and
-  the documents a bulk action skipped. The Beam pages through what stands beside it.
+  documents, the jobs, a webhook's deliveries, the existing document of a duplicate upload, the
+  documents a bulk action skipped and the document a version was split off. The Beam pages through what stands beside it.
 - **Lists of documents carry no eye:** a card or row (the documents, the inbox, search hits)
   and a chip of the stream is the button itself (`DocumentLink`, `viewOrOpen`): a click, a tap
   or Enter shows the document in the Beam, a double click or a long press (a phone) opens it; a
@@ -1286,12 +1286,15 @@ neuen Fassung steht hier etwas anderes.") with a line "Neu gelesen: …" (the la
 "Antwort des Modells"); confirming keeps the value, taking the new one means setting it. The
 title's note in the review has the same line, the title in quotes. The same upload (`VersionUpload`) stands in the
 document's menu "…", beside "PDF bearbeiten" (see [Page stack](#page-stack)). A version split
-off another document says so: "Abgetrennt aus „…“". A stack split at its separator sheets when
-it came in (Tobi 10.11.2026) keeps the stack as version 1 and says of version 2 "Am Trennblatt
-getrennt: S. 1–3 von Fassung 1"; its other parts are documents of their own, "Abgetrennt aus
-„…“". The processing step is "Trennung", its line "2 Trennblätter (S. 4 und 8): 3 Teile", "Kein
-Trennblatt", or why it did not look: "Teil eines getrennten Stapels", "Von Hand abgetrennt",
-"Nicht bei einer neuen Fassung", "Nicht bei der Migration", "Nicht bei E-Mails", "Ausgeschaltet".
+off another document says so on a line of its own, "Abgetrennt aus" and that document's title
+as it is now (`BeamTitle`; Tobi 11.11.2026: the title of then is often a stack's file name);
+where it is gone or the viewer may not read it, "Abgetrennt aus „…“" with the title of then. A
+stack split at its separator sheets when it came in (Tobi 10.11.2026) keeps the stack as
+version 1 and says of version 2 "Am Trennblatt getrennt: S. 1–3 von Fassung 1"; its other parts
+are documents of their own, split off it. The processing step is "Trennung", its line "2
+Trennblätter (S. 4 und 8): 3 Teile", "Kein Trennblatt", or why it did not look: "Teil eines
+getrennten Stapels", "Von Hand abgetrennt", "Nicht bei einer neuen Fassung", "Nicht bei der
+Migration", "Nicht bei E-Mails", "Ausgeschaltet".
 A merge says "Zusammengeführt aus Fassung 1 und „…“", and a version that came along from a merged
 document says where from before how it came: "Aus „…“ (dort Fassung 1) · Eingegangen".
 

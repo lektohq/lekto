@@ -30626,6 +30626,17 @@
             "type": "object",
             "title": "Detail",
             "description": "What it was made from. `edited` and `split`: `pages`, each with its `source` (0 the edited version, 1, 2, … the files in `added`, by name), `page` and `rotate`; `edited` also `from`, the version edited, and `split_off`, the documents split off in the same edit; `split` also `document`, `title` and `version`, the document it was split off (which may be gone since) and its version then, and `sheets` where it was split at separator sheets. `separated`: `pages` (source 0, the stack), `from`, `sheets`, the pages that were separator sheets, and `split_off`, the documents made of the other parts. `merged`: as `edited`, the sources after the files are the other documents, and `documents` names every document merged with its `title` and the `version` its file is here. A version taken over in a merge: `moved`, the `document`, `title` and `version` it was there."
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionOriginOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`split`: the document it was split off as it is now (`detail.title` is its title then); null where it is gone, the caller may not read it, or for another kind."
           }
         },
         "type": "object",
@@ -30637,7 +30648,8 @@
           "kind",
           "created_at",
           "created_by",
-          "detail"
+          "detail",
+          "origin"
         ],
         "title": "DocumentVersionOut",
         "description": "A version of the document's original: its number (from 1), whether it is the current\none, its file, how and when it came, by whom (null where nobody is known), and what it was\nmade from (an edit: the version and its pages). Its file:\n`GET /documents/{id}/versions/{number}/original`."
@@ -43956,6 +43968,26 @@
           "merged"
         ],
         "title": "VersionKindOut"
+      },
+      "VersionOriginOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Its title now."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "VersionOriginOut"
       },
       "VisibilityOut": {
         "properties": {

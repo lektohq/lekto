@@ -1,6 +1,8 @@
 <script lang="ts">
 	import Download from '@lucide/svelte/icons/download';
 	import type { components } from '#lib/api/schema.ts';
+	import { openBeam } from '#lib/beam.svelte.ts';
+	import BeamTitle from '#lib/components/BeamTitle.svelte';
 	import VersionUpload from '#lib/components/document/VersionUpload.svelte';
 	import { documentApi } from '#lib/document-view.ts';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
@@ -19,7 +21,9 @@
 	// Fassung hochladen", `POST /documents/{id}/versions`): processing runs again, keeps what a
 	// person confirmed, and the document waits in the inbox. A merge says what it was merged
 	// from ("Zusammengeführt aus Fassung 1 und „scan_0412“"), and a version that came along from a
-	// merged document says from where ("Aus „scan_0412“ (dort Fassung 1)") before how it came.
+	// merged document says from where ("Aus „scan_0412“ (dort Fassung 1)") before how it came. A
+	// version split off a document the viewer may read names it by its title now and shows it in
+	// the Beam ("Abgetrennt aus 👁 Zeugenladung"); the title of then where it is gone.
 	let {
 		documentId,
 		title,
@@ -42,7 +46,7 @@
 
 	const how = (version: Version) => {
 		const moved = movedFrom(version.detail.moved);
-		return moved ? `${moved} · ${kind(version)}` : kind(version);
+		return [moved, kind(version)].filter(Boolean).join(' · ');
 	};
 
 	const kind = (version: Version) => {
@@ -50,8 +54,9 @@
 		if (version.kind === 'replaced') return m.version_replaced();
 		if (version.kind === 'edited')
 			return m.version_edited({ from: String(version.detail.from ?? '') });
-		if (version.kind === 'split')
+		if (version.kind === 'split' && !version.origin)
 			return m.version_split({ title: String(version.detail.title ?? '') });
+		if (version.kind === 'split') return null;
 		if (version.kind === 'separated')
 			return m.version_separated({
 				pages: pagesOf(version.detail.pages),
@@ -124,6 +129,17 @@
 						{m.version_number({ number: String(version.number) })}
 						{#if version.current}<Badge variant="primary">{m.version_current()}</Badge>{/if}
 					</span>
+					{#if version.kind === 'split' && version.origin}
+						{@const origin = version.origin}
+						<span class="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+							<span class="shrink-0">{m.version_split_from()}</span>
+							<BeamTitle
+								title={origin.title}
+								class="text-sm"
+								onview={() => openBeam([origin.id], origin.id, title)}
+							/>
+						</span>
+					{/if}
 					<span class="text-sm break-words text-muted-foreground">
 						{[
 							how(version),
