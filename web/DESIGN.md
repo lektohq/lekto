@@ -512,7 +512,8 @@ row is `bg-panel` with `border-primary` (a border, no ring). While something is 
 **selection bar** (`SelectionBar`) names how many and what an action will leave out, then
 "Auswahl aufheben" (`ghost`) and the actions (`outline`, the primary `default` last), all `sm`.
 It has the card look through `cardVariants`: on desktop it stands above the list in `bg-panel`
-and sticks below the header (`top-20`); on the phone it sticks to the bottom of the screen
+and sticks below the header (`top-20`, `z-30`: above the band and the group titles of a sticky
+head, "Sticky heads"); on the phone it sticks to the bottom of the screen
 (`bg-card`, a line above), the hint as a line of its own and its two actions sharing the width.
 In a dialog (`inDialog`) it stands in a fixed part of the dialog that does not scroll: above the
 body, on a phone below it.
@@ -1137,10 +1138,46 @@ moves nothing beside it.
   system shows scroll bars (Windows, a Mac with a mouse).
 - A strip of tabs that scrolls on a phone brings the chosen tab into view; that is no move.
 
+### Sticky heads
+
+What stays while a page scrolls stands below the header (`AppShell`, 64 px, `z-40`), never over
+it, at one of its offsets: `top-16` right below it, `top-18` on the line of a desktop's tools,
+`top-20` with room (the filters beside the documents, the selection bar), or where the page says
+for the title of a group (`top-(--group-top)`). Nothing takes room for sticking: what stands on
+a line it does not own sits in a wrapper of no height.
+
+The documents list keeps its tools and the group at hand (Tobi, 11.11.2026):
+
+- **Desktop** (from `lg`): at the top the head is that of every page, the tools (sort,
+  "Auswählen", the layout, "Lens bearbeiten") at the end of the title's line. Once the page
+  moves, the title, its count and the page's search field (where the header shows only a
+  magnifier, `header-search.ts`) scroll away; the tools stay on the line below the header
+  (`top-18`, `z-30`), and once the head of the page has gone below the header a band behind it
+  across the list (`bg-background`, a line below, `z-20`; earlier it would hide a long count of
+  hits passing the line).
+  The title of the group at the top (`GroupTitle`: a month, a contact, a deadline) stands on that
+  line, the tools over the end of its line, until the next group's title pushes it away. The
+  filters beside the list stay as they are (`top-20`). Below `xl` the sort and "Lens bearbeiten"
+  are icons (their names as tooltips), so that the title of a group keeps room beside the tools.
+  While the selection bar stands, it owns the line: the tools scroll away with the title, and the
+  titles stick below the bar.
+- **Below the desktop**: the row of search, filters, sort, "Auswählen" and layout sticks below
+  the header (`top-16`, across the page, `bg-background`, a line below once it stands there).
+  Scrolling down it steps aside behind the header, scrolling up it comes back
+  (`sticky-head.ts`): only once it stands at the top, not for a few pixels, never while one types
+  in it. The titles of the groups stick below it, or below the header while it is aside. On a
+  tablet the selection bar owns the line as on a desktop; on a phone it stands at the bottom.
+- **Scrolling away** go the filter chips, the lens's changes and notes: the filters show in the
+  panel beside the list, below the desktop as the count on the filter button.
+- **The header's magnifier** (where the header has no field) shows the page's own field on the
+  documents page instead of opening it anew (`page-search.ts`): below the desktop its row comes
+  back, on a desktop the page goes up to it, and the field takes the focus. From another page it
+  opens the documents with the field focused.
+
 ### Motion
 
-Only `motion-safe`: the sliding pill of `Segmented`, the underline of `TabBar`, opening sheets and
-dialogs. Nothing moves on first show. Nothing grows over its neighbours on hover.
+Only `motion-safe`: the sliding pill of `Segmented`, the underline of `TabBar`, the row of the
+documents' tools stepping aside ("Sticky heads"), opening sheets and dialogs. Nothing moves on first show. Nothing grows over its neighbours on hover.
 A spinner, a pulse of what runs and a turning chevron are `motion-safe:` too (or stop with
 `motion-reduce:transition-none`); `tests/design-system.test.ts` refuses one without.
 
@@ -1387,7 +1424,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     places ("Logo and owl"); a dashed box of muted words only as `EmptyNote` ("States"); a lone
     radio only in `ChoiceCard` ("Checkboxes, radios, switches"); a pill of a chip only as `Chip`
     or `TagChip` ("Chips"); the phone's editor bar only in `PhoneEditorBar` ("Dialogs, sheets,
-    editors"); spins, pulses and turns only `motion-safe` ("Motion"); every page frame
+    editors"); spins, pulses and turns only `motion-safe` ("Motion"); a sticky element only
+    below the header at its offsets ("Sticky heads"); every page frame
     `flex flex-col gap-6`, the document page `gap-4` ("Spacing and layout");
     a pair of arrows back and forth only as `Stepper`, `Pagination` or in `DateInput`
     ("Stepper");

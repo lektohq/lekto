@@ -73,4 +73,20 @@ describe('PageViewer', () => {
 		await rerender({ sizes: [{ width: 600, height: 800 }] });
 		expect(scroll).toHaveBeenCalledOnce();
 	});
+
+	it('never scrolls the page behind a dialog to reveal a place (the Beam)', async () => {
+		const scroll = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
+		const dialog = document.body.appendChild(document.createElement('div'));
+		dialog.setAttribute('role', 'dialog');
+		const place = { page: 1, boxes: [{ x: 0.1, y: 0.5, width: 0.2, height: 0.05 }] };
+		const { component, rerender } = render(PageViewer, {
+			target: dialog,
+			props: { sizes: [], loading: true, label: 'PDF', page }
+		});
+		component.reveal(place);
+		await rerender({ sizes: [{ width: 600, height: 800 }], loading: false });
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(scroll).not.toHaveBeenCalled();
+		dialog.remove();
+	});
 });
