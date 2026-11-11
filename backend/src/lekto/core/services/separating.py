@@ -58,6 +58,10 @@ versions it made."""
 SPLIT_OFF = "split_off"
 """Key of the documents made of the parts after the first, in the node's output and the detail
 of the stack's version 2 (as `EditingService` writes it)."""
+NOT_LOOKED = "not_looked"
+"""Key of why the node did not look for sheets, in its output: `off` (no separator codes), `mail`
+(an e-mail), `migration`, `new_version`, `part` (a part of a stack split at its sheets) or
+`split` (pages a person split off another document)."""
 
 
 @dataclass(frozen=True)
@@ -90,8 +94,9 @@ class SeparateNode:
         self._version = pipeline_version
 
     async def run(self, document: Document) -> "NodeResult | Separation":
-        if not await self._looks_at(document):
-            return NodeResult(outcome=Outcome.OK)
+        not_looked = await self._not_looked(document)
+        if not_looked is not None:
+            return NodeResult(outcome=Outcome.OK, output={NOT_LOOKED: not_looked})
         async with work_directory() as work:
             original = work / ORIGINAL_FILE
             await self._store.download(original_key(document.sha256), original)
@@ -140,18 +145,24 @@ class SeparateNode:
                 raise
         return separation
 
-    async def _looks_at(self, document: Document) -> bool:
-        """Whether the document is a stack that came in as it is (see the module)."""
-        if (
-            not self._separators
-            or document.channel is Channel.MIGRATION
-            or document.processing.new_version
-            or document.media_type not in VERSION_MEDIA_TYPES
-        ):
-            return False
+    async def _not_looked(self, document: Document) -> str | None:
+        """Why the node does not look for sheets in the document (`NOT_LOOKED`); None for a
+        stack that came in as it is (see the module)."""
+        if not self._separators:
+            return "off"
+        if document.media_type not in VERSION_MEDIA_TYPES:
+            return "mail"
+        if document.channel is Channel.MIGRATION:
+            return "migration"
         async with self._uow() as uow:
             versions = await uow.document_versions.of_document(document.id)
-        return [version.kind for version in versions] == [VersionKind.RECEIVED]
+        first = versions[0] if versions else None
+        if first is not None and first.kind is VersionKind.SPLIT:
+            return "part" if SHEETS in first.detail else "split"
+        kinds = [version.kind for version in versions]
+        if document.processing.new_version or kinds != [VersionKind.RECEIVED]:
+            return "new_version"
+        return None
 
 
 @dataclass(frozen=True, kw_only=True)

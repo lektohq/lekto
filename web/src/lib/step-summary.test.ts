@@ -70,6 +70,11 @@ describe('stepSummary', () => {
 
 	it('tells the separator sheets a stack was split at', () => {
 		expect(summary('separate', {})).toBeNull();
+		expect(summary('separate', { not_looked: 'part' })).toBe(m.summary_not_looked_part());
+		expect(summary('separate', { not_looked: 'new_version' })).toBe(
+			m.summary_not_looked_new_version()
+		);
+		expect(summary('separate', { not_looked: 'unknown' })).toBeNull();
 		expect(summary('separate', { sheets: [], pages: 3 })).toBe(m.summary_no_separator());
 		expect(summary('separate', { sheets: [4, 8], pages: 10, parts: 3 })).toBe(
 			`${m.summary_sheets({ count: '2', pages: '4 and 8' })}: ${m.summary_parts({ count: '3' })}`

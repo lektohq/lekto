@@ -133,9 +133,19 @@ export function stepSummary(
 	}
 }
 
-/** The separator sheets a stack was split at, and into how many parts; null where none was
- * looked for (a migration, a new version). */
+const NOT_LOOKED: Record<string, () => string> = {
+	off: m.summary_not_looked_off,
+	mail: m.summary_not_looked_mail,
+	migration: m.summary_not_looked_migration,
+	new_version: m.summary_not_looked_new_version,
+	part: m.summary_not_looked_part,
+	split: m.summary_not_looked_split
+};
+
+/** The separator sheets a stack was split at, and into how many parts; or why none were
+ * looked for (a part of a stack, a new version, …); null where the entry does not say. */
 function separated(output: Json): string | null {
+	if (typeof output.not_looked === 'string') return NOT_LOOKED[output.not_looked]?.() ?? null;
 	if (!Array.isArray(output.sheets)) return null;
 	const sheets = output.sheets.map((page) => formatNumber(count(page)));
 	if (sheets.length === 0) return m.summary_no_separator();

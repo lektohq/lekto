@@ -1289,7 +1289,9 @@ document's menu "…", beside "PDF bearbeiten" (see [Page stack](#page-stack)). 
 off another document says so: "Abgetrennt aus „…“". A stack split at its separator sheets when
 it came in (Tobi 10.11.2026) keeps the stack as version 1 and says of version 2 "Am Trennblatt
 getrennt: S. 1–3 von Fassung 1"; its other parts are documents of their own, "Abgetrennt aus
-„…“". The processing step is "Trennung", its line "2 Trennblätter (S. 4 und 8): 3 Teile".
+„…“". The processing step is "Trennung", its line "2 Trennblätter (S. 4 und 8): 3 Teile", "Kein
+Trennblatt", or why it did not look: "Teil eines getrennten Stapels", "Von Hand abgetrennt",
+"Nicht bei einer neuen Fassung", "Nicht bei der Migration", "Nicht bei E-Mails", "Ausgeschaltet".
 A merge says "Zusammengeführt aus Fassung 1 und „…“", and a version that came along from a merged
 document says where from before how it came: "Aus „…“ (dort Fassung 1) · Eingegangen".
 
