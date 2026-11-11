@@ -12,11 +12,10 @@
 	import { untrack } from 'svelte';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
-	import { buttonVariants } from '#lib/components/ui/button/index.ts';
+	import PickerShell from '#lib/components/PickerShell.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Command from '#lib/components/ui/command/index.ts';
-	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { cn } from '#lib/utils.ts';
 
 	// The document a template is shown with. At first the newest of the type (a title pattern's),
 	// else the newest the user may read; typing searches the words of all documents (without a
@@ -118,36 +117,42 @@
 	}
 </script>
 
-<Popover.Root bind:open>
-	<Popover.Trigger
-		class={cn(buttonVariants({ variant: 'outline' }), 'w-full justify-between font-normal')}
-		aria-label={value ? m.template_reference_choose() : (label ?? m.template_reference_choose())}
-	>
-		<span class="truncate">{value?.title ?? label ?? m.template_reference_none()}</span>
-		<ChevronsUpDown class="opacity-50" aria-hidden="true" />
-	</Popover.Trigger>
-	<Popover.Content class="w-(--bits-popover-anchor-width) min-w-64 p-0" align="start">
-		<Command.Root shouldFilter={false}>
-			<Command.Input
-				bind:value={query}
-				placeholder={m.template_reference_search()}
-				aria-label={m.template_reference_search()}
-			/>
-			<Command.List>
-				<Command.Empty class="py-4 text-center text-sm text-muted-foreground">
-					{m.template_reference_empty()}
-				</Command.Empty>
-				{#each shown as item (item.id)}
-					<Command.Item
-						value={item.id}
-						onSelect={() => choose(item)}
-						class="flex-col items-start gap-0"
-					>
-						<span class="max-w-full truncate">{item.title}</span>
-						<span class="max-w-full truncate text-xs text-muted-foreground">{item.filename}</span>
-					</Command.Item>
-				{/each}
-			</Command.List>
-		</Command.Root>
-	</Popover.Content>
-</Popover.Root>
+<PickerShell
+	bind:open
+	title={label ?? m.template_reference_choose()}
+	class="w-(--bits-popover-anchor-width) min-w-64"
+>
+	{#snippet trigger(props)}
+		<Button
+			{...props}
+			variant="outline"
+			class="w-full justify-between font-normal"
+			aria-label={value ? m.template_reference_choose() : (label ?? m.template_reference_choose())}
+		>
+			<span class="truncate">{value?.title ?? label ?? m.template_reference_none()}</span>
+			<ChevronsUpDown class="opacity-50" aria-hidden="true" />
+		</Button>
+	{/snippet}
+	<Command.Root shouldFilter={false}>
+		<Command.Input
+			bind:value={query}
+			placeholder={m.template_reference_search()}
+			aria-label={m.template_reference_search()}
+		/>
+		<Command.List>
+			<Command.Empty class="py-4 text-center text-sm text-muted-foreground">
+				{m.template_reference_empty()}
+			</Command.Empty>
+			{#each shown as item (item.id)}
+				<Command.Item
+					value={item.id}
+					onSelect={() => choose(item)}
+					class="flex-col items-start gap-0"
+				>
+					<span class="max-w-full truncate">{item.title}</span>
+					<span class="max-w-full truncate text-xs text-muted-foreground">{item.filename}</span>
+				</Command.Item>
+			{/each}
+		</Command.List>
+	</Command.Root>
+</PickerShell>

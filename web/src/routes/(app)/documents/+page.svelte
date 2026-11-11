@@ -45,7 +45,6 @@
 	import Segmented from '#lib/components/Segmented.svelte';
 	import SortMenu from '#lib/components/SortMenu.svelte';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
-	import * as Sheet from '#lib/components/ui/sheet/index.ts';
 	import { coalesced } from '#lib/coalesce.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { events } from '#lib/events.svelte.ts';
@@ -114,6 +113,7 @@
 	import PageTitle from '#lib/components/page/PageTitle.svelte';
 	import SearchField from '#lib/components/SearchField.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
+	import PhoneSheet from '#lib/components/PhoneSheet.svelte';
 	import Loading from '#lib/components/Loading.svelte';
 	import Upload from '@lucide/svelte/icons/upload';
 	import { BASE } from '#lib/base.ts';
@@ -1026,63 +1026,50 @@ row of filters, on a desktop narrow by the title. -->
 				]}
 			>
 				{@render searchForm(false)}
-				<Sheet.Root bind:open={filtersOpen}>
-					<Sheet.Trigger>
-						{#snippet child({ props })}
-							<IconButton
-								{...props}
-								variant="outline"
-								class="relative shrink-0"
-								label={m.filters_open()}
-							>
-								<SlidersHorizontal aria-hidden="true" />
-								{#if activeFilters > 0}
-									<span
-										class="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-xs font-semibold text-primary-foreground tabular-nums"
-										aria-hidden="true"
-									>
-										{activeFilters}
-									</span>
-								{/if}
-							</IconButton>
-						{/snippet}
-					</Sheet.Trigger>
-					<!-- Title and close stay at the top, reset and show at the bottom; between them
-					the filters scroll. -->
-					<Sheet.Content
-						side="bottom"
-						showCloseButton={false}
-						class="max-h-[85dvh] gap-0 rounded-t-2xl"
-					>
-						<Sheet.Header class="flex-row items-center justify-between border-b py-2 pr-2 pl-4">
-							<Sheet.Title>{m.filters_title()}</Sheet.Title>
-							<Sheet.Close>
-								{#snippet child({ props })}
-									<IconButton {...props} label={m.close()}>
-										<X aria-hidden="true" />
-									</IconButton>
-								{/snippet}
-							</Sheet.Close>
-						</Sheet.Header>
-						<div class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-							{@render filterPanel()}
-						</div>
-						<Sheet.Footer class="flex-row border-t py-3">
-							<Button
-								variant="ghost"
-								disabled={!isFiltered(filters)}
-								onclick={() => change(NO_FILTERS)}
-							>
-								{m.filters_reset()}
-							</Button>
-							<Button class="flex-1" onclick={() => (filtersOpen = false)}>
-								{shownCount === null
-									? m.filters_show_all()
-									: m.filters_show({ count: formatNumber(shownCount) })}
-							</Button>
-						</Sheet.Footer>
-					</Sheet.Content>
-				</Sheet.Root>
+				<IconButton
+					variant="outline"
+					class="relative shrink-0"
+					label={m.filters_open()}
+					aria-haspopup="dialog"
+					aria-expanded={filtersOpen}
+					onclick={() => (filtersOpen = true)}
+				>
+					<SlidersHorizontal aria-hidden="true" />
+					{#if activeFilters > 0}
+						<span
+							class="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-xs font-semibold text-primary-foreground tabular-nums"
+							aria-hidden="true"
+						>
+							{activeFilters}
+						</span>
+					{/if}
+				</IconButton>
+				<!-- Title and close stay at the top, reset and show at the bottom; between them the
+				filters scroll. -->
+				<PhoneSheet bind:open={filtersOpen} title={m.filters_title()} fit>
+					{#snippet close()}
+						<IconButton label={m.close()} onclick={() => (filtersOpen = false)}>
+							<X aria-hidden="true" />
+						</IconButton>
+					{/snippet}
+					<div class="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t p-4">
+						{@render filterPanel()}
+					</div>
+					{#snippet footer()}
+						<Button
+							variant="ghost"
+							disabled={!isFiltered(filters)}
+							onclick={() => change(NO_FILTERS)}
+						>
+							{m.filters_reset()}
+						</Button>
+						<Button class="flex-1" onclick={() => (filtersOpen = false)}>
+							{shownCount === null
+								? m.filters_show_all()
+								: m.filters_show({ count: formatNumber(shownCount) })}
+						</Button>
+					{/snippet}
+				</PhoneSheet>
 				{#if !streaming}{@render sortMenu(true)}{@render selectButton(true)}{/if}
 				<!-- The layout as a menu that shows the current one, as the sort beside it. -->
 				<DropdownMenu.Root>

@@ -17,14 +17,13 @@
 	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 	import X from '@lucide/svelte/icons/x';
-	import { buttonVariants } from '#lib/components/ui/button/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Command from '#lib/components/ui/command/index.ts';
-	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { matchesWords, searchWords } from '#lib/picking.ts';
-	import { cn } from '#lib/utils.ts';
 	import IconButton from '#lib/components/IconButton.svelte';
+	import PickerShell from '#lib/components/PickerShell.svelte';
 
 	// What belongs to an item of master data, out of many: the assigned ones as rows (name,
 	// required, remove), more added through a search, so that the list stays short however
@@ -99,42 +98,39 @@
 		</Card.Root>
 	{/if}
 	{#if free.length > 0}
-		<Popover.Root bind:open>
-			<Popover.Trigger
-				class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'w-fit')}
-				aria-label={addLabel}
-			>
-				<Plus aria-hidden="true" />
-				{addLabel}
-			</Popover.Trigger>
-			<Popover.Content class="w-72 p-0" align="start">
-				<Command.Root shouldFilter={false}>
-					<Command.Input
-						bind:value={query}
-						placeholder={m.assignment_search()}
-						aria-label={m.assignment_search()}
-					/>
-					<Command.List>
-						<Command.Empty class="py-4 text-center text-sm text-muted-foreground">
-							{m.assignment_none_found()}
-						</Command.Empty>
-						{#each shown as candidate (candidate.id)}
-							<Command.Item
-								value={candidate.id}
-								onSelect={() => add(candidate.id)}
-								class="flex-col items-start gap-0"
-							>
-								<span class="max-w-full truncate">{candidate.name}</span>
-								{#if candidate.hint}
-									<span class="max-w-full truncate font-mono text-xs text-muted-foreground">
-										{candidate.hint}
-									</span>
-								{/if}
-							</Command.Item>
-						{/each}
-					</Command.List>
-				</Command.Root>
-			</Popover.Content>
-		</Popover.Root>
+		<PickerShell bind:open title={addLabel} class="w-72">
+			{#snippet trigger(props)}
+				<Button {...props} variant="outline" size="sm" class="w-fit">
+					<Plus aria-hidden="true" />
+					{addLabel}
+				</Button>
+			{/snippet}
+			<Command.Root shouldFilter={false}>
+				<Command.Input
+					bind:value={query}
+					placeholder={m.assignment_search()}
+					aria-label={m.assignment_search()}
+				/>
+				<Command.List>
+					<Command.Empty class="py-4 text-center text-sm text-muted-foreground">
+						{m.assignment_none_found()}
+					</Command.Empty>
+					{#each shown as candidate (candidate.id)}
+						<Command.Item
+							value={candidate.id}
+							onSelect={() => add(candidate.id)}
+							class="flex-col items-start gap-0"
+						>
+							<span class="max-w-full truncate">{candidate.name}</span>
+							{#if candidate.hint}
+								<span class="max-w-full truncate font-mono text-xs text-muted-foreground">
+									{candidate.hint}
+								</span>
+							{/if}
+						</Command.Item>
+					{/each}
+				</Command.List>
+			</Command.Root>
+		</PickerShell>
 	{/if}
 </div>
