@@ -59,8 +59,10 @@ from lekto.adapters.inbound.rest.schemas.documents import (
     VisibilityOut,
 )
 from lekto.adapters.inbound.rest.schemas.editing import (
+    DOCUMENTS,
     PARTS,
     PARTS_LIMIT,
+    TARGET,
     EditedDocuments,
     PagePreviews,
     parts_schema,
@@ -87,7 +89,7 @@ from lekto.core.domain.documents import (
     Unset,
     changed_fields,
 )
-from lekto.core.domain.editing import MAX_ADDED
+from lekto.core.domain.editing import MAX_ADDED, MAX_MERGED
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldDefinition, field_from_json
 from lekto.core.domain.identifiers import IdentifierKind
@@ -331,6 +333,24 @@ _EDIT_BODY = {
                                 "originals of their own; together within the upload limit."
                             ),
                         },
+                        "documents": {
+                            "type": "string",
+                            "contentMediaType": "application/json",
+                            "contentSchema": DOCUMENTS.json_schema(),
+                            "description": (
+                                f"JSON of up to {MAX_MERGED} IDs of other documents whose "
+                                "pages the parts take (the sources after the files): a merge."
+                            ),
+                        },
+                        "target": {
+                            "type": "string",
+                            "format": "uuid",
+                            "description": (
+                                "In a merge, the document the part that replaces makes the "
+                                "next version of: this one (the default) or one of "
+                                "`documents`."
+                            ),
+                        },
                     },
                 }
             }
@@ -349,11 +369,15 @@ _EDIT_BODY = {
         "part that `replaces` the document becomes its next version (as `POST "
         "/documents/{id}/versions`); every other part becomes a new document in its space, "
         "with its uploader and receipt; without a part that replaces it, the document is "
-        "deleted. All of it happens at once, and each document is processed again and waits "
-        "in the inbox. 409 while the document is processed or if its file changed meanwhile; "
-        "415 for a mail (its pages are no file) and for a file that is no PDF or image; 422 "
-        "for parts that do not fit the pages (a page twice, one a source does not have, more "
-        "than one part that replaces the document, or no change)."
+        "deleted. With `documents`, it merges them: the part that replaces (one must) becomes "
+        "the next version of the `target`; the other documents are deleted, their versions "
+        "become the target's, their relations name it. The caller needs to edit every one. "
+        "All of it happens at once, and each document is processed again and waits in the "
+        "inbox. 409 while a document is processed or if its file changed meanwhile; 415 for a "
+        "mail (its pages are no file) and for a file that is no PDF or image; 422 for parts "
+        "that do not fit the pages (a page twice, one a source does not have, more than one "
+        "part that replaces the document, none in a merge, or no change), a document twice or "
+        "a target that is none of them."
     ),
     response_model=EditedDocuments,
     responses=problem_responses(400, 401, 403, 404, 409, 413, 415, 422),
@@ -367,32 +391,45 @@ async def edit_pages(
         max_size=context.max_upload_size,
         file_field="files",
         max_files=MAX_ADDED,
-        fields=("parts",),
-        limits={"parts": PARTS_LIMIT},
+        fields=("parts", "documents", "target"),
+        limits={"parts": PARTS_LIMIT, "documents": PARTS_LIMIT, "target": 100},
     )
     try:
-        if "parts" not in received.fields:
+        parts = _form_field(received.fields, "parts", PARTS.validate_json)
+        if parts is None:
             raise RequestValidationError(
                 [{"type": "missing", "loc": ("body", "parts"), "msg": "Field required"}]
             )
-        try:
-            parts = PARTS.validate_json(received.fields["parts"])
-        except PydanticValidationError as error:
-            # The form is the body: its errors read as those of a JSON body.
-            raise RequestValidationError(
-                [{**item, "loc": ("body", "parts", *item["loc"])} for item in error.errors()]
-            ) from None
+        documents = _form_field(received.fields, "documents", DOCUMENTS.validate_json) or []
+        target = _form_field(received.fields, "target", TARGET.validate_python)
         result = await context.editing.edit(
             user,
             DocumentId(id),
             [part.to_domain() for part in parts],
             [AddedFile(item.file, item.filename) for item in received.files],
+            [DocumentId(document) for document in documents],
+            None if target is None else DocumentId(target),
         )
     finally:
         await received.remove()
     return EditedDocuments(
-        documents=[_details(view) for view in result.documents], deleted=result.deleted
+        documents=[_details(view) for view in result.documents],
+        deleted=result.deleted,
+        merged=list(result.merged),
     )
+
+
+def _form_field[T](fields: Mapping[str, str], name: str, read: Callable[[str], T]) -> T | None:
+    """The form field `name` read by `read`, None where it is missing. The form is the body:
+    its errors read as those of a JSON body."""
+    if name not in fields:
+        return None
+    try:
+        return read(fields[name])
+    except PydanticValidationError as error:
+        raise RequestValidationError(
+            [{**item, "loc": ("body", name, *item["loc"])} for item in error.errors()]
+        ) from None
 
 
 @router.get(

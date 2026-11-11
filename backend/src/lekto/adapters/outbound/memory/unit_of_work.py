@@ -721,6 +721,14 @@ class MemoryDocumentVersionRepository:
             None,
         )
 
+    async def move(self, version: DocumentVersion, to: DocumentVersion) -> None:
+        self._uow._check_open()
+        id = version_row_id(version.document_id, version.number)
+        if self._uow._row(DOCUMENT_VERSIONS, id) in (None, _REMOVED):
+            raise NotFoundError("document version", f"{version.document_id}/{version.number}")
+        self._uow._write(DOCUMENT_VERSIONS, id, _REMOVED)
+        await self.add(to)
+
 
 class MemoryDocumentRelationRepository:
     def __init__(self, uow: MemoryUnitOfWork) -> None:

@@ -72,6 +72,7 @@ class VersionKindOut(StrEnum):
     EDITED = "edited"
     SPLIT = "split"
     SEPARATED = "separated"
+    MERGED = "merged"
 
 
 class DocumentVersionOut(BaseModel):
@@ -88,7 +89,9 @@ class DocumentVersionOut(BaseModel):
         description="`received`: how the document came in; `replaced`: a person put another "
         "file in its place; `edited`: a person edited its pages; `split`: the first version, "
         "pages split off another document (by a person, or at a separator sheet); `separated`: "
-        "the first part of the stack the document came in as, split at its separator sheets."
+        "the first part of the stack the document came in as, split at its separator sheets; "
+        "`merged`: a person merged other documents into it. A version that came from another "
+        "document in a merge keeps its kind."
     )
     created_at: datetime
     created_by: UUID | None
@@ -101,7 +104,10 @@ class DocumentVersionOut(BaseModel):
             "it was split off (which may be gone since) and its version then, and `sheets` "
             "where it was split at separator sheets. `separated`: `pages` (source 0, the "
             "stack), `from`, `sheets`, the pages that were separator sheets, and `split_off`, "
-            "the documents made of the other parts."
+            "the documents made of the other parts. `merged`: as `edited`, the sources after the "
+            "files are the other documents, and `documents` names every document merged with "
+            "its `title` and the `version` its file is here. A version taken over in a merge: "
+            "`moved`, the `document`, `title` and `version` it was there."
         )
     )
 

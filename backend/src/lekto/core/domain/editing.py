@@ -5,10 +5,15 @@ PDF of its own: at most one replaces the document as its next version (`VersionK
 every other becomes a new document in its space (`VersionKind.SPLIT`). Without a part that
 replaces it, the document is deleted once the new ones are there.
 
-A page is picked from a source: `ORIGINAL`, the document's current original, or an added file
-(1, 2, … in the order they were given). Each page of a source goes into one part at most; a page
-left out is removed. An image's pages are its frames (a TIFF may have several); every part is a
-PDF."""
+Pages of other documents make a merge ("Trennblatt und Zusammenführen"): one of the documents is
+the target, the part that replaces it its next version (`VersionKind.MERGED`); the others are
+deleted, their versions go to the target. A merge needs that part (Tobi, 11.11.2026): without
+it, every document would go, their originals with them.
+
+A page is picked from a source: `ORIGINAL`, the document's current original, an added file
+(1, 2, … in the order they were given), then the other documents' originals in theirs. Each
+page of a source goes into one part at most; a page left out is removed. An image's pages are
+its frames (a TIFF may have several); every part is a PDF."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -22,6 +27,8 @@ ROTATIONS = (0, 90, 180, 270)
 """How far a page may be turned, clockwise, from how it is shown."""
 MAX_ADDED = 20
 """Files one edit adds at most."""
+MAX_MERGED = 20
+"""Other documents one edit takes the pages of at most."""
 
 
 @dataclass(frozen=True)
@@ -56,15 +63,19 @@ class EditPart:
             raise ValidationError("parts: every part has pages")
 
 
-def check_parts(parts: Sequence[EditPart], counts: Sequence[int]) -> None:
+def check_parts(parts: Sequence[EditPart], counts: Sequence[int], *, merging: bool = False) -> None:
     """ValidationError unless `parts` edit sources of `counts` pages each (the original first):
-    at least one part, at most one that replaces the document, every page one its source has and
-    in one place only, and a change: the one part that replaces the document with the original's
-    pages in their order, unturned, changes nothing."""
+    at least one part, at most one that replaces the document (in a merge, exactly one), every
+    page one its source has and in one place only, and a change: the one part that replaces the
+    document with the original's pages in their order, unturned, changes nothing (a merge
+    always changes, its other documents go)."""
     if not parts:
         raise ValidationError("parts: at least one")
-    if sum(part.replaces for part in parts) > 1:
+    replacing = sum(part.replaces for part in parts)
+    if replacing > 1:
         raise ValidationError("parts: at most one replaces the document")
+    if merging and replacing == 0:
+        raise ValidationError("parts: one continues the target when documents are merged")
     seen: set[tuple[int, int]] = set()
     for part in parts:
         for pick in part.pages:
@@ -78,5 +89,5 @@ def check_parts(parts: Sequence[EditPart], counts: Sequence[int]) -> None:
                 raise ValidationError(f"pages: page {pick.page} of source {pick.source} twice")
             seen.add((pick.source, pick.page))
     unchanged = tuple(PagePick(ORIGINAL, number) for number in range(1, counts[ORIGINAL] + 1))
-    if len(parts) == 1 and parts[0].replaces and parts[0].pages == unchanged:
+    if not merging and len(parts) == 1 and parts[0].replaces and parts[0].pages == unchanged:
         raise ValidationError("parts: nothing changed")

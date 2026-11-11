@@ -510,6 +510,12 @@ class DocumentVersionRepository(Protocol):
         """The version whose original is this file, of any document."""
         ...
 
+    async def move(self, version: DocumentVersion, to: DocumentVersion) -> None:
+        """Put `to`, the same file, in the place of `version`: as a version of another document
+        or under another number (merging documents, `services.editing`). NotFoundError if
+        `version` is not there; ConflictError if that document has the number already."""
+        ...
+
 
 class DocumentRelationRepository(Protocol):
     """The relations between documents (`domain.relations`)."""

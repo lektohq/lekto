@@ -1,11 +1,12 @@
 """Editing a document's pages (`POST /documents/{id}/edit`, `domain.editing`)."""
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from lekto.adapters.inbound.rest.schemas.documents import DocumentDetails
-from lekto.core.domain.editing import EditPart, PagePick
+from lekto.core.domain.editing import MAX_MERGED, EditPart, PagePick
 
 PARTS_LIMIT = 256 * 1024
 """Bytes the field `parts` may have: some 6,000 pages."""
@@ -19,7 +20,8 @@ class PagePickIn(BaseModel):
         ge=0,
         description=(
             "0: the document's original (its current version); 1, 2, …: the files sent along "
-            "in `files`, in their order."
+            "in `files`, in their order, then the originals of the documents in `documents`, "
+            "in theirs."
         ),
     )
     page: int = Field(ge=1, description="The page of that source, from 1; an image's frames.")
@@ -37,9 +39,9 @@ class EditPartIn(BaseModel):
     replaces: bool = Field(
         default=False,
         description=(
-            "It becomes the document's next version; at most one part does. Every other part "
-            "becomes a new document in the document's space; without one, the document is "
-            "deleted."
+            "It becomes the document's next version (of the `target` in a merge); at most one "
+            "part does, in a merge exactly one. Every other part becomes a new document in the "
+            "document's space; without one, the document is deleted."
         ),
     )
 
@@ -50,6 +52,12 @@ class EditPartIn(BaseModel):
 
 PARTS = TypeAdapter(list[EditPartIn])
 """The field `parts`: JSON of a list of parts."""
+DOCUMENTS: TypeAdapter[list[UUID]] = TypeAdapter(
+    Annotated[list[UUID], Field(max_length=MAX_MERGED)]
+)
+"""The field `documents`: JSON of a list of document IDs."""
+TARGET = TypeAdapter(UUID)
+"""The field `target`: a document ID."""
 
 
 def parts_schema() -> dict[str, Any]:
@@ -78,6 +86,12 @@ class EditedDocuments(BaseModel):
         )
     )
     deleted: bool = Field(description="No part replaced the document, and it is deleted.")
+    merged: list[UUID] = Field(
+        description=(
+            "The other documents of a merge: deleted, their versions now the target's, their "
+            "relations the target's."
+        )
+    )
 
 
 class PagePreviews(BaseModel):

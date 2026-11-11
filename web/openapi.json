@@ -14102,7 +14102,7 @@
           "documents"
         ],
         "summary": "Edit a document's pages",
-        "description": "Editors of the document's space and admins. Puts parts together from the pages of the document's original and of the files sent along: turned, in another order, without some, split into several. The part that `replaces` the document becomes its next version (as `POST /documents/{id}/versions`); every other part becomes a new document in its space, with its uploader and receipt; without a part that replaces it, the document is deleted. All of it happens at once, and each document is processed again and waits in the inbox. 409 while the document is processed or if its file changed meanwhile; 415 for a mail (its pages are no file) and for a file that is no PDF or image; 422 for parts that do not fit the pages (a page twice, one a source does not have, more than one part that replaces the document, or no change).",
+        "description": "Editors of the document's space and admins. Puts parts together from the pages of the document's original and of the files sent along: turned, in another order, without some, split into several. The part that `replaces` the document becomes its next version (as `POST /documents/{id}/versions`); every other part becomes a new document in its space, with its uploader and receipt; without a part that replaces it, the document is deleted. With `documents`, it merges them: the part that replaces (one must) becomes the next version of the `target`; the other documents are deleted, their versions become the target's, their relations name it. The caller needs to edit every one. All of it happens at once, and each document is processed again and waits in the inbox. 409 while a document is processed or if its file changed meanwhile; 415 for a mail (its pages are no file) and for a file that is no PDF or image; 422 for parts that do not fit the pages (a page twice, one a source does not have, more than one part that replaces the document, none in a merge, or no change), a document twice or a target that is none of them.",
         "operationId": "edit_pages_api_v1_documents__id__edit_post",
         "parameters": [
           {
@@ -14296,7 +14296,7 @@
                               "properties": {
                                 "source": {
                                   "default": 0,
-                                  "description": "0: the document's original (its current version); 1, 2, …: the files sent along in `files`, in their order.",
+                                  "description": "0: the document's original (its current version); 1, 2, …: the files sent along in `files`, in their order, then the originals of the documents in `documents`, in theirs.",
                                   "minimum": 0,
                                   "title": "Source",
                                   "type": "integer"
@@ -14332,7 +14332,7 @@
                           },
                           "replaces": {
                             "default": false,
-                            "description": "It becomes the document's next version; at most one part does. Every other part becomes a new document in the document's space; without one, the document is deleted.",
+                            "description": "It becomes the document's next version (of the `target` in a merge); at most one part does, in a merge exactly one. Every other part becomes a new document in the document's space; without one, the document is deleted.",
                             "title": "Replaces",
                             "type": "boolean"
                           }
@@ -14355,6 +14355,24 @@
                       "format": "binary"
                     },
                     "description": "Files whose pages the parts take (sources 1, 2, …): PDF, JPEG, PNG or TIFF, recognised by content. They become no originals of their own; together within the upload limit."
+                  },
+                  "documents": {
+                    "type": "string",
+                    "contentMediaType": "application/json",
+                    "contentSchema": {
+                      "items": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "maxItems": 20,
+                      "type": "array"
+                    },
+                    "description": "JSON of up to 20 IDs of other documents whose pages the parts take (the sources after the files): a merge."
+                  },
+                  "target": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "In a merge, the document the part that replaces makes the next version of: this one (the default) or one of `documents`."
                   }
                 }
               }
@@ -30584,7 +30602,7 @@
           },
           "kind": {
             "$ref": "#/components/schemas/VersionKindOut",
-            "description": "`received`: how the document came in; `replaced`: a person put another file in its place; `edited`: a person edited its pages; `split`: the first version, pages split off another document (by a person, or at a separator sheet); `separated`: the first part of the stack the document came in as, split at its separator sheets."
+            "description": "`received`: how the document came in; `replaced`: a person put another file in its place; `edited`: a person edited its pages; `split`: the first version, pages split off another document (by a person, or at a separator sheet); `separated`: the first part of the stack the document came in as, split at its separator sheets; `merged`: a person merged other documents into it. A version that came from another document in a merge keeps its kind."
           },
           "created_at": {
             "type": "string",
@@ -30607,7 +30625,7 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Detail",
-            "description": "What it was made from. `edited` and `split`: `pages`, each with its `source` (0 the edited version, 1, 2, … the files in `added`, by name), `page` and `rotate`; `edited` also `from`, the version edited, and `split_off`, the documents split off in the same edit; `split` also `document`, `title` and `version`, the document it was split off (which may be gone since) and its version then, and `sheets` where it was split at separator sheets. `separated`: `pages` (source 0, the stack), `from`, `sheets`, the pages that were separator sheets, and `split_off`, the documents made of the other parts."
+            "description": "What it was made from. `edited` and `split`: `pages`, each with its `source` (0 the edited version, 1, 2, … the files in `added`, by name), `page` and `rotate`; `edited` also `from`, the version edited, and `split_off`, the documents split off in the same edit; `split` also `document`, `title` and `version`, the document it was split off (which may be gone since) and its version then, and `sheets` where it was split at separator sheets. `separated`: `pages` (source 0, the stack), `from`, `sheets`, the pages that were separator sheets, and `split_off`, the documents made of the other parts. `merged`: as `edited`, the sources after the files are the other documents, and `documents` names every document merged with its `title` and the `version` its file is here. A version taken over in a merge: `moved`, the `document`, `title` and `version` it was there."
           }
         },
         "type": "object",
@@ -30746,12 +30764,22 @@
             "type": "boolean",
             "title": "Deleted",
             "description": "No part replaced the document, and it is deleted."
+          },
+          "merged": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Merged",
+            "description": "The other documents of a merge: deleted, their versions now the target's, their relations the target's."
           }
         },
         "type": "object",
         "required": [
           "documents",
-          "deleted"
+          "deleted",
+          "merged"
         ],
         "title": "EditedDocuments"
       },
@@ -43924,7 +43952,8 @@
           "replaced",
           "edited",
           "split",
-          "separated"
+          "separated",
+          "merged"
         ],
         "title": "VersionKindOut"
       },

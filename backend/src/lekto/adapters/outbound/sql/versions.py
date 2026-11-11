@@ -2,11 +2,12 @@
 
 from typing import Any
 
-from sqlalchemy import Row, insert, select
+from sqlalchemy import Row, delete, insert, select
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.transaction import Transaction
 from lekto.core.domain.documents import Sha256
+from lekto.core.domain.errors import NotFoundError
 from lekto.core.domain.ids import DocumentId, UserId
 from lekto.core.domain.versions import DocumentVersion, VersionKind
 
@@ -30,6 +31,18 @@ class SqlDocumentVersionRepository:
         table = t.document_versions
         rows = list(await self._tx.read(select(table).where(table.c.sha256 == sha256.hex)))
         return _version(rows[0]) if rows else None
+
+    async def move(self, version: DocumentVersion, to: DocumentVersion) -> None:
+        table = t.document_versions
+        removed = await self._tx.write(
+            delete(table).where(
+                table.c.document_id == version.document_id, table.c.number == version.number
+            )
+        )
+        if removed.rowcount != 1:
+            raise NotFoundError("document version", f"{version.document_id}/{version.number}")
+        # A number taken already: the transaction's ConflictError.
+        await self._tx.write(insert(t.document_versions), [_row(to)])
 
 
 def _row(version: DocumentVersion) -> dict[str, Any]:
