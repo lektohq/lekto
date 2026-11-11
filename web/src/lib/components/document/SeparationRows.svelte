@@ -62,6 +62,11 @@
 		if (found.kind === 'off') return m.details_separate_why_off();
 		if (found.kind === 'mail') return m.details_separate_why_mail();
 		if (found.kind === 'migration') return m.details_separate_why_migration();
+		if (found.kind === 'too_long')
+			return m.details_separate_why_too_long({
+				pages: formatNumber(found.pages),
+				max: formatNumber(found.max)
+			});
 		if (found.kind !== 'new_version') return '';
 		const how = found.how && found.version !== null ? versionHow[found.how] : undefined;
 		return [m.details_separate_why_new_version(), how?.({ version: String(found.version) })]

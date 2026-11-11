@@ -7,7 +7,8 @@ one taken over from another system (the migration splits before), not after a ne
 node runs again then, as every node after receiving, and is done at once), not pages split off
 another document, and not a mail. A person cannot process it again (`Document.reprocess_from`),
 but a retry after it failed runs it again. It reads the codes of every page of the original (an
-image's frames put together as a PDF first). Without a sheet it is done.
+image's frames put together as a PDF first), unless it has more than `MAX_STACK_PAGES`. Without
+a sheet it is done.
 
 Otherwise the parts are put together as PDFs (as `EditingService` does) and their files stored;
 when the node's result is stored, so is the rest: the document keeps the stack as version 1 and
@@ -36,7 +37,12 @@ from lekto.core.domain.pipeline import (
     ProcessingHistory,
 )
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.domain.separating import is_separator, separated_parts, separator_pages
+from lekto.core.domain.separating import (
+    MAX_STACK_PAGES,
+    is_separator,
+    separated_parts,
+    separator_pages,
+)
 from lekto.core.domain.versions import DocumentVersion, VersionKind
 from lekto.core.ports.codes import CodeReader
 from lekto.core.ports.composer import PageComposer, PageSource
@@ -68,8 +74,8 @@ NOT_LOOKED = "not_looked"
 """Key of why the node did not look for sheets, in its output: `off` (no separator codes), `mail`
 (an e-mail), `migration`, `new_version` (with the `version` and its `kind`), `part` (a part of a
 stack split at its sheets: `from` and `title` name the stack, `pages` are its pages there, with
-the stack's `sheets` and `stack_pages`) or `split` (pages a person split off another document:
-`from` and `title`)."""
+the stack's `sheets` and `stack_pages`), `split` (pages a person split off another document:
+`from` and `title`) or `too_long` (more `pages` than a stack has, at most `max`)."""
 
 
 @dataclass(frozen=True)
@@ -110,6 +116,11 @@ class SeparateNode:
             await self._store.download(original_key(document.sha256), original)
             source = PageSource(original, document.media_type)
             pages = await self._composer.count_pages(source)
+            if pages > MAX_STACK_PAGES:
+                return NodeResult(
+                    outcome=Outcome.OK,
+                    output={NOT_LOOKED: "too_long", "pages": pages, "max": MAX_STACK_PAGES},
+                )
             stack = original
             if document.media_type != media_types.PDF:
                 stack = work / "stack.pdf"
