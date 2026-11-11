@@ -132,6 +132,16 @@ async def test_a_merge_needs_a_part_that_continues_the_target(world: World) -> N
         assert (await world.documents.get(owner.id, document.id)).sha256 == document.sha256
 
 
+async def test_a_merge_takes_a_page_of_every_document(world: World) -> None:
+    """One whose pages all left the stack is no part of the merge: it would go for nothing."""
+    owner, stack, scan = await two(world)
+    with pytest.raises(ValidationError, match="none of source 1"):
+        await world.editing.edit(
+            owner.id, stack.id, [part(1, 2, 3, replaces=True)], documents=[scan.id]
+        )
+    assert (await world.documents.get(owner.id, scan.id)).sha256 == scan.sha256
+
+
 async def test_the_relations_of_a_merged_document_name_the_target(world: World) -> None:
     owner, stack, scan = await two(world)
     pipeline = world.pipeline()

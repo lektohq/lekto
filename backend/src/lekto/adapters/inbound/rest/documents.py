@@ -376,8 +376,8 @@ _EDIT_BODY = {
         "inbox. 409 while a document is processed or if its file changed meanwhile; 415 for a "
         "mail (its pages are no file) and for a file that is no PDF or image; 422 for parts "
         "that do not fit the pages (a page twice, one a source does not have, more than one "
-        "part that replaces the document, none in a merge, or no change), a document twice or "
-        "a target that is none of them."
+        "part that replaces the document, none in a merge, no page of a document merged, or "
+        "no change), a document twice or a target that is none of them."
     ),
     response_model=EditedDocuments,
     responses=problem_responses(400, 401, 403, 404, 409, 413, 415, 422),
