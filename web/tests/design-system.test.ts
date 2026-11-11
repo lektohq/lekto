@@ -58,7 +58,8 @@ const EXCEPTIONS = {
  * before a document's title and before "Woher gelernt?". */
 const EYE = new Set([
 	'/src/lib/components/BeamTitle.svelte',
-	'/src/lib/components/IdentifiersEditor.svelte'
+	'/src/lib/components/IdentifiersEditor.svelte',
+	'/src/lib/components/document/PageEditor.svelte'
 ]);
 
 /** Where a link to one document stands (DESIGN.md, "Beam"): the cards and rows of the lists and

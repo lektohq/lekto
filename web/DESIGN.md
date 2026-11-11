@@ -401,8 +401,10 @@ chosen a line there says how to choose, move and cut. The description under the 
   "Löschen", "Abtrennen" (`outline`, `sm`, each with its icon, disabled while none is chosen), on
   one line; nothing comes or goes as the choice changes. On the phone "Auswählen" follows the
   count and the tools share the width (`stack`: icon over word).
-- **The parts**, the second step: a `Card` (`row`) per part with its first two pages, "Teil n"
-  (a `BeamTitle`: the part in the Beam) and its pages as `Badge` `muted`, and a `Segmented` (`sm`) "Neue Fassung | Neues Dokument" at
+- **The parts**, the second step: a `Card` (`row`) per part whose head is the button that shows
+  it in the Beam, as a card of a list is (Tobi, 11.11.2026, mock "PDF bearbeiten: Teile
+  ruhiger", B1): its first pages as a small stack, "Teil n" and below it its pages (muted), the
+  eye at its end in a round `bg-panel` mark, and a `Segmented` (`sm`) "Neue Fassung | Neues Dokument" at
   its end (on a phone below, `equal`, the full width); at most one part replaces the document
   (choosing it lets go of another). Below them an `Alert` `note`: every result runs anew and waits
   in the inbox, which part becomes which version of the document ("Teil 1 wird Fassung 3 von
@@ -750,8 +752,9 @@ modal, over a dialog too.
   text.
 - **The eye means only this:** no other action uses `scan-eye` ("Mit dem Bildmodell lesen" has
   `scan-text`). The mark "Im Eingang" is navigation (the inbox's view of the document), not
-  viewing. `tests/design-system.test.ts` keeps both: the eye only in `BeamTitle` and before
-  "Woher gelernt?", a link to one document only where this section allows it.
+  viewing. `tests/design-system.test.ts` keeps both: the eye only in `BeamTitle`, before
+  "Woher gelernt?" and at the end of a part of "PDF bearbeiten", a link to one document only where
+  this section allows it.
 - A relation shows both documents, the newer first, the number they share marked in each. A
   rule's preview shows where its text conditions hit, each labelled with its text. A hit of a
   search (the documents list with words) shows where its words stand, as the search matched
