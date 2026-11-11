@@ -1688,6 +1688,26 @@ async def test_a_field_set_by_hand_is_never_asked_for(world: World) -> None:
     assert number.id not in outcome.changes.fields and paid.id not in outcome.changes.fields
 
 
+async def test_a_new_version_leaves_a_field_set_by_hand_as_it_is(world: World) -> None:
+    """It is never read, so it never differs: its value stays, and so does why."""
+    seeded = await seed(world)
+    number = seeded.fields["Rechnungsnummer"]
+    await set_by_hand(world, number)
+    document = await document_with(world, type=seeded.types["Rechnung"])
+    await signal_step(world, model(proposal())).run(document)
+    document.fields = {number.id: "RE-1"}
+    document.confirmed_at = NOW
+    document.processing.new_version = True
+    given = extraction()["fields"]
+    assert isinstance(given, dict)
+    answer: JsonObject = {"fields": {"a1": given["a1"], "a2": given["a2"], "a3": given["a3"]}}
+    outcome = await fields_step(world, model(answer)).run(document)
+    assert isinstance(outcome, MetadataResult)
+    check = field_check(seeded, outcome, "Rechnungsnummer")
+    assert check.ok and check.reason == "'Rechnungsnummer' is set by hand"
+    assert number.id not in outcome.changes.fields
+
+
 async def signalled(
     world: World, answer: JsonObject, type: DocumentType | None
 ) -> tuple[Document, NodeResult]:

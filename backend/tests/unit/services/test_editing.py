@@ -5,6 +5,7 @@ transaction, and every result waits in the inbox."""
 
 import logging
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -21,15 +22,18 @@ from lekto.core.domain.errors import (
     UnsupportedMediaTypeError,
     ValidationError,
 )
+from lekto.core.domain.ids import MailboxId, MailRecordId, new_id
+from lekto.core.domain.mail_intake import MailOrigin, OriginRole
 from lekto.core.domain.pipeline import Lane, Node, ProcessingHistory
 from lekto.core.domain.reasons import ReasonCode
 from lekto.core.domain.users import Role, User
 from lekto.core.domain.versions import VersionKind
 from lekto.core.ports.composer import PageSource
-from lekto.core.services.editing import SPLIT_FROM, AddedFile
+from lekto.core.services._intake import SPLIT_FROM
+from lekto.core.services.editing import AddedFile
 from lekto.core.services.objects import original_key, page_key
 from lekto.core.services.rules.nodes import ApplyRulesNode
-from tests.builders import HOUR, TEMPLATES, incoming
+from tests.builders import HOUR, NOW, TEMPLATES, incoming
 from tests.unit.services.support import World
 from tests.unit.services.test_maintenance import maintenance
 
@@ -116,6 +120,40 @@ async def test_a_part_replaces_the_document_and_the_others_become_new_documents(
     assert b" 3 90\n" in turned
     assert await world.object_store.get(original_key(document.sha256)) == STACK
     assert not await world.object_store.exists(page_key(document.id, 1))
+
+
+async def test_pages_split_off_a_mailed_document_keep_its_mail(world: World) -> None:
+    """As the parts of a stack do (`_intake.store_part`)."""
+    owner = await world.user()
+    document = await world.pipeline().receive(
+        owner.id, incoming(STACK), filename="stack.pdf", channel=Channel.MAIL
+    )
+    origin = MailOrigin(
+        document_id=document.id,
+        record_id=MailRecordId(new_id()),
+        mailbox_id=MailboxId(new_id()),
+        mailbox="Post",
+        rule="Scans",
+        role=OriginRole.ATTACHMENT,
+        letter=1,
+        message_id="<scans@example.org>",
+        sender=(),
+        to=(),
+        cc=(),
+        subject="Scans",
+        sent_at=None,
+        arrived_at=NOW,
+        filename="stack.pdf",
+    )
+    async with world.uow() as uow:
+        await uow.mail_origins.add(origin)
+        await uow.commit()
+    await world.drain()
+    result = await world.editing.edit(owner.id, document.id, [part(1, 2, replaces=True), part(3)])
+    _, new = (view.document for view in result.documents)
+    assert new.channel is Channel.MAIL
+    async with world.uow() as uow:
+        assert await uow.mail_origins.find(new.id) == replace(origin, document_id=new.id)
 
 
 async def test_without_a_part_that_replaces_it_the_document_is_deleted(world: World) -> None:
@@ -232,6 +270,28 @@ async def test_a_file_changed_meanwhile_stops_the_edit_and_leaves_nothing(world:
     )
     async with world.uow() as uow:
         assert await uow.documents.count_all() == 1
+
+
+async def test_a_part_that_cannot_be_stored_leaves_no_other(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owner, document = await received(world)
+    originals = world.object_store.keys("originals/")
+    upload = world.object_store.upload
+    calls = 0
+
+    async def second_fails(key: str, path: Path, *, content_type: str) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("the store went away")
+        await upload(key, path, content_type=content_type)
+
+    monkeypatch.setattr(world.object_store, "upload", second_fails)
+    with pytest.raises(OSError):
+        await world.editing.edit(owner.id, document.id, [part(1), part(2, 3, replaces=True)])
+    assert calls == 2
+    assert world.object_store.keys("originals/") == originals
 
 
 async def test_every_result_waits_in_the_inbox_and_what_was_confirmed_stays(
