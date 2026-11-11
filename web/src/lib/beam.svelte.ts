@@ -72,12 +72,16 @@ export interface BeamPart {
 
 // The parts the Beam shows. The history entry names them by their key only: their images (an
 // added file's among them) never go into it, and after a reload they are gone, as the edit is.
+// The key counts up: `crypto.randomUUID` exists in a secure context only, not on an instance
+// reached as http://10.0.0.5 (Tobi, 11.11.2026).
 let shownParts: { key: string; parts: readonly BeamPart[] } | null = null;
+let shownCount = 0;
 
 /** Open the Beam on the parts of an edit before they are stored (web/DESIGN.md, "Beam"), at
  * part `index` and its page `page` (from 1); `from` names the place. */
 export function showPages(parts: readonly BeamPart[], index: number, from: string, page = 1): void {
-	const key = crypto.randomUUID();
+	shownCount += 1;
+	const key = `parts-${shownCount}`;
 	shownParts = { key, parts };
 	pushEntry('beam', { ids: [], parts: key, index, page, from });
 }
