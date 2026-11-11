@@ -47,7 +47,6 @@ from lekto.core.domain.permissions import (
 from lekto.core.domain.pipeline import (
     CHOSEN_SPACE,
     NODES,
-    TRIGGER_UPLOAD,
     Lane,
     Node,
     NodeResult,
@@ -68,7 +67,7 @@ from lekto.core.domain.rule_planner import changed_fields
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
 from lekto.core.domain.validation import require_name
-from lekto.core.domain.versions import DocumentVersion, VersionKind
+from lekto.core.domain.versions import VersionKind
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.ocr import VisionModel
@@ -85,6 +84,7 @@ from lekto.core.services._access import (
     visible_space,
 )
 from lekto.core.services._first_runs import keep_first_run, keep_verdicts
+from lekto.core.services._intake import store_new_version, store_received
 from lekto.core.services._jobs import (
     NODE_JOB,
     STORE_ATTEMPTS,
@@ -109,10 +109,10 @@ from lekto.core.services.inbox import (
     suggested_spaces,
 )
 from lekto.core.services.master_data import learn_alias
-from lekto.core.services.objects import derivative_keys, original_key
+from lekto.core.services.objects import original_key
 from lekto.core.services.relating import RELATE_JOB, queue_relate, relate
 from lekto.core.services.relations import RELATIONS_LOCK, relation_events
-from lekto.core.services.rules.running import corrected_fields, person_record, space_choice
+from lekto.core.services.rules.running import corrected_fields, person_record
 from lekto.core.services.tasks.settling import Delegation, cancel_tasks
 
 log = logging.getLogger(__name__)
@@ -457,25 +457,19 @@ class PipelineService:
                 received=received,
                 space_chosen=chosen,
             )
-            await uow.documents.add(document)
-            await uow.document_versions.add(first_version(document, now))
-            await self._log(uow, document.id, Node.RECEIVE, 1, result, started, now)
-            if chosen:
-                await uow.processing_log.append(
-                    space_choice(
-                        document,
-                        node=Node.RECEIVE,
-                        actor=actor,
-                        trigger=TRIGGER_UPLOAD,
-                        version=self._version,
-                        now=now,
-                        via=via,
-                    )
-                )
+            await store_received(
+                uow,
+                document,
+                first_version(document, now),
+                result,
+                pipeline_version=self._version,
+                started=started,
+                now=now,
+                chooser=actor if chosen else None,
+                via=via,
+            )
             if also is not None:
                 await also(uow, document)
-            await enqueue_nodes(uow, document, document.processing.due(), now)
-            await uow.outbox.add(document.pull_events())
             await uow.commit()
         return document
 
@@ -568,20 +562,6 @@ class PipelineService:
         (`Document.new_version`). UnsupportedMediaTypeError for a type Lekto does not take,
         DuplicateDocumentError for a file in Lekto already (any version of any document),
         InvalidTransitionError while it is processed."""
-        return await self.add_version(actor, id, file, filename=filename, kind=VersionKind.REPLACED)
-
-    async def add_version(
-        self,
-        actor: UserId,
-        id: DocumentId,
-        file: IncomingFile,
-        *,
-        filename: str,
-        kind: VersionKind,
-        detail: JsonObject | None = None,
-    ) -> DocumentView:
-        """`new_version` for a version of `kind` with `detail` (an edit names what it was made
-        from)."""
         sha256 = file.sha256
         media_type = media_types.detect(await asyncio.to_thread(_head, file.path))
         # A mail is a way in, not a version of a document's original.
@@ -606,27 +586,19 @@ class PipelineService:
             access = await access_to(uow, user, document)
             if (error := await duplicate_of(uow, user, sha256)) is not None:
                 raise error
-            versions = await uow.document_versions.of_document(id)
-            pages = document.page_count
-            document.new_version(sha256, filename, media_type, now)
-            await uow.document_versions.add(
-                DocumentVersion(
-                    document_id=id,
-                    number=max((item.number for item in versions), default=0) + 1,
-                    sha256=sha256,
-                    original_filename=document.original_filename,
-                    media_type=media_type,
-                    kind=kind,
-                    created_at=now,
-                    created_by=actor,
-                    detail=detail or {},
-                )
+            await store_new_version(
+                uow,
+                self._store,
+                document,
+                sha256,
+                filename=filename,
+                media_type=media_type,
+                kind=VersionKind.REPLACED,
+                created_by=actor,
+                detail={},
+                now=now,
             )
-            # The earlier version's derivatives go before the new run's jobs are seen: page
-            # images beyond the new page count would stay otherwise.
-            for derivative in derivative_keys(id, pages):
-                await self._store.delete(derivative)
-            await self._restart(uow, document)
+            await uow.commit()
         return DocumentView(document, access)
 
     async def read_with_vision(self, actor: UserId, id: DocumentId) -> DocumentView:

@@ -20,7 +20,7 @@ in the inbox. If the stack is deleted before the result is stored, the parts' fi
 import asyncio
 import logging
 from collections.abc import Collection, Iterable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import datetime
 
 from lekto.core.domain import media_types
@@ -31,9 +31,7 @@ from lekto.core.domain.ids import UserId
 from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.pipeline import (
     TRIGGER_UPLOAD,
-    Node,
     NodeResult,
-    NodeRun,
     Outcome,
     ProcessingHistory,
 )
@@ -44,12 +42,10 @@ from lekto.core.ports.codes import CodeReader
 from lekto.core.ports.composer import PageComposer, PageSource
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
-from lekto.core.services._jobs import enqueue_nodes
-from lekto.core.services.editing import SPLIT_FROM
+from lekto.core.services._intake import store_part
 from lekto.core.services.nodes import ORIGINAL_FILE, work_directory
 from lekto.core.services.objects import original_key
 from lekto.core.services.pipeline import VERSION_MEDIA_TYPES, IncomingFile
-from lekto.core.services.rules.running import space_choice
 
 log = logging.getLogger(__name__)
 
@@ -229,7 +225,6 @@ class Separation:
 
     async def apply(self, uow: UnitOfWork, document: Document, now: datetime) -> NodeResult:
         first, *others = self.parts
-        mail = await uow.mail_origins.find(document.id)
         history = ProcessingHistory(await uow.processing_log.list_for(document.id))
         # Rules leave the space a person chose on upload; the parts' too.
         chosen = (
@@ -242,9 +237,6 @@ class Separation:
             await self._split_off(uow, document, part, number, chooser, now)
             for number, part in enumerate(others, start=2)
         ]
-        if mail is not None:
-            for new in created:
-                await uow.mail_origins.add(replace(mail, document_id=new.id))
         versions = await uow.document_versions.of_document(document.id)
         current = max(version.number for version in versions)
         split_off: list[JsonValue] = [str(new.id) for new in created]
@@ -300,73 +292,27 @@ class Separation:
         chooser: UserId | None,
         now: datetime,
     ) -> Document:
-        """A new document of the part `number`, as the stack came in: in its space (chosen by
-        `chooser`, if a person chose it), from its uploader, channel and receipt."""
-        file = part.file
-        result = NodeResult(
-            outcome=Outcome.OK,
-            output={
-                "sha256": file.sha256.hex,
-                "size": file.size,
-                "media_type": media_types.PDF,
-                SPLIT_FROM: str(stack.id),
+        """A new document of the part `number`, as the stack came in (`store_part`), its space
+        chosen by `chooser`, if a person chose it."""
+        return await store_part(
+            uow,
+            stack,
+            part.file.sha256,
+            part.file.size,
+            number=number,
+            detail={
+                "pages": [pick.to_json() for pick in part.picks()],
+                "added": [],
+                "document": str(stack.id),
+                "title": stack.title,
+                "version": 1,
+                SHEETS: list(self.sheets),
+                STACK_PAGES: self.pages,
             },
-        )
-        document = Document.receive(
-            uploaded_by=stack.uploaded_by,
-            space_id=stack.space_id,
-            sha256=file.sha256,
-            original_filename=f"{stack.file_title} ({number}).pdf",
-            media_type=media_types.PDF,
-            result=result,
+            created_by=None,
+            chooser=chooser,
+            trigger=TRIGGER_UPLOAD,
+            edited=False,
+            pipeline_version=self.pipeline_version,
             now=now,
-            channel=stack.channel,
-            received=stack.created_at,
-            space_chosen=chooser is not None,
         )
-        await uow.documents.add(document)
-        await uow.document_versions.add(
-            DocumentVersion(
-                document_id=document.id,
-                number=1,
-                sha256=file.sha256,
-                original_filename=document.original_filename,
-                media_type=media_types.PDF,
-                kind=VersionKind.SPLIT,
-                created_at=now,
-                detail={
-                    "pages": [pick.to_json() for pick in part.picks()],
-                    "added": [],
-                    "document": str(stack.id),
-                    "title": stack.title,
-                    "version": 1,
-                    SHEETS: list(self.sheets),
-                    STACK_PAGES: self.pages,
-                },
-            )
-        )
-        await uow.processing_log.append(
-            NodeRun(
-                document_id=document.id,
-                node=Node.RECEIVE,
-                run=1,
-                result=result,
-                pipeline_version=self.pipeline_version,
-                started_at=now,
-                duration=now - now,
-            )
-        )
-        if chooser is not None:
-            await uow.processing_log.append(
-                space_choice(
-                    document,
-                    node=Node.RECEIVE,
-                    actor=chooser,
-                    trigger=TRIGGER_UPLOAD,
-                    version=self.pipeline_version,
-                    now=now,
-                )
-            )
-        await enqueue_nodes(uow, document, document.processing.due(), now)
-        await uow.outbox.add(document.pull_events())
-        return document

@@ -1,7 +1,7 @@
 """Editing a document's pages (`domain.editing`; `.idea/umsetzungsplan.md`, "Fassungen, Datei
 ersetzen, PDF bearbeiten"): the parts are put together from the document's original and the
 files a person adds, and stored in one transaction. The part that replaces the document becomes
-its next version (as `PipelineService.add_version`); every other part becomes a new document in
+its next version (as `PipelineService.new_version`); every other part becomes a new document in
 its space, with the uploader, channel and receipt of the document it was split off; without a
 part that replaces it, the document is deleted (as `DocumentService.delete`). Each of them runs
 anew and waits in the inbox (`Processing.new_version`).
@@ -26,7 +26,7 @@ from datetime import datetime
 from pathlib import Path
 
 from lekto.core.domain import media_types
-from lekto.core.domain.documents import Document, Sha256, file_title
+from lekto.core.domain.documents import Document, Sha256
 from lekto.core.domain.editing import MAX_ADDED, MAX_MERGED, EditPart, check_parts
 from lekto.core.domain.errors import (
     ConcurrencyError,
@@ -38,33 +38,25 @@ from lekto.core.domain.ids import DocumentId, UserId
 from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.pipeline import (
     TRIGGER_EDIT,
-    Node,
-    NodeResult,
-    NodeRun,
-    Outcome,
     ProcessingStatus,
 )
 from lekto.core.domain.reasons import Action, ReasonCode, because
 from lekto.core.domain.users import User
-from lekto.core.domain.versions import DocumentVersion, VersionKind
+from lekto.core.domain.versions import VersionKind
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.composer import PageComposer, PageSource
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.pages import PageRenderer
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import access_to, controllable_document, load_actor
-from lekto.core.services._jobs import enqueue_nodes
+from lekto.core.services._intake import store_new_version, store_part
 from lekto.core.services.documents import DocumentView, delete_document
 from lekto.core.services.nodes import work_directory
-from lekto.core.services.objects import derivative_keys, original_key
+from lekto.core.services.objects import original_key
 from lekto.core.services.pipeline import VERSION_MEDIA_TYPES, IncomingFile
-from lekto.core.services.rules.running import space_choice
-from lekto.core.services.tasks.settling import cancel_tasks
 
 log = logging.getLogger(__name__)
 
-SPLIT_FROM = "split_from"
-"""Key of the document a part was split off, in the output of its receive node."""
 MOVED = "moved"
 """Key of where a version of a merged document came from (its document, title and number
 there), in its detail at the target."""
@@ -260,10 +252,8 @@ class EditingService:
                     "from": current,
                     "split_off": [str(new.id) for new in created],
                 }
-                last = current
                 if others:
                     taken = await self._take_versions(uow, document, others, current)
-                    last = current + len(taken)
                     detail["documents"] = [
                         {
                             "document": str(item.id),
@@ -273,7 +263,7 @@ class EditingService:
                         for item in found
                     ]
                 kind = VersionKind.MERGED if others else VersionKind.EDITED
-                await self._replace(uow, actor, document, replacing, last + 1, kind, detail, now)
+                await self._replace(uow, actor, document, replacing, kind, detail, now)
                 going = {item.id for item in others}
                 for other in others:
                     await _move_relations(uow, other.id, document.id, going)
@@ -328,73 +318,25 @@ class EditingService:
         added: Sequence[str],
     ) -> Document:
         """A new document of the part `number`, in the source's space; a person chose that."""
-        now = self._clock.now()
-        file = item.file
-        result = NodeResult(
-            outcome=Outcome.OK,
-            output={
-                "sha256": file.sha256.hex,
-                "size": file.size,
-                "media_type": media_types.PDF,
-                SPLIT_FROM: str(source.id),
+        return await store_part(
+            uow,
+            source,
+            item.file.sha256,
+            item.file.size,
+            number=number,
+            detail={
+                **_pages(item.part, added),
+                "document": str(source.id),
+                "title": source.title,
+                "version": current,
             },
-        )
-        document = Document.receive(
-            uploaded_by=source.uploaded_by,
-            space_id=source.space_id,
-            sha256=file.sha256,
-            original_filename=f"{file_title(source.original_filename)} ({number}).pdf",
-            media_type=media_types.PDF,
-            result=result,
-            now=now,
-            channel=source.channel,
-            received=source.created_at,
-            space_chosen=True,
+            created_by=actor,
+            chooser=actor,
+            trigger=TRIGGER_EDIT,
             edited=True,
+            pipeline_version=self._version,
+            now=self._clock.now(),
         )
-        await uow.documents.add(document)
-        await uow.document_versions.add(
-            DocumentVersion(
-                document_id=document.id,
-                number=1,
-                sha256=file.sha256,
-                original_filename=document.original_filename,
-                media_type=media_types.PDF,
-                kind=VersionKind.SPLIT,
-                created_at=now,
-                created_by=actor,
-                detail={
-                    **_pages(item.part, added),
-                    "document": str(source.id),
-                    "title": source.title,
-                    "version": current,
-                },
-            )
-        )
-        await uow.processing_log.append(
-            NodeRun(
-                document_id=document.id,
-                node=Node.RECEIVE,
-                run=1,
-                result=result,
-                pipeline_version=self._version,
-                started_at=now,
-                duration=now - now,
-            )
-        )
-        await uow.processing_log.append(
-            space_choice(
-                document,
-                node=Node.RECEIVE,
-                actor=actor,
-                trigger=TRIGGER_EDIT,
-                version=self._version,
-                now=now,
-            )
-        )
-        await enqueue_nodes(uow, document, document.processing.due(), now)
-        await uow.outbox.add(document.pull_events())
-        return document
 
     async def _replace(
         self,
@@ -402,34 +344,23 @@ class EditingService:
         actor: UserId,
         document: Document,
         item: _Part,
-        number: int,
         kind: VersionKind,
         detail: JsonObject,
         now: datetime,
     ) -> None:
-        """The part as the document's version `number` (as `PipelineService.add_version`)."""
-        pages = document.page_count
-        filename = f"{file_title(document.original_filename)}.pdf"
-        document.new_version(item.file.sha256, filename, media_types.PDF, now)
-        await uow.document_versions.add(
-            DocumentVersion(
-                document_id=document.id,
-                number=number,
-                sha256=item.file.sha256,
-                original_filename=document.original_filename,
-                media_type=media_types.PDF,
-                kind=kind,
-                created_at=now,
-                created_by=actor,
-                detail=detail,
-            )
+        """The part as the document's next version (as `PipelineService.new_version`)."""
+        await store_new_version(
+            uow,
+            self._store,
+            document,
+            item.file.sha256,
+            filename=f"{document.file_title}.pdf",
+            media_type=media_types.PDF,
+            kind=kind,
+            created_by=actor,
+            detail=detail,
+            now=now,
         )
-        for derivative in derivative_keys(document.id, pages):
-            await self._store.delete(derivative)
-        await cancel_tasks(uow, document.id, now)
-        await uow.documents.update(document)
-        await enqueue_nodes(uow, document, document.processing.due(), now)
-        await uow.outbox.add(document.pull_events())
 
 
 async def _editable(uow: UnitOfWork, user: User, id: DocumentId) -> Document:
