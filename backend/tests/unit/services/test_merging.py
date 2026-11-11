@@ -14,6 +14,8 @@ from lekto.core.domain.errors import (
     UnsupportedMediaTypeError,
     ValidationError,
 )
+from lekto.core.domain.events import DocumentUpdated
+from lekto.core.domain.first_runs import RELATIONS
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState
@@ -114,10 +116,24 @@ async def test_the_target_may_be_another_of_them(world: World) -> None:
         (3, VersionKind.MERGED),
     ]
     assert versions[1].sha256 == stack.sha256
-    assert versions[2].detail["documents"] == [
+    sources = [
         {"document": str(stack.id), "title": "stack", "version": 2},
         {"document": str(scan.id), "title": "scan_0412", "version": 1},
     ]
+    # Source 0, the stack's pages, is the scan's version 2 now.
+    assert versions[2].detail["from"] == 2
+    assert versions[2].detail["documents"] == sources
+    # So for the part split off: its pages name their sources as the merged version does.
+    async with world.uow() as uow:
+        (first,) = await uow.document_versions.of_document(split.id)
+    assert first.detail == {
+        "pages": [{"source": 1, "page": 2, "rotate": 0}],
+        "added": [],
+        "document": str(scan.id),
+        "title": "scan_0412",
+        "version": 2,
+        "documents": sources,
+    }
 
 
 async def test_a_merge_needs_a_part_that_continues_the_target(world: World) -> None:
@@ -183,6 +199,13 @@ async def test_the_relations_of_a_merged_document_name_the_target(world: World) 
     assert sorted((item.newer, item.older) for item in found) == sorted(
         [(reply.id, stack.id), (stack.id, letter.id)]
     )
+    # Both ends of the relation that moved hear of it, as of any change of relations.
+    told = {
+        (event.document_id, event.related)
+        for event in world.events()
+        if isinstance(event, DocumentUpdated) and event.fields == (RELATIONS,)
+    }
+    assert told == {(reply.id, stack.id), (stack.id, reply.id)}
 
 
 async def test_who_may_merge_and_what(world: World) -> None:
