@@ -7,7 +7,8 @@
 
 export type Turn = 0 | 90 | 180 | 270;
 
-/** One page on the stack. `source` 0 is the document's original, 1, 2, … the added files. */
+/** One page on the stack. `source` 0 is the document's original, 1, 2, … what was added (a
+ * file, or the original of another document), in the order it was added. */
 export interface StackPage {
 	/** Unique on the stack, for the list's keys and the choice. */
 	key: string;
@@ -109,7 +110,7 @@ export function toggleCut(stack: Stack, index: number): StackPage[] {
 	return stack.map((page, at) => (at === index && at > 0 ? { ...page, cut: !page.cut } : page));
 }
 
-/** The pages of the added file `source` put after the page at `after` (at the end for null). */
+/** The pages of the added source `source` put after the page at `after` (at the end for null). */
 export function addPages(
 	stack: Stack,
 	source: number,
@@ -129,12 +130,33 @@ export function addPages(
 }
 
 /** The parts as the API takes them; `replacing`: the index of the part that replaces the
- * document, null for none (the document is deleted). */
-export function partsRequest(stack: Stack, replacing: number | null): PartRequest[] {
+ * document, null for none (the document is deleted). `place`: a source's number in the request
+ * (the API counts the files first, then the other documents). */
+export function partsRequest(
+	stack: Stack,
+	replacing: number | null,
+	place: (source: number) => number = (source) => source
+): PartRequest[] {
 	return partsOf(stack).map((part, index) => ({
-		pages: part.map(({ source, page, rotate }) => ({ source, page, rotate })),
+		pages: part.map(({ source, page, rotate }) => ({ source: place(source), page, rotate })),
 		replaces: index === replacing
 	}));
+}
+
+/** The place of each added source in the request: the files (`isFile`) first, then the other
+ * documents, each in the order they were added; the original stays 0. */
+export function requestPlaces(isFile: readonly boolean[]): (source: number) => number {
+	const files = isFile.filter(Boolean).length;
+	const places = new Map<number, number>([[0, 0]]);
+	let file = 0;
+	let other = 0;
+	isFile.forEach((kind, index) => places.set(index + 1, kind ? ++file : files + ++other));
+	return (source) => places.get(source) ?? source;
+}
+
+/** The letters the documents of a merge are told apart by: A the edited one, then B, C, … */
+export function markOf(index: number): string {
+	return index < 26 ? String.fromCharCode(65 + index) : String(index + 1);
 }
 
 /** The first and last place (from 1) of each part on the stack. */
