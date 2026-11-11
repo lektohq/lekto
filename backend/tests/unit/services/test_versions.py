@@ -249,6 +249,18 @@ async def test_a_new_version_s_run_keeps_confirmed_values_and_suggests_what_diff
     assert [reason.code for reason in differs.reasons] == [ReasonCode.NEW_VERSION_DIFFERS]
     unread = _kept(check_of(None, ok=False, suggestion="c-3"), document, "c-1")
     assert (unread.ok, unread.suggestion) == (False, "c-3")
+    # Read the same, but uncertain (a quote missing, say): the person confirmed that value; the
+    # check's own reasons stay, as remarks.
+    doubted = FieldCheck(
+        field="contact",
+        outcome=Outcome.UNCERTAIN,
+        confidence=0.4,
+        suggestion="c-1",
+        reasons=(because(ReasonCode.QUOTE_MISSING),),
+    )
+    agreed = _kept(doubted, document, "c-1")
+    assert (agreed.ok, agreed.value, agreed.suggestion) == (True, "c-1", None)
+    assert [reason.code for reason in agreed.reasons] == [ReasonCode.QUOTE_MISSING]
     # Nothing confirmed there, no value, or not a new version's run: as in any run.
     assert _kept(other, document, None) == other
     document.processing.new_version = False
