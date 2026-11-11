@@ -145,6 +145,8 @@ const NOT_LOOKED: Record<string, () => string> = {
 /** The separator sheets a stack was split at, and into how many parts; or why none were
  * looked for (a part of a stack, a new version, …); null where the entry does not say. */
 function separated(output: Json): string | null {
+	if (output.not_looked === 'too_long')
+		return m.summary_not_looked_too_long({ max: formatNumber(count(output.max)) });
 	if (typeof output.not_looked === 'string') return NOT_LOOKED[output.not_looked]?.() ?? null;
 	if (!Array.isArray(output.sheets)) return null;
 	if (output.sheets.length === 0) return m.summary_no_separator();

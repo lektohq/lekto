@@ -74,6 +74,9 @@ describe('stepSummary', () => {
 		expect(summary('separate', { not_looked: 'new_version' })).toBe(
 			m.summary_not_looked_new_version()
 		);
+		expect(summary('separate', { not_looked: 'too_long', pages: 412, max: 200 })).toBe(
+			m.summary_not_looked_too_long({ max: '200' })
+		);
 		expect(summary('separate', { not_looked: 'unknown' })).toBeNull();
 		expect(summary('separate', { sheets: [], pages: 3 })).toBe(m.summary_no_separator());
 		expect(summary('separate', { sheets: [4, 8], pages: 10, parts: 3 })).toBe(

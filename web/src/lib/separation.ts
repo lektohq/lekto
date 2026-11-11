@@ -38,6 +38,8 @@ export type Separation =
 	  }
 	| { kind: 'split'; from: string | null; title: string }
 	| { kind: 'new_version'; version: number | null; how: string | null }
+	/** More pages than a stack has (`max`, the API's `MAX_STACK_PAGES`). */
+	| { kind: 'too_long'; pages: number; max: number }
 	| { kind: 'off' | 'mail' | 'migration' };
 
 const numbers = (value: unknown): number[] =>
@@ -64,6 +66,8 @@ export function separationOf(value: unknown): Separation | null {
 			version: typeof output.version === 'number' ? output.version : null,
 			how: text(output.kind)
 		};
+	if (why === 'too_long')
+		return { kind: 'too_long', pages: count(output.pages), max: count(output.max) };
 	if (why === 'off' || why === 'mail' || why === 'migration') return { kind: why };
 	if (!Array.isArray(output.sheets)) return null;
 	return {

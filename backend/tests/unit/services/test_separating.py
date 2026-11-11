@@ -26,7 +26,7 @@ from lekto.core.domain.pipeline import (
     ProcessingStatus,
 )
 from lekto.core.domain.reasons import ReasonCode
-from lekto.core.domain.separating import separated_parts, separator_pages
+from lekto.core.domain.separating import MAX_STACK_PAGES, separated_parts, separator_pages
 from lekto.core.domain.users import Role, User
 from lekto.core.domain.versions import VersionKind
 from lekto.core.ports.unit_of_work import UnitOfWork
@@ -276,6 +276,18 @@ async def test_no_sheets_are_looked_for_without_codes_or_in_a_migration(world: W
     assert reader.calls == []
     assert all(len(document.processing.outcomes) for document in await documents(world))
     assert [await not_looked(world, item.id) for item in (off, taken)] == ["off", "migration"]
+
+
+async def test_a_file_longer_than_a_stack_is_not_looked_through(world: World) -> None:
+    """Reading the codes of each of its pages would hold its processing up for minutes."""
+    reader = sheets(3)
+    _, book = await received(world, reader, fake_pdf(MAX_STACK_PAGES + 1, "a book"))
+    assert reader.calls == []
+    assert await separation(world, book.id) == {
+        NOT_LOOKED: "too_long",
+        "pages": MAX_STACK_PAGES + 1,
+        "max": MAX_STACK_PAGES,
+    }
 
 
 async def test_a_new_version_is_not_split(world: World) -> None:
