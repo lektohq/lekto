@@ -1219,6 +1219,45 @@ class UnitOfWorkContract:
             await uow.document_versions.add(replace(second, document_id=other.id, number=1))
             await uow.commit()
 
+    async def test_a_version_moves_to_another_document(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """A merged document's version goes to the target under the next number, its file the
+        same; not onto a number taken, and only from where it is."""
+        owner, space = await owner_with_space(uow_factory)
+        source, target = builders.processed(owner, space), builders.processed(owner, space)
+        mine = DocumentVersion(
+            document_id=source.id,
+            number=1,
+            sha256=source.sha256,
+            original_filename="scan.pdf",
+            media_type="application/pdf",
+            kind=VersionKind.RECEIVED,
+            created_at=NOW,
+            created_by=owner.id,
+        )
+        kept = replace(mine, document_id=target.id, sha256=target.sha256)
+        moved = replace(mine, document_id=target.id, number=2, detail={"moved": {"version": 1}})
+        async with uow_factory() as uow:
+            await uow.documents.add(source)
+            await uow.documents.add(target)
+            await uow.document_versions.add(mine)
+            await uow.document_versions.add(kept)
+            await uow.commit()
+        with pytest.raises(ConflictError):
+            async with uow_factory() as uow:
+                await uow.document_versions.move(mine, replace(moved, number=1))
+                await uow.commit()
+        async with uow_factory() as uow:
+            await uow.document_versions.move(mine, moved)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.document_versions.of_document(source.id) == []
+            assert await uow.document_versions.of_document(target.id) == [kept, moved]
+            assert await uow.document_versions.find_by_sha256(source.sha256) == moved
+            with pytest.raises(NotFoundError):
+                await uow.document_versions.move(mine, replace(moved, number=3))
+
     async def test_relations_between_documents(self, uow_factory: UnitOfWorkFactory) -> None:
         """A relation from the newer to the older document: found from either end, replaced in
         place, removed, and gone with either document."""

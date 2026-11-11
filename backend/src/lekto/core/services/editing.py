@@ -6,6 +6,13 @@ its space, with the uploader, channel and receipt of the document it was split o
 part that replaces it, the document is deleted (as `DocumentService.delete`). Each of them runs
 anew and waits in the inbox (`Processing.new_version`).
 
+With the pages of other documents, the edit merges them (Umsetzungsplan "Trennblatt und
+Zusammenführen"): one of them, the target, gets the part that replaces it as its next version
+(`VersionKind.MERGED`). Every other document goes: its versions become the target's (numbered
+after the target's, with where they came from), its relations name the target (one with the
+target, or with another of them, goes; one the target has already stays the target's), and it
+is deleted as `DocumentService.delete` does. Its files stay, as versions of the target.
+
 The parts' files are stored before the transaction. Every one is new (the composer makes each
 file unique), so no other document names it and the removal of a deleted document's files never
 takes one; if the transaction fails, they are removed again.
@@ -13,14 +20,14 @@ takes one; if the transaction fails, they are removed again.
 
 import asyncio
 import logging
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Collection, Sequence
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 
 from lekto.core.domain import media_types
 from lekto.core.domain.documents import Document, Sha256, file_title
-from lekto.core.domain.editing import MAX_ADDED, EditPart, check_parts
+from lekto.core.domain.editing import MAX_ADDED, MAX_MERGED, EditPart, check_parts
 from lekto.core.domain.errors import (
     ConcurrencyError,
     InvalidTransitionError,
@@ -38,6 +45,7 @@ from lekto.core.domain.pipeline import (
     ProcessingStatus,
 )
 from lekto.core.domain.reasons import Action, ReasonCode, because
+from lekto.core.domain.users import User
 from lekto.core.domain.versions import DocumentVersion, VersionKind
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.composer import PageComposer, PageSource
@@ -57,6 +65,9 @@ log = logging.getLogger(__name__)
 
 SPLIT_FROM = "split_from"
 """Key of the document a part was split off, in the output of its receive node."""
+MOVED = "moved"
+"""Key of where a version of a merged document came from (its document, title and number
+there), in its detail at the target."""
 
 
 @dataclass(frozen=True)
@@ -69,12 +80,14 @@ class AddedFile:
 
 @dataclass(frozen=True)
 class EditResult:
-    """The documents an edit leaves, in the order of the parts: the edited one where a part
-    replaces it, a new one for each other part. `deleted`: no part replaced the document, and
-    it is gone."""
+    """The documents an edit leaves, in the order of the parts: the edited one (the target of a
+    merge) where a part replaces it, a new one for each other part. `deleted`: no part replaced
+    the document, and it is gone. `merged`: the other documents of a merge, gone, their
+    versions the target's."""
 
     documents: tuple[DocumentView, ...]
     deleted: bool
+    merged: tuple[DocumentId, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -127,44 +140,65 @@ class EditingService:
         id: DocumentId,
         parts: Sequence[EditPart],
         added: Sequence[AddedFile] = (),
+        documents: Sequence[DocumentId] = (),
+        target: DocumentId | None = None,
     ) -> EditResult:
-        """Editors and admins: make `parts` of the document's pages and the pages of `added`
-        (sources 1, 2, … in their order), and store them (see the module). ValidationError for
-        parts that do not fit the pages (`check_parts`) or more than `MAX_ADDED` files;
+        """Editors and admins: make `parts` of the document's pages, the pages of `added`
+        (sources 1, 2, … in their order) and those of `documents` (the sources after them),
+        and store them (see the module). With `documents`, the part that replaces makes the
+        next version of `target`, the document or one of them (the document by default).
+        ValidationError for parts that do not fit the pages (`check_parts`; a merge needs a
+        part that replaces), more than `MAX_ADDED` files or `MAX_MERGED` documents, a document
+        twice (or the document among `documents`), or a target that is none of them;
         UnsupportedMediaTypeError for an added file that is no PDF or image, and for a mail,
         whose pages are not a file; UnprocessableDocumentError for a file whose pages cannot
-        be read; InvalidTransitionError while the document is processed; ConcurrencyError if
-        its file changed meanwhile."""
+        be read; InvalidTransitionError while one of them is processed; ConcurrencyError if a
+        file changed meanwhile. Each document needs the caller's right to edit its pages."""
         if len(added) > MAX_ADDED:
             raise ValidationError(f"files: at most {MAX_ADDED}")
+        if len(documents) > MAX_MERGED:
+            raise ValidationError(f"documents: at most {MAX_MERGED}")
+        involved = (id, *documents)
+        if len(set(involved)) != len(involved):
+            raise ValidationError("documents: each once, and not the document edited")
+        goal = id if target is None else target
+        if goal not in involved:
+            raise ValidationError("target: the document edited or one of `documents`")
         kinds = [await _kind(item.file.path) for item in added]
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
-            document, _ = await controllable_document(uow, user, id, Action.EDIT_PAGES)
-            _require_editable(document)
+            found = [await _editable(uow, user, each) for each in involved]
         async with work_directory() as work:
-            original = work / "original"
-            await self._store.download(original_key(document.sha256), original)
+            originals = []
+            for number, document in enumerate(found):
+                path = work / f"original-{number}"
+                await self._store.download(original_key(document.sha256), path)
+                originals.append(PageSource(path, document.media_type))
             sources = [
-                PageSource(original, document.media_type),
+                originals[0],
                 *(
                     PageSource(item.file.path, kind)
                     for item, kind in zip(added, kinds, strict=True)
                 ),
+                *originals[1:],
             ]
             counts = [await self._composer.count_pages(source) for source in sources]
-            check_parts(parts, counts)
+            check_parts(parts, counts, merging=bool(documents))
             made = []
             for number, part in enumerate(parts, start=1):
-                target = work / f"part-{number}.pdf"
-                await self._composer.compose(sources, part.pages, target)
-                made.append(_Part(part, await asyncio.to_thread(IncomingFile.of, target)))
+                target_file = work / f"part-{number}.pdf"
+                await self._composer.compose(sources, part.pages, target_file)
+                made.append(_Part(part, await asyncio.to_thread(IncomingFile.of, target_file)))
             for item in made:
                 key = original_key(item.file.sha256)
                 await self._store.upload(key, item.file.path, content_type=media_types.PDF)
             try:
                 result = await self._store_parts(
-                    actor, id, document.sha256, made, [item.filename for item in added]
+                    actor,
+                    {document.id: document.sha256 for document in found},
+                    goal,
+                    made,
+                    [item.filename for item in added],
                 )
             except BaseException:
                 # Not committed: no document names the parts' files.
@@ -178,6 +212,7 @@ class EditingService:
                 "parts": len(parts),
                 "new_documents": len(parts) - (0 if result.deleted else 1),
                 "deleted": result.deleted,
+                "merged": len(result.merged),
             },
         )
         return result
@@ -185,20 +220,29 @@ class EditingService:
     async def _store_parts(
         self,
         actor: UserId,
-        id: DocumentId,
-        sha256: Sha256,
+        files: dict[DocumentId, Sha256],
+        goal: DocumentId,
         parts: Sequence[_Part],
         added: Sequence[str],
     ) -> EditResult:
+        """`files`: the documents edited, the first the one whose pages were edited, each with
+        its file then; `goal`: the one the part that replaces makes the next version of."""
         now = self._clock.now()
         async with self._uow() as uow:
-            # Check again: rights, its file or its processing may have changed meanwhile.
+            # Check again: rights, their files or their processing may have changed meanwhile.
             user = await load_actor(uow, actor)
-            document, _ = await controllable_document(uow, user, id, Action.EDIT_PAGES)
-            if document.sha256 != sha256:
-                raise ConcurrencyError("the document's file changed while its pages were edited")
-            _require_editable(document)
-            versions = await uow.document_versions.of_document(id)
+            found = []
+            for each, sha256 in files.items():
+                document, _ = await controllable_document(uow, user, each, Action.EDIT_PAGES)
+                if document.sha256 != sha256:
+                    raise ConcurrencyError(
+                        "the document's file changed while its pages were edited"
+                    )
+                _require_editable(document)
+                found.append(document)
+            document = next(item for item in found if item.id == goal)
+            others = [item for item in found if item.id != goal]
+            versions = await uow.document_versions.of_document(document.id)
             current = max((version.number for version in versions), default=1)
             created: list[Document] = []
             for number, item in enumerate(parts, start=1):
@@ -207,7 +251,7 @@ class EditingService:
                         await self._split_off(uow, actor, document, item, number, current, added)
                     )
             replacing = next((item for item in parts if item.part.replaces), None)
-            if replacing is None:
+            if replacing is None:  # not in a merge (`check_parts`)
                 await delete_document(uow, document, now)
             else:
                 detail: JsonObject = {
@@ -215,14 +259,62 @@ class EditingService:
                     "from": current,
                     "split_off": [str(new.id) for new in created],
                 }
-                await self._replace(uow, actor, document, replacing, current, detail, now)
+                last = current
+                if others:
+                    taken = await self._take_versions(uow, document, others, current)
+                    last = current + len(taken)
+                    detail["documents"] = [
+                        {
+                            "document": str(item.id),
+                            "title": item.title,
+                            "version": current if item.id == goal else taken[item.sha256],
+                        }
+                        for item in found
+                    ]
+                kind = VersionKind.MERGED if others else VersionKind.EDITED
+                await self._replace(uow, actor, document, replacing, last + 1, kind, detail, now)
+                going = {item.id for item in others}
+                for other in others:
+                    await _move_relations(uow, other.id, document.id, going)
+                    await delete_document(uow, other, now)
             remaining = iter(created)
             documents = [document if item.part.replaces else next(remaining) for item in parts]
             views = tuple(
                 [DocumentView(item, await access_to(uow, user, item)) for item in documents]
             )
             await uow.commit()
-        return EditResult(documents=views, deleted=replacing is None)
+        return EditResult(
+            documents=views,
+            deleted=replacing is None,
+            merged=tuple(item.id for item in others),
+        )
+
+    async def _take_versions(
+        self, uow: UnitOfWork, target: Document, others: Sequence[Document], current: int
+    ) -> dict[Sha256, int]:
+        """Make the versions of `others` the target's, numbered after `current` in their order;
+        returns the number each one's current file has at the target."""
+        number = current
+        taken: dict[Sha256, int] = {}
+        for other in others:
+            for version in await uow.document_versions.of_document(other.id):
+                number += 1
+                moved: JsonObject = {
+                    "document": str(other.id),
+                    "title": other.title,
+                    "version": version.number,
+                }
+                await uow.document_versions.move(
+                    version,
+                    replace(
+                        version,
+                        document_id=target.id,
+                        number=number,
+                        detail={**version.detail, MOVED: moved},
+                    ),
+                )
+                taken[version.sha256] = number
+        return taken
 
     async def _split_off(
         self,
@@ -309,22 +401,23 @@ class EditingService:
         actor: UserId,
         document: Document,
         item: _Part,
-        current: int,
+        number: int,
+        kind: VersionKind,
         detail: JsonObject,
         now: datetime,
     ) -> None:
-        """The part as the document's next version (as `PipelineService.add_version`)."""
+        """The part as the document's version `number` (as `PipelineService.add_version`)."""
         pages = document.page_count
         filename = f"{file_title(document.original_filename)}.pdf"
         document.new_version(item.file.sha256, filename, media_types.PDF, now)
         await uow.document_versions.add(
             DocumentVersion(
                 document_id=document.id,
-                number=current + 1,
+                number=number,
                 sha256=item.file.sha256,
                 original_filename=document.original_filename,
                 media_type=media_types.PDF,
-                kind=VersionKind.EDITED,
+                kind=kind,
                 created_at=now,
                 created_by=actor,
                 detail=detail,
@@ -336,6 +429,31 @@ class EditingService:
         await uow.documents.update(document)
         await enqueue_nodes(uow, document, document.processing.due(), now)
         await uow.outbox.add(document.pull_events())
+
+
+async def _editable(uow: UnitOfWork, user: User, id: DocumentId) -> Document:
+    """The document whose pages the user may edit now (`_require_editable`)."""
+    document, _ = await controllable_document(uow, user, id, Action.EDIT_PAGES)
+    _require_editable(document)
+    return document
+
+
+async def _move_relations(
+    uow: UnitOfWork, source: DocumentId, target: DocumentId, going: Collection[DocumentId]
+) -> None:
+    """The relations of `source`, merged into `target`, name the target from now on, in the
+    same direction. One with the target or with another document of the merge (`going`) goes;
+    one the target has with the same document already stays the target's."""
+    relations = uow.document_relations
+    for relation in await relations.of_document(source):
+        await relations.remove(relation.newer, relation.older)
+        other = relation.other(source)
+        if other == target or other in going:
+            continue
+        if await relations.find(target, other) or await relations.find(other, target):
+            continue
+        newer, older = (target, other) if relation.newer == source else (other, target)
+        await relations.put(replace(relation, newer=newer, older=older))
 
 
 def _require_editable(document: Document) -> None:

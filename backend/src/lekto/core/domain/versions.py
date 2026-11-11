@@ -22,6 +22,7 @@ class VersionKind(StrEnum):
     EDITED = "edited"  # a person edited its pages
     SPLIT = "split"  # its first: pages split off another document (`domain.editing`, a stack)
     SEPARATED = "separated"  # the first part of the stack it came in as (`domain.separating`)
+    MERGED = "merged"  # pages of other documents merged into it (`domain.editing`)
 
 
 @dataclass(frozen=True, kw_only=True)
