@@ -381,7 +381,9 @@ chosen a line there says how to choose, move and cut. The description under the 
 "12 Seiten · 3 Teile"; the footer starts with how the keyboard works it (`footNote`).
 
 - **Page tile** (`PageTile`): the paper of a page (its image with `shadow-sm`) in a square, turned
-  as it will be, its place below ("Seite 3", `text-meta`, muted), a `ChoiceBox` at the top left.
+  as it will be, its place below ("Seite 3", `text-meta`) as a `BeamTitle` that shows it in the
+  Beam among the parts (out of the tab order: B on a page does the same), a `ChoiceBox` at the
+  top left.
   The tile is the label of its box: a click or a tap anywhere chooses it, with Shift up to here;
   chosen, it has the chosen look of "Choosing many" (`bg-panel`, `border-primary`). The tiles are
   a grid with one tab stop (the boxes, `grid-keys.ts`, as the icon picker): the arrows, Home and
@@ -399,8 +401,10 @@ chosen a line there says how to choose, move and cut. The description under the 
   "Löschen", "Abtrennen" (`outline`, `sm`, each with its icon, disabled while none is chosen), on
   one line; nothing comes or goes as the choice changes. On the phone "Auswählen" follows the
   count and the tools share the width (`stack`: icon over word).
-- **The parts**, the second step: a `Card` (`row`) per part with its first two pages, "Teil n"
-  and its pages as `Badge` `muted`, and a `Segmented` (`sm`) "Neue Fassung | Neues Dokument" at
+- **The parts**, the second step: a `Card` (`row`) per part whose head is the button that shows
+  it in the Beam, as a card of a list is (Tobi, 11.11.2026, mock "PDF bearbeiten: Teile
+  ruhiger", B1): its first pages as a small stack, "Teil n" and below it its pages (muted), the
+  eye at its end in a round `bg-panel` mark, and a `Segmented` (`sm`) "Neue Fassung | Neues Dokument" at
   its end (on a phone below, `equal`, the full width); at most one part replaces the document
   (choosing it lets go of another). Below them an `Alert` `note`: every result runs anew and waits
   in the inbox, which part becomes which version of the document ("Teil 1 wird Fassung 3 von
@@ -715,8 +719,15 @@ modal, over a dialog too.
   before those; marks on the archive only; before, its page images re-rastered every page at
   each step of a zoom), one page to a row at the start; buttons, Ctrl/⌘ with the wheel, pinch,
   double click, + − 0; `design-system.test.ts` keeps `PdfViewer` and `PageImages` inside
-  `DocumentPages`; at the bottom "Dokument öffnen", on a phone across the width.
-  Editing happens in the document view.
+  `DocumentPages` (and the parts below); at the bottom "Dokument öffnen", on a phone across the
+  width. Editing happens in the document view.
+- **The parts of an edit** (Tobi, 11.11.2026): from "PDF bearbeiten" it shows the parts before
+  they are stored, in the same sheet, head, paging and viewer (`showPages`): each part's pages as
+  they are to be (turned, in their order, an added file's too, as large as page images;
+  `PageImages`), "Teil 2" and its pages in the head (in the second step also what it becomes),
+  "Teil 2 von 3" to page through the parts, and nothing to open. The history entry names the
+  parts by a key only; their images stay in memory, so a reload closes it, as the edit is gone
+  then too.
 - **Opening it: one way everywhere** (Tobi, 31.10.2026). Wherever Lekto names a document, its
   title opens it in the Beam: the eye (`scan-eye`) before the title, both one button in the
   brand colour, medium weight, one line, cut (`BeamTitle`); a value that stands for documents
@@ -726,7 +737,8 @@ modal, over a dialog too.
   holders' evaluation, the similar documents of the processing, the overview's expected
   documents, the jobs, a webhook's deliveries, the existing document of a duplicate upload, the
   documents a bulk action skipped, the document a version was split off and the documents a
-  stack was separated into or a part came from. The Beam pages through what stands beside it.
+  stack was separated into or a part came from; in "PDF bearbeiten" a page's place below its tile
+  and a part's name. The Beam pages through what stands beside it.
 - **Lists of documents carry no eye:** a card or row (the documents, the inbox, search hits)
   and a chip of the stream is the button itself (`DocumentLink`, `viewOrOpen`): a click, a tap
   or Enter shows the document in the Beam, a double click or a long press (a phone) opens it; a
@@ -740,8 +752,9 @@ modal, over a dialog too.
   text.
 - **The eye means only this:** no other action uses `scan-eye` ("Mit dem Bildmodell lesen" has
   `scan-text`). The mark "Im Eingang" is navigation (the inbox's view of the document), not
-  viewing. `tests/design-system.test.ts` keeps both: the eye only in `BeamTitle` and before
-  "Woher gelernt?", a link to one document only where this section allows it.
+  viewing. `tests/design-system.test.ts` keeps both: the eye only in `BeamTitle`, before
+  "Woher gelernt?" and at the end of a part of "PDF bearbeiten", a link to one document only where
+  this section allows it.
 - A relation shows both documents, the newer first, the number they share marked in each. A
   rule's preview shows where its text conditions hit, each labelled with its text. A hit of a
   search (the documents list with words) shows where its words stand, as the search matched
@@ -1058,7 +1071,9 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Neu
   the stepper at once, the inbox read anew on its event, since whether it holds a document is the
   server's to say (`keepPlaces`, `dropPlace` in `lib/document-view.ts`, `DocumentPlace`). Saving
   stays on the document. Without the list in this tab (after a reload) it shows neither. Only
-  the document list; other lists open the Beam, which pages through them itself.
+  the document list; other lists open the Beam, which pages through them itself. The row of the
+  way back and the stepper never breaks (Tobi, 11.11.2026): the way back is cut where it is too
+  long, and on a phone the stepper says only "4 von 33".
 - Detail pages of the same kind offer the same actions in the same place: header actions (edit,
   primary action). A single destructive action stands there as an `IconButton` (rule, webhook);
   where there are more actions, a "…" menu holds the rest (delete last, in `destructive`).

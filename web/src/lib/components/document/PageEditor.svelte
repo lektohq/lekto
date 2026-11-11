@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ScanEye from '@lucide/svelte/icons/scan-eye';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import FileOutput from '@lucide/svelte/icons/file-output';
 	import FilePlus from '@lucide/svelte/icons/file-plus';
@@ -14,6 +15,7 @@
 	import type { components } from '#lib/api/schema.ts';
 	import DocumentChoice from '#lib/components/document/DocumentChoice.svelte';
 	import SelectionChooser from '#lib/components/SelectionChooser.svelte';
+	import { showPages, type BeamPart } from '#lib/beam.svelte.ts';
 	import EditorShell from '#lib/components/EditorShell.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import PageCut from '#lib/components/pages/PageCut.svelte';
@@ -53,6 +55,7 @@
 		type Stack
 	} from '#lib/page-edit.ts';
 	import { m } from '#lib/paraglide/messages.js';
+	import { cn } from '#lib/utils.ts';
 	import { phone } from '#lib/phone.svelte.ts';
 
 	type Edited = components['schemas']['EditedDocuments'];
@@ -189,8 +192,38 @@
 
 	const place = (key: string) => stack.findIndex((page) => page.key === key);
 
+	// Spelled out, for Tailwind to find them.
+	const TURNED = { 0: '', 90: 'rotate-90', 180: 'rotate-180', 270: '-rotate-90' } as const;
+
 	function chooseAll() {
 		chosen = new Set(stack.map((page) => page.key));
+	}
+
+	// --- the Beam: the parts as they are to be, before anything is stored -----------------------
+
+	/** The parts for the Beam (`showPages`): each its pages, turned; in the second step what it
+	 * becomes. */
+	function beamParts(): BeamPart[] {
+		return parts.map((part, index) => {
+			const becomes =
+				step === 'parts' ? (replacing === index ? m.page_edit_version() : m.page_edit_new()) : null;
+			return {
+				title: m.page_edit_part({ number: String(index + 1) }),
+				meta: [pagesOf(ranges[index]), becomes].filter(Boolean).join(' · '),
+				pages: part.map((page) => ({ src: page.image, turn: page.rotate }))
+			};
+		});
+	}
+
+	/** Show the page at `place` (from 0) of the stack in the Beam, among the parts. */
+	function showPage(place: number) {
+		let before = 0;
+		const index = parts.findIndex((part) => {
+			if (place < before + part.length) return true;
+			before += part.length;
+			return false;
+		});
+		showPages(beamParts(), Math.max(index, 0), title, place - before + 1);
 	}
 
 	function choose(key: string, range: boolean) {
@@ -226,6 +259,11 @@
 
 	function keydown(event: KeyboardEvent, index: number) {
 		const key = stack[index].key;
+		if (event.key.toLowerCase() === 'b' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+			event.preventDefault();
+			showPage(index);
+			return;
+		}
 		if (event.key === 'Enter') {
 			// A cut after this page; never the form's submit.
 			event.preventDefault();
@@ -250,7 +288,7 @@
 	let swallow = false;
 
 	function pointerdown(event: PointerEvent, key: string) {
-		if (event.button !== 0 || (event.target as HTMLElement).closest('input')) return;
+		if (event.button !== 0 || (event.target as HTMLElement).closest('input, button')) return;
 		const touch = event.pointerType === 'touch';
 		press = { key, x: event.clientX, y: event.clientY, touch, armed: !touch };
 		if (touch) timer = setTimeout(() => press && (press.armed = true), LONG_PRESS);
@@ -724,6 +762,7 @@
 						ghost={drag?.keys.has(page.key) ?? false}
 						tabindex={page.key === stop ? 0 : -1}
 						onchoose={(range) => choose(page.key, range)}
+						onview={() => showPage(index)}
 						onkeydown={(event) => keydown(event, index)}
 						onfocus={() => (focused = page.key)}
 						onpointerdown={(event) => pointerdown(event, page.key)}
@@ -755,15 +794,43 @@
 				size="row"
 				class={phone.current ? 'flex flex-col gap-3' : 'flex items-center gap-3'}
 			>
-				<div class="flex min-w-0 flex-1 items-center gap-3">
-					<div class="flex shrink-0 gap-1" aria-hidden="true">
-						{#each part.slice(0, 2) as page (page.key)}
-							<PageImage src={page.image} class="max-h-14 max-w-11 rounded-sm border bg-card" />
-						{/each}
-					</div>
-					<span class="font-medium">{m.page_edit_part({ number: String(index + 1) })}</span>
-					<Badge variant="muted">{pagesOf(ranges[index])}</Badge>
-				</div>
+				<!-- The part is the button that shows it in the Beam, as a card of a list is; the eye
+				at its end says so (Tobi, 11.11.2026, mock "PDF bearbeiten: Teile ruhiger", B1). -->
+				<button
+					type="button"
+					class="flex min-w-0 flex-1 items-center gap-3.5 rounded-lg text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+					aria-label={m.beam_open_named({ title: m.page_edit_part({ number: String(index + 1) }) })}
+					onclick={() => showPages(beamParts(), index, title)}
+				>
+					<span class="relative h-15 w-13 shrink-0" aria-hidden="true">
+						{#if part[1]}
+							<PageImage
+								src={part[1].image}
+								class={cn(
+									'absolute top-0 left-2.5 h-14 w-10 rounded-sm border bg-card object-cover',
+									TURNED[part[1].rotate]
+								)}
+							/>
+						{/if}
+						<PageImage
+							src={part[0].image}
+							class={cn(
+								'absolute top-1 left-0 h-14 w-10 rounded-sm border bg-card object-cover',
+								TURNED[part[0].rotate]
+							)}
+						/>
+					</span>
+					<span class="flex min-w-0 flex-1 flex-col gap-0.5">
+						<span class="font-semibold">{m.page_edit_part({ number: String(index + 1) })}</span>
+						<span class="text-sm text-muted-foreground">{pagesOf(ranges[index])}</span>
+					</span>
+					<span
+						class="grid size-9 shrink-0 place-items-center rounded-full border bg-panel text-brand"
+						aria-hidden="true"
+					>
+						<ScanEye class="size-4" />
+					</span>
+				</button>
 				<Segmented
 					size="sm"
 					equal={phone.current}

@@ -261,7 +261,7 @@
 </script>
 
 <div class="flex flex-col gap-3.5">
-	<div class="flex min-h-9 flex-wrap items-center gap-3">
+	<div class="flex min-h-9 items-center gap-3">
 		<DocumentBackLink inbox={Boolean(inbox)} />
 		<DocumentPlace {inbox} {list} />
 	</div>

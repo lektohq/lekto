@@ -524,7 +524,7 @@
 	{#if problem || !document}
 		<!-- While it loads or when it cannot, the way back and a title stay (one page title on every
 		page, web/DESIGN.md "Headings"). -->
-		<div class="flex min-h-9 flex-wrap items-center gap-3">
+		<div class="flex min-h-9 items-center gap-3">
 			<DocumentBackLink inbox={Boolean(inbox)} />
 			<DocumentPlace {inbox} list={listed} />
 		</div>

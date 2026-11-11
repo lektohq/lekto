@@ -96,5 +96,8 @@ class EditedDocuments(BaseModel):
 
 class PagePreviews(BaseModel):
     pages: list[str] = Field(
-        description="Each page of the file in its order, small, as a `data:` URL of a WebP image."
+        description=(
+            "Each page of the file in its order, as large as a document's page images, as a "
+            "`data:` URL of a WebP image."
+        )
     )
