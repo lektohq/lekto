@@ -1,6 +1,8 @@
 <script lang="ts">
+	import Ban from '@lucide/svelte/icons/ban';
 	import Check from '@lucide/svelte/icons/check';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
+	import X from '@lucide/svelte/icons/x';
 	import { onMount, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
@@ -289,14 +291,17 @@
 	<SelectionBar count={m.selection_selected({ count: formatNumber(selection.length) })} {busy}>
 		{#snippet trail()}
 			<Button variant="ghost" size="sm" disabled={busy} onclick={() => (chosen = {})}>
+				<X aria-hidden="true" />
 				{m.open_selection_clear()}
 			</Button>
 		{/snippet}
 		{#snippet actions()}
 			<Button variant="outline" size="sm" disabled={busy} onclick={() => decideChosen('reject')}>
+				<Ban aria-hidden="true" />
 				{m.open_reject()}
 			</Button>
 			<Button size="sm" disabled={busy} onclick={() => decideChosen('confirm')}>
+				<Check aria-hidden="true" />
 				{m.open_confirm()}
 			</Button>
 		{/snippet}

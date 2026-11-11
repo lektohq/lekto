@@ -182,6 +182,25 @@ function tags(source: string, name: string): string[] {
 	return found;
 }
 
+/** The bodies of the snippets named `name` in `source`, the snippets inside them included. */
+function snippets(source: string, name: string): string[] {
+	const found: string[] = [];
+	const start = `{#snippet ${name}(`;
+	for (let at = source.indexOf(start); at !== -1; at = source.indexOf(start, at + 1)) {
+		let depth = 0;
+		const tokens = /\{#snippet\b|\{\/snippet\}/g;
+		tokens.lastIndex = at;
+		for (let token = tokens.exec(source); token; token = tokens.exec(source)) {
+			depth += token[0] === '{/snippet}' ? -1 : 1;
+			if (depth === 0) {
+				found.push(source.slice(at, token.index));
+				break;
+			}
+		}
+	}
+	return found;
+}
+
 describe('the design system (web/DESIGN.md)', () => {
 	it('takes font sizes from the type scale only', () => {
 		// Neither an arbitrary size nor a step of Tailwind's beyond the scale (`text-xl` and up).
@@ -229,6 +248,24 @@ describe('the design system (web/DESIGN.md)', () => {
 				for (const match of source.matchAll(sticky)) {
 					const header = match[1] === '0' && path === '/src/lib/components/AppShell.svelte';
 					if (!header && !offsets.has(match[1])) return match[0];
+				}
+				return null;
+			})
+		).toEqual([]);
+	});
+
+	it('gives every action of a selection bar its icon', () => {
+		// DESIGN.md, "Choosing many": the actions are tools, each with its icon before its word.
+		const icon = /<[A-Z]\w*\b[^>]*aria-hidden="true"/;
+		const controls = /<Button\b[\s\S]*?<\/Button>|<a\b[^>]*buttonVariants[\s\S]*?<\/a>/g;
+		expect(
+			offenders((source) => {
+				if (!source.includes('<SelectionBar')) return null;
+				for (const name of ['actions', 'trail', 'pageActions']) {
+					for (const body of snippets(source, name)) {
+						const bare = (body.match(controls) ?? []).find((control) => !icon.test(control));
+						if (bare) return bare.split('\n')[0];
+					}
 				}
 				return null;
 			})

@@ -393,10 +393,12 @@ chosen a line there says how to choose, move and cut. The description under the 
   `primary` circle; unset, the scissors faint (`muted-foreground` at half strength), so nothing
   depends on hover. A page being dragged shows where it lands as the line of that gap. It is no
   tab stop: the keyboard cuts with Enter on a page; the footer says how.
-- **Choosing** uses `SelectionBar` (`inDialog`), always there on a desktop: "n Seiten gewählt"
-  ("Keine Seite gewählt"), "Auswahl aufheben" while some are, then "Links drehen", "Rechts
-  drehen", "Löschen", "Als neues Dokument" (`outline`, `sm`, disabled while none is chosen). On
-  the phone "Links", "Rechts", "Löschen", "Abtrennen" (`stack`: icon over word) share the width.
+- **Choosing** uses `SelectionBar` (`inDialog`), always there on a desktop, as the documents
+  list's (Tobi, 11.11.2026): "Auswählen" (`SelectionChooser`: "Alle Seiten auswählen", "Keine
+  auswählen"), "n Seiten gewählt" ("Keine Seite gewählt"), then the tools "Links", "Rechts",
+  "Löschen", "Abtrennen" (`outline`, `sm`, each with its icon, disabled while none is chosen), on
+  one line; nothing comes or goes as the choice changes. On the phone "Auswählen" follows the
+  count and the tools share the width (`stack`: icon over word).
 - **The parts**, the second step: a `Card` (`row`) per part with its first two pages, "Teil n"
   and its pages as `Badge` `muted`, and a `Segmented` (`sm`) "Neue Fassung | Neues Dokument" at
   its end (on a phone below, `equal`, the full width); at most one part replaces the document
@@ -511,6 +513,10 @@ at once puts a `ChoiceBox` at the start of each row and one in its head that cho
 row is `bg-panel` with `border-primary` (a border, no ring). While something is chosen, the
 **selection bar** (`SelectionBar`) names how many and what an action will leave out, then
 "Auswahl aufheben" (`ghost`) and the actions (`outline`, the primary `default` last), all `sm`.
+The actions are tools: each has its icon before its word, on a phone above it (Tobi,
+11.11.2026). Where a menu chooses many at once, "Auswählen" (`SelectionChooser`: `ListChecks`,
+a menu) stands before the count, on a phone after it. Nothing in the bar comes or goes as the
+choice changes ("Steady layout"): what cannot act yet is disabled.
 It has the card look through `cardVariants`: on desktop it stands above the list in `bg-panel`
 and sticks below the header (`top-20`, `z-30`: above the band and the group titles of a sticky
 head, "Sticky heads"); on the phone it sticks to the bottom of the screen
@@ -529,10 +535,11 @@ rows carry no box and no bar shows. A button with `ListChecks` (`outline`, "Ausw
 filters. In the mode a card or row is the label of its box instead of a link: the box starts
 the card's head (the first page stays clear) or the row, a tap anywhere chooses it, and a
 chosen one has the chosen look above. The bar (`SelectionBar`) shows from the start of the
-mode, with no hit too: an X that ends it, "Auswählen" (`outline`, a menu: "Diese Seite
+mode, with no hit too: an X that ends it, "Auswählen" (`SelectionChooser`: "Diese Seite
 auswählen", "Alle N Treffer auswählen" where there are more than the page, "Keine auswählen",
 and after a separator "Auswahlmodus beenden"), how many are chosen, a hint while none is, and
-the actions, disabled while none is chosen: "Tags", "Kontakt", "Typ" and "Mehr" (a menu: Thema,
+the actions, disabled while none is chosen: "Tags" (`Tag`), "Kontakt" (`Users`), "Typ"
+(`Shapes`) and "Mehr" (`Ellipsis`, a menu: Thema,
 Space, Bestätigen, Neu verarbeiten, and after a separator Löschen in `destructive`). On the
 phone the bar sits at the bottom: X, the count and "Auswählen" above, the hint as a line of its
 own, the four actions sharing the width below. With all hits chosen the choice is the search
@@ -1424,7 +1431,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     places ("Logo and owl"); a dashed box of muted words only as `EmptyNote` ("States"); a lone
     radio only in `ChoiceCard` ("Checkboxes, radios, switches"); a pill of a chip only as `Chip`
     or `TagChip` ("Chips"); the phone's editor bar only in `PhoneEditorBar` ("Dialogs, sheets,
-    editors"); spins, pulses and turns only `motion-safe` ("Motion"); a sticky element only
+    editors"); every action of a selection bar with its icon ("Lists"); spins, pulses and
+    turns only `motion-safe` ("Motion"); a sticky element only
     below the header at its offsets ("Sticky heads"); every page frame
     `flex flex-col gap-6`, the document page `gap-4` ("Spacing and layout");
     a pair of arrows back and forth only as `Stepper`, `Pagination` or in `DateInput`

@@ -1,5 +1,12 @@
 <script lang="ts">
+	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+	import ChevronsDown from '@lucide/svelte/icons/chevrons-down';
+	import CircleStop from '@lucide/svelte/icons/circle-stop';
+	import Info from '@lucide/svelte/icons/info';
+	import ListTodo from '@lucide/svelte/icons/list-todo';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import Play from '@lucide/svelte/icons/play';
+	import Power from '@lucide/svelte/icons/power';
 	import { BASE } from '#lib/base.ts';
 	import { bulkDocuments } from '#lib/bulk.ts';
 	import SelectionBar from '#lib/components/SelectionBar.svelte';
@@ -174,9 +181,15 @@
 
 {#snippet trail()}
 	{#if !application && loading}
-		<Button variant="ghost" size="sm" onclick={onstop}>{m.rule_preview_stop()}</Button>
+		<Button variant="ghost" size="sm" onclick={onstop}>
+			<CircleStop aria-hidden="true" />
+			{m.rule_preview_stop()}
+		</Button>
 	{:else if !application && stopped}
-		<Button variant="ghost" size="sm" onclick={onmore}>{m.rule_preview_more()}</Button>
+		<Button variant="ghost" size="sm" onclick={onmore}>
+			<ChevronsDown aria-hidden="true" />
+			{m.rule_preview_more()}
+		</Button>
 	{/if}
 {/snippet}
 
@@ -188,24 +201,29 @@
 			disabled={busy || loading || chosen === 0}
 			onclick={() => onapply(false)}
 		>
+			<Play aria-hidden="true" />
 			{m.rule_apply_action()}
 		</Button>
 		{#if offerSwitchOn}
 			<Button size="sm" disabled={busy || loading || chosen === 0} onclick={() => onapply(true)}>
+				<Power aria-hidden="true" />
 				{m.rule_switch_on_apply()}
 			</Button>
 		{/if}
 	{:else if application.status === 'queued'}
 		<a href="{BASE}/system?tab=jobs" class={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
+			<ListTodo aria-hidden="true" />
 			{m.rule_apply_jobs()}
 		</a>
 	{:else if finished}
 		{#if application.skipped.length > 0}
 			<Button variant="ghost" size="sm" onclick={() => ondetails(application)}>
+				<Info aria-hidden="true" />
 				{m.bulk_details()}
 			</Button>
 		{/if}
 		<a href="{BASE}/rules/{rule}" class={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
+			<ArrowLeft aria-hidden="true" />
 			{m.rule_apply_back()}
 		</a>
 	{/if}
