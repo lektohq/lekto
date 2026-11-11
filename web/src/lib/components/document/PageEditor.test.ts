@@ -134,6 +134,16 @@ describe('PageEditor', () => {
 		await user.keyboard('b');
 		expect(vi.mocked(showPages).mock.lastCall?.slice(1, 2)).toEqual([0]);
 		expect(vi.mocked(showPages).mock.lastCall?.[3]).toBe(1);
+		// In the second step a part is the button that shows it, saying what it becomes.
+		await user.click(screen.getByRole('button', { name: m.page_edit_next_parts({ count: 2 }) }));
+		await user.click(
+			screen.getByRole('button', {
+				name: m.beam_open_named({ title: m.page_edit_part({ number: '2' }) })
+			})
+		);
+		const [shown, at] = vi.mocked(showPages).mock.lastCall!;
+		expect(at).toBe(1);
+		expect(shown[1].meta).toContain(m.page_edit_new());
 	});
 
 	it('deletes the document where no part replaces it, and says so first', async () => {
