@@ -180,10 +180,10 @@ class EditingService:
                 target_file = work / f"part-{number}.pdf"
                 await self._composer.compose(sources, part.pages, target_file)
                 made.append(_Part(part, await asyncio.to_thread(IncomingFile.of, target_file)))
-            for item in made:
-                key = original_key(item.file.sha256)
-                await self._store.upload(key, item.file.path, content_type=media_types.PDF)
             try:
+                for item in made:
+                    key = original_key(item.file.sha256)
+                    await self._store.upload(key, item.file.path, content_type=media_types.PDF)
                 result = await self._store_parts(
                     actor,
                     {document.id: document.sha256 for document in found},
@@ -192,7 +192,7 @@ class EditingService:
                     [item.filename for item in added],
                 )
             except BaseException:
-                # Not committed: no document names the parts' files.
+                # Not committed: no document names the parts' files (those stored so far).
                 for item in made:
                     await asyncio.shield(self._store.delete(original_key(item.file.sha256)))
                 raise

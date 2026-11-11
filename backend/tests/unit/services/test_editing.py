@@ -272,6 +272,28 @@ async def test_a_file_changed_meanwhile_stops_the_edit_and_leaves_nothing(world:
         assert await uow.documents.count_all() == 1
 
 
+async def test_a_part_that_cannot_be_stored_leaves_no_other(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owner, document = await received(world)
+    originals = world.object_store.keys("originals/")
+    upload = world.object_store.upload
+    calls = 0
+
+    async def second_fails(key: str, path: Path, *, content_type: str) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("the store went away")
+        await upload(key, path, content_type=content_type)
+
+    monkeypatch.setattr(world.object_store, "upload", second_fails)
+    with pytest.raises(OSError):
+        await world.editing.edit(owner.id, document.id, [part(1), part(2, 3, replaces=True)])
+    assert calls == 2
+    assert world.object_store.keys("originals/") == originals
+
+
 async def test_every_result_waits_in_the_inbox_and_what_was_confirmed_stays(
     world: World,
 ) -> None:
