@@ -10,8 +10,9 @@ import pytest
 from lekto.adapters.outbound.memory import FakeCodeReader, fake_pdf
 from lekto.core.domain.codes import Code
 from lekto.core.domain.documents import Channel, Document
+from lekto.core.domain.editing import EditPart, PagePick
 from lekto.core.domain.errors import InvalidTransitionError
-from lekto.core.domain.ids import MailboxId, MailRecordId, new_id
+from lekto.core.domain.ids import DocumentId, MailboxId, MailRecordId, new_id
 from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.locations import Box
 from lekto.core.domain.mail_intake import MailOrigin, OriginRole
@@ -30,7 +31,7 @@ from lekto.core.domain.versions import VersionKind
 from lekto.core.services.editing import SPLIT_FROM
 from lekto.core.services.objects import original_key
 from lekto.core.services.pipeline import PipelineService
-from lekto.core.services.separating import SeparateNode, Separation
+from lekto.core.services.separating import NOT_LOOKED, SeparateNode, Separation
 from tests.builders import NOW, incoming
 from tests.unit.services.support import World
 
@@ -83,6 +84,14 @@ async def received(
     )
     await world.drain(pipeline)
     return owner, document
+
+
+async def not_looked(world: World, id: DocumentId) -> JsonValue:
+    """Why the node did not look for sheets in the document's last run (`NOT_LOOKED`)."""
+    async with world.uow() as uow:
+        log = await uow.processing_log.list_for(id)
+    *_, separate = [entry for entry in log if entry.node is Node.SEPARATE]
+    return separate.result.output.get(NOT_LOOKED)
 
 
 async def documents(world: World) -> list[Document]:
@@ -154,8 +163,9 @@ async def test_a_stack_is_split_at_its_sheets(world: World) -> None:
     for document in (first, second, third):
         assert document.processing.status is ProcessingStatus.COMPLETED
         assert not document.processing.new_version and document.lane is Lane.GREEN
-    # The parts are not looked through again.
+    # The parts are not looked through again, and say so.
     assert reader.calls and len(reader.calls) == 1
+    assert [await not_looked(world, item.id) for item in (second, third)] == ["part", "part"]
 
 
 async def test_the_parts_keep_the_space_a_person_chose(world: World) -> None:
@@ -235,10 +245,11 @@ async def test_a_stack_of_nothing_but_sheets_waits_in_the_inbox(world: World) ->
 
 async def test_no_sheets_are_looked_for_without_codes_or_in_a_migration(world: World) -> None:
     reader = sheets(3)
-    await received(world, reader, separators=())
-    await received(world, reader, fake_pdf(4, "taken over"), channel=Channel.MIGRATION)
+    _, off = await received(world, reader, separators=())
+    _, taken = await received(world, reader, fake_pdf(4, "taken over"), channel=Channel.MIGRATION)
     assert reader.calls == []
     assert all(len(document.processing.outcomes) for document in await documents(world))
+    assert [await not_looked(world, item.id) for item in (off, taken)] == ["off", "migration"]
 
 
 async def test_a_new_version_is_not_split(world: World) -> None:
@@ -251,6 +262,26 @@ async def test_a_new_version_is_not_split(world: World) -> None:
     async with world.uow() as uow:
         versions = await uow.document_versions.of_document(stack.id)
     assert [version.kind for version in versions] == [VersionKind.RECEIVED, VersionKind.REPLACED]
+    assert await not_looked(world, stack.id) == "new_version"
+
+
+async def test_pages_a_person_split_off_and_a_mail_are_not_looked_through(world: World) -> None:
+    reader = sheets(1)
+    owner, stack = await received(world, reader, fake_pdf(3, "three pages"), separators=())
+    pipeline = separating(world, reader)
+    result = await world.editing.edit(
+        owner.id,
+        stack.id,
+        [EditPart((PagePick(0, 1),), replaces=True), EditPart((PagePick(0, 2), PagePick(0, 3)))],
+    )
+    mail = b"From: a@example.org\r\nSubject: Hi\r\n\r\nHello\r\n"
+    letter = await pipeline.receive(owner.id, incoming(mail), filename="m.eml")
+    await world.drain(pipeline)
+    assert reader.calls == []
+    edited, split = result.documents
+    assert await not_looked(world, edited.document.id) == "new_version"
+    assert await not_looked(world, split.document.id) == "split"
+    assert await not_looked(world, letter.id) == "mail"
 
 
 async def test_separating_is_not_processed_again(world: World) -> None:
