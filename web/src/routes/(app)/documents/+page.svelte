@@ -1121,7 +1121,7 @@ row of filters, on a desktop narrow by the title. -->
 			<div
 				class={[
 					'flex flex-col gap-3 max-lg:-mt-3',
-					!(changed || query || isFiltered(filters) || lookupError) && 'hidden'
+					!(changed || isFiltered(filters) || selected.length > 0 || lookupError) && 'hidden'
 				]}
 			>
 				{#if lens && changed}
@@ -1138,11 +1138,6 @@ row of filters, on a desktop narrow by the title. -->
 						{filters}
 						{lookup}
 						onchange={change}
-						{query}
-						onclearquery={() => {
-							text = '';
-							search('');
-						}}
 						selection={selected.length}
 						onclearselection={clearSelection}
 					/>

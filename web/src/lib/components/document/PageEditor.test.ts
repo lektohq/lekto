@@ -2,9 +2,16 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
+import { showPages } from '#lib/beam.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { fakeApi } from '#lib/testing/api.ts';
 import PageEditor from './PageEditor.svelte';
+
+// The Beam is the app's: here only what the editor hands it.
+vi.mock('#lib/beam.svelte.ts', async (original) => ({
+	...(await original<typeof import('#lib/beam.svelte.ts')>()),
+	showPages: vi.fn()
+}));
 
 type Document = components['schemas']['DocumentDetails'];
 
@@ -102,6 +109,41 @@ describe('PageEditor', () => {
 		expect(tools()).toEqual(before);
 		await choose(m.bulk_select_none());
 		expect(screen.getByRole('region', { name: m.page_edit_none() })).toBeTruthy();
+	});
+
+	it('shows a page in the Beam among the parts as they are to be, by its eye or B', async () => {
+		const user = userEvent.setup();
+		open();
+		await user.click(page(3));
+		const bar = screen.getByRole('region', { name: m.page_edit_chosen_one() });
+		await user.click(within(bar).getByRole('button', { name: m.page_edit_right_short() }));
+		await user.click(screen.getByRole('button', { name: m.page_cut_after({ page: '1' }) }));
+		await user.click(
+			screen.getByRole('button', {
+				name: m.beam_open_named({ title: m.page_edit_page({ page: '3' }) })
+			})
+		);
+		const [parts, index, , start] = vi.mocked(showPages).mock.lastCall!;
+		expect(parts.map((part) => [part.title, part.meta])).toEqual([
+			[m.page_edit_part({ number: '1' }), m.page_edit_part_page({ page: '1' })],
+			[m.page_edit_part({ number: '2' }), m.page_edit_part_pages({ first: '2', last: '3' })]
+		]);
+		expect(parts[1].pages.map((shown) => shown.turn)).toEqual([0, 90]);
+		expect([index, start]).toEqual([1, 2]);
+		page(1).focus();
+		await user.keyboard('b');
+		expect(vi.mocked(showPages).mock.lastCall?.slice(1, 2)).toEqual([0]);
+		expect(vi.mocked(showPages).mock.lastCall?.[3]).toBe(1);
+		// In the second step a part is the button that shows it, saying what it becomes.
+		await user.click(screen.getByRole('button', { name: m.page_edit_next_parts({ count: 2 }) }));
+		await user.click(
+			screen.getByRole('button', {
+				name: m.beam_open_named({ title: m.page_edit_part({ number: '2' }) })
+			})
+		);
+		const [shown, at] = vi.mocked(showPages).mock.lastCall!;
+		expect(at).toBe(1);
+		expect(shown[1].meta).toContain(m.page_edit_new());
 	});
 
 	it('deletes the document where no part replaces it, and says so first', async () => {

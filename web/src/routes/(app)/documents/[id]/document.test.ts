@@ -593,6 +593,26 @@ describe('opened from the document list', () => {
 		expect(await screen.findByText(m.doc_list_position({ position: 2, total: 3 }))).toBeTruthy();
 	});
 
+	it('keeps the way back and its place on one line on a phone, saying only where it stands', async () => {
+		phone.override(true);
+		returnTo.rememberDocuments({ pathname: '/ui/documents', search: '?tag=t1' }, '');
+		goTo('/ui/documents/doc-1?from=list', { id: 'doc-1' });
+		serve(() => documentOf({ lane: 'green' }), {
+			'GET /api/v1/documents': () => ({
+				items: ['doc-0', 'doc-1', 'doc-2'].map((id) => listedOf({ id })),
+				next_cursor: null
+			})
+		});
+		render(Page);
+		expect(await screen.findByText(m.doc_position_short({ position: 2, total: 3 }))).toBeTruthy();
+		const nav = screen.getByRole('navigation', { name: m.doc_list_nav() });
+		const row = nav.parentElement!;
+		expect(row.className).not.toContain('flex-wrap');
+		expect(
+			within(row).getByRole('link', { name: m.nav_documents() }).querySelector('.truncate')
+		).toBeTruthy();
+	});
+
 	it('steps back to a document that left the list while one stepped on from it', async () => {
 		returnTo.rememberDocuments({ pathname: '/ui/documents', search: '?tag=t1' }, '');
 		goTo('/ui/documents/doc-1?from=list', { id: 'doc-1' });

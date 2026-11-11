@@ -8,8 +8,8 @@ import { kindLabel } from '#lib/identifiers.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { documentOf, processingOf } from '#lib/testing/documents.ts';
 import { calls, fakeApi } from '#lib/testing/api.ts';
-import { openBeam } from '#lib/beam.svelte.ts';
-import { goTo } from '#lib/testing/page-state.svelte.ts';
+import { leaveBeam, openBeam, showPages } from '#lib/beam.svelte.ts';
+import { goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import Beam from './Beam.svelte';
 
 vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
@@ -142,6 +142,32 @@ afterEach(() => {
 });
 
 describe('Beam', () => {
+	it('shows the parts of an edit before they are stored, with nothing to open', async () => {
+		goTo('/ui/documents/a');
+		showPages(
+			[
+				{
+					title: 'Teil 1',
+					meta: 'S. 1–2 · Neue Fassung',
+					pages: [{ src: '/p/1' }, { src: '/p/2' }]
+				},
+				{ title: 'Teil 2', meta: 'S. 3 · Neues Dokument', pages: [{ src: '/p/3', turn: 90 }] }
+			],
+			0,
+			'PDF bearbeiten'
+		);
+		testPage.state = vi.mocked(goto).mock.lastCall?.[1]?.state as App.PageState;
+		render(Beam);
+		const sheet = await screen.findByRole('dialog');
+		expect(sheet.textContent).toContain('Teil 1');
+		expect(sheet.textContent).toContain('S. 1–2 · Neue Fassung');
+		expect(screen.getByText(m.beam_part_position({ current: 1, total: 2 }))).toBeTruthy();
+		expect(screen.getAllByRole('img', { name: /1|2/ }).length).toBeGreaterThan(0);
+		expect(screen.queryByRole('button', { name: m.beam_open_document() })).toBeNull();
+		expect(calls(vi.mocked(fetch))).toEqual([]);
+		leaveBeam(); // the entry it pushed, so that the next test starts without one
+	});
+
 	it('stays closed without a Beam in the history entry', () => {
 		goTo(LIST);
 		render(Beam);
@@ -171,8 +197,8 @@ describe('Beam', () => {
 		expect(sheet.textContent).toContain(m.beam_name());
 		await waitFor(() => expect(sheet.textContent).toContain('Stadtwerke · Rechnung'));
 		expect(sheet.textContent).toContain(m.beam_position({ current: 1, total: 2 }));
-		const pages = await screen.findAllByRole('img');
-		expect(pages.map((image) => image.getAttribute('src'))).toEqual([
+		expect(await screen.findAllByRole('img', { name: /1|2/ })).toHaveLength(2);
+		expect([...sheet.querySelectorAll('img')].map((image) => image.getAttribute('src'))).toEqual([
 			'/api/v1/documents/a/pages/1',
 			'/api/v1/documents/a/pages/2'
 		]);
