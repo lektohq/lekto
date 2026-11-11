@@ -176,6 +176,8 @@ async def test_a_new_version_that_is_not_stored_leaves_the_derivatives(
     assert await world.object_store.exists(archive_key(document.id))
     assert await world.object_store.exists(page_key(document.id, 1))
     assert (await world.documents.get(owner.id, document.id)).sha256 == document.sha256
+    # No version names the new file: it goes again.
+    assert not await world.object_store.exists(original_key(Sha256.of(PART)))
 
 
 async def test_a_new_version_helps_a_document_that_failed(world: World) -> None:
@@ -201,6 +203,8 @@ async def test_a_new_version_must_be_a_new_file_of_a_kind_a_document_has(world: 
         await world.pipeline().new_version(
             owner.id, document.id, incoming(b"%PDF-1.7 new"), filename="new.pdf"
         )
+    # Asked before its file is stored: nothing is left behind.
+    assert not await world.object_store.exists(original_key(Sha256.of(b"%PDF-1.7 new")))
     await world.drain()
     for file in (STACK, PART):  # its own, another document's
         with pytest.raises(DuplicateDocumentError):
