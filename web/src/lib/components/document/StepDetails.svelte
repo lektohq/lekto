@@ -23,6 +23,8 @@
 <script lang="ts">
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
+	import SeparationDetails from '#lib/components/document/SeparationDetails.svelte';
+	import { separationOf } from '#lib/separation.ts';
 	import { openBeam } from '#lib/beam.svelte.ts';
 	import Info from '@lucide/svelte/icons/info';
 	import { api } from '#lib/api/client.ts';
@@ -138,7 +140,10 @@
 {/snippet}
 
 <div class="@container flex flex-col gap-3">
-	{#if entry.node === 'ocr'}
+	{#if entry.node === 'separate'}
+		{@const separation = separationOf(entry.output)}
+		{#if separation}<SeparationDetails {separation} />{/if}
+	{:else if entry.node === 'ocr'}
 		{@const notes = ocrNotes(output)}
 		{@const bars = pageBars(output)}
 		{#if latest && context.files}

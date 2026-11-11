@@ -86,12 +86,17 @@ async def received(
     return owner, document
 
 
-async def not_looked(world: World, id: DocumentId) -> JsonValue:
-    """Why the node did not look for sheets in the document's last run (`NOT_LOOKED`)."""
+async def separation(world: World, id: DocumentId) -> JsonObject:
+    """What the node said in the document's last run."""
     async with world.uow() as uow:
         log = await uow.processing_log.list_for(id)
     *_, separate = [entry for entry in log if entry.node is Node.SEPARATE]
-    return separate.result.output.get(NOT_LOOKED)
+    return separate.result.output
+
+
+async def not_looked(world: World, id: DocumentId) -> JsonValue:
+    """Why the node did not look for sheets in the document's last run (`NOT_LOOKED`)."""
+    return (await separation(world, id)).get(NOT_LOOKED)
 
 
 async def documents(world: World) -> list[Document]:
@@ -136,6 +141,11 @@ async def test_a_stack_is_split_at_its_sheets(world: World) -> None:
     assert separate.result.output == {
         "sheets": [3, 6],
         "pages": 8,
+        "separators": ["PATCHT"],
+        "codes": [
+            {"page": 3, "format": "Code 128", "separator": True},
+            {"page": 6, "format": "Code 128", "separator": True},
+        ],
         "parts": 3,
         "version": 2,
         "split_off": [str(second.id), str(third.id)],
@@ -158,6 +168,7 @@ async def test_a_stack_is_split_at_its_sheets(world: World) -> None:
         1,
     )
     assert pages_of(split.detail) == [4, 5]
+    assert split.detail["stack_pages"] == 8
     assert received_log[0].result.output[SPLIT_FROM] == str(stack.id)
     # Each is processed as any new one, green where all is sure: no inbox for a new version.
     for document in (first, second, third):
@@ -165,7 +176,15 @@ async def test_a_stack_is_split_at_its_sheets(world: World) -> None:
         assert not document.processing.new_version and document.lane is Lane.GREEN
     # The parts are not looked through again, and say so.
     assert reader.calls and len(reader.calls) == 1
-    assert [await not_looked(world, item.id) for item in (second, third)] == ["part", "part"]
+    assert await separation(world, third.id) == {
+        "not_looked": "part",
+        "from": str(stack.id),
+        "title": "scan_2026-11-10",
+        "pages": [7, 8],
+        "sheets": [3, 6],
+        "stack_pages": 8,
+    }
+    assert await not_looked(world, second.id) == "part"
 
 
 async def test_the_parts_keep_the_space_a_person_chose(world: World) -> None:
@@ -228,7 +247,12 @@ async def test_a_stack_without_a_sheet_stays_as_it_is(world: World) -> None:
     assert version.kind is VersionKind.RECEIVED
     (separate,) = [entry for entry in log if entry.node is Node.SEPARATE]
     assert separate.result.outcome is Outcome.OK
-    assert separate.result.output == {"sheets": [], "pages": 8}
+    assert separate.result.output == {
+        "sheets": [],
+        "pages": 8,
+        "separators": ["PATCHT"],
+        "codes": [{"page": 3, "format": "Code 128", "separator": False}],
+    }
 
 
 async def test_a_stack_of_nothing_but_sheets_waits_in_the_inbox(world: World) -> None:
@@ -279,8 +303,16 @@ async def test_pages_a_person_split_off_and_a_mail_are_not_looked_through(world:
     await world.drain(pipeline)
     assert reader.calls == []
     edited, split = result.documents
-    assert await not_looked(world, edited.document.id) == "new_version"
-    assert await not_looked(world, split.document.id) == "split"
+    assert await separation(world, edited.document.id) == {
+        "not_looked": "new_version",
+        "version": 2,
+        "kind": "edited",
+    }
+    assert await separation(world, split.document.id) == {
+        "not_looked": "split",
+        "from": str(stack.id),
+        "title": stack.title,
+    }
     assert await not_looked(world, letter.id) == "mail"
 
 
