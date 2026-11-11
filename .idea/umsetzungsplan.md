@@ -2593,7 +2593,7 @@ Stand: freigegeben (Tobi, 04.11.2026).
 
 Stand: umgesetzt (#269–#274, 04.11.2026); freigegeben in der Frage- und Antwortrunde mit Tobi, 04.11.2026. Mock: Leinwand „Mail als Begleitschreiben“ (https://claude.ai/artifact/TMFyyhhCo9atGf3AA6cv18): A die HTML-Mail mit WeasyPrint gesetzt, B nur Text, C das Begleitschreiben in Lekto mit Herkunft und Bezug, D Regeln › Mails, E eine Mail-Regel, F System › Eingangskanäle › Mail, G eine Dokument-Regel mit Mail-Bedingung (D–G gegen DESIGN.md geprüft und angepasst).
 
-**Anlass (Tobi):** Heute kommen Dokumente über die Web-UI, die API und die Übernahme aus Paperless. Viele kommen per Mail (Rechnungen, Bescheide, Bestellungen), auch aus Genius Scan und vom Scanner am Mac. Lekto soll Postfächer abholen, je Postfach mit Regeln, was übernommen wird und wohin.
+**Anlass (Tobi):** Heute kommen Dokumente über die Web-UI, die API und die Übernahme aus Paperless. Viele kommen per Mail (Rechnungen, Bescheide, Bestellungen), auch aus einer Scanner-App auf dem Telefon und vom Scanner am Mac. Lekto soll Postfächer abholen, je Postfach mit Regeln, was übernommen wird und wohin.
 
 **Befund (Claude, 04.11.2026):**
 - `Channel` kennt `web`, `api`, `migration` („Further connectors (mail, folder) follow“); jeder Eingang läuft über `PipelineService.receive` (Original, Dubletten über die ganze Installation, persönlicher Space oder ein Space, in dem man bearbeitet, `ImportedMetadata`).
@@ -2889,12 +2889,12 @@ Stand: Plan mit Tobi abgestimmt am 10.11.2026 (alle Fragen beantwortet). Mock na
 
 Stand: Plan mit Tobi abgestimmt am 10.11.2026 (alle Fragen beantwortet), Entscheidung 11 am 11.11.2026. Mock abgenommen am 11.11.2026: https://claude.ai/artifact/PY2NcCsSJkdT45qTrYTFTK
 
-**Anlass (Tobi, 10.11.2026):** Genius Scan im Vergleich, ein Scan mit einem Trennblatt „PATCH T“. „Bauen wir splitting und zusammenführen in einen PR.“ Beides stand in „Fassungen, Datei ersetzen, PDF bearbeiten“, Entscheidung 10, unter „nicht im ersten Schritt“ (Seiten aus anderen Lekto-Dokumenten dazuholen, Dokumente zusammenführen).
+**Anlass (Tobi, 10.11.2026):** eine Scanner-App im Vergleich, ein Scan mit einem Trennblatt „PATCH T“. „Bauen wir splitting und zusammenführen in einen PR.“ Beides stand in „Fassungen, Datei ersetzen, PDF bearbeiten“, Entscheidung 10, unter „nicht im ersten Schritt“ (Seiten aus anderen Lekto-Dokumenten dazuholen, Dokumente zusammenführen).
 
 **Befund (Claude, 10.11.2026):**
 - Lekto liest Bar- und QR-Codes schon (Port `CodeReader`, zxing-cpp auf mit PDFium gerenderten Seiten, Code 128/39, QR, Data Matrix u. a.), aber erst in `signal_facts` und vom Archiv-PDF, also nach der Texterkennung. Zum Trennen ist das zu spät: OCR und Seitenbilder liefen dann für den ganzen Stapel.
 - Teilen kann Lekto seit #393 (`EditingService`: Teile aus Seiten, ein Teil als neue Fassung, die anderen als neue Dokumente mit Herkunft, alles ein Vorgang). Es fehlen ein Auslöser ohne Person und Seiten aus anderen Dokumenten als Quelle.
-- Genius Scan bietet daneben Zuschneiden, Filter (S/W, Farben, Foto), Krümmungskorrektur und Seitenformat. Das erledigt der Scanner vor dem Hochladen; Filter und Krümmung hießen neu rendern, gegen „Seiten verlustfrei kopieren“. Nicht in diesem Plan; Zuschneiden (verlustfrei über die CropBox) bleibt ein Kandidat.
+- Die Scanner-App bietet daneben Zuschneiden, Filter (S/W, Farben, Foto), Krümmungskorrektur und Seitenformat. Das erledigt der Scanner vor dem Hochladen; Filter und Krümmung hießen neu rendern, gegen „Seiten verlustfrei kopieren“. Nicht in diesem Plan; Zuschneiden (verlustfrei über die CropBox) bleibt ein Kandidat.
 - Andere Wege zu trennen (Claude, 10.11.2026): ein Code auf der ersten Seite eines Dokuments (ASN-Aufkleber), leere Seiten (unzuverlässig bei Duplex), feste Seitenzahl, aus dem Inhalt erkennen (Modell; der Fall INTER, ein digitales PDF ohne Trennblatt). Tobi: nur das Trennblatt; kein ASN (die Archivnummer bleibt in Prod ein Feld, gesetzt von Hand oder vom Modell).
 - Welchen Code das Trennblatt aus Tobis Scan trägt, ließ sich am Bildschirmfoto nicht lesen (zu klein); vermutlich Code 128 `PATCHT` wie bei Paperless. Vor dem Bauen an einem echten Scan des Blatts prüfen.
 
