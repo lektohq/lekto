@@ -3,6 +3,7 @@ import { createRawSnippet, tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LANGUAGE_NAMES, locales } from '#lib/i18n.ts';
 import { inbox } from '#lib/inbox.svelte.ts';
+import { offerPageSearch } from '#lib/page-search.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { scope } from '#lib/scope.svelte.ts';
@@ -94,6 +95,24 @@ describe('AppShell', () => {
 		]);
 		expect(screen.getByRole('search')).toBeTruthy();
 		expect(screen.getByRole('searchbox', { name: m.header_search_label() })).toBeTruthy();
+	});
+
+	it("shows the documents page's own search field from the magnifier, there", async () => {
+		signIn('admin');
+		render(AppShell, { children });
+		const magnifier = screen.getByRole('link', { name: m.header_search_label() });
+		expect(magnifier.getAttribute('href')).toBe('/ui/documents#search');
+		const show = vi.fn();
+		const withdraw = offerPageSearch(show);
+		const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+		magnifier.dispatchEvent(click);
+		expect(show).toHaveBeenCalledOnce();
+		expect(click.defaultPrevented).toBe(true);
+		withdraw();
+		const elsewhere = new MouseEvent('click', { bubbles: true, cancelable: true });
+		magnifier.addEventListener('click', (event) => event.preventDefault(), { once: true });
+		magnifier.dispatchEvent(elsewhere);
+		expect(show).toHaveBeenCalledOnce();
 	});
 
 	it('separates the work from running Lekto, also for users', () => {
