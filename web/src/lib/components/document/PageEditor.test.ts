@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
@@ -53,7 +53,7 @@ describe('PageEditor', () => {
 		const onedited = open();
 		await user.click(page(3));
 		const bar = screen.getByRole('region', { name: m.page_edit_chosen_one() });
-		await user.click(within(bar).getByRole('button', { name: m.page_edit_left() }));
+		await user.click(within(bar).getByRole('button', { name: m.page_edit_left_short() }));
 		await user.click(screen.getByRole('button', { name: m.page_cut_after({ page: '1' }) }));
 		expect(
 			screen.getByText(
@@ -81,6 +81,27 @@ describe('PageEditor', () => {
 			}
 		]);
 		expect(onedited).toHaveBeenCalled();
+	});
+
+	it('chooses all pages or none from "Auswählen", the tools staying where they are', async () => {
+		const user = userEvent.setup();
+		open();
+		const bar = () => screen.getByRole('region', { name: /selected|gewählt/ });
+		const tools = () =>
+			within(bar())
+				.getAllByRole('button')
+				.map((button) => button.textContent?.trim());
+		const before = tools();
+		const choose = async (item: string) => {
+			const chooser = within(bar()).getByRole('button', { name: m.bulk_mode() });
+			await fireEvent.pointerDown(chooser, { button: 0, pointerType: 'mouse' });
+			await user.click(await screen.findByRole('menuitem', { name: item }));
+		};
+		await choose(m.page_edit_select_all());
+		expect(screen.getByRole('region', { name: m.page_edit_chosen({ count: 3 }) })).toBeTruthy();
+		expect(tools()).toEqual(before);
+		await choose(m.bulk_select_none());
+		expect(screen.getByRole('region', { name: m.page_edit_none() })).toBeTruthy();
 	});
 
 	it('deletes the document where no part replaces it, and says so first', async () => {

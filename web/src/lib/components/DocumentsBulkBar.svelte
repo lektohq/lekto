@@ -1,6 +1,9 @@
 <script lang="ts">
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
-	import ListChecks from '@lucide/svelte/icons/list-checks';
+	import Ellipsis from '@lucide/svelte/icons/ellipsis';
+	import Shapes from '@lucide/svelte/icons/shapes';
+	import Tag from '@lucide/svelte/icons/tag';
+	import Users from '@lucide/svelte/icons/users';
 	import X from '@lucide/svelte/icons/x';
 	import type { components } from '#lib/api/schema.ts';
 	import IconButton from '#lib/components/IconButton.svelte';
@@ -10,6 +13,7 @@
 	import SearchSelect from '#lib/components/SearchSelect.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import SelectionBar from '#lib/components/SelectionBar.svelte';
+	import SelectionChooser from '#lib/components/SelectionChooser.svelte';
 	import TagPicker from '#lib/components/TagPicker.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -198,18 +202,22 @@
 
 {#snippet actions()}
 	<Button variant="outline" size="sm" disabled={count === 0} onclick={open('tags')}>
+		<Tag aria-hidden="true" />
 		{m.field_tags()}
 	</Button>
 	<Button variant="outline" size="sm" disabled={count === 0} onclick={open('contact')}>
+		<Users aria-hidden="true" />
 		{m.field_contact()}
 	</Button>
 	<Button variant="outline" size="sm" disabled={count === 0} onclick={open('type')}>
+		<Shapes aria-hidden="true" />
 		{m.bulk_type()}
 	</Button>
 	<DropdownMenu.Root>
 		<DropdownMenu.Trigger disabled={count === 0}>
 			{#snippet child({ props })}
 				<Button {...props} variant="outline" size="sm">
+					<Ellipsis aria-hidden="true" />
 					{m.bulk_more()}
 					<ChevronDown aria-hidden="true" />
 				</Button>
@@ -256,30 +264,19 @@
 
 <!-- What to choose at once: the page, every hit, none; and the end of the mode. -->
 {#snippet chooser()}
-	<DropdownMenu.Root>
-		<DropdownMenu.Trigger disabled={running !== null}>
-			{#snippet child({ props })}
-				<Button {...props} variant="outline" size="sm">
-					<ListChecks aria-hidden="true" />
-					{m.bulk_mode()}
-					<ChevronDown aria-hidden="true" />
-				</Button>
-			{/snippet}
-		</DropdownMenu.Trigger>
-		<DropdownMenu.Content align={phone.current ? 'end' : 'start'} class="w-64">
-			<DropdownMenu.Item onSelect={onpage}>{m.bulk_select_page()}</DropdownMenu.Item>
-			{#if offerAll !== null}
-				<DropdownMenu.Item onSelect={onall}>
-					{m.bulk_select_all({ count: formatNumber(offerAll) })}
-				</DropdownMenu.Item>
-			{/if}
-			<DropdownMenu.Item disabled={count === 0} onSelect={onclear}>
-				{m.bulk_select_none()}
+	<SelectionChooser disabled={running !== null}>
+		<DropdownMenu.Item onSelect={onpage}>{m.bulk_select_page()}</DropdownMenu.Item>
+		{#if offerAll !== null}
+			<DropdownMenu.Item onSelect={onall}>
+				{m.bulk_select_all({ count: formatNumber(offerAll) })}
 			</DropdownMenu.Item>
-			<DropdownMenu.Separator />
-			<DropdownMenu.Item onSelect={onend}>{m.bulk_mode_end()}</DropdownMenu.Item>
-		</DropdownMenu.Content>
-	</DropdownMenu.Root>
+		{/if}
+		<DropdownMenu.Item disabled={count === 0} onSelect={onclear}>
+			{m.bulk_select_none()}
+		</DropdownMenu.Item>
+		<DropdownMenu.Separator />
+		<DropdownMenu.Item onSelect={onend}>{m.bulk_mode_end()}</DropdownMenu.Item>
+	</SelectionChooser>
 {/snippet}
 
 {#if lookup}
