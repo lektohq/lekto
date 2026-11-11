@@ -43,8 +43,14 @@
 	let sheet = $state<HTMLElement | null>(null);
 	let offset = $state(0);
 	let pulling = $state(false);
-	// Pulled out: it leaves by its own slide, without the closing animation of `ui/sheet`.
+	// Pulled out: it leaves by its own slide. The closing animation of `ui/sheet` would start
+	// from there and carry it back up while it fades, so it is switched off on the element.
 	let gone = $state(false);
+	const style = $derived(
+		[offset > 0 && `transform: translateY(${offset}px)`, gone && 'animation: none']
+			.filter(Boolean)
+			.join('; ') || undefined
+	);
 	let pull = { start: 0, last: 0, time: 0, speed: 0 };
 
 	$effect(() => {
@@ -99,12 +105,11 @@
 		side="bottom"
 		showCloseButton={false}
 		onOpenAutoFocus={(event) => event.preventDefault()}
-		style={offset > 0 ? `transform: translateY(${offset}px)` : undefined}
+		{style}
 		class={cn(
 			'gap-0 overflow-hidden rounded-t-2xl p-0 text-base',
 			fit ? 'max-h-[85dvh]' : 'h-[85dvh] max-h-[85dvh]',
-			pulling && 'transition-none',
-			gone && 'data-[state=closed]:animate-none'
+			pulling && 'transition-none'
 		)}
 	>
 		<!-- The pull is a shortcut for the finger; the close button is the way for everyone. -->
