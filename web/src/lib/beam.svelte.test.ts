@@ -71,6 +71,16 @@ describe('the state of the Beam', () => {
 		expect(partsOf(state.beam.parts)).toBeNull();
 	});
 
+	it('shows parts where the browser offers no random ids (plain http in a network)', () => {
+		vi.stubGlobal('crypto', {});
+		goTo('/ui/documents');
+		showPages([{ title: 'Teil 1', meta: 'S. 1', pages: [] }], 0, 'PDF bearbeiten');
+		const state = vi.mocked(goto).mock.lastCall?.[1]?.state as { beam: { parts: string } };
+		expect(partsOf(state.beam.parts)).toHaveLength(1);
+		vi.unstubAllGlobals();
+		leaveBeam();
+	});
+
 	it('lets a jump take the entry it opened in, not one a reload restored', () => {
 		goTo('/ui/documents');
 		openBeam(['a'], 'a', 'Dokumente');
