@@ -2887,7 +2887,7 @@ Stand: Plan mit Tobi abgestimmt am 10.11.2026 (alle Fragen beantwortet). Mock na
 
 ### Trennblatt und Zusammenführen
 
-Stand: Plan mit Tobi abgestimmt am 10.11.2026 (alle Fragen beantwortet). Mock folgt.
+Stand: Plan mit Tobi abgestimmt am 10.11.2026 (alle Fragen beantwortet), Entscheidung 11 am 11.11.2026. Mock abgenommen am 11.11.2026: https://claude.ai/artifact/PY2NcCsSJkdT45qTrYTFTK
 
 **Anlass (Tobi, 10.11.2026):** Genius Scan im Vergleich, ein Scan mit einem Trennblatt „PATCH T“. „Bauen wir splitting und zusammenführen in einen PR.“ Beides stand in „Fassungen, Datei ersetzen, PDF bearbeiten“, Entscheidung 10, unter „nicht im ersten Schritt“ (Seiten aus anderen Lekto-Dokumenten dazuholen, Dokumente zusammenführen).
 
@@ -2909,24 +2909,25 @@ Stand: Plan mit Tobi abgestimmt am 10.11.2026 (alle Fragen beantwortet). Mock fo
 8. **Rechte:** Bearbeiter in allen beteiligten Spaces und Admins, wie beim Verschieben; die Seiten landen im Space des Ziels. Kein beteiligtes Dokument darf gerade verarbeitet werden; Mails lassen sich nicht zusammenführen.
 9. **Danach:** Das Ziel läuft neu und kommt in den Posteingang wie nach „PDF bearbeiten“ (Grund „Datei geändert“, bestätigte Werte bleiben).
 10. **Ein PR** für beides (`new-feature`).
+11. **Genau ein Teil setzt das Ziel fort** (Tobi, 11.11.2026): Beim Zusammenführen muss ein Teil „Neue Fassung“ sein. Steht keiner darauf, ist „Übernehmen“ gesperrt, der Hinweis sagt warum, und die API lehnt es ab. Sonst würden alle beteiligten Dokumente gelöscht und mit ihnen ihre Originale, gegen Entscheidung 6. „PDF bearbeiten“ an einem einzelnen Dokument bleibt, wie es ist.
 
-**Gestalt (Entwurf, Mock folgt):**
+**Gestalt (nach dem Mock):**
 - Liste: „Zusammenführen“ im Menü „Mehr“ der Auswahl, ab zwei gewählten, deaktiviert mit Grund, wo eins nicht geht (verarbeitet gerade, Mail, keine Rechte). Öffnet den Dialog „PDF bearbeiten“ mit den Seiten aller in der Reihenfolge der Auswahl.
-- Seitenstapel: Seiten aus einem anderen Dokument tragen dessen Zeichen (eine Marke an der Kachel, die Legende über dem Stapel nennt die Dokumente); „Seiten aus Lekto-Dokument hinzufügen“ neben „Dokument hinzufügen“.
-- Abschluss: je Teil „Neue Fassung von ‹Ziel›“ (umstellbar unter den beteiligten) oder „Neues Dokument“; der Hinweis nennt, welche Dokumente gelöscht werden und dass ihre Fassungen beim Ziel bleiben.
-- Reiter „Dateien“: „Am Trennblatt getrennt“ (`separated`), „Zusammengeführt aus „…““ (`merged`), Fassungen aus einer Quelle mit ihrer Herkunft.
+- Seitenstapel: Sind mehrere Dokumente beteiligt, trägt jede Kachel den Buchstaben ihres Dokuments (Badge `outline` oben rechts, nicht als Farbe), die Legende „Seiten aus A · ‹Titel› B · ‹Titel›“ über dem Stapel nennt sie. „Hinzufügen ▾“ ersetzt „Dokument hinzufügen“: ein Menü mit „Datei vom Gerät …“ und „Dokument aus Lekto …“; das öffnet den Dialog „Dokument aus Lekto wählen“ (Suche, Trefferzeilen, was nicht geht deaktiviert mit Grund).
+- Abschluss: über den Teilen ein `Select` „Neue Fassung von“ mit den beteiligten Dokumenten, je Teil wie bisher „Neue Fassung | Neues Dokument“; der Hinweis nennt, welche Dokumente gelöscht werden und dass ihre Fassungen beim Ziel bleiben. Ohne Teil als neue Fassung ist „Übernehmen“ gesperrt (Entscheidung 11).
+- Reiter „Dateien“: „Am Trennblatt getrennt“ (`separated`), „Zusammengeführt aus „…““ (`merged`), Fassungen aus einer Quelle mit ihrer Herkunft („Aus „…“ (dort Fassung n)“). Im Protokoll heißt der Knoten „Trennung“.
 - DESIGN.md beschreibt es mit dem PR.
 
 **Technik (Entwurf):**
 - Neuer Knoten `separate` zwischen `receive` und `ocr`/`pages`. Er liest die Codes des Originals (ein Bild wird dafür als PDF zusammengesetzt) über alle Seiten, ohne die Seitengrenze des Lesers für die Fakten, und trennt, wenn er Trennblätter findet (wie `EditingService`, ohne Person). Ohne Trennblatt, bei abgeschalteter Einstellung, in einem Lauf nach einer neuen Fassung und bei der Migration ist er sofort fertig. Der Knoten verlangt eine Revision: Bestehende Dokumente bekommen ihn im Verarbeitungszustand als erledigt.
-- `POST /documents/{id}/edit` nimmt auch Seiten anderer Dokumente (`documents`: ihre IDs; ihre Seiten als weitere Quellen nach den hinzugefügten Dateien) und das Ziel; die Antwort nennt die gelöschten Quellen. Vorschau ihrer Seiten über `GET /documents/{id}/pages/{n}` wie bisher.
+- `POST /documents/{id}/edit` nimmt auch Seiten anderer Dokumente (`documents`: ihre IDs; ihre Seiten als weitere Quellen nach den hinzugefügten Dateien) und das Ziel; ohne Teil, der das Ziel fortsetzt, lehnt sie Seiten anderer Dokumente ab. Die Antwort nennt die gelöschten Quellen. Vorschau ihrer Seiten über `GET /documents/{id}/pages/{n}` wie bisher.
 - Fassungen einer Quelle ziehen zum Ziel (neue Nummern nach dessen letzter, Art und Herkunft bleiben, `detail` nennt die Quelle); die Beziehungen werden umgehängt, dann die Quelle gelöscht, ohne ihre Originale. Ein Vorgang.
 - Einstellung `LEKTO_SEPARATOR_CODES` in `settings.py` und `docs/configuration.md`.
 
 **PR (`new-feature`), Commits:**
 1. Knoten `separate` mit Revision, Einstellung, Trennen beim Eingang, Fassung `separated`.
 2. Zusammenführen im Backend: Quellen aus Dokumenten, Ziel, Fassungen und Beziehungen ziehen um; API.
-3. Web-UI nach dem Mock: „Zusammenführen“ in der Liste, „Seiten aus Lekto-Dokument hinzufügen“, Marken und Ziel im Dialog, die neuen Arten im Reiter „Dateien“; DESIGN.md.
+3. Web-UI nach dem Mock: „Zusammenführen“ in der Liste, „Hinzufügen ▾“ mit „Dokument aus Lekto …“, Buchstaben und Ziel im Dialog, die neuen Arten im Reiter „Dateien“; DESIGN.md.
 
 ### Weniger Pflege der Kennungen (#215)
 
