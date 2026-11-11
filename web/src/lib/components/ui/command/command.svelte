@@ -27,7 +27,7 @@
 	{disableInitialScroll}
 	data-slot="command"
 	class={cn(
-		'flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground',
+		'flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground max-sm:min-h-0 max-sm:flex-1',
 		className
 	)}
 	{...restProps}

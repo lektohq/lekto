@@ -307,6 +307,16 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('opens a choice by searching through PickerShell, a sheet on a phone', () => {
+		expect(
+			offenders((source, path) =>
+				path.endsWith('/PickerShell.svelte') || !source.includes('<Command.Root')
+					? null
+					: line(source, /<Popover\.(?:Root|Content)\b/)
+			)
+		).toEqual([]);
+	});
+
 	it('sizes dialogs by their size, not by a width of their own', () => {
 		expect(
 			offenders((source) => {
