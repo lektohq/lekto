@@ -256,7 +256,12 @@ initial on `primary`, its name as a `ui/tooltip` (Tobi, 09.11.2026). Plain `<but
 look-alikes of `Button`.
 
 **Menus:** several actions of one object go into a menu: "…" for the rest, "Herunterladen" for
-formats, the sort as `SortMenu`.
+formats, the sort as `SortMenu`. A menu opens at its trigger, on the phone too (Tobi, 11.11.2026):
+there it is as wide as the page, 16 px from both edges, with rows of 48 px, `text-base` and
+icons of 20 px (`ui/dropdown-menu` draws it so; no menu sizes itself). An open menu has no
+focus outline of its own; the row the keyboard is on shows it. A destructive action ("Löschen")
+stands last, behind a line (`design-system.test.ts` checks it). A choice from many by
+searching is no menu: it is a `PickerShell` (see [Dialogs, sheets, editors](#dialogs-sheets-editors)).
 
 **Pen:** in every list whose entries have an editor, `EditButton` is the last column behind a
 divider.
@@ -1292,7 +1297,8 @@ worker, and Lekto works as a website.
 - **Desktop:** at least 32 px for controls in rows and cards, 40 px elsewhere. No target is smaller
   than 24 × 24 px.
 - The components implement this (`Button`, `IconButton`, `Chip`, `Segmented`, `TabBar`, `Select`,
-  `Switch`, `ChoiceBox`, `InfoTip`, `BackLink`, `InboxMark`). Pages do not add sizes by hand.
+  `Switch`, `ChoiceBox`, `InfoTip`, `BackLink`, `InboxMark`, the rows of `ui/dropdown-menu` and
+  `ui/command`). Pages do not add sizes by hand.
 
 ## Accessibility baseline
 
