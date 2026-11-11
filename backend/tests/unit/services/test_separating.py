@@ -28,7 +28,7 @@ from lekto.core.domain.reasons import ReasonCode
 from lekto.core.domain.separating import separated_parts, separator_pages
 from lekto.core.domain.users import Role, User
 from lekto.core.domain.versions import VersionKind
-from lekto.core.services.editing import SPLIT_FROM
+from lekto.core.services._intake import SPLIT_FROM
 from lekto.core.services.objects import original_key
 from lekto.core.services.pipeline import PipelineService
 from lekto.core.services.separating import NOT_LOOKED, SeparateNode, Separation
