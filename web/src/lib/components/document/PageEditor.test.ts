@@ -185,4 +185,30 @@ describe('PageEditor', () => {
 		expect(sent?.get('target')).toBeNull();
 		expect(onedited).toHaveBeenCalledWith(expect.anything(), 'doc-1');
 	});
+
+	it('merges no document whose pages all left the stack', async () => {
+		const user = userEvent.setup();
+		const scan = { id: 'doc-2', title: 'scan_0412', page_count: 2 };
+		render(PageEditor, { open: true, document: DOCUMENT, mergeWith: [scan], onedited: vi.fn() });
+		for (const number of [4, 5]) {
+			await user.click(
+				screen.getByRole('checkbox', {
+					name: m.page_edit_page_from({ page: '4', title: 'scan_0412' })
+				})
+			);
+			await user.click(
+				within(screen.getByRole('region', { name: m.page_edit_chosen_one() })).getByRole('button', {
+					name: m.page_edit_remove()
+				})
+			);
+			expect(screen.getAllByRole('checkbox')).toHaveLength(8 - number);
+		}
+		expect(screen.getByText(m.page_edit_title({ title: '2022/11' }))).toBeTruthy();
+		expect(screen.queryByText(m.page_edit_source({ mark: 'B', title: 'scan_0412' }))).toBeNull();
+		// The document's own pages as they came: nothing to apply, nothing merged.
+		expect(screen.getByRole('button', { name: m.page_edit_next() })).toHaveProperty(
+			'disabled',
+			true
+		);
+	});
 });
