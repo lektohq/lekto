@@ -34,11 +34,12 @@ from lekto.core.domain.errors import (
     ValidationError,
 )
 from lekto.core.domain.ids import DocumentId, UserId
-from lekto.core.domain.json_value import JsonObject
+from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.pipeline import (
     TRIGGER_EDIT,
 )
 from lekto.core.domain.reasons import Action
+from lekto.core.domain.relations import Relation
 from lekto.core.domain.users import User
 from lekto.core.domain.versions import VersionKind
 from lekto.core.ports.clock import Clock
@@ -52,6 +53,7 @@ from lekto.core.services.documents import DocumentView, delete_document
 from lekto.core.services.nodes import work_directory
 from lekto.core.services.objects import original_key
 from lekto.core.services.pipeline import VERSION_MEDIA_TYPES, IncomingFile
+from lekto.core.services.relations import RELATIONS_LOCK, find_pair, relation_events
 
 log = logging.getLogger(__name__)
 
@@ -220,6 +222,10 @@ class EditingService:
         its file then; `goal`: the one the part that replaces makes the next version of."""
         now = self._clock.now()
         async with self._uow() as uow:
+            if len(files) > 1:
+                # A merge moves relations: one change of them at a time, the lock taken first
+                # (`relations.RELATIONS_LOCK`).
+                await uow.lock(RELATIONS_LOCK)
             # Check again: rights, their files or their processing may have changed meanwhile.
             user = await load_actor(uow, actor)
             found = []
@@ -235,11 +241,26 @@ class EditingService:
             others = [item for item in found if item.id != goal]
             versions = await uow.document_versions.of_document(document.id)
             current = max((version.number for version in versions), default=1)
+            # The version each document's file is at the target: the others' versions become
+            # its own first. The pages of every part name their sources by these.
+            taken = await self._take_versions(uow, document, others, current)
+            here = {item.id: current if item.id == goal else taken[item.sha256] for item in found}
+            sources: list[JsonValue] | None = (
+                [
+                    {"document": str(item.id), "title": item.title, "version": here[item.id]}
+                    for item in found
+                ]
+                if others
+                else None
+            )
+            edited = here[found[0].id]
             created: list[Document] = []
             for number, item in enumerate(parts, start=1):
                 if not item.part.replaces:
                     created.append(
-                        await self._split_off(uow, actor, document, item, number, current, added)
+                        await self._split_off(
+                            uow, actor, document, item, number, edited, added, sources
+                        )
                     )
             replacing = next((item for item in parts if item.part.replaces), None)
             stale: list[str] = []
@@ -248,25 +269,19 @@ class EditingService:
             else:
                 detail: JsonObject = {
                     **_pages(replacing.part, added),
-                    "from": current,
+                    "from": edited,
                     "split_off": [str(new.id) for new in created],
                 }
-                if others:
-                    taken = await self._take_versions(uow, document, others, current)
-                    detail["documents"] = [
-                        {
-                            "document": str(item.id),
-                            "title": item.title,
-                            "version": current if item.id == goal else taken[item.sha256],
-                        }
-                        for item in found
-                    ]
+                if sources is not None:
+                    detail["documents"] = sources
                 kind = VersionKind.MERGED if others else VersionKind.EDITED
                 stale = await self._replace(uow, actor, document, replacing, kind, detail, now)
                 going = {item.id for item in others}
+                moved: list[Relation] = []
                 for other in others:
-                    await _move_relations(uow, other.id, document.id, going)
+                    moved += await _move_relations(uow, other.id, document.id, going)
                     await delete_document(uow, other, now)
+                await uow.outbox.add(relation_events(moved, now))
             remaining = iter(created)
             documents = [document if item.part.replaces else next(remaining) for item in parts]
             views = tuple(
@@ -314,22 +329,29 @@ class EditingService:
         source: Document,
         item: _Part,
         number: int,
-        current: int,
+        version: int,
         added: Sequence[str],
+        sources: list[JsonValue] | None,
     ) -> Document:
-        """A new document of the part `number`, in the source's space; a person chose that."""
+        """A new document of the part `number`, in the source's space; a person chose that.
+        `version`: the source's version whose pages are source 0; `sources`: in a merge, the
+        documents merged into the source, each with the version its file is there (as a merged
+        version's detail names them)."""
+        detail: JsonObject = {
+            **_pages(item.part, added),
+            "document": str(source.id),
+            "title": source.title,
+            "version": version,
+        }
+        if sources is not None:
+            detail["documents"] = sources
         return await store_part(
             uow,
             source,
             item.file.sha256,
             item.file.size,
             number=number,
-            detail={
-                **_pages(item.part, added),
-                "document": str(source.id),
-                "title": source.title,
-                "version": current,
-            },
+            detail=detail,
             created_by=actor,
             chooser=actor,
             trigger=TRIGGER_EDIT,
@@ -372,20 +394,24 @@ async def _editable(uow: UnitOfWork, user: User, id: DocumentId) -> Document:
 
 async def _move_relations(
     uow: UnitOfWork, source: DocumentId, target: DocumentId, going: Collection[DocumentId]
-) -> None:
+) -> list[Relation]:
     """The relations of `source`, merged into `target`, name the target from now on, in the
-    same direction. One with the target or with another document of the merge (`going`) goes;
-    one the target has with the same document already stays the target's."""
+    same direction; returns them, for their events (`relation_events`). One with the target or
+    with another document of the merge (`going`) goes; one the target has with the same
+    document already stays the target's. Under `RELATIONS_LOCK`."""
     relations = uow.document_relations
+    moved = []
     for relation in await relations.of_document(source):
         await relations.remove(relation.newer, relation.older)
         other = relation.other(source)
         if other == target or other in going:
             continue
-        if await relations.find(target, other) or await relations.find(other, target):
+        if await find_pair(uow, target, other) is not None:
             continue
         newer, older = (target, other) if relation.newer == source else (other, target)
-        await relations.put(replace(relation, newer=newer, older=older))
+        moved.append(replace(relation, newer=newer, older=older))
+        await relations.put(moved[-1])
+    return moved
 
 
 def _require_editable(document: Document) -> None:
