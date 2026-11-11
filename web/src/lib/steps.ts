@@ -17,6 +17,7 @@ export type Phase = (typeof PHASES)[number];
 
 const PHASE_OF: Record<Node, Phase> = {
 	receive: 'read',
+	separate: 'read',
 	ocr: 'read',
 	pages: 'read',
 	parse: 'read',

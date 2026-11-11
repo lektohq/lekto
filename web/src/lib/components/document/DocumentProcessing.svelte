@@ -280,7 +280,7 @@
 	const canReprocess = $derived(
 		manageable &&
 			document.processing.status !== 'processing' &&
-			reprocessable(graph, document.processing).some((node) => node !== 'receive')
+			reprocessable(graph, document.processing).length > 0
 	);
 
 	function durationOf(entry: Step): string | null {

@@ -6,6 +6,7 @@ type Node = components['schemas']['Node'];
 
 export const NODE_LABELS: Record<Node, () => string> = {
 	receive: m.node_receive,
+	separate: m.node_separate,
 	ocr: m.node_ocr,
 	pages: m.node_pages,
 	parse: m.node_parse,

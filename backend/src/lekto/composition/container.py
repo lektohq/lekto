@@ -151,6 +151,7 @@ from lekto.core.services.rules.changes import ChangeRules
 from lekto.core.services.rules.nodes import ApplyRulesNode, FileNode
 from lekto.core.services.rules.retroactive import RuleApplicationService
 from lekto.core.services.search import SearchPolicy, SearchService
+from lekto.core.services.separating import SeparateNode
 from lekto.core.services.spaces import SpaceService
 from lekto.core.services.stream import StreamService
 from lekto.core.services.tasks.desk import TaskDesk
@@ -779,6 +780,11 @@ def classification_nodes(
     }
 
 
+def separators_of(settings: Settings) -> tuple[str, ...]:
+    """The codes of separator sheets (`LEKTO_SEPARATOR_CODES`); none: stacks are never split."""
+    return tuple(code.strip() for code in settings.separator_codes.split(",") if code.strip())
+
+
 def build_services(container: Container, settings: Settings | None = None) -> Services:
     """The use cases; tuning (retries, time limits, cleanup) from `settings`, or the defaults.
 
@@ -805,6 +811,14 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
     webhook_policy = webhook_policy_of(settings)
     desk = TaskDesk(container.cipher, container.templates, links=links)
     executors: dict[Node, NodeExecutor] = {
+        Node.SEPARATE: SeparateNode(
+            uow,
+            store,
+            container.codes,
+            container.composer,
+            separators=separators_of(settings),
+            pipeline_version=__version__,
+        ),
         Node.OCR: OcrNode(store, container.ocr, container.mail_renderer),
         Node.PAGES: PagesNode(store, container.pages, container.mail_renderer),
         Node.PARSE: ParseNode(store, container.parser),

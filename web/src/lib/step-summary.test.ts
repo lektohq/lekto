@@ -68,6 +68,20 @@ describe('stepSummary', () => {
 		expect(summary('parse', { characters: 14236 })).toBe(m.summary_characters({ count: '14,236' }));
 	});
 
+	it('tells the separator sheets a stack was split at', () => {
+		expect(summary('separate', {})).toBeNull();
+		expect(summary('separate', { sheets: [], pages: 3 })).toBe(m.summary_no_separator());
+		expect(summary('separate', { sheets: [4, 8], pages: 10, parts: 3 })).toBe(
+			`${m.summary_sheets({ count: '2', pages: '4 and 8' })}: ${m.summary_parts({ count: '3' })}`
+		);
+		expect(summary('separate', { sheets: [1, 2], pages: 2 })).toBe(
+			m.summary_sheets({ count: '2', pages: '1 and 2' })
+		);
+		expect(summary('separate', { sheets: [1], pages: 4, parts: 1 })).toBe(
+			`${m.summary_sheets_one({ pages: '1' })}: ${m.summary_parts_one()}`
+		);
+	});
+
 	it('tells how many relations were set and suggested', () => {
 		expect(summary('relate', { relations: [] })).toBe(m.summary_relations_none());
 		const relations = [{ state: 'set' }, { state: 'suggested' }, { state: 'set' }];

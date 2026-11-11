@@ -16,6 +16,7 @@ async def test_the_graph_lists_every_node_with_its_needs(api: Api) -> None:
     nodes = response.json()["nodes"]
     assert [node["node"] for node in nodes] == [
         "receive",
+        "separate",
         "ocr",
         "pages",
         "parse",
@@ -31,7 +32,8 @@ async def test_the_graph_lists_every_node_with_its_needs(api: Api) -> None:
     ]
     by_name = {node["node"]: node["requires"] for node in nodes}
     assert by_name["receive"] == []
-    assert by_name["ocr"] == by_name["pages"] == ["receive"]
+    assert by_name["separate"] == ["receive"]
+    assert by_name["ocr"] == by_name["pages"] == ["separate"]
     assert by_name["file"] == ["apply_rules", "pages"]
     assert by_name["relate"] == ["fields"]
     assert by_name["apply_rules"] == ["relate"]

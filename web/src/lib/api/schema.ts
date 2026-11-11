@@ -5324,7 +5324,7 @@ export interface components {
 			original_filename: string;
 			/** Media Type */
 			media_type: string;
-			/** @description `received`: how the document came in; `replaced`: a person put another file in its place; `edited`: a person edited its pages; `split`: the first version, pages a person split off another document. */
+			/** @description `received`: how the document came in; `replaced`: a person put another file in its place; `edited`: a person edited its pages; `split`: the first version, pages split off another document (by a person, or at a separator sheet); `separated`: the first part of the stack the document came in as, split at its separator sheets. */
 			kind: components['schemas']['VersionKindOut'];
 			/**
 			 * Created At
@@ -5335,7 +5335,7 @@ export interface components {
 			created_by: string | null;
 			/**
 			 * Detail
-			 * @description What it was made from. `edited` and `split`: `pages`, each with its `source` (0 the edited version, 1, 2, … the files in `added`, by name), `page` and `rotate`; `edited` also `from`, the version edited, and `split_off`, the documents split off in the same edit; `split` also `document`, `title` and `version`, the document it was split off (which may be gone since) and its version then.
+			 * @description What it was made from. `edited` and `split`: `pages`, each with its `source` (0 the edited version, 1, 2, … the files in `added`, by name), `page` and `rotate`; `edited` also `from`, the version edited, and `split_off`, the documents split off in the same edit; `split` also `document`, `title` and `version`, the document it was split off (which may be gone since) and its version then, and `sheets` where it was split at separator sheets. `separated`: `pages` (source 0, the stack), `from`, `sheets`, the pages that were separator sheets, and `split_off`, the documents made of the other parts.
 			 */
 			detail: {
 				[key: string]: unknown;
@@ -8662,6 +8662,9 @@ export interface components {
 		 * @description The nodes of the ingest graph, in a topological order: every node comes after the nodes
 		 *     it needs (`GRAPH`). Nodes that do not need each other run side by side.
 		 *
+		 *     `separate` splits a scanned stack at its separator sheets when it comes in, before anything
+		 *     reads its pages (`services.separating`).
+		 *
 		 *     The signals each propose metadata from one source: the language model, the trained
 		 *     classifier, similar confirmed documents, facts in the text (names, identifiers). `judge`
 		 *     decides from all of them, `fields` reads the fields of the decided type, `relate` finds the
@@ -8670,6 +8673,7 @@ export interface components {
 		 */
 		Node:
 			| 'receive'
+			| 'separate'
 			| 'ocr'
 			| 'pages'
 			| 'parse'
@@ -9654,6 +9658,7 @@ export interface components {
 			| 'vision_read'
 			| 'vision_not_configured'
 			| 'no_text'
+			| 'only_separator_sheets'
 			| 'answer_unfit'
 			| 'nothing_recognised'
 			| 'master_data_changed'
@@ -9749,6 +9754,7 @@ export interface components {
 			| 'being_processed'
 			| 'only_failed_retried'
 			| 'receive_not_repeatable'
+			| 'separate_not_repeatable'
 			| 'not_waiting_for_confirmation'
 			| 'still_running'
 			| 'no_text_to_extract'
@@ -11961,7 +11967,7 @@ export interface components {
 		 * VersionKindOut
 		 * @enum {string}
 		 */
-		VersionKindOut: 'received' | 'replaced' | 'edited' | 'split';
+		VersionKindOut: 'received' | 'replaced' | 'edited' | 'split' | 'separated';
 		/**
 		 * VisibilityOut
 		 * @description Who sees the document: the members of its space; readers only once it is green.

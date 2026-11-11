@@ -147,15 +147,16 @@ async def test_documents_go_through_the_api(
     # after the retry, before or after the OCR. Their place in the log is a matter of timing.
     # The signals, too, run side by side; the judge comes after all of them.
     chain = [run for run in runs if run[0] != "pages"]
-    assert chain[:4] == [
+    assert chain[:5] == [
         ("receive", 1, "ok"),
+        ("separate", 1, "ok"),  # no separator sheet
         ("ocr", 1, "failed"),
         ("ocr", 2, "ok"),
         ("parse", 2, "ok"),
     ]
     signals = {"signal_llm", "signal_classifier", "signal_neighbours", "signal_facts"}
-    assert {node for node, _, _ in chain[4:8]} == signals
-    assert chain[8] == ("judge", 2, "ok")
+    assert {node for node, _, _ in chain[5:9]} == signals
+    assert chain[9] == ("judge", 2, "ok")
     assert [outcome for node, _, outcome in runs if node == "pages"][:1] == ["ok"]
     assert ("parse", 3, "ok") in runs
 

@@ -18,12 +18,16 @@ class Node(StrEnum):
     """The nodes of the ingest graph, in a topological order: every node comes after the nodes
     it needs (`GRAPH`). Nodes that do not need each other run side by side.
 
+    `separate` splits a scanned stack at its separator sheets when it comes in, before anything
+    reads its pages (`services.separating`).
+
     The signals each propose metadata from one source: the language model, the trained
     classifier, similar confirmed documents, facts in the text (names, identifiers). `judge`
     decides from all of them, `fields` reads the fields of the decided type, `relate` finds the
     documents it refers to and those that refer to it (issue #145), before the rules see them."""
 
     RECEIVE = "receive"
+    SEPARATE = "separate"
     OCR = "ocr"
     PAGES = "pages"
     PARSE = "parse"
@@ -78,8 +82,9 @@ effect. The language model's signal keeps its answer."""
 
 GRAPH: Mapping[Node, frozenset[Node]] = {
     Node.RECEIVE: frozenset(),
-    Node.OCR: frozenset({Node.RECEIVE}),
-    Node.PAGES: frozenset({Node.RECEIVE}),
+    Node.SEPARATE: frozenset({Node.RECEIVE}),
+    Node.OCR: frozenset({Node.SEPARATE}),
+    Node.PAGES: frozenset({Node.SEPARATE}),
     Node.PARSE: frozenset({Node.OCR}),
     **dict.fromkeys(SIGNALS, frozenset({Node.PARSE})),
     Node.JUDGE: SIGNALS,

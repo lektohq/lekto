@@ -71,6 +71,7 @@ class VersionKindOut(StrEnum):
     REPLACED = "replaced"
     EDITED = "edited"
     SPLIT = "split"
+    SEPARATED = "separated"
 
 
 class DocumentVersionOut(BaseModel):
@@ -86,7 +87,8 @@ class DocumentVersionOut(BaseModel):
     kind: VersionKindOut = Field(
         description="`received`: how the document came in; `replaced`: a person put another "
         "file in its place; `edited`: a person edited its pages; `split`: the first version, "
-        "pages a person split off another document."
+        "pages split off another document (by a person, or at a separator sheet); `separated`: "
+        "the first part of the stack the document came in as, split at its separator sheets."
     )
     created_at: datetime
     created_by: UUID | None
@@ -96,7 +98,10 @@ class DocumentVersionOut(BaseModel):
             "the edited version, 1, 2, … the files in `added`, by name), `page` and `rotate`; "
             "`edited` also `from`, the version edited, and `split_off`, the documents split off "
             "in the same edit; `split` also `document`, `title` and `version`, the document "
-            "it was split off (which may be gone since) and its version then."
+            "it was split off (which may be gone since) and its version then, and `sheets` "
+            "where it was split at separator sheets. `separated`: `pages` (source 0, the "
+            "stack), `from`, `sheets`, the pages that were separator sheets, and `split_off`, "
+            "the documents made of the other parts."
         )
     )
 

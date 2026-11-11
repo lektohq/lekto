@@ -22,7 +22,7 @@
 	import { NODE_LABELS } from '#lib/node-labels.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { phone } from '#lib/phone.svelte.ts';
-	import { descendants, pipeline, type GraphNode } from '#lib/pipeline.ts';
+	import { descendants, isReprocessNode, pipeline, type GraphNode } from '#lib/pipeline.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import { bulkDocuments, MODEL_CALLS, WARN_ABOVE } from '#lib/bulk.ts';
 	import {
@@ -104,7 +104,7 @@
 	const nodes = $derived(
 		graph
 			.map((entry) => entry.node)
-			.filter((node): node is ReprocessNode => node !== 'receive')
+			.filter(isReprocessNode)
 			.map((node) => ({ value: node, label: NODE_LABELS[node]() }))
 	);
 	// From the model's step on, every document asks the model (proposal and facts).

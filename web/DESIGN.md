@@ -1266,7 +1266,10 @@ neuen Fassung steht hier etwas anderes.") with a line "Neu gelesen: …" (the la
 "Antwort des Modells"); confirming keeps the value, taking the new one means setting it. The
 title's note in the review has the same line, the title in quotes. The same upload (`VersionUpload`) stands in the
 document's menu "…", beside "PDF bearbeiten" (see [Page stack](#page-stack)). A version split
-off another document says so: "Abgetrennt aus „…“".
+off another document says so: "Abgetrennt aus „…“". A stack split at its separator sheets when
+it came in (Tobi 10.11.2026) keeps the stack as version 1 and says of version 2 "Am Trennblatt
+getrennt: S. 1–3 von Fassung 1"; its other parts are documents of their own, "Abgetrennt aus
+„…“". The processing step is "Trennung", its line "2 Trennblätter (S. 4 und 8): 3 Teile".
 
 **Fakt, Kennung, Nummer** (Tobi, 02.11.2026): three words, each for one thing.
 

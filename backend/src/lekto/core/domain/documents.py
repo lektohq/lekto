@@ -10,6 +10,7 @@ from enum import StrEnum
 from pathlib import PurePath
 from typing import Self
 
+from lekto.core.domain import media_types
 from lekto.core.domain.classification import (
     CHANGE_FIELDS,
     CONFIRMING,
@@ -455,6 +456,8 @@ class Document:
             raise InvalidTransitionError(because(ReasonCode.BEING_PROCESSED, id=str(self.id)))
         if node is Node.RECEIVE:
             raise InvalidTransitionError(because(ReasonCode.RECEIVE_NOT_REPEATABLE))
+        if node is Node.SEPARATE:
+            raise InvalidTransitionError(because(ReasonCode.SEPARATE_NOT_REPEATABLE))
         again = self._reset_set({node})
         skipped = [failed for failed in processing.failed() if failed not in again]
         if skipped:
@@ -491,6 +494,17 @@ class Document:
         due = self._reset(Node.RECEIVE.descendants, now)
         self.processing.new_version = True
         return due
+
+    def separate(self, sha256: Sha256, original_filename: str, now: datetime) -> None:
+        """The node `separate` split the stack it came in as at its separator sheets
+        (`domain.separating`): it names the first part's file, a PDF, from now on, and the nodes
+        after it read that one. Only while that node runs."""
+        if self.processing.nodes[Node.SEPARATE].status is not NodeStatus.RUNNING:
+            raise InvalidTransitionError(f"document {self.id}: {Node.SEPARATE} is not running")
+        filename = require_name(original_filename, "original filename", max_length=None)
+        self.sha256, self.original_filename, self.media_type = sha256, filename, media_types.PDF
+        self.page_count = None
+        self._touch(now)
 
     def read_with_vision(self, now: datetime) -> tuple[Node, ...]:
         """A person asked that the vision language model read the pages: process again from

@@ -134,7 +134,7 @@ class FakeCodeReader:
         self.codes = tuple(codes)
         self.calls: list[Path] = []
 
-    async def read_codes(self, source: Path) -> CodeReading:
+    async def read_codes(self, source: Path, *, every_page: bool = False) -> CodeReading:
         self.calls.append(source)
         _check(await asyncio.to_thread(source.read_bytes))
         return CodeReading(codes=self.codes, reader="fake-codes 1", pages=1)
