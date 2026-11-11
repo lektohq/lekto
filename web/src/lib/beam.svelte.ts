@@ -1,10 +1,11 @@
 /**
  * The Beam (web/DESIGN.md, "Beam"): a sheet from the right that shows a document's pages
- * without leaving the place. Its state lives in the history entry (`page.state.beam`, ids
- * only; `history-state.ts`): the back button closes it, a reload brings it back, paging through
- * its documents replaces the entry.
+ * without leaving the place, or the parts of an edit before they are stored. Its state lives in
+ * the history entry (`page.state.beam`, ids only; `history-state.ts`): the back button closes it,
+ * a reload brings it back, paging through its documents replaces the entry.
  */
 import { page } from '$app/state';
+import type { ShownPage } from '#lib/document-view.ts';
 import type { IdentifierKind } from '#lib/identifiers.ts';
 import { dropEntry, leaveEntry, pushEntry, replaceEntry } from '#lib/history-state.ts';
 
@@ -30,10 +31,14 @@ export interface ValueSource {
 }
 
 export interface BeamState {
-	/** The documents to page through, in order. */
+	/** The documents to page through, in order; none where it shows `parts`. */
 	ids: string[];
+	/** The parts of an edit it shows instead (`showPages`), by their key. */
+	parts?: string;
 	/** The one shown. */
 	index: number;
+	/** The page of a part to show first (from 1). */
+	page?: number;
 	/** The place it was opened from ("Dokumente"): the way back from the document names it. */
 	from: string;
 	/** Opened from the inbox: "Dokument öffnen" opens it there, with its neighbours. */
@@ -57,11 +62,41 @@ export function openBeam(
 	pushEntry('beam', { ids: unique, index, from, ...options });
 }
 
-/** Show the document at `index` of the open Beam, in the same history entry. */
+/** A part of an edit before it is stored, as the Beam shows it (`showPages`): its name, the
+ * line below it, its pages as they are to be. */
+export interface BeamPart {
+	title: string;
+	meta: string;
+	pages: ShownPage[];
+}
+
+// The parts the Beam shows. The history entry names them by their key only: their images (an
+// added file's among them) never go into it, and after a reload they are gone, as the edit is.
+let shownParts: { key: string; parts: readonly BeamPart[] } | null = null;
+
+/** Open the Beam on the parts of an edit before they are stored (web/DESIGN.md, "Beam"), at
+ * part `index` and its page `page` (from 1); `from` names the place. */
+export function showPages(parts: readonly BeamPart[], index: number, from: string, page = 1): void {
+	const key = crypto.randomUUID();
+	shownParts = { key, parts };
+	pushEntry('beam', { ids: [], parts: key, index, page, from });
+}
+
+/** The parts the Beam's entry names by `key`, while they are kept (the last shown). */
+export function partsOf(key: string): readonly BeamPart[] | null {
+	return shownParts?.key === key ? shownParts.parts : null;
+}
+
+/** How many the open Beam pages through: documents, or the parts of an edit. */
+export function beamCount(beam: BeamState): number {
+	return beam.parts ? (partsOf(beam.parts)?.length ?? 0) : beam.ids.length;
+}
+
+/** Show the document (or part) at `index` of the open Beam, in the same history entry. */
 export function beamTo(index: number): void {
 	const beam = page.state.beam;
-	if (!beam || index < 0 || index >= beam.ids.length) return;
-	replaceEntry('beam', { ...beam, index });
+	if (!beam || index < 0 || index >= beamCount(beam)) return;
+	replaceEntry('beam', { ...beam, index, page: undefined });
 }
 
 /** Close the Beam. */

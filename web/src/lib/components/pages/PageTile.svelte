@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { HTMLLabelAttributes } from 'svelte/elements';
+	import BeamTitle from '#lib/components/BeamTitle.svelte';
 	import PageImage from '#lib/components/pages/PageImage.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { ChoiceBox } from '#lib/components/ui/choice/index.ts';
@@ -12,7 +13,8 @@
 	// many". `ghost`: it is being moved, shown at half strength meanwhile. The grid owns the
 	// choice: a click, a tap or Space calls `onchoose` (with Shift held: up to here). `mark`: the
 	// letter of the document the page comes from in a merge, at the top right (an `outline`
-	// badge, not a colour); `name` then tells the box which one ("Seite 3, aus „…“").
+	// badge, not a colour); `name` then tells the box which one ("Seite 3, aus „…“"). With
+	// `onview` its place below shows it in the Beam (`BeamTitle`).
 	let {
 		image: src,
 		rotate = 0,
@@ -23,6 +25,7 @@
 		mark = undefined,
 		name = undefined,
 		onchoose,
+		onview,
 		onkeydown,
 		onfocus,
 		...rest
@@ -39,6 +42,9 @@
 		name?: string;
 		/** Chosen or let go; `range`: with Shift, up to here. */
 		onchoose: (range: boolean) => void;
+		/** Show the page in the Beam: its place below becomes the eye and its name, which the
+		 * keyboard reaches by a key of the grid, not by Tab. */
+		onview?: () => void;
 		onkeydown?: (event: KeyboardEvent) => void;
 		onfocus?: () => void;
 	} = $props();
@@ -98,5 +104,9 @@
 			</Badge>
 		{/if}
 	</span>
-	<span class="text-center text-meta text-muted-foreground">{label}</span>
+	{#if onview}
+		<BeamTitle title={label} tabindex={-1} class="self-center text-meta" {onview} />
+	{:else}
+		<span class="text-center text-meta text-muted-foreground">{label}</span>
+	{/if}
 </label>

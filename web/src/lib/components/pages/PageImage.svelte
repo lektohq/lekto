@@ -3,8 +3,17 @@
 
 	// The image of a page: a page image of the API as an `<img>`; the page of a file about to be
 	// added (a `data:` URL, `POST /documents/{id}/edit/pages`) drawn on a canvas, which the
-	// site's Content Security Policy (`img-src 'self'`) leaves alone. Either scales like an image.
-	let { src, class: className }: { src: string; class?: string } = $props();
+	// site's Content Security Policy (`img-src 'self'`) leaves alone. Either scales like an image
+	// and says its size once it has one (`onsize`).
+	let {
+		src,
+		class: className,
+		onsize
+	}: {
+		src: string;
+		class?: string;
+		onsize?: (width: number, height: number) => void;
+	} = $props();
 
 	let canvas = $state<HTMLCanvasElement | null>(null);
 	const drawn = $derived(src.startsWith('data:'));
@@ -19,6 +28,7 @@
 			target.width = bitmap.width;
 			target.height = bitmap.height;
 			target.getContext('2d')?.drawImage(bitmap, 0, 0);
+			onsize?.(bitmap.width, bitmap.height);
 			bitmap.close();
 		})();
 		return () => {
@@ -38,5 +48,16 @@
 {#if drawn}
 	<canvas bind:this={canvas} width="3" height="4" class={className} aria-hidden="true"></canvas>
 {:else}
-	<img {src} alt="" loading="lazy" draggable="false" class={cn(className)} />
+	<img
+		{src}
+		alt=""
+		loading="lazy"
+		decoding="async"
+		draggable="false"
+		class={cn(className)}
+		onload={(event) => {
+			const image = event.currentTarget as HTMLImageElement;
+			if (image.naturalWidth > 0) onsize?.(image.naturalWidth, image.naturalHeight);
+		}}
+	/>
 {/if}

@@ -438,11 +438,13 @@ describe('the design system (web/DESIGN.md)', () => {
 	});
 
 	it("shows a document's pages one way, in the document view and the Beam alike", () => {
-		const viewers = /<(PdfViewer|PageImages)\b/;
+		// The Beam shows the parts of an edit, before they are stored, as page images too.
+		const beam = '/src/lib/components/Beam.svelte';
 		expect(
-			offenders((source, path) =>
-				path.endsWith('/DocumentPages.svelte') ? null : line(source, viewers)
-			)
+			offenders((source, path) => {
+				if (path.endsWith('/DocumentPages.svelte')) return null;
+				return line(source, path === beam ? /<PdfViewer\b/ : /<(PdfViewer|PageImages)\b/);
+			})
 		).toEqual([]);
 	});
 
