@@ -332,11 +332,6 @@ def layout_parser(settings: Settings) -> LayoutParser:
 OCR_ENGINES: dict[str, Factory[Ocr]] = {"ocrmypdf": ocrmypdf_engine}
 PARSERS: dict[str, Factory[DocumentParser]] = {"layout": layout_parser}
 PAGE_RENDERERS: dict[str, Factory[PageRenderer]] = {"pdfium": lambda _: PdfiumPageRenderer()}
-THUMBNAIL_WIDTH = 320
-"""Pixels wide of the pages of a file a person is about to add to an edit of the pages."""
-THUMBNAIL_RENDERERS: dict[str, Factory[PageRenderer]] = {
-    "pdfium": lambda _: PdfiumPageRenderer(width=THUMBNAIL_WIDTH, preview_width=THUMBNAIL_WIDTH)
-}
 TEXT_LOCATORS: dict[str, Factory[TextLocator]] = {"pdfium": lambda _: PdfiumTextLocator()}
 CODE_READERS: dict[str, Factory[CodeReader]] = {"zxing": lambda _: ZxingCodeReader()}
 METADATA_READERS: dict[str, Factory[MetadataReader]] = {"pikepdf": lambda _: FileMetadataReader()}
@@ -400,7 +395,6 @@ class Container:
     ocr: Ocr
     parser: DocumentParser
     pages: PageRenderer
-    thumbnails: PageRenderer
     locator: TextLocator
     codes: CodeReader
     metadata: MetadataReader
@@ -473,7 +467,6 @@ def build_container(settings: Settings) -> Container:
         ocr=_select("ocr", "ocrmypdf", OCR_ENGINES, settings),
         parser=_select("parser", "layout", PARSERS, settings),
         pages=_select("pages", "pdfium", PAGE_RENDERERS, settings),
-        thumbnails=_select("pages", "pdfium", THUMBNAIL_RENDERERS, settings),
         locator=_select("locator", "pdfium", TEXT_LOCATORS, settings),
         codes=_select("codes", "zxing", CODE_READERS, settings),
         metadata=_select("metadata", "pikepdf", METADATA_READERS, settings),
@@ -539,7 +532,6 @@ def build_memory_container(
         ocr=FakeOcr(),
         parser=FakeParser(),
         pages=FakePageRenderer(),
-        thumbnails=FakePageRenderer(),
         locator=FakeTextLocator(),
         codes=FakeCodeReader(),
         metadata=FakeMetadataReader(),
@@ -975,7 +967,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
             clock,
             store,
             container.composer,
-            container.thumbnails,
+            container.pages,
             pipeline_version=__version__,
         ),
         mail_rules=MailRuleService(uow, clock),

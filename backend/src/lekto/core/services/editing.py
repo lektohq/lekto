@@ -95,22 +95,24 @@ class EditingService:
         clock: Clock,
         object_store: ObjectStore,
         composer: PageComposer,
-        thumbnails: PageRenderer,
+        pages: PageRenderer,
         *,
         pipeline_version: str,
     ) -> None:
-        """`thumbnails`: renders the small pages of a file a person is about to add."""
+        """`pages`: renders the pages of a file a person is about to add, as large as a
+        document's page images: the Beam shows them as it shows those."""
         self._uow = uow
         self._clock = clock
         self._store = object_store
         self._composer = composer
-        self._thumbnails = thumbnails
+        self._pages = pages
         self._version = pipeline_version
 
     async def preview(self, actor: UserId, id: DocumentId, file: IncomingFile) -> list[bytes]:
         """Editors and admins, before they add `file` to an edit of the document: its pages as
-        small WebP images, in their order; nothing is stored. UnsupportedMediaTypeError unless
-        a PDF or an image; UnprocessableDocumentError if its pages cannot be read."""
+        WebP images as large as a document's page images, in their order; nothing is stored.
+        UnsupportedMediaTypeError unless a PDF or an image; UnprocessableDocumentError if its
+        pages cannot be read."""
         kind = await _kind(file.path)
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
@@ -118,9 +120,7 @@ class EditingService:
         async with work_directory() as work:
             target = work / "pages"
             await asyncio.to_thread(target.mkdir)
-            rendered = await self._thumbnails.render_pages(
-                file.path, media_type=kind, target=target
-            )
+            rendered = await self._pages.render_pages(file.path, media_type=kind, target=target)
             return [
                 await asyncio.to_thread((target / f"{number}.webp").read_bytes)
                 for number in range(1, rendered.pages + 1)

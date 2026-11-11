@@ -1540,7 +1540,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * Show the pages of a file to add to an edit
-		 * @description Editors of the document's space and admins, before they add a file to an edit of the document's pages (`POST /documents/{id}/edit`): its pages as small images. Nothing is stored. 415 for a file that is no PDF or image; 422 for one whose pages cannot be read.
+		 * @description Editors of the document's space and admins, before they add a file to an edit of the document's pages (`POST /documents/{id}/edit`): its pages as images, as large as a document's page images (`GET /documents/{id}/pages/{number}`). Nothing is stored. 415 for a file that is no PDF or image; 422 for one whose pages cannot be read.
 		 */
 		post: operations['preview_pages_api_v1_documents__id__edit_pages_post'];
 		delete?: never;
@@ -9015,7 +9015,7 @@ export interface components {
 		PagePreviews: {
 			/**
 			 * Pages
-			 * @description Each page of the file in its order, small, as a `data:` URL of a WebP image.
+			 * @description Each page of the file in its order, as large as a document's page images, as a `data:` URL of a WebP image.
 			 */
 			pages: string[];
 		};
