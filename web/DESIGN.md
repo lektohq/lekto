@@ -256,7 +256,12 @@ initial on `primary`, its name as a `ui/tooltip` (Tobi, 09.11.2026). Plain `<but
 look-alikes of `Button`.
 
 **Menus:** several actions of one object go into a menu: "…" for the rest, "Herunterladen" for
-formats, the sort as `SortMenu`.
+formats, the sort as `SortMenu`. A menu opens at its trigger, on the phone too (Tobi, 11.11.2026):
+there it is as wide as the page, 16 px from both edges, with rows of 48 px, `text-base` and
+icons of 20 px (`ui/dropdown-menu` draws it so; no menu sizes itself). An open menu has no
+focus outline of its own; the row the keyboard is on shows it. A destructive action ("Löschen")
+stands last, behind a line (`design-system.test.ts` checks it). A choice from many by
+searching is no menu: it is a `PickerShell` (see [Dialogs, sheets, editors](#dialogs-sheets-editors)).
 
 **Pen:** in every list whose entries have an editor, `EditButton` is the last column behind a
 divider.
@@ -283,7 +288,7 @@ divider.
 - **`SearchSelect`** (one of many by searching: contact, document type), looking like a
   `Select`, wherever one is chosen: a document, many documents, a mailbox's and a mail rule's type
   of the mail text, a rule's action and the value of its condition (Tobi, 05.11.2026). Without
-  `noneLabel` where a value must be chosen (a rule's contact or type). A popover on desktop; on the phone a sheet from the bottom (`PhoneSheet`) named by
+  `noneLabel` where a value must be chosen (a rule's contact or type). A `PickerShell`: a popover on desktop; on the phone a sheet from the bottom named by
   its `title` ("Kontakt wählen"), with a close button and rows of 48 px; a choice closes it
   (Tobi, 28.10.2026). Admins can create from the search (`CreateOffer`).
 - **`SearchField`**: every search input, in pickers, lists and pages alike; no other `type="search"`.
@@ -660,15 +665,15 @@ list pages the same way (see [Lists](#lists)).
 
 ### Dialogs, sheets, editors
 
-| Need                                                         | Component                                   | Desktop                          | Phone                                                                                                                 |
-| ------------------------------------------------------------ | ------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Ask before a destructive action                              | `ConfirmDialog` (alert dialog)              | centred, `size="md"`             | centred with gutter                                                                                                   |
-| A short form (space, token, code, move, reprocess, new user) | `FormDialog`                                | centred, `size` `sm`/`md`/`lg`   | full screen with the editor bar                                                                                       |
-| An editor of master data, lenses, a mailbox                  | `EditorShell`                               | dialog with sticky head and foot | full screen with the editor bar                                                                                       |
-| A secret shown once                                          | `SecretDialog`                              | centred, `size="md"`             | centred with gutter                                                                                                   |
-| A choice from many (tags, facets, topic; contact, type)      | popover / `TagPickerDialog`, `SearchSelect` | popover or dialog                | sheet from the bottom (`PhoneSheet`; `SearchSelect`: see [Fields](#fields))                                           |
-| Filters                                                      | sidebar                                     | sidebar                          | sheet from the bottom, title and close fixed on top, "Zurücksetzen" and "Ergebnisse anzeigen (N)" fixed at the bottom |
-| A document's pages without leaving the place                 | `Beam`                                      | sheet from the right, 640 px     | full screen                                                                                                           |
+| Need                                                                                             | Component                                                                              | Desktop                          | Phone                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ask before a destructive action                                                                  | `ConfirmDialog` (alert dialog)                                                         | centred, `size="md"`             | centred with gutter                                                                                                                             |
+| A short form (space, token, code, move, reprocess, new user)                                     | `FormDialog`                                                                           | centred, `size` `sm`/`md`/`lg`   | full screen with the editor bar                                                                                                                 |
+| An editor of master data, lenses, a mailbox                                                      | `EditorShell`                                                                          | dialog with sticky head and foot | full screen with the editor bar                                                                                                                 |
+| A secret shown once                                                                              | `SecretDialog`                                                                         | centred, `size="md"`             | centred with gutter                                                                                                                             |
+| A choice from many (tags, facets, topic; contact, type; a document to relate, a field to assign) | `TagPickerDialog`, `PickerShell` (`SearchSelect`, `ReferencePicker`, `AssignmentList`) | dialog or popover                | sheet from the bottom (`PhoneSheet`; `SearchSelect`: see [Fields](#fields))                                                                     |
+| Filters                                                                                          | sidebar                                                                                | sidebar                          | sheet from the bottom (`PhoneSheet` with `fit`), title and close fixed on top, "Zurücksetzen" and "Ergebnisse anzeigen (N)" fixed at the bottom |
+| A document's pages without leaving the place                                                     | `Beam`                                                                                 | sheet from the right, 640 px     | full screen                                                                                                                                     |
 
 - **Scrolling:** a dialog's body scrolls in an area as wide as the dialog, with its own padding,
   so the scrollbar stands at the dialog's edge, never over a field; title, parts and footer stay
@@ -684,9 +689,16 @@ list pages the same way (see [Lists](#lists)).
   `action`, the account dialog) has no form around them and no footer; its bar shows the title
   and "Fertig".
 - **Sheet from the bottom:** `PhoneSheet`, on `ui/sheet` with `side="bottom"`: a grab handle,
-  the title and its close button (an X, "Fertig") fixed on top, 85 % of the screen high;
-  nothing takes the focus when it opens. The pickers (`SearchSelect`, `TagPickerDialog`) use
-  it; its classes are written nowhere else.
+  the title and its close button (an X, "Fertig") fixed on top, 85 % of the screen high (the
+  filters as high as they need, up to that: `fit`), what stays at the bottom in `footer`;
+  `text-base`; nothing takes the focus when it opens. Pulled down by the handle or the title it
+  follows the finger and closes past 96 px or when flicked, else it springs back; the close
+  button stays the way for everyone (Tobi, 11.11.2026). The pickers (`PickerShell`,
+  `TagPickerDialog`) and the filters use it; its classes are written nowhere else.
+- **A choice by searching:** `PickerShell` holds the search and its list (`ui/command`): a
+  popover at its trigger on desktop, on the phone a `PhoneSheet` named by its `title` with an
+  X, the search 48 px high in `text-base` (a smaller field makes iOS zoom into the page) and
+  rows of 48 px. No popover holds a `Command` by hand (`design-system.test.ts`).
 - **Steps:** an editor of several steps (`EditorShell` with `stay` and `back`, "PDF bearbeiten")
   leads on with its primary action ("Weiter", which may say what follows: "Weiter: 3
   Dokumente") and takes effect only in the last ("Übernehmen"). A later step has "Zurück"
@@ -1285,7 +1297,8 @@ worker, and Lekto works as a website.
 - **Desktop:** at least 32 px for controls in rows and cards, 40 px elsewhere. No target is smaller
   than 24 × 24 px.
 - The components implement this (`Button`, `IconButton`, `Chip`, `Segmented`, `TabBar`, `Select`,
-  `Switch`, `ChoiceBox`, `InfoTip`, `BackLink`, `InboxMark`). Pages do not add sizes by hand.
+  `Switch`, `ChoiceBox`, `InfoTip`, `BackLink`, `InboxMark`, the rows of `ui/dropdown-menu` and
+  `ui/command`). Pages do not add sizes by hand.
 
 ## Accessibility baseline
 
