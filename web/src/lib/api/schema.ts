@@ -5340,6 +5340,8 @@ export interface components {
 			detail: {
 				[key: string]: unknown;
 			};
+			/** @description `split`: the document it was split off as it is now (`detail.title` is its title then); null where it is gone, the caller may not read it, or for another kind. */
+			origin: components['schemas']['VersionOriginOut'] | null;
 		};
 		/**
 		 * DryRunMailOut
@@ -11973,6 +11975,19 @@ export interface components {
 		 * @enum {string}
 		 */
 		VersionKindOut: 'received' | 'replaced' | 'edited' | 'split' | 'separated' | 'merged';
+		/** VersionOriginOut */
+		VersionOriginOut: {
+			/**
+			 * Id
+			 * Format: uuid
+			 */
+			id: string;
+			/**
+			 * Title
+			 * @description Its title now.
+			 */
+			title: string;
+		};
 		/**
 		 * VisibilityOut
 		 * @description Who sees the document: the members of its space; readers only once it is green.
