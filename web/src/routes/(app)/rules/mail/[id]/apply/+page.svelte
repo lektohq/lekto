@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Power from '@lucide/svelte/icons/power';
 	import RuleSwitch from '#lib/components/rules/RuleSwitch.svelte';
 	import { RuleLoader } from '#lib/rules/page.svelte.ts';
 	import { switchMailRule } from '#lib/rules/switch.ts';
@@ -133,6 +134,7 @@
 		{#snippet actions()}
 			{#if rule && !rule.enabled}
 				<Button size="sm" disabled={busy} onclick={() => void switchOne(true)}>
+					<Power aria-hidden="true" />
 					{m.mail_rule_switch_on()}
 				</Button>
 			{/if}

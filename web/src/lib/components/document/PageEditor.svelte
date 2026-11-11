@@ -13,6 +13,7 @@
 	import { apiError } from '#lib/api/problem.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import DocumentChoice from '#lib/components/document/DocumentChoice.svelte';
+	import SelectionChooser from '#lib/components/SelectionChooser.svelte';
 	import EditorShell from '#lib/components/EditorShell.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import PageCut from '#lib/components/pages/PageCut.svelte';
@@ -187,6 +188,10 @@
 	}
 
 	const place = (key: string) => stack.findIndex((page) => page.key === key);
+
+	function chooseAll() {
+		chosen = new Set(stack.map((page) => page.key));
+	}
 
 	function choose(key: string, range: boolean) {
 		if (range && anchor !== null && place(anchor) >= 0) {
@@ -512,7 +517,7 @@
 		onclick={() => act((s, k) => turn(s, k, -90))}
 	>
 		<RotateCcw aria-hidden="true" />
-		{phone.current ? m.page_edit_left_short() : m.page_edit_left()}
+		{m.page_edit_left_short()}
 	</Button>
 	<Button
 		type="button"
@@ -522,7 +527,7 @@
 		onclick={() => act((s, k) => turn(s, k, 90))}
 	>
 		<RotateCw aria-hidden="true" />
-		{phone.current ? m.page_edit_right_short() : m.page_edit_right()}
+		{m.page_edit_right_short()}
 	</Button>
 	<Button type="button" variant="outline" {size} disabled={none} onclick={() => act(remove, false)}>
 		<Trash2 aria-hidden="true" />
@@ -536,21 +541,32 @@
 		onclick={() => act(splitOff, false)}
 	>
 		<FileOutput aria-hidden="true" />
-		{phone.current ? m.page_edit_split_short() : m.page_edit_split()}
+		{m.page_edit_split_short()}
 	</Button>
 {/snippet}
 
 {#snippet bar()}
-	<SelectionBar count={selected} inDialog>
-		{#snippet trail()}
-			{#if chosen.size > 0}
-				<Button type="button" variant="ghost" size="sm" onclick={() => (chosen = new Set())}>
-					{m.page_edit_clear()}
-				</Button>
-			{/if}
-		{/snippet}
+	<!-- As the documents list's (web/DESIGN.md, "Choosing many"): "Auswählen" before the count,
+	the tools after it, nothing that comes or goes as the choice changes. -->
+	<SelectionBar
+		count={selected}
+		inDialog
+		lead={phone.current ? undefined : chooser}
+		trail={phone.current ? chooser : undefined}
+	>
 		{#snippet actions()}{@render pageActions()}{/snippet}
 	</SelectionBar>
+{/snippet}
+
+{#snippet chooser()}
+	<SelectionChooser disabled={stack.length === 0}>
+		<DropdownMenu.Item disabled={chosen.size === stack.length} onSelect={chooseAll}>
+			{m.page_edit_select_all()}
+		</DropdownMenu.Item>
+		<DropdownMenu.Item disabled={chosen.size === 0} onSelect={() => (chosen = new Set())}>
+			{m.bulk_select_none()}
+		</DropdownMenu.Item>
+	</SelectionChooser>
 {/snippet}
 
 {#snippet tools()}

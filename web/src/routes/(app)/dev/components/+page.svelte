@@ -47,6 +47,8 @@
 	import Segmented from '#lib/components/Segmented.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import SelectionBar from '#lib/components/SelectionBar.svelte';
+	import SelectionChooser from '#lib/components/SelectionChooser.svelte';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.ts';
 	import TabBar from '#lib/components/TabBar.svelte';
 	import Eyebrow from '#lib/components/page/Eyebrow.svelte';
 	import PageHeader from '#lib/components/page/PageHeader.svelte';
@@ -501,13 +503,17 @@
 	<section class="flex flex-col gap-3" aria-labelledby="dev-selection">
 		<SectionTitle id="dev-selection">{m.dev_section_selection()}</SectionTitle>
 		<SelectionBar count={m.selection_selected({ count: '3' })}>
-			{#snippet hint()}{m.dev_sample_dialog_text()}{/snippet}
-			{#snippet trail()}
-				<Button variant="ghost" size="sm">{m.dev_sample_secondary()}</Button>
+			{#snippet lead()}
+				<SelectionChooser>
+					<DropdownMenu.Item>{m.dev_sample_secondary()}</DropdownMenu.Item>
+				</SelectionChooser>
 			{/snippet}
+			{#snippet hint()}{m.dev_sample_dialog_text()}{/snippet}
 			{#snippet actions()}
-				<Button variant="outline" size="sm">{m.dev_sample_button()}</Button>
-				<Button size="sm">{m.dev_sample_button()}</Button>
+				<Button variant="outline" size="sm"
+					><Tag aria-hidden="true" />{m.dev_sample_button()}</Button
+				>
+				<Button size="sm"><Pencil aria-hidden="true" />{m.dev_sample_button()}</Button>
 			{/snippet}
 		</SelectionBar>
 	</section>
