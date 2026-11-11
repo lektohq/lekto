@@ -43,6 +43,7 @@
 		partsRequest,
 		remove,
 		requestPlaces,
+		sourcesOn,
 		splitOff,
 		startStack,
 		toggleCut,
@@ -105,9 +106,18 @@
 	const count = $derived(document.page_count ?? 0);
 	const parts = $derived(partsOf(stack));
 	const ranges = $derived(partRanges(stack));
-	const files = $derived(sources.flatMap((source) => ('file' in source ? [source.file] : [])));
+	/** The added sources with a page on the stack: one undone or emptied is no part of the edit
+	 * (a document of it is not merged, and can be chosen again). */
+	const used = $derived(sourcesOn(stack));
+	const files = $derived(
+		sources.flatMap((source, index) =>
+			'file' in source && used.has(index + 1) ? [source.file] : []
+		)
+	);
 	const others = $derived(
-		sources.flatMap((source) => ('document' in source ? [source.document] : []))
+		sources.flatMap((source, index) =>
+			'document' in source && used.has(index + 1) ? [source.document] : []
+		)
 	);
 	/** The documents whose pages are on the stack (A, B, …): a merge with more than one. */
 	const documents = $derived([document, ...others]);
@@ -381,11 +391,16 @@
 	async function submit() {
 		if (step === 'pages') {
 			if (replacing !== null && replacing >= parts.length) replacing = 0;
+			// A document whose pages left the stack is merged no more, nor continued.
+			if (!documents.some((item) => item.id === target)) target = document.id;
 			step = 'parts';
 			return;
 		}
 		const form = new FormData();
-		const place = requestPlaces(sources.map((source) => 'file' in source));
+		const place = requestPlaces(
+			sources.map((source) => 'file' in source),
+			used
+		);
 		form.append('parts', JSON.stringify(partsRequest(stack, replacing, place)));
 		for (const file of files) form.append('files', file, file.name);
 		if (merging) {

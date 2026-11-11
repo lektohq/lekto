@@ -143,14 +143,25 @@ export function partsRequest(
 	}));
 }
 
+/** The added sources (from 1) with a page on the stack: one undone, or with every page removed,
+ * is no part of the edit, and a document of it is not merged. */
+export function sourcesOn(stack: Stack): ReadonlySet<number> {
+	return new Set(stack.flatMap((page) => (page.source > 0 ? [page.source] : [])));
+}
+
 /** The place of each added source in the request: the files (`isFile`) first, then the other
- * documents, each in the order they were added; the original stays 0. */
-export function requestPlaces(isFile: readonly boolean[]): (source: number) => number {
-	const files = isFile.filter(Boolean).length;
+ * documents, each in the order they were added; the original stays 0. Only the sources `used`
+ * (`sourcesOn`) are sent and counted. */
+export function requestPlaces(
+	isFile: readonly boolean[],
+	used: ReadonlySet<number>
+): (source: number) => number {
+	const sent = isFile.flatMap((kind, index) => (used.has(index + 1) ? [{ kind, index }] : []));
+	const files = sent.filter((item) => item.kind).length;
 	const places = new Map<number, number>([[0, 0]]);
 	let file = 0;
 	let other = 0;
-	isFile.forEach((kind, index) => places.set(index + 1, kind ? ++file : files + ++other));
+	sent.forEach(({ kind, index }) => places.set(index + 1, kind ? ++file : files + ++other));
 	return (source) => places.get(source) ?? source;
 }
 

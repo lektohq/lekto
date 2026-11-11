@@ -9,6 +9,7 @@ import {
 	partsRequest,
 	remove,
 	requestPlaces,
+	sourcesOn,
 	splitOff,
 	startStack,
 	toggleCut,
@@ -114,7 +115,7 @@ describe('page-edit', () => {
 
 	it('counts the files first and the other documents after them, as the API does', () => {
 		// Added in turn: a document (1), a file (2), a document (3), a file (4).
-		const place = requestPlaces([false, true, false, true]);
+		const place = requestPlaces([false, true, false, true], new Set([1, 2, 3, 4]));
 		expect([0, 1, 2, 3, 4].map(place)).toEqual([0, 3, 1, 4, 2]);
 		let stack = addPages(
 			startStack(1, (page) => `p${page}`),
@@ -125,5 +126,20 @@ describe('page-edit', () => {
 		stack = addPages(stack, 2, ['f1'], 0);
 		expect(partsRequest(stack, 0, place)[0].pages.map((pick) => pick.source)).toEqual([0, 1, 3]);
 		expect([0, 1, 25, 26].map(markOf)).toEqual(['A', 'B', 'Z', '27']);
+	});
+
+	it('leaves out what has no page on the stack: undone, or every page removed', () => {
+		// Added in turn: a document (1, undone), a file (2), a document (3).
+		const stack = addPages(
+			startStack(1, (page) => `p${page}`),
+			3,
+			['c1'],
+			null
+		);
+		const used = sourcesOn(addPages(stack, 2, ['f1'], null));
+		expect([...used]).toEqual([3, 2]);
+		const place = requestPlaces([false, true, false], used);
+		expect([0, 2, 3].map(place)).toEqual([0, 1, 2]);
+		expect([...sourcesOn(startStack(2, (page) => `p${page}`))]).toEqual([]);
 	});
 });
