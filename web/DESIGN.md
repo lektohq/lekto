@@ -1068,7 +1068,9 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Neu
   the stepper at once, the inbox read anew on its event, since whether it holds a document is the
   server's to say (`keepPlaces`, `dropPlace` in `lib/document-view.ts`, `DocumentPlace`). Saving
   stays on the document. Without the list in this tab (after a reload) it shows neither. Only
-  the document list; other lists open the Beam, which pages through them itself.
+  the document list; other lists open the Beam, which pages through them itself. The row of the
+  way back and the stepper never breaks (Tobi, 11.11.2026): the way back is cut where it is too
+  long, and on a phone the stepper says only "4 von 33".
 - Detail pages of the same kind offer the same actions in the same place: header actions (edit,
   primary action). A single destructive action stands there as an `IconButton` (rule, webhook);
   where there are more actions, a "…" menu holds the rest (delete last, in `destructive`).

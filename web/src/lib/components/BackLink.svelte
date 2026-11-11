@@ -24,8 +24,8 @@
 <a
 	{href}
 	onclick={follow}
-	class="relative inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground after:absolute after:-inset-x-1 after:-inset-y-3 hover:text-foreground"
+	class="relative inline-flex w-fit max-w-full min-w-0 items-center gap-1.5 text-sm text-muted-foreground after:absolute after:-inset-x-1 after:-inset-y-3 hover:text-foreground"
 >
-	<ArrowLeft class="size-4" aria-hidden="true" />
-	{label}
+	<ArrowLeft class="size-4 shrink-0" aria-hidden="true" />
+	<span class="truncate">{label}</span>
 </a>

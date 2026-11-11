@@ -1,5 +1,4 @@
 <script lang="ts">
-	import SearchIcon from '@lucide/svelte/icons/search';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { factFilterLabel } from '#lib/facts.ts';
 	import { NO_FILTERS, isFiltered, type Filters } from '#lib/filters.ts';
@@ -15,14 +14,12 @@
 	// What narrows the list, each as a chip that lets it go, and a reset; nothing while nothing
 	// is chosen. Tags, topics and groups are their chips as everywhere (`TagChip`: colour and
 	// icon, a topic square, a group outlined); the rest is brand-coloured. `readonly`: the chips
-	// only (what a lens keeps). The words of a search (`query`) stand first, `onclearquery` ends
-	// the search.
+	// only (what a lens keeps). The words of a search have no chip: they stand in the search
+	// field, whose X ends the search (Tobi, 11.11.2026).
 	let {
 		filters,
 		lookup,
 		onchange,
-		query = '',
-		onclearquery,
 		selection = 0,
 		onclearselection,
 		readonly = false
@@ -30,8 +27,6 @@
 		filters: Filters;
 		lookup: Lookup;
 		onchange?: (filters: Filters) => void;
-		query?: string;
-		onclearquery?: () => void;
 		/** How many documents a link selected (`lib/selection.ts`); its chip stands first. */
 		selection?: number;
 		onclearselection?: () => void;
@@ -148,7 +143,7 @@
 	});
 </script>
 
-{#if isFiltered(filters) || query || selection > 0}
+{#if isFiltered(filters) || selection > 0}
 	<div class="flex flex-wrap items-center gap-2" role="group" aria-label={m.filters_active()}>
 		{#if selection > 0}
 			<Chip variant="selected" onremove={onclearselection} removeLabel={m.selection_chip_remove()}>
@@ -156,18 +151,6 @@
 					<ListChecks class="size-3.5 shrink-0" aria-hidden="true" />
 				{/snippet}
 				{m.selection_chip({ count: selection })}
-			</Chip>
-		{/if}
-		{#if query}
-			<Chip
-				variant="outline"
-				onremove={onclearquery}
-				removeLabel={m.search_chip_remove({ words: query })}
-			>
-				{#snippet icon()}
-					<SearchIcon class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-				{/snippet}
-				{m.search_chip({ words: query })}
 			</Chip>
 		{/if}
 		{#each chips as chip (chip.key)}

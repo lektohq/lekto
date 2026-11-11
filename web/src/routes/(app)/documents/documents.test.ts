@@ -658,7 +658,7 @@ describe('the archive page', () => {
 		expect(vi.mocked(goto)).toHaveBeenLastCalledWith('?lens=l1&tag=t1', searching(''));
 	});
 
-	it('shows the words of a search as a chip that ends it, their count by the title', async () => {
+	it('shows the words of a search in its field, no chip beside it, their count by the title', async () => {
 		state.url = new URL('http://lekto/ui/documents?tag=t1');
 		state.entry = { words: 'Strom' };
 		const bodies: unknown[] = [];
@@ -677,9 +677,10 @@ describe('the archive page', () => {
 		const searched = calls(api).find((call) => call.startsWith('POST /api/v1/documents/search'));
 		expect(searched).toContain('tag_id=t1');
 		expect(searched).not.toContain('Strom');
-		await user.click(
-			screen.getByRole('button', { name: m.search_chip_remove({ words: 'Strom' }) })
-		);
+		// The field holds the words and ends the search; the chips are the filters' alone.
+		const filters = screen.getByRole('group', { name: m.filters_active() });
+		expect(filters.textContent).not.toContain('Strom');
+		await user.click(screen.getAllByRole('button', { name: m.documents_search_clear() })[0]);
 		expect(vi.mocked(goto)).toHaveBeenLastCalledWith('?tag=t1', searching(''));
 	});
 
