@@ -3,7 +3,8 @@ split at its separator sheets; the stack stays version 1, the first part becomes
 every other part a new document as the stack came in, each processed as any new one."""
 
 from collections.abc import Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
+from datetime import datetime
 
 import pytest
 
@@ -28,6 +29,7 @@ from lekto.core.domain.reasons import ReasonCode
 from lekto.core.domain.separating import separated_parts, separator_pages
 from lekto.core.domain.users import Role, User
 from lekto.core.domain.versions import VersionKind
+from lekto.core.ports.unit_of_work import UnitOfWork
 from lekto.core.services._intake import SPLIT_FROM
 from lekto.core.services.objects import original_key
 from lekto.core.services.pipeline import PipelineService
@@ -356,3 +358,49 @@ async def test_the_parts_files_go_if_the_stack_is_deleted_first(world: World) ->
     for key in deleting.parts:
         assert not await world.object_store.exists(key)
     assert await documents(world) == []
+
+
+@dataclass(frozen=True)
+class NotStored:
+    """A separation whose result cannot be stored (the database went away, say)."""
+
+    separation: Separation
+
+    async def apply(self, uow: UnitOfWork, document: Document, now: datetime) -> NodeResult:
+        raise RuntimeError("the database went away")
+
+    async def discard(self) -> None:
+        await self.separation.discard()
+
+
+class FailsToStore:
+    def __init__(self, node: SeparateNode) -> None:
+        self._node = node
+        self.parts: list[str] = []
+
+    async def run(self, document: Document) -> NotStored:
+        result = await self._node.run(document)
+        assert isinstance(result, Separation)
+        self.parts = [original_key(part.file.sha256) for part in result.parts]
+        return NotStored(result)
+
+
+async def test_the_parts_files_go_if_the_result_is_not_stored(world: World) -> None:
+    """The node runs again later and makes new ones: these would stay for good."""
+    owner = await world.user(role=Role.ADMIN)
+    node = SeparateNode(
+        world.uow,
+        world.object_store,
+        sheets(4),
+        world.composer,
+        separators=("PATCHT",),
+        pipeline_version="test",
+    )
+    failing = FailsToStore(node)
+    pipeline = world.pipeline(executors={Node.SEPARATE: failing})
+    await pipeline.receive(owner.id, incoming(STACK), filename="scan.pdf")
+    with pytest.raises(RuntimeError):
+        await world.drain(pipeline)
+    assert len(failing.parts) == 2
+    for key in failing.parts:
+        assert not await world.object_store.exists(key)

@@ -147,7 +147,8 @@ class DeferredResult(Protocol):
 @runtime_checkable
 class Discardable(Protocol):
     """A deferred result that stored files before it is stored itself (the parts of a stack,
-    `services.separating`): if its run is over first (the document was deleted), they go."""
+    `services.separating`): if it is never stored (the document was deleted, its run is over,
+    or storing failed), they go (`PipelineService._record`)."""
 
     async def discard(self) -> None: ...
 
@@ -1199,10 +1200,21 @@ class PipelineService:
     ) -> None:
         """Store a node result (completing a deferred one on the stored state). A concurrent
         change of the document (e.g. a metadata edit) is retried; if the job's claim was lost,
-        another worker owns the node and nothing is stored."""
-        await self._jobs.storing(
-            job, lambda: self._record_once(job, document_id, node, run, result, started)
-        )
+        another worker owns the node and nothing is stored. Files a result stored before it is
+        stored itself (`Discardable`) go when it never is: the document is gone or its run
+        over, the claim lost, or storing failed (the node then runs again, and makes new
+        ones)."""
+        stored = False
+
+        async def store() -> None:
+            nonlocal stored
+            stored = await self._record_once(job, document_id, node, run, result, started)
+
+        try:
+            await self._jobs.storing(job, store)
+        finally:
+            if not stored and isinstance(result, Discardable):
+                await asyncio.shield(result.discard())
 
     async def _record_once(
         self,
@@ -1212,7 +1224,9 @@ class PipelineService:
         run: int,
         outcome: NodeResult | DeferredResult,
         started: datetime,
-    ) -> None:
+    ) -> bool:
+        """One attempt of `_record`; whether the result was stored (not where the document is
+        gone or its run over)."""
         now = self._clock.now()
         catching_up = job.kind == CATCH_UP_JOB
         async with self._uow() as uow:
@@ -1222,9 +1236,7 @@ class PipelineService:
             ):
                 await uow.jobs.complete(job, now=now)
                 await uow.commit()
-                if isinstance(outcome, Discardable):
-                    await outcome.discard()
-                return
+                return False
             if isinstance(outcome, NodeResult):
                 result = outcome
             else:
@@ -1239,7 +1251,7 @@ class PipelineService:
                         await enqueue_nodes(uow, document, [node], now)
                     await uow.outbox.add(document.pull_events())
                     await uow.commit()
-                    return
+                    return True
                 result = applied
             first_lane = document.first_lane
             if catching_up:
@@ -1257,6 +1269,7 @@ class PipelineService:
                 await uow.jobs.complete(job, now=now)
             await uow.outbox.add(document.pull_events())
             await uow.commit()
+        return True
 
     async def _log(
         self,
