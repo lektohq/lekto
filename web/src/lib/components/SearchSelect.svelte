@@ -13,14 +13,10 @@
 	import Check from '@lucide/svelte/icons/check';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import Plus from '@lucide/svelte/icons/plus';
-	import X from '@lucide/svelte/icons/x';
 	import type { Snippet } from 'svelte';
-	import IconButton from '#lib/components/IconButton.svelte';
-	import PhoneSheet from '#lib/components/PhoneSheet.svelte';
+	import PickerShell from '#lib/components/PickerShell.svelte';
 	import * as Command from '#lib/components/ui/command/index.ts';
-	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { phone } from '#lib/phone.svelte.ts';
 	import { matchesWords, searchWords } from '#lib/picking.ts';
 	import { cn } from '#lib/utils.ts';
 	import { FIELD, FIELD_HEIGHT } from '#lib/components/ui/field-look.ts';
@@ -31,7 +27,7 @@
 	// a search over label and hint, "none" first while nothing is typed. With `create` (admins)
 	// a search that names nothing offers "„…“ anlegen …": the choice gives way to `create`'s
 	// dialog, and the one it makes is chosen. A popover on wider screens; on a phone a sheet from
-	// the bottom (`PhoneSheet`) named `title`, with rows a finger hits (Tobi, 28.10.2026).
+	// the bottom named `title`, with rows a finger hits (`PickerShell`; Tobi, 28.10.2026).
 	let {
 		value = $bindable(''),
 		options,
@@ -139,21 +135,29 @@
 	</button>
 {/snippet}
 
-{#snippet list(row: string)}
-	<Command.Root shouldFilter={false} class="min-h-0 flex-1">
+<PickerShell
+	bind:open
+	{title}
+	onOpenChange={(next) => next || (query = '')}
+	class="w-(--bits-popover-anchor-width) min-w-64"
+>
+	{#snippet trigger(props)}
+		{@render field(props)}
+	{/snippet}
+	<Command.Root shouldFilter={false}>
 		<Command.Input bind:value={query} placeholder={searchLabel} aria-label={searchLabel} />
-		<Command.List class={cn(phone.current && 'max-h-none flex-1 px-2 pt-2 pb-4')}>
+		<Command.List>
 			<Command.Empty class="py-4 text-center text-sm text-muted-foreground">
 				{m.assignment_none_found()}
 			</Command.Empty>
 			{#if words === '' && noneLabel}
-				<Command.Item value={NONE} onSelect={() => pick('')} class={row}>
+				<Command.Item value={NONE} onSelect={() => pick('')}>
 					<span class="flex-1">{noneLabel}</span>
 					{#if value === ''}<Check aria-hidden="true" />{/if}
 				</Command.Item>
 			{/if}
 			{#each found as option (option.value)}
-				<Command.Item value={option.value} onSelect={() => pick(option.value)} class={row}>
+				<Command.Item value={option.value} onSelect={() => pick(option.value)}>
 					<span class="flex min-w-0 flex-1 flex-col">
 						<span class="truncate">{option.label}</span>
 						{#if option.hint}
@@ -165,7 +169,7 @@
 			{/each}
 			{#if offered && create}
 				<Command.Group class={cn(found.length > 0 && 'border-t')}>
-					<Command.Item value="create:" onSelect={() => make(create)} class={cn(row, 'text-brand')}>
+					<Command.Item value="create:" onSelect={() => make(create)} class="text-brand">
 						<Plus aria-hidden="true" class="text-brand" />
 						{createLabel({ name: query.trim() })}
 					</Command.Item>
@@ -173,41 +177,4 @@
 			{/if}
 		</Command.List>
 	</Command.Root>
-{/snippet}
-
-{#if phone.current}
-	{@render field({
-		'aria-haspopup': 'dialog',
-		'aria-expanded': open,
-		onclick: () => (open = true)
-	})}
-	<PhoneSheet bind:open {title} onOpenChange={(next) => next || (query = '')}>
-		{#snippet close()}
-			<IconButton
-				label={m.close()}
-				onclick={() => {
-					query = '';
-					open = false;
-				}}
-			>
-				<X aria-hidden="true" />
-			</IconButton>
-		{/snippet}
-		{@render list('min-h-12 rounded-xl px-3')}
-	</PhoneSheet>
-{:else}
-	<Popover.Root bind:open onOpenChange={(next) => next || (query = '')}>
-		<Popover.Trigger>
-			{#snippet child({ props })}
-				{@render field(props)}
-			{/snippet}
-		</Popover.Trigger>
-		<Popover.Content
-			class="w-(--bits-popover-anchor-width) min-w-64 p-0"
-			align="start"
-			collisionPadding={8}
-		>
-			{@render list('')}
-		</Popover.Content>
-	</Popover.Root>
-{/if}
+</PickerShell>
