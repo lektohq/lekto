@@ -64,7 +64,8 @@
 		vision = null,
 		reading = null,
 		onchanged,
-		onleave
+		onleave,
+		onmerged
 	}: {
 		document: Document;
 		lookup: Lookup | null;
@@ -84,6 +85,8 @@
 		/** The document leaves the person's hands (deleted, handed over), just before the view
 		 * goes back. */
 		onleave?: () => void;
+		/** The document was merged into `target`, which takes its place. */
+		onmerged?: (target: string) => void;
 	} = $props();
 
 	let confirmDelete = $state(false);
@@ -140,11 +143,14 @@
 		manageable && status !== 'processing' && document.media_type !== 'message/rfc822'
 	);
 
-	async function edited(result: components['schemas']['EditedDocuments']) {
-		toast.success(m.page_edit_done());
-		if (result.deleted) {
+	async function edited(result: components['schemas']['EditedDocuments'], target: string | null) {
+		toast.success(result.merged.length > 0 ? m.merge_done() : m.page_edit_done());
+		if (target === null) {
 			onleave?.();
 			await leaveDocument(Boolean(inbox));
+		} else if (target !== document.id) {
+			// Merged into another document: this one is gone, that one takes its place.
+			onmerged?.(target);
 		} else {
 			onchanged();
 		}

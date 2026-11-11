@@ -241,6 +241,44 @@ describe('DocumentFiles', () => {
 		expect(rows[1].textContent).toContain(m.version_received());
 	});
 
+	it('says what a merge was made of and where a version came from', async () => {
+		const scan = { document: 'doc-2', title: 'scan_0412', version: 1 };
+		files = {
+			...FILES,
+			versions: [
+				{ ...FILES.versions[0], current: false },
+				{
+					...FILES.versions[0],
+					number: 2,
+					current: false,
+					detail: { moved: scan }
+				},
+				{
+					...FILES.versions[0],
+					number: 3,
+					current: true,
+					kind: 'merged',
+					detail: {
+						from: 1,
+						documents: [
+							{ document: 'doc-1', title: 'Bescheid', version: 1 },
+							{ ...scan, version: 2 }
+						]
+					}
+				}
+			]
+		};
+		render(DocumentFiles, { documentId: 'doc-1' });
+		const card = await screen.findByRole('region', { name: m.files_versions() });
+		const [merged, moved] = within(card).getAllByRole('listitem');
+		expect(merged.textContent).toContain(
+			m.version_merged({ sources: `${m.version_merged_self({ version: '1' })} and “scan_0412”` })
+		);
+		expect(moved.textContent).toContain(
+			`${m.version_moved({ title: 'scan_0412', version: '1' })} · ${m.version_received()}`
+		);
+	});
+
 	it('replaces the file with a new version after asking, for an editor only', async () => {
 		const posted: string[] = [];
 		fetchMock = fakeApi({

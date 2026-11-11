@@ -12,6 +12,7 @@
 	import ListChecks from '@lucide/svelte/icons/list-checks';
 	import X from '@lucide/svelte/icons/x';
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 	import { page } from '$app/state';
 	import { api } from '#lib/api/client.ts';
@@ -27,6 +28,8 @@
 	import DocumentRow from '#lib/components/DocumentRow.svelte';
 	import BulkSkipped from '#lib/components/BulkSkipped.svelte';
 	import DocumentsBulkBar from '#lib/components/DocumentsBulkBar.svelte';
+	import PageEditor from '#lib/components/document/PageEditor.svelte';
+	import { mergeBlocked, type Candidate, type Mergeable } from '#lib/merge.ts';
 	import { BulkRun, type BulkSelection } from '#lib/bulk.svelte.ts';
 	import { MAX_DOCUMENTS, MAX_HITS } from '#lib/bulk.ts';
 	import { phone } from '#lib/phone.svelte.ts';
@@ -461,6 +464,56 @@
 		return selected.length > 0 ? { ...base, ids: selected } : base;
 	}
 
+	// Merging the chosen documents (web/DESIGN.md, "Page stack"): "PDF bearbeiten" with the
+	// pages of all of them in the order they were chosen, the first the one edited. The page
+	// knows the chosen documents it has shown; one it has not is asked for when merging starts.
+	const seen = new SvelteMap<string, Candidate>();
+	$effect(() => {
+		for (const item of list.items) seen.set(item.document.id, item.document);
+	});
+	const chosenDocuments = $derived(
+		chosen.flatMap((id) => {
+			const known = list.items.find((item) => item.document.id === id)?.document ?? seen.get(id);
+			return known ? [known] : [];
+		})
+	);
+	const merge = $derived({
+		blocked: mergeBlocked(chosenDocuments, chosenCount, allHits),
+		start: startMerge
+	});
+	let merging = $state<{ document: Mergeable; others: Mergeable[] } | null>(null);
+	let mergeOpen = $state(false);
+
+	async function startMerge() {
+		try {
+			const documents: Candidate[] = [];
+			for (const id of chosen) {
+				documents.push(
+					seen.get(id) ??
+						(await unwrap(api.GET('/api/v1/documents/{id}', { params: { path: { id } } })))
+				);
+			}
+			const blocked = mergeBlocked(documents, documents.length, false);
+			if (blocked) {
+				toast.error(blocked);
+				return;
+			}
+			const [first, ...others] = documents;
+			merging = { document: first, others };
+			mergeOpen = true;
+		} catch (error) {
+			toast.error(describeError(error));
+		}
+	}
+
+	function merged() {
+		toast.success(m.merge_done());
+		letGo();
+		void list.refresh();
+		void loadFacets();
+		void loadLensCounts();
+	}
+
 	// The action on the choice, followed by the page until it ends, whichever bar shows it.
 	const bulk = new BulkRun(() => {
 		letGo();
@@ -767,6 +820,7 @@ row of filters, on a desktop narrow by the title. -->
 		onall={() => (allHits = true)}
 		onclear={letGo}
 		onend={endSelecting}
+		{merge}
 	/>
 {/snippet}
 
@@ -1164,5 +1218,14 @@ row of filters, on a desktop narrow by the title. -->
 		{today}
 		onsaved={saved}
 		ondeleted={deleted}
+	/>
+{/if}
+
+{#if merging}
+	<PageEditor
+		bind:open={mergeOpen}
+		document={merging.document}
+		mergeWith={merging.others}
+		onedited={merged}
 	/>
 {/if}

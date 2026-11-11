@@ -26,6 +26,7 @@
 	import Segmented from '#lib/components/Segmented.svelte';
 	import TabBar from '#lib/components/TabBar.svelte';
 	import ToTop from '#lib/components/ToTop.svelte';
+	import { documentHref } from '#lib/candidates.ts';
 	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
@@ -549,6 +550,10 @@
 			{reading}
 			onchanged={load}
 			onleave={() => (leaving = true)}
+			onmerged={(target) => {
+				leaving = true;
+				void goto(documentHref(target), { replaceState: true });
+			}}
 		/>
 
 		{#if advice}

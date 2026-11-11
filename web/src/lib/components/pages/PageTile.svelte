@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { HTMLLabelAttributes } from 'svelte/elements';
 	import PageImage from '#lib/components/pages/PageImage.svelte';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { ChoiceBox } from '#lib/components/ui/choice/index.ts';
 	import { cn } from '#lib/utils.ts';
 
@@ -9,7 +10,9 @@
 	// is the label of its box: a click or a tap anywhere chooses it, and the box is the tab stop
 	// of the grid it stands in (`tabindex`, roving). Chosen, it has the chosen look of "Choosing
 	// many". `ghost`: it is being moved, shown at half strength meanwhile. The grid owns the
-	// choice: a click, a tap or Space calls `onchoose` (with Shift held: up to here).
+	// choice: a click, a tap or Space calls `onchoose` (with Shift held: up to here). `mark`: the
+	// letter of the document the page comes from in a merge, at the top right (an `outline`
+	// badge, not a colour); `name` then tells the box which one ("Seite 3, aus „…“").
 	let {
 		image: src,
 		rotate = 0,
@@ -17,6 +20,8 @@
 		chosen = false,
 		ghost = false,
 		tabindex = -1,
+		mark = undefined,
+		name = undefined,
 		onchoose,
 		onkeydown,
 		onfocus,
@@ -29,6 +34,9 @@
 		chosen?: boolean;
 		ghost?: boolean;
 		tabindex?: number;
+		mark?: string;
+		/** The box's name where it says more than `label`. */
+		name?: string;
 		/** Chosen or let go; `range`: with Shift, up to here. */
 		onchoose: (range: boolean) => void;
 		onkeydown?: (event: KeyboardEvent) => void;
@@ -65,7 +73,7 @@
 		/>
 		<ChoiceBox
 			checked={chosen}
-			aria-label={label}
+			aria-label={name ?? label}
 			{tabindex}
 			class="absolute top-0 left-0"
 			onclick={(event) => {
@@ -80,6 +88,15 @@
 			{onkeydown}
 			{onfocus}
 		/>
+		{#if mark}
+			<Badge
+				variant="outline"
+				class="absolute top-0 right-0 bg-card font-semibold"
+				aria-hidden="true"
+			>
+				{mark}
+			</Badge>
+		{/if}
 	</span>
 	<span class="text-center text-meta text-muted-foreground">{label}</span>
 </label>

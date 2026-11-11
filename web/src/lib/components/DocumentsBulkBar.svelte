@@ -37,7 +37,9 @@
 	// The bar of the selection mode of the documents list (web/DESIGN.md, "Choosing many"): an
 	// X that ends the mode, "Auswählen" (a menu: this page, all N hits, none, end the mode), how
 	// many are chosen, and the actions, pale while none is (Tags, Kontakt, Typ, and under "Mehr"
-	// Thema, Space, Bestätigen, Neu verarbeiten, Löschen). Each action but confirming opens its
+	// Thema, Space, Zusammenführen, Bestätigen, Neu verarbeiten, Löschen). "Zusammenführen" opens
+	// "PDF bearbeiten" with the pages of every chosen document (`merge`); where it cannot be, it
+	// stands pale with why. Each action but confirming opens its
 	// dialog; deleting and reprocessing name the exact count. The action runs in the background
 	// (`run`, owned by the page: the bar is rendered anew across the phone width): the bar shows
 	// how far it has come in place of its actions.
@@ -53,7 +55,8 @@
 		onpage,
 		onall,
 		onclear,
-		onend
+		onend,
+		merge = null
 	}: {
 		/** How many documents are chosen. */
 		count: number;
@@ -75,6 +78,8 @@
 		onclear: () => void;
 		/** End the selection mode. */
 		onend: () => void;
+		/** Merging the chosen documents: why it cannot be now (null: it can), and its start. */
+		merge?: { blocked: string | null; start: () => void } | null;
 	} = $props();
 
 	const running = $derived(run.operation);
@@ -210,6 +215,18 @@
 		<DropdownMenu.Content align="end" class="w-56">
 			<DropdownMenu.Item onSelect={open('topic')}>{m.bulk_set_topic()}</DropdownMenu.Item>
 			<DropdownMenu.Item onSelect={open('move')}>{m.bulk_move()}</DropdownMenu.Item>
+			{#if merge}
+				<DropdownMenu.Item
+					disabled={merge.blocked !== null}
+					onSelect={merge.start}
+					class="flex-col items-start gap-0.5"
+				>
+					<span>{m.bulk_merge()}</span>
+					{#if merge.blocked}
+						<span class="text-meta text-muted-foreground">{merge.blocked}</span>
+					{/if}
+				</DropdownMenu.Item>
+			{/if}
 			<DropdownMenu.Item onSelect={confirmAll}>{m.bulk_confirm()}</DropdownMenu.Item>
 			<DropdownMenu.Item onSelect={startReprocess}>{m.bulk_reprocess()}</DropdownMenu.Item>
 			<DropdownMenu.Separator />

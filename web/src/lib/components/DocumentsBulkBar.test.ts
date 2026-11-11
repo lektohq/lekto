@@ -26,9 +26,13 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-function renderBar(count: number) {
+function renderBar(
+	count: number,
+	merge: { blocked: string | null; start: () => void } | null = null
+) {
 	const run = new BulkRun(vi.fn());
 	const rendered = render(DocumentsBulkBar, {
+		merge,
 		count,
 		all: false,
 		offerAll: null,
@@ -95,5 +99,20 @@ describe('the selection bar of the documents', () => {
 		const step = within(dialog).getByRole('combobox', { name: m.reprocess_from() });
 		await vi.waitFor(() => expect(step.textContent).toContain(NODE_LABELS.ocr()));
 		expect(dialog.textContent).not.toContain(m.bulk_reprocess_model({ calls: '6' }));
+	});
+
+	it('merges the chosen documents, or says why not', async () => {
+		vi.stubGlobal('fetch', fakeApi({}));
+		const start = vi.fn();
+		const { rerender } = renderBar(2, { blocked: null, start });
+		const more = screen.getByRole('button', { name: m.bulk_more() });
+		await fireEvent.pointerDown(more, { button: 0, pointerType: 'mouse' });
+		await userEvent.click(await screen.findByRole('menuitem', { name: m.bulk_merge() }));
+		expect(start).toHaveBeenCalled();
+		await rerender({ merge: { blocked: m.bulk_merge_two(), start } });
+		await fireEvent.pointerDown(more, { button: 0, pointerType: 'mouse' });
+		const item = await screen.findByRole('menuitem', { name: new RegExp(m.bulk_merge()) });
+		expect(item.getAttribute('aria-disabled')).toBe('true');
+		expect(item.textContent).toContain(m.bulk_merge_two());
 	});
 });
