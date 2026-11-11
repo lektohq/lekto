@@ -64,6 +64,8 @@
 	});
 	let problem = $state<string | null>(null);
 	let sheet = $state<HTMLElement | null>(null);
+	// What had the focus when it opened, for when it closes.
+	let opener: HTMLElement | null = null;
 	// The pages, shown as the document view shows them.
 	let images = $state<DocumentPages | null>(null);
 	// The places of the source, by document, and which source they are of.
@@ -355,7 +357,16 @@
 		tabindex={-1}
 		onOpenAutoFocus={(event) => {
 			event.preventDefault();
+			opener =
+				window.document.activeElement instanceof HTMLElement ? window.document.activeElement : null;
 			sheet?.focus();
+		}}
+		onCloseAutoFocus={(event) => {
+			// Back to what opened it, where it stands: a card half below the sticky head of a list
+			// would otherwise pull the page by that much (Tobi, 11.11.2026).
+			event.preventDefault();
+			if (opener?.isConnected) opener.focus({ preventScroll: true });
+			opener = null;
 		}}
 		onkeydown={keydown}
 		class="z-[60] gap-0 p-0 shadow-none outline-none data-[side=right]:w-full data-[side=right]:sm:max-w-[40rem]"
