@@ -233,7 +233,7 @@ receive ─► separate ─┬─► pages ────────────�
                                        └─► signal_facts ──────┘
 ```
 
-`separate` (geplant, Umsetzungsplan „Trennblatt und Zusammenführen“) trennt einen Stapel beim Eingang an Trennblättern; ohne Trennblatt, nach einer neuen Fassung und bei der Migration ist er sofort fertig.
+`separate` (Umsetzungsplan „Trennblatt und Zusammenführen“) trennt einen Stapel beim Eingang an Trennblättern; ohne Trennblatt, nach einer neuen Fassung und bei der Migration ist er sofort fertig.
 
 **Drei Ebenen**
 

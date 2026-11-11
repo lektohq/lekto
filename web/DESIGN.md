@@ -371,11 +371,11 @@ other pair of arrows is a `Stepper`.
 ### Page stack
 
 "PDF bearbeiten" (`PageEditor`, Tobi 10.11.2026) shows a document's pages as a stack to edit:
-choose, turn, remove, reorder, cut into parts, and add the pages of a file from the device. Its
-tools stand fixed under the title (`EditorShell` `top`), only the stack scrolls: the parts as
-`Badge` `muted` in a `SidewaysRow` ("Teil 2 · S. 3–4"), "Dokument hinzufügen" (`outline`),
-"Rückgängig" and "Wiederholen" (`IconButton`), all `sm` on a desktop; below them the selection
-bar. On a phone the tools are `default`, the parts a row of their own after the number of pages,
+choose, turn, remove, reorder, cut into parts, and add the pages of a file from the device or
+of another document. Its tools stand fixed under the title (`EditorShell` `top`), only the stack
+scrolls: the parts as `Badge` `muted` in a `SidewaysRow` ("Teil 2 · S. 3–4"), "Hinzufügen"
+(`outline`, a menu: "Datei vom Gerät …", "Dokument aus Lekto …"), "Rückgängig" and
+"Wiederholen" (`IconButton`), all `sm` on a desktop; below them the selection bar. On a phone the tools are `default`, the parts a row of their own after the number of pages,
 and the selection bar stands fixed under the stack (`EditorShell` `bottom`); while nothing is
 chosen a line there says how to choose, move and cut. The description under the title says
 "12 Seiten · 3 Teile"; the footer starts with how the keyboard works it (`footNote`).
@@ -403,6 +403,26 @@ chosen a line there says how to choose, move and cut. The description under the 
   (choosing it lets go of another). Below them an `Alert` `note`: every result runs anew and waits
   in the inbox, which part becomes which version of the document ("Teil 1 wird Fassung 3 von
   „…“") or that it is deleted where no part replaces it, and which parts become new documents.
+- **Merging** (Tobi 11.11.2026, mock "Trennblatt und Zusammenführen"): with the pages of other
+  documents, the dialog merges them and says so ("2 Dokumente zusammenführen", on a phone
+  "Zusammenführen"). Each document has a letter, A the one edited, B, C, … in the order they
+  joined: a tile carries its document's letter as a `Badge` `outline` at its top right (not a
+  colour), its box is named "Seite 3, aus „…“", and a `SidewaysRow` under the tools names them
+  ("Seiten aus" A · …, B · …). Another document joins through "Dokument aus Lekto …": a
+  `FormDialog` (`md`) "Dokument aus Lekto wählen" with a `SearchField` and the documents as radio
+  `Choice` rows (title; date, pages), the newest first, a search over all words while one types;
+  a document that cannot join stands disabled with why in its row (on the stack already, a mail,
+  being processed, not the user's to edit, without page images); "Seiten hinzufügen" puts its
+  pages after the chosen ones. In the second step a `Select` "Neue Fassung von" over the parts
+  names the document the part that replaces makes the next version of (it keeps its data); the
+  note says which documents are deleted and that their versions stay with it. A merge needs that
+  part: without one "Übernehmen" is disabled and the note says why ("Mach einen Teil zur neuen
+  Fassung, sonst gingen die Originale der Dokumente verloren.").
+- **From the list**: "Zusammenführen …" under "Mehr" of the selection bar of the documents list
+  opens the dialog with the pages of every chosen document, in the order they were chosen, the
+  first the one edited. Where they cannot be merged (fewer than two, every hit rather than single
+  ones, a chosen one a mail, processed, or not the user's to edit), the entry is disabled with
+  why under it.
 
 ### Badges
 
@@ -696,8 +716,9 @@ modal, over a dialog too.
   document directly: into the document from the Beam ("Dokument öffnen"). So the Fundstellen of
   an identifier, a relation, a rule's dry run (Probelauf), the cases behind a number of the
   holders' evaluation, the similar documents of the processing, the overview's expected
-  documents, the jobs, a webhook's deliveries, the existing document of a duplicate upload and
-  the documents a bulk action skipped. The Beam pages through what stands beside it.
+  documents, the jobs, a webhook's deliveries, the existing document of a duplicate upload, the
+  documents a bulk action skipped, the document a version was split off and the documents a
+  stack was separated into or a part came from. The Beam pages through what stands beside it.
 - **Lists of documents carry no eye:** a card or row (the documents, the inbox, search hits)
   and a chip of the stream is the button itself (`DocumentLink`, `viewOrOpen`): a click, a tap
   or Enter shows the document in the Beam, a double click or a long press (a phone) opens it; a
@@ -1266,7 +1287,26 @@ neuen Fassung steht hier etwas anderes.") with a line "Neu gelesen: …" (the la
 "Antwort des Modells"); confirming keeps the value, taking the new one means setting it. The
 title's note in the review has the same line, the title in quotes. The same upload (`VersionUpload`) stands in the
 document's menu "…", beside "PDF bearbeiten" (see [Page stack](#page-stack)). A version split
-off another document says so: "Abgetrennt aus „…“".
+off another document says so on a line of its own, "Abgetrennt aus" and that document's title
+as it is now (`BeamTitle`; Tobi 11.11.2026: the title of then is often a stack's file name);
+where it is gone or the viewer may not read it, "Abgetrennt aus „…“" with the title of then. A
+stack split at its separator sheets when it came in (Tobi 10.11.2026) keeps the stack as
+version 1 and says of version 2 "Am Trennblatt getrennt: S. 1–3 von Fassung 1"; its other parts
+are documents of their own, split off it. The processing step is "Trennung", its line "2
+Trennblätter (S. 4 und 8): 3 Teile", "Kein Trennblatt", or why it did not look: "Teil eines
+getrennten Stapels", "Von Hand abgetrennt", "Nicht bei einer neuen Fassung", "Nicht bei der
+Migration", "Nicht bei E-Mails", "Ausgeschaltet". Its details (Tobi 11.11.2026, after a mock;
+the step stays a card of its own, not part of "Annahme"): rows for the codes it looked for
+(mono), the sheets it found with the format of their code and the other codes it read (format
+and page, never their text: a payment's QR code); the stack as a row of pages
+(`SeparationDetails`), the sheets hatched, each part under a bracket with "Teil 1", and below
+where the parts went, "Teil 1 · S. 1–4 → Fassung 2 dieses Dokuments", the others by their title
+now (`BeamTitle`) with their lane. A part of a stack says "Herkunft: Teil 2 von 2 aus" and the
+stack's title, and shows the stack with its own pages marked ("dieses Dokument"); pages a person
+split off say "Mit „PDF bearbeiten“ abgetrennt aus"; a document without a sheet shows its pages
+with a dot where a code was read; where the step did not look, a row "Warum" says why.
+A merge says "Zusammengeführt aus Fassung 1 und „…“", and a version that came along from a merged
+document says where from before how it came: "Aus „…“ (dort Fassung 1) · Eingegangen".
 
 **Fakt, Kennung, Nummer** (Tobi, 02.11.2026): three words, each for one thing.
 

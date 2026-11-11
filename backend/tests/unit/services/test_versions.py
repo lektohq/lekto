@@ -139,7 +139,7 @@ async def test_a_new_version_takes_the_original_s_place_and_runs_anew(world: Wor
     assert replaced.processing.status is ProcessingStatus.PROCESSING
     assert replaced.processing.new_version and replaced.page_count is None
     # Everything after receiving runs again: the pages run beside OCR, not after it.
-    assert set(replaced.processing.due()) == {Node.OCR, Node.PAGES}
+    assert replaced.processing.due() == (Node.SEPARATE,)
     assert await world.object_store.get(original_key(replaced.sha256)) == PART
     # The earlier version's derivatives are gone; its original stays.
     assert not await world.object_store.exists(archive_key(document.id))
@@ -162,7 +162,7 @@ async def test_a_new_version_helps_a_document_that_failed(world: World) -> None:
     view = await world.pipeline().new_version(
         owner.id, document.id, incoming(PART), filename="november.pdf"
     )
-    assert set(view.document.processing.due()) == {Node.OCR, Node.PAGES}
+    assert view.document.processing.due() == (Node.SEPARATE,)
     await world.drain()
     after = await world.documents.get(owner.id, document.id)
     assert after.processing.status is ProcessingStatus.COMPLETED  # the rules of the world pass

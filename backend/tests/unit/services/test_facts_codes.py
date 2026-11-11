@@ -73,7 +73,7 @@ async def test_the_codes_are_read_once_and_again_with_a_new_archive(world: World
 
 
 class Broken(FakeCodeReader):
-    async def read_codes(self, source: Path) -> CodeReading:
+    async def read_codes(self, source: Path, *, every_page: bool = False) -> CodeReading:
         raise RuntimeError("the reader broke")
 
 

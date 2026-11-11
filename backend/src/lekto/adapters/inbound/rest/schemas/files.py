@@ -1,5 +1,6 @@
 """A document's files as they are stored, and what they say about themselves."""
 
+from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -7,7 +8,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from lekto.core.domain.versions import DocumentVersion
+from lekto.core.domain.ids import DocumentId
+from lekto.core.domain.versions import DocumentVersion, VersionKind
 from lekto.core.ports.metadata import FileMetadata, MetadataSource
 from lekto.core.services.documents import DocumentFiles, StoredFile
 
@@ -71,6 +73,13 @@ class VersionKindOut(StrEnum):
     REPLACED = "replaced"
     EDITED = "edited"
     SPLIT = "split"
+    SEPARATED = "separated"
+    MERGED = "merged"
+
+
+class VersionOriginOut(BaseModel):
+    id: UUID
+    title: str = Field(description="Its title now.")
 
 
 class DocumentVersionOut(BaseModel):
@@ -86,7 +95,10 @@ class DocumentVersionOut(BaseModel):
     kind: VersionKindOut = Field(
         description="`received`: how the document came in; `replaced`: a person put another "
         "file in its place; `edited`: a person edited its pages; `split`: the first version, "
-        "pages a person split off another document."
+        "pages split off another document (by a person, or at a separator sheet); `separated`: "
+        "the first part of the stack the document came in as, split at its separator sheets; "
+        "`merged`: a person merged other documents into it. A version that came from another "
+        "document in a merge keeps its kind."
     )
     created_at: datetime
     created_by: UUID | None
@@ -96,12 +108,31 @@ class DocumentVersionOut(BaseModel):
             "the edited version, 1, 2, … the files in `added`, by name), `page` and `rotate`; "
             "`edited` also `from`, the version edited, and `split_off`, the documents split off "
             "in the same edit; `split` also `document`, `title` and `version`, the document "
-            "it was split off (which may be gone since) and its version then."
+            "it was split off (which may be gone since) and its version then, and `sheets` "
+            "and `stack_pages` (the stack's pages) where it was split at separator sheets. "
+            "`separated`: `pages` (source 0, the stack), `from`, `sheets`, the pages that were "
+            "separator sheets, and `split_off`, "
+            "the documents made of the other parts. `merged`: as `edited`, the sources after the "
+            "files are the other documents, and `documents` names every document merged with "
+            "its `title` and the `version` its file is here. A version taken over in a merge: "
+            "`moved`, the `document`, `title` and `version` it was there."
         )
+    )
+    origin: VersionOriginOut | None = Field(
+        description="`split`: the document it was split off as it is now (`detail.title` is "
+        "its title then); null where it is gone, the caller may not read it, or for another "
+        "kind.",
     )
 
     @classmethod
-    def of(cls, version: DocumentVersion, *, current: bool) -> "DocumentVersionOut":
+    def of(
+        cls, version: DocumentVersion, *, current: bool, origins: Mapping[DocumentId, str]
+    ) -> "DocumentVersionOut":
+        named = version.detail.get("document")
+        origin = None
+        if version.kind is VersionKind.SPLIT and isinstance(named, str):
+            title = origins.get(DocumentId(UUID(named)))
+            origin = None if title is None else VersionOriginOut(id=UUID(named), title=title)
         return cls(
             number=version.number,
             current=current,
@@ -111,6 +142,7 @@ class DocumentVersionOut(BaseModel):
             created_at=version.created_at,
             created_by=version.created_by,
             detail=dict(version.detail),
+            origin=origin,
         )
 
 
@@ -153,6 +185,7 @@ class DocumentFilesOut(BaseModel):
                             "created_at": "2026-07-03T08:40:36Z",
                             "created_by": "01999d5e-4444-7c1e-b6a3-2f4d5e6f7a8b",
                             "detail": {},
+                            "origin": None,
                         }
                     ],
                 }
@@ -183,7 +216,11 @@ class DocumentFilesOut(BaseModel):
             original=StoredFileOut.of(files.original),
             archive=None if files.archive is None else StoredFileOut.of(files.archive),
             versions=[
-                DocumentVersionOut.of(version, current=index == len(files.versions) - 1)
+                DocumentVersionOut.of(
+                    version,
+                    current=index == len(files.versions) - 1,
+                    origins=files.origins,
+                )
                 for index, version in enumerate(files.versions)
             ],
         )

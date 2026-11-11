@@ -50,6 +50,10 @@ async def test_a_long_document_is_read_as_far_as_the_limit(tmp_path: Path) -> No
     reading = await ZxingCodeReader(max_pages=2).read_codes(path)
     assert reading.pages == 2
     assert sorted({code.page for code in reading.codes}) == [1, 2]
+    # Separator sheets are looked for on every page.
+    every = await ZxingCodeReader(max_pages=2).read_codes(path, every_page=True)
+    assert every.pages == 3
+    assert sorted({code.page for code in every.codes}) == [1, 2, 3]
 
 
 async def test_the_copy_of_a_page_does_not_hold_the_pdfium_lock(

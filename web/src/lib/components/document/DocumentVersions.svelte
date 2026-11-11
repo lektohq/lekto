@@ -1,13 +1,15 @@
 <script lang="ts">
 	import Download from '@lucide/svelte/icons/download';
 	import type { components } from '#lib/api/schema.ts';
+	import { openBeam } from '#lib/beam.svelte.ts';
+	import BeamTitle from '#lib/components/BeamTitle.svelte';
 	import VersionUpload from '#lib/components/document/VersionUpload.svelte';
 	import { documentApi } from '#lib/document-view.ts';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import { formatMoment } from '#lib/i18n.ts';
+	import { formatMoment, listLocale, quoted } from '#lib/i18n.ts';
 	import { userName, type Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 
@@ -17,7 +19,11 @@
 	// one marked, each with how and when it came and by whom, and its file to download. None is
 	// ever overwritten. An editor puts a new version in the place of the current one ("Neue
 	// Fassung hochladen", `POST /documents/{id}/versions`): processing runs again, keeps what a
-	// person confirmed, and the document waits in the inbox.
+	// person confirmed, and the document waits in the inbox. A merge says what it was merged
+	// from ("Zusammengeführt aus Fassung 1 und „scan_0412“"), and a version that came along from a
+	// merged document says from where ("Aus „scan_0412“ (dort Fassung 1)") before how it came. A
+	// version split off a document the viewer may read names it by its title now and shows it in
+	// the Beam ("Abgetrennt aus 👁 Zeugenladung"); the title of then where it is gone.
 	let {
 		documentId,
 		title,
@@ -39,13 +45,57 @@
 	let upload = $state<ReturnType<typeof VersionUpload> | null>(null);
 
 	const how = (version: Version) => {
+		const moved = movedFrom(version.detail.moved);
+		return [moved, kind(version)].filter(Boolean).join(' · ');
+	};
+
+	const kind = (version: Version) => {
+		if (version.kind === 'merged') return m.version_merged({ sources: sourcesOf(version) });
 		if (version.kind === 'replaced') return m.version_replaced();
 		if (version.kind === 'edited')
 			return m.version_edited({ from: String(version.detail.from ?? '') });
-		if (version.kind === 'split')
+		if (version.kind === 'split' && !version.origin)
 			return m.version_split({ title: String(version.detail.title ?? '') });
+		if (version.kind === 'split') return null;
+		if (version.kind === 'separated')
+			return m.version_separated({
+				pages: pagesOf(version.detail.pages),
+				from: String(version.detail.from ?? '')
+			});
 		return m.version_received();
 	};
+
+	/** The pages a version was made of, of one source: "S. 1–3" (a part of a stack is a run). */
+	function pagesOf(picks: unknown): string {
+		const pages = Array.isArray(picks)
+			? picks.map((pick) => Number((pick as { page?: unknown }).page)).filter(Number.isFinite)
+			: [];
+		if (pages.length === 0) return '';
+		const first = String(Math.min(...pages));
+		const last = String(Math.max(...pages));
+		return first === last
+			? m.page_edit_part_page({ page: first })
+			: m.page_edit_part_pages({ first, last });
+	}
+
+	/** Where a version taken over in a merge came from, or null. */
+	function movedFrom(moved: unknown): string | null {
+		if (typeof moved !== 'object' || moved === null) return null;
+		const { title, version } = moved as { title?: unknown; version?: unknown };
+		return m.version_moved({ title: String(title ?? ''), version: String(version ?? '') });
+	}
+
+	/** The documents a merge was made of: this one by its version, the others by title. */
+	function sourcesOf(version: Version): string {
+		const merged = Array.isArray(version.detail.documents) ? version.detail.documents : [];
+		const names = merged.map((item) => {
+			const { document, title, version: number } = item as Record<string, unknown>;
+			return document === documentId
+				? m.version_merged_self({ version: String(number ?? '') })
+				: quoted(String(title ?? ''));
+		});
+		return new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(names);
+	}
 
 	function download(number: number) {
 		const link = window.document.createElement('a');
@@ -79,6 +129,17 @@
 						{m.version_number({ number: String(version.number) })}
 						{#if version.current}<Badge variant="primary">{m.version_current()}</Badge>{/if}
 					</span>
+					{#if version.kind === 'split' && version.origin}
+						{@const origin = version.origin}
+						<span class="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+							<span class="shrink-0">{m.version_split_from()}</span>
+							<BeamTitle
+								title={origin.title}
+								class="text-sm"
+								onview={() => openBeam([origin.id], origin.id, title)}
+							/>
+						</span>
+					{/if}
 					<span class="text-sm break-words text-muted-foreground">
 						{[
 							how(version),

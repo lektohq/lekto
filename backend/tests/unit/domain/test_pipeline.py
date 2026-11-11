@@ -2,7 +2,7 @@ from datetime import timedelta
 
 import pytest
 
-from lekto.core.domain.documents import Document
+from lekto.core.domain.documents import Document, Sha256
 from lekto.core.domain.errors import InvalidTransitionError, ValidationError
 from lekto.core.domain.events import (
     DocumentConfirmed,
@@ -46,6 +46,15 @@ def status(document: Document) -> ProcessingStatus:
     return document.processing.status
 
 
+def received() -> Document:
+    """A received document whose stack was looked through for separator sheets: OCR and the
+    pages are due."""
+    document = builders.received()
+    document.record_result(Node.SEPARATE, 1, OK, NOW)
+    document.pull_events()
+    return document
+
+
 def test_the_graph_is_in_topological_order_with_one_source_and_one_sink() -> None:
     assert tuple(Node) == NODES
     assert set(GRAPH) == set(NODES)
@@ -58,8 +67,10 @@ def test_the_graph_is_in_topological_order_with_one_source_and_one_sink() -> Non
 
 
 def test_ocr_and_pages_run_side_by_side_and_filing_waits_for_both() -> None:
-    assert Node.RECEIVE.successors == {Node.OCR, Node.PAGES}
-    assert Node.PAGES.requires == {Node.RECEIVE}
+    # A stack is split at its separator sheets before anything reads its pages.
+    assert Node.RECEIVE.successors == {Node.SEPARATE}
+    assert Node.SEPARATE.successors == {Node.OCR, Node.PAGES}
+    assert Node.PAGES.requires == {Node.SEPARATE}
     assert Node.PAGES.descendants == {Node.FILE}
     assert Node.FILE.requires == {Node.APPLY_RULES, Node.PAGES}
     # The model waits for the page images without needing them.
@@ -76,6 +87,7 @@ def test_ocr_and_pages_run_side_by_side_and_filing_waits_for_both() -> None:
     }
     assert Node.APPLY_RULES.ancestors == {
         Node.RECEIVE,
+        Node.SEPARATE,
         Node.OCR,
         Node.PARSE,
         *SIGNALS,
@@ -115,7 +127,7 @@ def test_confidence_is_between_zero_and_one(confidence: float) -> None:
 
 
 def test_node_run_is_a_log_entry() -> None:
-    document = builders.received()
+    document = received()
     run = NodeRun(
         document_id=document.id,
         node=Node.OCR,
@@ -139,7 +151,7 @@ def test_node_run_is_a_log_entry() -> None:
 
 
 def test_the_history_reads_the_latest_entry_of_a_node() -> None:
-    document = builders.received()
+    document = received()
 
     def entry(node: Node, result: NodeResult) -> NodeRun:
         return NodeRun(
@@ -222,6 +234,10 @@ def test_received_document_has_ocr_and_pages_due_without_lane() -> None:
     assert processing.nodes[Node.RECEIVE] == NodeState(
         status=NodeStatus.DONE, outcome=Outcome.OK, started_at=NOW, finished_at=NOW
     )
+    # The stack is looked through for separator sheets before anything reads its pages.
+    assert processing.due() == (Node.SEPARATE,)
+    assert not document.is_awaiting(Node.OCR, 1)
+    assert document.record_result(Node.SEPARATE, 1, OK, NOW) == (Node.OCR, Node.PAGES)
     assert processing.due() == (Node.OCR, Node.PAGES)
     assert document.is_awaiting(Node.OCR, 1) and document.is_awaiting(Node.PAGES, 1)
     assert not document.is_awaiting(Node.PARSE, 1)
@@ -230,8 +246,8 @@ def test_received_document_has_ocr_and_pages_due_without_lane() -> None:
 
 
 def test_nodes_run_in_graph_order_and_end_green() -> None:
-    document = builders.received()
-    done = [Node.RECEIVE]
+    document = received()
+    done = [Node.RECEIVE, Node.SEPARATE]
     while due := [node for node in document.processing.due() if document.is_awaiting(node, 1)]:
         document.record_result(due[0], 1, OK, NOW)
         done.append(due[0])
@@ -243,7 +259,7 @@ def test_nodes_run_in_graph_order_and_end_green() -> None:
 
 
 def test_a_result_names_the_nodes_that_became_due_with_it() -> None:
-    document = builders.received()
+    document = received()
     assert document.record_result(Node.OCR, 1, OK, NOW) == (Node.PARSE,)
     assert document.record_result(Node.PAGES, 1, OK, NOW) == ()
     assert document.record_result(Node.PARSE, 1, OK, NOW) == SIGNAL_NODES
@@ -260,7 +276,7 @@ def test_a_result_names_the_nodes_that_became_due_with_it() -> None:
 
 def test_the_language_model_waits_for_the_pages() -> None:
     """The page images are there when a model call goes to a webhook."""
-    document = builders.received()
+    document = received()
     for node in (Node.OCR, Node.PARSE, *CURRENT_NODES):
         document.record_result(node, 1, OK, NOW)
     assert status(document) is ProcessingStatus.PROCESSING
@@ -271,7 +287,7 @@ def test_the_language_model_waits_for_the_pages() -> None:
 
 
 def test_a_worker_starts_a_due_node() -> None:
-    document = builders.received()
+    document = received()
     document.start_node(Node.OCR, 1, NOW)
     state = document.processing.nodes[Node.OCR]
     assert state == NodeState(status=NodeStatus.RUNNING, started_at=NOW)
@@ -299,7 +315,7 @@ def test_a_worker_starts_a_due_node() -> None:
 
 
 def test_uncertain_node_continues_and_waits_yellow_before_filing() -> None:
-    document = builders.run_pipeline(builders.received(), {Node.JUDGE: UNCERTAIN})
+    document = builders.run_pipeline(received(), {Node.JUDGE: UNCERTAIN})
     assert document.processing.status is ProcessingStatus.REVIEW
     assert Node.APPLY_RULES in document.processing.outcomes
     assert Node.FILE not in document.processing.outcomes
@@ -309,16 +325,14 @@ def test_uncertain_node_continues_and_waits_yellow_before_filing() -> None:
 
 
 def test_an_uncertain_filing_node_completes_yellow() -> None:
-    document = builders.run_pipeline(builders.received(), {Node.FILE: UNCERTAIN})
+    document = builders.run_pipeline(received(), {Node.FILE: UNCERTAIN})
     assert document.processing.status is ProcessingStatus.COMPLETED
     assert document.lane is Lane.YELLOW
 
 
 @pytest.mark.parametrize("resume_at", [Node.FIELDS, Node.APPLY_RULES])
 def test_confirming_a_yellow_document_resumes_and_files_it_green(resume_at: Node) -> None:
-    document = builders.run_pipeline(
-        builders.received(), {Node.OCR: UNCERTAIN, Node.JUDGE: UNCERTAIN}
-    )
+    document = builders.run_pipeline(received(), {Node.OCR: UNCERTAIN, Node.JUDGE: UNCERTAIN})
     run = document.processing.run
     document.pull_events()
 
@@ -345,7 +359,7 @@ def test_confirming_a_yellow_document_resumes_and_files_it_green(resume_at: Node
 
 
 def test_confirming_a_red_document_takes_over_the_failed_and_unrun_nodes() -> None:
-    document = builders.run_pipeline(builders.received(), {Node.OCR: FAILED})
+    document = builders.run_pipeline(received(), {Node.OCR: FAILED})
     assert document.processing.nodes[Node.PAGES] == NodeState()  # dropped after the failure
     assert document.confirm(Node.APPLY_RULES, NOW) == (
         Node.OCR,
@@ -366,14 +380,14 @@ def test_confirming_a_red_document_takes_over_the_failed_and_unrun_nodes() -> No
 
 
 def test_fields_are_only_extracted_again_from_a_parsed_text() -> None:
-    document = builders.run_pipeline(builders.received(), {Node.PARSE: FAILED})
+    document = builders.run_pipeline(received(), {Node.PARSE: FAILED})
     with pytest.raises(InvalidTransitionError, match="no text"):
         document.confirm(Node.FIELDS, NOW)
 
 
 @pytest.mark.parametrize("resume_at", [Node.OCR, Node.JUDGE, Node.FILE])
 def test_confirmation_resumes_only_after_classification(resume_at: Node) -> None:
-    document = builders.run_pipeline(builders.received(), {Node.JUDGE: UNCERTAIN})
+    document = builders.run_pipeline(received(), {Node.JUDGE: UNCERTAIN})
     with pytest.raises(InvalidTransitionError, match="resumes with"):
         document.confirm(resume_at, NOW)
 
@@ -388,7 +402,7 @@ def test_only_documents_in_the_inbox_are_confirmed() -> None:
 
 
 def test_uncertain_results_are_not_filed_by_reprocessing() -> None:
-    document = builders.run_pipeline(builders.received(), {Node.JUDGE: UNCERTAIN})
+    document = builders.run_pipeline(received(), {Node.JUDGE: UNCERTAIN})
     with pytest.raises(InvalidTransitionError, match="confirm them before filing"):
         document.reprocess_from(Node.FILE, NOW)
     document.reprocess_from(Node.APPLY_RULES, NOW)
@@ -397,7 +411,7 @@ def test_uncertain_results_are_not_filed_by_reprocessing() -> None:
 
 
 def test_failed_node_stops_processing_red() -> None:
-    document = builders.run_pipeline(builders.received(), {Node.PARSE: FAILED})
+    document = builders.run_pipeline(received(), {Node.PARSE: FAILED})
     assert document.processing.status is ProcessingStatus.FAILED
     assert document.processing.failed() == (Node.PARSE,)
     assert document.processing.nodes[Node.JUDGE] == NodeState()
@@ -406,7 +420,7 @@ def test_failed_node_stops_processing_red() -> None:
 
 
 def test_a_node_still_running_after_a_failure_finishes_but_nothing_new_starts() -> None:
-    document = builders.received()
+    document = received()
     document.start_node(Node.PAGES, 1, NOW)
     assert document.record_result(Node.OCR, 1, FAILED, NOW) == ()
     assert status(document) is ProcessingStatus.FAILED
@@ -417,7 +431,7 @@ def test_a_node_still_running_after_a_failure_finishes_but_nothing_new_starts() 
     assert document.lane is Lane.RED
     assert document.processing.outcome(Node.PAGES) is Outcome.OK
 
-    waiting = builders.received()
+    waiting = received()
     waiting.record_result(Node.OCR, 1, FAILED, NOW)
     assert not waiting.is_awaiting(Node.PAGES, 1)
     with pytest.raises(InvalidTransitionError, match="not due"):
@@ -429,20 +443,20 @@ def test_a_node_still_running_after_a_failure_finishes_but_nothing_new_starts() 
     [(Node.PARSE, 1), (Node.RECEIVE, 1), (Node.OCR, 2), (Node.OCR, 0)],
 )
 def test_only_a_due_node_of_the_current_run_is_accepted(node: Node, run: int) -> None:
-    document = builders.received()
+    document = received()
     assert not document.is_awaiting(node, run)
     with pytest.raises(InvalidTransitionError, match="not due"):
         document.record_result(node, run, OK, NOW)
 
 
 def test_completed_document_accepts_no_more_results() -> None:
-    document = builders.run_pipeline(builders.received())
+    document = builders.run_pipeline(received())
     with pytest.raises(InvalidTransitionError):
         document.record_result(Node.FILE, 1, OK, NOW)
 
 
 def test_retry_repeats_the_failed_node_and_continues() -> None:
-    document = builders.run_pipeline(builders.received(), {Node.JUDGE: FAILED})
+    document = builders.run_pipeline(received(), {Node.JUDGE: FAILED})
     assert document.retry(NOW) == (Node.JUDGE,)
     assert document.processing.status is ProcessingStatus.PROCESSING
     assert document.processing.run == 2
@@ -458,7 +472,7 @@ def test_retry_repeats_the_failed_node_and_continues() -> None:
 
 
 def test_retry_repeats_every_failed_node() -> None:
-    document = builders.received()
+    document = received()
     document.start_node(Node.PAGES, 1, NOW)
     document.record_result(Node.OCR, 1, FAILED, NOW)
     document.record_result(Node.PAGES, 1, FAILED, NOW)
@@ -469,7 +483,7 @@ def test_retry_repeats_every_failed_node() -> None:
 
 
 def test_retry_repeats_a_node_still_running() -> None:
-    document = builders.received()
+    document = received()
     document.start_node(Node.PAGES, 1, NOW)
     document.record_result(Node.OCR, 1, FAILED, NOW)
     assert document.retry(NOW) == (Node.OCR, Node.PAGES)
@@ -478,7 +492,7 @@ def test_retry_repeats_a_node_still_running() -> None:
 
 
 def test_retry_needs_failed_processing() -> None:
-    document = builders.received()
+    document = received()
     with pytest.raises(InvalidTransitionError, match="only failed"):
         document.retry(NOW)
     builders.run_pipeline(document)
@@ -487,13 +501,14 @@ def test_retry_needs_failed_processing() -> None:
 
 
 def test_reprocess_from_a_node_discards_the_results_after_it() -> None:
-    document = builders.run_pipeline(builders.received(), {Node.FIELDS: UNCERTAIN})
+    document = builders.run_pipeline(received(), {Node.FIELDS: UNCERTAIN})
     assert document.lane is Lane.YELLOW
     # The signals without a model call read the master data again; the model's answer stays.
     assert document.reprocess_from(Node.JUDGE, NOW) == CURRENT_NODES
     assert document.processing.run == 2
     assert set(document.processing.outcomes) == {
         Node.RECEIVE,
+        Node.SEPARATE,
         Node.OCR,
         Node.PAGES,
         Node.PARSE,
@@ -507,7 +522,7 @@ def test_reprocess_from_a_node_discards_the_results_after_it() -> None:
 def test_reprocessing_from_the_judge_runs_the_signals_a_document_skipped() -> None:
     """A document from before the signals existed has them skipped; done, the language model's
     stays."""
-    document = builders.run_pipeline(builders.received())
+    document = builders.run_pipeline(received())
     for signal in SIGNALS:
         document.processing.nodes[signal] = NodeState(status=NodeStatus.SKIPPED)
     assert document.reprocess_from(Node.JUDGE, NOW) == SIGNAL_NODES
@@ -517,14 +532,14 @@ def test_reprocessing_from_the_judge_runs_the_signals_a_document_skipped() -> No
 
 def test_reprocessing_the_pages_leaves_the_text_branch_alone() -> None:
     """The model waits for the pages, but does not read them: it is not asked again."""
-    document = builders.run_pipeline(builders.received())
+    document = builders.run_pipeline(received())
     assert document.reprocess_from(Node.PAGES, NOW) == (Node.PAGES,)
     assert set(document.processing.outcomes) == set(NODES) - {Node.PAGES, Node.FILE}
     assert document.record_result(Node.PAGES, 2, OK, NOW) == (Node.FILE,)
 
 
 def test_failed_pages_retried_let_the_model_run_after_them() -> None:
-    document = builders.received()
+    document = received()
     for node in (Node.OCR, Node.PARSE, *CURRENT_NODES):
         document.record_result(node, 1, OK, NOW)
     document.record_result(Node.PAGES, 1, FAILED, NOW)
@@ -535,7 +550,7 @@ def test_failed_pages_retried_let_the_model_run_after_them() -> None:
 
 
 def test_reprocess_rules() -> None:
-    document = builders.received()
+    document = received()
     with pytest.raises(InvalidTransitionError, match="being processed"):
         document.reprocess_from(Node.OCR, NOW)
 
@@ -550,7 +565,7 @@ def test_reprocess_rules() -> None:
 
 
 def test_the_page_count_is_set_by_the_pages_node() -> None:
-    document = builders.received()
+    document = received()
     document.set_page_count(3, LATER)
     assert (document.page_count, document.updated_at) == (3, LATER)
     with pytest.raises(ValidationError, match="at least one page"):
@@ -558,7 +573,7 @@ def test_the_page_count_is_set_by_the_pages_node() -> None:
 
 
 def test_a_skipped_node_is_caught_up_on_without_touching_status_or_lane() -> None:
-    document = builders.received()
+    document = received()
     document.processing.nodes[Node.PAGES] = NodeState(status=NodeStatus.SKIPPED)
     assert document.is_skipped(Node.PAGES, 1)  # also while the other nodes are processed
     builders.run_pipeline(document, {Node.JUDGE: UNCERTAIN})
@@ -578,7 +593,7 @@ def test_a_skipped_node_is_caught_up_on_without_touching_status_or_lane() -> Non
 
     # A failure is recorded, but the node stays skipped: nothing is blocked by it, the next
     # catch-up tries again, and the document is not red for it.
-    green = builders.run_pipeline(builders.received())
+    green = builders.run_pipeline(received())
     green.processing.nodes[Node.PAGES] = NodeState(status=NodeStatus.SKIPPED)
     green.pull_events()
     green.catch_up(Node.PAGES, 1, FAILED, NOW, LATER)
@@ -591,7 +606,7 @@ def test_a_skipped_node_is_caught_up_on_without_touching_status_or_lane() -> Non
 
 
 def test_confirming_waits_for_a_node_still_running() -> None:
-    document = builders.received()
+    document = received()
     document.start_node(Node.OCR, 1, NOW)
     document.record_result(Node.PAGES, 1, FAILED, NOW)
     assert status(document) is ProcessingStatus.FAILED
@@ -609,7 +624,7 @@ def test_confirming_waits_for_a_node_still_running() -> None:
 
 
 def test_a_node_whose_attempt_failed_waits_for_the_next() -> None:
-    document = builders.received()
+    document = received()
     document.start_node(Node.OCR, 1, NOW)
     document.pull_events()
     retry_at = NOW + timedelta(seconds=30)
@@ -633,7 +648,7 @@ def test_the_nodes_are_in_graph_order_whatever_order_the_store_gives() -> None:
 
 
 def test_a_skipped_node_counts_as_done_for_the_nodes_after_it() -> None:
-    document = builders.received()
+    document = received()
     document.processing.nodes[Node.PAGES] = NodeState(status=NodeStatus.SKIPPED)
     assert document.processing.due() == (Node.OCR,)
     builders.run_pipeline(document)
@@ -647,12 +662,12 @@ def test_a_skipped_node_counts_as_done_for_the_nodes_after_it() -> None:
 
 
 def test_events_follow_the_state_changes() -> None:
-    document = builders.received()
+    document = received()
     builders.run_pipeline(document, {Node.JUDGE: UNCERTAIN})
     events = document.pull_events()
     completed = [event for event in events if isinstance(event, NodeCompleted)]
-    assert [event.node for event in completed] == list(NODES[1:-1])
-    assert completed[NODES.index(Node.JUDGE) - 1].outcome is Outcome.UNCERTAIN
+    assert [event.node for event in completed] == list(NODES[2:-1])
+    assert completed[NODES.index(Node.JUDGE) - 2].outcome is Outcome.UNCERTAIN
     assert not any(isinstance(event, DocumentFiled) for event in events)
     assert [type(event) for event in events[-3:]] == [NodeCompleted, LaneChanged, ReviewRequired]
     lane_changed, review = events[-2:]
@@ -680,14 +695,14 @@ def test_events_follow_the_state_changes() -> None:
 def test_the_first_run_keeps_the_lane_it_ended_in(
     results: dict[Node, NodeResult], lane: Lane
 ) -> None:
-    document = builders.received()
+    document = received()
     assert document.first_lane is None  # while the first run runs
     builders.run_pipeline(document, results)
     assert document.first_lane is document.lane is lane
 
 
 def test_a_confirmation_leaves_the_first_lane_yellow() -> None:
-    document = builders.run_pipeline(builders.received(), {Node.JUDGE: UNCERTAIN})
+    document = builders.run_pipeline(received(), {Node.JUDGE: UNCERTAIN})
     document.confirm(Node.APPLY_RULES, NOW)
     builders.run_pipeline(document)
     assert document.lane is Lane.GREEN
@@ -695,7 +710,7 @@ def test_a_confirmation_leaves_the_first_lane_yellow() -> None:
 
 
 def test_a_retry_leaves_the_first_lane_red() -> None:
-    document = builders.received()
+    document = received()
     document.start_node(Node.PAGES, 1, NOW)
     builders.run_pipeline(document, {Node.OCR: FAILED})
     document.record_result(Node.PAGES, 1, OK, NOW)  # still running when OCR failed
@@ -707,7 +722,7 @@ def test_a_retry_leaves_the_first_lane_red() -> None:
 
 
 def test_a_later_run_leaves_the_first_lane() -> None:
-    document = builders.run_pipeline(builders.received())
+    document = builders.run_pipeline(received())
     document.reprocess_from(Node.JUDGE, NOW)
     builders.run_pipeline(document, {Node.JUDGE: UNCERTAIN})
     assert document.lane is Lane.YELLOW
@@ -717,7 +732,7 @@ def test_a_later_run_leaves_the_first_lane() -> None:
 def test_a_first_run_nobody_knows_stays_unknown() -> None:
     """A document from before the first lane was kept, whose log did not tell (revision
     0036): its later runs set none."""
-    document = builders.run_pipeline(builders.received(), {Node.JUDGE: UNCERTAIN})
+    document = builders.run_pipeline(received(), {Node.JUDGE: UNCERTAIN})
     document.first_lane = None
     document.reprocess_from(Node.APPLY_RULES, NOW)
     builders.run_pipeline(document)
@@ -725,7 +740,7 @@ def test_a_first_run_nobody_knows_stays_unknown() -> None:
 
 
 def test_failure_records_lane_red_without_filing() -> None:
-    document = builders.received()
+    document = received()
     builders.run_pipeline(document, {Node.OCR: FAILED})
     events = document.pull_events()
     assert [type(event) for event in events] == [NodeCompleted, LaneChanged, ReviewRequired]
@@ -733,7 +748,7 @@ def test_failure_records_lane_red_without_filing() -> None:
 
 
 def test_event_ids_are_unique() -> None:
-    document = builders.received()
+    document = received()
     document.start_node(Node.OCR, 1, NOW)
     builders.run_pipeline(document)
     ids = [event.id for event in document.pull_events()]
@@ -743,7 +758,7 @@ def test_event_ids_are_unique() -> None:
 
 def up_to_the_rules() -> Document:
     """A document whose rules a worker started."""
-    document = builders.received()
+    document = received()
     while due := [node for node in document.processing.due() if node is not Node.APPLY_RULES]:
         document.record_result(due[0], 1, OK, NOW)
     document.start_node(Node.APPLY_RULES, 1, NOW)
@@ -789,7 +804,7 @@ def test_only_a_delegated_node_has_a_deadline() -> None:
 
 
 def test_a_delegated_node_waits_out_a_failure_and_a_retry_repeats_it() -> None:
-    document = builders.received()
+    document = received()
     for node in (Node.OCR, Node.PAGES, Node.PARSE):
         document.record_result(node, 1, OK, NOW)
     document.start_node(Node.SIGNAL_CLASSIFIER, 1, NOW)
@@ -804,3 +819,18 @@ def test_a_delegated_node_waits_out_a_failure_and_a_retry_repeats_it() -> None:
     document.retry(LATER)
     assert document.processing.run == 2
     assert document.processing.nodes[Node.SIGNAL_LLM] == NodeState()
+
+
+def test_separating_names_the_first_part_while_the_node_runs() -> None:
+    document = builders.received()
+    part = Sha256.of(b"the first part")
+    with pytest.raises(InvalidTransitionError):
+        document.separate(part, "scan.pdf", NOW)
+    document.start_node(Node.SEPARATE, 1, NOW)
+    document.separate(part, "scan.pdf", LATER)
+    assert (document.sha256, document.media_type, document.page_count) == (
+        part,
+        "application/pdf",
+        None,
+    )
+    assert document.processing.due() == ()  # OCR and the pages wait for the node's result

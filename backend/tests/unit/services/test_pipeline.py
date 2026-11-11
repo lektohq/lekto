@@ -75,11 +75,14 @@ def in_graph_order(nodes: list[Node]) -> bool:
 
 
 async def receive(world: World, pipeline: PipelineService | None = None) -> tuple[User, Document]:
+    """A document received, its stack looked through for separator sheets: OCR and the pages
+    are due."""
     owner = await world.user()
-    document = await (pipeline or world.pipeline()).receive(
-        owner.id, incoming(PDF), filename="invoice.pdf"
-    )
-    return owner, document
+    pipeline = pipeline or world.pipeline()
+    document = await pipeline.receive(owner.id, incoming(PDF), filename="invoice.pdf")
+    assert document.processing.due() == (Node.SEPARATE,)
+    assert await pipeline.run_next_job()
+    return owner, await world.documents.get(owner.id, document.id)
 
 
 async def test_receive_stores_original_document_events_and_job(world: World) -> None:
@@ -88,7 +91,7 @@ async def test_receive_stores_original_document_events_and_job(world: World) -> 
     assert document.sha256 == Sha256.of(PDF)
     assert await world.object_store.get(original_key(document.sha256)) == PDF
     assert document.space_id == (await world.personal_space(owner)).id
-    assert document.processing.due() == (Node.OCR, Node.PAGES)
+    assert document.processing.due() == (Node.SEPARATE,)
     assert document.lane is None
 
     assert world.event_types() == [DocumentReceived.type, NodeCompleted.type]
@@ -102,15 +105,11 @@ async def test_receive_stores_original_document_events_and_job(world: World) -> 
             "media_type": "application/pdf",
         }
         assert entry.pipeline_version == "test"
-        first = await uow.jobs.claim(now=NOW, lease=timedelta(minutes=1))
-        second = await uow.jobs.claim(now=NOW, lease=timedelta(minutes=1))
-    assert first is not None and second is not None
-    assert {first.kind, second.kind} == {NODE_JOB}
-    payloads = sorted([first.payload, second.payload], key=lambda payload: str(payload["node"]))
-    assert payloads == [
-        {"document_id": str(document.id), "node": Node.OCR.value, "run": 1},
-        {"document_id": str(document.id), "node": Node.PAGES.value, "run": 1},
-    ]
+        job = await uow.jobs.claim(now=NOW, lease=timedelta(minutes=1))
+        assert await uow.jobs.claim(now=NOW, lease=timedelta(minutes=1)) is None
+    assert job is not None and job.kind == NODE_JOB
+    # The stack is looked through for separator sheets first.
+    assert job.payload == {"document_id": str(document.id), "node": Node.SEPARATE.value, "run": 1}
 
 
 async def test_pipeline_runs_to_green(world: World) -> None:
@@ -214,7 +213,7 @@ async def test_exceptions_are_retried_with_backoff(world: World) -> None:
     pipeline = world.pipeline({Node.OCR: flaky})
     owner, document = await receive(world, pipeline)
     # The pages, and the first attempt of the OCR, which fails.
-    assert await world.drain(pipeline) == len(Node.RECEIVE.successors)
+    assert await world.drain(pipeline) == len(Node.SEPARATE.successors)
     assert not await pipeline.run_next_job()  # waits 30 s
     waiting = await world.documents.get(owner.id, document.id)
     assert waiting.processing.nodes[Node.OCR] == NodeState()  # not shown as running meanwhile
@@ -282,8 +281,9 @@ async def test_skipped_pages_are_caught_up_on_without_a_new_run(world: World) ->
     pipeline = world.pipeline({Node.PAGES: pages})
     assert await pipeline.catch_up(Node.PAGES) == 3  # also the one being processed
     assert await pipeline.catch_up(Node.PAGES) == 0  # queued already
-    # And the processing one: every node after receiving, its pages job stale.
-    assert await world.drain(pipeline) == 3 + len(Node.RECEIVE.descendants)
+    # And the processing one: every node after receiving but the pages, skipped before they
+    # were due.
+    assert await world.drain(pipeline) == 3 + len(Node.RECEIVE.descendants) - 1
     assert pages.calls == 3
     caught_up = await world.documents.get(owner.id, processing.id)
     assert caught_up.lane is Lane.GREEN
@@ -557,7 +557,7 @@ async def test_stale_jobs_are_skipped(world: World) -> None:
     await world.documents.delete(owner.id, document.id)
     calls = Returns(FAILED)
     pipeline = world.pipeline({Node.OCR: calls})
-    assert await world.drain(pipeline) == len(Node.RECEIVE.successors)  # both stale
+    assert await world.drain(pipeline) == len(Node.SEPARATE.successors)  # both stale
     assert calls.calls == 0
     nodes = [job for job in world.database.jobs.values() if job.kind == NODE_JOB]
     assert all(job.status is JobStatus.DONE for job in nodes)

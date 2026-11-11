@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
 	History,
 	addPages,
+	markOf,
 	moveTo,
 	partRanges,
 	partsOf,
 	partsRequest,
 	remove,
+	requestPlaces,
 	splitOff,
 	startStack,
 	toggleCut,
@@ -108,5 +110,20 @@ describe('page-edit', () => {
 		history.undo();
 		expect(history.canUndo).toBe(false);
 		expect(order(history.current)).toEqual([1, 2, 3, 4, 5, 6]);
+	});
+
+	it('counts the files first and the other documents after them, as the API does', () => {
+		// Added in turn: a document (1), a file (2), a document (3), a file (4).
+		const place = requestPlaces([false, true, false, true]);
+		expect([0, 1, 2, 3, 4].map(place)).toEqual([0, 3, 1, 4, 2]);
+		let stack = addPages(
+			startStack(1, (page) => `p${page}`),
+			1,
+			['b1'],
+			null
+		);
+		stack = addPages(stack, 2, ['f1'], 0);
+		expect(partsRequest(stack, 0, place)[0].pages.map((pick) => pick.source)).toEqual([0, 1, 3]);
+		expect([0, 1, 25, 26].map(markOf)).toEqual(['A', 'B', 'Z', '27']);
 	});
 });

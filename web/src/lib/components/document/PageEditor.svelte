@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import FileOutput from '@lucide/svelte/icons/file-output';
 	import FilePlus from '@lucide/svelte/icons/file-plus';
 	import Redo2 from '@lucide/svelte/icons/redo-2';
@@ -11,30 +12,37 @@
 	import { api } from '#lib/api/client.ts';
 	import { apiError } from '#lib/api/problem.ts';
 	import type { components } from '#lib/api/schema.ts';
+	import DocumentChoice from '#lib/components/document/DocumentChoice.svelte';
 	import EditorShell from '#lib/components/EditorShell.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import PageCut from '#lib/components/pages/PageCut.svelte';
 	import PageImage from '#lib/components/pages/PageImage.svelte';
 	import PageTile from '#lib/components/pages/PageTile.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
+	import Select from '#lib/components/Select.svelte';
 	import SelectionBar from '#lib/components/SelectionBar.svelte';
 	import SidewaysRow from '#lib/components/SidewaysRow.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.ts';
+	import * as Field from '#lib/components/ui/field/index.ts';
 	import { pageImageHref } from '#lib/document-view.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { GRID_KEYS, nextTile } from '#lib/grid-keys.ts';
-	import { listLocale } from '#lib/i18n.ts';
+	import { listLocale, quoted } from '#lib/i18n.ts';
+	import type { Candidate, Mergeable } from '#lib/merge.ts';
 	import {
 		History,
 		addPages,
+		markOf,
 		moveTo,
 		partRanges,
 		partsOf,
 		partsRequest,
 		remove,
+		requestPlaces,
 		splitOff,
 		startStack,
 		toggleCut,
@@ -45,23 +53,31 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { phone } from '#lib/phone.svelte.ts';
 
-	type Document = components['schemas']['DocumentDetails'];
 	type Edited = components['schemas']['EditedDocuments'];
+	/** What was added: a file from the device, or another document (a merge). */
+	type Source = { file: File } | { document: Mergeable };
 
-	// "PDF bearbeiten" (web/DESIGN.md, "Page tile", "Page cut"; `POST /documents/{id}/edit`):
-	// first the stack of the document's pages, to choose, turn, remove, reorder (dragging, or
-	// Ctrl + arrow), cut into parts and add the pages of a file from the device to; then the
-	// parts, each replacing the document or becoming a new one. Nothing is stored before
-	// "Übernehmen"; every result waits in the inbox.
+	// "PDF bearbeiten" (web/DESIGN.md, "Page tile", "Page cut", "Page stack"; `POST
+	// /documents/{id}/edit`): first the stack of the document's pages, to choose, turn, remove,
+	// reorder (dragging, or Ctrl + arrow), cut into parts and add the pages of a file from the
+	// device or of another document to; then the parts, each replacing the document or becoming a
+	// new one. With other documents' pages it merges them ("2 Dokumente zusammenführen"): each
+	// page carries its document's letter, and one part becomes the next version of the document
+	// chosen as "Neue Fassung von" (it must: else every original would go). Nothing is stored
+	// before "Übernehmen"; every result waits in the inbox.
 	let {
 		open = $bindable(false),
 		document,
+		mergeWith = [],
 		onedited
 	}: {
 		open?: boolean;
-		document: Document;
-		/** After the edit, with the documents it left. */
-		onedited: (edited: Edited) => void;
+		document: Mergeable;
+		/** Documents whose pages are on the stack from the start (merging from the list). */
+		mergeWith?: readonly Mergeable[];
+		/** After the edit, with the documents it left and the one a part replaced (null: none,
+		 * the document is gone). */
+		onedited: (edited: Edited, target: string | null) => void;
 	} = $props();
 
 	/** How long a finger rests on a page before it can be moved. */
@@ -76,9 +92,12 @@
 	let focused = $state<string | null>(null);
 	let step = $state<'pages' | 'parts'>('pages');
 	let replacing = $state<number | null>(0);
-	let added = $state<File[]>([]);
+	let sources = $state<Source[]>([]);
 	let adding = $state(false);
 	let picker = $state<HTMLInputElement | null>(null);
+	let picking = $state(false);
+	/** The document the part that replaces makes the next version of, in a merge. */
+	let target = $state('');
 	let grid = $state<HTMLElement | null>(null);
 	/** The number the next version gets, once the document's versions are known. */
 	let nextVersion = $state<number | null>(null);
@@ -86,11 +105,22 @@
 	const count = $derived(document.page_count ?? 0);
 	const parts = $derived(partsOf(stack));
 	const ranges = $derived(partRanges(stack));
-	const nothing = $derived(stack.length === 0 || unchanged(stack, count));
+	const files = $derived(sources.flatMap((source) => ('file' in source ? [source.file] : [])));
+	const others = $derived(
+		sources.flatMap((source) => ('document' in source ? [source.document] : []))
+	);
+	/** The documents whose pages are on the stack (A, B, …): a merge with more than one. */
+	const documents = $derived([document, ...others]);
+	const merging = $derived(others.length > 0);
+	const nothing = $derived(stack.length === 0 || (!merging && unchanged(stack, count)));
 	const stop = $derived(
 		focused && stack.some((page) => page.key === focused) ? focused : (stack[0]?.key ?? null)
 	);
-	const title = $derived(m.page_edit_title({ title: document.title }));
+	const title = $derived(
+		merging
+			? m.merge_title({ count: String(documents.length) })
+			: m.page_edit_title({ title: document.title })
+	);
 
 	let shown = false;
 	$effect(() => {
@@ -99,13 +129,18 @@
 	});
 
 	function reset() {
-		history = new History(startStack(count, (page) => pageImageHref(document.id, page)));
+		let start = startStack(count, (page) => pageImageHref(document.id, page));
+		mergeWith.forEach((other, index) => {
+			start = addPages(start, index + 1, imagesOf(other), null);
+		});
+		history = new History(start);
 		chosen = new Set();
 		anchor = null;
 		focused = null;
 		step = 'pages';
 		replacing = 0;
-		added = [];
+		sources = mergeWith.map((other) => ({ document: other }));
+		target = document.id;
 		nextVersion = null;
 		sync();
 		void api
@@ -293,17 +328,52 @@
 				bodySerializer: () => form
 			});
 			if (!data) throw await apiError(response, error);
-			added = [...added, file];
-			const source = added.length;
-			const last = stack.reduce((at, page, index) => (chosen.has(page.key) ? index : at), -1);
-			change(addPages(stack, source, data.pages, last >= 0 ? last : null));
-			chosen = new Set(data.pages.map((_, index) => `${source}:${index + 1}`));
+			put({ file }, data.pages);
 			toast.success(m.page_edit_added({ count: data.pages.length, file: file.name }));
 		} catch (problem) {
 			toast.error(describeError(problem));
 		} finally {
 			adding = false;
 		}
+	}
+
+	/** The pages of another document joined to the stack (a merge). */
+	function addDocument(other: Candidate) {
+		put({ document: other }, imagesOf(other));
+	}
+
+	/** The pages of `source` put after the last chosen page (at the end without one), chosen. */
+	function put(source: Source, images: readonly string[]) {
+		sources = [...sources, source];
+		const number = sources.length;
+		const last = stack.reduce((at, page, index) => (chosen.has(page.key) ? index : at), -1);
+		change(addPages(stack, number, images, last >= 0 ? last : null));
+		chosen = new Set(images.map((_, index) => `${number}:${index + 1}`));
+	}
+
+	function imagesOf(other: Mergeable): string[] {
+		return Array.from({ length: other.page_count ?? 0 }, (_, index) =>
+			pageImageHref(other.id, index + 1)
+		);
+	}
+
+	/** The document a page of the stack comes from; null for a file's. */
+	function documentOf(source: number): Mergeable | null {
+		if (source === 0) return document;
+		const added = sources[source - 1];
+		return added && 'document' in added ? added.document : null;
+	}
+
+	/** The letter of the document a page comes from, in a merge. */
+	function markFor(source: number): string | undefined {
+		const from = merging ? documentOf(source) : null;
+		return from ? markOf(documents.indexOf(from)) : undefined;
+	}
+
+	/** The name of a page's box in a merge: its place and its document. */
+	function nameFor(source: number, place: number): string | undefined {
+		const from = merging ? documentOf(source) : null;
+		return from ? m.page_edit_page_from({ page: String(place), title: from.title }) : undefined;
 	}
 
 	// --- the steps --------------------------------------------------------------------------------
@@ -315,8 +385,13 @@
 			return;
 		}
 		const form = new FormData();
-		form.append('parts', JSON.stringify(partsRequest(stack, replacing)));
-		for (const file of added) form.append('files', file, file.name);
+		const place = requestPlaces(sources.map((source) => 'file' in source));
+		form.append('parts', JSON.stringify(partsRequest(stack, replacing, place)));
+		for (const file of files) form.append('files', file, file.name);
+		if (merging) {
+			form.append('documents', JSON.stringify(others.map((other) => other.id)));
+			if (target !== document.id) form.append('target', target);
+		}
 		const { data, error, response } = await api.POST('/api/v1/documents/{id}/edit', {
 			params: { path: { id: document.id } },
 			body: { parts: '' },
@@ -324,7 +399,7 @@
 		});
 		if (!data) throw await apiError(response, error);
 		open = false;
-		onedited(data);
+		onedited(data, replacing === null ? null : merging ? target : document.id);
 	}
 
 	const selected = $derived(
@@ -346,6 +421,7 @@
 	);
 	/** What becomes of each part, in words (the note of the second step). */
 	const outcome = $derived.by(() => {
+		if (merging) return merged();
 		const runs =
 			parts.length === 1
 				? m.page_edit_inbox_one()
@@ -374,6 +450,40 @@
 					: m.page_edit_new_many({ parts: names });
 		return [runs, kept, others].filter(Boolean).join(' ');
 	});
+
+	/** What a merge makes of each document, in words; it needs a part that replaces. */
+	function merged(): string {
+		if (replacing === null) return m.merge_needs_target();
+		const goal = documents.find((item) => item.id === target) ?? document;
+		const gone = documents.filter((item) => item.id !== goal.id);
+		const list = (items: string[]) =>
+			new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(items);
+		const kept = m.merge_kept({ part: String(replacing + 1), title: goal.title });
+		const lost =
+			gone.length === 1
+				? m.merge_gone_one({ title: gone[0].title, target: goal.title })
+				: m.merge_gone_many({
+						titles: list(gone.map((item) => quoted(item.title))),
+						target: goal.title
+					});
+		const fresh = parts.map((_, index) => index).filter((index) => index !== replacing);
+		const names = list(fresh.map((index) => String(index + 1)));
+		const split =
+			fresh.length === 0
+				? ''
+				: fresh.length === 1
+					? m.page_edit_new_one({ part: names })
+					: m.page_edit_new_many({ parts: names });
+		const runs = parts.length === 1 ? m.page_edit_inbox_one() : m.page_edit_inbox();
+		return [kept, lost, split, runs].filter(Boolean).join(' ');
+	}
+
+	const targets = $derived(
+		documents.map((item, index) => ({
+			value: item.id,
+			label: m.page_edit_source({ mark: markOf(index), title: item.title })
+		}))
+	);
 </script>
 
 {#snippet pageActions()}
@@ -435,16 +545,30 @@
 				{@render partBadges()}
 			</SidewaysRow>
 		{/if}
-		<Button
-			type="button"
-			variant="outline"
-			size={phone.current ? 'default' : 'sm'}
-			disabled={adding}
-			onclick={() => picker?.click()}
-		>
-			<FilePlus aria-hidden="true" />
-			{m.page_edit_add()}
-		</Button>
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger disabled={adding}>
+				{#snippet child({ props })}
+					<Button
+						{...props}
+						type="button"
+						variant="outline"
+						size={phone.current ? 'default' : 'sm'}
+					>
+						<FilePlus aria-hidden="true" />
+						{m.page_edit_add()}
+						<ChevronDown aria-hidden="true" />
+					</Button>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="end" class="w-56">
+				<DropdownMenu.Item onSelect={() => picker?.click()}>
+					{m.page_edit_add_file()}
+				</DropdownMenu.Item>
+				<DropdownMenu.Item onSelect={() => (picking = true)}>
+					{m.page_edit_add_document()}
+				</DropdownMenu.Item>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
 		{#if phone.current}<span class="flex-1"></span>{/if}
 		<input
 			bind:this={picker}
@@ -476,6 +600,16 @@
 			<Redo2 aria-hidden="true" />
 		</IconButton>
 	</div>
+	{#if merging}
+		<SidewaysRow label={m.page_edit_sources()}>
+			<span class="mr-1 text-meta text-muted-foreground">{m.page_edit_sources()}</span>
+			{#each documents as item, index (item.id)}
+				<Badge variant="outline">
+					{m.page_edit_source({ mark: markOf(index), title: item.title })}
+				</Badge>
+			{/each}
+		</SidewaysRow>
+	{/if}
 	{#if phone.current}
 		<SidewaysRow label={m.page_edit_parts()}>
 			<span class="mr-1 text-meta text-muted-foreground">{pageCount}</span>
@@ -509,7 +643,7 @@
 <EditorShell
 	bind:open
 	{title}
-	shortTitle={m.page_edit_short()}
+	shortTitle={merging ? m.merge_short() : m.page_edit_short()}
 	description={phone.current
 		? step === 'parts'
 			? m.page_edit_parts_hint()
@@ -527,7 +661,7 @@
 			: m.page_edit_next_parts({ count: parts.length })
 		: m.page_edit_apply()}
 	shortSubmitLabel={step === 'pages' ? m.page_edit_next() : m.page_edit_apply()}
-	disabled={nothing || adding}
+	disabled={nothing || adding || (step === 'parts' && merging && replacing === null)}
 	action={submit}
 	top={step === 'pages' ? tools : undefined}
 	bottom={step === 'pages' && phone.current ? phoneBottom : undefined}
@@ -553,6 +687,8 @@
 						image={page.image}
 						rotate={page.rotate}
 						label={m.page_edit_page({ page: String(index + 1) })}
+						mark={markFor(page.source)}
+						name={nameFor(page.source, index + 1)}
 						chosen={chosen.has(page.key)}
 						ghost={drag?.keys.has(page.key) ?? false}
 						tabindex={page.key === stop ? 0 : -1}
@@ -576,6 +712,13 @@
 			{/each}
 		</div>
 	{:else}
+		{#if merging}
+			<Field.Field class="max-w-md">
+				<Field.Label for="merge-target">{m.merge_target()}</Field.Label>
+				<Select id="merge-target" bind:value={target} options={targets} />
+				<Field.Description>{m.merge_target_hint()}</Field.Description>
+			</Field.Field>
+		{/if}
 		{#each parts as part, index (index)}
 			<Card.Root
 				size="row"
@@ -612,3 +755,5 @@
 		</Alert.Root>
 	{/if}
 </EditorShell>
+
+<DocumentChoice bind:open={picking} there={documents.map((item) => item.id)} onpick={addDocument} />

@@ -136,4 +136,53 @@ describe('PageEditor', () => {
 		expect(fields.find(([name]) => name === 'files')?.[1]).toBe(file);
 		appended.mockRestore();
 	});
+
+	it('merges documents: marks their pages, needs a part for the target, sends the documents', async () => {
+		const user = userEvent.setup();
+		const scan = { id: 'doc-2', title: 'scan_0412', page_count: 2 };
+		const onedited = vi.fn();
+		render(PageEditor, { open: true, document: DOCUMENT, mergeWith: [scan], onedited });
+		expect(screen.getByText(m.merge_title({ count: '2' }))).toBeTruthy();
+		expect(screen.getByText(m.page_edit_source({ mark: 'B', title: 'scan_0412' }))).toBeTruthy();
+		const from = screen.getByRole('checkbox', {
+			name: m.page_edit_page_from({ page: '4', title: 'scan_0412' })
+		});
+		expect(from.closest('label')?.textContent).toContain('B');
+		// The scan's first page goes (its blank back, say).
+		await user.click(from);
+		await user.click(
+			within(screen.getByRole('region', { name: m.page_edit_chosen_one() })).getByRole('button', {
+				name: m.page_edit_remove()
+			})
+		);
+		await user.click(screen.getByRole('button', { name: m.page_edit_next() }));
+		// Without a part that continues a document, nothing is merged.
+		await user.click(screen.getByRole('button', { name: m.page_edit_new() }));
+		expect(screen.getByText(m.merge_needs_target())).toBeTruthy();
+		expect(screen.getByRole('button', { name: m.page_edit_apply() })).toHaveProperty(
+			'disabled',
+			true
+		);
+		await user.click(screen.getByRole('button', { name: m.page_edit_version() }));
+		expect(
+			screen.getByText(m.merge_gone_one({ title: 'scan_0412', target: '2022/11' }), {
+				exact: false
+			})
+		).toBeTruthy();
+		await user.click(screen.getByRole('button', { name: m.page_edit_apply() }));
+		expect(parts()).toEqual([
+			{
+				pages: [
+					{ source: 0, page: 1, rotate: 0 },
+					{ source: 0, page: 2, rotate: 0 },
+					{ source: 0, page: 3, rotate: 0 },
+					{ source: 1, page: 2, rotate: 0 }
+				],
+				replaces: true
+			}
+		]);
+		expect(JSON.parse(String(sent?.get('documents')))).toEqual(['doc-2']);
+		expect(sent?.get('target')).toBeNull();
+		expect(onedited).toHaveBeenCalledWith(expect.anything(), 'doc-1');
+	});
 });

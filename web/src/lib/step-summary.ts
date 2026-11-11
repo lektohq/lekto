@@ -4,7 +4,7 @@
  */
 import type { components } from '#lib/api/schema.ts';
 import { describeValue, fieldLabel } from '#lib/describe.ts';
-import { formatDate, formatNumber } from '#lib/i18n.ts';
+import { formatDate, formatNumber, listLocale } from '#lib/i18n.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { labelled, outputReasonText, reasonsText } from '#lib/reasons.ts';
@@ -100,6 +100,8 @@ export function stepSummary(
 	switch (node) {
 		case 'receive':
 			return formatDate(entry.started_at, { dateStyle: 'short', timeStyle: 'short' });
+		case 'separate':
+			return separated(output);
 		case 'ocr':
 			return recognised(output);
 		case 'pages':
@@ -129,6 +131,39 @@ export function stepSummary(
 		default:
 			return null;
 	}
+}
+
+const NOT_LOOKED: Record<string, () => string> = {
+	off: m.summary_not_looked_off,
+	mail: m.summary_not_looked_mail,
+	migration: m.summary_not_looked_migration,
+	new_version: m.summary_not_looked_new_version,
+	part: m.summary_not_looked_part,
+	split: m.summary_not_looked_split
+};
+
+/** The separator sheets a stack was split at, and into how many parts; or why none were
+ * looked for (a part of a stack, a new version, …); null where the entry does not say. */
+function separated(output: Json): string | null {
+	if (typeof output.not_looked === 'string') return NOT_LOOKED[output.not_looked]?.() ?? null;
+	if (!Array.isArray(output.sheets)) return null;
+	if (output.sheets.length === 0) return m.summary_no_separator();
+	const found = summaryOfSheets(output.sheets.map(count));
+	const parts = count(output.parts);
+	if (parts === 0) return found;
+	const made =
+		parts === 1 ? m.summary_parts_one() : m.summary_parts({ count: formatNumber(parts) });
+	return `${found}: ${made}`;
+}
+
+/** The separator sheets on `sheets` (pages): "2 Trennblätter (S. 4 und 8)". */
+export function summaryOfSheets(sheets: readonly number[]): string {
+	const pages = new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(
+		sheets.map((page) => formatNumber(page))
+	);
+	return sheets.length === 1
+		? m.summary_sheets_one({ pages })
+		: m.summary_sheets({ count: formatNumber(sheets.length), pages });
 }
 
 function recognised(output: Json): string {

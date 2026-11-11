@@ -1560,7 +1560,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * Edit a document's pages
-		 * @description Editors of the document's space and admins. Puts parts together from the pages of the document's original and of the files sent along: turned, in another order, without some, split into several. The part that `replaces` the document becomes its next version (as `POST /documents/{id}/versions`); every other part becomes a new document in its space, with its uploader and receipt; without a part that replaces it, the document is deleted. All of it happens at once, and each document is processed again and waits in the inbox. 409 while the document is processed or if its file changed meanwhile; 415 for a mail (its pages are no file) and for a file that is no PDF or image; 422 for parts that do not fit the pages (a page twice, one a source does not have, more than one part that replaces the document, or no change).
+		 * @description Editors of the document's space and admins. Puts parts together from the pages of the document's original and of the files sent along: turned, in another order, without some, split into several. The part that `replaces` the document becomes its next version (as `POST /documents/{id}/versions`); every other part becomes a new document in its space, with its uploader and receipt; without a part that replaces it, the document is deleted. With `documents`, it merges them: the part that replaces (one must) becomes the next version of the `target`; the other documents are deleted, their versions become the target's, their relations name it. The caller needs to edit every one. All of it happens at once, and each document is processed again and waits in the inbox. 409 while a document is processed or if its file changed meanwhile; 415 for a mail (its pages are no file) and for a file that is no PDF or image; 422 for parts that do not fit the pages (a page twice, one a source does not have, more than one part that replaces the document, none in a merge, or no change), a document twice or a target that is none of them.
 		 */
 		post: operations['edit_pages_api_v1_documents__id__edit_post'];
 		delete?: never;
@@ -5324,7 +5324,7 @@ export interface components {
 			original_filename: string;
 			/** Media Type */
 			media_type: string;
-			/** @description `received`: how the document came in; `replaced`: a person put another file in its place; `edited`: a person edited its pages; `split`: the first version, pages a person split off another document. */
+			/** @description `received`: how the document came in; `replaced`: a person put another file in its place; `edited`: a person edited its pages; `split`: the first version, pages split off another document (by a person, or at a separator sheet); `separated`: the first part of the stack the document came in as, split at its separator sheets; `merged`: a person merged other documents into it. A version that came from another document in a merge keeps its kind. */
 			kind: components['schemas']['VersionKindOut'];
 			/**
 			 * Created At
@@ -5335,11 +5335,13 @@ export interface components {
 			created_by: string | null;
 			/**
 			 * Detail
-			 * @description What it was made from. `edited` and `split`: `pages`, each with its `source` (0 the edited version, 1, 2, … the files in `added`, by name), `page` and `rotate`; `edited` also `from`, the version edited, and `split_off`, the documents split off in the same edit; `split` also `document`, `title` and `version`, the document it was split off (which may be gone since) and its version then.
+			 * @description What it was made from. `edited` and `split`: `pages`, each with its `source` (0 the edited version, 1, 2, … the files in `added`, by name), `page` and `rotate`; `edited` also `from`, the version edited, and `split_off`, the documents split off in the same edit; `split` also `document`, `title` and `version`, the document it was split off (which may be gone since) and its version then, and `sheets` and `stack_pages` (the stack's pages) where it was split at separator sheets. `separated`: `pages` (source 0, the stack), `from`, `sheets`, the pages that were separator sheets, and `split_off`, the documents made of the other parts. `merged`: as `edited`, the sources after the files are the other documents, and `documents` names every document merged with its `title` and the `version` its file is here. A version taken over in a merge: `moved`, the `document`, `title` and `version` it was there.
 			 */
 			detail: {
 				[key: string]: unknown;
 			};
+			/** @description `split`: the document it was split off as it is now (`detail.title` is its title then); null where it is gone, the caller may not read it, or for another kind. */
+			origin: components['schemas']['VersionOriginOut'] | null;
 		};
 		/**
 		 * DryRunMailOut
@@ -5407,6 +5409,11 @@ export interface components {
 			 * @description No part replaced the document, and it is deleted.
 			 */
 			deleted: boolean;
+			/**
+			 * Merged
+			 * @description The other documents of a merge: deleted, their versions now the target's, their relations the target's.
+			 */
+			merged: string[];
 		};
 		/**
 		 * EventBody
@@ -8662,6 +8669,9 @@ export interface components {
 		 * @description The nodes of the ingest graph, in a topological order: every node comes after the nodes
 		 *     it needs (`GRAPH`). Nodes that do not need each other run side by side.
 		 *
+		 *     `separate` splits a scanned stack at its separator sheets when it comes in, before anything
+		 *     reads its pages (`services.separating`).
+		 *
 		 *     The signals each propose metadata from one source: the language model, the trained
 		 *     classifier, similar confirmed documents, facts in the text (names, identifiers). `judge`
 		 *     decides from all of them, `fields` reads the fields of the decided type, `relate` finds the
@@ -8670,6 +8680,7 @@ export interface components {
 		 */
 		Node:
 			| 'receive'
+			| 'separate'
 			| 'ocr'
 			| 'pages'
 			| 'parse'
@@ -9654,6 +9665,7 @@ export interface components {
 			| 'vision_read'
 			| 'vision_not_configured'
 			| 'no_text'
+			| 'only_separator_sheets'
 			| 'answer_unfit'
 			| 'nothing_recognised'
 			| 'master_data_changed'
@@ -9749,6 +9761,7 @@ export interface components {
 			| 'being_processed'
 			| 'only_failed_retried'
 			| 'receive_not_repeatable'
+			| 'separate_not_repeatable'
 			| 'not_waiting_for_confirmation'
 			| 'still_running'
 			| 'no_text_to_extract'
@@ -11961,7 +11974,20 @@ export interface components {
 		 * VersionKindOut
 		 * @enum {string}
 		 */
-		VersionKindOut: 'received' | 'replaced' | 'edited' | 'split';
+		VersionKindOut: 'received' | 'replaced' | 'edited' | 'split' | 'separated' | 'merged';
+		/** VersionOriginOut */
+		VersionOriginOut: {
+			/**
+			 * Id
+			 * Format: uuid
+			 */
+			id: string;
+			/**
+			 * Title
+			 * @description Its title now.
+			 */
+			title: string;
+		};
 		/**
 		 * VisibilityOut
 		 * @description Who sees the document: the members of its space; readers only once it is green.
@@ -23930,6 +23956,13 @@ export interface operations {
 					parts: string;
 					/** @description Files whose pages the parts take (sources 1, 2, …): PDF, JPEG, PNG or TIFF, recognised by content. They become no originals of their own; together within the upload limit. */
 					files?: string[];
+					/** @description JSON of up to 20 IDs of other documents whose pages the parts take (the sources after the files): a merge. */
+					documents?: string;
+					/**
+					 * Format: uuid
+					 * @description In a merge, the document the part that replaces makes the next version of: this one (the default) or one of `documents`.
+					 */
+					target?: string;
 				};
 			};
 		};

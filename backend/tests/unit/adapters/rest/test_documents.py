@@ -52,6 +52,7 @@ async def test_upload_is_accepted_and_processed(api: Api) -> None:
     assert (processing["status"], processing["run"]) == ("processing", 1)
     assert [node["node"] for node in processing["nodes"]] == [
         "receive",
+        "separate",
         "ocr",
         "pages",
         "parse",
@@ -74,7 +75,7 @@ async def test_upload_is_accepted_and_processed(api: Api) -> None:
         "deadline": None,
     }
     assert processing["nodes"][1] == {
-        "node": "ocr",
+        "node": "separate",
         "status": "waiting",
         "outcome": None,
         "started_at": None,
@@ -86,10 +87,10 @@ async def test_upload_is_accepted_and_processed(api: Api) -> None:
     status = (await api.client.get(f"{DOCUMENTS}/{id}", headers=auth(owner))).json()
     assert (status["lane"], status["processing"]["status"]) == ("green", "completed")
     log = (await api.client.get(f"{DOCUMENTS}/{id}/log", headers=auth(owner))).json()
-    assert [entry["node"] for entry in log][:3] in (
-        ["receive", "ocr", "pages"],
-        ["receive", "pages", "ocr"],
-        ["receive", "ocr", "parse"],
+    assert [entry["node"] for entry in log][:4] in (
+        ["receive", "separate", "ocr", "pages"],
+        ["receive", "separate", "pages", "ocr"],
+        ["receive", "separate", "ocr", "parse"],
     )
     assert log[0]["output"]["sha256"]
     ocr = next(entry for entry in log if entry["node"] == "ocr")
@@ -464,6 +465,7 @@ async def test_retry_and_reprocess(api: Api) -> None:
     assert (processing["status"], processing["run"]) == ("processing", 2)
     assert nodes(processing) == {
         "receive": "done",
+        "separate": "done",
         "pages": nodes(failed["processing"])["pages"],  # done or dropped: the branches race
         **waiting("ocr", "parse", *SIGNALS, "judge", "fields", "relate", "apply_rules", "file"),
     }

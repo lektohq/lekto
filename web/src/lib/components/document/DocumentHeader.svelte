@@ -33,7 +33,7 @@
 	import { NODE_LABELS } from '#lib/node-labels.ts';
 	import { canEdit } from '#lib/permissions.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { progress, reprocessable, type GraphNode } from '#lib/pipeline.ts';
+	import { isReprocessNode, progress, reprocessable, type GraphNode } from '#lib/pipeline.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import { cn } from '#lib/utils.ts';
 	import { adviceText, visionAvailable, type Reading, type Vision } from '#lib/vision.ts';
@@ -64,7 +64,8 @@
 		vision = null,
 		reading = null,
 		onchanged,
-		onleave
+		onleave,
+		onmerged
 	}: {
 		document: Document;
 		lookup: Lookup | null;
@@ -84,6 +85,8 @@
 		/** The document leaves the person's hands (deleted, handed over), just before the view
 		 * goes back. */
 		onleave?: () => void;
+		/** The document was merged into `target`, which takes its place. */
+		onmerged?: (target: string) => void;
 	} = $props();
 
 	let confirmDelete = $state(false);
@@ -123,7 +126,7 @@
 	// Nodes a reprocessing may start from: the graph decides (never past a failed node).
 	const nodes = $derived(
 		reprocessable(graph, document.processing)
-			.filter((node): node is ReprocessNode => node !== 'receive')
+			.filter(isReprocessNode)
 			.map((node) => ({ value: node, label: NODE_LABELS[node]() }))
 	);
 	// Sending the pages to the vision model is the person's decision, here or from the advice.
@@ -140,11 +143,14 @@
 		manageable && status !== 'processing' && document.media_type !== 'message/rfc822'
 	);
 
-	async function edited(result: components['schemas']['EditedDocuments']) {
-		toast.success(m.page_edit_done());
-		if (result.deleted) {
+	async function edited(result: components['schemas']['EditedDocuments'], target: string | null) {
+		toast.success(result.merged.length > 0 ? m.merge_done() : m.page_edit_done());
+		if (target === null) {
 			onleave?.();
 			await leaveDocument(Boolean(inbox));
+		} else if (target !== document.id) {
+			// Merged into another document: this one is gone, that one takes its place.
+			onmerged?.(target);
 		} else {
 			onchanged();
 		}
