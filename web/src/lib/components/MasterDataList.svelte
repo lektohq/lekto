@@ -6,12 +6,15 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import { BASE } from '#lib/base.ts';
 	import ContactAvatar from '#lib/components/ContactAvatar.svelte';
+	import MasterPages from '#lib/components/MasterPages.svelte';
 	import MasterRow from '#lib/components/MasterRow.svelte';
 	import PanelState from '#lib/components/PanelState.svelte';
 	import TagChip from '#lib/components/TagChip.svelte';
-	import TypeIcon from '#lib/components/TypeIcon.svelte';
+	import TypeAvatar from '#lib/components/TypeAvatar.svelte';
+	import { desktop } from '#lib/desktop.svelte.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { latest } from '#lib/latest.ts';
+	import { sortItems, type MasterSort } from '#lib/master-pages.ts';
 	import { contactMatches, typeMatches } from '#lib/master-search.ts';
 	import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 	import { type Item, KINDS } from '#lib/masterdata-api.ts';
@@ -24,10 +27,20 @@
 	import Chip from '#lib/components/Chip.svelte';
 
 	// Contacts (with their logo or initials, groups, aliases, identifiers, topics) or document
-	// types (with their icon, description, groups, title pattern, fields, whether a relation
-	// target), found by the search of the page. A link from the Tags tab lists the contacts of a group or topic, the types of a
-	// group (`?group=`, `?topic=`, with the ones below it). A row opens the editor.
-	let { kind, query = '' }: { kind: 'contacts' | 'document-types'; query?: string } = $props();
+	// types (with their icon, description, groups, fields, title pattern, whether a relation
+	// target), found by the search of the page, in the order of `sort`, a page at a time
+	// (`MasterPages`). A link from the Tags tab lists the contacts of a group or topic, the types
+	// of a group (`?group=`, `?topic=`, with the ones below it). A row opens the editor.
+	//
+	// Both rows are built alike (Tobi, 12.11.2026): the avatar, the name and under it what the
+	// item is (a contact's other spelling, a type's description); on a desktop its groups and
+	// what else it holds in columns of their own that line up from row to row, narrower all of it
+	// in the line under the name; on a phone the first group and what it is.
+	let {
+		kind,
+		query = '',
+		sort = 'name'
+	}: { kind: 'contacts' | 'document-types'; query?: string; sort?: MasterSort } = $props();
 	const ops = $derived(KINDS[kind]);
 
 	let items = $state<Item[] | null>(null);
@@ -60,7 +73,7 @@
 				kind === 'contacts' ? contactMatches(item, query) : typeMatches(item, query)
 			);
 		}
-		return list;
+		return sortItems(list, sort);
 	});
 
 	const begin = latest();
@@ -114,42 +127,51 @@
 			.sort((a, b) => pathLabel(a).localeCompare(pathLabel(b)));
 	}
 
-	/** What a row tells under the name besides the groups; a type's title pattern in full as a
-	 * tooltip. */
-	function notesOf(item: Item): { text: string; title?: string }[] {
-		if (kind === 'contacts') return contactNotes(item).map((text) => ({ text }));
-		const notes: { text: string; title?: string }[] = [];
-		if (item.title_pattern)
-			notes.push({ text: m.master_title_pattern(), title: item.title_pattern });
-		if (item.relation_target) notes.push({ text: m.master_relation_target() });
-		const fieldsText = fieldsNote(item);
-		if (fieldsText) notes.push({ text: fieldsText });
-		return notes;
+	interface Fact {
+		text: string;
+		/** Said in full as its tooltip (a title pattern). */
+		title?: string;
 	}
 
-	/** Identifiers and topics; an alias where there is room (on a phone only without groups). */
-	function contactNotes(item: Item): string[] {
-		const aliases = phone.current && (item.group_ids?.length ?? 0) > 0 ? [] : (item.aliases ?? []);
-		const identifiers = (item.identifiers ?? []).filter((entry) => entry.source !== 'rejected');
-		const topics = item.topic_ids?.length ?? 0;
-		const notes: (string | null)[] = [
-			identifiers.length === 1
-				? m.master_identifier_one()
-				: identifiers.length > 1
-					? m.master_identifiers_many({ count: identifiers.length })
-					: null,
-			topics === 1
-				? m.master_topic_one()
-				: topics > 1
-					? m.master_topics_many({ count: topics })
-					: null,
-			aliases.length === 1
-				? m.master_alias_short({ alias: aliases[0] })
-				: aliases.length > 1
-					? m.master_alias_more({ alias: aliases[0], count: aliases.length - 1 })
-					: null
-		];
-		return notes.filter((note) => note !== null);
+	/** What the item is, under its name: a contact's other spelling, a type's description. */
+	function aboutOf(item: Item): string | null {
+		if (kind === 'document-types') return item.description || null;
+		const aliases = item.aliases ?? [];
+		if (aliases.length === 0) return null;
+		return aliases.length === 1
+			? m.master_alias_short({ alias: aliases[0] })
+			: m.master_alias_more({ alias: aliases[0], count: aliases.length - 1 });
+	}
+
+	/** What else it holds: a contact's identifiers and topics; a type's fields, its title pattern
+	 * (in full as tooltip) and whether a relation target. */
+	function factsOf(item: Item): Fact[] {
+		const facts: (Fact | null)[] = [];
+		if (kind === 'contacts') {
+			const identifiers = (item.identifiers ?? []).filter((entry) => entry.source !== 'rejected');
+			const topics = item.topic_ids?.length ?? 0;
+			facts.push(
+				identifiers.length === 0
+					? null
+					: {
+							text:
+								identifiers.length === 1
+									? m.master_identifier_one()
+									: m.master_identifiers_many({ count: identifiers.length })
+						},
+				topics === 0
+					? null
+					: { text: topics === 1 ? m.master_topic_one() : m.master_topics_many({ count: topics }) }
+			);
+		} else {
+			const fieldsText = fieldsNote(item);
+			facts.push(
+				fieldsText ? { text: fieldsText } : null,
+				item.title_pattern ? { text: m.master_title_pattern(), title: item.title_pattern } : null,
+				item.relation_target ? { text: m.master_relation_target() } : null
+			);
+		}
+		return facts.filter((fact) => fact !== null);
 	}
 
 	/** A type's own fields, and how many of them are required. */
@@ -160,7 +182,10 @@
 		const count =
 			own.length === 1 ? m.master_field_one() : m.master_fields_many({ count: own.length });
 		return required.length > 0
-			? `${count} · ${m.master_required_count({ count: required.length })}`
+			? m.master_fields_required({
+					fields: count,
+					required: m.master_required_count({ count: required.length })
+				})
 			: count;
 	}
 </script>
@@ -189,46 +214,96 @@
 				: m.assignment_none_found()}
 		onretry={load}
 	>
-		<Card.Root as="ul" size="flush" class="divide-y overflow-hidden" aria-label={ops.title()}>
-			{#each listed as item (item.id)}
-				{@const groups = groupsOf(item)}
-				<MasterRow
-					onopen={() => masterDataDialogs.open(kind, item)}
-					editLabel={m.master_edit({ name: item.name })}
-					usage={[
-						{ count: item.document_count, href: `${BASE}/documents?${ops.filter}=${item.id}` }
-					]}
-				>
-					{#snippet lead()}
-						{#if kind === 'contacts'}
-							<ContactAvatar contact={item} size="md" class="max-sm:size-10 max-sm:text-sm" />
-						{:else}
-							<span
-								class="grid size-10 shrink-0 place-items-center rounded-xl bg-secondary text-foreground sm:size-8"
-							>
-								<TypeIcon icon={item.icon} class="size-5 sm:size-4" />
-							</span>
-						{/if}
-					{/snippet}
-					<span class="line-clamp-2 break-words">{item.name}</span>
-					{#if kind === 'document-types' && item.description}
-						<span class="line-clamp-2 text-sm text-muted-foreground">{item.description}</span>
-					{/if}
-					{#if groups.length > 0 || notesOf(item).length > 0}
-						<span
-							class="flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground"
+		<MasterPages items={listed} table={kind} {query}>
+			{#snippet children(shown)}
+				<Card.Root as="ul" size="flush" class="divide-y overflow-hidden" aria-label={ops.title()}>
+					{#each shown as item (item.id)}
+						{@const groups = groupsOf(item)}
+						{@const about = aboutOf(item)}
+						{@const facts = factsOf(item)}
+						<MasterRow
+							columns
+							onopen={() => masterDataDialogs.open(kind, item)}
+							editLabel={m.master_edit({ name: item.name })}
+							usage={[
+								{ count: item.document_count, href: `${BASE}/documents?${ops.filter}=${item.id}` }
+							]}
 						>
-							{#each groups as tag (tag.id)}<TagChip {tag} group size="sm" />{/each}
-							{#each notesOf(item) as note (note.text)}
-								<span class="min-w-0 truncate" title={note.title}
-									>{note.text}{#if note.title}: <code class="font-mono text-xs">{note.title}</code
-										>{/if}</span
-								>
-							{/each}
-						</span>
-					{/if}
-				</MasterRow>
-			{/each}
-		</Card.Root>
+							{#snippet lead()}
+								{#if kind === 'contacts'}
+									<ContactAvatar contact={item} size="md" class="max-sm:size-10 max-sm:text-sm" />
+								{:else}
+									<TypeAvatar icon={item.icon} class="max-sm:size-10 max-sm:[&_svg]:size-5" />
+								{/if}
+							{/snippet}
+							{#if phone.current}
+								<span class="line-clamp-2 break-words">{item.name}</span>
+								{#if groups.length > 0 || about}
+									<span
+										class="flex min-h-6 w-full min-w-0 items-center gap-1.5 text-sm text-muted-foreground"
+									>
+										{#if groups.length > 0}
+											<span class="flex max-w-2/3 shrink-0 items-center gap-1.5">
+												{@render groupChips(groups, 1)}
+											</span>
+										{/if}
+										{#if about}<span class="min-w-0 truncate">{about}</span>{/if}
+									</span>
+								{/if}
+							{:else if desktop.current}
+								<span class="flex w-full min-w-0 items-center gap-3">
+									<span class="flex min-w-0 flex-1 flex-col gap-1">
+										<span class="truncate" title={item.name}>{item.name}</span>
+										{#if about}
+											<span class="truncate text-sm text-muted-foreground">{about}</span>
+										{/if}
+									</span>
+									<span class="flex w-50 shrink-0 items-center gap-1.5 overflow-hidden">
+										{@render groupChips(groups, 2)}
+									</span>
+									<span class="w-60 shrink-0 truncate text-sm text-muted-foreground">
+										{@render line(facts)}
+									</span>
+								</span>
+							{:else}
+								<span class="w-full truncate" title={item.name}>{item.name}</span>
+								{#if groups.length > 0 || about || facts.length > 0}
+									<span
+										class="flex min-h-6 w-full min-w-0 items-center gap-2 text-sm text-muted-foreground"
+									>
+										{#if groups.length > 0}
+											<span class="flex max-w-2/3 shrink-0 items-center gap-1.5">
+												{@render groupChips(groups, 2)}
+											</span>
+										{/if}
+										<span class="min-w-0 truncate">
+											{@render line(about ? [{ text: about }, ...facts] : facts)}
+										</span>
+									</span>
+								{/if}
+							{/if}
+						</MasterRow>
+					{/each}
+				</Card.Root>
+			{/snippet}
+		</MasterPages>
 	</PanelState>
 </div>
+
+<!-- The first `room` groups as chips, the count of the others after them. -->
+{#snippet groupChips(groups: Tag[], room: number)}
+	{#each groups.slice(0, room) as tag (tag.id)}<TagChip {tag} group size="sm" />{/each}
+	{#if groups.length > room}
+		<span class="shrink-0 text-xs" title={groups.slice(room).map(pathLabel).join(', ')}>
+			{m.master_groups_more({ count: groups.length - room })}
+		</span>
+	{/if}
+{/snippet}
+
+<!-- Facts in a line, a dot between them (a comma to a screen reader). -->
+{#snippet line(facts: Fact[])}
+	{#each facts as fact, index (fact.text)}
+		{#if index > 0}<span class="sr-only">, </span><span class="px-1.5" aria-hidden="true">·</span
+			>{/if}<span title={fact.title}>{fact.text}</span>
+	{/each}
+{/snippet}

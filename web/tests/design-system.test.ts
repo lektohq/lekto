@@ -375,6 +375,33 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('pages the contacts, the types and the fields, and sorts the first two in one menu', () => {
+		// DESIGN.md, "Master data tabs": a page at a time through `MasterPages`; the tags whole.
+		for (const panel of ['MasterDataList', 'FieldsPanel']) {
+			expect(sources[`/src/lib/components/${panel}.svelte`]).toContain('<MasterPages');
+		}
+		expect(sources['/src/lib/components/TagsPanel.svelte']).not.toContain('<MasterPages');
+		expect(tags(sources[MASTER_PAGE], 'SortMenu')).toHaveLength(1);
+		// A contact's row and a type's line up as one.
+		expect(
+			tags(sources['/src/lib/components/MasterDataList.svelte'], 'MasterRow').every((tag) =>
+				/\scolumns\b/.test(tag)
+			)
+		).toBe(true);
+	});
+
+	it('draws a type at the start of its row as TypeAvatar, round as a contact’s avatar', () => {
+		// A tile around a type's icon is TypeAvatar's alone (DESIGN.md, "Master data tabs").
+		expect(sources['/src/lib/components/MasterDataList.svelte']).toContain('<TypeAvatar');
+		expect(
+			offenders((source, path) =>
+				path.endsWith('/TypeAvatar.svelte') || !source.includes('<TypeIcon')
+					? null
+					: line(source, /place-items-center[^"'`]*rounded-|rounded-[^"'`]*place-items-center/)
+			)
+		).toEqual([]);
+	});
+
 	it('shows every master data tab as tabs, search, its filter row and its list', () => {
 		const page = sources[MASTER_PAGE];
 		const at = (name: string) => page.indexOf(`<${name}`);

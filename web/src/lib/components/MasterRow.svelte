@@ -17,13 +17,17 @@
 	// its usage as a bare number (the last of `usage`) and a chevron, no other buttons. Wider,
 	// the usage links to where it is listed and a pencil, in a column of its own behind a line,
 	// opens the editor. `before` stands
-	// outside the button (a tree's chevron), `lead` before the content (avatar, icon).
+	// outside the button (a tree's chevron), `lead` before the content (avatar, icon). With
+	// `columns` (contacts, types) its parts line up from row to row: every row as high as one of
+	// two lines (64 px on a desktop, 68 narrower, 72 on a phone), the usage in a column of one
+	// width.
 	let {
 		onopen,
 		editLabel,
 		usage = [],
 		before,
 		lead,
+		columns = false,
 		children,
 		class: className
 	}: {
@@ -32,6 +36,7 @@
 		usage?: Usage[];
 		before?: Snippet;
 		lead?: Snippet;
+		columns?: boolean;
 		children: Snippet;
 		class?: string;
 	} = $props();
@@ -45,7 +50,8 @@
 		<button
 			type="button"
 			class={cn(
-				'flex min-h-14 min-w-0 flex-1 items-center gap-3 py-2.5 pr-3 text-left transition-colors hover:bg-panel focus-visible:bg-panel focus-visible:outline-none',
+				'flex min-w-0 flex-1 items-center gap-3 py-2.5 pr-3 text-left transition-colors hover:bg-panel focus-visible:bg-panel focus-visible:outline-none',
+				columns ? 'min-h-18' : 'min-h-14',
 				before ? 'pl-1' : 'pl-4'
 			)}
 			onclick={onopen}
@@ -62,12 +68,25 @@
 		</button>
 	</li>
 {:else}
-	<li class={cn('flex items-center gap-3 py-2 pr-2', before ? 'pl-2' : 'pl-4', className)} data-row>
+	<li
+		class={cn(
+			'flex items-center gap-3 py-2 pr-2',
+			columns && 'min-h-17 lg:min-h-16',
+			before ? 'pl-2' : 'pl-4',
+			className
+		)}
+		data-row
+	>
 		{@render before?.()}
 		{@render lead?.()}
 		<div class="flex min-w-0 flex-1 flex-col items-start gap-1">{@render children()}</div>
 		{#if usage.length > 0}
-			<span class="flex shrink-0 items-center text-sm text-muted-foreground">
+			<span
+				class={cn(
+					'flex shrink-0 items-center text-sm text-muted-foreground',
+					columns && 'min-w-36 justify-end'
+				)}
+			>
 				{#each usage as entry, index (index)}
 					{#if index > 0}<span aria-hidden="true">·</span>{/if}
 					<UsageCount count={entry.count} href={entry.href} unit={entry.unit} />
