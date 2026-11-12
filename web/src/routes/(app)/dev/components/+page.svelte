@@ -6,6 +6,7 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import Tag from '@lucide/svelte/icons/tag';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import Upload from '@lucide/svelte/icons/upload';
 	import { toast } from 'svelte-sonner';
 	import AlertDot from '#lib/components/AlertDot.svelte';
@@ -557,7 +558,13 @@
 				go={m.dev_sample_tile_go()}
 			>
 				<Figure count={12} label={m.overview_open()} />
-				<p class="text-meta text-muted-foreground">{m.dev_sample_text()}</p>
+				<ul class="flex flex-wrap gap-1.5">
+					<li>
+						<Badge variant="yellow"
+							><TriangleAlert aria-hidden="true" />{m.overview_lane_yellow({ count: '12' })}</Badge
+						>
+					</li>
+				</ul>
 			</Tile>
 		</div>
 	</section>
