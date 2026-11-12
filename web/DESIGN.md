@@ -639,7 +639,12 @@ around it gives the padding (`px-1 pb-1` in a `sm` card, `px-4 pb-4` otherwise).
 it shows more than words (chips, a value before and after).
 
 **Change preview** (`ChangePreview`, Tobi 10.11.2026): what saving a document's form would do,
-in the dialog "Was die Änderung bewirkt" (`md`) before "Speichern". Each changed field as a row
+in the dialog "Was die Änderung bewirkt" before "Speichern". The dialog is `ChangeDialog` (`md`,
+centred on a phone too, the footer's actions there one above the other): its title, a
+description that nothing is stored yet, the body scrolling, "Abbrechen" and the action
+(`destructive` where something is lost); "PDF bearbeiten" asks with it as well (see
+[Page stack](#page-stack)). No other dialog says "Was die Änderung bewirkt"
+(`design-system.test.ts`). Each changed field as a row
 of a `DetailList`: its value before (muted, struck through; "Nicht gesetzt" when it had none),
 an arrow, its value after; tags as `TagChip`s with `change` (as in the mock Tobi chose): a
 removed one in red and struck through, an added one in green. Then the rules that run ("Regel, die ausgeführt wird", "Regeln, die ausgeführt werden"),
