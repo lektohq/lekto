@@ -28,6 +28,5 @@
 		<LoadProblem {problem} {onretry} />
 	{:else if counts}
 		<Figure count={counts.suggested} label={m.overview_identifiers_suggestions()} />
-		<p class="text-meta text-muted-foreground">{m.overview_identifiers_hint()}</p>
 	{/if}
 </Tile>

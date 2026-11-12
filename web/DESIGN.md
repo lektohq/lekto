@@ -886,9 +886,12 @@ share what opens them (`DocumentLink`) and what they name (`documentParts`).
 The overview (`/`) shows what waits for someone as tiles in a grid (one column on the phone, two
 from `sm`, three from `lg` when there are three). A tile is a `Card` (`md`): an icon and its
 `Card.Title` (the place's name), the big number (`text-figure`, `tabular-nums`) with what it
-counts, badges in their tones (icon and word for a lane), one `text-meta` line of detail, and at
-its foot the way there, a `brand` link with an arrow ("Zum Posteingang"). Badges on a tile are
-not links. While a tile loads it shows a `Skeleton` in the place of the number. A tile that
+counts (the jobs' tile: the badge "Alles läuft" or "Kein Worker nimmt Jobs" while none failed),
+badges in their tones where there are any (icon and word for a lane, a failed kind), and at its
+foot the way there, a `brand` link with an arrow ("Zum Posteingang"). No line of detail under
+them (Tobi, 12.11.2026): not "Nichts offen.", not what is in processing, not when a worker last
+started a job; the place itself says that. Badges on a tile are not links. The way to the
+documents is no tile: "Zu den Dokumenten" (`outline`, `FileText`) stands in the page's head. While a tile loads it shows a `Skeleton` in the place of the number. A tile that
 reports only something to decide shows only while there is something (Tobi, 08.11.2026, #215:
 "Kennungen" with the suggestions alone, no to-do); the grid then takes the columns of the tiles
 shown, so none stands empty. Such a tile does not load inside itself: the page asks first and
@@ -1498,7 +1501,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     in the order tabs, search, filter row, list, with no paragraph before the list, the contacts,
     the types and the fields a page at a time through `MasterPages`, one `SortMenu` on the page,
     a contact's and a type's row with `columns`, a tile around a type's icon only as `TypeAvatar`
-    ("Master data tabs"); tooltips only through `ui/tooltip` ("Help and tooltips"); `Progress` only in the
+    ("Master data tabs"); no line of detail on an overview tile, the documents in the overview's
+    head ("Overview tiles"); tooltips only through `ui/tooltip` ("Help and tooltips"); `Progress` only in the
     selection bars of runs on many and the upload summary ("Choosing many"); dates and times
     through `DateInput`, no native date or time field, every search through `SearchField` at the
     height of a field ("Fields"); "Abbrechen" before the
