@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from uuid import NAMESPACE_URL, uuid5
+from uuid import UUID, uuid5
 
 from lekto.core.domain import media_types
 from lekto.core.domain.ids import (
@@ -137,7 +137,9 @@ among them (Tobi, 06.11.2026: only these); the rest let go of it (`MailRecord.fo
 only so that no mail is fetched twice."""
 
 
-_RECORDS = uuid5(NAMESPACE_URL, "https://github.com/tb1337/lekto-dms#mail-records")
+# The namespace of the records' ids (UUID v5): fixed for good, another one would change the id of
+# a mail whose run was cut off before its record was kept.
+_RECORDS = UUID("97260f53-1afd-57cc-9c58-5e76a4079414")
 
 
 def record_id(mailbox: MailboxId, folder: str, uidvalidity: int, uid: int) -> MailRecordId:

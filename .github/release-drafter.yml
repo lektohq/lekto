@@ -102,11 +102,11 @@ categories:
 
 header: |
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/tb1337/lekto-dms/main/.github/release/banner-dark.svg">
-    <img alt="Lekto" src="https://raw.githubusercontent.com/tb1337/lekto-dms/main/.github/release/banner-light.svg" width="100%">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/lektohq/lekto/main/.github/release/banner-dark.svg">
+    <img alt="Lekto" src="https://raw.githubusercontent.com/lektohq/lekto/main/.github/release/banner-light.svg" width="100%">
   </picture>
 
-  ![version](https://img.shields.io/static/v1?label=version&message=$RESOLVED_VERSION&color=0d6b6b) ![ghcr.io](https://img.shields.io/badge/ghcr.io-tb1337%2Flekto-0d6b6b)
+  ![version](https://img.shields.io/static/v1?label=version&message=$RESOLVED_VERSION&color=0d6b6b) ![ghcr.io](https://img.shields.io/badge/ghcr.io-lektohq%2Flekto-0d6b6b)
 
 template: |
 
@@ -125,8 +125,8 @@ footer: |
   > be undone.
 
   ```sh
-  docker pull ghcr.io/tb1337/lekto:$RESOLVED_VERSION
-  docker pull ghcr.io/tb1337/lekto-migration:$RESOLVED_VERSION
+  docker pull ghcr.io/lektohq/lekto:$RESOLVED_VERSION
+  docker pull ghcr.io/lektohq/lekto-migration:$RESOLVED_VERSION
   ```
 
   **Full changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION

@@ -14,7 +14,7 @@ name: Release
 # Last, a published release whose `lekto` image got `latest` tells the homelab
 # its version by `repository_dispatch` (repository in the secret `HOMELAB_DISPATCH_REPO`); the
 # homelab enters and deploys it.
-# Only in tb1337/lekto-dms itself: a fork never tells the homelab anything.
+# Only in lektohq/lekto itself: a fork never tells the homelab anything.
 
 # yamllint disable-line rule:truthy
 on:
@@ -253,7 +253,7 @@ jobs:
     # Only a published release of this repository, not of a fork, and only the newest (`latest`):
     # a release of an older line or a release built again by hand would set the homelab back.
     if: >-
-      github.repository == 'tb1337/lekto-dms'
+      github.repository == 'lektohq/lekto'
       && github.event_name == 'release'
       && contains(format(' {0} ', needs.tags.outputs.tags), ' latest ')
     runs-on: ubuntu-latest

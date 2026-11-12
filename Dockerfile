@@ -217,7 +217,7 @@ ENV PATH="/command:/opt/lekto/venv/bin:$PATH" \
 
 LABEL org.opencontainers.image.title="Lekto DMS" \
       org.opencontainers.image.description="Self-hosted, headless document management system" \
-      org.opencontainers.image.source="https://github.com/tb1337/lekto-dms" \
+      org.opencontainers.image.source="https://github.com/lektohq/lekto" \
       org.opencontainers.image.licenses="GPL-3.0-only" \
       org.opencontainers.image.version="$LEKTO_VERSION"
 
