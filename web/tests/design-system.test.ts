@@ -401,16 +401,21 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
-	it('shows a tile of the overview as its number and badges, the documents in its head', () => {
+	it('shows a tile of the overview as its number and badges, two to a row on the phone', () => {
 		// DESIGN.md, "Overview tiles": no line of detail under them (Tobi, 12.11.2026).
 		expect(
 			offenders((source, path) =>
 				/\/components\/overview\/\w+Tile\.svelte$/.test(path) ? line(source, /text-meta/) : null
 			)
 		).toEqual([]);
-		expect(snippets(sources['/src/routes/(app)/+page.svelte'], 'actions').join('')).toContain(
-			'${BASE}/documents`'
-		);
+		const page = sources['/src/routes/(app)/+page.svelte'];
+		expect(snippets(page, 'actions').join('')).toContain('${BASE}/documents`');
+		// Two to a row on the phone, an odd last one across it, each tile the way there.
+		expect(page).toContain("'grid grid-cols-2 ");
+		expect(page).toContain('max-lg:[&>:last-child:nth-child(odd)]:col-span-2');
+		const tile = sources['/src/lib/components/overview/Tile.svelte'];
+		expect(tile).toContain('max-sm:absolute max-sm:inset-0');
+		expect(tile).toMatch(/<ChevronRight\b[^>]*\bsm:hidden/);
 	});
 
 	it('shows every master data tab as tabs, search, its filter row and its list', () => {
