@@ -247,6 +247,30 @@ describe('the jobs tab', () => {
 		expect(screen.queryByRole('button', { name: m.jobs_retry() })).toBeNull();
 		expect(screen.queryByText(m.jobs_last_error())).toBeNull();
 		expect(screen.getByRole('columnheader', { name: m.jobs_col_failed_at() })).toBeTruthy();
+		expect(screen.queryByRole('button', { name: m.maintenance_title() })).toBeNull();
+	});
+
+	it('opens the maintenance to an admin beside the kinds', async () => {
+		vi.stubGlobal(
+			'fetch',
+			fakeApi({
+				'GET /api/v1/jobs/summary': () => summary,
+				'GET /api/v1/jobs': () => ({ items: [], total: 0, next_offset: null }),
+				'GET /api/v1/pipeline': () => ({
+					nodes: [],
+					vision: null,
+					logo_fetch: true,
+					meaning_search: false
+				})
+			})
+		);
+		render(JobsTab);
+		await userEvent.click(await screen.findByRole('button', { name: m.maintenance_title() }));
+		const dialog = await screen.findByRole('dialog');
+		expect(within(dialog).getByRole('heading', { name: m.maintenance_title() })).toBeTruthy();
+		// The logos' jobs wait in the tab's summary: one failed, none open.
+		const logos = within(dialog).getByText(m.maintenance_logos_name()).closest('li') as HTMLElement;
+		expect(within(logos).getByText(m.maintenance_waiting_none())).toBeTruthy();
 	});
 
 	it('warns when jobs are due and no worker took one for a while', async () => {

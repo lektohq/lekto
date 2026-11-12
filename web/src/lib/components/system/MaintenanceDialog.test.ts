@@ -1,5 +1,5 @@
-// The tab "Maintenance": the actions over the documents with their waiting jobs, run by admins
-// after a question.
+// The dialog "Wartung" of the tab "Jobs" (admins): the actions over the documents with their
+// waiting jobs, run after a question; a sheet on a phone.
 import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'svelte-sonner';
@@ -7,7 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import { calls, fakeApi } from '#lib/testing/api.ts';
-import MaintenanceTab from './MaintenanceTab.svelte';
+import { phone } from '#lib/phone.svelte.ts';
+import MaintenanceDialog from './MaintenanceDialog.svelte';
 
 const summary = {
 	kinds: [
@@ -21,7 +22,6 @@ const summary = {
 
 function routes(logoFetch = true) {
 	return fakeApi({
-		'GET /api/v1/jobs/summary': () => summary,
 		'GET /api/v1/pipeline': () => ({
 			nodes: [],
 			vision: null,
@@ -43,20 +43,23 @@ function signIn(role: 'admin' | 'user') {
 	});
 }
 
+const onqueued = vi.fn();
+
 beforeEach(() => signIn('admin'));
 
 afterEach(() => {
+	phone.override(null);
 	session.clear();
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 });
 
-describe('the maintenance tab', () => {
+describe('the maintenance dialog', () => {
 	it('names the actions with their waiting jobs and queues one after a question', async () => {
 		const success = vi.spyOn(toast, 'success');
 		const api = routes();
 		vi.stubGlobal('fetch', api);
-		render(MaintenanceTab);
+		render(MaintenanceDialog, { open: true, summary, onqueued });
 		const relate = (await screen.findByText(m.maintenance_relate_name())).closest(
 			'li'
 		) as HTMLElement;
@@ -72,12 +75,13 @@ describe('the maintenance tab', () => {
 		await waitFor(() =>
 			expect(success).toHaveBeenCalledWith(m.maintenance_queued_documents({ count: '1,284' }))
 		);
+		expect(onqueued).toHaveBeenCalled();
 	});
 
 	it('says when there was nothing to queue, and when one document was', async () => {
 		const success = vi.spyOn(toast, 'success');
 		vi.stubGlobal('fetch', routes());
-		render(MaintenanceTab);
+		render(MaintenanceDialog, { open: true, summary, onqueued });
 		const facts = (await screen.findByText(m.maintenance_facts_name())).closest(
 			'li'
 		) as HTMLElement;
@@ -100,7 +104,7 @@ describe('the maintenance tab', () => {
 
 	it('holds the logos back while Lekto does not fetch them', async () => {
 		vi.stubGlobal('fetch', routes(false));
-		render(MaintenanceTab);
+		render(MaintenanceDialog, { open: true, summary, onqueued });
 		const logos = (await screen.findByText(m.maintenance_logos_name())).closest(
 			'li'
 		) as HTMLElement;
@@ -111,12 +115,13 @@ describe('the maintenance tab', () => {
 		);
 	});
 
-	it('shows a user the rows without buttons', async () => {
-		signIn('user');
+	it('opens as a sheet named "Wartung" on a phone', async () => {
+		phone.override(true);
 		vi.stubGlobal('fetch', routes());
-		render(MaintenanceTab);
-		expect(await screen.findByText(m.maintenance_relate_name())).toBeTruthy();
-		expect(screen.getByText(m.maintenance_admins_only())).toBeTruthy();
-		expect(screen.queryByRole('button', { name: m.maintenance_run() })).toBeNull();
+		render(MaintenanceDialog, { open: true, summary, onqueued });
+		const sheet = await screen.findByRole('dialog');
+		expect(within(sheet).getByRole('heading', { name: m.maintenance_title() })).toBeTruthy();
+		expect(within(sheet).getByText(m.maintenance_info())).toBeTruthy();
+		expect(within(sheet).getAllByRole('button', { name: m.maintenance_run() })).toHaveLength(4);
 	});
 });
