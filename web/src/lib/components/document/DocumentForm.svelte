@@ -24,11 +24,11 @@
 	import SearchSelect, { type SearchOption } from '#lib/components/SearchSelect.svelte';
 	import GroupChips from '#lib/components/GroupChips.svelte';
 	import FieldValueInput from '#lib/components/FieldValueInput.svelte';
+	import ChangeDialog from '#lib/components/ChangeDialog.svelte';
 	import ChangePreview from '#lib/components/document/ChangePreview.svelte';
 	import TagPicker from '#lib/components/TagPicker.svelte';
 	import TypeIcon from '#lib/components/TypeIcon.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { fieldLabel } from '#lib/describe.ts';
@@ -1035,20 +1035,11 @@
 	</div>
 </form>
 
-<Dialog.Root open={preview !== null} onOpenChange={(open) => !open && (preview = null)}>
-	<Dialog.Content size="md">
-		<Dialog.Header>
-			<Dialog.Title>{m.dryrun_title()}</Dialog.Title>
-			<Dialog.Description>{m.dryrun_hint()}</Dialog.Description>
-		</Dialog.Header>
-		{#if preview}
-			<div class="max-h-[60vh] overflow-auto">
-				<ChangePreview before={document} {preview} {lookup} />
-			</div>
-		{/if}
-		<Dialog.Footer>
-			<Button variant="ghost" disabled={busy} onclick={() => (preview = null)}>{m.cancel()}</Button>
-			<Button disabled={busy} onclick={save}>{m.edit_save()}</Button>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+<ChangeDialog
+	bind:open={() => preview !== null, (open) => !open && (preview = null)}
+	description={m.dryrun_hint()}
+	submitLabel={m.edit_save()}
+	action={save}
+>
+	{#if preview}<ChangePreview before={document} {preview} {lookup} />{/if}
+</ChangeDialog>
