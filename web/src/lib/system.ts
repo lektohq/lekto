@@ -1,14 +1,8 @@
 import { formatDate } from '#lib/i18n.ts';
 
-/** The tabs of the page "System"; the first is shown without `?tab=` and for an unknown one. */
-export const SYSTEM_TABS = [
-	'automation',
-	'classifier',
-	'search',
-	'jobs',
-	'intake',
-	'maintenance'
-] as const;
+/** The tabs of the page "System"; the first is shown without `?tab=` and for an unknown one.
+ * The jobs first; the maintenance is a dialog of theirs (Tobi, 12.11.2026). */
+export const SYSTEM_TABS = ['jobs', 'automation', 'classifier', 'search', 'intake'] as const;
 export type SystemTab = (typeof SYSTEM_TABS)[number];
 
 /** Tabs only admins see: the intake channels (Tobi, 04.11.2026). */

@@ -967,6 +967,17 @@ Kennungen bei Kontakten, the last with its count. Each part keeps what was typed
 shows. Its frame is `EditorShell` without an action of its own, so on a phone it takes the whole
 screen like every editor (Tobi, 09.11.2026).
 
+### System page
+
+The page "System" shows its tabs in this order: Jobs · Automatisierung · Klassifikator ·
+Suchindex · Eingangskanäle (the last for admins only, see below); without `?tab=` it shows the
+jobs (Tobi, 12.11.2026). The maintenance, the actions that catch up over the existing documents
+("Bezüge neu suchen", "Seitenbilder nachholen", "Fakten neu lesen", "Logos holen"), is no tab:
+beside the kinds of the jobs an admin opens "Wartung" (`outline`, `Wrench`), a dialog (`lg`)
+with the rows (the name with its `InfoTip`, how many jobs wait, "Einreihen", which asks first in
+a `ConfirmDialog` over it), on a phone a `PhoneSheet` (`fit`). Others see no button: only
+admins queue, and the table of the jobs shows everyone what waits.
+
 ### Intake channels
 
 The page "System" has a tab "Eingangskanäle" for admins only (Tobi, 04.11.2026); other users do
@@ -1479,7 +1490,7 @@ Allowed outside the token rules, each for a stated reason:
 | `lib/templates/codemirror.ts`                                           | its own theme                          | The editor sits in a shadow root that the page's styles do not reach                |
 | `.lc-tooltip-*` in `app.css`                                            | LayerChart override                    | The library's tooltip ground is otherwise transparent                               |
 | `ui/*`                                                                  | shadcn internals (`data-[…]` variants) | Primitives; their look follows this document                                        |
-| `FilterSection`, `Lenses`, `SelectionBar`, the maintenance list         | `Card size="flush"` with side padding  | Their rows or buttons pad themselves top and bottom; only the sides are the frame's |
+| `FilterSection`, `Lenses`, `SelectionBar`                               | `Card size="flush"` with side padding  | Their rows or buttons pad themselves top and bottom; only the sides are the frame's |
 
 A new exception needs a row here and its entry in `tests/design-system.test.ts` (`EXCEPTIONS`).
 
@@ -1515,7 +1526,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     below the header at its offsets ("Sticky heads"); every page frame
     `flex flex-col gap-6`, the document page `gap-4` ("Spacing and layout");
     a pair of arrows back and forth only as `Stepper`, `Pagination` or in `DateInput`
-    ("Stepper");
+    ("Stepper"); the jobs first on the page "System", the maintenance a dialog of theirs for
+    admins, no tab ("System page");
   - `src/lib/tips.test.ts`: one box of help at a time, the next without delay; a tooltip opens on
     a focus Tab brought, not on one handed back;
   - `src/lib/via-token.test.ts`: every file that has a person's API token (`via_token`, a
