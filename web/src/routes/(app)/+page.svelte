@@ -16,8 +16,9 @@
 
 	// The overview, the start page under the logo (Tobi, 27.10.2026): what waits for someone, each
 	// with the way there. The inbox, the suggested identifiers (admins: they keep the master
-	// data; only while there are any, #215), the jobs, and below what is expected (the page
-	// "Erwartet" went into it). The way to the documents stands in the head (Tobi, 12.11.2026).
+	// data; #215), the jobs, and below what is expected (the page "Erwartet" went into it). The
+	// way to the documents stands in the head; the tiles two to a row below `lg`, also on a
+	// phone, and an odd last one takes the whole row (Tobi, 12.11.2026).
 	let counts = $state<OpenCounts | null>(null);
 	let problem = $state<string | null>(null);
 
@@ -33,10 +34,6 @@
 	onMount(() => {
 		if (session.isAdmin) void loadCounts();
 	});
-
-	const suggestions = $derived(
-		session.isAdmin && (problem !== null || (counts !== null && counts.suggested > 0))
-	);
 </script>
 
 <svelte:head><title>{m.overview_title()} · {m.app_name()}</title></svelte:head>
@@ -50,9 +47,14 @@
 			</a>
 		{/snippet}
 	</PageHeader>
-	<div class={cn('grid gap-4 sm:grid-cols-2', suggestions && 'lg:grid-cols-3')}>
+	<div
+		class={cn(
+			'grid grid-cols-2 gap-3 sm:gap-4 max-lg:[&>:last-child:nth-child(odd)]:col-span-2',
+			session.isAdmin && 'lg:grid-cols-3'
+		)}
+	>
 		<InboxTile />
-		{#if suggestions}<IdentifiersTile {counts} {problem} onretry={loadCounts} />{/if}
+		{#if session.isAdmin}<IdentifiersTile {counts} {problem} onretry={loadCounts} />{/if}
 		<SystemTile />
 	</div>
 	<ExpectedSection />
