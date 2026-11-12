@@ -12,7 +12,7 @@ name: lekto
 
 # What API and worker share: the image and the settings.
 x-lekto: &lekto
-  image: ghcr.io/tb1337/lekto:latest
+  image: ghcr.io/lektohq/lekto:latest
   restart: unless-stopped
   # The worker gets 30 s to finish its jobs, s6 waits up to 40 s: see deploy/README.md.
   stop_grace_period: 60s
