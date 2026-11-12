@@ -12,8 +12,9 @@
 	import { inbox } from '#lib/inbox.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 
-	// The inbox on the overview: everything open, by its lanes (badges with icon and word), from
-	// the counter the header keeps up to date.
+	// The inbox on the overview: everything open and, while there is, its lanes (badges with icon
+	// and word), from the counter the header keeps up to date. No line under them (Tobi,
+	// 12.11.2026).
 	const summary = $derived(inbox.summary);
 	const href = `${BASE}/inbox`;
 </script>
@@ -23,9 +24,7 @@
 		<Skeleton class="h-9 w-24" />
 	{:else}
 		<Figure count={summary.open} label={m.overview_open()} />
-		{#if summary.open === 0}
-			<p class="text-meta text-muted-foreground">{m.overview_inbox_none()}</p>
-		{:else}
+		{#if summary.open > 0}
 			<ul class="flex flex-wrap gap-1.5">
 				{#if summary.intervene > 0}
 					<li>
@@ -55,11 +54,6 @@
 					</li>
 				{/if}
 			</ul>
-			<p class="text-meta text-muted-foreground">
-				{summary.processing > 0
-					? m.overview_processing({ count: formatNumber(summary.processing) })
-					: m.overview_processing_none()}
-			</p>
 		{/if}
 	{/if}
 </Tile>
