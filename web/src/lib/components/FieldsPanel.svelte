@@ -3,6 +3,7 @@
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import { BASE } from '#lib/base.ts';
+	import MasterPages from '#lib/components/MasterPages.svelte';
 	import MasterRow from '#lib/components/MasterRow.svelte';
 	import PanelState from '#lib/components/PanelState.svelte';
 	import { describeError } from '#lib/errors.ts';
@@ -18,9 +19,9 @@
 	import * as Card from '#lib/components/ui/card/index.ts';
 
 	// The field definitions in their order (by position, the same by name), found by the search of
-	// the page: name, data type, set by hand only, a position other than 0, the types they apply
-	// to and whether they are required there, what belongs in them. The key templates use stands
-	// in the editor (and here, where there is room).
+	// the page, a page at a time (`MasterPages`): name, data type, set by hand only, a position
+	// other than 0, the types they apply to and whether they are required there, what belongs in
+	// them. The key templates use stands in the editor (and here, where there is room).
 	let { query = '' }: { query?: string } = $props();
 
 	let fields = $state<FieldDefinition[] | null>(null);
@@ -86,35 +87,44 @@
 			: m.assignment_none_found()}
 	onretry={load}
 >
-	<Card.Root as="ul" size="flush" class="divide-y overflow-hidden" aria-label={m.master_fields()}>
-		{#each listed as field (field.id)}
-			<MasterRow
-				onopen={() => masterDataDialogs.open('fields', field)}
-				editLabel={m.master_edit({ name: field.name })}
-				usage={[{ count: field.document_count, href: `${BASE}/documents?field=${field.id}` }]}
+	<MasterPages items={listed} table="fields" {query}>
+		{#snippet children(shown)}
+			<Card.Root
+				as="ul"
+				size="flush"
+				class="divide-y overflow-hidden"
+				aria-label={m.master_fields()}
 			>
-				<span class="flex max-w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-					<span class="break-words">{field.name}</span>
-					<Badge variant="muted">{fieldTypeLabel(field.data_type)}</Badge>
-					{#if field.assignment === 'manual'}
-						<Badge variant="muted">{m.field_def_manual_short()}</Badge>
-					{/if}
-					{#if field.position !== 0}
-						<Badge variant="muted">
-							{m.field_def_position_short({ position: formatNumber(field.position) })}
-						</Badge>
-					{/if}
-					{#if !phone.current}
-						<code class="font-mono text-xs text-muted-foreground">{`field.${field.key}`}</code>
-					{/if}
-				</span>
-				<span class="text-sm text-muted-foreground">{scopeText(field)}</span>
-				{#if field.description || field.choices.length > 0}
-					<span class="line-clamp-1 text-sm text-muted-foreground">
-						{field.description || field.choices.join(', ')}
-					</span>
-				{/if}
-			</MasterRow>
-		{/each}
-	</Card.Root>
+				{#each shown as field (field.id)}
+					<MasterRow
+						onopen={() => masterDataDialogs.open('fields', field)}
+						editLabel={m.master_edit({ name: field.name })}
+						usage={[{ count: field.document_count, href: `${BASE}/documents?field=${field.id}` }]}
+					>
+						<span class="flex max-w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+							<span class="break-words">{field.name}</span>
+							<Badge variant="muted">{fieldTypeLabel(field.data_type)}</Badge>
+							{#if field.assignment === 'manual'}
+								<Badge variant="muted">{m.field_def_manual_short()}</Badge>
+							{/if}
+							{#if field.position !== 0}
+								<Badge variant="muted">
+									{m.field_def_position_short({ position: formatNumber(field.position) })}
+								</Badge>
+							{/if}
+							{#if !phone.current}
+								<code class="font-mono text-xs text-muted-foreground">{`field.${field.key}`}</code>
+							{/if}
+						</span>
+						<span class="text-sm text-muted-foreground">{scopeText(field)}</span>
+						{#if field.description || field.choices.length > 0}
+							<span class="line-clamp-1 text-sm text-muted-foreground">
+								{field.description || field.choices.join(', ')}
+							</span>
+						{/if}
+					</MasterRow>
+				{/each}
+			</Card.Root>
+		{/snippet}
+	</MasterPages>
 </PanelState>
