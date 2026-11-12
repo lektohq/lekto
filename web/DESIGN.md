@@ -517,7 +517,10 @@ cards in a column. Each row has:
    Where the row has a detail page, the title's link takes the whole row (on the link
    `after:absolute after:inset-0`, the row `relative`); the controls of the row stand above it
    (`relative z-10`).
-3. **Secondary line**: `text-sm text-muted-foreground`, with badges at the title.
+3. **Secondary line**: `text-sm text-muted-foreground`, with badges at the title. The contacts
+   and the types of the master data put their groups and what else they hold in columns of their
+   own on a desktop, so that they line up from row to row (`MasterRow` with `columns`, see
+   [Master data tabs](#master-data-tabs)).
 4. **Trailing**: at most the `Switch` (where there is one) and the `EditButton`. Counts may stand
    before them as links. A space's row keeps its members and "Verlassen" as icon buttons: they
    have no detail page to go to.
@@ -845,7 +848,8 @@ version of the app ([App](#app)). **A toast never replaces a load error on the p
   about 200 characters. Longer explanations belong in the documentation.
 - **Tooltip** (`ui/tooltip`): the name of an icon button (through `IconButton`), the names of the
   options of `Segmented`, the inbox mark of a card. A native `title=` attribute is used only for
-  text that is cut off (a truncated name, "+3" for the rest of the tags) and for the names of
+  text that is cut off (a truncated name, "+3" for the rest of the tags, a type's title pattern
+  behind the word "Titelmuster" in its row) and for the names of
   options in pickers (swatches, icons, months, the path of a tag on a filter's chip), never on
   buttons; a document's title in the Beam's link (`BeamTitle`) shows itself and has none.
 - Information is never available only through hover. On the phone a tooltip's content must also be
