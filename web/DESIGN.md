@@ -411,9 +411,18 @@ chosen a line there says how to choose, move and cut. The description under the 
   ruhiger", B1): its first pages as a small stack, "Teil n" and below it its pages (muted), the
   eye at its end in a round `bg-panel` mark, and a `Segmented` (`sm`) "Neue Fassung | Neues Dokument" at
   its end (on a phone below, `equal`, the full width); at most one part replaces the document
-  (choosing it lets go of another). Below them an `Alert` `note`: every result runs anew and waits
-  in the inbox, which part becomes which version of the document ("Teil 1 wird Fassung 3 von
-  „…“") or that it is deleted where no part replaces it, and which parts become new documents.
+  (choosing it lets go of another). The step says nothing more of what follows: the question
+  does (nothing twice, Tobi 11.11.2026).
+- **The question before applying** (Tobi, 12.11.2026): "Übernehmen" asks first, in the window a
+  document's form asks with before saving (`ChangeDialog`, "Was die Änderung bewirkt", see
+  "Change preview" under [Lists](#lists)), described "Noch ist nichts gespeichert. Erst „Übernehmen“
+  führt die Änderung aus.". Its `DetailList` has a row per part, "Teil n · S. x–y", with what it
+  becomes: "Fassung 3 von „…“" (the number once the versions are known), "Was Du dort
+  entschieden hast, bleibt." muted below, or "Neues Dokument"; then "Gelöscht" with the titles
+  that go in `destructive`, struck through (as a removed tag), what follows muted below. After a
+  line, muted, that every result runs anew and waits in the inbox. Its "Übernehmen" is
+  `destructive` where no part replaces the document (its original is lost), else `default`.
+  Nothing is stored before it is agreed to; an error stays in it.
 - **Merging** (Tobi 11.11.2026, mock "Trennblatt und Zusammenführen"): with the pages of other
   documents, the dialog merges them and says so ("2 Dokumente zusammenführen", on a phone
   "Zusammenführen"). Each document has a letter, A the one edited, B, C, … in the order they
@@ -426,9 +435,9 @@ chosen a line there says how to choose, move and cut. The description under the 
   being processed, not the user's to edit, without page images); "Seiten hinzufügen" puts its
   pages after the chosen ones. In the second step a `Select` "Neue Fassung von" over the parts
   names the document the part that replaces makes the next version of (it keeps its data); the
-  note says which documents are deleted and that their versions stay with it. A merge needs that
-  part: without one "Übernehmen" is disabled and the note says why ("Mach einen Teil zur neuen
-  Fassung, sonst gingen die Originale der Dokumente verloren.").
+  question says which documents are deleted and that their versions stay with it. A merge needs
+  that part: without one "Übernehmen" is disabled and an `Alert` `note` below the parts says why
+  ("Mach einen Teil zur neuen Fassung, sonst gingen die Originale der Dokumente verloren.").
 - **From the list**: "Zusammenführen …" under "Mehr" of the selection bar of the documents list
   opens the dialog with the pages of every chosen document, in the order they were chosen, the
   first the one edited. Where they cannot be merged (fewer than two, every hit rather than single
@@ -639,7 +648,12 @@ around it gives the padding (`px-1 pb-1` in a `sm` card, `px-4 pb-4` otherwise).
 it shows more than words (chips, a value before and after).
 
 **Change preview** (`ChangePreview`, Tobi 10.11.2026): what saving a document's form would do,
-in the dialog "Was die Änderung bewirkt" (`md`) before "Speichern". Each changed field as a row
+in the dialog "Was die Änderung bewirkt" before "Speichern". The dialog is `ChangeDialog` (`md`,
+centred on a phone too, the footer's actions there one above the other): its title, a
+description that nothing is stored yet, the body scrolling, "Abbrechen" and the action
+(`destructive` where something is lost); "PDF bearbeiten" asks with it as well (see
+[Page stack](#page-stack)). No other dialog says "Was die Änderung bewirkt"
+(`design-system.test.ts`). Each changed field as a row
 of a `DetailList`: its value before (muted, struck through; "Nicht gesetzt" when it had none),
 an arrow, its value after; tags as `TagChip`s with `change` (as in the mock Tobi chose): a
 removed one in red and struck through, an added one in green. Then the rules that run ("Regel, die ausgeführt wird", "Regeln, die ausgeführt werden"),
@@ -701,9 +715,11 @@ list pages the same way (see [Lists](#lists)).
   rows of 48 px. No popover holds a `Command` by hand (`design-system.test.ts`).
 - **Steps:** an editor of several steps (`EditorShell` with `stay` and `back`, "PDF bearbeiten")
   leads on with its primary action ("Weiter", which may say what follows: "Weiter: 3
-  Dokumente") and takes effect only in the last ("Übernehmen"). A later step has "Zurück"
-  (`ghost`) at the start of the footer, apart from "Abbrechen" and the primary action; on the
-  phone "Zurück" stands instead of "Abbrechen" in the bar. Going back keeps what was done.
+  Dokumente") and takes effect only in the last ("Übernehmen"), after the question what it does
+  (`ChangeDialog`, as a document's form asks before saving; see [Page stack](#page-stack)). A
+  later step has "Zurück" (`ghost`) at the start of the footer, apart from "Abbrechen" and the
+  primary action; on the phone "Zurück" stands instead of "Abbrechen" in the bar. Going back
+  keeps what was done.
 - **A field to work on:** an editor whose body is a field of things to work on ("PDF
   bearbeiten") keeps its tools in place: `EditorShell` `top` stands fixed under the title (a line
   below, `bg-card`), `bottom` fixed under the body, and only the body scrolls, on `bg-background`.
