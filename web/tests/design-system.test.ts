@@ -38,8 +38,7 @@ const EXCEPTIONS = {
 	flushPadding: new Set([
 		'/src/lib/components/FilterSection.svelte',
 		'/src/lib/components/Lenses.svelte',
-		'/src/lib/components/SelectionBar.svelte',
-		'/src/lib/components/system/MaintenanceTab.svelte'
+		'/src/lib/components/SelectionBar.svelte'
 	]),
 	// Paper, logos and the QR code are drawn for white; the overlays of shadcn's dialogs.
 	palette: new Set([
@@ -446,6 +445,19 @@ describe('the design system (web/DESIGN.md)', () => {
 				);
 			})
 		).toEqual([]);
+	});
+
+	it('shows the jobs first on the page "System", the maintenance as their dialog for admins', () => {
+		// DESIGN.md, "System page" (Tobi, 12.11.2026).
+		expect(scripts['/src/lib/system.ts']).toContain(
+			"SYSTEM_TABS = ['jobs', 'automation', 'classifier', 'search', 'intake']"
+		);
+		expect(sources['/src/lib/components/system/JobsTab.svelte']).toMatch(
+			/\{#if session\.isAdmin\}\s*<MaintenanceDialog\b/
+		);
+		expect(Object.keys(sources).some((path) => path.endsWith('/MaintenanceTab.svelte'))).toBe(
+			false
+		);
 	});
 
 	it('keeps fields in the order the API lists them, never sorts them again', () => {

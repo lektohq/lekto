@@ -1,5 +1,6 @@
 <script lang="ts">
 	import RotateCw from '@lucide/svelte/icons/rotate-cw';
+	import Wrench from '@lucide/svelte/icons/wrench';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
@@ -40,13 +41,16 @@
 	import type { Tone } from '#lib/tones.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import Loading from '#lib/components/Loading.svelte';
+	import MaintenanceDialog from '#lib/components/system/MaintenanceDialog.svelte';
+	import { session } from '#lib/session.svelte.ts';
 
 	// The tab "Jobs" of the page "System" (Tobi, 24.10.2026; a table with pages since
 	// 26.10.2026): whether a worker takes jobs, how many stand where, and the jobs as a table,
 	// the open ones in the order the workers take them (what runs next on top), the failed ones
 	// (admins try them again) and the done ones with how long each waited and ran, by state and
-	// kind; below the done ones, how long each kind takes. It asks again every five seconds
-	// while the page is in view, the durations every minute; no events.
+	// kind; below the done ones, how long each kind takes. Beside the kinds admins open the
+	// maintenance (Tobi, 12.11.2026). It asks again every five seconds while the page is in
+	// view, the durations every minute; no events.
 	type View = 'open' | 'failed' | 'done';
 	type Durations = components['schemas']['JobDurationsOut'];
 
@@ -64,6 +68,7 @@
 	let durations = $state<Durations | null>(null);
 	let problem = $state<string | null>(null);
 	let busy = $state<string | null>(null);
+	let maintaining = $state(false);
 
 	const jobs = new Pager<Job>(async (offset, limit) => {
 		const found = await unwrap(
@@ -263,13 +268,21 @@
 					{ value: 'done', label: m.jobs_view_done(), count: formatNumber(all.done) }
 				]}
 			/>
-			<Select
-				aria-label={m.jobs_kind()}
-				class="w-auto min-w-48"
-				value={kind}
-				onchange={choose}
-				options={kindOptions}
-			/>
+			<!-- On a phone the kinds fill the row beside "Wartung". -->
+			<div class="flex items-center gap-2 max-sm:w-full">
+				<Select
+					aria-label={m.jobs_kind()}
+					class="w-auto min-w-48 max-sm:min-w-0 max-sm:flex-1"
+					value={kind}
+					onchange={choose}
+					options={kindOptions}
+				/>
+				{#if session.isAdmin}
+					<Button variant="outline" onclick={() => (maintaining = true)}>
+						<Wrench aria-hidden="true" />{m.maintenance_title()}
+					</Button>
+				{/if}
+			</div>
 		</div>
 
 		<Card.Root as="section" size="lg">
@@ -440,6 +453,10 @@
 					</div>
 				{/if}
 			</Card.Root>
+		{/if}
+
+		{#if session.isAdmin}
+			<MaintenanceDialog bind:open={maintaining} {summary} onqueued={refresh} />
 		{/if}
 	{/if}
 </div>

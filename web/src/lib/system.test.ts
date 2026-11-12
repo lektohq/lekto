@@ -5,11 +5,12 @@ describe('the tab of the page "System"', () => {
 	it('is the one the URL names, else the first', () => {
 		expect(systemTab(new URLSearchParams('tab=jobs'), true)).toBe('jobs');
 		expect(systemTab(new URLSearchParams('tab=search'), true)).toBe('search');
-		expect(systemTab(new URLSearchParams(''), true)).toBe('automation');
+		expect(systemTab(new URLSearchParams(''), true)).toBe('jobs');
 		expect(systemTab(new URLSearchParams('tab=classifier'), true)).toBe('classifier');
-		expect(systemTab(new URLSearchParams('tab=nonsense'), true)).toBe('automation');
+		expect(systemTab(new URLSearchParams('tab=nonsense'), true)).toBe('jobs');
+		expect(systemTab(new URLSearchParams('tab=maintenance'), true)).toBe('jobs');
 		expect(systemTab(new URLSearchParams('tab=intake'), true)).toBe('intake');
-		expect(systemTab(new URLSearchParams('tab=intake'), false)).toBe('automation');
+		expect(systemTab(new URLSearchParams('tab=intake'), false)).toBe('jobs');
 	});
 
 	it('keeps the intake channels to admins', () => {
