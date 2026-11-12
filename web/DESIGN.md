@@ -671,7 +671,7 @@ colour of its own: lane colours mean state. On the phone a table keeps to the co
 where it is wider, it scrolls inside its card, never the page. A list a person reads item by
 item is a list of rows, not a table. Pagination is `Pagination`, 50 to a page unless the table
 offers other sizes in a small menu beside the count (`outline`, `sm`): the jobs and the
-deliveries of a webhook and the mails of a mailbox 25, 50 and 100, 25 at first; the choice is remembered per table in the
+deliveries of a webhook, the mails of a mailbox and the lists of the master data 25, 50 and 100, 25 at first; the choice is remembered per table in the
 browser (`page-size.ts`) and holds wherever that table shows. Above such a table, a `Segmented`
 with counts picks what it shows and a `Select` narrows it to a kind (the jobs by state and kind,
 the deliveries by outcome and event, the mails of a mailbox by outcome and rule). The documents
@@ -1121,6 +1121,11 @@ of the tab (`SearchField`), the tab's filter row where it has one, then its list
 between them: an explanation is an info button (`InfoHint`) in the filter row, never a paragraph
 above the list.
 
+The contacts and the types sort beside their search (Tobi, 12.11.2026): a `SortMenu` ("Name
+A–Z", the API's order, or "Meiste Dokumente"; on a phone its icon), in the link (`?sort=`) and
+remembered per list in the browser (`master-pages.ts`). The fields keep their order (below) and
+offer no sort.
+
 | Tab       | Filter row                                                                                                |
 | --------- | --------------------------------------------------------------------------------------------------------- |
 | Kontakte  | the chip of the group or topic a link from the Tags tab names (removable)                                 |
@@ -1132,6 +1137,30 @@ above the list.
 The lists are rows in one card (`MasterRow`), the tags one card per kind; the open identifiers a
 table on a desktop (see [Lists](#lists)). Their rows on a phone are `MasterRow`s or built as they
 are.
+
+**Pages** (Tobi, 12.11.2026): the contacts, the types and the fields show a page at a time
+(`MasterPages`): 25 rows, `Pagination` below with 25, 50 and 100 (remembered per list), the page
+in the link (`?page=`). The lists load whole, so the search, a group's filter and the sort go over
+all of them; a new search or sort starts on the first page. The tags (trees, a card per kind)
+keep showing whole; the open identifiers page on their own.
+
+**A contact's row and a type's** are built alike (Tobi, 12.11.2026), `MasterRow` with `columns`:
+
+- At the start an avatar, round: `ContactAvatar` (logo or initials) or `TypeAvatar` (the type's
+  icon in `text-brand` on `bg-panel`, the ground of the initials; without an icon `Shapes`,
+  muted). A type's icon stands in no other tile.
+- The name, under it what the item is in one line, cut where it is too long: a contact's other
+  spelling ("auch „Markt-Apotheke“"), a type's description.
+- What else it holds, in one form: "2 Kennungen · 1 Thema"; "3 Felder, 1 Pflicht · Titelmuster ·
+  Bezugsziel" (the title pattern in full as its tooltip).
+- On a desktop (`lg`) the groups (two chips, then "+n") and what else it holds stand in columns
+  of their own, the usage in a column of one width, so that they line up from row to row.
+  Narrower the groups and the rest follow in the line under the name, the chips never squeezed
+  by the text.
+- On a phone the name may take two lines; under it the first group, "+n" and what the item is.
+  What else it holds is in its editor.
+- Every row is as high as one of two lines, whether it has a second or not: 64 px on a desktop,
+  68 px narrower, 72 px on a phone.
 
 Fields stand in one order everywhere (Tobi, 03.11.2026): by their position, the same by name, as
 `GET /fields` lists them. The field dialog sets the position ("Reihenfolge", a number); the Felder
@@ -1462,8 +1491,10 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     (`pressed`) only where each toggles on its own ("Tabs and switches"); a rule's switch only
     through `RuleSwitch`, its toast and those of a mailbox and a webhook only from
     `lib/rules/switch.ts` ("Mail rules"); every master data tab
-    in the order tabs, search, filter row, list, with no paragraph before the list ("Master data
-    tabs"); tooltips only through `ui/tooltip` ("Help and tooltips"); `Progress` only in the
+    in the order tabs, search, filter row, list, with no paragraph before the list, the contacts,
+    the types and the fields a page at a time through `MasterPages`, one `SortMenu` on the page,
+    a contact's and a type's row with `columns`, a tile around a type's icon only as `TypeAvatar`
+    ("Master data tabs"); tooltips only through `ui/tooltip` ("Help and tooltips"); `Progress` only in the
     selection bars of runs on many and the upload summary ("Choosing many"); dates and times
     through `DateInput`, no native date or time field, every search through `SearchField` at the
     height of a field ("Fields"); "Abbrechen" before the

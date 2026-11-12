@@ -19,6 +19,15 @@ describe('the page size of a table', () => {
 		expect([rememberedPageSize('jobs'), rememberedPageSize('documents')]).toEqual([100, 25]);
 	});
 
+	it('is 25 for the lists of the master data, each its own', () => {
+		expect(rememberedPageSize('contacts')).toBe(25);
+		rememberPageSize('document-types', 50);
+		expect([rememberedPageSize('contacts'), rememberedPageSize('document-types')]).toEqual([
+			25, 50
+		]);
+		expect(rememberedPageSize('fields')).toBe(25);
+	});
+
 	it('forgets the default and ignores a size the table does not offer', () => {
 		rememberPageSize('jobs', 100);
 		rememberPageSize('jobs', DEFAULT_PAGE_SIZES.jobs);
