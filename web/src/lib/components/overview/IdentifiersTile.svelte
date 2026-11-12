@@ -4,13 +4,14 @@
 	import Figure from '#lib/components/overview/Figure.svelte';
 	import Tile from '#lib/components/overview/Tile.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import type { OpenCounts } from '#lib/open-identifiers.ts';
 	import { m } from '#lib/paraglide/messages.js';
 
 	// The suggestions among the open identifiers on the overview (admins; #215): a domain that
-	// fits its contact's name, an IBAN for a profile. No to-do: the overview shows the tile only
-	// while there are suggestions (or their count could not be read), and the learned ones,
-	// which work already, only the tab of master data lists.
+	// fits its contact's name, an IBAN for a profile; shown also with none, like the inbox
+	// (Tobi, 12.11.2026). The learned ones, which work already, only the tab of master data
+	// lists. The page asks for the counts.
 	let {
 		counts,
 		problem,
@@ -25,8 +26,10 @@
 	go={m.overview_identifiers_go()}
 >
 	{#if problem}
-		<LoadProblem {problem} {onretry} />
-	{:else if counts}
+		<div class="relative z-10"><LoadProblem {problem} {onretry} /></div>
+	{:else if !counts}
+		<Skeleton class="h-9 w-24" />
+	{:else}
 		<Figure count={counts.suggested} label={m.overview_identifiers_suggestions()} />
 	{/if}
 </Tile>

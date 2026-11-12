@@ -18,8 +18,9 @@
 	import { m } from '#lib/paraglide/messages.js';
 
 	// The jobs on the overview: the failed ones by kind (admins try them again on the page
-	// "System"), else whether a worker takes jobs; no line under them (Tobi, 12.11.2026). Asked
-	// again every 30 seconds while the page is in view.
+	// "System"), else whether a worker takes jobs; no line under them (Tobi, 12.11.2026). In a
+	// tile half a phone wide a kind is cut short and "Kein Worker nimmt Jobs" wraps. Asked again
+	// every 30 seconds while the page is in view.
 	const POLL = 30_000;
 
 	let summary = $state<JobsSummary | null>(null);
@@ -52,7 +53,7 @@
 	go={m.overview_jobs_go()}
 >
 	{#if problem}
-		<LoadProblem {problem} onretry={load} />
+		<div class="relative z-10"><LoadProblem {problem} onretry={load} /></div>
 	{:else if !summary || !all}
 		<Skeleton class="h-9 w-24" />
 	{:else}
@@ -60,19 +61,24 @@
 			<Figure count={all.failed} label={m.overview_jobs_failed()} />
 			<ul class="flex flex-wrap gap-1.5">
 				{#each failed as kind (kind.kind)}
-					<li>
-						<Badge variant="red"
-							><OctagonX aria-hidden="true" />{m.overview_failed_kind({
-								kind: kindLabel(kind.kind),
-								count: formatNumber(kind.failed)
-							})}</Badge
+					<li class="max-w-full">
+						<Badge variant="red" class="max-w-full"
+							><OctagonX aria-hidden="true" /><span class="truncate"
+								>{m.overview_failed_kind({
+									kind: kindLabel(kind.kind),
+									count: formatNumber(kind.failed)
+								})}</span
+							></Badge
 						>
 					</li>
 				{/each}
 			</ul>
 		{:else if still}
 			<p>
-				<Badge variant="yellow" size="md"
+				<Badge
+					variant="yellow"
+					size="md"
+					class="max-sm:h-auto max-sm:py-0.5 max-sm:whitespace-normal"
 					><TriangleAlert aria-hidden="true" />{m.jobs_worker_stale()}</Badge
 				>
 			</p>
