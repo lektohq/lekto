@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Plus from '@lucide/svelte/icons/plus';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import FieldsPanel from '#lib/components/FieldsPanel.svelte';
 	import IdentifiersPanel from '#lib/components/IdentifiersPanel.svelte';
@@ -15,14 +16,40 @@
 	import { kindFilter } from '#lib/tag-kinds.ts';
 	import PageHeader from '#lib/components/page/PageHeader.svelte';
 	import SearchField from '#lib/components/SearchField.svelte';
+	import SortMenu from '#lib/components/SortMenu.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
+	import {
+		masterSortOf,
+		masterSortShort,
+		masterSorts,
+		rememberMasterSort,
+		type MasterSort,
+		type SortedList
+	} from '#lib/master-pages.ts';
 
 	// Five tabs: contacts, document types, every kind of tag, fields, and the identifiers no
 	// person has confirmed (Tobi, 27.10.2026). The tab stands in the URL (an unknown one is the
 	// first); the API refuses everyone but admins. Each tab has its own search (in this browser);
 	// all but the identifiers add with the button level with the title (on a phone an icon
-	// button).
+	// button). The contacts and the types sort beside the search (Tobi, 12.11.2026): by name or
+	// by most documents, in the URL and remembered per list.
 	const tab = $derived(masterTabOf(page.url.searchParams));
+	const sorted = $derived<SortedList | null>(
+		tab === 'contacts' || tab === 'document-types' ? tab : null
+	);
+	const sort = $derived<MasterSort>(sorted ? masterSortOf(page.url.searchParams, sorted) : 'name');
+
+	/** Sort the list of the tab by `value`, from its first page. */
+	function sortBy(value: string) {
+		if (!sorted) return;
+		const chosen = value as MasterSort;
+		rememberMasterSort(sorted, chosen);
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const next = new URLSearchParams(page.url.search);
+		next.set('sort', chosen);
+		next.delete('page');
+		void goto(`?${next}`, { reset: false });
+	}
 	const queries = $state<Record<Tab, string>>({
 		contacts: '',
 		'document-types': '',
@@ -96,11 +123,24 @@
 				current={tab}
 			/>
 			<div class="mt-4 flex flex-col gap-3 sm:gap-4">
-				<SearchField
-					bind:value={queries[tab]}
-					label={m.master_search_label({ what: LABEL[tab]() })}
-					placeholder={SEARCH[tab]()}
-				/>
+				<div class="flex items-center gap-2">
+					<SearchField
+						bind:value={queries[tab]}
+						class="min-w-0 flex-1"
+						label={m.master_search_label({ what: LABEL[tab]() })}
+						placeholder={SEARCH[tab]()}
+					/>
+					{#if sorted}
+						<SortMenu
+							options={masterSorts()}
+							value={sort}
+							short={masterSortShort(sort)}
+							onchange={sortBy}
+							compact={phone.current}
+							class="shrink-0"
+						/>
+					{/if}
+				</div>
 				{#key tab}
 					{#if tab === 'fields'}
 						<FieldsPanel query={queries.fields} />
@@ -109,7 +149,7 @@
 					{:else if tab === 'tags'}
 						<TagsPanel query={queries.tags} />
 					{:else}
-						<MasterDataList kind={tab} query={queries[tab]} />
+						<MasterDataList kind={tab} query={queries[tab]} {sort} />
 					{/if}
 				{/key}
 			</div>

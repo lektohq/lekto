@@ -5,7 +5,8 @@
  */
 
 /** The tables that offer a choice of page size. */
-export type PagedTable = 'jobs' | 'deliveries' | 'documents' | 'mails';
+export type PagedTable =
+	'jobs' | 'deliveries' | 'documents' | 'mails' | 'contacts' | 'document-types' | 'fields';
 
 /** The sizes a table offers: the jobs at most 100, as the API gives no more; the documents
  * too, as a search by words gives no more (200 was weighed and left out, Tobi 28.10.2026). */
@@ -13,17 +14,24 @@ export const PAGE_SIZES: Record<PagedTable, readonly number[]> = {
 	jobs: [25, 50, 100],
 	deliveries: [25, 50, 100],
 	documents: [25, 50, 100],
-	mails: [25, 50, 100]
+	mails: [25, 50, 100],
+	contacts: [25, 50, 100],
+	'document-types': [25, 50, 100],
+	fields: [25, 50, 100]
 };
 
 /** The size of a table until one is chosen: the jobs and the deliveries 25 (Tobi,
  * 27.10.2026), the documents 50 (Tobi, 28.10.2026), the mails of a mailbox 25 as the
- * deliveries (06.11.2026). */
+ * deliveries (06.11.2026), the lists of the master data 25, as their rows are high (Tobi,
+ * 12.11.2026). */
 export const DEFAULT_PAGE_SIZES: Record<PagedTable, number> = {
 	jobs: 25,
 	deliveries: 25,
 	documents: 50,
-	mails: 25
+	mails: 25,
+	contacts: 25,
+	'document-types': 25,
+	fields: 25
 };
 
 function key(table: PagedTable): string {

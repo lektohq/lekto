@@ -272,4 +272,29 @@ describe('FieldsPanel', () => {
 			.find((call) => call.method === 'DELETE');
 		expect(new URL(deleted!.url).pathname).toBe('/api/v1/fields/f1');
 	});
+	it('shows 25 fields a page, in their order', async () => {
+		fetchMock.mockImplementation(async (request) => {
+			const path = new URL(request.url).pathname;
+			if (path !== '/api/v1/fields') return json([]);
+			return json(
+				Array.from({ length: 30 }, (_, index) => ({
+					id: `f${index}`,
+					name: `Feld ${String(index + 1).padStart(2, '0')}`,
+					key: `feld_${index}`,
+					data_type: 'text',
+					document_type_ids: null,
+					choices: [],
+					required: false,
+					required_document_type_ids: [],
+					description: null,
+					position: 0,
+					created_at: '2026-10-13T12:00:00Z'
+				}))
+			);
+		});
+		render(FieldsPanel);
+		expect(await screen.findByText('Feld 25')).toBeTruthy();
+		expect(screen.queryByText('Feld 26')).toBeNull();
+		expect(screen.getByText(m.pagination_range({ from: '1', to: '25', total: '30' }))).toBeTruthy();
+	});
 });

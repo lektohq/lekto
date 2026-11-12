@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { desktop } from '#lib/desktop.svelte.ts';
 import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
@@ -86,6 +87,8 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllGlobals();
 	phone.override(null);
+	desktop.override(null);
+	localStorage.clear();
 	masterDataDialogs.close();
 });
 
@@ -168,5 +171,114 @@ describe('MasterDataList', () => {
 		expect(screen.queryByRole('link')).toBeNull();
 		await fireEvent.click(name.closest('button')!);
 		expect(masterDataDialogs.request).toMatchObject({ kind: 'contacts', item: { id: 'c1' } });
+	});
+	it('shows 25 contacts a page, the page the link names, and the first again on a search', async () => {
+		const many = Array.from({ length: 30 }, (_, index) =>
+			contact(`m${index}`, `Kontakt ${String(index + 1).padStart(2, '0')}`)
+		);
+		fetchMock.mockImplementation(async (request) => {
+			const path = new URL(request.url).pathname;
+			return json(path === '/api/v1/contacts' ? many : []);
+		});
+		nav.url = new URL('http://lekto/ui/admin/master-data?tab=contacts&page=2');
+		const { rerender } = render(MasterDataList, { kind: 'contacts' });
+		expect(await screen.findByText('Kontakt 26')).toBeTruthy();
+		expect(screen.queryByText('Kontakt 25')).toBeNull();
+		expect(
+			screen.getByText(m.pagination_range({ from: '26', to: '30', total: '30' }))
+		).toBeTruthy();
+		await fireEvent.click(screen.getByRole('button', { name: m.pagination_page({ page: '1' }) }));
+		expect(nav.goto).toHaveBeenLastCalledWith('?tab=contacts', {});
+		nav.goto.mockReset();
+		await rerender({ query: 'Kontakt 0' });
+		await waitFor(() =>
+			expect(nav.goto).toHaveBeenCalledWith('?tab=contacts', { replace: true, reset: false })
+		);
+	});
+
+	it('puts the contacts with the most documents first when sorted so', async () => {
+		fetchMock.mockImplementation(async (request) => {
+			const path = new URL(request.url).pathname;
+			if (path !== '/api/v1/contacts') return json([]);
+			return json([
+				contact('c1', 'Nord', { document_count: 104 }),
+				contact('c2', 'Sparkasse', { document_count: 5 }),
+				contact('c3', 'Stadtwerke', { document_count: 300 })
+			]);
+		});
+		render(MasterDataList, { kind: 'contacts', sort: 'documents' });
+		await screen.findByText('Nord');
+		const names = screen
+			.getAllByText(/^(Nord|Sparkasse|Stadtwerke)$/)
+			.map((name) => name.textContent);
+		expect(names).toEqual(['Stadtwerke', 'Nord', 'Sparkasse']);
+	});
+
+	it('on a desktop lines up a type’s groups and facts, the title pattern in full as tooltip', async () => {
+		desktop.override(true);
+		fetchMock.mockImplementation(async (request) => {
+			const path = new URL(request.url).pathname;
+			if (path === '/api/v1/document-types') {
+				return json([
+					{
+						id: 't1',
+						name: 'Rechnung',
+						description: 'Eine Forderung',
+						group_ids: ['g9'],
+						icon: null,
+						title_pattern: 'Rechnung {{ contact.name }}',
+						relation_target: true,
+						document_count: 3
+					}
+				]);
+			}
+			if (path === '/api/v1/tags') return json([tag('g9', ['Geld'], null, 'document_type')]);
+			if (path === '/api/v1/fields') {
+				return json([
+					{ id: 'f1', document_type_ids: ['t1'], required_document_type_ids: ['t1'] },
+					{ id: 'f2', document_type_ids: ['t1'], required_document_type_ids: [] },
+					{ id: 'f3', document_type_ids: null, required_document_type_ids: [] }
+				]);
+			}
+			return json([]);
+		});
+		render(MasterDataList, { kind: 'document-types' });
+		const row = (await screen.findByText('Rechnung')).closest('li')!;
+		expect(within(row).getByText('Eine Forderung')).toBeTruthy();
+		expect(within(row).getByText('Geld')).toBeTruthy();
+		const fieldsText = m.master_fields_required({
+			fields: m.master_fields_many({ count: 2 }),
+			required: m.master_required_count({ count: 1 })
+		});
+		expect(within(row).getByText(fieldsText)).toBeTruthy();
+		expect(within(row).getByText(m.master_title_pattern()).getAttribute('title')).toBe(
+			'Rechnung {{ contact.name }}'
+		);
+		expect(within(row).getByText(m.master_relation_target())).toBeTruthy();
+		// Round as a contact's avatar, the shapes of every type where it has no icon.
+		expect(row.querySelector('[data-type-avatar]')?.className).toContain('rounded-full');
+	});
+
+	it('on a phone tells the first group, how many more, and what the contact is', async () => {
+		phone.override(true);
+		fetchMock.mockImplementation(async (request) => {
+			const path = new URL(request.url).pathname;
+			if (path === '/api/v1/contacts') {
+				return json([contact('c9', 'Finanzamt', { group_ids: ['g1', 'g3'], aliases: ['FA'] })]);
+			}
+			if (path === '/api/v1/tags') {
+				return json([
+					tag('g1', ['Insurer'], null, 'contact'),
+					tag('g3', ['Bank'], null, 'contact')
+				]);
+			}
+			return json([]);
+		});
+		render(MasterDataList, { kind: 'contacts' });
+		const row = (await screen.findByText('Finanzamt')).closest('li')!;
+		expect(within(row).getByText('Bank')).toBeTruthy();
+		expect(within(row).queryByText('Insurer')).toBeNull();
+		expect(within(row).getByText(m.master_groups_more({ count: 1 }))).toBeTruthy();
+		expect(within(row).getByText(m.master_alias_short({ alias: 'FA' }))).toBeTruthy();
 	});
 });

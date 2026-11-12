@@ -11,7 +11,10 @@
 	import AlertDot from '#lib/components/AlertDot.svelte';
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
+	import ContactAvatar from '#lib/components/ContactAvatar.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
+	import MasterRow from '#lib/components/MasterRow.svelte';
+	import TypeAvatar from '#lib/components/TypeAvatar.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import Chip from '#lib/components/Chip.svelte';
 	import ChipInput from '#lib/components/ChipInput.svelte';
@@ -167,6 +170,12 @@
 	let contact = $state('c1');
 	let folded = $state(false);
 	// The identifiers at contacts, grouped by contact (web/DESIGN.md, "Lists").
+	// A contact's row and a type's in a master data list, built alike (`columns`).
+	const SAMPLE_ROWS = [
+		{ name: 'Stadtwerke Musterstadt', icon: null, count: 12, contact: true },
+		{ name: 'Kontoauszug', icon: 'receipt', count: 48, contact: false },
+		{ name: 'Garantieschein', icon: null, count: 3, contact: false }
+	];
 	const SAMPLE_CONTACTS = [
 		{ id: 'c1', name: 'Stadtwerke Musterstadt', topic_ids: [] },
 		{ id: 'c2', name: 'Hanse Versicherung', topic_ids: [] }
@@ -490,6 +499,26 @@
 				<p class="py-1 text-sm text-muted-foreground">{m.dev_sample_text()}</p>
 				<p class="py-1 text-sm text-muted-foreground">{m.dev_sample_text()}</p>
 			</FoldedGroup>
+		</Card.Root>
+		<Card.Root as="ul" size="flush" class="max-w-3xl divide-y overflow-hidden">
+			{#each SAMPLE_ROWS as sample (sample.name)}
+				<MasterRow
+					columns
+					onopen={() => toast.info(sample.name)}
+					editLabel={m.master_edit({ name: sample.name })}
+					usage={[{ count: sample.count, href: '#dev-cards' }]}
+				>
+					{#snippet lead()}
+						{#if sample.contact}
+							<ContactAvatar contact={sample} size="md" class="max-sm:size-10 max-sm:text-sm" />
+						{:else}
+							<TypeAvatar icon={sample.icon} class="max-sm:size-10 max-sm:[&_svg]:size-5" />
+						{/if}
+					{/snippet}
+					<span class="w-full truncate">{sample.name}</span>
+					<span class="w-full truncate text-sm text-muted-foreground">{m.dev_sample_hint()}</span>
+				</MasterRow>
+			{/each}
 		</Card.Root>
 		<div class="max-w-3xl">
 			<IdentifiersEditor
