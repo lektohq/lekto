@@ -332,6 +332,14 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('asks what a change does in one window, ChangeDialog', () => {
+		expect(
+			offenders((source, path) =>
+				path.endsWith('/ChangeDialog.svelte') ? null : line(source, /\bm\.dryrun_title\(/)
+			)
+		).toEqual([]);
+	});
+
 	it('sizes dialogs by their size, not by a width of their own', () => {
 		expect(
 			offenders((source) => {
