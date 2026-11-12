@@ -309,7 +309,7 @@ logos. Set both variables or neither; without them Lekto sends no notification.
 
 ## The image
 
-Variables of the image `ghcr.io/tb1337/lekto` that are not settings of Lekto itself.
+Variables of the image `ghcr.io/lektohq/lekto` that are not settings of Lekto itself.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -320,7 +320,7 @@ Variables of the image `ghcr.io/tb1337/lekto` that are not settings of Lekto its
 
 ## The migration client
 
-`lekto-migration` (image `ghcr.io/tb1337/lekto-migration`) reads its own variables, all with the
+`lekto-migration` (image `ghcr.io/lektohq/lekto-migration`) reads its own variables, all with the
 prefix `LEKTO_MIGRATION_`; Lekto ignores them. See [migration/README.md](../migration/README.md).
 
 | Variable | Default | Meaning |

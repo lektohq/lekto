@@ -28,8 +28,11 @@ Each release publishes the image on ghcr.io (`.github/workflows/release.yml`), f
 
 | Image | Content |
 | --- | --- |
-| `ghcr.io/tb1337/lekto` | Lekto with API and worker (`LEKTO_ROLE`) |
-| `ghcr.io/tb1337/lekto-migration` | the migration client from Paperless-ngx ([migration/README.md](../migration/README.md)) |
+| `ghcr.io/lektohq/lekto` | Lekto with API and worker (`LEKTO_ROLE`) |
+| `ghcr.io/lektohq/lekto-migration` | the migration client from Paperless-ngx ([migration/README.md](../migration/README.md)) |
+
+Up to 0.15.4 they were `ghcr.io/tb1337/lekto` and `ghcr.io/tb1337/lekto-migration`: those stay, but
+get no new version since the repository moved to `lektohq/lekto` (12.11.2026).
 
 Tags: every release its version (`0.6.0`); `beta` the newest beta (a version below 1.0, or with a
 pre-release such as `1.2.0-beta.1`), `stable` the newest stable release, `latest` the newest stable
@@ -47,7 +50,7 @@ Contents: write); a failed dispatch does not mark the release red.
 
 ## Start an example stack
 
-The Compose examples are in [docker/](../docker/), all with `ghcr.io/tb1337/lekto:latest` and
+The Compose examples are in [docker/](../docker/), all with `ghcr.io/lektohq/lekto:latest` and
 Meilisearch; the language model is outside unless you add Ollama (see
 [Language model](#language-model)). Settings and secrets come from one file `docker/.env`
 (template `docker/.env.example`); the examples need Docker Compose 2.24 or newer.

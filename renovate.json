@@ -45,7 +45,7 @@
     {
       "description": "Lekto's own images, which the compose examples name",
       "matchPackageNames": [
-        "ghcr.io/tb1337/**"
+        "ghcr.io/lektohq/**"
       ],
       "enabled": false
     },
