@@ -402,6 +402,18 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('shows a tile of the overview as its number and badges, the documents in its head', () => {
+		// DESIGN.md, "Overview tiles": no line of detail under them (Tobi, 12.11.2026).
+		expect(
+			offenders((source, path) =>
+				/\/components\/overview\/\w+Tile\.svelte$/.test(path) ? line(source, /text-meta/) : null
+			)
+		).toEqual([]);
+		expect(snippets(sources['/src/routes/(app)/+page.svelte'], 'actions').join('')).toContain(
+			'${BASE}/documents`'
+		);
+	});
+
 	it('shows every master data tab as tabs, search, its filter row and its list', () => {
 		const page = sources[MASTER_PAGE];
 		const at = (name: string) => page.indexOf(`<${name}`);

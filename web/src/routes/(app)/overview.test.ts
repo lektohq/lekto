@@ -78,8 +78,10 @@ describe('Übersicht', () => {
 		expect(tile.textContent).toContain(m.overview_lane_red({ count: '2' }));
 		expect(tile.textContent).toContain(m.overview_lane_yellow({ count: '7' }));
 		expect(tile.textContent).toContain(m.overview_lane_new({ count: '3' }));
-		expect(tile.textContent).toContain(m.overview_processing({ count: '1' }));
 		expect(within(tile).getByRole('link', { name: m.overview_inbox_go() })).toBeTruthy();
+		expect(screen.getByRole('link', { name: m.overview_documents_go() }).getAttribute('href')).toBe(
+			'/ui/documents'
+		);
 
 		// The suggestions alone: the learned ones work already (#215).
 		const identifiers = await screen.findByRole('region', { name: m.master_identifiers() });
@@ -94,7 +96,38 @@ describe('Übersicht', () => {
 
 		const system = screen.getByRole('region', { name: m.nav_system() });
 		expect(await within(system).findByText(m.overview_jobs_failed())).toBeTruthy();
-		expect(system.textContent).toContain(m.overview_jobs_due({ count: '3' }));
+		// The number and its badges, no line under them (Tobi, 12.11.2026).
+		expect(system.textContent).not.toContain(m.jobs_worker_active());
+	});
+
+	it('shows only the number of an empty inbox and that all runs', async () => {
+		signIn('user');
+		vi.stubGlobal(
+			'fetch',
+			fakeApi({
+				'GET /api/v1/expected': () => [],
+				'GET /api/v1/jobs/summary': () => ({
+					...JOBS,
+					kinds: [{ kind: 'documents.index', running: 0, due: 0, planned: 0, failed: 0, done: 4 }]
+				})
+			})
+		);
+		inbox.summary = {
+			new: 0,
+			review: 0,
+			intervene: 0,
+			processing: 2,
+			done: 4,
+			open: 0,
+			worst_lane: null
+		};
+		render(Page);
+		const tile = screen.getByRole('region', { name: m.nav_inbox() });
+		expect(tile.querySelector('ul')).toBeNull();
+		expect(tile.querySelectorAll('p')).toHaveLength(1);
+		const system = screen.getByRole('region', { name: m.nav_system() });
+		expect(await within(system).findByText(m.overview_jobs_ok())).toBeTruthy();
+		expect(system.querySelectorAll('p')).toHaveLength(1);
 	});
 
 	it('shows no identifiers without suggestions, the grid in two columns then', async () => {
