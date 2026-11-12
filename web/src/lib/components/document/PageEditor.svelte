@@ -17,6 +17,8 @@
 	import SelectionChooser from '#lib/components/SelectionChooser.svelte';
 	import { showPages, type BeamPart } from '#lib/beam.svelte.ts';
 	import EditorShell from '#lib/components/EditorShell.svelte';
+	import ChangeDialog from '#lib/components/ChangeDialog.svelte';
+	import DetailList, { type DetailRow } from '#lib/components/DetailList.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import PageCut from '#lib/components/pages/PageCut.svelte';
 	import PageImage from '#lib/components/pages/PageImage.svelte';
@@ -34,7 +36,7 @@
 	import { pageImageHref } from '#lib/document-view.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { GRID_KEYS, nextTile } from '#lib/grid-keys.ts';
-	import { listLocale, quoted } from '#lib/i18n.ts';
+	import { quoted } from '#lib/i18n.ts';
 	import type { Candidate, Mergeable } from '#lib/merge.ts';
 	import {
 		History,
@@ -68,8 +70,10 @@
 	// device or of another document to; then the parts, each replacing the document or becoming a
 	// new one. With other documents' pages it merges them ("2 Dokumente zusammenführen"): each
 	// page carries its document's letter, and one part becomes the next version of the document
-	// chosen as "Neue Fassung von" (it must: else every original would go). Nothing is stored
-	// before "Übernehmen"; every result waits in the inbox.
+	// chosen as "Neue Fassung von" (it must: else every original would go). "Übernehmen" first
+	// says what becomes of each part and what is deleted, in the dialog a document's form asks
+	// with before saving (`ChangeDialog`); nothing is stored before it is agreed to. Every result
+	// waits in the inbox.
 	let {
 		open = $bindable(false),
 		document,
@@ -104,8 +108,10 @@
 	/** The document the part that replaces makes the next version of, in a merge. */
 	let target = $state('');
 	let grid = $state<HTMLElement | null>(null);
-	/** The number the next version gets, once the document's versions are known. */
-	let nextVersion = $state<number | null>(null);
+	/** How many versions each document on the stack has, once known (the number of the next). */
+	let versions = $state<Record<string, number>>({});
+	/** The summary "Übernehmen" asks with. */
+	let confirming = $state(false);
 
 	const count = $derived(document.page_count ?? 0);
 	const parts = $derived(partsOf(stack));
@@ -155,12 +161,17 @@
 		replacing = 0;
 		sources = mergeWith.map((other) => ({ document: other }));
 		target = document.id;
-		nextVersion = null;
+		versions = {};
+		confirming = false;
 		sync();
+		for (const item of [document, ...mergeWith]) countVersions(item.id);
+	}
+
+	function countVersions(id: string) {
 		void api
-			.GET('/api/v1/documents/{id}/files', { params: { path: { id: document.id } } })
+			.GET('/api/v1/documents/{id}/files', { params: { path: { id } } })
 			.then(({ data }) => {
-				if (data) nextVersion = data.versions.length + 1;
+				if (data) versions = { ...versions, [id]: data.versions.length };
 			})
 			.catch(() => {});
 	}
@@ -393,6 +404,7 @@
 	/** The pages of another document joined to the stack (a merge). */
 	function addDocument(other: Candidate) {
 		put({ document: other }, imagesOf(other));
+		countVersions(other.id);
 	}
 
 	/** The pages of `source` put after the last chosen page (at the end without one), chosen. */
@@ -439,6 +451,11 @@
 			step = 'parts';
 			return;
 		}
+		confirming = true;
+	}
+
+	/** What the summary's "Übernehmen" does: the edit. */
+	async function apply() {
 		const form = new FormData();
 		const place = requestPlaces(
 			sources.map((source) => 'file' in source),
@@ -477,64 +494,51 @@
 	const partCount = $derived(
 		parts.length === 1 ? m.page_edit_parts_one() : m.page_edit_parts_count({ count: parts.length })
 	);
-	/** What becomes of each part, in words (the note of the second step). */
-	const outcome = $derived.by(() => {
-		if (merging) return merged();
-		const runs =
-			parts.length === 1
-				? m.page_edit_inbox_one()
-				: parts.length === 2
-					? m.page_edit_inbox_two()
-					: m.page_edit_inbox();
-		const fresh = parts.map((_, index) => index).filter((index) => index !== replacing);
-		const names = new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(
-			fresh.map((index) => String(index + 1))
-		);
-		const kept =
-			replacing === null
-				? m.page_edit_deleted({ title: document.title })
-				: nextVersion === null
-					? m.page_edit_kept_any({ part: String(replacing + 1), title: document.title })
-					: m.page_edit_kept({
-							part: String(replacing + 1),
-							version: String(nextVersion),
-							title: document.title
-						});
-		const others =
-			fresh.length === 0 || replacing === null
-				? ''
-				: fresh.length === 1
-					? m.page_edit_new_one({ part: names })
-					: m.page_edit_new_many({ parts: names });
-		return [runs, kept, others].filter(Boolean).join(' ');
+	/** The document the part that replaces makes the next version of. */
+	const goal = $derived((merging && documents.find((item) => item.id === target)) || document);
+	/** The number of that version: in a merge every document's versions become the goal's
+	 * first (`POST /documents/{id}/edit`), so it follows all of them. */
+	const nextVersion = $derived(
+		documents.every((item) => item.id in versions)
+			? documents.reduce((sum, item) => sum + versions[item.id], 0) + 1
+			: null
+	);
+	/** What a part becomes, in the question before applying. */
+	const becomes = (index: number) =>
+		replacing !== index
+			? m.page_edit_new()
+			: nextVersion === null
+				? m.page_edit_version_of_any({ title: goal.title })
+				: m.page_edit_version_of({ version: String(nextVersion), title: goal.title });
+	/** What the edit deletes, and what follows from it: the document where no part replaces it,
+	 * in a merge the documents that are not the goal. */
+	const gone = $derived.by(() => {
+		if (!merging) {
+			return replacing === null
+				? { titles: [document.title], line: m.page_edit_gone_lost() }
+				: null;
+		}
+		return {
+			titles: documents.filter((item) => item.id !== goal.id).map((item) => item.title),
+			line: m.merge_moved({ target: goal.title })
+		};
 	});
-
-	/** What a merge makes of each document, in words; it needs a part that replaces. */
-	function merged(): string {
-		if (replacing === null) return m.merge_needs_target();
-		const goal = documents.find((item) => item.id === target) ?? document;
-		const gone = documents.filter((item) => item.id !== goal.id);
-		const list = (items: string[]) =>
-			new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(items);
-		const kept = m.merge_kept({ part: String(replacing + 1), title: goal.title });
-		const lost =
-			gone.length === 1
-				? m.merge_gone_one({ title: gone[0].title, target: goal.title })
-				: m.merge_gone_many({
-						titles: list(gone.map((item) => quoted(item.title))),
-						target: goal.title
-					});
-		const fresh = parts.map((_, index) => index).filter((index) => index !== replacing);
-		const names = list(fresh.map((index) => String(index + 1)));
-		const split =
-			fresh.length === 0
-				? ''
-				: fresh.length === 1
-					? m.page_edit_new_one({ part: names })
-					: m.page_edit_new_many({ parts: names });
-		const runs = parts.length === 1 ? m.page_edit_inbox_one() : m.page_edit_inbox();
-		return [kept, lost, split, runs].filter(Boolean).join(' ');
-	}
+	/** The question before applying: a row per part, then what is deleted. */
+	const changes = $derived<DetailRow[]>([
+		...parts.map((_, index): DetailRow => [
+			`${m.page_edit_part({ number: String(index + 1) })} · ${pagesOf(ranges[index])}`,
+			becoming,
+			String(index)
+		]),
+		...(gone ? [[m.page_edit_deleted(), deleted] as DetailRow] : [])
+	]);
+	const runs = $derived(
+		parts.length === 1
+			? m.page_edit_inbox_one()
+			: parts.length === 2
+				? m.page_edit_inbox_two()
+				: m.page_edit_inbox()
+	);
 
 	const targets = $derived(
 		documents.map((item, index) => ({
@@ -722,7 +726,7 @@
 			: m.page_edit_parts_hint()}
 	size="xl"
 	fixed
-	stay={step === 'pages'}
+	stay
 	back={step === 'parts' ? () => (step = 'pages') : undefined}
 	submitLabel={step === 'pages'
 		? parts.length === 1
@@ -848,10 +852,47 @@
 				/>
 			</Card.Root>
 		{/each}
-		<Alert.Root variant="note">
-			<Alert.Description>{outcome}</Alert.Description>
-		</Alert.Root>
+		<!-- What becomes of the parts the summary says (Tobi, 11.11.2026: nothing twice); here only
+		why "Übernehmen" waits. -->
+		{#if merging && replacing === null}
+			<Alert.Root variant="note">
+				<Alert.Description>{m.merge_needs_target()}</Alert.Description>
+			</Alert.Root>
+		{/if}
 	{/if}
 </EditorShell>
+
+{#snippet becoming(key: string)}
+	{@const index = Number(key)}
+	<span class="block">{becomes(index)}</span>
+	{#if replacing === index}
+		<span class="block text-muted-foreground">{m.page_edit_kept_decisions()}</span>
+	{/if}
+{/snippet}
+
+{#snippet deleted()}
+	<!-- Struck through in red, as a removed tag in the question before saving a document. -->
+	<span class="flex flex-wrap gap-x-2">
+		{#each gone?.titles ?? [] as title (title)}
+			<span class="text-destructive line-through">{quoted(title)}</span>
+		{/each}
+	</span>
+	<span class="block text-muted-foreground">{gone?.line}</span>
+{/snippet}
+
+<!-- "Übernehmen" asks first, in the window a document's form asks with before saving (Tobi,
+12.11.2026); red where the original is lost. -->
+<ChangeDialog
+	bind:open={confirming}
+	description={m.page_edit_preview_hint()}
+	submitLabel={m.page_edit_apply()}
+	destructive={!merging && replacing === null}
+	action={apply}
+>
+	<div class="flex flex-col gap-4">
+		<DetailList rows={changes} />
+		<p class="border-t pt-3 text-sm text-muted-foreground">{runs}</p>
+	</div>
+</ChangeDialog>
 
 <DocumentChoice bind:open={picking} there={documents.map((item) => item.id)} onpick={addDocument} />
