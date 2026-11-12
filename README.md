@@ -3,8 +3,8 @@
   <img alt="Lekto" src=".github/release/banner-light.svg" width="100%">
 </picture>
 
-[![version](https://img.shields.io/github/v/release/tb1337/lekto-dms?label=version&color=0d6b6b)](https://github.com/tb1337/lekto-dms/releases)
-[![ghcr.io](https://img.shields.io/badge/ghcr.io-tb1337%2Flekto-0d6b6b)](https://github.com/tb1337/lekto-dms/pkgs/container/lekto)
+[![version](https://img.shields.io/github/v/release/lektohq/lekto?label=version&color=0d6b6b)](https://github.com/lektohq/lekto/releases)
+[![ghcr.io](https://img.shields.io/badge/ghcr.io-lektohq%2Flekto-0d6b6b)](https://github.com/lektohq/lekto/pkgs/container/lekto)
 [![license](https://img.shields.io/badge/license-GPL--3.0-0d6b6b)](LICENSE)
 [![python](https://img.shields.io/badge/python-3.13-0d6b6b)](backend/README.md)
 

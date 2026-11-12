@@ -12,7 +12,7 @@
 # The client runs as 1000:1000; for another owner of ./migration set `user`.
 services:
   migration:
-    image: ghcr.io/tb1337/lekto-migration:latest
+    image: ghcr.io/lektohq/lekto-migration:latest
     profiles: [migration]
     environment:
       LEKTO_MIGRATION_PAPERLESS_URL: ${LEKTO_MIGRATION_PAPERLESS_URL:?set LEKTO_MIGRATION_PAPERLESS_URL in .env}
