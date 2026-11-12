@@ -17,7 +17,7 @@ Python backend, hexagonal (ports and adapters); the REST API is the only way in.
 | `.devcontainer/` | Devcontainer: Compose services (Postgres, Garage, Meilisearch, GreenMail), the fixed credentials for tests and CI (in `compose.yml`), the development instance (`README.md`, `dev.local.env.example`, `dev-setup.sh`) |
 | `.vscode/tasks.json` | VS Code tasks that run the development instance from the devcontainer (start, stop, migrate, UI, reindex, render-pages, read-facts, relate, migration) |
 | `Dockerfile` | Stages `base`, `deps`, `app`, `s6`, `web` (UI build), `dev` (devcontainer) and `runtime` (production image); `migration/Dockerfile` builds `lekto-migration` |
-| `.idea/` | Design documents in German: `architektur.md` (binding), `umsetzungsplan.md` |
+| `.idea/` | Design documents in German: `architektur.md` (binding), `umsetzungsplan.md`; the private repository `lektohq/lekto-knowledge`, checked out here and ignored by this one (commits go straight to its `main`) |
 
 ## Commands
 
@@ -115,9 +115,9 @@ changes in `migration/` its checks.
 Every pull request carries exactly one category label from `.github/labels.yml` (`new-feature`,
 `bugfix`, `enhancement`, `refactor`, `performance`, `maintenance`, `ci`, `documentation`,
 `dependencies`, `dev-deps`, `breaking-change`); the Release Drafter builds the release notes from
-them. A pull request that changes only `.idea/` gets `skip-changelog`. Renovate (`renovate.json`,
-the hosted app) labels its own: `dependencies`, `dev-deps` (development dependencies, the
-devcontainer), `ci` (actions); it suggests a version 10 days after its release at the earliest.
+them. Renovate (`renovate.json`, the hosted app) labels its own: `dependencies`, `dev-deps`
+(development dependencies, the devcontainer), `ci` (actions); it suggests a version 10 days after
+its release at the earliest.
 The version bump follows the labels (`breaking-change` or `major`: major; `new-feature` or
 `minor`: minor; else patch). Tobi publishes and tags the release from the draft.
 A pull request a user notices fills the section `## Release notes` of its description with one
