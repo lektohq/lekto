@@ -23,11 +23,9 @@ node_modules/
 # Local data
 data/
 
-# IDE: keep design documents in .idea, ignore JetBrains files; VS Code: only the tasks
-.idea/*
-!.idea/*.md
-!.idea/prompts/
-!.idea/reviews/
+# The design documents: the private repository lektohq/lekto-knowledge, checked out in .idea
+.idea/
+# VS Code: only the tasks
 .vscode/*
 !.vscode/tasks.json
 .DS_Store
