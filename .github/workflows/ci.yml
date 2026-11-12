@@ -462,3 +462,26 @@ jobs:
       - name: Test the image
         timeout-minutes: 8
         run: deploy/test-image.sh lekto:ci
+
+  # The one check the ruleset of main requires: every job above passed or was skipped, as the
+  # change asked (`ocr-packages` runs only on main). Naming the jobs themselves in the ruleset
+  # would not do: a job the change skips by its `if` reports under a name of its matrix only when
+  # it runs.
+  passed:
+    name: CI passed
+    needs: [changes, backend, migration, release, web, integration, devcontainer, image]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every job passed or was skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          for result in $RESULTS; do
+            case "$result" in
+              success | skipped) ;;
+              *) exit 1 ;;
+            esac
+          done
