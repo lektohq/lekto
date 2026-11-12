@@ -17,7 +17,7 @@ Python backend, hexagonal (ports and adapters); the REST API is the only way in.
 | `.devcontainer/` | Devcontainer: Compose services (Postgres, Garage, Meilisearch, GreenMail), the fixed credentials for tests and CI (in `compose.yml`), the development instance (`README.md`, `dev.local.env.example`, `dev-setup.sh`) |
 | `.vscode/tasks.json` | VS Code tasks that run the development instance from the devcontainer (start, stop, migrate, UI, reindex, render-pages, read-facts, relate, migration) |
 | `Dockerfile` | Stages `base`, `deps`, `app`, `s6`, `web` (UI build), `dev` (devcontainer) and `runtime` (production image); `migration/Dockerfile` builds `lekto-migration` |
-| `.idea/` | Design documents in German: `architektur.md` (binding), `umsetzungsplan.md`; the private repository `lektohq/lekto-knowledge`, checked out here and ignored by this one (commits go straight to its `main`) |
+| `.idea/` | Design documents in German: `architektur.md` (binding), `umsetzungsplan.md`, plans, reviews; a checkout of the private repository `lektohq/lekto-knowledge`, ignored by this one (see "Working style") |
 
 ## Commands
 
@@ -133,6 +133,11 @@ documents in `.idea/` are German.
 ## Working style
 
 - Plan first: read the design documents, propose a plan, wait for approval.
+- The design documents, plans and reviews live only in the private repository
+  `lektohq/lekto-knowledge`, checked out at `.idea/` (after a fresh clone:
+  `git clone https://github.com/lektohq/lekto-knowledge.git .idea`). Commit and push every change
+  to them straight to its `main`; nothing stays only local, and none of it goes into this
+  repository.
 - If something is unclear or a decision is missing, ask before implementing. Do not deviate from
   the decisions in `.idea/architektur.md` on your own.
 - New dependencies need agreement first.
