@@ -3,8 +3,9 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
 import { showPages } from '#lib/beam.svelte.ts';
+import { quoted } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
-import { fakeApi } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 import PageEditor from './PageEditor.svelte';
 
 // The Beam is the app's: here only what the editor hands it.
@@ -29,7 +30,9 @@ beforeEach(() => {
 		'POST /api/v1/documents/doc-1/edit': async (request) => {
 			sent = await request.formData();
 			return { documents: [], deleted: false };
-		}
+		},
+		'GET /api/v1/documents/doc-1/files': () => ({ versions: [{}, {}] }),
+		'GET /api/v1/documents/doc-2/files': () => ({ versions: [{}] })
 	});
 	vi.stubGlobal('fetch', fetchMock);
 });
@@ -44,6 +47,21 @@ function open(onedited = vi.fn()) {
 const page = (number: number) =>
 	screen.getByRole('checkbox', { name: m.page_edit_page({ page: String(number) }) });
 const parts = () => JSON.parse(String(sent?.get('parts')));
+/** The question "Übernehmen" asks: the window of a document's form before saving. */
+const summary = () => screen.getByRole('dialog', { name: m.dryrun_title() });
+const agree = () => within(summary()).getByRole('button', { name: m.page_edit_apply() });
+/** Its rows, each label and value. */
+const rows = () =>
+	[...summary().querySelectorAll('dt')].map((label) => [
+		label.textContent?.trim(),
+		label.nextElementSibling?.textContent?.replace(/\s+/g, ' ').trim()
+	]);
+
+/** "Übernehmen", then the question's. */
+async function apply(user: ReturnType<typeof userEvent.setup>) {
+	await user.click(screen.getByRole('button', { name: m.page_edit_apply() }));
+	await user.click(agree());
+}
 
 describe('PageEditor', () => {
 	it('shows the pages and has nothing to apply as they came', () => {
@@ -73,10 +91,23 @@ describe('PageEditor', () => {
 			name: m.page_edit_version()
 		});
 		await user.click(replaces[1]);
-		expect(
-			screen.getByText(m.page_edit_kept_any({ title: '2022/11', part: '2' }), { exact: false })
-		).toBeTruthy();
+		// "Übernehmen" asks first: what becomes of each part, nothing sent yet.
 		await user.click(screen.getByRole('button', { name: m.page_edit_apply() }));
+		expect(sent).toBeNull();
+		expect(within(summary()).getByText(m.page_edit_preview_hint())).toBeTruthy();
+		expect(rows()).toEqual([
+			[
+				`${m.page_edit_part({ number: '1' })} · ${m.page_edit_part_page({ page: '1' })}`,
+				m.page_edit_new()
+			],
+			[
+				`${m.page_edit_part({ number: '2' })} · ${m.page_edit_part_pages({ first: '2', last: '3' })}`,
+				`${m.page_edit_version_of({ version: '3', title: '2022/11' })} ${m.page_edit_kept_decisions()}`
+			]
+		]);
+		expect(within(summary()).getByText(m.page_edit_inbox_two())).toBeTruthy();
+		expect(agree().className).not.toContain('text-destructive');
+		await user.click(agree());
 		expect(parts()).toEqual([
 			{ pages: [{ source: 0, page: 1, rotate: 0 }], replaces: false },
 			{
@@ -152,15 +183,40 @@ describe('PageEditor', () => {
 		await user.click(screen.getByRole('button', { name: m.page_cut_after({ page: '2' }) }));
 		await user.click(screen.getByRole('button', { name: m.page_edit_next_parts({ count: 2 }) }));
 		await user.click(screen.getAllByRole('button', { name: m.page_edit_new() })[0]);
-		expect(
-			screen.getByText(m.page_edit_deleted({ title: '2022/11' }), { exact: false })
-		).toBeTruthy();
 		// Back to the pages and on again keeps the stack.
 		await user.click(screen.getByRole('button', { name: m.editor_back() }));
 		expect(screen.getAllByRole('checkbox')).toHaveLength(3);
 		await user.click(screen.getByRole('button', { name: m.page_edit_next_parts({ count: 2 }) }));
 		await user.click(screen.getByRole('button', { name: m.page_edit_apply() }));
+		expect(rows().at(-1)).toEqual([
+			m.page_edit_deleted(),
+			`${quoted('2022/11')} ${m.page_edit_gone_lost()}`
+		]);
+		// The original is lost: the summary's "Übernehmen" is red.
+		expect(agree().className).toContain('text-destructive');
+		await user.click(agree());
 		expect(parts().map((part: { replaces: boolean }) => part.replaces)).toEqual([false, false]);
+	});
+
+	it('sends nothing when the summary is cancelled, and keeps it open on an error', async () => {
+		const user = userEvent.setup();
+		const onedited = open();
+		await user.click(screen.getByRole('button', { name: m.page_cut_after({ page: '1' }) }));
+		await user.click(screen.getByRole('button', { name: m.page_edit_next_parts({ count: 2 }) }));
+		await user.click(screen.getByRole('button', { name: m.page_edit_apply() }));
+		await user.click(within(summary()).getByRole('button', { name: m.cancel() }));
+		expect(screen.queryByRole('dialog', { name: m.dryrun_title() })).toBeNull();
+		expect(sent).toBeNull();
+		// Still the parts, as they were.
+		expect(screen.getAllByRole('button', { name: m.page_edit_version() })).toHaveLength(2);
+		fetchMock = fakeApi({
+			'POST /api/v1/documents/doc-1/edit': () =>
+				json({ title: 'Conflict', status: 409, detail: 'Being processed.' }, 409)
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await apply(user);
+		expect(await within(summary()).findByText('Being processed.')).toBeTruthy();
+		expect(onedited).not.toHaveBeenCalled();
 	});
 
 	it('moves a page with Ctrl and an arrow, and undoes it', async () => {
@@ -189,7 +245,7 @@ describe('PageEditor', () => {
 		await user.upload(picker!, file);
 		expect(await screen.findAllByRole('checkbox')).toHaveLength(5);
 		await user.click(screen.getByRole('button', { name: m.page_edit_next() }));
-		await user.click(screen.getByRole('button', { name: m.page_edit_apply() }));
+		await apply(user);
 		const fields = appended.mock.calls.filter(([name]) => name !== 'file');
 		const [, text] = fields.find(([name]) => name === 'parts')!;
 		const picks = JSON.parse(String(text))[0].pages.map(
@@ -227,12 +283,19 @@ describe('PageEditor', () => {
 			true
 		);
 		await user.click(screen.getByRole('button', { name: m.page_edit_version() }));
-		expect(
-			screen.getByText(m.merge_gone_one({ title: 'scan_0412', target: '2022/11' }), {
-				exact: false
-			})
-		).toBeTruthy();
+		expect(screen.queryByText(m.merge_needs_target())).toBeNull();
 		await user.click(screen.getByRole('button', { name: m.page_edit_apply() }));
+		// The scan's version comes along before the merged one: 2 + 1, then 4.
+		expect(rows()).toEqual([
+			[
+				`${m.page_edit_part({ number: '1' })} · ${m.page_edit_part_pages({ first: '1', last: '4' })}`,
+				`${m.page_edit_version_of({ version: '4', title: '2022/11' })} ${m.page_edit_kept_decisions()}`
+			],
+			[m.page_edit_deleted(), `${quoted('scan_0412')} ${m.merge_moved({ target: '2022/11' })}`]
+		]);
+		// Its versions stay: no red.
+		expect(agree().className).not.toContain('text-destructive');
+		await user.click(agree());
 		expect(parts()).toEqual([
 			{
 				pages: [
