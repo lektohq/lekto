@@ -84,8 +84,8 @@ describe('Übersicht', () => {
 		);
 
 		// The suggestions alone: the learned ones work already (#215).
-		const identifiers = await screen.findByRole('region', { name: m.master_identifiers() });
-		expect(within(identifiers).getByText('2')).toBeTruthy();
+		const identifiers = screen.getByRole('region', { name: m.master_identifiers() });
+		expect(await within(identifiers).findByText('2')).toBeTruthy();
 		expect(identifiers.textContent).toContain(m.overview_identifiers_suggestions());
 		expect(identifiers.textContent).not.toContain('31');
 		expect(
@@ -130,17 +130,15 @@ describe('Übersicht', () => {
 		expect(system.querySelectorAll('p')).toHaveLength(1);
 	});
 
-	it('shows no identifiers without suggestions, the grid in two columns then', async () => {
+	it('shows the identifiers to an admin also without suggestions', async () => {
+		// Like "0 offen" in the inbox (Tobi, 12.11.2026).
 		signIn('admin');
-		const api = routes([], 0);
-		vi.stubGlobal('fetch', api);
+		vi.stubGlobal('fetch', routes([], 0));
 		const { container } = render(Page);
-		expect(await screen.findByText(m.overview_jobs_failed())).toBeTruthy();
-		await vi.waitFor(() =>
-			expect(calls(api).some((call) => call.includes('/identifiers/open/summary'))).toBe(true)
-		);
-		expect(screen.queryByRole('region', { name: m.master_identifiers() })).toBeNull();
-		expect(container.querySelector('.lg\\:grid-cols-3')).toBeNull();
+		const identifiers = screen.getByRole('region', { name: m.master_identifiers() });
+		expect(await within(identifiers).findByText('0')).toBeTruthy();
+		expect(identifiers.textContent).toContain(m.overview_identifiers_suggestions());
+		expect(container.querySelector('.lg\\:grid-cols-3')).toBeTruthy();
 	});
 
 	it('leaves the identifiers to admins', async () => {

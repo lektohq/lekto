@@ -883,19 +883,27 @@ share what opens them (`DocumentLink`) and what they name (`documentParts`).
 
 ### Overview tiles
 
-The overview (`/`) shows what waits for someone as tiles in a grid (one column on the phone, two
-from `sm`, three from `lg` when there are three). A tile is a `Card` (`md`): an icon and its
+The overview (`/`) shows what waits for someone as tiles in a grid: two to a row below `lg`,
+also on the phone, three from `lg` when there are three; an odd last tile takes the whole row
+below `lg`, so none stands empty (Tobi, 12.11.2026). A tile is a `Card` (`md`): an icon and its
 `Card.Title` (the place's name), the big number (`text-figure`, `tabular-nums`) with what it
 counts (the jobs' tile: the badge "Alles läuft" or "Kein Worker nimmt Jobs" while none failed),
 badges in their tones where there are any (icon and word for a lane, a failed kind), and at its
 foot the way there, a `brand` link with an arrow ("Zum Posteingang"). No line of detail under
 them (Tobi, 12.11.2026): not "Nichts offen.", not what is in processing, not when a worker last
 started a job; the place itself says that. Badges on a tile are not links. The way to the
-documents is no tile: "Zu den Dokumenten" (`outline`, `FileText`) stands in the page's head. While a tile loads it shows a `Skeleton` in the place of the number. A tile that
-reports only something to decide shows only while there is something (Tobi, 08.11.2026, #215:
-"Kennungen" with the suggestions alone, no to-do); the grid then takes the columns of the tiles
-shown, so none stands empty. Such a tile does not load inside itself: the page asks first and
-places it.
+documents is no tile: "Zu den Dokumenten" (`outline`, `FileText`) stands in the page's head.
+While a tile loads it shows a `Skeleton` in the place of the number.
+
+On the phone a tile stays flat (Tobi, 12.11.2026): padding `p-4`, the word beside the number
+(under it only where it does not fit), a lane's badge with icon and number, its word for screen
+readers, all lanes in one row; a failed kind is cut short, "Kein Worker nimmt Jobs" wraps. The
+whole tile is the way there: the link takes the tile (`absolute inset-0`), its words for screen
+readers, and a chevron ends the tile's head; a control inside, the retry of a `LoadProblem`,
+stands above it (`relative z-10`).
+
+"Kennungen" (the suggestions alone, no to-do; #215) is a tile for admins, also with none ("0
+vorgeschlagen", like "0 offen"; Tobi, 12.11.2026). The page asks for its counts.
 
 ### Lenses
 
@@ -1513,7 +1521,7 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     the types and the fields a page at a time through `MasterPages`, one `SortMenu` on the page,
     a contact's and a type's row with `columns`, a tile around a type's icon only as `TypeAvatar`
     ("Master data tabs"); no line of detail on an overview tile, the documents in the overview's
-    head ("Overview tiles"); tooltips only through `ui/tooltip` ("Help and tooltips"); `Progress` only in the
+    head, its tiles two to a row on the phone, each the way there ("Overview tiles"); tooltips only through `ui/tooltip` ("Help and tooltips"); `Progress` only in the
     selection bars of runs on many and the upload summary ("Choosing many"); dates and times
     through `DateInput`, no native date or time field, every search through `SearchField` at the
     height of a field ("Fields"); "Abbrechen" before the
