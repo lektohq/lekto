@@ -4,9 +4,10 @@ Revision ID: 0044
 Revises: 0043
 Create Date: 2026-10-25 14:00:00.000000
 
-What a webhook's requests carry (Tobi, 25.10.2026, `webhooks-und-auftraege.md`):
-`webhooks.body` is `thin` (the event, as before), `full` (the document too) or `template` (what
-`webhooks.body_template`, Liquid, makes of them). Existing webhooks stay thin.
+What a webhook's requests carry (Tobi, 25.10.2026,
+`.idea/decisions/2026-10-25-webhooks-and-tasks.md`): `webhooks.body` is `thin` (the event, as
+before), `full` (the document too) or `template` (what `webhooks.body_template`, Liquid, makes of
+them). Existing webhooks stay thin.
 """
 
 from collections.abc import Sequence

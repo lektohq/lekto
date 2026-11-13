@@ -1,9 +1,9 @@
-"""Editing a document's pages (`.idea/umsetzungsplan.md`, "Fassungen, Datei ersetzen, PDF
-bearbeiten"; `services.editing`): a person turns, reorders, removes and splits the pages of the
-document's original, and adds the pages of files from their device. The pages make parts, each a
-PDF of its own: at most one replaces the document as its next version (`VersionKind.EDITED`),
-every other becomes a new document in its space (`VersionKind.SPLIT`). Without a part that
-replaces it, the document is deleted once the new ones are there.
+"""Editing a document's pages (`.idea/decisions/2026-11-10-versions.md`; `services.editing`): a
+person turns, reorders, removes and splits the pages of the document's original, and adds the pages
+of files from their device. The pages make parts, each a PDF of its own: at most one replaces the
+document as its next version (`VersionKind.EDITED`), every other becomes a new document in its space
+(`VersionKind.SPLIT`). Without a part that replaces it, the document is deleted once the new ones
+are there.
 
 Pages of other documents make a merge ("Trennblatt und Zusammenführen"): one of the documents is
 the target, the part that replaces it its next version (`VersionKind.MERGED`); the others are

@@ -368,13 +368,13 @@ class Contact(MasterData):
 class DocumentType(MasterData):
     """The kind of a document; field definitions can be bound to it. `description` tells the
     language model what belongs to the type ("pay slips, Entgeltbescheinigung, ...").
-    `title_pattern`: a template (Liquid, `domain.templates`) for the title of its documents,
-    carried out by a rule the type keeps (`rules.title_rule`); its syntax and fields are the
-    service's to check. `group_ids`: the type groups it is in (tags of scope
-    `document_type`). `icon`: the name of a Lucide icon (`appearance.checked_icon`).
-    `relation_target`: documents refer to those of the type (a contract, a policy) by a contract
-    or customer number they share (`.idea/bezuege.md`, decision 8); without it such a number
-    connects no documents (it would connect every invoice with every other)."""
+    `title_pattern`: a template (Liquid, `domain.templates`) for the title of its documents, carried
+    out by a rule the type keeps (`rules.title_rule`); its syntax and fields are the service's to
+    check. `group_ids`: the type groups it is in (tags of scope `document_type`). `icon`: the name
+    of a Lucide icon (`appearance.checked_icon`). `relation_target`: documents refer to those of the
+    type (a contract, a policy) by a contract or customer number they share
+    (`.idea/decisions/2026-10-25-relations.md`, decision 8); without it such a number connects no
+    documents (it would connect every invoice with every other)."""
 
     id: DocumentTypeId
     description: str | None = None

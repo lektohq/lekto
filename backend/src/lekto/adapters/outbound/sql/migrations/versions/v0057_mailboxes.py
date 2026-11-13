@@ -4,7 +4,7 @@ Revision ID: 0057
 Revises: 0056
 Create Date: 2026-11-04 12:00:00.000000
 
-The mailboxes Lekto fetches from (umsetzungsplan "Eingangskanal Mail"): server, account, the
+The mailboxes Lekto fetches from (`.idea/decisions/2026-11-04-mail.md`): server, account, the
 password encrypted, folders, interval, from when on, the fallback, the type of a mail's text and
 the status of the fetches. Names unique regardless of case. A document type or a person a
 mailbox names cannot be deleted. Nobody has one after the update. The downgrade drops the table.

@@ -515,7 +515,7 @@ async def test_me_names_the_shortcut_the_server_offers() -> None:
     assert me["shortcut_url"] == link
 
 
-# Every POST that only reads (`.idea/architektur.md`, "Keine Klardaten in Adressen"): it stores
+# Every POST that only reads (`.idea/architecture/no-plain-data-in-urls.md`): it stores
 # nothing, so a `read` token may call it. A new one that only reads belongs here.
 READING_POSTS = {
     "/documents/search",

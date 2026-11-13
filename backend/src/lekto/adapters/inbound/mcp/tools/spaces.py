@@ -1,6 +1,6 @@
-"""The tools of the domains `spaces` and `lenses`: where documents lie and who sees them, and
-the caller's saved views, read only (Tobi, 01.11.2026, umsetzungsplan "MCP": managing Lekto
-stays in the web UI)."""
+"""The tools of the domains `spaces` and `lenses`: where documents lie and who sees them, and the
+caller's saved views, read only (Tobi, 01.11.2026, `.idea/decisions/2026-11-01-mcp.md`: managing
+Lekto stays in the web UI)."""
 
 from collections.abc import Iterable, Mapping
 from uuid import UUID

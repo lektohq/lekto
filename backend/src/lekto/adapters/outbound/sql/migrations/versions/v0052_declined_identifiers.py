@@ -5,7 +5,7 @@ Revises: 0051
 Create Date: 2026-10-28 14:00:00.000000
 
 The open identifiers suggest an IBAN that a document's recipient holds for that person's
-profile (`.idea/umsetzungsplan.md`, "Inhaber von IBANs und Gläubiger-IDs", PR 4b). One a person
+profile (`.idea/decisions/2026-10-27-holders.md`, PR 4b). One a person
 declined is kept beside the profile, so it is not suggested again (`Profile.declined`).
 """
 

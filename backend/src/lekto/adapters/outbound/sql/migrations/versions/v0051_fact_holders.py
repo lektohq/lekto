@@ -5,7 +5,7 @@ Revises: 0050
 Create Date: 2026-10-28 08:00:00.000000
 
 A bank statement shows the payees' IBANs beside its own, and training learned them at the bank
-(`.idea/umsetzungsplan.md`, "Inhaber von IBANs und Gläubiger-IDs"). A fact of either kind gets
+(`.idea/decisions/2026-10-27-holders.md`). A fact of either kind gets
 whose it is where it stands: `holder` (sender, recipient, third party, unclear), the name the
 document gives the holder and who told it (`holder_source`: the rule or the language model).
 Existing facts have none until their facts are read again (`read-facts`).

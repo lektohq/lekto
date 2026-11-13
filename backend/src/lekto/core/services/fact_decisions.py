@@ -1,9 +1,9 @@
-"""A person's decisions about the facts of a document (`.idea/fakten.md`, issue #145 PR 6):
-adding one the sources did not find, correcting the value or the role of one, rejecting one
-(it is no fact of the document), and withdrawing a decision. Editors of the document's space
-and admins decide; the kinds that are a person's alone (tax ID, social security number, ...;
-`person_only`) only admins.
-A decision outlasts the runs of the facts signal (`DocumentFactRepository.replace_found`).
+"""A person's decisions about the facts of a document (`.idea/decisions/2026-10-25-facts.md`, issue
+#145 PR 6): adding one the sources did not find, correcting the value or the role of one, rejecting
+one (it is no fact of the document), and withdrawing a decision. Editors of the document's space and
+admins decide; the kinds that are a person's alone (tax ID, social security number, ...;
+`person_only`) only admins. A decision outlasts the runs of the facts signal
+(`DocumentFactRepository.replace_found`).
 
 A decision is a change of the document (`document.updated` with the field `facts`): the search
 index takes it in. The person's first decision about the facts of a document is a verdict on them

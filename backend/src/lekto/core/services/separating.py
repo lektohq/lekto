@@ -1,6 +1,6 @@
-"""The node `separate` (`domain.separating`; `.idea/umsetzungsplan.md`, "Trennblatt und
-Zusammenführen"): a scanned stack is split at its separator sheets when it comes in, before OCR
-and the page images read it.
+"""The node `separate` (`domain.separating`; `.idea/decisions/2026-11-10-separator-and-merge.md`): a
+scanned stack is split at its separator sheets when it comes in, before OCR and the page images read
+it.
 
 It looks for sheets only in a document that came in as it is, in the run it came in with: not
 one taken over from another system (the migration splits before), not after a new version (the

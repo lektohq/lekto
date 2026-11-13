@@ -1,17 +1,18 @@
-"""Editing a document's pages (`domain.editing`; `.idea/umsetzungsplan.md`, "Fassungen, Datei
-ersetzen, PDF bearbeiten"): the parts are put together from the document's original and the
-files a person adds, and stored in one transaction. The part that replaces the document becomes
-its next version (as `PipelineService.new_version`); every other part becomes a new document in
-its space, with the uploader, channel and receipt of the document it was split off; without a
-part that replaces it, the document is deleted (as `DocumentService.delete`). Each of them runs
-anew and waits in the inbox (`Processing.new_version`).
+"""Editing a document's pages (`domain.editing`; `.idea/decisions/2026-11-10-versions.md`): the
+parts are put together from the document's original and the files a person adds, and stored in one
+transaction. The part that replaces the document becomes its next version (as
+`PipelineService.new_version`); every other part becomes a new document in its space, with the
+uploader, channel and receipt of the document it was split off; without a part that replaces it, the
+document is deleted (as `DocumentService.delete`). Each of them runs anew and waits in the inbox
+(`Processing.new_version`).
 
-With the pages of other documents, the edit merges them (Umsetzungsplan "Trennblatt und
-Zusammenführen"): one of them, the target, gets the part that replaces it as its next version
-(`VersionKind.MERGED`). Every other document goes: its versions become the target's (numbered
-after the target's, with where they came from), its relations name the target (one with the
-target, or with another of them, goes; one the target has already stays the target's), and it
-is deleted as `DocumentService.delete` does. Its files stay, as versions of the target.
+With the pages of other documents, the edit merges them
+(`.idea/decisions/2026-11-10-separator-and-merge.md`): one of them, the target, gets the part that
+replaces it as its next version (`VersionKind.MERGED`). Every other document goes: its versions
+become the target's (numbered after the target's, with where they came from), its relations name the
+target (one with the target, or with another of them, goes; one the target has already stays the
+target's), and it is deleted as `DocumentService.delete` does. Its files stay, as versions of the
+target.
 
 The parts' files are stored before the transaction. Every one is new (the composer makes each
 file unique), so no other document names it and the removal of a deleted document's files never

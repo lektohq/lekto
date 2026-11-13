@@ -1,7 +1,7 @@
-"""Relations between documents (`.idea/bezuege.md`, issue #145 PR 9): a directed link from the
-newer document to the older one it refers to (a reminder to its invoice, a correction to the
-original, an invoice to its contract). Two documents stay two documents; relations are n:m and
-have no kind of their own, the types at both ends give their sense.
+"""Relations between documents (`.idea/decisions/2026-10-25-relations.md`, issue #145 PR 9): a
+directed link from the newer document to the older one it refers to (a reminder to its invoice, a
+correction to the original, an invoice to its contract). Two documents stay two documents; relations
+are n:m and have no kind of their own, the types at both ends give their sense.
 
 A relation is set (sure), suggested (unsure: shown at the document, never yellow), or rejected
 by a person (so recognition does not suggest it again). It comes from a person or from Lekto,

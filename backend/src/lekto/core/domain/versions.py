@@ -1,9 +1,9 @@
-"""Versions of a document's original (`.idea/architektur.md`, "Fassungen"; Umsetzungsplan
-"Fassungen, Datei ersetzen, PDF bearbeiten", "Trennblatt und Zusammenführen"): a document has
-versions 1, 2, …, each an original that never changes. A new version comes in when a person
-replaces the file or edits the pages, or when the stack it came in as is split at its separator
-sheets; none is overwritten. The document carries its current one's hash, name and media type;
-the derivatives (archive PDF, text, pages) are the current version's."""
+"""Versions of a document's original (`.idea/architecture/versions-and-pdf-edit.md`,
+`.idea/decisions/2026-11-10-versions.md`, `.idea/decisions/2026-11-10-separator-and-merge.md`): a
+document has versions 1, 2, …, each an original that never changes. A new version comes in when a
+person replaces the file or edits the pages, or when the stack it came in as is split at its
+separator sheets; none is overwritten. The document carries its current one's hash, name and media
+type; the derivatives (archive PDF, text, pages) are the current version's."""
 
 from dataclasses import dataclass, field
 from datetime import datetime

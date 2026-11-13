@@ -1,5 +1,5 @@
-"""Counting and summing over many documents (Tobi, 01.11.2026, umsetzungsplan "MCP", decision
-7: the server counts, an assistant does not add up a hundred answers).
+"""Counting and summing over many documents (Tobi, 01.11.2026, `.idea/decisions/2026-11-01-mcp.md`,
+decision 7: the server counts, an assistant does not add up a hundred answers).
 
 Documents are grouped by a key of theirs, each group with how many and, for an amount field,
 its sum per currency (amounts in different currencies are never added). By the document date's

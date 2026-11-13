@@ -1,4 +1,4 @@
-"""Setting up the mailboxes Lekto fetches from (umsetzungsplan "Eingangskanal Mail").
+"""Setting up the mailboxes Lekto fetches from (`.idea/decisions/2026-11-04-mail.md`).
 
 Only admins see and change mailboxes (Tobi, 04.11.2026: System, Eingangskanäle, Mail). The
 password is encrypted at once, bound to the mailbox, and never shown again; a change without a
