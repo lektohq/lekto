@@ -2379,6 +2379,7 @@
 	"expected_ended": "Ended",
 	"expected_weekly": "weekly",
 	"expected_monthly": "monthly",
+	"expected_bimonthly": "every two months",
 	"expected_quarterly": "quarterly",
 	"expected_half_yearly": "half-yearly",
 	"expected_yearly": "yearly",

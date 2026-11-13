@@ -59,6 +59,26 @@ def test_a_yearly_series_and_one_in_days() -> None:
     assert (days.cadence, days.interval, days.next_date) == (Cadence.DAYS, 14, date(2026, 2, 26))
 
 
+def test_every_two_months_and_every_eight_weeks() -> None:
+    bimonthly = series_of(KEY, dated(date(2026, 1, 15), date(2026, 3, 16), date(2026, 5, 15)))
+    assert bimonthly is not None
+    assert (bimonthly.cadence, bimonthly.next_date) == (Cadence.BIMONTHLY, date(2026, 7, 15))
+    at_month_end = series_of(KEY, dated(date(2026, 2, 28), date(2026, 4, 30), date(2026, 6, 30)))
+    assert at_month_end is not None
+    assert (at_month_end.cadence, at_month_end.next_date) == (
+        Cadence.BIMONTHLY,
+        date(2026, 8, 31),
+    )
+    weeks = (date(2026, 1, 5), date(2026, 3, 2), date(2026, 4, 27), date(2026, 6, 22))
+    eight_weeks = series_of(KEY, dated(*weeks))
+    assert eight_weeks is not None
+    assert (eight_weeks.cadence, eight_weeks.interval, eight_weeks.next_date) == (
+        Cadence.DAYS,
+        56,
+        date(2026, 8, 17),
+    )
+
+
 def test_a_correction_counts_once_and_the_next_period_follows() -> None:
     months = (Period.month(2026, 7), Period.month(2026, 8), Period.month(2026, 8))
     series = series_of(

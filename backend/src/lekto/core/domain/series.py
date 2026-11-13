@@ -2,17 +2,17 @@
 to 12; issue #145 PR 12): documents of one contact and type, and of one contract or customer number
 where they show one, that come at a steady interval. Derived, never stored.
 
-A series has at least three documents with a document date. The interval is the median of
-the gaps between them, as a calendar step where it is one (a week, a month, a quarter, half a
-year, a year), else in days: such a rhythm needs four documents, is at most `MAX_DAYS` long and
-is kept exactly. Each document is so many steps after the one before (a gap of two steps is one
-missed document, no deviation); one within the same step (a one-off of the contact) is set
-aside. The spread is how far a document came off its step (at least `MIN_SPREAD` days; in a
-longer history the worst step aside); a spread over a third of the step (a fifth for three
-documents or a rhythm of days) is no series, and neither are many missed steps or one-offs.
-The next document is expected one step after the last; it is overdue once the spread is over,
-and the series ended after two missed dates. Two documents of one day or of one period (a
-correction and its original) count once."""
+A series has at least three documents with a document date. The interval is the median of the
+gaps between them, as a calendar step where it is one (a week, a month, two months, a quarter,
+half a year, a year), else in days: such a rhythm needs four documents, is at most `MAX_DAYS`
+long and is kept exactly. Each document is so many steps after the one before (a gap of two
+steps is one missed document, no deviation); one within the same step (a one-off of the contact)
+is set aside. The spread is how far a document came off its step (at least `MIN_SPREAD` days; in
+a longer history the worst step aside); a spread over a third of the step (a fifth for three
+documents or a rhythm of days) is no series, and neither are many missed steps or one-offs. The
+next document is expected one step after the last; it is overdue once the spread is over, and
+the series ended after two missed dates. Two documents of one day or of one period (a correction
+and its original) count once."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -44,16 +44,25 @@ SOON = timedelta(days=30)
 class Cadence(StrEnum):
     WEEKLY = "weekly"
     MONTHLY = "monthly"
+    BIMONTHLY = "bimonthly"  # every two months (Tobi, 13.11.2026)
     QUARTERLY = "quarterly"
     HALF_YEARLY = "half_yearly"
     YEARLY = "yearly"
     DAYS = "days"  # a steady number of days that is no calendar step
 
 
-_MONTHS = {Cadence.MONTHLY: 1, Cadence.QUARTERLY: 3, Cadence.HALF_YEARLY: 6, Cadence.YEARLY: 12}
+_MONTHS = {
+    Cadence.MONTHLY: 1,
+    Cadence.BIMONTHLY: 2,
+    Cadence.QUARTERLY: 3,
+    Cadence.HALF_YEARLY: 6,
+    Cadence.YEARLY: 12,
+}
 _RANGES = (
     (Cadence.WEEKLY, 6, 8),
     (Cadence.MONTHLY, 26, 35),
+    # Two calendar months are 59 to 62 days; a rhythm of eight weeks (56 days) stays one of days.
+    (Cadence.BIMONTHLY, 58, 64),
     (Cadence.QUARTERLY, 80, 100),
     (Cadence.HALF_YEARLY, 170, 195),
     (Cadence.YEARLY, 350, 380),
@@ -61,6 +70,7 @@ _RANGES = (
 _STEP_DAYS = {
     Cadence.WEEKLY: 7.0,
     Cadence.MONTHLY: 30.44,
+    Cadence.BIMONTHLY: 60.87,
     Cadence.QUARTERLY: 91.31,
     Cadence.HALF_YEARLY: 182.62,
     Cadence.YEARLY: 365.25,
