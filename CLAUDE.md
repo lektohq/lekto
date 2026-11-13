@@ -40,6 +40,13 @@ uv run lekto worker              # run the worker until SIGTERM
 uv run lekto --env-file ../.devcontainer/dev.local.env reindex   # a command on the dev instance
 ```
 
+YAML files (workflows, Compose files, GitHub settings), in the repository root, with the rules of
+`.yamllint` (CI runs it in the job `yaml`):
+
+```sh
+uv run --project backend yamllint .
+```
+
 Web UI, in `web/` (`web/README.md`):
 
 ```sh
@@ -79,7 +86,7 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pyt
 ```
 
 Run all five checks before every commit; with changes in `web/` also the web UI's checks, with
-changes in `migration/` its checks.
+changes in `migration/` its checks, with changes to YAML files yamllint.
 
 ## Architecture rules
 
