@@ -5,10 +5,10 @@ Revises: 0045
 Create Date: 2026-10-25 22:00:00.000000
 
 An admin's webhook may take over a request to the language model (Tobi, 25.10.2026,
-`webhooks-und-auftraege.md`): `webhooks.model_call` names it (`propose` or `extract`, NULL for
-none), `webhooks.model_call_timeout_seconds` the consumer's time to answer. `tasks.context`
-keeps what the node sent and needs to read the answer (the keys of a model call's fields and
-spaces).
+`.idea/decisions/2026-10-25-webhooks-and-tasks.md`): `webhooks.model_call` names it (`propose` or
+`extract`, NULL for none), `webhooks.model_call_timeout_seconds` the consumer's time to answer.
+`tasks.context` keeps what the node sent and needs to read the answer (the keys of a model call's
+fields and spaces).
 """
 
 from collections.abc import Sequence

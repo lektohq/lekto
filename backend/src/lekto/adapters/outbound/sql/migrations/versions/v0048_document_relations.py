@@ -4,10 +4,10 @@ Revision ID: 0048
 Revises: 0047
 Create Date: 2026-10-26 08:00:00.000000
 
-A document refers to an older one (issue #145, `.idea/bezuege.md`): `document_relations` keeps
-the newer document, the older one, where the relation comes from (a person, Lekto), whether it
-is set, suggested or rejected, the evidence Lekto had, and who decided it last. A relation goes
-with either of its documents.
+A document refers to an older one (issue #145, `.idea/decisions/2026-10-25-relations.md`):
+`document_relations` keeps the newer document, the older one, where the relation comes from (a
+person, Lekto), whether it is set, suggested or rejected, the evidence Lekto had, and who decided it
+last. A relation goes with either of its documents.
 """
 
 from collections.abc import Sequence

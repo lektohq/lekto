@@ -84,10 +84,8 @@ name without asking.
 | Lekto: Relate | `relate`: queue finding the relations of every document not being processed (after the update, after marking a relation target); the worker relates them |
 | Lekto: Paperless migration | A new terminal in `migration/` with the variables of `dev.local.env` (`LEKTO_MIGRATION_*`), showing `lekto-migration --help`; the commands are typed there (see below) |
 
-When the folder opens, only the task **zsh** starts: a terminal without `dev.local.env` (VS Code
-asks once whether automatic tasks may run). After **Lekto: Start**, open
-<http://localhost:8000/ui/> and sign in as the admin from `dev.local.env`; the API documentation
-is at <http://localhost:8000/api/v1/docs>. The tasks use the terminals of VS Code; the logs are
+After **Lekto: Start**, open <http://localhost:8000/ui/> and sign in as the admin from
+`dev.local.env`; the API documentation is at <http://localhost:8000/api/v1/docs>. The tasks use the terminals of VS Code; the logs are
 there (`LEKTO_LOG_FORMAT=console`).
 
 **Update after `git pull`:** `uv sync` in `backend/` and `pnpm install` in `web/` when the lock
@@ -103,7 +101,7 @@ when the pull brings a new revision (`git log --stat -- backend/src/lekto/adapte
 
 `dev.local.env.example` points at Open WebUI (in front of Ollama) with `qwen3:8b-ctx8k`
 (classification) and Qwen3-Embedding 4B (search vectors), the models evaluated in
-`.idea/architektur.md`. On a CPU a document takes 3 to 10 minutes in the model
+`.idea/measurements/` (`2026-10-07-local-llm-qwen3.md`, `2026-10-21-embedding-models.md`). On a CPU a document takes 3 to 10 minutes in the model
 (`LEKTO_LLM_TIMEOUT=600`); embeddings take about 4 s per section of 1500 characters on Ollama
 with two vGPUs (21.10.2026), a query about 0.5 s. Single uploads are fine at any time. Mass runs (the migration with
 embeddings on, `reindex` after switching embeddings on, a reprocessing of many documents) load

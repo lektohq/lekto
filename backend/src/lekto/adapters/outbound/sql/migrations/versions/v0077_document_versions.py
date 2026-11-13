@@ -4,14 +4,14 @@ Revision ID: 0077
 Revises: 0076
 Create Date: 2026-11-10 18:00:00.000000
 
-A document has versions of its original (Tobi, 10.11.2026; Umsetzungsplan "Fassungen, Datei
-ersetzen, PDF bearbeiten"): a new one comes in when a person replaces the file or edits the
-pages; none is overwritten. `document_versions` keeps them all, gone with their document; the
-document keeps naming its current one (`documents.sha256`, `original_filename`, `media_type`).
+A document has versions of its original (Tobi, 10.11.2026;
+`.idea/decisions/2026-11-10-versions.md`): a new one comes in when a person replaces the file or
+edits the pages; none is overwritten. `document_versions` keeps them all, gone with their document;
+the document keeps naming its current one (`documents.sha256`, `original_filename`, `media_type`).
 Every existing document gets its first version: its original as it came in, by who uploaded it.
 Every file exists once per installation, the earlier versions' too (a unique index).
-`documents.processing_new_version` tells a run that reads a new version
-(`Processing.new_version`); none does yet.
+`documents.processing_new_version` tells a run that reads a new version (`Processing.new_version`);
+none does yet.
 
 The downgrade drops the table and the column: a document keeps its current original, the
 earlier ones are forgotten (their files stay in the store until removed by hand).

@@ -97,9 +97,10 @@ GRAPH: Mapping[Node, frozenset[Node]] = {
 one of its ancestors, so filing is the last thing that happens to a document."""
 
 WAITS: Mapping[Node, frozenset[Node]] = {Node.SIGNAL_LLM: frozenset({Node.PAGES})}
-"""Nodes a node waits for without needing their results: the page images are there when a model
-call goes to a webhook with links to them (`webhooks-und-auftraege.md`). Processing again from
-one of them leaves the node alone (the text, not the images, is what the model reads)."""
+"""Nodes a node waits for without needing their results: the page images are there when a model call
+goes to a webhook with links to them (`.idea/decisions/2026-10-25-webhooks-and-tasks.md`).
+Processing again from one of them leaves the node alone (the text, not the images, is what the model
+reads)."""
 
 NODES: tuple[Node, ...] = tuple(Node)
 """All nodes in topological order (the order of the enum)."""

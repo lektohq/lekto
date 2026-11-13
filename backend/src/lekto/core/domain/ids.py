@@ -36,8 +36,9 @@ _TIMESTAMP_BITS = 48
 _RANDOM_BITS = 80
 
 SHORT_ID = 8
-"""Characters of a short id: the end of the id, its random bits (Tobi, 01.11.2026, umsetzungsplan
-"MCP", decision 8; the start is the time and stays the same for a minute)."""
+"""Characters of a short id: the end of the id, its random bits (Tobi, 01.11.2026,
+`.idea/decisions/2026-11-01-mcp.md`, decision 8; the start is the time and stays the same for a
+minute)."""
 _REFERENCE = re.compile(rf"[0-9a-f]{{{SHORT_ID},12}}|[0-9a-f]{{32}}")
 
 

@@ -17,7 +17,7 @@ Python backend, hexagonal (ports and adapters); the REST API is the only way in.
 | `.devcontainer/` | Devcontainer: Compose services (Postgres, Garage, Meilisearch, GreenMail), the fixed credentials for tests and CI (in `compose.yml`), the development instance (`README.md`, `dev.local.env.example`, `dev-setup.sh`) |
 | `.vscode/tasks.json` | VS Code tasks that run the development instance from the devcontainer (start, stop, migrate, UI, reindex, render-pages, read-facts, relate, migration) |
 | `Dockerfile` | Stages `base`, `deps`, `app`, `s6`, `web` (UI build), `dev` (devcontainer) and `runtime` (production image); `migration/Dockerfile` builds `lekto-migration` |
-| `.idea/` | Design documents in German: `architektur.md` (binding), `umsetzungsplan.md`, plans, reviews; a checkout of the private repository `lektohq/lekto-knowledge`, ignored by this one (see "Working style") |
+| `.idea/` | The knowledge in German as small notes with frontmatter: `architecture/` (binding), `decisions/`, `open/`, `process/`, `ops/`, `history/` and more; start with `INDEX.md` and `README.md`. A checkout of the private repository `lektohq/lekto-knowledge`, ignored by this one (see "Working style") |
 
 ## Commands
 
@@ -105,7 +105,7 @@ changes in `migration/` its checks.
 - State change, domain events and follow-up jobs go through one `UnitOfWork` and one commit.
 - The web UI talks to the REST API only. Every text a user reads is in `web/messages/{en,de}.json`;
   a test fails on raw text in markup.
-- The web UI follows [`web/DESIGN.md`](web/DESIGN.md), binding like `.idea/architektur.md`: tokens,
+- The web UI follows [`web/DESIGN.md`](web/DESIGN.md), binding like `.idea/architecture/`: tokens,
   type scale, components, patterns, texts (German in the polite "Du" with a capital D). Read it
   before changing anything in `web/`. A change it does not cover, or a deviation, needs a decision
   and a change of `web/DESIGN.md` in the same pull request; never work around it in a component.
@@ -127,18 +127,20 @@ the release notes list it in the section "REST API" with that line.
 
 ## Language
 
-Code, comments, commit messages and documentation (README, docstrings) are English. The design
-documents in `.idea/` are German.
+Code, comments, commit messages and documentation (README, docstrings) are English. The notes in
+`.idea/` are German.
 
 ## Working style
 
-- Plan first: read the design documents, propose a plan, wait for approval.
-- The design documents, plans and reviews live only in the private repository
+- Plan first: read the notes in `.idea/` (`INDEX.md` first), propose a plan, wait for approval.
+- Decisions, plans, open points, working rules and history live only in the private repository
   `lektohq/lekto-knowledge`, checked out at `.idea/` (after a fresh clone:
-  `git clone https://github.com/lektohq/lekto-knowledge.git .idea`). Commit and push every change
-  to them straight to its `main`; nothing stays only local, and none of it goes into this
-  repository.
+  `git clone https://github.com/lektohq/lekto-knowledge.git .idea`), as one note per piece of
+  knowledge with YAML frontmatter (`.idea/README.md`; `uv run tools/index.py` lints it with
+  yamllint, checks the notes and writes the index). Commit and push every change to them straight
+  to its `main`; nothing stays only local, and none of it goes into this repository. Docstrings
+  point at notes as `.idea/<folder>/<name>.md`.
 - If something is unclear or a decision is missing, ask before implementing. Do not deviate from
-  the decisions in `.idea/architektur.md` on your own.
+  the decisions in `.idea/architecture/` and `.idea/decisions/` on your own.
 - New dependencies need agreement first.
 - Small, thematically separate commits. Keep answers short and precise.

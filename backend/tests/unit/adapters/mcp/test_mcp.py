@@ -285,7 +285,8 @@ async def test_documents_list_takes_the_filters_of_a_lens(api: Api, scene: Scene
 
 
 async def test_documents_go_by_a_short_id_or_the_whole_one(api: Api, scene: Scene) -> None:
-    """Tobi, 01.11.2026 (umsetzungsplan "MCP", decision 8): the last 8 characters of the id."""
+    """Tobi, 01.11.2026 (`.idea/decisions/2026-11-01-mcp.md`, decision 8): the last 8 characters of
+    the id."""
     owner = scene.headers["owner"]
     (short,) = shorts(scene.green)
     assert data(await call(api, owner, "documents_get", id=short))["id"] == short
@@ -911,8 +912,8 @@ async def test_documents_update_changes_what_is_given(api: Api, scene: Scene) ->
 
 
 async def test_a_change_carries_the_token(api: Api, scene: Scene) -> None:
-    """The verdicts name the token the change came through (umsetzungsplan "MCP", decision
-    11), as over REST."""
+    """The verdicts name the token the change came through (`.idea/decisions/2026-11-01-mcp.md`,
+    decision 11), as over REST."""
     changed = await call(
         api, scene.headers["owner"], "documents_update", id=scene.green, document_date="2026-03-31"
     )

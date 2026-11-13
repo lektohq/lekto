@@ -1,5 +1,5 @@
-"""The MCP server: tools to find, read and correct documents (Tobi, 01.11.2026, umsetzungsplan
-"MCP").
+"""The MCP server: tools to find, read and correct documents (Tobi, 01.11.2026,
+`.idea/decisions/2026-11-01-mcp.md`).
 
 Every tool calls the same services as the REST API with the caller's id, so rights and rules
 are the same. What all tools share stands once in the instructions, not in every description:

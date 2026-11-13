@@ -1,4 +1,4 @@
-"""Model calls a webhook takes over (`webhooks-und-auftraege.md`, "Modellaufrufe als Auftrag").
+"""Model calls a webhook takes over (`.idea/architecture/model-calls-via-tasks.md`).
 
 An admin's webhook that serves as `propose` or `extract` (`ModelCallRole`,
 `serving_model_call`) replaces the language model of the configuration for that request: the

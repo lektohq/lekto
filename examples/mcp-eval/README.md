@@ -3,7 +3,7 @@
 How well an AI assistant works with Lekto through MCP, measured: a dozen questions about the
 example documents of one household (`examples/documents`), each with the answer the manifest
 gives, asked through Claude Code with nothing but Lekto's tools. The run counts the right
-answers and the tokens (umsetzungsplan "MCP", decision 13). It costs what the calls cost, so it
+answers and the tokens (`.idea/decisions/2026-11-01-mcp.md`, decision 13). It costs what the calls cost, so it
 runs by hand, not in CI.
 
 Standard library only, like `examples/model-calls`.

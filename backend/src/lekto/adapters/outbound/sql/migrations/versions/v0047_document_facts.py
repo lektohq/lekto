@@ -4,13 +4,13 @@ Revision ID: 0047
 Revises: 0046
 Create Date: 2026-10-26 02:00:00.000000
 
-The identifiers a document shows become its facts (issue #145, `.idea/fakten.md`):
-`document_facts` keeps kind and normalised value as `document_identifiers` did, and adds the
-fact's role, where it comes from, as written, where it stands first in the text and whether a
-person decided it. The rows of `document_identifiers` are taken over with the role of their
-kind, as found by the patterns of the text (whether a code held one is not known); as written
-and where they stand come with the facts signal's next run. The downgrade keeps kind and value
-of every fact but those a person rejected.
+The identifiers a document shows become its facts (issue #145,
+`.idea/decisions/2026-10-25-facts.md`): `document_facts` keeps kind and normalised value as
+`document_identifiers` did, and adds the fact's role, where it comes from, as written, where it
+stands first in the text and whether a person decided it. The rows of `document_identifiers` are
+taken over with the role of their kind, as found by the patterns of the text (whether a code held
+one is not known); as written and where they stand come with the facts signal's next run. The
+downgrade keeps kind and value of every fact but those a person rejected.
 """
 
 from collections.abc import Sequence

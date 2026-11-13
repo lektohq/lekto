@@ -12,11 +12,11 @@ A rule has a scope, triggers, a tree of conditions and actions:
   operator and value.
 - Actions: set space, contact, type, topic, title or a field, add or remove tags, force a
   review, send a webhook (a notification through a webhook of whoever saved the rule).
-- Steps (Tobi, 25.10.2026, `webhooks-und-auftraege.md`): the actions are an ordered, linear
-  sequence that may hold two more kinds: asking a webhook (`AskWebhook`, a task whose answer
-  the steps after it see as `steps.<name>`) and a condition (`StepCondition`: if it does not
-  hold, the rule ends there; the steps before it count). Each rule works on its own copy of the
-  document and sees what its own steps before set; the rules are combined at the end.
+- Steps (Tobi, 25.10.2026, `.idea/decisions/2026-10-25-webhooks-and-tasks.md`): the actions are an
+  ordered, linear sequence that may hold two more kinds: asking a webhook (`AskWebhook`, a task
+  whose answer the steps after it see as `steps.<name>`) and a condition (`StepCondition`: if it
+  does not hold, the rule ends there; the steps before it count). Each rule works on its own copy of
+  the document and sees what its own steps before set; the rules are combined at the end.
 
 The definition (name, priority, triggers, conditions, actions) is versioned: every change makes
 a new version; old versions stay readable so the processing log can refer to them. Enabling and

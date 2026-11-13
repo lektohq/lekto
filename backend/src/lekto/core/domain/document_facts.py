@@ -1,6 +1,7 @@
-"""Facts as values of a document (`.idea/fakten.md`, issue #145): what a document shows that
-marks something or points to something, numbers and references, each with its kind, its value
-(normalised, as Lekto compares it), where it stands, where it comes from and its role.
+"""Facts as values of a document (`.idea/decisions/2026-10-25-facts.md`, issue #145): what a
+document shows that marks something or points to something, numbers and references, each with its
+kind, its value (normalised, as Lekto compares it), where it stands, where it comes from and its
+role.
 
 A fact stands in the document and is not configured: it holds for every type, and Lekto
 compares it across documents. The kinds are the identifiers' (`IdentifierKind`), fixed in the

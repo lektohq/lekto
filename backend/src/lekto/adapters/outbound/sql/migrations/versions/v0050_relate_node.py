@@ -5,11 +5,11 @@ Revises: 0049
 Create Date: 2026-10-26 12:00:00.000000
 
 A new node finds the documents a document refers to, and those that refer to it (issue #145,
-`.idea/bezuege.md`), before the rules see them. Every document gets its state: one whose rules
-ran (or were skipped, or wait for a webhook) has it `skipped`, as revision 0016 did for the
-signals; the command `relate` finds the relations of documents from before. One whose rules
-still wait (or were running) gets it waiting: a queued job of its rules is dropped, as they are
-no longer due, and once its fields are read, a job for `relate` takes its place.
+`.idea/decisions/2026-10-25-relations.md`), before the rules see them. Every document gets its
+state: one whose rules ran (or were skipped, or wait for a webhook) has it `skipped`, as revision
+0016 did for the signals; the command `relate` finds the relations of documents from before. One
+whose rules still wait (or were running) gets it waiting: a queued job of its rules is dropped, as
+they are no longer due, and once its fields are read, a job for `relate` takes its place.
 
 The downgrade drops the node from the states, the log, the jobs and the undelivered events; a
 document whose `relate` waits gets a job for its rules again once its fields are read.

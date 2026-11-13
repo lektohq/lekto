@@ -5,9 +5,9 @@ Revises: 0044
 Create Date: 2026-10-25 18:00:00.000000
 
 A rule step that asks a webhook hands its request to a task and waits for the answer (Tobi,
-25.10.2026, `webhooks-und-auftraege.md`). `tasks` keeps them, without foreign keys: a task
-outlives its webhook and its document. `webhooks.max_open_tasks`: how many tasks a webhook takes
-at the same time (4 for existing webhooks).
+25.10.2026, `.idea/decisions/2026-10-25-webhooks-and-tasks.md`). `tasks` keeps them, without foreign
+keys: a task outlives its webhook and its document. `webhooks.max_open_tasks`: how many tasks a
+webhook takes at the same time (4 for existing webhooks).
 """
 
 from collections.abc import Sequence

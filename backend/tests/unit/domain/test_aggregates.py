@@ -1,4 +1,4 @@
-"""Counting and summing over documents (umsetzungsplan "MCP", decision 7)."""
+"""Counting and summing over documents (`.idea/decisions/2026-11-01-mcp.md`, decision 7)."""
 
 from datetime import date
 from decimal import Decimal

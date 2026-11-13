@@ -285,9 +285,9 @@ class ApiToken:
 @dataclass(frozen=True)
 class ViaToken:
     """The API token a person acted through: kept with what records their decision (Tobi,
-    01.11.2026, umsetzungsplan "MCP", decision 11), so that a verdict through a script or an
-    assistant stays apart from one in the web UI. The name is a copy as it was then: it stays
-    readable once the token is renamed or revoked."""
+    01.11.2026, `.idea/decisions/2026-11-01-mcp.md`, decision 11), so that a verdict through a
+    script or an assistant stays apart from one in the web UI. The name is a copy as it was then: it
+    stays readable once the token is renamed or revoked."""
 
     id: ApiTokenId
     name: str
