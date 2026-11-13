@@ -453,8 +453,9 @@ async def test_editors_read_the_model_exchanges(world: World, scene: Scene) -> N
 
 
 async def test_a_document_is_found_by_the_end_of_its_id(world: World) -> None:
-    """Tobi, 01.11.2026 (umsetzungsplan "MCP", decision 8): the last 8 characters, the random
-    bits of a UUIDv7; among the documents the caller reads; an end several share names them."""
+    """Tobi, 01.11.2026 (`.idea/decisions/2026-11-01-mcp.md`, decision 8): the last 8 characters,
+    the random bits of a UUIDv7; among the documents the caller reads; an end several share names
+    them."""
     owner, stranger = await world.user(), await world.user()
     space = await world.personal_space(owner)
     theirs = await world.personal_space(stranger)

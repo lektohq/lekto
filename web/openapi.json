@@ -33003,7 +33003,7 @@
           "child_benefit_number"
         ],
         "title": "IdentifierKind",
-        "description": "The kinds of identifiers, which are the kinds of facts too (`domain.document_facts`;\n`.idea/fakten.md`, the catalog by role)."
+        "description": "The kinds of identifiers, which are the kinds of facts too (`domain.document_facts`;\n`.idea/architecture/fact-roles.md`)."
       },
       "IdentifierOut": {
         "properties": {

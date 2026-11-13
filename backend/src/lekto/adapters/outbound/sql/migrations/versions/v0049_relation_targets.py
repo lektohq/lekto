@@ -4,9 +4,10 @@ Revision ID: 0049
 Revises: 0048
 Create Date: 2026-10-26 10:00:00.000000
 
-An admin marks a document type as a relation target (issue #145, `.idea/bezuege.md`, decision
-8): a contract or customer number a document shares connects it only with documents of such a
-type. No type is one yet. The column is added in place on both databases.
+An admin marks a document type as a relation target (issue #145,
+`.idea/decisions/2026-10-25-relations.md`, decision 8): a contract or customer number a document
+shares connects it only with documents of such a type. No type is one yet. The column is added in
+place on both databases.
 """
 
 from collections.abc import Sequence

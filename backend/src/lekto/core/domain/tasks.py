@@ -1,4 +1,5 @@
-"""Tasks: requests through a webhook that expect an answer (`webhooks-und-auftraege.md`).
+"""Tasks: requests through a webhook that expect an answer
+(`.idea/decisions/2026-10-25-webhooks-and-tasks.md`).
 
 A node that needs something from outside (a rule step that asks, a model call a webhook takes
 over) hands it to a task and waits for its answer ("running externally",

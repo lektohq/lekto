@@ -1,6 +1,6 @@
-"""Parity of MCP with the REST API (Tobi, 01.11.2026, umsetzungsplan "MCP"): every endpoint is
-served by a tool or left out for a reason. A new endpoint fails this test until someone decides
-which."""
+"""Parity of MCP with the REST API (Tobi, 01.11.2026, `.idea/decisions/2026-11-01-mcp.md`): every
+endpoint is served by a tool or left out for a reason. A new endpoint fails this test until someone
+decides which."""
 
 import json
 from enum import StrEnum

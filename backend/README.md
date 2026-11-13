@@ -227,7 +227,7 @@ every field, a confirming change the fields it sets and those the automation had
 space; a field keeps its first verdict. A decision through an API token (a script, an assistant
 over MCP) carries the token beside the person (`ViaToken`: its id and a copy of its name; columns
 `via_token_id`, `via_token_name`, revision 0054), so a verdict through a token stays apart from one
-in the web UI (umsetzungsplan "MCP", decision 11): the verdicts, the confirmation and seen marks of
+in the web UI (`.idea/decisions/2026-11-01-mcp.md`, decision 11): the verdicts, the confirmation and seen marks of
 the inbox (`GET /inbox` names it under done, `via_token`), relations, bulk operations and rule
 applications (which pass it on to each document), and the log entries of a person (`via_token`
 beside `actor` or `confirmed_by`). The web UI writes "Tobi über Token „Claude“" there. The statistics over both are counted live. `GET /automation`
@@ -330,7 +330,7 @@ process (`services/_kept.py`).
   Docling's Markdown (`content.md`) until its text is read again (`reparse`); it is read
   meanwhile. The structure is Lekto's own JSON:
   the pages with their size, the lines and words with boxes in fractions of the page as shown.
-  It replaced Docling in 0.2: on the documents compared (`.idea/umsetzungsplan.md`) Docling
+  It replaced Docling in 0.2: on the documents compared (`.idea/decisions/2026-10-14-layout-text-not-docling.md`) Docling
   dropped headers and footers, merged the rows of forms and needed a minute and 2 GB per
   document.
 - Previews: PDFium (pypdfium2) renders, Pillow encodes WebP. PDFium is not thread-safe; all
@@ -625,7 +625,7 @@ and the space, the fields node reads the fields of the decided type and the titl
   until a source tells (`x-fact-roles`).
 - **Relations between documents** (issue #145 PR 9, `domain/relations.py`,
   `services/relations.py`, `GET`/`POST /documents/{id}/relations`,
-  `DELETE /documents/{id}/relations/{other_id}`; `.idea/bezuege.md`): a document refers to
+  `DELETE /documents/{id}/relations/{other_id}`; `.idea/decisions/2026-10-25-relations.md`): a document refers to
   another ("bezieht sich auf": the correction to the original, the reminder to the invoice, the
   invoice to the contract), many to many and without a kind of its own; the document types at
   both ends tell what it means. A relation points from the newer document to the older (by their
@@ -669,7 +669,7 @@ and the space, the fields node reads the fields of the decided type and the titl
   relations and in the log of `relate`. Every change of relations, Lekto's or a person's, holds
   one lock.
 - **Series and the documents expected next** (issue #145 PR 12, `domain/series.py`,
-  `services/expected.py`, `GET /expected`, MCP `expected_list`; `.idea/bezuege.md` decisions
+  `services/expected.py`, `GET /expected`, MCP `expected_list`; `.idea/decisions/2026-10-25-relations.md` decisions
   10–12): documents of one contact and type, and of one contract or customer number where they
   show one (by value, whatever its kind; a document whose number was not read joins the only
   numbered series of its contact and type; a person's number names none), at least three with
@@ -686,7 +686,7 @@ and the space, the fields node reads the fields of the decided type and the titl
   MCP lists the ended ones only with `include_ended`. The web UI shows
   them under "Erwartet": overdue, next 30 days, later, ended.
 - **The stream** (issue #145 PR 13, `services/stream.py`, `GET /documents/stream`;
-  `.idea/bezuege.md` decisions 13–17): the documents the filters of `GET /documents` find, in
+  `.idea/decisions/2026-10-25-relations.md` decisions 13–17): the documents the filters of `GET /documents` find, in
   lanes: a series with the relation target its documents refer to at its start (the contract;
   one may stand at the start of several series) and the document it expects next at its end;
   branches (documents that refer to one of a series or to its target without belonging to it,
@@ -1151,7 +1151,7 @@ where it is and edits where it goes (global: admins); every version names its sp
   enable the topic. `add_tags` and `remove_tags` take document tags (also those set by hand);
   a tag above one the document keeps or gets is not added, a parent gives way to a child
   added. Saving a rule checks the scope of every tag it names (`422`).
-- **Steps** (Tobi, 25.10.2026, `.idea/webhooks-und-auftraege.md`). The actions are an ordered,
+- **Steps** (Tobi, 25.10.2026, `.idea/decisions/2026-10-25-webhooks-and-tasks.md`). The actions are an ordered,
   linear sequence of at most 20 steps, which may also ask a webhook and check:
   - `ask_webhook` (`name`, `webhook_id`, `timeout_seconds`, default 300, 30 to 86,400;
     `missing`, default `red`): a task through a webhook of whoever saves the rule (see
@@ -1693,7 +1693,7 @@ person decided in this run already (then, and outside processing, it is only rep
 log, `sends_refused`). Deleting a webhook disables the rules that send through it, with the
 reason; so does deleting its owner.
 
-**Tasks** (requests that expect an answer, Tobi, 25.10.2026, `.idea/webhooks-und-auftraege.md`).
+**Tasks** (requests that expect an answer, Tobi, 25.10.2026, `.idea/decisions/2026-10-25-webhooks-and-tasks.md`).
 A node that needs an answer from outside hands the request to a task and waits for it without
 a worker: its state is `delegated` (the web UI says "running externally", with the minutes
 left), and `deadline` says when the last of its tasks ends at the latest. Whenever one of its
@@ -1717,7 +1717,7 @@ unknown task or token, or the deadline has passed. Without `LEKTO_PUBLIC_URL` no
 sent (the consumer would not know where to answer). Deleting a webhook fails the tasks that
 wait for it; those it sent run to their deadline, and an answer is still taken.
 
-**Model calls** (Tobi, 25.10.2026, `.idea/webhooks-und-auftraege.md`). An admin may make one of
+**Model calls** (Tobi, 25.10.2026, `.idea/decisions/2026-10-25-webhooks-and-tasks.md`). An admin may make one of
 their webhooks serve as a model call (`model_call`: `kind` `propose` or `extract`,
 `timeout_seconds`, default 300, 30 to 86,400): it then answers that request instead of the
 language model of `LEKTO_LLM_*`, for every document (an exception to "webhooks see what their
@@ -1872,7 +1872,7 @@ shown.
 
 ## Mail
 
-The intake channel `mail` (`.idea/umsetzungsplan.md`, "Eingangskanal Mail"; Tobi, 04.11.2026):
+The intake channel `mail` (`.idea/decisions/2026-11-04-mail.md`; Tobi, 04.11.2026):
 admins set up mailboxes Lekto fetches from over IMAP (`/mailboxes`; System › Eingangskanäle in
 the web UI), with mail rules per mailbox (`/mail-rules`; Regeln › Mails) that decide what a mail
 brings in and for whom.

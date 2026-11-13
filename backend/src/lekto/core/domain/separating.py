@@ -1,4 +1,4 @@
-"""Separator sheets (`.idea/umsetzungsplan.md`, "Trennblatt und Zusammenführen";
+"""Separator sheets (`.idea/decisions/2026-11-10-separator-and-merge.md`;
 `services.separating`): a scanned stack holds several documents, each after a sheet with a code
 that says "a new one starts here". When the stack comes in, it is split at those sheets, and the
 sheets are left out.

@@ -1,7 +1,7 @@
 """The tools of the domains `identifiers`, `rules` and `system`: whose a number is and where it
-stands, the rules read (to understand why a document came where it is), and the state of the
-system as the caller may see it (Tobi, 01.11.2026, umsetzungsplan "MCP", PR 6b). Rules are made,
-changed and applied in the web UI; identifiers are decided there."""
+stands, the rules read (to understand why a document came where it is), and the state of the system
+as the caller may see it (Tobi, 01.11.2026, `.idea/decisions/2026-11-01-mcp.md`, PR 6b). Rules are
+made, changed and applied in the web UI; identifiers are decided there."""
 
 from datetime import date, datetime
 from typing import Annotated, Literal

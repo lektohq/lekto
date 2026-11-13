@@ -1,8 +1,7 @@
-"""Whose an IBAN is where it stands (`.idea/umsetzungsplan.md`, "Inhaber von IBANs und
-Gläubiger-IDs"): the fixed rule on the text and the pages, German and English, that holds when
-the language model tells nothing (it is asked for IBANs only). Whose an e-mail domain is, its
-name tells (`domain_holder`); a customer number has one only in bookings (`booking_holder`).
-Creditor IDs and VAT IDs had holders until #215.
+"""Whose an IBAN is where it stands (`.idea/decisions/2026-10-27-holders.md`): the fixed rule on the
+text and the pages, German and English, that holds when the language model tells nothing (it is
+asked for IBANs only). Whose an e-mail domain is, its name tells (`domain_holder`); a customer
+number has one only in bookings (`booking_holder`). Creditor IDs and VAT IDs had holders until #215.
 
 A number's places are read one by one, each from its line, the three lines above and where it
 stands on its page. The first rule that applies tells (`_at`):

@@ -1,6 +1,6 @@
-"""Changing many documents at once (`.idea/umsetzungsplan.md`, "Massenaktionen und Seiten in der
-Dokumentliste"): one action on documents a person selected in the documents list, a page of them
-or all the hits of a search and filters, worked through in the background.
+"""Changing many documents at once (`.idea/decisions/2026-10-28-bulk-actions.md`): one action on
+documents a person selected in the documents list, a page of them or all the hits of a search and
+filters, worked through in the background.
 
 The selection is fixed when the person starts: the documents it names then, at most
 `MAX_DOCUMENTS`. Each document then goes through the same change a person makes on one (rights,

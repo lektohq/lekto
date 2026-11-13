@@ -1,5 +1,5 @@
 """Ask each task of `tasks.json` through Claude Code with Lekto's MCP server, and count the hits
-and the tokens (Tobi, 01.11.2026, umsetzungsplan "MCP", decision 13).
+and the tokens (Tobi, 01.11.2026, `.idea/decisions/2026-11-01-mcp.md`, decision 13).
 
     python run.py --url http://localhost:8010 --token lekto_... [--model sonnet] [--only t01,t05]
 

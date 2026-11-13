@@ -1,4 +1,4 @@
-"""Mailboxes: the intake channel mail (`.idea/umsetzungsplan.md`, "Eingangskanal Mail").
+"""Mailboxes: the intake channel mail (`.idea/decisions/2026-11-04-mail.md`).
 
 Admins set up mailboxes that Lekto fetches from, every `interval`: a server, an account, the
 folders to look in, and from when on. The password is stored encrypted (`SecretCipher`, bound

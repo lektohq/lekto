@@ -1,5 +1,5 @@
-"""Guards of the tools as a whole (Tobi, 01.11.2026, umsetzungsplan "MCP"): their names, the
-budget of their definitions, and their documentation."""
+"""Guards of the tools as a whole (Tobi, 01.11.2026, `.idea/decisions/2026-11-01-mcp.md`): their
+names, the budget of their definitions, and their documentation."""
 
 import json
 import re

@@ -1,4 +1,4 @@
-"""Setting up the mail rules of the mailboxes (umsetzungsplan "Eingangskanal Mail", decision 12).
+"""Setting up the mail rules of the mailboxes (`.idea/decisions/2026-11-04-mail.md`, decision 12).
 
 Mail rules are global and only admins see and change them, as the mailboxes (Tobi, 04.11.2026).
 A rule's person must be active, its space one the person files into, its type one that exists;

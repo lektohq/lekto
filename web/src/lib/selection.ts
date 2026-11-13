@@ -1,5 +1,5 @@
 /**
- * A selection a link hands over (Tobi, 01.11.2026, umsetzungsplan "MCP", decision 9): an
+ * A selection a link hands over (Tobi, 01.11.2026, `.idea/decisions/2026-11-01-mcp.md`, decision 9): an
  * assistant links to the documents it means, `/ui/documents?ids=…`, by their short ids (the
  * last characters of the id) or whole ones, comma-separated or repeated. The list shows exactly
  * them until the chip is removed; the remembered filters stay as they are (DESIGN.md, "Selection

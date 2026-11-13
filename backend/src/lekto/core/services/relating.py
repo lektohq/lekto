@@ -1,6 +1,6 @@
 """Recognising the relations of a document (the node `relate`, issue #145 PR 11;
-`.idea/bezuege.md`, decisions 7 to 9): the older documents it refers to, and the newer ones
-already there that refer to it, from what both show.
+`.idea/decisions/2026-10-25-relations.md`, decisions 7 to 9): the older documents it refers to, and
+the newer ones already there that refer to it, from what both show.
 
 - A number it refers to (`Ihre Rechnung Nr. 4711`, role `refers`) that another document carries
   as its own (an invoice, credit note or order number), and the other way round.

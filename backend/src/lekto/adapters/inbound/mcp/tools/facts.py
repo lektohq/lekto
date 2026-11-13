@@ -1,6 +1,6 @@
 """The tools of the domain `facts`: a person's decision about a number a document shows (Tobi,
-01.11.2026, umsetzungsplan "MCP", PR 5). A correction at the contact changes master data and
-stays in the web UI."""
+01.11.2026, `.idea/decisions/2026-11-01-mcp.md`, PR 5). A correction at the contact changes master
+data and stays in the web UI."""
 
 from typing import Annotated, Literal
 

@@ -1852,7 +1852,7 @@ async def test_a_title_of_its_own_stays_but_the_machine_s_is_replaced(world: Wor
 
 async def test_a_new_version_keeps_the_machine_s_title_a_person_confirmed(world: World) -> None:
     """In a new version's run the title stays as any confirmed value; the one read now is
-    suggested (Umsetzungsplan "Fassungen, Datei ersetzen, PDF bearbeiten", decision 5)."""
+    suggested (`.idea/decisions/2026-11-10-versions.md`, decision 5)."""
     seeded = await seed(world)
     document, _ = await signalled(world, proposal(), seeded.types["Rechnung"])
     earlier = FieldCheck(
