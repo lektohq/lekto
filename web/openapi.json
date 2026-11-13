@@ -27558,6 +27558,7 @@
         "enum": [
           "weekly",
           "monthly",
+          "bimonthly",
           "quarterly",
           "half_yearly",
           "yearly",

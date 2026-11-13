@@ -64,6 +64,7 @@
 	const CADENCES: Record<Exclude<Cadence, 'days'>, () => string> = {
 		weekly: m.expected_weekly,
 		monthly: m.expected_monthly,
+		bimonthly: m.expected_bimonthly,
 		quarterly: m.expected_quarterly,
 		half_yearly: m.expected_half_yearly,
 		yearly: m.expected_yearly
