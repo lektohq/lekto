@@ -3819,7 +3819,7 @@ export interface components {
 		 * Cadence
 		 * @enum {string}
 		 */
-		Cadence: 'weekly' | 'monthly' | 'quarterly' | 'half_yearly' | 'yearly' | 'days';
+		Cadence: 'weekly' | 'monthly' | 'bimonthly' | 'quarterly' | 'half_yearly' | 'yearly' | 'days';
 		/**
 		 * CandidateOut
 		 * @description A value the signals proposed for a field.
