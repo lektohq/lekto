@@ -1,0 +1,21 @@
+# yamllint for the YAML files of this repository: the workflows, the Compose files, the GitHub
+# settings. `uv run --project backend yamllint .` in the repository root; CI runs it in the job
+# `yaml`.
+extends: default
+
+# Whatever git ignores is not ours to lint (installed packages, builds, `.idea`, a local
+# migration-plan.yaml with real data).
+ignore-from-file: [.gitignore, web/.gitignore]
+
+rules:
+  # Compose files and workflows start without `---`.
+  document-start: disable
+  # These files hold shell scripts, patterns, HTML and Compose substitutions that cannot be
+  # wrapped without changing them; prose comments keep to 100 columns as everywhere.
+  line-length: disable
+  # `on:` of the workflows is a key, not a boolean.
+  truthy:
+    check-keys: false
+  # Action pins carry their version as `@<sha> # v6.1.0` (Renovate writes it so).
+  comments:
+    min-spaces-from-content: 1
