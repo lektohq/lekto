@@ -1,4 +1,4 @@
-"""Mail rules: what a mailbox's mails bring in (umsetzungsplan "Eingangskanal Mail", decision 12).
+"""Mail rules: what a mailbox's mails bring in (`.idea/decisions/2026-11-04-mail.md`, decision 12).
 
 A mail rule belongs to one mailbox. Its conditions look at the mail (sender, recipients,
 subject, the folder it lies in, whether it has attachments Lekto takes), in the tree every rule

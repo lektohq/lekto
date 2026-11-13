@@ -1,5 +1,5 @@
 """Fetching mail: a job per mailbox that looks into its folders, takes what is new and plans
-the next fetch (umsetzungsplan "Eingangskanal Mail").
+the next fetch (`.idea/decisions/2026-11-04-mail.md`).
 
 Each mailbox has one job (`fetch_key`): it runs, then queues the next after the mailbox's
 interval; "Jetzt abrufen" brings the waiting one forward (`fetch_now`). A fetch signs in once,

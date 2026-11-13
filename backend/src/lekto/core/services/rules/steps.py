@@ -1,4 +1,5 @@
-"""A rule's steps, one after the other (Tobi, 25.10.2026, `webhooks-und-auftraege.md`).
+"""A rule's steps, one after the other (Tobi, 25.10.2026,
+`.idea/decisions/2026-10-25-webhooks-and-tasks.md`).
 
 A rule whose conditions hold goes through its steps in order: actions (which the planner
 combines with the other rules' at the end), conditions on the document as the rule's own steps

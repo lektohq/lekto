@@ -1,6 +1,6 @@
 """The tools that look at many documents: list them by filters, or count and sum them (Tobi,
-01.11.2026, umsetzungsplan "MCP", decisions 1 and 7: "Was habe ich 2025 für Strom bezahlt?" is
-answered by the server, not by adding up a hundred answers)."""
+01.11.2026, `.idea/decisions/2026-11-01-mcp.md`, decisions 1 and 7: "Was habe ich 2025 für Strom
+bezahlt?" is answered by the server, not by adding up a hundred answers)."""
 
 from dataclasses import replace
 from datetime import date

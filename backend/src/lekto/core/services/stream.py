@@ -1,7 +1,7 @@
-"""The stream of documents (`.idea/bezuege.md`, decisions 13 to 17; issue #145 PR 13): the
-documents a filter finds, in lanes. A series is a lane, the relation target its documents refer
-to (the contract) at its start and its expected document at its end; a branch is the chain of
-documents that refer to a document of a series, or to its target, without belonging to it;
+"""The stream of documents (`.idea/decisions/2026-10-25-relations.md`, decisions 13 to 17; issue
+#145 PR 13): the documents a filter finds, in lanes. A series is a lane, the relation target its
+documents refer to (the contract) at its start and its expected document at its end; a branch is the
+chain of documents that refer to a document of a series, or to its target, without belonging to it;
 documents related only among themselves make a lane of their own; the rest stand in one lane
 "single".
 

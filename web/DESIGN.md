@@ -1,7 +1,7 @@
 # Lekto design system
 
 This document is binding for the web UI. Every page, component and text in `web/` follows it.
-`CLAUDE.md` links it. `.idea/architektur.md` describes what the views do. This document says how
+`CLAUDE.md` links it. The notes in `.idea/architecture/` describe what the views do. This document says how
 they look and how they are used. Where the two seem to disagree on looks, this document wins.
 
 **Changing a rule:** first a decision (Tobi), then a change of this document, then the code, in
@@ -1212,7 +1212,7 @@ true })`, read from `page.state` (`lib/words.ts` for the words of the documents)
 ### Selection by link
 
 A link `/ui/documents?ids=…` shows exactly the documents it names: an assistant's selection
-(Tobi, 01.11.2026, umsetzungsplan "MCP", decision 9). It names them by short ids (the last 8
+(Tobi, 01.11.2026, `.idea/decisions/2026-11-01-mcp.md`, decision 9). It names them by short ids (the last 8
 characters of an id) or whole ones, comma-separated, at most 100 (`lib/selection.ts`).
 
 - The chip "Auswahl · N" (`selected`, icon `list-checks`) stands first among the active filters;

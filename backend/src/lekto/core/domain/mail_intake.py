@@ -1,4 +1,4 @@
-"""What Lekto takes from a mail (umsetzungsplan "Eingangskanal Mail", decisions 6, 9 to 11).
+"""What Lekto takes from a mail (`.idea/decisions/2026-11-04-mail.md`, decisions 6, 9 to 11).
 
 A mail that only wraps an attached mail is unwrapped, layer by layer, to the innermost (at most
 `MAX_FORWARDS`); its forwarders form the chain of its origin. A mail with several attached mails

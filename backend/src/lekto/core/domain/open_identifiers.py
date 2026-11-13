@@ -1,4 +1,4 @@
-"""The open identifiers (`.idea/umsetzungsplan.md`, "Übersicht und Kennungen"): the identifiers
+"""The open identifiers (`.idea/architecture/open-identifiers.md`): the identifiers
 no person has confirmed yet, across all contacts and documents. A learned one stands at a contact
 (training found it); an unknown one stands in confirmed documents of a contact's kind
 (`CONTACT_KINDS`) but at no contact, neither entered, learned nor rejected. A person's value (a

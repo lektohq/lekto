@@ -14,7 +14,7 @@ from lekto.core.domain.reasons import ReasonCode, because
 
 class IdentifierKind(StrEnum):
     """The kinds of identifiers, which are the kinds of facts too (`domain.document_facts`;
-    `.idea/fakten.md`, the catalog by role)."""
+    `.idea/architecture/fact-roles.md`)."""
 
     IBAN = "iban"
     VAT_ID = "vat_id"

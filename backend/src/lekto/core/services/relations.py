@@ -1,5 +1,5 @@
-"""Relations between documents (`domain.relations`, `.idea/bezuege.md`, issue #145 PR 9): which
-a person sees, sets, accepts and removes.
+"""Relations between documents (`domain.relations`, `.idea/decisions/2026-10-25-relations.md`, issue
+#145 PR 9): which a person sees, sets, accepts and removes.
 
 Only who reads both documents sees a relation. Who edits the newer and reads the older sets one
 by hand, accepts a suggestion or removes one: a relation Lekto made is rejected then (so it is

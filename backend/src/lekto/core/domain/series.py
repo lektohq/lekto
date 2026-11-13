@@ -1,6 +1,6 @@
-"""Series and the documents expected next (`.idea/bezuege.md`, decisions 10 to 12; issue #145
-PR 12): documents of one contact and type, and of one contract or customer number where they
-show one, that come at a steady interval. Derived, never stored.
+"""Series and the documents expected next (`.idea/decisions/2026-10-25-relations.md`, decisions 10
+to 12; issue #145 PR 12): documents of one contact and type, and of one contract or customer number
+where they show one, that come at a steady interval. Derived, never stored.
 
 A series has at least three documents with a document date. The interval is the median of
 the gaps between them, as a calendar step where it is one (a week, a month, a quarter, half a
