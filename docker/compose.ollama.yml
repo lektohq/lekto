@@ -16,12 +16,6 @@ services:
       OLLAMA_CONTEXT_LENGTH: 8192
     volumes:
       - ollama-models:/root/.ollama
-    # The CLI asks the local server: healthy once it answers, so that the models are pulled then.
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 10s
-      timeout: 5s
-      retries: 20
     # deploy:
     #   resources:
     #     reservations:
@@ -29,6 +23,12 @@ services:
     #         - driver: nvidia
     #           count: all
     #           capabilities: [gpu]
+    # The CLI asks the local server: healthy once it answers, so that the models are pulled then.
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
 
   ollama-models:
     image: ollama/ollama:0.40.13
