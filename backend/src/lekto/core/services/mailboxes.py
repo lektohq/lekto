@@ -148,7 +148,11 @@ class MailboxService:
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.MANAGE_MAILBOXES)
             mailbox = await uow.mailboxes.get(id)
+            before = _target(mailbox.host, mailbox.port, mailbox.security, mailbox.username)
             mailbox.change(changes, now=now)
+            after = _target(mailbox.host, mailbox.port, mailbox.security, mailbox.username)
+            if password is None and after != before:
+                raise ValidationError(because(ReasonCode.MAIL_PASSWORD_AGAIN))
             if password is not None:
                 mailbox.set_password(self._encrypt(id, password), now=now)
             await _check_references(uow, mailbox)
@@ -183,6 +187,10 @@ class MailboxService:
         if password is None:
             if stored is None:
                 raise ValidationError("password: required without a mailbox")
+            if _target(host, port, security, username) != _target(
+                stored.host, stored.port, stored.security, stored.username
+            ):
+                raise ValidationError(because(ReasonCode.MAIL_PASSWORD_AGAIN))
             try:
                 password = self._decrypt(stored)
             except DecryptionError:
@@ -302,3 +310,10 @@ def _next_rule(active: list[MailRule], record: MailRecord) -> MailRule | None:
     """The rule that takes a waiting mail at the next fetch, as its record keeps it (its flags
     of the fetch: the fetch reads them anew)."""
     return first_match(active, record_facts(record)) if record.waiting else None
+
+
+def _target(host: str, port: int, security: MailSecurity, username: str) -> tuple[object, ...]:
+    """Where a stored password may go: only to the server, port, encryption and user it was
+    given for. Otherwise an admin (or a leaked admin token) could have Lekto send a password it
+    never shows again to a server of their choice, or unencrypted."""
+    return (host.strip().lower(), port, security, username.strip())

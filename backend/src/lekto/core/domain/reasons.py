@@ -442,6 +442,7 @@ class ReasonCode(StrEnum):
     MAIL_SERVER_ERROR = "mail_server_error"
     MAIL_PASSWORD_UNREADABLE = "mail_password_unreadable"
     MAIL_FETCH_FAILED = "mail_fetch_failed"
+    MAIL_PASSWORD_AGAIN = "mail_password_again"
     MAILBOX_PAUSED = "mailbox_paused"
     MAIL_TOO_LARGE = "mail_too_large"
     MAIL_STEP_FAILED = "mail_step_failed"
@@ -456,6 +457,7 @@ class ReasonCode(StrEnum):
     DELIVERY_OWNER_NO_ADMIN = "delivery_owner_no_admin"
     DELIVERY_WEBHOOK_DELETED = "delivery_webhook_deleted"
     DELIVERY_SECRET_UNUSABLE = "delivery_secret_unusable"
+    WEBHOOK_HEADERS_AGAIN = "webhook_headers_again"
     MAIL_RULE_UNREADABLE = "mail_rule_unreadable"
 
 
@@ -1014,6 +1016,9 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.MAIL_FETCH_FAILED: (
         "fetching stopped at an error in Lekto; the next fetch tries again"
     ),
+    ReasonCode.MAIL_PASSWORD_AGAIN: (
+        "for another server, port, encryption or user, enter the password again"
+    ),
     ReasonCode.MAILBOX_PAUSED: "the mailbox is paused; activate it to fetch",
     ReasonCode.MAIL_TOO_LARGE: (
         "the mail '{subject}' has {size:number} MB; Lekto fetches mails of up to {max:number} MB "
@@ -1034,6 +1039,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.DELIVERY_DOCUMENT_UNAVAILABLE: "the document is not available to the owner",
     ReasonCode.DELIVERY_OWNER_NO_ADMIN: "the owner is no admin any more",
     ReasonCode.DELIVERY_WEBHOOK_DELETED: "the webhook was deleted",
+    ReasonCode.WEBHOOK_HEADERS_AGAIN: "for another address, enter the values of the headers again",
     ReasonCode.DELIVERY_SECRET_UNUSABLE: (
         "the secret or the header values cannot be used (was the secret key changed?)"
     ),

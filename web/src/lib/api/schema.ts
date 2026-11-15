@@ -9946,6 +9946,7 @@ export interface components {
 			| 'mail_server_error'
 			| 'mail_password_unreadable'
 			| 'mail_fetch_failed'
+			| 'mail_password_again'
 			| 'mailbox_paused'
 			| 'mail_too_large'
 			| 'mail_step_failed'
@@ -9960,6 +9961,7 @@ export interface components {
 			| 'delivery_owner_no_admin'
 			| 'delivery_webhook_deleted'
 			| 'delivery_secret_unusable'
+			| 'webhook_headers_again'
 			| 'mail_rule_unreadable';
 		/**
 		 * ReasonOut

@@ -262,6 +262,34 @@ def stored_headers(world: World, webhook_id: WebhookId, encrypted: bytes | None)
     return headers_from_bytes(world.cipher.decrypt(encrypted, context=headers_context(webhook_id)))
 
 
+async def test_the_header_values_go_to_another_address_only_when_given_anew(
+    world: World,
+) -> None:
+    """The values of the headers are never shown again: when an admin moves another user's
+    webhook to another address, they must give them anew; the owner moves theirs freely."""
+    owner, admin = await world.user(), await world.user(role=Role.ADMIN)
+    service = world.webhooks
+    created = await service.create(
+        owner.id, name="n8n", url=URL, event_types=["*"], headers=[("Authorization", "Bearer x")]
+    )
+    hook = created.webhook
+    other = "http://n8n.example.net/webhook/lekto"
+
+    with pytest.raises(ValidationError) as kept:
+        await service.update(admin.id, hook.id, url=other)
+    assert kept.value.reason.code is ReasonCode.WEBHOOK_HEADERS_AGAIN
+    with pytest.raises(ValidationError):
+        await service.update(admin.id, hook.id, url=other, headers=[("Authorization", None)])
+    await service.update(admin.id, hook.id, name="renamed")  # the address stays: fine
+    moved = await service.update(
+        admin.id, hook.id, url=other, headers=[("Authorization", "Bearer y")]
+    )
+    assert moved.url == other
+    assert stored_headers(world, hook.id, moved.encrypted_headers) == {"Authorization": "Bearer y"}
+    back = await service.update(owner.id, hook.id, url=URL)
+    assert back.url == URL
+
+
 async def test_header_values_are_stored_encrypted_and_kept_by_name(world: World) -> None:
     user = await world.user()
     service = world.webhooks
