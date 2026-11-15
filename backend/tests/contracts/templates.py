@@ -145,6 +145,24 @@ class TemplateRendererContract:
         with pytest.raises(ValidationError, match="invalid template"):
             template_renderer.render(template, VALUES)
 
+    @pytest.mark.parametrize(
+        "template",
+        [
+            "{{ document_date | datetime: format: 'dd.MM.yyyy HH:mm' }}",
+            "{{ document_date | datetime: format: 'yyyy-mm-dd' }}",
+            "{{ tags | sum }}",
+            "{{ 253402300800 | date: '%Y' }}",
+        ],
+    )
+    def test_a_filter_that_fails_on_a_value(
+        self, template_renderer: TemplateRenderer, template: str
+    ) -> None:
+        """A valid template a filter fails with on its values is an invalid template, not
+        whatever the filter raised: a rule's step or a preview handles that."""
+        template_renderer.check(template)
+        with pytest.raises(ValidationError, match="invalid template"):
+            template_renderer.render(template, VALUES)
+
     def test_loops_and_output_are_bounded(self, template_renderer: TemplateRenderer) -> None:
         with pytest.raises(ValidationError):
             template_renderer.render("{% for i in (1..1000000) %}x{% endfor %}", VALUES)

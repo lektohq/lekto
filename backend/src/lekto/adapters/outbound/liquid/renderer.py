@@ -142,6 +142,11 @@ class LiquidTemplateRenderer:
             raise MissingValueError(found.group("path") if found else "a value") from None
         except LiquidError as error:
             raise _invalid(error) from None
+        except Exception as error:
+            # A valid template can still fail on its values: a time pattern on a date (`HH:mm`,
+            # or `mm` meant as the month), a sum over text, a date out of range. The callers
+            # handle a `ValidationError` (a rule's step, a preview, a webhook body).
+            raise ValidationError(f"invalid template: a filter failed: {error}") from None
 
     def _parsed(self, template: str) -> BoundTemplate:
         try:
