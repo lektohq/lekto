@@ -116,7 +116,9 @@ describe('stepSummary', () => {
 				document_types: [[PAYSLIP, 0.91]]
 			})
 		).toBe('Jugendverein Muster e.V. 52% · Lohnabrechnung 91%');
-		const neighbours = [MUSTERVEREIN, MUSTERVEREIN, BAKERY, MUSTERVEREIN, MUSTERVEREIN].map((contact) => ({ contact_id: contact }));
+		const neighbours = [MUSTERVEREIN, MUSTERVEREIN, BAKERY, MUSTERVEREIN, MUSTERVEREIN].map(
+			(contact) => ({ contact_id: contact })
+		);
 		expect(summary('signal_neighbours', { neighbours })).toBe(
 			m.summary_neighbours_most({
 				documents: m.summary_neighbours({ count: '5' }),

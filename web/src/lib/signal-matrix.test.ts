@@ -136,11 +136,7 @@ describe('matrixOf', () => {
 		expect(rows.map((row) => [row.label, row.value, row.open])).toEqual([
 			[m.field_contact(), 'Muster Bäckerei', false],
 			[m.field_document_type(), 'Lohnabrechnung', false],
-			[
-				m.field_space(),
-				m.run_suggestion({ choice: m.move_hand_over({ name: 'Jane Doe' }) }),
-				true
-			]
+			[m.field_space(), m.run_suggestion({ choice: m.move_hand_over({ name: 'Jane Doe' }) }), true]
 		]);
 		// Model names it, classifier too unsure, neighbours name another without proof, the
 		// identifier proves it.

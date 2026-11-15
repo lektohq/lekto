@@ -276,7 +276,10 @@ describe('changesOf', () => {
 	});
 
 	it('tells nothing for the first run, nor when nothing changed', () => {
-		const log = [entry('judge', 1, 'ok', decided(MUSTERVEREIN)), entry('judge', 2, 'ok', decided(MUSTERVEREIN))];
+		const log = [
+			entry('judge', 1, 'ok', decided(MUSTERVEREIN)),
+			entry('judge', 2, 'ok', decided(MUSTERVEREIN))
+		];
 		expect(changesOf(log, graph, 1, [2, 1], lookup)).toBeNull();
 		expect(changesOf(log, graph, 2, [2, 1], lookup)).toBeNull();
 	});
