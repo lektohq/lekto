@@ -3,6 +3,7 @@
 import base64
 import hashlib
 from email.message import EmailMessage
+from urllib.parse import quote
 
 from lekto.core.domain.mail import MailLogin, MailSecurity
 from lekto.core.domain.mail_intake import SMALL_IMAGE
@@ -120,3 +121,33 @@ def apple_mail() -> bytes:
         "--mix--\r\n"
         "--alt--\r\n"
     ).encode()
+
+
+def named_attachments_mail(*names: str, subject: str = "Ihre Unterlagen") -> bytes:
+    """A mail with a PDF under each of `names`, written as a sender may (RFC 2231, so path
+    separators and control characters come through), and `subject` as it stands (it may be an
+    encoded word)."""
+    message = EmailMessage()
+    message["From"] = "Muster Versicherung <post@versicherung.example>"
+    message["To"] = "Jane Doe <jane@example.test>"
+    message["Date"] = "Wed, 04 Nov 2026 10:00:00 +0100"
+    message["Message-ID"] = (
+        f"<{hashlib.sha256(repr(names).encode()).hexdigest()[:16]}@example.test>"
+    )
+    message["Subject"] = "placeholder"
+    message.set_content("Anbei die Unterlagen.")
+    for index, _ in enumerate(names):
+        message.add_attachment(
+            PDF + f"% {index}\n".encode(),
+            maintype="application",
+            subtype="pdf",
+            filename=f"placeholder-{index}.pdf",
+        )
+    data = bytes(message)
+    data = data.replace(b"Subject: placeholder", b"Subject: " + subject.encode(), 1)
+    for index, name in enumerate(names):
+        encoded = "utf-8''" + quote(name, safe="")
+        data = data.replace(
+            f'filename="placeholder-{index}.pdf"'.encode(), f"filename*={encoded}".encode(), 1
+        )
+    return data

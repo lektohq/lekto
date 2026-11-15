@@ -12,11 +12,10 @@ only the fields the caller names are kept, others are skipped.
 import asyncio
 import hashlib
 import os
-import re
 import tempfile
 from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, field
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, cast
 
 from python_multipart.exceptions import MultipartParseError
@@ -24,6 +23,7 @@ from python_multipart.multipart import MultipartParser, parse_options_header
 from starlette.requests import Request
 
 from lekto.core.domain.documents import Sha256
+from lekto.core.domain.validation import clean_filename
 from lekto.core.services.pipeline import IncomingFile
 
 if TYPE_CHECKING:
@@ -32,8 +32,6 @@ if TYPE_CHECKING:
 FILE_FIELD = "file"
 _FIELD_LIMIT = 1024  # bytes of a text field
 _OVERHEAD = 64 * 1024  # bytes of multipart framing and small text fields beyond the files
-_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
-_MAX_FILENAME = 255
 
 
 class UploadTooLargeError(Exception):
@@ -260,7 +258,7 @@ class _State:
                 )
                 return
             raw = options.get(b"filename", b"").decode("utf-8", errors="replace")
-            self.files.append(_File(clean_filename(raw)))
+            self.files.append(_File(clean_filename(raw) or "upload"))
             self._part = self.files[-1]
         elif b"filename" in options or name not in self.wanted:
             self._part = None  # other files and unknown fields are skipped
@@ -316,11 +314,3 @@ def upload_body(file: str, **fields: object) -> dict[str, Any]:
             },
         }
     }
-
-
-def clean_filename(raw: str) -> str:
-    """The last path segment, without control characters; `upload` if nothing is left."""
-    name = PurePosixPath(raw.replace("\\", "/")).name
-    name = _CONTROL.sub("", name).strip()
-    name = name[:_MAX_FILENAME]
-    return name if name not in ("", ".", "..") else "upload"

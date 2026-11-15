@@ -1,6 +1,8 @@
 """Small checks shared by the domain model."""
 
+import re
 from datetime import UTC, datetime, timedelta
+from pathlib import PurePosixPath
 
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.reasons import ReasonCode, because
@@ -31,6 +33,28 @@ def require_name(value: str, what: str = "name", *, max_length: int | None = MAX
     if max_length is not None and len(name) > max_length:
         raise ValidationError(because(ReasonCode.NAME_TOO_LONG, what=what, max=max_length))
     return name
+
+
+MAX_FILENAME = 255
+"""Characters of a file's name as Lekto keeps it: an upload, an attachment of a mail."""
+
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def without_control(text: str) -> str:
+    """`text` without control characters (those below the space, and DEL): Postgres refuses NUL
+    in text, the others garble what a person reads. Texts from outside (a file's name, a mail's
+    subject and addresses) pass through here before Lekto keeps them."""
+    return _CONTROL.sub("", text)
+
+
+def clean_filename(raw: str) -> str:
+    """The last path segment of a file's name as a client or a mail gives it, without control
+    characters, at most `MAX_FILENAME` characters; empty if nothing is left (the caller names
+    the file then)."""
+    name = PurePosixPath(raw.replace("\\", "/")).name
+    name = without_control(name).strip()[:MAX_FILENAME]
+    return "" if name in (".", "..") else name
 
 
 MAX_URL_LENGTH = 2000

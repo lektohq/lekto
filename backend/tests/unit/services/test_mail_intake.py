@@ -152,6 +152,37 @@ async def test_everything_for_a_person_makes_documents_of_a_mail(world: World) -
     assert len(await world.documents.list_visible(person.id)) == 3
 
 
+async def test_names_and_header_values_from_a_sender_lose_paths_and_control_characters(
+    world: World,
+) -> None:
+    """A sender writes the names of the attachments and the subject as they like: path parts,
+    NUL (which Postgres refuses) and names longer than a title may be. Every part still comes in,
+    under the name an upload would get."""
+    _, person, mailbox = await _setup(world)
+    _deliver(
+        world,
+        mails.named_attachments_mail(
+            "klein.pdf",
+            "x" * 3000 + ".pdf",
+            "../../etc/a\x00b\x07.pdf",
+            subject="=?utf-8?q?Rechnung=00_1?=",
+        ),
+    )
+    await _fetch(world, world.mail_intake())
+
+    assert len(await world.documents.list_visible(person.id)) == 4  # three PDFs and the text
+    async with world.uow() as uow:
+        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        origins = await uow.mail_origins.of_record(record.id)
+    assert (record.outcome, record.documents, record.subject) == (
+        MailOutcome.TAKEN,
+        4,
+        "Rechnung 1",
+    )
+    names = [origin.filename for origin in origins if origin.role is OriginRole.ATTACHMENT]
+    assert names == ["klein.pdf", "x" * 255, "ab.pdf"]
+
+
 async def test_what_apple_mail_sends_inline_becomes_a_document(world: World) -> None:
     """Apple Mail sends a PDF `inline` with a file name (Tobi, 06.11.2026): it is taken as an
     attachment beside the mail's text; the logo the HTML embeds is not."""

@@ -18,6 +18,7 @@ from email.utils import getaddresses, parsedate_to_datetime
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.mail_traits import Importance, importance_of
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.validation import clean_filename, without_control
 
 RFC822 = "message/rfc822"
 MAX_HEADER = 1000
@@ -230,7 +231,7 @@ def _filename(part: Message) -> str | None:
         name = part.get_filename()
     except (LookupError, UnicodeError, ValueError):
         return None
-    return _SPACE.sub(" ", name).strip() or None if name else None
+    return clean_filename(_SPACE.sub(" ", name)) or None if name else None
 
 
 def _content_id(part: Message) -> str | None:
@@ -247,7 +248,9 @@ def _header(message: EmailMessage, name: str) -> str:
         value = message.get(name)
     except (LookupError, UnicodeError, ValueError):
         return ""
-    return _SPACE.sub(" ", str(value)).strip()[:MAX_HEADER] if value is not None else ""
+    if value is None:
+        return ""
+    return without_control(_SPACE.sub(" ", str(value))).strip()[:MAX_HEADER]
 
 
 def _addresses(message: EmailMessage, name: str) -> tuple[Address, ...]:
@@ -258,7 +261,12 @@ def _addresses(message: EmailMessage, name: str) -> tuple[Address, ...]:
     found = []
     for display, address in getaddresses([str(value) for value in values]):
         if address or display:
-            found.append(Address(_SPACE.sub(" ", display).strip(), address.strip()))
+            found.append(
+                Address(
+                    without_control(_SPACE.sub(" ", display)).strip(),
+                    without_control(address).strip(),
+                )
+            )
     return tuple(found)
 
 

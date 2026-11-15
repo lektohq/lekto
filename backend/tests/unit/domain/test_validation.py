@@ -3,7 +3,14 @@ from datetime import UTC, datetime, timedelta, timezone
 import pytest
 
 from lekto.core.domain.errors import ValidationError
-from lekto.core.domain.validation import name_key, require_name, require_utc
+from lekto.core.domain.validation import (
+    MAX_FILENAME,
+    clean_filename,
+    name_key,
+    require_name,
+    require_utc,
+    without_control,
+)
 
 
 def test_require_utc_accepts_utc() -> None:
@@ -33,3 +40,24 @@ def test_require_name_strips_and_rejects_blank() -> None:
 
 def test_name_key_ignores_case_and_surrounding_space() -> None:
     assert name_key(" Straße ") == name_key("STRASSE")
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("Rechnung 12345.pdf", "Rechnung 12345.pdf"),
+        ("../../etc/a\x00b\x07c.pdf", "abc.pdf"),
+        ("C:\\Users\\scan.pdf", "scan.pdf"),
+        ("..", ""),
+        ("\x00\x01", ""),
+        ("a" * 3000 + ".pdf", "a" * MAX_FILENAME),
+    ],
+)
+def test_a_file_name_keeps_its_last_segment_without_control_characters(
+    raw: str, expected: str
+) -> None:
+    assert clean_filename(raw) == expected
+
+
+def test_text_from_outside_loses_its_control_characters() -> None:
+    assert without_control("Rechnung\x00 1\x1b\x7f") == "Rechnung 1"

@@ -9,7 +9,7 @@ from lekto.core.domain import media_types
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.mail_intake import letters
 from lekto.core.domain.mail_message import Address, read_mail
-from tests.mails import PDF, PNG, apple_mail, plain_mail, rich_mail
+from tests.mails import PDF, PNG, apple_mail, named_attachments_mail, plain_mail, rich_mail
 
 
 def test_reads_what_a_mail_says_about_itself() -> None:
@@ -102,3 +102,12 @@ def test_a_mail_is_told_by_its_header_lines(head: bytes) -> None:
 )
 def test_other_files_are_no_mail(head: bytes) -> None:
     assert media_types.detect(head) != media_types.EML
+
+
+def test_names_and_header_values_lose_paths_and_control_characters() -> None:
+    raw = named_attachments_mail(
+        "../../etc/a\x00b\x07.pdf", "b" * 3000 + ".pdf", subject="=?utf-8?q?Rechnung=00_1?="
+    )
+    mail = read_mail(raw)
+    assert [part.filename for part in mail.attachments] == ["ab.pdf", "b" * 255]
+    assert mail.subject == "Rechnung 1"
