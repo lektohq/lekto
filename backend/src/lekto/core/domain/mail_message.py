@@ -276,8 +276,9 @@ def _date(message: EmailMessage) -> datetime | None:
         return None
     try:
         moment = parsedate_to_datetime(value)
-    except (TypeError, ValueError, IndexError):
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=UTC)
+        return moment.astimezone(UTC)
+    except (TypeError, ValueError, IndexError, OverflowError):
+        # A date at the edge of the calendar (`31 Dec 9999 … -0100`) leaves it in UTC.
         return None
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=UTC)
-    return moment.astimezone(UTC)

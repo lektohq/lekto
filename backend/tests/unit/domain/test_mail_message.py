@@ -111,3 +111,10 @@ def test_names_and_header_values_lose_paths_and_control_characters() -> None:
     mail = read_mail(raw)
     assert [part.filename for part in mail.attachments] == ["ab.pdf", "b" * 255]
     assert mail.subject == "Rechnung 1"
+
+
+def test_a_date_at_the_edge_of_the_calendar_is_no_date() -> None:
+    raw = plain_mail().replace(
+        b"Date: Wed, 04 Nov 2026 10:00:00 +0100", b"Date: Fri, 31 Dec 9999 23:59:59 -0100"
+    )
+    assert read_mail(raw).date is None
