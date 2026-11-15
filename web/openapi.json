@@ -26929,6 +26929,7 @@
               "format": "uuid"
             },
             "type": "array",
+            "maxItems": 100000,
             "title": "Accept Conflicts",
             "description": "Selected documents where the rule's value replaces a different one."
           }
@@ -28064,7 +28065,8 @@
                 "items": {
                   "type": "string"
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 100
               },
               {
                 "items": {
@@ -28083,7 +28085,8 @@
                     }
                   ]
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 100
               },
               {
                 "type": "null"
@@ -31664,7 +31667,8 @@
                   "type": "string",
                   "format": "uuid"
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 1000
               },
               {
                 "type": "null"
@@ -31696,6 +31700,7 @@
               "format": "uuid"
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Required Document Type Ids",
             "description": "A typed field: the document types (of its own) it is required for; for the others it is optional. Extraction must find a required field; an optional one may stay empty, but a value it gives must be shown by the text."
           },
@@ -31799,6 +31804,7 @@
               "format": "uuid"
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Required Document Type Ids",
             "description": "A typed field: the document types (of its own) it is required for; for the others it is optional. Extraction must find a required field; an optional one may stay empty, but a value it gives must be shown by the text."
           },
@@ -31917,7 +31923,8 @@
                   "type": "string",
                   "format": "uuid"
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 1000
               },
               {
                 "type": "null"
@@ -31946,6 +31953,7 @@
                   "format": "uuid"
                 },
                 "type": "array",
+                "maxItems": 1000,
                 "description": "A typed field: the document types (of its own) it is required for; for the others it is optional. Extraction must find a required field; an optional one may stay empty, but a value it gives must be shown by the text."
               },
               {
@@ -34244,6 +34252,7 @@
               "format": "uuid"
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Ids",
             "description": "Each of the caller's lenses once, in the new order."
           }
@@ -39229,6 +39238,7 @@
               ]
             },
             "type": "array",
+            "maxItems": 4,
             "title": "Kinds",
             "description": "What the caller is told about: `waiting` (documents wait in their inbox), `webhook_disabled` (one of their webhooks was switched off), and for admins `mailbox_failed` (a mailbox fails to fetch) and `job_failed` (a job was given up)."
           },
@@ -40470,6 +40480,7 @@
               "$ref": "#/components/schemas/Trigger"
             },
             "type": "array",
+            "maxItems": 2,
             "minItems": 1,
             "title": "Triggers",
             "description": "`ingest`: when a document arrives; `change`: when a person changes it. A rule with a step that asks a webhook: `ingest` only."
@@ -40654,6 +40665,7 @@
               "$ref": "#/components/schemas/Trigger"
             },
             "type": "array",
+            "maxItems": 2,
             "minItems": 1,
             "title": "Triggers",
             "description": "`ingest`: when a document arrives; `change`: when a person changes it. A rule with a step that asks a webhook: `ingest` only."
@@ -42241,7 +42253,8 @@
                 "items": {
                   "$ref": "#/components/schemas/SpaceMember"
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 1000
               },
               {
                 "type": "null"
@@ -43859,6 +43872,7 @@
               "$ref": "#/components/schemas/SpaceSettlementIn"
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Spaces",
             "description": "Each space once."
           }
@@ -44062,6 +44076,7 @@
               "type": "string"
             },
             "type": "array",
+            "maxItems": 13,
             "title": "Event Types",
             "description": "Event types: `document.confirmed`, `document.deleted`, `document.filed`, `document.lane_changed`, `document.moved`, `document.node_completed`, `document.node_deferred`, `document.node_delegated`, `document.node_started`, `document.received`, `document.review_required`, `document.updated`, or `*` for all, also future ones. None: the webhook serves rules only.",
             "default": []
@@ -44526,7 +44541,8 @@
                 "items": {
                   "type": "string"
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 13
               },
               {
                 "type": "null"
@@ -44925,7 +44941,7 @@
               }
             ],
             "default": null,
-            "description": "A request that does not fit (422): what is wrong with each part.",
+            "description": "A request that does not fit (422): what is wrong with each part, the first 50; `detail` then says how many there are.",
             "title": "Errors"
           }
         },

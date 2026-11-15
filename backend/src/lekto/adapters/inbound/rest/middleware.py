@@ -3,7 +3,7 @@
 Paths given to them may name a segment `{id}`: it stands for one segment of any value."""
 
 import re
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 
 from starlette.datastructures import MutableHeaders
 from starlette.exceptions import HTTPException
@@ -29,25 +29,43 @@ def _pattern(path: str) -> re.Pattern[str]:
 class LimitRequestBody:
     """Bounds request bodies: by `Content-Length` before anything is read, and by the bytes
     received otherwise. Routes in `exempt` (method, path) have limits of their own, such as the
-    uploads. FastAPI reads JSON bodies completely before validating them, so without this a
-    client could make the process hold any amount of data."""
+    uploads; routes in `limits` a smaller one than `limit`, such as the public sign-in. FastAPI
+    reads JSON bodies completely before validating them, so without this a client could make the
+    process hold any amount of data."""
 
-    def __init__(self, app: ASGIApp, *, limit: int, exempt: Collection[tuple[str, str]]) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        limit: int,
+        exempt: Collection[tuple[str, str]],
+        limits: Mapping[tuple[str, str], int] | None = None,
+    ) -> None:
         self._app = app
         self._limit = limit
         self._exempt = [(method, _pattern(path)) for method, path in exempt]
+        self._limits = [
+            (method, _pattern(path), size) for (method, path), size in (limits or {}).items()
+        ]
 
     def _exempted(self, method: str, path: str) -> bool:
         return any(method == wanted and pattern.fullmatch(path) for wanted, pattern in self._exempt)
+
+    def _limit_of(self, method: str, path: str) -> int:
+        for wanted, pattern, size in self._limits:
+            if method == wanted and pattern.fullmatch(path):
+                return size
+        return self._limit
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http" or self._exempted(scope["method"], scope["path"]):
             await self._app(scope, receive, send)
             return
+        limit = self._limit_of(scope["method"], scope["path"])
         headers = dict(scope["headers"])
         length = headers.get(b"content-length", b"").decode("latin-1")
-        if length.isdigit() and int(length) > self._limit:
-            error = RequestTooLargeError(self._limit)
+        if length.isdigit() and int(length) > limit:
+            error = RequestTooLargeError(limit)
             await problem(413, error.detail)(scope, receive, send)
             return
         received = 0
@@ -57,8 +75,8 @@ class LimitRequestBody:
             message = await receive()
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
-                if received > self._limit:
-                    raise RequestTooLargeError(self._limit)
+                if received > limit:
+                    raise RequestTooLargeError(limit)
             return message
 
         await self._app(scope, limited, send)

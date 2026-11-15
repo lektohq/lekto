@@ -13,6 +13,7 @@ from lekto.core.domain.master_data import MAX_DESCRIPTION
 from lekto.core.domain.permissions import space_role
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import User
+from lekto.core.domain.validation import MAX_REFERENCES
 
 SpaceDescription = Annotated[
     str,
@@ -67,6 +68,7 @@ class SpaceCreate(NameIn):
     description: SpaceDescription | None = None
     members: list[SpaceMember] | None = Field(
         default=None,
+        max_length=MAX_REFERENCES,
         description=(
             "Who else is a member, with their role. The caller always edits a space they "
             "create; an admin may give the members alone (one of them must edit)."

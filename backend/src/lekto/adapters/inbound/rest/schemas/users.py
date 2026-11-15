@@ -10,6 +10,7 @@ from lekto.adapters.inbound.rest.schemas.account import LinkOut, Password, UserO
 from lekto.adapters.inbound.rest.schemas.common import each_once
 from lekto.core.domain.ids import SpaceId, UserId
 from lekto.core.domain.users import MAX_DISPLAY_NAME, MAX_USERNAME, Role, Settle, Settlement
+from lekto.core.domain.validation import MAX_REFERENCES
 
 
 class UserCreate(BaseModel):
@@ -130,7 +131,9 @@ class UserRemovalIn(BaseModel):
         },
     )
 
-    spaces: list[SpaceSettlementIn] = Field(default_factory=list, description="Each space once.")
+    spaces: list[SpaceSettlementIn] = Field(
+        default_factory=list, max_length=MAX_REFERENCES, description="Each space once."
+    )
 
     @field_validator("spaces")
     @classmethod

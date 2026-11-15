@@ -9,6 +9,11 @@ MAX_NAME = 200
 """Characters of a name: contacts, types, tags, fields, spaces, rules, aliases, choices. The
 REST schemas take their limit from here."""
 
+MAX_REFERENCES = 1000
+"""Ids in one list of a request that name other objects with no limit of their own: the members
+of a space, the spaces of a user being removed, the order of lenses, the document types of a
+field. More than there can be of them is no request; the REST schemas take the limit from here."""
+
 
 def require_utc(value: datetime, what: str = "timestamp") -> datetime:
     """Timestamps are timezone-aware and in UTC; naive or offset times are rejected."""

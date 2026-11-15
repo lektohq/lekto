@@ -339,6 +339,39 @@ async def test_openapi_lists_every_endpoint(api: Api) -> None:
     }
 
 
+async def test_every_list_in_a_request_body_has_a_limit(api: Api) -> None:
+    """Pydantic finds an error for every bad item of a list: a list without `maxItems` would let
+    a body of a megabyte make a hundred thousand of them."""
+    schema = await openapi(api)
+    components = schema["components"]["schemas"]
+    unbounded: set[str] = set()
+
+    def walk(node: dict[str, Any], where: str, seen: frozenset[str]) -> None:
+        if "$ref" in node:
+            name = node["$ref"].rsplit("/", 1)[-1]
+            if name not in seen:
+                walk(components[name], name, seen | {name})
+            return
+        for key in ("anyOf", "oneOf", "allOf"):
+            for item in node.get(key, []):
+                walk(item, where, seen)
+        if node.get("type") == "array":
+            if "maxItems" not in node:
+                unbounded.add(where)
+            walk(node.get("items", {}), f"{where}[]", seen)
+        for name, item in node.get("properties", {}).items():
+            walk(item, f"{where}.{name}", seen)
+        if isinstance(node.get("additionalProperties"), dict):
+            walk(node["additionalProperties"], f"{where}{{}}", seen)
+
+    for path, methods in schema["paths"].items():
+        for method, operation in methods.items():
+            for content in operation.get("requestBody", {}).get("content", {}).values():
+                if "schema" in content:
+                    walk(content["schema"], f"{method.upper()} {path}", frozenset())
+    assert not unbounded
+
+
 async def test_errors_are_documented_as_problems_with_examples(api: Api) -> None:
     schema = await openapi(api)
     for path, item in schema["paths"].items():

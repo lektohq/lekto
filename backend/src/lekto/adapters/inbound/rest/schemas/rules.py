@@ -53,6 +53,10 @@ from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE
 from lekto.core.services.rules.changes import ArrivalStep
 from lekto.core.services.rules.retroactive import Outcome, TextHit
 
+MAX_APPLIED = 100_000
+"""Documents one application of a rule names (`ApplyRequest`): as many as
+`LEKTO_RULES_APPLY_MAX_DOCUMENTS` allows at most; the service bounds them by its value."""
+
 
 class ConditionSchema(BaseModel):
     """`field` `op` `value`. Operators by field: contact, document_type: `is`, `in`, `present`,
@@ -116,8 +120,8 @@ class ConditionSchema(BaseModel):
         | float
         | MoneyValue
         | PeriodValue
-        | list[str]
-        | list[str | bool | int | float]
+        | Annotated[list[str], Field(max_length=MAX_LIST)]
+        | Annotated[list[str | bool | int | float], Field(max_length=MAX_LIST)]
         | None
     ) = Field(
         default=None,
@@ -380,6 +384,7 @@ class RuleDefinitionIn(BaseModel):
     triggers: list[Trigger] = Field(
         default_factory=lambda: list(Trigger),
         min_length=1,
+        max_length=len(Trigger),
         description=(
             "`ingest`: when a document arrives; `change`: when a person changes it. A rule "
             "with a step that asks a webhook: `ingest` only."
@@ -765,9 +770,10 @@ class ApplyRequest(BaseModel):
     )
 
     version: int = Field(ge=1, description="The rule version to apply (from the preview).")
-    document_ids: list[UUID] = Field(min_length=1, max_length=100_000)
+    document_ids: list[UUID] = Field(min_length=1, max_length=MAX_APPLIED)
     accept_conflicts: list[UUID] = Field(
         default_factory=list,
+        max_length=MAX_APPLIED,
         description="Selected documents where the rule's value replaces a different one.",
     )
 

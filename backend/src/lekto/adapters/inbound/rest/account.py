@@ -81,6 +81,11 @@ async def _json_body(request: Request) -> None:
 
 # --- password sign-in ---------------------------------------------------------------------------
 
+LOGIN_MAX_BODY = 8 * 1024
+"""Bytes of a sign-in's body: a username, a password and a code, each bounded, even with every
+character escaped. The route is public, so FastAPI must not read and validate more: a megabyte of
+unknown keys held the event loop for seconds."""
+
 
 @public.post(
     "/login",

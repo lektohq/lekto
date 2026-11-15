@@ -24,6 +24,7 @@ from lekto.core.domain.master_data import (
     TagScope,
 )
 from lekto.core.domain.tag_tree import TagTree
+from lekto.core.domain.validation import MAX_REFERENCES
 from lekto.core.ports.images import LOGO_SIZE
 
 
@@ -553,11 +554,12 @@ Position = Annotated[
 RequiredTypes = Annotated[
     list[UUID],
     Field(
+        max_length=MAX_REFERENCES,
         description=(
             "A typed field: the document types (of its own) it is required for; for the others "
             "it is optional. Extraction must find a required field; an optional one may stay "
             "empty, but a value it gives must be shown by the text."
-        )
+        ),
     ),
 ]
 
@@ -580,7 +582,9 @@ class FieldCreate(BaseModel):
     name: Name
     data_type: FieldType
     document_type_ids: list[UUID] | None = Field(
-        default=None, description="null: global; otherwise only for these document types."
+        default=None,
+        max_length=MAX_REFERENCES,
+        description="null: global; otherwise only for these document types.",
     )
     choices: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(
         default_factory=list, max_length=200, description="For `choice` only."
@@ -615,6 +619,7 @@ class FieldPatch(BaseModel):
     )
     document_type_ids: list[UUID] | None = Field(
         default=None,
+        max_length=MAX_REFERENCES,
         description=(
             "null: global. Narrowing is a conflict (409) while documents outside the new scope "
             "have values; the types it is required for narrow with it."

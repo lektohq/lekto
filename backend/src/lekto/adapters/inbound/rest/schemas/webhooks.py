@@ -34,6 +34,9 @@ from lekto.core.services.webhooks.management import (
     DeliveryView,
 )
 
+MAX_EVENT_TYPES = len(event_type_names()) + 1
+"""Event types a webhook can name: each of them once, and `*` for all."""
+
 EVENT_TYPES_HELP = (
     f"Event types: {', '.join(f'`{name}`' for name in event_type_names())}, or `{ALL_EVENTS}` "
     "for all, also future ones."
@@ -151,7 +154,9 @@ class WebhookCreate(BaseModel):
         ),
     )
     event_types: list[str] = Field(
-        default=[], description=EVENT_TYPES_HELP + " None: the webhook serves rules only."
+        default=[],
+        max_length=MAX_EVENT_TYPES,
+        description=EVENT_TYPES_HELP + " None: the webhook serves rules only.",
     )
     active: bool = True
     signed: bool = Field(
@@ -181,7 +186,9 @@ class WebhookPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=MAX_NAME_LENGTH)
     url: str | None = Field(default=None, max_length=MAX_URL_LENGTH)
     event_types: list[str] | None = Field(
-        default=None, description=EVENT_TYPES_HELP + " Empty: the webhook serves rules only."
+        default=None,
+        max_length=MAX_EVENT_TYPES,
+        description=EVENT_TYPES_HELP + " Empty: the webhook serves rules only.",
     )
     active: bool | None = Field(
         default=None, description="Switching on clears the failure count and the reason."

@@ -60,7 +60,7 @@ from lekto.adapters.inbound.rest.auth import (
 from lekto.adapters.inbound.rest.context import ApiContext
 from lekto.adapters.inbound.rest.events import EventHub
 from lekto.adapters.inbound.rest.middleware import LimitRequestBody, NoStore
-from lekto.adapters.inbound.rest.paths import HEALTH_PATH, MCP_PATH, PREFIX
+from lekto.adapters.inbound.rest.paths import HEALTH_PATH, LOGIN_PATH, MCP_PATH, PREFIX
 from lekto.adapters.inbound.rest.schemas.events import EventMessage
 from lekto.adapters.inbound.rest.schemas.external import TaskAnswer
 from lekto.adapters.inbound.rest.ui import UI_PREFIX, ui_routes
@@ -205,6 +205,8 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
             ("PUT", master_data.LOGO_PATH),
             ("POST", PREFIX + TASK_RESULT),
         },
+        # The sign-in is public: what it may read and validate stays small.
+        limits={("POST", LOGIN_PATH): account.LOGIN_MAX_BODY},
     )
     app.add_middleware(
         NoStore,

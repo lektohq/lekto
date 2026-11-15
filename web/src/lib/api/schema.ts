@@ -12467,7 +12467,7 @@ export interface components {
 			reason: components['schemas']['ReasonOut'] | null;
 			/**
 			 * Errors
-			 * @description A request that does not fit (422): what is wrong with each part.
+			 * @description A request that does not fit (422): what is wrong with each part, the first 50; `detail` then says how many there are.
 			 * @default null
 			 */
 			errors: components['schemas']['InputErrorOut'][] | null;

@@ -31,6 +31,7 @@ from lekto.core.domain.lenses import (
     RelativePeriod,
 )
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.validation import MAX_REFERENCES
 from lekto.core.ports.identity import RefCipher
 
 
@@ -232,7 +233,10 @@ class LensOrder(BaseModel):
         },
     )
 
-    ids: list[UUID] = Field(description="Each of the caller's lenses once, in the new order.")
+    ids: list[UUID] = Field(
+        max_length=MAX_REFERENCES,
+        description="Each of the caller's lenses once, in the new order.",
+    )
 
 
 class LensOut(BaseModel):

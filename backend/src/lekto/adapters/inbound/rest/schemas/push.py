@@ -1,7 +1,7 @@
 """Bodies and answers of `/push`."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, get_args
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -112,11 +112,12 @@ class PushPreferencesBody(BaseModel):
     )
 
     kinds: list[NoticeKind] = Field(
+        max_length=len(get_args(NoticeKind)),
         description=(
             "What the caller is told about: `waiting` (documents wait in their inbox), "
             "`webhook_disabled` (one of their webhooks was switched off), and for admins "
             "`mailbox_failed` (a mailbox fails to fetch) and `job_failed` (a job was given up)."
-        )
+        ),
     )
     titles: bool = Field(
         description=(

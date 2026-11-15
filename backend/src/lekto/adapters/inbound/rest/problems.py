@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
 from lekto.adapters.inbound.problems import (
+    MAX_INPUT_ERRORS,
     PROBLEM_JSON,
     PROBLEMS,
     InputErrorOut,
@@ -96,8 +97,11 @@ def install(app: FastAPI) -> None:
 
     async def validation_error(request: Request, error: Exception) -> JSONResponse:
         assert isinstance(error, RequestValidationError)
-        errors = [_input_error(item) for item in error.errors()]
+        found = error.errors()
+        errors = [_input_error(item) for item in found[:MAX_INPUT_ERRORS]]
         details = "; ".join(f"{item.field}: {item.message}" for item in errors)
+        if len(found) > len(errors):
+            details += f" (the first {len(errors)} of {len(found)} errors)"
         return problem(422, details, errors=errors)
 
     async def http_error(request: Request, error: Exception) -> JSONResponse:

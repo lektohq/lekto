@@ -29,6 +29,12 @@ class BlockingSpaceOut(BaseModel):
     )
 
 
+MAX_INPUT_ERRORS = 50
+"""Parts of a request a 422 names. Pydantic finds an error for every unknown key and every bad
+item of a list: a body of a megabyte holds a hundred thousand of them, and writing each would
+hold the event loop for seconds."""
+
+
 class InputErrorOut(BaseModel):
     """What is wrong with one part of a request."""
 
@@ -95,7 +101,10 @@ class Problem(BaseModel):
     )
     errors: list[InputErrorOut] | None = Field(
         default=None,
-        description="A request that does not fit (422): what is wrong with each part.",
+        description=(
+            "A request that does not fit (422): what is wrong with each part, the first "
+            f"{MAX_INPUT_ERRORS}; `detail` then says how many there are."
+        ),
     )
 
 
