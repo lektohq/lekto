@@ -195,9 +195,13 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
     app.add_middleware(
         LimitRequestBody,
         limit=context.max_request_size,
-        # The uploads and the answers to tasks have their own limits.
+        # The uploads (every route that reads one with `read_upload(s)`) and the answers to
+        # tasks have their own limits.
         exempt={
             ("POST", f"{PREFIX}/documents"),
+            ("POST", f"{PREFIX}/documents/{{id}}/versions"),
+            ("POST", f"{PREFIX}/documents/{{id}}/edit"),
+            ("POST", f"{PREFIX}/documents/{{id}}/edit/pages"),
             ("PUT", master_data.LOGO_PATH),
             ("POST", PREFIX + TASK_RESULT),
         },

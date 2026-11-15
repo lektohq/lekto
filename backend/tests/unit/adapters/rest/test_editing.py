@@ -4,9 +4,14 @@ replaces it is its next version, the others new documents, the document gone wit
 import json
 from typing import Any
 
-from lekto.adapters.outbound.memory import fake_pdf
+import httpx2
+import pytest
+
+from lekto.adapters.outbound.memory import ManualClock, fake_pdf
+from lekto.composition.container import build_memory_container, build_services
+from tests import builders
 from tests.api import auth
-from tests.unit.adapters.rest.support import DOCUMENTS, Api, file_part, upload
+from tests.unit.adapters.rest.support import DOCUMENTS, Api, file_part, make_app, upload
 
 
 def form(parts: Any, *files: tuple[str, bytes], **fields: str) -> dict[str, Any]:
@@ -179,3 +184,31 @@ async def test_the_pages_of_a_file_to_add_are_shown_not_stored(api: Api) -> None
         url, files=file_part("more.pdf", fake_pdf(1, "more")), headers=auth(stranger)
     )
     assert hidden.status_code == 404
+
+
+@pytest.mark.parametrize("route", ["versions", "edit/pages", "edit"])
+async def test_a_file_above_the_request_limit_is_no_upload_too_large(route: str) -> None:
+    """A new version and a file added to an edit are uploads: their limit is
+    `LEKTO_UPLOAD_MAX_SIZE`, not the bound on request bodies (`LEKTO_REQUEST_MAX_SIZE`)."""
+    limit = int(builders.DEFAULT_SETTINGS.request_max_size)
+    clock = ManualClock(builders.NOW)
+    container = build_memory_container(clock)
+    services = build_services(container)
+    builders.skip_classification(services.pipeline)
+    app = make_app(container, services, max_upload=4 * limit)
+    transport = httpx2.ASGITransport(app=app)
+    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
+        api = Api(container, services, app, client, clock)
+        owner = await api.user()
+        id = await upload(api, auth(owner))
+        big = fake_pdf(1, "x" * 2 * limit)
+        url = f"{DOCUMENTS}/{id}/{route}"
+        if route == "edit":
+            parts = [
+                {"pages": [{"page": 1}], "replaces": True},
+                {"pages": [{"source": 1, "page": 1}]},
+            ]
+            response = await client.post(url, **form(parts, ("big.pdf", big)), headers=auth(owner))
+        else:
+            response = await client.post(url, files=file_part("big.pdf", big), headers=auth(owner))
+    assert response.status_code in (200, 202), response.text
