@@ -9945,6 +9945,7 @@ export interface components {
 			| 'mail_folder_missing'
 			| 'mail_server_error'
 			| 'mail_password_unreadable'
+			| 'mail_fetch_failed'
 			| 'mailbox_paused'
 			| 'mail_too_large'
 			| 'mail_step_failed'

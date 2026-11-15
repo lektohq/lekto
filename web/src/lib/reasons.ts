@@ -465,6 +465,7 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	mail_folder_missing: entry(m.reason_mail_folder_missing),
 	mail_server_error: entry(m.reason_mail_server_error),
 	mail_password_unreadable: entry(m.reason_mail_password_unreadable),
+	mail_fetch_failed: entry(m.reason_mail_fetch_failed),
 	mailbox_paused: entry(m.reason_mailbox_paused),
 	mail_too_large: entry(m.reason_mail_too_large, { size: 'number', max: 'number' }),
 	mail_step_failed: entry(m.reason_mail_step_failed, { step: 'thing' }),

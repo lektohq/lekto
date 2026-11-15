@@ -8,6 +8,7 @@ characters rather than failing the mail.
 
 import email
 import email.policy
+import logging
 import re
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
@@ -19,6 +20,8 @@ from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.mail_traits import Importance, importance_of
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.validation import clean_filename, without_control
+
+log = logging.getLogger(__name__)
 
 RFC822 = "message/rfc822"
 MAX_HEADER = 1000
@@ -86,11 +89,20 @@ class MailMessage:
 
 
 def read_mail(data: bytes) -> MailMessage:
-    """The mail `data`; UnprocessableDocumentError if it has no header of a mail at all."""
-    message = email.message_from_bytes(data, policy=email.policy.default)
-    if not isinstance(message, EmailMessage) or not (message["From"] or message["Date"]):
-        raise UnprocessableDocumentError(because(ReasonCode.FILE_DAMAGED))
-    return _read(message, data)
+    """The mail `data`; UnprocessableDocumentError if it has no header of a mail at all, or if
+    reading it fails in any other way: a mail comes from anyone, and the mail intake records a
+    mail it cannot read as failed and goes on with the next (mails attached a hundred deep make
+    the standard library recurse too deep, for one)."""
+    try:
+        message = email.message_from_bytes(data, policy=email.policy.default)
+        if not isinstance(message, EmailMessage) or not (message["From"] or message["Date"]):
+            raise UnprocessableDocumentError(because(ReasonCode.FILE_DAMAGED))
+        return _read(message, data)
+    except UnprocessableDocumentError:
+        raise
+    except Exception:
+        log.warning("a mail could not be read", exc_info=True)
+        raise UnprocessableDocumentError(because(ReasonCode.FILE_DAMAGED)) from None
 
 
 def _read(message: EmailMessage, raw: bytes) -> MailMessage:

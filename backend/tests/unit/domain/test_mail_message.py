@@ -9,7 +9,15 @@ from lekto.core.domain import media_types
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.mail_intake import letters
 from lekto.core.domain.mail_message import Address, read_mail
-from tests.mails import PDF, PNG, apple_mail, named_attachments_mail, plain_mail, rich_mail
+from tests.mails import (
+    PDF,
+    PNG,
+    apple_mail,
+    named_attachments_mail,
+    nested_mail,
+    plain_mail,
+    rich_mail,
+)
 
 
 def test_reads_what_a_mail_says_about_itself() -> None:
@@ -118,3 +126,10 @@ def test_a_date_at_the_edge_of_the_calendar_is_no_date() -> None:
         b"Date: Wed, 04 Nov 2026 10:00:00 +0100", b"Date: Fri, 31 Dec 9999 23:59:59 -0100"
     )
     assert read_mail(raw).date is None
+
+
+def test_a_mail_that_breaks_reading_is_a_damaged_file() -> None:
+    """Anything that fails while reading a mail (here: mails attached too deep for the standard
+    library) is a damaged file, which the mail intake records and goes past."""
+    with pytest.raises(UnprocessableDocumentError):
+        read_mail(nested_mail(150))

@@ -203,6 +203,13 @@ class MailIntakeService:
             error = because(ReasonCode.MAIL_PASSWORD_UNREADABLE)
         except MailServerError as failure:
             error = failure.reason
+        except Exception:
+            # Anything else (the database gone for a moment, a bug) must not leave the job
+            # running and the mailbox silent: the fetch ends with the error at the mailbox, and
+            # the next one, at its time, tries the same mail again. Stopping the worker
+            # (`CancelledError`) is no `Exception` and goes through.
+            log.exception("fetching mail broke", extra={"mailbox_id": str(id)})
+            error = because(ReasonCode.MAIL_FETCH_FAILED)
         if error is not None:
             log.info("fetching mail failed", extra={"mailbox_id": str(id), "reason": error.text})
         await self._finish(job, id, started, count, error)

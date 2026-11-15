@@ -1,6 +1,7 @@
 """Fetching mail: a job per mailbox, what each mail brings in by the mailbox's fallback, what is
 not fetched twice, and what shows at the mailbox."""
 
+import asyncio
 from dataclasses import replace
 from datetime import timedelta
 from email.message import EmailMessage
@@ -391,11 +392,11 @@ async def test_a_run_interrupted_within_a_mail_leaves_no_document_without_it(
         nonlocal calls
         calls += 1
         if calls == 2:
-            raise RuntimeError("the worker stopped")
+            raise asyncio.CancelledError("the worker stopped")
         return await receive(self, *args, **kwargs)
 
     monkeypatch.setattr(PipelineService, "receive", stops_at_the_second)
-    with pytest.raises(RuntimeError, match="stopped"):
+    with pytest.raises(asyncio.CancelledError, match="stopped"):
         await _fetch(world, service)
     (first,) = await world.documents.list_visible(person.id)
     async with world.uow() as uow:
@@ -431,9 +432,64 @@ async def test_a_document_comes_with_its_mail_or_not_at_all(
         raise RuntimeError("the database went away")
 
     monkeypatch.setattr(MemoryMailOriginRepository, "add", fails)
-    with pytest.raises(RuntimeError, match="went away"):
-        await _fetch(world, service)
+    await _fetch(world, service)
     assert await world.documents.list_visible(person.id) == []
+
+
+async def test_a_fetch_that_breaks_shows_at_the_mailbox_and_the_next_tries_again(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An error the fetch does not expect (the database gone for a moment) ends it with the
+    error at the mailbox; the job does not stay running, and the next fetch takes the mail."""
+    _, person, mailbox = await _setup(world)
+    service = world.mail_intake()
+    _deliver(world, mails.plain_mail("Strom"))
+    add = MemoryMailOriginRepository.add
+
+    async def fails(self: MemoryMailOriginRepository, origin: MailOrigin) -> None:
+        raise RuntimeError("the database went away")
+
+    monkeypatch.setattr(MemoryMailOriginRepository, "add", fails)
+    await _fetch(world, service)
+    async with world.uow() as uow:
+        stored = await uow.mailboxes.get(mailbox.id)
+        running = await uow.jobs.find(
+            now=world.clock.now(), states=[JobState.RUNNING], kind=FETCH_JOB, limit=5
+        )
+        planned = await uow.jobs.find(
+            now=world.clock.now(), states=[JobState.PLANNED], kind=FETCH_JOB, limit=5
+        )
+    assert stored.status.error is not None
+    assert stored.status.error.code is ReasonCode.MAIL_FETCH_FAILED
+    assert (running, [job.dedup_key for job in planned]) == ([], [fetch_key(mailbox.id)])
+
+    monkeypatch.setattr(MemoryMailOriginRepository, "add", add)
+    world.clock.advance(mailbox.interval)
+    await _fetch(world, service)
+    names = [
+        document.original_filename for document in await world.documents.list_visible(person.id)
+    ]
+    assert names == ["Strom.eml"]
+
+
+async def test_a_mail_that_cannot_be_read_fails_and_the_next_comes_in(world: World) -> None:
+    """Mails attached a hundred and fifty deep make the standard library recurse too deep: that
+    mail is recorded as failed, the one after it still comes in."""
+    _, person, mailbox = await _setup(world)
+    _deliver(world, mails.nested_mail(150))
+    _deliver(world, mails.plain_mail("Danach"))
+    await _fetch(world, world.mail_intake())
+    names = [
+        document.original_filename for document in await world.documents.list_visible(person.id)
+    ]
+    assert names == ["Danach.eml"]
+    async with world.uow() as uow:
+        records = await uow.mail_records.recent(mailbox.id, limit=5)
+        stored = await uow.mailboxes.get(mailbox.id)
+    assert sorted(record.outcome for record in records) == sorted(
+        [MailOutcome.FAILED, MailOutcome.TAKEN]
+    )
+    assert stored.status.error is None
 
 
 async def test_the_documents_of_a_mail_relate_and_stay_related(world: World) -> None:
@@ -574,7 +630,7 @@ def _stops_once(monkeypatch: pytest.MonkeyPatch, name: str, *, after: bool = Fal
         if calls == 1 and after:
             await done(self, *args, **kwargs)
         if calls == 1:
-            raise RuntimeError("the worker stopped")
+            raise asyncio.CancelledError("the worker stopped")
         await done(self, *args, **kwargs)
 
     monkeypatch.setattr(MemoryMailSession, name, stops)
@@ -599,7 +655,7 @@ async def test_the_next_fetch_runs_the_steps_a_stopped_one_left(
     _deliver(world, mails.plain_mail("Strom"))
     service = world.mail_intake()
     _stops_once(monkeypatch, "mark")
-    with pytest.raises(RuntimeError, match="stopped"):
+    with pytest.raises(asyncio.CancelledError, match="stopped"):
         await _fetch(world, service)
     async with world.uow() as uow:
         (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
@@ -628,7 +684,7 @@ async def test_steps_left_due_count_as_done_when_the_mail_went_with_the_last(
     _deliver(world, mails.plain_mail("Strom"))
     service = world.mail_intake()
     _stops_once(monkeypatch, "move", after=True)
-    with pytest.raises(RuntimeError, match="stopped"):
+    with pytest.raises(asyncio.CancelledError, match="stopped"):
         await _fetch(world, service)
     assert len(account.boxes["Erledigt"].mails) == 1
 
@@ -653,7 +709,7 @@ async def test_steps_left_due_fail_when_the_mail_is_gone_otherwise(
     _deliver(world, mails.plain_mail("Strom"))
     service = world.mail_intake()
     _stops_once(monkeypatch, "mark")
-    with pytest.raises(RuntimeError, match="stopped"):
+    with pytest.raises(asyncio.CancelledError, match="stopped"):
         await _fetch(world, service)
     account.boxes["INBOX"].mails = []  # deleted by the person
 
@@ -686,7 +742,7 @@ async def test_a_waiting_mail_a_rule_takes_keeps_its_outcome_and_steps_due(
     world.clock.advance(LATER)
     await world.mail_rules.change(admin.id, rule.id, MailRuleChanges(enabled=True))
     _stops_once(monkeypatch, "mark")
-    with pytest.raises(RuntimeError, match="stopped"):
+    with pytest.raises(asyncio.CancelledError, match="stopped"):
         await drain(service)
     async with world.uow() as uow:
         (record,) = await uow.mail_records.recent(mailbox.id, limit=5)

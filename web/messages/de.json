@@ -2966,6 +2966,7 @@
 	"reason_mail_folder_missing": "Das Postfach hat keinen Ordner „{folder}“.",
 	"reason_mail_server_error": "Der Mailserver meldet einen Fehler: {detail}",
 	"reason_mail_password_unreadable": "Das gespeicherte Passwort ist nicht lesbar (wurde der geheime Schlüssel geändert?). Gib es neu ein.",
+	"reason_mail_fetch_failed": "Der Abruf brach an einem Fehler in Lekto ab; der nächste Abruf versucht es erneut.",
 	"reason_mailbox_paused": "Das Postfach ist pausiert. Aktiviere es, damit Lekto abholt.",
 	"reason_mail_too_large": "Die Mail „{subject}“ hat {size} MB; Lekto holt Mails bis {max} MB (LEKTO_UPLOAD_MAX_SIZE).",
 	"reason_mail_step_failed": "„{step}“ ging auf dem Server für die Mail „{subject}“ nicht: {detail}",

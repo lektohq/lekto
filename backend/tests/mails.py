@@ -151,3 +151,23 @@ def named_attachments_mail(*names: str, subject: str = "Ihre Unterlagen") -> byt
             f'filename="placeholder-{index}.pdf"'.encode(), f"filename*={encoded}".encode(), 1
         )
     return data
+
+
+def nested_mail(depth: int) -> bytes:
+    """A mail attached in a mail, `depth` deep, written by hand: building it with `email` would
+    recurse as deep as reading it does."""
+    data = plain_mail("Innen")
+    for level in range(depth):
+        boundary = f"level-{level}".encode()
+        data = (
+            b"From: Jane Doe <jane@example.test>\r\nTo: John Doe <john@example.test>\r\n"
+            b"Subject: Weitergeleitet " + str(level).encode() + b"\r\n"
+            b"Date: Wed, 04 Nov 2026 10:00:00 +0100\r\n"
+            b"Message-ID: <nested-" + str(level).encode() + b"@example.test>\r\n"
+            b"MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="
+            + boundary
+            + b"\r\n\r\n"
+            b"--" + boundary + b"\r\nContent-Type: message/rfc822\r\n\r\n" + data + b"\r\n"
+            b"--" + boundary + b"--\r\n"
+        )
+    return data
