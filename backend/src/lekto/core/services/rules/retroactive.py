@@ -68,6 +68,7 @@ from lekto.core.ports.templates import TemplateRenderer
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import (
     check_rule_facts,
+    edited_spaces,
     field_definitions,
     load_actor,
     readable_document,
@@ -116,6 +117,22 @@ class Outcome:
 
     space_id: SpaceId
     chain: tuple[ArrivalStep, ...]
+
+
+def _as_seen(outcome: Outcome, edited: set[SpaceId] | None) -> Outcome:
+    """The outcome as a user who edits the spaces `edited` (None: an admin, every space) may see
+    it: the chain up to the first space they do not edit, which shows only that the document
+    goes there. Whoever does not edit a space does not learn that its rules exist
+    (`rules.management`); where the document ends up is that space, as far as they know."""
+    if edited is None:
+        return outcome
+    shown: list[ArrivalStep] = []
+    for step in outcome.chain:
+        if step.space_id not in edited:
+            shown.append(ArrivalStep(step.space_id, (), None, None, None))
+            return Outcome(step.space_id, tuple(shown))
+        shown.append(step)
+    return outcome
 
 
 @dataclass(frozen=True)
@@ -266,9 +283,12 @@ class RuleApplicationService:
             current = await uow.documents.find(id)
             if current is None or not await _candidate(uow, user, rule, current):
                 return None
+            edited = None if user.is_admin else await edited_spaces(uow, user.id)
             shown = copy.deepcopy(current)
             played = await self._play(uow, user, rule, current, prepared, accept=False)
-            outcome = Outcome(current.space_id, () if played is None else played.chain)
+            outcome = _as_seen(
+                Outcome(current.space_id, () if played is None else played.chain), edited
+            )
         if played is None:
             return None
         report = played.run.plan.reports[0]
@@ -282,7 +302,9 @@ class RuleApplicationService:
                 current = await uow.documents.find(id)
                 if current is not None:
                     other = await self._play(uow, user, rule, current, prepared, accept=True)
-                    accepted = Outcome(current.space_id, () if other is None else other.chain)
+                    accepted = _as_seen(
+                        Outcome(current.space_id, () if other is None else other.chain), edited
+                    )
         return PreviewItem(
             shown,
             tuple(report.applied),

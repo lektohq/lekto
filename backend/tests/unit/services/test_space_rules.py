@@ -313,9 +313,29 @@ async def test_the_preview_of_applying_a_rule_shows_the_chain_and_stores_nothing
 
 async def test_the_preview_shows_where_a_chain_stops_going_back(world: World) -> None:
     rules = await rule_world(world)
+    _, anna, shared = await household(rules)
+    office = await world.spaces.create(anna.id, "Büro")
+    await rules.arrive(anna)
+    rule = await rules.personal_rule(anna, files_into(shared))
+    await rules.space_rule(anna, shared.id, files_into(office, "To the office"))
+    await rules.space_rule(anna, office.id, files_into(shared, "Back"))
+
+    (item,) = (await rules.applications.preview(anna.id, rule.id)).items
+
+    first, second = item.outcome.chain
+    assert (first.space_id, first.moved_to) == (shared.id, office.id)
+    assert (second.space_id, second.moved_to, second.looped_to) == (office.id, None, shared.id)
+    assert second.problem is not None
+    assert second.problem.text == "rules move it back and forth: anna → Haushalt → Büro → Haushalt"
+    assert item.outcome.space_id == office.id
+
+
+async def test_the_preview_ends_where_the_caller_hands_the_document_over(world: World) -> None:
+    """Whoever does not edit a space does not learn that its rules exist: tobi's preview shows
+    that the document goes into anna's space, not what her rules do there."""
+    rules = await rule_world(world)
     tobi, anna, shared = await household(rules)
     annas = await world.personal_space(anna)
-    home = await world.personal_space(tobi)
     await rules.arrive(tobi)
     rule = await rules.personal_rule(tobi, files_into(shared))
     await rules.space_rule(anna, shared.id, files_into(annas, "To Anna"))
@@ -325,11 +345,14 @@ async def test_the_preview_shows_where_a_chain_stops_going_back(world: World) ->
 
     first, second = item.outcome.chain
     assert (first.space_id, first.moved_to) == (shared.id, annas.id)
-    assert (second.space_id, second.moved_to, second.looped_to) == (annas.id, None, shared.id)
-    assert second.problem is not None
-    assert second.problem.text == "rules move it back and forth: tobi → Haushalt → anna → Haushalt"
+    assert (second.space_id, second.reports, second.moved_to, second.looped_to) == (
+        annas.id,
+        (),
+        None,
+        None,
+    )
+    assert second.problem is None
     assert item.outcome.space_id == annas.id
-    del home
 
 
 async def test_the_preview_shows_the_chain_of_an_accepted_conflict(world: World) -> None:
