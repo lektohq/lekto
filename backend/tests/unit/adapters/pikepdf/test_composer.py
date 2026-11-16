@@ -17,6 +17,7 @@ from lekto.core.ports.composer import PageSource
 from tests.builders import SAMPLES
 from tests.contracts.processing import PageComposerContract
 from tests.images import stated_png, too_large_on_page_two
+from tests.pdfs import broken_pages_tree
 
 
 @pytest.fixture
@@ -176,6 +177,20 @@ async def test_an_image_over_the_limit_is_refused_before_it_is_decoded(
     ):
         with pytest.raises(UnprocessableDocumentError, match="megapixels"):
             await page_composer.compose([source], [PagePick(0, 1)], tmp_path / "x.pdf")
+
+
+async def test_a_pdf_damaged_beyond_opening_is_unprocessable(
+    page_composer: PikepdfPageComposer, tmp_path: Path
+) -> None:
+    """qpdf raises `RuntimeError` for a page tree it cannot rebuild: a file that cannot be
+    read, not a raw error (an edit answered 500)."""
+    path = tmp_path / "broken.pdf"
+    path.write_bytes(broken_pages_tree())
+    source = PageSource(path, media_types.PDF)
+    with pytest.raises(UnprocessableDocumentError):
+        await page_composer.count_pages(source)
+    with pytest.raises(UnprocessableDocumentError):
+        await page_composer.compose([source], [PagePick(0, 1)], tmp_path / "x.pdf")
 
 
 async def test_an_encrypted_pdf_is_unprocessable(

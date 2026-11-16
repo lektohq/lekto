@@ -97,16 +97,26 @@ def _as_pdf(source: PageSource) -> Iterator[pikepdf.Pdf]:
         raise UnprocessableDocumentError(because(ReasonCode.FILE_NOT_PDF_OR_IMAGE))
 
 
+# What qpdf raises for a damaged file: on opening, and on reading an object later (it reads
+# them as they are used), as `RuntimeError` too ("/Count is wrong after flattening pages tree").
+_DAMAGED = (pikepdf.PdfError, RuntimeError)
+
+
 @contextmanager
 def _opened_pdf(path: Path) -> Iterator[pikepdf.Pdf]:
+    """The PDF at `path`, open for the `with` block; UnprocessableDocumentError if it is
+    damaged, found on opening or when the block reads it (its pages, saving its pages)."""
     try:
         pdf = pikepdf.open(path)
     except pikepdf.PasswordError:
         raise UnprocessableDocumentError(because(ReasonCode.PDF_ENCRYPTED)) from None
-    except pikepdf.PdfError:
+    except _DAMAGED:
         raise UnprocessableDocumentError(because(ReasonCode.PDF_UNREADABLE)) from None
     with pdf:
-        yield pdf
+        try:
+            yield pdf
+        except _DAMAGED:
+            raise UnprocessableDocumentError(because(ReasonCode.PDF_UNREADABLE)) from None
 
 
 def _image_pdf(path: Path) -> pikepdf.Pdf:

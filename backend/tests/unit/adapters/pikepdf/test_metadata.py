@@ -2,6 +2,7 @@
 themselves (document information, XMP, PDF/A level; EXIF without how the pixels are stored)."""
 
 import io
+from pathlib import Path
 
 import pikepdf
 import pytest
@@ -12,7 +13,9 @@ from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.ports.metadata import MetadataSource
 from tests.builders import SAMPLES
 from tests.contracts.processing import MetadataReaderContract
+from tests.images import stated_png
 from tests.mails import rich_mail
+from tests.pdfs import broken_pages_tree, metadata_not_a_stream
 
 
 @pytest.fixture
@@ -103,3 +106,15 @@ async def test_a_mail_with_the_header_lines_a_person_reads(
         (MetadataSource.MAIL, "Subject"),
     ]
     assert metadata.entries[-1].value == "Ihre Rechnung über 123,45 €"
+
+
+@pytest.mark.filterwarnings("ignore::PIL.Image.DecompressionBombWarning")
+async def test_a_file_damaged_beyond_opening_is_unprocessable(
+    metadata_reader: FileMetadataReader, tmp_path: Path
+) -> None:
+    """qpdf reads objects as they are used, and raises `RuntimeError` too; an image may state
+    more pixels than Pillow opens: each is a file that cannot be read, not a raw error."""
+    huge = stated_png(tmp_path / "huge.png", 20_000, 20_000).read_bytes()
+    for data in (broken_pages_tree(), metadata_not_a_stream(), huge):
+        with pytest.raises(UnprocessableDocumentError):
+            await metadata_reader.read_metadata(data)
