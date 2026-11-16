@@ -13,7 +13,8 @@ due again at `retry_at` (`RetryPolicy`: growing delay, limited attempts; given u
 removed from `event_retries` and logged). Due retries go fewest attempts first, so events that
 keep failing do not starve newer failures.
 
-`purge` deletes events below the lowest subscription position that no subscriber still retries.
+`purge` deletes events below the lowest subscription position that no subscriber still retries,
+after removing orphaned subscriptions (`EventBus.purge`).
 
 Rows of an unknown event type (written by a newer version) cannot be turned into events; they
 are logged and skipped, as receivers ignore unknown types anyway.
@@ -124,6 +125,7 @@ class SqlEventBus:
         lowest = select(func.min(_subscriptions.c.position)).scalar_subquery()
         everything = select(func.coalesce(func.max(_outbox.c.seq), 0)).scalar_subquery()
         async with self._db.writing() as connection:
+            await self._remove_orphans(connection, before)
             result = await connection.execute(
                 delete(_outbox).where(
                     _outbox.c.seq <= func.coalesce(lowest, everything),
@@ -135,6 +137,30 @@ class SqlEventBus:
         if purged:
             log.info("delivered events purged", extra={"count": purged})
         return purged
+
+    async def _remove_orphans(self, connection: AsyncConnection, before: datetime) -> None:
+        """Remove the subscriptions no subscriber of this bus serves that an event recorded
+        before `before` still waits for, with their retries (`EventBus.purge`)."""
+        names = list(self._subscribers)
+        if not names:
+            return  # a process that serves none cannot tell
+        waiting = exists().where(
+            _outbox.c.seq > _subscriptions.c.position, _outbox.c.recorded_at < before
+        )
+        orphans = list(
+            (
+                await connection.execute(
+                    select(_subscriptions.c.name).where(
+                        _subscriptions.c.name.not_in(names), waiting
+                    )
+                )
+            ).scalars()
+        )
+        if not orphans:
+            return
+        await connection.execute(delete(_retries).where(_retries.c.subscriber.in_(orphans)))
+        await connection.execute(delete(_subscriptions).where(_subscriptions.c.name.in_(orphans)))
+        log.warning("orphaned event subscriptions removed", extra={"subscribers": orphans})
 
     async def _dispatch_to(self, name: str, subscriber: _Subscriber, limit: int) -> int:
         position = await self._position(name, subscriber.since)

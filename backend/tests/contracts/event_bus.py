@@ -393,6 +393,60 @@ class EventBusContract:
         await bus.dispatch()
         assert await bus.purge(before=FAR_FUTURE) == 1
 
+    async def test_an_orphaned_subscription_goes_and_holds_back_nothing(
+        self, uow_factory: UnitOfWorkFactory, event_bus_factory: EventBusFactory
+    ) -> None:
+        """A subscriber no longer subscribed (the search switched off) leaves its subscription
+        behind: purge removes it once an old event waits for it, and empties the outbox."""
+        before = event_bus_factory(retry=IMMEDIATE)
+        before.subscribe("index", Recorder())
+        before.subscribe("search", Recorder())
+        await before.dispatch()  # creates both subscriptions
+        now = event_bus_factory(retry=IMMEDIATE)
+        now.subscribe("index", Recorder())
+        await publish(uow_factory, received(1), received(2))
+        await now.dispatch()
+        assert await now.purge(before=datetime(2000, 1, 1, tzinfo=UTC)) == 0  # nothing old yet
+        assert await now.purge(before=FAR_FUTURE) == 2
+        # Subscribed again, it starts afresh.
+        later = received(3)
+        await publish(uow_factory, later)
+        again = event_bus_factory(retry=IMMEDIATE)
+        search = Recorder()
+        again.subscribe("search", search)
+        await again.dispatch()
+        assert search.received == []
+
+    async def test_a_subscription_served_here_stays_however_long_it_waited(
+        self, uow_factory: UnitOfWorkFactory, event_bus: EventBus
+    ) -> None:
+        """The process was stopped longer than events are kept: its own subscriptions stay."""
+        index = Recorder()
+        event_bus.subscribe("index", index)
+        await event_bus.dispatch()
+        first = received(1)
+        await publish(uow_factory, first)
+        assert await event_bus.purge(before=FAR_FUTURE) == 0
+        await event_bus.dispatch()
+        assert index.received == [first]
+
+    async def test_a_subscription_another_process_serves_stays_while_it_moves_on(
+        self, uow_factory: UnitOfWorkFactory, event_bus_factory: EventBusFactory
+    ) -> None:
+        """No old event waits for it: it is no orphan to a process that does not serve it."""
+        both = event_bus_factory(retry=IMMEDIATE)
+        webhooks = Recorder()
+        both.subscribe("index", Recorder())
+        both.subscribe("webhooks", webhooks)
+        await both.dispatch()
+        other = event_bus_factory(retry=IMMEDIATE)
+        other.subscribe("index", Recorder())
+        first = received(1)
+        await publish(uow_factory, first)
+        assert await other.purge(before=datetime(2000, 1, 1, tzinfo=UTC)) == 0
+        await both.dispatch()
+        assert webhooks.received == [first]
+
     async def test_without_subscriptions_every_event_is_handled(
         self, uow_factory: UnitOfWorkFactory, event_bus: EventBus
     ) -> None:
