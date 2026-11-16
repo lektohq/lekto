@@ -240,7 +240,16 @@ def test_a_payslip_of_a_new_employer_is_green_by_its_proof() -> None:
                 model=model(sender="Stadtwerke Musterstadt"),
                 facts=FactsView(named=frozenset({UTILITY.id}), identifiers={BANK.id: ("iban",)}),
             ),
-            "only one signal names 'Stadtwerke Musterstadt'",
+            "an identifier of 'Beispielbank' stands in the text",
+        ),
+        (
+            # Two signals name the contact: the identifier of another one is what is wrong.
+            Signals(
+                model=model(sender="Stadtwerke Musterstadt"),
+                classifier=classifier(UTILITY.id),
+                facts=FactsView(named=frozenset({UTILITY.id}), identifiers={BANK.id: ("iban",)}),
+            ),
+            "an identifier of 'Beispielbank' stands in the text",
         ),
         (
             # A pay slip: the model takes the employee, an unknown name, for the sender.

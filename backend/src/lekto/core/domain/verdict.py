@@ -514,6 +514,10 @@ def _contact_reason(view: _ContactView, top: ContactId | None, no_model: bool) -
         return because(ReasonCode.ONLY_SUGGESTED, name=name)
     if not view.hard(top):
         return because(ReasonCode.CONTACT_NOT_IN_TEXT, contact=name)
+    other = next((id for id in view.facts.identifiers if id != top and id in names), None)
+    if other is not None:
+        # The one identifier in the text is another contact's (`contradicted`).
+        return because(ReasonCode.CONTACT_IDENTIFIER_OF_OTHER, other=names[other].name)
     return because(ReasonCode.ONE_SIGNAL_ONLY, name=name)
 
 

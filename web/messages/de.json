@@ -2596,6 +2596,7 @@
 	"reason_only_identifier": "nur eine Kennung weist auf „{name}“",
 	"reason_contact_is_recipient": "„{contact}“ ist der Empfänger, nicht der Absender",
 	"reason_contact_identifiers_several": "im Text stehen Kennungen mehrerer Kontakte",
+	"reason_contact_identifier_of_other": "im Text steht eine Kennung von „{other}“",
 	"reason_contact_new_proposed": "kein Kontakt passt zu „{sender}“; ein neuer Kontakt wird vorgeschlagen",
 	"reason_contact_none": "kein Kontakt erkannt",
 	"reason_contact_none_no_model": "kein Kontakt erkannt (das Sprachmodell hat nicht geantwortet)",

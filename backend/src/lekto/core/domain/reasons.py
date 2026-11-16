@@ -38,6 +38,7 @@ class ReasonCode(StrEnum):
     ONLY_IDENTIFIER = "only_identifier"
     CONTACT_IS_RECIPIENT = "contact_is_recipient"
     CONTACT_IDENTIFIERS_SEVERAL = "contact_identifiers_several"
+    CONTACT_IDENTIFIER_OF_OTHER = "contact_identifier_of_other"
     CONTACT_NEW_PROPOSED = "contact_new_proposed"
     CONTACT_NONE = "contact_none"
     CONTACT_NONE_NO_MODEL = "contact_none_no_model"
@@ -475,6 +476,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.ONLY_IDENTIFIER: "only an identifier points to '{name}'",
     ReasonCode.CONTACT_IS_RECIPIENT: "'{contact}' is the recipient, not the sender",
     ReasonCode.CONTACT_IDENTIFIERS_SEVERAL: "identifiers of several contacts stand in the text",
+    ReasonCode.CONTACT_IDENTIFIER_OF_OTHER: "an identifier of '{other}' stands in the text",
     ReasonCode.CONTACT_NEW_PROPOSED: "no contact matches '{sender}'; a new contact is proposed",
     ReasonCode.CONTACT_NONE: "no contact recognised",
     ReasonCode.CONTACT_NONE_NO_MODEL: "no contact recognised (the language model did not answer)",

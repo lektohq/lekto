@@ -60,6 +60,7 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	only_identifier: entry(m.reason_only_identifier),
 	contact_is_recipient: entry(m.reason_contact_is_recipient),
 	contact_identifiers_several: entry(m.reason_contact_identifiers_several),
+	contact_identifier_of_other: entry(m.reason_contact_identifier_of_other),
 	contact_new_proposed: entry(m.reason_contact_new_proposed),
 	contact_none: entry(m.reason_contact_none),
 	contact_none_no_model: entry(m.reason_contact_none_no_model),

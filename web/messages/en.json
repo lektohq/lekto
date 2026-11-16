@@ -2596,6 +2596,7 @@
 	"reason_only_identifier": "only an identifier points to “{name}”",
 	"reason_contact_is_recipient": "“{contact}” is the recipient, not the sender",
 	"reason_contact_identifiers_several": "identifiers of several contacts stand in the text",
+	"reason_contact_identifier_of_other": "an identifier of “{other}” stands in the text",
 	"reason_contact_new_proposed": "no contact matches “{sender}”; a new contact is proposed",
 	"reason_contact_none": "no contact recognised",
 	"reason_contact_none_no_model": "no contact recognised (the language model did not answer)",

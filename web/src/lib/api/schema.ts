@@ -9552,6 +9552,7 @@ export interface components {
 			| 'only_identifier'
 			| 'contact_is_recipient'
 			| 'contact_identifiers_several'
+			| 'contact_identifier_of_other'
 			| 'contact_new_proposed'
 			| 'contact_none'
 			| 'contact_none_no_model'
