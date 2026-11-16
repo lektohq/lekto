@@ -10,9 +10,11 @@
   the group's kinds is due (`JobQueue.next_due`) and waits until then, or until a commit
   signals a job of those kinds (`Wakeup`), or at most `waiting.SAFETY_NET`; where signals of
   other processes do not arrive (SQLite) it polls, from `poll_interval` up to
-  `waiting.IDLE_BACKOFF_MAX`. Once a job is due, every loop of the group runs until it finds
-  nothing; then the coordinator looks again. So an idle worker costs the database nothing but
-  the safety net, and a job starts as soon as its commit is signalled.
+  `waiting.IDLE_BACKOFF_MAX`. Once a job is due, every free loop of the group runs until it
+  finds nothing; the coordinator looks again as soon as one of them is free again, a signal
+  comes or the next job is due, so a loop on a long job (an OCR, the vision model) holds up
+  none of the others. So an idle worker costs the database nothing but the safety net, and a
+  job starts as soon as its commit is signalled and a loop is free.
 - One loop dispatches the outbox (`EventBus.dispatch`) the same way (`waiting.dispatch_events`).
 - After an error, a loop waits longer, doubling up to `backoff.MAX_BACKOFF`, and ends its round;
   the coordinator looks again when the queue says, so a job that keeps failing is not polled.
@@ -59,13 +61,16 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class _Member:
-    """One loop of a group: told to `go`, `done` once it found nothing more, and whether it
-    `worked` on the way."""
+    """One loop of a group: told to `go`, `done` (free) once it found nothing more, and
+    whether it `worked` on the way."""
 
     name: str
     go: asyncio.Event = field(default_factory=asyncio.Event)
     done: asyncio.Event = field(default_factory=asyncio.Event)
     worked: bool = False
+
+    def __post_init__(self) -> None:
+        self.done.set()  # free until told to go
 
 
 @dataclass(frozen=True)
@@ -177,7 +182,8 @@ class Worker:
             await asyncio.wait(pending)
 
     async def _coordinate(self, group: _Group) -> None:
-        """Wake the group's loops whenever a job of its kinds is due, and wait in between."""
+        """Wake the group's free loops whenever a job of its kinds is due, and wait in
+        between: for the first of them to be free again, a signal or the next due job."""
         signal = self._wakeup.subscribe(Channel.JOBS, kinds=group.kinds)
         idle = Idle(signal, self._poll, self._stopping)
         failures = 0
@@ -193,25 +199,41 @@ class Worker:
                 continue
             failures = 0
             due_in = None if due is None else due - self._clock.now()
-            if due_in is not None and due_in <= timedelta(0):
-                for member in group.members:
+            free = [member for member in group.members if member.done.is_set()]
+            if due_in is not None and due_in <= timedelta(0) and free:
+                for member in free:
                     member.done.clear()
                     member.worked = False
                     member.go.set()
-                await unless_stopped(
-                    self._stopping,
-                    asyncio.gather(*(member.done.wait() for member in group.members)),
-                )
-                if any(member.worked for member in group.members):
+                woken = free
+                await self._first_free(group)
+                finished = [member for member in woken if member.done.is_set()]
+                if any(member.worked for member in finished):
                     idle.found()
-                    continue
-                # Due by the queue, yet no loop took it (not expected): look again in a
-                # while rather than at once.
-                if not self._stopping.is_set():
+                elif len(finished) == len(woken) and not self._stopping.is_set():
+                    # Due by the queue, yet no loop took it (not expected): look again in a
+                    # while rather than at once.
                     log.warning("due jobs were not claimed", extra={"loop": group.name})
                     await sleep_unless_stopped(self._stopping, self._poll)
                 continue
-            await idle.wait(due_in=due_in)
+            if not free:
+                await self._first_free(group)  # every loop is busy: nothing to wake
+                continue
+            busy = [member.done.wait() for member in group.members if not member.done.is_set()]
+            if busy:
+                # A loop still at work may be free before the next due job or a signal.
+                await unless_stopped(
+                    self._stopping,
+                    _first_of([idle.wait(due_in=due_in), *busy]),
+                )
+            else:
+                await idle.wait(due_in=due_in)
+
+    async def _first_free(self, group: _Group) -> None:
+        """Wait until a loop of the group is free (at once if one is), or the worker stops."""
+        await unless_stopped(
+            self._stopping, _first_of([member.done.wait() for member in group.members])
+        )
 
     async def _next_due(self, kinds: Sequence[str]) -> datetime | None:
         async with self._uow() as uow:
@@ -286,6 +308,18 @@ class Worker:
 
     async def _deliver(self) -> bool:
         return self._webhooks is not None and await self._webhooks.run_next_job()
+
+
+async def _first_of(waits: Sequence[Awaitable[object]]) -> None:
+    """Return once the first of `waits` is done; the others are cancelled."""
+    tasks = [asyncio.ensure_future(wait) for wait in waits]
+    try:
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 def _group(
