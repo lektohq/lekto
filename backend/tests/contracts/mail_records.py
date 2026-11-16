@@ -111,6 +111,30 @@ class MailRecordRepositoryContract:
             assert recent[1] == failed
             assert (recent[0].importance, recent[0].marks) == (None, None)  # not known
 
+    async def test_only_a_mail_taken_makes_its_message_id_known(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """One no rule took, or that failed, may be taken in another folder or mailbox."""
+        mailbox = await a_mailbox(uow_factory)
+        outcomes = {
+            1: MailOutcome.TAKEN,
+            2: MailOutcome.NOTHING,
+            3: MailOutcome.NO_RULE,
+            4: MailOutcome.FAILED,
+            5: MailOutcome.KNOWN,
+        }
+        async with uow_factory() as uow:
+            for uid, outcome in outcomes.items():
+                await uow.mail_records.add(a_record(mailbox, uid, outcome=outcome))
+            await uow.commit()
+        async with uow_factory() as uow:
+            known = {
+                uid
+                for uid in outcomes
+                if await uow.mail_records.has_message(f"m{uid}@example.test")
+            }
+        assert known == {1, 2}
+
     async def test_old_records_let_go_of_what_the_mail_said(
         self, uow_factory: UnitOfWorkFactory
     ) -> None:

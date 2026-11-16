@@ -13,7 +13,13 @@ from lekto.core.domain.errors import NotFoundError
 from lekto.core.domain.ids import DocumentId, DocumentTypeId, MailboxId, MailRecordId, MailRuleId
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.mail import MailAction, MailStep, StepOutcome
-from lekto.core.domain.mail_intake import MailOrigin, MailOutcome, MailRecord, OriginRole
+from lekto.core.domain.mail_intake import (
+    TAKEN_OUTCOMES,
+    MailOrigin,
+    MailOutcome,
+    MailRecord,
+    OriginRole,
+)
 from lekto.core.domain.mail_message import Address
 from lekto.core.domain.mail_traits import FlagColor, Importance, MailMarks
 from lekto.core.domain.reasons import Reason
@@ -122,7 +128,12 @@ class SqlMailRecordRepository:
 
     async def has_message(self, message_id: str) -> bool:
         found = await self._tx.read(
-            select(_records.c.id).where(_records.c.message_id == message_id).limit(1)
+            select(_records.c.id)
+            .where(
+                _records.c.message_id == message_id,
+                _records.c.outcome.in_([outcome.value for outcome in TAKEN_OUTCOMES]),
+            )
+            .limit(1)
         )
         return found.first() is not None
 

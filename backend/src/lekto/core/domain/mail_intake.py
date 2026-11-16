@@ -161,10 +161,16 @@ class MailOutcome(StrEnum):
     FAILED = "failed"
 
 
+TAKEN_OUTCOMES = frozenset({MailOutcome.TAKEN, MailOutcome.NOTHING})
+"""What became of a mail that was taken: another mail with its Message-ID is `KNOWN`. One no rule
+took, or that failed, may still be taken in another folder or mailbox."""
+
+
 @dataclass(kw_only=True)
 class MailRecord:
     """A mail Lekto fetched from a mailbox's folder: it is not fetched again (by the folder's
-    UIDVALIDITY and its UID; by its Message-ID across folders and mailboxes)."""
+    UIDVALIDITY and its UID), nor taken again once taken (by its Message-ID across folders and
+    mailboxes, `TAKEN_OUTCOMES`)."""
 
     id: MailRecordId
     mailbox_id: MailboxId

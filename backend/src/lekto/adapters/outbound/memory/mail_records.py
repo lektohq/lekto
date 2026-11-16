@@ -9,7 +9,13 @@ from lekto.adapters.outbound.memory.database import DOCUMENTS, MAILBOXES
 from lekto.adapters.outbound.memory.rows import MemoryRows, _copy
 from lekto.core.domain.errors import ConflictError, NotFoundError
 from lekto.core.domain.ids import DocumentId, MailboxId, MailRecordId, MailRuleId
-from lekto.core.domain.mail_intake import SETTLED, MailOrigin, MailOutcome, MailRecord
+from lekto.core.domain.mail_intake import (
+    SETTLED,
+    TAKEN_OUTCOMES,
+    MailOrigin,
+    MailOutcome,
+    MailRecord,
+)
 from lekto.core.ports.repository import PAGE_SIZE
 
 
@@ -27,7 +33,9 @@ class MemoryMailRecordRepository(MemoryRows[MailRecordId, MailRecord]):
         }
 
     async def has_message(self, message_id: str) -> bool:
-        return any(row.message_id == message_id for row in self._all())
+        return any(
+            row.message_id == message_id and row.outcome in TAKEN_OUTCOMES for row in self._all()
+        )
 
     async def recent(self, mailbox: MailboxId, *, limit: int) -> list[MailRecord]:
         rows = [row for row in self._all() if row.mailbox_id == mailbox]

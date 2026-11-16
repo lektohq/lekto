@@ -946,7 +946,8 @@ class MailRecordRepository(Protocol):
         ...
 
     async def has_message(self, message_id: str) -> bool:
-        """Whether a mail with that Message-ID was fetched, from any folder or mailbox."""
+        """Whether a mail with that Message-ID was taken (`TAKEN_OUTCOMES`), from any folder or
+        mailbox: one no rule took, or that failed, does not count."""
         ...
 
     async def recent(self, mailbox: MailboxId, *, limit: int) -> list[MailRecord]:

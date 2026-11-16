@@ -262,6 +262,43 @@ async def test_a_mail_is_fetched_once_across_mailboxes(world: World) -> None:
     assert (of_first.outcome, of_second.outcome) == (MailOutcome.TAKEN, MailOutcome.KNOWN)
 
 
+async def test_a_mail_no_rule_took_is_taken_where_one_does(world: World) -> None:
+    """Only a mail taken is known by its Message-ID: one no rule took, moved to a folder a rule
+    takes from, or in another mailbox, is taken there."""
+    admin, person, first = await _setup(world, everything=False)
+    _deliver(world, mails.plain_mail())
+    await _fetch(world, world.mail_intake())
+    other = MailLogin(
+        host="imap.other.test", port=993, security=MailSecurity.TLS, username="x", password="y"
+    )
+    world.mail_server.add_account(other).deliver(
+        "INBOX", mails.plain_mail(), arrived_at=world.clock.now() + LATER
+    )
+    second = await world.mailboxes.create(
+        admin.id,
+        name="Other",
+        host=other.host,
+        port=other.port,
+        security=other.security,
+        username=other.username,
+        password=other.password,
+        changes=MailboxChanges(fallback=Fallback.EVERYTHING, fallback_user_id=person.id),
+    )
+    await _fetch(world, world.mail_intake())
+    assert [record.outcome for record in await _records(world, first)] == [MailOutcome.NO_RULE]
+    assert [record.outcome for record in await _records(world, second)] == [MailOutcome.TAKEN]
+    # The same mail again in the first mailbox (moved, its UID new), which takes it now.
+    await world.mailboxes.change(
+        admin.id,
+        first.id,
+        MailboxChanges(fallback=Fallback.EVERYTHING, fallback_user_id=person.id),
+    )
+    _deliver(world, mails.plain_mail())
+    await _fetch(world, world.mail_intake())
+    assert [record.outcome for record in await _records(world, first)][-1] is MailOutcome.KNOWN
+    assert len(await world.documents.list_visible(person.id)) == 1
+
+
 async def test_the_start_of_a_mailbox(world: World) -> None:
     _, person, _ = await _setup(world, start=FetchStart.UNREAD)
     _deliver(world, mails.plain_mail("Gelesen"), seen=True)
