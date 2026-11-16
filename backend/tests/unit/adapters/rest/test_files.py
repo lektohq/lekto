@@ -1,6 +1,10 @@
 """A document's files over HTTP: size, SHA-256 and what they say about themselves."""
 
 import hashlib
+import tempfile
+from pathlib import Path
+
+import pytest
 
 from tests.api import auth
 from tests.builders import SAMPLES
@@ -93,3 +97,20 @@ async def test_a_new_version_replaces_the_file_and_runs_anew(api: Api) -> None:
         f"{url}/versions", files=file_part("x.pdf", b"%PDF-1.7 x"), headers=auth(other)
     )
     assert hidden.status_code == 404
+
+
+async def test_a_download_leaves_no_copy_whatever_its_range(
+    api: Api, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every download goes through a temporary copy; a broken or unsatisfiable `Range` (400,
+    416) must not leave it on the disk, as a background task that never runs would."""
+    owner = await api.user()
+    id = await upload(api, auth(owner))
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    statuses = []
+    for value in ("bytes=999999999-", "bytes=abc", "bytes=0-9", None):
+        headers = {**auth(owner), **({"range": value} if value else {})}
+        response = await api.client.get(f"{DOCUMENTS}/{id}/original", headers=headers)
+        statuses.append(response.status_code)
+    assert statuses == [416, 400, 206, 200]
+    assert list(tmp_path.glob("lekto-download-*")) == []

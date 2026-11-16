@@ -21,7 +21,7 @@ from fastapi import Path as FastApiPath
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 from pydantic import ValidationError as PydanticValidationError
-from starlette.background import BackgroundTask
+from starlette.types import Receive, Scope, Send
 
 from lekto.adapters.inbound.rest.auth import (
     PROTECTED,
@@ -751,7 +751,7 @@ async def _sent(write: Callable[[Path], Awaitable[FileInfo]], disposition: str) 
     except BaseException:
         await asyncio.shield(asyncio.to_thread(path.unlink, missing_ok=True))
         raise
-    return FileResponse(
+    return _CopyResponse(
         path,
         media_type=info.media_type,
         filename=info.filename,
@@ -760,8 +760,19 @@ async def _sent(write: Callable[[Path], Awaitable[FileInfo]], disposition: str) 
         # every answer. A file shown in the browser runs no scripts and reaches nothing of
         # this site.
         headers={"Content-Security-Policy": "sandbox; default-src 'none'"},
-        background=BackgroundTask(path.unlink, missing_ok=True),
     )
+
+
+class _CopyResponse(FileResponse):
+    """The temporary copy of a file, removed however the answer ends: Starlette answers a
+    broken or unsatisfiable `Range` with 400 or 416 and runs no background task then, so a
+    copy removed by one would stay on the disk with every such request."""
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            await asyncio.shield(asyncio.to_thread(Path(self.path).unlink, missing_ok=True))
 
 
 @router.get(
