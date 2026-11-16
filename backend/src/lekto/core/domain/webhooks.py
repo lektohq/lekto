@@ -528,10 +528,12 @@ class Webhook:
     def delivered(self) -> None:
         self.failed_streak = 0
 
-    def gave_up(self, *, disable_after: int, now: datetime) -> bool:
-        """A delivery was given up. Returns True if this switched the webhook off."""
+    def gave_up(self, *, disable_after: int, now: datetime, takes_tasks: bool = False) -> bool:
+        """A delivery was given up. Returns True if this switched the webhook off: after
+        `disable_after` in a row, unless it `takes_tasks` (a model call, a rule's step that
+        asks it), which is never switched off (Tobi, 25.10.2026)."""
         self.failed_streak += 1
-        if self.active and self.failed_streak >= disable_after:
+        if self.active and not takes_tasks and self.failed_streak >= disable_after:
             self.active = False
             self.disabled_reason = because(ReasonCode.WEBHOOK_FAILING)
             self.updated_at = now

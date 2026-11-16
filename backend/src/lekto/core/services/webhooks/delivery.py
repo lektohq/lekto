@@ -27,7 +27,8 @@ Two steps, both idempotent and safe to repeat (events arrive at least once):
 
    Repetitions wait `retry_delay`, doubling, at most `max_retry_delay`. After `disable_after`
    given-up deliveries in a row the webhook is switched off (`disabled_reason`, the code
-   `webhook_failing`).
+   `webhook_failing`), unless it takes tasks (`takes_tasks`): its events are given up one by
+   one, and it goes on serving its model call and the rules that ask it.
 
 A task's request (`domain.tasks`, payload with `task_id`) goes the same way, with these
 differences: its body was made when the task was sent and waits encrypted with the task's token
@@ -605,7 +606,7 @@ class WebhookDeliveryService:
                             next_attempt,
                         )
                         await uow.webhooks.add_delivery(delivery)
-                        switched_off = self._count(webhook, outcome, now)
+                        switched_off = await self._count(uow, webhook, outcome, now)
                         if switched_off is not None:
                             await uow.webhooks.update(webhook)
                         if switched_off:
@@ -634,9 +635,12 @@ class WebhookDeliveryService:
                 )
             return
 
-    def _count(self, webhook: Webhook, outcome: DeliveryOutcome, now: datetime) -> bool | None:
+    async def _count(
+        self, uow: UnitOfWork, webhook: Webhook, outcome: DeliveryOutcome, now: datetime
+    ) -> bool | None:
         """Update the failure counter. None: nothing changed; else whether it switched the
-        webhook off."""
+        webhook off. Whether it takes tasks is looked up only when the streak reaches the
+        limit."""
         match outcome:
             case DeliveryOutcome.DELIVERED:
                 if webhook.failed_streak == 0:
@@ -644,9 +648,21 @@ class WebhookDeliveryService:
                 webhook.delivered()
                 return False
             case DeliveryOutcome.GAVE_UP:
-                return webhook.gave_up(disable_after=self._policy.disable_after, now=now)
+                limit = self._policy.disable_after
+                due = webhook.active and webhook.failed_streak + 1 >= limit
+                tasks = due and await takes_tasks(uow, webhook)
+                return webhook.gave_up(disable_after=limit, now=now, takes_tasks=tasks)
             case _:
                 return None
+
+
+async def takes_tasks(uow: UnitOfWork, webhook: Webhook) -> bool:
+    """Whether `webhook` takes tasks: it serves as a model call, or a rule's step asks it (a
+    rule not deleted, enabled or not: it may be enabled again)."""
+    if webhook.model_call is not None:
+        return True
+    rules = await uow.rules.list_for(spaces=None, include_global=True)
+    return any(ask.webhook_id == webhook.id for rule in rules for ask in rule.definition.asks)
 
 
 # --- a rule's request and a task's ---------------------------------------------------------------

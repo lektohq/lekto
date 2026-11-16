@@ -27,6 +27,7 @@ from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.master_data import Contact, DocumentType
 from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rules import AskWebhook, Trigger
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.domain.webhooks import (
@@ -34,6 +35,8 @@ from lekto.core.domain.webhooks import (
     TEST_EVENT,
     BodyFormat,
     DeliveryOutcome,
+    ModelCallKind,
+    ModelCallRole,
     Webhook,
     WebhookDelivery,
 )
@@ -41,8 +44,10 @@ from lekto.core.ports.webhook_sender import WebhookRequest
 from lekto.core.services._push_queue import PUSH_JOB
 from lekto.core.services.webhooks import DELIVER_JOB, WebhookDeliveryService
 from lekto.core.services.webhooks.delivery import queue_rule_send
+from lekto.core.services.webhooks.management import serving_model_call
 from tests import builders
 from tests.builders import NOW
+from tests.unit.services.rules_support import channel_api, definition, rule_world
 from tests.unit.services.support import World
 
 URL = "http://n8n.lan:5678/webhook/lekto"
@@ -438,6 +443,40 @@ async def test_a_webhook_is_switched_off_after_repeated_failures_and_success_res
     before = len(deliveries(world))
     await service.on_event(lane_changed(document))
     assert len(deliveries(world)) == before
+
+
+async def test_a_webhook_that_takes_tasks_is_never_switched_off(world: World) -> None:
+    """Its events give up one by one; it goes on serving its model call and the rule that asks
+    it (Tobi, 25.10.2026)."""
+    r = await rule_world(world)
+    admin = r.admin
+    document = await seed(world, admin)
+    asked, _ = await hook(world, admin)
+    ask = AskWebhook("flow", asked.id)
+    await r.personal_rule(
+        admin, definition("Fragen", channel_api(), ask, triggers=[Trigger.INGEST])
+    )
+    role = ModelCallRole(ModelCallKind.PROPOSE, timedelta(minutes=10))
+    created = await world.webhooks.create(
+        admin.id, name="agent", url=URL, event_types=["*"], model_call=role
+    )
+    model = created.webhook
+    events_only, _ = await hook(world, admin)
+    service = world.webhook_delivery(replace(builders.WEBHOOKS, disable_after=3))
+    world.sender.answers = lambda request: 404
+    for _ in range(4):
+        await service.on_event(lane_changed(document))
+        while await service.run_next_job():
+            pass
+    async with world.uow() as uow:
+        states = {
+            item.id: (item.active, item.failed_streak) for item in await uow.webhooks.list_all()
+        }
+        serving = await serving_model_call(uow, ModelCallKind.PROPOSE)
+    assert states[asked.id] == (True, 4)
+    assert states[model.id] == (True, 4)
+    assert states[events_only.id] == (False, 3)  # switched off as before, then sent nothing
+    assert serving is not None and serving.id == model.id
 
 
 async def test_own_headers_go_with_the_request_and_an_unsigned_one_has_no_signature(
