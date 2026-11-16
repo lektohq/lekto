@@ -21,7 +21,8 @@ takes one; if the transaction fails, they are removed again.
 
 import asyncio
 import logging
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
@@ -37,6 +38,7 @@ from lekto.core.domain.editing import (
 )
 from lekto.core.domain.errors import (
     ConcurrencyError,
+    UnprocessableDocumentError,
     UnsupportedMediaTypeError,
     ValidationError,
 )
@@ -118,13 +120,14 @@ class EditingService:
     async def preview(self, actor: UserId, id: DocumentId, file: IncomingFile) -> list[bytes]:
         """Editors and admins, before they add `file` to an edit of the document: its pages as
         WebP images as large as a document's page images, in their order; nothing is stored.
-        UnsupportedMediaTypeError unless a PDF or an image; UnprocessableDocumentError if its
-        pages cannot be read; ValidationError if it has more than `MAX_PREVIEW_PAGES`."""
+        UnsupportedMediaTypeError unless a PDF or an image; ValidationError if its pages cannot
+        be read (`_readable`) or it has more than `MAX_PREVIEW_PAGES`."""
         kind = await _kind(file.path)
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             await controllable_document(uow, user, id, Action.EDIT_PAGES)
-        pages = await self._composer.count_pages(PageSource(file.path, kind))
+        with _readable():
+            pages = await self._composer.count_pages(PageSource(file.path, kind))
         if pages > MAX_PREVIEW_PAGES:
             raise ValidationError(
                 because(ReasonCode.PREVIEW_TOO_MANY_PAGES, pages=pages, max=MAX_PREVIEW_PAGES)
@@ -132,7 +135,8 @@ class EditingService:
         async with work_directory() as work:
             target = work / "pages"
             await asyncio.to_thread(target.mkdir)
-            rendered = await self._pages.render_pages(file.path, media_type=kind, target=target)
+            with _readable():
+                rendered = await self._pages.render_pages(file.path, media_type=kind, target=target)
             return [
                 await asyncio.to_thread((target / f"{number}.webp").read_bytes)
                 for number in range(1, rendered.pages + 1)
@@ -156,9 +160,10 @@ class EditingService:
         `MAX_MERGED` documents, a document twice (or the document among `documents`), or a
         target that is none of them;
         UnsupportedMediaTypeError for an added file that is no PDF or image, and for a mail,
-        whose pages are not a file; UnprocessableDocumentError for a file whose pages cannot
-        be read; InvalidTransitionError while one of them is processed; ConcurrencyError if a
-        file changed meanwhile. Each document needs the caller's right to edit its pages."""
+        whose pages are not a file; ValidationError also for a file whose pages cannot be read
+        (`_readable`); InvalidTransitionError while one of them is processed; ConcurrencyError
+        if a file changed meanwhile. Each document needs the caller's right to edit its
+        pages."""
         if len(added) > MAX_ADDED:
             raise ValidationError(f"files: at most {MAX_ADDED}")
         if len(documents) > MAX_MERGED:
@@ -187,13 +192,15 @@ class EditingService:
                 ),
                 *originals[1:],
             ]
-            counts = [await self._composer.count_pages(source) for source in sources]
-            check_parts(parts, counts, merged=len(documents))
-            made = []
-            for number, part in enumerate(parts, start=1):
-                target_file = work / f"part-{number}.pdf"
-                await self._composer.compose(sources, part.pages, target_file)
-                made.append(_Part(part, await asyncio.to_thread(IncomingFile.of, target_file)))
+            with _readable():
+                counts = [await self._composer.count_pages(source) for source in sources]
+                check_parts(parts, counts, merged=len(documents))
+                made = []
+                for number, part in enumerate(parts, start=1):
+                    target_file = work / f"part-{number}.pdf"
+                    await self._composer.compose(sources, part.pages, target_file)
+                    file = await asyncio.to_thread(IncomingFile.of, target_file)
+                    made.append(_Part(part, file))
             try:
                 for item in made:
                     key = original_key(item.file.sha256)
@@ -432,6 +439,17 @@ def _require_editable(document: Document) -> None:
     document.require_idle()
     if document.media_type not in VERSION_MEDIA_TYPES:
         raise UnsupportedMediaTypeError("the pages of a mail cannot be edited")
+
+
+@contextmanager
+def _readable() -> Iterator[None]:
+    """A file of the request whose pages cannot be read (UnprocessableDocumentError, as the
+    worker's nodes raise it) as a ValidationError with the same reason: the REST API answers
+    that with 422, the other only from the worker (`NOT_FROM_REQUESTS`)."""
+    try:
+        yield
+    except UnprocessableDocumentError as error:
+        raise ValidationError(error.reason) from None
 
 
 async def _kind(path: Path) -> str:

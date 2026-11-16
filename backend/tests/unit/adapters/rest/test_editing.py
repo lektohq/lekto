@@ -1,17 +1,22 @@
 """`POST /documents/{id}/edit`: parts of the document's pages and of added files; the part that
 replaces it is its next version, the others new documents, the document gone without one."""
 
+import dataclasses
 import json
+from pathlib import Path
 from typing import Any
 
 import httpx2
 import pytest
 
 from lekto.adapters.outbound.memory import ManualClock, fake_pdf
+from lekto.adapters.outbound.pdfium import PdfiumPageRenderer
+from lekto.adapters.outbound.pikepdf import PikepdfPageComposer
 from lekto.composition.container import build_memory_container, build_services
 from lekto.core.domain.editing import MAX_PREVIEW_PAGES
 from tests import builders
 from tests.api import auth
+from tests.pdfs import missing_page
 from tests.unit.adapters.rest.support import DOCUMENTS, Api, file_part, make_app, upload
 
 
@@ -203,6 +208,41 @@ async def test_the_pages_of_a_longer_file_are_not_shown(api: Api) -> None:
         "preview_too_many_pages",
         {"pages": MAX_PREVIEW_PAGES + 1, "max": MAX_PREVIEW_PAGES},
     )
+
+
+async def test_a_file_whose_pages_cannot_be_read_is_refused_saying_why(tmp_path: Path) -> None:
+    """With the adapters that read files: their error (as the worker's nodes have it) is the
+    request's, 422 with its reason, not 500."""
+    clock = ManualClock(builders.NOW)
+    container = dataclasses.replace(
+        build_memory_container(clock), composer=PikepdfPageComposer(), pages=PdfiumPageRenderer()
+    )
+    services = build_services(container)
+    builders.skip_classification(services.pipeline)
+    app = make_app(container, services)
+    transport = httpx2.ASGITransport(app=app)
+    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
+        api = Api(container, services, app, client, clock)
+        owner = await api.user()
+        text = (builders.SAMPLES / "text.pdf").read_bytes()
+        id = await upload(api, auth(owner), content=text)
+        damaged = (builders.SAMPLES / "damaged.pdf").read_bytes()
+        missing = missing_page(tmp_path / "missing.pdf").read_bytes()  # PDFium fails page 2
+        url = f"{DOCUMENTS}/{id}/edit"
+        parts = [{"pages": [{"page": 1}, {"source": 1, "page": 1}], "replaces": True}]
+        answers = [
+            await client.post(
+                f"{url}/pages", files=file_part("d.pdf", damaged), headers=auth(owner)
+            ),
+            await client.post(
+                f"{url}/pages", files=file_part("m.pdf", missing), headers=auth(owner)
+            ),
+            await client.post(url, **form(parts, ("d.pdf", damaged)), headers=auth(owner)),
+        ]
+        for answer in answers:
+            assert answer.status_code == 422, answer.text
+            assert answer.json()["reason"]["code"].startswith("pdf_unreadable")
+        assert "page 2: Failed to load page" in answers[1].json()["detail"]
 
 
 @pytest.mark.parametrize("route", ["versions", "edit/pages", "edit"])
