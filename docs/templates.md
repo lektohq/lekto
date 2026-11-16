@@ -242,6 +242,9 @@ JSON, or writes a missing value, is not sent; the webhook's log says why.
 
 - A loop stops after 1,000 turns.
 - The output stops after 10,000 characters.
+- So does the result of each filter: a text of more than 10,000 characters, a list of more than
+  10,000 entries or a number of more than 10,000 digits stops the template, also where it is not
+  written out (`size`, `contains`).
 - A title is at most 500 characters, a webhook's body template 10,000.
 
 `POST /api/v1/templates/preview` checks a template and renders it with a document the caller may

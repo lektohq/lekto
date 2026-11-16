@@ -1,6 +1,6 @@
 """Templates in Liquid (`python-liquid`), for users: no other templates (`include`, `render`
 are not tags here), no attributes of Python objects (Liquid looks up keys only), bounded loops
-and output.
+and output, and bounded results of filters (`_Bounded`).
 
 Values come as the domain has them and are given to Liquid in forms its filters understand: a
 number is a float that writes itself as its exact decimal text (Liquid's arithmetic filters
@@ -13,7 +13,7 @@ bodies of webhooks.
 
 import json
 import re
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 from functools import lru_cache
@@ -51,6 +51,87 @@ class _Environment(Environment):
     local_namespace_limit = 10_000
     loop_iteration_limit = 1_000
     output_stream_limit = 10_000
+
+
+MAX_RESULT = _Environment.output_stream_limit
+"""The characters a filter's result may have at most: as many as the output. A list may have as
+many entries, and as many characters in its texts; a number as many digits."""
+_MAX_NUMBER = 10**MAX_RESULT
+
+
+class _Bounded:
+    """A filter whose result stops the render once it is larger than `MAX_RESULT`. Liquid's own
+    limits look at what is assigned and written out, not at what the filters of an expression
+    make on the way: three `replace` made 1.6 billion characters of 200, 3 GB, before the output
+    was refused. `before` looks at the arguments of a filter that multiplies in a single call,
+    before it runs. Everything else of the filter (`with_context`, `with_environment`) is the
+    filter's own."""
+
+    def __init__(
+        self, name: str, inner: Callable[..., object], before: "_Before | None" = None
+    ) -> None:
+        self._name = name
+        self._inner = inner
+        self._before = before
+
+    def __getattr__(self, attribute: str) -> object:
+        return getattr(self._inner, attribute)
+
+    def __call__(self, left: object, *args: Any, **kwargs: Any) -> object:
+        if self._before is not None:
+            self._before(self._name, left, *args)
+        result = self._inner(left, *args, **kwargs)
+        _check_result(self._name, result)
+        return result
+
+
+type _Before = Callable[..., None]
+
+
+def _check_result(name: str, result: object) -> None:
+    match result:
+        case str() if len(result) > MAX_RESULT:
+            raise _too_large(name, "characters")
+        case list() | tuple() if len(result) > MAX_RESULT:
+            raise _too_large(name, "entries")
+        case list() | tuple() if sum(len(item) for item in result if isinstance(item, str)) > (
+            MAX_RESULT
+        ):
+            raise _too_large(name, "characters")
+        case int() if not isinstance(result, bool) and abs(result) >= _MAX_NUMBER:
+            raise _too_large(name, "digits")
+
+
+def _too_large(name: str, unit: str) -> ValidationError:
+    return ValidationError(
+        f"invalid template: the result of the filter {name!r} has more than {MAX_RESULT} {unit}"
+    )
+
+
+def _text(value: object) -> str:
+    """`value` as a string filter takes it (`liquid.filter.string_filter`)."""
+    return "" if value is None else value if isinstance(value, str) else str(value)
+
+
+def _before_replace(
+    name: str, left: object, seq: object = "", sub: object = "", *_: object
+) -> None:
+    """`replace` writes `sub` for every `seq`: 10 000 characters for each of 10 000."""
+    text, seq, sub = _text(left), _text(seq), _text(sub)
+    grows = len(sub) - len(seq)
+    if grows > 0 and len(text) + text.count(seq) * grows > MAX_RESULT:
+        raise _too_large(name, "characters")
+
+
+def _before_join(name: str, left: object, separator: object = " ", *_: object) -> None:
+    """`join` writes the separator between every two entries: 10 000 characters 10 000 times."""
+    if isinstance(left, (list, tuple)):
+        texts = sum(len(item) for item in left if isinstance(item, str))
+        if texts + max(0, len(left) - 1) * len(_text(separator)) > MAX_RESULT:
+            raise _too_large(name, "characters")
+
+
+_BEFORE: Mapping[str, _Before] = {"replace": _before_replace, "join": _before_join}
 
 
 class _DateTime(DateTime):
@@ -118,6 +199,8 @@ class LiquidTemplateRenderer:
         )
         environment.filters["decimal"] = Number(default_locale=self._locale)
         environment.filters["json"] = _Json()
+        for name, inner in list(environment.filters.items()):
+            environment.filters[name] = _Bounded(name, inner, _BEFORE.get(name))
         self._environment = environment
         self._parse = lru_cache(maxsize=512)(self._parsed)
         self._writing = Writing(Locale.parse(self._locale).language, currency)
@@ -142,6 +225,8 @@ class LiquidTemplateRenderer:
             raise MissingValueError(found.group("path") if found else "a value") from None
         except LiquidError as error:
             raise _invalid(error) from None
+        except ValidationError:
+            raise  # a filter's result too large (`_Bounded`)
         except Exception as error:
             # A valid template can still fail on its values: a time pattern on a date (`HH:mm`,
             # or `mm` meant as the month), a sum over text, a date out of range. The callers
