@@ -16,6 +16,7 @@ from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.ports.composer import PageSource
 from tests.builders import SAMPLES
 from tests.contracts.processing import PageComposerContract
+from tests.images import stated_png, too_large_on_page_two
 
 
 @pytest.fixture
@@ -163,6 +164,18 @@ async def test_what_it_cannot_read_is_unprocessable(
         await page_composer.compose(
             [PageSource(path, media_type)], [PagePick(0, 1)], tmp_path / "x.pdf"
         )
+
+
+@pytest.mark.filterwarnings("ignore::PIL.Image.DecompressionBombWarning")
+async def test_an_image_over_the_limit_is_refused_before_it_is_decoded(
+    page_composer: PikepdfPageComposer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for source in (
+        PageSource(stated_png(tmp_path / "large.png", 11_000, 11_000), media_types.PNG),
+        PageSource(too_large_on_page_two(tmp_path / "large.tiff", monkeypatch), media_types.TIFF),
+    ):
+        with pytest.raises(UnprocessableDocumentError, match="megapixels"):
+            await page_composer.compose([source], [PagePick(0, 1)], tmp_path / "x.pdf")
 
 
 async def test_an_encrypted_pdf_is_unprocessable(

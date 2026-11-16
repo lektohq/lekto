@@ -1,9 +1,15 @@
 """An image on white: what PDFium's page images and OCRmyPDF's input share."""
 
+from pathlib import Path
+
 import pytest
 from PIL import Image
 
-from lekto.adapters.outbound.imaging import flatten_on_white
+from lekto.adapters.outbound.imaging import check_pixels, flatten_on_white
+from lekto.core.domain.errors import UnprocessableDocumentError
+from lekto.core.domain.reasons import ReasonCode
+from lekto.core.ports.images import MAX_DOCUMENT_PIXELS
+from tests.images import stated_png
 
 RED = (200, 0, 0)
 GREY = 90
@@ -47,3 +53,20 @@ def test_transparency_turns_white(mode: str) -> None:
 def test_an_image_without_transparency_stays_as_it_is(mode: str) -> None:
     image = Image.new(mode, (2, 1))
     assert flatten_on_white(image) is image
+
+
+@pytest.mark.filterwarnings("ignore::PIL.Image.DecompressionBombWarning")
+def test_an_image_over_the_limit_is_refused_from_its_header(tmp_path: Path) -> None:
+    assert MAX_DOCUMENT_PIXELS == 120_000_000
+    with Image.open(stated_png(tmp_path / "large.png", 10_000, 12_000)) as image:
+        check_pixels(image)  # at the limit: read
+    with (
+        Image.open(stated_png(tmp_path / "larger.png", 10_000, 12_001)) as image,
+        pytest.raises(UnprocessableDocumentError) as raised,
+    ):
+        check_pixels(image)
+    assert raised.value.reason.code is ReasonCode.IMAGE_TOO_LARGE
+    assert raised.value.reason.params == {"pixels": 121, "max": 120}
+    assert str(raised.value) == (
+        "the image has 121 megapixels; Lekto reads images of up to 120 megapixels"
+    )

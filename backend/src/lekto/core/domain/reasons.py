@@ -146,6 +146,7 @@ class ReasonCode(StrEnum):
     PDF_UNREADABLE_DETAIL = "pdf_unreadable_detail"
     IMAGE_UNREADABLE = "image_unreadable"
     IMAGE_UNREADABLE_DETAIL = "image_unreadable_detail"
+    IMAGE_TOO_LARGE = "image_too_large"
     DOCUMENT_NO_PAGES = "document_no_pages"
     OCR_FAILED = "ocr_failed"
     TEXT_UNREADABLE = "text_unreadable"
@@ -611,6 +612,10 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.PDF_UNREADABLE_DETAIL: "the PDF cannot be read: {detail}",
     ReasonCode.IMAGE_UNREADABLE: "the image cannot be read",
     ReasonCode.IMAGE_UNREADABLE_DETAIL: "the image cannot be read: {detail}",
+    ReasonCode.IMAGE_TOO_LARGE: (
+        "the image has {pixels:number} megapixels; Lekto reads images of up to {max:number} "
+        "megapixels"
+    ),
     ReasonCode.DOCUMENT_NO_PAGES: "the document has no pages",
     ReasonCode.OCR_FAILED: "{problem:reason}: {detail}",
     ReasonCode.TEXT_UNREADABLE: (

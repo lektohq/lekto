@@ -23,7 +23,7 @@ from pathlib import Path
 import pikepdf
 from PIL import ExifTags, Image, ImageOps, ImageSequence
 
-from lekto.adapters.outbound.imaging import flatten_on_white, image_dpi
+from lekto.adapters.outbound.imaging import check_pixels, flatten_on_white, image_dpi
 from lekto.core.domain import media_types
 from lekto.core.domain.editing import PagePick
 from lekto.core.domain.errors import UnprocessableDocumentError
@@ -116,7 +116,11 @@ def _image_pdf(path: Path) -> pikepdf.Pdf:
         with Image.open(path) as image:
             as_is = image.format == "JPEG" and image.mode in ("L", "RGB")
             for frame in ImageSequence.Iterator(image):
+                check_pixels(frame)
                 _add_page(pdf, frame, path.read_bytes() if as_is else None)
+    except UnprocessableDocumentError:
+        pdf.close()
+        raise
     except (OSError, ValueError, Image.DecompressionBombError) as error:
         pdf.close()
         raise _unreadable_image(error) from None

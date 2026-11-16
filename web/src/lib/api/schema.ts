@@ -9655,6 +9655,7 @@ export interface components {
 			| 'pdf_unreadable_detail'
 			| 'image_unreadable'
 			| 'image_unreadable_detail'
+			| 'image_too_large'
 			| 'document_no_pages'
 			| 'ocr_failed'
 			| 'text_unreadable'

@@ -8,6 +8,10 @@ MAX_PIXELS = 4096 * 4096
 """Pixels of an image a logo is made from at most (64 MB decoded as RGBA)."""
 MAX_ICON_ENTRIES = 64
 """Pictures of an ICO a logo is made from at most (a website's favicon has a few)."""
+MAX_DOCUMENT_PIXELS = 120_000_000
+"""Pixels of an image a document is (or a page of it) at most: A3 scanned at 600 dpi has 70
+million, a phone's photo up to 108. A file of a few hundred kilobytes can hold more, and every
+full-size copy of it took hundreds of megabytes; the adapters check it before they decode."""
 
 
 class ImageNormaliser(Protocol):

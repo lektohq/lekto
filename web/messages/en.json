@@ -2701,6 +2701,7 @@
 	"reason_pdf_unreadable_detail": "the PDF cannot be read: {detail}",
 	"reason_image_unreadable": "the image cannot be read",
 	"reason_image_unreadable_detail": "the image cannot be read: {detail}",
+	"reason_image_too_large": "the image has {pixels} megapixels; Lekto reads images of up to {max} megapixels",
 	"reason_document_no_pages": "the document has no pages",
 	"reason_ocr_failed": "{problem}: {detail}",
 	"reason_text_unreadable": "the text in the PDF cannot be read (a font without a character map); every page was recognised from its image",

@@ -39484,6 +39484,7 @@
           "pdf_unreadable_detail",
           "image_unreadable",
           "image_unreadable_detail",
+          "image_too_large",
           "document_no_pages",
           "ocr_failed",
           "text_unreadable",
@@ -45235,6 +45236,10 @@
     "image_unreadable": {},
     "image_unreadable_detail": {
       "detail": "text"
+    },
+    "image_too_large": {
+      "pixels": "number",
+      "max": "number"
     },
     "document_no_pages": {},
     "ocr_failed": {

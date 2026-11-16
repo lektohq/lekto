@@ -169,6 +169,7 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	pdf_unreadable_detail: entry(m.reason_pdf_unreadable_detail),
 	image_unreadable: entry(m.reason_image_unreadable),
 	image_unreadable_detail: entry(m.reason_image_unreadable_detail),
+	image_too_large: entry(m.reason_image_too_large, { pixels: 'number', max: 'number' }),
 	document_no_pages: entry(m.reason_document_no_pages),
 	ocr_failed: entry(m.reason_ocr_failed, { problem: 'reason' }),
 	text_unreadable: entry(m.reason_text_unreadable),

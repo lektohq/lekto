@@ -11,7 +11,7 @@ import PIL
 import pypdfium2
 from PIL import ExifTags, Image, ImageSequence
 
-from lekto.adapters.outbound.imaging import flatten_on_white
+from lekto.adapters.outbound.imaging import check_pixels, flatten_on_white
 from lekto.adapters.outbound.pdfium.library import LOCK
 from lekto.core.domain import media_types
 from lekto.core.domain.errors import UnprocessableDocumentError
@@ -124,8 +124,9 @@ _SIDEWAYS = (5, 6, 7, 8)  # orientations that swap width and height
 def _image_pages(source: Path, width: int) -> Iterator[Iterator[Image.Image]]:
     """The frames of an image (a TIFF may have several), the right way up, on white, at most
     `width` wide. Each is made small first and turned and laid on white then: a file of a few
-    hundred kilobytes may hold a picture of 170 megapixels, of which every full-size copy took
-    another 700 MB. A JPEG is decoded at the smallest scale that still gives `width`."""
+    hundred kilobytes may hold a picture of `MAX_DOCUMENT_PIXELS` (one larger is refused), of
+    which every full-size copy took another 480 MB. A JPEG is decoded at the smallest scale that
+    still gives `width`."""
     try:
         opened = Image.open(source)
     except (OSError, Image.DecompressionBombError) as error:
@@ -136,6 +137,7 @@ def _image_pages(source: Path, width: int) -> Iterator[Iterator[Image.Image]]:
     def frames() -> Iterator[Image.Image]:
         try:
             for frame in ImageSequence.Iterator(opened):
+                check_pixels(frame)
                 orientation = frame.getexif().get(ExifTags.Base.Orientation, 1)
                 sideways = orientation in _SIDEWAYS
                 if opened.format == "JPEG":

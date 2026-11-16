@@ -2701,6 +2701,7 @@
 	"reason_pdf_unreadable_detail": "das PDF lässt sich nicht lesen: {detail}",
 	"reason_image_unreadable": "das Bild lässt sich nicht lesen",
 	"reason_image_unreadable_detail": "das Bild lässt sich nicht lesen: {detail}",
+	"reason_image_too_large": "das Bild hat {pixels} Megapixel; Lekto liest Bilder bis {max} Megapixel",
 	"reason_document_no_pages": "das Dokument hat keine Seiten",
 	"reason_ocr_failed": "{problem}: {detail}",
 	"reason_text_unreadable": "der Text im PDF lässt sich nicht lesen (eine Schrift ohne Zeichentabelle); jede Seite wurde aus ihrem Bild erkannt",

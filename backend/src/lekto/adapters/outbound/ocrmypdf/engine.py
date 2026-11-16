@@ -68,7 +68,7 @@ from pathlib import Path
 from PIL import Image, ImageSequence, TiffImagePlugin
 
 from lekto.adapters.outbound.http_client import endpoint_of
-from lekto.adapters.outbound.imaging import flatten_on_white, image_dpi
+from lekto.adapters.outbound.imaging import check_pixels, flatten_on_white, image_dpi
 from lekto.adapters.outbound.ocrmypdf.hocr import read_hocr
 from lekto.adapters.outbound.ocrmypdf.vision import (
     PROMPT,
@@ -387,6 +387,7 @@ def prepare_image(source: Path, prepared: Path) -> tuple[Path, int]:
     all of them at once took gigabytes."""
     try:
         with Image.open(source) as image:
+            check_pixels(image)
             dpi = image_dpi(image.size, image.info.get("dpi"))
             if getattr(image, "n_frames", 1) == 1:
                 ready = _ocr_ready(image)
@@ -396,6 +397,7 @@ def prepare_image(source: Path, prepared: Path) -> tuple[Path, int]:
                 return prepared, dpi
             with _PageWriter(str(prepared), new=True) as tiff:
                 for frame in ImageSequence.Iterator(image):
+                    check_pixels(frame)
                     _ocr_ready(frame).save(tiff, "TIFF", dpi=(dpi, dpi), compression="tiff_lzw")
                     tiff.newFrame()
     except (OSError, ValueError, Image.DecompressionBombError) as error:
