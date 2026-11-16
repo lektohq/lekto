@@ -156,17 +156,21 @@ class Relating:
 
 async def relate(uow: UnitOfWork, document: Document, now: datetime) -> Relating:
     """Store what the sources find for `document` (`recognise`) in the unit, which holds
-    `RELATIONS_LOCK`, and drop Lekto's undecided relations of it they no longer find."""
+    `RELATIONS_LOCK`, and drop Lekto's undecided relations of it that neither end finds any
+    more: a document without a contact finds one of a contact that does not find it back
+    (`_with_fact`), and its suggestion stays when the other end looks again."""
     found = await recognise(uow, document)
     seen = {item.other.id for item in found}
     dropped = []
     for relation in await uow.document_relations.of_document(document.id):
+        other = relation.other(document.id)
         if (
             relation.origin is RelationOrigin.LEKTO
             and relation.decided_by is None
             and relation.state is not RelationState.REJECTED
-            and relation.other(document.id) not in seen
+            and other not in seen
             and relation.evidence.get("kind") != MAIL_EVIDENCE
+            and not await _finds(uow, other, document.id)
         ):
             await uow.document_relations.remove(relation.newer, relation.older)
             dropped.append(relation)
@@ -269,6 +273,14 @@ def _fits(document: Document, other: Document) -> bool | None:
 
 def _sure(fit: bool | None, alone: bool) -> RelationState:
     return RelationState.SET if fit and alone else RelationState.SUGGESTED
+
+
+async def _finds(uow: UnitOfWork, id: DocumentId, other: DocumentId) -> bool:
+    """Whether the sources find `other` for the document `id` (False if it is gone)."""
+    document = await uow.documents.find(id)
+    return document is not None and any(
+        item.other.id == other for item in await recognise(uow, document)
+    )
 
 
 async def _with_fact(

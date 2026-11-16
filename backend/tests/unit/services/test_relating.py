@@ -386,6 +386,29 @@ async def test_a_relation_lekto_made_goes_when_no_source_finds_it_any_more(world
     assert await s.relations(reminder) == []
 
 
+async def test_a_suggestion_without_a_contact_stays_when_the_other_end_looks_again(
+    world: World,
+) -> None:
+    """The invoice of a contact does not find the reminder without one (`_with_fact`), which
+    found the invoice: the suggestion stays when the invoice looks again."""
+    s = await Scene.of(world)
+    shop = await s.contact("Versandhaus")
+    invoice = await s.document(
+        contact=shop, dated=date(2026, 5, 12), facts=((K.INVOICE_NUMBER, "VB1", FactRole.OWN),)
+    )
+    reminder = await s.document(
+        dated=date(2026, 6, 10), facts=((K.INVOICE_NUMBER, "VB1", FactRole.REFERS),)
+    )
+    suggested = {(reminder.id, invoice.id, RelationState.SUGGESTED)}
+    assert pairs(await s.relate(reminder)) == suggested
+    async with world.uow() as uow:
+        await uow.lock(RELATIONS_LOCK)
+        related = await relate(uow, invoice, NOW)
+        await uow.commit()
+    assert (related.made, related.dropped) == ((), ())
+    assert pairs(await s.relations(invoice)) == suggested
+
+
 async def test_two_relation_targets_are_not_related_by_a_customer_number(world: World) -> None:
     s = await Scene.of(world)
     insurer = await s.contact("Nord Versicherung")
