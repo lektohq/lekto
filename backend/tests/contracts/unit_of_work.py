@@ -2163,6 +2163,23 @@ class UnitOfWorkContract:
 
     # --- removal and references -----------------------------------------------------------------
 
+    async def test_a_document_whose_filing_failed_is_read_back(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """Its processing has failed with no node open (filing is the last): a store that
+        builds the state anew reads it, the document and the list keep working."""
+        owner, space = await owner_with_space(uow_factory)
+        document = builders.processed(owner, space, {Node.FILE: builders.FAILED})
+        async with uow_factory() as uow:
+            await uow.documents.add(document)
+            await uow.commit()
+        async with uow_factory() as uow:
+            stored = await uow.documents.get(document.id)
+            listed = await uow.documents.query(DocumentFilter(), limit=10)
+        assert stored.processing == document.processing
+        assert stored.processing.status is ProcessingStatus.FAILED
+        assert [item.id for item in listed] == [document.id]
+
     async def test_users_keep_their_active_flag(self, uow_factory: UnitOfWorkFactory) -> None:
         user = builders.user()
         user.active = False

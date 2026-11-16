@@ -1,3 +1,4 @@
+import dataclasses
 from datetime import timedelta
 
 import pytest
@@ -377,6 +378,19 @@ def test_confirming_a_red_document_takes_over_the_failed_and_unrun_nodes() -> No
     builders.run_pipeline(document)
     assert document.lane is Lane.GREEN
     assert document.processing.outcome(Node.PAGES) is Outcome.OK
+
+
+def test_failed_filing_leaves_no_node_open_and_is_valid() -> None:
+    """Filing is the last node: when it fails, the processing has failed with no node open. A
+    store that builds the state anew (SQL) must read it back."""
+    failed = builders.run_pipeline(received(), {Node.FILE: FAILED}).processing
+    assert (failed.status, failed.is_open()) == (ProcessingStatus.FAILED, False)
+    assert dataclasses.replace(failed) == failed  # checked again, as a store reads it
+    with pytest.raises(ValidationError, match="completed processing has no open node"):
+        dataclasses.replace(Processing.new(), status=ProcessingStatus.COMPLETED)
+    done = builders.run_pipeline(received()).processing
+    with pytest.raises(ValidationError, match="without an open node is completed or failed"):
+        dataclasses.replace(done, status=ProcessingStatus.PROCESSING)
 
 
 def test_fields_are_only_extracted_again_from_a_parsed_text() -> None:
