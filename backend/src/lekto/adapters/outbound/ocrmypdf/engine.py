@@ -78,7 +78,7 @@ from lekto.adapters.outbound.ocrmypdf.vision import (
     read_error,
     read_records,
 )
-from lekto.adapters.outbound.pdfium import count_pages, has_hidden_text, has_unreadable_text
+from lekto.adapters.outbound.pdfium import PDF_TIMEOUT, count_pages, text_layer
 from lekto.adapters.outbound.system import Completed, run_process
 from lekto.core.domain import media_types
 from lekto.core.domain.errors import LanguageModelError, UnprocessableDocumentError
@@ -140,15 +140,19 @@ class OcrmypdfEngine:
         vision: VisionSettings | None = None,
         vision_timeout: timedelta,
         memory: int | None = None,
+        pdf_timeout: timedelta = PDF_TIMEOUT,
     ) -> None:
         """`languages`: Tesseract language codes, e.g. `deu`, `eng`. `jobs`: CPU cores for
         the pages of one document. `vision`: the model that reads pages when asked to, all
         pages of a document within `vision_timeout` (a setting, like `timeout`). `memory`: the
-        address space OCRmyPDF and each program it starts may take (`run_process`)."""
+        address space OCRmyPDF and each program it starts may take (`run_process`), and the
+        child that reads a PDF's text layer before (`pdfium.text_layer`) within
+        `pdf_timeout`."""
         if not languages:
             raise ValueError("at least one OCR language is needed")
         self._languages = "+".join(languages)
         self._memory = memory
+        self._pdf_timeout = pdf_timeout
         self._timeout = timeout
         self._jobs = jobs
         self._vision = vision
@@ -179,8 +183,8 @@ class OcrmypdfEngine:
                 source, dpi = await asyncio.to_thread(prepare_image, source, prepared)
                 extra = ["--image-dpi", str(dpi)]
             elif not vision:
-                unreadable = await asyncio.to_thread(has_unreadable_text, source)
-                hidden = not unreadable and await asyncio.to_thread(has_hidden_text, source)
+                layer = await text_layer(source, timeout=self._pdf_timeout, memory=self._memory)
+                unreadable, hidden = layer.unreadable, layer.hidden
             if vision:
                 assert self._vision is not None
                 await asyncio.to_thread(records.mkdir)

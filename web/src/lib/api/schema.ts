@@ -9653,6 +9653,7 @@ export interface components {
 			| 'pdf_encrypted'
 			| 'pdf_unreadable'
 			| 'pdf_unreadable_detail'
+			| 'pdf_too_complex'
 			| 'image_unreadable'
 			| 'image_unreadable_detail'
 			| 'image_too_large'

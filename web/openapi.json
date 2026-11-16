@@ -39482,6 +39482,7 @@
           "pdf_encrypted",
           "pdf_unreadable",
           "pdf_unreadable_detail",
+          "pdf_too_complex",
           "image_unreadable",
           "image_unreadable_detail",
           "image_too_large",
@@ -45233,6 +45234,7 @@
     "pdf_unreadable_detail": {
       "detail": "text"
     },
+    "pdf_too_complex": {},
     "image_unreadable": {},
     "image_unreadable_detail": {
       "detail": "text"

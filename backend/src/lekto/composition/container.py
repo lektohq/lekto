@@ -322,18 +322,31 @@ def ocrmypdf_engine(settings: Settings) -> OcrmypdfEngine:
         vision=vision,
         vision_timeout=settings.vlm_timeout,
         memory=int(settings.child_max_memory),
+        pdf_timeout=settings.pdf_timeout,
     )
 
 
 def layout_parser(settings: Settings) -> LayoutParser:
-    return LayoutParser()
+    return LayoutParser(timeout=settings.pdf_timeout, memory=int(settings.child_max_memory))
+
+
+def page_renderer(settings: Settings) -> PdfiumPageRenderer:
+    return PdfiumPageRenderer(timeout=settings.pdf_timeout, memory=int(settings.child_max_memory))
+
+
+def text_locator(settings: Settings) -> PdfiumTextLocator:
+    return PdfiumTextLocator(timeout=settings.pdf_timeout, memory=int(settings.child_max_memory))
+
+
+def code_reader(settings: Settings) -> ZxingCodeReader:
+    return ZxingCodeReader(timeout=settings.pdf_timeout, memory=int(settings.child_max_memory))
 
 
 OCR_ENGINES: dict[str, Factory[Ocr]] = {"ocrmypdf": ocrmypdf_engine}
 PARSERS: dict[str, Factory[DocumentParser]] = {"layout": layout_parser}
-PAGE_RENDERERS: dict[str, Factory[PageRenderer]] = {"pdfium": lambda _: PdfiumPageRenderer()}
-TEXT_LOCATORS: dict[str, Factory[TextLocator]] = {"pdfium": lambda _: PdfiumTextLocator()}
-CODE_READERS: dict[str, Factory[CodeReader]] = {"zxing": lambda _: ZxingCodeReader()}
+PAGE_RENDERERS: dict[str, Factory[PageRenderer]] = {"pdfium": page_renderer}
+TEXT_LOCATORS: dict[str, Factory[TextLocator]] = {"pdfium": text_locator}
+CODE_READERS: dict[str, Factory[CodeReader]] = {"zxing": code_reader}
 METADATA_READERS: dict[str, Factory[MetadataReader]] = {"pikepdf": lambda _: FileMetadataReader()}
 PAGE_COMPOSERS: dict[str, Factory[PageComposer]] = {"pikepdf": lambda _: PikepdfPageComposer()}
 IMAGE_NORMALISERS: dict[str, Factory[ImageNormaliser]] = {
@@ -606,13 +619,15 @@ of `signal_llm` (#145), each once more after an unfit answer."""
 
 def node_lease(settings: Settings) -> timedelta:
     """How long a worker holds the job of a node: longer than any node may take, except the
-    OCR of a document the vision model reads (`vision_lease`)."""
+    OCR of a document the vision model reads (`vision_lease`). A node may read a PDF with
+    PDFium once besides (`pdf_timeout`): the text layer before the OCR, the page images after
+    setting a mail, the places of the quotes after asking the model."""
     longest = max(
         settings.ocr_timeout,
         settings.mail_render_timeout,
         MODEL_CALLS_PER_NODE * settings.llm_timeout,
     )
-    return longest + WORK_LEASE_MARGIN
+    return longest + settings.pdf_timeout + WORK_LEASE_MARGIN
 
 
 def vision_lease(settings: Settings) -> timedelta | None:

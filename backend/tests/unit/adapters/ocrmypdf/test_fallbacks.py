@@ -19,6 +19,7 @@ from lekto.adapters.outbound.ocrmypdf.engine import (
     pdfa_reasons,
 )
 from lekto.adapters.outbound.ocrmypdf.vision import CONFIG_ENV, VisionSettings, write_error
+from lekto.adapters.outbound.pdfium import TextLayer
 from lekto.adapters.outbound.system import Completed
 from lekto.core.domain import media_types
 from lekto.core.domain.errors import LanguageModelError, UnprocessableDocumentError
@@ -123,8 +124,12 @@ def runs(monkeypatch: pytest.MonkeyPatch) -> Runs:
     runs = Runs()
     monkeypatch.setattr(module, "run_process", runs)
     monkeypatch.setattr(module, "count_pages", lambda path: 1)
-    monkeypatch.setattr(module, "has_hidden_text", lambda path: runs.hidden_text)
-    monkeypatch.setattr(module, "has_unreadable_text", lambda path: runs.unreadable_text)
+
+    async def text_layer(path: Path, **limits: object) -> TextLayer:
+        unreadable = runs.unreadable_text
+        return TextLayer(unreadable=unreadable, hidden=not unreadable and runs.hidden_text)
+
+    monkeypatch.setattr(module, "text_layer", text_layer)
     return runs
 
 

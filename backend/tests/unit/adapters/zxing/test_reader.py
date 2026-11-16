@@ -8,6 +8,7 @@ import pytest
 
 from lekto.adapters.outbound.pdfium.library import LOCK
 from lekto.adapters.outbound.zxing import ZxingCodeReader
+from lekto.adapters.outbound.zxing.reader import read_codes
 from tests.builders import SAMPLES
 from tests.contracts.processing import CodeReaderContract
 
@@ -56,7 +57,7 @@ async def test_a_long_document_is_read_as_far_as_the_limit(tmp_path: Path) -> No
     assert sorted({code.page for code in every.codes}) == [1, 2, 3]
 
 
-async def test_the_copy_of_a_page_does_not_hold_the_pdfium_lock(
+def test_the_copy_of_a_page_does_not_hold_the_pdfium_lock(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The pixels of a rendered page lie in a buffer of our own; copying them into an image is
@@ -69,6 +70,6 @@ async def test_the_copy_of_a_page_does_not_hold_the_pdfium_lock(
         return to_pil(self)
 
     monkeypatch.setattr(pypdfium2.PdfBitmap, "to_pil", observed)
-    reading = await ZxingCodeReader().read_codes(SAMPLES / "codes.pdf")
+    reading = read_codes(SAMPLES / "codes.pdf", max_pages=None)  # what the child does
     assert reading.pages == 1
     assert held == [False]

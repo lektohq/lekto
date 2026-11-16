@@ -1,10 +1,11 @@
-"""Page images with PDFium (PDFs) and Pillow (images). Rendering a page takes milliseconds to
-a fraction of a second, so it runs in a thread, under the process-wide PDFium lock."""
+"""Page images with PDFium (PDFs) and Pillow (images). The pages of a PDF are rendered in a
+child (`child`), those of an image in a thread."""
 
 import asyncio
 import shutil
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from datetime import timedelta
 from pathlib import Path
 
 import PIL
@@ -12,9 +13,11 @@ import pypdfium2
 from PIL import ExifTags, Image, ImageSequence
 
 from lekto.adapters.outbound.imaging import check_pixels, flatten_on_white
-from lekto.adapters.outbound.pdfium.library import LOCK
+from lekto.adapters.outbound.pdfium.child import DEFAULT_TIMEOUT, run_child
+from lekto.adapters.outbound.pdfium.library import LOCK, MODULE
 from lekto.core.domain import media_types
 from lekto.core.domain.errors import UnprocessableDocumentError
+from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.pages import PREVIEW_FILE, RenderedPages
 
@@ -29,43 +32,84 @@ full width, and a page of any size a PDF may give (14 400 points a side) renders
 50 MB. Rendered at a fixed scale, such a page of a file of 553 bytes asked for 3.3 GB."""
 
 
+_SCRATCH = ".rendering"
+"""Everything goes to this directory in `target` first, so `target` stays empty on an error."""
+
+
 class PdfiumPageRenderer:
     """Pages `width` pixels wide (an image narrower than that keeps its size), the preview
-    `preview_width` wide."""
+    `preview_width` wide. A PDF is rendered in a child with `timeout` and `memory`
+    (`child.run_child`)."""
 
     def __init__(
-        self, *, width: int = DEFAULT_WIDTH, preview_width: int = DEFAULT_PREVIEW_WIDTH
+        self,
+        *,
+        width: int = DEFAULT_WIDTH,
+        preview_width: int = DEFAULT_PREVIEW_WIDTH,
+        timeout: timedelta = DEFAULT_TIMEOUT,
+        memory: int | None = None,
     ) -> None:
         self._width = width
         self._preview_width = preview_width
+        self._timeout = timeout
+        self._memory = memory
 
     async def render_pages(self, source: Path, *, media_type: str, target: Path) -> RenderedPages:
-        return await asyncio.to_thread(self._render, source, media_type, target)
-
-    def _render(self, source: Path, media_type: str, target: Path) -> RenderedPages:
-        # Everything goes to a scratch directory first, so `target` stays empty on an error.
-        scratch = target / ".rendering"
-        scratch.mkdir()
+        if media_type != media_types.PDF:
+            return await asyncio.to_thread(
+                render, source, media_type, target, self._width, self._preview_width
+            )
+        args = [str(source), str(target), str(self._width), str(self._preview_width)]
         try:
-            if media_type == media_types.PDF:
-                pages = _pdf_pages(source, self._width)
-                renderer = f"pdfium {pypdfium2.PDFIUM_INFO.build}"
-            else:
-                pages = _image_pages(source, self._width)
-                renderer = f"pillow {PIL.__version__}"
-            count = 0
-            with pages as images:
-                for count, image in enumerate(images, start=1):
-                    if count == 1:
-                        _save(_fit(image, self._preview_width), scratch / PREVIEW_FILE)
-                    _save(_fit(image, self._width), scratch / f"{count}.webp")
-            if count == 0:
-                raise UnprocessableDocumentError(because(ReasonCode.DOCUMENT_NO_PAGES))
-            for file in scratch.iterdir():
-                file.replace(target / file.name)
-        finally:
-            shutil.rmtree(scratch, ignore_errors=True)
-        return RenderedPages(pages=count, renderer=renderer)
+            answer = await run_child(
+                MODULE, "pages", args, timeout=self._timeout, memory=self._memory
+            )
+        except BaseException:
+            # A child ended by its limits leaves what it rendered so far.
+            await asyncio.to_thread(shutil.rmtree, target / _SCRATCH, ignore_errors=True)
+            raise
+        if not (
+            isinstance(answer, dict)
+            and isinstance(pages := answer.get("pages"), int)
+            and isinstance(renderer := answer.get("renderer"), str)
+        ):
+            raise RuntimeError("pages gave no usable answer")
+        return RenderedPages(pages=pages, renderer=renderer)
+
+
+def render_task(args: Sequence[str], _: JsonValue) -> JsonValue:
+    """The child's task `pages SOURCE TARGET WIDTH PREVIEW_WIDTH` for a PDF."""
+    source, target, width, preview_width = args
+    rendered = render(Path(source), media_types.PDF, Path(target), int(width), int(preview_width))
+    return {"pages": rendered.pages, "renderer": rendered.renderer}
+
+
+def render(
+    source: Path, media_type: str, target: Path, width: int, preview_width: int
+) -> RenderedPages:
+    """Render the pages of `source` into `target`, in this process (blocking)."""
+    scratch = target / _SCRATCH
+    scratch.mkdir()
+    try:
+        if media_type == media_types.PDF:
+            pages = _pdf_pages(source, width)
+            renderer = f"pdfium {pypdfium2.PDFIUM_INFO.build}"
+        else:
+            pages = _image_pages(source, width)
+            renderer = f"pillow {PIL.__version__}"
+        count = 0
+        with pages as images:
+            for count, image in enumerate(images, start=1):
+                if count == 1:
+                    _save(_fit(image, preview_width), scratch / PREVIEW_FILE)
+                _save(_fit(image, width), scratch / f"{count}.webp")
+        if count == 0:
+            raise UnprocessableDocumentError(because(ReasonCode.DOCUMENT_NO_PAGES))
+        for file in scratch.iterdir():
+            file.replace(target / file.name)
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+    return RenderedPages(pages=count, renderer=renderer)
 
 
 def page_scale(width: float, height: float, target: int) -> float:
@@ -90,14 +134,19 @@ def _pdf_pages(source: Path, width: int) -> Iterator[Iterator[Image.Image]]:
 
     def pages() -> Iterator[Image.Image]:
         for index in range(count):
-            with LOCK:
-                page = document[index]
-                try:
-                    across, high = page.get_size()
-                    bitmap = page.render(scale=page_scale(across, high, width))
-                    image: Image.Image = bitmap.to_pil().convert("RGB")
-                finally:
-                    page.close()
+            try:
+                with LOCK:
+                    page = document[index]
+                    try:
+                        across, high = page.get_size()
+                        bitmap = page.render(scale=page_scale(across, high, width))
+                        image: Image.Image = bitmap.to_pil().convert("RGB")
+                    finally:
+                        page.close()
+            except pypdfium2.PdfiumError as error:
+                raise UnprocessableDocumentError(
+                    because(ReasonCode.PDF_UNREADABLE_DETAIL, detail=f"page {index + 1}: {error}")
+                ) from None
             yield image
 
     try:

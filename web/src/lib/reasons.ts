@@ -167,6 +167,7 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	pdf_encrypted: entry(m.reason_pdf_encrypted),
 	pdf_unreadable: entry(m.reason_pdf_unreadable),
 	pdf_unreadable_detail: entry(m.reason_pdf_unreadable_detail),
+	pdf_too_complex: entry(m.reason_pdf_too_complex),
 	image_unreadable: entry(m.reason_image_unreadable),
 	image_unreadable_detail: entry(m.reason_image_unreadable_detail),
 	image_too_large: entry(m.reason_image_too_large, { pixels: 'number', max: 'number' }),

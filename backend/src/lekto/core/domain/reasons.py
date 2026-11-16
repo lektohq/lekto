@@ -144,6 +144,7 @@ class ReasonCode(StrEnum):
     PDF_ENCRYPTED = "pdf_encrypted"
     PDF_UNREADABLE = "pdf_unreadable"
     PDF_UNREADABLE_DETAIL = "pdf_unreadable_detail"
+    PDF_TOO_COMPLEX = "pdf_too_complex"
     IMAGE_UNREADABLE = "image_unreadable"
     IMAGE_UNREADABLE_DETAIL = "image_unreadable_detail"
     IMAGE_TOO_LARGE = "image_too_large"
@@ -610,6 +611,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.PDF_ENCRYPTED: "the PDF is encrypted",
     ReasonCode.PDF_UNREADABLE: "the PDF cannot be read",
     ReasonCode.PDF_UNREADABLE_DETAIL: "the PDF cannot be read: {detail}",
+    ReasonCode.PDF_TOO_COMPLEX: "the PDF needs more memory or time than Lekto gives it",
     ReasonCode.IMAGE_UNREADABLE: "the image cannot be read",
     ReasonCode.IMAGE_UNREADABLE_DETAIL: "the image cannot be read: {detail}",
     ReasonCode.IMAGE_TOO_LARGE: (

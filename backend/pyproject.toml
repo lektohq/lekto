@@ -117,7 +117,7 @@ modules = [
 name = "Outbound adapters are independent of each other"
 type = "independence"
 # Shared infrastructure, not adapters: `http_client`, `imaging`, `languages` and `system`. OCRmyPDF checks
-# the PDFs it makes with PDFium, and ZXing renders pages under PDFium's lock.
+# the PDFs it makes with PDFium, and ZXing renders pages with PDFium, under its lock and in its child.
 modules = [
     "lekto.adapters.outbound.crypto",
     "lekto.adapters.outbound.filesystem",
@@ -144,6 +144,8 @@ modules = [
 ignore_imports = [
     "lekto.adapters.outbound.ocrmypdf.engine -> lekto.adapters.outbound.pdfium",
     "lekto.adapters.outbound.zxing.reader -> lekto.adapters.outbound.pdfium.library",
+    "lekto.adapters.outbound.zxing.reader -> lekto.adapters.outbound.pdfium.child",
+    "lekto.adapters.outbound.zxing.__main__ -> lekto.adapters.outbound.pdfium.child",
 ]
 
 [[tool.importlinter.contracts]]

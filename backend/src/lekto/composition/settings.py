@@ -214,6 +214,10 @@ class Settings(BaseSettings):
     # the archive's text layer as it is set (PDFium), which needs no settings.
     ocr_languages: Annotated[str, Field(pattern=r"^[a-z_]+(\+[a-z_]+)*$")] = "deu+eng"
     ocr_timeout: Seconds = timedelta(minutes=10)
+    # PDFium reads the pages of a PDF (codes, the text layer before OCR, page images, the text
+    # as it is set, the places of quotes) in a child process with a time limit: 0.1 to 0.2 s a
+    # page, a PDF of 1000 pages two minutes on a fast machine.
+    pdf_timeout: Seconds = timedelta(minutes=10)
     # Separator sheets: a page with a code whose whole text is one of these (comma-separated,
     # any case) splits a stack that comes in there; empty: stacks are never split.
     separator_codes: Annotated[str, Field(max_length=1000)] = "PATCHT"
@@ -221,9 +225,10 @@ class Settings(BaseSettings):
     # from anyone, and WeasyPrint has no limit of its own.
     mail_render_timeout: Seconds = timedelta(minutes=2)
     # The address space each program Lekto starts may take (OCRmyPDF with Ghostscript, Tesseract
-    # and its other tools; the mail renderer): a document built to make them allocate without
-    # end fails its step instead of the worker. Documents need less than 1 GiB (measured with 8
-    # OCR jobs); a page of 14 400 points a side took 6.9 GB in OCRmyPDF without it.
+    # and its other tools; the mail renderer; PDFium): a document built to make them allocate
+    # without end fails its step instead of the worker. Documents need less than 1 GiB
+    # (measured with 8 OCR jobs); a page of 14 400 points a side took 6.9 GB in OCRmyPDF without
+    # it, a PDF of 62 KB 3.4 GB in PDFium.
     child_max_memory: Annotated[ByteSize, Field(gt=0)] = ByteSize(2 * 1024**3)
     # Fetching mail (IMAP): connecting to the server, and each of its answers.
     mail_timeout: Seconds = timedelta(seconds=30)

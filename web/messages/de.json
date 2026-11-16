@@ -2699,6 +2699,7 @@
 	"reason_pdf_encrypted": "das PDF ist verschlüsselt",
 	"reason_pdf_unreadable": "das PDF lässt sich nicht lesen",
 	"reason_pdf_unreadable_detail": "das PDF lässt sich nicht lesen: {detail}",
+	"reason_pdf_too_complex": "das PDF braucht mehr Speicher oder Zeit, als Lekto ihm gibt",
 	"reason_image_unreadable": "das Bild lässt sich nicht lesen",
 	"reason_image_unreadable_detail": "das Bild lässt sich nicht lesen: {detail}",
 	"reason_image_too_large": "das Bild hat {pixels} Megapixel; Lekto liest Bilder bis {max} Megapixel",

@@ -46,14 +46,16 @@ async def run_process(
     env: Mapping[str, str] | None = None,
     tail: int = TAIL,
     memory: int | None = None,
+    input: bytes | None = None,
 ) -> Completed:
     """Run `args` and wait for it. TimeoutError after `timeout`; the process group is killed
     then, and also when the caller is cancelled. `env` adds to the child's environment (see the
     module); `tail` is how much of the end of its error output is kept; `memory` the bytes of
-    address space the child and what it starts may take each (see the module)."""
+    address space the child and what it starts may take each (see the module); `input` what it
+    reads from its standard input (else nothing)."""
     process = await asyncio.create_subprocess_exec(
         *args,
-        stdin=asyncio.subprocess.DEVNULL,
+        stdin=asyncio.subprocess.DEVNULL if input is None else asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         start_new_session=True,
@@ -64,7 +66,7 @@ async def run_process(
             resource.prlimit(process.pid, resource.RLIMIT_AS, (memory, memory))
     try:
         stdout, stderr = await asyncio.wait_for(
-            process.communicate(), timeout=timeout.total_seconds()
+            process.communicate(input), timeout=timeout.total_seconds()
         )
     except TimeoutError:
         await _kill(process)

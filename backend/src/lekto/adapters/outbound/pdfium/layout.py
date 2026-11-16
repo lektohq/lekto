@@ -27,6 +27,7 @@ import json
 import statistics
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -40,9 +41,11 @@ from lekto.adapters.outbound.pdfium.chars import (
     page_fractions,
     reading_turn,
 )
+from lekto.adapters.outbound.pdfium.child import DEFAULT_TIMEOUT, run_child
 from lekto.adapters.outbound.pdfium.fixed_pitch import FixedPitchBlock, blocks_of, page_lines
-from lekto.adapters.outbound.pdfium.library import LOCK
+from lekto.adapters.outbound.pdfium.library import LOCK, MODULE
 from lekto.core.domain.errors import UnprocessableDocumentError
+from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.parser import ParseResult
 
@@ -68,37 +71,66 @@ class Page:
 
 
 class LayoutParser:
-    """The text as it is set; fast enough to run in a thread of the worker."""
+    """The text as it is set, read in a child with `timeout` and `memory` (`child.run_child`)."""
+
+    def __init__(self, *, timeout: timedelta = DEFAULT_TIMEOUT, memory: int | None = None) -> None:
+        self._timeout = timeout
+        self._memory = memory
 
     async def parse(self, source: Path, *, text: Path, structure: Path) -> ParseResult:
-        pages = await asyncio.to_thread(read_pages, source)
-        content = PAGE_BREAK.join(page.text for page in pages)
-        data = {
-            "parser": "layout",
-            "version": VERSION,
-            "pages": [
-                {"number": page.number, "width": page.width, "height": page.height}
-                | {"lines": page.lines}
-                for page in pages
-            ],
-        }
         try:
-            await asyncio.to_thread(text.write_text, content, encoding="utf-8")
-            await asyncio.to_thread(
-                lambda: structure.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            answer = await run_child(
+                MODULE,
+                "parse",
+                [str(source), str(text), str(structure)],
+                timeout=self._timeout,
+                memory=self._memory,
             )
         except BaseException:
             for path in (text, structure):
                 await asyncio.to_thread(path.unlink, missing_ok=True)
             raise
-        return ParseResult(
-            pages=len(pages),
-            parser=f"layout {VERSION}, pypdfium2 {importlib.metadata.version('pypdfium2')}",
-        )
+        if not (
+            isinstance(answer, dict)
+            and isinstance(pages := answer.get("pages"), int)
+            and isinstance(parser := answer.get("parser"), str)
+        ):
+            raise RuntimeError("parse gave no usable answer")
+        return ParseResult(pages=pages, parser=parser)
+
+
+def parse_task(args: Sequence[str], _: JsonValue) -> JsonValue:
+    """The child's task `parse SOURCE TEXT STRUCTURE`."""
+    source, text, structure = args
+    result = parse(Path(source), text=Path(text), structure=Path(structure))
+    return {"pages": result.pages, "parser": result.parser}
+
+
+def parse(source: Path, *, text: Path, structure: Path) -> ParseResult:
+    """Write the text of `source` to `text` and its structure to `structure`, in this process
+    (blocking)."""
+    pages = read_pages(source)
+    content = PAGE_BREAK.join(page.text for page in pages)
+    data = {
+        "parser": "layout",
+        "version": VERSION,
+        "pages": [
+            {"number": page.number, "width": page.width, "height": page.height}
+            | {"lines": page.lines}
+            for page in pages
+        ],
+    }
+    text.write_text(content, encoding="utf-8")
+    structure.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    return ParseResult(
+        pages=len(pages),
+        parser=f"layout {VERSION}, pypdfium2 {importlib.metadata.version('pypdfium2')}",
+    )
 
 
 def read_pages(path: Path) -> list[Page]:
-    """Every page's text and lines (blocking; run it in a thread)."""
+    """Every page's text and lines (blocking). UnprocessableDocumentError if the PDF, or a page
+    of it, cannot be read."""
     with LOCK:
         try:
             document = pypdfium2.PdfDocument(path)
@@ -109,17 +141,22 @@ def read_pages(path: Path) -> list[Page]:
         try:
             pages = []
             for number in range(1, len(document) + 1):
-                page = document[number - 1]
                 try:
-                    geometry = Geometry.of(page)
-                    textpage = page.get_textpage()
+                    page = document[number - 1]
                     try:
-                        geometry = geometry.turned(reading_turn(textpage, geometry))
-                        upright, angled = page_chars(textpage, geometry)
+                        geometry = Geometry.of(page)
+                        textpage = page.get_textpage()
+                        try:
+                            geometry = geometry.turned(reading_turn(textpage, geometry))
+                            upright, angled = page_chars(textpage, geometry)
+                        finally:
+                            textpage.close()
                     finally:
-                        textpage.close()
-                finally:
-                    page.close()
+                        page.close()
+                except pypdfium2.PdfiumError as error:
+                    raise UnprocessableDocumentError(
+                        because(ReasonCode.PDF_UNREADABLE_DETAIL, detail=f"page {number}: {error}")
+                    ) from None
                 width, height = geometry.size
                 text, lines = _page(upright, angled, width, height)
                 pages.append(Page(number, round(width, 2), round(height, 2), text, lines))

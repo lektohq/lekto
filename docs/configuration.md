@@ -195,7 +195,8 @@ Background jobs, the delivery of events and the cleanup.
 | `LEKTO_OCR_TIMEOUT` | Worker | `600` | duration | Time per document for OCR (OCRmyPDF) |
 | `LEKTO_SEPARATOR_CODES` | Worker | `PATCHT` | text | Codes of separator sheets, comma-separated: a page with a bar or QR code whose whole text is one of them (in any case) splits a stack that comes in there, and is left out; empty: stacks are never split. Not for the migration, new versions or reprocessing |
 | `LEKTO_MAIL_RENDER_TIMEOUT` | Worker | `120` | duration | Time per mail for setting it as a PDF (WeasyPrint, in a child process) |
-| `LEKTO_CHILD_MAX_MEMORY` | Worker | `2GiB` | size | Address space each program Lekto starts may take: OCRmyPDF with Ghostscript and Tesseract, the mail renderer. A document that needs more fails its step instead of the worker; documents need less than 1 GiB |
+| `LEKTO_PDF_TIMEOUT` | Worker | `600` | duration | Time for each step that reads the pages of a PDF with PDFium, in a child process: codes, the text layer before OCR, page images, the text as it is set, the places of quotes. About 0.1 to 0.2 s a page; a PDF that needs longer fails its step |
+| `LEKTO_CHILD_MAX_MEMORY` | Worker | `2GiB` | size | Address space each program Lekto starts may take: OCRmyPDF with Ghostscript and Tesseract, the mail renderer, PDFium. A document that needs more fails its step instead of the worker; documents need less than 1 GiB |
 | `LEKTO_MAIL_TIMEOUT` | both | `30` | duration | Time for connecting to a mail server (IMAP) and for each of its answers; the API tests connections, the worker fetches |
 
 ## Search
