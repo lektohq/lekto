@@ -295,8 +295,9 @@ class Settings(BaseSettings):
     vlm_api_key: SecretStr | None = None
     vlm_timeout: Seconds = timedelta(minutes=30)
 
-    # Classification: a field is accepted (ok) from this confidence on; an existing contact is
-    # suggested from the second.
+    # Classification: how well a name must match (`Thresholds.accept`): the model's sender names
+    # an existing contact, a recipient's name a user, from this similarity on (also the lowest
+    # confidence shown for a value taken); an existing contact is suggested from the second.
     confidence_threshold: Annotated[float, Field(gt=0, le=1)] = 0.9
     contact_suggest_threshold: Annotated[float, Field(gt=0, le=1)] = 0.75
     # Share of unsure content words (noise left out, `domain.reading.is_noise`) from which a

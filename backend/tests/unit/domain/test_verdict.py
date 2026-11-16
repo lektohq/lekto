@@ -269,6 +269,21 @@ def test_a_contradiction_is_never_green(signals: Signals, reason: str) -> None:
     assert check.reason == reason
 
 
+def test_an_uncertain_value_shows_a_confidence_below_the_threshold() -> None:
+    """`LEKTO_CONFIDENCE_THRESHOLD` set lower: an uncertain contact stays below it all the
+    same (the classifier is surer, yet another contact's identifier stands in the text)."""
+    signals = Signals(
+        model=model(sender="Stadtwerke Musterstadt"),
+        classifier=classifier(UTILITY.id),
+        facts=FactsView(named=frozenset({UTILITY.id}), identifiers={BANK.id: ("iban",)}),
+    )
+    for accept in (0.9, 0.8):
+        thresholds = replace(builders.THRESHOLDS, accept=accept, suggest=min(0.75, accept))
+        check = verdict.judge_contact(signals, CONTACTS, thresholds)
+        assert check.outcome is Outcome.UNCERTAIN
+        assert check.confidence == pytest.approx(accept - 0.01)
+
+
 def test_similar_documents_cover_only_what_confirmed_documents_carry() -> None:
     """Similar documents were found, but none carries a type or tag: they could not have named
     the model's, which stand on its word as before the signals. An older entry without what

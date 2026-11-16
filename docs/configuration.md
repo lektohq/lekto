@@ -271,7 +271,7 @@ together or neither; off without them.
 
 | Variable | Role | Default | Values | Meaning |
 | --- | --- | --- | --- | --- |
-| `LEKTO_CONFIDENCE_THRESHOLD` | Worker | `0.9` | more than 0, at most 1 | A value passes (green) from this confidence on |
+| `LEKTO_CONFIDENCE_THRESHOLD` | Worker | `0.9` | more than 0, at most 1 | How well a name must match: the sender the model reads names an existing contact (a recipient's name a user) from this similarity on. A lower value matches names more loosely, not more values green. Also the lowest confidence shown for a value taken |
 | `LEKTO_CONTACT_SUGGEST_THRESHOLD` | Worker | `0.75` | more than 0, at most 1 | An existing contact is suggested from this similarity on; not above `LEKTO_CONFIDENCE_THRESHOLD` |
 | `LEKTO_POOR_READING_THRESHOLD` | Worker | `0.08` | more than 0, at most 1 | Share of unsure words around a value from which its place counts as poorly read, and the value is only suggested. The default lies between good scans (up to 7 %) and broken ones (from 9 %) |
 | `LEKTO_DEFAULT_CURRENCY` | both | `EUR` | text | ISO 4217 code: the currency of an amount in a document that shows none, and of the `currency` filter in templates |

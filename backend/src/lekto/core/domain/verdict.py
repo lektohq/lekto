@@ -89,7 +89,7 @@ LLM = Node.SIGNAL_LLM.value
 CLASSIFIER = Node.SIGNAL_CLASSIFIER.value
 NEIGHBOURS = Node.SIGNAL_NEIGHBOURS.value
 FACTS = Node.SIGNAL_FACTS.value
-_UNSURE = 0.89  # the confidence of an uncertain field stays below acceptance
+_BELOW = 0.01  # how far the confidence of an uncertain field stays below `Thresholds.accept`
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -101,6 +101,11 @@ class Thresholds:
     suggest: float  # this well: a weak match, a suggestion
     classifier: float  # the classifier this sure: it names the class
     ambiguity: float = 0.05  # two contacts this close: the model names neither
+
+    @property
+    def unsure(self) -> float:
+        """The highest confidence an uncertain value shows: just below `accept`."""
+        return max(0.0, self.accept - _BELOW)
 
 
 @dataclass(frozen=True)
@@ -411,7 +416,7 @@ def judge_contact(
     return FieldCheck(
         field=CONTACT,
         outcome=Outcome.UNCERTAIN,
-        confidence=min(score, _UNSURE),
+        confidence=min(score, view.thresholds.unsure),
         reasons=(_contact_reason(view, top, signals.model is None),),
         proposed=view.sender,
         evidence=view.quote,
@@ -589,7 +594,7 @@ def judge_type(
     return FieldCheck(
         field=DOCUMENT_TYPE,
         outcome=Outcome.UNCERTAIN,
-        confidence=min(probabilities.get(top, 0.0) if top else 0.0, _UNSURE),
+        confidence=min(probabilities.get(top, 0.0) if top else 0.0, thresholds.unsure),
         reasons=(_type_reason(names, namers, top, new),),
         proposed=proposed,
         suggestion=None if top is None else str(top),
@@ -944,7 +949,7 @@ def judge_space(
             FieldCheck(
                 field=SPACE,
                 outcome=Outcome.UNCERTAIN,
-                confidence=min(confidence, _UNSURE),
+                confidence=min(confidence, thresholds.unsure),
                 reasons=why,
                 suggestion=str(target) if target != current else None,
                 candidates=listed,
