@@ -101,3 +101,21 @@ async def test_without_a_trash_folder_the_mail_is_deleted_alone(
     await _session(imap).trash("INBOX", 7)
     assert _commands(imap) == expected
     assert ("EXPUNGE",) not in imap.sent
+
+
+async def test_a_folder_is_addressed_as_the_server_lists_it() -> None:
+    """A server that sends a name in UTF-8, or with a bare `&`, against the standard: Lekto
+    sends it back as the server spelt it, not in its own modified UTF-7."""
+    imap = FakeImap(
+        folders=[("INBOX", ()), ("Entwürfe", ("\\Trash",)), ("R&D", ()), ("Archiv", ())]
+    )
+    session = _session(imap)
+    await session.trash("INBOX", 7)
+    await session.move("INBOX", 8, "R&D")
+    await session.head("R&D", 9)
+    assert _commands(imap) == [
+        ("UID", "MOVE", "7", '"Entwürfe"'.encode()),
+        ("UID", "MOVE", "8", '"R&D"'),
+        ("UID", "FETCH", "9", "(BODY.PEEK[HEADER])"),
+    ]
+    assert ("SELECT", '"R&D"') in imap.sent

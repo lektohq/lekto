@@ -2,7 +2,7 @@
 
 import pytest
 
-from lekto.adapters.outbound.imap.names import decode, encode, listed, quoted
+from lekto.adapters.outbound.imap.names import decode, encode, listed, quoted, shown
 
 
 @pytest.mark.parametrize(
@@ -33,10 +33,31 @@ def test_listed_reads_names_flags_and_literals() -> None:
         b'(\\HasNoChildren) NIL "Say \\"hi\\""',
         None,
     ]
-    assert listed(entries) == [
+    assert [(item.name, item.flags) for item in listed(entries)] == [
         ("INBOX", frozenset({"\\hasnochildren"})),
         ("[Gmail]", frozenset({"\\haschildren", "\\noselect"})),
         ("Archiv", frozenset({"\\hasnochildren"})),
         ("Bestätigungen", frozenset({"\\hasnochildren"})),
         ('Say "hi"', frozenset({"\\hasnochildren"})),
     ]
+
+
+def test_a_name_sent_against_the_standard_is_shown_and_kept_as_sent() -> None:
+    """A server sends UTF-8, or a bare `&`: the name is shown as UTF-8, the list stays whole,
+    and the bytes as sent address the folder."""
+    raw = "Entwürfe".encode()
+    entries: list[bytes | tuple[bytes, bytes] | None] = [
+        b'(\\HasNoChildren) "/" "INBOX"',
+        b'(\\HasNoChildren) "/" "R&D"',
+        b'(\\HasNoChildren) "/" "' + raw + b'"',
+        b'(\\HasNoChildren) "/" "Best&AOQ-tigungen"',
+        b'(\\HasNoChildren) "/" "\xff&"',
+    ]
+    assert [(item.name, item.raw) for item in listed(entries)] == [
+        ("INBOX", b"INBOX"),
+        ("R&D", b"R&D"),
+        ("Entwürfe", raw),
+        ("Bestätigungen", b"Best&AOQ-tigungen"),
+        ("\ufffd&", b"\xff&"),
+    ]
+    assert shown(b"Gr&APwA3w-e") == "Grüße"

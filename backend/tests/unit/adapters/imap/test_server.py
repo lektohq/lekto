@@ -5,7 +5,7 @@ from collections.abc import Sequence
 
 import pytest
 
-from lekto.adapters.outbound.imap.server import ImapMailServer
+from lekto.adapters.outbound.imap.server import ImapMailServer, _folders
 from lekto.core.domain.mail import MailLogin, MailSecurity
 
 
@@ -53,3 +53,17 @@ def test_without_an_answer_the_greetings_capabilities_stay(
     imap = SigningIn(answer)
     _sign_in(imap)
     assert imap.capabilities == ("IMAP4REV1", "AUTH=PLAIN")
+
+
+class Listing:
+    def __init__(self, *names: bytes) -> None:
+        self._names = names
+
+    def list(self) -> tuple[str, list[bytes]]:
+        return "OK", [b'(\\HasNoChildren) "/" "' + name + b'"' for name in self._names]
+
+
+def test_the_folders_of_an_account_keep_names_sent_against_the_standard() -> None:
+    """One name the server sends in UTF-8 or with a bare `&` broke the whole list."""
+    listing = Listing(b"INBOX", b"R&D", "Entwürfe".encode(), b"Best&AOQ-tigungen")
+    assert _folders(listing) == ("INBOX", "Bestätigungen", "Entwürfe", "R&D")  # type: ignore[arg-type]

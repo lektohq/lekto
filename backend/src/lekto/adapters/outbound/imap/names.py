@@ -1,7 +1,13 @@
-"""Folder names in IMAP's modified UTF-7 (RFC 3501, 5.1.3) and the lines of a LIST answer."""
+"""Folder names in IMAP's modified UTF-7 (RFC 3501, 5.1.3) and the lines of a LIST answer.
+
+Some servers send a name otherwise: in UTF-8 (`Entwürfe`), or with a bare `&` (`R&D`). Such a
+name is shown as UTF-8 (`shown`), and the folder is addressed by the bytes the server listed it
+with (`Listed.raw`, `quoted_raw`): the server knows its own spelling, whatever it is.
+"""
 
 import base64
 import re
+from typing import NamedTuple
 
 _LIST = re.compile(rb'\((?P<flags>[^)]*)\) (?P<delimiter>NIL|"(?:[^"\\]|\\.)*") (?P<name>.*)')
 
@@ -55,13 +61,35 @@ def encode(name: str) -> bytes:
 
 def quoted(name: str) -> bytes:
     """`encode(name)` as an IMAP quoted string."""
-    return b'"' + encode(name).replace(b"\\", b"\\\\").replace(b'"', b'\\"') + b'"'
+    return quoted_raw(encode(name))
 
 
-def listed(entries: list[bytes | tuple[bytes, bytes] | None]) -> list[tuple[str, frozenset[str]]]:
+def quoted_raw(raw: bytes) -> bytes:
+    """A name as the server sent it, as an IMAP quoted string."""
+    return b'"' + raw.replace(b"\\", b"\\\\").replace(b'"', b'\\"') + b'"'
+
+
+def shown(raw: bytes) -> str:
+    """The name to show: modified UTF-7 as the standard has it; one a server sends otherwise
+    is read as UTF-8 (a character it cannot be becomes a replacement character)."""
+    try:
+        return decode(raw)
+    except ValueError:  # UnicodeDecodeError too
+        return raw.decode("utf-8", "replace")
+
+
+class Listed(NamedTuple):
+    """A folder of a LIST answer: its name as shown, its flags, the name as the server sent it."""
+
+    name: str
+    flags: frozenset[str]
+    raw: bytes
+
+
+def listed(entries: list[bytes | tuple[bytes, bytes] | None]) -> list[Listed]:
     """The folders of a LIST answer (as `imaplib` gives it: a line, or a line and a literal for
     a name the server sends as one) with their flags, lower case (`\\noselect`, ...)."""
-    found: list[tuple[str, frozenset[str]]] = []
+    found: list[Listed] = []
     for entry in entries:
         if entry is None:
             continue
@@ -76,5 +104,5 @@ def listed(entries: list[bytes | tuple[bytes, bytes] | None]) -> list[tuple[str,
             raw = match["name"].strip()
             if raw.startswith(b'"') and raw.endswith(b'"'):
                 raw = re.sub(rb"\\(.)", rb"\1", raw[1:-1])
-        found.append((decode(raw), flags))
+        found.append(Listed(shown(raw), flags, raw))
     return found

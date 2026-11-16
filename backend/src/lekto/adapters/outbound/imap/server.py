@@ -160,7 +160,7 @@ def _folders(imap: imaplib.IMAP4) -> tuple[str, ...]:
     if status != "OK":
         raise imaplib.IMAP4.error(_text(entries))
     answer: list[bytes | tuple[bytes, bytes] | None] = list(entries)
-    names = {name for name, flags in listed(answer) if "\\noselect" not in flags}
+    names = {item.name for item in listed(answer) if "\\noselect" not in item.flags}
     names = {INBOX if name.upper() == INBOX else name for name in names}
     return tuple(sorted(names, key=lambda name: (name != INBOX, name.casefold())))
 
