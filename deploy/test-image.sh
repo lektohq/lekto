@@ -241,12 +241,17 @@ wait_for 180 "healthy" healthy api || logs api
 check "the API runs" test "$(count api 'bin/lekto api')" -eq 1
 check "no worker process" test "$(count api 'bin/lekto worker')" -eq 0
 check "svc-worker stays down" bash -c "docker exec $prefix-api s6-svstat /run/service/svc-worker | grep -q '^down'"
+check "svc-worker is left out of the bundle, never started" \
+  bash -c "docker logs $prefix-api 2>&1 | grep -q 'svc-worker is not started with LEKTO_ROLE=api' && ! docker logs $prefix-api 2>&1 | grep -q 'svc-worker: not started'"
+check "no s6-ftrigrd error in the log" bash -c "! docker logs $prefix-api 2>&1 | grep -q 's6-ftrigrd'"
 
 step "role worker: the API container has migrated, the worker starts"
 wait_for 180 "the worker container becomes healthy" healthy worker || logs worker
 check "the worker runs" test "$(count worker 'bin/lekto worker')" -eq 1
 check "the worker is ready for the healthcheck" docker exec "$prefix-worker" test -e /run/lekto-worker-ready
 check "no API process in the worker container" test "$(count worker 'bin/lekto api')" -eq 0
+check "svc-api stays down, left out of the bundle" \
+  bash -c "docker exec $prefix-worker s6-svstat /run/service/svc-api | grep -q '^down' && docker logs $prefix-worker 2>&1 | grep -q 'svc-api is not started with LEKTO_ROLE=worker'"
 
 step "invalid configuration stops the container with a reason"
 wait_for 60 "the container stops" exited nokey || true
