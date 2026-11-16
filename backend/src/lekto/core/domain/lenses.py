@@ -35,7 +35,11 @@ MAX_CARD_FIELDS = 3
 MAX_QUERY_LENGTH = 500  # as the search takes it
 MAX_FILTER_FACTS = 5
 """Facts a lens's filter names at most."""
-MAX_FILTER_VALUES = 200  # of each kind
+MAX_FILTER_VALUES = 50
+"""Values of one kind (contacts, types, tags, spaces) a filter names at most: the documents list
+takes them as query parameters (`rest.params`, the MCP tools), and 200 ids would burst the 8 KiB
+nginx allows the request line. A lens holds no more (`Lens.change`); one stored with more before
+is read as it is, to be shortened."""
 
 
 class Grouping(StrEnum):
@@ -122,23 +126,23 @@ class LensFilter:
     relative_period: RelativePeriod | None = None
     facts: tuple[FactCriterion, ...] = ()
 
+    _KINDS = (
+        "contact_ids",
+        "document_type_ids",
+        "contact_group_ids",
+        "document_type_group_ids",
+        "topic_ids",
+        "tag_ids",
+        "space_ids",
+    )
+
     def __post_init__(self) -> None:
         facts = tuple(dict.fromkeys(self.facts))
         if len(facts) > MAX_FILTER_FACTS:
             raise ValidationError(f"facts: at most {MAX_FILTER_FACTS}")
         object.__setattr__(self, "facts", facts)
-        for name in (
-            "contact_ids",
-            "document_type_ids",
-            "contact_group_ids",
-            "document_type_group_ids",
-            "topic_ids",
-            "tag_ids",
-            "space_ids",
-        ):
+        for name in self._KINDS:
             values = tuple(dict.fromkeys(getattr(self, name)))  # once each, in order
-            if len(values) > MAX_FILTER_VALUES:
-                raise ValidationError(f"{name}: at most {MAX_FILTER_VALUES}")
             object.__setattr__(self, name, values)
         if self.relative_period is not None and (
             self.date_from is not None or self.date_to is not None
@@ -150,6 +154,13 @@ class LensFilter:
             and self.date_from > self.date_to
         ):
             raise ValidationError("document_date_from: after document_date_to")
+
+    def check_values(self) -> None:
+        """ValidationError if it names more than `MAX_FILTER_VALUES` of a kind: checked when a
+        lens takes the filter, not when one is read."""
+        for name in self._KINDS:
+            if len(getattr(self, name)) > MAX_FILTER_VALUES:
+                raise ValidationError(f"{name}: at most {MAX_FILTER_VALUES}")
 
 
 @dataclass(kw_only=True)
@@ -208,7 +219,9 @@ class Lens:
 
     def change(self, changes: "LensChanges", *, now: datetime) -> None:
         """Apply what `changes` sets; ValidationError (and nothing changed) if the result does
-        not fit together."""
+        not fit together, or a filter it sets names too many values (`check_values`)."""
+        if not isinstance(changes.filter, _Unset):
+            changes.filter.check_values()
         updated = replace(
             self,
             **{name: value for name, value in vars(changes).items() if value is not UNSET},

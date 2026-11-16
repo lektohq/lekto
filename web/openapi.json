@@ -33995,7 +33995,7 @@
               "format": "uuid"
             },
             "type": "array",
-            "maxItems": 200,
+            "maxItems": 50,
             "title": "Contact Ids"
           },
           "document_type_ids": {
@@ -34004,7 +34004,7 @@
               "format": "uuid"
             },
             "type": "array",
-            "maxItems": 200,
+            "maxItems": 50,
             "title": "Document Type Ids"
           },
           "contact_group_ids": {
@@ -34013,7 +34013,7 @@
               "format": "uuid"
             },
             "type": "array",
-            "maxItems": 200,
+            "maxItems": 50,
             "title": "Contact Group Ids"
           },
           "document_type_group_ids": {
@@ -34022,7 +34022,7 @@
               "format": "uuid"
             },
             "type": "array",
-            "maxItems": 200,
+            "maxItems": 50,
             "title": "Document Type Group Ids"
           },
           "topic_ids": {
@@ -34031,7 +34031,7 @@
               "format": "uuid"
             },
             "type": "array",
-            "maxItems": 200,
+            "maxItems": 50,
             "title": "Topic Ids"
           },
           "tag_ids": {
@@ -34040,7 +34040,7 @@
               "format": "uuid"
             },
             "type": "array",
-            "maxItems": 200,
+            "maxItems": 50,
             "title": "Tag Ids"
           },
           "space_ids": {
@@ -34049,7 +34049,7 @@
               "format": "uuid"
             },
             "type": "array",
-            "maxItems": 200,
+            "maxItems": 50,
             "title": "Space Ids"
           },
           "field_id": {

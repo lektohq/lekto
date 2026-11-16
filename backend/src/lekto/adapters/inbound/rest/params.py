@@ -18,6 +18,7 @@ from lekto.core.domain.document_facts import FactCriterion, FactRole
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, SpaceId, TagId, id_reference
+from lekto.core.domain.lenses import MAX_FILTER_VALUES
 from lekto.core.domain.periods import Period
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.identity import RefCipher
@@ -26,8 +27,8 @@ from lekto.core.ports.repository import DocumentFilter
 ADMINS_ONLY = "Admins only."
 SESSION_ONLY_NOTE = " Needs a session; API tokens are refused (403)."
 
-MAX_IDS = 50
-"""Ids of one kind a filter names at most."""
+MAX_IDS = MAX_FILTER_VALUES
+"""Ids of one kind a filter names at most: as many as a lens holds."""
 MAX_FACTS = 5
 """Facts a filter names at most."""
 

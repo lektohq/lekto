@@ -31,7 +31,7 @@ from lekto.core.domain.documents import (
 from lekto.core.domain.fields import FieldValue, field_from_json, field_to_json
 from lekto.core.domain.ids import DocumentId, FieldId, UserId, short_id
 from lekto.core.domain.json_value import JsonValue
-from lekto.core.domain.lenses import MAX_QUERY_LENGTH
+from lekto.core.domain.lenses import MAX_FILTER_VALUES, MAX_QUERY_LENGTH
 from lekto.core.domain.mail_intake import OriginRole
 from lekto.core.domain.mail_message import address_line
 from lekto.core.domain.pipeline import ACTOR, CONFIRMED_BY, VIA_TOKEN, NodeRun
@@ -225,8 +225,8 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
         offset: Annotated[int, Field(ge=0, le=MAX_HITS)] = 0,
         contact: str | None = None,
         document_type: str | None = None,
-        tags: Annotated[list[str] | None, Field(max_length=50)] = None,
-        topics: Annotated[list[str] | None, Field(max_length=50)] = None,
+        tags: Annotated[list[str] | None, Field(max_length=MAX_FILTER_VALUES)] = None,
+        topics: Annotated[list[str] | None, Field(max_length=MAX_FILTER_VALUES)] = None,
     ) -> str:
         user = principal_of(ctx).id
         searching = context.require_search()

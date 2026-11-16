@@ -5,7 +5,12 @@ from typing import Any
 
 import pytest
 
-from lekto.core.domain.errors import ConcurrencyError, ConflictError, NotFoundError
+from lekto.core.domain.errors import (
+    ConcurrencyError,
+    ConflictError,
+    NotFoundError,
+    ValidationError,
+)
 from lekto.core.domain.ids import (
     ContactId,
     DocumentTypeId,
@@ -15,6 +20,7 @@ from lekto.core.domain.ids import (
     new_id,
 )
 from lekto.core.domain.lenses import (
+    MAX_FILTER_VALUES,
     Grouping,
     Layout,
     Lens,
@@ -79,6 +85,24 @@ class LensRepositoryContract:
         async with uow_factory() as uow:
             assert await uow.lenses.get(lens.id) == lens
             assert await uow.lenses.find(moving.id) == moving
+
+    async def test_a_lens_stored_with_more_values_than_it_takes_now_is_read(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """Lenses held up to 200 values of a kind before; they are read as they are, to be
+        shortened, while a lens takes no more than `MAX_FILTER_VALUES` now."""
+        owner = await a_user(uow_factory)
+        many = tuple(ContactId(new_id()) for _ in range(MAX_FILTER_VALUES + 10))
+        lens = a_lens(owner)
+        lens.filter = LensFilter(contact_ids=many)  # as stored before
+        async with uow_factory() as uow:
+            await uow.lenses.add(lens)
+            await uow.commit()
+        async with uow_factory() as uow:
+            (stored,) = await uow.lenses.list_for_owner(owner.id)
+        assert stored.filter.contact_ids == many
+        with pytest.raises(ValidationError, match="contact_ids: at most 50"):
+            stored.change(LensChanges(filter=LensFilter(contact_ids=many)), now=NOW)
 
     async def test_a_missing_lens_is_not_found(self, uow_factory: UnitOfWorkFactory) -> None:
         missing = a_lens(builders.user())
