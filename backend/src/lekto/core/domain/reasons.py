@@ -219,6 +219,7 @@ class ReasonCode(StrEnum):
     TAG_USED_BY_RULES = "tag_used_by_rules"
     FIELD_USED_BY_PATTERNS = "field_used_by_patterns"
     FIELD_USED_BY_RULES = "field_used_by_rules"
+    FIELD_USED_BY_WEBHOOKS = "field_used_by_webhooks"
     FIELD_KEY_TAKEN = "field_key_taken"
     IDENTIFIER_OF_PERSON = "identifier_of_person"
     IDENTIFIER_OF_CONTACT = "identifier_of_contact"
@@ -711,6 +712,9 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.FIELD_USED_BY_PATTERNS: "field.{key} is used by the title patterns of {types:list}",
     ReasonCode.FIELD_USED_BY_RULES: (
         "field.{key} is used by the templates of the rules {rules:list}"
+    ),
+    ReasonCode.FIELD_USED_BY_WEBHOOKS: (
+        "field.{key} is used by the templates of the webhooks {webhooks:list}"
     ),
     ReasonCode.FIELD_KEY_TAKEN: "'{field}' would be field.{key} in templates, as '{other}' is",
     ReasonCode.IDENTIFIER_OF_PERSON: "'{value}' is an identifier of a person",

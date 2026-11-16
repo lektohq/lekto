@@ -37,6 +37,7 @@ from lekto.core.domain.rules_json import definition_to_json
 from lekto.core.domain.sorting import sort_key
 from lekto.core.domain.templates import rename_field_key, unknown_values
 from lekto.core.domain.templates import uses_field as field_used
+from lekto.core.domain.webhooks import BodyFormat, Webhook
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.repository import DocumentFilter, DocumentPosition, NamedRepository
@@ -585,6 +586,7 @@ class MasterDataService:
                 if definition.key != old_key:
                     await self._rename_in_patterns(uow, actor, old_key, definition.key)
                     await self._rename_in_rules(uow, actor, old_key, definition.key)
+                    await self._rename_in_webhooks(uow, old_key, definition.key)
             if choices is not None:
                 removed = definition.change_choices(choices)
                 if removed and await uow.documents.field_in_use(id, values=removed):
@@ -855,7 +857,8 @@ class MasterDataService:
         await self._delete(actor, _tags, id, used, ("tag", lambda refs: refs.tags))
 
     async def delete_field(self, actor: UserId, id: FieldId) -> None:
-        """Not while a document has a value or a template of a rule uses it."""
+        """Not while a document has a value or a template uses it (a title pattern's, a
+        rule's, a webhook's body)."""
 
         async def used(uow: UnitOfWork) -> bool:
             if await uow.documents.exists(field=id):
@@ -872,6 +875,12 @@ class MasterDataService:
                 names = sorted((rule.definition.name for rule in rules), key=sort_key)
                 raise ConflictError(
                     because(ReasonCode.FIELD_USED_BY_RULES, key=definition.key, rules=names)
+                )
+            webhooks = await self._webhooks_using(uow, definition.key)
+            if webhooks:
+                names = sorted((webhook.name for webhook in webhooks), key=sort_key)
+                raise ConflictError(
+                    because(ReasonCode.FIELD_USED_BY_WEBHOOKS, key=definition.key, webhooks=names)
                 )
             return False
 
@@ -951,6 +960,23 @@ class MasterDataService:
         for rule in await self._rules_using(uow, old):
             rule.change(renamed_field(rule.definition, old, new), actor, self._now())
             await uow.rules.update(rule)
+
+    async def _webhooks_using(self, uow: UnitOfWork, key: str) -> list[Webhook]:
+        """The webhooks whose body template uses the field `key`."""
+        return [
+            webhook
+            for webhook in await uow.webhooks.list_all()
+            if webhook.body is BodyFormat.TEMPLATE
+            and webhook.body_template is not None
+            and field_used(self._templates.check(webhook.body_template), key)
+        ]
+
+    async def _rename_in_webhooks(self, uow: UnitOfWork, old: str, new: str) -> None:
+        """The body templates of webhooks that use `field.<old>` take the new key."""
+        for webhook in await self._webhooks_using(uow, old):
+            template = rename_field_key(webhook.body_template or "", old, new)
+            webhook.set_body(webhook.body, template, now=self._now())
+            await uow.webhooks.update(webhook)
 
     async def _list[K, E: MasterData](self, actor: UserId, repository: Repo[K, E]) -> list[E]:
         async with self._uow() as uow:

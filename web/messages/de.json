@@ -2774,6 +2774,7 @@
 	"reason_tag_used_by_rules": "„{tag}“ wird von den Regeln {rules} genutzt.",
 	"reason_field_used_by_patterns": "field.{key} wird von den Titelmustern von {types} genutzt.",
 	"reason_field_used_by_rules": "field.{key} wird von den Vorlagen der Regeln {rules} genutzt.",
+	"reason_field_used_by_webhooks": "field.{key} wird von den Vorlagen der Webhooks {webhooks} genutzt.",
 	"reason_field_key_taken": "„{field}“ wäre in Vorlagen field.{key}, wie schon „{other}“.",
 	"reason_identifier_of_person": "„{value}“ ist eine Kennung einer Person.",
 	"reason_identifier_of_contact": "„{value}“ ist schon eine Kennung des Kontakts „{contact}“.",

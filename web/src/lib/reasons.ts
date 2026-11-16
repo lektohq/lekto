@@ -247,6 +247,7 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	tag_used_by_rules: entry(m.reason_tag_used_by_rules, { rules: 'list' }),
 	field_used_by_patterns: entry(m.reason_field_used_by_patterns, { types: 'list' }),
 	field_used_by_rules: entry(m.reason_field_used_by_rules, { rules: 'list' }),
+	field_used_by_webhooks: entry(m.reason_field_used_by_webhooks, { webhooks: 'list' }),
 	field_key_taken: entry(m.reason_field_key_taken),
 	identifier_of_person: entry(m.reason_identifier_of_person),
 	identifier_of_contact: entry(m.reason_identifier_of_contact),

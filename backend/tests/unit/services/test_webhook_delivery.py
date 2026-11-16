@@ -12,7 +12,7 @@ import pytest
 
 from lekto.adapters.inbound.rest.schemas.outgoing import EventBody
 from lekto.core.domain.documents import Document
-from lekto.core.domain.errors import NotFoundError, TooManyAttemptsError
+from lekto.core.domain.errors import ConflictError, NotFoundError, TooManyAttemptsError
 from lekto.core.domain.events import (
     DocumentDeleted,
     DocumentFiled,
@@ -555,6 +555,58 @@ async def test_a_template_body_is_what_the_template_makes(world: World) -> None:
         "topic": None,
         "open": f"https://lekto.example.org/ui/documents/{document.id}",
     }
+
+
+async def test_a_field_renamed_is_renamed_in_the_template_and_not_deleted_while_used(
+    world: World,
+) -> None:
+    """As in title patterns and rules: renaming a field rewrites a webhook's template that
+    uses it; deleting it is refused while one does."""
+    user, admin = await world.user(), await world.user(role=Role.ADMIN)
+    document = await described(world, user)
+    async with world.uow() as uow:
+        (amount,) = await uow.fields.list_all()
+    template = '{"amount": {{ field.betrag.amount | json }}, "betrag": {{ title | json }}}'
+    created = await world.webhooks.create(
+        user.id,
+        name="HA",
+        url=URL,
+        event_types=["*"],
+        signed=False,
+        body=BodyFormat.TEMPLATE,
+        body_template=template,
+    )
+    other = await world.webhooks.create(
+        user.id,
+        name="Andere",
+        url=URL,
+        event_types=["*"],
+        body=BodyFormat.TEMPLATE,
+        body_template='{"title": {{ title | json }}}',
+    )
+    await world.master_data.change_field(admin.id, amount.id, name="Summe")
+    async with world.uow() as uow:
+        renamed = await uow.webhooks.get(created.webhook.id)
+        untouched = await uow.webhooks.get(other.webhook.id)
+    assert renamed.body_template == (
+        '{"amount": {{ field.summe.amount | json }}, "betrag": {{ title | json }}}'
+    )
+    assert untouched.body_template == '{"title": {{ title | json }}}'
+    service = world.webhook_delivery()
+    await queue(world, document, service)
+    while await service.run_next_job():
+        pass
+    bodies = [json.loads(request.body) for request in world.sender.requests]
+    assert {"amount": "120.50", "betrag": "Strom März"} in bodies
+    async with world.uow() as uow:  # no document has a value of it any more
+        stored = await uow.documents.get(document.id)
+        stored.fields = {}
+        await uow.documents.update(stored)
+        await uow.commit()
+    with pytest.raises(
+        ConflictError, match=r"field\.summe is used by the templates of the webhooks 'HA'"
+    ):
+        await world.master_data.delete_field(admin.id, amount.id)
 
 
 @pytest.mark.parametrize(
