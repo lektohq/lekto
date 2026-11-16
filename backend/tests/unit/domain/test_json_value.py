@@ -21,6 +21,7 @@ from lekto.core.domain.json_value import (
     require_date,
     require_object,
     require_uuid,
+    same_json,
 )
 from lekto.core.domain.reading import readings_from_json
 
@@ -70,3 +71,14 @@ def test_input_that_must_fit_names_its_place(
 ) -> None:
     with pytest.raises(ValidationError, match=message):
         read(value, "document_date")
+
+
+def test_the_same_json_is_the_same_whatever_the_order_of_its_keys() -> None:
+    """Postgres gives `jsonb` back with its keys sorted."""
+    period: JsonObject = {"start": "2026-01-01", "end": "2026-01-31"}
+    sorted_back: JsonObject = {"end": "2026-01-31", "start": "2026-01-01"}
+    assert same_json(period, sorted_back)
+    assert same_json([period, 1], [sorted_back, 1])
+    assert not same_json(period, {"start": "2026-01-01", "end": "2026-02-28"})
+    assert not same_json(True, 1)
+    assert not same_json(1, 1.0)

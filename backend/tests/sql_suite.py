@@ -27,11 +27,12 @@ from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.migrations import downgrade
 from lekto.adapters.outbound.sql.migrations.versions import v0067_json_empty_as_null as v0067
 from lekto.adapters.outbound.sql.types import UtcDateTime, json_type
+from lekto.core.domain.classification import CHECKS, FieldCheck, field_key
 from lekto.core.domain.condition_tree import Group
 from lekto.core.domain.documents import Document, DocumentChanges
 from lekto.core.domain.errors import ConflictError, DuplicateDocumentError, ValidationError
 from lekto.core.domain.events import DomainEvent
-from lekto.core.domain.fields import FieldDefinition, FieldType, Money
+from lekto.core.domain.fields import FieldDefinition, FieldType, Money, field_to_json
 from lekto.core.domain.ids import DocumentTypeId, RuleId, UserId, new_id
 from lekto.core.domain.jobs import Job
 from lekto.core.domain.mail import MailAction, MailStep
@@ -42,7 +43,8 @@ from lekto.core.domain.mail_rules import (
     MailRule,
     MailRuleChanges,
 )
-from lekto.core.domain.pipeline import NODES, Node
+from lekto.core.domain.periods import Period
+from lekto.core.domain.pipeline import NODES, Node, NodeResult, NodeRun, Outcome
 from lekto.core.domain.reasons import ReasonCode
 from lekto.core.domain.rules import ForceReview, RuleScope
 from lekto.core.domain.spaces import Space, SpaceRole
@@ -50,6 +52,7 @@ from lekto.core.domain.templates import TemplateValue
 from lekto.core.domain.users import User
 from lekto.core.ports.event_bus import EventBus
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
+from lekto.core.services.rules.running import provenance
 from tests import builders
 from tests.builders import HOUR, NOW, PlaceholderNode, incoming
 from tests.contracts.event_bus import EventBusFactory, Recorder, publish, received
@@ -90,6 +93,43 @@ class SqlAdapterSuite(ServicesOverPersistence):
         stored_money = stored[amount.id]
         assert isinstance(stored_money, Money)
         assert str(stored_money.amount) == "0.10"  # scale kept, no binary float
+
+    async def test_a_model_s_period_is_its_own_in_whatever_order_its_keys_come_back(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """Postgres gives `jsonb` back with its keys sorted (`end` before `start`): the rules
+        still see the period as the model's value and do not overwrite it."""
+        owner, space = await owner_with_space(uow_factory)
+        when = FieldDefinition.create(name="Zeitraum", data_type=FieldType.PERIOD, now=NOW)
+        period = Period.month(2026, 1)
+        document = builders.document(owner, space)
+        document.apply_changes(DocumentChanges(fields={when.id: period}), {when.id: when}, NOW)
+        check = FieldCheck(
+            field=field_key(when.id),
+            outcome=Outcome.OK,
+            confidence=0.9,
+            value=field_to_json(period),
+        )
+        entry = NodeRun(
+            document_id=document.id,
+            node=Node.FIELDS,
+            run=1,
+            result=NodeResult(
+                outcome=Outcome.OK, model_version="model-1", output={CHECKS: [check.to_json()]}
+            ),
+            pipeline_version="0.1.0",
+            started_at=NOW,
+            duration=timedelta(0),
+        )
+        async with uow_factory() as uow:
+            await uow.fields.add(when)
+            await uow.documents.add(document)
+            await uow.processing_log.append(entry)
+            await uow.commit()
+        async with uow_factory() as uow:
+            stored = await uow.documents.get(document.id)
+            log = await uow.processing_log.list_for(document.id)
+        assert provenance(log, stored).model_values == {field_key(when.id): field_to_json(period)}
 
     async def test_timestamps_are_utc_with_microseconds(
         self, uow_factory: UnitOfWorkFactory

@@ -41,7 +41,14 @@ from lekto.core.domain.ids import (
     UserId,
     WebhookId,
 )
-from lekto.core.domain.json_value import JsonObject, JsonValue, as_list, as_object, as_uuid
+from lekto.core.domain.json_value import (
+    JsonObject,
+    JsonValue,
+    as_list,
+    as_object,
+    as_uuid,
+    same_json,
+)
 from lekto.core.domain.permissions import in_reach
 from lekto.core.domain.pipeline import (
     ACCEPTED,
@@ -358,7 +365,7 @@ def provenance(log: Sequence[NodeRun], document: Document) -> Provenance:
                 model_tags = frozenset(TagId(UUID(str(tag))) for tag in check.value) & frozenset(
                     document.tag_ids
                 )
-        elif name in current and repr(current[name]) == repr(check.value):
+        elif name in current and same_json(current[name], check.value):
             model_values[name] = check.value
     run = document.processing.run
     reviewed: set[RuleId] = set()

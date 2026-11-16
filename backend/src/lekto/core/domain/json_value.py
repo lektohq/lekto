@@ -2,6 +2,7 @@
 holds of the expected type, None (or nothing) for anything else. The `require_` readers are for
 input that must fit: a ValidationError that names the place otherwise."""
 
+import json
 from datetime import date
 from uuid import UUID
 
@@ -9,6 +10,16 @@ from lekto.core.domain.errors import ValidationError
 
 type JsonValue = str | int | float | bool | list[JsonValue] | dict[str, JsonValue] | None
 type JsonObject = dict[str, JsonValue]
+
+
+def same_json(first: JsonValue, second: JsonValue) -> bool:
+    """Whether two JSON values are the same: an object's keys in any order (Postgres gives
+    `jsonb` back with its keys sorted), but `true` is not `1` and `1` not `1.0`."""
+    return _canonical(first) == _canonical(second)
+
+
+def _canonical(value: JsonValue) -> str:
+    return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
 
 
 def as_text(value: JsonValue) -> str | None:
