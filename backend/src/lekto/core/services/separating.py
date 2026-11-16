@@ -5,10 +5,11 @@ it.
 It looks for sheets only in a document that came in as it is, in the run it came in with: not
 one taken over from another system (the migration splits before), not after a new version (the
 node runs again then, as every node after receiving, and is done at once), not pages split off
-another document, and not a mail. A person cannot process it again (`Document.reprocess_from`),
-but a retry after it failed runs it again. It reads the codes of every page of the original (an
-image's frames put together as a PDF first), unless it has more than `MAX_STACK_PAGES`. Without
-a sheet it is done.
+another document, and not a mail. First it counts the pages of every file but a mail: one of
+more than `MAX_DOCUMENT_PAGES` fails, before OCR and the page images read it. A person cannot
+process it again (`Document.reprocess_from`), but a retry after it failed runs it again. It
+reads the codes of every page of the original (an image's frames put together as a PDF first),
+unless it has more than `MAX_STACK_PAGES`. Without a sheet it is done.
 
 Otherwise the parts are put together as PDFs (as `EditingService` does) and their files stored;
 when the node's result is stored, so is the rest: the document keeps the stack as version 1 and
@@ -26,8 +27,9 @@ from datetime import datetime
 
 from lekto.core.domain import media_types
 from lekto.core.domain.codes import Code
-from lekto.core.domain.documents import Channel, Document
+from lekto.core.domain.documents import MAX_DOCUMENT_PAGES, Channel, Document
 from lekto.core.domain.editing import ORIGINAL, PagePick
+from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.ids import UserId
 from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.pipeline import (
@@ -109,13 +111,19 @@ class SeparateNode:
 
     async def run(self, document: Document) -> "NodeResult | Separation":
         not_looked = await self._not_looked(document)
-        if not_looked is not None:
-            return NodeResult(outcome=Outcome.OK, output=not_looked)
+        if not_looked is not None and document.media_type not in VERSION_MEDIA_TYPES:
+            return NodeResult(outcome=Outcome.OK, output=not_looked)  # a mail
         async with work_directory() as work:
             original = work / ORIGINAL_FILE
             await self._store.download(original_key(document.sha256), original)
             source = PageSource(original, document.media_type)
             pages = await self._composer.count_pages(source)
+            if pages > MAX_DOCUMENT_PAGES:
+                raise UnprocessableDocumentError(
+                    because(ReasonCode.DOCUMENT_TOO_MANY_PAGES, pages=pages, max=MAX_DOCUMENT_PAGES)
+                )
+            if not_looked is not None:
+                return NodeResult(outcome=Outcome.OK, output=not_looked)
             if pages > MAX_STACK_PAGES:
                 return NodeResult(
                     outcome=Outcome.OK,

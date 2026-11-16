@@ -28,7 +28,13 @@ from pathlib import Path
 
 from lekto.core.domain import media_types
 from lekto.core.domain.documents import Document, Sha256
-from lekto.core.domain.editing import MAX_ADDED, MAX_MERGED, EditPart, check_parts
+from lekto.core.domain.editing import (
+    MAX_ADDED,
+    MAX_MERGED,
+    MAX_PREVIEW_PAGES,
+    EditPart,
+    check_parts,
+)
 from lekto.core.domain.errors import (
     ConcurrencyError,
     UnsupportedMediaTypeError,
@@ -39,7 +45,7 @@ from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.pipeline import (
     TRIGGER_EDIT,
 )
-from lekto.core.domain.reasons import Action
+from lekto.core.domain.reasons import Action, ReasonCode, because
 from lekto.core.domain.relations import Relation
 from lekto.core.domain.users import User
 from lekto.core.domain.versions import VersionKind
@@ -113,11 +119,16 @@ class EditingService:
         """Editors and admins, before they add `file` to an edit of the document: its pages as
         WebP images as large as a document's page images, in their order; nothing is stored.
         UnsupportedMediaTypeError unless a PDF or an image; UnprocessableDocumentError if its
-        pages cannot be read."""
+        pages cannot be read; ValidationError if it has more than `MAX_PREVIEW_PAGES`."""
         kind = await _kind(file.path)
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             await controllable_document(uow, user, id, Action.EDIT_PAGES)
+        pages = await self._composer.count_pages(PageSource(file.path, kind))
+        if pages > MAX_PREVIEW_PAGES:
+            raise ValidationError(
+                because(ReasonCode.PREVIEW_TOO_MANY_PAGES, pages=pages, max=MAX_PREVIEW_PAGES)
+            )
         async with work_directory() as work:
             target = work / "pages"
             await asyncio.to_thread(target.mkdir)

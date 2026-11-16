@@ -2704,6 +2704,8 @@
 	"reason_image_unreadable_detail": "the image cannot be read: {detail}",
 	"reason_image_too_large": "the image has {pixels} megapixels; Lekto reads images of up to {max} megapixels",
 	"reason_document_no_pages": "the document has no pages",
+	"reason_document_too_many_pages": "the document has {pages} pages; Lekto reads documents of up to {max} pages",
+	"reason_preview_too_many_pages": "the file has {pages} pages; the preview shows files of up to {max} pages",
 	"reason_ocr_failed": "{problem}: {detail}",
 	"reason_text_unreadable": "the text in the PDF cannot be read (a font without a character map); every page was recognised from its image",
 	"reason_signature_dropped": "the original is digitally signed; the archive does not carry the signature (the original is unchanged)",

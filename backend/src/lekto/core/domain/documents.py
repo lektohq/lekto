@@ -92,6 +92,11 @@ MAX_TITLE = 500
 """Characters of a document's title; the REST schemas, the MCP tool and the model's answers
 keep to it."""
 
+MAX_DOCUMENT_PAGES = 1_000
+"""Pages a document has at most; the node `separate` fails a longer one before anything reads
+its pages. An empty PDF page takes 233 bytes, so a file of 100 MB may hold 430 000 of them, and
+each takes the page images 0.1 to 0.6 s (on a NAS): 1000 render within `LEKTO_PDF_TIMEOUT`."""
+
 
 class Channel(StrEnum):
     """How a document came in (its intake channel)."""

@@ -149,6 +149,8 @@ class ReasonCode(StrEnum):
     IMAGE_UNREADABLE_DETAIL = "image_unreadable_detail"
     IMAGE_TOO_LARGE = "image_too_large"
     DOCUMENT_NO_PAGES = "document_no_pages"
+    DOCUMENT_TOO_MANY_PAGES = "document_too_many_pages"
+    PREVIEW_TOO_MANY_PAGES = "preview_too_many_pages"
     OCR_FAILED = "ocr_failed"
     TEXT_UNREADABLE = "text_unreadable"
     SIGNATURE_DROPPED = "signature_dropped"
@@ -619,6 +621,12 @@ TEMPLATES: Mapping[ReasonCode, str] = {
         "megapixels"
     ),
     ReasonCode.DOCUMENT_NO_PAGES: "the document has no pages",
+    ReasonCode.DOCUMENT_TOO_MANY_PAGES: (
+        "the document has {pages:number} pages; Lekto reads documents of up to {max:number} pages"
+    ),
+    ReasonCode.PREVIEW_TOO_MANY_PAGES: (
+        "the file has {pages:number} pages; the preview shows files of up to {max:number} pages"
+    ),
     ReasonCode.OCR_FAILED: "{problem:reason}: {detail}",
     ReasonCode.TEXT_UNREADABLE: (
         "the text in the PDF cannot be read (a font without a character map); every page was "

@@ -9,6 +9,7 @@ import pytest
 
 from lekto.adapters.outbound.memory import ManualClock, fake_pdf
 from lekto.composition.container import build_memory_container, build_services
+from lekto.core.domain.editing import MAX_PREVIEW_PAGES
 from tests import builders
 from tests.api import auth
 from tests.unit.adapters.rest.support import DOCUMENTS, Api, file_part, make_app, upload
@@ -184,6 +185,24 @@ async def test_the_pages_of_a_file_to_add_are_shown_not_stored(api: Api) -> None
         url, files=file_part("more.pdf", fake_pdf(1, "more")), headers=auth(stranger)
     )
     assert hidden.status_code == 404
+
+
+async def test_the_pages_of_a_longer_file_are_not_shown(api: Api) -> None:
+    """They are rendered in the API and sent in one answer, some 75 KB each."""
+    owner = await api.user()
+    id = await upload(api, auth(owner))
+    url = f"{DOCUMENTS}/{id}/edit/pages"
+    longest = fake_pdf(MAX_PREVIEW_PAGES, "longest")
+    shown = await api.client.post(url, files=file_part("a.pdf", longest), headers=auth(owner))
+    assert shown.status_code == 200, shown.text
+    longer = fake_pdf(MAX_PREVIEW_PAGES + 1, "longer")
+    refused = await api.client.post(url, files=file_part("b.pdf", longer), headers=auth(owner))
+    assert refused.status_code == 422
+    reason = refused.json()["reason"]
+    assert (reason["code"], reason["params"]) == (
+        "preview_too_many_pages",
+        {"pages": MAX_PREVIEW_PAGES + 1, "max": MAX_PREVIEW_PAGES},
+    )
 
 
 @pytest.mark.parametrize("route", ["versions", "edit/pages", "edit"])

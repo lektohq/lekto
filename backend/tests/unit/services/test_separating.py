@@ -10,7 +10,7 @@ import pytest
 
 from lekto.adapters.outbound.memory import FakeCodeReader, fake_pdf
 from lekto.core.domain.codes import Code
-from lekto.core.domain.documents import Channel, Document
+from lekto.core.domain.documents import MAX_DOCUMENT_PAGES, Channel, Document
 from lekto.core.domain.editing import EditPart, PagePick
 from lekto.core.domain.errors import InvalidTransitionError
 from lekto.core.domain.ids import DocumentId, MailboxId, MailRecordId, new_id
@@ -25,7 +25,7 @@ from lekto.core.domain.pipeline import (
     Outcome,
     ProcessingStatus,
 )
-from lekto.core.domain.reasons import ReasonCode
+from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.separating import MAX_STACK_PAGES, separated_parts, separator_pages
 from lekto.core.domain.users import Role, User
 from lekto.core.domain.versions import VersionKind
@@ -288,6 +288,34 @@ async def test_a_file_longer_than_a_stack_is_not_looked_through(world: World) ->
         "pages": MAX_STACK_PAGES + 1,
         "max": MAX_STACK_PAGES,
     }
+
+
+async def test_a_file_of_more_pages_than_lekto_reads_fails_before_they_are_read(
+    world: World,
+) -> None:
+    """A file of 100 MB may hold 430 000 empty pages: OCR and the page images would read each."""
+    reader = sheets(3)
+    pages = MAX_DOCUMENT_PAGES + 1
+    for separators, channel in ((("PATCHT",), Channel.WEB), ((), Channel.MIGRATION)):
+        _, book = await received(
+            world,
+            reader,
+            fake_pdf(pages, f"a book {channel}"),
+            separators=separators,
+            channel=channel,
+        )
+        async with world.uow() as uow:
+            log = await uow.processing_log.list_for(book.id)
+        (run,) = [entry for entry in log if entry.node is Node.SEPARATE]
+        assert run.result.outcome is Outcome.FAILED
+        assert run.result.reasons == (
+            because(ReasonCode.DOCUMENT_TOO_MANY_PAGES, pages=pages, max=MAX_DOCUMENT_PAGES),
+        )
+    assert reader.calls == []
+    _, longest = await received(
+        world, reader, fake_pdf(MAX_DOCUMENT_PAGES, "the longest"), separators=()
+    )
+    assert await not_looked(world, longest.id) == "off"
 
 
 async def test_a_new_version_is_not_split(world: World) -> None:

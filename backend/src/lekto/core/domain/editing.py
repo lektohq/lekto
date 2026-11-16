@@ -29,6 +29,10 @@ MAX_ADDED = 20
 """Files one edit adds at most."""
 MAX_MERGED = 20
 """Other documents one edit takes the pages of at most."""
+MAX_PREVIEW_PAGES = 200
+"""Pages of a file the preview of an edit shows at most (`EditingService.preview`): it renders
+them in the API and sends them in one answer, some 75 KB each; as many as a stack has
+(`separating.MAX_STACK_PAGES`)."""
 
 
 @dataclass(frozen=True)

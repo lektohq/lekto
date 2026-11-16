@@ -89,7 +89,7 @@ from lekto.core.domain.documents import (
     Unset,
     changed_fields,
 )
-from lekto.core.domain.editing import MAX_ADDED, MAX_MERGED
+from lekto.core.domain.editing import MAX_ADDED, MAX_MERGED, MAX_PREVIEW_PAGES
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldDefinition, field_from_json
 from lekto.core.domain.identifiers import IdentifierKind
@@ -285,7 +285,8 @@ _PREVIEW_BODY = upload_body("PDF, JPEG, PNG or TIFF; recognised by content.")
         EDITORS + ", before they add a file to an edit of the document's pages (`POST "
         "/documents/{id}/edit`): its pages as images, as large as a document's page images "
         "(`GET /documents/{id}/pages/{number}`). Nothing is stored. 415 for a file "
-        "that is no PDF or image; 422 for one whose pages cannot be read."
+        "that is no PDF or image; 422 for one whose pages cannot be read, or of more than "
+        f"{MAX_PREVIEW_PAGES} pages."
     ),
     response_model=PagePreviews,
     responses=problem_responses(400, 401, 403, 404, 413, 415, 422),
@@ -299,11 +300,12 @@ async def preview_pages(
         images = await context.editing.preview(user, DocumentId(id), received.file)
     finally:
         await asyncio.shield(asyncio.to_thread(received.file.path.unlink, missing_ok=True))
-    return PagePreviews(
-        pages=[
-            f"data:{PAGE_MEDIA_TYPE};base64,{base64.b64encode(image).decode()}" for image in images
-        ]
-    )
+    return PagePreviews(pages=await asyncio.to_thread(_data_urls, images))
+
+
+def _data_urls(images: list[bytes]) -> list[str]:
+    """Each WebP image as a data URL (blocking: some 75 KB each)."""
+    return [f"data:{PAGE_MEDIA_TYPE};base64,{base64.b64encode(image).decode()}" for image in images]
 
 
 _EDIT_BODY = {
