@@ -147,7 +147,9 @@ answer, `LEKTO_MAIL_RENDER_TIMEOUT` (two minutes) the setting of a mail as a PDF
 
 ## Roles
 
-`LEKTO_ROLE` decides which services s6 starts; the other one stays down (`s6-svstat` shows it).
+`LEKTO_ROLE` decides which services s6 starts. Before they start, the hook `stage2-hook`
+(`S6_STAGE2_HOOK`) leaves the service the role does not run out of the bundle `user`; it is never
+started and stays down (`s6-svstat` shows it).
 
 | Role | Starts | Migrates | Health |
 | --- | --- | --- | --- |
