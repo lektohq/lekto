@@ -198,17 +198,14 @@ names, few enough that the list does not crowd out the document (`architektur.md
 
 @dataclass(frozen=True, kw_only=True)
 class ClassificationPolicy:
-    """`accept`: a field with at least this confidence is applied; `suggest_contact`: an
-    existing contact at least this similar is suggested. Texts longer than `input_budget`
-    characters are shortened; at most `max_tags` tags and `max_contacts` contacts (those the
-    text names most) are listed in a prompt. `default_currency`: the currency of an amount in
-    a text that shows none. `poor_reading`: the share of unsure (content) words from which a
-    value's place counts as poorly read (`Surroundings.poor`, `PageReading.poor`). All but
-    `max_contacts` are configuration: the composition sets them from the settings, whose
-    defaults are the one source."""
+    """Texts longer than `input_budget` characters are shortened; at most `max_tags` tags and
+    `max_contacts` contacts (those the text names most) are listed in a prompt.
+    `default_currency`: the currency of an amount in a text that shows none. `poor_reading`:
+    the share of unsure (content) words from which a value's place counts as poorly read
+    (`Surroundings.poor`, `PageReading.poor`). All but `max_contacts` are configuration: the
+    composition sets them from the settings, whose defaults are the one source. How well a
+    name must match is the judge's (`verdict.Thresholds`)."""
 
-    accept: float
-    suggest_contact: float
     input_budget: int
     max_tags: int
     max_contacts: int = MAX_CONTACTS

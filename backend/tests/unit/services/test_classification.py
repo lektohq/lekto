@@ -51,7 +51,6 @@ from lekto.core.domain.pipeline import (
 from lekto.core.domain.reading import PageReading, PageWords, reading_to_json, readings_to_json
 from lekto.core.domain.reasons import ReasonCode, written
 from lekto.core.domain.users import Role
-from lekto.core.domain.verdict import Thresholds
 from lekto.core.ports.llm import StructuredRequest
 from lekto.core.services.classification.nodes import (
     ClassificationPolicy,
@@ -228,11 +227,6 @@ def policy_with(**overrides: Any) -> ClassificationPolicy:
     return replace(builders.CLASSIFICATION, **overrides)
 
 
-def thresholds_for(policy: ClassificationPolicy) -> Thresholds:
-    """The judge's thresholds as the composition derives them from the same settings."""
-    return replace(builders.THRESHOLDS, accept=policy.accept, suggest=policy.suggest_contact)
-
-
 class ModelSignal(LlmSignal):
     """The language model's signal without a webhook to hand its request to: a result at
     once (the facts it read are kept when the pipeline stores it)."""
@@ -295,7 +289,7 @@ async def judge(
         world.object_store,
         world.clock,
         chosen,
-        thresholds=thresholds_for(chosen),
+        thresholds=builders.THRESHOLDS,
         locator=locator,
     )
     return await step.run(document)
@@ -600,7 +594,7 @@ async def test_the_contact_is_matched_and_shown_in_the_text(world: World, name: 
     result = await classify(world, proposal(sender={"value": name, "evidence": None}))
     contact = checks(result.result)["contact"]
     assert contact.ok
-    assert contact.confidence >= builders.CLASSIFICATION.accept
+    assert contact.confidence >= builders.THRESHOLDS.accept
     assert result.changes.contact_id == seeded.contacts["Stadtwerke Musterstadt GmbH"].id
 
 
@@ -628,7 +622,7 @@ async def test_a_contact_absent_from_the_text_is_only_suggested(world: World) ->
     assert contact.outcome is Outcome.UNCERTAIN
     assert contact.reason == "the contact 'AOK Bayern' does not appear in the text"
     assert contact.suggestion == str(seeded.contacts["AOK Bayern"].id)
-    assert contact.confidence < builders.CLASSIFICATION.accept
+    assert contact.confidence < builders.THRESHOLDS.accept
 
 
 async def test_a_similar_contact_is_suggested(world: World) -> None:
@@ -642,8 +636,8 @@ async def test_a_similar_contact_is_suggested(world: World) -> None:
     assert contact.reason == (
         "'Stadtwerk Musterstadt Netz' is only similar to the contact 'Stadtwerke Musterstadt GmbH'"
     )
-    policy = builders.CLASSIFICATION
-    assert policy.suggest_contact <= contact.confidence < policy.accept
+    thresholds = builders.THRESHOLDS
+    assert thresholds.suggest <= contact.confidence < thresholds.accept
 
 
 async def test_the_contact_itself_must_be_named(world: World) -> None:

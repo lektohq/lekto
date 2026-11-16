@@ -677,8 +677,6 @@ def session_policy_of(settings: Settings) -> SessionPolicy:
 def policy_of(settings: Settings) -> ClassificationPolicy:
     """Thresholds and limits of classification and field extraction."""
     return ClassificationPolicy(
-        accept=settings.confidence_threshold,
-        suggest_contact=settings.contact_suggest_threshold,
         input_budget=settings.llm_input_budget,
         max_tags=settings.llm_max_tags,
         default_currency=settings.default_currency,
