@@ -60,7 +60,7 @@ from lekto.core.services._access import access_to, controllable_document, load_a
 from lekto.core.services._intake import delete_derivatives, store_new_version, store_part
 from lekto.core.services.documents import DocumentView, delete_document
 from lekto.core.services.nodes import work_directory
-from lekto.core.services.objects import original_key
+from lekto.core.services.objects import original_key, remove_unnamed
 from lekto.core.services.pipeline import VERSION_MEDIA_TYPES, IncomingFile
 from lekto.core.services.relations import RELATIONS_LOCK, find_pair, relation_events
 
@@ -213,9 +213,10 @@ class EditingService:
                     [item.filename for item in added],
                 )
             except BaseException:
-                # Not committed: no document names the parts' files (those stored so far).
-                for item in made:
-                    await asyncio.shield(self._store.delete(original_key(item.file.sha256)))
+                # Perhaps committed after all (cancelled while the database answered): a part's
+                # file goes only if no document names it.
+                stored = [item.file.sha256 for item in made]
+                await asyncio.shield(remove_unnamed(self._uow, self._store, stored))
                 raise
         log.info(
             "pages edited",

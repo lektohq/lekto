@@ -52,7 +52,7 @@ from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._intake import store_part
 from lekto.core.services.nodes import ORIGINAL_FILE, work_directory
-from lekto.core.services.objects import original_key
+from lekto.core.services.objects import original_key, remove_unnamed
 from lekto.core.services.pipeline import VERSION_MEDIA_TYPES, IncomingFile
 
 log = logging.getLogger(__name__)
@@ -161,6 +161,7 @@ class SeparateNode:
                 await self._composer.compose([source], picks, target)
                 parts.append(_Part(piece, await asyncio.to_thread(IncomingFile.of, target)))
             separation = Separation(
+                uow=self._uow,
                 store=self._store,
                 pipeline_version=self._version,
                 reader=reading.reader,
@@ -233,6 +234,7 @@ class Separation:
     """The parts of a stack, their files stored: the rest is stored with the node's result
     (`DeferredResult`), or their files go again if that never happens (`Discardable`)."""
 
+    uow: UnitOfWorkFactory
     store: ObjectStore
     pipeline_version: str
     reader: str
@@ -298,9 +300,9 @@ class Separation:
         )
 
     async def discard(self) -> None:
-        """Remove the parts' files: no document names them (each is new)."""
-        for part in self.parts:
-            await self.store.delete(original_key(part.file.sha256))
+        """Remove the parts' files that no document names: storing the result may have gone
+        through after all (cancelled while the database answered the commit)."""
+        await remove_unnamed(self.uow, self.store, [part.file.sha256 for part in self.parts])
 
     async def _split_off(
         self,

@@ -1,6 +1,7 @@
 """What the service tests share: `World`, the services on one in-memory unit of work, and
 `Raises`. The `world` fixture is in `conftest.py`."""
 
+import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -18,6 +19,7 @@ from lekto.adapters.outbound.memory import (
     MemoryDatabase,
     MemoryMailServer,
     MemoryObjectStore,
+    MemoryUnitOfWork,
     MemoryUnitOfWorkFactory,
 )
 from lekto.core.domain.documents import Document
@@ -65,6 +67,28 @@ class Raises:
         if self.calls <= self.times:
             raise OSError("scanner glitch")
         return builders.OK
+
+
+class CancelledCommit:
+    """Units of work on `inner` whose first commit once `armed` is stored and then cancelled:
+    a request stopped, or a connection lost, while the database answered its commit."""
+
+    def __init__(self, inner: MemoryUnitOfWorkFactory) -> None:
+        self._inner = inner
+        self.armed = False
+
+    def __call__(self) -> MemoryUnitOfWork:
+        work = self._inner()
+        commit = work.commit
+
+        async def stored_then_cancelled() -> None:
+            await commit()
+            if self.armed:
+                self.armed = False
+                raise asyncio.CancelledError
+
+        work.commit = stored_then_cancelled  # type: ignore[method-assign]
+        return work
 
 
 @dataclass

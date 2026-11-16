@@ -3,6 +3,7 @@ document is its next version, every other part a new document in its space, the 
 without one; added files bring their pages but are no originals of their own; all of it in one
 transaction, and every result waits in the inbox."""
 
+import asyncio
 import logging
 from collections.abc import Sequence
 from dataclasses import replace
@@ -11,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from lekto.adapters.outbound.memory import FakePageComposer, fake_pdf
+from lekto.adapters.outbound.memory import FakePageComposer, FakePageRenderer, fake_pdf
 from lekto.adapters.outbound.regex import RegexPatternMatcher
 from lekto.core.domain.documents import Channel, Document, DocumentChanges, Sha256
 from lekto.core.domain.editing import MAX_ADDED, EditPart, PagePick
@@ -30,11 +31,11 @@ from lekto.core.domain.users import Role, User
 from lekto.core.domain.versions import VersionKind
 from lekto.core.ports.composer import PageSource
 from lekto.core.services._intake import SPLIT_FROM
-from lekto.core.services.editing import AddedFile
+from lekto.core.services.editing import AddedFile, EditingService
 from lekto.core.services.objects import original_key, page_key
 from lekto.core.services.rules.nodes import ApplyRulesNode
 from tests.builders import HOUR, NOW, TEMPLATES, incoming
-from tests.unit.services.support import World
+from tests.unit.services.support import CancelledCommit, World
 from tests.unit.services.test_maintenance import maintenance
 
 STACK = fake_pdf(3, "three payslips")
@@ -292,6 +293,29 @@ async def test_a_part_that_cannot_be_stored_leaves_no_other(
         await world.editing.edit(owner.id, document.id, [part(1), part(2, 3, replaces=True)])
     assert calls == 2
     assert world.object_store.keys("originals/") == originals
+
+
+async def test_an_edit_stored_as_it_was_cancelled_keeps_its_files(world: World) -> None:
+    """Cancelled while the database answered the commit (the API stopped, the connection
+    lost): the edit is stored, and the files of its documents stay."""
+    owner, document = await received(world)
+    cancelled = CancelledCommit(world.uow)
+    editing = EditingService(
+        cancelled,
+        world.clock,
+        world.object_store,
+        world.composer,
+        FakePageRenderer(pages=2),
+        pipeline_version="test",
+    )
+    cancelled.armed = True
+    with pytest.raises(asyncio.CancelledError):
+        await editing.edit(owner.id, document.id, [part(1), part(2, 3)])  # none replaces it
+    async with world.uow() as uow:
+        documents = await uow.documents.list_all()
+    assert document.id not in {item.id for item in documents} and len(documents) == 2
+    for item in documents:
+        assert await world.object_store.exists(original_key(item.sha256))
 
 
 async def test_every_result_waits_in_the_inbox_and_what_was_confirmed_stays(

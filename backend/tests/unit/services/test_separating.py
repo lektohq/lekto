@@ -2,6 +2,7 @@
 split at its separator sheets; the stack stays version 1, the first part becomes version 2 and
 every other part a new document as the stack came in, each processed as any new one."""
 
+import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -34,8 +35,9 @@ from lekto.core.services._intake import SPLIT_FROM
 from lekto.core.services.objects import original_key
 from lekto.core.services.pipeline import PipelineService
 from lekto.core.services.separating import NOT_LOOKED, SeparateNode, Separation
+from tests import builders
 from tests.builders import NOW, incoming
-from tests.unit.services.support import World
+from tests.unit.services.support import CancelledCommit, World
 
 STACK = fake_pdf(8, "two payslips and a letter")
 BOX = Box.clamped(0.1, 0.1, 0.9, 0.3)
@@ -316,6 +318,42 @@ async def test_a_file_of_more_pages_than_lekto_reads_fails_before_they_are_read(
         world, reader, fake_pdf(MAX_DOCUMENT_PAGES, "the longest"), separators=()
     )
     assert await not_looked(world, longest.id) == "off"
+
+
+async def test_parts_stored_as_storing_was_cancelled_keep_their_files(world: World) -> None:
+    """Cancelled while the database answered the commit of the node's result: the parts are
+    stored, their files stay (`Separation.discard`)."""
+    cancelled = CancelledCommit(world.uow)
+    node = SeparateNode(
+        cancelled,
+        world.object_store,
+        sheets(3),
+        world.composer,
+        separators=("PATCHT",),
+        pipeline_version="test",
+    )
+
+    class ThenCancelled:
+        async def run(self, document: Document) -> NodeResult | Separation:
+            result = await node.run(document)
+            cancelled.armed = True  # the next commit stores the result
+            return result
+
+    pipeline = builders.pipeline_service(
+        cancelled,
+        world.clock,
+        world.object_store,
+        {**world.executors, Node.SEPARATE: ThenCancelled()},
+    )
+    owner = await world.user(role=Role.ADMIN)
+    await pipeline.receive(owner.id, incoming(STACK), filename="scan_2026-11-10.pdf")
+    with pytest.raises(asyncio.CancelledError):
+        await world.drain(pipeline)
+    async with world.uow() as uow:
+        documents = await uow.documents.list_all()
+    assert len(documents) == 2  # the stack's first part, and the second as a document
+    for item in documents:
+        assert await world.object_store.exists(original_key(item.sha256))
 
 
 async def test_a_new_version_is_not_split(world: World) -> None:

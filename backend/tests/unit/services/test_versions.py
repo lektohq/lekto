@@ -1,6 +1,7 @@
 """Versions of a document's original (`domain.versions`): the first comes with the document,
 every version's file counts for duplicates, and all their originals go with the document."""
 
+import asyncio
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
@@ -25,8 +26,9 @@ from lekto.core.domain.versions import DocumentVersion, VersionKind
 from lekto.core.services.classification.nodes import _kept
 from lekto.core.services.objects import archive_key, derivative_keys, original_key, page_key
 from lekto.core.services.rules.nodes import ApplyRulesNode
+from tests import builders
 from tests.builders import FAILED, TEMPLATES, Returns, incoming
-from tests.unit.services.support import World
+from tests.unit.services.support import CancelledCommit, World
 from tests.unit.services.test_maintenance import maintenance
 
 STACK = b"%PDF-1.7 three payslips"
@@ -178,6 +180,24 @@ async def test_a_new_version_that_is_not_stored_leaves_the_derivatives(
     assert (await world.documents.get(owner.id, document.id)).sha256 == document.sha256
     # No version names the new file: it goes again.
     assert not await world.object_store.exists(original_key(Sha256.of(PART)))
+
+
+async def test_a_new_version_stored_as_it_was_cancelled_keeps_its_file(world: World) -> None:
+    """Cancelled while the database answered the commit: the version is stored, its file
+    stays."""
+    owner = await world.user()
+    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
+    await world.drain()
+    cancelled = CancelledCommit(world.uow)
+    pipeline = builders.pipeline_service(
+        cancelled, world.clock, world.object_store, world.executors
+    )
+    cancelled.armed = True
+    with pytest.raises(asyncio.CancelledError):
+        await pipeline.new_version(owner.id, document.id, incoming(PART), filename="november.pdf")
+    stored = await world.documents.get(owner.id, document.id)
+    assert stored.sha256 == Sha256.of(PART)
+    assert await world.object_store.get(original_key(stored.sha256)) == PART
 
 
 async def test_a_new_version_helps_a_document_that_failed(world: World) -> None:
