@@ -20,8 +20,9 @@ from lekto.core.domain.users import (
     Settlement,
     UserDeletionBlockedError,
 )
+from lekto.core.services.users import UserService
 from tests import builders
-from tests.builders import NOW, PASSWORD
+from tests.builders import NOW, PASSWORD, incoming
 from tests.unit.services.support import World
 
 NEW_PASSWORD = "another long passphrase"
@@ -50,6 +51,47 @@ async def test_an_api_token_creates_only_plain_users(world: World) -> None:
     for role, password in ((Role.ADMIN, None), (Role.USER, PASSWORD)):
         with pytest.raises(PermissionDeniedError, match="signed-in session"):
             await world.users.create_user(admin.id, "bob", role, password, session=False)
+
+
+async def test_a_non_admin_is_refused_before_any_work(world: World) -> None:
+    """Creating and deleting users check the admin first: a hash costs a place the sign-in
+    shares, and preparing a deletion reads the documents of the spaces named and runs rules on
+    their texts, so how long a refusal takes would tell a non-admin what they contain."""
+    user = await world.account("alice")
+    other = await world.account("bob")
+    async with world.uow() as uow:
+        bobs = next(
+            space for space in await uow.spaces.list_accessible(other.id) if space.personal_of
+        )
+        alices = next(
+            space for space in await uow.spaces.list_accessible(user.id) if space.personal_of
+        )
+
+    class Watching:
+        """Rules that only count how often the deletion asks them."""
+
+        asked = 0
+
+        async def arrival_rules(self, *args: object, **kwargs: object) -> list[object]:
+            Watching.asked += 1
+            return []
+
+        async def prepare(self, *args: object, **kwargs: object) -> object:
+            Watching.asked += 1
+            return None
+
+    users = UserService(world.uow, world.clock, world.hasher, rules=Watching())  # type: ignore[arg-type]
+    await world.pipeline().receive(
+        other.id, incoming(b"%PDF-1.7 x"), filename="x.pdf", space=bobs.id
+    )
+    hashed = world.hasher.hashed
+    with pytest.raises(PermissionDeniedError):
+        await users.create_user(user.id, "eve", Role.USER, password="short")
+    with pytest.raises(PermissionDeniedError):
+        await users.delete_user(
+            user.id, other.id, settle={bobs.id: Settlement(Settle.MOVE_TO, move_to=alices.id)}
+        )
+    assert (world.hasher.hashed, Watching.asked) == (hashed, 0)
 
 
 async def test_only_admins_manage_accounts(world: World) -> None:
