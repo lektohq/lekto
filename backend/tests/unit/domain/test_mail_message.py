@@ -1,6 +1,7 @@
 """Reading a mail: what it says about itself, its text, attachments, pictures and the mails
 attached to it; and telling a mail from other files by its first bytes."""
 
+import time
 from datetime import UTC, datetime
 
 import pytest
@@ -9,6 +10,7 @@ from lekto.core.domain import media_types
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.mail_intake import letters
 from lekto.core.domain.mail_message import Address, read_mail
+from lekto.core.domain.validation import MAX_NAME
 from tests.mails import (
     PDF,
     PNG,
@@ -133,3 +135,55 @@ def test_a_mail_that_breaks_reading_is_a_damaged_file() -> None:
     library) is a damaged file, which the mail intake records and goes past."""
     with pytest.raises(UnprocessableDocumentError):
         read_mail(nested_mail(150))
+
+
+def addressed(to: str, sender: str = "Jane Doe <jane@example.org>", *, more: str = "") -> bytes:
+    """A plain mail from `sender` to `to`, with `more` header lines."""
+    head = f"From: {sender}\r\nTo: {to}\r\n{more}Subject: Hallo\r\n"
+    return (head + "Date: Mon, 16 Nov 2026 10:00:00 +0000\r\n\r\nbody\r\n").encode()
+
+
+def many(count: int, start: int = 0) -> str:
+    return ", ".join(
+        f"=?utf-8?q?M=C3=BCller_{number}?= <user{number}@example.org>"
+        for number in range(start, start + count)
+    )
+
+
+def test_a_long_list_of_recipients_is_read_as_far_as_the_limit_in_time() -> None:
+    """The standard library parses a list of addresses in a time growing with its square:
+    16 000 recipients took 19 s, also in a mail attached to one."""
+    head = addressed(many(16_000))
+    attached = addressed("John Doe <john@example.org>").replace(
+        b"\r\n\r\nbody\r\n",
+        b'\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="b"\r\n\r\n'
+        b"--b\r\nContent-Type: text/plain\r\n\r\nsee below\r\n"
+        b"--b\r\nContent-Type: message/rfc822\r\n\r\n" + head + b"\r\n--b--\r\n",
+    )
+    started = time.perf_counter()
+    mail, outer = read_mail(head), read_mail(attached)
+    assert time.perf_counter() - started < 1
+    (inner,) = outer.messages
+    assert inner.to == mail.to
+    assert 100 < len(mail.to) < 16_000
+    assert mail.to[0] == Address("Müller 0", "user0@example.org")
+    last = len(mail.to) - 1  # cut at a comma: no half address
+    assert mail.to[-1] == Address(f"Müller {last}", f"user{last}@example.org")
+
+
+def test_the_lines_of_a_list_share_the_limit_other_headers_keep_their_first() -> None:
+    raw = addressed(many(150), more=f"To: {many(150, start=150)}\r\nSubject: Zweiter\r\n")
+    mail = read_mail(raw)
+    assert mail.to[150] == Address("Müller 150", "user150@example.org")
+    assert 150 < len(mail.to) < 300  # 15 000 characters in two lines, cut at `MAX_RAW_HEADER`
+    assert mail.subject == "Zweiter"  # the first Subject line (the other follows it)
+
+
+def test_a_name_is_cut_and_an_address_too_long_left_out() -> None:
+    raw = addressed(
+        f"{'x' * 300}@example.org, John Doe <john@example.org>",
+        sender=f'"{"N" * 5000}" <jane@example.org>',
+    )
+    mail = read_mail(raw)
+    assert mail.sender == (Address("N" * MAX_NAME, "jane@example.org"),)
+    assert mail.to == (Address("John Doe", "john@example.org"),)

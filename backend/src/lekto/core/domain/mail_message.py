@@ -4,6 +4,10 @@ What a mail says about itself (sender, recipients, date, subject, Message-ID), i
 part and the plain one, as far as there are), its attachments, the pictures its HTML shows by
 `cid:`, and the mails attached to it. A part that cannot be decoded is read with replacement
 characters rather than failing the mail.
+
+A header is read from its raw value, at most `MAX_RAW_HEADER` characters of it (`_raw`): the
+standard library parses a list of addresses in a time that grows with its square, 16 000
+recipients took 19 s.
 """
 
 import email
@@ -19,13 +23,21 @@ from email.utils import getaddresses, parsedate_to_datetime
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.mail_traits import Importance, importance_of
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.domain.validation import clean_filename, without_control
+from lekto.core.domain.validation import MAX_NAME, clean_filename, without_control
 
 log = logging.getLogger(__name__)
 
 RFC822 = "message/rfc822"
 MAX_HEADER = 1000
-"""Characters of a header value kept (a subject, a list of recipients)."""
+"""Characters of a header value kept (a subject, a Message-ID)."""
+MAX_RAW_HEADER = 10_000
+"""Characters of the raw values of a header read at most, all of its lines together: a list of
+addresses is cut at the last comma before (some 200 to 300 addresses)."""
+MAX_ADDRESS = 254
+"""Characters of an address at most (RFC 5321); a longer one is left out. A name is cut to
+`MAX_NAME`."""
+_SMTP = email.policy.SMTP.clone(refold_source="none")
+"""Writes an attached mail's headers as they are: folding them again would parse them."""
 
 _SPACE = re.compile(r"\s+")
 
@@ -95,7 +107,9 @@ def read_mail(data: bytes) -> MailMessage:
     the standard library recurse too deep, for one)."""
     try:
         message = email.message_from_bytes(data, policy=email.policy.default)
-        if not isinstance(message, EmailMessage) or not (message["From"] or message["Date"]):
+        if not isinstance(message, EmailMessage) or not (
+            _raw(message, "From").strip() or _raw(message, "Date").strip()
+        ):
             raise UnprocessableDocumentError(because(ReasonCode.FILE_DAMAGED))
         return _read(message, data)
     except UnprocessableDocumentError:
@@ -162,7 +176,7 @@ def _read(message: EmailMessage, raw: bytes) -> MailMessage:
 
 def _bytes(message: EmailMessage) -> bytes:
     try:
-        return message.as_bytes(policy=email.policy.SMTP)
+        return message.as_bytes(policy=_SMTP)
     except (LookupError, UnicodeError, ValueError):
         return message.as_bytes(policy=email.policy.compat32)
 
@@ -255,30 +269,42 @@ def _bare(value: str) -> str:
     return value.strip().removeprefix("<").removesuffix(">").strip()
 
 
-def _header(message: EmailMessage, name: str) -> str:
+def _raw(message: Message, name: str, *, listed: bool = False) -> str:
+    """The raw value of the header `name` (its first line, as `Message.get` takes it), at most
+    `MAX_RAW_HEADER` characters; `listed`: a list of addresses, all its lines joined by `, `
+    (as `Message.get_all` takes them) and cut at the last comma before. Nothing parsed."""
+    values = [str(value) for key, value in message.raw_items() if key.lower() == name.lower()]
+    joined = ", ".join(values if listed else values[:1])
+    if len(joined) <= MAX_RAW_HEADER:
+        return joined
+    cut = joined[:MAX_RAW_HEADER]
+    return cut.rpartition(",")[0] if listed and "," in cut else cut
+
+
+def _parsed(message: Message, name: str, *, listed: bool = False) -> str:
+    """The header `name` decoded (encoded words), from its raw values (`_raw`); empty if it
+    cannot be read."""
+    raw = _raw(message, name, listed=listed)
+    if not raw:
+        return ""
     try:
-        value = message.get(name)
+        return str(email.policy.default.header_fetch_parse(name, raw))
     except (LookupError, UnicodeError, ValueError):
         return ""
-    if value is None:
-        return ""
-    return without_control(_SPACE.sub(" ", str(value))).strip()[:MAX_HEADER]
+
+
+def _header(message: EmailMessage, name: str) -> str:
+    value = _parsed(message, name)
+    return without_control(_SPACE.sub(" ", value)).strip()[:MAX_HEADER]
 
 
 def _addresses(message: EmailMessage, name: str) -> tuple[Address, ...]:
-    try:
-        values = message.get_all(name) or []
-    except (LookupError, UnicodeError, ValueError):
-        return ()
     found = []
-    for display, address in getaddresses([str(value) for value in values]):
-        if address or display:
-            found.append(
-                Address(
-                    without_control(_SPACE.sub(" ", display)).strip(),
-                    without_control(address).strip(),
-                )
-            )
+    for display, address in getaddresses([_parsed(message, name, listed=True)]):
+        address = without_control(address).strip()
+        if (address or display) and len(address) <= MAX_ADDRESS:
+            name_shown = without_control(_SPACE.sub(" ", display)).strip()[:MAX_NAME]
+            found.append(Address(name_shown, address))
     return tuple(found)
 
 
