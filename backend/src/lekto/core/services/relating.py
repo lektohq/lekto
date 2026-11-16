@@ -166,7 +166,7 @@ async def relate(uow: UnitOfWork, document: Document, now: datetime) -> Relating
         other = relation.other(document.id)
         if (
             relation.origin is RelationOrigin.LEKTO
-            and relation.decided_by is None
+            and relation.decided_at is None  # its person may be gone (decided_by NULL)
             and relation.state is not RelationState.REJECTED
             and other not in seen
             and relation.evidence.get("kind") != MAIL_EVIDENCE

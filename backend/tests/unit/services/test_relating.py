@@ -1,6 +1,7 @@
 """Recognising relations (#145 PR 11, `services.relating`): the sources, how sure each is, both
 directions, and what a person decided stays."""
 
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -263,6 +264,37 @@ async def test_what_a_person_decided_stays(world: World) -> None:
     assert await s.relate(reminder) == []
     (kept,) = await s.relations(invoice)
     assert kept.state is RelationState.REJECTED
+
+
+async def test_what_a_person_decided_stays_when_they_are_gone(world: World) -> None:
+    """Removing a user leaves their decisions without a decider (`decided_by` NULL): a
+    relation they set stays when no source finds it any more."""
+    s = await Scene.of(world)
+    shop, other = await s.contact("Versandhaus"), await s.contact("Stadtwerke")
+    await s.document(
+        contact=shop, dated=date(2026, 5, 12), facts=((K.INVOICE_NUMBER, "VB1", FactRole.OWN),)
+    )
+    reminder = await s.document(
+        contact=shop, dated=date(2026, 6, 10), facts=((K.INVOICE_NUMBER, "VB1", FactRole.REFERS),)
+    )
+    (made,) = await s.relate(reminder)
+    leaving = builders.user()
+    accepted = replace(made, decided_by=leaving.id, decided_at=NOW)
+    async with world.uow() as uow:
+        await uow.users.add(leaving)
+        await uow.document_relations.put(accepted)
+        await uow.commit()
+    async with world.uow() as uow:
+        await uow.users.remove(leaving.id)
+        await uow.commit()
+    reminder.apply_changes(DocumentChanges(contact_id=other), {}, NOW)
+    async with world.uow() as uow:
+        await uow.documents.update(reminder)
+        await uow.lock(RELATIONS_LOCK)
+        related = await relate(uow, reminder, NOW)
+        await uow.commit()
+    assert related.dropped == ()
+    assert await s.relations(reminder) == [replace(accepted, decided_by=None)]
 
 
 async def test_the_node_relates_a_reminder_on_arrival(world: World) -> None:

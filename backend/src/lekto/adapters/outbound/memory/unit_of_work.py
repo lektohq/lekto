@@ -432,8 +432,10 @@ class MemoryUserRepository(MemoryRepository[UserId, User]):
         return next((_copy(row) for row in self._all() if name_key(row.username) == key), None)
 
     async def remove(self, id: UserId) -> None:
-        """As the SQL schema's foreign keys: the user's documents keep no uploader (SET NULL),
-        the contacts' identifiers that named them and their profile go with them (CASCADE)."""
+        """As the SQL schema's foreign keys: the user's documents keep no uploader, the
+        relations they decided no decider, the versions they made no maker (SET NULL); the
+        contacts' identifiers that named them, their profile and their bulk operations go with
+        them (CASCADE)."""
         await self.get(id)
         self._uow._check_unreferenced(self._table, id)
         for row in self._uow._rows(DOCUMENTS):
@@ -441,6 +443,21 @@ class MemoryUserRepository(MemoryRepository[UserId, User]):
                 changed = _copy(row)
                 changed.uploaded_by = None
                 self._uow._write(DOCUMENTS, row.id, changed)
+        for relation in self._uow._rows(DOCUMENT_RELATIONS):
+            if relation.relation.decided_by == id:
+                undecided = dataclasses.replace(relation.relation, decided_by=None)
+                self._uow._write(
+                    DOCUMENT_RELATIONS,
+                    relation.id,
+                    RelationRow(relation.id, undecided, relation.version),
+                )
+        for version in self._uow._rows(DOCUMENT_VERSIONS):
+            if version.version.created_by == id:
+                made = dataclasses.replace(version.version, created_by=None)
+                self._uow._write(DOCUMENT_VERSIONS, version.id, VersionRow(version.id, made))
+        for operation in self._uow._rows(BULK_OPERATIONS):
+            if operation.user_id == id:
+                self._uow._write(BULK_OPERATIONS, operation.id, _REMOVED)
         for contact in self._uow._rows(CONTACTS):
             if any(item.user_id == id for item in contact.identifiers):
                 updated = _copy(contact)

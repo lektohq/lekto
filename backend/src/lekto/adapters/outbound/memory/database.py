@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import NAMESPACE_URL, UUID, uuid5
 
+from lekto.core.domain.bulk import BulkOperation
 from lekto.core.domain.classifier import ClassifierModel
 from lekto.core.domain.document_facts import DocumentFact
 from lekto.core.domain.documents import Document
@@ -172,7 +173,7 @@ LOGIN_FAILURES = Table("login failures", _no_keys)
 RULES = Table("rule", _no_keys)
 RULE_VERSIONS = Table("rule version", _no_keys)
 RULE_APPLICATIONS = Table("rule application", _no_keys)
-BULK_OPERATIONS = Table("bulk operation", _no_keys)
+BULK_OPERATIONS = Table[BulkOperation]("bulk operation", _no_keys)
 DOCUMENT_FACTS = Table[FactsRow]("document facts", _no_keys)
 DOCUMENT_RELATIONS = Table[RelationRow]("document relation", _no_keys)
 DOCUMENT_VERSIONS = Table[VersionRow]("document version", _version_keys)

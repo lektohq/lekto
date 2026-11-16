@@ -2200,6 +2200,61 @@ class UnitOfWorkContract:
             await uow.users.remove(other.id)  # no membership left
             await uow.commit()
 
+    async def test_a_user_removed_leaves_what_they_decided_and_made(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """As the schema's foreign keys: a relation they decided keeps its decision without
+        them, a version they made stays without its maker (SET NULL), their bulk operations go
+        (CASCADE)."""
+        owner, space = await owner_with_space(uow_factory)
+        leaving = builders.user()
+        await seed(uow_factory, leaving)
+        invoice, reminder = builders.processed(owner, space), builders.processed(owner, space)
+        decided = Relation(
+            newer=reminder.id,
+            older=invoice.id,
+            origin=RelationOrigin.LEKTO,
+            state=RelationState.SET,
+            evidence={"kind": "fact", "fact_kind": "invoice_number", "value": "4711"},
+            created_at=NOW,
+            decided_by=leaving.id,
+            decided_at=NOW + timedelta(minutes=1),
+        )
+        made = DocumentVersion(
+            document_id=invoice.id,
+            number=1,
+            sha256=invoice.sha256,
+            original_filename="invoice.pdf",
+            media_type="application/pdf",
+            kind=VersionKind.RECEIVED,
+            created_at=NOW,
+            created_by=leaving.id,
+        )
+        operation = BulkOperation.create(
+            user_id=leaving.id,
+            action=BulkAction(kind=BulkKind.CHANGE_TAGS, add=frozenset({TagId(new_id())})),
+            documents=(invoice.id,),
+            now=NOW,
+        )
+        async with uow_factory() as uow:
+            await uow.documents.add(invoice)
+            await uow.documents.add(reminder)
+            await uow.document_relations.put(decided)
+            await uow.document_versions.add(made)
+            await uow.bulk_operations.add(operation)
+            await uow.commit()
+        async with uow_factory() as uow:
+            await uow.users.remove(leaving.id)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.document_relations.of_document(invoice.id) == [
+                replace(decided, decided_by=None)
+            ]
+            assert await uow.document_versions.of_document(invoice.id) == [
+                replace(made, created_by=None)
+            ]
+            assert await uow.bulk_operations.find(operation.id) is None
+
     async def test_bulk_operations_round_trip(self, uow_factory: UnitOfWorkFactory) -> None:
         """An action on many documents keeps its action, documents and progress, with the
         reasons of the skipped ones."""
