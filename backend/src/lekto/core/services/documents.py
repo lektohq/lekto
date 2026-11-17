@@ -92,6 +92,7 @@ from lekto.core.services._access import (
     readable_log,
 )
 from lekto.core.services._first_runs import keep_verdicts
+from lekto.core.services._identifiers import as_seen, member_spaces
 from lekto.core.services._moves import move_by_person, move_target
 from lekto.core.services._tags import expand, expanded, tag_counts, tag_tree
 from lekto.core.services.fact_decisions import FactDecision, decide_fact
@@ -482,7 +483,10 @@ class DocumentService:
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             document, space = await readable_document(uow, user, id)
-            contacts = await uow.contacts.list_all()
+            # The contacts' identifiers as the caller sees them (`as_seen`): another's number,
+            # one learned in a space not theirs or rejected shows as unknown (XA-01).
+            spaces = await member_spaces(uow, user)
+            contacts = [as_seen(item, user, spaces) for item in await uow.contacts.list_all()]
             definitions = await field_definitions(uow)
             editor = document_access(user, document, space) is SpaceRole.EDIT
             persons = await matching_persons(uow, user)

@@ -16,9 +16,11 @@ from lekto.core.domain.errors import (
     ValidationError,
 )
 from lekto.core.domain.fields import FieldDefinition
+from lekto.core.domain.identifiers import IdentifierKind, matches
+from lekto.core.domain.identifiers.visibility import seen_by
 from lekto.core.domain.ids import ContactId, DocumentId, FieldId, SpaceId, UserId
 from lekto.core.domain.json_value import JsonValue
-from lekto.core.domain.master_data import TagScope
+from lekto.core.domain.master_data import Contact, TagScope
 from lekto.core.domain.permissions import (
     can_edit_document,
     can_read_document,
@@ -298,6 +300,8 @@ async def readable_log(uow: UnitOfWork, user: User, log: Sequence[NodeRun]) -> l
         assert isinstance(output, dict)
         if run.node in (Node.SIGNAL_FACTS, Node.JUDGE) and "persons" in output:
             output = _persons_seen(output, str(user.id))
+        if run.node is Node.SIGNAL_FACTS:
+            output = await _identifiers_seen(uow, user, output)
         if run.node is Node.RELATE and isinstance(output.get("relations"), list):
             # A relation to a document the reader may not read is none of theirs (#145).
             relations = output["relations"]
@@ -312,6 +316,55 @@ async def readable_log(uow: UnitOfWork, user: User, log: Sequence[NodeRun]) -> l
             }
         result.append(replace(run, result=replace(run.result, output=output)))
     return result
+
+
+async def _identifiers_seen(
+    uow: UnitOfWork, user: User, output: dict[str, JsonValue]
+) -> dict[str, JsonValue]:
+    """`output` of the facts signal with the identifiers at a contact that `user` sees there
+    (`seen_by`: entered by hand, naming them, learned in a space of theirs); any other as an
+    unknown one, as the facts show it to them (XA-01)."""
+    spaces = frozenset(space.id for space in await uow.spaces.list_accessible(user.id))
+    contacts: dict[str, Contact | None] = {}
+
+    async def seen(item: Mapping[str, JsonValue]) -> bool:
+        id, kind, value = item.get("contact_id"), item.get("kind"), item.get("value")
+        if not isinstance(id, str) or not isinstance(kind, str) or not isinstance(value, str):
+            return False
+        if id not in contacts:
+            try:
+                contacts[id] = await uow.contacts.find(ContactId(UUID(id)))
+            except ValueError:
+                contacts[id] = None
+        contact = contacts[id]
+        try:
+            key = (IdentifierKind(kind), value)
+        except ValueError:
+            return False
+        return contact is not None and any(
+            identifier.counts and matches(identifier, key) and seen_by(identifier, user.id, spaces)
+            for identifier in contact.identifiers
+        )
+
+    result = dict(output)
+    unknown: list[JsonValue] = list(_items(output.get("unknown_identifiers")))
+    for name in ("identifiers", "foreign_identifiers"):
+        if name not in output:
+            continue
+        kept: list[JsonValue] = []
+        for item in _items(output[name]):
+            if await seen(item):
+                kept.append(item)
+            else:
+                unknown.append({k: v for k, v in item.items() if k in ("kind", "value", "in_code")})
+        result[name] = kept
+    if unknown or "unknown_identifiers" in output:
+        result["unknown_identifiers"] = unknown
+    return result
+
+
+def _items(value: JsonValue) -> list[dict[str, JsonValue]]:
+    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
 
 
 _NAME = "name"
