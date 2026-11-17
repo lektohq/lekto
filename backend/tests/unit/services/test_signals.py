@@ -42,7 +42,7 @@ _numbers = itertools.count()
 
 
 def output(result: NodeResult | FactsResult) -> Any:
-    return result.output
+    return (result.result if isinstance(result, FactsResult) else result).output
 
 
 async def stored(world: World, owner: User, text: str, contact: Contact | None = None) -> Document:
@@ -114,7 +114,7 @@ async def test_without_text_facts_abstain(world: World) -> None:
     owner = await world.user()
     document = builders.processed(owner, await world.personal_space(owner))
     result = await FactsSignal(world.uow, world.object_store).run(document)
-    assert ABSTAINED in result.output
+    assert ABSTAINED in output(result)
 
 
 # --- classifier -------------------------------------------------------------------------------
@@ -128,7 +128,7 @@ async def test_the_classifier_proposes_with_its_probabilities(world: World) -> N
     service = ClassifierService(
         world.uow, world.object_store, world.clock, FakeClassifier(), builders.CLASSIFIER
     )
-    signal = ClassifierSignal(world.object_store, service)
+    signal = ClassifierSignal(world.object_store, service, world.uow)
     document = await stored(world, owner, "Stadtwerke Stromrechnung Zählerstand")
     assert output(await signal.run(document))[ABSTAINED] == "no model is trained yet"
 
@@ -146,7 +146,9 @@ async def test_the_classifier_proposes_with_its_probabilities(world: World) -> N
     (best, probability), _ = output(result)["contacts"]
     assert best == str(utility.id) and probability > 0.5
     assert sorted(output(result)["known"]["contacts"]) == sorted([str(utility.id), str(bank.id)])
-    assert output(await ClassifierSignal(world.object_store, None).run(document))[ABSTAINED]
+    assert output(await ClassifierSignal(world.object_store, None, world.uow).run(document))[
+        ABSTAINED
+    ]
 
 
 async def test_the_classifier_names_spaces_among_the_uploader_s_candidates(world: World) -> None:

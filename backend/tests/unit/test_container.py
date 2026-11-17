@@ -46,6 +46,7 @@ from lekto.core.domain.templates import TemplateValue
 from lekto.core.domain.users import Role
 from lekto.core.ports.ocr import VisionModel
 from lekto.core.services.nodes import OcrNode, ParseNode
+from lekto.core.services.pipeline import PipelineService
 from tests import builders
 from tests.builders import NOW, SAMPLES, incoming
 from tests.contracts.language_model import REQUEST
@@ -234,7 +235,7 @@ async def test_processing_adapters_follow_the_settings(tmp_path: Path, ocr_runs:
 
 
 async def test_a_vision_model_reads_pages_when_configured(
-    tmp_path: Path, ocr_runs: OcrRuns
+    tmp_path: Path, ocr_runs: OcrRuns, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     configured = settings(
         vlm_base_url="https://user:pw@chat.example/api",
@@ -259,13 +260,27 @@ async def test_a_vision_model_reads_pages_when_configured(
     slow = settings(vlm_base_url="https://chat.example/api", vlm_model="m", vlm_timeout="2400")
     assert container.node_lease(slow) == timedelta(minutes=30) + WORK_LEASE_MARGIN
     assert container.vision_lease(slow) == timedelta(minutes=40) + WORK_LEASE_MARGIN
-    assert build_services(build_memory_container(), slow).pipeline.vision_lease == (
+    assert pipeline_made(monkeypatch, slow)["vision_lease"] == (
         timedelta(minutes=40) + WORK_LEASE_MARGIN
     )
     assert container.vision_lease(settings()) is None  # no vision model
 
 
-def test_services_take_their_tuning_from_the_settings() -> None:
+def pipeline_made(monkeypatch: pytest.MonkeyPatch, configured: Settings) -> dict[str, Any]:
+    """What `build_services` gives the pipeline of `configured`, by name."""
+    made: dict[str, Any] = {}
+
+    def pipeline(*args: Any, **named: Any) -> Any:
+        made.update(named)
+        return PipelineService(*args, **named)
+
+    with monkeypatch.context() as patched:
+        patched.setattr("lekto.composition.container.PipelineService", pipeline)
+        build_services(build_memory_container(), configured)
+    return made
+
+
+def test_services_take_their_tuning_from_the_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     configured = settings(
         node_max_attempts="5",
         node_retry_delay="10",
@@ -275,14 +290,15 @@ def test_services_take_their_tuning_from_the_settings() -> None:
         cleanup_interval="60",
         retention="P1D",
     )
-    services = build_services(build_memory_container(), configured)
-    pipeline = services.pipeline
-    assert pipeline.retry_policy == RetryPolicy(max_attempts=5, delay=timedelta(seconds=10))
+    made = pipeline_made(monkeypatch, configured)
+    assert made["retry"] == RetryPolicy(max_attempts=5, delay=timedelta(seconds=10))
     # The model's signal may ask four times: 4 times 100 s beyond the OCR's 300 s; a node may
     # read a PDF besides (60 s).
-    assert pipeline.lease == timedelta(seconds=460) + WORK_LEASE_MARGIN
-    longer = build_services(build_memory_container(), settings(llm_timeout="400")).pipeline
-    assert longer.lease == timedelta(seconds=1600 + 600) + WORK_LEASE_MARGIN
+    assert made["lease"] == timedelta(seconds=460) + WORK_LEASE_MARGIN
+    longer = pipeline_made(monkeypatch, settings(llm_timeout="400"))
+    assert longer["lease"] == timedelta(seconds=1600 + 600) + WORK_LEASE_MARGIN
+    services = build_services(build_memory_container(), configured)
+    pipeline = services.pipeline
     assert isinstance(pipeline.executor(Node.OCR), OcrNode)
     assert isinstance(pipeline.executor(Node.PARSE), ParseNode)
     maintenance = services.maintenance

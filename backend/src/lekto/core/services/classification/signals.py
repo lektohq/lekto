@@ -265,10 +265,6 @@ class FactsResult:
     in_codes: frozenset[tuple[IdentifierKind, str]] = frozenset()
     holders: Mapping[Key, Holder] = field(default_factory=dict)
 
-    @property
-    def output(self) -> JsonObject:
-        return self.result.output
-
     async def apply(self, uow: UnitOfWork, document: Document, now: datetime) -> NodeResult:
         # The lock before the log: the model's signal may be keeping its half now, and its
         # facts are read from its entry once it committed (SA-14).
@@ -397,13 +393,10 @@ class ClassifierSignal:
     know it cannot name: the judge then goes by the other signals). Its spaces are the
     uploader's candidates only (`OWN_SPACE` their personal space); if those hold at least half
     of the probability, it is spread over them alone, otherwise they keep their small shares
-    and name nothing. Without `uow` it says nothing about spaces."""
+    and name nothing."""
 
     def __init__(
-        self,
-        store: ObjectStore,
-        classifier: ClassifierService | None,
-        uow: UnitOfWorkFactory | None = None,
+        self, store: ObjectStore, classifier: ClassifierService | None, uow: UnitOfWorkFactory
     ) -> None:
         self._store = store
         self._classifier = classifier
@@ -425,7 +418,7 @@ class ClassifierSignal:
         model, prediction = predicted
         spaces: list[tuple[SpaceId, float]] = []
         known_spaces: frozenset[SpaceId] = frozenset()
-        if prediction.spaces and self._uow is not None:
+        if prediction.spaces:
             async with self._uow() as uow:
                 candidates = await space_candidates(uow, document.uploaded_by)
             if candidates is not None:

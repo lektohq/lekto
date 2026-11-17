@@ -131,8 +131,8 @@ async def test_the_ocr_the_model_reads_holds_its_job_longer(world: World) -> Non
     owner, document = await ingest(world, service)
     await service.read_with_vision(owner.id, document.id)
     await world.drain(service)
-    # Tesseract within the lease of every node, the model with its own.
-    assert held == [service.lease, timedelta(minutes=32)]
+    # Tesseract within the lease of every node (the service's default), the model with its own.
+    assert held == [timedelta(minutes=10), timedelta(minutes=32)]
 
 
 async def test_reprocessing_reads_with_tesseract_again(world: World) -> None:

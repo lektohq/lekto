@@ -314,21 +314,6 @@ class PipelineService:
         """The vision language model a person can have documents read with, if any."""
         return self._vision
 
-    @property
-    def retry_policy(self) -> RetryPolicy:
-        """How often and when a node that raised runs again."""
-        return self._retry
-
-    @property
-    def lease(self) -> timedelta:
-        """How long a worker holds the job of a node."""
-        return self._lease
-
-    @property
-    def vision_lease(self) -> timedelta | None:
-        """How long a worker holds the OCR of a document the vision model reads, if longer."""
-        return self._vision_lease
-
     # --- ingest ---------------------------------------------------------------------------------
 
     async def receive(

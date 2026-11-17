@@ -1892,7 +1892,7 @@ async def run(world: World, fake: FakeLanguageModel, text: str = INVOICE) -> tup
     executors: dict[Node, NodeExecutor] = {
         Node.SIGNAL_LLM: LlmSignal(world.uow, world.object_store, fake, world.clock, policy_with()),
         Node.SIGNAL_FACTS: FactsSignal(world.uow, world.object_store),
-        Node.SIGNAL_CLASSIFIER: ClassifierSignal(world.object_store, None),
+        Node.SIGNAL_CLASSIFIER: ClassifierSignal(world.object_store, None, world.uow),
         Node.SIGNAL_NEIGHBOURS: NeighboursSignal(
             world.uow, world.object_store, None, None, builders.NEIGHBOURS
         ),

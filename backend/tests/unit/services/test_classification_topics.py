@@ -105,7 +105,7 @@ async def test_the_facts_tell_the_topic_an_identifier_points_to(world: World) ->
     document = await document_with(world, PAY_SLIP)
     ran = await FactsSignal(world.uow, world.object_store).run(document)
     assert isinstance(ran, FactsResult)
-    assert ran.output["identifiers"] == [
+    assert ran.result.output["identifiers"] == [
         {
             "contact_id": str(nord.id),
             "kind": "personnel_number",
