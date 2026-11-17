@@ -132,6 +132,42 @@ class IdentityRepositoriesContract:
             await first.sessions.touch(session.id, NOW + 2 * HOUR)
             await first.commit()
 
+    async def test_a_touch_after_a_concurrent_removal_does_not_conflict(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """Signing out in one tab while a request in another touches the session (or renews the
+        device): the touch changes nothing, its commit goes through, and what was removed
+        stays removed (PM-09)."""
+        user = await a_user(uow_factory)
+        session = a_session(user)
+        device, token = KnownDevice.issue(user_id=user.id, now=NOW)
+        async with uow_factory() as uow:
+            await uow.sessions.add(session)
+            await uow.known_devices.add(device)
+            await uow.commit()
+        touched = asyncio.Event()
+
+        async def touch() -> None:
+            async with uow_factory() as uow:
+                await uow.sessions.touch(session.id, NOW + HOUR)
+                await uow.known_devices.renew(device.id, device.expires_at + HOUR)
+                touched.set()
+                await asyncio.sleep(0)  # the other unit removes them meanwhile, or waits
+                await uow.commit()
+
+        async def remove() -> None:
+            async with asyncio.timeout(10):
+                await touched.wait()
+            async with uow_factory() as uow:
+                await uow.sessions.remove(session.id)
+                await uow.known_devices.remove_for_user(user.id)
+                await uow.commit()
+
+        await asyncio.gather(touch(), remove())
+        async with uow_factory() as uow:
+            assert await uow.sessions.find_by_token(session.token_hash) is None
+            assert await uow.known_devices.find_by_token(hash_token(token)) is None
+
     async def test_session_tokens_are_unique(self, uow_factory: UnitOfWorkFactory) -> None:
         user = await a_user(uow_factory)
         session = a_session(user)

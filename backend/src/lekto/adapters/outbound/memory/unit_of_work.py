@@ -153,6 +153,8 @@ class MemoryUnitOfWork:
         self._writes: dict[str, dict[UUID, Identified[UUID] | None]] = {}
         self._tables: dict[str, Table[Any]] = {}  # the tables written to, of any kind
         self._base_versions: dict[tuple[str, UUID], int | None] = {}
+        # The timestamps only `_touch` moved forward, by row: laid on the row at the commit.
+        self._touched: dict[tuple[str, UUID], dict[str, datetime]] = {}
         self._log: list[NodeRun] = []
         self._events: list[DomainEvent] = []
         self._jobs: dict[JobId, Job] = {}
@@ -243,6 +245,7 @@ class MemoryUnitOfWork:
             self._release()
 
     def _commit(self) -> None:
+        self._settle_touches()
         self._check_versions()
         self._check_uniqueness()
         self._check_jobs()
@@ -373,9 +376,39 @@ class MemoryUnitOfWork:
         row = writes[id] if id in writes else self._db.tables.get(table.name, {}).get(id)
         return cast(E | None, row)
 
+    def _touch[E: Identified[UUID]](
+        self, table: Table[E], id: UUID, field: str, value: datetime, row: E
+    ) -> None:
+        """Move `field` of the row `id` forward to `value` (`row`: the row with it, which this
+        unit reads from now on). No change: no base version; on a row this unit did not write
+        otherwise, the commit lays the timestamp on the row as it then is, and on none if
+        another unit removed it meanwhile, as SQL's update of no row (PM-09)."""
+        self._check_open()
+        key = (table.name, id)
+        if key not in self._base_versions:
+            self._touched.setdefault(key, {})[field] = value
+        self._tables[table.name] = table
+        self._writes.setdefault(table.name, {})[id] = row
+
+    def _settle_touches(self) -> None:
+        """The rows only touched as the commit writes them: the committed row with the touched
+        timestamps moved forward, or none if it is gone (`_touch`)."""
+        for (name, id), fields in self._touched.items():
+            committed = self._db.tables.get(name, {}).get(id)
+            if committed is None:
+                del self._writes[name][id]
+                continue
+            changed = _copy(committed)
+            for name_of, value in fields.items():
+                current = getattr(changed, name_of)
+                if current is None or current < value:
+                    setattr(changed, name_of, value)
+            self._writes[name][id] = changed
+
     def _write[E: Identified[UUID]](self, table: Table[E], id: UUID, row: E | None) -> None:
         self._check_open()
         key = (table.name, id)
+        self._touched.pop(key, None)  # written as a whole: the version counts
         if key not in self._base_versions:
             committed = self._db.tables.get(table.name, {}).get(id)
             # Rows that only insert (`Identified`) have no version: None, as absent ones.
