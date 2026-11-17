@@ -333,10 +333,8 @@ class ClassifierService:
         ]
         examples = []
         async with self._uow() as uow:
-            kept = {
-                document.id: await uow.document_facts.of_document(document.id)
-                for document in documents
-            }
+            # In one query, not one for each document (SA-04).
+            kept = await uow.document_facts.of_documents([document.id for document in documents])
         for document in documents:
             try:
                 raw = await load_text(self._store, document.id)

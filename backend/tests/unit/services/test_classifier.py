@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from lekto.adapters.outbound.memory import FakeClassifier
+from lekto.adapters.outbound.memory.unit_of_work import MemoryDocumentFactRepository
 from lekto.core.domain.classifier import KEPT_MODELS
 from lekto.core.domain.document_facts import (
     DocumentFact,
@@ -152,9 +153,27 @@ async def test_a_number_counts_only_where_it_is_its_contact_s(world: World) -> N
         assert (await uow.contacts.get(bank.id)).identifiers == []
 
 
-async def test_training_follows_a_person_s_decisions_about_facts(world: World) -> None:
+async def test_training_follows_a_person_s_decisions_about_facts(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The utility's customer number rejected on its documents is not learned; one a person
-    added (the text writes it so no pattern reads it) is."""
+    added (the text writes it so no pattern reads it) is. The facts of all documents are read
+    at once, not one query each (SA-04)."""
+
+    inside: list[bool] = []
+    many, one = MemoryDocumentFactRepository.of_documents, MemoryDocumentFactRepository.of_document
+
+    async def at_once(self: Any, documents: Any) -> Any:
+        inside.append(True)  # the memory adapter reads them one by one itself
+        try:
+            return await many(self, documents)
+        finally:
+            inside.pop()
+
+    async def alone(self: Any, document: Any) -> Any:
+        assert inside, "the facts of one document read alone"
+        return await one(self, document)
+
     _, utility, _ = await corpus(world)
     their = (IdentifierKind.CUSTOMER_NUMBER, "K4711")
     async with world.uow() as uow:
@@ -183,6 +202,8 @@ async def test_training_follows_a_person_s_decisions_about_facts(world: World) -
                 ),
             )
         await uow.commit()
+    monkeypatch.setattr(MemoryDocumentFactRepository, "of_documents", at_once)
+    monkeypatch.setattr(MemoryDocumentFactRepository, "of_document", alone)
     await service(world).train()
     async with world.uow() as uow:
         learned = [item.key for item in (await uow.contacts.get(utility.id)).identifiers]
