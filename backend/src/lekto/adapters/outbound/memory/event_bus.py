@@ -107,11 +107,10 @@ class MemoryEventBus:
         attempts = {retry.position: retry.attempts for retry in due}
         end = min(len(self._db.outbox), state.cursor + limit)
         fresh = list(range(state.cursor, end))
-        state.cursor = end
-        failed: list[Retry] = []
         delivered = 0
         for position in [*attempts, *fresh]:
             event = self._db.outbox[position]
+            again: list[Retry] = []
             try:
                 await handler(event)
             except Exception:
@@ -122,19 +121,22 @@ class MemoryEventBus:
                         "event delivery given up",
                         extra={"subscriber": name, "event_id": str(event.id), "attempts": tries},
                     )
-                    continue
-                log.warning(
-                    "event handler failed",
-                    extra={"subscriber": name, "event_id": str(event.id), "attempts": tries},
-                    exc_info=True,
-                )
-                failed.append(Retry(position, tries, retry_at))
+                else:
+                    log.warning(
+                        "event handler failed",
+                        extra={"subscriber": name, "event_id": str(event.id), "attempts": tries},
+                        exc_info=True,
+                    )
+                    again.append(Retry(position, tries, retry_at))
             else:
                 delivered += 1
-        state.retries = [
-            *(retry for retry in state.retries if retry.position not in attempts),
-            *failed,
-        ]
+            # Kept after each event, not before the handlers: a dispatch cancelled in a handler
+            # (the worker stops) leaves that event and the later ones to the next (PM-06).
+            state.retries = [
+                *(retry for retry in state.retries if retry.position != position),
+                *again,
+            ]
+            state.cursor = max(state.cursor, position + 1)
         return delivered
 
     def _now(self) -> datetime:

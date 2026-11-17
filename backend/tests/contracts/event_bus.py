@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
@@ -209,6 +210,29 @@ class EventBusContract:
         assert await event_bus.dispatch() == 1
         assert flaky.received == [second, first]
         assert await event_bus.dispatch() == 0
+
+    async def test_a_cancelled_dispatch_skips_no_event(
+        self, uow_factory: UnitOfWorkFactory, event_bus: EventBus
+    ) -> None:
+        """A handler cancelled (the worker stops) leaves its event and the later ones to the next
+        dispatch: no committed event is skipped (PM-06)."""
+        delivered: list[DomainEvent] = []
+        cancel = True
+
+        async def handler(event: DomainEvent) -> None:
+            nonlocal cancel
+            if cancel:
+                cancel = False
+                raise asyncio.CancelledError
+            delivered.append(event)
+
+        event_bus.subscribe("test", handler)
+        events = [received(1), received(2)]
+        await publish(uow_factory, *events)
+        with pytest.raises(asyncio.CancelledError):
+            await event_bus.dispatch()
+        assert await event_bus.dispatch() == 2
+        assert delivered == events
 
     async def test_permanently_failing_events_do_not_block_later_ones(
         self, uow_factory: UnitOfWorkFactory, event_bus: EventBus
