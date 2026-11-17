@@ -295,12 +295,9 @@ class _Snapshot:
 
 
 class IndexingService:
-    job_kinds = (
-        INDEX_JOB,
-        REFRESH_JOB,
-        RECONCILE_JOB,
-        REBUILD_JOB,
-    )
+    _LEASED = (INDEX_JOB, REFRESH_JOB, RECONCILE_JOB)
+    _REBUILDING = (REBUILD_JOB,)  # with a lease of its own, as long as a rebuild may take
+    job_kinds = (*_LEASED, *_REBUILDING)
     """The kinds of jobs `run_next_job` runs."""
 
     def __init__(
@@ -361,8 +358,10 @@ class IndexingService:
         """Claim and run a due job of this service. Returns False if none was due. The rebuild
         has a lease of its own, as long as a rebuild may take."""
         return await self._jobs.run_next(
-            [INDEX_JOB, REFRESH_JOB, RECONCILE_JOB], self._policy.job_lease, self._run_claimed
-        ) or await self._jobs.run_next([REBUILD_JOB], self._policy.rebuild_lease, self._run_claimed)
+            self._LEASED, self._policy.job_lease, self._run_claimed
+        ) or await self._jobs.run_next(
+            self._REBUILDING, self._policy.rebuild_lease, self._run_claimed
+        )
 
     async def _run_claimed(self, job: Job) -> None:
         try:

@@ -410,7 +410,7 @@ class RuleApplicationService:
 
     async def run_next_job(self) -> bool:
         """Claim and run a due application job. Returns False if none was due."""
-        return await self._jobs.run_next([APPLY_JOB], LEASE, self._attempt)
+        return await self._jobs.run_next(self.job_kinds, LEASE, self._attempt)
 
     async def _attempt(self, job: Job) -> None:
         try:

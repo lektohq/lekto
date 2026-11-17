@@ -479,7 +479,7 @@ class MasterDataService:
 
     async def run_next_job(self) -> bool:
         """Claim and run a due normalisation (`NORMALISE_JOB`); False if none was due."""
-        return await self._jobs.run_next([NORMALISE_JOB], LEASE, self._normalise)
+        return await self._jobs.run_next(self.job_kinds, LEASE, self._normalise)
 
     async def _normalise(self, job: Job) -> None:
         """One step: the batch, completing the job and queueing the next step commit together;

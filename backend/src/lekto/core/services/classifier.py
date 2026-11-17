@@ -115,10 +115,9 @@ class _Example:
 
 
 class ClassifierService:
-    job_kinds = (
-        CHECK_JOB,
-        TRAIN_JOB,
-    )
+    _CHECKING = (CHECK_JOB,)
+    _TRAINING = (TRAIN_JOB,)  # with a lease of its own, as long as a training may take
+    job_kinds = (*_CHECKING, *_TRAINING)
     """The kinds of jobs `run_next_job` runs."""
 
     def __init__(
@@ -152,8 +151,8 @@ class ClassifierService:
     async def run_next_job(self) -> bool:
         """Claim and run a due check or training; False if none was due."""
         return await self._jobs.run_next(
-            [CHECK_JOB], LEASE, self._run_claimed
-        ) or await self._jobs.run_next([TRAIN_JOB], self.policy.train_lease, self._run_claimed)
+            self._CHECKING, LEASE, self._run_claimed
+        ) or await self._jobs.run_next(self._TRAINING, self.policy.train_lease, self._run_claimed)
 
     async def check(self) -> bool:
         """Queue a training if one is due; returns whether it is."""

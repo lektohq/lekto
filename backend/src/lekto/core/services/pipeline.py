@@ -945,11 +945,7 @@ class PipelineService:
         A catch-up job (`catch_up`) runs the same way, except that its node is not marked as
         running and its result changes neither the status nor the lane.
         """
-        return await self._jobs.run_next(
-            [NODE_JOB, CATCH_UP_JOB, REPARSE_JOB, FACTS_JOB, RELATE_JOB],
-            self._lease,
-            self._run_claimed,
-        )
+        return await self._jobs.run_next(self.job_kinds, self._lease, self._run_claimed)
 
     async def _run_claimed(self, job: Job) -> None:
         if job.kind == FACTS_JOB:

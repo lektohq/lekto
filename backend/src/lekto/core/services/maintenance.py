@@ -134,7 +134,7 @@ class MaintenanceService:
 
     async def run_next_job(self) -> bool:
         """Run a due housekeeping job. Returns False if none was due."""
-        return await self._jobs.run_next([CLEANUP_JOB, REMOVE_FILES_JOB], LEASE, self._run)
+        return await self._jobs.run_next(self.job_kinds, LEASE, self._run)
 
     async def _run(self, job: Job) -> None:
         if job.kind == REMOVE_FILES_JOB:

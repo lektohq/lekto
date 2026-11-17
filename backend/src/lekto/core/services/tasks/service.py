@@ -140,7 +140,7 @@ class TaskService:
 
     async def run_next_job(self) -> bool:
         """Claim and run a due job that ends a task at its deadline. False if none was due."""
-        return await self._jobs.run_next([EXPIRE_JOB], LEASE, self._expire)
+        return await self._jobs.run_next(self.job_kinds, LEASE, self._expire)
 
     async def _expire(self, job: Job) -> None:
         try:

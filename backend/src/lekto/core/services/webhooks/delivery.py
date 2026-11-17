@@ -202,7 +202,7 @@ class WebhookDeliveryService:
     async def run_next_job(self) -> bool:
         """Claim and run a due delivery. Returns False if none was due."""
         lease = self._policy.timeout + ATTEMPT_LEASE_MARGIN
-        return await self._jobs.run_next([DELIVER_JOB], lease, self._run_claimed)
+        return await self._jobs.run_next(self.job_kinds, lease, self._run_claimed)
 
     async def _private(self, uow: UnitOfWork, webhook: Webhook) -> bool:
         """Whether the webhook may reach an address that is not public: by its owner, as
