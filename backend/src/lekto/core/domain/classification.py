@@ -68,6 +68,24 @@ CUSTOM_FIELDS = "fields"
 CHECKS = "fields"
 """Key of the field checks (`checks_to_json`) in the output of the judge, the fields node and
 the rules node."""
+
+# What the processing log hides from a reader (`_access.readable_log`), named once for the nodes
+# that write it and the filter alike: a key renamed on one side alone would let the filter pass
+# what it is there to hide (SA-07).
+PERSONS = "persons"
+"""The users the document names, in the output of the facts signal and of the judge."""
+PERSON_USER = "user_id"
+PERSON_STRENGTH = "strength"  # `facts.Strength`
+PERSON_EVIDENCE = "evidence"
+"""The facts signal's: what named the user (`facts.NAME`: their display name, which anyone may
+know)."""
+PERSON_PUBLIC = "public"
+"""The judge's: the strength of the evidence anyone may know (display name, recipient)."""
+UNSEEN_BY = "unseen_by"
+"""A space check's: the users the document names who would not see it there."""
+RELATED = "relations"
+"""The relations `relate` made, each with the other document (`RELATED_DOCUMENT`)."""
+RELATED_DOCUMENT = "document_id"
 CONFIRMING = frozenset(
     {CHANGE_FIELDS[name] for name in (CONTACT, DOCUMENT_TYPE, TOPIC, TAGS, DOCUMENT_DATE)}
     | {CUSTOM_FIELDS}
@@ -273,7 +291,7 @@ class FieldCheck:
             "label": None if self.label is None else self.label.to_json(),
         }
         if self.unseen_by:
-            data["unseen_by"] = list(self.unseen_by)
+            data[UNSEEN_BY] = list(self.unseen_by)
         return data
 
     @classmethod
@@ -298,7 +316,7 @@ class FieldCheck:
                 locations=locations_from_json(data.get("locations")),
                 candidates=_candidates(data.get("candidates")),
                 label=LabelCheck.from_json(data.get("label")),
-                unseen_by=tuple(str(item) for item in as_list(data.get("unseen_by"))),
+                unseen_by=tuple(str(item) for item in as_list(data.get(UNSEEN_BY))),
             )
         except (KeyError, ValueError) as error:
             raise ValidationError(f"invalid field check: {error}") from None

@@ -23,6 +23,7 @@ from datetime import datetime
 from uuid import UUID
 
 from lekto.core.domain import media_types
+from lekto.core.domain.classification import PERSON_EVIDENCE, PERSON_STRENGTH, PERSON_USER, PERSONS
 from lekto.core.domain.codes import (
     Code,
     code_identifiers,
@@ -380,11 +381,11 @@ def facts_of(
             for item in facts.identifiers
             if item.contact_id is None
         ],
-        "persons": [
+        PERSONS: [
             {
-                "user_id": str(item.user_id),
-                "strength": item.strength.value,
-                "evidence": list(item.evidence),
+                PERSON_USER: str(item.user_id),
+                PERSON_STRENGTH: item.strength.value,
+                PERSON_EVIDENCE: list(item.evidence),
             }
             for item in facts.persons
         ],
@@ -818,12 +819,13 @@ def _facts_view(output: JsonObject | None) -> FactsView | None:
     )
     persons: dict[UserId, Strength] = {}
     public: set[UserId] = set()
-    for value in as_list(output.get("persons")):
+    for value in as_list(output.get(PERSONS)):
         item = as_object(value) or {}
-        user, strength = _id_of(UserId, item.get("user_id")), as_text(item.get("strength"))
+        user = _id_of(UserId, item.get(PERSON_USER))
+        strength = as_text(item.get(PERSON_STRENGTH))
         if user is not None and strength in set(Strength):
             persons[user] = Strength(strength)
-            if NAME in as_list(item.get("evidence")):
+            if NAME in as_list(item.get(PERSON_EVIDENCE)):
                 public.add(user)
     return FactsView(
         named=frozenset(contact for contact in named if contact is not None),

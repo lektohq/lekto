@@ -28,6 +28,8 @@ from lekto.core.domain.classification import (
     CUSTOM_FIELDS,
     DOCUMENT_DATE,
     DOCUMENT_TYPE,
+    RELATED,
+    RELATED_DOCUMENT,
 )
 from lekto.core.domain.document_facts import (
     DocumentFact,
@@ -236,9 +238,7 @@ class RelateResult:
         await uow.lock(RELATIONS_LOCK)
         related = await relate(uow, document, now)
         await uow.outbox.add(relation_events([*related.made, *related.dropped], now))
-        output: JsonObject = {
-            "relations": [relation_json(item, document.id) for item in related.made]
-        }
+        output: JsonObject = {RELATED: [relation_json(item, document.id) for item in related.made]}
         if related.dropped:
             output["dropped"] = [relation_json(item, document.id) for item in related.dropped]
         return NodeResult(outcome=Outcome.OK, model_version=RELATE, output=output)
@@ -248,7 +248,7 @@ def relation_json(relation: Relation, document: DocumentId) -> JsonObject:
     """A relation as the log of `document` names it: the other document, which way, how sure,
     and why."""
     return {
-        "document_id": str(relation.other(document)),
+        RELATED_DOCUMENT: str(relation.other(document)),
         "direction": (
             Direction.REFERS_TO if relation.newer == document else Direction.REFERRED_BY
         ).value,

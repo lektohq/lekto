@@ -24,6 +24,10 @@ from uuid import UUID
 from lekto.core.domain.classification import (
     CHECKS,
     DOCUMENT_DATE,
+    PERSON_PUBLIC,
+    PERSON_STRENGTH,
+    PERSON_USER,
+    PERSONS,
     TITLE,
     FieldCheck,
     checks_to_json,
@@ -853,9 +857,6 @@ class JudgeNode:
         return self._clock.now().date()
 
 
-PERSONS = "persons"
-
-
 def _persons_json(
     persons: Mapping[UserId, Strength], public: Mapping[UserId, Strength]
 ) -> JsonValue:
@@ -865,9 +866,9 @@ def _persons_json(
     only by that (`_access.readable_log`)."""
     return [
         {
-            "user_id": str(user),
-            "strength": strength.value,
-            **({"public": public[user].value} if user in public else {}),
+            PERSON_USER: str(user),
+            PERSON_STRENGTH: strength.value,
+            **({PERSON_PUBLIC: public[user].value} if user in public else {}),
         }
         for user, strength in sorted(
             persons.items(), key=lambda item: (-item[1].rank, str(item[0]))
