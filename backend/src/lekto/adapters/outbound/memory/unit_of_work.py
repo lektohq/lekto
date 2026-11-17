@@ -149,6 +149,7 @@ class MemoryUnitOfWork:
     def __init__(self, database: MemoryDatabase) -> None:
         self._db = database
         self._closed = False
+        self._failed = False  # a write broke a constraint: only rollback remains (PM-04)
         self._writes: dict[str, dict[UUID, Identified[UUID] | None]] = {}
         self._tables: dict[str, Table[Any]] = {}  # the tables written to, of any kind
         self._base_versions: dict[tuple[str, UUID], int | None] = {}
@@ -233,10 +234,12 @@ class MemoryUnitOfWork:
             self._held = None
 
     async def commit(self) -> None:
+        """Closes the unit, also if the commit fails, as the SQL transaction does."""
         self._check_open()
         try:
             self._commit()
         finally:
+            self._closed = True
             self._release()
 
     def _commit(self) -> None:
@@ -302,13 +305,24 @@ class MemoryUnitOfWork:
             del self._db.verdicts[key]
 
     async def rollback(self) -> None:
-        self._check_open()
+        if self._closed:
+            raise RuntimeError("the unit of work is closed")
         self._closed = True
         self._release()
 
     def _check_open(self) -> None:
+        """RuntimeError if the unit is closed, or a write of it failed (`_violated`)."""
         if self._closed:
             raise RuntimeError("the unit of work is closed")
+        if self._failed:
+            raise RuntimeError("a write of this unit of work failed; it can only roll back")
+
+    def _violated(self, message: str) -> ConflictError:
+        """The error of a write that breaks a constraint of the SQL schema (a key, a foreign
+        key, a unique index); the unit fails with it, as the database's transaction does: only
+        rollback remains (PM-04)."""
+        self._failed = True
+        return ConflictError(message)
 
     def _check_versions(self) -> None:
         for (table_name, id), base in self._base_versions.items():
@@ -376,7 +390,7 @@ class MemoryUnitOfWork:
             if reference.target.name != table.name or reference.on_delete is not OnDelete.RESTRICT:
                 continue
             if any(id in reference.ids(row) for row in self._rows(reference.table)):
-                raise ConflictError(f"a {reference.table.name} still refers to {table.name} {id}")
+                raise self._violated(f"a {reference.table.name} still refers to {table.name} {id}")
 
     def _removed(self) -> dict[str, set[UUID]]:
         """The ids of the rows this unit removed, by table."""
@@ -436,13 +450,12 @@ class MemoryUnitOfWork:
             if run.document_id not in documents:
                 raise ConflictError(f"a processing log entry refers to document {run.document_id}")
 
-    @staticmethod
-    def _unique_or_fail[E: Identified[UUID]](table: Table[E], rows: Iterable[E]) -> None:
+    def _unique_or_fail[E: Identified[UUID]](self, table: Table[E], rows: Iterable[E]) -> None:
         seen: set[Hashable] = set()
         for row in rows:
             for key in table.unique_keys(row):
                 if key in seen:
-                    raise ConflictError(f"{table.name} already exists: {key}")
+                    raise self._violated(f"{table.name} already exists: {key}")
                 seen.add(key)
 
 
@@ -748,7 +761,7 @@ class MemoryDocumentVersionRepository:
         self._uow._check_open()
         id = version_row_id(version.document_id, version.number)
         if self._uow._row(DOCUMENT_VERSIONS, id) not in (None, _REMOVED):
-            raise ConflictError(f"document version already exists: {version.number}")
+            raise self._uow._violated(f"document version already exists: {version.number}")
         self._uow._write(DOCUMENT_VERSIONS, id, VersionRow(id, version))
 
     async def of_document(self, document: DocumentId) -> list[DocumentVersion]:

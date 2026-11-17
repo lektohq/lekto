@@ -7,7 +7,7 @@ from datetime import datetime
 
 from lekto.adapters.outbound.memory.database import DOCUMENTS, MAILBOXES
 from lekto.adapters.outbound.memory.rows import MemoryRows, _copy
-from lekto.core.domain.errors import ConflictError, NotFoundError
+from lekto.core.domain.errors import NotFoundError
 from lekto.core.domain.ids import DocumentId, MailboxId, MailRecordId, MailRuleId
 from lekto.core.domain.mail_intake import (
     SETTLED,
@@ -22,7 +22,7 @@ from lekto.core.ports.repository import PAGE_SIZE
 class MemoryMailRecordRepository(MemoryRows[MailRecordId, MailRecord]):
     async def add(self, record: MailRecord) -> None:
         if self._uow._row(MAILBOXES, record.mailbox_id) is None:
-            raise ConflictError("mail record: no such mailbox")  # as the foreign key
+            raise self._uow._violated("mail record: no such mailbox")  # as the foreign key
         await super().add(record)
 
     async def known_uids(self, mailbox: MailboxId, folder: str, uidvalidity: int) -> set[int]:
@@ -107,7 +107,7 @@ class MemoryMailOriginRepository(MemoryRows[DocumentId, MailOrigin]):
 
     async def add(self, origin: MailOrigin) -> None:
         if self._uow._row(DOCUMENTS, origin.document_id) is None:
-            raise ConflictError("mail origin: no such document")  # as the foreign key
+            raise self._uow._violated("mail origin: no such document")  # as the foreign key
         await super().add(origin)
 
     async def find(self, document: DocumentId) -> MailOrigin | None:

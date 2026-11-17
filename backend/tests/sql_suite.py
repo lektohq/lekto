@@ -334,19 +334,6 @@ class SqlAdapterSuite(ServicesOverPersistence):
         async with uow_factory() as uow:
             assert len(await uow.documents.list_visible_to(owner.id)) == 1
 
-    async def test_a_failed_write_leaves_only_rollback(
-        self, uow_factory: UnitOfWorkFactory
-    ) -> None:
-        user = builders.user()
-        await _seed_user(uow_factory, user)
-        async with uow_factory() as uow:
-            with pytest.raises(ConflictError):
-                await uow.users.add(user)
-            with pytest.raises(RuntimeError):
-                await uow.users.find(user.id)
-            with pytest.raises(RuntimeError):
-                await uow.commit()
-
     # --- events ---------------------------------------------------------------------------------
 
     async def test_handlers_may_write_while_dispatching(

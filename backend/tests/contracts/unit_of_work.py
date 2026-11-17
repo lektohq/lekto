@@ -340,6 +340,40 @@ class UnitOfWorkContract:
             stored = await uow.users.get(owner.id)
         assert (stored.username, stored.version) == (winners[0], 2)
 
+    async def test_a_failed_write_leaves_only_rollback(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """A write that breaks a constraint fails the unit: on Postgres the transaction is
+        aborted anyway, so with every adapter only rollback remains (PM-04, TA-03)."""
+        user = builders.user()
+        await seed(uow_factory, user)
+        async with uow_factory() as uow:
+            with pytest.raises(ConflictError):
+                await uow.users.add(user)
+            with pytest.raises(RuntimeError):
+                await uow.users.find(user.id)
+            with pytest.raises(RuntimeError):
+                await uow.commit()
+            await uow.rollback()
+
+    async def test_a_failed_commit_closes_the_unit(self, uow_factory: UnitOfWorkFactory) -> None:
+        """Two units add users of the same name; the one refused, at its write or its commit,
+        is closed or failed after it: committing again is an error (PM-04)."""
+
+        async def add(name: str) -> str:
+            async with uow_factory() as uow:
+                try:
+                    await uow.users.add(builders.user(name))
+                    await asyncio.sleep(0)
+                    await uow.commit()
+                except ConflictError:
+                    with pytest.raises(RuntimeError):
+                        await uow.commit()
+                    return "refused"
+            return "added"
+
+        assert sorted(await asyncio.gather(add("Dora"), add("dora"))) == ["added", "refused"]
+
     async def test_update_of_missing_entity(self, uow_factory: UnitOfWorkFactory) -> None:
         async with uow_factory() as uow:
             with pytest.raises(NotFoundError):

@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 
 from lekto.adapters.outbound.memory.database import DOCUMENTS
 from lekto.core.domain.documents import Document
-from lekto.core.domain.errors import ConflictError
 from lekto.core.domain.first_runs import FieldVerdict, FirstRun, Verdict
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.pipeline import Lane, Node
@@ -128,7 +127,9 @@ class MemoryProcessingFacts:
         """ConflictError for a fact of a document that does not exist, as the SQL schema's
         foreign key refuses it."""
         if self._uow._row(DOCUMENTS, document) is None:
-            raise ConflictError(f"processing fact of a document that does not exist: {document}")
+            raise self._uow._violated(
+                f"processing fact of a document that does not exist: {document}"
+            )
 
     def _runs(self) -> dict[DocumentId, FirstRun]:
         """The first runs committed, with this unit's."""

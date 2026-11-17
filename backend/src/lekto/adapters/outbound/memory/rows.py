@@ -10,7 +10,7 @@ from uuid import UUID
 
 from lekto.adapters.outbound.memory.database import Table
 from lekto.core.domain.entity import Entity, Identified
-from lekto.core.domain.errors import ConcurrencyError, ConflictError, NotFoundError
+from lekto.core.domain.errors import ConcurrencyError, NotFoundError
 
 if TYPE_CHECKING:
     from lekto.adapters.outbound.memory.unit_of_work import MemoryUnitOfWork
@@ -44,7 +44,7 @@ class MemoryRows[K: UUID, E: Identified[UUID]]:
     async def add(self, entity: E) -> None:
         id = entity.id
         if self._uow._row(self._table, id) is not _REMOVED:
-            raise ConflictError(f"{self._table.name} {id} already exists")
+            raise self._uow._violated(f"{self._table.name} {id} already exists")
         self._uow._unique_or_fail(self._table, [*self._uow._rows(self._table), entity])
         self._uow._write(self._table, id, _copy(entity))
 
