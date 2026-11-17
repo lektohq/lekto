@@ -112,7 +112,10 @@ asn: {to: field, name: ASN}
   `{matches: <regex>}`), `mime_type`, `correspondent`, `document_type`, `storage_path`, `owner`
   (a name or list; `null` for none), `tags` (a list, `{any}`, `{all}`, `{none}`),
   `shared_with`, `created`, `added`, `modified` (`{from, to}`), `has_notes`, `custom_fields`
-  (`{<name>: true | false | <value> | [<values>] | {from, to}}`).
+  (`{<name>: true | false | <value> | [<values>] | {from, to}}`). A criterion in another form
+  (a key mistyped, a regular expression that does not compile, a day that is none) is a
+  problem of the plan, as is a bound of a custom field that does not fit its type (a day for a
+  date field, else a number).
 
 ## Defaults of the first plan
 

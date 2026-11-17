@@ -135,6 +135,12 @@ async def test_the_cold_run_says_who_sees_a_document_beyond_paperless(setup: Set
     assert (ten["becomes"]["members"], ten["becomes"]["beyond"]) == (["tobias: edit"], [])
 
 
+async def test_a_bound_that_does_not_fit_its_field_stops_the_commands(setup: Setup) -> None:
+    assert await setup.run("plan") == 0
+    setup.edit("documents", "exclude", "{custom_fields: {Due: {from: 2024}}}")
+    assert await setup.run("check") == 2  # a date field: from a day
+
+
 async def test_a_plan_cannot_name_a_shared_space_like_a_personal_one(setup: Setup) -> None:
     assert await setup.run("plan") == 0
     setup.edit("storage_paths", "Bank", "{to: space, name: Persönlich, create: true}")

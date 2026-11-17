@@ -8,7 +8,7 @@ import pytest
 
 from lekto_migration import plan as plans
 from lekto_migration.plan import PlanError, Target
-from lekto_migration.select import Names, selected
+from lekto_migration.select import Names, mismatches, selected
 
 EXAMPLE = """\
 # The plan of the move to Lekto.
@@ -159,6 +159,75 @@ def test_a_missing_section_is_empty_and_asn_is_dropped_by_default() -> None:
         (HEAD + "settings: {colour: red}\n", "settings.colour"),
         (HEAD + "documents: {include: {colour: red}}\n", "unknown criterion"),
         (HEAD + "documents: {sometimes: {}}\n", "only include and exclude"),
+        (
+            HEAD + 'documents: {exclude: {title: {matches: "[Privat"}}}\n',
+            "documents.exclude.title.matches: not a regular expression",
+        ),
+        (
+            HEAD + "documents: {include: {title: {contain: x}}}\n",
+            "documents.include.title: a text, {contains",
+        ),
+        (
+            HEAD + "documents: {include: {title: {matches: [a]}}}\n",
+            "documents.include.title.matches: a text",
+        ),
+        (
+            HEAD + "documents: {include: {tags: {al: [Steuer]}}}\n",
+            "documents.include.tags.al: only any, all and none",
+        ),
+        (
+            HEAD + "documents: {include: {tags: {all: {x: y}}}}\n",
+            "documents.include.tags.all: a name or a list",
+        ),
+        (
+            HEAD + "documents: {include: {shared_with: [[x]]}}\n",
+            "documents.include.shared_with: a name, a list",
+        ),
+        (
+            HEAD + "documents: {include: {asn: {from: '3'}}}\n",
+            "documents.include.asn.from: a number",
+        ),
+        (HEAD + "documents: {include: {id: [true]}}\n", "documents.include.id: a number, a list"),
+        (
+            HEAD + "documents: {include: {added: {from: gestern}}}\n",
+            "documents.include.added.from: a day",
+        ),
+        (
+            HEAD + "documents: {include: {added: {from: 2024-01-01T10:00:00}}}\n",
+            "documents.include.added.from: a day",
+        ),
+        (
+            HEAD + "documents: {include: {added: {form: 2024-01-01}}}\n",
+            "documents.include.added.form: only from and to",
+        ),
+        (
+            HEAD + "documents: {include: {created: 2024}}\n",
+            "documents.include.created: {from: <day>",
+        ),
+        (
+            HEAD + "documents: {include: {has_notes: maybe}}\n",
+            "documents.include.has_notes: true or false",
+        ),
+        (
+            HEAD + "documents: {include: {owner: {name: x}}}\n",
+            "documents.include.owner: a name, null for none",
+        ),
+        (
+            HEAD + "documents: {include: {custom_fields: [Amount]}}\n",
+            "documents.include.custom_fields: a mapping",
+        ),
+        (
+            HEAD + "documents: {include: {custom_fields: {Amount: {from: ten}}}}\n",
+            "custom_fields.Amount.from: a number or a day",
+        ),
+        (
+            HEAD + "documents: {include: {custom_fields: {Amount: {over: 1}}}}\n",
+            "custom_fields.Amount.over: only from and to",
+        ),
+        (
+            HEAD + "documents: {include: {custom_fields: {Amount: null}}}\n",
+            "custom_fields.Amount: true, false, a value",
+        ),
     ],
 )
 def test_what_a_plan_may_not_say(body: str, expected: str) -> None:
@@ -277,6 +346,28 @@ DOCUMENT: dict[str, Any] = {
 )
 def test_include_needs_every_criterion(criteria: dict[str, Any], expected: bool) -> None:
     assert selected(plans.Selection(include=criteria), DOCUMENT, NAMES) is expected
+    # Each form the README names is one the plan takes.
+    plans.parse({"source": "http://p", "target": "http://l", "documents": {"include": criteria}})
+
+
+def test_a_day_is_a_date_or_a_text_that_starts_with_one() -> None:
+    plan = parse(
+        HEAD + "documents: {include: {added: {from: 2018-01-01, to: '2018-12-31'}, "
+        "custom_fields: {Due: {from: 2024-06-01}, Amount: {to: '12.50'}}}}\n"
+    )
+    assert selected(plan.selection, DOCUMENT, NAMES) is False  # added 2024
+
+
+def test_the_bounds_of_a_custom_field_fit_its_type() -> None:
+    """Which type a field has, only Paperless knows: the plan takes either."""
+    fitting = {"Due": {"from": "2024-06-01"}, "Amount": {"from": 10, "to": "20.5"}}
+    assert mismatches(plans.Selection(include={"custom_fields": fitting}), NAMES) == []
+    swapped = {"Due": {"from": 2024}, "amount": {"to": "2024-12-31"}, "Missing": {"to": 1}}
+    assert mismatches(plans.Selection(exclude={"custom_fields": swapped}), NAMES) == [
+        "documents.exclude.custom_fields.Due.from: a day such as 2024-01-31, as the field Due "
+        "holds",
+        "documents.exclude.custom_fields.amount.to: a number, as the field Amount holds",
+    ]
 
 
 def test_exclude_needs_one_criterion() -> None:

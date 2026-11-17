@@ -10,9 +10,10 @@ import io
 import os
 import re
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -365,11 +366,128 @@ def _selection(raw: Any, problems: list[str]) -> Selection:
         if not isinstance(value, Mapping):
             problems.append(f"documents.{key}: a mapping of criteria")
             continue
-        for criterion in value:
+        for criterion, condition in value.items():
+            where = f"documents.{key}.{criterion}"
             if criterion not in CRITERIA:
-                problems.append(f"documents.{key}.{criterion}: unknown criterion")
+                problems.append(f"{where}: unknown criterion")
+            else:
+                _criterion(where, criterion, condition, problems)
         parts[key] = dict(value)
     return Selection(include=parts.get("include", {}), exclude=parts.get("exclude", {}))
+
+
+_NAMES_FORM = "a name, null for none, or a list of them"
+_SET_FORM = "a name, a list of names, or {any|all|none: <names>}"
+_TEXT_FORM = "a text, {contains: <text>} or {matches: <regular expression>}"
+
+
+def _criterion(where: str, key: str, condition: Any, problems: list[str]) -> None:
+    """The problems of a criterion of `documents` whose form is none `select` reads (the
+    README, "Selection"): a typo in a key would drop it, so it held for every document, and a
+    regular expression that does not compile would hold for none."""
+    match key:
+        case "id" | "asn":
+            if isinstance(condition, Mapping):
+                _range(where, condition, _is_number, "a number", problems)
+            elif not all(item is None or _is_number(item) for item in _listed(condition)):
+                problems.append(f"{where}: a number, a list of numbers, null or {{from, to}}")
+        case "title" | "original_file_name":
+            if not isinstance(condition, Mapping):
+                if not _is_scalar(condition):
+                    problems.append(f"{where}: {_TEXT_FORM}")
+            elif len(condition) != 1 or not set(condition) <= {"contains", "matches"}:
+                problems.append(f"{where}: {_TEXT_FORM}")
+            elif not _is_scalar(text := next(iter(condition.values()))):
+                problems.append(f"{where}.{next(iter(condition))}: a text")
+            elif "matches" in condition:
+                try:
+                    re.compile(str(text))
+                except re.error as error:
+                    problems.append(f"{where}.matches: not a regular expression ({error})")
+        case "mime_type" | "correspondent" | "document_type" | "storage_path" | "owner":
+            if not all(item is None or _is_scalar(item) for item in _listed(condition)):
+                problems.append(f"{where}: {_NAMES_FORM}")
+        case "tags" | "shared_with":
+            if isinstance(condition, Mapping):
+                for mode, names in condition.items():
+                    if mode not in ("any", "all", "none"):
+                        problems.append(f"{where}.{mode}: only any, all and none")
+                    elif not _names(names):
+                        problems.append(f"{where}.{mode}: a name or a list of names")
+            elif not _names(condition):
+                problems.append(f"{where}: {_SET_FORM}")
+        case "created" | "added" | "modified":
+            if isinstance(condition, Mapping):
+                _range(where, condition, _is_day, "a day such as 2024-01-31", problems)
+            else:
+                problems.append(f"{where}: {{from: <day>, to: <day>}}")
+        case "has_notes":
+            if not isinstance(condition, bool):
+                problems.append(f"{where}: true or false")
+        case "custom_fields":
+            if not isinstance(condition, Mapping):
+                problems.append(f"{where}: a mapping from the names of fields to their values")
+                return
+            for name, wanted in condition.items():
+                field_where = f"{where}.{name}"
+                if isinstance(wanted, Mapping):
+                    _range(field_where, wanted, _is_bound, "a number or a day", problems)
+                elif not isinstance(wanted, bool) and not _names(wanted):
+                    problems.append(
+                        f"{field_where}: true, false, a value, a list of values or {{from, to}}"
+                    )
+
+
+def _range(
+    where: str,
+    condition: Mapping[str, Any],
+    valid: Callable[[Any], bool],
+    form: str,
+    problems: list[str],
+) -> None:
+    for bound, value in condition.items():
+        if bound not in ("from", "to"):
+            problems.append(f"{where}.{bound}: only from and to")
+        elif not valid(value):
+            problems.append(f"{where}.{bound}: {form}")
+
+
+def _listed(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else [value]
+
+
+def _names(value: Any) -> bool:
+    items = _listed(value)
+    return bool(items) and all(_is_scalar(item) for item in items)
+
+
+def _is_scalar(value: Any) -> bool:
+    """A text, or a number YAML read for one (`title: 2023`)."""
+    return isinstance(value, str) or _is_number(value)
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
+def _is_day(value: Any) -> bool:
+    """A day as `select` reads it: a date, or a text that starts with one."""
+    if isinstance(value, datetime):
+        return False
+    if isinstance(value, date):
+        return True
+    return isinstance(value, str) and _is_date(value[:10])
+
+
+def _is_bound(value: Any) -> bool:
+    """A bound of a custom field's value: a number or a day (a date field)."""
+    if _is_number(value) or _is_day(value):
+        return True
+    try:
+        Decimal(str(value))
+    except InvalidOperation:
+        return False
+    return isinstance(value, str)
 
 
 def _entry(section: str, name: str, raw: Any, problems: list[str]) -> Entry | None:
