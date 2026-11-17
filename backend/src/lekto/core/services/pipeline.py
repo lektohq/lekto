@@ -694,8 +694,8 @@ class PipelineService:
         document where it lies now (handed over, or moved into a space they only read, where
         it is not green yet).
 
-        If the fields node does not run again, the type's title pattern is rendered with the
-        decided values, as long as the document has the machine's title (`titles`)."""
+        A type's title pattern is a rule (`rules.title_rule`): it sets the title when the rules
+        run again, as on arrival; confirming renders no title of its own."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             document, source = await controllable_document(uow, user, id, Action.CONTROL_PROCESSING)

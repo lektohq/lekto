@@ -888,8 +888,9 @@ class FieldsNode(_ModelStep):
     holds, the required ones say why. A field set by hand is never asked for and keeps its
     value (the rules node checks that a required one has one).
 
-    The title comes from the type's title pattern, or from the model's proposal, as long as
-    the document's title is still the file name or the one set here before.
+    The title is the model's proposal, as long as the document's title is still the file name
+    or the one set here before. A type's title pattern is a rule (`rules.title_rule`): it sets
+    the title when the rules run.
 
     A webhook that serves as the model call `extract` (`external`) reads the missing fields
     instead of the model: the node sends it the context and waits for its answer, which
