@@ -128,7 +128,7 @@ from lekto.core.domain.relations import Relation
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
 from lekto.core.domain.validation import name_key, require_utc
-from lekto.core.domain.verdict import KnownLabels
+from lekto.core.domain.verdict import KnownLabels, known_space
 from lekto.core.domain.versions import DocumentVersion
 from lekto.core.ports.repository import (
     NEWEST_FIRST,
@@ -647,9 +647,7 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
         spaces = {space.id: space for space in self._uow._rows(SPACES)}
         own = next((space.id for space in spaces.values() if space.personal_of == reader), None)
         decided = frozenset(
-            own
-            if own is not None and spaces[row.space_id].personal_of == row.uploaded_by
-            else row.space_id
+            known_space(row.space_id, spaces[row.space_id].personal_of, row.uploaded_by, own)
             for row in confirmed
             if row.space_confirmed_at is not None and row.space_id in spaces
         )

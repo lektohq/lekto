@@ -1463,6 +1463,23 @@ class UnitOfWorkContract:
             assert known.spaces == {shared.id}
             assert (await uow.documents.confirmed_labels(owner.id)).spaces == {shared.id, home.id}
 
+    async def test_a_shared_space_stays_known_without_the_uploader(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """A confirmed document in a shared space whose uploader is gone (deleted, the column
+        emptied) is known in that space, not in the reader's personal space (PM-01)."""
+        owner, _ = await owner_with_space(uow_factory)
+        shared = builders.space(owner, "Haushalt")
+        orphan = builders.processed(None, shared)
+        orphan.confirm_space(NOW)
+        orphan.mark_confirmed(NOW)
+        async with uow_factory() as uow:
+            await uow.spaces.add(shared)
+            await uow.documents.add(orphan)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert (await uow.documents.confirmed_labels(owner.id)).spaces == {shared.id}
+
     async def test_a_space_s_description(self, uow_factory: UnitOfWorkFactory) -> None:
         editor = builders.user()
         space = builders.space(editor, "Haushalt")

@@ -178,6 +178,21 @@ class KnownLabels:
     spaces: frozenset[SpaceId] = frozenset()  # as candidates of the uploader
 
 
+def known_space(
+    space: SpaceId,
+    personal_of: UserId | None,
+    uploaded_by: UserId | None,
+    reader_space: SpaceId | None,
+) -> SpaceId:
+    """The decided space of a confirmed document as a candidate of the reader
+    (`KnownLabels.spaces`): one in its uploader's personal space (`personal_of`, the space's
+    person) counts as the reader's personal space (`reader_space`), if they have one; a shared
+    space, also of a document whose uploader is gone, as itself (PM-01)."""
+    if reader_space is not None and personal_of is not None and personal_of == uploaded_by:
+        return reader_space
+    return space
+
+
 @dataclass(frozen=True)
 class Signals:
     """What each signal said; None where it abstained (or, before the signals, never ran).
