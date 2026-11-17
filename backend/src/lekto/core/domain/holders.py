@@ -498,11 +498,12 @@ class ReadHolder:
 
 
 def checked_holder(
-    text: str, read: ReadHolder, listed: Collection[Key]
+    text: str, read: ReadHolder, listed: Collection[Key], normalised: str | None = None
 ) -> tuple[Key, Holder] | Reason:
     """The holder `read` tells, checked: of one of the `listed` numbers, a holder Lekto knows,
     a passage of the text that shows the number (`QUOTE_*`), and a name that stands in the text
-    near one of the number's places (`NEAR`). Why not, otherwise."""
+    near one of the number's places (`NEAR`). Why not, otherwise. `normalised` is
+    `normalise(text)`, if known."""
     number = next((kind for kind in MODEL_HOLDER_KINDS if kind.value == read.kind), None)
     if number is None:
         return because(ReasonCode.HOLDER_NOT_LISTED, value=read.value)
@@ -519,7 +520,7 @@ def checked_holder(
     evidence = (read.evidence or "").strip()
     if not evidence:
         return because(ReasonCode.QUOTE_MISSING)
-    if not contains(normalise(text), evidence):
+    if not contains(normalise(text) if normalised is None else normalised, evidence):
         return because(ReasonCode.QUOTE_NOT_IN_TEXT)
     if re.search(type_of(key[0]).written(key[1]), evidence, re.IGNORECASE) is None:
         return because(ReasonCode.QUOTE_WITHOUT_VALUE)

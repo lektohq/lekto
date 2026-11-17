@@ -14,6 +14,7 @@ the new one takes its place: entered by hand, or, where the old one was learned,
 the same spaces and user (who saw the old one sees the new one, #82); as a person's choice it
 takes the value from another contact that only learned or rejected it."""
 
+import asyncio
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -111,6 +112,12 @@ async def decide_fact(
         text = (await load_text(store, id)).decode("utf-8", errors="replace")
     except NotFoundError:
         text = None
+    # What the sources find in the text, for a withdrawal: read before the lock is taken.
+    sources = (
+        await TextFacts.read(text)
+        if text is not None and decision.action is FactAction.WITHDRAW
+        else None
+    )
     now = clock.now()
     async with uow_factory() as uow:
         # One store of the document's facts at a time: the signals' and a person's.
@@ -128,8 +135,13 @@ async def decide_fact(
             case FactAction.ADD:
                 if decision.role is None:
                     raise ValidationError(because(ReasonCode.FACT_ROLE_MISSING))
-                given = person_fact(
-                    text, decision.kind, decision.value, decision.role, FactState.ADDED
+                given = await asyncio.to_thread(
+                    person_fact,
+                    text,
+                    decision.kind,
+                    decision.value,
+                    decision.role,
+                    FactState.ADDED,
                 )
                 known = facts.get(given.key)
                 if known is not None and known.state is not FactState.REJECTED:
@@ -142,7 +154,8 @@ async def decide_fact(
                 fact = _fact(facts, key)
                 new = None
                 if decision.new_value is not None:
-                    new = person_fact(
+                    new = await asyncio.to_thread(
+                        person_fact,
                         text,
                         decision.kind,
                         decision.new_value,
@@ -163,13 +176,14 @@ async def decide_fact(
                 verdict = Verdict.CORRECTED
             case FactAction.WITHDRAW:
                 _fact(facts, key)
+                assert sources is not None  # read above: the document has its text
                 await uow.document_facts.withdraw(id, key)
                 # As the sources find it now: its role and origins, or nothing.
                 log = await uow.processing_log.list_for(id)
                 await refresh_facts(
                     uow,
                     id,
-                    await TextFacts.read(text),
+                    sources,
                     model_facts(ProcessingHistory(log).signals()),
                     in_codes={
                         fact.key for fact in facts.values() if FactOrigin.CODE in fact.origins

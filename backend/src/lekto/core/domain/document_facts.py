@@ -233,18 +233,38 @@ def found_facts(
     codes on its pages (`code_identifiers`), each once, as the text reads (those only in a code
     last), with the role of its kind; a document's own number the text shows only as another's
     (`referred_in`: "Ihre Rechnung Nr. 4711") refers to that document ("Ihre Vertragsnummer" is
-    still the contract's). Where one stands first is where its
-    reader took it (`places`: in the normalised text, `places_in`), else where its value stands
-    first."""
-    texts, codes = set(in_text), set(in_codes)
+    still the contract's). Where one stands is `standing`."""
+    return facts_at(text, standing(text, in_text, places), in_codes, referred)
+
+
+def standing(
+    text: str, in_text: Iterable[Key], places: Mapping[Key, int] | None = None
+) -> dict[Key, tuple[int, int] | None]:
+    """Where each identifier in `text` (`in_text`) stands first: where its reader took it
+    (`places`: in the normalised text, `places_in`), else where its value stands first; None
+    if it stands nowhere as its kind writes it. A search of the whole text for each: one long
+    text with many takes seconds (`kept_facts.TextFacts` keeps it)."""
     normalised = normalise(text) if places else ""
+    return {
+        key: _first(text, normalised, *key, None if places is None else places.get(key))
+        for key in in_text
+    }
+
+
+def facts_at(
+    text: str,
+    standing: Mapping[Key, tuple[int, int] | None],
+    in_codes: Iterable[Key] = (),
+    referred: Collection[Key] = (),
+) -> tuple[DocumentFact, ...]:
+    """`found_facts` with where the identifiers in the text stand (`standing`) known."""
+    codes = set(in_codes)
     facts = []
-    for kind, value in texts | codes:
-        origins = {FactOrigin.PATTERN} if (kind, value) in texts else set()
+    for kind, value in standing.keys() | codes:
+        origins = {FactOrigin.PATTERN} if (kind, value) in standing else set()
         if (kind, value) in codes:
             origins.add(FactOrigin.CODE)
-        at = None if places is None else places.get((kind, value))
-        where = _first(text, normalised, kind, value, at) if (kind, value) in texts else None
+        where = standing.get((kind, value))
         facts.append(
             DocumentFact(
                 kind=kind,
@@ -336,13 +356,14 @@ def checked_read(
     kinds: Collection[IdentifierKind],
     roles: Collection[FactRole],
     personal: Collection[Key] = (),
+    normalised: str | None = None,
 ) -> DocumentFact | Reason:
     """The fact `read` gives, checked as a field's value is: one of the `kinds` in one of the
     `roles` the reader was asked for, a value of the kind, standing in the text, and a passage
     of the text that shows it (`QUOTE_*`); for the day of a letter, the passage names the letter
     ("Ihr Schreiben vom"). A value that is one of a person's (`personal`: their numbers in the
     text and in the users' profiles, `of_person`), under whatever kind, is none. Its role as
-    given. Why not, otherwise."""
+    given. Why not, otherwise. `normalised` is `normalise(text)`, if known."""
     try:
         kind = IdentifierKind(read.kind)
         role = FactRole(read.role)
@@ -364,7 +385,7 @@ def checked_read(
     evidence = (read.evidence or "").strip()
     if not evidence:
         return because(ReasonCode.QUOTE_MISSING)
-    if not contains(normalise(text), evidence):
+    if not contains(normalise(text) if normalised is None else normalised, evidence):
         return because(ReasonCode.QUOTE_NOT_IN_TEXT)
     if re.search(type_of(kind).written(value), evidence, re.IGNORECASE) is None:
         return because(ReasonCode.QUOTE_WITHOUT_VALUE)

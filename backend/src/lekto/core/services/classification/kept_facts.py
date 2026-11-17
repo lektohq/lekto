@@ -19,9 +19,11 @@ from lekto.core.domain.document_facts import (
     Holder,
     ReadFact,
     checked_read,
-    found_facts,
+    facts_at,
+    standing,
     with_read,
 )
+from lekto.core.domain.evidence import normalise
 from lekto.core.domain.holders import ReadHolder, checked_holder, merged_holder
 from lekto.core.domain.identifiers import (
     TYPES,
@@ -53,29 +55,34 @@ def facts_lock(document: DocumentId) -> str:
 @dataclass(frozen=True)
 class TextFacts:
     """What the patterns read in a document's text (`identifiers_in`, `places_in`,
-    `referred_in`), read outside the transaction that keeps the facts."""
+    `referred_in`) and where each stands (`standing`), with the normalised text: read outside
+    the transaction that keeps the facts and outside the event loop."""
 
     text: str
     in_text: frozenset[Key]
-    places: dict[Key, int]
     referred: frozenset[Key]
+    standing: dict[Key, tuple[int, int] | None]
+    normalised: str
 
     @classmethod
     async def read(cls, text: str) -> "TextFacts":
         def reading() -> "TextFacts":
+            in_text = frozenset(identifiers_in(text))
             return cls(
                 text,
-                frozenset(identifiers_in(text)),
-                places_in(text),
+                in_text,
                 frozenset(referred_in(text)),
+                standing(text, in_text, places_in(text)),
+                normalise(text),
             )
 
-        # Every kind's patterns over a long text take a while: not in the loop.
+        # Every kind's patterns over a long text take a while, and finding where each of
+        # a thousand numbers stands seconds: not in the loop.
         return await asyncio.to_thread(reading)
 
     def found(self, in_codes: Iterable[Key] = ()) -> tuple[DocumentFact, ...]:
         """The facts of the patterns and of the codes on the pages (`in_codes`)."""
-        return found_facts(self.text, self.in_text, in_codes, self.places, self.referred)
+        return facts_at(self.text, self.standing, in_codes, self.referred)
 
 
 def merged_facts(
@@ -93,7 +100,9 @@ def merged_facts(
     without them)."""
     patterns = text.found(in_codes)
     listed = {fact.key for fact in patterns if fact.key[0] in MODEL_HOLDER_KINDS}
-    checked_holders = [(item, checked_holder(text.text, item, listed)) for item in told or ()]
+    checked_holders = [
+        (item, checked_holder(text.text, item, listed, text.normalised)) for item in told or ()
+    ]
     model = {item[0]: item[1] for _, item in checked_holders if not isinstance(item, Reason)}
     found = [
         fact
@@ -114,7 +123,14 @@ def merged_facts(
     checked = [
         (
             fact,
-            checked_read(text.text, fact, kinds=_KINDS, roles=_ROLES, personal=personal),
+            checked_read(
+                text.text,
+                fact,
+                kinds=_KINDS,
+                roles=_ROLES,
+                personal=personal,
+                normalised=text.normalised,
+            ),
         )
         for fact in read
     ]
@@ -172,6 +188,9 @@ async def refresh_facts(
             holders = {fact.key: fact.holder for fact in kept if fact.holder is not None}
     personal = {key for key in text.in_text if TYPES[key[0]].for_persons}
     personal |= await person_identifiers(uow)
-    facts, report = merged_facts(text, in_codes, read, personal, holders, told)
+    # A search of the text for each fact the model read: not in the loop.
+    facts, report = await asyncio.to_thread(
+        merged_facts, text, in_codes, read, personal, holders, told
+    )
     await uow.document_facts.replace_found(document, facts)
     return report
