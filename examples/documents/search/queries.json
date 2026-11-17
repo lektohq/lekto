@@ -132,7 +132,7 @@
    ]
   },
   {
-   "query": "2004 7718",
+   "query": "1234 5678",
    "kind": "number",
    "expected": [
     "strom-2024",

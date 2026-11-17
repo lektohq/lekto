@@ -9,7 +9,7 @@ import Page from './+page.svelte';
 const USERS = [
 	{
 		id: 'u1',
-		username: 'anna',
+		username: 'erika',
 		display_name: 'Jane Doe',
 		role: 'admin',
 		active: true,
@@ -20,7 +20,7 @@ const USERS = [
 
 beforeEach(() => {
 	session.start({
-		user: { id: 'u1', username: 'anna', role: 'admin' },
+		user: { id: 'u1', username: 'erika', role: 'admin' },
 		method: 'password',
 		expires_at: '2026-10-21T12:00:00Z',
 		csrf_token: 'token'
@@ -61,7 +61,7 @@ describe('the users', () => {
 		expect(screen.queryByRole('table')).toBeNull();
 		expect(rows).toHaveLength(2);
 		expect(within(rows[0]).getByRole('button', { name: 'Jane Doe' })).toBeTruthy();
-		expect(rows[0].textContent).toContain('anna');
+		expect(rows[0].textContent).toContain('erika');
 		expect(rows[0].textContent).toContain(m.role_admin());
 		// Without a display name the username is the name.
 		await userEvent.click(within(rows[1]).getByRole('button', { name: 'bob' }));

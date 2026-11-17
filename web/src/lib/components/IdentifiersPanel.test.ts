@@ -23,9 +23,9 @@ const BANK = { id: '0199a6c4-0000-7000-8000-0000000000c2', name: 'Bank' };
 
 const CUSTOMER = {
 	kind: 'customer_number',
-	value: '20047718',
+	value: '12345678',
 	ref: 'MjAwNDc3MTg',
-	written: '2004 7718',
+	written: '1234 5678',
 	source: 'learned',
 	contacts: [UTILITY],
 	documents: 4,
@@ -121,7 +121,7 @@ beforeEach(() => {
 						title: 'Rechnung Oktober',
 						date: '2026-10-12',
 						role: 'contact',
-						excerpt: { before: 'Kundennummer ', match: '2004 7718', after: ' bitte angeben' }
+						excerpt: { before: 'Kundennummer ', match: '1234 5678', after: ' bitte angeben' }
 					}
 				]
 			});
@@ -191,11 +191,11 @@ describe('IdentifiersPanel', () => {
 		const user = userEvent.setup();
 		render(IdentifiersPanel);
 		await screen.findByRole('list', { name: m.master_identifiers() });
-		const customer = () => screen.getByRole('button', { name: m.open_open({ value: '20047718' }) });
+		const customer = () => screen.getByRole('button', { name: m.open_open({ value: '12345678' }) });
 		// As a row of the master data: the value with its source, kind and contact below, the
 		// documents a bare number.
 		const [value, below] = customer().querySelectorAll(':scope > span > span');
-		expect(value.textContent).toContain('20047718');
+		expect(value.textContent).toContain('12345678');
 		expect(value.textContent).toContain(m.open_learned());
 		expect(below.textContent?.replace(/\s+/g, ' ').trim()).toBe(
 			`${m.identifier_kind_customer_number()} · ${UTILITY.name}`
@@ -206,7 +206,7 @@ describe('IdentifiersPanel', () => {
 		);
 		screen.getByRole('region', { name: m.selection_selected({ count: '1' }) });
 		// Chosen: the rows choose, the dialog waits.
-		await user.click(screen.getByRole('button', { name: m.open_select({ value: '20047718' }) }));
+		await user.click(screen.getByRole('button', { name: m.open_select({ value: '12345678' }) }));
 		screen.getByRole('region', { name: m.selection_selected({ count: '2' }) });
 		expect(screen.queryByRole('dialog')).toBeNull();
 		await user.click(screen.getByRole('button', { name: m.open_selection_clear() }));
@@ -287,7 +287,7 @@ describe('IdentifiersPanel', () => {
 		await vi.waitFor(() =>
 			expect(decisions).toEqual([
 				{ kind: 'email_domain', value: 'stadtwerke-nord.example', action: 'confirm' },
-				{ kind: 'customer_number', value: '20047718', action: 'confirm' }
+				{ kind: 'customer_number', value: '12345678', action: 'confirm' }
 			])
 		);
 		expect(screen.queryByRole('region', { name: /ausgewählt|selected/ })).toBeNull();
@@ -297,10 +297,10 @@ describe('IdentifiersPanel', () => {
 		const user = userEvent.setup();
 		render(IdentifiersPanel);
 		await rows();
-		await user.click(screen.getByRole('checkbox', { name: m.open_select({ value: '20047718' }) }));
+		await user.click(screen.getByRole('checkbox', { name: m.open_select({ value: '12345678' }) }));
 		await user.click(screen.getByRole('button', { name: m.open_reject() }));
 		await vi.waitFor(() =>
-			expect(decisions).toEqual([{ kind: 'customer_number', value: '20047718', action: 'reject' }])
+			expect(decisions).toEqual([{ kind: 'customer_number', value: '12345678', action: 'reject' }])
 		);
 	});
 
@@ -308,14 +308,14 @@ describe('IdentifiersPanel', () => {
 		const user = userEvent.setup();
 		render(IdentifiersPanel);
 		await rows();
-		await user.click(screen.getByRole('button', { name: m.open_open({ value: '20047718' }) }));
+		await user.click(screen.getByRole('button', { name: m.open_open({ value: '12345678' }) }));
 		const dialog = await screen.findByRole('dialog');
-		expect(await within(dialog).findByText('2004 7718')).toBeTruthy();
+		expect(await within(dialog).findByText('1234 5678')).toBeTruthy();
 		expect(dialog.textContent).toContain('Rechnung Oktober');
 		await user.click(within(dialog).getByRole('button', { name: m.open_confirm() }));
 		await vi.waitFor(() =>
 			expect(decisions).toEqual([
-				{ kind: 'customer_number', value: '20047718', action: 'confirm', contact_id: null }
+				{ kind: 'customer_number', value: '12345678', action: 'confirm', contact_id: null }
 			])
 		);
 	});
@@ -324,7 +324,7 @@ describe('IdentifiersPanel', () => {
 		const user = userEvent.setup();
 		render(IdentifiersPanel);
 		await rows();
-		await user.click(screen.getByRole('button', { name: m.open_open({ value: '20047718' }) }));
+		await user.click(screen.getByRole('button', { name: m.open_open({ value: '12345678' }) }));
 		const dialog = await screen.findByRole('dialog');
 		// The address names nothing; the entry holds the identifier by its reference.
 		expect(testPage.url.search).toBe('?tab=identifiers');

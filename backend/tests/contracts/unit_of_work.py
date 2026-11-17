@@ -859,13 +859,13 @@ class UnitOfWorkContract:
     async def test_numbers_of_users(self, uow_factory: UnitOfWorkFactory) -> None:
         """A learned identifier keeps the user it belongs to and the spaces it was learned in;
         the numbers that name a user go with them (issue #82: nobody else's to see then)."""
-        anna, bob = builders.user(), builders.user()
-        await seed(uow_factory, anna, bob)
+        erika, bob = builders.user(), builders.user()
+        await seed(uow_factory, erika, bob)
         spaces = frozenset({SpaceId(new_id()), SpaceId(new_id())})
-        contract = Identifier(IdentifierKind.CUSTOMER_NUMBER, "K4711", user_id=anna.id)
+        contract = Identifier(IdentifierKind.CUSTOMER_NUMBER, "K4711", user_id=erika.id)
         learned = IdentifierSource.LEARNED
         personnel = Identifier(
-            IdentifierKind.PERSONNEL_NUMBER, "12345", learned, None, anna.id, spaces
+            IdentifierKind.PERSONNEL_NUMBER, "12345", learned, None, erika.id, spaces
         )
         iban = Identifier(  # a contract number that names nobody (an IBAN until #215)
             IdentifierKind.CONTRACT_NUMBER, "V778899", IdentifierSource.LEARNED, learned_in=spaces
@@ -883,7 +883,7 @@ class UnitOfWorkContract:
                 personnel,
                 iban,
             ]
-            await uow.users.remove(anna.id)
+            await uow.users.remove(erika.id)
             await uow.commit()
         async with uow_factory() as uow:
             assert (await uow.contacts.get(contact.id)).identifiers == [bobs, iban]
@@ -1121,7 +1121,7 @@ class UnitOfWorkContract:
         owner, space = await owner_with_space(uow_factory)
         utility, bank = (Contact.create(name=name, now=NOW) for name in ("Stadtwerke", "Bank"))
         own = (IdentifierKind.IBAN, "DE02120300000000202051")
-        customer = (IdentifierKind.CUSTOMER_NUMBER, "20047718")
+        customer = (IdentifierKind.CUSTOMER_NUMBER, "12345678")
         other = (IdentifierKind.VAT_ID, "DE312456789")
         documents = [builders.processed(owner, space) for _ in range(4)]
         shows = [{own, customer}, {own}, {other}, {own}]
@@ -2545,22 +2545,22 @@ class UnitOfWorkContract:
     async def test_profiles_round_trip_and_go_with_their_user(
         self, uow_factory: UnitOfWorkFactory
     ) -> None:
-        anna, bob = builders.user(), builders.user()
-        anna.display_name = "Anna Example"
-        await seed(uow_factory, anna, bob)
+        erika, bob = builders.user(), builders.user()
+        erika.display_name = "Erika Mustermann"
+        await seed(uow_factory, erika, bob)
         iban = Identifier(IdentifierKind.IBAN, "DE89370400440532013000")
         profile = Profile(
-            id=anna.id,
-            aliases=["Anna Sample", "Anna Muster"],
+            id=erika.id,
+            aliases=["E. Mustermann", "Erika M."],
             birth_date=date(1980, 6, 15),
-            email="anna@mail.example",
+            email="erika@mail.example",
             identifiers=[Identifier(IdentifierKind.TAX_ID, "12345678911"), iban],
             declined=[Identifier(IdentifierKind.IBAN, "DE02120300000000202051")],
             version=1,
         )
         contact = Contact.create(name="Insurer", now=NOW)
         contact.set_identifiers(
-            [Identifier(IdentifierKind.CUSTOMER_NUMBER, "K4711", user_id=anna.id)]
+            [Identifier(IdentifierKind.CUSTOMER_NUMBER, "K4711", user_id=erika.id)]
         )
         async with uow_factory() as uow:
             await uow.profiles.add(profile)
@@ -2568,11 +2568,11 @@ class UnitOfWorkContract:
             await uow.contacts.add(contact)
             await uow.commit()
         async with uow_factory() as uow:
-            assert (await uow.users.get(anna.id)).display_name == "Anna Example"
-            stored = await uow.profiles.get(anna.id)
-            assert stored.aliases == ["Anna Sample", "Anna Muster"]
+            assert (await uow.users.get(erika.id)).display_name == "Erika Mustermann"
+            stored = await uow.profiles.get(erika.id)
+            assert stored.aliases == ["E. Mustermann", "Erika M."]
             assert stored.birth_date == date(1980, 6, 15)
-            assert stored.email == "anna@mail.example"
+            assert stored.email == "erika@mail.example"
             assert {item.key for item in stored.identifiers} == {
                 (IdentifierKind.TAX_ID, "12345678911"),
                 iban.key,
@@ -2580,25 +2580,25 @@ class UnitOfWorkContract:
             assert [item.key for item in stored.declined] == [
                 (IdentifierKind.IBAN, "DE02120300000000202051")
             ]
-            assert (await uow.contacts.get(contact.id)).identifiers[0].user_id == anna.id
-            stored.aliases = ["Anna Muster"]
+            assert (await uow.contacts.get(contact.id)).identifiers[0].user_id == erika.id
+            stored.aliases = ["Erika M."]
             stored.birth_date = None
             await uow.profiles.update(stored)
             await uow.commit()
         async with uow_factory() as uow:
-            changed = await uow.profiles.get(anna.id)
+            changed = await uow.profiles.get(erika.id)
             assert (changed.aliases, changed.birth_date, changed.version) == (
-                ["Anna Muster"],
+                ["Erika M."],
                 None,
                 2,
             )
             assert await uow.profiles.find(UserId(new_id())) is None
-            for space in await uow.spaces.list_accessible(anna.id):
+            for space in await uow.spaces.list_accessible(erika.id):
                 await uow.spaces.remove(space.id)
-            await uow.users.remove(anna.id)
+            await uow.users.remove(erika.id)
             await uow.commit()
         async with uow_factory() as uow:
-            assert await uow.profiles.find(anna.id) is None
+            assert await uow.profiles.find(erika.id) is None
             # Her number at the contact went with her: nobody else's to see.
             assert (await uow.contacts.get(contact.id)).identifiers == []
             assert [item.id for item in await uow.profiles.list_all()] == [bob.id]
@@ -2606,17 +2606,17 @@ class UnitOfWorkContract:
     async def test_display_names_are_unique_and_aliases_need_not_be(
         self, uow_factory: UnitOfWorkFactory
     ) -> None:
-        anna, bob = builders.user(), builders.user()
-        anna.display_name = "Anna"
-        await seed(uow_factory, anna, bob)
-        bob.display_name = "ANNA"
+        erika, bob = builders.user(), builders.user()
+        erika.display_name = "Erika"
+        await seed(uow_factory, erika, bob)
+        bob.display_name = "ERIKA"
         async with uow_factory() as uow:
             with pytest.raises(ConflictError):
                 await uow.users.update(bob)
                 await uow.commit()
         # Aliases are private: two users may have the same (a conflict would tell whose it is).
         async with uow_factory() as uow:
-            await uow.profiles.add(Profile(id=anna.id, aliases=["Ann"], version=1))
+            await uow.profiles.add(Profile(id=erika.id, aliases=["Ann"], version=1))
             await uow.profiles.add(Profile(id=bob.id, aliases=["ann"], version=1))
             await uow.commit()
         async with uow_factory() as uow:

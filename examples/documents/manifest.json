@@ -20,7 +20,7 @@
      "currency": "EUR"
     },
     "Rechnungsnummer": "R-2024-0277",
-    "Kundennummer": "2004 7718",
+    "Kundennummer": "1234 5678",
     "Bezugszeitraum": "2023-03-01/2024-02-29"
    },
    "facts": [
@@ -31,7 +31,7 @@
     },
     {
      "kind": "customer_number",
-     "value": "2004 7718",
+     "value": "1234 5678",
      "role": "contact"
     },
     {
@@ -47,7 +47,7 @@
     },
     {
      "kind": "mandate_reference",
-     "value": "SWM-20047718-01",
+     "value": "SWM-12345678-01",
      "role": "target"
     },
     {
@@ -86,7 +86,7 @@
      "currency": "EUR"
     },
     "Rechnungsnummer": "R-2025-0311",
-    "Kundennummer": "2004 7718",
+    "Kundennummer": "1234 5678",
     "Bezugszeitraum": "2024-03-01/2025-02-28",
     "Fällig am": "2025-04-04"
    },
@@ -98,7 +98,7 @@
     },
     {
      "kind": "customer_number",
-     "value": "2004 7718",
+     "value": "1234 5678",
      "role": "contact"
     },
     {
@@ -146,7 +146,7 @@
      "currency": "EUR"
     },
     "Rechnungsnummer": "R-2025-0311",
-    "Kundennummer": "2004 7718",
+    "Kundennummer": "1234 5678",
     "Bezugszeitraum": "2024-03-01/2025-02-28",
     "Fällig am": "2025-04-04"
    },
@@ -158,7 +158,7 @@
     },
     {
      "kind": "customer_number",
-     "value": "2004 7718",
+     "value": "1234 5678",
      "role": "contact"
     },
     {
@@ -210,7 +210,7 @@
      "currency": "EUR"
     },
     "Rechnungsnummer": "R-2025-0884",
-    "Kundennummer": "2004 7718",
+    "Kundennummer": "1234 5678",
     "Bezugszeitraum": "2025-03-01/2025-07-31"
    },
    "facts": [
@@ -221,7 +221,7 @@
     },
     {
      "kind": "customer_number",
-     "value": "2004 7718",
+     "value": "1234 5678",
      "role": "contact"
     },
     {
@@ -265,7 +265,7 @@
    "recipient": "max",
    "fields": {
     "Vertragsbeginn": "2025-08-01",
-    "Kundennummer": "2004 7718"
+    "Kundennummer": "1234 5678"
    },
    "facts": [
     {
@@ -275,7 +275,7 @@
     },
     {
      "kind": "customer_number",
-     "value": "2004 7718",
+     "value": "1234 5678",
      "role": "contact"
     },
     {
@@ -290,7 +290,7 @@
     },
     {
      "kind": "mandate_reference",
-     "value": "SWM-20047718-02",
+     "value": "SWM-12345678-02",
      "role": "target"
     }
    ],
@@ -324,7 +324,7 @@
     },
     {
      "kind": "customer_number",
-     "value": "2004 7718",
+     "value": "1234 5678",
      "role": "contact"
     }
    ],
@@ -358,7 +358,7 @@
    "facts": [
     {
      "kind": "customer_number",
-     "value": "2004 7718",
+     "value": "1234 5678",
      "role": "contact"
     },
     {
@@ -398,7 +398,7 @@
      "currency": "EUR"
     },
     "Rechnungsnummer": "R-2026-0815",
-    "Kundennummer": "2004 7718",
+    "Kundennummer": "1234 5678",
     "Bezugszeitraum": "2025-08-01/2026-07-31",
     "Fällig am": "2026-09-02"
    },
@@ -410,7 +410,7 @@
     },
     {
      "kind": "customer_number",
-     "value": "2004 7718",
+     "value": "1234 5678",
      "role": "contact"
     },
     {
@@ -460,7 +460,7 @@
      "currency": "EUR"
     },
     "Rechnungsnummer": "R-2026-0902",
-    "Kundennummer": "2004 7718"
+    "Kundennummer": "1234 5678"
    },
    "facts": [
     {
@@ -475,7 +475,7 @@
     },
     {
      "kind": "customer_number",
-     "value": "2004 7718",
+     "value": "1234 5678",
      "role": "contact"
     },
     {
@@ -3035,7 +3035,7 @@
    "media_type": "application/pdf",
    "pages": 1,
    "language": "de",
-   "contact": "Dr. med. Anna Beispiel",
+   "contact": "Dr. med. Jane Doe",
    "document_type": "Rechnung",
    "document_date": "2025-04-22",
    "title": "Arztrechnung Max 22.04.2025",
@@ -3081,7 +3081,7 @@
    "media_type": "application/pdf",
    "pages": 1,
    "language": "de",
-   "contact": "Dr. med. Anna Beispiel",
+   "contact": "Dr. med. Jane Doe",
    "document_type": "Rechnung",
    "document_date": "2026-02-17",
    "title": "Arztrechnung Erika 17.02.2026",
@@ -13748,7 +13748,7 @@
    "media_type": "application/pdf",
    "pages": 1,
    "language": "de",
-   "contact": "Dr. med. Anna Beispiel",
+   "contact": "Dr. med. Jane Doe",
    "document_type": "Arztbrief",
    "document_date": "2026-02-05",
    "title": "Laborbefund Gesundheits-Check",
@@ -13773,7 +13773,7 @@
    "media_type": "image/jpeg",
    "pages": 1,
    "language": "de",
-   "contact": "Dr. med. Anna Beispiel",
+   "contact": "Dr. med. Jane Doe",
    "document_type": "Bescheinigung",
    "document_date": "2026-01-13",
    "title": "Arbeitsunfähigkeitsbescheinigung",

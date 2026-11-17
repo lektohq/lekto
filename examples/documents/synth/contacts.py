@@ -398,13 +398,13 @@ BUSSGELD = _sender(
 
 # Health.
 
-DR_BEISPIEL = _sender(
-    "Dr. med. Anna Beispiel",
+DR_DOE = _sender(
+    "Dr. med. Jane Doe",
     "Ärztehaus am Park, Parkstraße 3",
     "12345 Musterstadt",
     Style("serif", (0, 100, 140), "none", "center", "Fachärztin für Allgemeinmedizin"),
     phone="Telefon 01234 45 45 45",
-    email="praxis@dr-beispiel.example",
+    email="praxis@dr-doe.example",
     bank="Deutsche Ärztebank Musterstadt",
     iban=ids.iban("DE", "300606010004545450"),
     tax_number="21/280/45454",

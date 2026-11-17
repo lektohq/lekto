@@ -241,7 +241,7 @@ async def test_the_parts_of_a_mailed_stack_keep_its_mail(world: World) -> None:
 
 
 async def test_a_stack_without_a_sheet_stays_as_it_is(world: World) -> None:
-    reader = sheets(3, text="K-20047718")
+    reader = sheets(3, text="K-12345678")
     _, stack = await received(world, reader)
     (document,) = await documents(world)
     assert document.sha256 == stack.sha256

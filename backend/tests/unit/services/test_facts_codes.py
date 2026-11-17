@@ -178,7 +178,7 @@ async def test_the_report_lists_the_document_s_numbers(world: World) -> None:
     reads, with where they stand; a customer number stays among the identifiers."""
     owner = await world.user()
     text = (
-        "Mahnung\nRechnungsnummer: M-77\nIhre Rechnung Nr. 4711 ist offen.\nKundennummer 20047718\n"
+        "Mahnung\nRechnungsnummer: M-77\nIhre Rechnung Nr. 4711 ist offen.\nKundennummer 12345678\n"
     )
     document = await stored(world, owner, text)
     result = await facts(world, document, FakeCodeReader([]))

@@ -48,7 +48,7 @@ const SPACES = [
 		role: 'edit',
 		members: [
 			{ user_id: OWNER, role: 'edit', username: 'tobi', active: true },
-			{ user_id: 'anna-1', role: 'read', username: 'anna', active: true }
+			{ user_id: 'erika-1', role: 'read', username: 'erika', active: true }
 		]
 	}
 ];
@@ -216,7 +216,7 @@ describe('inbox rows', () => {
 		]);
 		const row = (await screen.findByText('Vorschlag')).closest('li')!;
 		expect(
-			await within(row).findByText(m.space_suggestion_for({ space: 'Haushalt', names: 'anna' }))
+			await within(row).findByText(m.space_suggestion_for({ space: 'Haushalt', names: 'erika' }))
 		).toBeTruthy();
 	});
 

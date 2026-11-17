@@ -123,7 +123,7 @@ def test_what_is_written_is_kept_short() -> None:
 
 # --- facts the language model reads ------------------------------------------------------------
 
-REMINDER = "Mahnung\nIhre Rechnung Nr. 4711 vom 04.06.2026 ist noch offen.\nKundennummer 20047718"
+REMINDER = "Mahnung\nIhre Rechnung Nr. 4711 vom 04.06.2026 ist noch offen.\nKundennummer 12345678"
 ASKED = frozenset(IdentifierKind) - {IdentifierKind.VAT_ID, IdentifierKind.TAX_ID}
 ROLES_ASKED = frozenset(FactRole) - {FactRole.PERSON}
 

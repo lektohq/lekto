@@ -256,7 +256,7 @@ class FactsOut(BaseModel):
                     "identifiers": [
                         {
                             "kind": "customer_number",
-                            "value": "20047718",
+                            "value": "12345678",
                             "contact_id": None,
                             "in_text": True,
                             "in_code": False,
@@ -328,7 +328,7 @@ class FactsOut(BaseModel):
             "admins; null for readers. What is private about a person (aliases, birth date, "
             "identifiers, a contact's number that names them) finds them only for admins and "
             "that person: anyone else sees another user only where the text has their display "
-            "name (that a number is Anna's tax ID is Anna's)."
+            "name (that a number is Erika's tax ID is Erika's)."
         ),
     )
 
@@ -434,7 +434,7 @@ class FactDecisionIn(RequestBody):
                 {
                     "action": "correct",
                     "kind": "customer_number",
-                    "value": "20047718",
+                    "value": "12345678",
                     "new_value": "2004 7719",
                     "at_contact": True,
                 },

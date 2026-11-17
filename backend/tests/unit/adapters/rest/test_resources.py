@@ -655,9 +655,9 @@ async def test_the_last_admin_stays(api: Api) -> None:
 
 async def test_deleting_a_user_settles_the_spaces_that_stop_it(api: Api) -> None:
     """Tobi, 22.10.2026: the API names the spaces, the admin decides in one request."""
-    admin, anna = await api.admin("root"), await api.user("anna")
-    document = await upload(api, auth(anna), content=unique_pdf("anna"))
-    url = f"{PREFIX}/users/{anna.id}"
+    admin, erika = await api.admin("root"), await api.user("erika")
+    document = await upload(api, auth(erika), content=unique_pdf("erika"))
+    url = f"{PREFIX}/users/{erika.id}"
     removal = await api.client.get(f"{url}/removal", headers=auth(admin))
     assert removal.status_code == 200, removal.text
     (blocking,) = removal.json()["blocking_spaces"]
@@ -666,7 +666,7 @@ async def test_deleting_a_user_settles_the_spaces_that_stop_it(api: Api) -> None
         1,
         ["move_to"],
     )
-    assert (await api.client.get(f"{url}/removal", headers=auth(anna))).status_code == 403
+    assert (await api.client.get(f"{url}/removal", headers=auth(erika))).status_code == 403
     target = (await api.client.get(f"{PREFIX}/users/{admin.id}", headers=auth(admin))).json()[
         "personal_space_id"
     ]

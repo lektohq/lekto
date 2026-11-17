@@ -22,11 +22,11 @@ PDF = b"%PDF-1.7\n% a test attachment\n%%EOF\n"
 
 
 def plain_mail(
-    subject: str = "Ihre Rechnung Oktober", text: str = "Hallo Anna,\n\nanbei."
+    subject: str = "Ihre Rechnung Oktober", text: str = "Hallo Erika,\n\nanbei."
 ) -> bytes:
     message = EmailMessage()
     message["From"] = "Stadtwerke Musterstadt <rechnung@stadtwerke.example>"
-    message["To"] = "Anna Beispiel <anna@example.test>"
+    message["To"] = "Erika Mustermann <erika@example.test>"
     message["Date"] = "Wed, 04 Nov 2026 10:00:00 +0100"
     message["Message-ID"] = (
         f"<{hashlib.sha256(subject.encode()).hexdigest()[:16]}@stadtwerke.example>"
@@ -40,17 +40,17 @@ def rich_mail(html: str | None = None) -> bytes:
     """Text and HTML with a picture by `cid:`, a PDF attached, and a forwarded mail."""
     message = EmailMessage()
     message["From"] = "Stadtwerke Musterstadt <rechnung@stadtwerke.example>"
-    message["To"] = "Anna Beispiel <anna@example.test>, ben@example.test"
+    message["To"] = "Erika Mustermann <erika@example.test>, ben@example.test"
     message["Cc"] = "Buchhaltung <buchhaltung@example.test>"
     message["Date"] = "Wed, 04 Nov 2026 10:00:00 +0100"
     message["Message-ID"] = "<rechnung-4711@stadtwerke.example>"
     message["Subject"] = "=?utf-8?q?Ihre_Rechnung_=C3=BCber_123=2C45_=E2=82=AC?="
-    message.set_content("Hallo Anna,\n\nanbei die Rechnung über 123,45 €.\n")
+    message.set_content("Hallo Erika,\n\nanbei die Rechnung über 123,45 €.\n")
     message.add_alternative(
         html
         or (
             "<html><head><style>p { color: #333 }</style></head><body>"
-            "<p>Hallo <b>Anna</b>,</p><p>anbei die Rechnung über 123,45 €.</p>"
+            "<p>Hallo <b>Erika</b>,</p><p>anbei die Rechnung über 123,45 €.</p>"
             '<img src="cid:logo@stadtwerke"></body></html>'
         ),
         subtype="html",
@@ -76,7 +76,7 @@ def apple_mail() -> bytes:
     png = base64.b64encode(PNG).decode()
     photo = base64.b64encode(PNG + bytes(SMALL_IMAGE)).decode()  # larger than a logo
     return (
-        "From: Anna Beispiel <anna@example.test>\r\n"
+        "From: Erika Mustermann <erika@example.test>\r\n"
         "To: dms@example.test\r\n"
         "Subject: Ein Test mit Anhang\r\n"
         "Date: Fri, 06 Nov 2026 09:27:00 +0100\r\n"

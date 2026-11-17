@@ -16,7 +16,7 @@ from lekto.core.domain.names import (
         ("Stadtwerke Musterstadt GmbH", "stadtwerke musterstadt"),
         ("Müller & Söhne GmbH & Co. KG", "mueller und soehne"),
         ("Sportverein Musterstadt e. V.", "sportverein musterstadt"),
-        ("Dr. med. Anna Nord", "dr med anna nord"),
+        ("Dr. med. Erika Nord", "dr med erika nord"),
         ("ACME Inc.", "acme"),
         ("Bäckerei Schmidt (haftungsbeschränkt)", "baeckerei schmidt"),
         ("GmbH", ""),

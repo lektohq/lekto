@@ -296,25 +296,25 @@ async def test_spaces_that_stop_deleting_a_user_need_a_decision(world: World) ->
 
 async def test_deleting_a_user_settles_their_spaces(world: World) -> None:
     admin = await world.account("root", Role.ADMIN)
-    anna, tobi = await world.account("anna"), await world.account("tobi")
-    annas, tobis = await world.personal_space(anna), await world.personal_space(tobi)
-    household = await world.spaces.create(anna.id, "Household")
-    await world.spaces.set_member(anna.id, household.id, tobi.id, SpaceRole.READ)
-    empty = await world.spaces.create(anna.id, "Empty")
-    archive = await world.spaces.create(anna.id, "Archive")
+    erika, tobi = await world.account("erika"), await world.account("tobi")
+    erikas, tobis = await world.personal_space(erika), await world.personal_space(tobi)
+    household = await world.spaces.create(erika.id, "Household")
+    await world.spaces.set_member(erika.id, household.id, tobi.id, SpaceRole.READ)
+    empty = await world.spaces.create(erika.id, "Empty")
+    archive = await world.spaces.create(erika.id, "Archive")
     target = await world.spaces.create(admin.id, "Target")
     async with world.uow() as uow:
-        letters = [builders.processed(anna, annas) for _ in range(2)]
-        bill, kept = builders.processed(anna, household), builders.processed(anna, archive)
+        letters = [builders.processed(erika, erikas) for _ in range(2)]
+        bill, kept = builders.processed(erika, household), builders.processed(erika, archive)
         for document in [*letters, bill, kept]:
             await uow.documents.add(document)
         await uow.commit()
 
     await world.users.delete_user(
         admin.id,
-        anna.id,
+        erika.id,
         {
-            annas.id: Settlement(Settle.MOVE_TO, move_to=tobis.id),
+            erikas.id: Settlement(Settle.MOVE_TO, move_to=tobis.id),
             household.id: Settlement(Settle.MOVE_TO, move_to=target.id),
             empty.id: Settlement(Settle.REMOVE),
             archive.id: Settlement(Settle.EDITOR, editor=tobi.id),
@@ -322,8 +322,8 @@ async def test_deleting_a_user_settles_their_spaces(world: World) -> None:
     )
 
     async with world.uow() as uow:
-        assert await uow.users.find(anna.id) is None
-        for gone in (annas, household, empty):
+        assert await uow.users.find(erika.id) is None
+        for gone in (erikas, household, empty):
             assert await uow.spaces.find(gone.id) is None
         assert (await uow.spaces.get(archive.id)).members == {tobi.id: SpaceRole.EDIT}
         for letter in letters:
@@ -336,35 +336,35 @@ async def test_deleting_a_user_settles_their_spaces(world: World) -> None:
 
 async def test_a_deletion_that_cannot_settle_changes_nothing(world: World) -> None:
     admin = await world.account("root", Role.ADMIN)
-    anna, tobi = await world.account("anna"), await world.account("tobi")
-    annas = await world.personal_space(anna)
-    full = await world.spaces.create(anna.id, "Full")
+    erika, tobi = await world.account("erika"), await world.account("tobi")
+    erikas = await world.personal_space(erika)
+    full = await world.spaces.create(erika.id, "Full")
     async with world.uow() as uow:
-        for space in (annas, full):
-            await uow.documents.add(builders.processed(anna, space))
+        for space in (erikas, full):
+            await uow.documents.add(builders.processed(erika, space))
         await uow.commit()
     elsewhere = await world.spaces.create(tobi.id, "Elsewhere")
-    settle = {annas.id: Settlement(Settle.MOVE_TO, move_to=full.id)}
+    settle = {erikas.id: Settlement(Settle.MOVE_TO, move_to=full.id)}
     # Into a space that goes as well, or: removing a space that holds documents.
     with pytest.raises(NotFoundError):
         await world.users.delete_user(
-            admin.id, anna.id, {**settle, full.id: Settlement(Settle.MOVE_TO, move_to=annas.id)}
+            admin.id, erika.id, {**settle, full.id: Settlement(Settle.MOVE_TO, move_to=erikas.id)}
         )
     with pytest.raises(ValidationError, match="cannot be settled by remove"):
         await world.users.delete_user(
             admin.id,
-            anna.id,
+            erika.id,
             {
-                annas.id: Settlement(Settle.MOVE_TO, move_to=elsewhere.id),
+                erikas.id: Settlement(Settle.MOVE_TO, move_to=elsewhere.id),
                 full.id: Settlement(Settle.REMOVE),
             },
         )
     with pytest.raises(ValidationError, match="does not stop deleting the user"):
         await world.users.delete_user(
             admin.id,
-            anna.id,
+            erika.id,
             {
-                annas.id: Settlement(Settle.MOVE_TO, move_to=elsewhere.id),
+                erikas.id: Settlement(Settle.MOVE_TO, move_to=elsewhere.id),
                 full.id: Settlement(Settle.EDITOR, editor=tobi.id),
                 elsewhere.id: Settlement(Settle.REMOVE),
             },
@@ -372,19 +372,19 @@ async def test_a_deletion_that_cannot_settle_changes_nothing(world: World) -> No
     with pytest.raises(NotFoundError):
         await world.users.delete_user(
             admin.id,
-            anna.id,
+            erika.id,
             {
-                annas.id: Settlement(Settle.MOVE_TO, move_to=elsewhere.id),
-                full.id: Settlement(Settle.EDITOR, editor=anna.id),
+                erikas.id: Settlement(Settle.MOVE_TO, move_to=elsewhere.id),
+                full.id: Settlement(Settle.EDITOR, editor=erika.id),
             },
         )
     async with world.uow() as uow:
-        assert await uow.users.find(anna.id) is not None
-        assert {space.id for space in await uow.spaces.list_accessible(anna.id)} >= {
-            annas.id,
+        assert await uow.users.find(erika.id) is not None
+        assert {space.id for space in await uow.spaces.list_accessible(erika.id)} >= {
+            erikas.id,
             full.id,
         }
-        assert await uow.documents.exists(space=annas.id)
+        assert await uow.documents.exists(space=erikas.id)
 
 
 # --- first admin --------------------------------------------------------------------------------

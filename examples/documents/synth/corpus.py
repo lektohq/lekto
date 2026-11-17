@@ -355,7 +355,7 @@ def entries() -> list[Entry]:
     add(
         "arzt-max",
         lambda: bi.doctor_invoice(
-            c.DR_BEISPIEL,
+            c.DR_DOE,
             "2025-0419",
             date(2025, 4, 22),
             MAX,
@@ -373,7 +373,7 @@ def entries() -> list[Entry]:
     add(
         "arzt-erika",
         lambda: bi.doctor_invoice(
-            c.DR_BEISPIEL,
+            c.DR_DOE,
             "2026-0212",
             date(2026, 2, 17),
             ERIKA,

@@ -724,7 +724,7 @@ and the space, the fields node reads the fields of the decided type and the titl
   its groups (`12 345 678 901`), a social security number anywhere, a health insurance number
   after its label (`Versichertennummer`, `Krankenversicherungsnummer`); a customer or personnel
   number that is one of these, stands in one or overlaps it is none (a pension fund writes
-  "Versicherungsnummer: 65 170839 J 003"). A person's own numbers, a user's IBAN among them, are
+  "Versicherungsnummer: 12 010145 M 122"). A person's own numbers, a user's IBAN among them, are
   no unknown identifiers. The judge weighs the persons for the space (below), and adds the
   model's recipient: every user whose display name or alias stands whole in it, else one whose
   name matches it from `LEKTO_CONFIDENCE_THRESHOLD` on, unless another user's name matches it
@@ -735,8 +735,8 @@ and the space, the fields node reads the fields of the decided type and the titl
   them only for admins and that person: the log, the review and the facts show anyone else a
   user only where the text has their display name (`weak`, or `medium` as the recipient), and
   `unseen_by` names another user only for a public `medium`; their numbers then show as unknown
-  identifiers. Inherent, and accepted: a suggestion to hand a document over to Anna tells its
-  uploader that something in it is Anna's.
+  identifiers. Inherent, and accepted: a suggestion to hand a document over to Erika tells its
+  uploader that something in it is Erika's.
 
 A signal *names* a value it is sure of: the model, a contact whose name or alias its sender
 matches at least `LEKTO_CONFIDENCE_THRESHOLD` (legal forms and punctuation aside) with no other

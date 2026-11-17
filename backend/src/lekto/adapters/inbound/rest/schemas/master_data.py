@@ -61,7 +61,7 @@ class IdentifierIn(RequestBody):
     without `www.`)."""
 
     model_config = ConfigDict(
-        json_schema_extra={"examples": [{"kind": "customer_number", "value": "2004-7718"}]},
+        json_schema_extra={"examples": [{"kind": "customer_number", "value": "1234-5678"}]},
     )
 
     kind: IdentifierKind
@@ -74,7 +74,7 @@ class IdentifierIn(RequestBody):
     )
     user_id: UUID | None = Field(
         default=None,
-        description="The user a customer, contract or personnel number belongs to (Anna's "
+        description="The user a customer, contract or personnel number belongs to (Erika's "
         "contract): found in a document, it is hard evidence for whose it is. Not for other "
         "kinds, not for a rejected one.",
     )

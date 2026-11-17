@@ -108,7 +108,7 @@ def with_codes(image: Image.Image) -> Image.Image:
     image = image.copy()
     for content, format, scale, place in [
         (GIRO_CODE, zxingcpp.BarcodeFormat.QRCode, 4, (900, 1350)),
-        ("K-20047718", zxingcpp.BarcodeFormat.Code128, 3, (120, 600)),
+        ("K-12345678", zxingcpp.BarcodeFormat.Code128, 3, (120, 600)),
         ("LEKTO-DM-0001", zxingcpp.BarcodeFormat.DataMatrix, 5, (1000, 60)),
     ]:
         barcode = zxingcpp.create_barcode(content, format)
@@ -277,13 +277,13 @@ def serialized(objects: list[str]) -> bytes:
 def mail() -> bytes:
     message = EmailMessage()
     message["From"] = "Lekto Test GmbH <rechnung@lekto-test.example>"
-    message["To"] = "Anna Beispiel <anna@example.test>"
+    message["To"] = "Erika Mustermann <erika@example.test>"
     message["Date"] = "Tue, 04 Nov 2026 10:00:00 +0100"
     message["Message-ID"] = "<rechnung-4711@lekto-test.example>"
     message["Subject"] = "Ihre Rechnung Nummer 4711"
-    text = "\n".join(["Hallo Anna,", "", *LINES, "", "Viele Grüße"])
+    text = "\n".join(["Hallo Erika,", "", *LINES, "", "Viele Grüße"])
     message.set_content(text)
-    html = "".join(f"<p>{line}</p>" for line in ["Hallo Anna,", *LINES, "Viele Grüße"])
+    html = "".join(f"<p>{line}</p>" for line in ["Hallo Erika,", *LINES, "Viele Grüße"])
     message.add_alternative(f"<html><body>{html}</body></html>", subtype="html")
     message.set_boundary("lekto-sample-boundary")
     return bytes(message)

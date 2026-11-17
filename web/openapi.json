@@ -31162,7 +31162,7 @@
             "at_contact": true,
             "kind": "customer_number",
             "new_value": "2004 7719",
-            "value": "20047718"
+            "value": "12345678"
           },
           {
             "action": "add",
@@ -31385,7 +31385,7 @@
               }
             ],
             "title": "Persons",
-            "description": "The users the document names, the surest first: for the editors of its space and admins; null for readers. What is private about a person (aliases, birth date, identifiers, a contact's number that names them) finds them only for admins and that person: anyone else sees another user only where the text has their display name (that a number is Anna's tax ID is Anna's)."
+            "description": "The users the document names, the surest first: for the editors of its space and admins; null for readers. What is private about a person (aliases, birth date, identifiers, a contact's number that names them) finds them only for admins and that person: anyone else sees another user only where the text has their display name (that a number is Erika's tax ID is Erika's)."
           }
         },
         "type": "object",
@@ -31430,7 +31430,7 @@
                     "start": 412
                   }
                 ],
-                "value": "20047718"
+                "value": "12345678"
               }
             ],
             "named": []
@@ -32974,7 +32974,7 @@
               }
             ],
             "title": "User Id",
-            "description": "The user a customer, contract or personnel number belongs to (Anna's contract): found in a document, it is hard evidence for whose it is. Not for other kinds, not for a rejected one."
+            "description": "The user a customer, contract or personnel number belongs to (Erika's contract): found in a document, it is hard evidence for whose it is. Not for other kinds, not for a rejected one."
           }
         },
         "additionalProperties": false,
@@ -32988,7 +32988,7 @@
         "examples": [
           {
             "kind": "customer_number",
-            "value": "2004-7718"
+            "value": "1234-5678"
           }
         ]
       },
@@ -38080,7 +38080,7 @@
               {
                 "action": "confirm",
                 "kind": "customer_number",
-                "value": "20047718"
+                "value": "12345678"
               },
               {
                 "action": "reject",
@@ -38335,7 +38335,7 @@
         "title": "OpenSearchIn",
         "examples": [
           {
-            "q": "2004 7718"
+            "q": "1234 5678"
           }
         ]
       },
@@ -39021,10 +39021,10 @@
         "examples": [
           {
             "aliases": [
-              "Anna Sample"
+              "E. Mustermann"
             ],
             "birth_date": "1980-06-15",
-            "display_name": "Anna Example"
+            "display_name": "Erika Mustermann"
           }
         ]
       },

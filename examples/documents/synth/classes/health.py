@@ -23,7 +23,7 @@ def discharge_letter(day: date, seed: int = 0) -> Doc:
         f"Entlassungsbrief – stationärer Aufenthalt vom 14.10. bis 17.10.{day.year}",
         seed=seed,
     )
-    bill.paragraph("Sehr geehrte Eltern, sehr geehrte Frau Kollegin Dr. Beispiel,")
+    bill.paragraph("Sehr geehrte Eltern, sehr geehrte Frau Kollegin Dr. Doe,")
     bill.paragraph(
         f"wir berichten über Ihre Tochter Lena Mustermann, geboren am {german(LENA.born)}, die sich vom 14.10. bis 17.10.{day.year} in unserer stationären Behandlung befand."
     )
@@ -55,7 +55,7 @@ def discharge_letter(day: date, seed: int = 0) -> Doc:
 
 
 def findings(day: date, seed: int = 0) -> Doc:
-    s = c.DR_BEISPIEL
+    s = c.DR_DOE
     bill = letter(
         s,
         MAX,
@@ -90,7 +90,7 @@ def findings(day: date, seed: int = 0) -> Doc:
     bill.paragraph(
         "Ich empfehle mehr Bewegung und eine Kontrolle in sechs Monaten. Bei Fragen melden Sie sich gern in der Praxis."
     )
-    bill.signature("Mit freundlichen Grüßen", "Dr. med. Anna Beispiel")
+    bill.signature("Mit freundlichen Grüßen", "Dr. med. Jane Doe")
     return doc(
         "findings",
         "Arztbrief",
@@ -145,7 +145,7 @@ def sick_note(day: date) -> Doc:
         10, 150, "Vertragsarztstempel / Unterschrift des Arztes", SANS, 6, color=(170, 40, 40)
     )
     page.rect(10, 152, 128, 30, stroke=(200, 120, 120), width=0.3)
-    page.text(14, 160, "Dr. med. Anna Beispiel", SANS_BOLD, 8)
+    page.text(14, 160, "Dr. med. Jane Doe", SANS_BOLD, 8)
     page.text(14, 164, "Fachärztin für Allgemeinmedizin", SANS, 7)
     page.text(14, 168, "Parkstraße 3, 12345 Musterstadt", SANS, 7)
     page.text(85, 176, "A. Beispiel", HAND, 15, color=(20, 40, 120))
@@ -160,7 +160,7 @@ def sick_note(day: date) -> Doc:
     return doc(
         "sick-note",
         "Bescheinigung",
-        c.DR_BEISPIEL,
+        c.DR_DOE,
         day,
         "Arbeitsunfähigkeitsbescheinigung",
         [page],

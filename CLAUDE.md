@@ -147,7 +147,7 @@ placeholders are fixed:
 | What | Placeholder |
 | --- | --- |
 | A company | a name with "Muster" in it (`Muster Bäckerei`, `Muster Versicherung`) |
-| A woman, a man | `Jane Doe`, `John Doe` |
+| A woman, a man | `Jane Doe`, `John Doe`; a second woman `Erika Mustermann` |
 | A surname alone | `Mustermann` |
 | A number | `12345` |
 | An IP address | `127.128.129.23` |

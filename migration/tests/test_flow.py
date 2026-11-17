@@ -110,7 +110,7 @@ async def test_the_cold_run_says_what_would_happen_and_writes_nothing(setup: Set
 
 
 async def test_the_cold_run_says_who_sees_a_document_beyond_paperless(setup: Setup) -> None:
-    """The plan puts ACME's documents of tobias (10) and anna (12) into one space: each sees
+    """The plan puts ACME's documents of tobias (10) and erika (12) into one space: each sees
     the other's there, which Paperless did not let them."""
     assert await setup.run("plan") == 0
     setup.edit(
@@ -122,10 +122,10 @@ async def test_the_cold_run_says_who_sees_a_document_beyond_paperless(setup: Set
     assert await setup.run("check") == 0
     report = setup.report("check")
     ten, twelve = row(report, 10), row(report, 12)
-    assert ten["becomes"]["members"] == ["anna: edit", "tobias: edit"]
-    assert (ten["becomes"]["beyond"], twelve["becomes"]["beyond"]) == (["anna"], ["tobias"])
+    assert ten["becomes"]["members"] == ["erika: edit", "tobias: edit"]
+    assert (ten["becomes"]["beyond"], twelve["becomes"]["beyond"]) == (["erika"], ["tobias"])
     space = next(a for a in report["actions"] if a["kind"] == "space" and a["name"] == "Energie")
-    assert "anna and tobias see each other's documents in 'Energie'" in space["notes"]
+    assert "erika and tobias see each other's documents in 'Energie'" in space["notes"]
     text = (setup.directory / "reports" / "check.md").read_text()
     assert "## New documents visible beyond Paperless' permissions" in text
     # In their personal spaces only the uploader sees a document.
@@ -168,7 +168,7 @@ async def test_prepare_asks_and_creates_the_master_data(setup: Setup) -> None:
     assert {u["username"] for u in lekto.users.values()} == {
         "root",
         "tobias",
-        "anna",
+        "erika",
         "bob",
         "gone",
     }
@@ -209,17 +209,17 @@ async def test_profiles_are_filled_once_and_never_hold_the_run_back(setup: Setup
     for user in setup.archive.users:
         if user["username"] == "tobias":
             user["email"] = "tobias@mail.example"
-        elif user["username"] == "anna":
-            user["email"] = "anna@localhost"
+        elif user["username"] == "erika":
+            user["email"] = "erika@localhost"
     assert await setup.run("plan") == 0
     assert await setup.run("prepare") == 0
     assert lekto.profiles["u-tobias"]["email"] == "tobias@mail.example"
-    anna = named(lekto.users, "anna")
-    assert anna["display_name"] == "Anna Example"
-    assert not lekto.profiles[anna["id"]]["email"]
+    erika = named(lekto.users, "erika")
+    assert erika["display_name"] == "Erika Mustermann"
+    assert not lekto.profiles[erika["id"]]["email"]
     assert not named(lekto.users, "bob").get("display_name")
     notes = {a["name"]: a["notes"] for a in setup.report("prepare")["actions"]}
-    assert any("refused by Lekto" in note for note in notes["anna"])
+    assert any("refused by Lekto" in note for note in notes["erika"])
     assert any("is taken" in note for note in notes["bob"])
     assert await setup.run("check") == 0
     users = [a for a in setup.report("check")["actions"] if a["kind"] == "user"]
@@ -267,13 +267,13 @@ async def test_the_migration_takes_everything_over(setup: Setup) -> None:
     assert by_title(setup, "Document 12")["space_id"].startswith("personal:")
     shared = by_title(setup, "Document 13")
     space = lekto.spaces[shared["space_id"]]
-    assert space["name"] == "Geteilt: anna (bearbeiten), bob (lesen), tobias (bearbeiten)"
-    anna = named(lekto.users, "anna")["id"]
-    assert shared["uploaded_by"] == anna
-    assert {"user_id": anna, "role": "edit"} in space["members"]
+    assert space["name"] == "Geteilt: bob (lesen), erika (bearbeiten), tobias (bearbeiten)"
+    erika = named(lekto.users, "erika")["id"]
+    assert shared["uploaded_by"] == erika
+    assert {"user_id": erika, "role": "edit"} in space["members"]
     upload = next(u for u in lekto.uploads if u["filename"] == "scan-13.pdf")
     assert upload["channel"] == "migration" and upload["space_id"] == space["id"]
-    assert upload["uploaded_by"] == anna
+    assert upload["uploaded_by"] == erika
     assert json.loads(upload["metadata"])["review"] == []
     report = setup.report("run")
     assert report["document_results"] == {"done": 8, "skipped": 2}
@@ -305,7 +305,7 @@ async def test_a_member_taken_out_of_a_migration_space_stays_out(setup: Setup) -
     bob = named(setup.lekto.users, "bob")
     space["members"] = [m for m in space["members"] if m["user_id"] != bob["id"]]
     writes = len(setup.lekto.writes())
-    assert await setup.run("prepare") == 0  # its uploader anna is in: nothing to do
+    assert await setup.run("prepare") == 0  # its uploader erika is in: nothing to do
     assert len(setup.lekto.writes()) == writes
     assert bob["id"] not in {m["user_id"] for m in space["members"]}
 
@@ -563,9 +563,9 @@ async def test_the_same_file_is_a_duplicate_wherever_it_lies(setup: Setup) -> No
     """Every file exists once per installation: a copy is a duplicate also for a user who
     cannot see the document that holds it."""
     assert await setup.migrate() == 0
-    twelve = setup.archive.documents[2]  # anna's, in her personal space
+    twelve = setup.archive.documents[2]  # erika's, in her personal space
     setup.archive.documents += [
-        {**twelve, "id": 30, "title": "Anna's copy"},
+        {**twelve, "id": 30, "title": "Erika's copy"},
         {**twelve, "id": 31, "title": "Bob's copy", "owner": 3},
     ]
     setup.archive.files[30] = setup.archive.files[31] = setup.archive.files[12]
@@ -579,8 +579,8 @@ async def test_the_same_file_is_a_duplicate_wherever_it_lies(setup: Setup) -> No
 
 
 async def test_a_copy_of_another_users_document_leaves_it_as_it_is(setup: Setup) -> None:
-    """tobias may change anna's document 13 in Paperless and has a copy of his own: Lekto
-    finds the file in the space he edits, and that document stays anna's, where it is."""
+    """tobias may change erika's document 13 in Paperless and has a copy of his own: Lekto
+    finds the file in the space he edits, and that document stays erika's, where it is."""
     assert await setup.migrate() == 0
     thirteen = next(d for d in setup.archive.documents if d["id"] == 13)
     original = row(setup.report("run"), 13)["lekto_id"]

@@ -61,7 +61,7 @@ describe('a template of an action', () => {
 describe('sending through a webhook', () => {
 	function send(webhooks: Lookup['webhooks']) {
 		session.start({
-			user: { id: 'anna', username: 'anna', role: 'admin' },
+			user: { id: 'erika', username: 'erika', role: 'admin' },
 			method: 'password',
 			expires_at: '2026-10-26T12:00:00Z',
 			csrf_token: 'token'
@@ -80,7 +80,7 @@ describe('sending through a webhook', () => {
 	});
 
 	it('explains what goes out through an own webhook', () => {
-		send([{ id: 'w2', name: 'Home Assistant', owner_id: 'anna' }]);
+		send([{ id: 'w2', name: 'Home Assistant', owner_id: 'erika' }]);
 		expect(screen.getByText(m.rule_send_webhook_hint())).toBeTruthy();
 	});
 });

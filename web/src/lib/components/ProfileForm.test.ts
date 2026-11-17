@@ -13,11 +13,11 @@ let fetchMock = fakeApi();
 const sent: { path: string; body: unknown }[] = [];
 
 const stored = {
-	user_id: 'anna',
-	display_name: 'Anna Example',
-	aliases: ['Anna Sample'],
+	user_id: 'erika',
+	display_name: 'Erika Mustermann',
+	aliases: ['E. Mustermann'],
 	birth_date: '1980-06-15',
-	email: 'anna@mail.example',
+	email: 'erika@mail.example',
 	identifiers: [{ kind: 'tax_id', value: '12345678911' }],
 	numbers: [
 		{
@@ -53,7 +53,7 @@ const data = { profile: stored, contacts, topics: [] } as unknown as ProfileData
 
 beforeEach(() => {
 	session.start({
-		user: { id: 'anna', username: 'anna', role: 'user' },
+		user: { id: 'erika', username: 'erika', role: 'user' },
 		method: 'password',
 		expires_at: '2026-10-14T12:00:00Z',
 		csrf_token: 'token'
@@ -83,14 +83,14 @@ describe('ProfileForm', () => {
 	it('shows the own profile and saves what is in it', async () => {
 		render(ProfileForm, { data });
 		const name = await screen.findByLabelText(m.profile_display_name());
-		expect((name as HTMLInputElement).value).toBe('Anna Example');
-		expect(screen.getByText('Anna Sample')).toBeTruthy();
+		expect((name as HTMLInputElement).value).toBe('Erika Mustermann');
+		expect(screen.getByText('E. Mustermann')).toBeTruthy();
 		expect(screen.getByText('12345678911')).toBeTruthy();
 		await userEvent.click(
-			screen.getByRole('button', { name: m.alias_remove({ name: 'Anna Sample' }) })
+			screen.getByRole('button', { name: m.alias_remove({ name: 'E. Mustermann' }) })
 		);
 		await userEvent.click(screen.getByRole('button', { name: m.profile_alias_chip() }));
-		await userEvent.type(screen.getByLabelText(m.profile_alias_input()), 'Anna Muster{Enter}');
+		await userEvent.type(screen.getByLabelText(m.profile_alias_input()), 'Erika M.{Enter}');
 		await userEvent.clear(name);
 		await userEvent.click(screen.getByRole('button', { name: m.save() }));
 		expect(sent).toEqual([
@@ -98,9 +98,9 @@ describe('ProfileForm', () => {
 				path: '/api/v1/auth/me/profile',
 				body: {
 					display_name: null,
-					aliases: ['Anna Muster'],
+					aliases: ['Erika M.'],
 					birth_date: '1980-06-15',
-					email: 'anna@mail.example',
+					email: 'erika@mail.example',
 					identifiers: [{ kind: 'tax_id', value: '12345678911' }],
 					numbers: [{ contact_id: 'employer', kind: 'personnel_number', value: '12345' }],
 					declined_numbers: []

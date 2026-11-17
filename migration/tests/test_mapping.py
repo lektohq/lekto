@@ -130,7 +130,7 @@ def test_the_date_added_is_taken_over_with_its_time_zone_and_never_ahead() -> No
 
 USERS = {
     1: {"id": 1, "username": "tobias", "is_active": True, "groups": [1]},
-    2: {"id": 2, "username": "anna", "is_active": True, "groups": [1]},
+    2: {"id": 2, "username": "erika", "is_active": True, "groups": [1]},
     3: {"id": 3, "username": "bob", "is_active": True, "groups": []},
     4: {"id": 4, "username": "gone", "is_active": False, "groups": []},
 }
@@ -158,16 +158,16 @@ def test_groups_are_resolved_and_writers_win_over_readers() -> None:
         {"owner": 1, "permissions": permissions([3], [1], [2], [])},
         USERS,
     )
-    # tobias (the owner) is left out; anna reads via the group and writes directly (edits); bob
+    # tobias (the owner) is left out; erika reads via the group and writes directly (edits); bob
     # reads.
-    assert access.shares == (("anna", "edit"), ("bob", "read"))
+    assert access.shares == (("bob", "read"), ("erika", "edit"))
     access = access_of({"owner": 3, "permissions": permissions([], [], [], [1])}, USERS)
-    assert access.shares == (("anna", "edit"), ("tobias", "edit"))
+    assert access.shares == (("erika", "edit"), ("tobias", "edit"))
 
 
 def test_no_owner_unknown_owner_and_users_that_are_gone_are_noted() -> None:
     nobody = access_of({"owner": None, "permissions": permissions([2])}, USERS)
-    assert nobody.owner is None and nobody.shares == (("anna", "read"),)
+    assert nobody.owner is None and nobody.shares == (("erika", "read"),)
     assert "no owner" in nobody.notes[0]
     deleted = access_of({"owner": 99, "permissions": permissions()}, USERS)
     assert deleted.owner is None and "no longer exists" in deleted.notes[0]

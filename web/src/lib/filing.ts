@@ -269,13 +269,13 @@ export function visibleNames(
 	};
 }
 
-/** "visible to Anna, Ben", or "visible to you only". */
+/** "visible to Erika, Ben", or "visible to you only". */
 export function visibleText(members: readonly Member[], viewer: Viewer, green: boolean): string {
 	const { now } = visibleNames(members, viewer, green);
 	return now.length > 0 ? m.visible_to({ names: now.join(', ') }) : m.visible_to_you();
 }
 
-/** "Anna reads it once it is green"; null when nobody waits for that. */
+/** "Erika reads it once it is green"; null when nobody waits for that. */
 export function readersLaterText(
 	members: readonly Member[],
 	viewer: Viewer,

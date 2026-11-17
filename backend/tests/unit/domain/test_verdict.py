@@ -184,7 +184,7 @@ def test_similar_documents_contradict_only_with_a_proof_of_their_contact() -> No
 
 
 def test_a_payslip_of_a_new_employer_is_green_by_its_proof() -> None:
-    """Tobi, 22.10.2026, Anna's payslip among Tobi's: the model reads the new employer (a
+    """Tobi, 22.10.2026, Erika's payslip among Tobi's: the model reads the new employer (a
     full match), its personnel number and its name stand in the text; four of the five
     similar payslips are from Tobi's employer, one from another, the classifier leans to
     Tobi's employer (52 %) without naming it. The old employer is not in the text: no

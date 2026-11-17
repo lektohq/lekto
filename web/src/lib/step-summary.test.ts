@@ -11,7 +11,7 @@ const MUSTERVEREIN = '0199a6c4-0000-7000-8000-0000000000c1';
 const BAKERY = '0199a6c4-0000-7000-8000-0000000000c2';
 const PAYSLIP = '0199a6c4-0000-7000-8000-0000000000e1';
 const HOME = '0199a6c4-0000-7000-8000-0000000000a1';
-const ANNA = '0199a6c4-0000-7000-8000-0000000000b1';
+const ERIKA = '0199a6c4-0000-7000-8000-0000000000b1';
 const lookup = {
 	contacts: [
 		{ id: MUSTERVEREIN, name: 'Jugendverein Muster e.V.' },
@@ -21,7 +21,7 @@ const lookup = {
 	tags: [],
 	fields: [],
 	spaces: [{ id: HOME, name: 'Tobi', personal_of: null, members: [] }],
-	users: [{ id: ANNA, username: 'anna', display_name: 'Jane Doe', personal_space_id: null }]
+	users: [{ id: ERIKA, username: 'erika', display_name: 'Jane Doe', personal_space_id: null }]
 } as unknown as Lookup;
 
 const done = (node: Node): NodeState => ({
@@ -130,7 +130,7 @@ describe('stepSummary', () => {
 		expect(
 			summary('signal_facts', {
 				identifiers: [{ kind: 'personnel_number', value: '12345', contact_id: BAKERY }],
-				persons: [{ user_id: ANNA, strength: 'hard' }]
+				persons: [{ user_id: ERIKA, strength: 'hard' }]
 			})
 		).toContain('Muster Bäckerei');
 		expect(summary('signal_classifier', { abstained: 'too few documents' })).toBe(
@@ -141,7 +141,7 @@ describe('stepSummary', () => {
 	it('tells what the verdict left open and who would not see it', () => {
 		const fields = [
 			{ field: 'contact', outcome: 'ok', value: BAKERY },
-			{ field: 'space', outcome: 'uncertain', unseen_by: [ANNA] }
+			{ field: 'space', outcome: 'uncertain', unseen_by: [ERIKA] }
 		];
 		const unsure: NodeState = { ...done('judge'), outcome: 'uncertain' };
 		const judged = entry('judge', { fields }, { outcome: 'uncertain' });
@@ -155,7 +155,7 @@ describe('stepSummary', () => {
 		);
 		const both = entry(
 			'judge',
-			{ fields: [{ field: 'space', outcome: 'uncertain', unseen_by: [ANNA, 'someone'] }] },
+			{ fields: [{ field: 'space', outcome: 'uncertain', unseen_by: [ERIKA, 'someone'] }] },
 			{ outcome: 'uncertain' }
 		);
 		expect(stepSummary('judge', unsure, both, 'review', lookup)).toContain(
@@ -174,32 +174,36 @@ describe('stepSummary', () => {
 
 	it('tells who settled what a step left uncertain or failed', () => {
 		const confirmed = (before: string) =>
-			summary('judge', { confirmed_by: ANNA, outcome_before: before }, { model_version: 'person' });
+			summary(
+				'judge',
+				{ confirmed_by: ERIKA, outcome_before: before },
+				{ model_version: 'person' }
+			);
 		expect(confirmed('uncertain')).toBe(m.summary_overruled_confirmed({ name: 'Jane Doe' }));
 		expect(confirmed('failed')).toBe(m.summary_overruled_decided({ name: 'Jane Doe' }));
 		// The rules filed the document where the verdict suggested: no longer open.
-		const fields = [{ field: 'space', outcome: 'uncertain', unseen_by: [ANNA] }];
+		const fields = [{ field: 'space', outcome: 'uncertain', unseen_by: [ERIKA] }];
 		expect(summary('judge', { fields }, { outcome: 'uncertain' })).toBe(
 			m.summary_overruled_settled()
 		);
 		expect(
-			confirmationOf(entry('judge', { confirmed_by: ANNA, outcome_before: 'ok' }, {}))
+			confirmationOf(entry('judge', { confirmed_by: ERIKA, outcome_before: 'ok' }, {}))
 		).toBeNull();
 		expect(
 			confirmationOf(
 				entry(
 					'judge',
-					{ confirmed_by: ANNA, outcome_before: 'failed' },
+					{ confirmed_by: ERIKA, outcome_before: 'failed' },
 					{ model_version: 'person' }
 				)
 			)
-		).toEqual({ by: ANNA, via: null, before: 'failed' });
+		).toEqual({ by: ERIKA, via: null, before: 'failed' });
 		// Through an API token: the token stands after the name.
 		const token = { id: 't', name: 'Claude' };
 		expect(
 			summary(
 				'judge',
-				{ confirmed_by: ANNA, via_token: token, outcome_before: 'uncertain' },
+				{ confirmed_by: ERIKA, via_token: token, outcome_before: 'uncertain' },
 				{ model_version: 'person' }
 			)
 		).toBe(
@@ -212,9 +216,9 @@ describe('stepSummary', () => {
 	it('names who set off an entry outside processing, with the token', () => {
 		const change = (input: Record<string, unknown>) =>
 			actorOf(entry('apply_rules', {}, { model_version: 'rules:change', input }));
-		expect(change({ actor: ANNA })).toEqual({ by: ANNA, via: null });
-		expect(change({ actor: ANNA, via_token: { id: 't', name: 'Claude' } })).toEqual({
-			by: ANNA,
+		expect(change({ actor: ERIKA })).toEqual({ by: ERIKA, via: null });
+		expect(change({ actor: ERIKA, via_token: { id: 't', name: 'Claude' } })).toEqual({
+			by: ERIKA,
 			via: 'Claude'
 		});
 		expect(change({ trigger: 'change' })).toBeNull();

@@ -6,7 +6,7 @@ from lekto.core.domain.locations import Box, Location
 from lekto.core.domain.text_places import TextPlaces
 
 TEXT = """\
-Stadtwerke Süd GmbH                       Kundennummer 2004-7718
+Stadtwerke Süd GmbH                       Kundennummer 1234-5678
 IBAN DE89 3704 0044 0532 0130 00
 Betreff: Abschlag
 \f
@@ -55,7 +55,7 @@ def test_the_words_of_a_later_page_are_found_on_it() -> None:
 
 def test_a_stretch_within_a_word_stands_where_the_word_stands() -> None:
     places = places_of(TEXT)
-    start, _ = at(TEXT, "2004-7718")
+    start, _ = at(TEXT, "1234-5678")
     (location,) = places.locations(start + 5, start + 9)
     assert location.boxes == (cells(0, 55, 64),)
 

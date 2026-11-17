@@ -54,7 +54,7 @@ const FACTS: Facts = {
 		},
 		{
 			kind: 'customer_number',
-			value: '20047718',
+			value: '12345678',
 			contact_id: null,
 			in_text: true,
 			in_code: false,
@@ -142,7 +142,7 @@ describe('FactsPanel', () => {
 		// The IBAN as a fact, and as the GiroCode's.
 		expect(screen.getAllByText('DE89 3704 0044 0532 0130 00')).toHaveLength(2);
 		expect(screen.getByText(m.facts_unknown())).toBeTruthy();
-		expect(screen.getByText('20047718')).toBeTruthy();
+		expect(screen.getByText('12345678')).toBeTruthy();
 		// Each with what it is to the document.
 		expect(screen.getAllByText(`· ${m.fact_role_contact()}`)).toHaveLength(3);
 		// The owner's own IBAN stands on many contacts' documents.
@@ -232,7 +232,7 @@ describe('FactsPanel', () => {
 		await waitFor(() => expect(onchanged).toHaveBeenCalled());
 		const [request] = fetchMock.mock.calls[0];
 		expect(calls(fetchMock)[0]).toBe(`POST /api/v1/contacts/${UTILITY}/identifiers`);
-		expect(await request.json()).toEqual({ kind: 'customer_number', value: '20047718' });
+		expect(await request.json()).toEqual({ kind: 'customer_number', value: '12345678' });
 	});
 
 	it("attaches an identifier with a topic of the contact, the document's at first", async () => {
@@ -270,7 +270,7 @@ describe('FactsPanel', () => {
 		const [request] = fetchMock.mock.calls[0];
 		expect(await request.json()).toEqual({
 			kind: 'customer_number',
-			value: '20047718',
+			value: '12345678',
 			topic_id: 'p2'
 		});
 	});

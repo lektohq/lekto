@@ -90,7 +90,7 @@ def test_each_kind_is_found_and_normalised(text: str, kind: IdentifierKind, valu
 @pytest.mark.parametrize(
     ("text", "kind"),
     [
-        ("Rentenversicherungsnummer: 65 170839 J 003", K.CONTRACT_NUMBER),
+        ("Rentenversicherungsnummer: 12 010145 M 122", K.CONTRACT_NUMBER),
         ("Krankenversicherungsnummer A123456789", K.CONTRACT_NUMBER),
         ("Kundennummer 4711", K.CONTRACT_NUMBER),  # the customer number keeps its kind
         ("IBAN DE89 3704 0044 0532 0130 00", K.CREDITOR_ID),  # no letter in the business code

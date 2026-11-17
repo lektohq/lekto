@@ -28,9 +28,9 @@ from tests.unit.services.support import World
 IBAN = (IdentifierKind.IBAN, "DE02120300000000202051")
 SHARED = (IdentifierKind.CUSTOMER_NUMBER, "55667788")
 SITE = (IdentifierKind.EMAIL_DOMAIN, "stadtwerke-nord.example")
-CUSTOMER = (IdentifierKind.CUSTOMER_NUMBER, "20047718")
-TEXT = "Stadtwerke Nord\nKundennummer 2004 7718\nKonto 5566 7788\nservice@stadtwerke-nord.example\n"
-WRITTEN = {CUSTOMER[1]: "2004 7718", SHARED[1]: "5566 7788"}
+CUSTOMER = (IdentifierKind.CUSTOMER_NUMBER, "12345678")
+TEXT = "Stadtwerke Nord\nKundennummer 1234 5678\nKonto 5566 7788\nservice@stadtwerke-nord.example\n"
+WRITTEN = {CUSTOMER[1]: "1234 5678", SHARED[1]: "5566 7788"}
 
 
 async def confirmed(
@@ -129,7 +129,7 @@ async def test_a_detail_shows_where_it_stands(world: World) -> None:
     assert place.excerpt is not None
     assert (place.excerpt.before, place.excerpt.match) == (
         "Stadtwerke Nord Kundennummer ",
-        "2004 7718",
+        "1234 5678",
     )
     with pytest.raises(NotFoundError):
         await world.open_identifiers.detail(admin.id, IdentifierKind.CUSTOMER_NUMBER, "99999999")

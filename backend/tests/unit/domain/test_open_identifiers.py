@@ -28,8 +28,8 @@ from tests.builders import NOW
 
 IBAN = (IdentifierKind.IBAN, "DE02120300000000202051")
 VAT = (IdentifierKind.VAT_ID, "DE312456789")
-CUSTOMER = (IdentifierKind.CUSTOMER_NUMBER, "20047718")
-CONTRACT = (IdentifierKind.CONTRACT_NUMBER, "20047718")
+CUSTOMER = (IdentifierKind.CUSTOMER_NUMBER, "12345678")
+CONTRACT = (IdentifierKind.CONTRACT_NUMBER, "12345678")
 OTHER = (IdentifierKind.CUSTOMER_NUMBER, "55667788")
 DOMAIN = (IdentifierKind.EMAIL_DOMAIN, "stadtwerke.example")
 INVOICE = (IdentifierKind.INVOICE_NUMBER, "R-4711")
@@ -66,12 +66,12 @@ def seen(
 def test_a_learned_one_is_open_with_the_documents_that_show_it() -> None:
     utility = Contact.create(name="Stadtwerke", now=NOW)
     utility.set_learned([Identifier(*CUSTOMER, IdentifierSource.LEARNED)])
-    sightings = [seen(utility.id, CUSTOMER, 1), seen(utility.id, CONTRACT, 9, "2004 7718")]
+    sightings = [seen(utility.id, CUSTOMER, 1), seen(utility.id, CONTRACT, 9, "1234 5678")]
     (item,) = open_identifiers([utility], sightings)
     # A customer number stands for the contract number of its value.
     assert (item.key, item.source, item.contacts) == (CUSTOMER, OpenSource.LEARNED, (utility.id,))
     assert [each.dated.day for each in item.seen] == [9, 1]
-    assert (item.written, item.last) == ("2004 7718", date(2026, 10, 9))
+    assert (item.written, item.last) == ("1234 5678", date(2026, 10, 9))
 
 
 def test_a_domain_that_fits_its_contact_s_name_is_suggested_for_it() -> None:

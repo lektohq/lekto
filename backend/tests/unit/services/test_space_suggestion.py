@@ -49,22 +49,22 @@ from tests.unit.services.test_classification import (
 from tests.unit.services.test_space_rules import files_into
 
 
-async def household(world: World, *, anna_reads_tobi: bool = False) -> tuple[User, User, Space]:
-    """Tobi and Anna edit "Haushalt"; Anna described her personal space (only for her)."""
-    tobi, anna = await world.user("tobi"), await world.user("anna")
-    shared = builders.space(tobi, "Haushalt", editors=[anna])
+async def household(world: World, *, erika_reads_tobi: bool = False) -> tuple[User, User, Space]:
+    """Tobi and Erika edit "Haushalt"; Erika described her personal space (only for her)."""
+    tobi, erika = await world.user("tobi"), await world.user("erika")
+    shared = builders.space(tobi, "Haushalt", editors=[erika])
     shared.describe("Wohnung, Nebenkosten, Versorger")
     async with world.uow() as uow:
         await uow.spaces.add(shared)
-        annas = await uow.spaces.get_personal(anna.id)
-        annas.describe("Annas Arbeit")
-        await uow.spaces.update(annas)
-        if anna_reads_tobi:
+        erikas = await uow.spaces.get_personal(erika.id)
+        erikas.describe("Erikas Arbeit")
+        await uow.spaces.update(erikas)
+        if erika_reads_tobi:
             home = await uow.spaces.get_personal(tobi.id)
-            home.set_member(anna.id, SpaceRole.READ)
+            home.set_member(erika.id, SpaceRole.READ)
             await uow.spaces.update(home)
         await uow.commit()
-    return tobi, anna, shared
+    return tobi, erika, shared
 
 
 async def tobis_invoice(world: World, tobi: User) -> Document:
@@ -83,7 +83,7 @@ def space_check(result: MetadataResult) -> Any:
 
 
 KINDS = {"a shared space", "the uploader's personal space", "another user's personal space"}
-NAMES = ("Haushalt", "Wohnung", "Annas Arbeit", "tobi", "anna", "Jane Doe")
+NAMES = ("Haushalt", "Wohnung", "Erikas Arbeit", "tobi", "erika", "Jane Doe")
 
 
 def named_by_kind(check: Any) -> None:
@@ -97,9 +97,9 @@ def named_by_kind(check: Any) -> None:
 
 async def test_the_model_chooses_among_the_spaces_the_uploader_may_file_into(world: World) -> None:
     """The uploader's own personal space first, shared spaces with their description, other
-    users' personal spaces by their user only: what Anna wrote about hers is hers."""
+    users' personal spaces by their user only: what Erika wrote about hers is hers."""
     await seed(world)
-    tobi, anna, shared = await household(world)
+    tobi, erika, shared = await household(world)
     document = await tobis_invoice(world, tobi)
     fake = model(proposal(space="s2"))
 
@@ -110,15 +110,15 @@ async def test_the_model_chooses_among_the_spaces_the_uploader_may_file_into(wor
     assert listed.strip().splitlines() == [
         "- s1: own personal space of the uploader",
         "- s2: Haushalt: Wohnung, Nebenkosten, Versorger",
-        "- s3: personal space of anna",
+        "- s3: personal space of erika",
     ]
-    assert "Annas Arbeit" not in request.task
+    assert "Erikas Arbeit" not in request.task
     schema: Any = request.schema
     assert schema["properties"]["space"]["anyOf"][0]["enum"] == ["s1", "s2", "s3"]
     out: Any = result.output
     assert out["proposal"]["space"] == str(shared.id)
     sent: Any = result.input
-    assert sent["spaces"]["s3"] == str((await world.personal_space(anna)).id)
+    assert sent["spaces"]["s3"] == str((await world.personal_space(erika)).id)
 
 
 async def test_the_uploader_s_own_description_of_their_personal_space_is_listed(
@@ -177,9 +177,9 @@ async def test_a_wider_space_is_suggested_and_the_document_stays(world: World) -
 
 
 async def test_a_space_that_shows_it_to_no_one_new_is_moved_to(world: World) -> None:
-    """Anna reads Tobi's personal space already: Haushalt shows it to no one new."""
+    """Erika reads Tobi's personal space already: Haushalt shows it to no one new."""
     await seed(world)
-    tobi, _, shared = await household(world, anna_reads_tobi=True)
+    tobi, _, shared = await household(world, erika_reads_tobi=True)
     document = await tobis_invoice(world, tobi)
     result = await judge(world, document, model(proposal(space="s2")))
     assert isinstance(result, MetadataResult)
@@ -246,13 +246,13 @@ async def test_accepting_the_suggestion_moves_it_and_it_is_new_for_the_others(
     world: World,
 ) -> None:
     await seed(world)
-    tobi, anna, shared = await household(world)
+    tobi, erika, shared = await household(world)
     document = await arrive(world, tobi, proposal(space="s2"))
     assert document.lane is Lane.YELLOW
     assert document.processing.status is ProcessingStatus.REVIEW
     assert document.space_id == (await world.personal_space(tobi)).id
     with pytest.raises(NotFoundError):  # not shown to her yet
-        await world.documents.get(anna.id, document.id)
+        await world.documents.get(erika.id, document.id)
 
     await world.pipeline({Node.APPLY_RULES: rules_step(world)}).confirm(
         tobi.id, document.id, DocumentChanges(), accept_suggestions=True
@@ -263,7 +263,7 @@ async def test_accepting_the_suggestion_moves_it_and_it_is_new_for_the_others(
     assert moved.space_id == shared.id
     assert moved.space_confirmed_at is not None
     assert moved.lane is Lane.GREEN
-    tabs = await world.inbox.summary(anna.id)
+    tabs = await world.inbox.summary(erika.id)
     assert tabs.counts.get(InboxTab.NEW, 0) == 1
 
 
@@ -334,33 +334,33 @@ async def test_a_suggestion_the_confirming_editor_cannot_take_keeps_the_space(
 
 
 def test_own_and_the_id_of_the_uploader_s_personal_space_add_up() -> None:
-    """Documents handed over to Anna are labelled with her space's id, her own uploads "own":
+    """Documents handed over to Erika are labelled with her space's id, her own uploads "own":
     for her, both are her personal space."""
-    anna = builders.user("anna")
-    annas = builders.personal_space(anna)
-    house = builders.space(anna, "Haushalt")
+    erika = builders.user("erika")
+    erikas = builders.personal_space(erika)
+    house = builders.space(erika, "Haushalt")
     candidates = SpaceCandidates(
-        uploader=anna, personal=annas.id, spaces={annas.id: annas, house.id: house}, people={}
+        uploader=erika, personal=erikas.id, spaces={erikas.id: erikas, house.id: house}, people={}
     )
     ranked, known = _candidate_spaces(
-        [(OWN_SPACE, 0.4), (str(house.id), 0.35), (str(annas.id), 0.25)], candidates
+        [(OWN_SPACE, 0.4), (str(house.id), 0.35), (str(erikas.id), 0.25)], candidates
     )
-    assert ranked[0][0] == annas.id
+    assert ranked[0][0] == erikas.id
     assert ranked[0][1] == pytest.approx(0.65)
-    assert [space for space, _ in ranked] == [annas.id, house.id]
-    assert known == {annas.id, house.id}
+    assert [space for space, _ in ranked] == [erikas.id, house.id]
+    assert known == {erikas.id, house.id}
 
 
-async def annas_profile(world: World, anna: User, *, tax: str | None = None) -> None:
-    """Anna's display name, and her tax ID if given."""
+async def erikas_profile(world: World, erika: User, *, tax: str | None = None) -> None:
+    """Erika's display name, and her tax ID if given."""
     async with world.uow() as uow:
-        user = await uow.users.get(anna.id)
+        user = await uow.users.get(erika.id)
         user.display_name = "Jane Doe"
         await uow.users.update(user)
         if tax is not None:
             await uow.profiles.add(
                 Profile(
-                    id=anna.id,
+                    id=erika.id,
                     identifiers=[Identifier.parse(IdentifierKind.TAX_ID, tax)],
                     version=1,
                 )
@@ -379,13 +379,13 @@ async def tobis_upload_of(world: World, tobi: User, text: str) -> Document:
     return document
 
 
-async def test_anna_s_tax_id_in_tobi_s_upload_suggests_handing_it_over(world: World) -> None:
-    """No signal names a space; Anna's tax ID stands in the text (hard evidence): Lekto
+async def test_erika_s_tax_id_in_tobi_s_upload_suggests_handing_it_over(world: World) -> None:
+    """No signal names a space; Erika's tax ID stands in the text (hard evidence): Lekto
     suggests handing it over to her, it never hands over by itself."""
     await seed(world)
-    tobi, anna, _ = await household(world)
+    tobi, erika, _ = await household(world)
     tax = person_numbers.tax_id()
-    await annas_profile(world, anna, tax=tax)
+    await erikas_profile(world, erika, tax=tax)
     document = await tobis_upload_of(world, tobi, f"{INVOICE}\n\nSteuer-ID: {tax}\n")
 
     result = await judge(world, document, model(proposal()))
@@ -393,20 +393,20 @@ async def test_anna_s_tax_id_in_tobi_s_upload_suggests_handing_it_over(world: Wo
     assert isinstance(result, MetadataResult)
     check = space_check(result)
     assert check.outcome is Outcome.UNCERTAIN
-    assert check.suggestion == str((await world.personal_space(anna)).id)
+    assert check.suggestion == str((await world.personal_space(erika)).id)
     named_by_kind(check)
     assert result.space is None
     out: Any = result.result.output
-    assert out["persons"] == [{"user_id": str(anna.id), "strength": "hard"}]
+    assert out["persons"] == [{"user_id": str(erika.id), "strength": "hard"}]
     assert tax not in str(out)  # ids and strengths only
 
 
 async def test_the_model_s_recipient_only_warns(world: World) -> None:
-    """The letter is addressed to Anna (the model's recipient, medium evidence): it stays with
-    Tobi, never yellow for that, and the check says Anna would not see it."""
+    """The letter is addressed to Erika (the model's recipient, medium evidence): it stays with
+    Tobi, never yellow for that, and the check says Erika would not see it."""
     await seed(world)
-    tobi, anna, _ = await household(world)
-    await annas_profile(world, anna)
+    tobi, erika, _ = await household(world)
+    await erikas_profile(world, erika)
     document = await tobis_invoice(world, tobi)
 
     result = await judge(world, document, model(proposal(recipient="Frau Jane Doe")))
@@ -414,7 +414,7 @@ async def test_the_model_s_recipient_only_warns(world: World) -> None:
     assert isinstance(result, MetadataResult)
     check = space_check(result)
     assert check.outcome is Outcome.OK
-    assert check.unseen_by == (str(anna.id),)
+    assert check.unseen_by == (str(erika.id),)
     assert check.reason == "names someone who would not see it there"
     assert result.space is None
 
@@ -422,23 +422,23 @@ async def test_the_model_s_recipient_only_warns(world: World) -> None:
 async def test_the_model_proposing_the_recipient_s_space_marks_the_hand_over(
     world: World,
 ) -> None:
-    """The model proposes Anna's personal space and reads Anna as the recipient (by her
+    """The model proposes Erika's personal space and reads Erika as the recipient (by her
     display name): the candidate says so (`recipient`), and the judge suggests the hand-over;
     against similar documents that stay with Tobi too (`test_space_persons`)."""
     await seed(world)
-    tobi, anna, _ = await household(world)
-    await annas_profile(world, anna)
+    tobi, erika, _ = await household(world)
+    await erikas_profile(world, erika)
     document = await tobis_invoice(world, tobi)
 
     result = await judge(world, document, model(proposal(space="s3", recipient="Frau Jane Doe")))
 
     assert isinstance(result, MetadataResult)
     check = space_check(result)
-    annas = (await world.personal_space(anna)).id
+    erikas = (await world.personal_space(erika)).id
     assert check.outcome is Outcome.UNCERTAIN
-    assert check.suggestion == str(annas)
+    assert check.suggestion == str(erikas)
     assert result.space is None  # never by itself
-    proposed = next(c for c in check.candidates if c.value == str(annas))
+    proposed = next(c for c in check.candidates if c.value == str(erikas))
     assert any(source.recipient for source in proposed.sources)
 
 
@@ -446,15 +446,15 @@ async def test_the_recipient_is_matched_by_display_names_not_usernames(world: Wo
     await seed(world)
     tobi, _, _ = await household(world)
     document = await tobis_invoice(world, tobi)
-    result = await judge(world, document, model(proposal(recipient="anna")))
+    result = await judge(world, document, model(proposal(recipient="erika")))
     assert isinstance(result, MetadataResult)
-    assert space_check(result).unseen_by == ()  # "anna" is her username, she gave no name
+    assert space_check(result).unseen_by == ()  # "erika" is her username, she gave no name
 
 
 async def test_others_personal_spaces_are_listed_by_display_name(world: World) -> None:
     await seed(world)
-    tobi, anna, _ = await household(world)
-    await annas_profile(world, anna)
+    tobi, erika, _ = await household(world)
+    await erikas_profile(world, erika)
     document = await tobis_invoice(world, tobi)
     fake = model(proposal())
     await signal_step(world, fake).run(document)

@@ -5586,7 +5586,7 @@ export interface components {
 		 *       "at_contact": true,
 		 *       "kind": "customer_number",
 		 *       "new_value": "2004 7719",
-		 *       "value": "20047718"
+		 *       "value": "12345678"
 		 *     }
 		 * @example {
 		 *       "action": "add",
@@ -5703,7 +5703,7 @@ export interface components {
 		 *               "start": 412
 		 *             }
 		 *           ],
-		 *           "value": "20047718"
+		 *           "value": "12345678"
 		 *         }
 		 *       ],
 		 *       "named": []
@@ -5745,7 +5745,7 @@ export interface components {
 			editable: boolean;
 			/**
 			 * Persons
-			 * @description The users the document names, the surest first: for the editors of its space and admins; null for readers. What is private about a person (aliases, birth date, identifiers, a contact's number that names them) finds them only for admins and that person: anyone else sees another user only where the text has their display name (that a number is Anna's tax ID is Anna's).
+			 * @description The users the document names, the surest first: for the editors of its space and admins; null for readers. What is private about a person (aliases, birth date, identifiers, a contact's number that names them) finds them only for admins and that person: anyone else sees another user only where the text has their display name (that a number is Erika's tax ID is Erika's).
 			 */
 			persons?: components['schemas']['FoundPersonOut'][] | null;
 		};
@@ -6463,7 +6463,7 @@ export interface components {
 		 *     without `www.`).
 		 * @example {
 		 *       "kind": "customer_number",
-		 *       "value": "2004-7718"
+		 *       "value": "1234-5678"
 		 *     }
 		 */
 		IdentifierIn: {
@@ -6480,7 +6480,7 @@ export interface components {
 			topic_id?: string | null;
 			/**
 			 * User Id
-			 * @description The user a customer, contract or personnel number belongs to (Anna's contract): found in a document, it is hard evidence for whose it is. Not for other kinds, not for a rejected one.
+			 * @description The user a customer, contract or personnel number belongs to (Erika's contract): found in a document, it is hard evidence for whose it is. Not for other kinds, not for a rejected one.
 			 */
 			user_id?: string | null;
 		};
@@ -8822,7 +8822,7 @@ export interface components {
 		 *         {
 		 *           "action": "confirm",
 		 *           "kind": "customer_number",
-		 *           "value": "20047718"
+		 *           "value": "12345678"
 		 *         },
 		 *         {
 		 *           "action": "reject",
@@ -8954,7 +8954,7 @@ export interface components {
 		/**
 		 * OpenSearchIn
 		 * @example {
-		 *       "q": "2004 7718"
+		 *       "q": "1234 5678"
 		 *     }
 		 */
 		OpenSearchIn: {
@@ -9301,10 +9301,10 @@ export interface components {
 		 *     `identifiers` and `numbers` replace all of them.
 		 * @example {
 		 *       "aliases": [
-		 *         "Anna Sample"
+		 *         "E. Mustermann"
 		 *       ],
 		 *       "birth_date": "1980-06-15",
-		 *       "display_name": "Anna Example"
+		 *       "display_name": "Erika Mustermann"
 		 *     }
 		 */
 		ProfilePatch: {

@@ -153,8 +153,8 @@ class ProfilePatch(RequestBody):
         json_schema_extra={
             "examples": [
                 {
-                    "display_name": "Anna Example",
-                    "aliases": ["Anna Sample"],
+                    "display_name": "Erika Mustermann",
+                    "aliases": ["E. Mustermann"],
                     "birth_date": "1980-06-15",
                 }
             ]

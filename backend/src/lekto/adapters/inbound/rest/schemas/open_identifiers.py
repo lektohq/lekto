@@ -222,7 +222,7 @@ class OpenDetailOut(BaseModel):
 
 
 class OpenSearchIn(RequestBody):
-    model_config = ConfigDict(json_schema_extra={"examples": [{"q": "2004 7718"}]})
+    model_config = ConfigDict(json_schema_extra={"examples": [{"q": "1234 5678"}]})
 
     q: str = Field(
         min_length=1,
@@ -264,7 +264,7 @@ class OpenDecisionsIn(RequestBody):
             "examples": [
                 {
                     "decisions": [
-                        {"kind": "customer_number", "value": "20047718", "action": "confirm"},
+                        {"kind": "customer_number", "value": "12345678", "action": "confirm"},
                         {"kind": "iban", "value": "DE02120300000000202051", "action": "reject"},
                     ]
                 }

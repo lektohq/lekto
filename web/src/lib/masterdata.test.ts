@@ -15,7 +15,7 @@ import {
 
 const users = [
 	{ id: 'u1', username: 'tobi', role: 'user' as const, personal_space_id: 'mine' },
-	{ id: 'u2', username: 'anna', role: 'user' as const, personal_space_id: 'anna' },
+	{ id: 'u2', username: 'erika', role: 'user' as const, personal_space_id: 'erika' },
 	{ id: 'u3', username: 'bob', role: 'user' as const, personal_space_id: 'bobs' }
 ];
 const space = (id: string, changes: Partial<Space> = {}): Space => ({
@@ -32,11 +32,11 @@ const space = (id: string, changes: Partial<Space> = {}): Space => ({
 
 const mine = space('mine', { personal_of: 'u1' });
 const house = space('house', { name: 'Haushalt' });
-const anna = space('anna', {
+const erika = space('erika', {
 	personal_of: 'u2',
 	role: 'read',
 	members: [
-		{ user_id: 'u2', role: 'edit', username: 'anna', active: true },
+		{ user_id: 'u2', role: 'edit', username: 'erika', active: true },
 		{ user_id: 'u1', role: 'read', username: 'tobi', active: true }
 	]
 });
@@ -57,11 +57,11 @@ describe('spaces by name', () => {
 		expect(spaceNameFor('gone', lookup, 'u1')).toBe(m.space_unseen());
 		expect(spaceNameFor('gone', lookup, 'u1', '')).toBe('');
 		expect(spaceNameFor('house', null, 'u1')).toBe(m.space_unseen());
-		expect(holderOf(users, 'anna')?.username).toBe('anna');
+		expect(holderOf(users, 'erika')?.username).toBe('erika');
 	});
 
 	it('names a space only where the caller is no member (an admin looking at others)', () => {
-		const lookup = { spaces: [mine, house, anna], users };
+		const lookup = { spaces: [mine, house, erika], users };
 		expect(foreignSpace('house', lookup, 'u1')).toBeNull();
 		expect(foreignSpace('house', lookup, 'u3')).toBe('Haushalt');
 		expect(foreignSpace('mine', lookup, 'u3')).toBe('tobi');
@@ -70,10 +70,10 @@ describe('spaces by name', () => {
 
 	it('offers the edited spaces, then hand-overs to every other user', () => {
 		// bob's personal space is not listed for tobi; a hand-over needs no membership.
-		expect(spaceOptions([mine, house, anna], users, users[0])).toEqual([
+		expect(spaceOptions([mine, house, erika], users, users[0])).toEqual([
 			{ value: 'mine', label: m.space_personal() },
 			{ value: 'house', label: 'Haushalt' },
-			{ value: 'anna', label: m.move_hand_over({ name: 'anna' }) },
+			{ value: 'erika', label: m.move_hand_over({ name: 'erika' }) },
 			{ value: 'bobs', label: m.move_hand_over({ name: 'bob' }) }
 		]);
 	});
@@ -95,9 +95,9 @@ describe('the names of users', () => {
 
 describe('a user offered for a choice', () => {
 	it('shows the username beside a display name that differs', () => {
-		expect(userChoice({ username: 'bob', display_name: 'anna' })).toBe('anna (bob)');
-		expect(userChoice({ username: 'anna', display_name: 'Anna' })).toBe('Anna');
-		expect(userChoice({ username: 'anna', display_name: null })).toBe('anna');
+		expect(userChoice({ username: 'bob', display_name: 'erika' })).toBe('erika (bob)');
+		expect(userChoice({ username: 'erika', display_name: 'Erika' })).toBe('Erika');
+		expect(userChoice({ username: 'erika', display_name: null })).toBe('erika');
 	});
 });
 

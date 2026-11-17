@@ -2,7 +2,7 @@
 kind in a text, a GiroCode's IBAN), Lekto checks each against its kind and weighs them together
 (`identifiers_from`). A number that may name a user (`NAMING_KINDS`) that is one of a person's
 numbers, stands in one or overlaps it is theirs only (a pension fund writes
-"Versicherungsnummer" before the social security number, `65 170839 J 003`)."""
+"Versicherungsnummer" before the social security number, `12 010145 M 122`)."""
 
 import re
 from collections.abc import Iterable, Iterator

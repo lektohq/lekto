@@ -10,9 +10,9 @@ type LogEntry = components['schemas']['LogEntry'];
 type ProcessingStatus = components['schemas']['ProcessingStatus'];
 
 const TOBI = 'u-tobi';
-const ANNA = 'u-anna';
+const ERIKA = 'u-erika';
 const MINE = 's-mine';
-const ANNAS = 's-anna';
+const ERIKAS = 's-erika';
 const MUSTERVEREIN = 'c-musterverein';
 const BAKERY = 'c-bakery';
 
@@ -36,11 +36,11 @@ const lookup = {
 	users: [
 		{ id: TOBI, username: 'tobi', role: 'user', personal_space_id: MINE },
 		{
-			id: ANNA,
-			username: 'anna',
+			id: ERIKA,
+			username: 'erika',
 			display_name: 'Jane Doe',
 			role: 'user',
-			personal_space_id: ANNAS
+			personal_space_id: ERIKAS
 		}
 	]
 } as unknown as Lookup;
@@ -107,11 +107,11 @@ const spaceOpen = {
 			field: 'space',
 			outcome: 'uncertain',
 			confidence: 0.6,
-			suggestion: ANNAS,
+			suggestion: ERIKAS,
 			unseen_by: []
 		}
 	],
-	persons: [{ user_id: ANNA, strength: 'hard' }]
+	persons: [{ user_id: ERIKA, strength: 'hard' }]
 };
 
 describe('headlineOf', () => {
@@ -251,7 +251,7 @@ describe('changesOf', () => {
 	const decided = (contact: string) => ({
 		fields: [
 			{ field: 'contact', outcome: 'ok', value: contact },
-			{ field: 'space', outcome: 'uncertain', suggestion: ANNAS }
+			{ field: 'space', outcome: 'uncertain', suggestion: ERIKAS }
 		]
 	});
 

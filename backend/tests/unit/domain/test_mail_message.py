@@ -26,7 +26,7 @@ from tests.mails import (
 def test_reads_what_a_mail_says_about_itself() -> None:
     mail = read_mail(rich_mail())
     assert mail.sender == (Address("Stadtwerke Musterstadt", "rechnung@stadtwerke.example"),)
-    assert [address.address for address in mail.to] == ["anna@example.test", "ben@example.test"]
+    assert [address.address for address in mail.to] == ["erika@example.test", "ben@example.test"]
     assert mail.cc[0].shown == "Buchhaltung <buchhaltung@example.test>"
     assert mail.subject == "Ihre Rechnung über 123,45 €"
     assert mail.date == datetime(2026, 11, 4, 9, 0, tzinfo=UTC)
@@ -36,7 +36,7 @@ def test_reads_what_a_mail_says_about_itself() -> None:
 def test_reads_text_html_attachments_pictures_and_attached_mails() -> None:
     mail = read_mail(rich_mail())
     assert mail.text is not None and "123,45 €" in mail.text
-    assert mail.html is not None and "<b>Anna</b>" in mail.html
+    assert mail.html is not None and "<b>Erika</b>" in mail.html
     assert [(part.filename, part.media_type, part.data) for part in mail.attachments] == [
         ("Rechnung 4711.pdf", "application/pdf", PDF)
     ]
@@ -64,7 +64,7 @@ def test_a_plain_mail_has_its_text_only() -> None:
     mail = read_mail(plain_mail())
     assert (mail.html, mail.text, mail.attachments, mail.messages) == (
         None,
-        "Hallo Anna,\n\nanbei.\n",
+        "Hallo Erika,\n\nanbei.\n",
         (),
         (),
     )
@@ -89,7 +89,7 @@ def test_no_mail_is_refused() -> None:
     [
         plain_mail(),
         rich_mail(),
-        b"Delivered-To: anna@example.test\r\nReceived: by 2002:a05 with SMTP id x;\r\n"
+        b"Delivered-To: erika@example.test\r\nReceived: by 2002:a05 with SMTP id x;\r\n"
         b"        Tue, 4 Nov 2026 01:00:00 -0800 (PST)\r\nX-Google: y\r\n",
         b"Return-Path: <a@example.test>\nFrom: a@example.test\nSubject: Hallo",
     ],

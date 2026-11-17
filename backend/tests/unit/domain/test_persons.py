@@ -58,7 +58,7 @@ def test_check_digits() -> None:
         (TAX, f"{TAX_ID[:2]} {TAX_ID[2:5]} {TAX_ID[5:8]} {TAX_ID[8:]}", TAX_ID),
         (SOCIAL, f"{SV[:2]} {SV[2:8]} {SV[8].lower()} {SV[9:]}", SV),
         (HEALTH, KVNR.lower(), KVNR),
-        (ADDRESS, "mailto:Anna.Example@Mail.Example", "anna.example@mail.example"),
+        (ADDRESS, "mailto:Erika.Example@Mail.Example", "erika.example@mail.example"),
     ],
 )
 def test_normalised(kind: IdentifierKind, raw: str, value: str) -> None:
@@ -67,7 +67,7 @@ def test_normalised(kind: IdentifierKind, raw: str, value: str) -> None:
 
 @pytest.mark.parametrize(
     ("kind", "raw"),
-    [(TAX, "12345678901"), (SOCIAL, "12150680M120"), (HEALTH, "A123456789"), (ADDRESS, "anna")],
+    [(TAX, "12345678901"), (SOCIAL, "12150680M120"), (HEALTH, "A123456789"), (ADDRESS, "erika")],
 )
 def test_invalid(kind: IdentifierKind, raw: str) -> None:
     with pytest.raises(ValidationError):
@@ -79,7 +79,7 @@ def test_persons_numbers_in_a_text() -> None:
     text = (
         f"Identifikationsnummer: {TAX_ID}\nSteuer-ID {grouped}\n"
         f"Sozialversicherungsnummer {SV[:2]} {SV[2:8]} {SV[8]} {SV[9:]}\n"
-        f"Versichertennummer: {KVNR}\nKontakt: anna@mail.example\n"
+        f"Versichertennummer: {KVNR}\nKontakt: erika@mail.example\n"
         f"Versicherungsnummer: {SV}\nTelefon 0221 123 456 789"
     )
     found = identifiers_in(text)
@@ -87,7 +87,7 @@ def test_persons_numbers_in_a_text() -> None:
         (TAX, TAX_ID),
         (SOCIAL, SV),
         (HEALTH, KVNR),
-        (ADDRESS, "anna@mail.example"),
+        (ADDRESS, "erika@mail.example"),
     }
     # The pension fund's "Versicherungsnummer" before the number is not a customer number.
     assert (CUSTOMER, SV) not in found
@@ -122,18 +122,18 @@ def test_a_profile() -> None:
     user = UserId(new_id())
     profile = Profile(
         id=user,
-        aliases=[" Anna Sample "],
-        email="Anna@Mail.Example",
+        aliases=[" E. Mustermann "],
+        email="Erika@Mail.Example",
         identifiers=[Identifier.parse(TAX, TAX_ID), Identifier.parse(TAX, TAX_ID)],
     )
-    assert profile.aliases == ["Anna Sample"]
-    assert profile.email == "anna@mail.example"
+    assert profile.aliases == ["E. Mustermann"]
+    assert profile.email == "erika@mail.example"
     assert [item.key for item in profile.evidence()] == [
         (TAX, TAX_ID),
-        (ADDRESS, "anna@mail.example"),
+        (ADDRESS, "erika@mail.example"),
     ]
     with pytest.raises(ValidationError, match="twice"):
-        Profile(id=user, aliases=["Anna", "anna"])
+        Profile(id=user, aliases=["Erika", "erika"])
     with pytest.raises(ValidationError, match="kind"):
         Profile(id=user, identifiers=[Identifier(CUSTOMER, "4711")])
     with pytest.raises(ValidationError, match="1900"):
@@ -166,7 +166,7 @@ def test_a_contact_names_a_user_only_by_a_customer_or_personnel_number() -> None
 def test_a_user_keeps_their_numbers_at_a_contact() -> None:
     """Issue #82: what names a user they enter, take over or decline themselves; the rest of
     the contact stays; a number entered for someone else, or for nobody, is taken."""
-    anna, bob = UserId(new_id()), UserId(new_id())
+    erika, bob = UserId(new_id()), UserId(new_id())
     topic = TagId(new_id())
     insurer = Contact.create(
         name="Insurer",
@@ -174,23 +174,23 @@ def test_a_user_keeps_their_numbers_at_a_contact() -> None:
         topic_ids=[topic],
         identifiers=[
             Identifier.parse(IdentifierKind.EMAIL_DOMAIN, "insurer.example"),
-            Identifier.parse(CUSTOMER, "K-1001", user_id=anna),
+            Identifier.parse(CUSTOMER, "K-1001", user_id=erika),
             Identifier.parse(CUSTOMER, "K-9009", user_id=bob),
         ],
     )
     learned = [
-        Identifier(CUSTOMER, "K2002", IdentifierSource.LEARNED, user_id=anna),
-        Identifier(CUSTOMER, "K3003", IdentifierSource.LEARNED, user_id=anna),
+        Identifier(CUSTOMER, "K2002", IdentifierSource.LEARNED, user_id=erika),
+        Identifier(CUSTOMER, "K3003", IdentifierSource.LEARNED, user_id=erika),
     ]
     insurer.set_learned(learned)
     insurer.set_numbers_of(
-        anna,
+        erika,
         [Identifier.parse(CUSTOMER, "K 2002", topic_id=topic), Identifier.parse(CUSTOMER, "K4004")],
         declined=[(CUSTOMER, "K3003")],
     )
     assert [(item.value, item.source, item.user_id) for item in insurer.identifiers] == [
-        ("K2002", IdentifierSource.MANUAL, anna),  # taken over
-        ("K4004", IdentifierSource.MANUAL, anna),
+        ("K2002", IdentifierSource.MANUAL, erika),  # taken over
+        ("K4004", IdentifierSource.MANUAL, erika),
         ("K9009", IdentifierSource.MANUAL, bob),  # not hers: stays
         ("insurer.example", IdentifierSource.MANUAL, None),
         ("K3003", IdentifierSource.REJECTED, None),  # declined; K1001 she took away
@@ -199,21 +199,21 @@ def test_a_user_keeps_their_numbers_at_a_contact() -> None:
     domain = IdentifierKind.EMAIL_DOMAIN
     for kind, taken in ((CUSTOMER, "K9009"), (domain, "insurer.example")):
         with pytest.raises(ConflictError, match="already taken"):
-            insurer.set_numbers_of(anna, [Identifier.parse(kind, taken)])
+            insurer.set_numbers_of(erika, [Identifier.parse(kind, taken)])
     with pytest.raises(ValidationError, match="names the user"):
-        insurer.set_numbers_of(anna, [Identifier.parse(domain, "anna.example")])
+        insurer.set_numbers_of(erika, [Identifier.parse(domain, "erika.example")])
     with pytest.raises(ValidationError):
         insurer.set_numbers_of(
-            anna, [Identifier.parse(CUSTOMER, "K5005", topic_id=TagId(new_id()))]
+            erika, [Identifier.parse(CUSTOMER, "K5005", topic_id=TagId(new_id()))]
         )
 
 
-def _anna() -> Person:
-    user = User.create(username="anna", role=Role.USER, now=builders.NOW)
-    user.display_name = "Anna Example"
+def _erika() -> Person:
+    user = User.create(username="erika", role=Role.USER, now=builders.NOW)
+    user.display_name = "Erika Mustermann"
     profile = Profile(
         id=user.id,
-        aliases=["Anna Sample"],
+        aliases=["E. Mustermann"],
         birth_date=date(1980, 6, 15),
         identifiers=[Identifier.parse(TAX, TAX_ID), Identifier.parse(IdentifierKind.IBAN, IBAN)],
     )
@@ -224,39 +224,39 @@ def _anna() -> Person:
 def test_a_birth_date_is_compared_in_any_form(written: str) -> None:
     # Two digits match the known birth date by day, month and year without its century: no
     # guess of the century (Tobi, 22.10.2026).
-    found = facts_in(f"geb. {written}", [], persons=[_anna()])
+    found = facts_in(f"geb. {written}", [], persons=[_erika()])
     assert [(p.strength, p.evidence) for p in found.persons] == [(Strength.MEDIUM, ("birth_date",))]
 
 
 def test_another_birth_date_names_no_one() -> None:
-    assert facts_in("geb. 15.06.81", [], persons=[_anna()]).persons == ()
+    assert facts_in("geb. 15.06.81", [], persons=[_erika()]).persons == ()
 
 
 def test_persons_by_their_evidence() -> None:
-    anna = _anna()
-    weak = facts_in("An Frau Anna Sample", [], persons=[anna])
+    erika = _erika()
+    weak = facts_in("An Frau E. Mustermann", [], persons=[erika])
     assert [(p.strength, p.evidence) for p in weak.persons] == [(Strength.WEAK, ("alias",))]
-    medium = facts_in("Anna Example, geboren am 15.06.1980", [], persons=[anna])
+    medium = facts_in("Erika Mustermann, geboren am 15.06.1980", [], persons=[erika])
     assert [(p.strength, p.evidence) for p in medium.persons] == [
         (Strength.MEDIUM, ("birth_date", "name"))
     ]
-    hard = facts_in(f"Steuer-ID {TAX_ID}, IBAN DE89 3704 0044 0532 0130 00", [], persons=[anna])
+    hard = facts_in(f"Steuer-ID {TAX_ID}, IBAN DE89 3704 0044 0532 0130 00", [], persons=[erika])
     assert [(p.strength, set(p.evidence)) for p in hard.persons] == [
         (Strength.HARD, {"tax_id", "iban"})
     ]
     # Their own IBAN is no unknown identifier; their numbers are no contact's.
     assert hard.identifiers == ()
-    assert facts_in("Niemand", [], persons=[anna]).persons == ()
+    assert facts_in("Niemand", [], persons=[erika]).persons == ()
 
 
 def test_a_contacts_number_names_its_user() -> None:
-    anna = _anna()
+    erika = _erika()
     contact = Contact.create(name="Insurer", now=builders.NOW)
-    contact.set_identifiers([Identifier.parse(CUSTOMER, "K-4711", user_id=anna.user_id)])
-    facts = facts_in("Kundennummer K-4711", [contact], persons=[anna], places=True)
+    contact.set_identifiers([Identifier.parse(CUSTOMER, "K-4711", user_id=erika.user_id)])
+    facts = facts_in("Kundennummer K-4711", [contact], persons=[erika], places=True)
     (person,) = facts.persons
     assert (person.user_id, person.strength, person.evidence) == (
-        anna.user_id,
+        erika.user_id,
         Strength.HARD,
         ("customer_number",),
     )
@@ -293,23 +293,23 @@ def test_a_customer_number_that_stands_in_a_persons_number_is_theirs() -> None:
 
 def test_a_deactivated_or_unlisted_user_is_never_named() -> None:
     """Only the persons given are found, also by a contact's number that names a user."""
-    anna = _anna()
+    erika = _erika()
     contact = Contact.create(name="Insurer", now=builders.NOW)
-    contact.set_identifiers([Identifier.parse(CUSTOMER, "K-4711", user_id=anna.user_id)])
+    contact.set_identifiers([Identifier.parse(CUSTOMER, "K-4711", user_id=erika.user_id)])
     assert facts_in("Kundennummer K-4711", [contact], persons=[]).persons == ()
 
 
 def test_a_person_in_public_form_is_found_by_their_display_name_alone() -> None:
-    anna = _anna()
+    erika = _erika()
     contact = Contact.create(name="Insurer", now=builders.NOW)
-    contact.set_identifiers([Identifier.parse(CUSTOMER, "K-4711", user_id=anna.user_id)])
-    text = f"Anna Sample, 15.06.1980, Steuer-ID {TAX_ID}, Kundennummer K-4711"
-    assert facts_in(text, [contact], persons=[anna.public()]).persons == ()
-    named = facts_in(f"An Anna Example. {text}", [contact], persons=[anna.public()])
+    contact.set_identifiers([Identifier.parse(CUSTOMER, "K-4711", user_id=erika.user_id)])
+    text = f"E. Mustermann, 15.06.1980, Steuer-ID {TAX_ID}, Kundennummer K-4711"
+    assert facts_in(text, [contact], persons=[erika.public()]).persons == ()
+    named = facts_in(f"An Erika Mustermann. {text}", [contact], persons=[erika.public()])
     assert [(p.strength, p.evidence) for p in named.persons] == [(Strength.WEAK, ("name",))]
     # Her IBAN shows nowhere as hers: that it is hers is private (and no contact carries IBANs
     # since #215, so it is no identifier of the facts either).
-    iban = facts_in("IBAN DE89 3704 0044 0532 0130 00", [], persons=[anna.public()])
+    iban = facts_in("IBAN DE89 3704 0044 0532 0130 00", [], persons=[erika.public()])
     assert iban.identifiers == () and iban.persons == ()
 
 

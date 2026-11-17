@@ -14,7 +14,7 @@ type User = components['schemas']['UserOut'];
 
 const USERS: User[] = [
 	{ id: 'u1', username: 'tobi', role: 'user', active: true },
-	{ id: 'u2', username: 'anna', role: 'user', active: true },
+	{ id: 'u2', username: 'erika', role: 'user', active: true },
 	{ id: 'u3', username: 'admin', role: 'admin', active: true }
 ] as User[];
 
@@ -34,18 +34,18 @@ const HOUSE = space('house', {
 	name: 'Haushalt',
 	members: [
 		{ user_id: 'u1', role: 'edit', username: 'tobi', active: true },
-		{ user_id: 'u2', role: 'read', username: 'anna', active: true }
+		{ user_id: 'u2', role: 'read', username: 'erika', active: true }
 	]
 });
 const TOBI = space('tobi', {
 	personal_of: 'u1',
 	members: [{ user_id: 'u1', role: 'edit', username: 'tobi', active: true }]
 });
-const ANNA = space('anna', {
+const ERIKA = space('erika', {
 	personal_of: 'u2',
 	role: 'read',
 	members: [
-		{ user_id: 'u2', role: 'edit', username: 'anna', active: true },
+		{ user_id: 'u2', role: 'edit', username: 'erika', active: true },
 		{ user_id: 'u1', role: 'read', username: 'tobi', active: true }
 	]
 });
@@ -83,13 +83,13 @@ afterEach(() => {
 
 describe('spaces', () => {
 	it('lists the personal space first, then the others with members and role', async () => {
-		start([HOUSE, ANNA, TOBI]);
+		start([HOUSE, ERIKA, TOBI]);
 		const own = await screen.findByRole('region', { name: m.spaces_own() });
 		const rows = within(own).getAllByRole('listitem');
 		expect(rows.map((row) => row.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
 			`${m.space_personal()} ${m.space_only_you()}`,
-			`Haushalt ${m.space_members_line({ names: m.space_member_reads({ name: 'anna' }) })}`,
-			`anna ${m.space_personal()} ${m.space_role_read()} ${m.space_members_line({ names: 'anna' })}`
+			`Haushalt ${m.space_members_line({ names: m.space_member_reads({ name: 'erika' }) })}`,
+			`erika ${m.space_personal()} ${m.space_role_read()} ${m.space_members_line({ names: 'erika' })}`
 		]);
 		expect(screen.queryByRole('region', { name: m.spaces_others() })).toBeNull();
 		// Deleted in the editor, not in the row (web/DESIGN.md, "Lists").
@@ -98,7 +98,7 @@ describe('spaces', () => {
 		expect(
 			screen.getByRole('button', { name: m.space_members({ name: m.space_personal() }) })
 		).toBeTruthy();
-		expect(screen.queryByRole('button', { name: m.space_members({ name: 'anna' }) })).toBeNull();
+		expect(screen.queryByRole('button', { name: m.space_members({ name: 'erika' }) })).toBeNull();
 	});
 
 	it('shows an admin the spaces they are no member of apart, with all users included', async () => {
@@ -145,7 +145,7 @@ describe('spaces', () => {
 			within(dialog).queryByRole('button', { name: m.members_remove({ name: 'tobi' }) })
 		).toBeNull();
 		await user.click(
-			within(dialog).getByRole('button', { name: m.members_remove({ name: 'anna' }) })
+			within(dialog).getByRole('button', { name: m.members_remove({ name: 'erika' }) })
 		);
 		// Asked first.
 		const ask = await screen.findByRole('alertdialog');
@@ -210,7 +210,7 @@ describe('spaces', () => {
 		signIn('u2');
 		// A dialog of an earlier test may still leave the body without pointer events.
 		const user = userEvent.setup({ pointerEventsCheck: 0 });
-		const api = start([{ ...HOUSE, role: 'read' }, ANNA]);
+		const api = start([{ ...HOUSE, role: 'read' }, ERIKA]);
 		// Not their own personal space.
 		expect(
 			screen.queryByRole('button', { name: m.space_leave({ name: m.space_personal() }) })
@@ -245,10 +245,10 @@ describe('spaces', () => {
 	});
 
 	it('opens the editor by the name of a space one edits, not of one one reads', async () => {
-		start([HOUSE, ANNA, TOBI]);
+		start([HOUSE, ERIKA, TOBI]);
 		const own = await screen.findByRole('region', { name: m.spaces_own() });
 		await userEvent.click(within(own).getByRole('button', { name: 'Haushalt' }));
 		expect(await screen.findByRole('dialog')).toBeTruthy();
-		expect(within(own).queryByRole('button', { name: 'anna' })).toBeNull();
+		expect(within(own).queryByRole('button', { name: 'erika' })).toBeNull();
 	});
 });

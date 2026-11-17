@@ -286,7 +286,7 @@ export function actionTemplate(
 }
 
 /** Where a rule files: a space the caller knows by its label; another user's personal space,
- * which the caller need not be a member of, as a hand-over ("Hand over to Anna"). */
+ * which the caller need not be a member of, as a hand-over ("Hand over to Erika"). */
 function targetName(id: string, lookup: Lookup | null): string {
 	const space = lookup ? byId(lookup.spaces).get(id) : undefined;
 	if (space) return spaceLabel(space, lookup?.users ?? [], session.user?.id);

@@ -458,7 +458,7 @@ def test_a_learned_number_belongs_to_whom_all_its_documents_surely_belong() -> N
     """Issue #82: a customer or personnel number gets the user every document of it is surely
     theirs alone; what is learned notes the spaces of its documents."""
     employer = ContactId(new_id())
-    anna, bob = UserId(new_id()), UserId(new_id())
+    erika, bob = UserId(new_id()), UserId(new_id())
     own, shared = SpaceId(new_id()), SpaceId(new_id())
     number = (PERSONNEL, "12345")
 
@@ -469,16 +469,16 @@ def test_a_learned_number_belongs_to_whom_all_its_documents_surely_belong() -> N
         ]
         return list(mine_identifiers(documents)[employer])
 
-    assert learn(frozenset({anna}), frozenset({anna})) == [
+    assert learn(frozenset({erika}), frozenset({erika})) == [
         Identifier(
-            PERSONNEL, "12345", IdentifierSource.LEARNED, None, anna, frozenset({own, shared})
+            PERSONNEL, "12345", IdentifierSource.LEARNED, None, erika, frozenset({own, shared})
         ),
     ]
     # Another user, both, or nobody surely: nobody's.
     for whose in (
-        (frozenset({anna}), frozenset({bob})),
-        (frozenset({anna}), frozenset({anna, bob})),
-        (frozenset({anna}), frozenset()),
+        (frozenset({erika}), frozenset({bob})),
+        (frozenset({erika}), frozenset({erika, bob})),
+        (frozenset({erika}), frozenset()),
     ):
         assert [item.user_id for item in learn(*whose)] == [None]
 
@@ -487,39 +487,39 @@ def test_a_tax_number_is_not_learned() -> None:
     """A company's tax number stands on all its letters; since #215 it is no contact's
     identifier and training learns none (before, a learned one named nobody)."""
     insurer = ContactId(new_id())
-    anna = UserId(new_id())
+    erika = UserId(new_id())
     own = SpaceId(new_id())
     tax = (IdentifierKind.TAX_NUMBER, "6420000010")
-    documents = [Confirmed(insurer, None, frozenset({tax}), own, frozenset({anna}))] * 2
+    documents = [Confirmed(insurer, None, frozenset({tax}), own, frozenset({erika}))] * 2
     assert mine_identifiers(documents) == {}
 
 
 def test_who_sees_a_contacts_identifier() -> None:
-    anna, bob = UserId(new_id()), UserId(new_id())
+    erika, bob = UserId(new_id()), UserId(new_id())
     own, other = SpaceId(new_id()), SpaceId(new_id())
     public = Identifier(IBAN, THEIR_IBAN)
-    hers = Identifier(CUSTOMER, "K4711", user_id=anna)
+    hers = Identifier(CUSTOMER, "K4711", user_id=erika)
     learned = Identifier(IBAN, OWN_IBAN, IdentifierSource.LEARNED, learned_in=frozenset({own}))
     learned_hers = Identifier(
-        PERSONNEL, "12345", IdentifierSource.LEARNED, None, anna, frozenset({own, other})
+        PERSONNEL, "12345", IdentifierSource.LEARNED, None, erika, frozenset({own, other})
     )
     old = Identifier(VAT, "DE123456789", IdentifierSource.LEARNED)  # before 0040: no spaces
     rejected = Identifier(DOMAIN, "nord.example", IdentifierSource.REJECTED)
     seen = {
         name: [seen_by(item, user, spaces) for item in (public, hers, learned, learned_hers)]
         for name, user, spaces in (
-            ("anna", anna, {own}),
+            ("erika", erika, {own}),
             ("bob in her space", bob, {own}),
             ("bob", bob, {other}),
         )
     }
     assert seen == {
-        "anna": [True, True, True, True],
+        "erika": [True, True, True, True],
         "bob in her space": [True, False, True, False],
         "bob": [True, False, False, False],
     }
-    assert not seen_by(old, anna, {own, other})
-    assert not seen_by(rejected, anna, {own})
+    assert not seen_by(old, erika, {own, other})
+    assert not seen_by(rejected, erika, {own})
 
 
 def test_every_kind_has_its_type_and_says_whose_it_is() -> None:

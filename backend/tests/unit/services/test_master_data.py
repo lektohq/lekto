@@ -669,16 +669,16 @@ async def test_a_document_type_comes_with_its_fields_or_not_at_all(world: World)
 async def test_holders_of_an_identifier_are_those_the_caller_sees(world: World) -> None:
     """Whose an identifier is, in the service for REST and MCP alike (review 0.12.2, A-12): a
     value as written finds its normal form; a person's number only for admins and the person."""
-    admin, anna, bob = (
+    admin, erika, bob = (
         await world.user(role=Role.ADMIN),
-        await world.user("anna"),
+        await world.user("erika"),
         await world.user("bob"),
     )
     utility = await world.master_data.create_contact(admin.id, "Stadtwerke")
     employer = await world.master_data.create_contact(admin.id, "Arbeitgeber")
     kind = IdentifierKind.CUSTOMER_NUMBER
     async with world.uow() as uow:
-        for contact, number, user in ((utility, "KD20047718", None), (employer, "P4711", anna.id)):
+        for contact, number, user in ((utility, "KD12345678", None), (employer, "P4711", erika.id)):
             stored = await uow.contacts.get(contact.id)
             stored.set_identifiers([Identifier(kind, number, user_id=user)])
             await uow.contacts.update(stored)
@@ -689,7 +689,7 @@ async def test_holders_of_an_identifier_are_those_the_caller_sees(world: World) 
             contact.name for contact in await world.master_data.holders_of(user.id, kind, written)
         ]
 
-    assert await holders(bob, " kd-20 047 718 ") == ["Stadtwerke"]
+    assert await holders(bob, " kd-12 345 678 ") == ["Stadtwerke"]
     assert await holders(admin, "p-4711") == ["Arbeitgeber"]
-    assert await holders(anna, "p-4711") == ["Arbeitgeber"]
+    assert await holders(erika, "p-4711") == ["Arbeitgeber"]
     assert await holders(bob, "p-4711") == []

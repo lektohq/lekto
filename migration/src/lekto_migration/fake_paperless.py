@@ -115,10 +115,10 @@ def sample_archive(base_pdf: bytes, jpeg: bytes | None = None) -> Archive:
         {"id": 1, "username": "tobias", "is_active": True, "is_superuser": True, "groups": [1]},
         {
             "id": 2,
-            "username": "anna",
-            "first_name": "Anna",
-            "last_name": "Example",
-            "email": "anna@mail.example",
+            "username": "erika",
+            "first_name": "Erika",
+            "last_name": "Mustermann",
+            "email": "erika@mail.example",
             "is_active": True,
             "is_superuser": False,
             "groups": [1],
@@ -215,7 +215,7 @@ def sample_archive(base_pdf: bytes, jpeg: bytes | None = None) -> Archive:
                     "id": 1,
                     "note": "Second",
                     "created": "2024-02-02T10:00:00Z",
-                    "user": {"username": "anna"},
+                    "user": {"username": "erika"},
                 },
                 {
                     "id": 2,

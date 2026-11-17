@@ -29,7 +29,7 @@ documents:
 
 users:
   Tobias: {to: user, name: tobi}
-  anna: [{to: user, name: anna, create: true}, {to: tag, name: Anna}]
+  erika: [{to: user, name: erika, create: true}, {to: tag, name: Erika}]
   scanner: drop
 
 correspondents:
@@ -83,8 +83,8 @@ def test_a_plan_says_where_everything_goes() -> None:
 
     tobias = plan.entry("users", "TOBIAS")
     assert tobias is not None and tobias.targets == (Target("user", "tobi"),)
-    anna = plan.entry("users", "anna")
-    assert anna is not None and [t.to for t in anna.targets] == ["user", "tag"]
+    erika = plan.entry("users", "erika")
+    assert erika is not None and [t.to for t in erika.targets] == ["user", "tag"]
     scanner = plan.entry("users", "scanner")
     assert scanner is not None and scanner.dropped
 
@@ -269,7 +269,7 @@ def test_a_plan_that_is_no_yaml_is_refused(tmp_path: Path) -> None:
 # --- selection --------------------------------------------------------------------------------
 
 NAMES = Names(
-    users={1: "tobias", 2: "anna", 3: "bob"},
+    users={1: "tobias", 2: "erika", 3: "bob"},
     correspondents={1: "ACME Energy"},
     document_types={1: "Invoice"},
     storage_paths={1: "Bank"},
@@ -325,7 +325,7 @@ DOCUMENT: dict[str, Any] = {
         ({"document_type": [None]}, True),
         ({"document_type": "Invoice"}, False),
         ({"storage_path": ["Bank"]}, True),
-        ({"owner": "anna"}, False),
+        ({"owner": "erika"}, False),
         ({"tags": "TAX"}, True),
         ({"tags": {"all": ["tax", "Privat"]}}, False),
         ({"tags": {"none": ["Privat"]}}, True),

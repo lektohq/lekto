@@ -18,9 +18,9 @@ type Check = components['schemas']['FieldCheckOut'];
 type Member = components['schemas']['SpaceOut']['members'][number];
 
 const TOBI = 'u-tobi';
-const ANNA = 'u-anna';
+const ERIKA = 'u-erika';
 const MINE = 's-mine';
-const ANNAS = 's-anna';
+const ERIKAS = 's-erika';
 const HOME = 's-home';
 
 const lookup = {
@@ -39,24 +39,24 @@ const lookup = {
 			role: 'edit',
 			members: [
 				{ user_id: TOBI, role: 'edit', username: 'tobi' },
-				{ user_id: ANNA, role: 'read', username: 'anna', display_name: 'Jane Doe' }
+				{ user_id: ERIKA, role: 'read', username: 'erika', display_name: 'Jane Doe' }
 			]
 		}
 	],
 	users: [
 		{ id: TOBI, username: 'tobi', role: 'user', personal_space_id: MINE },
 		{
-			id: ANNA,
-			username: 'anna',
+			id: ERIKA,
+			username: 'erika',
 			display_name: 'Jane Doe',
 			role: 'user',
-			personal_space_id: ANNAS
+			personal_space_id: ERIKAS
 		}
 	]
 } as unknown as Lookup;
 
 const tobi = { id: TOBI, admin: false };
-const choices = [{ value: HOME }, { value: ANNAS }];
+const choices = [{ value: HOME }, { value: ERIKAS }];
 
 function spaceCheck(fields: Partial<Check>): Check {
 	return {
@@ -85,13 +85,13 @@ describe('filing', () => {
 	it('tells staying, moving and handing over apart', () => {
 		expect(filingKind(MINE, MINE, lookup, tobi)).toBe('stay');
 		expect(filingKind(HOME, MINE, lookup, tobi)).toBe('move');
-		expect(filingKind(ANNAS, MINE, lookup, tobi)).toBe('hand_over');
+		expect(filingKind(ERIKAS, MINE, lookup, tobi)).toBe('hand_over');
 	});
 
 	it('offers the suggestion first, the other spaces named, and staying, each once', () => {
 		const filing = openFiling(
 			spaceCheck({
-				suggestion: ANNAS,
+				suggestion: ERIKAS,
 				candidates: [
 					{
 						value: MINE,
@@ -100,7 +100,7 @@ describe('filing', () => {
 						sources: [{ signal: 'signal_neighbours', names: true, votes: 5, found: 5 }]
 					},
 					{
-						value: ANNAS,
+						value: ERIKAS,
 						label: '',
 						contradicted: true,
 						sources: [{ signal: 'signal_llm', names: true, recipient: true }]
@@ -113,7 +113,7 @@ describe('filing', () => {
 			choices
 		);
 		expect(filing.options.map((option) => [option.value, option.kind])).toEqual([
-			[ANNAS, 'hand_over'],
+			[ERIKAS, 'hand_over'],
 			[MINE, 'stay']
 		]);
 		expect(filing.lead).toBe(m.filing_lead_hand_over({ name: 'Jane Doe' }));
@@ -122,7 +122,7 @@ describe('filing', () => {
 			m.filing_chip_model()
 		]);
 		expect(filing.options[1].title).toBe(m.filing_stay({ space: m.space_personal() }));
-		expect(initialChoice(filing)).toBe(ANNAS);
+		expect(initialChoice(filing)).toBe(ERIKAS);
 	});
 
 	it('chooses nothing when the signals disagree or the suggestion is not the caller’s to take', () => {
@@ -151,11 +151,11 @@ describe('filing', () => {
 			tone: 'hint'
 		});
 		expect(confirmHint(MINE, MINE, lookup, tobi)).toBeNull();
-		expect(confirmHint(ANNAS, MINE, lookup, tobi)).toEqual({
+		expect(confirmHint(ERIKAS, MINE, lookup, tobi)).toEqual({
 			text: m.filing_hint_hand_over({ name: 'Jane Doe' }),
 			tone: 'warning'
 		});
-		expect(confirmHint(ANNAS, MINE, lookup, { id: TOBI, admin: true })?.text).toBe(
+		expect(confirmHint(ERIKAS, MINE, lookup, { id: TOBI, admin: true })?.text).toBe(
 			m.filing_hint_hand_over_admin({ name: 'Jane Doe' })
 		);
 		expect(confirmHint(HOME, MINE, lookup, tobi)).toEqual({
@@ -171,18 +171,18 @@ describe('filing', () => {
 		expect(whereText(MINE, lookup, admin, true)).toBe(
 			m.filing_where_person({ name: 'tobi', visible: m.visible_to({ names: 'tobi' }) })
 		);
-		expect(confirmHint(ANNAS, HOME, lookup, { id: TOBI, admin: false })?.tone).toBe('warning');
+		expect(confirmHint(ERIKAS, HOME, lookup, { id: TOBI, admin: false })?.tone).toBe('warning');
 	});
 
 	it('lists the members, the caller first, readers once the document is green', () => {
 		const home = lookup.spaces[1].members;
 		expect(memberChips(home, tobi, true)).toEqual([
 			{ key: TOBI, text: m.filing_you_edit() },
-			{ key: ANNA, text: m.filing_member_read({ name: 'Jane Doe' }) }
+			{ key: ERIKA, text: m.filing_member_read({ name: 'Jane Doe' }) }
 		]);
 		expect(memberChips(home, tobi, false)).toEqual([
 			{ key: TOBI, text: m.filing_you_edit() },
-			{ key: ANNA, text: m.filing_member_read_later({ name: 'Jane Doe' }) }
+			{ key: ERIKA, text: m.filing_member_read_later({ name: 'Jane Doe' }) }
 		]);
 		expect(whereText(MINE, lookup, tobi, true)).toBe(
 			m.filing_where({ space: m.space_personal(), visible: m.visible_to_you() })
@@ -192,14 +192,14 @@ describe('filing', () => {
 	it('keeps two members of one display name apart', () => {
 		const twins = [
 			{ user_id: TOBI, role: 'edit', username: 'tobi' },
-			{ user_id: 'u-anna-1', role: 'read', username: 'anna1', display_name: 'Anna' },
-			{ user_id: 'u-anna-2', role: 'read', username: 'anna2', display_name: 'Anna' }
+			{ user_id: 'u-erika-1', role: 'read', username: 'erika1', display_name: 'Erika' },
+			{ user_id: 'u-erika-2', role: 'read', username: 'erika2', display_name: 'Erika' }
 		] as unknown as Member[];
 		const chips = memberChips(twins, tobi, true);
 		expect(chips.map((chip) => chip.text)).toEqual([
 			m.filing_you_edit(),
-			m.filing_member_read({ name: 'Anna' }),
-			m.filing_member_read({ name: 'Anna' })
+			m.filing_member_read({ name: 'Erika' }),
+			m.filing_member_read({ name: 'Erika' })
 		]);
 		expect(new Set(chips.map((chip) => chip.key)).size).toBe(3);
 	});

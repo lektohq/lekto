@@ -638,7 +638,7 @@ MASTER_DATA = {
 # Changes of an item besides renaming and deleting, also for admins only: (method, path below
 # the item, body).
 ITEM_CHANGES: dict[str, list[tuple[str, str, Any]]] = {
-    "contacts": [("POST", "/identifiers", {"kind": "customer_number", "value": "2004-7718"})],
+    "contacts": [("POST", "/identifiers", {"kind": "customer_number", "value": "1234-5678"})],
     "document-types": [("PUT", "/fields", {"fields": []})],
 }
 NOT_ADMIN = {"owner": 403, "reader": 403, "writer": 403, "stranger": 403, "read_token": 403}

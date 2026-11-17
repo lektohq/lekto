@@ -39,7 +39,7 @@ def row(setup: Setup, command: str, id: int) -> dict[str, Any]:
 async def test_documents_of_an_inactive_user_are_taken_over_and_the_user_deactivated(
     setup: Setup,
 ) -> None:
-    # "gone" (id 4) is inactive in Paperless and owns a document that anna may read.
+    # "gone" (id 4) is inactive in Paperless and owns a document that erika may read.
     add_document(
         setup,
         30,
@@ -140,10 +140,10 @@ async def test_a_space_that_cannot_be_made_holds_the_run_back(setup: Setup) -> N
 
 
 async def test_a_lost_answer_after_creating_a_user_is_not_an_error(setup: Setup) -> None:
-    setup.lekto.lose_answer = {"anna", "ACME Energy"}
+    setup.lekto.lose_answer = {"erika", "ACME Energy"}
     assert await setup.migrate() == 0
     names = [u["username"] for u in setup.lekto.users.values()]
-    assert names.count("anna") == 1
+    assert names.count("erika") == 1
     assert [c["name"] for c in setup.lekto.contacts.values()].count("ACME Energy") == 1
 
 
@@ -182,7 +182,7 @@ async def test_further_versions_of_a_file_are_reported(setup: Setup) -> None:
 
 async def test_a_document_a_person_moved_stays_where_it_is(setup: Setup) -> None:
     assert await setup.migrate() == 0
-    document = titled(setup, "Document 12")  # anna's, in her personal space
+    document = titled(setup, "Document 12")  # erika's, in her personal space
     document["space_id"] = f"personal:{ADMIN['id']}"  # a rule or a person filed it elsewhere
     assert await setup.run("check") == 0
     differences = row(setup, "check", 12)["differences"]
@@ -221,18 +221,18 @@ async def test_a_run_notes_that_a_document_was_repaired_since(setup: Setup) -> N
 def test_a_state_from_before_spaces_reads_its_drawers_as_spaces(tmp_path: Path) -> None:
     path = tmp_path / "state.sqlite"
     state = State(path)
-    state.put_object("drawer", "anna|bob", "Shared", "id-1", "new", [])
-    state.put_document(7, "done", detail={"title": "T", "drawer": "Shared", "owner": "anna"})
+    state.put_object("drawer", "erika|bob", "Shared", "id-1", "new", [])
+    state.put_document(7, "done", detail={"title": "T", "drawer": "Shared", "owner": "erika"})
     state.close()
 
     state = State(path)
-    assert state.object("space", "anna|bob") == ("id-1", "new")
-    assert state.object("drawer", "anna|bob") is None
+    assert state.object("space", "erika|bob") == ("id-1", "new")
+    assert state.object("drawer", "erika|bob") is None
     found = state.document(7)
     assert found is not None
-    assert found.detail == {"title": "T", "space": "Shared", "owner": "anna"}
+    assert found.detail == {"title": "T", "space": "Shared", "owner": "erika"}
     # Before 0.5 the state kept the Paperless owner, which uploaded the document.
-    assert run_documents(state, {7})[0]["uploaded_by"] == "anna"
+    assert run_documents(state, {7})[0]["uploaded_by"] == "erika"
     state.close()
 
 

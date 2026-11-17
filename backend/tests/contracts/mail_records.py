@@ -67,7 +67,7 @@ def a_record(mailbox: Mailbox, uid: int, **parts: object) -> MailRecord:
         "documents": 2,
         "fetched_at": NOW + uid * HOUR,
         "senders": ("rechnung@stadtwerke.example", "Stadtwerke"),
-        "recipients": ("anna@example.test",),
+        "recipients": ("erika@example.test",),
         "attachments": ("Rechnung.pdf", ""),
     }
     values.update(parts)
@@ -85,7 +85,7 @@ class MailRecordRepositoryContract:
             rule="Strom",
             message_id=None,
             sent_at=None,
-            to=("anna@example.test",),
+            to=("erika@example.test",),
             cc=("ben@example.test", "Ben"),
             importance=Importance.HIGH,
             marks=MailMarks(keywords=("Lekto", "$label1"), flag=FlagColor.GREEN),
@@ -145,7 +145,7 @@ class MailRecordRepositoryContract:
                     a_record(
                         mailbox,
                         uid,
-                        to=("anna@example.test",),
+                        to=("erika@example.test",),
                         cc=("Ben",),
                         importance=Importance.HIGH,
                         marks=MailMarks(keywords=("Lekto",), flag=FlagColor.RED),
@@ -352,7 +352,7 @@ class MailOriginRepositoryContract:
                 "letter": 0,
                 "message_id": "m1@example.test",
                 "sender": (Address("Stadtwerke", "rechnung@stadtwerke.example"),),
-                "to": (Address("", "anna@example.test"),),
+                "to": (Address("", "erika@example.test"),),
                 "cc": (),
                 "subject": "Rechnung",
                 "sent_at": NOW - HOUR,

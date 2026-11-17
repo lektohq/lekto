@@ -15,7 +15,7 @@ const attachment: Origin = {
 		filename: 'Rechnung 4711.pdf',
 		subject: 'Ihre Rechnung',
 		sender: [{ name: 'Stadtwerke', address: 'rechnung@stadtwerke.example' }],
-		to: [{ name: '', address: 'anna@example.test' }],
+		to: [{ name: '', address: 'erika@example.test' }],
 		cc: [{ name: '', address: 'carl@example.test' }],
 		sent_at: '2026-11-04T09:00:00Z',
 		arrived_at: '2026-11-04T09:01:00Z',
@@ -51,7 +51,7 @@ describe('OriginCard', () => {
 		expect(screen.getByText(m.origin_title())).toBeTruthy();
 		expect(screen.getByText(m.origin_fallback())).toBeTruthy();
 		expect(screen.getByText('Stadtwerke <rechnung@stadtwerke.example>')).toBeTruthy();
-		expect(screen.getByText('anna@example.test')).toBeTruthy();
+		expect(screen.getByText('erika@example.test')).toBeTruthy();
 		expect(screen.getByText('Ben <ben@example.test>')).toBeTruthy();
 		expect(screen.getByText('Rechnung 4711.pdf')).toBeTruthy();
 		expect(screen.queryByText(m.origin_forwarded())).toBeTruthy();

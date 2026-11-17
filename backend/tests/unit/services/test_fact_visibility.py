@@ -18,26 +18,26 @@ from tests.unit.services.support import World
 from tests.unit.services.test_signals import contacts, stored
 
 K = IdentifierKind.CUSTOMER_NUMBER
-PUBLIC, ANNAS, LEARNED, REJECTED = "77770001", "77770002", "77770003", "77770004"
-TEXT = "".join(f"Kundennummer {number}\n" for number in (PUBLIC, ANNAS, LEARNED, REJECTED))
+PUBLIC, ERIKAS, LEARNED, REJECTED = "77770001", "77770002", "77770003", "77770004"
+TEXT = "".join(f"Kundennummer {number}\n" for number in (PUBLIC, ERIKAS, LEARNED, REJECTED))
 
 
 async def _scene(world: World) -> tuple[Any, Any, Any, Any, Contact]:
     """Tobi's letter in a space he shares with Bert, who edits it; the bank has a number entered
-    by hand, one that names Anna, one learned in Anna's personal space and one rejected. The
+    by hand, one that names Erika, one learned in Erika's personal space and one rejected. The
     facts signal ran and is in the processing log."""
-    tobi, bert, anna = await world.user(), await world.user(), await world.user()
+    tobi, bert, erika = await world.user(), await world.user(), await world.user()
     admin = await world.user(role=Role.ADMIN)
     shared = await world.spaces.create(tobi.id, "Shared")
     await world.spaces.set_member(tobi.id, shared.id, bert.id, SpaceRole.EDIT)
-    annas = await world.personal_space(anna)
+    erikas = await world.personal_space(erika)
     bank = Contact.create(name="Muster Bank", now=builders.NOW)
     bank.set_identifiers(
-        [Identifier(K, PUBLIC), Identifier(K, ANNAS, user_id=anna.id)],
+        [Identifier(K, PUBLIC), Identifier(K, ERIKAS, user_id=erika.id)],
         rejected=[Identifier(K, REJECTED)],
     )
     bank.set_learned(
-        [Identifier(K, LEARNED, IdentifierSource.LEARNED, learned_in=frozenset({annas.id}))]
+        [Identifier(K, LEARNED, IdentifierSource.LEARNED, learned_in=frozenset({erikas.id}))]
     )
     await contacts(world, bank)
     document = await stored(world, tobi, TEXT)
@@ -61,7 +61,7 @@ async def _scene(world: World) -> tuple[Any, Any, Any, Any, Contact]:
             )
         )
         await uow.commit()
-    return bert, anna, admin, document, bank
+    return bert, erika, admin, document, bank
 
 
 async def _facts(world: World, user: Any, document: Any) -> dict[str, tuple[Any, Any]]:
@@ -86,14 +86,14 @@ async def test_a_reader_sees_the_contact_of_the_numbers_they_may_see_alone(world
     bert, _, _, document, bank = await _scene(world)
     assert await _facts(world, bert, document) == {
         PUBLIC: (bank.id, None),
-        ANNAS: (None, None),
+        ERIKAS: (None, None),
         LEARNED: (None, None),
         REJECTED: (None, None),
     }
     # The signal leaves out a rejected one: no evidence of any contact.
     assert _logged(await world.documents.processing_log(bert.id, document.id)) == (
         {PUBLIC},
-        {ANNAS, LEARNED},
+        {ERIKAS, LEARNED},
     )
 
 
@@ -101,11 +101,11 @@ async def test_admins_see_every_contact_and_rejection(world: World) -> None:
     _, _, admin, document, bank = await _scene(world)
     assert await _facts(world, admin, document) == {
         PUBLIC: (bank.id, None),
-        ANNAS: (bank.id, None),
+        ERIKAS: (bank.id, None),
         LEARNED: (bank.id, None),
         REJECTED: (None, bank.id),
     }
     assert _logged(await world.documents.processing_log(admin.id, document.id)) == (
-        {PUBLIC, ANNAS, LEARNED},
+        {PUBLIC, ERIKAS, LEARNED},
         set(),
     )

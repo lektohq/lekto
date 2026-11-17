@@ -32,8 +32,8 @@ from tests.mails import plain_mail, rich_mail
 
 FACTS = MailFacts(
     senders=("rechnung@stadtwerke.example", "Stadtwerke Musterstadt"),
-    recipients=("anna@example.test", "ben@example.test"),
-    to=("anna@example.test",),
+    recipients=("erika@example.test", "ben@example.test"),
+    to=("erika@example.test",),
     cc=("ben@example.test",),
     subject="Ihre Rechnung Oktober",
     folder="INBOX",

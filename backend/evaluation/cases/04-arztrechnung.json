@@ -2,7 +2,7 @@
   "description": "Private medical invoice; treatment date and invoice date differ. Trained, the similar documents (and the classifier) name a contact of the corpus for this new one: a contradiction, so yellow.",
   "expected": {
     "lane": "green",
-    "contact": "Dr. med. Anna Beispiel",
+    "contact": "Dr. med. Jane Doe",
     "document_type": "Rechnung",
     "tags": [
       "Gesundheit"
@@ -23,8 +23,8 @@
   "fake": {
     "classification": {
       "contact": {
-        "value": "Dr. med. Anna Beispiel",
-        "evidence": "Dr. med. Anna Beispiel"
+        "value": "Dr. med. Jane Doe",
+        "evidence": "Dr. med. Jane Doe"
       },
       "document_type": "Rechnung",
       "new_document_type": null,

@@ -44,7 +44,7 @@ async def test_the_head_and_the_html(tmp_path: Path) -> None:
         "E-MAIL",
         "Ihre Rechnung über 123,45 €",
         "Von Stadtwerke Musterstadt <rechnung@stadtwerke.example>",
-        "An Anna Beispiel <anna@example.test>, ben@example.test",
+        "An Erika Mustermann <erika@example.test>, ben@example.test",
         "Kopie Buchhaltung <buchhaltung@example.test>",
         "Datum 04.11.2026, 09:00 UTC",
         "Anhänge Rechnung 4711.pdf",

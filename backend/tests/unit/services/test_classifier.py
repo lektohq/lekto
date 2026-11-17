@@ -214,19 +214,19 @@ async def test_a_learned_number_knows_whose_it_is_and_where_it_was_learned(world
     """Issue #82: the pay slips in a user's personal space teach the employer her personnel
     number as hers, seen by the members of that space. A customer number in a shared space that
     names nobody surely is nobody's."""
-    anna, bob = await world.user(), await world.user()
+    erika, bob = await world.user(), await world.user()
     employer = Contact.create(name="Arbeitgeber", now=builders.NOW)
     utility = Contact.create(name="Stadtwerke", now=builders.NOW)
     async with world.uow() as uow:
         await uow.contacts.add(employer)
         await uow.contacts.add(utility)
         await uow.commit()
-    own = await world.personal_space(anna)
-    family = await world.spaces.create(anna.id, "Familie")
+    own = await world.personal_space(erika)
+    family = await world.spaces.create(erika.id, "Familie")
     for number in range(2):
         await confirmed(
             world,
-            anna,
+            erika,
             employer,
             f"Arbeitgeber Lohnabrechnung {number} Personalnummer 12345 IBAN {THEIR_IBAN}",
         )
@@ -241,7 +241,7 @@ async def test_a_learned_number_knows_whose_it_is_and_where_it_was_learned(world
             for item in contact.identifiers
         }
     personnel = learned[IdentifierKind.PERSONNEL_NUMBER]
-    assert (personnel.user_id, personnel.learned_in) == (anna.id, frozenset({own.id}))
+    assert (personnel.user_id, personnel.learned_in) == (erika.id, frozenset({own.id}))
     contract = learned[IdentifierKind.CUSTOMER_NUMBER]
     assert (contract.user_id, contract.learned_in) == (None, frozenset({family.id}))
 

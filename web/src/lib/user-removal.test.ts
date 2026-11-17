@@ -11,11 +11,11 @@ import {
 
 type Space = components['schemas']['SpaceOut'];
 
-const ANNA = 'anna-id';
+const ERIKA = 'erika-id';
 const TOBI = 'tobi-id';
 const GONE = 'gone-id';
 const users = [
-	{ id: ANNA, username: 'anna', active: true },
+	{ id: ERIKA, username: 'erika', active: true },
 	{ id: TOBI, username: 'tobi', display_name: 'John Doe', active: true },
 	{ id: GONE, username: 'gone', active: false }
 ];
@@ -34,7 +34,7 @@ function space(id: string, name: string, personal_of: string | null = null): Spa
 }
 
 const personal: BlockingSpace = {
-	space_id: 'annas',
+	space_id: 'erikas',
 	name: 'Personal',
 	personal: true,
 	documents: 3,
@@ -60,34 +60,34 @@ describe('deleting a user who leaves spaces behind', () => {
 		const spaces = [personal, household, empty];
 		const decisions = initialDecisions(spaces);
 		expect(decisions).toEqual({
-			annas: { how: 'move_to', target: '' },
+			erikas: { how: 'move_to', target: '' },
 			household: { how: 'move_to', target: '' },
 			empty: { how: 'remove', target: '' }
 		});
 		expect(settled(spaces, decisions)).toBe(false);
-		decisions.annas.target = 'tobis';
+		decisions.erikas.target = 'tobis';
 		decisions.household = { how: 'editor', target: TOBI };
 		expect(settled(spaces, decisions)).toBe(true);
 		expect(removalBody(spaces, decisions)).toEqual({
 			spaces: [
-				{ space_id: 'annas', remove: false, move_to: 'tobis' },
+				{ space_id: 'erikas', remove: false, move_to: 'tobis' },
 				{ space_id: 'household', remove: false, editor: TOBI },
 				{ space_id: 'empty', remove: true }
 			]
 		});
-		expect(settled([personal], { annas: { how: 'remove', target: '' } })).toBe(false);
+		expect(settled([personal], { erikas: { how: 'remove', target: '' } })).toBe(false);
 	});
 
 	it('moves only into spaces that stay, never to a deactivated user', () => {
 		const spaces = [
-			space('annas', 'Personal', ANNA),
+			space('erikas', 'Personal', ERIKA),
 			space('household', 'Household'),
 			space('tobis', 'Personal', TOBI),
 			space('gones', 'Personal', GONE),
 			space('archive', 'Archive')
 		];
-		const targets = moveTargets(spaces, users, ANNA, [personal, household], 'admin-id');
+		const targets = moveTargets(spaces, users, ERIKA, [personal, household], 'admin-id');
 		expect(targets.map((target) => target.value)).toEqual(['archive', 'tobis']);
-		expect(editorOptions(users, ANNA)).toEqual([{ value: TOBI, label: 'John Doe (tobi)' }]);
+		expect(editorOptions(users, ERIKA)).toEqual([{ value: TOBI, label: 'John Doe (tobi)' }]);
 	});
 });

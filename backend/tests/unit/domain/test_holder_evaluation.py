@@ -22,7 +22,7 @@ OWN = (IdentifierKind.EMAIL_DOMAIN, "stadtwerke.example")
 PORTAL = (IdentifierKind.EMAIL_DOMAIN, "portal.example")
 OLD = (IdentifierKind.EMAIL_DOMAIN, "alt-stadtwerke.example")
 DOMAIN = IdentifierKind.EMAIL_DOMAIN
-CUSTOMER = (IdentifierKind.CUSTOMER_NUMBER, "20047718")
+CUSTOMER = (IdentifierKind.CUSTOMER_NUMBER, "12345678")
 SENDER = Holder(HolderKind.SENDER, HolderSource.RULE)
 THIRD = Holder(HolderKind.THIRD_PARTY, HolderSource.RULE)
 

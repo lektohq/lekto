@@ -11,13 +11,13 @@ type LogEntry = components['schemas']['LogEntry'];
 let fetchMock = fakeApi();
 
 const MUSTERVEREIN = '0199a6c4-0000-7000-8000-0000000000c2';
-const ANNA = '0199a6c4-0000-7000-8000-0000000000a1';
+const ERIKA = '0199a6c4-0000-7000-8000-0000000000a1';
 const lookup = {
 	contacts: [{ id: MUSTERVEREIN, name: 'Jugendverein Muster e.V.' }],
 	documentTypes: [],
 	tags: [],
 	spaces: [],
-	users: [{ id: ANNA, username: 'anna', display_name: 'Jane Doe' }]
+	users: [{ id: ERIKA, username: 'erika', display_name: 'Jane Doe' }]
 } as unknown as Lookup;
 
 const stored = (format: string, pdfa: string | null, size: number) => ({

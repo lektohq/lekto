@@ -140,7 +140,7 @@ const lookup = {
 	],
 	users: [
 		{ id: 'u1', username: 'tobi', role: 'user', personal_space_id: 'mine' },
-		{ id: 'u2', username: 'anna', role: 'user', personal_space_id: 'annas' }
+		{ id: 'u2', username: 'erika', role: 'user', personal_space_id: 'erikas' }
 	]
 } as unknown as Lookup;
 
@@ -191,24 +191,24 @@ describe('the chain of a rule applied to a document', () => {
 	it('shows a hand-over, a loop and a space the reader cannot see', () => {
 		const lines = chainLines(
 			{
-				space_id: 'annas',
+				space_id: 'erikas',
 				chain: [
 					{
 						space_id: 'house',
-						rules: [report('An Anna', [{ field: 'space', old: 'house', new: 'annas' }])],
-						moved_to: 'annas',
+						rules: [report('An Erika', [{ field: 'space', old: 'house', new: 'erikas' }])],
+						moved_to: 'erikas',
 						looped_to: null,
 						problem: null
 					},
 					{
-						space_id: 'annas',
+						space_id: 'erikas',
 						rules: [
 							report(
 								'Weiter',
 								[],
 								[{ field: 'space', kind: 'refused', reason: 'no write access' }]
 							),
-							report('Zurück', [{ field: 'space', old: 'annas', new: 'house' }])
+							report('Zurück', [{ field: 'space', old: 'erikas', new: 'house' }])
 						],
 						moved_to: null,
 						looped_to: 'house',
@@ -222,15 +222,15 @@ describe('the chain of a rule applied to a document', () => {
 		);
 		expect(lines).toEqual([
 			m.rule_chain_into({ space: 'Haushalt', rule: 'Versorger' }),
-			m.rule_chain_moved({ space: 'anna', rule: 'An Anna', from: 'Haushalt' }),
+			m.rule_chain_moved({ space: 'erika', rule: 'An Erika', from: 'Haushalt' }),
 			m.rule_chain_note({
 				field: m.field_space(),
 				reason: 'no write access',
 				rule: 'Weiter',
-				space: 'anna'
+				space: 'erika'
 			}),
-			m.rule_chain_loop({ spaces: 'Haushalt → anna → Haushalt' }),
-			m.rule_chain_end({ space: 'anna' })
+			m.rule_chain_loop({ spaces: 'Haushalt → erika → Haushalt' }),
+			m.rule_chain_end({ space: 'erika' })
 		]);
 		const hidden = chainLines({ space_id: 'elsewhere', chain: [] }, 'Versorger', lookup, 'u1');
 		expect(hidden).toEqual([m.rule_chain_into({ space: m.space_unseen(), rule: 'Versorger' })]);

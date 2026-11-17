@@ -4,7 +4,7 @@ import { m } from '#lib/paraglide/messages.js';
 import { namesOf } from './mail-rule-lookup.ts';
 
 const users = [
-	{ id: 'u1', username: 'anna', display_name: 'Jane Doe', active: true }
+	{ id: 'u1', username: 'erika', display_name: 'Jane Doe', active: true }
 ] as UserName[];
 const spaces = [{ id: 's1', name: 'Haushalt' }] as Space[];
 const types = [{ id: 't1', name: 'E-Mail' }] as DocumentType[];
@@ -12,7 +12,7 @@ const types = [{ id: 't1', name: 'E-Mail' }] as DocumentType[];
 describe('the names a mail rule shows', () => {
 	it('names a person as a choice names them, spaces and types by name', () => {
 		const names = namesOf({ users, spaces, types });
-		expect(names.user('u1')).toBe('Jane Doe (anna)');
+		expect(names.user('u1')).toBe('Jane Doe (erika)');
 		expect(names.space('s1')).toBe('Haushalt');
 		expect(names.type('t1')).toBe('E-Mail');
 	});

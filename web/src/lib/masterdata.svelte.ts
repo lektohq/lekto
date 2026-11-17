@@ -133,7 +133,7 @@ export function userLabel(user: { username: string; display_name?: string | null
 }
 
 /** How a user is offered for a choice (a member, a hand-over, whose number): the display name
- * with the username beside it where they differ ("Jane Doe (anna)"), so that a display name
+ * with the username beside it where they differ ("Jane Doe (erika)"), so that a display name
  * chosen to look like another user's cannot pass for them. */
 export function userChoice(user: { username: string; display_name?: string | null }): string {
 	const shown = userLabel(user);
@@ -202,7 +202,7 @@ export function documentParts(
 }
 
 /** The spaces a document goes to, as options: those the caller edits, then the other users'
- * personal spaces, as a hand-over ("Hand over to Anna"). */
+ * personal spaces, as a hand-over ("Hand over to Erika"). */
 export function spaceOptions(
 	spaces: readonly Space[],
 	users: readonly UserName[],

@@ -1,4 +1,4 @@
-"""Customer number: a contact's, which may name the user it belongs to (Anna's customer
+"""Customer number: a contact's, which may name the user it belongs to (Erika's customer
 account); found after its label. Until #145 also the contract, policy and membership numbers,
 which the contract number holds now (#215); a contact's customer number still matches it
 (`identifier.matches`)."""

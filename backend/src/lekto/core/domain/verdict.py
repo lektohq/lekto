@@ -384,7 +384,7 @@ class _ContactView:
         """Whether the signals naming `other` speak against another contact: the model always;
         the classifier and the similar documents only with a proof of `other` in the text, its
         name, an alias or an identifier (Tobi, 22.10.2026: similar payslips name Tobi's
-        employer, the text shows Anna's; hard evidence rules the employer out)."""
+        employer, the text shows Erika's; hard evidence rules the employer out)."""
         return LLM in self.ranking.namers.get(other, ()) or self.hard(other)
 
     def green(self, id: ContactId) -> bool:
@@ -891,7 +891,7 @@ def judge_space(
     names, with the strongest evidence (`named_persons`); `recipients`: those the model's
     recipient names by their display name (what anyone may know). The model proposing the
     personal space of a user its recipient names suggests handing it over to them, whatever
-    the other signals say (Tobi, 22.10.2026: a payslip for Anna among Tobi's payslips).
+    the other signals say (Tobi, 22.10.2026: a payslip for Erika among Tobi's payslips).
     Reasons and candidates name no space and no person (the editors of the document may not
     see them): the suggestion is the space's id, `unseen_by` the ids of those named (medium or
     hard) who would not see the document where the check leads."""

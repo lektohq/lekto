@@ -15,7 +15,7 @@ const sent: { method: string; path: string; body: unknown }[] = [];
 
 const stored: Webhook = {
 	id: 'hook',
-	owner_id: 'anna',
+	owner_id: 'erika',
 	name: 'HA',
 	url: 'http://ha.lan:8123/api/webhook/lekto',
 	event_types: ['*'],
@@ -36,7 +36,7 @@ const stored: Webhook = {
 
 beforeEach(() => {
 	session.start({
-		user: { id: 'anna', username: 'anna', role: 'user' },
+		user: { id: 'erika', username: 'erika', role: 'user' },
 		method: 'password',
 		expires_at: '2026-10-26T12:00:00Z',
 		csrf_token: 'token'
@@ -168,7 +168,7 @@ describe('WebhookForm', () => {
 
 	it('lets an admin make a webhook serve as a model call, with its time to answer', async () => {
 		session.start({
-			user: { id: 'anna', username: 'anna', role: 'admin' },
+			user: { id: 'erika', username: 'erika', role: 'admin' },
 			method: 'password',
 			expires_at: '2026-10-26T12:00:00Z',
 			csrf_token: 'token'

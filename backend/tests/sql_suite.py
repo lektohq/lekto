@@ -2210,7 +2210,7 @@ class MigrationSuite:
         await migrate(empty_database, "0034")
         async with empty_database.reading() as connection:
             schema = await connection.run_sync(_schema)
-        ids = {name: new_id() for name in ("anna", "bob", "contact", "topic")}
+        ids = {name: new_id() for name in ("erika", "bob", "contact", "topic")}
         await _insert(
             empty_database,
             [
@@ -2219,7 +2219,7 @@ class MigrationSuite:
                         _before_0035(t.users),
                         {"id": ids[name], "username": name, "username_key": name, "role": "user"},
                     )
-                    for name in ("anna", "bob")
+                    for name in ("erika", "bob")
                 ),
                 (t.contacts, {"id": ids["contact"], "name": "Insurer", "name_key": "insurer"}),
                 (
@@ -2243,36 +2243,36 @@ class MigrationSuite:
         await _insert(
             empty_database,
             [
-                (t.user_profiles, {"user_id": ids["anna"], "email": "a@b.example", "version": 1}),
+                (t.user_profiles, {"user_id": ids["erika"], "email": "a@b.example", "version": 1}),
                 *(  # an alias is private: two users may have the same
                     (
                         t.user_aliases,
                         {"user_id": ids[name], "name": "Ann", "name_key": "ann", "position": 0},
                     )
-                    for name in ("anna", "bob")
+                    for name in ("erika", "bob")
                 ),
                 *(
                     (
                         t.user_identifiers,
                         {"user_id": ids[name], "kind": "iban", "value": "DE89370400440532013000"},
                     )
-                    for name in ("anna", "bob")  # a joint account
+                    for name in ("erika", "bob")  # a joint account
                 ),
             ],
         )
         async with empty_database.writing() as connection:
             await connection.execute(
                 t.users.update()
-                .where(t.users.c.id == ids["anna"])
-                .values(display_name="Anna", display_name_key="anna")
+                .where(t.users.c.id == ids["erika"])
+                .values(display_name="Erika", display_name_key="erika")
             )
-            await connection.execute(t.contact_identifiers.update().values(user_id=ids["anna"]))
+            await connection.execute(t.contact_identifiers.update().values(user_id=ids["erika"]))
         with pytest.raises(sa.exc.IntegrityError):
             async with empty_database.writing() as connection:
                 await connection.execute(
                     t.users.update()
                     .where(t.users.c.id == ids["bob"])
-                    .values(display_name="ANNA", display_name_key="anna")
+                    .values(display_name="ERIKA", display_name_key="erika")
                 )
         async with empty_database.reading() as connection:
             identifiers = await _read_all(
@@ -2283,7 +2283,7 @@ class MigrationSuite:
                     t.contact_identifiers.c.user_id,
                 ),
             )
-        assert identifiers == [("K4711", ids["topic"], ids["anna"])]
+        assert identifiers == [("K4711", ids["topic"], ids["erika"])]
 
         await downgrade(empty_database, "0034")
         async with empty_database.reading() as connection:
@@ -2481,7 +2481,7 @@ class MigrationSuite:
         await migrate(empty_database, "0039")
         async with empty_database.reading() as connection:
             schema = await connection.run_sync(_schema)
-        ids = {name: new_id() for name in ("anna", "bob", "contact")}
+        ids = {name: new_id() for name in ("erika", "bob", "contact")}
         before = _before_0040(t.contact_identifiers)
         number = {"contact_id": ids["contact"], "kind": "customer_number", "source": "manual"}
         await _insert(
@@ -2492,10 +2492,10 @@ class MigrationSuite:
                         t.users,
                         {"id": ids[name], "username": name, "username_key": name, "role": "user"},
                     )
-                    for name in ("anna", "bob")
+                    for name in ("erika", "bob")
                 ),
                 (t.contacts, {"id": ids["contact"], "name": "Insurer", "name_key": "insurer"}),
-                (before, number | {"value": "K4711", "user_id": ids["anna"]}),
+                (before, number | {"value": "K4711", "user_id": ids["erika"]}),
                 (before, number | {"value": "K0815", "user_id": ids["bob"]}),
                 (before, number | {"value": "K1", "source": "learned"}),
             ],
@@ -2509,11 +2509,11 @@ class MigrationSuite:
                 select(identifiers.c.value, identifiers.c.user_id, identifiers.c.learned_in),
             )
         assert sorted(rows, key=str) == sorted(
-            [("K4711", ids["anna"], None), ("K0815", ids["bob"], None), ("K1", None, None)],
+            [("K4711", ids["erika"], None), ("K0815", ids["bob"], None), ("K1", None, None)],
             key=str,
         )
         async with empty_database.writing() as connection:
-            await connection.execute(sa.delete(t.users).where(t.users.c.id == ids["anna"]))
+            await connection.execute(sa.delete(t.users).where(t.users.c.id == ids["erika"]))
         async with empty_database.reading() as connection:
             kept = await _read_all(connection, select(identifiers.c.value))
         assert sorted(kept) == [("K0815",), ("K1",)]
@@ -3129,7 +3129,12 @@ class MigrationSuite:
             [
                 (
                     t.users,
-                    {"id": ids["user"], "username": "anna", "username_key": "anna", "role": "user"},
+                    {
+                        "id": ids["user"],
+                        "username": "erika",
+                        "username_key": "erika",
+                        "role": "user",
+                    },
                 ),
                 (_before_0043(t.webhooks), webhook | {"id": ids["signed"], "secret": b"s"}),
             ],
@@ -3192,7 +3197,12 @@ class MigrationSuite:
             [
                 (
                     t.users,
-                    {"id": ids["user"], "username": "anna", "username_key": "anna", "role": "user"},
+                    {
+                        "id": ids["user"],
+                        "username": "erika",
+                        "username_key": "erika",
+                        "role": "user",
+                    },
                 ),
                 (
                     _before_0044(t.webhooks),
@@ -3235,7 +3245,12 @@ class MigrationSuite:
             [
                 (
                     t.users,
-                    {"id": ids["user"], "username": "anna", "username_key": "anna", "role": "user"},
+                    {
+                        "id": ids["user"],
+                        "username": "erika",
+                        "username_key": "erika",
+                        "role": "user",
+                    },
                 ),
                 (
                     _before_0045(t.webhooks),
@@ -3277,7 +3292,12 @@ class MigrationSuite:
             [
                 (
                     t.users,
-                    {"id": ids["user"], "username": "anna", "username_key": "anna", "role": "user"},
+                    {
+                        "id": ids["user"],
+                        "username": "erika",
+                        "username_key": "erika",
+                        "role": "user",
+                    },
                 ),
                 (
                     _before_0046(t.webhooks),
@@ -3343,14 +3363,19 @@ class MigrationSuite:
             [
                 (
                     t.users,
-                    {"id": ids["user"], "username": "anna", "username_key": "anna", "role": "user"},
+                    {
+                        "id": ids["user"],
+                        "username": "erika",
+                        "username_key": "erika",
+                        "role": "user",
+                    },
                 ),
                 (
                     t.spaces,
                     {
                         "id": ids["space"],
-                        "name": "Anna",
-                        "name_key": "anna",
+                        "name": "Erika",
+                        "name_key": "erika",
                         "personal_of": ids["user"],
                         "created_at": NOW,
                         "version": 1,
@@ -3498,14 +3523,14 @@ class MigrationSuite:
         entered as theirs is dropped. Other numbers keep their user; the downgrade changes
         nothing."""
         await migrate(empty_database, "0054")
-        ids = {name: new_id() for name in ("anna", "contact", "space")}
+        ids = {name: new_id() for name in ("erika", "contact", "space")}
         number = {"contact_id": ids["contact"], "kind": "tax_number"}
         await _insert(
             empty_database,
             [
                 (
                     t.users,
-                    {"id": ids["anna"], "username": "a", "username_key": "a", "role": "user"},
+                    {"id": ids["erika"], "username": "a", "username_key": "a", "role": "user"},
                 ),
                 (t.contacts, {"id": ids["contact"], "name": "Insurer", "name_key": "insurer"}),
                 (
@@ -3514,13 +3539,13 @@ class MigrationSuite:
                     | {
                         "value": "6420000010",
                         "source": "learned",
-                        "user_id": ids["anna"],
+                        "user_id": ids["erika"],
                         "learned_in": [str(ids["space"])],
                     },
                 ),
                 (
                     t.contact_identifiers,
-                    number | {"value": "03148103084", "source": "manual", "user_id": ids["anna"]},
+                    number | {"value": "03148103084", "source": "manual", "user_id": ids["erika"]},
                 ),
                 (t.contact_identifiers, number | {"value": "2713100040", "source": "manual"}),
                 (
@@ -3530,7 +3555,7 @@ class MigrationSuite:
                         "kind": "customer_number",
                         "value": "K4711",
                         "source": "learned",
-                        "user_id": ids["anna"],
+                        "user_id": ids["erika"],
                     },
                 ),
             ],
@@ -3553,7 +3578,7 @@ class MigrationSuite:
             [
                 ("6420000010", None, [str(ids["space"])]),
                 ("2713100040", None, None),
-                ("K4711", ids["anna"], None),
+                ("K4711", ids["erika"], None),
             ],
             key=str,
         )
@@ -3569,7 +3594,7 @@ class MigrationSuite:
         await migrate(empty_database, "0070")
         ids = {
             name: new_id()
-            for name in ("anna", "space", "insurer", "club", "document", "rule", "lens")
+            for name in ("erika", "space", "insurer", "club", "document", "rule", "lens")
         }
         identifier = {"contact_id": ids["insurer"]}
         fact = {"document_id": ids["document"], "role": "target", "origins": "pattern"}
@@ -3579,7 +3604,7 @@ class MigrationSuite:
             [
                 (
                     t.users,
-                    {"id": ids["anna"], "username": "a", "username_key": "a", "role": "user"},
+                    {"id": ids["erika"], "username": "a", "username_key": "a", "role": "user"},
                 ),
                 (
                     t.spaces,
@@ -3587,7 +3612,7 @@ class MigrationSuite:
                         "id": ids["space"],
                         "name": "A",
                         "name_key": "a",
-                        "personal_of": ids["anna"],
+                        "personal_of": ids["erika"],
                         "created_at": NOW,
                         "version": 1,
                     },
@@ -3614,11 +3639,11 @@ class MigrationSuite:
                 ),
                 (
                     t.user_identifiers,
-                    {"user_id": ids["anna"], "kind": "membership_number", "value": "333333"},
+                    {"user_id": ids["erika"], "kind": "membership_number", "value": "333333"},
                 ),
                 (
                     t.user_identifiers,
-                    {"user_id": ids["anna"], "kind": "contract_number", "value": "333333"},
+                    {"user_id": ids["erika"], "kind": "contract_number", "value": "333333"},
                 ),
                 (t.documents, {"id": ids["document"], "space_id": ids["space"]}),
                 (
@@ -3644,7 +3669,7 @@ class MigrationSuite:
                     t.lenses,
                     {
                         "id": ids["lens"],
-                        "owner_id": ids["anna"],
+                        "owner_id": ids["erika"],
                         "name": "L",
                         "name_key": "l",
                         "position": 0,
@@ -3693,7 +3718,7 @@ class MigrationSuite:
         the domains a person entered; the rest of its identifiers go, and VAT IDs and creditor IDs
         lose their holders."""
         await migrate(empty_database, "0071")
-        ids = {name: new_id() for name in ("anna", "space", "utility", "document")}
+        ids = {name: new_id() for name in ("erika", "space", "utility", "document")}
         at = {"contact_id": ids["utility"]}
         fact = {"document_id": ids["document"], "role": "contact", "origins": "pattern"}
         held = {"holder": "sender", "holder_name": None, "holder_source": "rule"}
@@ -3702,7 +3727,7 @@ class MigrationSuite:
             [
                 (
                     t.users,
-                    {"id": ids["anna"], "username": "a", "username_key": "a", "role": "user"},
+                    {"id": ids["erika"], "username": "a", "username_key": "a", "role": "user"},
                 ),
                 (
                     t.spaces,
@@ -3710,7 +3735,7 @@ class MigrationSuite:
                         "id": ids["space"],
                         "name": "A",
                         "name_key": "a",
-                        "personal_of": ids["anna"],
+                        "personal_of": ids["erika"],
                         "created_at": NOW,
                         "version": 1,
                     },
