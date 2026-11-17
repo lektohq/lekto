@@ -3,6 +3,8 @@ A-06)."""
 
 from uuid import UUID
 
+import httpx2
+
 from lekto.adapters.inbound.rest import PREFIX
 from lekto.adapters.inbound.rest.problems import NOT_FROM_REQUESTS, STATUSES
 from lekto.core.domain import errors
@@ -62,6 +64,22 @@ async def test_a_moment_beyond_the_calendar_is_a_422(api: Api) -> None:
             )
             assert changed.status_code == 422, (path, changed.text)
             assert "beyond the calendar" in changed.json()["detail"]
+
+
+async def test_an_unexpected_error_is_marked_like_every_answer(api: Api) -> None:
+    """Not cached, not sniffed, no referrer: also a 500, which passes no middleware (RB-03)."""
+
+    async def broken() -> None:
+        raise RuntimeError("broken")
+
+    api.app.add_api_route(f"{PREFIX}/broken", broken)
+    transport = httpx2.ASGITransport(app=api.app, raise_app_exceptions=False)
+    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
+        response = await client.get(f"{PREFIX}/broken")
+    assert response.status_code == 500
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["referrer-policy"] == "no-referrer"
 
 
 async def test_a_refusal_names_its_code_beside_the_text(api: Api) -> None:

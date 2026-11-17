@@ -65,6 +65,16 @@ __all__ = [
 log = logging.getLogger(__name__)
 
 
+PRIVATE_HEADERS = {
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+}
+"""What `middleware.NoStore` sets on the API's answers; the answer to an unexpected error, which
+leaves the app past every middleware (Starlette's `ServerErrorMiddleware`), sets it itself
+(RB-03)."""
+
+
 def install(app: FastAPI) -> None:
     """Register the handlers that turn errors into problems."""
 
@@ -109,9 +119,10 @@ def install(app: FastAPI) -> None:
         return problem(error.status_code, str(error.detail), headers=error.headers)
 
     async def unexpected_error(request: Request, error: Exception) -> JSONResponse:
-        # Details stay in the server log; the client learns only that something broke.
+        # Details stay in the server log; the client learns only that something broke. The
+        # answer passes no middleware: it marks itself as `NoStore` would (RB-03).
         log.error("request failed", exc_info=error)
-        return problem(500, PROBLEMS[500][1])
+        return problem(500, PROBLEMS[500][1], headers=PRIVATE_HEADERS)
 
     for kind, _ in STATUSES:
         app.add_exception_handler(kind, domain_error)

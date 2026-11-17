@@ -9,7 +9,7 @@ from starlette.datastructures import MutableHeaders
 from starlette.exceptions import HTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from lekto.adapters.inbound.rest.problems import problem
+from lekto.adapters.inbound.rest.problems import PRIVATE_HEADERS, problem
 
 
 class RequestTooLargeError(HTTPException):
@@ -122,10 +122,9 @@ class NoStore:
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
                 kept = cacheable and message["status"] == 200 and "cache-control" in headers
-                if not kept:
-                    headers["Cache-Control"] = "no-store"
-                headers["X-Content-Type-Options"] = "nosniff"
-                headers["Referrer-Policy"] = "no-referrer"
+                for name, value in PRIVATE_HEADERS.items():
+                    if name != "Cache-Control" or not kept:
+                        headers[name] = value
             await send(message)
 
         await self._app(scope, receive, marked)
