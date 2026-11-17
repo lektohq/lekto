@@ -25,7 +25,7 @@ from lekto.core.domain.errors import (
     SpaceWriteDeniedError,
     ValidationError,
 )
-from lekto.core.domain.fields import FieldDefinition, FieldValue, read_written
+from lekto.core.domain.fields import FieldDefinition, FieldValue, Writing, read_written
 from lekto.core.domain.ids import (
     DocumentId,
     DocumentTypeId,
@@ -198,7 +198,9 @@ class RuleService:
             )
             if not enabled:
                 rule.disable(self._clock.now())
-            await check_references(uow, rule.definition, author=user)
+            await check_references(
+                uow, rule.definition, author=user, writing=self._templates.writing
+            )
             check_rule_facts(user, rule.definition)
             check_patterns(self._patterns, rule.definition)
             await check_templates(uow, self._templates, rule.definition)
@@ -325,7 +327,7 @@ class RuleService:
             else:
                 place = await _place(uow, user, scope, space)
                 rule.change(definition, user.id, self._clock.now(), scope=scope, space_id=place)
-            await check_references(uow, definition, author=user)
+            await check_references(uow, definition, author=user, writing=self._templates.writing)
             check_rule_facts(user, definition)
             check_patterns(self._patterns, definition)
             await check_templates(uow, self._templates, definition)
@@ -352,7 +354,12 @@ class RuleService:
             user = await load_actor(uow, actor)
             rule = await _managed_rule(uow, user, id)
             if enabled:
-                await check_references(uow, rule.definition, author=await _author(uow, rule))
+                await check_references(
+                    uow,
+                    rule.definition,
+                    author=await _author(uow, rule),
+                    writing=self._templates.writing,
+                )
                 await check_templates(uow, self._templates, rule.definition)
                 rule.enable(self._clock.now())
             else:
@@ -371,15 +378,15 @@ class RuleService:
 
 
 async def check_references(
-    uow: UnitOfWork, definition: RuleDefinition, *, author: User | None
+    uow: UnitOfWork, definition: RuleDefinition, *, author: User | None, writing: Writing
 ) -> None:
     """Everything the definition refers to exists (NotFoundError otherwise), field
-    conditions and values fit their field, tags are of the scope their place asks for (groups
-    in the conditions on groups, topics in those on the topic and in "set topic", document
-    tags elsewhere; ValidationError), the rule's `author` may file into the spaces it
-    files into, unless one is the personal space of another, active user (handing over;
-    PermissionDeniedError; checked again whenever it runs), and sends and asks only through
-    their own webhooks (someone else's is not found)."""
+    conditions and values fit their field (text read as `writing` writes it), tags are of the
+    scope their place asks for (groups in the conditions on groups, topics in those on the topic
+    and in "set topic", document tags elsewhere; ValidationError), the rule's `author` may file
+    into the spaces it files into, unless one is the personal space of another, active user
+    (handing over; PermissionDeniedError; checked again whenever it runs), and sends and asks
+    only through their own webhooks (someone else's is not found)."""
     references = definition.references()
     for webhook_id in references.webhooks:
         webhook = await uow.webhooks.find(webhook_id)
@@ -400,7 +407,7 @@ async def check_references(
         for field_id in references.fields:
             if field_id not in fields:
                 raise NotFoundError("field", field_id)
-        check_fields(definition, fields)
+        check_fields(definition, fields, writing)
     for space_id in references.spaces:
         space = await uow.spaces.find(space_id)
         if (

@@ -5,7 +5,7 @@ from uuid import UUID
 import pytest
 
 from lekto.core.domain.errors import ValidationError
-from lekto.core.domain.fields import FieldDefinition, FieldType
+from lekto.core.domain.fields import FieldDefinition, FieldType, Writing
 from lekto.core.domain.ids import (
     ContactId,
     DocumentId,
@@ -71,6 +71,7 @@ OTHER_TAG = TagId(new_id())
 SPACE = SpaceId(new_id())
 FIELD = FieldId(new_id())
 ID = str(new_id())
+WRITING = Writing("de", "EUR")
 
 ALWAYS = Condition(field=ConditionField.CHANNEL, op=Operator.IN, value=["web", "api"])
 
@@ -435,7 +436,7 @@ def test_field_condition_fits_data_type(
     choices = ("monthly", "yearly") if data_type is FieldType.CHOICE else ()
     attr = field(data_type, choices)
 
-    check_fields(field_rule(attr, op, value), {attr.id: attr})
+    check_fields(field_rule(attr, op, value), {attr.id: attr}, WRITING)
 
 
 @pytest.mark.parametrize(
@@ -463,7 +464,7 @@ def test_field_operator_must_fit_data_type(
     attr = field(data_type, choices)
 
     with pytest.raises(ValidationError, match=f"operator '{op}' does not apply to field"):
-        check_fields(field_rule(attr, op, value), {attr.id: attr})
+        check_fields(field_rule(attr, op, value), {attr.id: attr}, WRITING)
 
 
 @pytest.mark.parametrize(
@@ -489,7 +490,7 @@ def test_field_condition_value_must_fit(
     attr = field(data_type, choices)
 
     with pytest.raises(ValidationError, match="does not accept"):
-        check_fields(field_rule(attr, op, value), {attr.id: attr})
+        check_fields(field_rule(attr, op, value), {attr.id: attr}, WRITING)
 
 
 @pytest.mark.parametrize(
@@ -528,18 +529,18 @@ def test_set_field_value_must_fit(data_type: FieldType, value: JsonValue, fits: 
     rule = definition(SetField(attr.id, value))
 
     if fits:
-        check_fields(rule, {attr.id: attr})
+        check_fields(rule, {attr.id: attr}, WRITING)
     else:
         with pytest.raises(ValidationError, match="does not accept"):
-            check_fields(rule, {attr.id: attr})
+            check_fields(rule, {attr.id: attr}, WRITING)
 
 
 def test_missing_field_is_rejected() -> None:
     attr = field(FieldType.TEXT)
     with pytest.raises(ValidationError, match=f"field {attr.id} does not exist"):
-        check_fields(field_rule(attr, Operator.PRESENT), {})
+        check_fields(field_rule(attr, Operator.PRESENT), {}, WRITING)
     with pytest.raises(ValidationError, match="does not exist"):
-        check_fields(definition(SetField(attr.id, "x")), {})
+        check_fields(definition(SetField(attr.id, "x")), {}, WRITING)
 
 
 def test_errors_of_stored_data_and_scope_name_the_place() -> None:
@@ -556,10 +557,10 @@ def test_errors_of_stored_data_and_scope_name_the_place() -> None:
     with pytest.raises(
         ValidationError, match=r"^conditions\.all\[1\]\.any\[1\]: .*does not accept"
     ):
-        check_fields(nested, {number.id: number})
+        check_fields(nested, {number.id: number}, WRITING)
     fitting = definition(SetField(number.id, "seven"), AddTags(frozenset({TAG})))
     with pytest.raises(ValidationError, match=r"^actions\[0\]: .*does not accept"):
-        check_fields(fitting, {number.id: number})
+        check_fields(fitting, {number.id: number}, WRITING)
     with pytest.raises(ValidationError, match=r"^actions\[2\]: an action sets the same field"):
         definition(SetTitle("A"), AddTags(frozenset({TAG})), SetTitle("B"))
 
@@ -831,6 +832,7 @@ def test_a_period_starts_after_and_ends_before_a_date() -> None:
         check_fields(
             field_rule(attr, Operator.GT, {"start": "2026-09-01", "end": "2026-09-30"}),
             {attr.id: attr},
+            WRITING,
         )
 
 

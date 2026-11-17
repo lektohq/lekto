@@ -334,7 +334,7 @@ def test_a_template_value_is_read_as_its_field_has_it(
     choices = ("monthly", "yearly", "Typ  A") if data_type is FieldType.CHOICE else ()
     definition = FieldDefinition.create(name="F", data_type=data_type, now=NOW, choices=choices)
 
-    assert read_written(definition, text, Writing(), received=RECEIVED) == expected
+    assert read_written(definition, text, Writing("de", "EUR"), received=RECEIVED) == expected
 
 
 def test_the_writing_settles_ambiguous_numbers_and_missing_currencies() -> None:
@@ -342,7 +342,7 @@ def test_the_writing_settles_ambiguous_numbers_and_missing_currencies() -> None:
     amount = FieldDefinition.create(name="A", data_type=FieldType.AMOUNT, now=NOW)
     english = Writing("en", "GBP")
 
-    assert read_written(number, "1,234", Writing()) == Decimal("1.234")
+    assert read_written(number, "1,234", Writing("de", "EUR")) == Decimal("1.234")
     assert read_written(number, "1,234", english) == Decimal(1234)
     assert read_written(amount, "1,250", english) == Money(Decimal(1250), "GBP")
     assert read_written(amount, "12,50", english) == Money(Decimal("12.50"), "GBP")

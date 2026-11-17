@@ -164,7 +164,7 @@ class Situation:
     document: Document
     definitions: Mapping[FieldId, FieldDefinition]
     render: Render
-    writing: Writing = field(default_factory=Writing)
+    writing: Writing
     in_personal_space: bool = False
     uploader_name: str | None = None
     spaces: Mapping[SpaceId, SpaceTarget] = field(default_factory=dict)

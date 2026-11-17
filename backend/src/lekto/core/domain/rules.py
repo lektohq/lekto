@@ -765,10 +765,11 @@ def title_rule(document_type: DocumentType) -> RuleDefinition:
 
 
 def check_fields(
-    definition: RuleDefinition, definitions: Mapping[FieldId, FieldDefinition]
+    definition: RuleDefinition, definitions: Mapping[FieldId, FieldDefinition], writing: Writing
 ) -> None:
     """Conditions and actions on fields fit the field's data type. ValidationError
-    otherwise, naming the place; a missing field is a ValidationError too."""
+    otherwise, naming the place; a missing field is a ValidationError too. `writing`: how the
+    templates write values (`TemplateRenderer.writing`), by which text without markup is read."""
     places = [
         *condition_places(definition.conditions),
         *(
@@ -803,7 +804,7 @@ def check_fields(
                     # Text without markup writes itself: it must be readable now. A template's
                     # syntax and values are checked where the rule is saved (a port renders it).
                     not TEMPLATE_MARKUP.search(str(action.value))
-                    and read_written(field, str(action.value), Writing()) is None
+                    and read_written(field, str(action.value), writing) is None
                 ):
                     raise field.refusal(action.value)
 

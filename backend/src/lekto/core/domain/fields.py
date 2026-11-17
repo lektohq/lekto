@@ -357,10 +357,11 @@ def _numeric(value: object) -> bool:
 class Writing:
     """How templates write values (`TemplateRenderer.writing`): `language` (ISO 639-1, of
     `LEKTO_TEMPLATE_LOCALE`) the way an ambiguous number is meant, `currency` the one an amount
-    without its own has (`LEKTO_DEFAULT_CURRENCY`)."""
+    without its own has (`LEKTO_DEFAULT_CURRENCY`). No defaults: the settings hold them, and
+    whoever reads a value takes the renderer's (DA-15)."""
 
-    language: str = "de"
-    currency: str = "EUR"
+    language: str
+    currency: str
 
 
 _PLAIN_AMOUNT = re.compile(

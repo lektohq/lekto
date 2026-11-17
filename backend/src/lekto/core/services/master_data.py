@@ -626,7 +626,7 @@ class MasterDataService:
                     uow,
                     self._now(),
                     because(ReasonCode.RULE_DISABLED_CHOICE, field=definition.name),
-                    misfits(definition.id, fields),
+                    misfits(definition.id, fields, self._templates.writing),
                 )
 
         return await self._change(actor, _fields, id, change, check=check, after=after)
