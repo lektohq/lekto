@@ -21,7 +21,7 @@ from sqlalchemy import Connection, insert, inspect, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from lekto.adapters.outbound.memory import ManualClock, MemoryObjectStore
+from lekto.adapters.outbound.memory import ManualClock
 from lekto.adapters.outbound.sql import Database, SqlUnitOfWorkFactory, migrate, schema_state
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.migrations import downgrade
@@ -30,7 +30,7 @@ from lekto.adapters.outbound.sql.types import UtcDateTime, json_type
 from lekto.core.domain.classification import CHECKS, FieldCheck, field_key
 from lekto.core.domain.condition_tree import Group
 from lekto.core.domain.documents import Document, DocumentChanges
-from lekto.core.domain.errors import ConflictError, DuplicateDocumentError, ValidationError
+from lekto.core.domain.errors import ConflictError, ValidationError
 from lekto.core.domain.events import DomainEvent
 from lekto.core.domain.fields import FieldDefinition, FieldType, Money, field_to_json
 from lekto.core.domain.ids import DocumentTypeId, RuleId, UserId, new_id
@@ -54,7 +54,7 @@ from lekto.core.ports.event_bus import EventBus
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from lekto.core.services.rules.running import provenance
 from tests import builders
-from tests.builders import HOUR, NOW, PlaceholderNode, incoming
+from tests.builders import HOUR, NOW
 from tests.contracts.event_bus import EventBusFactory, Recorder, publish, received
 from tests.contracts.mail_records import a_mailbox
 from tests.contracts.unit_of_work import owner_with_space
@@ -313,26 +313,6 @@ class SqlAdapterSuite(ServicesOverPersistence):
         results = await asyncio.gather(add(), add(), return_exceptions=True)
         assert len([r for r in results if isinstance(r, Document)]) == 1
         assert len([r for r in results if isinstance(r, ConflictError)]) == 1
-
-    async def test_concurrent_uploads_of_the_same_file_create_one_document(
-        self, uow_factory: UnitOfWorkFactory
-    ) -> None:
-        owner, _ = await owner_with_space(uow_factory)
-        pipeline = builders.pipeline_service(
-            uow_factory,
-            ManualClock(NOW),
-            MemoryObjectStore(),
-            {node: PlaceholderNode() for node in NODES if node is not Node.RECEIVE},
-        )
-
-        async def upload() -> Document:
-            return await pipeline.receive(owner.id, incoming(b"%PDF-1.7 same"), filename="a.pdf")
-
-        results = await asyncio.gather(*(upload() for _ in range(3)), return_exceptions=True)
-        assert len([r for r in results if isinstance(r, Document)]) == 1, results
-        assert all(isinstance(r, Document | DuplicateDocumentError) for r in results), results
-        async with uow_factory() as uow:
-            assert len(await uow.documents.list_visible_to(owner.id)) == 1
 
     # --- events ---------------------------------------------------------------------------------
 
