@@ -113,7 +113,8 @@ check "the image runs s6-overlay as PID 1" \
 
 # Every container whose checks follow starts now; each one migrates or fails on its own.
 start all
-start api LEKTO_ROLE=api
+# Written as a person might: the image goes by the settings as Lekto reads them.
+start api "LEKTO_ROLE= API " "LEKTO_API_PORT= 8000"
 start waiter LEKTO_ROLE=worker
 VOLUME=$prefix-shared start worker LEKTO_ROLE=worker
 # invalid NAME DOCKER-RUN-ARGUMENTS...: a container whose configuration is refused.
@@ -236,7 +237,7 @@ check "stopped in ${elapsed}s (under 20 s when idle)" test "$elapsed" -lt 20
 check "the worker and Uvicorn logged their shutdown" \
   bash -c "docker logs $prefix-all 2>&1 | grep -q 'worker stopped' && docker logs $prefix-all 2>&1 | grep -q 'Finished server process'"
 
-step "role api: no worker"
+step "role api (written ' API '): no worker"
 wait_for 180 "healthy" healthy api || logs api
 check "the API runs" test "$(count api 'bin/lekto api')" -eq 1
 check "no worker process" test "$(count api 'bin/lekto worker')" -eq 0

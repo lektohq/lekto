@@ -4,8 +4,8 @@
 # by `docker stop`, a service can).
 set -eu
 
-role=$(printf %s "${LEKTO_ROLE:-all}" | tr '[:upper:]' '[:lower:]')
-if [ "$role" = worker ]; then
+# LEKTO_ROLE as init-lekto resolved it.
+if [ "$LEKTO_ROLE" = worker ]; then
   echo "init-migrations: LEKTO_ROLE=worker does not migrate; svc-worker waits for the schema"
   exit 0
 fi

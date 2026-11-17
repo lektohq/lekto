@@ -1,10 +1,10 @@
 #!/command/with-contenv sh
 # Uvicorn with the REST API, MCP and the event streams. Only with LEKTO_ROLE all or api.
-role=$(printf %s "${LEKTO_ROLE:-all}" | tr '[:upper:]' '[:lower:]')
-case "$role" in
+# LEKTO_ROLE as init-lekto resolved it.
+case "$LEKTO_ROLE" in
   all | api) ;;
   *)
-    echo "svc-api: not started with LEKTO_ROLE=$role"
+    echo "svc-api: not started with LEKTO_ROLE=$LEKTO_ROLE"
     exec s6-svc -Od .
     ;;
 esac

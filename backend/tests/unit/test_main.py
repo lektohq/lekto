@@ -63,6 +63,37 @@ def test_external_language_models_are_reported(
     assert "outside the local network" in warnings[0]["event"]
 
 
+def test_check_gives_the_image_the_settings_as_lekto_reads_them(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The image's scripts go by these lines, not by the environment as it is: with
+    `LEKTO_ROLE="api "` they started no service, and the health check said healthy (OP-04)."""
+    monkeypatch.setenv("LEKTO_ROLE", " API ")
+    monkeypatch.setenv("LEKTO_DB_TYPE", "SQLite ")
+    monkeypatch.setenv("LEKTO_DB_SQLITE_PATH", " /data/lekto.db ")
+    monkeypatch.setenv("LEKTO_STORAGE_TYPE", " ")  # blank: not set
+    monkeypatch.setenv("LEKTO_STORAGE_PATH", "/data/objects")
+    monkeypatch.delenv("LEKTO_API_HOST", raising=False)
+    monkeypatch.setenv("LEKTO_API_PORT", " 8000")
+
+    assert main(["check", "--environment"]) == 0
+
+    assert capsys.readouterr().out.splitlines() == [
+        "LEKTO_ROLE=api",
+        "LEKTO_DB_TYPE=sqlite",
+        "LEKTO_DB_SQLITE_PATH=/data/lekto.db",
+        "LEKTO_STORAGE_TYPE=filesystem",
+        "LEKTO_STORAGE_PATH=/data/objects",
+        "LEKTO_API_HOST=0.0.0.0",
+        "LEKTO_API_PORT=8000",
+    ]
+    assert main(["check"]) == 0
+    assert capsys.readouterr().out == ""  # the configuration goes to the log, on stderr
+    monkeypatch.setenv("LEKTO_STORAGE_PATH", "/data/a\nb")
+    assert main(["check", "--environment"]) == 1
+    assert "LEKTO_STORAGE_PATH must be a single line" in capsys.readouterr().err
+
+
 def test_invalid_configuration_exits_one_with_message(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

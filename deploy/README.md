@@ -5,7 +5,7 @@ processes inside it:
 
 | Service | Type | Purpose |
 | --- | --- | --- |
-| `init-lekto` | oneshot | check `PUID`/`PGID`, prepare the volume, validate the configuration |
+| `init-lekto` | oneshot | check `PUID`/`PGID`, validate the configuration, prepare the volume |
 | `init-migrations` | oneshot | `LEKTO_ROLE` `all`/`api`: migrate the database; `worker`: nothing |
 | `svc-api` | longrun | Uvicorn with FastAPI: REST, MCP, SSE, and the web UI below `/ui` |
 | `svc-worker` | longrun | waits for the schema (role `worker`), then pipeline jobs, outbox dispatch, webhook delivery |
@@ -148,6 +148,9 @@ answer, `LEKTO_MAIL_RENDER_TIMEOUT` (two minutes) the setting of a mail as a PDF
 ## Roles
 
 `LEKTO_ROLE` decides which services s6 starts; the other one stays down (`s6-svstat` shows it).
+The scripts of the image go by the settings as Lekto reads them (`lekto check --environment`:
+whitespace removed, a blank value as not set, any case): `init-lekto` writes them to the
+container's environment, where the services and the health check take them from.
 
 | Role | Starts | Migrates | Health |
 | --- | --- | --- | --- |
