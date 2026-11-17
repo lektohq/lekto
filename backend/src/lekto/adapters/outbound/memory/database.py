@@ -26,6 +26,7 @@ from lekto.core.domain.master_data import Contact, DocumentType, MasterData, Tag
 from lekto.core.domain.pipeline import NodeRun
 from lekto.core.domain.push import PushDevice, PushPreferences
 from lekto.core.domain.relations import Relation
+from lekto.core.domain.rules import Rule
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
 from lekto.core.domain.validation import name_key
@@ -126,6 +127,14 @@ def _mail_record_keys(record: MailRecord) -> Iterable[Hashable]:
     return [("uid", record.mailbox_id, record.folder, record.uidvalidity, record.uid)]
 
 
+def _rule_keys(rule: Rule) -> Iterable[Hashable]:
+    """The rule of a type's title pattern: one per type while it lives, as the primary key of
+    `title_pattern_rules` (PM-08); a deleted rule keeps no type (`Rule.delete`)."""
+    if rule.managed_by is not None and rule.deleted_at is None:
+        return [("managed_by", rule.managed_by)]
+    return []
+
+
 def _no_keys(item: Identified[UUID]) -> Iterable[Hashable]:
     return []
 
@@ -170,7 +179,7 @@ PUSH_DEVICES = Table("push device", _push_device_keys)
 PUSH_PREFERENCES: Table[PushPreferences] = Table("push preferences", _no_keys)
 EXTERNAL_IDENTITIES = Table("external identity", _external_identity_keys)
 LOGIN_FAILURES = Table("login failures", _no_keys)
-RULES = Table("rule", _no_keys)
+RULES = Table("rule", _rule_keys)
 RULE_VERSIONS = Table("rule version", _no_keys)
 RULE_APPLICATIONS = Table("rule application", _no_keys)
 BULK_OPERATIONS = Table[BulkOperation]("bulk operation", _no_keys)

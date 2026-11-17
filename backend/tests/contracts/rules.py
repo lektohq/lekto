@@ -256,6 +256,19 @@ class RuleRepositoriesContract:
             listed = await uow.rules.list_for(spaces=[], include_global=True)
         assert stored == rule and stored.managed_by == kind.id
         assert [item.managed_by for item in listed] == [kind.id]
+        # A second living rule of the same type is refused (PM-08).
+        second = Rule.create(
+            scope=RuleScope.GLOBAL,
+            space_id=None,
+            definition=title,
+            by=admin.id,
+            now=NOW,
+            managed_by=kind.id,
+        )
+        with pytest.raises(ConflictError):
+            async with uow_factory() as uow:
+                await uow.rules.add(second)
+                await uow.commit()
         # Deleted, it is no type's rule any more: the type may get another one.
         stored.delete(NOW)
         async with uow_factory() as uow:
