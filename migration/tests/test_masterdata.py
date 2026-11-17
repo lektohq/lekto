@@ -3,6 +3,8 @@ Lekto's ids."""
 
 from typing import Any
 
+import pytest
+
 from lekto_migration.directory import Directory
 from lekto_migration.expect import Expected, field_infos
 from lekto_migration.lekto import Lekto
@@ -81,6 +83,26 @@ def test_an_empty_lekto_needs_everything_of_the_first_plan() -> None:
     assert (
         kinds.index("user") < kinds.index("contact") < kinds.index("field") < kinds.index("space")
     )
+
+
+@pytest.mark.parametrize("child_first", [True, False])
+def test_three_levels_of_tags_keep_each_its_parent(child_first: bool) -> None:
+    """The first plan follows the order Paperless gives the tags in: a child may come before
+    the tag above it, which has a parent of its own (MI-03)."""
+    child = "{to: tag, name: Arzt, parent: Gesundheit, create: true}"
+    middle = "{to: tag, name: Gesundheit, parent: Privat, create: true}"
+    first, second = (child, middle) if child_first else (middle, child)
+    world = World().set("tags", "tax", first).set("tags", "tax/2024", second)
+    world.directory.add("tag", {"id": "t1", "name": "Gesundheit", "parent_id": None})
+    tags = by(actions_of(world), "tag")
+    assert [(name, tags[name].data.get("parent")) for name in tags] == [
+        ("Privat", None),
+        ("Gesundheit", "Privat"),
+        ("Arzt", "Gesundheit"),
+    ]
+    assert tags["Privat"].status == CREATE and tags["Privat"].source.endswith("Gesundheit")
+    assert tags["Gesundheit"].status == EXISTS
+    assert tags["Gesundheit"].notes == ["Lekto has it elsewhere; the plan says below Privat"]
 
 
 def test_what_exists_is_found_and_what_may_not_be_created_is_missing() -> None:
