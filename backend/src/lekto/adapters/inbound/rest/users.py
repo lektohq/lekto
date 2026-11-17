@@ -52,10 +52,9 @@ def _account(account: Account, personal_space: SpaceId | None) -> AccountOut:
     responses=problem_responses(401),
 )
 async def list_users(principal: Authenticated, context: Context) -> list[UserOut]:
-    full = principal.user.is_admin
     users = await context.users.list_users(principal.id)
     personal = await context.users.personal_spaces(principal.id)
-    return [UserOut.of(user, full=full, personal_space=personal.get(user.id)) for user in users]
+    return [UserOut.seen(user, personal.get(user.id)) for user in users]
 
 
 @router.post(
@@ -98,8 +97,7 @@ async def get_user(id: UUID, principal: Authenticated, context: Context) -> Acco
     personal = (await context.users.personal_spaces(principal.id)).get(UserId(id))
     if principal.user.is_admin:
         return _account(await context.users.account(principal.id, UserId(id)), personal)
-    found = await context.users.get(principal.id, UserId(id))
-    return UserOut.of(found, full=False, personal_space=personal)
+    return UserOut.seen(await context.users.get(principal.id, UserId(id)), personal)
 
 
 @router.get(

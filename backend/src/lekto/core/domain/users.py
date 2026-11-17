@@ -57,6 +57,38 @@ class User:
         return self.active and self.is_admin
 
 
+@dataclass(frozen=True, kw_only=True)
+class SeenUser:
+    """A user as the caller may see them (`UserService.list_users`, `get`): everyone the id and
+    the names, to share a space or hand a document over; only an admin also the role, whether
+    the account is active and when it was made (None for others; RB-11)."""
+
+    id: UserId
+    username: str
+    display_name: str | None
+    role: Role | None = None
+    active: bool | None = None
+    created_at: datetime | None = None
+
+    @property
+    def label(self) -> str:
+        """What others read: the display name, else the username."""
+        return self.display_name or self.username
+
+    @classmethod
+    def of(cls, user: User, *, by_admin: bool) -> Self:
+        if not by_admin:
+            return cls(id=user.id, username=user.username, display_name=user.display_name)
+        return cls(
+            id=user.id,
+            username=user.username,
+            display_name=user.display_name,
+            role=user.role,
+            active=user.active,
+            created_at=user.created_at,
+        )
+
+
 def display_name_of(value: str | None) -> str | None:
     """A display name as stored: trimmed, at most `MAX_DISPLAY_NAME` characters; None for none
     (an empty one is none)."""

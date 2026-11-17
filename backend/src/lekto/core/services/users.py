@@ -26,6 +26,7 @@ from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import (
     BlockingSpace,
     Role,
+    SeenUser,
     Settle,
     Settlement,
     User,
@@ -80,22 +81,25 @@ class UserService:
 
     # --- reading --------------------------------------------------------------------------------
 
-    async def list_users(self, actor: UserId) -> list[User]:
-        """Admins see all users; others see the active ones (to share spaces with them)."""
+    async def list_users(self, actor: UserId) -> list[SeenUser]:
+        """Admins see all users, whole; others see the active ones by id and name (to share
+        spaces with them, `SeenUser`)."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             users = await uow.users.list_all()
-        visible = users if user.is_active_admin else [u for u in users if u.active]
-        return sorted(visible, key=lambda u: sort_key(u.label))
+        admin = user.is_active_admin
+        visible = users if admin else [u for u in users if u.active]
+        seen = [SeenUser.of(u, by_admin=admin) for u in visible]
+        return sorted(seen, key=lambda u: sort_key(u.label))
 
-    async def get(self, actor: UserId, id: UserId) -> User:
+    async def get(self, actor: UserId, id: UserId) -> SeenUser:
         """Like `list_users`: a deactivated user is not found for others than admins."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             found = await uow.users.find(id)
         if found is None or not (found.active or user.is_active_admin):
             raise NotFoundError("user", id)
-        return found
+        return SeenUser.of(found, by_admin=user.is_active_admin)
 
     async def personal_spaces(self, actor: UserId) -> dict[UserId, SpaceId]:
         """The personal space of every user, by user: where a document is handed over to them

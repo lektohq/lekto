@@ -15,7 +15,7 @@ from lekto.core.domain.identity import (
     TokenScope,
 )
 from lekto.core.domain.ids import SpaceId
-from lekto.core.domain.users import MAX_USERNAME, Role, User
+from lekto.core.domain.users import MAX_USERNAME, Role, SeenUser, User
 
 Password = Annotated[SecretStr, Field(min_length=1, max_length=1024)]
 
@@ -62,16 +62,20 @@ class UserOut(BaseModel):
     created_at: datetime | None = None
 
     @classmethod
-    def of(
-        cls, user: User, *, full: bool = True, personal_space: SpaceId | None = None
-    ) -> "UserOut":
-        if not full:
-            return cls(
-                id=user.id,
-                username=user.username,
-                display_name=user.display_name,
-                personal_space_id=personal_space,
-            )
+    def seen(cls, user: SeenUser, personal_space: SpaceId | None) -> "UserOut":
+        """As the service lets the caller see them (`SeenUser`)."""
+        return cls(
+            id=user.id,
+            username=user.username,
+            display_name=user.display_name,
+            personal_space_id=personal_space,
+            role=user.role,
+            active=user.active,
+            created_at=user.created_at,
+        )
+
+    @classmethod
+    def of(cls, user: User, *, personal_space: SpaceId | None = None) -> "UserOut":
         return cls(
             id=user.id,
             username=user.username,

@@ -16,6 +16,7 @@ from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import (
     BlockingSpace,
     Role,
+    SeenUser,
     Settle,
     Settlement,
     UserDeletionBlockedError,
@@ -116,8 +117,14 @@ async def test_users_see_active_users_and_admins_all(world: World) -> None:
     admin = await world.account("root", Role.ADMIN)
     alice, bob = await world.account("alice"), await world.account("Bob")
     await world.users.update(admin.id, bob.id, active=False)
-    assert [u.username for u in await world.users.list_users(alice.id)] == ["alice", "root"]
-    assert [u.username for u in await world.users.list_users(admin.id)] == ["alice", "Bob", "root"]
+    seen = await world.users.list_users(alice.id)
+    assert [u.username for u in seen] == ["alice", "root"]
+    # Others see names alone, admins also role, state and creation (RB-11).
+    assert {(u.role, u.active, u.created_at) for u in seen} == {(None, None, None)}
+    every = await world.users.list_users(admin.id)
+    assert [u.username for u in every] == ["alice", "Bob", "root"]
+    assert [u.active for u in every] == [True, False, True]
+    assert (await world.users.get(alice.id, admin.id)).role is None
     with pytest.raises(NotFoundError):
         await world.users.get(alice.id, bob.id)
     assert (await world.users.get(admin.id, bob.id)).active is False
@@ -461,4 +468,5 @@ async def test_role_and_state_change_together(world: World) -> None:
     with pytest.raises(ConflictError):  # nothing changes when one part is refused
         await world.users.update(admin.id, admin.id, role=Role.ADMIN, active=False)
     assert (await world.users.get(admin.id, admin.id)).active is True
-    assert await world.users.update(admin.id, admin.id) == await world.users.get(admin.id, admin.id)
+    unchanged = await world.users.update(admin.id, admin.id)
+    assert SeenUser.of(unchanged, by_admin=True) == await world.users.get(admin.id, admin.id)
