@@ -73,7 +73,7 @@ export interface paths {
 		};
 		/**
 		 * Return from the identity provider
-		 * @description The provider sends the browser here. Signs in (new session cookie; a session the browser had ends) or completes a link, then redirects to the path given at the start. If that fails, the browser goes to the web UI instead: `/ui/login?error=<code>` (while linking: `/ui/settings?error=<code>`) with `denied` (the provider did not sign the user in), `failed` (the flow expired or does not match, or no account is linked to this sign-in), `conflict` (the provider's account is linked to another user) or `provider` (the provider cannot be reached or answered wrongly).
+		 * @description The provider sends the browser here. Signs in (new session cookie; a session the browser had ends) or completes a link, then redirects to the path given at the start. If that fails, the browser goes to the web UI instead: `/ui/login?error=<code>` (while linking: `/ui/settings?error=<code>`) with `denied` (the provider did not sign the user in), `failed` (the flow expired or does not match, no account is linked to this sign-in, or none can be made of it), `conflict` (the provider's account is linked to another user) or `provider` (the provider cannot be reached or answered wrongly).
 		 */
 		get: operations['oidc_callback_api_v1_auth_oidc_callback_get'];
 		put?: never;

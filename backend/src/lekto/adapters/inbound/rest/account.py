@@ -50,6 +50,7 @@ from lekto.adapters.inbound.rest.ui import UI_PREFIX
 from lekto.core.domain.errors import (
     AuthenticationError,
     ConflictError,
+    DomainError,
     IdentityProviderError,
     UnsupportedMediaTypeError,
 )
@@ -400,9 +401,9 @@ async def oidc_login(context: Context, oidc: Oidc, next: Next = None) -> Redirec
         "browser had ends) or completes a link, then redirects to the path given at the start. "
         "If that fails, the browser goes to the web UI instead: `/ui/login?error=<code>` (while "
         "linking: `/ui/settings?error=<code>`) with `denied` (the provider did not sign the "
-        "user in), `failed` (the flow expired or does not match, or no account is linked to "
-        "this sign-in), `conflict` (the provider's account is linked to another user) or "
-        "`provider` (the provider cannot be reached or answered wrongly)."
+        "user in), `failed` (the flow expired or does not match, no account is linked to this "
+        "sign-in, or none can be made of it), `conflict` (the provider's account is linked to "
+        "another user) or `provider` (the provider cannot be reached or answered wrongly)."
     ),
     response_class=RedirectResponse,
     responses={
@@ -438,6 +439,10 @@ async def oidc_callback(
         return _oidc_failure(failed, "conflict", context)
     except IdentityProviderError:
         return _oidc_failure(failed, "provider", context)
+    except DomainError:
+        # Any other refusal, such as a user name of the provider Lekto refuses for an account
+        # it creates: the browser goes back as well, not to a problem document (RB-07).
+        return _oidc_failure(failed, "failed", context)
     response = RedirectResponse(outcome.redirect_to, status_code=303)
     clear_flow_cookie(response, context)
     if outcome.signed_in is not None:
