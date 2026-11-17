@@ -31,6 +31,7 @@ from lekto.core.domain.errors import (
 )
 from lekto.core.domain.fields import FieldDefinition, FieldType, Money, Url
 from lekto.core.domain.identifiers import Identifier, IdentifierKind, IdentifierSource
+from lekto.core.domain.identity import LoginMethod, Session
 from lekto.core.domain.ids import (
     BulkOperationId,
     ContactId,
@@ -115,6 +116,79 @@ async def owner_with_space(uow_factory: UnitOfWorkFactory) -> tuple[User, Space]
     owner = await builders.seed_user(uow_factory)
     async with uow_factory() as uow:
         return owner, await uow.spaces.get_personal(owner.id)
+
+
+type Dangling = Callable[[UnitOfWork, User, Space, Document], Awaitable[None]]
+
+
+async def _in_no_space(uow: UnitOfWork, owner: User, space: Space, document: Document) -> None:
+    await uow.documents.add(builders.processed(owner, builders.space(owner)))
+
+
+async def _of_no_contact(uow: UnitOfWork, owner: User, space: Space, document: Document) -> None:
+    added = builders.processed(owner, space)
+    added.contact_id = ContactId(new_id())
+    await uow.documents.add(added)
+
+
+async def _by_no_user(uow: UnitOfWork, owner: User, space: Space, document: Document) -> None:
+    await uow.documents.add(builders.processed(builders.user(), space))
+
+
+async def _session_of_no_user(
+    uow: UnitOfWork, owner: User, space: Space, document: Document
+) -> None:
+    session, _ = Session.start(
+        user_id=builders.user().id,
+        method=LoginMethod.PASSWORD,
+        now=NOW,
+        max_age=timedelta(hours=24),
+    )
+    await uow.sessions.add(session)
+
+
+async def _member_no_user(uow: UnitOfWork, owner: User, space: Space, document: Document) -> None:
+    await uow.spaces.add(builders.space(owner, readers=[builders.user()]))
+
+
+async def _relation_to_no_document(
+    uow: UnitOfWork, owner: User, space: Space, document: Document
+) -> None:
+    relation = Relation(
+        newer=document.id,
+        older=DocumentId(new_id()),
+        origin=RelationOrigin.LEKTO,
+        state=RelationState.SUGGESTED,
+        evidence={},
+        created_at=NOW,
+    )
+    await uow.document_relations.put(relation)
+
+
+async def _log_of_no_document(
+    uow: UnitOfWork, owner: User, space: Space, document: Document
+) -> None:
+    entry = NodeRun(
+        document_id=DocumentId(new_id()),
+        node=Node.RECEIVE,
+        run=1,
+        result=OK,
+        pipeline_version="0.1.0",
+        started_at=NOW,
+        duration=timedelta(0),
+    )
+    await uow.processing_log.append(entry)
+
+
+_DANGLING: dict[str, Dangling] = {
+    "document in no space": _in_no_space,
+    "document of no contact": _of_no_contact,
+    "document by no user": _by_no_user,
+    "session of no user": _session_of_no_user,
+    "space member no user": _member_no_user,
+    "relation to no document": _relation_to_no_document,
+    "log entry of no document": _log_of_no_document,
+}
 
 
 _RULE_DEFINITION = RuleDefinition(
@@ -1462,6 +1536,56 @@ class UnitOfWorkContract:
             known = await uow.documents.confirmed_labels(other.id)
             assert known.spaces == {shared.id}
             assert (await uow.documents.confirmed_labels(owner.id)).spaces == {shared.id, home.id}
+
+    @pytest.mark.parametrize("write", list(_DANGLING.values()), ids=list(_DANGLING))
+    async def test_a_reference_to_no_row_is_refused(
+        self, uow_factory: UnitOfWorkFactory, write: Dangling
+    ) -> None:
+        """A row that refers to a row that does not exist is refused, at the commit at the
+        latest, as the SQL schema's foreign keys refuse it (PM-03)."""
+        owner, space = await owner_with_space(uow_factory)
+        document = builders.processed(owner, space)
+        async with uow_factory() as uow:
+            await uow.documents.add(document)
+            await uow.commit()
+        with pytest.raises(ConflictError):
+            async with uow_factory() as uow:
+                await write(uow, owner, space, document)
+                await uow.commit()
+
+    async def test_a_contact_removed_while_a_document_gets_it(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """One unit removes a contact while another files a document to it: one of them is
+        refused, and no document is left with a contact that is gone (PM-03)."""
+        owner, space = await owner_with_space(uow_factory)
+        contact = Contact.create(name="Muster Versicherung", now=NOW)
+        async with uow_factory() as uow:
+            await uow.contacts.add(contact)
+            await uow.commit()
+        document = builders.processed(owner, space)
+        document.contact_id = contact.id
+
+        async def remove() -> str:
+            async with uow_factory() as uow:
+                await uow.contacts.remove(contact.id)
+                await asyncio.sleep(0)
+                await uow.commit()
+            return "removed"
+
+        async def add() -> str:
+            async with uow_factory() as uow:
+                await uow.documents.add(document)
+                await asyncio.sleep(0)
+                await uow.commit()
+            return "added"
+
+        results = await asyncio.gather(add(), remove(), return_exceptions=True)
+        assert len([result for result in results if isinstance(result, str)]) == 1
+        assert any(isinstance(result, ConflictError) for result in results)
+        async with uow_factory() as uow:
+            stored = await uow.documents.find(document.id)
+            assert stored is None or await uow.contacts.find(contact.id) is not None
 
     async def test_a_shared_space_stays_known_without_the_uploader(
         self, uow_factory: UnitOfWorkFactory

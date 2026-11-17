@@ -2,7 +2,9 @@
 
 Behaves like a database transaction with read-committed isolation and optimistic locking:
 reads see committed data plus the unit's own changes; commit checks that every row written
-still has the version it had when the unit first touched it, and that uniqueness holds.
+still has the version it had when the unit first touched it, that uniqueness holds, and that
+every reference points to a row, after removing what goes with a removed one
+(`references.REFERENCES`, as the SQL schema's foreign keys).
 """
 
 import asyncio
@@ -79,6 +81,7 @@ from lekto.adapters.outbound.memory.push import (
     MemoryPushDeviceRepository,
     MemoryPushPreferencesRepository,
 )
+from lekto.adapters.outbound.memory.references import REFERENCES, OnDelete, Reference
 from lekto.adapters.outbound.memory.rows import _REMOVED, MemoryRepository, _copy
 from lekto.adapters.outbound.memory.rules import (
     MemoryBulkOperationRepository,
@@ -240,6 +243,8 @@ class MemoryUnitOfWork:
         self._check_versions()
         self._check_uniqueness()
         self._check_jobs()
+        self._cascade()
+        self._check_references()
         for table_name, writes in self._writes.items():
             rows = self._db.tables.setdefault(table_name, {})
             for id, row in writes.items():
@@ -366,10 +371,70 @@ class MemoryUnitOfWork:
 
     def _check_unreferenced[E: Identified[UUID]](self, table: Table[E], id: UUID) -> None:
         """ConflictError if a row refers to the row `id` of `table`: the SQL schema's foreign
-        keys without a cascade refuse its removal so."""
-        for referring, refers in _REFERRERS.get(table.name, ()):
-            if any(refers(row, id) for row in self._rows(referring)):
-                raise ConflictError(f"a {referring.name} still refers to {table.name} {id}")
+        keys without a cascade refuse its removal so (`OnDelete.RESTRICT`)."""
+        for reference in REFERENCES:
+            if reference.target.name != table.name or reference.on_delete is not OnDelete.RESTRICT:
+                continue
+            if any(id in reference.ids(row) for row in self._rows(reference.table)):
+                raise ConflictError(f"a {reference.table.name} still refers to {table.name} {id}")
+
+    def _removed(self) -> dict[str, set[UUID]]:
+        """The ids of the rows this unit removed, by table."""
+        removed: dict[str, set[UUID]] = {}
+        for name, writes in self._writes.items():
+            ids = {id for id, row in writes.items() if row is _REMOVED}
+            if ids:
+                removed[name] = ids
+        return removed
+
+    def _cascade(self) -> None:
+        """Remove the rows that refer to a row this unit removed where the foreign key cascades
+        (`OnDelete.CASCADE`), also those other units committed meanwhile, as the database does
+        on the removal. Without a base version: a cascade conflicts with no change (PM-03)."""
+        gone = self._removed()
+        while gone:
+            more: dict[str, set[UUID]] = {}
+            for reference in REFERENCES:
+                ids = gone.get(reference.target.name)
+                if not ids or reference.on_delete is not OnDelete.CASCADE:
+                    continue
+                for row in self._rows(reference.table):
+                    if not ids.isdisjoint(reference.ids(row)):
+                        self._tables[reference.table.name] = reference.table
+                        self._writes.setdefault(reference.table.name, {})[row.id] = _REMOVED
+                        more.setdefault(reference.table.name, set()).add(row.id)
+            gone = more
+
+    def _check_references(self) -> None:
+        """ConflictError if a row this unit wrote refers to a row that does not exist (any
+        more), or a row refers to one this unit removed, or a processing log entry to no
+        document: the SQL schema's foreign keys refuse such a commit (PM-03)."""
+        removed = self._removed()
+        existing: dict[str, set[UUID]] = {}
+
+        def exists(reference: Reference, id: UUID) -> bool:
+            name = reference.target.name
+            if name not in existing:
+                existing[name] = {row.id for row in self._rows(reference.target)}
+            return id in existing[name]
+
+        for reference in REFERENCES:
+            if reference.target.name in removed:
+                rows: Iterable[Identified[UUID]] = self._rows(reference.table)
+            else:
+                written = self._writes.get(reference.table.name, {}).values()
+                rows = [row for row in written if row is not _REMOVED]
+            for row in rows:
+                for id in reference.ids(row):
+                    if id is not None and not exists(reference, id):
+                        raise ConflictError(
+                            f"{reference.table.name} {row.id} refers to "
+                            f"{reference.target.name} {id}, which does not exist"
+                        )
+        documents = {row.id for row in self._rows(DOCUMENTS)} | removed.get(DOCUMENTS.name, set())
+        for run in self._log:
+            if run.document_id not in documents:
+                raise ConflictError(f"a processing log entry refers to document {run.document_id}")
 
     @staticmethod
     def _unique_or_fail[E: Identified[UUID]](table: Table[E], rows: Iterable[E]) -> None:
@@ -379,36 +444,6 @@ class MemoryUnitOfWork:
                 if key in seen:
                     raise ConflictError(f"{table.name} already exists: {key}")
                 seen.add(key)
-
-
-# What refers to a row, as the SQL schema's foreign keys without ON DELETE CASCADE do.
-_REFERRERS: dict[str, tuple[tuple[Table[Any], Callable[[Any, UUID], bool]], ...]] = {
-    USERS.name: (
-        (SPACES, lambda space, id: space.personal_of == id or id in space.members),
-        (MAILBOXES, lambda mailbox, id: mailbox.fallback_user_id == id),
-    ),
-    SPACES.name: ((DOCUMENTS, lambda document, id: document.space_id == id),),
-    CONTACTS.name: ((DOCUMENTS, lambda document, id: document.contact_id == id),),
-    DOCUMENT_TYPES.name: (
-        (DOCUMENTS, lambda document, id: document.document_type_id == id),
-        (FIELDS, lambda field, id: id in (field.document_type_ids or ())),
-        (MAILBOXES, lambda mailbox, id: mailbox.body_type_id == id),
-    ),
-    TAGS.name: (
-        (TAGS, lambda tag, id: tag.parent_id == id),
-        (
-            CONTACTS,
-            lambda contact, id: (
-                id in contact.group_ids
-                or id in contact.topic_ids
-                or any(item.topic_id == id for item in contact.identifiers)
-            ),
-        ),
-        (DOCUMENT_TYPES, lambda kind, id: id in kind.group_ids),
-        (DOCUMENTS, lambda document, id: document.topic_id == id or id in document.tag_ids),
-    ),
-    FIELDS.name: ((DOCUMENTS, lambda document, id: id in document.fields),),
-}
 
 
 class MemoryNamedRepository[K: UUID, E: MasterData](MemoryRepository[K, E]):
