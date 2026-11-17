@@ -57,7 +57,7 @@ from lekto.core.domain.rules import (
     RuleDefinition,
     RuleScope,
 )
-from lekto.core.domain.text_hits import MAX_HITS, collapsed, contained
+from lekto.core.domain.text_hits import MAX_HITS, contained, pattern_text
 from lekto.core.domain.text_places import TextPlaces
 from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
@@ -319,9 +319,9 @@ class RuleApplicationService:
     async def hits(self, actor: UserId, id: RuleId, document: DocumentId) -> list[TextHit]:
         """Where the text conditions of the rule's current version (`contains`, `matches`)
         hit the document, on its pages, for those who apply the rule and read the document;
-        none without text or the words of its pages. A pattern runs as in the rules, on the
-        text with whitespace collapsed, at most `max_text` characters, with the time limit
-        (PatternTimeoutError)."""
+        none without text or the words of its pages. Each searches the text the rules read
+        (`text_hits`); a pattern runs as in the rules, on the text without markup, at most
+        `max_text` characters, with the time limit (PatternTimeoutError)."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             rule = await _applicable_rule(uow, user, id)
@@ -341,18 +341,18 @@ class RuleApplicationService:
         if not pages:
             return []
         places = await asyncio.to_thread(TextPlaces, text, pages)
-        folded = collapsed(text[: self._max_text * 2])
+        searched = pattern_text(text, self._max_text)
         hits = []
         for condition in conditions:
             value = str(condition.value)
             if condition.op is Operator.MATCHES:
                 found = await self._matcher.find(
                     value,
-                    folded.text[: self._max_text],
+                    searched.text,
                     case_sensitive=condition.case_sensitive,
                     limit=MAX_HITS,
                 )
-                spans = [folded.span(start, end) for start, end in found]
+                spans = [searched.span(start, end) for start, end in found if end > start]
             else:
                 spans = list(contained(text, value))
             occurrences = tuple(

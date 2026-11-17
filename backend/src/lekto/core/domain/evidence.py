@@ -18,6 +18,7 @@ from itertools import pairwise
 
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.periods import Period
+from lekto.core.domain.traced import Traced
 from lekto.core.domain.vocabulary import (
     CURRENCY_WORDS,
     MONTH_NAMES,
@@ -63,6 +64,61 @@ def normalise(text: str, *, columns: bool = False) -> str:
         text = _COLUMN_GAP.sub(COLUMN_GAP, text)
     text = _MARKUP.sub(" ", _STARS.sub("xxx", text))
     return _WHITESPACE.sub(_collapsed if columns else " ", text.casefold()).strip()
+
+
+# What `html.unescape` replaces (CPython's `html._charref`), to apply it match by match.
+_CHARREF = re.compile(r"&(#[0-9]+;?|#[xX][0-9a-fA-F]+;?|[^\t\n\f <&#;]{1,32};?)")
+_SOFT_HYPHEN = re.compile("\xad")
+
+
+def traced_normalise(text: str) -> Traced:
+    """`normalise(text)` (without `columns`), each of its characters traced to the characters
+    of `text` it comes from: where a value found in the normalised text stands in the text."""
+    traced = Traced.of(text)
+    if "&" in text:
+        traced = traced.sub(_CHARREF, lambda match: html.unescape(match.group()))
+    traced = _traced_nfkc(traced).sub(_SOFT_HYPHEN, "").sub(_HYPHENATION, "")
+    traced = traced.sub(_STARS, "xxx").sub(_MARKUP, " ")
+    folded = traced.text.casefold()
+    if len(folded) == len(traced.text):  # each character folded into one
+        traced = Traced(folded, traced.start, traced.end)
+    else:
+        traced = traced.each(str.casefold)
+    return traced.sub(_WHITESPACE, " ").strip()
+
+
+def traced_without_markup(text: str) -> Traced:
+    """`without_markup(text)`, each of its characters traced to those of `text`."""
+    return Traced.of(text).sub(_MARKUP, " ").sub(_WHITESPACE, " ").strip()
+
+
+def _traced_nfkc(traced: Traced) -> Traced:
+    """NFKC, a character with the combining ones after it at a time, so that each part of the
+    result is traced to the characters it comes from."""
+    whole = unicodedata.normalize("NFKC", traced.text)
+    if whole == traced.text:
+        return traced
+    grouped = traced.grouped(_begins_group, lambda part: unicodedata.normalize("NFKC", part))
+    if grouped.text == whole:
+        return grouped
+    # Composed across groups (seldom: scripts that join letters that stand alone): the text as
+    # NFKC makes it, each character traced to about where it stands.
+    length, made = len(traced.text), len(whole)
+    places = [min(length - 1, index * length // made) for index in range(made)]
+    return Traced(
+        whole,
+        tuple(traced.start[place] for place in places),
+        tuple(traced.end[place] for place in places),
+    )
+
+
+def _begins_group(character: str) -> bool:
+    """A character NFKC does not join to the one before it: not combining, no Hangul vowel or
+    final consonant (they compose with the syllable before)."""
+    code = ord(character)
+    return unicodedata.combining(character) == 0 and not (
+        0x1160 <= code <= 0x11FF or 0xD7B0 <= code <= 0xD7FF
+    )
 
 
 def _collapsed(match: re.Match[str]) -> str:
@@ -554,7 +610,7 @@ def read_amount(
 
 # --- text -------------------------------------------------------------------------------------
 
-_SHORTEST_SPACELESS = 8  # characters; shorter values compared without spaces match too easily
+SHORTEST_SPACELESS = 8  # characters; shorter values compared without spaces match too easily
 
 
 def contains(text: str, value: str) -> bool:
@@ -567,14 +623,20 @@ def contains(text: str, value: str) -> bool:
     if _whole(needle, text) or _whole(fold_umlauts(needle), fold_umlauts(text)):
         return True
     spaceless = needle.replace(" ", "")
-    return len(spaceless) >= _SHORTEST_SPACELESS and spaceless in text.replace(" ", "")
+    return len(spaceless) >= SHORTEST_SPACELESS and spaceless in text.replace(" ", "")
+
+
+def whole_words(needle: str) -> re.Pattern[str]:
+    """Where `needle` stands as whole words: not next to a letter or digit, nor joined to one
+    by `-`, `.`, `/` or `,` (`R-2026` is not in `R-2026-0815`, `31` not in `31.03.2026`)."""
+    return re.compile(
+        r"(?<![^\W_])(?<![^\W_][-./,])" + re.escape(needle) + r"(?![^\W_])(?![-./,][^\W_])"
+    )
 
 
 def _whole(needle: str, text: str) -> bool:
-    """`needle` occurs in `text` as whole words: not next to a letter or digit, nor joined to
-    one by `-`, `.`, `/` or `,` (`R-2026` is not in `R-2026-0815`, `31` not in `31.03.2026`)."""
-    pattern = r"(?<![^\W_])(?<![^\W_][-./,])" + re.escape(needle) + r"(?![^\W_])(?![-./,][^\W_])"
-    return re.search(pattern, text) is not None
+    """`needle` occurs in `text` as whole words (`whole_words`)."""
+    return whole_words(needle).search(text) is not None
 
 
 @dataclass(frozen=True)
