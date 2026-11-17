@@ -11,7 +11,10 @@ right and see everything (Tobi, 08.10.2026); lists show their reach unless they 
 users. Hidden documents and spaces are "not found" (404), exactly as missing ones.
 """
 
+import json
+import re
 from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 from uuid import UUID
@@ -23,20 +26,88 @@ from lekto.adapters.inbound.rest import PREFIX
 from lekto.core.domain.encoding import base64url
 from lekto.core.domain.ids import new_id
 from tests.contracts.images import image
-from tests.unit.adapters.rest.support import ACTORS, DENIED, Api, Scene, build_scene
+from tests.unit.adapters.rest.support import (
+    ACTORS,
+    DENIED,
+    Api,
+    Scene,
+    build_scene,
+    file_part,
+    unique_pdf,
+    upload,
+)
 
-type Call = Callable[[Scene, httpx2.AsyncClient, dict[str, str], str], Awaitable[httpx2.Response]]
+
+@pytest.fixture
+def api(vision_api: Api) -> Api:
+    """With a vision language model: without one, `POST /vision` answers 409 before it asks who
+    may (`conftest.vision_api`)."""
+    return vision_api
 
 
-def doc(method: str, suffix: str = "", body: Any = None) -> Call:
-    async def call(
-        scene: Scene, client: httpx2.AsyncClient, headers: dict[str, str], which: str
+@dataclass(frozen=True)
+class Call:
+    """A request on a document (`suffix` after its path, `{before}` in it for what `before`
+    gave): `body` as JSON (or made from the scene and what `before` gave), `files` as a
+    multipart form; `before` prepares the scene as its owner (a fact, a related document)."""
+
+    method: str
+    suffix: str = ""
+    body: Any = None
+    files: Callable[[], Any] | None = None
+    before: Callable[[Scene, str], Awaitable[Any]] | None = None
+
+    async def __call__(
+        self, scene: Scene, client: httpx2.AsyncClient, headers: dict[str, str], which: str
     ) -> httpx2.Response:
+        prepared = None if self.before is None else await self.before(scene, which)
+        suffix = self.suffix.format(before=prepared)
         url = f"{PREFIX}/documents/{scene.document(which)}{suffix}"
-        payload = body(scene) if callable(body) else body
-        return await client.request(method, url, json=payload, headers=headers)
+        if self.files is not None:
+            return await client.request(self.method, url, files=self.files(), headers=headers)
+        payload = self.body(scene, prepared) if callable(self.body) else self.body
+        return await client.request(self.method, url, json=payload, headers=headers)
 
-    return call
+
+doc = Call
+
+
+async def another(scene: Scene, which: str) -> str:
+    """Another document in the shared space, which the owner uploads after `which`."""
+    return await upload(
+        scene.api,
+        scene.headers["owner"],
+        content=unique_pdf("another"),
+        filename="another.pdf",
+        space=str(scene.shared.id),
+    )
+
+
+async def related(scene: Scene, which: str) -> str:
+    """`another`, which the owner related with `which`."""
+    other = await another(scene, which)
+    response = await scene.api.client.post(
+        f"{PREFIX}/documents/{scene.document(which)}/relations",
+        json={"document_id": other},
+        headers=scene.headers["owner"],
+    )
+    assert response.status_code == 200, response.text
+    return other
+
+
+async def with_fact(scene: Scene, which: str) -> str:
+    """The reference of a customer number the owner added to `which` as a fact."""
+    response = await scene.api.client.post(
+        f"{PREFIX}/documents/{scene.document(which)}/facts/decisions",
+        json=FACT,
+        headers=scene.headers["owner"],
+    )
+    assert response.status_code == 200, response.text
+    return scene.api.container.refs.seal(FACT["value"], context=FACT["kind"])
+
+
+FACT = {"action": "add", "kind": "customer_number", "value": "12345", "role": "contact"}
+PARTS = json.dumps([{"pages": [{"page": 1, "rotate": 90}], "replaces": True}])
 
 
 HIDDEN = {"stranger": 404}
@@ -53,6 +124,23 @@ READ_ALL: Mapping[str, int] = MappingProxyType(
         **DENIED,
     }
 )
+
+
+def editors(done: int, *, read_token: int = 403) -> Mapping[str, int]:
+    """What only its editors and admins may do with the green document, done with `done`; the
+    owner's read token may do it if it only reads (`read_token`)."""
+    return MappingProxyType(
+        {
+            "owner": done,
+            "reader": 403,
+            "writer": done,
+            "read_token": read_token,
+            "admin": done,
+            **HIDDEN,
+            **DENIED,
+        }
+    )
+
 
 # For the green document in the shared space.
 GREEN: dict[str, tuple[Call, Mapping[str, int]]] = {
@@ -89,7 +177,7 @@ GREEN: dict[str, tuple[Call, Mapping[str, int]]] = {
         },
     ),
     "move": (
-        doc("POST", "/move", lambda scene: {"space_id": str(scene.own_space.id)}),
+        doc("POST", "/move", lambda scene, _: {"space_id": str(scene.own_space.id)}),
         {
             "owner": 204,
             "reader": 403,
@@ -172,6 +260,44 @@ GREEN: dict[str, tuple[Call, Mapping[str, int]]] = {
             **DENIED,
         },
     ),
+    "versions": (
+        doc("POST", "/versions", files=lambda: file_part("v2.pdf", unique_pdf("v2"))),
+        editors(202),
+    ),
+    "version_original": (doc("GET", "/versions/1/original"), READ_ALL),
+    "edit": (
+        doc(
+            "POST",
+            "/edit",
+            files=lambda: [("parts", (None, PARTS))],
+        ),
+        editors(202),
+    ),
+    "edit_pages": (
+        doc("POST", "/edit/pages", files=lambda: file_part("more.pdf", unique_pdf("more"))),
+        editors(200),
+    ),
+    "vision": (doc("POST", "/vision"), editors(202)),
+    "reading": (doc("GET", "/reading"), editors(200, read_token=200)),
+    "facts": (doc("GET", "/facts"), READ_ALL),
+    "decide_fact": (doc("POST", "/facts/decisions", FACT), editors(200)),
+    "place": (
+        doc("GET", "/places/customer_number/{before}", before=with_fact),
+        READ_ALL,
+    ),
+    "origin": (doc("GET", "/origin"), READ_ALL),
+    "search_places": (doc("POST", "/search-places", {"q": "green"}), READ_ALL),
+    "relations": (doc("GET", "/relations"), READ_ALL),
+    "relate": (
+        doc(
+            "POST",
+            "/relations",
+            lambda scene, other: {"document_id": other},
+            before=another,
+        ),
+        editors(200),
+    ),
+    "unrelate": (doc("DELETE", "/relations/{before}", before=related), editors(200)),
     "confirm": (
         doc("POST", "/confirm", {}),
         {
@@ -185,6 +311,32 @@ GREEN: dict[str, tuple[Call, Mapping[str, int]]] = {
         },
     ),
 }
+
+# The routes on a document whose rights other tests here check, and why.
+ELSEWHERE = {
+    ("PUT", "/seen"): "test_seen_is_marked_by_whoever_reads_the_document",
+    ("DELETE", "/seen"): "test_seen_is_marked_by_whoever_reads_the_document",
+}
+
+
+def test_every_route_on_a_document_is_in_the_matrix(api: Api) -> None:
+    """A route on a document whose rights no case here checks fails (TC-07): a check lowered
+    from editing to reading went unnoticed for five of them."""
+    tried = [(call.method, call.suffix.format(before="x")) for call, _ in GREEN.values()]
+    tried += list(ELSEWHERE)
+    prefix = f"{PREFIX}/documents/{{id}}"
+    missing = []
+    for path, operations in api.app.openapi()["paths"].items():
+        if not path.startswith(prefix):
+            continue
+        suffix = re.compile(re.sub(r"\\{[a-z_]+\\}", "[^/]+", re.escape(path[len(prefix) :])))
+        for method in operations:
+            if method.upper() not in {"GET", "POST", "PUT", "PATCH", "DELETE"}:
+                continue
+            if not any(m == method.upper() and suffix.fullmatch(t) for m, t in tried):
+                missing.append(f"{method.upper()} {path}")
+    assert missing == []
+
 
 CASES = [
     pytest.param(name, actor, expected.get(actor), id=f"{name}-{actor}")
