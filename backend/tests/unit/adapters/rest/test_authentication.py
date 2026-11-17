@@ -183,6 +183,8 @@ async def test_changes_with_a_session_need_the_csrf_token(api: Api) -> None:
         assert CSRF_HEADER in missing.json()["detail"]
         wrong = await client.post(url, json={"name": "A"}, headers={CSRF_HEADER: "x" * 64})
         assert wrong.status_code == 403
+        latin = await client.post(url, json={"name": "A"}, headers={CSRF_HEADER.encode(): b"\xe4"})
+        assert latin.status_code == 403  # not a 500 (RB-02)
         right = await client.post(url, json={"name": "A"}, headers=session.headers)
         assert right.status_code == 201
         # Another session's CSRF token does not fit.

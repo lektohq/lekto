@@ -95,6 +95,20 @@ async def test_the_callback_needs_the_browser_that_started(
     )
 
 
+async def test_a_state_that_is_not_ascii_fails_as_a_wrong_one(
+    oidc_api: tuple[Api, FakeOidcProvider],
+) -> None:
+    """Not a 500 (RB-02)."""
+    api, provider = oidc_api
+    user = await api.user("alice")
+    await link(api, "sub-alice", user.id)
+    url = (await api.client.get(f"{OIDC}/login")).headers["location"]
+    code = provider.consent(url, "sub-alice")
+    back = await api.client.get(f"{OIDC}/callback", params={"code": code, "state": "ä"})
+    assert back.status_code == 303
+    assert back.headers["location"] == "/ui/login?error=failed"
+
+
 async def test_a_denied_callback_clears_the_flow_cookie(
     oidc_api: tuple[Api, FakeOidcProvider],
 ) -> None:

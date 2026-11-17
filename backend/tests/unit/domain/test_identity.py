@@ -79,6 +79,8 @@ def test_csrf_tokens_belong_to_their_session() -> None:
     assert csrf_matches("session-a", csrf_token("session-a"))
     assert not csrf_matches("session-b", csrf_token("session-a"))
     assert not csrf_matches("session-a", "")
+    assert not csrf_matches("session-a", "ä")  # not ASCII: no TypeError (RB-02)
+    assert not csrf_matches("session-a", "\udce4")  # a lone surrogate either
 
 
 def test_account_throttle_doubles_up_to_fifteen_minutes() -> None:

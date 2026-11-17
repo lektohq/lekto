@@ -214,7 +214,16 @@ def csrf_token(session_token: str) -> str:
 
 
 def csrf_matches(session_token: str, candidate: str) -> bool:
-    return hmac.compare_digest(csrf_token(session_token), candidate)
+    return same_secret(csrf_token(session_token), candidate)
+
+
+def same_secret(expected: str, given: str) -> bool:
+    """Whether `given` is `expected`, compared in constant time; also for a `given` that is not
+    ASCII (a header, a query parameter), which `hmac.compare_digest` refuses as text with a
+    TypeError (RB-02)."""
+    return hmac.compare_digest(
+        expected.encode("utf-8", "surrogatepass"), given.encode("utf-8", "surrogatepass")
+    )
 
 
 class TokenScope(StrEnum):
