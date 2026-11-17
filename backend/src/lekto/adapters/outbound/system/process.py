@@ -31,6 +31,8 @@ from datetime import timedelta
 
 # Output kept for error messages, unless the caller asks for more (`tail`).
 TAIL = 4000
+# Bytes of the error output read at a time.
+_CHUNK = 64 * 1024
 # The prefix of Lekto's configuration variables (`composition/settings.py`); none of them
 # reaches a child.
 _SETTINGS_PREFIX = "LEKTO_"
@@ -82,7 +84,7 @@ async def run_process(
     )
     try:
         stdout, stderr = await asyncio.wait_for(
-            process.communicate(input), timeout=timeout.total_seconds()
+            _converse(process, input, tail), timeout=timeout.total_seconds()
         )
     except TimeoutError:
         await _kill(process)
@@ -98,6 +100,39 @@ async def run_process(
         stdout=stdout.decode(errors="replace"),
         stderr=stderr.decode(errors="replace")[-tail:],
     )
+
+
+async def _converse(
+    process: asyncio.subprocess.Process, input: bytes | None, tail: int
+) -> tuple[bytes, bytes]:
+    """`input` to the child, all of its output and the end of its error output (enough bytes
+    for `tail` characters), until it ends. Read as it comes: what a program writes about a
+    document of unknown origin (OCRmyPDF passes on Ghostscript's and Tesseract's messages)
+    would otherwise be held in the worker in full, whatever the child's own limit (XB-07)."""
+    assert process.stdout is not None and process.stderr is not None
+
+    async def feed() -> None:
+        if input is None or process.stdin is None:
+            return
+        with contextlib.suppress(BrokenPipeError, ConnectionResetError):
+            process.stdin.write(input)
+            await process.stdin.drain()
+        process.stdin.close()
+
+    async def last(stream: asyncio.StreamReader, keep: int) -> bytes:
+        kept = bytearray()
+        while chunk := await stream.read(_CHUNK):
+            kept += chunk
+            if len(kept) > 2 * keep:
+                del kept[:-keep]
+        return bytes(kept[-keep:]) if keep else b""
+
+    # A character takes up to four bytes in UTF-8.
+    _, stdout, stderr = await asyncio.gather(
+        feed(), process.stdout.read(), last(process.stderr, 4 * tail)
+    )
+    await process.wait()
+    return stdout, stderr
 
 
 def child_environment(extra: Mapping[str, str] | None = None) -> dict[str, str]:

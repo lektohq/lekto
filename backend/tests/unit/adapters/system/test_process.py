@@ -144,3 +144,37 @@ def test_a_lower_hard_limit_of_the_process_is_the_childs() -> None:
 async def test_a_program_that_is_not_there_is_not_found() -> None:
     with pytest.raises(FileNotFoundError):
         await run_process(["lekto-no-such-program"], timeout=timedelta(seconds=5), memory=MiB)
+
+
+NOISY = """
+import asyncio, json, resource, sys
+from datetime import timedelta
+from lekto.adapters.outbound.system import run_process
+WRITE = (
+    "import sys\\n"
+    "chunk = b'x' * (1 << 20)\\n"
+    "for _ in range(200): sys.stderr.buffer.write(chunk)\\n"
+    "sys.stderr.buffer.write('the end: ü'.encode())\\n"
+    "sys.stdout.write('answer')\\n"
+)
+async def main():
+    before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    completed = await run_process(
+        [sys.executable, "-I", "-c", WRITE], timeout=timedelta(seconds=60), tail=10
+    )
+    grown = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss - before  # KiB on Linux
+    print(json.dumps([completed.returncode, completed.stdout, completed.stderr, grown]))
+asyncio.run(main())
+"""
+
+
+def test_what_a_child_writes_to_its_error_output_is_not_held_in_full() -> None:
+    """Only the end is kept, and only the end is held while it runs: 200 MB of messages took
+    as much in the worker before (XB-07). In a process of its own, to measure it."""
+    ran = subprocess.run(
+        [sys.executable, "-c", NOISY], capture_output=True, text=True, timeout=120, check=False
+    )
+    assert ran.returncode == 0, ran.stderr
+    code, stdout, stderr, grown = json.loads(ran.stdout)
+    assert (code, stdout, stderr) == (0, "answer", "the end: ü")
+    assert grown < 50 * 1024
