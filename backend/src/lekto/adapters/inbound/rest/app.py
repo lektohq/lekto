@@ -348,20 +348,19 @@ def _docs(title: str, *, ui: bool) -> Callable[[Request], Awaitable[HTMLResponse
     the description stays at `openapi.json`."""
 
     async def docs(request: Request) -> HTMLResponse:
-        root = request.scope.get("root_path", "").rstrip("/")
         if not ui:
             return HTMLResponse(
                 "The API documentation comes with the web UI. The API's description: "
-                f"{root}{PREFIX}/openapi.json",
+                f"{PREFIX}/openapi.json",
                 status_code=404,
                 headers=_DOCS_HEADERS,
             )
         page = get_swagger_ui_html(
-            openapi_url=f"{root}{PREFIX}/openapi.json",
+            openapi_url=f"{PREFIX}/openapi.json",
             title=f"{title} - Swagger UI",
-            swagger_js_url=f"{root}{SWAGGER_PATH}/swagger-ui-bundle.js",
-            swagger_css_url=f"{root}{SWAGGER_PATH}/swagger-ui.css",
-            swagger_favicon_url=f"{root}{FAVICON_PATH}",
+            swagger_js_url=f"{SWAGGER_PATH}/swagger-ui-bundle.js",
+            swagger_css_url=f"{SWAGGER_PATH}/swagger-ui.css",
+            swagger_favicon_url=FAVICON_PATH,
         )
         scripts = " ".join(
             f"'sha256-{base64.b64encode(hashlib.sha256(script.encode()).digest()).decode()}'"

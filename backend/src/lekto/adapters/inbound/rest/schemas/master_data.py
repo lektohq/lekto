@@ -517,8 +517,8 @@ class TagOut(MasterDataOut):
     )
 
     @classmethod
-    def of(cls, item: Tag, tree: TagTree | None = None) -> "TagOut":
-        path = [item.name] if tree is None or item.id not in tree else tree.path(item.id)
+    def of(cls, item: Tag, tree: TagTree) -> "TagOut":
+        path = tree.path(item.id) if item.id in tree else [item.name]
         return cls(
             id=item.id,
             name=item.name,

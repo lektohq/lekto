@@ -59,30 +59,27 @@ class Listener:
 
     async def events(
         self,
-        still_allowed: Callable[[], Awaitable[bool]] | None,
+        still_allowed: Callable[[], Awaitable[bool]],
         every: timedelta,
     ) -> AsyncIterator[DomainEvent]:
         """The events for this listener until the hub closes or the client falls behind.
 
-        With `still_allowed`, the stream asks it at least every `every` (also while no event
-        comes) and ends once it answers False, e.g. when the session was revoked."""
+        The stream asks `still_allowed` at least every `every` (also while no event comes) and
+        ends once it answers False, e.g. when the session was revoked."""
         loop = asyncio.get_running_loop()
         checked = loop.time()
         while True:
-            if still_allowed is None:
-                item = await self.queue.get()
-            else:
-                try:
-                    wait = max(0.0, checked + every.total_seconds() - loop.time())
-                    item = await asyncio.wait_for(self.queue.get(), timeout=wait)
-                except TimeoutError:
-                    item = None
-                if loop.time() - checked >= every.total_seconds():
-                    if not await still_allowed():
-                        return
-                    checked = loop.time()
-                if item is None:
-                    continue
+            try:
+                wait = max(0.0, checked + every.total_seconds() - loop.time())
+                item = await asyncio.wait_for(self.queue.get(), timeout=wait)
+            except TimeoutError:
+                item = None
+            if loop.time() - checked >= every.total_seconds():
+                if not await still_allowed():
+                    return
+                checked = loop.time()
+            if item is None:
+                continue
             if item is _CLOSED:
                 return
             assert isinstance(item, DomainEvent)

@@ -406,7 +406,14 @@ class RuleDefinitionIn(RequestBody):
     )
 
     def to_json(self) -> JsonValue:
-        data: JsonValue = self.model_dump(mode="json", by_alias=True, exclude_defaults=True)
+        """The definition as `definition_from_json` reads it: not where the rule stands or
+        whether it is on, which `RuleCreate` and `RuleChange` add (RB-12)."""
+        data: JsonValue = self.model_dump(
+            mode="json",
+            by_alias=True,
+            exclude_defaults=True,
+            exclude={"scope", "space_id", "enabled"},
+        )
         return data
 
 
@@ -432,15 +439,6 @@ class RuleCreate(RuleDefinitionIn):
         "switched on.",
     )
 
-    def to_json(self) -> JsonValue:
-        data: JsonValue = self.model_dump(
-            mode="json",
-            by_alias=True,
-            exclude_defaults=True,
-            exclude={"scope", "space_id", "enabled"},
-        )
-        return data
-
 
 class RuleChange(RuleDefinitionIn):
     """The new content of a rule, and, with `scope`, where it moves."""
@@ -463,15 +461,6 @@ class RuleChange(RuleDefinitionIn):
         description="Switched on or off with the change, in one transaction (the editor saves "
         "a change switched off, to try it first); left out: as it was.",
     )
-
-    def to_json(self) -> JsonValue:
-        data: JsonValue = self.model_dump(
-            mode="json",
-            by_alias=True,
-            exclude_defaults=True,
-            exclude={"scope", "space_id", "enabled"},
-        )
-        return data
 
 
 class RulePatch(RequestBody):
