@@ -7,7 +7,6 @@ from lekto.core.domain.identity import (
     ACCOUNT_THROTTLE,
     SOURCE_THROTTLE,
     Credential,
-    LoginFailures,
     LoginMethod,
     Session,
     TotpSetting,
@@ -83,54 +82,15 @@ def test_csrf_tokens_belong_to_their_session() -> None:
 
 
 def test_account_throttle_doubles_up_to_fifteen_minutes() -> None:
-    failures = LoginFailures.first("account:alice", NOW)
-    at, blocks = NOW, []
-    for _ in range(18):
-        assert failures.reserve(ACCOUNT_THROTTLE, at) is None
-        blocks.append(failures.retry_after(at))
-        at = failures.blocked_until or at
+    blocks = [ACCOUNT_THROTTLE.block(failures) for failures in range(1, 19)]
     assert blocks[:5] == [None] * 5
     assert blocks[5:9] == [timedelta(seconds=s) for s in (1, 2, 4, 8)]
     assert blocks[-1] == timedelta(minutes=15)
 
 
-def test_a_blocked_key_counts_nothing() -> None:
-    failures = LoginFailures.first("account:alice", NOW)
-    for _ in range(6):
-        failures.reserve(ACCOUNT_THROTTLE, NOW)
-    assert failures.reserve(ACCOUNT_THROTTLE, NOW) == timedelta(seconds=1)
-    assert failures.failures == 6
-
-
-def test_a_released_attempt_lifts_its_block() -> None:
-    failures = LoginFailures.first("account:alice", NOW)
-    for _ in range(6):
-        failures.reserve(ACCOUNT_THROTTLE, NOW)
-    failures.release(ACCOUNT_THROTTLE)
-    assert failures.failures == 5 and failures.retry_after(NOW) is None
-    failures.reserve(ACCOUNT_THROTTLE, NOW)
-    failures.reserve(ACCOUNT_THROTTLE, NOW + timedelta(seconds=1))
-    failures.release(ACCOUNT_THROTTLE)  # six remain: their block stays
-    assert failures.retry_after(NOW + timedelta(seconds=1)) == timedelta(seconds=2)
-
-
-def test_failures_count_within_their_window() -> None:
-    failures = LoginFailures.first("account:alice", NOW)
-    for _ in range(5):
-        failures.reserve(ACCOUNT_THROTTLE, NOW)
-    later = NOW + ACCOUNT_THROTTLE.window
-    failures.reserve(ACCOUNT_THROTTLE, later)
-    assert failures.failures == 1 and failures.retry_after(later) is None
-
-
 def test_source_throttle_blocks_after_thirty_failures() -> None:
-    failures = LoginFailures.first("source:192.0.2.1", NOW)
-    for _ in range(29):
-        failures.reserve(SOURCE_THROTTLE, NOW)
-    assert failures.retry_after(NOW) is None
-    failures.reserve(SOURCE_THROTTLE, NOW)
-    assert failures.retry_after(NOW) == timedelta(minutes=15)
-    assert failures.retry_after(NOW + timedelta(minutes=15)) is None
+    assert SOURCE_THROTTLE.block(29) is None
+    assert SOURCE_THROTTLE.block(30) == SOURCE_THROTTLE.block(99) == timedelta(minutes=15)
 
 
 def test_sources_are_ipv4_addresses_and_ipv6_networks() -> None:

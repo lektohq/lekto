@@ -418,7 +418,10 @@ def source_key(address: str) -> str:
 
 @dataclass(kw_only=True)
 class LoginFailures:
-    """Failed sign-ins under one key (`account:<name>` or `source:<address>`)."""
+    """Failed sign-ins under one key (`account:<name>` or `source:<address>`). How an attempt
+    counts (`ThrottleRule`, the port's `reserve` and `release`) each adapter applies
+    atomically: SQL in one statement (`SqlLoginFailureRepository`), the memory in
+    `MemoryLoginFailureRepository` (PM-11)."""
 
     key: str
     failures: int
@@ -429,35 +432,6 @@ class LoginFailures:
     @property
     def id(self) -> uuid.UUID:
         return failure_id(self.key)
-
-    @classmethod
-    def first(cls, key: str, now: datetime) -> Self:
-        return cls(key=key, failures=0, first_failure_at=now)
-
-    def retry_after(self, now: datetime) -> timedelta | None:
-        """How long further attempts are refused, if they are."""
-        if self.blocked_until is None or self.blocked_until <= now:
-            return None
-        return self.blocked_until - now
-
-    def reserve(self, rule: ThrottleRule, now: datetime) -> timedelta | None:
-        """Count an attempt before it is checked, and block as if it fails: so attempts that
-        arrive together cannot all pass. If blocked, count nothing and return how long."""
-        wait = self.retry_after(now)
-        if wait is not None:
-            return wait
-        if now - self.first_failure_at >= rule.window:
-            self.failures, self.first_failure_at = 0, now
-        self.failures += 1
-        block = rule.block(self.failures)
-        self.blocked_until = None if block is None else now + block
-        return None
-
-    def release(self, rule: ThrottleRule) -> None:
-        """Take back a reserved attempt that did not fail."""
-        self.failures = max(0, self.failures - 1)
-        if rule.block(self.failures) is None:
-            self.blocked_until = None
 
 
 KNOWN_DEVICE_LIFETIME = timedelta(days=365)

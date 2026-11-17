@@ -391,6 +391,21 @@ class IdentityRepositoriesContract:
         assert fresh.failures == 1 and fresh.first_failure_at == NOW + 2 * HOUR
         assert fresh.blocked_until is None
 
+    async def test_a_release_keeps_the_block_the_rest_earns(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """Released, an attempt lifts a block only where the attempts left earn none."""
+        rule = ThrottleRule(free=2, window=HOUR, base=timedelta(minutes=1), limit=HOUR)
+        async with uow_factory() as uow:
+            for at in (0, 0, 0, 2):
+                await uow.login_failures.reserve("account:alice", rule, NOW + timedelta(minutes=at))
+            await uow.login_failures.release("account:alice", rule)  # three remain
+            await uow.commit()
+        async with uow_factory() as uow:
+            found = await uow.login_failures.find("account:alice")
+        assert found is not None and found.failures == 3
+        assert found.blocked_until == NOW + timedelta(minutes=4)  # the fourth's
+
     async def test_concurrent_reservations_are_all_counted(
         self, uow_factory: UnitOfWorkFactory
     ) -> None:

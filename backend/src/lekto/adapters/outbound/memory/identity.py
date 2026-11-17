@@ -132,21 +132,29 @@ class MemoryLoginFailureRepository:
         return await self._rows.find(failure_id(key))
 
     async def reserve(self, key: str, rule: ThrottleRule, now: datetime) -> timedelta | None:
+        """Count an attempt before it is checked, and block as if it fails: so attempts that
+        arrive together cannot all pass. If blocked, count nothing and return how long."""
         failures = await self.find(key)
+        new = failures is None
         if failures is None:
-            failures = LoginFailures.first(key, now)
-            wait = failures.reserve(rule, now)
-            await self._rows.add(failures)
-            return wait
-        wait = failures.reserve(rule, now)
-        if wait is None:
-            await self._rows.update(failures)
-        return wait
+            failures = LoginFailures(key=key, failures=0, first_failure_at=now)
+        elif failures.blocked_until is not None and failures.blocked_until > now:
+            return failures.blocked_until - now
+        if now - failures.first_failure_at >= rule.window:
+            failures.failures, failures.first_failure_at = 0, now
+        failures.failures += 1
+        block = rule.block(failures.failures)
+        failures.blocked_until = None if block is None else now + block
+        await (self._rows.add if new else self._rows.update)(failures)
+        return None
 
     async def release(self, key: str, rule: ThrottleRule) -> None:
+        """Take back a reserved attempt that did not fail."""
         failures = await self.find(key)
         if failures is not None:
-            failures.release(rule)
+            failures.failures = max(0, failures.failures - 1)
+            if rule.block(failures.failures) is None:
+                failures.blocked_until = None
             await self._rows.update(failures)
 
     async def remove(self, key: str) -> None:
