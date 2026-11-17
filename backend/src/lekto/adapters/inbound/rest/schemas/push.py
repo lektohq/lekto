@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.push import (
+    DEFAULT_KINDS,
+    LOCALES,
     MAX_DEVICE_NAME,
     MAX_ENDPOINT,
     PushDevice,
@@ -15,6 +17,9 @@ from lekto.core.domain.push import (
     PushPreferences,
 )
 from lekto.core.ports.push import PushOutcome, PushResult
+
+Locale = Literal[LOCALES]  # type: ignore[valid-type]
+"""The languages notifications speak (`push.LOCALES`; RB-10)."""
 
 
 class PushSettingsOut(BaseModel):
@@ -60,9 +65,7 @@ class PushDeviceIn(RequestBody):
     )
     keys: PushKeysIn
     name: str = Field(min_length=1, max_length=MAX_DEVICE_NAME, description="Which device it is.")
-    locale: Literal["de", "en"] = Field(
-        description="The language the device's notifications speak."
-    )
+    locale: Locale = Field(description="The language the device's notifications speak.")
 
 
 class PushDeviceOut(BaseModel):
@@ -102,7 +105,8 @@ class PushTestOut(BaseModel):
         return cls(outcome=result.outcome)
 
 
-NoticeKind = Literal["waiting", "mailbox_failed", "webhook_disabled", "job_failed"]
+NoticeKind = Literal[tuple(kind.value for kind in PushKind if kind in DEFAULT_KINDS)]  # type: ignore[valid-type]
+"""What a person may be told about (`push.DEFAULT_KINDS`; RB-10)."""
 
 
 class PushPreferencesBody(RequestBody):
@@ -112,7 +116,7 @@ class PushPreferencesBody(RequestBody):
         },
     )
 
-    kinds: list[NoticeKind] = Field(
+    kinds: list[NoticeKind] = Field(  # type: ignore[valid-type]
         max_length=len(get_args(NoticeKind)),
         description=(
             "What the caller is told about: `waiting` (documents wait in their inbox), "
@@ -129,7 +133,7 @@ class PushPreferencesBody(RequestBody):
     @classmethod
     def of(cls, preferences: PushPreferences) -> "PushPreferencesBody":
         return cls(
-            kinds=sorted(kind.value for kind in preferences.kinds),  # type: ignore[misc]
+            kinds=sorted(kind.value for kind in preferences.kinds),
             titles=preferences.titles,
         )
 

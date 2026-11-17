@@ -70,6 +70,17 @@ from lekto.core.domain.validation import require_name, require_utc
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
+_NOT_REPEATABLE = {
+    Node.RECEIVE: ReasonCode.RECEIVE_NOT_REPEATABLE,
+    Node.SEPARATE: ReasonCode.SEPARATE_NOT_REPEATABLE,
+}
+"""The nodes that run only when a document comes in, with why they cannot run again."""
+REPROCESSABLE_NODES = tuple(node for node in Node if node not in _NOT_REPEATABLE)
+"""The nodes processing can restart from (`Document.reprocess_from`; RA-06)."""
+RESUMABLE_NODES = (Node.FIELDS, Node.APPLY_RULES)
+"""The nodes processing can resume with after a confirmation (`Document.confirm`; RA-06)."""
+
+
 @dataclass(frozen=True)
 class Sha256:
     """SHA-256 of a document's original, lower-case hex. Also the original's object key."""
@@ -459,10 +470,8 @@ class Document:
         processing = self.processing
         if processing.status is ProcessingStatus.PROCESSING:
             raise InvalidTransitionError(because(ReasonCode.BEING_PROCESSED, id=str(self.id)))
-        if node is Node.RECEIVE:
-            raise InvalidTransitionError(because(ReasonCode.RECEIVE_NOT_REPEATABLE))
-        if node is Node.SEPARATE:
-            raise InvalidTransitionError(because(ReasonCode.SEPARATE_NOT_REPEATABLE))
+        if node in _NOT_REPEATABLE:
+            raise InvalidTransitionError(because(_NOT_REPEATABLE[node]))
         again = self._reset_set({node})
         skipped = [failed for failed in processing.failed() if failed not in again]
         if skipped:
@@ -549,9 +558,9 @@ class Document:
             raise InvalidTransitionError(
                 because(ReasonCode.STILL_RUNNING, id=str(self.id), nodes=list(running))
             )
-        if resume_at not in (Node.FIELDS, Node.APPLY_RULES):
+        if resume_at not in RESUMABLE_NODES:
             raise InvalidTransitionError(
-                f"processing resumes with {Node.FIELDS} or {Node.APPLY_RULES}, not {resume_at}"
+                f"processing resumes with {' or '.join(RESUMABLE_NODES)}, not {resume_at}"
             )
         if resume_at is Node.FIELDS and processing.outcome(Node.PARSE) not in (
             Outcome.OK,

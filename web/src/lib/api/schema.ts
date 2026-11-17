@@ -5326,7 +5326,7 @@ export interface components {
 			/** Media Type */
 			media_type: string;
 			/** @description `received`: how the document came in; `replaced`: a person put another file in its place; `edited`: a person edited its pages; `split`: the first version, pages split off another document (by a person, or at a separator sheet); `separated`: the first part of the stack the document came in as, split at its separator sheets; `merged`: a person merged other documents into it. A version that came from another document in a merge keeps its kind. */
-			kind: components['schemas']['VersionKindOut'];
+			kind: components['schemas']['VersionKind'];
 			/**
 			 * Created At
 			 * Format: date-time
@@ -11982,10 +11982,10 @@ export interface components {
 			added: number;
 		};
 		/**
-		 * VersionKindOut
+		 * VersionKind
 		 * @enum {string}
 		 */
-		VersionKindOut: 'received' | 'replaced' | 'edited' | 'split' | 'separated' | 'merged';
+		VersionKind: 'received' | 'replaced' | 'edited' | 'split' | 'separated' | 'merged';
 		/** VersionOriginOut */
 		VersionOriginOut: {
 			/**

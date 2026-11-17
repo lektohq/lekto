@@ -2,7 +2,6 @@
 
 from collections.abc import Mapping
 from datetime import datetime
-from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
@@ -68,15 +67,6 @@ class StoredFileOut(BaseModel):
         )
 
 
-class VersionKindOut(StrEnum):
-    RECEIVED = "received"
-    REPLACED = "replaced"
-    EDITED = "edited"
-    SPLIT = "split"
-    SEPARATED = "separated"
-    MERGED = "merged"
-
-
 class VersionOriginOut(BaseModel):
     id: UUID
     title: str = Field(description="Its title now.")
@@ -92,7 +82,7 @@ class DocumentVersionOut(BaseModel):
     current: bool
     original_filename: str
     media_type: str
-    kind: VersionKindOut = Field(
+    kind: VersionKind = Field(
         description="`received`: how the document came in; `replaced`: a person put another "
         "file in its place; `edited`: a person edited its pages; `split`: the first version, "
         "pages split off another document (by a person, or at a separator sheet); `separated`: "
@@ -139,7 +129,7 @@ class DocumentVersionOut(BaseModel):
             current=current,
             original_filename=version.original_filename,
             media_type=version.media_type,
-            kind=VersionKindOut(version.kind.value),
+            kind=version.kind,
             created_at=version.created_at,
             created_by=version.created_by,
             detail=dict(version.detail),

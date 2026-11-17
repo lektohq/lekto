@@ -16,7 +16,7 @@ from lekto.adapters.inbound.schemas import (
     RuleReportOut,
     field_json,
 )
-from lekto.core.domain.documents import MAX_TITLE, Channel, Document
+from lekto.core.domain.documents import MAX_TITLE, REPROCESSABLE_NODES, Channel, Document
 from lekto.core.domain.exchanges import ModelCall, RunExchange
 from lekto.core.domain.imports import MAX_REVIEW_REASON, MAX_REVIEWS
 from lekto.core.domain.json_value import JsonObject
@@ -36,11 +36,10 @@ from lekto.core.services.documents import DocumentFacets
 from lekto.core.services.objects import EXCHANGE_NODES
 
 ReprocessNode = StrEnum(  # type: ignore[misc]
-    "ReprocessNode",
-    {node.name: node.value for node in Node if node not in (Node.RECEIVE, Node.SEPARATE)},
+    "ReprocessNode", {node.name: node.value for node in REPROCESSABLE_NODES}
 )
-"""Nodes processing can restart from; receiving and separating (only when a document comes in)
-cannot be repeated."""
+"""Nodes processing can restart from (`documents.REPROCESSABLE_NODES`); receiving and
+separating (only when a document comes in) cannot be repeated."""
 
 ExchangeNode = StrEnum(  # type: ignore[misc]
     "ExchangeNode", {node.name: node.value for node in EXCHANGE_NODES}
