@@ -85,6 +85,8 @@ UNSEEN_BY = "unseen_by"
 """A space check's: the users the document names who would not see it there."""
 RELATED = "relations"
 """The relations `relate` made, each with the other document (`RELATED_DOCUMENT`)."""
+RELATED_DROPPED = "dropped"
+"""The relations `relate` removed, as `RELATED`."""
 RELATED_DOCUMENT = "document_id"
 CONFIRMING = frozenset(
     {CHANGE_FIELDS[name] for name in (CONTACT, DOCUMENT_TYPE, TOPIC, TAGS, DOCUMENT_DATE)}

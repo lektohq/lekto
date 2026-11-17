@@ -30,6 +30,7 @@ from lekto.core.domain.classification import (
     DOCUMENT_TYPE,
     RELATED,
     RELATED_DOCUMENT,
+    RELATED_DROPPED,
 )
 from lekto.core.domain.document_facts import (
     DocumentFact,
@@ -240,7 +241,7 @@ class RelateResult:
         await uow.outbox.add(relation_events([*related.made, *related.dropped], now))
         output: JsonObject = {RELATED: [relation_json(item, document.id) for item in related.made]}
         if related.dropped:
-            output["dropped"] = [relation_json(item, document.id) for item in related.dropped]
+            output[RELATED_DROPPED] = [relation_json(item, document.id) for item in related.dropped]
         return NodeResult(outcome=Outcome.OK, model_version=RELATE, output=output)
 
 

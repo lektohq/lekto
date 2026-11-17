@@ -14,6 +14,7 @@ from lekto.core.domain.classification import (
     PERSONS,
     RELATED,
     RELATED_DOCUMENT,
+    RELATED_DROPPED,
     UNSEEN_BY,
 )
 from lekto.core.domain.document_facts import FactCriterion, FactRole, person_only
@@ -313,18 +314,20 @@ async def readable_log(uow: UnitOfWork, user: User, log: Sequence[NodeRun]) -> l
             output = _persons_seen(output, str(user.id))
         if run.node is Node.SIGNAL_FACTS:
             output = await _identifiers_seen(uow, user, output)
-        if run.node is Node.RELATE and isinstance(output.get(RELATED), list):
-            # A relation to a document the reader may not read is none of theirs (#145).
-            relations = output[RELATED]
-            assert isinstance(relations, list)
-            output = {
-                **output,
-                RELATED: [
-                    item
-                    for item in relations
-                    if isinstance(item, dict) and await may_read(item.get(RELATED_DOCUMENT))
-                ],
-            }
+        if run.node is Node.RELATE:
+            # A relation to a document the reader may not read is none of theirs (#145), made
+            # or removed.
+            for key in (RELATED, RELATED_DROPPED):
+                relations = output.get(key)
+                if isinstance(relations, list):
+                    output = {
+                        **output,
+                        key: [
+                            item
+                            for item in relations
+                            if isinstance(item, dict) and await may_read(item.get(RELATED_DOCUMENT))
+                        ],
+                    }
         result.append(replace(run, result=replace(run.result, output=output)))
     return result
 

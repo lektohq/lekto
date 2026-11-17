@@ -2,7 +2,8 @@
 directions, and what a person decided stays."""
 
 from dataclasses import replace
-from datetime import date
+from datetime import date, timedelta
+from typing import Any
 
 import pytest
 
@@ -15,7 +16,7 @@ from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import ContactId, DocumentId, DocumentTypeId
 from lekto.core.domain.master_data import Contact, DocumentType
 from lekto.core.domain.periods import Period
-from lekto.core.domain.pipeline import Node
+from lekto.core.domain.pipeline import Node, NodeResult, NodeRun, Outcome
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState
 from lekto.core.domain.rules import AddTags, Condition, ConditionField, Operator
 from lekto.core.domain.spaces import Space
@@ -534,3 +535,40 @@ async def test_a_rule_sees_only_relations_its_author_may_read(world: World) -> N
     log = await world.documents.processing_log(owner.id, reminder.id)
     (entry,) = [item for item in log if item.node is Node.RELATE]
     assert entry.result.output["relations"] == []
+
+
+async def test_the_log_names_no_removed_relation_to_a_document_the_reader_does_not_read(
+    world: World,
+) -> None:
+    """Made or removed, a relation to a document the reader may not read is none of theirs
+    (#145): the relations `relate` removed were shown with the other document's id."""
+    owner, other = await world.user(), await world.user()
+    space = await world.personal_space(owner)
+    reminder = builders.processed(owner, space)
+    visible = builders.processed(owner, space)
+    hidden = builders.processed(other, await world.personal_space(other))
+
+    def removed(document: Document) -> dict[str, Any]:
+        return {"document_id": str(document.id), "direction": "refers_to", "state": "suggested"}
+
+    async with world.uow() as uow:
+        for document in (reminder, visible, hidden):
+            await uow.documents.add(document)
+        await uow.processing_log.append(
+            NodeRun(
+                document_id=reminder.id,
+                node=Node.RELATE,
+                run=1,
+                result=NodeResult(
+                    outcome=Outcome.OK,
+                    output={"relations": [], "dropped": [removed(visible), removed(hidden)]},
+                ),
+                pipeline_version="1",
+                started_at=NOW,
+                duration=timedelta(seconds=1),
+            )
+        )
+        await uow.commit()
+    log = await world.documents.processing_log(owner.id, reminder.id)
+    (entry,) = [item for item in log if item.node is Node.RELATE]
+    assert entry.result.output["dropped"] == [removed(visible)]
