@@ -39,7 +39,7 @@ from lekto.core.domain.addresses import is_public, literal
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.events import DOCUMENT_EVENT_TYPES
 from lekto.core.domain.ids import DeliveryId, DocumentId, EventId, UserId, WebhookId, new_id
-from lekto.core.domain.json_value import JsonObject
+from lekto.core.domain.json_value import JsonObject, loads
 from lekto.core.domain.reasons import Reason, ReasonCode, because
 from lekto.core.domain.tasks import DEFAULT_TIMEOUT, validate_timeout
 from lekto.core.domain.validation import (
@@ -334,12 +334,14 @@ def rendered_body(text: str) -> bytes:
     """What a template made, as the body goes: the text in UTF-8, as it is. ValueError if it is
     not JSON."""
     try:
-        json.loads(text)
+        loads(text)
     except json.JSONDecodeError as error:
         raise ValueError(
             f"the template does not make JSON: {error.msg} at line {error.lineno}, "
             f"column {error.colno}"
         ) from None
+    except ValueError:
+        raise ValueError("the template does not make JSON: it is nested too deeply") from None
     return text.encode("utf-8")
 
 

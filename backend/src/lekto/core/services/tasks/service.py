@@ -17,7 +17,6 @@ The consumer of a model call fetches the document's files by the signed links of
 """
 
 import hmac
-import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime
@@ -32,6 +31,7 @@ from lekto.core.domain.errors import (
 from lekto.core.domain.identity import hash_token
 from lekto.core.domain.ids import TaskId
 from lekto.core.domain.jobs import Job
+from lekto.core.domain.json_value import loads
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.tasks import MAX_ANSWER_BYTES, Task, TaskStatus, parse_answer
 from lekto.core.ports.clock import Clock
@@ -181,7 +181,7 @@ async def _take(uow: UnitOfWork, task: Task, body: bytes | None, now: datetime) 
         task.fail(because(ReasonCode.TASK_TOO_LARGE, webhook=name, limit=MAX_ANSWER_BYTES), now)
         return AnswerReceipt(f"the answer is larger than {MAX_ANSWER_BYTES} bytes", True)
     try:
-        envelope = parse_answer(json.loads(body))
+        envelope = parse_answer(loads(body))
     except (ValueError, ValidationError) as error:
         detail = str(error) if isinstance(error, ValidationError) else "the answer is not JSON"
         task.fail(because(ReasonCode.TASK_INVALID, webhook=name, detail=detail), now)

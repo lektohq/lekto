@@ -213,6 +213,17 @@ async def test_the_token_holds_for_one_answer_until_the_deadline(world: World) -
         await world.tasks.answer(task, token_of(request), b'{"status": "ok", "answer": 2}')
 
 
+async def test_an_answer_nested_deeper_than_the_parser_goes_is_none(world: World) -> None:
+    """No answer either, not an error of Lekto's that left the task open (XB-08)."""
+    f = await flow(world)
+    await f.arrive()
+    (request,) = f.asked()
+    deep = await world.tasks.answer(task_of(request), token_of(request), b"[" * 10_000)
+    assert deep.problem == "the answer is not JSON" and not deep.too_large
+    with pytest.raises(ConflictError):  # it counted: the task is closed
+        await world.tasks.answer(task_of(request), token_of(request), b'{"status": "ok"}')
+
+
 async def test_an_answer_that_is_not_taken_counts_as_none(world: World) -> None:
     f = await flow(world)
     first, second, third = await f.arrive(), await f.arrive(), await f.arrive()

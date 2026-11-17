@@ -9,12 +9,12 @@ largest first (an apple-touch-icon without sizes is 180 px by Apple's convention
 without a size follow, `/favicon.ico` last.
 """
 
-import json
 import re
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit
 
+from lekto.core.domain.json_value import loads
 from lekto.core.ports.logos import MIN_LOGO_SIZE
 
 APPLE_TOUCH_SIZE = 180
@@ -87,8 +87,8 @@ def page_icons(html: str, page_url: str) -> tuple[list[Candidate], str | None]:
 def manifest_icons(text: str, manifest_url: str) -> list[Candidate]:
     """The icons of a web app manifest (JSON) at `manifest_url`."""
     try:
-        manifest = json.loads(text)
-    except (ValueError, RecursionError):  # nested deeper than the parser goes
+        manifest = loads(text)
+    except ValueError:
         return []
     found = manifest.get("icons") if isinstance(manifest, dict) else None
     if not isinstance(found, list):

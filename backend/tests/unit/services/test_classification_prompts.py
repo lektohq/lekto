@@ -140,6 +140,7 @@ def test_fenced_answers_are_read() -> None:
     ("content", "error"),
     [
         ("no json", "not JSON"),
+        pytest.param("[" * 10_000, "not JSON", id="nested-deeper-than-the-parser-goes"),
         ("[1]", "not a JSON object"),
         (json.dumps({k: v for k, v in ANSWER.items() if k != "tags"}), "missing tags"),
         (json.dumps(ANSWER | {"space": "Shared"}), "unexpected space"),

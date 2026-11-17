@@ -88,6 +88,7 @@ def test_the_answer_s_lines_with_their_boxes() -> None:
     "content",
     [
         "Here is the page.",
+        pytest.param("[" * 10_000, id="nested-deeper-than-the-parser-goes"),
         '{"text": "no lines"}',
         '{"lines": [{"text": "x"}]}',
         '{"lines": [{"text": "x", "box": [1, 2, 3]}]}',

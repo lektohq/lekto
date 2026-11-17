@@ -4,12 +4,23 @@ input that must fit: a ValidationError that names the place otherwise."""
 
 import json
 from datetime import date
+from typing import Any
 from uuid import UUID
 
 from lekto.core.domain.errors import ValidationError
 
 type JsonValue = str | int | float | bool | list[JsonValue] | dict[str, JsonValue] | None
 type JsonObject = dict[str, JsonValue]
+
+
+def loads(text: str | bytes) -> Any:
+    """`json.loads` for what someone else wrote: a document nested deeper than the parser goes
+    (some 10,000 brackets, 10 KB) is a ValueError like any that is no JSON, not the
+    RecursionError the parser raises, which callers of foreign JSON do not expect (XB-08)."""
+    try:
+        return json.loads(text)
+    except RecursionError:
+        raise ValueError("the JSON is nested too deeply") from None
 
 
 def same_json(first: JsonValue, second: JsonValue) -> bool:
