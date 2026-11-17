@@ -23,6 +23,7 @@ from typing import Any
 
 import asyncpg
 
+from lekto.adapters.outbound.signals import InProcessSignal
 from lekto.adapters.outbound.sql.database import Database
 from lekto.adapters.outbound.sql.transaction import NOTIFY_CHANNELS
 from lekto.core.ports.wakeup import Channel
@@ -37,39 +38,10 @@ RECONNECT_MAX_DELAY = timedelta(seconds=30)
 _CHANNELS = {name: channel for channel, name in NOTIFY_CHANNELS.items()}
 
 
-class SqlSignal:
-    def __init__(
-        self, wakeup: "SqlWakeup", channel: Channel, kinds: Collection[str] | None
-    ) -> None:
-        self._wakeup = wakeup
-        self.channel = channel
-        self.kinds = None if kinds is None else frozenset(kinds)
-        self._event = asyncio.Event()
-
-    @property
-    def live(self) -> bool:
-        return self._wakeup.listening
-
-    def raise_for(self, channel: Channel, kind: str | None) -> None:
-        if channel is self.channel and (self.kinds is None or kind in self.kinds):
-            self._event.set()
-
-    def raise_now(self) -> None:
-        self._event.set()
-
-    async def wait(self, timeout: timedelta) -> bool:
-        with contextlib.suppress(TimeoutError):
-            await asyncio.wait_for(self._event.wait(), timeout=timeout.total_seconds())
-        if not self._event.is_set():
-            return False
-        self._event.clear()
-        return True
-
-
 class SqlWakeup:
     def __init__(self, database: Database) -> None:
         self._db = database
-        self._signals: list[SqlSignal] = []
+        self._signals: list[InProcessSignal] = []
         self._listener: asyncio.Task[None] | None = None
         self._listening = False
         self._closed = False
@@ -81,10 +53,12 @@ class SqlWakeup:
         """Whether a connection listens for the notifications of Postgres right now."""
         return self._listening
 
-    def subscribe(self, channel: Channel, *, kinds: Collection[str] | None = None) -> SqlSignal:
+    def subscribe(
+        self, channel: Channel, *, kinds: Collection[str] | None = None
+    ) -> InProcessSignal:
         if self._closed:
             raise RuntimeError("the wakeup is closed")
-        signal = SqlSignal(self, channel, kinds)
+        signal = InProcessSignal(channel, kinds, live=lambda: self.listening)
         self._signals.append(signal)
         if not self._db.is_sqlite and self._listener is None:
             self._listener = asyncio.create_task(self._listen_forever(), name="lekto-listener")
