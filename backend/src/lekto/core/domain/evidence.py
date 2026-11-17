@@ -9,7 +9,7 @@ or word. Everything works on a normalised text (see `normalise`).
 import html
 import re
 import unicodedata
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Collection, Iterable, Iterator
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -461,14 +461,16 @@ def _reading(token: str, decimal_mark: str, groups: str) -> Decimal | None:
         return None
 
 
-def amounts_in(text: str) -> set[Decimal]:
+def amounts_in(text: str, codes: Collection[str] | None = None) -> set[Decimal]:
     """The numbers the normalised `text` writes as amounts: with two decimal places
     (`620,00`, `1,234.56`), or with a currency or a dash beside them (`620 €`, `eur 620`,
-    `620,-`). A bare number (`620`) is none: on a scan it may be any fragment."""
+    `620,-`). A bare number (`620`) is none: on a scan it may be any fragment. `codes`: the
+    currency codes that count beside a number (`written_codes`; None: every one); an
+    abbreviation (`Fr.`, `kr`) makes no bare number an amount."""
     found: set[Decimal] = set()
     for match in _NUMBER.finditer(text):
         readings = _readings(match.group())
-        if _beside_currency(text, match.start(), match.end()):
+        if _beside_currency(text, match.start(), match.end(), codes):
             found.update(readings)
         else:
             found.update(number for number in readings if number.as_tuple().exponent == -2)
@@ -480,13 +482,15 @@ _AFTER = re.compile(r" ?(?:[^\W\d_]+\.?|[€$£¥])")
 _DASH_AFTER = re.compile(r"[.,][-\u2013]")
 
 
-def _beside_currency(text: str, start: int, end: int) -> bool:
+def _beside_currency(text: str, start: int, end: int, codes: Collection[str] | None) -> bool:
     if _DASH_AFTER.match(text, end):
         return True
     before = _BEFORE.search(text[max(0, start - 12) : start])
     after = _AFTER.match(text, end)
     return any(
-        currencies_in(found.group().strip()) for found in (before, after) if found is not None
+        currencies_in(found.group().strip(), codes=codes, abbreviations=codes is None)
+        for found in (before, after)
+        if found is not None
     )
 
 
@@ -512,19 +516,51 @@ def is_currency_code(code: str) -> bool:
     return code in _ISO_4217
 
 
-def currencies_in(text: str) -> set[str]:
+def currencies_in(
+    text: str, *, codes: Collection[str] | None = None, abbreviations: bool = True
+) -> set[str]:
     """ISO 4217 codes the normalised `text` shows: as code (`EUR`), sign (`€`) or word
-    (`Euro`)."""
+    (`Euro`). `codes`: the codes that count as a word (None: every one); `abbreviations`:
+    whether `Fr.`, `sFr`, `kr` count, words of a text that are no currency as often."""
     found: set[str] = set()
     for match in _WORD.finditer(text):
         word = match.group()
-        found.update(CURRENCY_WORDS.get(word, ()))
         bare = word.rstrip(".")
-        found.update(CURRENCY_WORDS.get(bare, ()))
-        if bare.upper() in _ISO_4217:
-            found.add(bare.upper())
+        for key in (word, bare):
+            if abbreviations or key not in _ABBREVIATIONS:
+                found.update(CURRENCY_WORDS.get(key, ()))
+        code = bare.upper()
+        if code in _ISO_4217 and (codes is None or code in codes):
+            found.add(code)
     if "us$" in text:
         found.add("USD")
+    return found
+
+
+_ABBREVIATIONS = frozenset({"fr.", "sfr", "sfr.", "kr", "kr."})
+"""Currency words that are as often none (`Fr.` Friday, `kr` an initial): a currency only
+right beside an amount with decimals (`Fr. 12.50`, `120,00 kr`)."""
+_CODE = re.compile(r"(?<![^\W\d_])[A-Z]{3}(?![^\W\d_])")
+_DECIMALS = r"\d(?:[\d.,'\u202f ]*\d)?[.,]\d{2}(?!\d)"
+_ABBREVIATED = re.compile(
+    rf"(?<![^\W\d_])(?P<before>sfr\.?|fr\.|kr\.?) ?{_DECIMALS}"
+    rf"|{_DECIMALS} ?(?P<after>sfr\.?|fr\.|kr\.?)(?![^\W\d_])"
+)
+
+
+def written_codes(raw: str) -> frozenset[str]:
+    """The ISO 4217 codes `raw` writes in capitals, as a code is written: a word that is one in
+    lower case (`all`, `top`, `Sek.`) is none (DA-09)."""
+    return frozenset(code for code in _CODE.findall(raw) if code in _ISO_4217)
+
+
+def text_currencies(raw: str, normalised: str) -> set[str]:
+    """The currencies a document's text shows (`raw`, and `normalised` it): its codes in
+    capitals, its signs and names of a currency, an abbreviation (`Fr.`, `kr`) only right beside
+    an amount with decimals, not beside a time (`Mo. - Fr. 8-12 Uhr`) (DA-09)."""
+    found = currencies_in(normalised, codes=written_codes(raw), abbreviations=False)
+    for match in _ABBREVIATED.finditer(normalised):
+        found.update(CURRENCY_WORDS[match["before"] or match["after"]])
     return found
 
 
@@ -673,11 +709,11 @@ class DocumentText:
 
     @cached_property
     def amounts(self) -> set[Decimal]:
-        return amounts_in(self.normalised)
+        return amounts_in(self.normalised, written_codes(self.raw))
 
     @cached_property
     def currencies(self) -> set[str]:
-        return currencies_in(self.normalised)
+        return text_currencies(self.raw, self.normalised)
 
     def contains(self, value: str) -> bool:
         return contains(self.normalised, value)

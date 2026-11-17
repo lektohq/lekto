@@ -262,6 +262,32 @@ def test_an_amount_in_a_text_without_currency_is_in_the_default_one() -> None:
     assert read_amount("2,111.68", shown, default="EUR") == (Decimal("2111.68"), "USD")
 
 
+@pytest.mark.parametrize(
+    ("text", "shown"),
+    [
+        ("Sprechzeiten Mo. - Fr. 8-12 Uhr", set()),  # Friday
+        ("Top-Arbeitgeber, all inclusive, Sek. I", set()),  # words that are codes in capitals
+        ("Unsere All-Net-Flat für 84,20 €", {"EUR"}),
+        ("Preis: Fr. 12.50", {"CHF"}),
+        ("Summe 120,00 kr", {"SEK", "NOK", "DKK"}),
+        ("Betrag CHF 12.50", {"CHF"}),
+    ],
+)
+def test_a_text_shows_a_currency_by_its_code_in_capitals_or_beside_an_amount(
+    text: str, shown: set[str]
+) -> None:
+    """A word that is a code in lower case, or an abbreviation beside no amount, showed a
+    currency, and an amount without one was read in it, or not at all (DA-09)."""
+    assert DocumentText(text).currencies == shown
+    if not shown:
+        assert read_amount("84,20", DocumentText(text), default="EUR") == (Decimal("84.20"), "EUR")
+
+
+def test_a_word_that_is_a_code_in_lower_case_makes_no_amount() -> None:
+    assert DocumentText("Top 620 Angebote").amounts == set()
+    assert DocumentText("EUR 620 bezahlt").amounts == {Decimal(620)}
+
+
 # --- periods ------------------------------------------------------------------------------------
 
 DOCUMENT_DATE = date(2026, 10, 5)
