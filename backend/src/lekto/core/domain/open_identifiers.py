@@ -304,20 +304,20 @@ def _recommended(
         if seen.contact != contact and not foreign(seen.fact.holder, names.get(seen.contact, ()))
     }
     held = item.kind in HOLDER_KINDS
-    if item.source is OpenSource.LEARNED:
-        elsewhere = {
-            seen.document for seen in own if held and foreign(seen.fact.holder, names[contact])
-        }
-        if elsewhere:
-            reason = because(
-                ReasonCode.RECOMMEND_REJECT_FOREIGN, count=len(elsewhere), name=labels[contact]
-            )
-            return Recommended(Recommendation.REJECT, reason)
-        if others:
-            reason = because(ReasonCode.RECOMMEND_REJECT_CONTACTS, count=len(others) + 1)
-            return Recommended(Recommendation.REJECT, reason)
+    # A learned one (a suggested one returned above).
+    elsewhere = {
+        seen.document for seen in own if held and foreign(seen.fact.holder, names[contact])
+    }
+    if elsewhere:
+        reason = because(
+            ReasonCode.RECOMMEND_REJECT_FOREIGN, count=len(elsewhere), name=labels[contact]
+        )
+        return Recommended(Recommendation.REJECT, reason)
+    if others:
+        reason = because(ReasonCode.RECOMMEND_REJECT_CONTACTS, count=len(others) + 1)
+        return Recommended(Recommendation.REJECT, reason)
     mine = {seen.document for seen in own}
-    if others or len(mine) < RECOMMEND_FROM:
+    if len(mine) < RECOMMEND_FROM:  # one other contacts hold was rejected above
         return None
     if any(seen.fact.role not in _OF_CONTACTS for seen in own):
         return None

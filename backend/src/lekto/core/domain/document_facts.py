@@ -125,10 +125,6 @@ MODEL_HOLDER_KINDS = frozenset({IdentifierKind.IBAN})
 """The kinds whose holder the language model is asked for (`facts-3`); the others' the rule
 tells alone (Tobi, 28.10.2026)."""
 
-SURE_HOLDER_KINDS = frozenset({IdentifierKind.EMAIL_DOMAIN})
-"""The kinds training learns for a contact only where the rule tells they are its: a domain
-names its holder, and one that names no one is often another party's (Tobi, 28.10.2026)."""
-
 ROLES: Mapping[IdentifierKind, FactRole] = {
     IdentifierKind.IBAN: FactRole.CONTACT,
     IdentifierKind.VAT_ID: FactRole.CONTACT,

@@ -35,7 +35,6 @@ from functools import lru_cache
 from lekto.core.domain.document_facts import (
     HOLDER_KINDS,
     MODEL_HOLDER_KINDS,
-    SURE_HOLDER_KINDS,
     DocumentFact,
     Holder,
     HolderKind,
@@ -97,12 +96,8 @@ _TARGET = re.compile(
     re.IGNORECASE,
 )
 # The label of the number just before it, left out of the name before it.
-_LABEL = re.compile(
-    r"(?i)(iban|gläubiger[-\s]*(id(entifikations(nummer)?)?|identifikationsnummer|nr\.?)"
-    r"|creditor[-\s]*(id|identifier)|ci"
-    r"|(ust|umsatzsteuer)[-.\s]*(id(\.|entifikations)?[-.\s]*(nr|nummer)?|identifikationsnummer)"
-    r"|vat[-\s]*(id|no|number|reg(istration)?[-\s]*(no|number)?)?)\s*[:=.]?\s*$"
-)
+_LABEL = re.compile(r"(?i)iban\s*[:=.]?\s*$")
+"""The label before a number `holder_at` places: since #215 it places IBANs alone (DA-07)."""
 _WORD = re.compile(r"[a-z]{3,}")
 _ANOTHER_NUMBER = re.compile(r"\b[A-Z]{2}\d{2}[ A-Z0-9]{12,}")
 # A column: words apart by one or two spaces; columns apart by three spaces or a table's `|`.
@@ -248,19 +243,6 @@ def foreign(holder: Holder | None, names: Iterable[str]) -> bool:
     """Whether a number belongs to someone other than the contact of `names`: a person or a
     third party (`held_by`). A number without a holder (read before 0.8) is not."""
     return held_by(holder, names) in (HolderKind.RECIPIENT, HolderKind.THIRD_PARTY)
-
-
-def unlearned(fact: DocumentFact, names: Iterable[str]) -> bool:
-    """Whether training leaves `fact` out for the contact of `names`: someone else's
-    (`foreign`), or of `SURE_HOLDER_KINDS` and not surely its (an e-mail domain whose name
-    names no one: offered in the open list, not learned)."""
-    if foreign(fact.holder, names):
-        return True
-    return (
-        fact.kind in SURE_HOLDER_KINDS
-        and fact.holder is not None
-        and fact.holder.kind is HolderKind.UNCLEAR
-    )
 
 
 # --- e-mail domains: whose by the name --------------------------------------------------------

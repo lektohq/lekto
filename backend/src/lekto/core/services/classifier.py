@@ -24,7 +24,7 @@ from lekto.core.domain.errors import (
 )
 from lekto.core.domain.events import ClassifierTrained
 from lekto.core.domain.facts import Strength, persons_in
-from lekto.core.domain.holders import unlearned
+from lekto.core.domain.holders import foreign
 from lekto.core.domain.identifiers import (
     Confirmed,
     Identifier,
@@ -370,7 +370,7 @@ class ClassifierService:
                         for fact in facts
                         if fact.state in (FactState.ADDED, FactState.CORRECTED)
                     ),
-                    foreign=frozenset(fact.key for fact in facts if unlearned(fact, own)),
+                    foreign=frozenset(fact.key for fact in facts if foreign(fact.holder, own)),
                     personal=frozenset(
                         fact.key
                         for fact in facts
