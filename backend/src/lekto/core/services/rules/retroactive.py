@@ -73,7 +73,7 @@ from lekto.core.services._access import (
     load_actor,
     readable_document,
 )
-from lekto.core.services._jobs import LEASE, JobRunner, lost
+from lekto.core.services._jobs import LEASE, JobRunner, lost, reason_of
 from lekto.core.services._tags import tag_tree
 from lekto.core.services.objects import load_layout, load_text
 from lekto.core.services.rules.changes import ArrivalStep, ChangeRules
@@ -425,9 +425,7 @@ class RuleApplicationService:
         """An unexpected error: end the application, so it does not run again and again."""
         try:
             async with self._uow() as uow:
-                await uow.jobs.fail(
-                    job, now=self._clock.now(), error=f"{type(error).__name__}: {error}"
-                )
+                await uow.jobs.fail(job, now=self._clock.now(), error=reason_of(error))
                 application = await uow.rule_applications.find(
                     RuleApplicationId(UUID(str(job.payload.get("application_id"))))
                 )

@@ -506,9 +506,7 @@ class MasterDataService:
                     )
                 await uow.commit()
         except Exception as error:  # a row changed meanwhile, or the database failed: again
-            log.warning("normalising tags failed", extra={"job_id": str(job.id)}, exc_info=True)
-            reason = f"{type(error).__name__}: {error}"
-            await self._jobs.again(job, reason, _NORMALISE_RETRY.next_run(job.tries, self._now()))
+            await self._jobs.failed(job, error, _NORMALISE_RETRY, "normalising tags failed")
             return
         log.info("tags normalised", extra={"tag_id": str(tag), "changed": changed})
 

@@ -45,7 +45,7 @@ from lekto.core.ports.clock import Clock
 from lekto.core.ports.repository import PAGE_LIMIT, DocumentFilter
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import load_actor
-from lekto.core.services._jobs import LEASE, JobRunner, lost
+from lekto.core.services._jobs import LEASE, JobRunner, lost, reason_of
 from lekto.core.services.documents import DocumentService
 from lekto.core.services.pipeline import PipelineService
 from lekto.core.services.search import SearchService
@@ -177,9 +177,7 @@ class BulkService:
         """An unexpected error: end the operation, so it does not run again and again."""
         try:
             async with self._uow() as uow:
-                await uow.jobs.fail(
-                    job, now=self._clock.now(), error=f"{type(error).__name__}: {error}"
-                )
+                await uow.jobs.fail(job, now=self._clock.now(), error=reason_of(error))
                 operation = await uow.bulk_operations.find(_operation_id(job))
                 if operation is not None and not operation.finished:
                     operation.finish(self._clock.now(), error="stopped by an internal error")

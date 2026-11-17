@@ -280,9 +280,7 @@ class WebhookDeliveryService:
         except ConcurrencyError:
             lost(job)
         except Exception as error:
-            log.warning("webhook job failed", extra={"job_id": str(job.id)}, exc_info=True)
-            reason = f"{type(error).__name__}: {error}"
-            await self._jobs.again(job, reason, self._retry.next_run(job.tries, self._clock.now()))
+            await self._jobs.failed(job, error, self._retry, "webhook job failed")
 
     async def _attempt(
         self,

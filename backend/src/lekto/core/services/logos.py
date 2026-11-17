@@ -282,9 +282,7 @@ class LogoService:
                 asked=bool(payload.get("asked")),
             )
         except Exception as error:
-            log.warning("logo job failed", extra={"job_id": str(job.id)}, exc_info=True)
-            reason = f"{type(error).__name__}: {error}"
-            await self._jobs.again(job, reason, _RETRY.next_run(job.tries, self._clock.now()))
+            await self._jobs.failed(job, error, _RETRY, "logo job failed")
             return
         await self._jobs.end(job)
 

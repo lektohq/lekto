@@ -1136,11 +1136,7 @@ class PipelineService:
     ) -> None:
         """An attempt of a job beside processing (facts, reading again) raised: it runs again
         later, like a node, and is given up after as many attempts."""
-        log.warning(
-            message, extra={"document_id": str(document_id), "attempt": job.tries}, exc_info=True
-        )
-        reason = f"{type(error).__name__}: {error}"
-        await self._jobs.again(job, reason, self._retry.next_run(job.tries, self._clock.now()))
+        await self._jobs.failed(job, error, self._retry, message, document_id=str(document_id))
 
     async def _skipped(self, document_id: DocumentId, node: Node, run: int) -> Document | None:
         """The document, if its `node` is still to catch up on; None if the job is stale."""

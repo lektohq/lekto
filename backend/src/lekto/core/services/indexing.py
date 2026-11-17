@@ -86,7 +86,13 @@ from lekto.core.ports.repository import DocumentFilter
 from lekto.core.ports.search_index import IndexStats, SearchIndex
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import load_actor, require_admin
-from lekto.core.services._jobs import JobRunner, document_payload, lost, payload_document
+from lekto.core.services._jobs import (
+    JobRunner,
+    document_payload,
+    lost,
+    payload_document,
+    reason_of,
+)
 from lekto.core.services._kept import Kept
 from lekto.core.services._pages import document_pages
 from lekto.core.services._tags import tag_tree
@@ -399,16 +405,15 @@ class IndexingService:
         return self.rebuild
 
     async def _failed(self, job: Job, error: Exception) -> None:
-        reason = f"{type(error).__name__}: {error}"
+        if job.kind != RECONCILE_JOB:
+            await self._jobs.failed(job, error, _RETRIES[job.kind], "search job failed")
+            return
+        # Again at the next interval, like the cleanup.
         log.warning(
             "search job failed", extra={"job_id": str(job.id), "kind": job.kind}, exc_info=True
         )
-        now = self._clock.now()
-        if job.kind == RECONCILE_JOB:  # again at the next interval, like the cleanup
-            run_at: datetime | None = now + self._policy.reconcile_interval
-        else:
-            run_at = _RETRIES[job.kind].next_run(job.tries, now)
-        await self._jobs.again(job, reason, run_at)
+        run_at = self._clock.now() + self._policy.reconcile_interval
+        await self._jobs.again(job, reason_of(error), run_at)
 
     async def _next_reconcile(self, uow: UnitOfWork) -> None:
         run_at = self._clock.now() + self._policy.reconcile_interval

@@ -47,7 +47,7 @@ from lekto.core.ports.repository import DocumentFilter
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import load_actor, require_admin
 from lekto.core.services._identifiers import person_identifiers
-from lekto.core.services._jobs import LEASE, JobRunner, Step, retrying
+from lekto.core.services._jobs import LEASE, JobRunner, Step, reason_of, retrying
 from lekto.core.services._pages import document_pages
 from lekto.core.services.master_data import replace_learned_identifiers
 from lekto.core.services.objects import classifier_key, load_text
@@ -450,13 +450,11 @@ class ClassifierService:
             await self._jobs.end(job, error=str(error), also=self._after(job))
             return
         except Exception as error:
-            log.warning("classifier job failed", extra={"kind": job.kind}, exc_info=True)
-            reason = f"{type(error).__name__}: {error}"
             if job.kind == CHECK_JOB:  # the next check comes anyway
-                await self._jobs.end(job, error=reason, also=self._next_check)
+                log.warning("classifier check failed", extra={"kind": job.kind}, exc_info=True)
+                await self._jobs.end(job, error=reason_of(error), also=self._next_check)
             else:
-                run_at = _TRAIN_RETRY.next_run(job.tries, self._clock.now())
-                await self._jobs.again(job, reason, run_at)
+                await self._jobs.failed(job, error, _TRAIN_RETRY, "classifier job failed")
             return
         await self._jobs.end(job, also=self._after(job))
 
