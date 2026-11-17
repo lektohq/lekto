@@ -218,11 +218,16 @@ def _words(words: tuple[str, ...]) -> str:
 # Between the ends of a span: `01.09.2026 - 30.09.2026`, `1. bis 30. September 2026`.
 _TO = rf"\s*(?:-|\u2013|\u2014|{_words(SPAN_WORDS)})\s*"
 _YEAR = r"((?:19|20)\d{2})"
+_WHOLE_MONTH = rf"(?<![^\W\d_]){_MONTH}(?![^\W\d_])"
+"""A month's name as a whole word: "Weimar 2025" is no March, "Mainz" no May (DA-10)."""
 _WEEK_WORD = rf"(?:{_words(WEEK_WORDS)})\.?"
 # A month, week or quarter with its year, or without one (`für September`, `KW 38`).
 _PERIOD_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     # September 2026, Sept. 2026, september, 2026
-    (re.compile(rf"(?<![\d.]\s)(?<![\d.]){_MONTH}(?:,?\s*{_YEAR})?(?![\d])"), "month name"),
+    (
+        re.compile(rf"(?<![\d.]\s)(?<![\d.]){_WHOLE_MONTH}(?:,?\s*{_YEAR})?(?![\d])"),
+        "month name",
+    ),
     # 09/2026, 9.2026 (not inside a date: 01.09.2026)
     (re.compile(rf"(?<![\d./-])(\d{{1,2}})[./]{_YEAR}(?![\d./])"), "month number"),
     # 2026-09 (not a date: 2026-09-30)
@@ -245,7 +250,7 @@ _SPAN_PATTERNS: tuple[re.Pattern[str], ...] = (
         rf"(?<![\d.])(\d{{1,2}})\.(\d{{1,2}})\.?{_TO}(\d{{1,2}})\.(\d{{1,2}})\.(\d{{4}}|\d{{2}})(?!\d)"
     ),
     re.compile(rf"(?<![\d.])(\d{{1,2}})\.?{_TO}(\d{{1,2}})\.(\d{{1,2}})\.(\d{{4}}|\d{{2}})(?!\d)"),
-    re.compile(rf"(?<![\d.])(\d{{1,2}})\.?{_TO}(\d{{1,2}})\.?\s*{_MONTH}\s*(\d{{4}})(?!\d)"),
+    re.compile(rf"(?<![\d.])(\d{{1,2}})\.?{_TO}(\d{{1,2}})\.?\s*{_WHOLE_MONTH}\s*(\d{{4}})(?!\d)"),
 )
 _GAP = re.compile(_TO)
 

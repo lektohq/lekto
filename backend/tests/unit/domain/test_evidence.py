@@ -391,3 +391,13 @@ def test_a_text_read_at_once_has_found_everything() -> None:
     text = DocumentText.read("Rechnung vom 31.03.2026 über 84,20 EUR")
     assert {"normalised", "dates", "periods", "numbers", "amounts", "currencies"} <= set(vars(text))
     assert text.has_date(date(2026, 3, 31)) and text.has_currency("EUR")
+
+
+def test_a_month_s_name_is_a_whole_word() -> None:
+    """ "Weimar 2025" was March 2025, "Mainz" May of the document's year (DA-10)."""
+    assert periods_in(normalise("Stadt Weimar 2025")) == {Period.year(2025)}
+    assert read_period("Weimar 2025") == (Period.year(2025), False)
+    assert read_period("März 2025") == (Period.month(2025, 3), False)
+    mainz = DocumentText("Stadtwerke Mainz, Marktplatz 1")
+    assert not mainz.has_period(Period.month(2026, 5), date(2026, 6, 15))
+    assert DocumentText("Abrechnung Mai").has_period(Period.month(2026, 5), date(2026, 6, 15))
