@@ -74,11 +74,18 @@ WRITTEN_SEPARATORS = r"[\s./\u00ad-]*"
 """Between the characters of a number as a text writes it: separators, also several (two
 spaces, a line break and its indent of an OCR text) and soft hyphens, or none."""
 
-_MONTHS = r"(?:jan|feb|mär|maer|mar|apr|mai|may|jun|jul|aug|sep|okt|oct|nov|dez|dec)[a-zäöü]*\.?"
+_MONTHS = (
+    r"(?:jan(?:uar|uary)?|feb(?:ruar|ruary)?|(?:mär|maer)z?|mar(?:ch)?|apr(?:il)?|mai|may"
+    r"|jun(?:i|e)?|jul(?:i|y)?|aug(?:ust)?|sep(?:t|tember)?|okt(?:ober)?|oct(?:ober)?"
+    r"|nov(?:ember)?|dez(?:ember)?|dec(?:ember)?)\.?"
+)
+"""A month's name or its abbreviation as a whole word (`März`, `Nov.`): `SEPA`, `Main` or `Mark`
+before a number made a date of it, and a number no number (DA-01). Narrowed only: what is no
+date now was none before either, so a rule's stored value stays one."""
 _DATE = re.compile(
     rf"(?P<day>\d{{1,2}})[./-](?P<month>\d{{1,2}})[./-](?:\d{{4}}|\d{{2}})"
     rf"|\d{{4}}-(?P<iso_month>\d{{2}})-(?P<iso_day>\d{{2}})"
-    rf"|{_MONTHS}\s*(?:\d{{4}}|\d{{2}})"
+    rf"|{_MONTHS}\s*(?:(?:19|20)\d{{2}}|\d{{2}})"
 )
 
 

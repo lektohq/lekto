@@ -262,6 +262,8 @@ def test_a_value_in_a_sentence_after_its_verb(text: str, kind: IdentifierKind, v
         (PERSONNEL, "14.03.2019"),
         (PERSONNEL, "Nov 2023"),
         (PERSONNEL, "November 2023"),
+        (PERSONNEL, "Sept. 23"),
+        (CUSTOMER, "März 2024"),
         (CUSTOMER, "2016-01-25"),
         (IdentifierKind.CONTRACT_NUMBER, "07.05.19"),
     ],
@@ -275,6 +277,13 @@ def test_what_only_looks_like_a_date_is_a_number() -> None:
     contract = IdentifierKind.CONTRACT_NUMBER
     assert normalise_identifier(contract, "12.345.678/9") == "123456789"
     assert normalise_identifier(contract, "12.34.5678") == "12345678"  # no month 34
+    # A word that begins like a month is none, nor a number after it a year (DA-01).
+    assert normalise_identifier(CUSTOMER, "MAR1234") == "MAR1234"
+    assert normalise_identifier(CUSTOMER, "Mark 2024") == "MARK2024"
+    assert identifiers_in("Mandatsreferenz: SEPA 1234\nKundennummer: MAIN 4711") == {
+        (IdentifierKind.MANDATE_REFERENCE, "SEPA1234"),
+        (CUSTOMER, "MAIN4711"),
+    }
     assert normalise_identifier(IdentifierKind.LETTER_DATE, "18.06.2026") == "2026-06-18"
 
 
