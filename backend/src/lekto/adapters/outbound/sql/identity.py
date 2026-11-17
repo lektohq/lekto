@@ -330,10 +330,6 @@ class SqlExternalIdentityRepository:
         )
         return [_external_identity(row) for row in rows]
 
-    async def remove(self, id: ExternalIdentityId) -> None:
-        table = t.external_identities
-        await self._tx.write(delete(table).where(table.c.id == id))
-
     async def remove_for_user(self, user: UserId) -> int:
         table = t.external_identities
         return (await self._tx.write(delete(table).where(table.c.user_id == user))).rowcount

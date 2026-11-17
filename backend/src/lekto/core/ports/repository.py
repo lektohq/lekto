@@ -36,7 +36,6 @@ from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import (
     BulkOperationId,
-    ClassifierModelId,
     ContactId,
     DocumentId,
     DocumentTypeId,
@@ -876,10 +875,8 @@ class ClassifierModelRepository(Protocol):
         ...
 
     async def list_all(self) -> list[ClassifierModel]:
-        """Newest first."""
+        """Newest first. The rows of older models stay; only their files go."""
         ...
-
-    async def remove(self, id: ClassifierModelId) -> None: ...
 
 
 class LensRepository(Protocol):
@@ -1113,10 +1110,6 @@ class WebhookRepository(Protocol):
 class TaskRepository(Protocol):
     """Tasks (`domain.tasks`). They outlive their webhook (an open one runs to its deadline)
     and their document (a late answer is refused as stale)."""
-
-    async def get(self, id: TaskId) -> Task:
-        """NotFoundError if it does not exist."""
-        ...
 
     async def find(self, id: TaskId) -> Task | None: ...
 

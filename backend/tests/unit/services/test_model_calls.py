@@ -311,8 +311,8 @@ async def test_a_file_the_document_lacks_is_not_found(world: World) -> None:
     link = urlsplit(body(request)["document"]["structure"])
     id = TaskId(UUID(link.path.split("/tasks/", 1)[1].split("/files/", 1)[0]))
     async with world.uow() as uow:
-        task = await uow.tasks.get(id)
-    assert task.deadline is not None
+        task = await uow.tasks.find(id)
+    assert task is not None and task.deadline is not None
     # Signed as Lekto signs, for a page the document does not have.
     beyond = urlsplit(file_link(builders.LINKS, world.cipher, task, "pages/3.webp", task.deadline))
     query = {key: values[0] for key, values in parse_qs(beyond.query).items()}
@@ -372,7 +372,8 @@ async def test_a_task_that_ends_meanwhile_lets_the_node_run_anew(world: World) -
     assert state is not None and state.sent
     async with world.uow() as uow:
         assert state.task is not None
-        task = await uow.tasks.get(state.task.id)
+        task = await uow.tasks.find(state.task.id)
+        assert task is not None
         task.answered(proposal(), None, world.clock.now())
         await uow.tasks.update(task)
         await uow.commit()

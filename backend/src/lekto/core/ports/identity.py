@@ -24,7 +24,6 @@ from lekto.core.domain.identity import (
 )
 from lekto.core.domain.ids import (
     ApiTokenId,
-    ExternalIdentityId,
     KnownDeviceId,
     SessionId,
     UserId,
@@ -109,8 +108,6 @@ class ExternalIdentityRepository(Protocol):
     async def find(self, issuer: str, subject: str) -> ExternalIdentity | None: ...
 
     async def list_for(self, user: UserId) -> list[ExternalIdentity]: ...
-
-    async def remove(self, id: ExternalIdentityId) -> None: ...
 
     async def remove_for_user(self, user: UserId) -> int: ...
 

@@ -349,8 +349,7 @@ class IdentityRepositoriesContract:
                 )
                 await uow.commit()
         async with uow_factory() as uow:
-            await uow.external_identities.remove(link.id)
-            assert await uow.external_identities.remove_for_user(user.id) == 1
+            assert await uow.external_identities.remove_for_user(user.id) == 2
             await uow.commit()
         async with uow_factory() as uow:
             assert await uow.external_identities.list_for(user.id) == []

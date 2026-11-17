@@ -115,9 +115,6 @@ class MemoryExternalIdentityRepository:
         rows = [row for row in self._rows._all() if row.user_id == user]
         return [_copy(row) for row in sorted(rows, key=lambda row: (row.created_at, row.id))]
 
-    async def remove(self, id: ExternalIdentityId) -> None:
-        self._rows._remove_rows([row for row in self._rows._all() if row.id == id])
-
     async def remove_for_user(self, user: UserId) -> int:
         return self._rows._remove_rows([row for row in self._rows._all() if row.user_id == user])
 

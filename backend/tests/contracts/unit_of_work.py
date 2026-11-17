@@ -1778,10 +1778,7 @@ class UnitOfWorkContract:
         async with uow_factory() as uow:
             assert await uow.classifier_models.latest() == second
             assert await uow.classifier_models.list_all() == [second, first]
-            await uow.classifier_models.remove(first.id)
-            await uow.commit()
         async with uow_factory() as uow:
-            assert await uow.classifier_models.list_all() == [second]
             with pytest.raises(ConflictError):
                 again = ClassifierModel.create(
                     number=2, now=NOW, examples=1, examples_until=None, object_key="x", summary={}
