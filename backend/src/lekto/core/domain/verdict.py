@@ -571,9 +571,7 @@ def judge_type(
         return any(other != id for other in namers)
 
     def green(id: DocumentTypeId) -> bool:
-        naming = namers.get(id, ())
-        sole = naming == (LLM,) and not covered_by_others(id)
-        return not contradicted(id) and (len(naming) >= 2 or sole)
+        return not contradicted(id) and _settled(namers.get(id, ()), covered_by_others(id))
 
     ranked = ranking.candidates()
     listed = ranking.listed(ranked, contradicted)
@@ -650,7 +648,7 @@ def judge_tags(
             found.append(LLM)
         if probabilities.get(id, 0.0) >= thresholds.classifier:
             found.append(CLASSIFIER)
-        if carried.get(id, 0) >= 2 and carried[id] > len(neighbours) / 2:
+        if _most(carried.get(id, 0), len(neighbours)):
             found.append(NEIGHBOURS)
         return tuple(found)
 
@@ -666,7 +664,7 @@ def judge_tags(
         naming = namers(id)
         if id not in names or not naming:
             continue
-        if len(naming) >= 2 or (naming == (LLM,) and not covered_by_others(id)):
+        if _settled(naming, covered_by_others(id)):
             applied.append(id)
         else:
             suggested.append(id)
@@ -927,8 +925,7 @@ def judge_space(
         naming = namers.get(id, ())
         if any(other != id for other in namers):
             return False
-        sole = naming == (LLM,) and not covered_by_others(id)
-        return len(naming) >= 2 or sole or (id == backed and bool(naming))
+        return _settled(naming, covered_by_others(id)) or (id == backed and bool(naming))
 
     ranked = named.preferred(ranking.candidates(), names, namers, backed)
     listed = tuple(ranking.listed(ranked, contradicted))
@@ -1130,15 +1127,28 @@ def _top[K](ranking: Sequence[tuple[K, float]], threshold: float) -> K | None:
     return ranking[0][0] if ranking and ranking[0][1] >= threshold else None
 
 
+def _settled(naming: Sequence[str], covered: bool) -> bool:
+    """Whether the signals `naming` a value settle it: two of them, or the language model alone
+    where no other signal could have named it (`covered`: one that knows the value had the
+    chance). A type, a tag and a space alike (DA-11)."""
+    return len(naming) >= 2 or (tuple(naming) == (LLM,) and not covered)
+
+
+def _most(count: int, found: int) -> bool:
+    """Whether `count` of the `found` neighbours are a majority: at least two and more than
+    half."""
+    return count >= 2 and count > found / 2
+
+
 def _majority[K](votes: Counter[K], found: int, *, undivided: bool = False) -> K | None:
-    """The value at least two and more than half of the `found` carry; `undivided`: and no
-    other value two of them carry."""
+    """The value a majority of the `found` carry (`_most`); `undivided`: and no other value two
+    of them carry."""
     if not votes:
         return None
     (value, count), *others = votes.most_common()
     if undivided and any(other >= 2 for _, other in others):
         return None
-    return value if count >= 2 and count > found / 2 else None
+    return value if _most(count, found) else None
 
 
 def _unique[K](items: Iterable[K]) -> list[K]:
