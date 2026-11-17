@@ -82,6 +82,19 @@ def space_check(result: MetadataResult) -> Any:
     return next(c for c in checks_from_json(result.result.output["fields"]) if c.field == SPACE)
 
 
+KINDS = {"a shared space", "the uploader's personal space", "another user's personal space"}
+NAMES = ("Haushalt", "Wohnung", "Annas Arbeit", "tobi", "anna", "Jane Doe")
+
+
+def named_by_kind(check: Any) -> None:
+    """Who reads the check may not see the spaces it names or their members: its candidates
+    name a space by its kind, its reason no one (`SpaceCandidates._kind`); the web names what
+    its viewer sees."""
+    assert check.candidates and {c.label for c in check.candidates} <= KINDS
+    said = " ".join([str(check.reason), *(c.label for c in check.candidates)]).lower()
+    assert not [name for name in NAMES if name.lower() in said]
+
+
 async def test_the_model_chooses_among_the_spaces_the_uploader_may_file_into(world: World) -> None:
     """The uploader's own personal space first, shared spaces with their description, other
     users' personal spaces by their user only: what Anna wrote about hers is hers."""
@@ -158,6 +171,7 @@ async def test_a_wider_space_is_suggested_and_the_document_stays(world: World) -
     assert check.outcome is Outcome.UNCERTAIN
     assert check.suggestion == str(shared.id)
     assert check.reason == "suggests another space, which shows it to more people"
+    named_by_kind(check)
     assert result.space is None
     assert result.result.outcome is Outcome.UNCERTAIN
 
@@ -380,6 +394,7 @@ async def test_anna_s_tax_id_in_tobi_s_upload_suggests_handing_it_over(world: Wo
     check = space_check(result)
     assert check.outcome is Outcome.UNCERTAIN
     assert check.suggestion == str((await world.personal_space(anna)).id)
+    named_by_kind(check)
     assert result.space is None
     out: Any = result.result.output
     assert out["persons"] == [{"user_id": str(anna.id), "strength": "hard"}]

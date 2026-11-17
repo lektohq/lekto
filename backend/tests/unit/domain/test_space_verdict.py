@@ -55,9 +55,9 @@ def test_two_signals_that_name_a_wider_space_suggest_it_without_naming_anyone() 
     assert check.outcome is Outcome.UNCERTAIN
     assert check.value is None
     assert check.suggestion == str(HOUSEHOLD)
-    # Who reads the check may not see the space or its members: the web names them.
+    # Who reads the check may not see the space or its members: the web names them. That the
+    # candidates name no one, the service shows (`test_space_suggestion.named_by_kind`).
     assert check.reason == "suggests another space, which shows it to more people"
-    assert all("Haushalt" not in c.label and "anna" not in c.label for c in check.candidates)
     assert check.confidence < 0.9
 
 

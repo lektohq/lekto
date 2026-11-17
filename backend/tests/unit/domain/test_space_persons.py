@@ -61,8 +61,8 @@ def test_anna_s_identifier_alone_suggests_handing_it_over() -> None:
     # Anna is new there: it shows the document to more people (a hand-over among them).
     assert str(check.reason).endswith("which shows it to more people")
     assert check.unseen_by == ()  # Anna sees it where the check leads
-    # Names stay out of what is stored: ids only.
-    assert "anna" not in str(check.reason).lower()
+    # Names stay out of what is stored, ids only: the service shows it
+    # (`test_space_suggestion.named_by_kind`).
 
 
 def test_hard_evidence_against_a_sure_choice_makes_it_uncertain() -> None:
