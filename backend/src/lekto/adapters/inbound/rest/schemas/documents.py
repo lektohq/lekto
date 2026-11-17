@@ -9,7 +9,13 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, Json, field_validator
 
 from lekto.adapters.inbound.rest.schemas.spaces import MemberOut
-from lekto.adapters.inbound.schemas import FieldJson, ReasonOut, RuleReportOut, field_json
+from lekto.adapters.inbound.schemas import (
+    FieldJson,
+    ReasonOut,
+    RequestBody,
+    RuleReportOut,
+    field_json,
+)
 from lekto.core.domain.documents import MAX_TITLE, Channel, Document
 from lekto.core.domain.exchanges import ModelCall, RunExchange
 from lekto.core.domain.imports import MAX_REVIEW_REASON, MAX_REVIEWS
@@ -361,13 +367,12 @@ class DocumentFacetsOut(BaseModel):
         )
 
 
-class DocumentPatch(BaseModel):
+class DocumentPatch(RequestBody):
     """Fields left out stay as they are; null removes a value. A new contact that does not
     enable the document's topic removes the topic; a topic given must be one the contact
     enables (422), unless an admin gives it: it is then enabled at the contact."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -539,9 +544,8 @@ class UploadFields(BaseModel):
         return value
 
 
-class MoveRequest(BaseModel):
+class MoveRequest(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"space_id": "01999d5e-3333-7c1e-b6a3-2f4d5e6f7a8b"}]},
     )
 
@@ -661,7 +665,7 @@ class RunExchangeOut(BaseModel):
         return cls(run=exchange.run, calls=[ModelCallOut.of(call) for call in exchange.calls])
 
 
-class ReprocessRequest(BaseModel):
+class ReprocessRequest(RequestBody):
     model_config = ConfigDict(
         extra="forbid", json_schema_extra={"examples": [{"from_node": "judge"}]}
     )

@@ -3,6 +3,7 @@ identifiers): an address names a value by its reference, never as written."""
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.reasons import ReasonCode, because
@@ -25,9 +26,8 @@ def opened(refs: RefCipher, kind: IdentifierKind, ref: str) -> str:
         raise ValidationError(because(ReasonCode.REF_UNKNOWN)) from None
 
 
-class RefIn(BaseModel):
+class RefIn(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"kind": "invoice_number", "value": "R-2025-0471"}]},
     )
 

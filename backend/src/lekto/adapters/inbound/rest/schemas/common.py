@@ -4,16 +4,16 @@ from collections.abc import Callable
 from datetime import timedelta
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.validation import MAX_NAME
 
 Name = Annotated[str, Field(min_length=1, max_length=MAX_NAME, examples=["ACME Energy"])]
 
 
-class NameIn(BaseModel):
+class NameIn(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"name": "ACME Energy"}]},
     )
 

@@ -428,6 +428,13 @@ async def test_documents_list_refuses_an_offset_beyond_what_the_database_holds(
     assert not (await call(api, owner, "documents_list", offset=MAX_POSITION)).is_error
 
 
+async def test_a_nul_in_a_tool_s_argument_is_refused(api: Api, scene: Scene) -> None:
+    """As in a REST body (RB-08)."""
+    owner = scene.headers["owner"]
+    refused = await call(api, owner, "documents_update", id=scene.green, title="a\x00b")
+    assert "title holds a NUL character" in error(refused)
+
+
 async def test_documents_update_refuses_a_moment_beyond_the_calendar(
     api: Api, scene: Scene
 ) -> None:

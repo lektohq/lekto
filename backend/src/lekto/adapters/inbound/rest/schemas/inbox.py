@@ -8,7 +8,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.rest.schemas.documents import DocumentDetails, DocumentPatch
-from lekto.adapters.inbound.schemas import ReasonOut
+from lekto.adapters.inbound.schemas import ReasonOut, RequestBody
 from lekto.core.domain.classification import Candidate, CandidateSource, FieldCheck
 from lekto.core.domain.inbox import DONE_PERIOD, Departure, Done, InboxTab
 from lekto.core.domain.labels import LABEL_LINES, LabelCheck, LabelOutcome
@@ -473,9 +473,8 @@ class ReviewOut(BaseModel):
         )
 
 
-class ConfirmRequest(BaseModel):
+class ConfirmRequest(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {

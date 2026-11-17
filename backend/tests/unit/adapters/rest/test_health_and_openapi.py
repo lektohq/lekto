@@ -14,6 +14,7 @@ from typing import Any
 import httpx2
 from pydantic import BaseModel
 
+import lekto.adapters.inbound
 from lekto.adapters.inbound.rest import (
     HEALTH_PATH,
     OIDC_CALLBACK_PATH,
@@ -22,6 +23,7 @@ from lekto.adapters.inbound.rest import (
     schemas,
 )
 from lekto.adapters.inbound.rest.app import DOCS_PATH, FAVICON_PATH, SWAGGER_PATH
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.composition.api import api_context
 from lekto.composition.container import build_memory_container, build_services
 from tests import builders
@@ -402,6 +404,36 @@ async def test_every_object_in_a_request_body_refuses_unknown_keys(api: Api) -> 
             content = operation.get("requestBody", {}).get("content", {})
             if "application/json" in content:
                 walk(content["application/json"]["schema"], f"{method.upper()} {path}", frozenset())
+    assert not lenient
+
+
+def _models() -> dict[str, list[type[BaseModel]]]:
+    found: dict[str, list[type[BaseModel]]] = {}
+    for info in pkgutil.walk_packages(lekto.adapters.inbound.__path__, "lekto.adapters.inbound."):
+        module = importlib.import_module(info.name)
+        for item in vars(module).values():
+            if (
+                isinstance(item, type)
+                and issubclass(item, BaseModel)
+                and item.__module__ == info.name
+            ):
+                found.setdefault(item.__name__, []).append(item)
+    return found
+
+
+async def test_every_json_body_of_the_api_is_a_request_body(api: Api) -> None:
+    """So no route's body is left without the checks of `RequestBody` (RB-08)."""
+    models = _models()
+    names: set[str] = set()
+    for methods in (await openapi(api))["paths"].values():
+        for operation in methods.values():
+            content = operation.get("requestBody", {}).get("content", {})
+            if "application/json" in content:
+                schema = content["application/json"]["schema"]
+                refs = [schema, *schema.get("anyOf", []), *schema.get("oneOf", [])]
+                names.update(ref["$ref"].rsplit("/", 1)[-1] for ref in refs if "$ref" in ref)
+    assert names
+    lenient = {name for name in names if not all(issubclass(m, RequestBody) for m in models[name])}
     assert not lenient
 
 

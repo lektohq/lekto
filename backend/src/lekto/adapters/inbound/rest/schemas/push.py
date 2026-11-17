@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.push import (
     MAX_DEVICE_NAME,
     MAX_ENDPOINT,
@@ -33,9 +34,8 @@ class PushKeysIn(BaseModel):
     auth: str = Field(max_length=100, description="The browser's auth secret (base64url).")
 
 
-class PushDeviceIn(BaseModel):
+class PushDeviceIn(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -105,9 +105,8 @@ class PushTestOut(BaseModel):
 NoticeKind = Literal["waiting", "mailbox_failed", "webhook_disabled", "job_failed"]
 
 
-class PushPreferencesBody(BaseModel):
+class PushPreferencesBody(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [{"kinds": ["waiting", "webhook_disabled"], "titles": True}]
         },

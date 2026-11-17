@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.rest.schemas.documents import ReprocessNode
 from lekto.adapters.inbound.rest.schemas.rules import SkippedOut
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.bulk import MAX_IDS, BulkAction, BulkKind, BulkOperation, BulkStatus
 from lekto.core.domain.ids import ContactId, DocumentTypeId, SpaceId, TagId
 from lekto.core.domain.lenses import MAX_QUERY_LENGTH
@@ -55,9 +56,8 @@ class BulkActionIn(BaseModel):
         )
 
 
-class BulkRequest(BaseModel):
+class BulkRequest(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {

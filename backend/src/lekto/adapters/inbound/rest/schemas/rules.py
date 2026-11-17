@@ -18,6 +18,7 @@ from lekto.adapters.inbound.schemas import (
     MoneyValue,
     PeriodValue,
     ReasonOut,
+    RequestBody,
     RuleEffectOut,
     RuleNoteOut,
     RuleReportOut,
@@ -367,10 +368,10 @@ _RULE_EXAMPLE: dict[str, Any] = {
 }
 
 
-class RuleDefinitionIn(BaseModel):
+class RuleDefinitionIn(RequestBody):
     """The content of a rule; changing it makes a new version."""
 
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [_RULE_EXAMPLE]})
+    model_config = ConfigDict(json_schema_extra={"examples": [_RULE_EXAMPLE]})
 
     name: str = Field(min_length=1, max_length=MAX_NAME)
     priority: int = Field(
@@ -444,7 +445,7 @@ class RuleCreate(RuleDefinitionIn):
 class RuleChange(RuleDefinitionIn):
     """The new content of a rule, and, with `scope`, where it moves."""
 
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [_RULE_EXAMPLE]})
+    model_config = ConfigDict(json_schema_extra={"examples": [_RULE_EXAMPLE]})
 
     scope: RuleScope | None = Field(
         default=None,
@@ -473,8 +474,8 @@ class RuleChange(RuleDefinitionIn):
         return data
 
 
-class RulePatch(BaseModel):
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [{"enabled": False}]})
+class RulePatch(RequestBody):
+    model_config = ConfigDict(json_schema_extra={"examples": [{"enabled": False}]})
 
     enabled: bool
 
@@ -559,9 +560,8 @@ class RuleOut(_RuleDefinitionOut):
         )
 
 
-class TemplatePreviewIn(BaseModel):
+class TemplatePreviewIn(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -631,8 +631,8 @@ class TemplatePreviewOut(BaseModel):
     )
 
 
-class ApplyPreviewRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [{"limit": 50}]})
+class ApplyPreviewRequest(RequestBody):
+    model_config = ConfigDict(json_schema_extra={"examples": [{"limit": 50}]})
 
     cursor: str | None = Field(default=None, max_length=64, description="`next_cursor`.")
     limit: int = Field(default=PAGE_SIZE, ge=1, le=PAGE_LIMIT)
@@ -756,9 +756,8 @@ class ApplyPreviewOut(BaseModel):
     )
 
 
-class ApplyRequest(BaseModel):
+class ApplyRequest(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {

@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from lekto.adapters.inbound.rest.paths import logo_url
 from lekto.adapters.inbound.rest.schemas.common import Name, NameIn, each_once
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.appearance import MAX_ICON, ContactLogo, LogoSource, PaletteColor
 from lekto.core.domain.fields import FieldDefinition, FieldType
 from lekto.core.domain.identifiers import MAX_IDENTIFIERS, IdentifierKind, IdentifierSource
@@ -55,12 +56,11 @@ Aliases = Annotated[
 ]
 
 
-class IdentifierIn(BaseModel):
+class IdentifierIn(RequestBody):
     """Written as in documents; lekto stores it normalised (an IBAN without spaces, a domain
     without `www.`)."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"kind": "customer_number", "value": "2004-7718"}]},
     )
 
@@ -213,7 +213,6 @@ ContactTopics = Annotated[
 
 class ContactCreate(NameIn):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"name": "ACME Energy", "aliases": ["ACME Strom"]}]},
     )
 
@@ -223,7 +222,7 @@ class ContactCreate(NameIn):
     topic_ids: ContactTopics = Field(default_factory=list)
 
 
-class ContactPatch(BaseModel):
+class ContactPatch(RequestBody):
     """Fields left out stay; `aliases` replaces all aliases, `identifiers` those entered by
     hand and `rejected_identifiers` the rejected ones. A value another contact learned or
     rejected moves here; one another contact entered by hand is a conflict (409)."""
@@ -334,7 +333,6 @@ class FieldAssignmentIn(BaseModel):
 
 class DocumentTypeCreate(NameIn):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [{"name": "Pay slip", "description": "Entgeltbescheinigung"}]
         },
@@ -365,7 +363,7 @@ class DocumentTypeCreate(NameIn):
         return each_once(fields, lambda item: item.field_id, "field")
 
 
-class DocumentTypePatch(BaseModel):
+class DocumentTypePatch(RequestBody):
     """Fields left out stay; a `description` or `title_pattern` of null or empty removes
     it."""
 
@@ -428,7 +426,6 @@ class TagCreate(NameIn):
     `assignment` and `shown` follow the scope unless given."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {"name": "Health insurance", "parent_id": "01999d5e-2222-7c1e-b6a3-2f4d5e6f7a8b"},
@@ -450,7 +447,7 @@ class TagCreate(NameIn):
     color: Color | None = None
 
 
-class TagPatch(BaseModel):
+class TagPatch(RequestBody):
     """Fields left out stay; a `parent_id` of null makes it a top-level tag. The scope stays."""
 
     model_config = ConfigDict(
@@ -564,9 +561,8 @@ RequiredTypes = Annotated[
 ]
 
 
-class FieldCreate(BaseModel):
+class FieldCreate(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -600,12 +596,11 @@ class FieldCreate(BaseModel):
     position: Position = 0
 
 
-class FieldPatch(BaseModel):
+class FieldPatch(RequestBody):
     """Fields left out stay; a `description` of null or empty removes it. The data type
     cannot change."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [{"name": "Payment method", "choices": ["Card", "Transfer", "Cash"]}]
         },
@@ -704,11 +699,10 @@ class FieldOut(BaseModel):
         )
 
 
-class FieldAssignmentsIn(BaseModel):
+class FieldAssignmentsIn(RequestBody):
     """The fields of a document type, global ones aside."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {

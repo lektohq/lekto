@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.rest.schemas.common import Name, NameIn
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.ids import UserId
 from lekto.core.domain.master_data import MAX_DESCRIPTION
 from lekto.core.domain.permissions import space_role
@@ -28,9 +29,8 @@ SpaceDescription = Annotated[
 ]
 
 
-class MemberIn(BaseModel):
+class MemberIn(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"role": "read"}]},
     )
 
@@ -61,7 +61,6 @@ class MemberDetails(MemberOut):
 
 class SpaceCreate(NameIn):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"name": "Household"}]},
     )
 
@@ -76,11 +75,10 @@ class SpaceCreate(NameIn):
     )
 
 
-class SpacePatch(BaseModel):
+class SpacePatch(RequestBody):
     """Fields left out stay; a `description` of null or empty removes it."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"description": "Wohnung, Nebenkosten, Versorger"}]},
     )
 

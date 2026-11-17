@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, SecretStr
 
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.identity import (
     MAX_TOKEN_NAME,
     ApiToken,
@@ -22,9 +23,8 @@ Password = Annotated[SecretStr, Field(min_length=1, max_length=1024)]
 Code = Annotated[str, Field(min_length=1, max_length=64)]
 
 
-class LoginRequest(BaseModel):
+class LoginRequest(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [{"username": "alice", "password": "********", "code": "123456"}]
         },
@@ -150,9 +150,8 @@ class Me(BaseModel):
     )
 
 
-class PasswordChange(BaseModel):
+class PasswordChange(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {"current_password": "********", "new_password": "********", "revoke_tokens": False}
@@ -178,9 +177,8 @@ class TotpSetupOut(BaseModel):
     otpauth_uri: str = Field(examples=["otpauth://totp/Lekto:alice?secret=JBSWY3DPEHPK3PXP"])
 
 
-class CodeIn(BaseModel):
+class CodeIn(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"code": "123456"}]},
     )
 
@@ -193,9 +191,8 @@ class RecoveryCodes(BaseModel):
     recovery_codes: list[str] = Field(examples=[["ABCD-EFGH-IJKL-MNOP"]])
 
 
-class TokenCreate(BaseModel):
+class TokenCreate(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {"name": "scanner", "scope": "read_write", "expires_at": "2027-01-01T00:00:00Z"}

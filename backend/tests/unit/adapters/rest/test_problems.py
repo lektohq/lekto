@@ -110,6 +110,26 @@ async def test_a_number_beyond_what_the_database_holds_is_a_422(api: Api) -> Non
     assert applied.status_code == 422
 
 
+async def test_a_nul_in_a_text_of_a_body_is_a_422(api: Api) -> None:
+    """Postgres takes no NUL: it is refused where it comes in, in a name, in a document's title,
+    deep in a rule (RB-08)."""
+    admin = await api.admin()
+    id = await upload(api, auth(admin))
+    rule = {
+        "name": "Rule",
+        "conditions": {"all": [{"field": "title", "op": "contains", "value": "a\x00b"}]},
+        "actions": [{"type": "add_tags", "tag_names": ["x"]}],
+    }
+    for method, path, body in (
+        ("POST", "/tags", {"name": "a\x00b"}),
+        ("PATCH", f"/documents/{id}", {"title": "a\x00b"}),
+        ("POST", "/rules", rule),
+    ):
+        response = await api.client.request(method, PREFIX + path, json=body, headers=auth(admin))
+        assert response.status_code == 422, (path, response.text)
+        assert "NUL" in response.json()["detail"], path
+
+
 async def test_a_refusal_names_its_code_beside_the_text(api: Api) -> None:
     a = auth(await api.admin())
     await post(api, "/document-types", {"name": "Invoice"}, a)

@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.relations import RelationOrigin, RelationState
 from lekto.core.services.relations import DocumentRelations, Related
 
@@ -85,12 +86,11 @@ class RelationsOut(BaseModel):
         )
 
 
-class RelateIn(BaseModel):
+class RelateIn(RequestBody):
     """The document to relate the document with; Lekto points the relation from the newer to the
     older."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"document_id": "01999d5e-4444-7c1e-b6a3-2f4d5e6f7a8b"}]},
     )
 

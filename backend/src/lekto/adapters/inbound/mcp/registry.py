@@ -24,6 +24,7 @@ from mcp_types import CallToolResult, ListToolsResult, TextContent, ToolAnnotati
 from starlette.requests import Request
 
 from lekto.adapters.inbound.mcp.names import similar_names
+from lekto.adapters.inbound.schemas import refuse_nul
 from lekto.core.domain.errors import DomainError, SearchUnavailableError
 from lekto.core.services.auth import Principal
 
@@ -176,10 +177,15 @@ def _parameters(tool: Tool) -> frozenset[str]:
 
 
 def _guarded(tool: Tool) -> Tool:
-    """Turn the core's errors into the tool's error text."""
+    """Turn the core's errors into the tool's error text; refuse a NUL in a text of the
+    arguments, as a REST body does (`refuse_nul`, RB-08)."""
 
     @functools.wraps(tool)
     async def run(*args: Any, **kwargs: Any) -> Any:
+        try:
+            refuse_nul(kwargs)
+        except ValueError as error:
+            raise ToolError(str(error)) from None
         try:
             return await tool(*args, **kwargs)
         except SearchUnavailableError:

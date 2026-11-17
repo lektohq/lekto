@@ -7,14 +7,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from lekto.adapters.inbound.rest.schemas.common import ms
 from lekto.adapters.inbound.rest.schemas.documents import ListedDocument
 from lekto.adapters.inbound.rest.schemas.open_identifiers import OccurrenceOut
-from lekto.adapters.inbound.schemas import ReasonOut
+from lekto.adapters.inbound.schemas import ReasonOut, RequestBody
 from lekto.core.domain.lenses import MAX_QUERY_LENGTH
 from lekto.core.ports.search_index import MAX_HITS
 from lekto.core.services.indexing import IndexCheck, IndexStatus, JobTimes
 from lekto.core.services.search import SearchMode, SearchPlaces
 
 
-class SearchIn(BaseModel):
+class SearchIn(RequestBody):
     model_config = ConfigDict(
         extra="forbid", json_schema_extra={"examples": [{"q": "Stromrechnung 2025"}]}
     )

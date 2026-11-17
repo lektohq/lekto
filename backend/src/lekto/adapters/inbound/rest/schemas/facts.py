@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.rest.schemas.inbox import BoxOut, LocationOut
-from lekto.adapters.inbound.schemas import MoneyValue
+from lekto.adapters.inbound.schemas import MoneyValue, RequestBody
 from lekto.core.domain.document_facts import (
     FactOrigin,
     FactRole,
@@ -419,11 +419,10 @@ def _origins(report: DocumentFacts, item: FoundIdentifier) -> list[FactOrigin]:
     return sorted(found)
 
 
-class FactDecisionIn(BaseModel):
+class FactDecisionIn(RequestBody):
     """A person's decision about a fact of the document."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {

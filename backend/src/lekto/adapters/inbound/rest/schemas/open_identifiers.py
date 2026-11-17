@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from lekto.adapters.inbound.limits import in_words
 from lekto.adapters.inbound.rest.schemas.inbox import LocationOut
 from lekto.adapters.inbound.rest.schemas.refs import seal
-from lekto.adapters.inbound.schemas import ReasonOut
+from lekto.adapters.inbound.schemas import ReasonOut, RequestBody
 from lekto.core.domain.document_facts import FactRole
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import ContactId, UserId
@@ -221,8 +221,8 @@ class OpenDetailOut(BaseModel):
         )
 
 
-class OpenSearchIn(BaseModel):
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [{"q": "2004 7718"}]})
+class OpenSearchIn(RequestBody):
+    model_config = ConfigDict(json_schema_extra={"examples": [{"q": "2004 7718"}]})
 
     q: str = Field(
         min_length=1,
@@ -258,9 +258,8 @@ class OpenDecisionIn(BaseModel):
         )
 
 
-class OpenDecisionsIn(BaseModel):
+class OpenDecisionsIn(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {

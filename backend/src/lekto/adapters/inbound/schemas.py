@@ -5,7 +5,7 @@ from datetime import date
 from typing import Annotated, Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
 from lekto.core.domain.fields import FieldValue, field_to_json
 from lekto.core.domain.reasons import Reason, ReasonCode
@@ -13,6 +13,38 @@ from lekto.core.domain.rule_planner import Effect, Note, NoteKind, RuleReport
 from lekto.core.domain.rules import RuleScope
 from lekto.core.services._access import DocumentRef
 from lekto.core.services.rules.running import Send
+
+
+def refuse_nul(value: object, where: str = "") -> None:
+    """ValueError if a text in `value` (a body or a tool's arguments as read: texts, lists,
+    objects, their keys too) holds a NUL character. Postgres takes none, in `text` nor in
+    `jsonb`, and its driver's error is no DomainError: a 500. Checked where a request comes in,
+    not in the core: `require_name` also reads stored documents (RB-08)."""
+    if isinstance(value, str):
+        if "\x00" in value:
+            raise ValueError(f"{where or 'a text'} holds a NUL character")
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            refuse_nul(key, f"{where} key" if where else "a key")
+            refuse_nul(item, f"{where}.{key}" if where else str(key))
+    elif isinstance(value, list | tuple):
+        for index, item in enumerate(value):
+            refuse_nul(item, f"{where}[{index}]")
+
+
+class RequestBody(BaseModel):
+    """A JSON request body of the REST API: no key it does not know (`extra="forbid"`, the
+    security baseline; RB-06) and no NUL in any of its texts (`refuse_nul`, RB-08). What a
+    body holds (a condition, a value) forbids unknown keys itself."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _without_nul(cls, data: Any) -> Any:
+        refuse_nul(data)
+        return data
+
 
 MAX_POSITION = 2**31 - 1
 """The largest offset into a list and the largest version number REST and MCP take: what a

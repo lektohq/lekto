@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.documents import UNSET
 from lekto.core.domain.identifiers import (
     MAX_IDENTIFIERS,
@@ -144,12 +145,11 @@ class ProfileOut(BaseModel):
         )
 
 
-class ProfilePatch(BaseModel):
+class ProfilePatch(RequestBody):
     """What is given changes; null removes the display name, birth date or e-mail; `aliases`,
     `identifiers` and `numbers` replace all of them."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {

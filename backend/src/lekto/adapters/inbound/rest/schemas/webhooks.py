@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.rest.schemas.common import following_offset
-from lekto.adapters.inbound.schemas import ReasonOut
+from lekto.adapters.inbound.schemas import ReasonOut, RequestBody
 from lekto.core.domain.documents import UNSET, Unset
 from lekto.core.domain.tasks import DEFAULT_TIMEOUT, MAX_TIMEOUT, MIN_TIMEOUT
 from lekto.core.domain.validation import MAX_URL_LENGTH
@@ -131,9 +131,8 @@ class HeaderPatch(BaseModel):
     )
 
 
-class WebhookCreate(BaseModel):
+class WebhookCreate(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -178,10 +177,10 @@ class WebhookCreate(BaseModel):
     model_call: WebhookModelCallIn | None = Field(default=None, description=MODEL_CALL_HELP)
 
 
-class WebhookPatch(BaseModel):
+class WebhookPatch(RequestBody):
     """Fields left out stay as they are."""
 
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [{"active": False}]})
+    model_config = ConfigDict(json_schema_extra={"examples": [{"active": False}]})
 
     name: str | None = Field(default=None, min_length=1, max_length=MAX_NAME_LENGTH)
     url: str | None = Field(default=None, max_length=MAX_URL_LENGTH)
