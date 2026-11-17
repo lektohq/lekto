@@ -372,8 +372,13 @@ class IndexingService:
             return
         try:
             outcome = await work()
-        except ConcurrencyError:
-            lost(job)
+        except ConcurrencyError as error:
+            # A lost claim only if another worker owns the job now; else (a deadlock, a row
+            # changed meanwhile) it fails this attempt and runs again (SA-08).
+            if not await self._jobs.still_claimed(job):
+                lost(job)
+                return
+            await self._failed(job, error)
             return
         except Exception as error:
             await self._failed(job, error)

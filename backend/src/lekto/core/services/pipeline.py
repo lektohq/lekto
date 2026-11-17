@@ -22,7 +22,6 @@ from lekto.core.domain.documents import (
     received_at,
 )
 from lekto.core.domain.errors import (
-    ConcurrencyError,
     ConflictError,
     InvalidTransitionError,
     NotFoundError,
@@ -92,7 +91,6 @@ from lekto.core.services._jobs import (
     NodeJob,
     document_payload,
     enqueue_nodes,
-    lost,
     payload_document,
     retrying,
 )
@@ -1077,7 +1075,8 @@ class PipelineService:
         except (KeyError, ValueError) as error:
             await self._jobs.invalid(job, error)
             return
-        try:
+
+        async def store() -> None:
             async with self._uow() as uow:
                 await uow.lock(RELATIONS_LOCK)
                 document = await uow.documents.find(document_id)
@@ -1093,8 +1092,11 @@ class PipelineService:
                 )
                 await uow.jobs.complete(job, now=now, result=result)
                 await uow.commit()
-        except ConcurrencyError:
-            lost(job)
+
+        # A conflict is a lost claim only if another worker owns the job now; else (a deadlock,
+        # a row changed meanwhile) it is tried again (SA-08).
+        try:
+            await self._jobs.storing(job, store)
         except Exception as error:
             await self._failed_aside(job, "finding the relations failed", document_id, error)
 

@@ -9,11 +9,13 @@ import pytest
 
 from lekto.core.domain.document_facts import DocumentFact, FactOrigin, FactRole
 from lekto.core.domain.documents import Document, DocumentChanges
+from lekto.core.domain.errors import ConcurrencyError
 from lekto.core.domain.events import DocumentUpdated
 from lekto.core.domain.fields import FieldDefinition, FieldType
 from lekto.core.domain.first_runs import RELATIONS
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import ContactId, DocumentId, DocumentTypeId
+from lekto.core.domain.jobs import JobStatus
 from lekto.core.domain.master_data import Contact, DocumentType
 from lekto.core.domain.periods import Period
 from lekto.core.domain.pipeline import Node, NodeResult, NodeRun, Outcome
@@ -21,9 +23,10 @@ from lekto.core.domain.relations import Relation, RelationOrigin, RelationState
 from lekto.core.domain.rules import AddTags, Condition, ConditionField, Operator
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
+from lekto.core.services import pipeline as pipeline_module
 from lekto.core.services import relating
 from lekto.core.services.classification.signals import FactsSignal
-from lekto.core.services.relating import RELATE, queue_relate, relate
+from lekto.core.services.relating import RELATE, RELATE_JOB, queue_relate, relate
 from lekto.core.services.relations import RELATIONS_LOCK, RelationService
 from tests import builders
 from tests.unit.services.rules_support import Classifies, definition, rule_world
@@ -572,3 +575,33 @@ async def test_the_log_names_no_removed_relation_to_a_document_the_reader_does_n
     log = await world.documents.processing_log(owner.id, reminder.id)
     (entry,) = [item for item in log if item.node is Node.RELATE]
     assert entry.result.output["dropped"] == [removed(visible)]
+
+
+async def test_a_conflict_while_relating_aside_is_tried_again(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A deadlock or a row changed meanwhile is no lost claim while the job is still this
+    worker's: it was left running until its lease ran out (SA-08)."""
+    r = await rule_world(world)
+    owner = await world.user()
+    facts = FactsSignal(world.uow, world.object_store)
+    invoice = await r.arrive(owner, text="Rechnungsnummer: VB-889911", facts=facts)
+    reminder = await r.arrive(owner, text="Ihre Rechnung Nr. VB-889911 ist offen.", facts=facts)
+    pipeline = r.pipeline(facts=facts)
+    async with world.uow() as uow:
+        await uow.document_relations.remove(reminder.id, invoice.id)
+        await queue_relate(uow, reminder.id, NOW)
+        await uow.commit()
+    conflicts = [ConcurrencyError("could not serialize access")]
+
+    async def relating(*args: Any) -> Any:
+        if conflicts:
+            raise conflicts.pop()
+        return await relate(*args)
+
+    monkeypatch.setattr(pipeline_module, "relate", relating)
+    await world.drain(pipeline)
+    assert not conflicts
+    assert len(await stored_relations(world, reminder)) == 1
+    relate_jobs = [job for job in world.database.jobs.values() if job.kind == RELATE_JOB]
+    assert relate_jobs and all(job.status is JobStatus.DONE for job in relate_jobs)

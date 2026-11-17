@@ -16,7 +16,12 @@ from lekto.adapters.outbound.memory import (
 from lekto.adapters.outbound.memory.processing import FAKE_PDF
 from lekto.core.domain.document_facts import FactRole
 from lekto.core.domain.documents import DocumentChanges
-from lekto.core.domain.errors import EmbeddingsError, PermissionDeniedError, SearchIndexError
+from lekto.core.domain.errors import (
+    ConcurrencyError,
+    EmbeddingsError,
+    PermissionDeniedError,
+    SearchIndexError,
+)
 from lekto.core.domain.events import NodeCompleted, NodeDeferred, NodeStarted
 from lekto.core.domain.fields import FieldType
 from lekto.core.domain.identifiers import IdentifierKind
@@ -34,6 +39,7 @@ from lekto.core.services.indexing import (
     INDEX_JOB,
     RECONCILE_JOB,
     REFRESH_JOB,
+    IndexingService,
     split_sections,
 )
 from lekto.core.services.objects import archive_key
@@ -898,3 +904,23 @@ async def test_the_facts_read_outside_processing_reach_the_index(setup: Setup) -
     assert await pipeline.request_facts() == 1
     await setup.settle(pipeline_service=pipeline)
     assert any(token.startswith("iban|") for token in setup.entry(document.id).facts)
+
+
+async def test_a_conflict_while_indexing_fails_the_attempt_not_the_claim(
+    setup: Setup, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A deadlock or a row changed meanwhile is no lost claim while the job is still this
+    worker's: the job runs again later, not left running until its lease ran out (SA-08)."""
+    document = DocumentId(new_id())
+    await setup.indexing.on_event(
+        NodeCompleted(document_id=document, occurred_at=NOW, node=Node.JUDGE, run=1, outcome=OK)
+    )
+
+    async def conflict(*args: object, **kwargs: object) -> None:
+        raise ConcurrencyError("could not serialize access")
+
+    monkeypatch.setattr(IndexingService, "index_document", conflict)
+    assert await setup.indexing.run_next_job()
+    (job,) = index_jobs(setup.world)
+    assert job.status is JobStatus.QUEUED
+    assert job.last_error is not None and "ConcurrencyError" in job.last_error
