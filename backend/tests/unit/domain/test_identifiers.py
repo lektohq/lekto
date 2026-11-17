@@ -301,6 +301,10 @@ def test_what_only_looks_like_a_date_is_a_number() -> None:
         "Zählernummer 1.8.0 (Bezug) kWh 2.8.0 (Lieferung) kWh",
         "Vertragsnummer 332",
         "Vertragskonto bei Muster",
+        # A label that is no whole word (DA-02).
+        "Ihre Kundennummern 2024 bis 2025",
+        "Customer notes 2024",
+        "Personalnummern 00123 und 00124",
     ],
 )
 def test_what_a_reader_takes_for_a_number_but_is_none(text: str) -> None:

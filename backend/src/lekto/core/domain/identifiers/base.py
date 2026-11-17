@@ -125,7 +125,9 @@ Schaden-Nummer lautet 12-34-567/890123-X", "Your customer number is 4711"), also
 filler and its word ("Die Vertragsnummer bei Muster lautet 123/456789-X-01")."""
 # A label, then the value: its first word, and further words that hold a digit (`DE 123 456
 # 789`, `123 456`), not the words after it (`DE123456789 Steuernummer`, `4711 Tel.1: 0621`).
-VALUE = rf"{_BEFORE}({_WORDS})"
+VALUE = rf"(?![a-zäöüß]){_BEFORE}({_WORDS})"
+"""A value after its label, the label a whole word as in `labelled`: "Kundennummern 2024" or
+"Customer notes 2024" read no customer number (DA-02)."""
 
 
 class IdentifierType:
