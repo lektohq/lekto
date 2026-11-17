@@ -93,7 +93,7 @@ from lekto.core.domain.reading import (
 )
 from lekto.core.domain.reasons import Reason, ReasonCode, because
 from lekto.core.domain.sorting import sort_key
-from lekto.core.domain.tasks import TaskKind, TaskStatus
+from lekto.core.domain.tasks import TaskKind
 from lekto.core.domain.text import Shortened, shorten
 from lekto.core.domain.validation import name_key
 from lekto.core.domain.verdict import (
@@ -129,9 +129,11 @@ from lekto.core.services.classification.answers import (
     read_holder_to_json,
 )
 from lekto.core.services.classification.external import (
+    Answered,
     ExternalCall,
     ListedSpace,
-    ModelCallState,
+    ModelCallContext,
+    by_webhook,
     extract_context,
     model_call_state,
     proposal_of,
@@ -169,7 +171,7 @@ from lekto.core.services.classification.signals import (
     model_proposal,
     signals_of,
 )
-from lekto.core.services.exchanges import keep_answer, keep_calls, keep_request
+from lekto.core.services.exchanges import keep_calls
 from lekto.core.services.nodes import ARCHIVE_FILE, work_directory
 from lekto.core.services.objects import (
     archive_key,
@@ -412,26 +414,38 @@ class LlmSignal(_ModelStep):
         if outside is None and self._model is None:
             return abstained(because(ReasonCode.NO_LANGUAGE_MODEL))
         text = await _document_text(self._store, document.id)
-        if outside is not None and outside.settled is not None:
-            return await self._answered(document, text, outside)
-        if outside is not None and outside.sent:
-            return ExternalCall(outside, None)
-        offer = await self._offer(document, text)
         if outside is not None:
-            context = propose_context(
-                document,
-                text,
-                contacts=offer.listed_contacts,
-                document_types=offer.typed,
-                general=offer.general,
-                tags=offer.tag_names,
-                spaces=offer.spaces,
-                schema=offer.schema,
+
+            async def context() -> ModelCallContext:
+                offer = await self._offer(document, text)
+                return propose_context(
+                    document,
+                    text,
+                    contacts=offer.listed_contacts,
+                    document_types=offer.typed,
+                    general=offer.general,
+                    tags=offer.tag_names,
+                    spaces=offer.spaces,
+                    schema=offer.schema,
+                )
+
+            called = await by_webhook(
+                outside, self._store, document, Node.SIGNAL_LLM, text, context, proposal_of
             )
-            await keep_request(
-                self._store, document, Node.SIGNAL_LLM, await asyncio.to_thread(context.logged)
+            if not isinstance(called, Answered):
+                return called
+            answer, fields, spaces = called.read
+            return NodeResult(
+                outcome=Outcome.OK,
+                model_version=outside.model_version,
+                input=called.input,
+                output={
+                    "attempts": 1,
+                    "answer": answer.raw,
+                    PROPOSAL: StoredProposal.of(answer, fields, spaces).to_json(),
+                },
             )
-            return ExternalCall(outside, context)
+        offer = await self._offer(document, text)
         sent = shorten(text, self._policy.input_budget)
         input = self._input(document, text, sent, PROPOSE_PROMPT) | {
             "contacts": offer.contacts,
@@ -594,36 +608,6 @@ class LlmSignal(_ModelStep):
             MODEL_HOLDERS: [read_holder_to_json(holder) for holder in told],
         }
         return output, answers, read, told
-
-    async def _answered(self, document: Document, text: str, outside: ModelCallState) -> NodeResult:
-        """What the webhook's task brought: its proposal, as the model's, or why none."""
-        task = outside.settled
-        assert task is not None
-        input = outside.input(document, text)
-        if task.status is not TaskStatus.ANSWERED:
-            return outside.failed(input)
-        try:
-            answer, fields, spaces = proposal_of(task)
-        except AnswerError as error:  # checked when it came: the contract changed since
-            return outside.unfit(input, str(error))
-        await keep_answer(
-            self._store, document, Node.SIGNAL_LLM, _answer_text(task.answer), outside.model_version
-        )
-        return NodeResult(
-            outcome=Outcome.OK,
-            model_version=outside.model_version,
-            input=input,
-            output={
-                "attempts": 1,
-                "answer": answer.raw,
-                PROPOSAL: StoredProposal.of(answer, fields, spaces).to_json(),
-            },
-        )
-
-
-def _answer_text(answer: JsonValue) -> str:
-    """A webhook's answer as the document keeps it beside what was sent."""
-    return json.dumps(answer, ensure_ascii=False, indent=2)
 
 
 def _listed_spaces(candidates: SpaceCandidates | None) -> dict[str, ListedSpace]:
@@ -949,30 +933,20 @@ class FieldsNode(_ModelStep):
         )
         external: str | None = None  # what answered, if a webhook did
         if outside is not None:
-            task = outside.settled
-            if task is None and outside.sent:
-                return ExternalCall(outside, None)
-            if task is None:
-                context = extract_context(
-                    document,
-                    text,
-                    None if document_type is None else document_type.name,
-                    field_keys(missing),
-                )
-                await keep_request(
-                    self._store, document, Node.FIELDS, await asyncio.to_thread(context.logged)
-                )
-                return ExternalCall(outside, context)
-            input |= outside.input(document, text)
-            if task.status is not TaskStatus.ANSWERED:
-                return outside.failed(input)
-            try:
-                read = values_of(task)
-            except AnswerError as error:  # checked when it came: the contract changed since
-                return outside.unfit(input, str(error))
-            await keep_answer(
-                self._store, document, Node.FIELDS, _answer_text(task.answer), outside.model_version
+
+            async def context() -> ModelCallContext:
+                name = None if document_type is None else document_type.name
+                return extract_context(document, text, name, field_keys(missing))
+
+            called = await by_webhook(
+                outside, self._store, document, Node.FIELDS, text, context, values_of
             )
+            if not isinstance(called, Answered):
+                if isinstance(called, NodeResult):  # what was taken over is input too
+                    return replace(called, input=input | called.input)
+                return called
+            input |= called.input
+            read = called.read
             external = outside.model_version
             # A field defined after the request went was not asked for: nothing read it.
             given |= {

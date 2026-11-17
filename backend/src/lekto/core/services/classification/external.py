@@ -14,8 +14,9 @@ with the rules of the system prompt as descriptions. Lekto's guard against instr
 text and the budget for the text are the consumer's.
 """
 
+import asyncio
 import json
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
@@ -37,6 +38,7 @@ from lekto.core.domain.pipeline import (
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.tasks import DEFAULT_TIMEOUT, Task, TaskKind, TaskStatus
 from lekto.core.domain.webhooks import ModelCallKind, Webhook
+from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services.classification.answers import (
     AnswerError,
@@ -57,6 +59,7 @@ from lekto.core.services.classification.prompts import (
     WRITTEN_FORMS,
     Listed,
 )
+from lekto.core.services.exchanges import keep_answer, keep_request
 from lekto.core.services.objects import text_key
 from lekto.core.services.tasks.desk import Ask, TaskDesk, TaskRequest
 from lekto.core.services.tasks.files import STRUCTURE, page_file
@@ -458,3 +461,43 @@ class ExternalCall:
         if placed.status.settled:  # the request could not be made: the node reads why
             return Delegation(None, again=True)
         return Delegation(placed.deadline)
+
+
+@dataclass(frozen=True)
+class Answered[T]:
+    """What a webhook's answer to a model call brought (`read`), and the run's input."""
+
+    input: JsonObject
+    read: T
+
+
+async def by_webhook[T](
+    outside: ModelCallState,
+    store: ObjectStore,
+    document: Document,
+    node: Node,
+    text: str,
+    context: Callable[[], Awaitable[ModelCallContext]],
+    read: Callable[[Task], T],
+) -> "Answered[T] | NodeResult | ExternalCall":
+    """A model call a webhook takes over, as the model's signal and the fields node make it
+    (SA-15): its answer as `read` reads it (kept beside what was sent), why it brought none
+    (failed; unfit when `read` raises AnswerError), the call while it waits, or the call that
+    sends the `context` built now (kept as the request)."""
+    task = outside.settled
+    if task is not None:
+        input = outside.input(document, text)
+        if task.status is not TaskStatus.ANSWERED:
+            return outside.failed(input)
+        try:
+            answer = read(task)
+        except AnswerError as error:  # checked when it came: the contract changed since
+            return outside.unfit(input, str(error))
+        written = json.dumps(task.answer, ensure_ascii=False, indent=2)
+        await keep_answer(store, document, node, written, outside.model_version)
+        return Answered(input, answer)
+    if outside.sent:
+        return ExternalCall(outside, None)
+    sending = await context()
+    await keep_request(store, document, node, await asyncio.to_thread(sending.logged))
+    return ExternalCall(outside, sending)
