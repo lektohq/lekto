@@ -108,8 +108,9 @@ class ModelCallRole:
 
 MAX_HEADERS = 20
 MAX_HEADER_VALUE = 4096
-_HEADER_NAME = re.compile(r"[!#$%&'*+\-.^_`|~0-9A-Za-z]{1,100}")
-"""A header name: a token of RFC 9110 (section 5.1), at most 100 characters."""
+MAX_HEADER_NAME = 100
+_HEADER_NAME = re.compile(rf"[!#$%&'*+\-.^_`|~0-9A-Za-z]{{1,{MAX_HEADER_NAME}}}")
+"""A header name: a token of RFC 9110 (section 5.1), at most `MAX_HEADER_NAME` characters."""
 RESERVED_HEADERS = frozenset(
     {"content-type", "content-length", "host", "connection", "transfer-encoding"}
 )

@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.documents import UNSET
 from lekto.core.domain.identifiers import (
+    MAX_IDENTIFIER_VALUE,
     MAX_IDENTIFIERS,
     Identifier,
     IdentifierKind,
@@ -42,7 +43,7 @@ class PersonIdentifierIn(BaseModel):
             "kinds are a contact's (422)."
         )
     )
-    value: str = Field(min_length=1, max_length=100)
+    value: str = Field(min_length=1, max_length=MAX_IDENTIFIER_VALUE)
 
 
 class PersonIdentifierOut(BaseModel):
@@ -72,7 +73,7 @@ class ContactNumberIn(BaseModel):
         description="`customer_number` (also a contract or policy number) or `personnel_number`; "
         "other kinds name nobody (422)."
     )
-    value: str = Field(min_length=1, max_length=100)
+    value: str = Field(min_length=1, max_length=MAX_IDENTIFIER_VALUE)
     topic_id: UUID | None = Field(
         default=None,
         description="One of the contact's topics it points to (a personnel number to work).",
@@ -168,7 +169,7 @@ class ProfilePatch(RequestBody):
     )
     aliases: list[Alias] = Field(default_factory=list, max_length=MAX_ALIASES)
     birth_date: date | None = None
-    email: str | None = Field(default=None, max_length=254)
+    email: str | None = Field(default=None, max_length=MAX_IDENTIFIER_VALUE)
     identifiers: list[PersonIdentifierIn] = Field(
         default_factory=list,
         max_length=MAX_PERSON_IDENTIFIERS,

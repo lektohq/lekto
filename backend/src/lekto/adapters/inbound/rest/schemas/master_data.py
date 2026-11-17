@@ -10,8 +10,19 @@ from lekto.adapters.inbound.rest.paths import logo_url
 from lekto.adapters.inbound.rest.schemas.common import Name, NameIn, each_once
 from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.appearance import MAX_ICON, ContactLogo, LogoSource, PaletteColor
-from lekto.core.domain.fields import FieldDefinition, FieldType
-from lekto.core.domain.identifiers import MAX_IDENTIFIERS, IdentifierKind, IdentifierSource
+from lekto.core.domain.fields import (
+    MAX_CHOICES,
+    MAX_FIELD_POSITION,
+    MAX_TYPE_FIELDS,
+    FieldDefinition,
+    FieldType,
+)
+from lekto.core.domain.identifiers import (
+    MAX_IDENTIFIER_VALUE,
+    MAX_IDENTIFIERS,
+    IdentifierKind,
+    IdentifierSource,
+)
 from lekto.core.domain.master_data import (
     MAX_ALIASES,
     MAX_DESCRIPTION,
@@ -25,7 +36,7 @@ from lekto.core.domain.master_data import (
     TagScope,
 )
 from lekto.core.domain.tag_tree import TagTree
-from lekto.core.domain.validation import MAX_REFERENCES
+from lekto.core.domain.validation import MAX_NAME, MAX_REFERENCES
 from lekto.core.ports.images import LOGO_SIZE
 
 
@@ -65,7 +76,9 @@ class IdentifierIn(RequestBody):
     )
 
     kind: IdentifierKind
-    value: str = Field(min_length=1, max_length=100, examples=["DE89 3704 0044 0532 0130 00"])
+    value: str = Field(
+        min_length=1, max_length=MAX_IDENTIFIER_VALUE, examples=["DE89 3704 0044 0532 0130 00"]
+    )
     topic_id: UUID | None = Field(
         default=None,
         description="One of the contact's topics it points to (a personnel number to work): "
@@ -352,7 +365,7 @@ class DocumentTypeCreate(NameIn):
     )
     fields: list[FieldAssignmentIn] = Field(
         default_factory=list,
-        max_length=500,
+        max_length=MAX_TYPE_FIELDS,
         description="The fields of the type besides the global ones, each once, required or "
         "optional: set with it in one transaction (as `PUT /document-types/{id}/fields`).",
     )
@@ -543,8 +556,8 @@ Required = Annotated[
 Position = Annotated[
     int,
     Field(
-        ge=-9999,
-        le=9999,
+        ge=-MAX_FIELD_POSITION,
+        le=MAX_FIELD_POSITION,
         description="Where the field stands among the fields: smaller first, the same by name.",
     ),
 ]
@@ -582,8 +595,8 @@ class FieldCreate(RequestBody):
         max_length=MAX_REFERENCES,
         description="null: global; otherwise only for these document types.",
     )
-    choices: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(
-        default_factory=list, max_length=200, description="For `choice` only."
+    choices: list[Annotated[str, Field(min_length=1, max_length=MAX_NAME)]] = Field(
+        default_factory=list, max_length=MAX_CHOICES, description="For `choice` only."
     )
     required: Required = False
     required_document_type_ids: RequiredTypes = Field(default_factory=list)
@@ -607,9 +620,9 @@ class FieldPatch(RequestBody):
     )
 
     name: Name | None = None
-    choices: list[Annotated[str, Field(min_length=1, max_length=200)]] | None = Field(
+    choices: list[Annotated[str, Field(min_length=1, max_length=MAX_NAME)]] | None = Field(
         default=None,
-        max_length=200,
+        max_length=MAX_CHOICES,
         description="All choices; removing one that documents use is a conflict (409).",
     )
     document_type_ids: list[UUID] | None = Field(
@@ -715,7 +728,9 @@ class FieldAssignmentsIn(RequestBody):
         },
     )
 
-    fields: list[FieldAssignmentIn] = Field(max_length=500, description="Each field once.")
+    fields: list[FieldAssignmentIn] = Field(
+        max_length=MAX_TYPE_FIELDS, description="Each field once."
+    )
 
     @field_validator("fields")
     @classmethod

@@ -21,7 +21,7 @@ from lekto.adapters.inbound.mcp.names import (
 from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
 from lekto.core.domain.errors import ValidationError
-from lekto.core.domain.identifiers import normalise_identifier
+from lekto.core.domain.identifiers import MAX_IDENTIFIER_VALUE, normalise_identifier
 from lekto.core.domain.ids import UserId, short_id
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.open_identifiers import OpenSource
@@ -123,7 +123,9 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
         "text around it.",
     )
     async def identifiers_find(
-        ctx: Context, kind: str, value: Annotated[str, Field(min_length=1, max_length=200)]
+        ctx: Context,
+        kind: str,
+        value: Annotated[str, Field(min_length=1, max_length=MAX_IDENTIFIER_VALUE)],
     ) -> str:
         user = principal_of(ctx).id
         chosen = identifier_kind(kind, "identifier")

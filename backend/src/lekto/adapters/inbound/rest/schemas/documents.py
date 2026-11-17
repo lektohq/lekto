@@ -16,7 +16,7 @@ from lekto.adapters.inbound.schemas import (
     RuleReportOut,
     field_json,
 )
-from lekto.core.domain.documents import MAX_TITLE, REPROCESSABLE_NODES, Channel, Document
+from lekto.core.domain.documents import MAX_TAGS, MAX_TITLE, REPROCESSABLE_NODES, Channel, Document
 from lekto.core.domain.exchanges import ModelCall, RunExchange
 from lekto.core.domain.imports import MAX_REVIEW_REASON, MAX_REVIEWS
 from lekto.core.domain.json_value import JsonObject
@@ -394,7 +394,7 @@ class DocumentPatch(RequestBody):
     contact_id: UUID | None = None
     document_type_id: UUID | None = None
     topic_id: UUID | None = None
-    tag_ids: list[UUID] | None = Field(default=None, max_length=500)
+    tag_ids: list[UUID] | None = Field(default=None, max_length=MAX_TAGS)
     document_date: date | None = None
     fields: dict[UUID, Any] | None = Field(
         default=None,
@@ -459,7 +459,7 @@ class ImportedMetadataIn(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=MAX_TITLE)
     contact_id: UUID | None = None
     document_type_id: UUID | None = None
-    tag_ids: list[UUID] = Field(default_factory=list, max_length=500)
+    tag_ids: list[UUID] = Field(default_factory=list, max_length=MAX_TAGS)
     document_date: date | None = None
     fields: dict[UUID, Any] = Field(
         default_factory=dict, description="Values by field id, as in `PATCH /documents/{id}`."

@@ -34,6 +34,7 @@ from lekto.core.domain.rules import (
     MAX_DEPTH,
     MAX_LIST,
     MAX_PRIORITY,
+    MAX_STEP_NAME,
     MAX_STEP_PATH,
     MAX_TEXT,
     MIN_PRIORITY,
@@ -53,9 +54,9 @@ from lekto.core.domain.validation import MAX_NAME
 from lekto.core.domain.webhooks import MAX_BODY_TEMPLATE
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE
 from lekto.core.services.rules.changes import ArrivalStep
-from lekto.core.services.rules.retroactive import Outcome, TextHit
+from lekto.core.services.rules.retroactive import MAX_APPLY_DOCUMENTS, Outcome, TextHit
 
-MAX_APPLIED = 100_000
+MAX_APPLIED = MAX_APPLY_DOCUMENTS
 """Documents one application of a rule names (`ApplyRequest`): as many as
 `LEKTO_RULES_APPLY_MAX_DOCUMENTS` allows at most; the service bounds them by its value."""
 
@@ -289,7 +290,7 @@ class AskWebhookAction(BaseModel):
     type: Literal["ask_webhook"]
     name: str = Field(
         min_length=1,
-        max_length=50,
+        max_length=MAX_STEP_NAME,
         examples=["accounting"],
         description=(
             "Small letters, digits and `_`, unique in the rule: the steps after it see the "

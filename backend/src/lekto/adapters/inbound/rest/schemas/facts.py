@@ -16,7 +16,7 @@ from lekto.core.domain.document_facts import (
     role_of,
 )
 from lekto.core.domain.facts import FoundIdentifier, Span, Strength
-from lekto.core.domain.identifiers import IdentifierKind
+from lekto.core.domain.identifiers import MAX_IDENTIFIER_VALUE, IdentifierKind
 from lekto.core.services.documents import CodeFacts, DocumentFacts, DocumentNumber
 from lekto.core.services.fact_decisions import FactAction, FactDecision
 
@@ -455,14 +455,17 @@ class FactDecisionIn(RequestBody):
     kind: IdentifierKind
     value: str = Field(
         min_length=1,
-        max_length=200,
+        max_length=MAX_IDENTIFIER_VALUE,
         description="`add`: as written; otherwise the fact's value, normalised.",
     )
     role: FactRole | None = Field(
         default=None, description="`add`: its role; `correct`: the role it has instead."
     )
     new_value: str | None = Field(
-        default=None, min_length=1, max_length=200, description="`correct`: the value, as written."
+        default=None,
+        min_length=1,
+        max_length=MAX_IDENTIFIER_VALUE,
+        description="`correct`: the value, as written.",
     )
     at_contact: bool = Field(
         default=False,

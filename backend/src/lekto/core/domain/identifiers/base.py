@@ -11,6 +11,10 @@ from typing import ClassVar
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.reasons import ReasonCode, because
 
+MAX_IDENTIFIER_VALUE = 200
+"""Characters an identifier's value has at most, as written: at contacts and persons, as a
+fact, a reference, an open identifier, in REST and MCP alike (Tobi, 17.11.2026; RA-03)."""
+
 
 class IdentifierKind(StrEnum):
     """The kinds of identifiers, which are the kinds of facts too (`domain.document_facts`;

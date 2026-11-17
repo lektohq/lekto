@@ -35,7 +35,13 @@ pair of contact and topic. A learned one gets a topic only if all the confirmed 
 stands in carry it.
 """
 
-from lekto.core.domain.identifiers.base import Candidate, IdentifierKind, IdentifierType, Key
+from lekto.core.domain.identifiers.base import (
+    MAX_IDENTIFIER_VALUE,
+    Candidate,
+    IdentifierKind,
+    IdentifierType,
+    Key,
+)
 from lekto.core.domain.identifiers.email_domain import FREE_MAIL
 from lekto.core.domain.identifiers.health_insurance_number import health_insurance_number_valid
 from lekto.core.domain.identifiers.iban import iban_valid
@@ -77,6 +83,7 @@ __all__ = [
     "LEARNED_KINDS",
     "LEARN_FROM",
     "MAX_IDENTIFIERS",
+    "MAX_IDENTIFIER_VALUE",
     "NAMING_KINDS",
     "PERSON_KINDS",
     "PERSON_ONLY_KINDS",

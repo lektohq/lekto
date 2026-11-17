@@ -34,6 +34,7 @@ from lekto.adapters.outbound.liquid import parse_locale
 from lekto.adapters.outbound.webpush.sender import private_key_of as vapid_key_of
 from lekto.composition.errors import ConfigurationError
 from lekto.core.services.documents import TEXT_MAX
+from lekto.core.services.rules.retroactive import MAX_APPLY_DOCUMENTS
 
 ENV_PREFIX = "LEKTO_"
 FILE_SUFFIX = "_FILE"
@@ -337,7 +338,7 @@ class Settings(BaseSettings):
     # text conditions see, and the documents one retroactive application may cover.
     rules_pattern_timeout: Seconds = timedelta(milliseconds=200)
     rules_max_text: Annotated[int, Field(ge=1000, le=10_000_000)] = 200_000
-    rules_apply_max_documents: Annotated[int, Field(ge=1, le=100_000)] = 1000
+    rules_apply_max_documents: Annotated[int, Field(ge=1, le=MAX_APPLY_DOCUMENTS)] = 1000
     # Templates of rules and title patterns write dates and amounts in this locale (`de`,
     # `en_US`, ...; Babel's names); the head of a mail set as a PDF speaks its language too
     # (German, else English).

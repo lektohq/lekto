@@ -352,8 +352,10 @@ class Condition:
         return [] if self.value is None else [self.value]
 
 
-STEP_NAME = re.compile(r"[a-z][a-z0-9_]{0,49}")
-"""A step's name: what the steps after it write as `steps.<name>`."""
+MAX_STEP_NAME = 50
+STEP_NAME = re.compile(rf"[a-z][a-z0-9_]{{0,{MAX_STEP_NAME - 1}}}")
+"""A step's name: what the steps after it write as `steps.<name>`; at most `MAX_STEP_NAME`
+characters."""
 _STEP_KEY = re.compile(r"[A-Za-z0-9_-]{1,100}")
 MAX_STEP_PATH = 200
 

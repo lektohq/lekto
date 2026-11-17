@@ -305,7 +305,7 @@ logos. Set both variables or neither; without them Lekto sends no notification.
 | --- | --- | --- | --- | --- |
 | `LEKTO_RULES_PATTERN_TIMEOUT` | both | `0.2` | duration | Time a regular expression of a rule may run per text or value (worker: rules; API: previews) |
 | `LEKTO_RULES_MAX_TEXT` | both | `200000` | 1,000–10,000,000 | Characters of document text that rules look at |
-| `LEKTO_RULES_APPLY_MAX_DOCUMENTS` | both | `1000` | 1–100,000 | Documents per retroactive application of a rule |
+| `LEKTO_RULES_APPLY_MAX_DOCUMENTS` | both | `1000` | 1–100,000 | Documents per retroactive application of a rule; a request of `LEKTO_REQUEST_MAX_SIZE` (1 MiB) holds about 26,000 of their ids |
 | `LEKTO_TEMPLATE_LOCALE` | both | `de` | text | Locale in which templates write dates and amounts (Babel's names: `de`, `en_US`); the head of a mail set as a PDF speaks its language too (German, else English). See [templates.md](templates.md) |
 
 ## The image

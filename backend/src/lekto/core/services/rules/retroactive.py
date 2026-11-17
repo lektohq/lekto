@@ -185,6 +185,12 @@ class ApplyPreview:
     (`prefilter`), earlier pages included."""
 
 
+MAX_APPLY_DOCUMENTS = 100_000
+"""Documents one retroactive application of a rule names at most: the upper bound of
+`LEKTO_RULES_APPLY_MAX_DOCUMENTS`, which the service takes as its own (`max_documents`). A
+request of `LEKTO_REQUEST_MAX_SIZE` (1 MiB) holds about 26,000 ids (Tobi, 17.11.2026; RB-09)."""
+
+
 class RuleApplicationService:
     job_kinds = (APPLY_JOB,)
     """The kinds of jobs `run_next_job` runs."""

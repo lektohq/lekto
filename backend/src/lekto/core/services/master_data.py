@@ -10,7 +10,7 @@ from lekto.core.domain.errors import (
     NotFoundError,
     ValidationError,
 )
-from lekto.core.domain.fields import FieldDefinition, FieldType, field_order
+from lekto.core.domain.fields import MAX_TYPE_FIELDS, FieldDefinition, FieldType, field_order
 from lekto.core.domain.identifiers import (
     Identifier,
     IdentifierKind,
@@ -652,6 +652,8 @@ class MasterDataService:
     ) -> list[FieldDefinition]:
         """Make `fields` the type's fields besides the global ones (`assign_fields`), in `uow`
         without committing; the fields that changed."""
+        if len(fields) > MAX_TYPE_FIELDS:
+            raise ValidationError(because(ReasonCode.INPUT_TOO_MANY, max=MAX_TYPE_FIELDS))
         id = document_type.id
         definitions = await field_definitions(uow)
         for field in fields:

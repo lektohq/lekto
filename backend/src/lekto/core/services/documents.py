@@ -24,7 +24,14 @@ from lekto.core.domain.document_facts import (
     FactState,
     person_only,
 )
-from lekto.core.domain.documents import Channel, Document, DocumentChanges, confirms
+from lekto.core.domain.documents import (
+    MAX_TAGS,
+    Channel,
+    Document,
+    DocumentChanges,
+    Unset,
+    confirms,
+)
 from lekto.core.domain.errors import (
     ConflictError,
     NotFoundError,
@@ -1093,6 +1100,8 @@ class DocumentService:
         change neither confirms the document nor counts as a person's decision; the checks and
         the rules are the same. `via`: the API token the caller acts through, kept with the
         verdicts and in the log."""
+        if not isinstance(changes.tag_ids, Unset) and len(changes.tag_ids) > MAX_TAGS:
+            raise ValidationError(because(ReasonCode.INPUT_TOO_MANY, max=MAX_TAGS))
         # When the document came in is no metadata the rules decide on: changed alone, they
         # do not run (Tobi, 21.10.2026).
         rules = None if changes.only_receipt else self._rules

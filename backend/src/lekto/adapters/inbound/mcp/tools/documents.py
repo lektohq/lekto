@@ -20,6 +20,7 @@ from lekto.adapters.inbound.schemas import FieldJson, RuleReportOut, field_json
 from lekto.core.domain.classification import CheckField, field_id_of
 from lekto.core.domain.document_facts import FactState
 from lekto.core.domain.documents import (
+    MAX_TAGS,
     MAX_TITLE,
     UNSET,
     Channel,
@@ -187,7 +188,7 @@ class RetryOut(BaseModel):
 # tool's schema): plain aliases, so that the schema names no definitions of its own.
 TitleIn = Annotated[str, Field(min_length=1, max_length=MAX_TITLE, default_factory=lambda: UNSET)]
 NameIn = Annotated[str | None, Field(default_factory=lambda: UNSET)]
-TagsIn = Annotated[list[str], Field(default_factory=lambda: UNSET, max_length=50)]
+TagsIn = Annotated[list[str], Field(default_factory=lambda: UNSET, max_length=MAX_TAGS)]
 DateIn = Annotated[date | None, Field(default_factory=lambda: UNSET)]
 FieldsIn = Annotated[dict[str, Any], Field(default_factory=lambda: UNSET)]
 CreatedIn = Annotated[AwareDatetime, Field(default_factory=lambda: UNSET)]

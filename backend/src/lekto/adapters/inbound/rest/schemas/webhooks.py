@@ -14,6 +14,7 @@ from lekto.core.domain.webhooks import (
     ALL_EVENTS,
     DEFAULT_OPEN_TASKS,
     MAX_BODY_TEMPLATE,
+    MAX_HEADER_NAME,
     MAX_HEADER_VALUE,
     MAX_HEADERS,
     MAX_NAME_LENGTH,
@@ -108,7 +109,7 @@ class WebhookModelCallOut(BaseModel):
 class HeaderIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(min_length=1, max_length=100, examples=["Authorization"])
+    name: str = Field(min_length=1, max_length=MAX_HEADER_NAME, examples=["Authorization"])
     value: str = Field(
         min_length=1,
         max_length=MAX_HEADER_VALUE,
@@ -121,7 +122,7 @@ class HeaderIn(BaseModel):
 class HeaderPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(min_length=1, max_length=100, examples=["Authorization"])
+    name: str = Field(min_length=1, max_length=MAX_HEADER_NAME, examples=["Authorization"])
     value: str | None = Field(
         default=None,
         min_length=1,

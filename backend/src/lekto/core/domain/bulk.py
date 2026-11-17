@@ -15,6 +15,7 @@ from enum import StrEnum
 from typing import Self
 from uuid import UUID
 
+from lekto.core.domain.documents import MAX_TAGS
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import (
@@ -87,6 +88,8 @@ class BulkAction:
             raise ValidationError("name the tags to add or remove")
         if self.add & self.remove:
             raise ValidationError("a tag is both added and removed")
+        if max(len(self.add), len(self.remove)) > MAX_TAGS:
+            raise ValidationError(f"at most {MAX_TAGS} tags to add and {MAX_TAGS} to remove")
         if self.kind is BulkKind.MOVE and self.space is None:
             raise ValidationError("name the space to move into")
         if self.kind is BulkKind.REPROCESS and (self.node is None or self.node is Node.RECEIVE):

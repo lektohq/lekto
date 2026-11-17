@@ -5,7 +5,7 @@ import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 
 /** The longest value of an identifier the API takes (`tests/api-limits.test.ts`). */
-export const IDENTIFIER_VALUE_MAX = 100;
+export const IDENTIFIER_VALUE_MAX = 200;
 
 export type IdentifierIn = components['schemas']['IdentifierIn'];
 export type IdentifierOut = components['schemas']['IdentifierOut'];

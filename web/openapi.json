@@ -28507,7 +28507,7 @@
           },
           "value": {
             "type": "string",
-            "maxLength": 100,
+            "maxLength": 200,
             "minLength": 1,
             "title": "Value"
           },
@@ -30089,7 +30089,7 @@
                   "format": "uuid"
                 },
                 "type": "array",
-                "maxItems": 500
+                "maxItems": 50
               },
               {
                 "type": "null"
@@ -32943,7 +32943,7 @@
           },
           "value": {
             "type": "string",
-            "maxLength": 100,
+            "maxLength": 200,
             "minLength": 1,
             "title": "Value",
             "examples": [
@@ -38627,7 +38627,7 @@
           },
           "value": {
             "type": "string",
-            "maxLength": 100,
+            "maxLength": 200,
             "minLength": 1,
             "title": "Value"
           }
@@ -38978,7 +38978,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 254
+                "maxLength": 200
               },
               {
                 "type": "null"

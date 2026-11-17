@@ -99,6 +99,9 @@ class Sha256:
         return self.hex
 
 
+MAX_TAGS = 50
+"""Tags a person gives a document at most in one change: by hand, in bulk, in an import, in
+REST and MCP alike (Tobi, 17.11.2026; RA-03). Rules may add more."""
 MAX_TITLE = 500
 """Characters of a document's title; the REST schemas, the MCP tool and the model's answers
 keep to it."""

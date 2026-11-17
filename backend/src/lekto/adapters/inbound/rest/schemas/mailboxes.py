@@ -18,8 +18,10 @@ from lekto.core.domain.mail import (
     MAX_HOST,
     MAX_INTERVAL,
     MAX_NAME,
+    MAX_PORT,
     MAX_USERNAME,
     MIN_INTERVAL,
+    MIN_PORT,
     Fallback,
     FetchStart,
     MailAction,
@@ -131,7 +133,7 @@ class MailboxCreate(_Settings):
 
     name: str = Field(min_length=1, max_length=MAX_NAME)
     host: str = Field(min_length=1, max_length=MAX_HOST)
-    port: int = Field(ge=1, le=65535)
+    port: int = Field(ge=MIN_PORT, le=MAX_PORT)
     security: MailSecurity = Field(description=SECURITY_HELP)
     username: str = Field(min_length=1, max_length=MAX_USERNAME)
     password: SecretStr = Field(
@@ -147,7 +149,7 @@ class MailboxPatch(_Settings):
 
     name: str | None = Field(default=None, min_length=1, max_length=MAX_NAME)
     host: str | None = Field(default=None, min_length=1, max_length=MAX_HOST)
-    port: int | None = Field(default=None, ge=1, le=65535)
+    port: int | None = Field(default=None, ge=MIN_PORT, le=MAX_PORT)
     security: MailSecurity | None = Field(default=None, description=SECURITY_HELP)
     username: str | None = Field(default=None, min_length=1, max_length=MAX_USERNAME)
     password: SecretStr | None = Field(
@@ -273,7 +275,7 @@ class ConnectionTestBody(RequestBody):
     )
 
     host: str = Field(min_length=1, max_length=MAX_HOST)
-    port: int = Field(ge=1, le=65535)
+    port: int = Field(ge=MIN_PORT, le=MAX_PORT)
     security: MailSecurity = Field(description=SECURITY_HELP)
     username: str = Field(min_length=1, max_length=MAX_USERNAME)
     password: SecretStr | None = Field(default=None, min_length=1, max_length=MAX_PASSWORD)

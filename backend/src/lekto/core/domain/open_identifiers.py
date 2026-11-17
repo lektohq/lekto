@@ -40,6 +40,8 @@ from lekto.core.domain.master_data import Contact
 from lekto.core.domain.profiles import Person
 from lekto.core.domain.reasons import Reason, ReasonCode, because
 
+MAX_DECISIONS = 200
+"""Decisions about open identifiers in one call at most (RA-03)."""
 REACH = 120
 """Characters of text shown before and after an identifier where it stands."""
 

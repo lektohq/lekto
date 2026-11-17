@@ -12,10 +12,11 @@ from lekto.adapters.inbound.rest.schemas.inbox import LocationOut
 from lekto.adapters.inbound.rest.schemas.refs import seal
 from lekto.adapters.inbound.schemas import ReasonOut, RequestBody
 from lekto.core.domain.document_facts import FactRole
-from lekto.core.domain.identifiers import IdentifierKind
+from lekto.core.domain.identifiers import MAX_IDENTIFIER_VALUE, IdentifierKind
 from lekto.core.domain.ids import ContactId, UserId
 from lekto.core.domain.occurrences import Occurrence
 from lekto.core.domain.open_identifiers import (
+    MAX_DECISIONS,
     OpenIdentifier,
     OpenSource,
     Recommendation,
@@ -30,8 +31,6 @@ from lekto.core.services.open_identifiers import (
     OpenPage,
 )
 from lekto.core.services.places import PLACES, Place
-
-MAX_DECISIONS = 200
 
 
 class OpenContactOut(BaseModel):
@@ -226,7 +225,7 @@ class OpenSearchIn(RequestBody):
 
     q: str = Field(
         min_length=1,
-        max_length=200,
+        max_length=MAX_IDENTIFIER_VALUE,
         description="Words in the value (with or without spaces), as written or in a contact's "
         "name.",
     )
@@ -236,7 +235,9 @@ class OpenDecisionIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: IdentifierKind
-    value: str = Field(max_length=200, description="Normalised, as the list gives it.")
+    value: str = Field(
+        max_length=MAX_IDENTIFIER_VALUE, description="Normalised, as the list gives it."
+    )
     action: OpenAction = Field(
         description="`confirm`: enter it at the contact by hand, or a person's suggestion in "
         "their profile; `reject`: training does not learn it again, and a learned one no "
