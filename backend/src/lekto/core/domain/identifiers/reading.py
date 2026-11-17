@@ -1,8 +1,8 @@
 """Finding identifiers: readers take values for identifiers (`Candidate`: the patterns of each
 kind in a text, a GiroCode's IBAN), Lekto checks each against its kind and weighs them together
-(`identifiers_from`). A customer or personnel number that is one of a person's numbers, stands
-in one or overlaps it is theirs only (a pension fund writes "Versicherungsnummer" before the
-social security number, `65 170839 J 003`)."""
+(`identifiers_from`). A number that may name a user (`NAMING_KINDS`) that is one of a person's
+numbers, stands in one or overlaps it is theirs only (a pension fund writes
+"Versicherungsnummer" before the social security number, `65 170839 J 003`)."""
 
 import re
 from collections.abc import Iterable, Iterator
@@ -20,8 +20,8 @@ from lekto.core.domain.identifiers.registry import (
 )
 
 _CONTAINED = 6
-"""Characters a customer or personnel number has at least to count as part of a person's number
-it stands in."""
+"""Characters a number that may name a user has at least to count as part of a person's
+number it stands in."""
 
 
 def candidates_in(text: str) -> Iterator[Candidate]:
@@ -105,8 +105,9 @@ def referred_in(text: str) -> set[Key]:
 
 def identifiers_from(candidates: Iterable[Candidate]) -> set[Key]:
     """The identifiers among `candidates`, normalised: those of their kind (the others are left
-    out); a customer or personnel number only if it is none of the person's numbers found, does
-    not stand in one (`of_person`) and does not overlap one where both tell their place."""
+    out); one that may name a user (`NAMING_KINDS`: a customer, contract, personnel number, ...)
+    only if it is none of the person's numbers found, does not stand in one (`of_person`) and
+    does not overlap one where both tell their place."""
     found: set[Key] = set()
     naming: list[tuple[Key, tuple[int, int] | None]] = []
     own_spans: list[tuple[int, int]] = []
@@ -131,8 +132,8 @@ def identifiers_from(candidates: Iterable[Candidate]) -> set[Key]:
 
 
 def of_person(key: Key, personal: Iterable[Key]) -> bool:
-    """Whether an identifier is one of a person's values `personal`: the same, or a customer or
-    personnel number with the value of one of them (of any kind: the IBAN as an "account
+    """Whether an identifier is one of a person's values `personal`: the same, or one that may
+    name a user (`NAMING_KINDS`) with the value of one of them (of any kind: the IBAN as an "account
     number"), or one that stands in a tax ID, social security or health insurance number (a
     pension fund's "Versicherungsnummer" is the start of the social security number)."""
     kind, value = key

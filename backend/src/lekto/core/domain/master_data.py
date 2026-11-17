@@ -139,9 +139,9 @@ class Contact(MasterData):
 
     `identifiers` are values its documents carry (see `identifiers`): entered by hand, learned
     by training, or learned and rejected. Each value belongs to one contact at most, and may
-    point to one of the contact's topics. A customer or personnel number may name the user it
-    belongs to; that user maintains it too (`set_numbers_of`), and only they and admins see it
-    (`identifiers.seen_by`).
+    point to one of the contact's topics. A customer, contract or personnel number may name the
+    user it belongs to; that user maintains it too (`set_numbers_of`), and only they and admins
+    see it (`identifiers.seen_by`).
 
     `group_ids`: the contact groups it is in (tags of scope `contact`; the service checks
     them). `topic_ids`: the topics it enables (tags of scope `topic`, checked by the service):
@@ -547,7 +547,8 @@ _KIND_ORDER = {kind: order for order, kind in enumerate(IdentifierKind)}
 def _identifiers(identifiers: Iterable[Identifier]) -> list[Identifier]:
     """Without duplicates (the first of a value wins), entered first, then learned, then
     rejected; at most `MAX_IDENTIFIERS` that count. Only the kinds of contacts
-    (`CONTACT_KINDS`); a user named only by a customer or personnel number that counts."""
+    (`CONTACT_KINDS`); a user named only by a customer, contract or personnel number that
+    counts."""
     seen: set[tuple[IdentifierKind, str]] = set()
     result: list[Identifier] = []
     for item in identifiers:

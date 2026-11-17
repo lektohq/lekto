@@ -1,5 +1,5 @@
-"""Meter number (Zählernummer, Zählpunkt): a contact's, which may name the user it belongs
-to; points to the meter a utility's bills refer to."""
+"""Meter number (Zählernummer, Zählpunkt): a fact of the document, since #215 no contact's
+identifier; points to the meter a utility's bills refer to."""
 
 from lekto.core.domain.identifiers.base import (
     COMPOUND,

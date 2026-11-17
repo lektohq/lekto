@@ -1,13 +1,13 @@
 """The open identifiers (`.idea/architecture/open-identifiers.md`): the identifiers
 no person has confirmed yet, across all contacts and documents. A learned one stands at a contact
-(training found it); an unknown one stands in confirmed documents of a contact's kind
-(`CONTACT_KINDS`) but at no contact, neither entered, learned nor rejected. A person's value (a
-user's profile, `of_person`) and a free mail domain are never open, nor an IBAN or a creditor ID
-a person holds in any document; one counts only in the documents where it is their contact's
-(`domain.holders`: not a payee's on a bank statement). A suggested one is a number with a
-holder (an IBAN, a creditor ID, a VAT ID, an e-mail domain) open nowhere else whose holder a
-document names: for that person's profile (a kind a person has), or for that contact (the
-landlord's IBAN in the bookings of a bank statement, a parent company's VAT ID)."""
+(training found it). A suggested one stands in confirmed documents and is open nowhere else: an
+IBAN whose holder a document names as its recipient, for that person's profile (`_suggested`);
+an e-mail domain whose name fits the contact of its documents, for that contact while it has
+none entered (`_domains`). A person's value (a user's profile, `of_person`) and a free mail
+domain are never open. A recommendation counts a document only where the number is its
+contact's (`domain.holders`: not a payee's customer number in the bookings of a bank
+statement). Unknown ones, of a contact's kind at no contact, were open until #215
+(`OpenSource`)."""
 
 import re
 from collections import defaultdict
@@ -92,8 +92,7 @@ class Sighting:
 class OpenIdentifier:
     """An identifier no person has confirmed: its kind and value (normalised, and as the newest
     document writes it), where it is open, and the confirmed documents that show it, newest
-    first. `contacts`: a learned one's contact; an unknown one's are the contacts of its
-    documents, the one with most documents first; a suggested one's the contact it belongs to,
+    first. `contacts`: a learned one's contact; a suggested one's the contact it belongs to,
     or none and the `person` it belongs to."""
 
     kind: IdentifierKind
@@ -280,8 +279,7 @@ def _recommended(
       its contact's in each of them (a customer number: no other's in any); a suggested one
       that as many documents name;
     - to reject a learned one that a document of its contact gives someone else (a person, a
-      third party: in dev all 29 such were rejected), or that other contacts hold as theirs
-      (a payment service's creditor ID).
+      third party: in dev all 29 such were rejected), or that other contacts hold as theirs.
     """
     documents = {seen.document for seen in item.seen}
     if item.source is OpenSource.SUGGESTED:
@@ -296,8 +294,8 @@ def _recommended(
         return None
     contact = item.contacts[0]
     own = [seen for seen in item.seen if seen.contact == contact]
-    # Another contact's document counts where it holds the number as its own: the utility's
-    # IBAN among the bookings of a bank statement does not.
+    # Another contact's document counts where it holds the number as its own: a payee's
+    # customer number among the bookings of a bank statement does not.
     others = {
         seen.contact
         for seen in item.seen

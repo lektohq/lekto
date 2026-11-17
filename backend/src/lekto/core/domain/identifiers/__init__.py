@@ -1,10 +1,13 @@
 """Identifiers of contacts and of persons. A contact's are values a document of the contact
-carries and no other contact's does (an IBAN, a VAT number, the customer number, the personnel
-number at an employer, the domain of its e-mail addresses); found in the text, they are hard
-evidence for the contact. A person's (a user's profile) are their own numbers: an IBAN, the tax
-ID, the social security and the health insurance number, e-mail addresses; found in the text,
-they are hard evidence for whose document it is. A value is never both a contact's and a
-person's; a customer or personnel number of a contact may name the user it belongs to.
+carries and no other contact's does: since #215 the customer number, the contract number (also
+a policy's, a membership's), the personnel number at an employer and the domain of its e-mail
+addresses (`CONTACT_KINDS`); found in the text, they are hard evidence for the contact. Every
+other kind (an IBAN, a VAT ID, a creditor ID, a meter number, ...) is a fact of the document
+alone (`domain.document_facts`). A person's (a user's profile) are their own numbers: an IBAN,
+the tax ID, the social security and the health insurance number, e-mail addresses; found in
+the text, they are hard evidence for whose document it is. A value is never both a contact's
+and a person's; a customer, contract or personnel number of a contact may name the user it
+belongs to.
 
 Each kind is a type of its own, in its own module (`base.IdentifierType`: whose it is, its
 comparable form, how it is found in a text and written there); the registry lists them
@@ -12,23 +15,24 @@ comparable form, how it is found in a text and written there); the registry list
 against its kind and weighs them together (`reading.identifiers_from`), whoever read them: the
 patterns of each kind in a text, a GiroCode, and in time a language model.
 
-Admins enter identifiers by hand. Training learns more from confirmed documents (see
-`learning.mine_identifiers`): a value that stands in at least two of them, all of one contact.
-A value in documents of several contacts (the owner's own IBAN on every direct debit) is never
-learned. An admin can reject a learned one; it is then not learned again.
+Admins enter identifiers by hand. Training learns customer, contract and personnel numbers
+from confirmed documents (see `learning.mine_identifiers`): a value that stands in at least two
+of them, all of one contact. A value in documents of several contacts is never learned. An
+admin can reject a learned one; it is then not learned again.
 
 Who sees a contact's identifier (issue #82, Tobi 24.10.2026: "wenn Datenschutz dann richtig";
 `seen_by`): one entered by hand that names no user is the contact's own and everyone's to see;
-one that names a user (a customer or personnel number) only that user's and the admins'; a
-learned one only theirs who are a member of a space a document it was learned from lies in,
-so a number learned from the pay slips in a personal space stays its user's; a rejected one
-the admins' alone. Training gives a learned customer or personnel number the user every one of
-its documents surely belongs to (`Confirmed.whose`); a user maintains the numbers that name
-them in their profile, and may decline a learned one (it is then rejected).
+one that names a user (a customer, contract or personnel number) only that user's and the
+admins'; a learned one only theirs who are a member of a space a document it was learned from
+lies in, so a number learned from the pay slips in a personal space stays its user's; a
+rejected one the admins' alone. Training gives a learned customer, contract or personnel number
+the user every one of its documents surely belongs to (`Confirmed.whose`); a user maintains the
+numbers that name them in their profile, and may decline a learned one (it is then rejected).
 
-An identifier may point to one of its contact's topics (a personnel number to "work", a policy
-number to "health insurance"): found in a document, it is evidence for the pair of contact and
-topic. A learned one gets a topic only if all the confirmed documents it stands in carry it.
+An identifier may point to one of its contact's topics (a personnel number to "work", a
+policy's contract number to "health insurance"): found in a document, it is evidence for the
+pair of contact and topic. A learned one gets a topic only if all the confirmed documents it
+stands in carry it.
 """
 
 from lekto.core.domain.identifiers.base import Candidate, IdentifierKind, IdentifierType, Key

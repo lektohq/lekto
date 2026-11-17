@@ -1,5 +1,5 @@
-"""SEPA mandate reference (Mandatsreferenz): a contact's, which may name the user it belongs
-to; points to the direct debit mandate."""
+"""SEPA mandate reference (Mandatsreferenz): a fact of the document, since #215 no contact's
+identifier; points to the direct debit mandate."""
 
 from lekto.core.domain.identifiers.base import (
     IdentifierKind,

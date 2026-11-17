@@ -4341,7 +4341,8 @@ export interface components {
 		};
 		/**
 		 * ContactNumberIn
-		 * @description A customer or personnel number of the user at a contact, written as in documents.
+		 * @description A customer, contract or personnel number of the user at a contact, written as in
+		 *     documents.
 		 * @example {
 		 *       "contact_id": "6f1c2a4e-0000-4000-8000-000000000001",
 		 *       "kind": "personnel_number",
@@ -6479,7 +6480,7 @@ export interface components {
 			topic_id?: string | null;
 			/**
 			 * User Id
-			 * @description The user a customer or personnel number belongs to (Anna's contract): found in a document, it is hard evidence for whose it is. Not for other kinds, not for a rejected one.
+			 * @description The user a customer, contract or personnel number belongs to (Anna's contract): found in a document, it is hard evidence for whose it is. Not for other kinds, not for a rejected one.
 			 */
 			user_id?: string | null;
 		};
@@ -6533,7 +6534,7 @@ export interface components {
 			topic_id: string | null;
 			/**
 			 * User Id
-			 * @description The user a customer or personnel number belongs to: entered by hand, or found by training when all its documents are surely theirs alone.
+			 * @description The user a customer, contract or personnel number belongs to: entered by hand, or found by training when all its documents are surely theirs alone.
 			 */
 			user_id?: string | null;
 		};

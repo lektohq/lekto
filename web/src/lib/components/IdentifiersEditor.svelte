@@ -54,8 +54,8 @@
 	// rejected (training does not learn it again); a rejected one can be allowed again. Enter
 	// in the value closes the line. A search finds them by value, kind and topic; a new one
 	// opens empty. `errors` (by row key) show in their open line. `kinds`: those offered (a
-	// person's in the profile); `users`: a customer or personnel number may name the user it
-	// belongs to, one of these (the contact dialog). `contacts`: the lines are a user's identifiers
+	// person's in the profile); `users`: a customer, contract or personnel number may name the user
+	// it belongs to, one of these (the contact dialog). `contacts`: the lines are a user's identifiers
 	// at these contacts (the profile, issue #82): grouped by contact, one closed line each, which a
 	// search opens where it finds something, and shown by source (Tobi, 02.11.2026); each offers
 	// the topics its contact enables, and a learned one is taken over or declined as not theirs.

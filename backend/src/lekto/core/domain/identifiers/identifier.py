@@ -25,9 +25,9 @@ class IdentifierSource(StrEnum):
 class Identifier:
     """`value` is normalised (see `normalise_identifier`); kind and value are unique across
     all contacts. `topic_id`: the topic of its contact it points to, if any (the contact checks
-    that it enables it). `user_id`: the user a contact's customer or personnel number belongs
-    to, if one does (entered by hand, or found by training); found in a document, it is
-    evidence for them too. `learned_in`: the spaces of the confirmed documents a learned one
+    that it enables it). `user_id`: the user a contact's customer, contract or personnel
+    number belongs to, if one does (entered by hand, or found by training); found in a document,
+    it is evidence for them too. `learned_in`: the spaces of the confirmed documents a learned one
     was learned from (`seen_by`). A person's identifier has none of them."""
 
     kind: IdentifierKind
@@ -93,8 +93,9 @@ def matches(identifier: Identifier, found: Key) -> bool:
 class KeyIndex[T]:
     """Identifiers with what belongs to each (`T`: their contact, the identifier itself), to
     tell for a found key which of them it is (`matches`) without comparing it with each: by
-    its own key, a found contract, policy or membership number also as the customer number of
-    its value (`CUSTOMER_KINDS`), a found domain also as each domain it is a subdomain of."""
+    its own key, a found contract number (a policy's, a membership's too) also as the customer
+    number of its value (`CUSTOMER_KINDS`), a found domain also as each domain it is a
+    subdomain of."""
 
     def __init__(self, items: Iterable[tuple[Identifier, T]]) -> None:
         self._by_key: dict[Key, list[T]] = defaultdict(list)

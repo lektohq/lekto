@@ -148,9 +148,9 @@
 	// refuses): saving then opens its tab and its line.
 	let openedIdentifier = $state<number | null>(null);
 	let identifierErrors = $state<Record<number, string>>({});
-	// The users a customer or personnel number may belong to: fetched once each time the dialog
-	// opens for a contact, not on every switch to the identifiers tab. Without the list, a number
-	// still shows whose it is by id.
+	// The users a customer, contract or personnel number may belong to: fetched once each time the
+	// dialog opens for a contact, not on every switch to the identifiers tab. Without the list, a
+	// number still shows whose it is by id.
 	let users = $state<UserName[]>([]);
 	const beginUsers = latest();
 	$effect(() => {

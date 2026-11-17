@@ -9,7 +9,7 @@ code. Its role says what it is to the document (`FactRole`): the same number is 
 own on the invoice and a reference on the reminder. The role follows the kind (`role_of`)
 unless the language model read the fact (`with_read`).
 
-An IBAN, a creditor ID, a VAT ID or an e-mail domain also has its holder (`Holder`,
+An IBAN, an e-mail domain or a customer number in a booking also has its holder (`Holder`,
 `HOLDER_KINDS`): whose it is where it stands, the sender's, the recipient's or another party's.
 A bank statement names the payees' IBANs beside its own.
 

@@ -1,7 +1,7 @@
-"""Licence plate (Kfz-Kennzeichen): a contact's (the insurer's, the garage's), which may name
-the user it belongs to; points to the car. A German plate: the district's one to three letters,
-one or two letters, one to four digits, `E` or `H` after them or not (`M-AB 1234`); found after
-its label."""
+"""Licence plate (Kfz-Kennzeichen): a fact of the document (the insurer's, the garage's),
+since #215 no contact's identifier; points to the car. A German plate: the district's one to
+three letters, one or two letters, one to four digits, `E` or `H` after them or not
+(`M-AB 1234`); found after its label."""
 
 import re
 

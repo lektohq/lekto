@@ -926,7 +926,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.CONTACT_TOO_MANY_ALIASES: "a contact has at most {max:number} aliases",
     ReasonCode.CONTACT_TOO_MANY_IDENTIFIERS: "a contact has at most {max:number} identifiers",
     ReasonCode.ONLY_NUMBERS_NAME_USERS: (
-        "only a customer or personnel number names the user it belongs to"
+        "only a customer, contract or personnel number names the user it belongs to"
     ),
     ReasonCode.IDENTIFIER_TAKEN: "'{value}' is already taken",
     ReasonCode.IDENTIFIER_ENTERED: "'{value}' is entered at the contact by hand",

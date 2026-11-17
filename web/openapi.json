@@ -28523,7 +28523,7 @@
           "value"
         ],
         "title": "ContactNumberIn",
-        "description": "A customer or personnel number of the user at a contact, written as in documents.",
+        "description": "A customer, contract or personnel number of the user at a contact, written as in\ndocuments.",
         "examples": [
           {
             "contact_id": "6f1c2a4e-0000-4000-8000-000000000001",
@@ -32963,7 +32963,7 @@
               }
             ],
             "title": "User Id",
-            "description": "The user a customer or personnel number belongs to (Anna's contract): found in a document, it is hard evidence for whose it is. Not for other kinds, not for a rejected one."
+            "description": "The user a customer, contract or personnel number belongs to (Anna's contract): found in a document, it is hard evidence for whose it is. Not for other kinds, not for a rejected one."
           }
         },
         "additionalProperties": false,
@@ -33054,7 +33054,7 @@
               }
             ],
             "title": "User Id",
-            "description": "The user a customer or personnel number belongs to: entered by hand, or found by training when all its documents are surely theirs alone."
+            "description": "The user a customer, contract or personnel number belongs to: entered by hand, or found by training when all its documents are surely theirs alone."
           }
         },
         "type": "object",

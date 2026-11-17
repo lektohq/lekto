@@ -1,6 +1,6 @@
 """Customer number: a contact's, which may name the user it belongs to (Anna's customer
 account); found after its label. Until #145 also the contract, policy and membership numbers,
-which have kinds of their own now; a contact's customer number still matches them
+which the contract number holds now (#215); a contact's customer number still matches it
 (`identifier.matches`)."""
 
 import re

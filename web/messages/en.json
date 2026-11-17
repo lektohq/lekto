@@ -2906,7 +2906,7 @@
 	"reason_alias_is_name": "The spelling “{alias}” is the contact’s name.",
 	"reason_contact_too_many_aliases": "A contact has at most {max} spellings.",
 	"reason_contact_too_many_identifiers": "A contact has at most {max} identifiers.",
-	"reason_only_numbers_name_users": "Only a customer or personnel number names the user it belongs to.",
+	"reason_only_numbers_name_users": "Only a customer, contract or personnel number names the user it belongs to.",
 	"reason_identifier_taken": "“{value}” is already taken.",
 	"reason_identifier_entered": "“{value}” is entered at the contact by hand.",
 	"reason_identifier_not_open": "“{value}” is no longer open.",

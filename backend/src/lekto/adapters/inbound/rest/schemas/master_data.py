@@ -74,9 +74,9 @@ class IdentifierIn(BaseModel):
     )
     user_id: UUID | None = Field(
         default=None,
-        description="The user a customer or personnel number belongs to (Anna's contract): "
-        "found in a document, it is hard evidence for whose it is. Not for other kinds, not "
-        "for a rejected one.",
+        description="The user a customer, contract or personnel number belongs to (Anna's "
+        "contract): found in a document, it is hard evidence for whose it is. Not for other "
+        "kinds, not for a rejected one.",
     )
 
 
@@ -95,8 +95,8 @@ class IdentifierOut(BaseModel):
     )
     user_id: UUID | None = Field(
         default=None,
-        description="The user a customer or personnel number belongs to: entered by hand, or "
-        "found by training when all its documents are surely theirs alone.",
+        description="The user a customer, contract or personnel number belongs to: entered by "
+        "hand, or found by training when all its documents are surely theirs alone.",
     )
 
 

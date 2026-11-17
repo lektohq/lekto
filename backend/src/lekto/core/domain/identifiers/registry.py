@@ -75,8 +75,9 @@ LEARNED_KINDS = frozenset(kind for kind, item in TYPES.items() if item.learned)
 PERSON_KINDS = frozenset(kind for kind, item in TYPES.items() if item.for_persons)
 """The kinds a person's identifiers have."""
 NAMING_KINDS = frozenset(kind for kind, item in TYPES.items() if item.names_user)
-"""The kinds of a contact's identifiers that may name the user they belong to (a contract, a
-policy, a personnel number)."""
+"""The kinds of numbers that may name the user they belong to: a contact's customer, contract
+or personnel number; read alike, a meter number, a mandate reference or a licence plate, which
+no contact carries since #215 (`reading.identifiers_from`)."""
 PERSON_ONLY_KINDS = PERSON_KINDS - {kind for kind, item in TYPES.items() if item.for_contacts}
 """The kinds only a person has (not the IBAN: a contact has one too, though no longer as its
 identifier): only admins and that person see such a fact (`document_facts.person_only`)."""

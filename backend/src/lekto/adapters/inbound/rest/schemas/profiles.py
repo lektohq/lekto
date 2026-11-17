@@ -50,7 +50,8 @@ class PersonIdentifierOut(BaseModel):
 
 
 class ContactNumberIn(BaseModel):
-    """A customer or personnel number of the user at a contact, written as in documents."""
+    """A customer, contract or personnel number of the user at a contact, written as in
+    documents."""
 
     model_config = ConfigDict(
         extra="forbid",
