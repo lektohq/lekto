@@ -5,9 +5,13 @@ import json
 import sqlite3
 from collections import Counter
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
+import pytest
+
 from lekto_migration import plan as plans
+from lekto_migration.directory import takes_review_codes
 from tests import fake_lekto
 from tests.conftest import Setup
 
@@ -622,17 +626,31 @@ async def test_a_group_of_the_same_name_is_no_tag(setup: Setup) -> None:
     assert sorted(t.get("scope", "document") for t in tags) == ["contact", "document"]
 
 
-async def test_reviews_go_with_their_codes_where_lekto_takes_them(setup: Setup) -> None:
+@pytest.mark.parametrize("takes", [True, False])
+async def test_reviews_go_with_their_codes_where_lekto_takes_them(
+    setup: Setup, takes: bool
+) -> None:
     assert await setup.run("plan") == 0
     setup.edit("tags", "tax", "{to: tag, name: tax, create: true, review: true}")
-
-    def reviews() -> list[dict[str, Any]]:
-        return [
-            review
-            for upload in setup.lekto.uploads
-            for review in json.loads(upload.get("metadata", "{}")).get("review", [])
-        ]
-
-    setup.lekto.review_codes = False  # a Lekto from before the codes refuses them
+    setup.lekto.review_codes = takes  # a Lekto from before the codes refuses them
     assert await setup.migrate() == 0, setup.messages
-    assert reviews() and all("code" not in review for review in reviews())
+    reviews = [
+        review
+        for upload in setup.lekto.uploads
+        for review in json.loads(upload.get("metadata", "{}")).get("review", [])
+    ]
+    assert reviews
+    if takes:
+        assert {(review["code"], review["params"]["name"]) for review in reviews} == {
+            ("paperless_tag_review", "tax")
+        }
+    else:
+        assert all("code" not in review for review in reviews)
+
+
+def test_lekto_takes_the_codes_of_reviews_by_its_openapi_document() -> None:
+    """By the document Lekto serves (`web/openapi.json`, written from it): the upload's
+    metadata are a form field, so the reasons it knows tell, not a schema (MI-01)."""
+    document = json.loads((Path(__file__).parents[2] / "web" / "openapi.json").read_text())
+    assert takes_review_codes(document["x-reasons"])
+    assert not takes_review_codes({"text": {}, "error": {}})

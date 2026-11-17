@@ -87,7 +87,7 @@ asn: {to: field, name: ASN}
 - `review: true`, or a reason: every document with the object waits in Lekto's inbox (yellow)
   with the reason, the field it is about open; with `drop`, that field stays empty for a person
   to decide. The default reason of `review: true` goes with its code, so Lekto shows it in the
-  user's language (a Lekto from before 0.6.2 is asked first and gets the text alone); a reason
+  user's language (a Lekto from before 0.6.3 is asked first and gets the text alone); a reason
   you write stays as written. A document left without a contact, document type or date (Paperless has none, or
   the plan drops it) waits as well, with that field open: Lekto decides so, as for documents
   of its own, whatever the plan says.

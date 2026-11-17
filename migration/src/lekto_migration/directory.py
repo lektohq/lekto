@@ -3,13 +3,22 @@ document types and fields by name, tags by scope and name (names are unique per 
 spaces by name (unique among them) and personal spaces by their user. Names are compared
 without case, as Lekto does."""
 
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from typing import Any
 
 from lekto_migration.lekto import Lekto
-from lekto_migration.plan import TAG_SCOPES, norm
+from lekto_migration.plan import REVIEW_CODES, TAG_SCOPES, norm
 
 SCOPES = ("document", "topic", "contact", "document_type")
+
+
+def takes_review_codes(known: Collection[str]) -> bool:
+    """Whether a Lekto that knows the reasons' codes `known` (`Lekto.reason_codes`) takes the
+    codes of the default reasons of reviews with an upload (`ImportedReviewIn.code`, issue
+    #83): both came in 0.6.3, and an older Lekto refuses them. The upload's metadata are a
+    form field, so their schema is no component of Lekto's OpenAPI document."""
+    return set(REVIEW_CODES.values()) <= set(known)
 
 
 @dataclass
@@ -45,7 +54,7 @@ class Directory:
         # Every space: the list follows the reach an admin asks for (`all_users`).
         directory.spaces = await lekto.items("/spaces", params={"all_users": "true"})
         directory.users.setdefault(norm(directory.admin["username"]), directory.admin)
-        directory.review_codes = await lekto.takes_review_codes()
+        directory.review_codes = takes_review_codes(await lekto.reason_codes())
         return directory
 
     def _store(self, to: str) -> dict[str, dict[str, Any]] | None:
