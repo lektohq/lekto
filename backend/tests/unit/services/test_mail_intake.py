@@ -2,6 +2,7 @@
 not fetched twice, and what shows at the mailbox."""
 
 import asyncio
+import threading
 from dataclasses import replace
 from datetime import timedelta
 from email.message import EmailMessage
@@ -12,6 +13,7 @@ import pytest
 from lekto.adapters.outbound.memory.mail_records import MemoryMailOriginRepository
 from lekto.adapters.outbound.memory.mail_server import MemoryMailSession
 from lekto.adapters.outbound.regex import RegexPatternMatcher
+from lekto.core.domain import mail_message
 from lekto.core.domain.condition_tree import Group
 from lekto.core.domain.documents import Channel, Document
 from lekto.core.domain.errors import PermissionDeniedError, ValidationError
@@ -45,6 +47,7 @@ from lekto.core.domain.reasons import ReasonCode
 from lekto.core.domain.rules import Condition, ConditionField, Operator, RuleScope
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
+from lekto.core.services import mail_intake as intake_module
 from lekto.core.services._push_queue import PUSH_JOB
 from lekto.core.services.classification.signals import FactsResult, FactsSignal, sender_line
 from lekto.core.services.mail_intake import (
@@ -233,6 +236,43 @@ async def test_a_forward_is_unwrapped_and_a_known_attachment_related(world: Worl
     assert [item.address for item in origin.forwarded_by] == ["ben@example.test"]
     assert origin.related == (existing.id,)
     assert record.documents == 1
+
+
+async def test_a_mail_attached_deeper_than_five_levels_is_a_document_of_its_own(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Five levels of forwards are unwrapped; the mail attached to the fifth is an attachment of
+    its letter (DB-01). The mail is read and its letter written outside the event loop
+    (SB-02)."""
+    _, _, mailbox = await _setup(world)
+    reading, writing = mail_message.read_mail, mail_message._bytes
+    threads: dict[str, list[int]] = {"read": [], "written": []}
+
+    def read(data: bytes) -> Any:
+        threads["read"].append(threading.get_ident())
+        return reading(data)
+
+    def write(message: Any) -> bytes:
+        threads["written"].append(threading.get_ident())
+        return writing(message)
+
+    monkeypatch.setattr(intake_module, "read_mail", read)
+    monkeypatch.setattr(mail_message, "_bytes", write)
+    _deliver(world, mails.nested_mail(8))
+    await _fetch(world, world.mail_intake())
+    async with world.uow() as uow:
+        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        origins = await uow.mail_origins.of_record(record.id)
+    assert record.documents == 2
+    assert sorted(
+        (origin.role, origin.subject, len(origin.forwarded_by)) for origin in origins
+    ) == [
+        (OriginRole.ATTACHMENT, "Weitergeleitet 2", 5),
+        (OriginRole.COVER, "Weitergeleitet 2", 5),
+    ]
+    # Read once; written: the mail attached to the fifth level, and the fifth as its letter.
+    assert [len(threads["read"]), len(threads["written"])] == [1, 2]
+    assert threading.get_ident() not in threads["read"] + threads["written"]
 
 
 async def test_a_mail_is_fetched_once_across_mailboxes(world: World) -> None:

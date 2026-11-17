@@ -374,7 +374,7 @@ class MailIntakeService:
         now = self._clock.now()
         decided = replace(record, rule=decision.rule, rule_id=decision.rule_id, decided_at=now)
         try:
-            message = read_mail(data)
+            message = await asyncio.to_thread(read_mail, data)
         except UnprocessableDocumentError as error:
             await self._settle(replace(decided, outcome=MailOutcome.FAILED, reason=error.reason))
             return 0
@@ -474,7 +474,7 @@ class MailIntakeService:
         if data is None:
             return None
         try:
-            message = read_mail(data)
+            message = await asyncio.to_thread(read_mail, data)
         except UnprocessableDocumentError as error:
             await self._keep(replace(record, outcome=MailOutcome.FAILED, reason=error.reason))
             return 0
@@ -624,7 +624,9 @@ class MailIntakeService:
                         related=tuple(related),
                         body_type_id=decision.body_type_id,
                     )
-                    found = await self._receive(folder, letter.message.raw, name, decision, cover)
+                    # An attached mail is written as a file only now, and may be large.
+                    raw = await asyncio.to_thread(_written, letter.message)
+                    found = await self._receive(folder, raw, name, decision, cover)
                     if found is not None and found[1]:
                         made += 1
         return made
@@ -808,6 +810,10 @@ async def _mark(
         await session.mark(folder, uid, add=system(add), remove=system(remove))
     if own(add) or own(remove):
         await session.mark(folder, uid, add=own(add), remove=own(remove))
+
+
+def _written(message: MailMessage) -> bytes:
+    return message.raw
 
 
 def _named(record: MailRecord, head: bytes | None) -> MailRecord:

@@ -3,13 +3,14 @@ attached to it; and telling a mail from other files by its first bytes."""
 
 import time
 from datetime import UTC, datetime
+from email.message import EmailMessage
 
 import pytest
 
-from lekto.core.domain import media_types
+from lekto.core.domain import mail_message, media_types
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.mail_intake import letters
-from lekto.core.domain.mail_message import Address, read_mail
+from lekto.core.domain.mail_message import MAX_FORWARDS, Address, read_mail
 from lekto.core.domain.validation import MAX_NAME
 from tests.mails import (
     PDF,
@@ -135,6 +136,45 @@ def test_a_mail_that_breaks_reading_is_a_damaged_file() -> None:
     library) is a damaged file, which the mail intake records and goes past."""
     with pytest.raises(UnprocessableDocumentError):
         read_mail(nested_mail(150))
+
+
+def test_a_mail_attached_deeper_than_five_levels_stays_an_attachment() -> None:
+    """Five levels of attached mails are read; the mail attached to the fifth stays its
+    attachment (`.eml`): one letter of the fifth with five forwarders, not a letter more for
+    each five levels below (DB-01, SB-02)."""
+    mail = read_mail(nested_mail(8))
+    (letter,) = letters(mail)
+    assert letter.message.subject == "Weitergeleitet 2"
+    assert len(letter.forwarded_by) == MAX_FORWARDS
+    assert letter.message.messages == ()
+    (attached,) = letter.taken
+    assert attached.media_type == media_types.EML
+    assert read_mail(attached.data).subject == "Weitergeleitet 1"
+
+
+def test_an_attached_mail_is_written_as_a_file_only_when_asked_for(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Each level would write all below it again: a hundred levels of 16 MB took 91 s and
+    1.6 GB. Only the mail attached below the last level read is written while reading."""
+    writing = mail_message._bytes
+    written: list[str] = []
+
+    def write(message: EmailMessage) -> bytes:
+        written.append(str(message["Subject"]))
+        return writing(message)
+
+    monkeypatch.setattr(mail_message, "_bytes", write)
+    deep = read_mail(nested_mail(100))
+    assert written == ["Weitergeleitet 93"]  # attached to the fifth level
+    assert deep.raw == nested_mail(100)  # the mail as received
+    written.clear()
+    mail = read_mail(nested_mail(3))
+    assert written == []
+    inner = mail.messages[0].messages[0].messages[0]
+    assert read_mail(inner.raw).subject == inner.subject == "Innen"
+    assert inner.raw is inner.raw
+    assert written == ["Innen"]  # once, when asked for
 
 
 def addressed(to: str, sender: str = "Jane Doe <jane@example.org>", *, more: str = "") -> bytes:

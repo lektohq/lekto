@@ -1,11 +1,11 @@
 """What Lekto takes from a mail (`.idea/decisions/2026-11-04-mail.md`, decisions 6, 9 to 11).
 
 A mail that only wraps an attached mail is unwrapped, layer by layer, to the innermost (at most
-`MAX_FORWARDS`); its forwarders form the chain of its origin. A mail with several attached mails
-gives a letter of each, and one of its own where it has text of its own. Of a letter Lekto
-takes its text (as the `.eml` it stands in, set as PDF) and its attachments it can read (PDF,
-images, mails), small images aside (logos, signatures); the rest stays and the head of the PDF
-names it ("Nicht übernommen").
+`MAX_FORWARDS`: one attached deeper is an attachment of the last, `mail_message`); its forwarders
+form the chain of its origin. A mail with several attached mails gives a letter of each, and one of
+its own where it has text of its own. Of a letter Lekto takes its text (as the `.eml` it stands in,
+set as PDF) and its attachments it can read (PDF, images, mails), small images aside (logos,
+signatures); the rest stays and the head of the PDF names it ("Nicht übernommen").
 """
 
 import json
@@ -25,12 +25,11 @@ from lekto.core.domain.ids import (
     UserId,
 )
 from lekto.core.domain.mail import MailStep, StepOutcome
-from lekto.core.domain.mail_message import Address, MailMessage, MailPart
+from lekto.core.domain.mail_message import MAX_FORWARDS, Address, MailMessage, MailPart
 from lekto.core.domain.mail_traits import Importance, MailMarks
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.validation import require_utc
 
-MAX_FORWARDS = 5
 HEADROOM = 1024 * 1024
 """Bytes a mail has beyond its attachments: its header, its text."""
 

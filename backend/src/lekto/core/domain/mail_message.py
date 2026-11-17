@@ -2,8 +2,9 @@
 
 What a mail says about itself (sender, recipients, date, subject, Message-ID), its text (the HTML
 part and the plain one, as far as there are), its attachments, the pictures its HTML shows by
-`cid:`, and the mails attached to it. A part that cannot be decoded is read with replacement
-characters rather than failing the mail.
+`cid:`, and the mails attached to it, `MAX_FORWARDS` deep: one attached deeper stays an
+attachment (`.eml`). A part that cannot be decoded is read with replacement characters rather
+than failing the mail.
 
 A header is read from its raw value, at most `MAX_RAW_HEADER` characters of it (`_raw`): the
 standard library parses a list of addresses in a time that grows with its square, 16 000
@@ -14,11 +15,12 @@ import email
 import email.policy
 import logging
 import re
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.message import EmailMessage, Message
 from email.utils import getaddresses, parsedate_to_datetime
+from functools import cached_property, partial
 
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.mail_traits import Importance, importance_of
@@ -28,6 +30,10 @@ from lekto.core.domain.validation import MAX_NAME, clean_filename, without_contr
 log = logging.getLogger(__name__)
 
 RFC822 = "message/rfc822"
+MAX_FORWARDS = 5
+"""Levels of attached mails read (`mail_intake.letters` unwraps them); a mail attached deeper
+stays an attachment of the last (`.eml`). Each level is written again as the file of its mail
+(`MailMessage.raw`): a hundred levels of 16 MB took 91 s and 1.6 GB."""
 MAX_HEADER = 1000
 """Characters of a header value kept (a subject, a Message-ID)."""
 MAX_RAW_HEADER = 10_000
@@ -93,11 +99,17 @@ class MailMessage:
     pictures: tuple[MailPart, ...]
     """Parts the HTML can show by `cid:`."""
     messages: tuple["MailMessage", ...]
-    """Mails attached to this one (a forward as attachment)."""
-    raw: bytes = field(repr=False, default=b"")
-    """The mail as a file (`.eml`): as received, or an attached one as it stands in it."""
+    """Mails attached to this one (a forward as attachment), `MAX_FORWARDS` deep."""
+    source: bytes | Callable[[], bytes] = field(repr=False, compare=False, default=b"")
+    """The mail as a file, or how to write it (`raw`)."""
     importance: Importance = Importance.NORMAL
     """As its header gives it (`mail_traits.importance_of`)."""
+
+    @cached_property
+    def raw(self) -> bytes:
+        """The mail as a file (`.eml`): as received, or an attached one as it stands in it,
+        written when first asked for: a mail that only wraps another needs none."""
+        return self.source if isinstance(self.source, bytes) else self.source()
 
 
 def read_mail(data: bytes) -> MailMessage:
@@ -111,7 +123,7 @@ def read_mail(data: bytes) -> MailMessage:
             _raw(message, "From").strip() or _raw(message, "Date").strip()
         ):
             raise UnprocessableDocumentError(because(ReasonCode.FILE_DAMAGED))
-        return _read(message, data)
+        return _read(message, data, 0)
     except UnprocessableDocumentError:
         raise
     except Exception:
@@ -119,7 +131,8 @@ def read_mail(data: bytes) -> MailMessage:
         raise UnprocessableDocumentError(because(ReasonCode.FILE_DAMAGED)) from None
 
 
-def _read(message: EmailMessage, raw: bytes) -> MailMessage:
+def _read(message: EmailMessage, source: bytes | Callable[[], bytes], depth: int) -> MailMessage:
+    """`message`, attached `depth` levels deep."""
     html = _body(message, "html")
     text = _body(message, "plain")
     shown = _html_of(message)
@@ -130,8 +143,12 @@ def _read(message: EmailMessage, raw: bytes) -> MailMessage:
         kind = part.get_content_type()
         if kind == RFC822:
             inner = _attached(part)
-            if inner is not None:
-                messages.append(_read(inner, _bytes(inner)))
+            if inner is None:
+                continue
+            if depth < MAX_FORWARDS:
+                messages.append(_read(inner, partial(_bytes, inner), depth + 1))
+            else:
+                attachments.append(MailPart(_filename(part), RFC822, _bytes(inner)))
             continue
         if _is_body(part, html, text):
             continue
@@ -164,7 +181,7 @@ def _read(message: EmailMessage, raw: bytes) -> MailMessage:
         attachments=tuple(attachments),
         pictures=tuple(pictures),
         messages=tuple(messages),
-        raw=raw,
+        source=source,
         importance=importance_of(
             {
                 name: _header(message, name) or None
