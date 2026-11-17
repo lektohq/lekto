@@ -28,6 +28,7 @@ from lekto.core.domain.open_identifiers import OpenSource
 from lekto.core.domain.rules import Rule
 from lekto.core.domain.rules_json import definition_to_json
 from lekto.core.domain.spaces import Space
+from lekto.core.domain.validation import name_key
 
 OPEN_SIZE = 20
 
@@ -213,13 +214,14 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
     @tools.read(
         "rules_get",
         "A rule by name: its conditions and actions as stored, with names for the ids of "
-        "contacts, types, tags, topics, fields and spaces.",
+        "contacts, types, tags, topics, fields and spaces. space: where two rules share the "
+        "name, the space as rules_list names it, or global.",
     )
-    async def rules_get(ctx: Context, name: str) -> str:
+    async def rules_get(ctx: Context, name: str, space: str | None = None) -> str:
         user = principal_of(ctx).id
-        found = _named_rule(await context.rules.list_rules(user), name)
-        rule = await context.rules.get(user, found.id)
         spaces = await _spaces(context, user)
+        found = _named_rule(await context.rules.list_rules(user), name, space, spaces)
+        rule = await context.rules.get(user, found.id)
         names = await Names.load(context, user)
         lookup: dict[str, str] = {
             str(id): label
@@ -322,12 +324,38 @@ def _named(value: JsonValue, lookup: dict[str, str]) -> JsonValue:
     return value
 
 
-def _named_rule(rules: list[Rule], name: str) -> Rule:
-    """The rule named `name` (any case); an error with similar names for none."""
-    by_name = {rule.current.definition.name: rule for rule in rules}
-    for key, rule in by_name.items():
-        if key.casefold() == name.casefold():
-            return rule
-    alike = similar_names(name, by_name)
-    hint = f"; similar: {', '.join(alike)}" if alike else ""
-    raise ValidationError(f"no rule named '{name}'{hint}")
+GLOBAL = "global"
+"""How `rules_get` names where a global rule is (`space`)."""
+
+
+def _named_rule(
+    rules: list[Rule], name: str, space: str | None, spaces: dict[UUID, tuple[Space, str]]
+) -> Rule:
+    """The rule named `name` (as names compare), in `space` if given (as `rules_list` names
+    it, or `GLOBAL`): rule names are not unique, also not in a space. An error with similar
+    names for none, and with their spaces for more than one."""
+    wanted = name_key(name)
+    named = [rule for rule in rules if name_key(rule.current.definition.name) == wanted]
+    if not named:
+        alike = similar_names(name, {rule.current.definition.name for rule in rules})
+        hint = f"; similar: {', '.join(alike)}" if alike else ""
+        raise ValidationError(f"no rule named '{name}'{hint}")
+    where = {id(rule): _where(rule, spaces) for rule in named}
+    if space is not None:
+        found = [rule for rule in named if name_key(where[id(rule)]) == name_key(space)]
+        if not found:
+            places = ", ".join(sorted({repr(place) for place in where.values()}))
+            raise ValidationError(f"no rule named '{name}' in '{space}'; it is in {places}")
+        named = found
+    if len(named) > 1:
+        places = ", ".join(sorted(repr(where[id(rule)]) for rule in named))
+        more = "; give space" if space is None else "; rename one in the web UI"
+        raise ValidationError(f"{len(named)} rules are named '{name}', in {places}{more}")
+    return named[0]
+
+
+def _where(rule: Rule, spaces: dict[UUID, tuple[Space, str]]) -> str:
+    """The space of `rule` as `rules_list` names it; `GLOBAL` for a global rule."""
+    if rule.space_id is None:
+        return GLOBAL
+    return spaces.get(rule.space_id, (None, str(rule.space_id)))[1]

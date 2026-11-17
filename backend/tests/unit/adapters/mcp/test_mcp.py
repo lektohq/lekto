@@ -678,6 +678,30 @@ async def test_rules_are_read_with_names(api: Api, scene: Scene) -> None:
     )
 
 
+async def test_two_rules_of_one_name_are_told_apart_by_their_space(api: Api, scene: Scene) -> None:
+    """Rule names are not unique, also not in a space: the second of a name hid the first."""
+    owner = scene.headers["owner"]
+    for space in (None, scene.shared.id):
+        body = {
+            "name": "Ablage",
+            "scope": "space",
+            "conditions": {"all": [{"field": "channel", "op": "is", "value": "api"}]},
+            "actions": [{"type": "force_review", "reason": f"in {space}"}],
+        }
+        await post(
+            api, "/rules", body if space is None else {**body, "space_id": str(space)}, owner
+        )
+    places = {rule["space"] for rule in data(await call(api, owner, "rules_list"))["rules"]}
+    assert "Shared" in places and len(places) == 2
+    (personal,) = places - {"Shared"}
+    both = error(await call(api, owner, "rules_get", name="ablage"))
+    assert "2 rules are named 'ablage'" in both and "'Shared'" in both and "give space" in both
+    shared = data(await call(api, owner, "rules_get", name="Ablage", space="shared"))
+    mine = data(await call(api, owner, "rules_get", name="Ablage", space=personal))
+    assert (shared["space"], mine["space"]) == ("Shared", personal)
+    assert "it is in" in error(await call(api, owner, "rules_get", name="Ablage", space="global"))
+
+
 async def test_system_status_names_what_is_running(api: Api, scene: Scene) -> None:
     status = data(await call(api, scene.headers["owner"], "system_status"))
     assert isinstance(status.get("jobs", []), list)
