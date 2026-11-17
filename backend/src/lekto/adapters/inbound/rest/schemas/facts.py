@@ -423,6 +423,7 @@ class FactDecisionIn(BaseModel):
     """A person's decision about a fact of the document."""
 
     model_config = ConfigDict(
+        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -440,7 +441,7 @@ class FactDecisionIn(BaseModel):
                 },
                 {"action": "add", "kind": "contract_number", "value": "V-123", "role": "target"},
             ]
-        }
+        },
     )
 
     action: FactAction = Field(

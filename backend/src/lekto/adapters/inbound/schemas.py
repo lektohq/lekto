@@ -5,7 +5,7 @@ from datetime import date
 from typing import Annotated, Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from lekto.core.domain.fields import FieldValue, field_to_json
 from lekto.core.domain.reasons import Reason, ReasonCode
@@ -21,11 +21,15 @@ with a 500 (RB-04); no list and no rule has that many."""
 
 
 class MoneyValue(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     amount: str = Field(examples=["12.50"], description="Decimal number as text, exact.")
     currency: str = Field(examples=["EUR"], description="ISO 4217 code.")
 
 
 class PeriodValue(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     start: date = Field(examples=["2026-09-01"], description="First day, included.")
     end: date = Field(
         examples=["2026-09-30"], description="Last day, included; a single day has start = end."

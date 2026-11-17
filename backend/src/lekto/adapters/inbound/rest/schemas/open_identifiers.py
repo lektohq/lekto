@@ -233,8 +233,10 @@ class OpenSearchIn(BaseModel):
 
 
 class OpenDecisionIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     kind: IdentifierKind
-    value: str = Field(description="Normalised, as the list gives it.")
+    value: str = Field(max_length=200, description="Normalised, as the list gives it.")
     action: OpenAction = Field(
         description="`confirm`: enter it at the contact by hand, or a person's suggestion in "
         "their profile; `reject`: training does not learn it again, and a learned one no "
@@ -258,6 +260,7 @@ class OpenDecisionIn(BaseModel):
 
 class OpenDecisionsIn(BaseModel):
     model_config = ConfigDict(
+        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -267,7 +270,7 @@ class OpenDecisionsIn(BaseModel):
                     ]
                 }
             ]
-        }
+        },
     )
 
     decisions: Annotated[list[OpenDecisionIn], Field(min_length=1, max_length=MAX_DECISIONS)]

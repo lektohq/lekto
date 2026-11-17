@@ -27,6 +27,8 @@ class PushSettingsOut(BaseModel):
 
 
 class PushKeysIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     p256dh: str = Field(max_length=200, description="The browser's public key (base64url).")
     auth: str = Field(max_length=100, description="The browser's auth secret (base64url).")
 
