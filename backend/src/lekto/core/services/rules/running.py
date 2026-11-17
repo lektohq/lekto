@@ -250,7 +250,7 @@ async def prepare(
     if document.processing.outcome(Node.PARSE) not in (Outcome.OK, Outcome.UNCERTAIN):
         return Prepared(codes=codes)
     try:
-        markdown = (await load_text(store, document.id)).decode("utf-8")
+        markdown = await load_text(store, document.id)
     except NotFoundError:
         return Prepared(codes=codes)
     text = pattern_text(markdown, max_text)

@@ -110,7 +110,7 @@ async def decide_fact(
     value that is none of the kind, a decision without what it needs, and `at_contact` without
     a contact or for a kind that is no contact's."""
     try:
-        text = (await load_text(store, id)).decode("utf-8", errors="replace")
+        text = await load_text(store, id)
     except NotFoundError:
         text = None
     # What the sources find in the text, for a withdrawal: read before the lock is taken.

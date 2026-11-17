@@ -227,7 +227,7 @@ class _UnfitAnswerError(Exception):
 
 
 async def _document_text(store: ObjectStore, id: DocumentId) -> str:
-    return (await load_text(store, id)).decode("utf-8")
+    return await load_text(store, id)
 
 
 async def _locate_quotes(

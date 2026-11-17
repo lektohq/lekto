@@ -459,10 +459,9 @@ class DocumentService:
         async with self._uow() as uow:
             await readable_document(uow, await load_actor(uow, actor), id)
         try:
-            data = await load_text(store, id)
+            text = await load_text(store, id)
         except NotFoundError:
             raise ConflictError(because(ReasonCode.NO_TEXT_YET)) from None
-        text = data.decode("utf-8", errors="replace")
         end = offset + limit
         return DocumentText(
             text=text[offset:end],
@@ -493,7 +492,7 @@ class DocumentService:
             labels = {item.id: item.label for item in await uow.users.list_all()}
             stored = {fact.key: fact for fact in await uow.document_facts.of_document(id)}
         try:
-            text = (await load_text(store, id)).decode("utf-8", errors="replace")
+            text = await load_text(store, id)
         except NotFoundError:
             raise ConflictError(because(ReasonCode.NO_TEXT_YET)) from None
         codes = await self._codes(id)

@@ -334,7 +334,7 @@ class RuleApplicationService:
         if not conditions:
             return []
         try:
-            text = (await load_text(self._store, document)).decode("utf-8", "replace")
+            text = await load_text(self._store, document)
         except NotFoundError:
             return []
         pages = await load_layout(self._store, document)

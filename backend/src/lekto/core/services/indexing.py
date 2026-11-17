@@ -465,10 +465,10 @@ class IndexingService:
 
     async def _read_text(self, id: DocumentId) -> str:
         try:
-            data = await load_text(self._store, id)
+            text = await load_text(self._store, id)
         except NotFoundError:
             return ""  # not parsed yet
-        return data.decode("utf-8", errors="replace")[: self._policy.max_text]
+        return text[: self._policy.max_text]
 
     async def _compose(
         self,

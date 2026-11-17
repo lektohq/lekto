@@ -339,7 +339,7 @@ class ClassifierService:
                 raw = await load_text(self._store, document.id)
             except NotFoundError:
                 continue
-            text = shorten(raw.decode("utf-8", "replace"), self.policy.text_limit).text
+            text = shorten(raw, self.policy.text_limit).text
             example = TrainingExample(
                 text=text,
                 contact=document.contact_id,

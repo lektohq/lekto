@@ -361,7 +361,7 @@ class SearchService:
         if not matches or self._store is None:
             return SearchPlaces(len(matches))
         try:
-            content = (await load_text(self._store, found.id)).decode("utf-8", "replace")
+            content = await load_text(self._store, found.id)
         except NotFoundError:
             return SearchPlaces(0)
         matches = _worth_marking(content, matches, text)

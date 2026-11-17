@@ -141,7 +141,7 @@ def abstained_reason(output: JsonObject) -> Reason | None:
 
 async def _text(store: ObjectStore, document: Document) -> str | None:
     try:
-        return (await load_text(store, document.id)).decode("utf-8", "replace")
+        return await load_text(store, document.id)
     except NotFoundError:
         return None
 

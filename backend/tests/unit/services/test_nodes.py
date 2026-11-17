@@ -216,7 +216,7 @@ async def test_the_markdown_of_before_goes_once_the_text_is_read_again(world: Wo
     read = await load_text(store, document.id)
     await store.delete(text_key(document.id))
     await store.put(legacy_text_key(document.id), b"# Docling", content_type="text/markdown")
-    assert await load_text(store, document.id) == b"# Docling"
+    assert await load_text(store, document.id) == "# Docling"
     await service.reprocess_from(owner.id, document.id, Node.PARSE)
     await world.drain(service)
     assert await load_text(store, document.id) == read

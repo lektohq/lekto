@@ -72,7 +72,13 @@ from lekto.core.services.classification.signals import (
     NeighboursSignal,
 )
 from lekto.core.services.nodes import OcrNode, ParseNode
-from lekto.core.services.objects import archive_key, exchanges_key, reading_key, text_key
+from lekto.core.services.objects import (
+    archive_key,
+    exchanges_key,
+    load_text,
+    reading_key,
+    text_key,
+)
 from lekto.core.services.pipeline import MetadataResult, NodeExecutor
 from lekto.core.services.rules.nodes import ApplyRulesNode
 from tests import builders
@@ -2260,3 +2266,20 @@ async def test_the_names_and_patterns_are_matched_outside_the_event_loop(
     await judge(world, document, model(proposal()))
     assert threads["contact"] and threads["identifiers"]
     assert threading.get_ident() not in threads["contact"] + threads["identifiers"]
+
+
+async def test_a_text_with_a_byte_that_is_no_utf_8_is_read_with_a_replacement(
+    world: World,
+) -> None:
+    """The model's signal read the text strictly: one such byte failed the node, while every
+    other reader took a replacement character (SA-12)."""
+    await seed(world)
+    document = await document_with(world)
+    await world.object_store.put(
+        text_key(document.id),
+        INVOICE.encode() + b"\nKundennummer 4711 \xff\n",
+        content_type="text/markdown; charset=utf-8",
+    )
+    assert "�" in await load_text(world.object_store, document.id)
+    result = await signal_step(world, model(proposal())).run(document)
+    assert result.outcome is Outcome.OK, result.reason

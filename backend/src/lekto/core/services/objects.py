@@ -92,13 +92,15 @@ def reading_key(document: DocumentId) -> str:
     return f"documents/{document}/reading.json"
 
 
-async def load_text(store: ObjectStore, document: DocumentId) -> bytes:
+async def load_text(store: ObjectStore, document: DocumentId) -> str:
     """The document's text, or the Markdown of one parsed before 0.2. NotFoundError if it has
-    neither (it is not parsed yet)."""
+    neither (it is not parsed yet). A byte that is no UTF-8 reads as a replacement character
+    (SA-12): every reader of the text takes it so, none fails on it."""
     try:
-        return await store.get(text_key(document))
+        data = await store.get(text_key(document))
     except NotFoundError:
-        return await store.get(legacy_text_key(document))
+        data = await store.get(legacy_text_key(document))
+    return data.decode("utf-8", errors="replace")
 
 
 async def load_layout(
