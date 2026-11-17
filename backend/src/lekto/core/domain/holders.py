@@ -39,6 +39,7 @@ from lekto.core.domain.document_facts import (
     Holder,
     HolderKind,
     HolderSource,
+    quote_reason,
 )
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.evidence import contains, normalise
@@ -48,7 +49,6 @@ from lekto.core.domain.identifiers import (
     IdentifierKind,
     Key,
     normalise_identifier,
-    type_of,
 )
 from lekto.core.domain.names import match_key
 from lekto.core.domain.reasons import Reason, ReasonCode, because
@@ -499,13 +499,11 @@ def checked_holder(
         kind = HolderKind(read.holder)
     except ValueError:
         return because(ReasonCode.HOLDER_KIND_UNKNOWN, holder=read.holder)
-    evidence = (read.evidence or "").strip()
-    if not evidence:
-        return because(ReasonCode.QUOTE_MISSING)
-    if not contains(normalise(text) if normalised is None else normalised, evidence):
-        return because(ReasonCode.QUOTE_NOT_IN_TEXT)
-    if re.search(type_of(key[0]).written(key[1]), evidence, re.IGNORECASE) is None:
-        return because(ReasonCode.QUOTE_WITHOUT_VALUE)
+    quoted = quote_reason(
+        normalise(text) if normalised is None else normalised, read.evidence, *key
+    )
+    if quoted is not None:
+        return quoted
     name = (read.name or "").strip() or None
     if name is not None:
         near = [

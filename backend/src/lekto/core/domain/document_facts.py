@@ -378,13 +378,12 @@ def checked_read(
     where = _first(text, "", kind, value, None)
     if where is None:
         return because(ReasonCode.FACT_NOT_IN_TEXT, value=read.value)
+    quoted = quote_reason(
+        normalise(text) if normalised is None else normalised, read.evidence, kind, value
+    )
+    if quoted is not None:
+        return quoted
     evidence = (read.evidence or "").strip()
-    if not evidence:
-        return because(ReasonCode.QUOTE_MISSING)
-    if not contains(normalise(text) if normalised is None else normalised, evidence):
-        return because(ReasonCode.QUOTE_NOT_IN_TEXT)
-    if re.search(type_of(kind).written(value), evidence, re.IGNORECASE) is None:
-        return because(ReasonCode.QUOTE_WITHOUT_VALUE)
     if kind is IdentifierKind.LETTER_DATE and not any(type_of(kind).find(normalise(evidence))):
         return because(ReasonCode.QUOTE_WITHOUT_VALUE)
     return DocumentFact(
@@ -395,6 +394,23 @@ def checked_read(
         written=text[where[0] : where[1]],
         position=where[0],
     )
+
+
+def quote_reason(
+    normalised: str, evidence: str | None, kind: IdentifierKind, value: str
+) -> Reason | None:
+    """Why the passage a reader quotes for a value of `kind` does not show it in the text
+    (`normalised`: the document's, normalised once by the caller): none given, not in the text,
+    or without the value as its kind writes it (`QUOTE_*`); None if it shows it. What the
+    facts and the holders the language model read are checked by alike (DA-08)."""
+    quote = (evidence or "").strip()
+    if not quote:
+        return because(ReasonCode.QUOTE_MISSING)
+    if not contains(normalised, quote):
+        return because(ReasonCode.QUOTE_NOT_IN_TEXT)
+    if re.search(type_of(kind).written(value), quote, re.IGNORECASE) is None:
+        return because(ReasonCode.QUOTE_WITHOUT_VALUE)
+    return None
 
 
 def with_read(found: Iterable[DocumentFact], read: Iterable[DocumentFact]) -> list[DocumentFact]:

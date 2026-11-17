@@ -16,9 +16,11 @@ from lekto.core.domain.document_facts import (
     fact_tokens,
     found_facts,
     merged,
+    quote_reason,
     with_read,
 )
 from lekto.core.domain.errors import ValidationError
+from lekto.core.domain.evidence import normalise
 from lekto.core.domain.identifiers import IdentifierKind, identifiers_in, places_in, referred_in
 from lekto.core.domain.reasons import Reason, ReasonCode
 
@@ -247,3 +249,21 @@ def test_a_criterion_finds_a_fact_by_its_parts() -> None:
             FactCriterion(**wrong)  # type: ignore[arg-type]
     with pytest.raises(ValidationError):
         FactCriterion.written(IdentifierKind.CREDITOR_ID, "DE00", None)
+
+
+@pytest.mark.parametrize(
+    ("evidence", "reason"),
+    [
+        (None, ReasonCode.QUOTE_MISSING),
+        ("  ", ReasonCode.QUOTE_MISSING),
+        ("Kundennummer 99999", ReasonCode.QUOTE_NOT_IN_TEXT),
+        ("Bitte überweisen Sie auf", ReasonCode.QUOTE_WITHOUT_VALUE),
+        ("auf DE02 1203 0000 0000 2020 51", None),
+    ],
+)
+def test_a_quote_shows_the_value_in_the_text(
+    evidence: str | None, reason: ReasonCode | None
+) -> None:
+    """What the facts and the holders a reader gives are checked by alike (DA-08)."""
+    found = quote_reason(normalise(TEXT), evidence, *IBAN)
+    assert (found.code if found else None) is reason
