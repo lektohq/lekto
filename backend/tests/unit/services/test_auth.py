@@ -370,8 +370,11 @@ async def test_failed_sign_ins_do_not_log_the_typed_username(
         pytest.raises(AuthenticationError),
     ):
         await world.auth.login(typed_into_the_wrong_field, "x", source=SOURCE)
+    [record] = [r for r in caplog.records if r.getMessage() == "sign-in failed"]
+    assert record.__dict__["account_known"] is False
+    # In no record, under no field (TD-01: one field alone was looked at, which was gone).
     for record in caplog.records:
-        logged = record.getMessage() + repr(record.__dict__.get("keys"))
+        logged = record.getMessage() + repr(record.__dict__)
         assert typed_into_the_wrong_field.casefold() not in logged.casefold(), logged
 
 
