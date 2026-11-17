@@ -11,8 +11,9 @@ them; the protocol allows dots, but clients refuse them.
 """
 
 import functools
+import inspect
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
 
@@ -22,6 +23,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import CallToolResult, ListToolsResult, TextContent, ToolAnnotations
 from starlette.requests import Request
 
+from lekto.adapters.inbound.mcp.names import similar_names
 from lekto.core.domain.errors import DomainError, SearchUnavailableError
 from lekto.core.services.auth import Principal
 
@@ -82,6 +84,7 @@ class ToolSpec:
     tool_class: ToolClass
     admin: bool = False
     idempotent: bool = False
+    parameters: frozenset[str] = frozenset()  # the arguments it takes (`_parameters`)
 
     def __post_init__(self) -> None:
         if len(self.name) > MAX_NAME or split_name(self.name) is None:
@@ -106,6 +109,24 @@ class ToolSpec:
             return "this API token may only read"
         if self.admin and not principal.user.is_active_admin:
             return "only admins may use this tool"
+        return None
+
+    def unknown(self, arguments: object) -> str | None:
+        """Why `arguments` do not fit: one the tool does not take (a name the model guessed or
+        mistyped would drop out silently, and a filter count everything), with a name it may
+        have meant; None if they fit."""
+        if not isinstance(arguments, Mapping):
+            return None
+        for name in arguments:
+            if name in self.parameters:
+                continue
+            alike = similar_names(str(name), sorted(self.parameters))
+            hint = (
+                f"did you mean {', '.join(repr(item) for item in alike)}?"
+                if alike
+                else f"it takes {', '.join(sorted(self.parameters)) or 'none'}"
+            )
+            return f"unknown argument {str(name)!r}; {hint}"
         return None
 
 
@@ -139,10 +160,19 @@ class Tools:
                 # more than double the definitions every conversation loads.
                 structured_output=False,
             )(_guarded(tool))
-            self._specs[spec.name] = spec
+            self._specs[spec.name] = replace(spec, parameters=_parameters(tool))
             return tool
 
         return add
+
+
+def _parameters(tool: Tool) -> frozenset[str]:
+    """The arguments `tool` takes: its parameters but the context the SDK passes in."""
+    return frozenset(
+        name
+        for name, parameter in inspect.signature(tool).parameters.items()
+        if parameter.annotation is not Context and name != "ctx"
+    )
 
 
 def _guarded(tool: Tool) -> Tool:
@@ -189,8 +219,11 @@ class Visibility:
     ) -> HandlerResult:
         principal = _principal(ctx.request)
         if ctx.method == "tools/call":
-            spec = self._specs.get(str((ctx.params or {}).get("name")))
+            params = ctx.params or {}
+            spec = self._specs.get(str(params.get("name")))
             refusal = None if spec is None else spec.refusal(principal)
+            if refusal is None and spec is not None:
+                refusal = spec.unknown(params.get("arguments"))
             if refusal is not None:
                 text = TextContent(type="text", text=refusal)
                 return CallToolResult(content=[text], is_error=True)

@@ -66,6 +66,22 @@ async def tools_of(api: Api, headers: dict[str, str]) -> dict[str, Tool]:
         return {tool.name: tool for tool in (await client.list_tools()).tools}
 
 
+async def test_an_argument_a_tool_does_not_take_is_refused_with_what_it_may_mean(
+    api: Api, scene: Scene
+) -> None:
+    """A name the model guesses or mistypes dropped out silently: a filter counted every
+    document, an update changed nothing and said it had."""
+    headers = scene.headers["owner"]
+    for tool in sorted(READS | WRITES):
+        refused = await call(api, headers, tool, nonsense=1)
+        assert "unknown argument 'nonsense'" in error(refused), tool
+    listed = await call(api, headers, "documents_list", contakt="Stadtwerke")
+    assert "unknown argument 'contakt'; did you mean 'contact'?" in error(listed)
+    updated = await call(api, headers, "documents_update", id="x", titel="Neu")
+    assert "did you mean 'title'?" in error(updated)
+    assert not (await call(api, headers, "documents_list", lane="green")).is_error
+
+
 async def test_the_server_lists_its_tools_with_their_class(api: Api, scene: Scene) -> None:
     by_name = await tools_of(api, scene.headers["owner"])
     assert set(by_name) == READS | WRITES
