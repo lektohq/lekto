@@ -82,6 +82,14 @@ class MemoryKnownDeviceRepository(MemoryRepository[KnownDeviceId, KnownDevice]):
     async def remove_for_user(self, user: UserId) -> int:
         return self._remove_rows([row for row in self._all() if row.user_id == user])
 
+    async def keep_newest(self, user: UserId, count: int) -> int:
+        rows = sorted(
+            (row for row in self._all() if row.user_id == user),
+            key=lambda row: (row.created_at, row.id),
+            reverse=True,
+        )
+        return self._remove_rows(rows[count:])
+
     async def purge(self, *, now: datetime) -> int:
         return self._remove_rows([row for row in self._all() if row.expires_at <= now])
 

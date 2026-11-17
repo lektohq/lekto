@@ -159,7 +159,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * Change the own password
-		 * @description Ends all sessions and starts a new one for the caller (new cookie and CSRF token). API tokens stay unless `revoke_tokens`. Needs a session; API tokens are refused (403).
+		 * @description Ends all sessions and starts a new one for the caller (new cookie and CSRF token). The caller's known devices are forgotten; this browser is known again by a new device cookie. API tokens stay unless `revoke_tokens`. Needs a session; API tokens are refused (403).
 		 */
 		post: operations['change_password_api_v1_auth_password_post'];
 		delete?: never;

@@ -464,6 +464,9 @@ KNOWN_DEVICE_LIFETIME = timedelta(days=365)
 """How long a known device stays known after its last sign-in with the password."""
 KNOWN_DEVICES_PER_BROWSER = 5
 """Accounts a browser stays known for at most (a household's browser); the oldest go first."""
+KNOWN_DEVICES_PER_USER = 20
+"""Known devices a user keeps at most; a new one replaces the oldest. Each counts its failed
+sign-ins by itself (`device_key`): many would give one who knew the password many guesses."""
 
 
 @dataclass(kw_only=True)

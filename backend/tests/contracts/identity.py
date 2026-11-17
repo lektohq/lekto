@@ -223,6 +223,34 @@ class IdentityRepositoriesContract:
             ]
             assert [d.id if d else None for d in remaining] == [None, None, kept.id, None]
 
+    async def test_a_user_keeps_the_newest_known_devices(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        user, other = await a_user(uow_factory), await a_user(uow_factory)
+        oldest, _ = KnownDevice.issue(user_id=user.id, now=NOW)
+        older, _ = KnownDevice.issue(user_id=user.id, now=NOW + HOUR)
+        newest, _ = KnownDevice.issue(user_id=user.id, now=NOW + 2 * HOUR)
+        theirs, _ = KnownDevice.issue(user_id=other.id, now=NOW)
+        async with uow_factory() as uow:
+            for device in (newest, oldest, theirs, older):
+                await uow.known_devices.add(device)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.known_devices.keep_newest(user.id, 2) == 1
+            assert await uow.known_devices.keep_newest(user.id, 2) == 0
+            await uow.commit()
+        async with uow_factory() as uow:
+            remaining = [
+                await uow.known_devices.find_by_token(d.token_hash)
+                for d in (oldest, older, newest, theirs)
+            ]
+            assert [d.id if d else None for d in remaining] == [
+                None,
+                older.id,
+                newest.id,
+                theirs.id,
+            ]
+
     # --- API tokens -----------------------------------------------------------------------------
 
     async def test_api_tokens(self, uow_factory: UnitOfWorkFactory) -> None:

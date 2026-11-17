@@ -47,6 +47,7 @@ from lekto.core.domain.identity import (
     ACCOUNT_THROTTLE,
     KNOWN_DEVICE_LIFETIME,
     KNOWN_DEVICES_PER_BROWSER,
+    KNOWN_DEVICES_PER_USER,
     SOURCE_THROTTLE,
     ApiToken,
     Credential,
@@ -348,9 +349,13 @@ class AuthService:
         *,
         session: SessionId | None = None,
         revoke_tokens: bool = False,
+        devices: Sequence[str] = (),
     ) -> SignedIn | None:
         """Change the caller's password. All sessions end; if the caller uses `session`, it is
-        replaced by a new one, which is returned. API tokens stay unless `revoke_tokens`."""
+        replaced by a new one, which is returned. API tokens stay unless `revoke_tokens`. The
+        user's known devices go: who knew the old password keeps no device, which would count
+        its guesses by itself; the browser of `session` (`devices`: the tokens it keeps) is
+        known again, by a new token (`SignedIn.devices`)."""
         now = self._clock.now()
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
@@ -362,6 +367,7 @@ class AuthService:
             _log_failure(actor, None)
             raise PermissionDeniedError(because(ReasonCode.WRONG_PASSWORD))
         new_hash = await self._hasher.hash(new_password)
+        known = await self._known_devices(user.username, devices, now)
 
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
@@ -375,11 +381,14 @@ class AuthService:
             await uow.credentials.update(credential)
             await _release(uow, reserved)
             await uow.sessions.remove_for_user(actor)
+            await uow.known_devices.remove_for_user(actor)
             if revoke_tokens:
                 await uow.api_tokens.remove_for_user(actor)
             signed_in = None
             if session is not None:
                 signed_in = await self._start_session(uow, user, LoginMethod.PASSWORD, now)
+                kept = await _keep_known(uow, user, replace(known, own=None), now)
+                signed_in = replace(signed_in, devices=kept)
             await uow.commit()
         log.info("password changed", extra={"user_id": str(actor), "tokens_revoked": revoke_tokens})
         return signed_in
@@ -588,6 +597,7 @@ async def _keep_known(uow: UnitOfWork, user: User, known: _Known, now: datetime)
     if known.own is None:
         device, token = KnownDevice.issue(user_id=user.id, now=now)
         await uow.known_devices.add(device)
+        await uow.known_devices.keep_newest(user.id, KNOWN_DEVICES_PER_USER)
     else:
         token, device = known.own
         await uow.known_devices.renew(device.id, now + KNOWN_DEVICE_LIFETIME)

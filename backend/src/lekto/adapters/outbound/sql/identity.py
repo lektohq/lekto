@@ -270,6 +270,18 @@ class SqlKnownDeviceRepository:
         table = t.known_devices
         return (await self._tx.write(delete(table).where(table.c.user_id == user))).rowcount
 
+    async def keep_newest(self, user: UserId, count: int) -> int:
+        table = t.known_devices
+        rows = await self._tx.read(
+            select(table.c.id)
+            .where(table.c.user_id == user)
+            .order_by(table.c.created_at.desc(), table.c.id.desc())
+        )
+        older = [row.id for row in rows][count:]
+        if not older:
+            return 0
+        return (await self._tx.write(delete(table).where(table.c.id.in_(older)))).rowcount
+
     async def purge(self, *, now: datetime) -> int:
         table = t.known_devices
         return (await self._tx.write(delete(table).where(table.c.expires_at <= now))).rowcount

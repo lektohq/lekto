@@ -205,13 +205,18 @@ async def change_own_profile(
     summary="Change the own password",
     description=(
         "Ends all sessions and starts a new one for the caller (new cookie and CSRF token). "
-        "API tokens stay unless `revoke_tokens`." + SESSION_ONLY_NOTE
+        "The caller's known devices are forgotten; this browser is known again by a new "
+        "device cookie. API tokens stay unless `revoke_tokens`." + SESSION_ONLY_NOTE
     ),
     response_model=SessionOut,
     responses=problem_responses(401, 403, 422, 429),
 )
 async def change_password(
-    body: PasswordChange, principal: SessionPrincipal, response: Response, context: Context
+    body: PasswordChange,
+    principal: SessionPrincipal,
+    request: Request,
+    response: Response,
+    context: Context,
 ) -> SessionOut:
     assert principal.session is not None
     signed_in = await context.auth.change_password(
@@ -220,9 +225,11 @@ async def change_password(
         body.new_password.get_secret_value(),
         session=principal.session.id,
         revoke_tokens=body.revoke_tokens,
+        devices=known_devices(request, context),
     )
     assert signed_in is not None
     set_session_cookie(response, context, signed_in)
+    set_device_cookie(response, context, signed_in)
     return _session_out(signed_in)
 
 

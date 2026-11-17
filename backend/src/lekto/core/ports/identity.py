@@ -93,6 +93,11 @@ class KnownDeviceRepository(Protocol):
 
     async def remove_for_user(self, user: UserId) -> int: ...
 
+    async def keep_newest(self, user: UserId, count: int) -> int:
+        """Remove the user's devices but the `count` newest (by `created_at`, then id);
+        returns how many went."""
+        ...
+
     async def purge(self, *, now: datetime) -> int:
         """Remove devices that expired (`expires_at <= now`); returns how many."""
         ...

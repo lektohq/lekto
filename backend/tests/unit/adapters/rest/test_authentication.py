@@ -263,6 +263,9 @@ async def test_password_change_over_http(api: Api) -> None:
         )
         assert response.status_code == 200
         assert "__Host-lekto_session=" in response.headers["set-cookie"]
+        # The known devices are forgotten; this browser is known again by a new cookie (XA-05).
+        devices = [c for c in response.headers.get_list("set-cookie") if "lekto_device" in c]
+        assert [c.split("=")[0] for c in devices] == ["__Secure-lekto_device"]
         new_csrf = response.json()["csrf_token"]
         assert new_csrf != session.csrf_token
         assert (await client.get(f"{PREFIX}/auth/me")).status_code == 200  # renewed
