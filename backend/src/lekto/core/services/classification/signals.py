@@ -88,7 +88,12 @@ from lekto.core.services.classification.answers import (
     read_fact_from_json,
     read_holder_from_json,
 )
-from lekto.core.services.classification.kept_facts import READ_FACTS, TextFacts, keep_facts
+from lekto.core.services.classification.kept_facts import (
+    READ_FACTS,
+    TextFacts,
+    facts_lock,
+    refresh_facts,
+)
 from lekto.core.services.classifier import ClassifierService
 from lekto.core.services.indexing import split_sections
 from lekto.core.services.nodes import ARCHIVE_FILE, work_directory
@@ -264,9 +269,12 @@ class FactsResult:
         return self.result.output
 
     async def apply(self, uow: UnitOfWork, document: Document, now: datetime) -> NodeResult:
+        # The lock before the log: the model's signal may be keeping its half now, and its
+        # facts are read from its entry once it committed (SA-14).
+        await uow.lock(facts_lock(document.id))
         log = await uow.processing_log.list_for(document.id)
         signals = ProcessingHistory(log).signals()
-        report = await keep_facts(
+        report = await refresh_facts(
             uow,
             document.id,
             self.text,

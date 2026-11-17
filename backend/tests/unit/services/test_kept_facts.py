@@ -2,19 +2,26 @@
 text is read outside the event loop; the facts are merged outside it too, with the text
 normalised once (SA-02)."""
 
+import asyncio
 import threading
 from collections.abc import Callable
+from datetime import timedelta
 from typing import Any
 
 import pytest
 
+from lekto.adapters.outbound.memory import FakeCodeReader
 from lekto.core.domain import document_facts, holders
 from lekto.core.domain.document_facts import FactOrigin, HolderKind, ReadFact, found_facts
 from lekto.core.domain.evidence import normalise
 from lekto.core.domain.holders import ReadHolder
 from lekto.core.domain.identifiers import IdentifierKind, identifiers_in, places_in, referred_in
+from lekto.core.domain.pipeline import Node, NodeResult, NodeRun, Outcome
 from lekto.core.services.classification import kept_facts
+from lekto.core.services.classification.answers import read_fact_to_json
 from lekto.core.services.classification.kept_facts import TextFacts, keep_facts
+from lekto.core.services.classification.signals import MODEL_FACTS, FactsResult, FactsSignal
+from tests import builders
 from tests.unit.services.support import World
 from tests.unit.services.test_signals import stored
 
@@ -92,3 +99,53 @@ async def test_the_facts_are_merged_outside_the_loop_with_the_text_normalised_on
     assert customer.origins == {FactOrigin.PATTERN, FactOrigin.MODEL}
     holder = facts[IBAN].holder
     assert holder is not None and holder.kind is HolderKind.RECIPIENT
+
+
+async def test_the_facts_signal_waits_for_the_model_s_half_before_it_reads_it(
+    world: World,
+) -> None:
+    """The model's signal keeps its facts holding the lock, not committed yet; the facts signal
+    stores meanwhile. It reads the model's facts from the log after the lock, so both halves
+    stay (SA-14): read before, it wrote the patterns' alone over the model's."""
+    owner = await world.user()
+    document = await stored(world, owner, TEXT)
+    patterns = await FactsSignal(world.uow, world.object_store, FakeCodeReader([])).run(document)
+    assert isinstance(patterns, FactsResult)
+    model = [
+        ReadFact(
+            kind="customer_number", value="12345", role="contact", evidence="Kundennummer 12345"
+        )
+    ]
+    keeping = world.uow()
+    async with keeping as uow:
+        await uow.processing_log.append(
+            NodeRun(
+                document_id=document.id,
+                node=Node.SIGNAL_LLM,
+                run=1,
+                result=NodeResult(
+                    outcome=Outcome.OK,
+                    output={MODEL_FACTS: [read_fact_to_json(fact) for fact in model]},
+                ),
+                pipeline_version="1",
+                started_at=builders.NOW,
+                duration=timedelta(seconds=1),
+            )
+        )
+        await keep_facts(uow, document.id, await TextFacts.read(TEXT), model)
+
+        async def store_patterns() -> None:
+            async with world.uow() as other:
+                current = await other.documents.get(document.id)
+                await patterns.apply(other, current, builders.NOW)
+                await other.commit()
+
+        storing = asyncio.create_task(store_patterns())
+        for _ in range(5):
+            await asyncio.sleep(0)  # it starts and waits for the lock
+        await uow.commit()
+    await storing
+    async with world.uow() as uow:
+        facts = {fact.key: fact for fact in await uow.document_facts.of_document(document.id)}
+    customer = facts[(IdentifierKind.CUSTOMER_NUMBER, "12345")]
+    assert customer.origins == {FactOrigin.PATTERN, FactOrigin.MODEL}
