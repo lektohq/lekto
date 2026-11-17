@@ -21,7 +21,7 @@ from enum import StrEnum
 
 from lekto.core.domain.document_facts import BOOKED_HOLDER_KINDS, HOLDER_KINDS, HolderKind
 from lekto.core.domain.holders import foreign, held_by
-from lekto.core.domain.identifiers import IdentifierKind, IdentifierSource, Key
+from lekto.core.domain.identifiers import CONTACT_KINDS, IdentifierKind, IdentifierSource, Key
 from lekto.core.domain.ids import ContactId, DocumentId
 from lekto.core.domain.master_data import Contact
 from lekto.core.domain.open_identifiers import Recommendation, Sighting, recommendation_for
@@ -100,8 +100,10 @@ def evaluate(contacts: Iterable[Contact], sightings: Iterable[Sighting]) -> Hold
         by_key[sighting.fact.key].append(sighting)
     names = {contact.id: contact.names() for contact in contacts}
     labels = {contact.id: contact.name for contact in contacts}
-    # A customer number's holder is told only in bookings: nothing to measure the rule by.
-    measured = HOLDER_KINDS - BOOKED_HOLDER_KINDS
+    # The kinds a contact carries (since #215 no IBAN, which the row would always leave
+    # empty), but the customer number: its holder is told only in bookings, nothing to measure
+    # the rule by (DA-06).
+    measured = (HOLDER_KINDS & CONTACT_KINDS) - BOOKED_HOLDER_KINDS
     evaluation = HolderEvaluation({kind: Tally() for kind in sorted(measured)})
     for contact in contacts:
         for identifier in contact.identifiers:

@@ -65,7 +65,7 @@ def test_the_holders_and_the_recommendation_against_the_decisions() -> None:
     found = evaluate([utility, bank], sightings)
 
     assert found.kinds[DOMAIN] == Tally(right=2, unread=1)
-    assert found.kinds[IdentifierKind.IBAN] == Tally()
+    assert list(found.kinds) == [DOMAIN]  # no contact carries an IBAN since #215
     # Twice right; the unread one has no holder to confirm by (none); the customer number of
     # one document neither.
     assert found.recommendation == Tally(right=2, unclear=2)
