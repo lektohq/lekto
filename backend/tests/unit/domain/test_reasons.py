@@ -124,6 +124,18 @@ def test_a_field_check_stores_its_reasons_beside_the_english_text() -> None:
             "'DE00 1234' is not a valid IBAN",
         ),
         (
+            lambda: normalise_identifier(IdentifierKind.CUSTOMER_NUMBER, "A12"),
+            ReasonCode.NOT_CUSTOMER_NUMBER,
+            {"value": "A12", "min": 4, "max": 30},
+            "'A12' is no customer number (4 to 30 letters and digits, one a digit)",
+        ),
+        (
+            lambda: normalise_identifier(IdentifierKind.PERSONNEL_NUMBER, "ABC"),
+            ReasonCode.NOT_PERSONNEL_NUMBER,
+            {"value": "ABC", "min": 3, "max": 30},
+            "'ABC' is no personnel number (3 to 30 letters and digits, one a digit)",
+        ),
+        (
             lambda: check_new_password("short", "tobi"),
             ReasonCode.PASSWORD_TOO_SHORT,
             {"min": PASSWORD_MIN_LENGTH},

@@ -228,7 +228,7 @@ class PushService:
                 await uow.push_devices.update(device)
             else:
                 if len(await uow.push_devices.list_for(actor)) >= MAX_DEVICES:
-                    raise ConflictError(because(ReasonCode.PUSH_DEVICES_LIMIT))
+                    raise ConflictError(because(ReasonCode.PUSH_DEVICES_LIMIT, max=MAX_DEVICES))
                 await uow.push_devices.add(device)
             await uow.commit()
         log.info("push device registered", extra={"user_id": str(actor)})

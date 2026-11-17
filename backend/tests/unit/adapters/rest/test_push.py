@@ -96,7 +96,7 @@ async def test_a_person_has_at_most_twenty_devices(api: Api) -> None:
     body = subscription("https://fcm.googleapis.com/fcm/send/20")
     refused = await api.client.post(f"{PREFIX}/push/devices", json=body, headers=auth(user))
     assert refused.status_code == 409
-    assert refused.json()["reason"]["code"] == "push_devices_limit"
+    assert refused.json()["reason"] == {"code": "push_devices_limit", "params": {"max": 20}}
 
 
 async def test_another_persons_device_is_not_found(api: Api) -> None:

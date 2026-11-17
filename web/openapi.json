@@ -45540,7 +45540,9 @@
     "push_off": {},
     "push_endpoint_refused": {},
     "push_keys_invalid": {},
-    "push_devices_limit": {},
+    "push_devices_limit": {
+      "max": "number"
+    },
     "csrf_missing": {
       "header": "text"
     },
@@ -45661,7 +45663,9 @@
       "value": "text"
     },
     "not_customer_number": {
-      "value": "text"
+      "value": "text",
+      "min": "number",
+      "max": "number"
     },
     "not_of_kind": {
       "value": "text",
@@ -45709,7 +45713,9 @@
       "kind": "identifier_kind"
     },
     "not_personnel_number": {
-      "value": "text"
+      "value": "text",
+      "min": "number",
+      "max": "number"
     },
     "not_domain": {
       "value": "text"

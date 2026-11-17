@@ -17,7 +17,10 @@ from lekto.core.domain.identifiers.base import (
 )
 from lekto.core.domain.reasons import ReasonCode, because
 
-_FORM = re.compile(r"(?=[A-Z0-9]*\d)[A-Z0-9]{4,30}")
+MIN_LENGTH = 4
+MAX_LENGTH = 30
+"""The letters and digits a customer number has at least and at most."""
+_FORM = re.compile(rf"(?=[A-Z0-9]*\d)[A-Z0-9]{{{MIN_LENGTH},{MAX_LENGTH}}}")
 _ACCOUNT = re.compile(r"account")
 _BANK = re.compile(r"(?<![a-z])(?:routing|swift|iban|bic|bank)(?![a-z])")
 _NEAR = 60
@@ -37,11 +40,13 @@ class CustomerNumber(IdentifierType):
     names_user = True
 
     def normalise(self, raw: str) -> str:
-        """Without separators, in upper case: 4 to 30 letters and digits, one a digit; none
-        where a character is hidden (`XXXXXX123`)."""
+        """Without separators, in upper case: `MIN_LENGTH` to `MAX_LENGTH` letters and digits,
+        one a digit; none where a character is hidden (`XXXXXX123`)."""
         value = SEPARATORS.sub("", raw.strip()).upper()
         if not _FORM.fullmatch(value) or MASKED.search(raw.upper()):
-            raise ValidationError(because(ReasonCode.NOT_CUSTOMER_NUMBER, value=raw))
+            raise ValidationError(
+                because(ReasonCode.NOT_CUSTOMER_NUMBER, value=raw, min=MIN_LENGTH, max=MAX_LENGTH)
+            )
         return value
 
     def find(self, text: str) -> Iterator[Candidate]:

@@ -801,7 +801,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.PUSH_OFF: "notifications are off on this server",
     ReasonCode.PUSH_ENDPOINT_REFUSED: "the device's push address is no known push service's",
     ReasonCode.PUSH_KEYS_INVALID: "the device's keys are not valid",
-    ReasonCode.PUSH_DEVICES_LIMIT: "at most 20 devices receive notifications",
+    ReasonCode.PUSH_DEVICES_LIMIT: "at most {max:number} devices receive notifications",
     ReasonCode.CSRF_MISSING: "the header {header} is missing or wrong",
     ReasonCode.SESSION_NEEDED: "this needs a signed-in session, not an API token",
     ReasonCode.OIDC_MISMATCH: "the sign-in does not match the one started here",
@@ -896,10 +896,12 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ),
     ReasonCode.NOT_OF_KIND: "'{value}' is no valid {kind:identifier_kind}",
     ReasonCode.NOT_CUSTOMER_NUMBER: (
-        "'{value}' is no customer number (4 to 30 letters and digits, one a digit)"
+        "'{value}' is no customer number ({min:number} to {max:number} letters and digits, "
+        "one a digit)"
     ),
     ReasonCode.NOT_PERSONNEL_NUMBER: (
-        "'{value}' is no personnel number (3 to 30 letters and digits, one a digit)"
+        "'{value}' is no personnel number ({min:number} to {max:number} letters and digits, "
+        "one a digit)"
     ),
     ReasonCode.NOT_DOMAIN: "'{value}' is not a domain",
     ReasonCode.FREE_MAIL_DOMAIN: "'{value}' is a free mail provider, not one contact's",
