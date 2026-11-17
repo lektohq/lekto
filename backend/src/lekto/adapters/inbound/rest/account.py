@@ -1,6 +1,5 @@
 """`/auth`: signing in and out, the caller's account, TOTP, API tokens, OpenID Connect."""
 
-from datetime import UTC
 from typing import Annotated
 from urllib.parse import urlencode
 from uuid import UUID
@@ -56,7 +55,7 @@ from lekto.core.domain.errors import (
 )
 from lekto.core.domain.identity import csrf_token
 from lekto.core.domain.ids import ApiTokenId
-from lekto.core.domain.validation import MAX_URL_LENGTH
+from lekto.core.domain.validation import MAX_URL_LENGTH, to_utc
 from lekto.core.services.auth import Principal, SignedIn
 
 public = APIRouter(prefix="/auth", tags=["auth"])
@@ -337,7 +336,7 @@ async def create_token(
         principal.id,
         body.name,
         body.scope,
-        expires_at=None if body.expires_at is None else body.expires_at.astimezone(UTC),
+        expires_at=None if body.expires_at is None else to_utc(body.expires_at, "expires_at"),
     )
     return TokenCreated(**TokenOut.of(token).model_dump(), token=value)
 

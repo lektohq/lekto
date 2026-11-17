@@ -3,7 +3,7 @@
 import asyncio
 import tempfile
 from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Annotated, Any, Literal
 from uuid import UUID
@@ -37,6 +37,7 @@ from lekto.core.domain.mail_message import address_line
 from lekto.core.domain.pipeline import ACTOR, CONFIRMED_BY, VIA_TOKEN, NodeRun
 from lekto.core.domain.relations import RelationState
 from lekto.core.domain.spaces import SpaceRole
+from lekto.core.domain.validation import to_utc
 from lekto.core.ports.repository import DocumentFilter
 from lekto.core.ports.search_index import MAX_HITS
 from lekto.core.services.documents import DocumentFacts, DocumentFile
@@ -590,7 +591,7 @@ def changes_of(given: ChangesIn, names: Names) -> DocumentChanges:
         created_at=(
             given.created_at
             if isinstance(given.created_at, Unset)
-            else given.created_at.astimezone(UTC)
+            else to_utc(given.created_at, "created_at")
         ),
     )
 

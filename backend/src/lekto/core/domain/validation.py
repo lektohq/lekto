@@ -24,6 +24,20 @@ def require_utc(value: datetime, what: str = "timestamp") -> datetime:
     return value.astimezone(UTC)
 
 
+def to_utc(value: datetime, what: str = "timestamp") -> datetime:
+    """The moment `value` (with its offset) in UTC; ValidationError if it has no offset, or
+    lies beyond the calendar in UTC (`9999-12-31T23:59:59-14:00`, `0001-01-01T00:00:00+14:00`),
+    which `astimezone` cannot write (RB-01, RA-13)."""
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValidationError(f"{what} needs an offset, got {value.isoformat()}")
+    try:
+        return value.astimezone(UTC)
+    except OverflowError:
+        raise ValidationError(
+            f"{what} lies beyond the calendar in UTC: {value.isoformat()}"
+        ) from None
+
+
 def require_name(value: str, what: str = "name", *, max_length: int | None = MAX_NAME) -> str:
     """Names are stripped, must not be empty and have at most `max_length` characters (None:
     no limit, for values that are not names of Lekto's own, such as file names)."""

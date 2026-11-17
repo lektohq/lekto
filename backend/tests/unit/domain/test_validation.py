@@ -9,6 +9,7 @@ from lekto.core.domain.validation import (
     name_key,
     require_name,
     require_utc,
+    to_utc,
     without_control,
 )
 
@@ -30,6 +31,26 @@ def test_require_utc_accepts_zero_offset_and_normalises() -> None:
 def test_require_utc_rejects_naive_and_offset_times(value: datetime) -> None:
     with pytest.raises(ValidationError, match="UTC"):
         require_utc(value)
+
+
+def test_to_utc_moves_an_offset_to_utc() -> None:
+    value = datetime(2026, 1, 1, 12, tzinfo=timezone(timedelta(hours=2)))
+    assert to_utc(value) == datetime(2026, 1, 1, 10, tzinfo=UTC)
+    assert to_utc(value).tzinfo is UTC
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        datetime(9999, 12, 31, 23, 59, 59, tzinfo=timezone(timedelta(hours=-14))),
+        datetime(1, 1, 1, tzinfo=timezone(timedelta(hours=14))),
+        datetime(2026, 1, 1),
+    ],
+)
+def test_to_utc_refuses_what_has_no_moment_in_utc(value: datetime) -> None:
+    """At the edge of the calendar, or without an offset (RB-01, RA-13)."""
+    with pytest.raises(ValidationError, match="created_at"):
+        to_utc(value, "created_at")
 
 
 def test_require_name_strips_and_rejects_blank() -> None:

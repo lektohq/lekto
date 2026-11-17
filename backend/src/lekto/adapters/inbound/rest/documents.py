@@ -10,7 +10,6 @@ import base64
 import os
 import tempfile
 from collections.abc import Awaitable, Callable, Mapping
-from datetime import UTC
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -106,6 +105,7 @@ from lekto.core.domain.imports import ImportedMetadata, ImportedReview
 from lekto.core.domain.inbox import DONE_PERIOD, InboxTab
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.validation import to_utc
 from lekto.core.ports.pages import PAGE_MEDIA_TYPE
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE, DocumentOrder, SortKey
 from lekto.core.services.documents import DocumentFile, DocumentView, FileInfo, MetadataChange
@@ -1220,7 +1220,7 @@ async def _changes(body: DocumentPatch, user: UserId, context: Context) -> Docum
         ),
         document_date=body.document_date if "document_date" in given else UNSET,
         fields=fields,
-        created_at=UNSET if body.created_at is None else body.created_at.astimezone(UTC),
+        created_at=UNSET if body.created_at is None else to_utc(body.created_at, "created_at"),
     )
 
 
@@ -1256,7 +1256,7 @@ async def _imported_metadata(
             tag_ids=frozenset(TagId(tag) for tag in body.tag_ids),
             document_date=body.document_date,
             fields={key: field_from_json(definitions[key], raw) for key, raw in fields.items()},
-            created_at=None if body.created_at is None else body.created_at.astimezone(UTC),
+            created_at=None if body.created_at is None else to_utc(body.created_at, "created_at"),
             review=tuple(_review(item, definitions) for item in body.review),
         )
     except ValidationError as error:

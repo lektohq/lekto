@@ -8,7 +8,7 @@ from lekto.adapters.inbound.rest.problems import NOT_FROM_REQUESTS, STATUSES
 from lekto.core.domain import errors
 from lekto.core.domain.errors import DomainError
 from tests.api import auth
-from tests.unit.adapters.rest.support import Api, post
+from tests.unit.adapters.rest.support import Api, post, upload
 
 
 def _domain_errors() -> set[type[DomainError]]:
@@ -37,6 +37,31 @@ def test_every_domain_error_has_a_status_or_never_reaches_a_route() -> None:
     }
     assert unmapped == set()
     assert not any(issubclass(kind, base) for kind in NOT_FROM_REQUESTS for base in mapped)
+
+
+EDGES = ("9999-12-31T23:59:59-14:00", "0001-01-01T00:00:00+14:00")
+"""Moments with an offset that lie beyond the calendar in UTC."""
+
+
+async def test_a_moment_beyond_the_calendar_is_a_422(api: Api) -> None:
+    """An API token's `expires_at`, a document's `created_at` (RB-01, RA-13)."""
+    owner = await api.user()
+    id = await upload(api, auth(owner))
+    for edge in EDGES:
+        async with api.sign_in(owner) as session:
+            token = await session.client.post(
+                f"{PREFIX}/auth/tokens",
+                json={"name": "edge", "scope": "read", "expires_at": edge},
+                headers=session.headers,
+            )
+        assert token.status_code == 422, token.text
+        for path in ("", "/dry-run"):
+            send = api.client.post if path else api.client.patch
+            changed = await send(
+                f"{PREFIX}/documents/{id}{path}", json={"created_at": edge}, headers=auth(owner)
+            )
+            assert changed.status_code == 422, (path, changed.text)
+            assert "beyond the calendar" in changed.json()["detail"]
 
 
 async def test_a_refusal_names_its_code_beside_the_text(api: Api) -> None:

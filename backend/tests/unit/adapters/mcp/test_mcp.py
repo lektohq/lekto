@@ -417,6 +417,17 @@ async def test_documents_update_tries_a_change_without_storing_it(api: Api, scen
     assert stored["title"] != "Probe"
 
 
+async def test_documents_update_refuses_a_moment_beyond_the_calendar(
+    api: Api, scene: Scene
+) -> None:
+    """Not "Error executing tool" (RA-13)."""
+    owner = scene.headers["owner"]
+    refused = await call(
+        api, owner, "documents_update", id=scene.green, created_at="9999-12-31T23:59:59-14:00"
+    )
+    assert "beyond the calendar" in error(refused)
+
+
 async def test_documents_update_names_a_space_a_rule_moves_it_to(api: Api, scene: Scene) -> None:
     """What changed is what REST reports (`changed_fields`, review 0.12.2 A-01): a rule's move
     to another space the caller reads too, by its name."""
