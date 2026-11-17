@@ -338,27 +338,29 @@ class MemoryUnitOfWork:
             self._unique_or_fail(self._tables[table_name], self._rows(self._tables[table_name]))
 
     def _check_jobs(self) -> None:
+        """ConcurrencyError if a job this unit changed was changed meanwhile. A job this unit
+        added whose key another unit's job took meanwhile (an active one's `dedup_key`, a queued
+        one's `coalesce_key`) is dropped, the rest commits: SQL's insert with ON CONFLICT DO
+        NOTHING waits for the other unit and adds nothing (PM-10). A job changed here whose key
+        another took is a ConflictError, as the unique index refuses the update."""
         for id, base in self._job_base.items():
             if self._db.jobs.get(id) != base:
                 raise ConcurrencyError(f"job {id} was changed concurrently")
-        for job in self._jobs.values():
-            if job.dedup_key is not None and job.status.is_active:
-                for other in self._db.jobs.values():
-                    if (
-                        other.id not in self._jobs
-                        and other.id not in self._purged_jobs
-                        and other.dedup_key == job.dedup_key
-                        and other.status.is_active
-                    ):
-                        raise ConflictError(f"an active job with key {job.dedup_key} exists")
-            if job.coalesce_key is not None:
-                for other in self._db.jobs.values():
-                    if (
-                        other.id not in self._jobs
-                        and other.id not in self._purged_jobs
-                        and other.coalesce_key == job.coalesce_key
-                    ):
-                        raise ConflictError(f"a queued job with key {job.coalesce_key} exists")
+        for job in list(self._jobs.values()):
+            if not any(self._takes(other, job) for other in self._db.jobs.values()):
+                continue
+            if self._job_base.get(job.id) is not None:  # changed here, not added
+                raise ConflictError(f"another job holds the key of job {job.id}")
+            del self._jobs[job.id]
+
+    def _takes(self, other: Job, job: Job) -> bool:
+        """Whether another unit's job `other` holds the key of the added `job`."""
+        if other.id in self._jobs or other.id in self._purged_jobs:
+            return False
+        deduplicated = job.dedup_key is not None and job.status.is_active
+        if deduplicated and other.dedup_key == job.dedup_key and other.status.is_active:
+            return True
+        return job.coalesce_key is not None and other.coalesce_key == job.coalesce_key
 
     # --- rows -----------------------------------------------------------------------------------
     # A table holds rows of its own kind only: those of `Table[E]` are `E`.

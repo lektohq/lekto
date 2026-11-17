@@ -7,6 +7,7 @@ from lekto.core.domain.errors import ConcurrencyError, ConflictError, NotFoundEr
 from lekto.core.domain.ids import JobId, new_id
 from lekto.core.domain.jobs import FinishedJob, Job, JobCount, JobState, JobStatus
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
+from tests import builders
 from tests.builders import NOW
 
 LEASE = timedelta(minutes=5)
@@ -325,6 +326,26 @@ class JobQueueContract:
             assert await uow.jobs.enqueue("test", {}, run_at=NOW, dedup_key="k") is not None
             assert await uow.jobs.enqueue("test", {}, run_at=NOW, dedup_key="k") is None
             await uow.commit()
+
+    @pytest.mark.parametrize("key", ["dedup_key", "coalesce_key"])
+    async def test_concurrent_enqueues_of_one_key_both_commit(
+        self, uow_factory: UnitOfWorkFactory, key: str
+    ) -> None:
+        """Two units enqueue a job with the same key at once: both commit, with the change
+        they make besides, and one job stands (PM-10)."""
+
+        async def enqueue_with(name: str) -> None:
+            async with uow_factory() as uow:
+                await uow.users.add(builders.user(name))
+                await uow.jobs.enqueue("test", {}, run_at=NOW, **{key: "k"})
+                await asyncio.sleep(0)
+                await uow.commit()
+
+        await asyncio.gather(enqueue_with("first"), enqueue_with("second"))
+        async with uow_factory() as uow:
+            jobs = await uow.jobs.find(now=NOW, states=list(JobState), kind="test", limit=9)
+            assert len(jobs) == 1
+            assert {user.username for user in await uow.users.list_all()} >= {"first", "second"}
 
     async def test_coalesce_key_while_queued(self, uow_factory: UnitOfWorkFactory) -> None:
         first = await enqueue(uow_factory, coalesce_key="index:a")
