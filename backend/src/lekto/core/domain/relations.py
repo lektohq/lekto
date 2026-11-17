@@ -23,6 +23,17 @@ from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.validation import require_utc
 
 
+class EvidenceKind(StrEnum):
+    """What a relation Lekto made rests on (`Relation.evidence`, its `kind`; the web UI words
+    each, revision 0071 reads them)."""
+
+    MAIL = "mail"  # one mail brought both: it holds once made, as the mail did
+    FACT = "fact"  # one refers to a number the other carries as its own
+    TARGET = "target"  # both are about the same contract, policy, meter or account
+    PERIOD = "period"  # both cover the same period of a field
+    LETTER_DATE = "letter_date"  # one answers the other's letter of that day
+
+
 class RelationOrigin(StrEnum):
     PERSON = "person"  # a person set it
     LEKTO = "lekto"  # Lekto recognised it (`relate`)
