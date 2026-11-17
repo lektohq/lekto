@@ -55,6 +55,20 @@ def test_the_newer_refers_to_the_older() -> None:
         )
 
 
+async def test_relating_before_the_first_run_stopped_is_early(world: World) -> None:
+    """Nothing the automation decided is judged yet: the verdict is early (SA-05)."""
+    owner = await world.user()
+    space = await world.personal_space(owner)
+    original = await stored(world, owner, space, date(2026, 1, 31))
+    arriving = builders.document(owner, space)
+    assert arriving.first_run_open
+    async with world.uow() as uow:
+        await uow.documents.add(arriving)
+        await uow.commit()
+    await service(world).relate(owner.id, arriving.id, original.id)
+    assert await verdicts(world, arriving.id) == [(RELATIONS, Verdict.EARLY)]
+
+
 async def test_a_person_relates_two_documents_and_removes_the_relation(world: World) -> None:
     owner = await world.user()
     space = await world.personal_space(owner)

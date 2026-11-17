@@ -38,7 +38,7 @@ from lekto.core.domain.errors import (
     ValidationError,
 )
 from lekto.core.domain.events import DocumentUpdated
-from lekto.core.domain.first_runs import FACTS, Decision, FieldVerdict, Verdict
+from lekto.core.domain.first_runs import FACTS, Verdict
 from lekto.core.domain.identifiers import (
     CONTACT_KINDS,
     Identifier,
@@ -55,6 +55,7 @@ from lekto.core.ports.clock import Clock
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import controllable_document, load_actor
+from lekto.core.services._first_runs import keep_verdict
 from lekto.core.services._identifiers import claim_identifiers
 from lekto.core.services.classification.kept_facts import TextFacts, facts_lock, refresh_facts
 from lekto.core.services.classification.signals import model_facts
@@ -199,20 +200,7 @@ async def decide_fact(
             if after is not None:
                 await after(uow, user, document, tuple(facts.values()))
         if verdict is not None:
-            if document.processing.run == 1 and document.first_lane is None:
-                verdict = Verdict.EARLY  # before the first run stopped: nothing to judge
-            await uow.processing_facts.add_verdicts(
-                [
-                    FieldVerdict(
-                        document_id=id,
-                        field=FACTS,
-                        verdict=verdict,
-                        decided_at=now,
-                        decision=Decision.CHANGE,
-                        via=via,
-                    )
-                ]
-            )
+            await keep_verdict(uow, document, FACTS, verdict, now, via)
         await uow.commit()
 
 

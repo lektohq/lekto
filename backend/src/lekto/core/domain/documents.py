@@ -827,6 +827,12 @@ class Document:
             )
         )
 
+    @property
+    def first_run_open(self) -> bool:
+        """Its first run has not stopped yet: where it stops is its first lane, and what a
+        person decides meanwhile is early (`first_runs.Verdict.EARLY`), nothing to judge."""
+        return self.processing.run == 1 and self.first_lane is None
+
     # --- events ---------------------------------------------------------------------------------
 
     def pull_events(self) -> list[DocumentEvent]:
@@ -839,7 +845,7 @@ class Document:
 
     def _stopped(self, lane: Lane, now: datetime) -> None:
         """Processing stopped in `lane`; where the first run first stopped is kept for good."""
-        if self.processing.run == 1 and self.first_lane is None:
+        if self.first_run_open:
             self.first_lane = lane
         self._set_lane(lane, now)
 

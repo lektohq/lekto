@@ -23,7 +23,7 @@ from lekto.core.domain.first_runs import (
     values_of,
 )
 from lekto.core.domain.identity import ViaToken
-from lekto.core.domain.ids import FieldId, TagId
+from lekto.core.domain.ids import DocumentId, FieldId, TagId
 from lekto.core.domain.master_data import Assignment
 from lekto.core.domain.pipeline import Lane, NodeRun
 from lekto.core.domain.relations import RelationOrigin, RelationState
@@ -70,7 +70,7 @@ async def keep_verdicts(
         for id, definition in definitions.items()
         if definition.applies_to(after.document_type_id)
     }
-    if before.processing.run == 1 and before.first_lane is None:
+    if before.first_run_open:
         named = {*given, *([SPACE] if decision is Decision.MOVE else [])}
         early = named & {*JUDGED_FIELDS, *applying}
         verdicts = early_verdicts(after.id, decision, early, now)
@@ -104,15 +104,7 @@ async def keep_verdicts(
     ):
         # Confirmed with its facts: the person took what the sources found, unless they
         # decided about them before (the first decision stands).
-        verdicts.append(
-            FieldVerdict(
-                document_id=after.id,
-                field=FACTS,
-                verdict=Verdict.TAKEN,
-                decided_at=now,
-                decision=decision,
-            )
-        )
+        verdicts.append(_verdict(after.id, FACTS, Verdict.TAKEN, decision, now))
     if decision is Decision.INBOX and any(
         relation.origin is RelationOrigin.LEKTO
         and relation.state is RelationState.SET
@@ -121,16 +113,42 @@ async def keep_verdicts(
     ):
         # Confirmed with the relations Lekto set for it: taken likewise. A suggestion stays the
         # person's to decide (accepted or rejected, a verdict of its own).
-        verdicts.append(
-            FieldVerdict(
-                document_id=after.id,
-                field=RELATIONS,
-                verdict=Verdict.TAKEN,
-                decided_at=now,
-                decision=decision,
-            )
-        )
+        verdicts.append(_verdict(after.id, RELATIONS, Verdict.TAKEN, decision, now))
     await uow.processing_facts.add_verdicts(through(verdicts, via))
+
+
+async def keep_verdict(
+    uow: UnitOfWork,
+    document: Document,
+    field: str,
+    verdict: Verdict,
+    now: datetime,
+    via: ViaToken | None = None,
+) -> None:
+    """A person's first decision about what is no field of the document's own (its facts, its
+    relations; through the API token `via`): `verdict`, early before its first run stopped."""
+    early = Verdict.EARLY if document.first_run_open else verdict
+    await uow.processing_facts.add_verdicts(
+        [_verdict(document.id, field, early, Decision.CHANGE, now, via)]
+    )
+
+
+def _verdict(
+    document: DocumentId,
+    field: str,
+    verdict: Verdict,
+    decision: Decision,
+    now: datetime,
+    via: ViaToken | None = None,
+) -> FieldVerdict:
+    return FieldVerdict(
+        document_id=document,
+        field=field,
+        verdict=verdict,
+        decided_at=now,
+        decision=decision,
+        via=via,
+    )
 
 
 async def _manual_tags(uow: UnitOfWork, tags: Collection[TagId]) -> frozenset[TagId]:
