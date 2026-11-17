@@ -79,7 +79,7 @@ from lekto.adapters.inbound.rest.schemas.inbox import (
 from lekto.adapters.inbound.rest.schemas.open_identifiers import PlaceOut
 from lekto.adapters.inbound.rest.schemas.refs import MAX_REF, opened
 from lekto.adapters.inbound.rest.upload import read_upload, read_uploads, upload_body
-from lekto.adapters.inbound.schemas import RuleReportOut
+from lekto.adapters.inbound.schemas import MAX_POSITION, RuleReportOut
 from lekto.core.domain.classification import field_id_of
 from lekto.core.domain.documents import (
     UNSET,
@@ -484,6 +484,7 @@ async def list_documents(
         int,
         Query(
             ge=0,
+            le=MAX_POSITION,
             description="Skip so many documents (pages by number); with `cursor`, after it.",
         ),
     ] = 0,
@@ -704,7 +705,10 @@ _file_route(DocumentFile.ORIGINAL, "The original file", "application/octet-strea
     },
 )
 async def version_original(
-    id: UUID, number: Annotated[int, FastApiPath(ge=1)], user: CurrentUser, context: Context
+    id: UUID,
+    number: Annotated[int, FastApiPath(ge=1, le=MAX_POSITION)],
+    user: CurrentUser,
+    context: Context,
 ) -> FileResponse:
     return await _sent(
         lambda target: context.documents.download_version(user, DocumentId(id), number, target),

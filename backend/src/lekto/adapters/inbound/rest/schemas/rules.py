@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from lekto.adapters.inbound.rest.schemas import groups
 from lekto.adapters.inbound.rest.schemas.open_identifiers import OccurrenceOut
 from lekto.adapters.inbound.schemas import (
+    MAX_POSITION,
     FieldJson,
     MoneyValue,
     PeriodValue,
@@ -769,7 +770,9 @@ class ApplyRequest(BaseModel):
         },
     )
 
-    version: int = Field(ge=1, description="The rule version to apply (from the preview).")
+    version: int = Field(
+        ge=1, le=MAX_POSITION, description="The rule version to apply (from the preview)."
+    )
     document_ids: list[UUID] = Field(min_length=1, max_length=MAX_APPLIED)
     accept_conflicts: list[UUID] = Field(
         default_factory=list,

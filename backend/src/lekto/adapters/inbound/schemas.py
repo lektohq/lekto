@@ -14,6 +14,11 @@ from lekto.core.domain.rules import RuleScope
 from lekto.core.services._access import DocumentRef
 from lekto.core.services.rules.running import Send
 
+MAX_POSITION = 2**31 - 1
+"""The largest offset into a list and the largest version number REST and MCP take: what a
+column `integer` holds on Postgres. Beyond it a number reached the database and failed there
+with a 500 (RB-04); no list and no rule has that many."""
+
 
 class MoneyValue(BaseModel):
     amount: str = Field(examples=["12.50"], description="Decimal number as text, exact.")

@@ -15,7 +15,7 @@ from lekto.adapters.inbound.lanes import LANES, LaneFilter
 from lekto.adapters.inbound.mcp.names import Names, find
 from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
-from lekto.adapters.inbound.schemas import FieldJson, field_json
+from lekto.adapters.inbound.schemas import MAX_POSITION, FieldJson, field_json
 from lekto.core.domain.aggregates import Aggregate, GroupBy, GroupKey
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldType
@@ -89,7 +89,7 @@ def add_listing_tools(tools: Tools, context: ApiContext) -> None:
         sum: str | None = None,
         fields: Annotated[list[str] | None, Field(max_length=10)] = None,
         limit: Annotated[int, Field(ge=1, le=LIST_MAX)] = LIST_SIZE,
-        offset: Annotated[int, Field(ge=0)] = 0,
+        offset: Annotated[int, Field(ge=0, le=MAX_POSITION)] = 0,
     ) -> str:
         user = principal_of(ctx).id
         names = await Names.load(context, user)

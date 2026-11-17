@@ -17,6 +17,7 @@ from mcp_types import ImageContent, Tool
 from lekto.adapters.inbound.limits import MAX_SELECTED
 from lekto.adapters.inbound.mcp.server import instructions
 from lekto.adapters.inbound.rest import PREFIX
+from lekto.adapters.inbound.schemas import MAX_POSITION
 from lekto.adapters.outbound.memory import ManualClock
 from lekto.composition.container import build_memory_container, build_services
 from lekto.core.domain.classification import FieldCheck, checks_to_json
@@ -415,6 +416,16 @@ async def test_documents_update_tries_a_change_without_storing_it(api: Api, scen
     assert tried["dry_run"] is True and tried["set"] == {"title": "Probe"}
     stored = data(await call(api, owner, "documents_get", id=scene.green))
     assert stored["title"] != "Probe"
+
+
+async def test_documents_list_refuses_an_offset_beyond_what_the_database_holds(
+    api: Api, scene: Scene
+) -> None:
+    """Not "Error executing tool" from the database (RB-04)."""
+    owner = scene.headers["owner"]
+    refused = await call(api, owner, "documents_list", offset=MAX_POSITION + 1)
+    assert refused.is_error
+    assert not (await call(api, owner, "documents_list", offset=MAX_POSITION)).is_error
 
 
 async def test_documents_update_refuses_a_moment_beyond_the_calendar(

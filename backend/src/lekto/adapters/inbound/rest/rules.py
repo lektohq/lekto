@@ -1,8 +1,9 @@
 """`/rules`: rules that tag, file and check documents; their versions."""
 
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Path, Request, Response
 
 from lekto.adapters.inbound.rest.auth import PROTECTED, READS, CurrentUser, Via
 from lekto.adapters.inbound.rest.context import Context
@@ -26,7 +27,13 @@ from lekto.adapters.inbound.rest.schemas.rules import (
     TextHitOut,
     TextHitsOut,
 )
-from lekto.adapters.inbound.schemas import ReasonOut, RuleEffectOut, RuleNoteOut, field_json
+from lekto.adapters.inbound.schemas import (
+    MAX_POSITION,
+    ReasonOut,
+    RuleEffectOut,
+    RuleNoteOut,
+    field_json,
+)
 from lekto.core.domain.ids import (
     DocumentId,
     DocumentTypeId,
@@ -185,7 +192,10 @@ async def list_rule_versions(id: UUID, user: CurrentUser, context: Context) -> l
     responses=problem_responses(401, 404, 422),
 )
 async def get_rule_version(
-    id: UUID, number: int, user: CurrentUser, context: Context
+    id: UUID,
+    number: Annotated[int, Path(ge=1, le=MAX_POSITION)],
+    user: CurrentUser,
+    context: Context,
 ) -> RuleVersionOut:
     return RuleVersionOut.of(await context.rules.version(user, RuleId(id), number))
 

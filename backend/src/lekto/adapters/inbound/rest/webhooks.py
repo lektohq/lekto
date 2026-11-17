@@ -17,6 +17,7 @@ from lekto.adapters.inbound.rest.schemas.webhooks import (
     WebhookOut,
     WebhookPatch,
 )
+from lekto.adapters.inbound.schemas import MAX_POSITION
 from lekto.core.domain.ids import UserId, WebhookId
 from lekto.core.domain.webhooks import DeliveryOutcome
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE
@@ -183,7 +184,7 @@ async def list_deliveries(
         list[DeliveryOutcome] | None, Query(description="Repeat for several.")
     ] = None,
     event_type: Annotated[str | None, Query(max_length=100)] = None,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    offset: Annotated[int, Query(ge=0, le=MAX_POSITION)] = 0,
     limit: Annotated[int, Query(ge=1, le=PAGE_LIMIT)] = PAGE_SIZE,
 ) -> DeliveryPageOut:
     page = await context.webhooks.deliveries(

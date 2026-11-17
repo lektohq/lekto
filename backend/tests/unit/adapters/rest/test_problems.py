@@ -1,12 +1,13 @@
 """Every domain error a request can raise answers with a status of its own, not 500 (M13 review
 A-06)."""
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import httpx2
 
 from lekto.adapters.inbound.rest import PREFIX
 from lekto.adapters.inbound.rest.problems import NOT_FROM_REQUESTS, STATUSES
+from lekto.adapters.inbound.schemas import MAX_POSITION
 from lekto.core.domain import errors
 from lekto.core.domain.errors import DomainError
 from tests.api import auth
@@ -80,6 +81,33 @@ async def test_an_unexpected_error_is_marked_like_every_answer(api: Api) -> None
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["referrer-policy"] == "no-referrer"
+
+
+async def test_a_number_beyond_what_the_database_holds_is_a_422(api: Api) -> None:
+    """Offsets and version numbers end at `MAX_POSITION`: beyond, they failed in the database
+    with a 500 (RB-04)."""
+    admin = await api.admin()
+    missing = uuid4()
+    paths = [
+        f"/rules/{missing}/versions/{{n}}",
+        f"/documents/{missing}/versions/{{n}}/original",
+        "/jobs?offset={n}",
+        "/documents?offset={n}",
+        "/identifiers/open?offset={n}",
+        f"/webhooks/{missing}/deliveries?offset={{n}}",
+        f"/mailboxes/{missing}/mails?offset={{n}}",
+    ]
+    for path in paths:
+        beyond = await api.client.get(PREFIX + path.format(n=MAX_POSITION + 1), headers=auth(admin))
+        assert beyond.status_code == 422, path
+        at = await api.client.get(PREFIX + path.format(n=MAX_POSITION), headers=auth(admin))
+        assert at.status_code in (200, 404), (path, at.text)
+    applied = await api.client.post(
+        f"{PREFIX}/rules/{missing}/apply",
+        json={"version": MAX_POSITION + 1, "document_ids": []},
+        headers=auth(admin),
+    )
+    assert applied.status_code == 422
 
 
 async def test_a_refusal_names_its_code_beside_the_text(api: Api) -> None:

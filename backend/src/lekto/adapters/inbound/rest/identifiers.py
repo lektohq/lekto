@@ -21,6 +21,7 @@ from lekto.adapters.inbound.rest.schemas.open_identifiers import (
     PlacesOut,
 )
 from lekto.adapters.inbound.rest.schemas.refs import MAX_REF, RefIn, RefOut, opened, seal
+from lekto.adapters.inbound.schemas import MAX_POSITION
 from lekto.core.domain.identifiers import IdentifierKind, normalise_identifier
 from lekto.core.domain.ids import UserId
 from lekto.core.domain.open_identifiers import OpenSource
@@ -51,7 +52,7 @@ class _Listing:
         source: OpenSource | None = None,
         kind: IdentifierKind | None = None,
         recommended: bool = False,
-        offset: Annotated[int, Query(ge=0)] = 0,
+        offset: Annotated[int, Query(ge=0, le=MAX_POSITION)] = 0,
         limit: Annotated[int, Query(ge=0, le=PAGE_LIMIT)] = PAGE_SIZE,
     ) -> None:
         self.source, self.kind, self.recommended = source, kind, recommended

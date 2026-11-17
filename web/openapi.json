@@ -7171,6 +7171,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
               "minimum": 0,
               "default": 0,
               "title": "Offset"
@@ -7332,6 +7333,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
               "minimum": 0,
               "default": 0,
               "title": "Offset"
@@ -10158,6 +10160,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Number"
             }
           }
@@ -13332,6 +13336,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
               "minimum": 0,
               "description": "Skip so many documents (pages by number); with `cursor`, after it.",
               "default": 0,
@@ -15996,6 +16001,7 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
               "minimum": 1,
               "title": "Number"
             }
@@ -20383,6 +20389,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
               "minimum": 0,
               "default": 0,
               "title": "Offset"
@@ -23001,6 +23008,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
               "minimum": 0,
               "default": 0,
               "title": "Offset"
@@ -25178,6 +25186,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
               "minimum": 0,
               "default": 0,
               "title": "Offset"
@@ -26909,6 +26918,7 @@
         "properties": {
           "version": {
             "type": "integer",
+            "maximum": 2147483647.0,
             "minimum": 1.0,
             "title": "Version",
             "description": "The rule version to apply (from the preview)."
