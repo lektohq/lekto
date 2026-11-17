@@ -743,14 +743,14 @@ class MemoryProcessingLog:
 
     async def append(self, run: NodeRun) -> None:
         self._uow._check_open()
-        self._uow._log.append(run)
+        self._uow._log.append(copy.deepcopy(run))
 
     async def list_for(self, document: DocumentId) -> list[NodeRun]:
         self._uow._check_open()
         if self._uow._row(DOCUMENTS, document) is _REMOVED:
             return []
         entries = [*self._uow._db.processing_log, *self._uow._log]
-        return [entry for entry in entries if entry.document_id == document]
+        return [copy.deepcopy(entry) for entry in entries if entry.document_id == document]
 
 
 class MemoryDocumentVersionRepository:
@@ -762,12 +762,12 @@ class MemoryDocumentVersionRepository:
         id = version_row_id(version.document_id, version.number)
         if self._uow._row(DOCUMENT_VERSIONS, id) not in (None, _REMOVED):
             raise self._uow._violated(f"document version already exists: {version.number}")
-        self._uow._write(DOCUMENT_VERSIONS, id, VersionRow(id, version))
+        self._uow._write(DOCUMENT_VERSIONS, id, VersionRow(id, copy.deepcopy(version)))
 
     async def of_document(self, document: DocumentId) -> list[DocumentVersion]:
         self._uow._check_open()
         found = [
-            row.version
+            copy.deepcopy(row.version)
             for row in self._uow._rows(DOCUMENT_VERSIONS)
             if row.version.document_id == document
         ]
@@ -777,7 +777,7 @@ class MemoryDocumentVersionRepository:
         self._uow._check_open()
         return next(
             (
-                row.version
+                copy.deepcopy(row.version)
                 for row in self._uow._rows(DOCUMENT_VERSIONS)
                 if row.version.sha256 == sha256
             ),
@@ -798,9 +798,9 @@ class MemoryDocumentRelationRepository:
         self._uow = uow
 
     def _live(self) -> list[Relation]:
-        """The relations whose documents are both there (the database cascades)."""
+        """The relations whose documents are both there (the database cascades), copied."""
         return [
-            row.relation
+            copy.deepcopy(row.relation)
             for row in self._uow._rows(DOCUMENT_RELATIONS)
             if self._uow._row(DOCUMENTS, row.relation.newer) is not _REMOVED
             and self._uow._row(DOCUMENTS, row.relation.older) is not _REMOVED
@@ -824,7 +824,7 @@ class MemoryDocumentRelationRepository:
         id = relation_row_id(relation.newer, relation.older)
         current = self._uow._row(DOCUMENT_RELATIONS, id)
         version = 1 if current is _REMOVED else current.version + 1
-        self._uow._write(DOCUMENT_RELATIONS, id, RelationRow(id, relation, version))
+        self._uow._write(DOCUMENT_RELATIONS, id, RelationRow(id, copy.deepcopy(relation), version))
 
     async def remove(self, newer: DocumentId, older: DocumentId) -> None:
         self._uow._check_open()

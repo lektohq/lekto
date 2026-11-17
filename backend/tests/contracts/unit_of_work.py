@@ -1327,6 +1327,67 @@ class UnitOfWorkContract:
             await uow.document_versions.add(replace(second, document_id=other.id, number=1))
             await uow.commit()
 
+    async def test_versions_relations_and_the_log_are_copies(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """What a unit hands over or gets back is its own: changing it after the write or the
+        read changes nothing stored (PM-07)."""
+        owner, space = await owner_with_space(uow_factory)
+        newer, older = builders.processed(owner, space), builders.processed(owner, space)
+        version = DocumentVersion(
+            document_id=newer.id,
+            number=1,
+            sha256=newer.sha256,
+            original_filename="scan.pdf",
+            media_type="application/pdf",
+            kind=VersionKind.RECEIVED,
+            created_at=NOW,
+            created_by=owner.id,
+            detail={"pages": 1},
+        )
+        relation = Relation(
+            newer=newer.id,
+            older=older.id,
+            origin=RelationOrigin.LEKTO,
+            state=RelationState.SUGGESTED,
+            evidence={"kind": "mail"},
+            created_at=NOW,
+        )
+        run = NodeRun(
+            document_id=newer.id,
+            node=Node.RECEIVE,
+            run=1,
+            result=NodeResult(outcome=Outcome.OK, output={"pages": 1}),
+            pipeline_version="0.1.0",
+            started_at=NOW,
+            duration=timedelta(0),
+        )
+
+        def change(version: DocumentVersion, relation: Relation, run: NodeRun) -> None:
+            version.detail["pages"] = 9
+            relation.evidence["kind"] = "changed"
+            run.result.output["pages"] = 9
+
+        async with uow_factory() as uow:
+            for document in (newer, older):
+                await uow.documents.add(document)
+            await uow.document_versions.add(version)
+            await uow.document_relations.put(relation)
+            await uow.processing_log.append(run)
+            change(version, relation, run)
+            await uow.commit()
+        for _ in range(2):
+            async with uow_factory() as uow:
+                (stored_version,) = await uow.document_versions.of_document(newer.id)
+                stored_relation = await uow.document_relations.find(newer.id, older.id)
+                (stored_run,) = await uow.processing_log.list_for(newer.id)
+                assert stored_version.detail == {"pages": 1}
+                assert stored_relation is not None
+                assert stored_relation.evidence == {"kind": "mail"}
+                assert stored_run.result.output == {"pages": 1}
+                change(stored_version, stored_relation, stored_run)
+                await uow.commit()
+
     async def test_a_version_moves_to_another_document(
         self, uow_factory: UnitOfWorkFactory
     ) -> None:
