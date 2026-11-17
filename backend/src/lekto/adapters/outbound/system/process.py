@@ -11,16 +11,20 @@ which process documents of unknown origin, have no use for them. What a child ne
 
 A child may get a limit of its address space (`memory`, `LEKTO_CHILD_MAX_MEMORY`), which the
 programs it starts inherit: a document built to make them allocate without end fails the child,
-not the worker. The limit is set right after the start (`prlimit`), not in the child before it
-runs: that hook is not safe in a process with threads. The child is then still starting its
-interpreter, long before it starts a program of its own.
+not the worker. A short Python prelude (`_LIMITED`) sets it in the child and then becomes the
+program (`exec`): the limit holds from the program's first instruction. Set from the parent
+after the start (`prlimit`), it came late on a busy machine, and a child allocated without it;
+set before the start in the parent's fork (`preexec_fn`), it would not be safe in a process
+with threads. Where the process's own hard limit is lower (a container's `--ulimit as=`), the
+child gets that one: it cannot be raised.
 """
 
 import asyncio
 import contextlib
 import os
-import resource
+import shutil
 import signal
+import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
@@ -30,6 +34,16 @@ TAIL = 4000
 # The prefix of Lekto's configuration variables (`composition/settings.py`); none of them
 # reaches a child.
 _SETTINGS_PREFIX = "LEKTO_"
+# The prelude of a child with a memory limit: `python -I -c _LIMITED LIMIT PROGRAM ARGS...`.
+_LIMITED = (
+    "import os, resource, sys\n"
+    "limit = int(sys.argv[1])\n"
+    "_, hard = resource.getrlimit(resource.RLIMIT_AS)\n"
+    "if hard != resource.RLIM_INFINITY:\n"
+    "    limit = min(limit, hard)\n"
+    "resource.setrlimit(resource.RLIMIT_AS, (limit, limit))\n"
+    "os.execvp(sys.argv[2], sys.argv[2:])\n"
+)
 
 
 @dataclass(frozen=True)
@@ -53,17 +67,19 @@ async def run_process(
     module); `tail` is how much of the end of its error output is kept; `memory` the bytes of
     address space the child and what it starts may take each (see the module); `input` what it
     reads from its standard input (else nothing)."""
+    command = list(args)
+    if memory is not None:
+        if shutil.which(command[0]) is None:  # as starting it without the prelude would
+            raise FileNotFoundError(f"no program {command[0]!r}")
+        command = [sys.executable, "-I", "-c", _LIMITED, str(memory), *command]
     process = await asyncio.create_subprocess_exec(
-        *args,
+        *command,
         stdin=asyncio.subprocess.DEVNULL if input is None else asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         start_new_session=True,
         env=child_environment(env),
     )
-    if memory is not None:
-        with contextlib.suppress(ProcessLookupError):  # it ended already
-            resource.prlimit(process.pid, resource.RLIMIT_AS, (memory, memory))
     try:
         stdout, stderr = await asyncio.wait_for(
             process.communicate(input), timeout=timeout.total_seconds()
