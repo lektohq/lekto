@@ -337,6 +337,8 @@ class FakeLekto:
             if document["channel"] != "migration":
                 return _problem(422, "only a document of the channel 'migration'")
             after = self._public(document) | {k: v for k, v in body.items() if k != "fields"}
+            if body.get("topic_id") is not None and after.get("contact_id") is None:
+                return _problem(422, "a topic is one of the contact's: give the document a contact")
             fields = dict(document["fields"])
             for key, value in (body.get("fields") or {}).items():
                 if value is None:

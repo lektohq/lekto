@@ -336,6 +336,23 @@ async def test_a_changed_plan_aligns_what_was_migrated(setup: Setup) -> None:
     assert row(setup.report("check"), 10)["status"] == "same"
 
 
+async def test_a_topic_without_a_contact_is_not_taken_over(setup: Setup) -> None:
+    """Lekto keeps a topic only with a contact: it refused the alignment at every run (MI-04)."""
+    assert await setup.run("plan") == 0
+    setup.edit("correspondents", "ACME Energy", "drop")
+    setup.edit("tags", "tax", "{to: topic, name: Taxes, create: true}")
+    assert await setup.run("check") == 0, setup.report("check")["problems"]
+    note = (
+        "topic 'Taxes' is not taken over: a topic is one of the contact's, and the document "
+        "has none"
+    )
+    assert note in row(setup.report("check"), 10)["notes"]
+    assert await setup.migrate() == 0, setup.messages
+    assert by_title(setup, "Document 10")["topic_id"] is None
+    assert await setup.run("check") == 0
+    assert row(setup.report("check"), 10)["status"] == "same"
+
+
 async def test_a_value_changed_in_lekto_stays(setup: Setup) -> None:
     assert await setup.migrate() == 0
     first = by_title(setup, "Document 10")

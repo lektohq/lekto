@@ -267,6 +267,14 @@ def expect(document: dict[str, Any], context: Context) -> Expected:
 
     for kind, offered in collected.single.items():
         _apply(kind, offered, expected)
+    if expected.topic is not None and expected.contact is None:
+        # Lekto refuses it: its topics are a contact's.
+        expected.notes.append(
+            f"topic '{expected.topic}' is not taken over: a topic is one of the contact's, "
+            "and the document has none"
+        )
+        expected.topic = None
+        expected.sources.pop("topic", None)
     expected.tags = frozenset(collected.many["tags"])
     expected.contact_groups = frozenset(collected.many["contact_groups"])
     expected.type_groups = frozenset(collected.many["type_groups"])
