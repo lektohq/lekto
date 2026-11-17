@@ -2,6 +2,7 @@
 every check, the answer handling, and the way through the pipeline."""
 
 import json
+import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, timedelta
@@ -36,6 +37,7 @@ from lekto.core.domain.events import DocumentFiled
 from lekto.core.domain.exchanges import RunExchange, exchanges_from_json
 from lekto.core.domain.fields import FieldDefinition, FieldType, Money
 from lekto.core.domain.identifiers import Identifier, IdentifierKind
+from lekto.core.domain.identifiers import identifiers_in as identifiers_in
 from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.locations import Box, Location
 from lekto.core.domain.master_data import Assignment, Contact, DocumentType, Tag, TagScope
@@ -51,7 +53,9 @@ from lekto.core.domain.pipeline import (
 from lekto.core.domain.reading import PageReading, PageWords, reading_to_json, readings_to_json
 from lekto.core.domain.reasons import ReasonCode, written
 from lekto.core.domain.users import Role
+from lekto.core.domain.verdict import judge_contact
 from lekto.core.ports.llm import StructuredRequest
+from lekto.core.services.classification import nodes
 from lekto.core.services.classification.nodes import (
     ClassificationPolicy,
     FieldsNode,
@@ -2230,3 +2234,29 @@ def test_the_facts_signal_does_not_wait_for_the_model() -> None:
     joins both)."""
     assert Node.SIGNAL_FACTS.waits_for == {Node.PARSE}
     assert Node.SIGNAL_FACTS not in Node.SIGNAL_LLM.descendants
+
+
+async def test_the_names_and_patterns_are_matched_outside_the_event_loop(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Matching the names the model read with every contact's, and every kind's patterns over
+    the text sent, take a while with many contacts or a long text (SA-03)."""
+    threads: dict[str, list[int]] = {"contact": [], "identifiers": []}
+    contact, identifiers = judge_contact, identifiers_in
+
+    def judging(*args: Any) -> Any:
+        threads["contact"].append(threading.get_ident())
+        return contact(*args)
+
+    def reading(text: str) -> Any:
+        threads["identifiers"].append(threading.get_ident())
+        return identifiers(text)
+
+    monkeypatch.setattr(nodes, "judge_contact", judging)
+    monkeypatch.setattr(nodes, "identifiers_in", reading)
+    await seed(world)
+    document = await document_with(world)
+    await signal_step(world, model(proposal())).run(document)
+    await judge(world, document, model(proposal()))
+    assert threads["contact"] and threads["identifiers"]
+    assert threading.get_ident() not in threads["contact"] + threads["identifiers"]

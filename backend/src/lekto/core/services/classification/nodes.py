@@ -424,7 +424,9 @@ class LlmSignal(_ModelStep):
                 spaces=offer.spaces,
                 schema=offer.schema,
             )
-            await keep_request(self._store, document, Node.SIGNAL_LLM, context.logged())
+            await keep_request(
+                self._store, document, Node.SIGNAL_LLM, await asyncio.to_thread(context.logged)
+            )
             return ExternalCall(outside, context)
         sent = shorten(text, self._policy.input_budget)
         input = self._input(document, text, sent, PROPOSE_PROMPT) | {
@@ -559,7 +561,9 @@ class LlmSignal(_ModelStep):
         answers, the facts and the holders (None: it read none). What goes wrong is in the
         output and never fails the signal, also an error that would pass with time (the
         proposal stands without facts; asking the model again reads them)."""
-        numbers = sorted(key for key in identifiers_in(sent.text) if key[0] in MODEL_HOLDER_KINDS)
+        # Every kind's patterns over the text: not in the loop (SA-03).
+        found = await asyncio.to_thread(identifiers_in, sent.text)
+        numbers = sorted(key for key in found if key[0] in MODEL_HOLDER_KINDS)
         try:
             (read, told), answers = await self._ask(
                 document,
@@ -663,6 +667,9 @@ class ModelFactsResult:
         return replace(self.result, output=self.result.output | {READ_FACTS: report})
 
 
+type Persons = dict[UserId, Strength]
+
+
 class JudgeNode:
     """The judge (`judge`): contact, document type, topic and tags from the signals' proposals
     by the rules of `domain.verdict`, and the document date the model read, checked against the
@@ -730,13 +737,25 @@ class JudgeNode:
                 self._today(),
                 document.created_at.date(),
             )
-        contact = judge_contact(signals, contacts, self._thresholds)
-        kind = judge_type(signals, types, self._thresholds)
-        topic = judge_topic(signals, contact, contacts, tags, self._thresholds)
-        tagged = judge_tags(signals, tags, self._thresholds)
         # The persons the document names: the facts' and the model's recipient (only names
         # are matched here; the facts matched the rest of the profiles).
         recipient = signals.model.recipient if signals.model is not None else None
+        thresholds = self._thresholds
+
+        def judged() -> tuple[FieldCheck, FieldCheck, FieldCheck, FieldCheck, Persons, Persons]:
+            contact = judge_contact(signals, contacts, thresholds)
+            return (
+                contact,
+                judge_type(signals, types, thresholds),
+                judge_topic(signals, contact, contacts, tags, thresholds),
+                judge_tags(signals, tags, thresholds),
+                recipient_persons(recipient, people, thresholds),
+                recipient_persons(recipient, shown, thresholds),
+            )
+
+        # Matching the names the model read with every contact's and every person's takes a
+        # while with many of them: not in the loop (SA-03).
+        contact, kind, topic, tagged, named, addressed = await asyncio.to_thread(judged)
         active = {person.user_id for person in matched}
         persons = named_persons(
             {  # facts of an earlier run may name a user deactivated since
@@ -744,9 +763,8 @@ class JudgeNode:
                 for user, strength in (signals.facts.persons if signals.facts else {}).items()
                 if user in active
             },
-            recipient_persons(recipient, people, self._thresholds),
+            named,
         )
-        addressed = recipient_persons(recipient, shown, self._thresholds)
         public = named_persons(
             {user: Strength.WEAK for user in (signals.facts.public if signals.facts else ())},
             addressed,
@@ -939,7 +957,9 @@ class FieldsNode(_ModelStep):
                     None if document_type is None else document_type.name,
                     field_keys(missing),
                 )
-                await keep_request(self._store, document, Node.FIELDS, context.logged())
+                await keep_request(
+                    self._store, document, Node.FIELDS, await asyncio.to_thread(context.logged)
+                )
                 return ExternalCall(outside, context)
             input |= outside.input(document, text)
             if task.status is not TaskStatus.ANSWERED:
