@@ -77,9 +77,9 @@ PERSON_KINDS = frozenset(kind for kind, item in TYPES.items() if item.for_person
 NAMING_KINDS = frozenset(kind for kind, item in TYPES.items() if item.names_user)
 """The kinds of a contact's identifiers that may name the user they belong to (a contract, a
 policy, a personnel number)."""
-OWN_KINDS = PERSON_KINDS - {kind for kind, item in TYPES.items() if item.for_contacts}
+PERSON_ONLY_KINDS = PERSON_KINDS - {kind for kind, item in TYPES.items() if item.for_contacts}
 """The kinds only a person has (not the IBAN: a contact has one too, though no longer as its
-identifier)."""
+identifier): only admins and that person see such a fact (`document_facts.person_only`)."""
 
 
 def type_of(kind: IdentifierKind) -> IdentifierType:

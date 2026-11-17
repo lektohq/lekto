@@ -14,7 +14,7 @@ from lekto.core.domain.evidence import COLUMN_GAP, LINE_BREAK, normalise
 from lekto.core.domain.identifiers.base import Candidate, Key
 from lekto.core.domain.identifiers.registry import (
     NAMING_KINDS,
-    OWN_KINDS,
+    PERSON_ONLY_KINDS,
     TYPES,
     normalise_identifier,
 )
@@ -117,9 +117,9 @@ def identifiers_from(candidates: Iterable[Candidate]) -> set[Key]:
                 naming.append((key, candidate.span))
                 continue
             found.add(key)
-            if candidate.kind in OWN_KINDS and candidate.span is not None:
+            if candidate.kind in PERSON_ONLY_KINDS and candidate.span is not None:
                 own_spans.append(candidate.span)
-    personal = [key for key in found if key[0] in OWN_KINDS]
+    personal = [key for key in found if key[0] in PERSON_ONLY_KINDS]
     for key, span in naming:
         overlaps = span is not None and any(
             span[0] < theirs_end and theirs_start < span[1]
@@ -145,6 +145,6 @@ def of_person(key: Key, personal: Iterable[Key]) -> bool:
         compact = re.sub(r"[^A-Z0-9]", "", their_value.upper())
         if value == compact:
             return True
-        if their_kind in OWN_KINDS and len(value) >= _CONTAINED and value in compact:
+        if their_kind in PERSON_ONLY_KINDS and len(value) >= _CONTAINED and value in compact:
             return True
     return False

@@ -27,6 +27,7 @@ from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.evidence import contains, normalise
 from lekto.core.domain.facts import identifier_spans
 from lekto.core.domain.identifiers import (
+    PERSON_ONLY_KINDS,
     TYPES,
     IdentifierKind,
     Key,
@@ -157,10 +158,7 @@ ROLES: Mapping[IdentifierKind, FactRole] = {
 missing)."""
 
 NUMBER_KINDS = frozenset(
-    kind
-    for kind in IdentifierKind
-    if not TYPES[kind].at_contacts
-    and not (TYPES[kind].for_persons and not TYPES[kind].for_contacts)
+    kind for kind in IdentifierKind if not TYPES[kind].at_contacts and kind not in PERSON_ONLY_KINDS
 )
 """The kinds of the numbers the facts report lists as the document's: no contact's identifiers
 and no person's alone. Its own, a strand's, another document's it refers to (invoice number,
@@ -175,7 +173,7 @@ def role_of(kind: IdentifierKind) -> FactRole:
 def person_only(kind: IdentifierKind) -> bool:
     """A kind of a person's and no contact's (the IBAN is both): only admins and that person
     see such a fact, only admins decide or find documents by it."""
-    return TYPES[kind].for_persons and not TYPES[kind].for_contacts
+    return kind in PERSON_ONLY_KINDS
 
 
 @dataclass(frozen=True, kw_only=True)
