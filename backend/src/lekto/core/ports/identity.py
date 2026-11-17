@@ -117,7 +117,10 @@ class LoginFailureRepository(Protocol):
     (`reserve`) and taken back if they did not fail (`release`), so attempts that arrive at
     the same time cannot pass a throttle together."""
 
-    async def find(self, key: str) -> LoginFailures | None: ...
+    async def find(self, key: str) -> LoginFailures | None:
+        """The counts under `key`, for tests and diagnosis: no service reads them, they count
+        through `reserve` and `release` alone (PM-13, Tobi 17.11.2026)."""
+        ...
 
     async def reserve(self, key: str, rule: ThrottleRule, now: datetime) -> timedelta | None:
         """Atomically: if `key` is blocked at `now`, count nothing and return how long it
