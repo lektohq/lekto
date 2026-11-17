@@ -90,7 +90,7 @@ from lekto.core.domain.documents import (
     changed_fields,
 )
 from lekto.core.domain.editing import MAX_ADDED, MAX_MERGED, MAX_PREVIEW_PAGES
-from lekto.core.domain.errors import ValidationError
+from lekto.core.domain.errors import PermissionDeniedError, ValidationError
 from lekto.core.domain.fields import FieldDefinition, field_from_json
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import (
@@ -105,6 +105,7 @@ from lekto.core.domain.ids import (
 from lekto.core.domain.imports import ImportedMetadata, ImportedReview
 from lekto.core.domain.inbox import DONE_PERIOD, InboxTab
 from lekto.core.domain.pipeline import Node
+from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.pages import PAGE_MEDIA_TYPE
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE, DocumentOrder, SortKey
 from lekto.core.services.documents import DocumentFile, DocumentView, FileInfo, MetadataChange
@@ -217,6 +218,14 @@ async def upload(
             raise RequestValidationError(
                 [{**item, "loc": ("body", *item["loc"])} for item in error.errors()]
             ) from None
+        # An upload token (a shortcut on a phone) uploads for its own user, as a user does:
+        # an admin's, lost with the phone, would put documents in anyone's name (XA-07).
+        if principal.only_uploads:
+            given = [name for name in ("uploaded_by", "channel", "metadata") if getattr(form, name)]
+            if given:
+                raise PermissionDeniedError(
+                    because(ReasonCode.UPLOAD_ONLY_TOKEN_FIELDS, fields=given)
+                )
         # The intake channel: as the caller says (`migration` only), else by credentials.
         channel = Channel.API if principal.session is None else Channel.WEB
         if form.channel is not None:

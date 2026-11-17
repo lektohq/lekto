@@ -2836,6 +2836,7 @@
 	"reason_code_invalid": "Der Code ist nicht gültig.",
 	"reason_read_only_token": "Dieser API-Token darf nur lesen.",
 	"reason_upload_only_token": "Dieser API-Token darf nur Dokumente hochladen.",
+	"reason_upload_only_token_fields": "Dieser API-Token lädt nur für den eigenen Nutzer hoch, ohne {fields}.",
 	"reason_push_off": "Benachrichtigungen sind auf diesem Server aus.",
 	"reason_push_endpoint_refused": "Die Push-Adresse dieses Geräts gehört zu keinem bekannten Push-Dienst.",
 	"reason_push_keys_invalid": "Die Schlüssel dieses Geräts sind ungültig.",

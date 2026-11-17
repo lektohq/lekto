@@ -244,17 +244,36 @@ async def test_only_admins_upload_through_the_channel_migration(api: Api) -> Non
     """The channel tells where a document came from; a user's own upload is no migration, with
     a session, an API token or an upload token alike."""
     admin, user = await api.admin(), await api.user()
-    _, shortcut = await api.services.auth.create_api_token(user.id, "phone", TokenScope.UPLOAD)
-    for headers in (auth(user), bearer(shortcut)):
-        refused = await upload(api, headers, channel="migration")
-        assert refused.status_code == 403
-        reason = refused.json()["reason"]
-        assert (reason["code"], reason["params"]["action"]) == (
-            "admins_only",
-            "upload_as_migration",
-        )
+    refused = await upload(api, auth(user), channel="migration")
+    assert refused.status_code == 403
+    reason = refused.json()["reason"]
+    assert (reason["code"], reason["params"]["action"]) == ("admins_only", "upload_as_migration")
     taken = await upload(api, auth(admin), channel="migration")
     assert taken.status_code == 202, taken.text
+
+
+async def test_an_upload_token_uploads_for_its_own_user_alone(api: Api) -> None:
+    """An admin's upload token, lost with the phone, would put documents in anyone's name, as a
+    migration, in any space: it names no uploader, no channel and no metadata (XA-07), as an
+    upload token of a user does not either."""
+    admin, user, owner = await api.admin(), await api.user(), await api.user()
+    data = await master_data(api, admin)
+    for who in (admin, user):
+        _, shortcut = await api.services.auth.create_api_token(who.id, "phone", TokenScope.UPLOAD)
+        for fields, named in [
+            ({"uploaded_by": str(owner.id)}, ["uploaded_by"]),
+            ({"channel": "migration"}, ["channel"]),
+            ({"channel": "migration", "metadata": metadata(data)}, ["channel", "metadata"]),
+        ]:
+            refused = await upload(api, bearer(shortcut), **fields)
+            assert refused.status_code == 403, refused.text
+            reason = refused.json()["reason"]
+            assert reason == {"code": "upload_only_token_fields", "params": {"fields": named}}
+    _, shortcut = await api.services.auth.create_api_token(admin.id, "phone", TokenScope.UPLOAD)
+    taken = await upload(api, bearer(shortcut))
+    assert taken.status_code == 202, taken.text
+    document = (await api.client.get(taken.json()["status_url"], headers=auth(admin))).json()
+    assert document["uploaded_by"] == str(admin.id)
 
 
 async def test_an_uploader_who_is_gone_or_inactive_is_not_found(api: Api) -> None:

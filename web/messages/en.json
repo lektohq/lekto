@@ -2836,6 +2836,7 @@
 	"reason_code_invalid": "The code is not valid.",
 	"reason_read_only_token": "This API token may only read.",
 	"reason_upload_only_token": "This API token may only upload documents.",
+	"reason_upload_only_token_fields": "This API token uploads only for its own user, without {fields}.",
 	"reason_push_off": "Notifications are off on this server.",
 	"reason_push_endpoint_refused": "This device's push address belongs to no known push service.",
 	"reason_push_keys_invalid": "This device's keys are not valid.",

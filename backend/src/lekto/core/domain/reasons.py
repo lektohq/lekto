@@ -280,6 +280,7 @@ class ReasonCode(StrEnum):
     CODE_INVALID = "code_invalid"
     READ_ONLY_TOKEN = "read_only_token"
     UPLOAD_ONLY_TOKEN = "upload_only_token"
+    UPLOAD_ONLY_TOKEN_FIELDS = "upload_only_token_fields"
     PUSH_OFF = "push_off"
     PUSH_ENDPOINT_REFUSED = "push_endpoint_refused"
     PUSH_KEYS_INVALID = "push_keys_invalid"
@@ -794,6 +795,9 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.CODE_INVALID: "the code is not valid",
     ReasonCode.READ_ONLY_TOKEN: "this API token may only read",
     ReasonCode.UPLOAD_ONLY_TOKEN: "this API token may only upload documents",
+    ReasonCode.UPLOAD_ONLY_TOKEN_FIELDS: (
+        "this API token uploads only for its own user, without {fields:list}"
+    ),
     ReasonCode.PUSH_OFF: "notifications are off on this server",
     ReasonCode.PUSH_ENDPOINT_REFUSED: "the device's push address is no known push service's",
     ReasonCode.PUSH_KEYS_INVALID: "the device's keys are not valid",

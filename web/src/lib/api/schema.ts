@@ -9788,6 +9788,7 @@ export interface components {
 			| 'code_invalid'
 			| 'read_only_token'
 			| 'upload_only_token'
+			| 'upload_only_token_fields'
 			| 'push_off'
 			| 'push_endpoint_refused'
 			| 'push_keys_invalid'
