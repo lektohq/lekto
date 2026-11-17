@@ -74,8 +74,12 @@ jobs:
           # one with the settings.
           code="^backend/|^web/openapi\.json$|^docs/configuration\.md$|^\.devcontainer/(compose\.yml|garage)|$ci"
           migration="^migration/|^web/openapi\.json$|$ci"
-          # The backend's unit tests run the migration client against the API, too.
-          backend_tests="$code|^migration/"
+          # The backend's unit tests run the migration client against the API, too, and read
+          # files outside backend/: the pages the core links to (test_core_links), the job kinds'
+          # labels (test_job_kind_labels), the web UI's version (test_version), the example
+          # documents' manifest and search queries (test_search_evaluation).
+          read='^web/(src/routes/|src/lib/jobs\.ts$|package\.json$)|^examples/documents/(manifest\.json$|search/)'
+          backend_tests="$code|^migration/|$read"
           web="^web/|^\.github/workflows/ci\.yml$"
           # The Compose examples, the release's tag script and the workflows.
           release="^docker/|^\.github/(scripts|workflows)/"
