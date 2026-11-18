@@ -471,6 +471,11 @@ def build_container(settings: Settings) -> Container:
         if settings.embedding_base_url is not None
         else None
     )
+    # The head of a mail set as a PDF speaks the language of the templates' locale (`de` of
+    # `de_AT`), not the locale as written (AD-04).
+    templates = LiquidTemplateRenderer(
+        locale=settings.template_locale, currency=settings.default_currency
+    )
     return Container(
         unit_of_work=persistence.unit_of_work,
         event_bus=persistence.event_bus,
@@ -500,15 +505,13 @@ def build_container(settings: Settings) -> Container:
         ),
         mail_server=ImapMailServer(timeout=settings.mail_timeout),
         mail_renderer=WeasyPrintMailRenderer(
-            settings.template_locale,
+            templates.writing.language,
             timeout=settings.mail_render_timeout,
             memory=int(settings.child_max_memory),
         ),
         totp=PyotpTotp(),
         patterns=RegexPatternMatcher(settings.rules_pattern_timeout.total_seconds()),
-        templates=LiquidTemplateRenderer(
-            locale=settings.template_locale, currency=settings.default_currency
-        ),
+        templates=templates,
         oidc=(
             _select("oidc", "authlib", OIDC_PROVIDERS, settings) if settings.oidc_enabled else None
         ),

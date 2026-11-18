@@ -25,6 +25,7 @@ from lekto.adapters.outbound.pillow import PillowImageNormaliser
 from lekto.adapters.outbound.s3 import S3ObjectStore
 from lekto.adapters.outbound.sql import Database, SqlEventBus, SqlUnitOfWorkFactory, migrate
 from lekto.adapters.outbound.system import Completed, SystemClock
+from lekto.adapters.outbound.weasyprint import WeasyPrintMailRenderer
 from lekto.composition import container
 from lekto.composition.api import health_checks
 from lekto.composition.container import (
@@ -402,6 +403,14 @@ def test_templates_from_settings() -> None:
     assert built.templates.render(template, values) == "March CHF12.50"
     memory = build_memory_container()
     assert memory.templates.render(template, values) == "März 12,50\xa0€"
+
+
+@pytest.mark.usefixtures("offline_adapters")
+def test_the_head_of_a_mail_speaks_the_language_of_the_locale() -> None:
+    """`de_AT` makes a German head, not an English one (AD-04)."""
+    built = build_container(settings(template_locale="de_AT"))
+    assert isinstance(built.mail_renderer, WeasyPrintMailRenderer)
+    assert built.mail_renderer.language == "de"
 
 
 async def index_settings(index: MeilisearchIndex, network: Network) -> httpx2.Request:
