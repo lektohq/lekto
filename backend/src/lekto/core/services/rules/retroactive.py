@@ -264,19 +264,28 @@ class RuleApplicationService:
             if budget.exhausted and last is not None:
                 next_cursor = last
                 break
-            last = document.id
-            looked_at += 1
             async with self._uow() as uow:
-                if not await _candidate(uow, user, rule, document):
-                    continue
+                candidate = await _candidate(uow, user, rule, document)
+            if not candidate:
+                last = document.id
+                looked_at += 1
+                continue
+            # The first document of a page has the time of one document, so the dry run goes
+            # on; a later one whose patterns the page's time cut short comes first on the next
+            # page instead of being judged on half its patterns (SC-12).
             prepared = await prepare(
                 self._store,
                 self._matcher,
                 [rule, *following],
                 document,
                 max_text=self._max_text,
-                budget=budget,
+                budget=PatternBudget() if last is None else budget,
             )
+            if prepared.out_of_time and last is not None:
+                next_cursor = last
+                break
+            last = document.id
+            looked_at += 1
             item = await self._preview_one(user, rule, document.id, prepared)
             if item is not None:
                 items.append(item)

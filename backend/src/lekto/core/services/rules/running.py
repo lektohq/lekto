@@ -223,12 +223,14 @@ class PatternBudget:
 @dataclass(frozen=True)
 class Prepared:
     """The document text as conditions see it, and the results of the regular expressions on
-    it. `problems`: patterns that timed out or could not run (they do not match)."""
+    it. `problems`: patterns that timed out or could not run (they do not match);
+    `out_of_time`: some of them were skipped because the budget was used up."""
 
     text: DocumentText | None = None
     patterns: Mapping[PatternKey, bool] = field(default_factory=dict)
     problems: tuple[str, ...] = ()
     codes: tuple[Code, ...] = ()  # the codes on its pages, for templates (`facts.girocode`)
+    out_of_time: bool = False
 
 
 async def prepare(
@@ -255,8 +257,8 @@ async def prepare(
         return Prepared(codes=codes)
     text = await asyncio.to_thread(_searchable, markdown, max_text)
     keys = {key for rule in rules for key in rule.definition.patterns() if key[0] == TEXT_TARGET}
-    results, problems = await _search(matcher, {key: text.raw for key in keys}, budget)
-    return Prepared(text, results, problems, codes)
+    results, problems, out_of_time = await _search(matcher, {key: text.raw for key in keys}, budget)
+    return Prepared(text, results, problems, codes, out_of_time)
 
 
 def _searchable(markdown: str, max_text: int) -> DocumentText:
@@ -272,20 +274,27 @@ async def field_patterns(
     kept_facts: Sequence[DocumentFact] = (),
 ) -> tuple[dict[PatternKey, bool], tuple[str, ...]]:
     """The rules' patterns on the document's field values and its facts."""
-    return await _search(matcher, pattern_subjects(rules, document, None, kept_facts), None)
+    results, problems, _ = await _search(
+        matcher, pattern_subjects(rules, document, None, kept_facts), None
+    )
+    return results, problems
 
 
 async def _search(
     matcher: PatternMatcher,
     subjects: Mapping[PatternKey, PatternSubject],
     budget: PatternBudget | None,
-) -> tuple[dict[PatternKey, bool], tuple[str, ...]]:
+) -> tuple[dict[PatternKey, bool], tuple[str, ...], bool]:
+    """The patterns' results, what could not run, and whether some were skipped because the
+    budget was used up."""
     budget = budget or PatternBudget()
     results: dict[PatternKey, bool] = {}
     problems: list[str] = []
+    out_of_time = False
     for key, subject in subjects.items():
         _, pattern, case_sensitive = key
         if budget.exhausted:
+            out_of_time = True
             problems.append(f"pattern {pattern!r} skipped: the time for patterns is used up")
             log.warning("rule pattern skipped", extra={"pattern": pattern, "error": "no time"})
             continue
@@ -300,7 +309,7 @@ async def _search(
         except (PatternTimeoutError, ValidationError) as error:
             problems.append(str(error))
             log.warning("rule pattern skipped", extra={"pattern": pattern, "error": str(error)})
-    return results, tuple(problems)
+    return results, tuple(problems), out_of_time
 
 
 # --- where values came from -------------------------------------------------------------------

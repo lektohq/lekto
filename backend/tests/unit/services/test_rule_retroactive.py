@@ -1,6 +1,7 @@
 """Applying a rule to existing documents: the preview and the background job."""
 
 import threading
+from types import SimpleNamespace
 
 import pytest
 
@@ -16,10 +17,12 @@ from lekto.core.domain.rules import (
     ConditionField,
     ForceReview,
     Operator,
+    Rule,
     SetSpace,
     SetTitle,
 )
 from lekto.core.domain.spaces import SpaceRole
+from lekto.core.domain.users import User
 from lekto.core.services.rules import retroactive, running
 from lekto.core.services.rules.retroactive import BATCH
 from lekto.core.services.rules.running import Prepared, prepare
@@ -421,6 +424,66 @@ async def test_the_text_is_read_for_the_rules_outside_the_event_loop(
     assert preview.looked_at == 1
     assert len(folds) == 1 and len(cuts) == 1
     assert threading.get_ident() not in folds + cuts
+
+
+def slow_patterns(r: RuleWorld, monkeypatch: pytest.MonkeyPatch, page: float) -> None:
+    """Each pattern takes 0.06 s of a clock of its own; a page of the dry run has `page`."""
+    now = [0.0]
+    search = r.matcher.search
+
+    async def slow(pattern: str, text: str, *, case_sensitive: bool) -> bool:
+        now[0] += 0.06
+        return await search(pattern, text, case_sensitive=case_sensitive)
+
+    r.matcher.search = slow  # type: ignore[method-assign]
+    monkeypatch.setattr(running, "time", SimpleNamespace(monotonic=lambda: now[0]))
+    monkeypatch.setattr(retroactive, "PREVIEW_BUDGET", page)
+
+
+async def pages(r: RuleWorld, owner: User, rule: Rule) -> list[list[DocumentId]]:
+    """The dry run page by page: the documents each shows."""
+    shown: list[list[DocumentId]] = []
+    before = None
+    while True:
+        preview = await r.applications.preview(owner.id, rule.id, before=before)
+        shown.append([item.document.id for item in preview.items])
+        if preview.next_cursor is None:
+            return shown
+        before = preview.next_cursor
+
+
+async def test_the_first_document_of_a_page_has_the_time_of_one(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Shorter than two patterns, the page's time judged each document on half of them: none
+    was shown (SC-12)."""
+    r = await rule_world(world)
+    owner = await world.user()
+    tax = await r.tag("tax")
+    documents = [await r.arrive(owner, text="# Strom Rechnung") for _ in range(3)]
+    rule = await r.personal_rule(
+        owner,
+        definition("Tax", all_of(text_matches("Strom"), text_matches("Rech")), add_tags(tax.id)),
+    )
+    slow_patterns(r, monkeypatch, page=0.05)
+    assert await pages(r, owner, rule) == [[item.id] for item in reversed(documents)]
+
+
+async def test_a_document_the_page_s_time_cuts_short_comes_first_on_the_next(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Not judged on half its patterns, and not left behind (SC-12)."""
+    r = await rule_world(world)
+    owner = await world.user()
+    tax = await r.tag("tax")
+    invoice = await r.arrive(owner, text="# Strom Rechnung")
+    await r.arrive(owner)  # no text: no patterns, no time
+    rule = await r.personal_rule(
+        owner,
+        definition("Tax", all_of(text_matches("Strom"), text_matches("Rech")), add_tags(tax.id)),
+    )
+    slow_patterns(r, monkeypatch, page=0.05)
+    assert await pages(r, owner, rule) == [[], [invoice.id]]
 
 
 async def test_an_unexpected_error_ends_the_application(world: World) -> None:
