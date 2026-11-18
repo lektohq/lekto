@@ -48,6 +48,15 @@ def test_two_documents_or_scattered_ones_are_no_series() -> None:
     assert series_of(KEY, dated(date(2026, 1, 5), date(2026, 1, 20), date(2026, 3, 30))) is None
 
 
+def test_a_series_whose_next_step_lies_beyond_the_calendar_is_none() -> None:
+    """Not an error for whoever reads the expected documents or the stream (DB-10)."""
+    for days in (
+        (date(9999, 9, 30), date(9999, 10, 31), date(9999, 11, 30)),
+        (date(9999, 10, 31), date(9999, 11, 30), date(9999, 12, 31)),
+    ):
+        assert series_of(KEY, dated(*days)) is None
+
+
 def test_a_yearly_series_and_one_in_days() -> None:
     yearly = series_of(KEY, dated(date(2024, 3, 1), date(2025, 3, 3), date(2026, 3, 2)))
     assert yearly is not None
