@@ -37,6 +37,7 @@ from lekto.core.domain.permissions import (
     can_edit_document,
     can_read_document,
     document_access,
+    in_reach,
     space_role,
 )
 from lekto.core.domain.pipeline import Node, NodeRun
@@ -117,6 +118,13 @@ async def load_lister(uow: UnitOfWork, actor: UserId, all_users: bool, action: A
     if all_users:
         admin_only(user, action)
     return user
+
+
+async def may_reach(uow: UnitOfWork, user: User, document: Document) -> bool:
+    """Whether `user` has `document` within reach where it lies now (`permissions.in_reach`);
+    False if its space is gone. What a webhook's owner must have to hear of it (SC-07)."""
+    space = await uow.spaces.find(document.space_id)
+    return space is not None and in_reach(user, document, space)
 
 
 async def readable_document(uow: UnitOfWork, user: User, id: DocumentId) -> tuple[Document, Space]:

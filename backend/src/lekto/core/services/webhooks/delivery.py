@@ -50,11 +50,9 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 from lekto.core.domain.codes import Code
-from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import (
     ConcurrencyError,
     MissingValueError,
-    NotFoundError,
     TooManyAttemptsError,
     ValidationError,
 )
@@ -74,7 +72,6 @@ from lekto.core.domain.push import PushKind
 from lekto.core.domain.reasons import Reason, ReasonCode, because
 from lekto.core.domain.tasks import Task, TaskKind, TaskStatus
 from lekto.core.domain.templates import RULE
-from lekto.core.domain.users import User
 from lekto.core.domain.webhooks import (
     RULE_SEND,
     TEST_EVENT,
@@ -93,7 +90,7 @@ from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.templates import TemplateRenderer
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.ports.webhook_sender import WebhookRequest, WebhookResponse, WebhookSender
-from lekto.core.services._access import load_actor
+from lekto.core.services._access import load_actor, may_reach
 from lekto.core.services._jobs import JobRunner, lost
 from lekto.core.services._push_queue import queue_push
 from lekto.core.services._templates import document_json, event_values, webhook_values
@@ -772,7 +769,7 @@ async def _owners_who_may_read(
         user = await uow.users.find(owner)
         if user is None or not in_reach(user, document, space):
             continue
-        if related is None or await _may_read(uow, user, related):
+        if related is None or await may_reach(uow, user, related):
             allowed.add(owner)
     return allowed
 
@@ -797,7 +794,7 @@ async def _reason_to_drop(
         return unavailable
     if event_type in MODEL_CALLS:  # the webhook of a model call sees every document, an admin's
         return None if owner.is_active_admin else because(ReasonCode.DELIVERY_OWNER_NO_ADMIN)
-    if not await _may_read(uow, owner, document):
+    if not await may_reach(uow, owner, document):
         return unavailable  # the same reason: gone and hidden must not be told apart
     return None
 
@@ -805,14 +802,6 @@ async def _reason_to_drop(
 def _not_sent(reason: Reason) -> WebhookResponse:
     """The answer of a request Lekto did not send, and why."""
     return WebhookResponse(status_code=None, duration_ms=0, error=reason.text, reason=reason)
-
-
-async def _may_read(uow: UnitOfWork, user: User, document: Document) -> bool:
-    try:
-        space = await uow.spaces.get(document.space_id)
-    except NotFoundError:
-        return False
-    return in_reach(user, document, space)
 
 
 # --- answers ------------------------------------------------------------------------------------

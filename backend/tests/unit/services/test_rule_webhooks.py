@@ -3,8 +3,9 @@ after a change at once, applied to existing documents per document; and who may 
 
 import pytest
 
-from lekto.core.domain.documents import DocumentChanges
+from lekto.core.domain.documents import Document, DocumentChanges
 from lekto.core.domain.errors import NotFoundError, ValidationError
+from lekto.core.domain.ids import UserId, WebhookId, new_id
 from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.pipeline import RULES, Lane, Node
 from lekto.core.domain.reasons import ReasonCode
@@ -20,7 +21,7 @@ from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import User
 from lekto.core.domain.webhooks import RULE_SEND, Webhook
 from lekto.core.services.rules.changes import ChangeRules
-from lekto.core.services.rules.running import SENDS, SENDS_REFUSED, Prepared
+from lekto.core.services.rules.running import SENDS, SENDS_REFUSED, Prepared, refusal
 from lekto.core.services.webhooks import DELIVER_JOB
 from tests import builders
 from tests.builders import TEMPLATES
@@ -259,3 +260,21 @@ async def test_rules_that_move_it_back_send_nothing(world: World) -> None:
         await uow.commit()
     assert (await r.stored(document)).space_id == theirs.id
     assert sent(world) == []
+
+
+async def test_one_check_tells_whether_a_rule_may_send_or_ask(world: World) -> None:
+    """The webhook is there, its owner wrote the rule and reaches the document (SC-07)."""
+    r = await rule_world(world)
+    owner, other = await world.user(), await world.user()
+    webhook = await hook(world, owner)
+    mine, theirs = await r.arrive(owner), await r.arrive(other)
+
+    async def check(webhook_id: WebhookId, author: UserId, document: Document) -> object:
+        async with world.uow() as uow:
+            reason = await refusal(uow, webhook_id, author, "Notify", document)
+        return None if reason is None else reason.code
+
+    assert await check(webhook.id, owner.id, mine) is None
+    assert await check(WebhookId(new_id()), owner.id, mine) is ReasonCode.RULE_WEBHOOK_GONE
+    assert await check(webhook.id, other.id, mine) is ReasonCode.RULE_WEBHOOK_GONE
+    assert await check(webhook.id, owner.id, theirs) is ReasonCode.RULE_WEBHOOK_UNREADABLE

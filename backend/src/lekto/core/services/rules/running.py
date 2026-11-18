@@ -50,7 +50,6 @@ from lekto.core.domain.json_value import (
     as_uuid,
     same_json,
 )
-from lekto.core.domain.permissions import in_reach
 from lekto.core.domain.pipeline import (
     ACCEPTED,
     ACTOR,
@@ -94,7 +93,7 @@ from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.patterns import PatternMatcher
 from lekto.core.ports.templates import TemplateRenderer
 from lekto.core.ports.unit_of_work import UnitOfWork
-from lekto.core.services._access import space_label
+from lekto.core.services._access import may_reach, space_label
 from lekto.core.services._tags import tag_tree
 from lekto.core.services.inbox import MODEL_NODES, arrived, field_checks, latest_entries
 from lekto.core.services.objects import load_codes, load_text
@@ -772,21 +771,31 @@ SENDS_REFUSED = "sends_refused"
 async def deliverable(
     uow: UnitOfWork, sends: Iterable[Send], document: Document
 ) -> tuple[list[Send], list[Reason]]:
-    """Of `sends`, those whose webhook is there, still its rule author's, and whose owner may
-    read `document` where it lies now; and why the others are not."""
-    space = await uow.spaces.find(document.space_id)
+    """Of `sends`, those that may go (`refusal`); and why the others may not."""
     ok: list[Send] = []
     refused: list[Reason] = []
     for send in sends:
-        webhook = await uow.webhooks.find(send.webhook_id)
-        owner = None if webhook is None else await uow.users.find(webhook.owner_id)
-        if owner is None or not owner.active or owner.id != send.author:
-            refused.append(because(ReasonCode.RULE_WEBHOOK_GONE, rule=send.name))
-        elif space is None or not in_reach(owner, document, space):
-            refused.append(because(ReasonCode.RULE_WEBHOOK_UNREADABLE, rule=send.name))
-        else:
+        reason = await refusal(uow, send.webhook_id, send.author, send.name, document)
+        if reason is None:
             ok.append(send)
+        else:
+            refused.append(reason)
     return ok, refused
+
+
+async def refusal(
+    uow: UnitOfWork, webhook_id: WebhookId, author: UserId | None, rule: str, document: Document
+) -> Reason | None:
+    """Why the rule `rule` may not send or ask through the webhook now: it is gone, no longer
+    its rule's `author`'s, or its owner may not read `document` where it lies now; None if it
+    may. One check for sending and asking alike (SC-07)."""
+    webhook = await uow.webhooks.find(webhook_id)
+    owner = None if webhook is None else await uow.users.find(webhook.owner_id)
+    if owner is None or not owner.active or owner.id != author:
+        return because(ReasonCode.RULE_WEBHOOK_GONE, rule=rule)
+    if not await may_reach(uow, owner, document):
+        return because(ReasonCode.RULE_WEBHOOK_UNREADABLE, rule=rule)
+    return None
 
 
 async def queue_sends(
