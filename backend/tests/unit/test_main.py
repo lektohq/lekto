@@ -231,6 +231,11 @@ def test_a_service_only_runs_in_its_role(
     assert events[-1] == "the api does not run with LEKTO_ROLE=worker"
 
 
+AS_ROOT = {"PUID": "0"} if os.geteuid() == 0 else {}
+"""pytest as root (a container, `sudo`): the processes it starts run as root, which is meant
+then (TC-05). Read on import, before `clean_environment` sets another uid."""
+
+
 def test_the_worker_stops_cleanly_on_sigterm(tmp_path: Path) -> None:
     """In a process of its own: start on SQLite and the filesystem, then SIGTERM."""
     environment = {key: value for key, value in os.environ.items() if not key.startswith("LEKTO_")}
@@ -240,6 +245,7 @@ def test_the_worker_stops_cleanly_on_sigterm(tmp_path: Path) -> None:
         "LEKTO_LOG_LEVEL": "INFO",
         "LEKTO_SECRET_KEY": SECRET_KEY,
         "LEKTO_FORWARDED_ALLOW_IPS": TRUSTED_PROXY,
+        **AS_ROOT,
     }
     command = [sys.executable, "-m", "lekto.composition"]
     subprocess.run([*command, "migrate"], env=environment, check=True, capture_output=True)
@@ -276,6 +282,7 @@ def test_the_api_serves_health_and_stops_on_sigterm(tmp_path: Path) -> None:
         "LEKTO_FORWARDED_ALLOW_IPS": TRUSTED_PROXY,
         "LEKTO_ADMIN_USERNAME": "admin",
         "LEKTO_ADMIN_PASSWORD_FILE": str(password_file),
+        **AS_ROOT,
     }
     command = [sys.executable, "-m", "lekto.composition"]
     subprocess.run([*command, "migrate"], env=environment, check=True, capture_output=True)
