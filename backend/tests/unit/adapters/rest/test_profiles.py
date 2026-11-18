@@ -1,7 +1,6 @@
 """Profiles over HTTP: display names, private data, identifiers of persons, and the persons a
 document names."""
 
-import dataclasses
 from collections.abc import AsyncIterator
 from uuid import UUID
 
@@ -9,19 +8,23 @@ import httpx2
 import pytest
 
 from lekto.adapters.inbound.rest import PREFIX
-from lekto.adapters.outbound.memory import FakeParser, ManualClock
-from lekto.composition.container import build_memory_container, build_services
+from lekto.adapters.outbound.memory import FakeParser
 from lekto.core.domain.identifiers import Identifier, IdentifierKind
 from lekto.core.domain.identity import TokenScope
 from lekto.core.domain.ids import DocumentId, UserId
 from lekto.core.domain.labels import grid_layout
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.spaces import SpaceRole
-from lekto.core.domain.users import User
-from tests import builders
 from tests.api import auth, bearer
 from tests.person_numbers import tax_id
-from tests.unit.adapters.rest.support import Api, make_app, upload
+from tests.unit.adapters.rest.support import (
+    OWN_PROFILE,
+    Api,
+    api_with,
+    change_profile,
+    read_profile,
+    upload,
+)
 
 TAX_ID = tax_id()
 TEXT = f"""\
@@ -34,16 +37,8 @@ Kundennummer K-4711
 
 @pytest.fixture
 async def api() -> AsyncIterator[Api]:
-    clock = ManualClock(builders.NOW)
-    container = dataclasses.replace(
-        build_memory_container(clock), parser=FakeParser(TEXT, grid_layout(TEXT))
-    )
-    services = build_services(container)
-    builders.skip_classification(services.pipeline)
-    app = make_app(container, services)
-    transport = httpx2.ASGITransport(app=app)
-    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
-        yield Api(container, services, app, client, clock)
+    async with api_with(adapters={"parser": FakeParser(TEXT, grid_layout(TEXT))}) as made:
+        yield made
 
 
 async def patch(api: Api, path: str, body: object, headers: dict[str, str]) -> httpx2.Response:
@@ -54,23 +49,9 @@ async def get(api: Api, path: str, headers: dict[str, str]) -> httpx2.Response:
     return await api.client.get(f"{PREFIX}{path}", headers=headers)
 
 
-OWN = "/auth/me/profile"
-
-
-async def change(api: Api, user: User, body: object, path: str = OWN) -> httpx2.Response:
-    """Change a profile signed in as `user` (a profile needs a session)."""
-    async with api.sign_in(user) as session:
-        return await session.client.patch(f"{PREFIX}{path}", json=body, headers=session.headers)
-
-
-async def read(api: Api, user: User, path: str = OWN) -> httpx2.Response:
-    async with api.sign_in(user) as session:
-        return await session.client.get(f"{PREFIX}{path}")
-
-
 async def test_the_own_profile_and_the_display_name_others_see(api: Api) -> None:
     erika, bob = await api.user("erika"), await api.user("bob")
-    empty = await read(api, erika)
+    empty = await read_profile(api, erika)
     assert empty.status_code == 200, empty.text
     assert empty.json() == {
         "user_id": str(erika.id),
@@ -88,12 +69,12 @@ async def test_the_own_profile_and_the_display_name_others_see(api: Api) -> None
         "email": "Erika@Mail.Example",
         "identifiers": [{"kind": "tax_id", "value": TAX_ID}],
     }
-    changed = await change(api, erika, body)
+    changed = await change_profile(api, erika, body)
     assert changed.status_code == 200, changed.text
     assert changed.json()["email"] == "erika@mail.example"
     assert changed.json()["identifiers"] == [{"kind": "tax_id", "value": TAX_ID}]
     # Only what is given changes.
-    kept = await change(api, erika, {"birth_date": None})
+    kept = await change_profile(api, erika, {"birth_date": None})
     assert kept.json()["aliases"] == ["E. Mustermann"]
     assert kept.json()["birth_date"] is None
 
@@ -108,13 +89,13 @@ async def test_the_own_profile_and_the_display_name_others_see(api: Api) -> None
 async def test_only_the_user_and_admins_see_a_profile(api: Api) -> None:
     erika, bob, admin = await api.user("erika"), await api.user("bob"), await api.admin()
     path = f"/users/{erika.id}/profile"
-    assert (await read(api, bob, path)).status_code == 403
-    assert (await change(api, bob, {"display_name": "X"}, path)).status_code == 403
-    assert (await read(api, erika, path)).status_code == 200
-    changed = await change(api, admin, {"display_name": "Erika Mustermann"}, path)
+    assert (await read_profile(api, bob, path)).status_code == 403
+    assert (await change_profile(api, bob, {"display_name": "X"}, path)).status_code == 403
+    assert (await read_profile(api, erika, path)).status_code == 200
+    changed = await change_profile(api, admin, {"display_name": "Erika Mustermann"}, path)
     assert changed.status_code == 200, changed.text
-    assert (await read(api, admin, path)).json()["display_name"] == "Erika Mustermann"
-    assert (await read(api, admin, f"/users/{UUID(int=1)}/profile")).status_code == 404
+    assert (await read_profile(api, admin, path)).json()["display_name"] == "Erika Mustermann"
+    assert (await read_profile(api, admin, f"/users/{UUID(int=1)}/profile")).status_code == 404
 
 
 async def test_a_profile_needs_a_session_and_an_admin_token_fills_name_and_email(
@@ -122,10 +103,10 @@ async def test_a_profile_needs_a_session_and_an_admin_token_fills_name_and_email
 ) -> None:
     erika, admin = await api.user("erika"), await api.admin()
     private = {"aliases": ["E. Mustermann"], "birth_date": "1980-06-15", "email": "a@x.example"}
-    assert (await change(api, erika, private)).status_code == 200
+    assert (await change_profile(api, erika, private)).status_code == 200
     # Her own token reads and changes nothing of it: a leaked token is no sign-in.
-    assert (await get(api, OWN, auth(erika))).status_code == 403
-    assert (await patch(api, OWN, {"display_name": "A"}, auth(erika))).status_code == 403
+    assert (await get(api, OWN_PROFILE, auth(erika))).status_code == 403
+    assert (await patch(api, OWN_PROFILE, {"display_name": "A"}, auth(erika))).status_code == 403
     path = f"/users/{erika.id}/profile"
     assert (await get(api, path, auth(erika))).status_code == 403
     # An admin's token (a migration) sees and sets the display name and e-mail alone.
@@ -136,25 +117,27 @@ async def test_a_profile_needs_a_session_and_an_admin_token_fills_name_and_email
     assert filled.status_code == 200, filled.text
     refused = await patch(api, path, {"aliases": []}, auth(admin))
     assert refused.status_code == 403
-    assert (await read(api, erika)).json()["aliases"] == ["E. Mustermann"]
+    assert (await read_profile(api, erika)).json()["aliases"] == ["E. Mustermann"]
     _, read_only = await api.services.auth.create_api_token(admin.id, "r", TokenScope.READ)
     assert (await patch(api, path, {"email": None}, bearer(read_only))).status_code == 403
 
 
 async def test_display_names_are_unique_and_never_another_users_username(api: Api) -> None:
     erika, bob = await api.user("erika"), await api.user("bob")
-    assert (await change(api, erika, {"display_name": "Erika B", "aliases": ["Ann"]})).is_success
+    assert (
+        await change_profile(api, erika, {"display_name": "Erika B", "aliases": ["Ann"]})
+    ).is_success
     # Another user's display name, or username: shown, it would stand for two people.
     for body in ({"display_name": "erika b"}, {"display_name": "ERIKA"}):
-        taken = await change(api, bob, body)
+        taken = await change_profile(api, bob, body)
         assert taken.status_code == 409, body
     # Her own username she may take.
-    assert (await change(api, erika, {"display_name": "erika"})).status_code == 200
+    assert (await change_profile(api, erika, {"display_name": "erika"})).status_code == 200
     # Aliases are private: another user's alias, or display name, is no conflict (a 409 would
     # tell whose alias it is).
-    assert (await change(api, bob, {"aliases": ["ERIKA B"]})).status_code == 200
-    assert (await change(api, bob, {"display_name": "Ann"})).status_code == 200
-    twice = await change(api, bob, {"display_name": "Bobby", "aliases": ["bobby"]})
+    assert (await change_profile(api, bob, {"aliases": ["ERIKA B"]})).status_code == 200
+    assert (await change_profile(api, bob, {"display_name": "Ann"})).status_code == 200
+    twice = await change_profile(api, bob, {"display_name": "Bobby", "aliases": ["bobby"]})
     assert twice.status_code == 422
     admin = await api.admin()
     created = await api.client.post(
@@ -175,16 +158,18 @@ async def test_display_names_are_unique_and_never_another_users_username(api: Ap
 
 async def test_identifiers_of_persons_and_of_contacts(api: Api) -> None:
     erika, admin = await api.user("erika"), await api.admin()
-    wrong = await change(api, erika, {"identifiers": [{"kind": "vat_id", "value": "DE123456789"}]})
+    wrong = await change_profile(
+        api, erika, {"identifiers": [{"kind": "vat_id", "value": "DE123456789"}]}
+    )
     assert wrong.status_code == 422
-    invalid = await change(api, erika, {"identifiers": [{"kind": "tax_id", "value": "1"}]})
+    invalid = await change_profile(api, erika, {"identifiers": [{"kind": "tax_id", "value": "1"}]})
     assert invalid.status_code == 422
-    future = await change(api, erika, {"birth_date": "2999-01-01"})
+    future = await change_profile(api, erika, {"birth_date": "2999-01-01"})
     assert future.status_code == 422
 
     iban = "DE89370400440532013000"
     bank = await api.services.master_data.create_contact(admin.id, "Bank")
-    mine = await change(api, erika, {"identifiers": [{"kind": "iban", "value": iban}]})
+    mine = await change_profile(api, erika, {"identifiers": [{"kind": "iban", "value": iban}]})
     assert mine.status_code == 200, mine.text
     # A contact carries no IBAN since #215: neither hers nor any other.
     refused = await api.client.post(
@@ -227,7 +212,7 @@ async def test_identifiers_of_persons_and_of_contacts(api: Api) -> None:
 
 async def test_the_persons_a_document_names(api: Api) -> None:
     erika, reader, admin = await api.user("erika"), await api.user("reader"), await api.admin()
-    await change(
+    await change_profile(
         api,
         erika,
         {"display_name": "Erika Mustermann", "identifiers": [{"kind": "tax_id", "value": TAX_ID}]},
@@ -262,7 +247,7 @@ async def test_the_persons_a_document_names(api: Api) -> None:
 
 async def test_a_deleted_user_takes_their_profile_along(api: Api) -> None:
     erika, admin = await api.user("erika"), await api.admin()
-    await change(api, erika, {"display_name": "E. Mustermann", "aliases": ["Ann"]})
+    await change_profile(api, erika, {"display_name": "E. Mustermann", "aliases": ["Ann"]})
     bank = await api.services.master_data.create_contact(
         admin.id,
         "Bank",
@@ -279,14 +264,14 @@ async def test_a_deleted_user_takes_their_profile_along(api: Api) -> None:
     assert contact.identifiers == []  # her number went with her
     # The display name is free again.
     bob = await api.user("bob")
-    reused = await change(api, bob, {"display_name": "E. Mustermann"})
+    reused = await change_profile(api, bob, {"display_name": "E. Mustermann"})
     assert reused.status_code == 200, reused.text
 
 
 async def test_what_is_private_finds_a_person_only_for_them_and_admins(api: Api) -> None:
     erika, bob, admin = await api.user("erika"), await api.user("bob"), await api.admin()
     # The text has her alias and her tax ID, not her display name.
-    await change(
+    await change_profile(
         api,
         erika,
         {
@@ -308,6 +293,6 @@ async def test_what_is_private_finds_a_person_only_for_them_and_admins(api: Api)
         (person,) = (await get(api, f"/documents/{document}/facts", auth(viewer))).json()["persons"]
         assert (person["strength"], person["evidence"]) == ("hard", ["tax_id", "alias"])
     # Named by her display name, anyone who edits the space sees that, and nothing more.
-    await change(api, erika, {"display_name": "Erika Mustermann", "aliases": []})
+    await change_profile(api, erika, {"display_name": "Erika Mustermann", "aliases": []})
     (person,) = (await get(api, f"/documents/{document}/facts", auth(bob))).json()["persons"]
     assert (person["strength"], person["evidence"]) == ("weak", ["name"])

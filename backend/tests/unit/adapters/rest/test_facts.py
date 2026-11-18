@@ -12,16 +12,13 @@ from lekto.adapters.outbound.memory import (
     FAKE_GIRO_CODE,
     FakeCodeReader,
     FakeParser,
-    ManualClock,
 )
-from lekto.composition.container import build_memory_container, build_services
 from lekto.core.domain.codes import Code
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.labels import grid_layout
 from lekto.core.domain.locations import Box
-from tests import builders
 from tests.api import auth
-from tests.unit.adapters.rest.support import DOCUMENTS, Api, make_app, upload
+from tests.unit.adapters.rest.support import DOCUMENTS, Api, api_with, upload
 
 TEXT = """\
 Lekto Test GmbH
@@ -41,18 +38,9 @@ CODES = [
 
 @pytest.fixture
 async def facts_api() -> AsyncIterator[Api]:
-    clock = ManualClock(builders.NOW)
-    container = dataclasses.replace(
-        build_memory_container(clock),
-        parser=FakeParser(TEXT, grid_layout(TEXT)),
-        codes=FakeCodeReader(CODES),
-    )
-    services = build_services(container)
-    builders.skip_classification(services.pipeline)
-    app = make_app(container, services)
-    transport = httpx2.ASGITransport(app=app)
-    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
-        yield Api(container, services, app, client, clock)
+    adapters = {"parser": FakeParser(TEXT, grid_layout(TEXT)), "codes": FakeCodeReader(CODES)}
+    async with api_with(adapters=adapters) as made:
+        yield made
 
 
 async def post(api: Api, path: str, body: object, headers: dict[str, str]) -> httpx2.Response:

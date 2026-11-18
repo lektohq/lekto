@@ -2,7 +2,7 @@
 permission matrix (its actors and documents: `test_permission_matrix`). The MCP tests use them too.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from datetime import timedelta
@@ -18,16 +18,23 @@ from lekto.adapters.inbound.rest import MCP_PATH, PREFIX, create_app
 from lekto.adapters.inbound.rest.auth import CSRF_HEADER
 from lekto.adapters.outbound.memory import ManualClock
 from lekto.composition.api import api_context
-from lekto.composition.container import Container, Services
+from lekto.composition.container import (
+    Container,
+    Services,
+    build_memory_container,
+    build_services,
+)
+from lekto.composition.settings import Settings
 from lekto.core.domain.identity import TokenScope
 from lekto.core.domain.ids import DocumentId
-from lekto.core.domain.pipeline import Node
+from lekto.core.domain.pipeline import SIGNALS, Node
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import Role, User
+from lekto.core.services.imports import ImportedFieldsNode, ImportedJudgeNode, ImportedSignal
 from lekto.core.services.objects import archive_key, preview_key
 from tests import builders
 from tests.api import auth, bearer, issue_token
-from tests.builders import PASSWORD, SAMPLES, UNCERTAIN, Returns
+from tests.builders import PASSWORD, SAMPLES, UNCERTAIN, PlaceholderNode, Returns
 
 MAX_UPLOAD = 1024 * 1024
 
@@ -43,6 +50,7 @@ def make_app(
     mcp: bool = False,
     ui_directory: Path | None = None,
     shortcut_url: str | None = None,
+    health_checks: Mapping[str, Callable[[], Awaitable[None]]] | None = None,
 ) -> FastAPI:
     """The app as `composition.api` builds it from the shipped settings, with what a test
     changes."""
@@ -55,6 +63,8 @@ def make_app(
         ui_directory=ui_directory,
         shortcut_url=shortcut_url,
     )
+    if health_checks is not None:
+        context = replace(context, health_checks=dict(health_checks))
     mounts = [McpEndpoint(context, path=MCP_PATH)] if mcp else []
     return create_app(context, mounts)
 
@@ -91,8 +101,10 @@ class Api:
     async def admin(self, name: str | None = None) -> User:
         return await self.user(name, Role.ADMIN)
 
-    def new_client(self) -> httpx2.AsyncClient:
-        transport = httpx2.ASGITransport(app=self.app)
+    def new_client(self, *, raise_app_exceptions: bool = True) -> httpx2.AsyncClient:
+        """Another client of the app; `raise_app_exceptions=False` answers what the server
+        would (500) instead of raising."""
+        transport = httpx2.ASGITransport(app=self.app, raise_app_exceptions=raise_app_exceptions)
         return httpx2.AsyncClient(transport=transport, base_url="https://lekto")
 
     @asynccontextmanager
@@ -107,6 +119,56 @@ class Api:
 
     async def drain(self) -> None:
         await builders.drain(self.services.pipeline)
+
+
+@asynccontextmanager
+async def api_with(
+    *,
+    adapters: Mapping[str, Any] | None = None,
+    settings: Settings | None = None,
+    replaced: Mapping[str, Any] | None = None,
+    **options: Any,
+) -> AsyncIterator[Api]:
+    """The API as the fixture `api` builds it, with what a test changes: the container's
+    `adapters`, the `settings` of the services, services `replaced`, and the options of
+    `make_app`. Its client speaks HTTPS, plain HTTP with insecure cookies (TC-09)."""
+    clock = ManualClock(builders.NOW)
+    container = replace(build_memory_container(clock), **(adapters or {}))
+    services = replace(build_services(container, settings), **(replaced or {}))
+    builders.skip_classification(services.pipeline)
+    app = make_app(container, services, **options)
+    base_url = "https://lekto" if options.get("cookie_secure", True) else "http://lekto"
+    transport = httpx2.ASGITransport(app=app)
+    async with httpx2.AsyncClient(transport=transport, base_url=base_url) as client:
+        yield Api(container, services, app, client, clock)
+
+
+OWN_PROFILE = "/auth/me/profile"
+
+
+async def change_profile(
+    api: Api, user: User, body: object, path: str = OWN_PROFILE
+) -> httpx2.Response:
+    """Change a profile signed in as `user` (a profile needs a session)."""
+    async with api.sign_in(user) as session:
+        return await session.client.patch(f"{PREFIX}{path}", json=body, headers=session.headers)
+
+
+async def read_profile(api: Api, user: User, path: str = OWN_PROFILE) -> httpx2.Response:
+    """Read a profile signed in as `user`."""
+    async with api.sign_in(user) as session:
+        return await session.client.get(f"{PREFIX}{path}")
+
+
+def imported_nodes(api: Api) -> None:
+    """The signals, the judge and the fields node of a migration as the container builds them,
+    around nodes that do nothing (there is no language model)."""
+    uow = api.container.unit_of_work
+    pipeline = api.services.pipeline
+    for signal in SIGNALS:
+        pipeline.replace_executor(signal, ImportedSignal(uow, PlaceholderNode()))
+    pipeline.replace_executor(Node.JUDGE, ImportedJudgeNode(uow, PlaceholderNode()))
+    pipeline.replace_executor(Node.FIELDS, ImportedFieldsNode(uow, PlaceholderNode()))
 
 
 DOCUMENTS = f"{PREFIX}/documents"

@@ -16,12 +16,10 @@ from lekto_migration.config import Config
 from lekto_migration.fake_paperless import FakePaperless, sample_archive
 
 from lekto.adapters.inbound.rest import PREFIX
-from lekto.core.domain.pipeline import SIGNALS, Node
-from lekto.core.services.imports import ImportedFieldsNode, ImportedJudgeNode, ImportedSignal
 from tests import api as helpers
 from tests.api import until
-from tests.builders import SAMPLES, PlaceholderNode
-from tests.unit.adapters.rest.support import Api
+from tests.builders import SAMPLES
+from tests.unit.adapters.rest.support import Api, imported_nodes
 
 
 class Migrating:
@@ -90,12 +88,7 @@ async def migrating(api: Api, directory: Path) -> AsyncIterator[Migrating]:
     """The API with its worker running, an admin to migrate with, and the real signals, judge
     and fields node of a migration around nodes that do nothing (there is no language
     model)."""
-    uow = api.container.unit_of_work
-    pipeline = api.services.pipeline
-    for signal in SIGNALS:
-        pipeline.replace_executor(signal, ImportedSignal(uow, PlaceholderNode()))
-    pipeline.replace_executor(Node.JUDGE, ImportedJudgeNode(uow, PlaceholderNode()))
-    pipeline.replace_executor(Node.FIELDS, ImportedFieldsNode(uow, PlaceholderNode()))
+    imported_nodes(api)
     admin = await api.admin()
 
     async def work() -> None:

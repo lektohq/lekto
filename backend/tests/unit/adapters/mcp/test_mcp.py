@@ -3,7 +3,6 @@ API hold here too."""
 
 import base64
 import json
-from dataclasses import replace
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -18,8 +17,6 @@ from lekto.adapters.inbound.limits import MAX_SELECTED
 from lekto.adapters.inbound.mcp.server import instructions
 from lekto.adapters.inbound.rest import PREFIX
 from lekto.adapters.inbound.schemas import MAX_POSITION
-from lekto.adapters.outbound.memory import ManualClock
-from lekto.composition.container import build_memory_container, build_services
 from lekto.core.domain.classification import FieldCheck, checks_to_json
 from lekto.core.domain.document_facts import DocumentFact, FactOrigin, FactRole
 from lekto.core.domain.documents import DocumentChanges
@@ -35,7 +32,14 @@ from tests import builders
 from tests.api import auth, serving
 from tests.builders import SAMPLES
 from tests.unit.adapters.mcp.support import TEXT, call, connected, data, error, running
-from tests.unit.adapters.rest.support import Api, Scene, make_app, post, unique_pdf, upload
+from tests.unit.adapters.rest.support import (
+    Api,
+    Scene,
+    api_with,
+    post,
+    unique_pdf,
+    upload,
+)
 
 # --- the endpoint -------------------------------------------------------------------------------
 
@@ -178,37 +182,24 @@ async def test_a_session_cookie_does_not_open_the_endpoint(api: Api, scene: Scen
 
 
 async def test_the_endpoint_is_absent_when_switched_off() -> None:
-
-    container = build_memory_container(ManualClock(builders.NOW))
-    app = make_app(container, build_services(container), mcp=False)
-    async with httpx2.AsyncClient(
-        transport=httpx2.ASGITransport(app=app), base_url="https://lekto"
-    ) as client:
-        response = await client.post(f"{PREFIX}/mcp", json={})
+    async with api_with(mcp=False) as api:
+        response = await api.client.post(f"{PREFIX}/mcp", json={})
     assert response.status_code == 404
 
 
 async def test_the_server_works_over_a_real_connection() -> None:
-
-    clock = ManualClock(builders.NOW)
-    container = build_memory_container(clock)
-    services = build_services(container)
-    builders.skip_classification(services.pipeline)
-    app = make_app(container, services, mcp=True)  # Uvicorn runs its lifespan
-    client = httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="https://lekto")
-    api = Api(container, services, app, client, clock)
-    user = await api.user()
-    received = await services.pipeline.receive(
-        user.id, builders.incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
-    )
-    await api.drain()
-    async with (
-        serving(app) as base,
-        httpx2.AsyncClient(headers=auth(user)) as http,
-        Client(streamable_http_client(f"{base}{PREFIX}/mcp", http_client=http)) as mcp,
-    ):
-        result = await mcp.call_tool("documents_get", {"id": str(received.id)})
-    await client.aclose()
+    async with api_with(mcp=True) as api:  # Uvicorn runs its lifespan
+        user = await api.user()
+        received = await api.services.pipeline.receive(
+            user.id, builders.incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
+        )
+        await api.drain()
+        async with (
+            serving(api.app) as base,
+            httpx2.AsyncClient(headers=auth(user)) as http,
+            Client(streamable_http_client(f"{base}{PREFIX}/mcp", http_client=http)) as mcp,
+        ):
+            result = await mcp.call_tool("documents_get", {"id": str(received.id)})
     assert data(result)["id"] == short_id(received.id)
 
 
@@ -944,18 +935,7 @@ async def test_search_filters_by_topics(api: Api, scene: Scene) -> None:
 
 
 async def test_search_without_an_index_says_so() -> None:
-
-    container = build_memory_container(ManualClock(builders.NOW))
-    services = replace(build_services(container), search=None)
-    app = make_app(container, services, mcp=True)
-    async with running(app):
-        api = Api(
-            container,
-            services,
-            app,
-            httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="https://lekto"),
-            ManualClock(builders.NOW),
-        )
+    async with api_with(replaced={"search": None}, mcp=True) as api, running(api.app):
         user = await api.user()
         result = await call(api, auth(user), "documents_search", query="anything")
     assert "search is not available" in error(result)

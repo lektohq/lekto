@@ -1,23 +1,20 @@
 """`POST /documents/{id}/edit`: parts of the document's pages and of added files; the part that
 replaces it is its next version, the others new documents, the document gone without one."""
 
-import dataclasses
 import json
 from pathlib import Path
 from typing import Any
 
-import httpx2
 import pytest
 
-from lekto.adapters.outbound.memory import ManualClock, fake_pdf
+from lekto.adapters.outbound.memory import fake_pdf
 from lekto.adapters.outbound.pdfium import PdfiumPageRenderer
 from lekto.adapters.outbound.pikepdf import PikepdfPageComposer
-from lekto.composition.container import build_memory_container, build_services
 from lekto.core.domain.editing import MAX_PREVIEW_PAGES
 from tests import builders
 from tests.api import auth
 from tests.pdfs import missing_page
-from tests.unit.adapters.rest.support import DOCUMENTS, Api, file_part, make_app, upload
+from tests.unit.adapters.rest.support import DOCUMENTS, Api, api_with, file_part, upload
 
 
 def form(parts: Any, *files: tuple[str, bytes], **fields: str) -> dict[str, Any]:
@@ -213,16 +210,9 @@ async def test_the_pages_of_a_longer_file_are_not_shown(api: Api) -> None:
 async def test_a_file_whose_pages_cannot_be_read_is_refused_saying_why(tmp_path: Path) -> None:
     """With the adapters that read files: their error (as the worker's nodes have it) is the
     request's, 422 with its reason, not 500."""
-    clock = ManualClock(builders.NOW)
-    container = dataclasses.replace(
-        build_memory_container(clock), composer=PikepdfPageComposer(), pages=PdfiumPageRenderer()
-    )
-    services = build_services(container)
-    builders.skip_classification(services.pipeline)
-    app = make_app(container, services)
-    transport = httpx2.ASGITransport(app=app)
-    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
-        api = Api(container, services, app, client, clock)
+    adapters = {"composer": PikepdfPageComposer(), "pages": PdfiumPageRenderer()}
+    async with api_with(adapters=adapters) as api:
+        client = api.client
         owner = await api.user()
         text = (builders.SAMPLES / "text.pdf").read_bytes()
         id = await upload(api, auth(owner), content=text)
@@ -250,14 +240,8 @@ async def test_a_file_above_the_request_limit_is_no_upload_too_large(route: str)
     """A new version and a file added to an edit are uploads: their limit is
     `LEKTO_UPLOAD_MAX_SIZE`, not the bound on request bodies (`LEKTO_REQUEST_MAX_SIZE`)."""
     limit = int(builders.DEFAULT_SETTINGS.request_max_size)
-    clock = ManualClock(builders.NOW)
-    container = build_memory_container(clock)
-    services = build_services(container)
-    builders.skip_classification(services.pipeline)
-    app = make_app(container, services, max_upload=4 * limit)
-    transport = httpx2.ASGITransport(app=app)
-    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
-        api = Api(container, services, app, client, clock)
+    async with api_with(max_upload=4 * limit) as api:
+        client = api.client
         owner = await api.user()
         id = await upload(api, auth(owner))
         big = fake_pdf(1, "x" * 2 * limit)

@@ -14,25 +14,17 @@ from lekto.adapters.inbound.rest import PREFIX
 from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.identity import TokenScope
-from lekto.core.domain.pipeline import SIGNALS, Node, NodeResult
+from lekto.core.domain.pipeline import Node, NodeResult
 from lekto.core.domain.users import User
-from lekto.core.services.imports import ImportedFieldsNode, ImportedJudgeNode, ImportedSignal
 from lekto.core.services.pipeline import DeferredResult, NodeExecutor
 from tests.api import auth, bearer
-from tests.builders import SAMPLES, PlaceholderNode
-from tests.unit.adapters.rest.support import DOCUMENTS, Api, post, sample_file
+from tests.builders import SAMPLES
+from tests.unit.adapters.rest.support import DOCUMENTS, Api, imported_nodes, post, sample_file
 
 
 @pytest.fixture(autouse=True)
 def imported_steps(api: Api) -> None:
-    """The signals, the judge and the fields node as the container builds them, around nodes
-    that do nothing (there is no language model)."""
-    uow = api.container.unit_of_work
-    pipeline = api.services.pipeline
-    for signal in SIGNALS:
-        pipeline.replace_executor(signal, ImportedSignal(uow, PlaceholderNode()))
-    pipeline.replace_executor(Node.JUDGE, ImportedJudgeNode(uow, PlaceholderNode()))
-    pipeline.replace_executor(Node.FIELDS, ImportedFieldsNode(uow, PlaceholderNode()))
+    imported_nodes(api)
 
 
 async def upload(

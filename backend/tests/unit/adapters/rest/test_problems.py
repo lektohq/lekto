@@ -5,8 +5,6 @@ import importlib
 import pkgutil
 from uuid import UUID, uuid4
 
-import httpx2
-
 import lekto.adapters
 import lekto.core
 from lekto.adapters.inbound.rest import PREFIX
@@ -83,8 +81,7 @@ async def test_an_unexpected_error_is_marked_like_every_answer(api: Api) -> None
         raise RuntimeError("broken")
 
     api.app.add_api_route(f"{PREFIX}/broken", broken)
-    transport = httpx2.ASGITransport(app=api.app, raise_app_exceptions=False)
-    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
+    async with api.new_client(raise_app_exceptions=False) as client:
         response = await client.get(f"{PREFIX}/broken")
     assert response.status_code == 500
     assert response.headers["cache-control"] == "no-store"

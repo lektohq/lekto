@@ -3,33 +3,22 @@
 from collections.abc import AsyncIterator
 from uuid import UUID
 
-import httpx2
 import pytest
 
-from lekto.adapters.outbound.memory import ManualClock
-from lekto.composition.container import build_memory_container, build_services
 from lekto.composition.settings import Settings
 from lekto.core.domain.ids import DocumentId
 from lekto.core.services.objects import text_key
-from tests import builders
 from tests.unit.adapters.mcp.support import TEXT, running
-from tests.unit.adapters.rest.support import Api, Scene, indexed_scene, make_app
+from tests.unit.adapters.rest.support import Api, Scene, api_with, indexed_scene
 
 
 @pytest.fixture
 async def api() -> AsyncIterator[Api]:
     """The API with the MCP endpoint, its lifespan running."""
-
-    clock = ManualClock(builders.NOW)
-    container = build_memory_container(clock)
     # A piece of text holds 100 characters (`LEKTO_MCP_TEXT_MAX`).
-    services = build_services(container, Settings.model_construct(mcp_text_max=100))
-    builders.skip_classification(services.pipeline)
-    app = make_app(container, services, mcp=True)
-    async with running(app):
-        transport = httpx2.ASGITransport(app=app)
-        async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
-            yield Api(container, services, app, client, clock)
+    settings = Settings.model_construct(mcp_text_max=100)
+    async with api_with(settings=settings, mcp=True) as made, running(made.app):
+        yield made
 
 
 @pytest.fixture

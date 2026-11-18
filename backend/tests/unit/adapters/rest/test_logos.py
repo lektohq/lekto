@@ -2,24 +2,20 @@
 removal, and reading by every user with a cache header of its own."""
 
 from collections.abc import AsyncIterator
-from dataclasses import replace
 from datetime import timedelta
 from uuid import UUID
 
-import httpx2
 import pytest
 from httpx2 import Response
 
 from lekto.adapters.inbound.rest import PREFIX
-from lekto.adapters.outbound.memory import FAKE_LOGO, FakeLogoFetcher, ManualClock
-from lekto.composition.container import build_memory_container, build_services
+from lekto.adapters.outbound.memory import FAKE_LOGO, FakeLogoFetcher
 from lekto.core.domain.ids import ContactId
 from lekto.core.services.logos import LOGO_MAX_SIZE
 from lekto.core.services.objects import logo_key
-from tests import builders
 from tests.api import auth
 from tests.contracts.images import SVG, image
-from tests.unit.adapters.rest.support import Api, make_app
+from tests.unit.adapters.rest.support import Api, api_with
 
 PNG = image((180, 120))
 
@@ -133,14 +129,9 @@ async def test_a_logo_goes_with_its_contact(api: Api) -> None:
 @pytest.fixture
 async def fetching() -> AsyncIterator[Api]:
     """The API with fetching on, against a stand-in for the websites."""
-    clock = ManualClock(builders.NOW)
     fetcher = FakeLogoFetcher({"nord.example": PNG})
-    container = replace(build_memory_container(clock), logo_fetcher=fetcher)
-    services = build_services(container)
-    app = make_app(container, services)
-    transport = httpx2.ASGITransport(app=app)
-    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
-        yield Api(container, services, app, client, clock)
+    async with api_with(adapters={"logo_fetcher": fetcher}) as made:
+        yield made
 
 
 async def test_an_admin_has_the_logo_fetched(fetching: Api) -> None:

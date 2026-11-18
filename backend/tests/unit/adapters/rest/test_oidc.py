@@ -1,37 +1,28 @@
 """OpenID Connect over HTTP, with the fake provider."""
 
 from collections.abc import AsyncIterator
-from dataclasses import replace
 
-import httpx2
 import pytest
 
 from lekto.adapters.inbound.rest import PREFIX
-from lekto.adapters.outbound.memory import FakeOidcProvider, ManualClock
-from lekto.composition.container import build_memory_container, build_services
+from lekto.adapters.outbound.memory import FakeOidcProvider
 from lekto.composition.settings import Settings
 from lekto.core.domain.encoding import query_parameters
 from lekto.core.domain.errors import AuthenticationError
 from lekto.core.domain.identity import ExternalIdentity
 from lekto.core.domain.ids import UserId
-from tests import builders
 from tests.api import auth
 from tests.builders import NOW
-from tests.unit.adapters.rest.support import Api, make_app
+from tests.unit.adapters.rest.support import Api, api_with
 
 OIDC = f"{PREFIX}/auth/oidc"
 
 
 @pytest.fixture
 async def oidc_api() -> AsyncIterator[tuple[Api, FakeOidcProvider]]:
-    clock = ManualClock(builders.NOW)
     provider = FakeOidcProvider()
-    container = replace(build_memory_container(clock), oidc=provider)
-    services = build_services(container)
-    app = make_app(container, services)
-    transport = httpx2.ASGITransport(app=app)
-    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
-        yield Api(container, services, app, client, clock), provider
+    async with api_with(adapters={"oidc": provider}) as made:
+        yield made, provider
 
 
 def state(url: str) -> str:
@@ -113,12 +104,10 @@ async def test_a_state_that_is_not_ascii_fails_as_a_wrong_one(
 async def test_a_user_name_lekto_refuses_fails_back_to_the_web_ui() -> None:
     """With accounts made on the first sign-in: a provider's user name Lekto refuses ends as
     `failed` in the web UI, not as a problem document (RB-07)."""
-    clock = ManualClock(builders.NOW)
     provider = FakeOidcProvider()
-    container = replace(build_memory_container(clock), oidc=provider)
-    services = build_services(container, Settings.model_construct(oidc_auto_create=True))
-    transport = httpx2.ASGITransport(app=make_app(container, services))
-    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
+    settings = Settings.model_construct(oidc_auto_create=True)
+    async with api_with(adapters={"oidc": provider}, settings=settings) as api:
+        client = api.client
         for username in ("x" * 151, "   "):
             url = (await client.get(f"{OIDC}/login")).headers["location"]
             code = provider.consent(url, f"sub-{len(username)}", username=username)

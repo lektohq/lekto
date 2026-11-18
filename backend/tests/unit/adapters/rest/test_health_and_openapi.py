@@ -7,7 +7,6 @@ import json
 import pkgutil
 import re
 from collections.abc import Awaitable, Callable
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -19,16 +18,12 @@ from lekto.adapters.inbound.rest import (
     HEALTH_PATH,
     OIDC_CALLBACK_PATH,
     PREFIX,
-    create_app,
     schemas,
 )
 from lekto.adapters.inbound.rest.app import DOCS_PATH, FAVICON_PATH, SWAGGER_PATH
 from lekto.adapters.inbound.schemas import RequestBody
-from lekto.composition.api import api_context
-from lekto.composition.container import build_memory_container, build_services
-from tests import builders
 from tests.builders import PASSWORD, SECRET_KEY
-from tests.unit.adapters.rest.support import Api, make_app
+from tests.unit.adapters.rest.support import Api, api_with
 
 PROBLEM = "application/problem+json"
 
@@ -41,11 +36,8 @@ async def test_health_is_ok_without_authentication(api: Api) -> None:
 
 
 async def docs(ui_directory: Path | None) -> httpx2.Response:
-    container = build_memory_container()
-    app = make_app(container, build_services(container), ui_directory=ui_directory)
-    transport = httpx2.ASGITransport(app=app)
-    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
-        return await client.get(DOCS_PATH)
+    async with api_with(ui_directory=ui_directory) as api:
+        return await api.client.get(DOCS_PATH)
 
 
 async def test_the_api_documentation_comes_with_the_web_ui_not_a_cdn(tmp_path: Path) -> None:
@@ -92,22 +84,14 @@ def test_the_paths_known_outside_the_routes_are_routes(api: Api) -> None:
 
 
 async def test_a_failing_check_makes_the_api_unavailable() -> None:
-    container = build_memory_container()
-    services = build_services(container)
-
     async def ok() -> None:
         pass
 
     async def broken() -> None:
         raise OSError("connection refused")
 
-    context = api_context(container, builders.DEFAULT_SETTINGS, services)
-    checks = {"database": broken, "object_store": ok}
-    app = create_app(replace(context, health_checks=checks))
-    async with httpx2.AsyncClient(
-        transport=httpx2.ASGITransport(app=app), base_url="http://lekto"
-    ) as client:
-        response = await client.get(f"{PREFIX}/health")
+    async with api_with(health_checks={"database": broken, "object_store": ok}) as api:
+        response = await api.client.get(f"{PREFIX}/health")
     assert response.status_code == 503
     assert response.json() == {
         "status": "unavailable",
@@ -123,14 +107,8 @@ async def test_a_failing_search_only_degrades_the_api() -> None:
         raise OSError("connection refused")
 
     async def health(checks: dict[str, Callable[[], Awaitable[None]]]) -> httpx2.Response:
-        container = build_memory_container()
-        services = build_services(container)
-        context = api_context(container, builders.DEFAULT_SETTINGS, services)
-        app = create_app(replace(context, health_checks=checks))
-        async with httpx2.AsyncClient(
-            transport=httpx2.ASGITransport(app=app), base_url="http://lekto"
-        ) as client:
-            return await client.get(f"{PREFIX}/health")
+        async with api_with(health_checks=checks) as api:
+            return await api.client.get(f"{PREFIX}/health")
 
     degraded = await health({"database": ok, "search": broken})
     assert degraded.status_code == 200
