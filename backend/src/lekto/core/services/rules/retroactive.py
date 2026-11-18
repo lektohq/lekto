@@ -471,7 +471,8 @@ class RuleApplicationService:
                 await uow.rule_applications.update(application)
                 await uow.commit()
                 return True
-            document = await uow.documents.find(application.remaining[0])
+            target = application.remaining[0]
+            document = await uow.documents.find(target)
             rule = await uow.rules.find(application.rule_id)
             user = await uow.users.find(application.user_id)
             if rule is None or rule.deleted_at is not None or user is None or not user.active:
@@ -488,22 +489,24 @@ class RuleApplicationService:
             prepared = await prepare(
                 self._store, self._matcher, [rule, *following], document, max_text=self._max_text
             )
+        # Another worker may have taken the application over and gone on meanwhile (its lease
+        # ran out): what was prepared for `target` is for no other document (SC-04).
         try:
             async with self._uow() as uow:
                 application = await uow.rule_applications.get(id)
-                await self._apply_one(uow, user, rule, prepared, application)
+                if application.remaining[:1] != (target,):
+                    return False
+                await self._apply_one(uow, user, rule, prepared, application, target)
                 await uow.rule_applications.update(application)
                 await uow.commit()
         except ConcurrencyError:
-            # The document changed meanwhile (or another worker took the application over;
-            # then this fails again and the claim is lost).
+            # The document changed meanwhile, or another worker went on.
             async with self._uow() as uow:
                 application = await uow.rule_applications.get(id)
-                application.record_skipped(
-                    application.remaining[0], because(ReasonCode.SKIP_CHANGED_MEANWHILE)
-                )
-                await uow.rule_applications.update(application)
-                await uow.commit()
+                if application.remaining[:1] == (target,):
+                    application.record_skipped(target, because(ReasonCode.SKIP_CHANGED_MEANWHILE))
+                    await uow.rule_applications.update(application)
+                    await uow.commit()
         return False
 
     async def _apply_one(
@@ -513,9 +516,10 @@ class RuleApplicationService:
         rule: Rule,
         prepared: Prepared,
         application: RuleApplication,
+        id: DocumentId,
     ) -> None:
-        """Apply the rule to the next document of `application` and record what it did."""
-        id = application.remaining[0]
+        """Apply the rule to `id`, the next document of `application`, and record what it
+        did."""
         document = await uow.documents.find(id)
         if document is None or not await _candidate(uow, user, rule, document):
             application.record_skipped(id, because(ReasonCode.SKIP_NOT_AVAILABLE))

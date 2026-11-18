@@ -19,6 +19,7 @@ from lekto.core.domain.rules import (
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.services.rules import retroactive
 from lekto.core.services.rules.retroactive import BATCH
+from lekto.core.services.rules.running import Prepared, prepare
 from tests import builders
 from tests.unit.services.rules_support import (
     MAX_DOCUMENTS,
@@ -324,6 +325,41 @@ async def test_filing_on_an_unconfirmed_contact_is_a_conflict_until_accepted(
     )
     await run_jobs(r)
     assert (await r.stored(document)).space_id == shared.id
+
+
+async def test_a_worker_overtaken_applies_what_it_prepared_to_no_other_document(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Another worker took the application over (the lease ran out) and went on while the
+    first prepared a document: the first applies nothing to the next one (SC-04)."""
+    r = await rule_world(world)
+    owner = await world.user()
+    tax = await r.tag("tax")
+    invoice = await r.arrive(owner, text="# Rechnung")
+    others = [await r.arrive(owner, text="# Strom") for _ in range(2)]
+    rule = await r.personal_rule(owner, definition("Tax", text_matches("Rech"), add_tags(tax.id)))
+    application = await r.applications.start(
+        owner.id, rule.id, version=1, documents=[invoice.id, *(item.id for item in others)]
+    )
+    real, calls = prepare, 0
+
+    async def overtaken(*args: object, **kwargs: object) -> Prepared:
+        nonlocal calls
+        calls += 1
+        prepared = await real(*args, **kwargs)  # type: ignore[arg-type]
+        if calls == 1:
+            await r.applications._next_document(application.id)  # the other worker
+        return prepared
+
+    monkeypatch.setattr(retroactive, "prepare", overtaken)
+    await r.applications._next_document(application.id)
+    await run_jobs(r)
+
+    assert (await r.stored(invoice)).tag_ids == {tax.id}
+    for item in others:
+        assert (await r.stored(item)).tag_ids == set()
+    done = await r.applications.get(owner.id, application.id)
+    assert (done.status, done.applied) == (ApplicationStatus.DONE, 1)
 
 
 async def test_an_unexpected_error_ends_the_application(world: World) -> None:
