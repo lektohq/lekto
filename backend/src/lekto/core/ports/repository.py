@@ -17,7 +17,7 @@ Common rules for every adapter:
 - `get` raises NotFoundError, `find` returns None.
 """
 
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -161,6 +161,17 @@ class FieldDefinitionRepository(NamedRepository[FieldId, FieldDefinition], Proto
 type TagSets = tuple[frozenset[TagId], ...]
 
 
+def each_tag(tags: Iterable[TagId]) -> TagSets:
+    """Each tag a set of its own, each once: a document carries all of them."""
+    return tuple(frozenset({tag}) for tag in dict.fromkeys(tags))
+
+
+def any_group(groups: Iterable[TagId]) -> TagSets:
+    """The groups one set: a document's contact or type is in one of them."""
+    chosen = frozenset(groups)
+    return (chosen,) if chosen else ()
+
+
 @dataclass(frozen=True, kw_only=True)
 class DocumentFilter:
     """Criteria for listing documents; all given ones must match.
@@ -195,6 +206,37 @@ class DocumentFilter:
     document_dates: Period | None = None
     facts: tuple[FactCriterion, ...] = ()
     ids: frozenset[str] | None = None
+
+    @classmethod
+    def chosen(
+        cls,
+        *,
+        contacts: Iterable[ContactId] = (),
+        document_types: Iterable[DocumentTypeId] = (),
+        tags: Iterable[TagId] = (),
+        contact_groups: Iterable[TagId] = (),
+        document_type_groups: Iterable[TagId] = (),
+        topics: Iterable[TagId] = (),
+        spaces: Iterable[SpaceId] = (),
+        field: FieldId | None = None,
+        document_dates: Period | None = None,
+        facts: Iterable[FactCriterion] = (),
+    ) -> "DocumentFilter":
+        """The filter of what a person chose in a list of documents (a lens, the REST list,
+        MCP): several contacts, types, topics, spaces or groups of a kind, one of them; each
+        tag a set of its own, all of them; a kind none of which is chosen, any (SB-12)."""
+        return cls(
+            contacts=frozenset(contacts) or None,
+            document_types=frozenset(document_types) or None,
+            tags=each_tag(tags),
+            contact_groups=any_group(contact_groups),
+            document_type_groups=any_group(document_type_groups),
+            topics=frozenset(topics) or None,
+            spaces=frozenset(spaces) or None,
+            field=field,
+            document_dates=document_dates,
+            facts=tuple(dict.fromkeys(facts)),
+        )
 
     def __post_init__(self) -> None:
         for sets in (self.tags, self.contact_groups, self.document_type_groups):

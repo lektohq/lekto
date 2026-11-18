@@ -16,6 +16,7 @@ from lekto.core.domain.lenses import (
     RelativePeriod,
 )
 from lekto.core.domain.periods import Period
+from lekto.core.ports.repository import DocumentFilter
 from tests.builders import HOUR, NOW
 
 FIELD = FieldId(new_id())
@@ -116,3 +117,29 @@ def test_a_relative_period_as_the_web_ui_reckons_it(
     period: RelativePeriod, today: date, days: Period
 ) -> None:
     assert period.period(today) == days
+
+
+def test_a_period_between_two_days_may_stay_open_at_either_end() -> None:
+    """As the lists take a document date from and to (SB-12)."""
+    assert Period.between(None, None) is None
+    assert Period.between(date(2026, 1, 1), None) == Period(date(2026, 1, 1), date.max)
+    assert Period.between(None, date(2026, 1, 31)) == Period(date.min, date(2026, 1, 31))
+    with pytest.raises(ValidationError):
+        Period.between(date(2026, 2, 1), date(2026, 1, 31))
+
+
+def test_a_filter_is_built_alike_from_what_a_person_chose() -> None:
+    """Each tag a set of its own, groups one set, a kind none of which is chosen any: for a
+    lens, the REST list and MCP alike (SB-12)."""
+    first, second, group = TagId(new_id()), TagId(new_id()), TagId(new_id())
+    chosen = DocumentFilter.chosen(
+        tags=[first, second, first], contact_groups=[group], topics=[first]
+    )
+    assert chosen.tags == (frozenset({first}), frozenset({second}))
+    assert chosen.contact_groups == (frozenset({group}),)
+    assert (chosen.topics, chosen.contacts, chosen.document_type_groups) == (
+        frozenset({first}),
+        None,
+        (),
+    )
+    assert DocumentFilter.chosen() == DocumentFilter()

@@ -22,7 +22,7 @@ from lekto.core.domain.fields import FieldType
 from lekto.core.domain.ids import FieldId, LensId, UserId, short_id
 from lekto.core.domain.lenses import MAX_FILTER_VALUES, MAX_QUERY_LENGTH
 from lekto.core.domain.periods import Period
-from lekto.core.ports.repository import DocumentFilter
+from lekto.core.ports.repository import DocumentFilter, each_tag
 
 LIST_SIZE = 20
 """Documents one list returns unless the client asks for more."""
@@ -100,13 +100,13 @@ def add_listing_tools(tools: Tools, context: ApiContext) -> None:
             chosen = frozenset({names.find_document_type(document_type)})
             filter = replace(filter, document_types=chosen)
         if tags:
-            filter = replace(filter, tags=tuple(frozenset({names.find_tag(t)}) for t in tags))
+            filter = replace(filter, tags=each_tag(names.find_tag(t) for t in tags))
         if topics:
             filter = replace(filter, topics=frozenset(names.find_topic(t) for t in topics))
         if lane is not None:
             filter = replace(filter, lanes=frozenset({LANES[LaneFilter(lane)]}))
         if document_date_from is not None or document_date_to is not None:
-            period = Period(document_date_from or date.min, document_date_to or date.max)
+            period = Period.between(document_date_from, document_date_to)
             filter = replace(filter, document_dates=period)
         words = query or words
         if group_by is not None or sum is not None:

@@ -48,6 +48,14 @@ class Period:
         return f"{self.start.isoformat()}/{self.end.isoformat()}"
 
     @classmethod
+    def between(cls, start: date | None, end: date | None) -> Self | None:
+        """The days from `start` to `end`, both included, either end open (from the first day
+        or to the last there is); None with both open (SB-12)."""
+        if start is None and end is None:
+            return None
+        return cls(start or date.min, end or date.max)
+
+    @classmethod
     def day(cls, day: date) -> Self:
         return cls(day, day)
 

@@ -10,13 +10,12 @@ events.
 
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
-from datetime import date
 from uuid import UUID
 
 from lekto.core.domain.changes import UNSET
 from lekto.core.domain.errors import ConflictError, NotFoundError, ValidationError
 from lekto.core.domain.fields import SORTABLE_TYPES, FieldDefinition, FieldType
-from lekto.core.domain.ids import FieldId, LensId, TagId, UserId
+from lekto.core.domain.ids import FieldId, LensId, UserId
 from lekto.core.domain.lenses import Grouping, Lens, LensChanges
 from lekto.core.domain.periods import Period
 from lekto.core.domain.reasons import ReasonCode, because
@@ -52,20 +51,17 @@ class LensService:
         """The filter of the documents list that `lens` holds, as of today in UTC (the web UI
         reckons a relative period in the viewer's time zone); its words are `lens.query`."""
         chosen = lens.filter
+        period = Period.between(chosen.date_from, chosen.date_to)
         if chosen.relative_period is not None:
             period = chosen.relative_period.period(self._clock.now().date())
-        elif chosen.date_from is None and chosen.date_to is None:
-            period = None
-        else:
-            period = Period(chosen.date_from or date.min, chosen.date_to or date.max)
-        return DocumentFilter(
-            contacts=frozenset(chosen.contact_ids) or None,
-            document_types=frozenset(chosen.document_type_ids) or None,
-            tags=tuple(frozenset({tag}) for tag in chosen.tag_ids),
-            contact_groups=_either(chosen.contact_group_ids),
-            document_type_groups=_either(chosen.document_type_group_ids),
-            topics=frozenset(chosen.topic_ids) or None,
-            spaces=frozenset(chosen.space_ids) or None,
+        return DocumentFilter.chosen(
+            contacts=chosen.contact_ids,
+            document_types=chosen.document_type_ids,
+            tags=chosen.tag_ids,
+            contact_groups=chosen.contact_group_ids,
+            document_type_groups=chosen.document_type_group_ids,
+            topics=chosen.topic_ids,
+            spaces=chosen.space_ids,
             field=chosen.field_id,
             document_dates=period,
             facts=chosen.facts,
@@ -221,8 +217,3 @@ async def _existing(uow: UnitOfWork, user: User) -> _Existing:
         fields=await field_definitions(uow),
         admin=user.is_active_admin,
     )
-
-
-def _either(groups: tuple[TagId, ...]) -> tuple[frozenset[TagId], ...]:
-    """Groups of a lens as a filter takes them: one set, any of them."""
-    return (frozenset(groups),) if groups else ()
