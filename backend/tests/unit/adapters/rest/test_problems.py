@@ -1,20 +1,31 @@
 """Every domain error a request can raise answers with a status of its own, not 500 (M13 review
 A-06)."""
 
+import importlib
+import pkgutil
 from uuid import UUID, uuid4
 
 import httpx2
 
+import lekto.adapters
+import lekto.core
 from lekto.adapters.inbound.rest import PREFIX
 from lekto.adapters.inbound.rest.problems import NOT_FROM_REQUESTS, STATUSES
 from lekto.adapters.inbound.schemas import MAX_POSITION
-from lekto.core.domain import errors
 from lekto.core.domain.errors import DomainError
+from lekto.core.domain.users import UserDeletionBlockedError
+from lekto.core.ports.mail_server import MailServerError
 from tests.api import auth
 from tests.unit.adapters.rest.support import Api, post, upload
 
 
 def _domain_errors() -> set[type[DomainError]]:
+    """Every domain error of Lekto, wherever it is defined: the core and the adapters are
+    imported first (the migrations aside, which run on import)."""
+    for package in (lekto.core, lekto.adapters):
+        for info in pkgutil.walk_packages(package.__path__, f"{package.__name__}."):
+            if ".migrations" not in info.name:
+                importlib.import_module(info.name)
     found: set[type[DomainError]] = set()
     stack: list[type[DomainError]] = [DomainError]
     while stack:
@@ -22,16 +33,14 @@ def _domain_errors() -> set[type[DomainError]]:
             if kind not in found:
                 found.add(kind)
                 stack.append(kind)
-    return found
+    return {kind for kind in found if kind.__module__.startswith("lekto.")}
 
 
 def test_every_domain_error_has_a_status_or_never_reaches_a_route() -> None:
-    every = {
-        kind
-        for kind in vars(errors).values()
-        if isinstance(kind, type) and issubclass(kind, DomainError) and kind is not DomainError
-    }
-    assert every <= _domain_errors()
+    """Not only those of `errors.py`: one defined in a port or an adapter reaches a route as
+    well (TC-01)."""
+    every = _domain_errors()
+    assert {MailServerError, UserDeletionBlockedError} <= every
     mapped = [kind for kind, _ in STATUSES]
     unmapped = {
         kind

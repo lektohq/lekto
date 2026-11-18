@@ -51,6 +51,7 @@ from lekto.core.domain.errors import (
 )
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.users import UserDeletionBlockedError
+from lekto.core.ports.mail_server import MailServerError
 
 __all__ = [
     "NOT_FROM_REQUESTS",
@@ -158,6 +159,7 @@ NOT_FROM_REQUESTS: frozenset[type[DomainError]] = frozenset(
         LogoFetchError,  # fetching in the worker: the contact keeps no logo
         PatternTimeoutError,  # the rules skip the pattern and note it
         MissingValueError,  # a template's: the rules skip the action and note it
+        MailServerError,  # the mailbox test and the intake report it with its reason (TC-01)
     }
 )
 """Domain errors no request lets through: the services catch them, or they arise in the worker
