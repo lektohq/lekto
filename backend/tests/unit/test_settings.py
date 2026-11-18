@@ -7,8 +7,9 @@ from typing import Annotated, Literal, Union, get_args, get_origin
 
 import annotated_types
 import pytest
-from pydantic import ByteSize, SecretStr
+from pydantic import ByteSize, SecretStr, TypeAdapter
 from pydantic.fields import FieldInfo
+from pydantic_core import PydanticUndefined
 
 from lekto.adapters.outbound.webpush.sender import new_private_key
 from lekto.composition.errors import ConfigurationError
@@ -850,6 +851,24 @@ def test_the_values_column_names_what_a_setting_takes(name: str) -> None:
         assert expected in values, f"{ENV_PREFIX + name.upper()}: {expected!r} not in {values!r}"
     if "*secret*" not in _expected_values(name):
         assert "*secret*" not in values, f"{ENV_PREFIX + name.upper()} is no secret"
+
+
+@pytest.mark.parametrize("name", sorted(Settings.model_fields))
+def test_the_default_column_names_the_default(name: str) -> None:
+    """The column Default in docs/configuration.md: its first value, read as the variable would
+    be, is the setting's default; a dash or *required* where there is none (TC-02)."""
+    variable = ENV_PREFIX + name.upper()
+    cell = _documented()[variable][1]
+    field = Settings.model_fields[name]
+    default = field.get_default(call_default_factory=True)
+    if default is None or default is PydanticUndefined:
+        assert cell.startswith((DASH, "required")), f"{variable} has no default: {cell!r}"
+        return
+    written = re.match(r"`([^`]*)`", cell)
+    assert written is not None, f"{variable}: no default in {cell!r}"
+    kind = Annotated[field.annotation, *field.metadata] if field.metadata else field.annotation
+    value: object = TypeAdapter(kind).validate_strings(written[1])
+    assert value == default, f"{variable}: {cell!r} is not the default {default!r}"
 
 
 def test_renamed_variables_are_refused_with_their_new_name(monkeypatch: pytest.MonkeyPatch) -> None:
