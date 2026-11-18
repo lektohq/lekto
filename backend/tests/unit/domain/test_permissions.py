@@ -7,7 +7,6 @@ from lekto.core.domain.permissions import (
     can_file_into,
     can_hand_over,
     can_manage_space,
-    can_move_document,
     can_read_document,
     document_access,
     in_reach,
@@ -149,15 +148,23 @@ def test_moving_needs_edit_rights_on_both_spaces_or_hands_over(
     own = builders.personal_space(editor)
     theirs = builders.personal_space(stranger)
     read_only = builders.space(stranger, readers=[editor])
-    assert can_move_document(editor, document, shared, own)
-    assert can_move_document(editor, document, shared, theirs)  # handing over
+
+    # As `_moves.move_target` and the services ask: edit the document, and file into the
+    # target or hand it over (DB-08).
+    def may_move(user: User, target: Space) -> bool:
+        return can_edit_document(user, document, shared) and (
+            can_file_into(user, target) or can_hand_over(user, target)
+        )
+
+    assert may_move(editor, own)
+    assert may_move(editor, theirs)  # handing over
     assert can_hand_over(editor, theirs)
     assert not can_hand_over(editor, own)  # their own: they edit it anyway
     assert not can_hand_over(editor, read_only)
-    assert not can_move_document(editor, document, shared, read_only)
-    assert not can_move_document(reader, document, shared, builders.personal_space(reader))
-    assert not can_move_document(stranger, document, shared, theirs)
-    assert can_move_document(builders.admin(), document, shared, read_only)
+    assert not may_move(editor, read_only)
+    assert not may_move(reader, builders.personal_space(reader))
+    assert not may_move(stranger, theirs)
+    assert may_move(builders.admin(), read_only)
 
 
 @pytest.mark.parametrize(

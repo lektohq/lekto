@@ -138,13 +138,6 @@ def can_hand_over(user: User, space: Space) -> bool:
     return user.active and space.personal_of is not None and space.personal_of != user.id
 
 
-def can_move_document(user: User, document: Document, source: Space, target: Space) -> bool:
-    """Move `document` out of `source`, the space it lies in, into `target`."""
-    if not can_edit_document(user, document, source):
-        return False
-    return can_file_into(user, target) or can_hand_over(user, target)
-
-
 def can_manage_space(user: User, space: Space) -> bool:
     """Rename and delete a space, and choose the members of a shared one."""
     role = space_role(user, space)

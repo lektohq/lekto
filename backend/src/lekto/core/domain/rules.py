@@ -676,11 +676,6 @@ class RuleDefinition:
         )
 
     @property
-    def sends(self) -> tuple[SendWebhook, ...]:
-        """The webhooks the rule sends through, in order."""
-        return tuple(action for action in self.actions if isinstance(action, SendWebhook))
-
-    @property
     def asks(self) -> tuple[AskWebhook, ...]:
         """The steps that ask a webhook, in order."""
         return tuple(action for action in self.actions if isinstance(action, AskWebhook))

@@ -87,7 +87,6 @@ class MailMessage:
     sender: tuple[Address, ...]
     to: tuple[Address, ...]
     cc: tuple[Address, ...]
-    reply_to: tuple[Address, ...]
     subject: str
     date: datetime | None  # UTC
     message_id: str | None  # without angle brackets
@@ -172,7 +171,6 @@ def _read(message: EmailMessage, source: bytes | Callable[[], bytes], depth: int
         sender=_addresses(message, "From"),
         to=_addresses(message, "To"),
         cc=_addresses(message, "Cc"),
-        reply_to=_addresses(message, "Reply-To"),
         subject=_header(message, "Subject"),
         date=_date(message),
         message_id=_bare(_header(message, "Message-ID")) or None,

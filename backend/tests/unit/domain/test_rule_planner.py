@@ -140,7 +140,7 @@ def test_same_value_from_two_rules_is_set() -> None:
         [Effect("contact", None, str(ACME))],
     ]
     assert check(result, "contact").outcome is Outcome.OK
-    assert not result.uncertain
+    assert not result.reasons
 
 
 def test_different_values_conflict_whatever_the_priority() -> None:
@@ -153,7 +153,7 @@ def test_different_values_conflict_whatever_the_priority() -> None:
     contact = check(result, "contact")
     assert contact.outcome is Outcome.UNCERTAIN
     assert contact.suggestion == str(ACME)
-    assert result.uncertain
+    assert result.reasons
     assert result.reasons[0].text.startswith("contact: rules set different values")
 
 
@@ -210,7 +210,7 @@ def test_person_decided_field_overrules_the_rule() -> None:
     assert result.changes.contact_id is UNSET
     assert notes(result) == [("contact", "overruled")]
     assert result.checks == []
-    assert not result.uncertain
+    assert not result.reasons
 
 
 def test_person_decided_field_is_not_yellow_even_if_rules_disagree() -> None:
@@ -220,7 +220,7 @@ def test_person_decided_field_is_not_yellow_even_if_rules_disagree() -> None:
     )
 
     assert notes(result) == [("contact", "conflict"), ("contact", "conflict")]
-    assert not result.uncertain
+    assert not result.reasons
 
 
 def test_rule_does_not_replace_an_unconfirmed_model_value() -> None:
@@ -268,7 +268,7 @@ def test_tags_of_several_rules_are_combined() -> None:
     )
 
     assert result.changes.tag_ids == frozenset({PAID, URGENT})
-    assert not result.uncertain
+    assert not result.reasons
 
 
 def test_tag_added_and_removed_is_a_conflict() -> None:
@@ -289,7 +289,7 @@ def test_removing_a_model_tag_is_no_conflict() -> None:
 
     assert result.changes.tag_ids == frozenset({OPEN})
     assert result.reports[0].applied == [Effect("tags", str(PAID), None)]
-    assert not result.uncertain
+    assert not result.reasons
 
 
 def test_tags_a_person_set_or_removed_are_kept() -> None:
@@ -304,7 +304,7 @@ def test_tags_a_person_set_or_removed_are_kept() -> None:
 
     assert result.changes.tag_ids is UNSET
     assert notes(result) == [("tags", "overruled"), ("tags", "overruled")]
-    assert not result.uncertain
+    assert not result.reasons
 
 
 def test_tags_already_as_wanted_change_nothing() -> None:
@@ -337,7 +337,7 @@ def test_unconfirmed_contact_does_not_file_into_a_shared_space() -> None:
     contact = check(result, "contact")
     assert contact.outcome is Outcome.UNCERTAIN
     assert contact.suggestion == str(ACME)
-    assert result.uncertain
+    assert result.reasons
 
 
 def test_unconfirmed_contact_may_file_into_the_owners_own_space() -> None:
@@ -349,7 +349,7 @@ def test_unconfirmed_contact_may_file_into_the_owners_own_space() -> None:
 
     assert result.space == OWN
     assert result.reports[0].applied == [Effect("space", str(DEFAULT), str(OWN))]
-    assert not result.uncertain
+    assert not result.reasons
 
 
 def test_confirmed_contact_files_into_a_shared_space() -> None:
@@ -369,7 +369,7 @@ def test_unconfirmed_contact_on_change_is_reported_only() -> None:
 
     assert result.space is None
     assert notes(result) == [("space", "refused")]
-    assert not result.uncertain
+    assert not result.reasons
 
 
 def test_retroactive_filing_on_unconfirmed_values_is_a_conflict() -> None:
@@ -397,7 +397,7 @@ def test_no_write_access_to_the_space() -> None:
     assert ingest.space is None and change.space is None
     assert notes(ingest) == notes(change) == [("space", "refused")]
     assert check(ingest, "space").outcome is Outcome.UNCERTAIN
-    assert not change.uncertain
+    assert not change.reasons
 
 
 def test_a_rule_of_another_space_does_not_move_the_document() -> None:
@@ -447,7 +447,7 @@ def test_deleted_space_is_skipped() -> None:
 
     assert result.space is None
     assert notes(result) == [("space", "skipped")]
-    assert not result.uncertain
+    assert not result.reasons
 
 
 def test_rules_filing_into_different_spaces_conflict() -> None:
@@ -528,7 +528,7 @@ def test_forced_review_on_arrival() -> None:
     result = run([rule(ForceReview("check the IBAN"), name="Bank")], situation(doc()))
 
     assert texts(result.reviews) == ["rule 'Bank': check the IBAN"]
-    assert result.uncertain
+    assert result.reasons
     assert texts(result.reasons) == [
         "review: rule 'Bank': check the IBAN",
         "rule 'Bank': check the IBAN",
@@ -542,7 +542,7 @@ def test_forced_review_after_a_person_confirmed_it() -> None:
 
     assert texts(result.reviews) == [f"rule '{other.definition.name}': new"]
     assert notes(result) == [("review", "overruled"), ("review", "review")]
-    assert result.uncertain
+    assert result.reasons
 
 
 @pytest.mark.parametrize("mode", [Mode.CHANGE, Mode.RETROACTIVE])
@@ -551,7 +551,7 @@ def test_forced_review_only_on_arrival(mode: Mode) -> None:
 
     assert texts(result.reviews) == []
     assert notes(result) == [("review", "skipped")]
-    assert not result.uncertain
+    assert not result.reasons
 
 
 def test_change_turns_nothing_yellow() -> None:
@@ -577,7 +577,7 @@ def test_change_turns_nothing_yellow() -> None:
     assert ("document_type", "conflict") in notes(result)
     assert ("tags", "conflict") in notes(result)
     assert result.checks == []
-    assert not result.uncertain
+    assert not result.reasons
 
 
 def test_retroactive_conflict_with_an_existing_value() -> None:
@@ -593,7 +593,7 @@ def test_retroactive_conflict_with_an_existing_value() -> None:
     assert notes(refused) == [("contact", "conflict")]
     assert "not accepted" in refused.reports[0].notes[0].reason.text
     assert empty.changes.contact_id == ACME
-    assert not refused.uncertain and refused.checks == []
+    assert not refused.reasons and refused.checks == []
 
 
 def test_retroactive_personal_space_and_file_name_title_count_as_empty() -> None:
