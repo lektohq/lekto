@@ -24,6 +24,7 @@ from functools import cached_property, partial
 
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.mail_traits import Importance, importance_of
+from lekto.core.domain.pixels import pixels
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.validation import MAX_NAME, clean_filename, without_control
 
@@ -80,6 +81,12 @@ class MailPart:
     data: bytes
     content_id: str | None = None
     inline: bool = False
+
+    @cached_property
+    def pixels(self) -> tuple[int, int] | None:
+        """Width and height of an image, as its head says (`pixels.pixels`); None for another
+        file or a head that does not say."""
+        return pixels(self.data)
 
 
 @dataclass(frozen=True, kw_only=True)

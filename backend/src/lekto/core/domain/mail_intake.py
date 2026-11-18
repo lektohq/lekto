@@ -43,6 +43,9 @@ def mail_limit(upload_max: int) -> int:
 
 SMALL_IMAGE = 20 * 1024
 """An image smaller than this (bytes) is a logo or a signature: left out without a word."""
+SMALL_EDGE = 300
+"""So is one whose longer edge has fewer pixels than this, whatever its bytes
+([[mail-intake]]: "unter etwa 20 KB oder 300 px"; DB-09)."""
 
 
 @dataclass(frozen=True)
@@ -70,8 +73,14 @@ def readable(part: MailPart) -> bool:
 
 
 def kept(part: MailPart) -> bool:
-    """Not a small image (a logo, a signature)."""
-    return not (part.media_type.startswith("image/") and len(part.data) < SMALL_IMAGE)
+    """Not a small image (a logo, a signature): one of fewer than `SMALL_IMAGE` bytes, or
+    whose head names a longer edge of fewer than `SMALL_EDGE` pixels."""
+    if not part.media_type.startswith("image/"):
+        return True
+    if len(part.data) < SMALL_IMAGE:
+        return False
+    size = part.pixels
+    return size is None or max(size) >= SMALL_EDGE
 
 
 def letters(message: MailMessage) -> list[Letter]:
