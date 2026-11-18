@@ -19,6 +19,7 @@ from lekto.core.domain.ids import (
 )
 from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.master_data import TagScope
+from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.reasons import written
 from lekto.core.domain.rules import (
     MAX_ACTIONS,
@@ -29,7 +30,6 @@ from lekto.core.domain.rules import (
     MAX_TEXT,
     Action,
     AddTags,
-    ApplicationStatus,
     Condition,
     ConditionField,
     ForceReview,
@@ -789,7 +789,7 @@ def application(
 def test_application_progress() -> None:
     a, b, c, d = (DocumentId(new_id()) for _ in range(4))
     run = application(a, b, c, d, accept=frozenset({b}))
-    assert (run.status, run.remaining) == (ApplicationStatus.QUEUED, (a, b, c, d))
+    assert (run.status, run.remaining) == (ProgressStatus.QUEUED, (a, b, c, d))
 
     run.record_applied()
     run.record_unchanged()
@@ -797,14 +797,14 @@ def test_application_progress() -> None:
 
     assert (run.position, run.applied, run.unchanged) == (3, 1, 1)
     assert run.skipped == [(c, written("the space is read-only"))]
-    assert (run.status, run.remaining) == (ApplicationStatus.RUNNING, (d,))
+    assert (run.status, run.remaining) == (ProgressStatus.RUNNING, (d,))
 
     run.record_applied()
     later = NOW + timedelta(minutes=1)
     run.finish(later)
 
     assert not run.remaining
-    assert (run.status, run.error, run.finished_at) == (ApplicationStatus.DONE, None, later)
+    assert (run.status, run.error, run.finished_at) == (ProgressStatus.DONE, None, later)
 
 
 def test_application_fails_with_error() -> None:
@@ -812,7 +812,7 @@ def test_application_fails_with_error() -> None:
 
     run.finish(NOW, error="database gone")
 
-    assert run.status is ApplicationStatus.FAILED
+    assert run.status is ProgressStatus.FAILED
     assert run.error == "database gone"
 
 

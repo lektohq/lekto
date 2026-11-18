@@ -3344,11 +3344,6 @@ export interface components {
 			not: boolean;
 		};
 		/**
-		 * ApplicationStatus
-		 * @enum {string}
-		 */
-		ApplicationStatus: 'queued' | 'running' | 'done' | 'failed';
-		/**
 		 * ApplyOutcomeOut
 		 * @description Where applying the rule leaves the document.
 		 */
@@ -3746,7 +3741,7 @@ export interface components {
 			 */
 			id: string;
 			kind: components['schemas']['BulkKind'];
-			status: components['schemas']['BulkStatus'];
+			status: components['schemas']['ProgressStatus'];
 			/**
 			 * Total
 			 * @description Selected documents.
@@ -3810,11 +3805,6 @@ export interface components {
 			q?: string | null;
 			action: components['schemas']['BulkActionIn'];
 		};
-		/**
-		 * BulkStatus
-		 * @enum {string}
-		 */
-		BulkStatus: 'queued' | 'running' | 'done' | 'failed';
 		/**
 		 * Cadence
 		 * @enum {string}
@@ -9276,6 +9266,11 @@ export interface components {
 			declined_numbers?: components['schemas']['ContactNumberIn'][];
 		};
 		/**
+		 * ProgressStatus
+		 * @enum {string}
+		 */
+		ProgressStatus: 'queued' | 'running' | 'done' | 'failed';
+		/**
 		 * ProposeContext
 		 * @description `signal_llm`'s request (`external.propose`): the context to propose the document's
 		 *     metadata from. No prompt: the consumer makes its own. Lekto checks the answer as a
@@ -10190,7 +10185,7 @@ export interface components {
 			rule_id: string;
 			/** Version */
 			version: number;
-			status: components['schemas']['ApplicationStatus'];
+			status: components['schemas']['ProgressStatus'];
 			/**
 			 * Total
 			 * @description Selected documents.

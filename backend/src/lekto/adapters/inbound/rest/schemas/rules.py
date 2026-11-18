@@ -26,6 +26,7 @@ from lekto.adapters.inbound.schemas import (
 from lekto.core.domain.document_facts import FactRole
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.json_value import JsonValue
+from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.rules import (
     DEFAULT_PRIORITY,
@@ -38,7 +39,6 @@ from lekto.core.domain.rules import (
     MAX_STEP_PATH,
     MAX_TEXT,
     MIN_PRIORITY,
-    ApplicationStatus,
     ConditionField,
     Missing,
     Operator,
@@ -784,7 +784,7 @@ class RuleApplicationOut(BaseModel):
     id: UUID
     rule_id: UUID
     version: int
-    status: ApplicationStatus
+    status: ProgressStatus
     total: int = Field(description="Selected documents.")
     done: int = Field(description="Documents worked through so far.")
     applied: int

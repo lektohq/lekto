@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from lekto.core.domain.bulk import MAX_IDS, BulkAction, BulkKind, BulkStatus
+from lekto.core.domain.bulk import MAX_IDS, BulkAction, BulkKind
 from lekto.core.domain.documents import DocumentChanges
 from lekto.core.domain.errors import (
     NotFoundError,
@@ -22,6 +22,7 @@ from lekto.core.domain.ids import (
     new_id,
 )
 from lekto.core.domain.pipeline import Lane, Node
+from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.rules import ForceReview
 from lekto.core.domain.spaces import SpaceRole
@@ -105,12 +106,12 @@ async def test_tags_are_added_where_missing_and_the_others_are_skipped_with_why(
         Selection(ids=(first.id, tagged.id, read_only.id, busy.id, gone)),
         BulkAction(BulkKind.CHANGE_TAGS, add=frozenset({tax.id})),
     )
-    assert operation.status is BulkStatus.QUEUED
+    assert operation.status is ProgressStatus.QUEUED
     assert await builders.drain(bulk_service) == 1
 
     done = await bulk_service.get(owner.id, operation.id)
     assert (done.status, done.position, done.changed, done.unchanged) == (
-        BulkStatus.DONE,
+        ProgressStatus.DONE,
         5,
         1,
         1,
@@ -307,7 +308,7 @@ async def test_the_job_hands_back_after_a_batch_and_continues(
 
     assert await builders.drain(bulk_service) == 3
     done = await bulk_service.get(owner.id, operation.id)
-    assert (done.status, done.changed) == (BulkStatus.DONE, 5)
+    assert (done.status, done.changed) == (ProgressStatus.DONE, 5)
 
 
 async def test_a_deactivated_person_stops_the_operation(world: World) -> None:
@@ -322,7 +323,7 @@ async def test_a_deactivated_person_stops_the_operation(world: World) -> None:
 
     done = await bulk_service.get(r.admin.id, operation.id)
     assert (done.status, done.position, done.error) == (
-        BulkStatus.FAILED,
+        ProgressStatus.FAILED,
         0,
         "the user is no longer active",
     )

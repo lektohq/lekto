@@ -9,7 +9,7 @@ with its reason, and the others go on.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from typing import Self
@@ -30,8 +30,8 @@ from lekto.core.domain.ids import (
 )
 from lekto.core.domain.json_value import JsonObject, JsonValue, as_list, as_text
 from lekto.core.domain.pipeline import Node
-from lekto.core.domain.reasons import Reason, ReasonCode, because
-from lekto.core.domain.validation import require_utc
+from lekto.core.domain.progress import Progress
+from lekto.core.domain.reasons import ReasonCode, because
 
 MAX_DOCUMENTS = 10_000
 """Documents one action changes at most."""
@@ -134,43 +134,22 @@ class BulkAction:
         )
 
 
-class BulkStatus(StrEnum):
-    QUEUED = "queued"
-    RUNNING = "running"
-    DONE = "done"
-    FAILED = "failed"
-
-
 @dataclass(kw_only=True)
-class BulkOperation:
+class BulkOperation(Progress):
     """A person's action on the documents they selected, worked through in the background.
-    `position`: how many of `documents` are done; `changed` of them changed, `unchanged` were as
-    the action wants them already, `skipped` left as they were, each with why. `via`: the API
-    token the person started it through, kept with each change as with one by hand."""
+    `changed`: documents it changed; the rest as `Progress` counts them. `via`: the API token
+    the person started it through, kept with each change as with one by hand."""
 
     id: BulkOperationId
     user_id: UserId
     action: BulkAction
-    documents: tuple[DocumentId, ...]
     via: ViaToken | None = None
-    status: BulkStatus = BulkStatus.QUEUED
-    position: int = 0
     changed: int = 0
-    unchanged: int = 0
-    skipped: list[tuple[DocumentId, Reason]] = field(default_factory=list)
-    error: str | None = None
-    created_at: datetime
-    finished_at: datetime | None = None
-    version: int = 1
 
     def __post_init__(self) -> None:
-        if not self.documents:
-            raise ValidationError("select at least one document")
+        super().__post_init__()
         if len(self.documents) > MAX_DOCUMENTS:
             raise ValidationError(because(ReasonCode.BULK_TOO_MANY, max=MAX_DOCUMENTS))
-        if len(set(self.documents)) != len(self.documents):
-            raise ValidationError("a document is selected twice")
-        self.created_at = require_utc(self.created_at, "created_at")
 
     @classmethod
     def create(
@@ -191,31 +170,7 @@ class BulkOperation:
             created_at=now,
         )
 
-    @property
-    def remaining(self) -> tuple[DocumentId, ...]:
-        return self.documents[self.position :]
-
-    @property
-    def finished(self) -> bool:
-        return self.status in (BulkStatus.DONE, BulkStatus.FAILED)
-
     def record_changed(self) -> None:
+        """One more document done: the action changed it."""
         self.changed += 1
         self._next()
-
-    def record_unchanged(self) -> None:
-        self.unchanged += 1
-        self._next()
-
-    def record_skipped(self, document: DocumentId, reason: Reason) -> None:
-        self.skipped.append((document, reason))
-        self._next()
-
-    def _next(self) -> None:
-        self.position += 1
-        self.status = BulkStatus.RUNNING
-
-    def finish(self, now: datetime, error: str | None = None) -> None:
-        self.status = BulkStatus.FAILED if error else BulkStatus.DONE
-        self.error = error
-        self.finished_at = require_utc(now, "finished_at")

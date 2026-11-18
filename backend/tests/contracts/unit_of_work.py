@@ -9,7 +9,7 @@ from uuid import UUID
 import pytest
 
 from lekto.core.domain.appearance import ContactLogo, FailedLogoFetch, LogoSource
-from lekto.core.domain.bulk import BulkAction, BulkKind, BulkOperation, BulkStatus
+from lekto.core.domain.bulk import BulkAction, BulkKind, BulkOperation
 from lekto.core.domain.classifier import ClassifierModel
 from lekto.core.domain.document_facts import (
     DocumentFact,
@@ -56,6 +56,7 @@ from lekto.core.domain.pipeline import (
     ProcessingStatus,
 )
 from lekto.core.domain.profiles import Profile
+from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.reasons import ReasonCode, because, written
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState
 from lekto.core.domain.rules import (
@@ -2526,7 +2527,7 @@ class UnitOfWorkContract:
             assert (stored.action, stored.documents, stored.status, stored.via) == (
                 BulkAction(kind=BulkKind.CHANGE_TAGS, add=tags),
                 documents,
-                BulkStatus.QUEUED,
+                ProgressStatus.QUEUED,
                 builders.VIA,
             )
             stored.record_changed()
@@ -2535,7 +2536,7 @@ class UnitOfWorkContract:
             await uow.commit()
         async with uow_factory() as uow:
             again = await uow.bulk_operations.get(operation.id)
-            assert (again.position, again.changed, again.status) == (2, 1, BulkStatus.RUNNING)
+            assert (again.position, again.changed, again.status) == (2, 1, ProgressStatus.RUNNING)
             assert [(id, reason.code) for id, reason in again.skipped] == [
                 (documents[1], ReasonCode.NO_DOCUMENT_TEXT)
             ]

@@ -19,10 +19,10 @@ from lekto.core.domain.ids import (
     new_id,
 )
 from lekto.core.domain.master_data import DocumentType
+from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.reasons import ReasonCode, because, written
 from lekto.core.domain.rules import (
     AddTags,
-    ApplicationStatus,
     Condition,
     ConditionField,
     ForceReview,
@@ -635,7 +635,7 @@ class RuleRepositoriesContract:
         assert stored.via == VIA
         assert stored.documents == item.documents  # in the order selected
         assert stored.accept_conflicts == frozenset(item.documents[:1])
-        assert (stored.status, stored.position, stored.skipped) == (ApplicationStatus.QUEUED, 0, [])
+        assert (stored.status, stored.position, stored.skipped) == (ProgressStatus.QUEUED, 0, [])
         assert (stored.rule_id, stored.rule_version, stored.user_id) == (rule.id, 1, owner.id)
         assert stored.remaining == item.documents
 
@@ -657,7 +657,7 @@ class RuleRepositoriesContract:
             stored = await uow.rule_applications.get(item.id)
         assert stored == running
         assert (stored.status, stored.position, stored.applied, stored.unchanged) == (
-            ApplicationStatus.RUNNING,
+            ProgressStatus.RUNNING,
             3,
             1,
             1,
@@ -674,7 +674,7 @@ class RuleRepositoriesContract:
             failed = await uow.rule_applications.get(item.id)
         assert failed == stored
         assert (failed.status, failed.error, failed.finished_at, failed.version) == (
-            ApplicationStatus.FAILED,
+            ProgressStatus.FAILED,
             "the rule was deleted",
             LATER,
             3,
@@ -690,7 +690,7 @@ class RuleRepositoriesContract:
         async with uow_factory() as uow:
             stored = await uow.rule_applications.get(item.id)
         assert stored == item
-        assert (stored.status, stored.error, stored.remaining) == (ApplicationStatus.DONE, None, ())
+        assert (stored.status, stored.error, stored.remaining) == (ProgressStatus.DONE, None, ())
 
     async def test_missing_applications(self, uow_factory: UnitOfWorkFactory) -> None:
         owner, owned = await owner_with_space(uow_factory)
@@ -723,7 +723,7 @@ class RuleRepositoriesContract:
                 await second.commit()
         async with uow_factory() as uow:
             stored = await uow.rule_applications.get(item.id)
-        assert (stored.status, stored.position, stored.version) == (ApplicationStatus.RUNNING, 1, 2)
+        assert (stored.status, stored.position, stored.version) == (ProgressStatus.RUNNING, 1, 2)
 
     async def test_application_reads_are_copies(self, uow_factory: UnitOfWorkFactory) -> None:
         owner, owned = await owner_with_space(uow_factory)

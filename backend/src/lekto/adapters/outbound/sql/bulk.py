@@ -7,10 +7,11 @@ from sqlalchemy import Row
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.repositories import SqlRepository, Values, via_columns
-from lekto.core.domain.bulk import BulkAction, BulkOperation, BulkStatus
+from lekto.core.domain.bulk import BulkAction, BulkOperation
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import BulkOperationId, DocumentId, UserId
 from lekto.core.domain.json_value import JsonValue
+from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.reasons import Reason
 
 
@@ -25,7 +26,7 @@ class SqlBulkOperationRepository(SqlRepository[BulkOperationId, BulkOperation]):
             action=BulkAction.from_json(row.action),
             documents=tuple(DocumentId(UUID(item)) for item in row.documents),
             via=ViaToken.stored(row.via_token_id, row.via_token_name),
-            status=BulkStatus(row.status),
+            status=ProgressStatus(row.status),
             position=row.position,
             changed=row.changed,
             unchanged=row.unchanged,

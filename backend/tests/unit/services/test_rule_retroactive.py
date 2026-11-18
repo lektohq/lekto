@@ -10,9 +10,9 @@ from lekto.core.domain.documents import DocumentChanges
 from lekto.core.domain.errors import NotFoundError, ValidationError
 from lekto.core.domain.ids import DocumentId, new_id
 from lekto.core.domain.pipeline import RULES_APPLY, Lane
+from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.rules import (
-    ApplicationStatus,
     Condition,
     ConditionField,
     ForceReview,
@@ -101,7 +101,7 @@ async def test_the_preview_lists_changes_and_the_job_applies_the_pinned_version(
 
     done = await r.applications.get(owner.id, application.id)
     assert (done.status, done.applied, done.unchanged, done.skipped) == (
-        ApplicationStatus.DONE,
+        ProgressStatus.DONE,
         3,
         0,
         [],
@@ -223,7 +223,7 @@ async def test_the_job_checks_the_rights_again_and_a_global_rule_moves_nothing(
     await run_jobs(r)
 
     done = await r.applications.get(editor.id, application.id)
-    assert (done.status, done.applied) == (ApplicationStatus.DONE, 1)
+    assert (done.status, done.applied) == (ProgressStatus.DONE, 1)
     assert done.skipped == [(in_shared.id, NOT_AVAILABLE), (private.id, NOT_AVAILABLE)]
     assert (await r.stored(in_shared)).tag_ids == set()
     assert (await r.stored(private)).tag_ids == set()
@@ -293,14 +293,14 @@ async def test_a_long_application_continues_in_a_new_job(world: World) -> None:
     assert await r.applications.run_next_job()
     progress = await r.applications.get(owner.id, application.id)
     assert (progress.status, progress.position, progress.finished_at) == (
-        ApplicationStatus.RUNNING,
+        ProgressStatus.RUNNING,
         BATCH,
         None,
     )
 
     assert await run_jobs(r) == 1
     done = await r.applications.get(owner.id, application.id)
-    assert (done.status, done.applied) == (ApplicationStatus.DONE, BATCH + 1)
+    assert (done.status, done.applied) == (ProgressStatus.DONE, BATCH + 1)
     for document in documents:
         assert (await r.stored(document)).tag_ids == {tax.id}
 
@@ -317,7 +317,7 @@ async def test_an_application_ends_when_its_rule_is_deleted(world: World) -> Non
     await run_jobs(r)
 
     done = await r.applications.get(owner.id, application.id)
-    assert (done.status, done.error) == (ApplicationStatus.FAILED, "the rule or its user is gone")
+    assert (done.status, done.error) == (ProgressStatus.FAILED, "the rule or its user is gone")
     assert (await r.stored(document)).tag_ids == set()
     with pytest.raises(NotFoundError):
         await r.applications.preview(owner.id, rule.id)
@@ -384,7 +384,7 @@ async def test_a_worker_overtaken_applies_what_it_prepared_to_no_other_document(
     for item in others:
         assert (await r.stored(item)).tag_ids == set()
     done = await r.applications.get(owner.id, application.id)
-    assert (done.status, done.applied) == (ApplicationStatus.DONE, 1)
+    assert (done.status, done.applied) == (ProgressStatus.DONE, 1)
 
 
 async def test_the_text_is_read_for_the_rules_outside_the_event_loop(
@@ -502,7 +502,7 @@ async def test_an_unexpected_error_ends_the_application(world: World) -> None:
     assert await r.applications.run_next_job()
     assert not await r.applications.run_next_job()
     done = await r.applications.get(owner.id, application.id)
-    assert (done.status, done.error) == (ApplicationStatus.FAILED, "stopped by an internal error")
+    assert (done.status, done.error) == (ProgressStatus.FAILED, "stopped by an internal error")
     assert (await r.stored(document)).tag_ids == set()
 
 

@@ -26654,16 +26654,6 @@
         ],
         "title": "AnyGroup[MailConditionBody]"
       },
-      "ApplicationStatus": {
-        "type": "string",
-        "enum": [
-          "queued",
-          "running",
-          "done",
-          "failed"
-        ],
-        "title": "ApplicationStatus"
-      },
       "ApplyOutcomeOut": {
         "properties": {
           "space_id": {
@@ -27419,7 +27409,7 @@
             "$ref": "#/components/schemas/BulkKind"
           },
           "status": {
-            "$ref": "#/components/schemas/BulkStatus"
+            "$ref": "#/components/schemas/ProgressStatus"
           },
           "total": {
             "type": "integer",
@@ -27553,16 +27543,6 @@
             }
           }
         ]
-      },
-      "BulkStatus": {
-        "type": "string",
-        "enum": [
-          "queued",
-          "running",
-          "done",
-          "failed"
-        ],
-        "title": "BulkStatus"
       },
       "Cadence": {
         "type": "string",
@@ -38911,6 +38891,16 @@
           }
         ]
       },
+      "ProgressStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "done",
+          "failed"
+        ],
+        "title": "ProgressStatus"
+      },
       "ProposeContext": {
         "properties": {
           "contract": {
@@ -40213,7 +40203,7 @@
             "title": "Version"
           },
           "status": {
-            "$ref": "#/components/schemas/ApplicationStatus"
+            "$ref": "#/components/schemas/ProgressStatus"
           },
           "total": {
             "type": "integer",
