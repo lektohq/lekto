@@ -84,7 +84,16 @@ class Lekto:
                 continue
             if response.status_code >= 400:
                 raise _error(response)
-            return None if response.status_code == 204 else response.json()
+            if response.is_redirect:  # the client follows none: another address is meant
+                location = response.headers.get("location", "?")
+                raise ApiError(response.status_code, f"sent on to {location}: set that address")
+            if response.status_code == 204:
+                return None
+            try:
+                return response.json()
+            except ValueError:  # a proxy's page, say (MI-07)
+                kind = response.headers.get("content-type", "no content type")
+                raise ApiError(response.status_code, f"no JSON in the answer ({kind})") from None
         raise AssertionError("unreachable")
 
     async def _object(self, method: str, path: str, **arguments: Any) -> dict[str, Any]:

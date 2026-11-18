@@ -4,10 +4,12 @@ import asyncio
 import json
 import sqlite3
 from collections import Counter
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import httpx2
 import pytest
 
 from lekto_migration import plan as plans
@@ -81,6 +83,34 @@ async def test_a_plan_file_that_is_no_plan_stops_every_command_alike(
     for command in ("plan", "check"):
         assert await setup.run(command) == 2
         assert "migration-plan.yaml" in capsys.readouterr().err
+
+
+def answering(status: int, **response: Any) -> Callable[[], httpx2.MockTransport]:
+    return lambda: httpx2.MockTransport(lambda request: httpx2.Response(status, **response))
+
+
+async def test_an_answer_that_is_no_json_stops_with_a_word_not_a_traceback(
+    setup: Setup, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An address that is sent on (`http` to `https`) or a proxy's sign-in page: what went
+    wrong, exit 2 (MI-07)."""
+    real = setup.paperless.transport
+    page = {"text": "<html>Sign in</html>", "headers": {"content-type": "text/html"}}
+    for transport, said in (
+        (answering(301, headers={"location": "https://paperless.example/"}), "sent on to"),
+        (answering(200, **page), "no JSON in the answer (text/html)"),
+    ):
+        setup.paperless.transport = transport  # type: ignore[method-assign]
+        assert await setup.run("plan") == 2
+        assert said in capsys.readouterr().err
+    setup.paperless.transport = real  # type: ignore[method-assign]
+    for transport, said in (
+        (answering(308, headers={"location": "https://lekto.example/"}), "sent on to"),
+        (answering(200, **page), "no JSON in the answer (text/html)"),
+    ):
+        setup.lekto.transport = transport  # type: ignore[method-assign]
+        assert await setup.run("plan") == 2
+        assert said in capsys.readouterr().err
 
 
 async def test_a_plan_with_problems_is_reported(setup: Setup) -> None:
