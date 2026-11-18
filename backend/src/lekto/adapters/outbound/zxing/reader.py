@@ -129,8 +129,10 @@ def _render(document: pypdfium2.PdfDocument, index: int) -> Image.Image:
             page.close()
     # The pixels lie in a buffer of our own (`PdfBitmap.new_native`), so the copy into a PIL
     # image (about 17 MB for a page at 300 dpi) needs no PDFium call: outside the lock, where it
-    # does not hold up the other users of PDFium.
+    # does not hold up the other users of PDFium. Releasing the bitmap is one (AD-07).
     image: Image.Image = bitmap.to_pil().convert("L")
+    with LOCK:
+        bitmap.close()
     return image
 
 

@@ -141,6 +141,7 @@ def _pdf_pages(source: Path, width: int) -> Iterator[Iterator[Image.Image]]:
                         across, high = page.get_size()
                         bitmap = page.render(scale=page_scale(across, high, width))
                         image: Image.Image = bitmap.to_pil().convert("RGB")
+                        bitmap.close()  # a PDFium call: under the lock, not when collected
                     finally:
                         page.close()
             except pypdfium2.PdfiumError as error:
