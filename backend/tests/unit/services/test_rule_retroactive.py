@@ -153,6 +153,25 @@ async def test_the_dry_run_looks_only_at_documents_the_conditions_leave(
     assert [item.document.id for item in unfiltered.items] == [arrived["a1"]]
 
 
+async def test_a_dry_run_counts_only_the_documents_the_caller_may_edit(world: World) -> None:
+    """A global rule, applied by someone who only reads a shared space: its documents are
+    neither listed nor counted (SC-10)."""
+    r = await rule_world(world)
+    owner, reader = await world.user(), await world.user()
+    tax = await r.tag("tax")
+    shared = await world.spaces.create(owner.id, "Haushalt")
+    await world.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
+    for _ in range(3):
+        await r.arrive(owner, space=shared.id)
+    mine = await r.arrive(reader)
+    rule = await r.global_rule(definition("Tax", channel_api(), add_tags(tax.id)))
+
+    preview = await r.applications.preview(reader.id, rule.id)
+
+    assert [item.document.id for item in preview.items] == [mine.id]
+    assert (preview.looked_at, preview.total) == (1, 1)
+
+
 async def test_a_dry_run_whose_conditions_no_document_meets_looks_at_none(world: World) -> None:
     r = await rule_world(world)
     owner = await world.user()

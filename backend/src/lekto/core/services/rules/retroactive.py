@@ -242,14 +242,16 @@ class RuleApplicationService:
             wanted = prefilter(rule.definition.conditions, await tag_tree(uow), _looked_at(rule))
             if wanted is None:
                 return ApplyPreview(rule, (), None, 0, 0)
-            if user.is_active_admin:
-                documents = await uow.documents.query(wanted, after=_position(before), limit=SCAN)
-                total = await uow.documents.count(wanted, None)
-            else:
-                documents = await uow.documents.query_visible(
-                    actor, wanted, after=_position(before), limit=SCAN
-                )
-                total = await uow.documents.count(wanted, actor)
+            if not user.is_active_admin:
+                # Only the documents of the spaces the caller edits, one by one and in the
+                # counts alike: those they only read are not theirs to change (SC-10).
+                edited = frozenset(await edited_spaces(uow, user.id))
+                spaces = edited if wanted.spaces is None else wanted.spaces & edited
+                if not spaces:
+                    return ApplyPreview(rule, (), None, 0, 0)
+                wanted = replace(wanted, spaces=spaces)
+            documents = await uow.documents.query(wanted, after=_position(before), limit=SCAN)
+            total = await uow.documents.count(wanted, None)
         items: list[PreviewItem] = []
         next_cursor = documents[-1].id if len(documents) == SCAN else None
         budget = PatternBudget(PREVIEW_BUDGET)
