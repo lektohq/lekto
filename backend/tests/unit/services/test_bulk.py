@@ -196,6 +196,27 @@ async def test_a_selection_by_filter_takes_what_the_person_reaches(world: World)
         r.admin.id, Selection(all_users=True), BulkAction(BulkKind.CONFIRM)
     )
     assert len(everyone.documents) == 4
+    # With ids too, every user's documents are an admin's to name (RA-09).
+    with pytest.raises(PermissionDeniedError):
+        await bulk_service.start(
+            owner.id, Selection(ids=(mine[0].id,), all_users=True), BulkAction(BulkKind.CONFIRM)
+        )
+    named = await bulk_service.start(
+        r.admin.id, Selection(ids=(mine[0].id,), all_users=True), BulkAction(BulkKind.CONFIRM)
+    )
+    assert named.documents == (mine[0].id,)
+
+
+def test_a_selection_takes_ids_or_a_filter_and_words_not_both() -> None:
+    """Neither would be dropped silently (RA-09)."""
+    ids = (DocumentId(new_id()),)
+    for selection in (
+        {"text": "Rechnung"},
+        {"filter": DocumentFilter(lanes=frozenset({Lane.GREEN}))},
+    ):
+        with pytest.raises(ValidationError) as caught:
+            Selection(ids=ids, **selection)
+        assert caught.value.reason == because(ReasonCode.BULK_IDS_AND_FILTER)
 
 
 async def test_a_selection_is_bounded(world: World, monkeypatch: pytest.MonkeyPatch) -> None:

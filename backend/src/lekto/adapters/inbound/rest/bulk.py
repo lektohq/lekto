@@ -10,10 +10,7 @@ from lekto.adapters.inbound.rest.params import AllDocuments, Listed
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.bulk import BulkOperationOut, BulkRequest
 from lekto.core.domain.bulk import MAX_DOCUMENTS, MAX_IDS
-from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import BulkOperationId, DocumentId
-from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.ports.repository import DocumentFilter
 from lekto.core.ports.search_index import MAX_HITS
 from lekto.core.services.bulk import Selection
 
@@ -50,8 +47,6 @@ async def start_bulk(
     all_users: AllDocuments = False,
 ) -> BulkOperationOut:
     q = body.q
-    if body.document_ids is not None and (q is not None or filter != DocumentFilter()):
-        raise ValidationError(because(ReasonCode.BULK_IDS_AND_FILTER))
     operation = await context.bulk.start(
         user,
         Selection(

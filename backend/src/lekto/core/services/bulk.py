@@ -40,11 +40,11 @@ from lekto.core.domain.ids import BulkOperationId, DocumentId, UserId
 from lekto.core.domain.jobs import Job
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.pipeline import Lane
-from lekto.core.domain.reasons import Reason, ReasonCode, because
+from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.repository import PAGE_LIMIT, DocumentFilter
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
-from lekto.core.services._access import load_actor
+from lekto.core.services._access import load_actor, load_lister
 from lekto.core.services._jobs import LEASE, JobRunner, lost, reason_of
 from lekto.core.services.documents import DocumentService
 from lekto.core.services.pipeline import PipelineService
@@ -67,6 +67,11 @@ class Selection:
     filter: DocumentFilter = field(default_factory=DocumentFilter)
     text: str | None = None
     all_users: bool = False
+
+    def __post_init__(self) -> None:
+        """Ids or a filter and words, not both: neither would be dropped silently (RA-09)."""
+        if self.ids is not None and (self.text is not None or self.filter != DocumentFilter()):
+            raise ValidationError(because(ReasonCode.BULK_IDS_AND_FILTER))
 
 
 class BulkService:
@@ -128,6 +133,9 @@ class BulkService:
         if selection.ids is not None:
             if len(selection.ids) > MAX_IDS:
                 raise ValidationError(because(ReasonCode.BULK_TOO_MANY, max=MAX_IDS))
+            if selection.all_users:  # as a filter over every user's documents asks (RA-09)
+                async with self._uow() as uow:
+                    await load_lister(uow, actor, True, Action.LIST_ALL_DOCUMENTS)
             return tuple(dict.fromkeys(selection.ids))
         if selection.text is not None:
             return await self._hits(actor, selection)
