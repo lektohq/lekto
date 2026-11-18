@@ -172,12 +172,3 @@ async def load(
         outdated=outdated(plan, snapshot, directory),
         ours=ours,
     )
-
-
-def unmanaged(state: State) -> set[str]:
-    """Fields the alignment leaves alone: the notes field of migrations before the plan."""
-    return {
-        str(o["lekto_id"])
-        for o in state.objects("field")
-        if o["source_id"] == "notes" and o["lekto_id"] is not None
-    }

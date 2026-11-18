@@ -13,7 +13,7 @@ BASE: dict[str, Any] = {
     "document_date": "2024-03-31",
     "created_at": "2024-04-02T07:30:00+00:00",
     "tag_ids": ["tax"],
-    "fields": {"amount": {"amount": "84.20", "currency": "EUR"}, "notes": "old notes"},
+    "fields": {"amount": {"amount": "84.20", "currency": "EUR"}},
     "space_id": "default",
 }
 TYPES = {"amount": "amount", "count": "number", "notes": "text"}
@@ -30,7 +30,6 @@ def run(
         {**had, **(want or {})},
         parents=PARENTS,
         types=TYPES,
-        unmanaged={"notes"},
     )
 
 
@@ -109,14 +108,17 @@ def test_a_child_kept_alone_holds_its_parent_too() -> None:
     assert result.changes == {}
 
 
-def test_fields_change_by_value_and_unmanaged_ones_stay() -> None:
+def test_fields_change_by_value() -> None:
     result = run(want={"fields": {"amount": {"amount": "90", "currency": "EUR"}, "count": "3"}})
     assert result.changes == {
         "fields": {"amount": {"amount": "90", "currency": "EUR"}, "count": "3"}
     }
-    assert "notes" not in result.changes["fields"]  # the notes field of earlier migrations
-    same = run(now={"fields": {"amount": {"amount": "84.2", "currency": "EUR"}, "notes": "x"}})
+    same = run(now={"fields": {"amount": {"amount": "84.2", "currency": "EUR"}}})
     assert not same.needed
+    # A field named `notes` is aligned as any other: once the notes field of migrations before
+    # the plan, left alone then (MI-11).
+    notes = run(want={"fields": {"amount": {"amount": "84.2", "currency": "EUR"}, "notes": "x"}})
+    assert notes.changes == {"fields": {"notes": "x"}}
     dropped = run(want={"fields": {}})
     assert dropped.changes == {"fields": {"amount": None}}
     assert "amount" not in dropped.applied["fields"]

@@ -19,7 +19,7 @@ from lekto_migration.lekto import ApiError, Lekto
 from lekto_migration.masterdata import MISSING, visible_to
 from lekto_migration.paperless import Paperless, PaperlessError, checksum
 from lekto_migration.resolve import resolve, space_of
-from lekto_migration.session import Loaded, Progress, unmanaged
+from lekto_migration.session import Loaded, Progress
 from lekto_migration.state import DocumentRow, State
 
 MIGRATED = ("done", "duplicate", "uploaded")
@@ -180,7 +180,6 @@ class _Checker:
             str(tag["id"]): tag.get("parent_id") for tag in directory.tags["document"].values()
         }
         self._types = {str(f["id"]): str(f.get("data_type")) for f in directory.fields.values()}
-        self._unmanaged = unmanaged(state)
         self._state = state
 
     def new(self, item: Expected, row: DocumentRow | None) -> dict[str, Any]:
@@ -219,7 +218,6 @@ class _Checker:
             {**resolved.values, "space_id": space},
             parents=self._parents,
             types=self._types,
-            unmanaged=self._unmanaged,
         )
         status = "differs" if alignment.differences else "same"
         entry = _entry(item.id, item.title, status, row, item=item)

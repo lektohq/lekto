@@ -4,7 +4,7 @@ Lekto's log), what Lekto has now, and what the plan gives now. A value changes o
 Lekto still has the migration's; what a person or a rule changed since stays and is reported.
 Fields and tags the migration never set are not touched."""
 
-from collections.abc import Collection, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -85,11 +85,10 @@ def align(
     *,
     parents: Mapping[str, str | None],
     types: Mapping[str, str],
-    unmanaged: Collection[str] = (),
 ) -> Alignment:
     """What to change so that Lekto has the plan's values where it still has the migration's.
     `parents`: the tag above each tag (Lekto keeps a child set with its parent as the child
-    alone); `types`: the data type of each field; `unmanaged`: fields left alone."""
+    alone); `types`: the data type of each field."""
     result = Alignment(applied={**base, "fields": dict(base.get("fields") or {})})
     for key in SCALARS:
         wanted = want.get(key)
@@ -107,7 +106,7 @@ def align(
         else:
             result.differences.append(Difference(key, have, wanted, KEPT))
     _tags(base, now, want, parents, result)
-    _fields(base, now, want, types, unmanaged, result)
+    _fields(base, now, want, types, result)
     space, before, wanted_space = now.get("space_id"), base.get("space_id"), want.get("space_id")
     if wanted_space is not None and space == wanted_space:
         result.applied["space_id"] = wanted_space
@@ -149,7 +148,6 @@ def _fields(
     now: Mapping[str, Any],
     want: Mapping[str, Any],
     types: Mapping[str, str],
-    unmanaged: Collection[str],
     result: Alignment,
 ) -> None:
     have, had = now.get("fields") or {}, base.get("fields") or {}
@@ -157,8 +155,6 @@ def _fields(
     changes: dict[str, Any] = {}
     applied = result.applied["fields"]
     for field_id in sorted(set(wanted) | set(had)):
-        if field_id in unmanaged:
-            continue
         data_type = types.get(field_id, "text")
         value, before, target = have.get(field_id), had.get(field_id), wanted.get(field_id)
         if same_value(value, target, data_type):

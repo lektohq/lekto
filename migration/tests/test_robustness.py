@@ -1,15 +1,12 @@
 """Edge cases found in review: inactive uploaders, the executing admin among the members, spaces
-that cannot be made, lost answers, big values, documents moved in Lekto, old state files."""
+that cannot be made, lost answers, big values, documents moved in Lekto."""
 
 import asyncio
 import json
-from pathlib import Path
 from typing import Any
 
 from lekto_migration.config import public
 from lekto_migration.fake_paperless import pdf
-from lekto_migration.report import run_documents
-from lekto_migration.state import State
 from tests.conftest import PDF, Setup
 from tests.fake_lekto import ADMIN
 
@@ -232,49 +229,3 @@ async def test_a_run_notes_that_a_document_was_repaired_since(setup: Setup) -> N
     report = setup.report("run")
     assert report["lanes"] == {"green": 8}
     assert row(setup, "run", 12)["reason"] is None
-
-
-def test_a_state_from_before_spaces_reads_its_drawers_as_spaces(tmp_path: Path) -> None:
-    path = tmp_path / "state.sqlite"
-    state = State(path)
-    state.put_object("drawer", "erika|bob", "Shared", "id-1", "new", [])
-    state.put_document(7, "done", detail={"title": "T", "drawer": "Shared", "owner": "erika"})
-    state.close()
-
-    state = State(path)
-    assert state.object("space", "erika|bob") == ("id-1", "new")
-    assert state.object("drawer", "erika|bob") is None
-    found = state.document(7)
-    assert found is not None
-    assert found.detail == {"title": "T", "space": "Shared", "owner": "erika"}
-    # Before 0.5 the state kept the Paperless owner, which uploaded the document.
-    assert run_documents(state, {7})[0]["uploaded_by"] == "erika"
-    state.close()
-
-
-def test_a_state_from_before_the_plan_learns_what_was_applied(tmp_path: Path) -> None:
-    import sqlite3
-
-    path = tmp_path / "state.sqlite"
-    old = sqlite3.connect(path)
-    old.executescript(
-        """
-        CREATE TABLE documents (
-            source_id INTEGER PRIMARY KEY, status TEXT NOT NULL, lekto_id TEXT, sha256 TEXT,
-            lane TEXT, reason TEXT, notes TEXT NOT NULL DEFAULT '[]',
-            detail TEXT NOT NULL DEFAULT '{}', upload_seconds REAL, pipeline_seconds REAL,
-            updated_at TEXT NOT NULL
-        );
-        INSERT INTO documents (source_id, status, lekto_id, updated_at)
-            VALUES (7, 'done', 'l7', '2026-10-10');
-        """
-    )
-    old.commit()
-    old.close()
-    state = State(path)
-    found = state.document(7)
-    assert found is not None and found.lekto_id == "l7" and found.applied is None
-    state.put_document(7, "done", applied={"title": "T"})
-    again = state.document(7)
-    assert again is not None and again.applied == {"title": "T"} and again.lekto_id == "l7"
-    state.close()

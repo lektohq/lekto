@@ -24,7 +24,7 @@ from lekto_migration.lekto import ApiError, Lekto
 from lekto_migration.paperless import Paperless, PaperlessError
 from lekto_migration.plan import norm
 from lekto_migration.resolve import Resolved, resolve, space_of
-from lekto_migration.session import Loaded, MigrationError, Progress, unmanaged
+from lekto_migration.session import Loaded, MigrationError, Progress
 from lekto_migration.state import DOCUMENT_DONE, DocumentRow, State
 
 DONE_PIPELINE = ("completed", "failed", "review")
@@ -78,7 +78,6 @@ class Run:
             str(tag["id"]): tag.get("parent_id") for tag in directory.tags["document"].values()
         }
         self._types = {str(f["id"]): str(f.get("data_type")) for f in directory.fields.values()}
-        self._unmanaged = unmanaged(state)
         self._sleeping: list[tuple[str, str]] = []  # users woken for this run: deactivate again
 
     async def execute(self) -> Totals:
@@ -400,7 +399,6 @@ class Run:
             self._want(resolved),
             parents=self._parents,
             types=self._types,
-            unmanaged=self._unmanaged,
         )
         if alignment.changes:
             await self._target.align(lekto_id, alignment.changes)

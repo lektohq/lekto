@@ -352,6 +352,19 @@ async def test_a_member_taken_out_of_a_migration_space_stays_out(setup: Setup) -
     assert bob["id"] not in {m["user_id"] for m in space["members"]}
 
 
+async def test_a_field_named_notes_is_aligned_as_any_other(setup: Setup) -> None:
+    """Once the notes field of migrations before the plan, which the alignment left alone: a
+    field the plan names `notes` kept its values after `drop` (MI-11)."""
+    assert await setup.run("plan") == 0
+    setup.edit("custom_fields", "Text", "{to: field, name: notes, create: true}")
+    assert await setup.migrate() == 0
+    notes = named(setup.lekto.fields, "notes")
+    assert by_title(setup, "Document 10")["fields"][notes["id"]] == "Hello"
+    setup.edit("custom_fields", "Text", "drop")
+    assert await setup.run("run") == 0
+    assert notes["id"] not in by_title(setup, "Document 10")["fields"]
+
+
 async def test_a_changed_plan_aligns_what_was_migrated(setup: Setup) -> None:
     assert await setup.migrate() == 0
     setup.edit("tags", "tax", "[{to: topic, name: Taxes, create: true}, {to: tag, name: tax}]")
