@@ -17,13 +17,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from lekto_migration.align import KEPT, Alignment, align, current, foreign, uploaded
+from lekto_migration.align import KEPT, Alignment
+from lekto_migration.basis import Basis
 from lekto_migration.config import Config
 from lekto_migration.expect import Expected
 from lekto_migration.lekto import ApiError, Lekto
 from lekto_migration.paperless import Paperless, PaperlessError
 from lekto_migration.plan import norm
-from lekto_migration.resolve import Resolved, resolve, space_of
+from lekto_migration.resolve import Resolved, resolve
 from lekto_migration.session import Loaded, MigrationError, Progress
 from lekto_migration.state import DOCUMENT_DONE, DocumentRow, State
 
@@ -73,11 +74,7 @@ class Run:
         self._sleep = sleep
         self._poll = poll
         self.totals = Totals()
-        directory = loaded.directory
-        self._parents = {
-            str(tag["id"]): tag.get("parent_id") for tag in directory.tags["document"].values()
-        }
-        self._types = {str(f["id"]): str(f.get("data_type")) for f in directory.fields.values()}
+        self._basis = Basis(loaded, state, target)
         self._sleeping: list[tuple[str, str]] = []  # users woken for this run: deactivate again
 
     async def execute(self) -> Totals:
@@ -318,19 +315,13 @@ class Run:
         details = await self._target.document(lekto_id)
         alignment, reason = None, None
         if details.get("channel") == "migration":
-            reason = self._foreign(item, lekto_id, details, resolved)
+            reason = self._basis.foreign(item, lekto_id, details, resolved)
             if reason is None:
-                base = await self._baseline(lekto_id, None, details)
+                base = await self._basis.baseline(lekto_id, None, details)
                 alignment = await self._align(lekto_id, details, base, resolved)
         await self._finish(
             item.id, "duplicate", lekto_id, alignment, None, details=details, reason=reason
         )
-
-    def _foreign(
-        self, item: Expected, lekto_id: str, details: dict[str, Any], resolved: Resolved
-    ) -> str | None:
-        target = space_of(resolved, self._loaded.directory)
-        return foreign(self._state.claimant(lekto_id, item.id), details.get("space_id"), target)
 
     async def _existing(self, item: Expected, row: DocumentRow, resolved: Resolved) -> None:
         assert row.lekto_id is not None
@@ -359,32 +350,19 @@ class Run:
             )
             return
         if row.status == "duplicate":
-            reason = self._foreign(item, row.lekto_id, details, resolved)
+            reason = self._basis.foreign(item, row.lekto_id, details, resolved)
             if reason is not None:
                 await self._finish(
                     item.id, row.status, row.lekto_id, None, None, details=details, reason=reason
                 )
                 return
-        base = await self._baseline(row.lekto_id, row.applied, details)
+        base = await self._basis.baseline(row.lekto_id, row.applied, details)
         alignment = await self._align(row.lekto_id, details, base, resolved)
         await self._finish(item.id, row.status, row.lekto_id, alignment, None, details=details)
 
-    async def _baseline(
-        self, lekto_id: str, applied: dict[str, Any] | None, details: dict[str, Any]
-    ) -> dict[str, Any]:
-        """What the migration set last: the state's, else the upload's from the log (its
-        space is taken as it is now: the migration never moved documents then)."""
-        if applied is not None:
-            return applied
-        log = await self._target.log(lekto_id)
-        return uploaded(log, details.get("space_id")) or current(details)
-
     def _sent(self, resolved: Resolved) -> dict[str, Any]:
         """What the upload sets: its metadata (no topic), in the space it goes to."""
-        return {**self._want(resolved), "topic_id": None}
-
-    def _want(self, resolved: Resolved) -> dict[str, Any]:
-        return {**resolved.values, "space_id": space_of(resolved, self._loaded.directory)}
+        return {**self._basis.want(resolved), "topic_id": None}
 
     async def _align(
         self,
@@ -393,13 +371,7 @@ class Run:
         base: dict[str, Any],
         resolved: Resolved,
     ) -> Alignment:
-        alignment = align(
-            base,
-            current(details),
-            self._want(resolved),
-            parents=self._parents,
-            types=self._types,
-        )
+        alignment = self._basis.align(base, details, resolved)
         if alignment.changes:
             await self._target.align(lekto_id, alignment.changes)
         if alignment.move is not None:

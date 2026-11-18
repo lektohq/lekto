@@ -13,6 +13,7 @@ import httpx2
 import pytest
 
 from lekto_migration import plan as plans
+from lekto_migration.basis import Basis
 from lekto_migration.directory import takes_review_codes
 from tests import fake_lekto
 from tests.conftest import Setup
@@ -363,6 +364,26 @@ async def test_a_field_named_notes_is_aligned_as_any_other(setup: Setup) -> None
     setup.edit("custom_fields", "Text", "drop")
     assert await setup.run("run") == 0
     assert notes["id"] not in by_title(setup, "Document 10")["fields"]
+
+
+async def test_check_shows_the_alignment_run_makes(
+    setup: Setup, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both stand on one `Basis`: the same base and the same wish for every document (MI-09)."""
+    assert await setup.migrate() == 0
+    setup.edit("custom_fields", "Count", "drop")
+    seen: list[str] = []
+    real = Basis.align
+
+    def spying(self: Basis, base: dict[str, Any], details: dict[str, Any], resolved: Any) -> Any:
+        seen.append(json.dumps([base, self.want(resolved)], sort_keys=True))
+        return real(self, base, details, resolved)
+
+    monkeypatch.setattr(Basis, "align", spying)
+    assert await setup.run("check") == 0
+    checked, seen[:] = sorted(seen), []
+    assert await setup.run("run") == 0
+    assert sorted(seen) == checked and checked
 
 
 async def test_a_changed_plan_aligns_what_was_migrated(setup: Setup) -> None:

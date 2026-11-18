@@ -50,6 +50,14 @@ class Action:
     notes: list[str] = field(default_factory=list)
 
 
+def missing(action: Action) -> str:
+    """The problem of an action Lekto needs and the plan may not create (`MISSING`)."""
+    return (
+        f"{action.kind.replace('_', ' ')} '{action.name}' does not exist in Lekto "
+        f"and the plan may not create it ({action.source})"
+    )
+
+
 def is_open(actions: Sequence[Action]) -> bool:
     return any(action.status in OPEN for action in actions)
 

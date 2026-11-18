@@ -27,6 +27,7 @@ from lekto_migration.masterdata import (
     PENDING,
     UPDATED,
     Action,
+    missing,
     needs,
     prepare,
 )
@@ -287,10 +288,7 @@ async def _plan(
         expected = [expect(d, context) for d in snapshot.documents]
         for action in needs(plan, directory, snapshot, expected, fields):
             if action.status == MISSING:
-                problems.append(
-                    f"{action.kind.replace('_', ' ')} '{action.name}' does not exist in Lekto "
-                    f"and the plan may not create it ({action.source})"
-                )
+                problems.append(missing(action))
     for problem in problems:
         progress(f"  problem: {problem}")
     report = {
