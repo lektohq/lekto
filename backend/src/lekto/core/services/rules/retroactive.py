@@ -347,7 +347,8 @@ class RuleApplicationService:
         if not pages:
             return []
         places = await asyncio.to_thread(TextPlaces, text, pages)
-        searched = pattern_text(text, self._max_text)
+        # Long texts take a while: not in the event loop (SC-05).
+        searched = await asyncio.to_thread(pattern_text, text, self._max_text)
         hits = []
         for condition in conditions:
             value = str(condition.value)
@@ -360,7 +361,7 @@ class RuleApplicationService:
                 )
                 spans = [searched.span(start, end) for start, end in found if end > start]
             else:
-                spans = list(contained(text, value))
+                spans = list(await asyncio.to_thread(contained, text, value))
             occurrences = tuple(
                 Occurrence(located)
                 for start, end in spans

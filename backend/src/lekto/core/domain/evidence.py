@@ -654,17 +654,24 @@ def read_amount(
 SHORTEST_SPACELESS = 8  # characters; shorter values compared without spaces match too easily
 
 
-def contains(text: str, value: str) -> bool:
+def contains(
+    text: str, value: str, *, folded: str | None = None, spaceless: str | None = None
+) -> bool:
     """Whether the normalised `text` contains `value` (normalised here) as whole words: as is,
     with umlauts written as `ae`/`oe`/`ue`, or, for longer values, ignoring spaces (an IBAN in
-    groups). `Z-3` is not in `Z-3141`."""
+    groups). `Z-3` is not in `Z-3141`. `folded` and `spaceless`: those forms of `text`, if
+    computed already (`DocumentText`)."""
     needle = normalise(value)
     if not needle:
         return False
-    if _whole(needle, text) or _whole(fold_umlauts(needle), fold_umlauts(text)):
+    if _whole(needle, text):
         return True
-    spaceless = needle.replace(" ", "")
-    return len(spaceless) >= SHORTEST_SPACELESS and spaceless in text.replace(" ", "")
+    if _whole(fold_umlauts(needle), fold_umlauts(text) if folded is None else folded):
+        return True
+    joined = needle.replace(" ", "")
+    if len(joined) < SHORTEST_SPACELESS:
+        return False
+    return joined in (text.replace(" ", "") if spaceless is None else spaceless)
 
 
 def whole_words(needle: str) -> re.Pattern[str]:
@@ -687,6 +694,15 @@ class DocumentText:
     raw: str
 
     @classmethod
+    def searchable(cls, raw: str) -> "DocumentText":
+        """The text with the forms `contains` searches computed at once: for a worker thread,
+        as the rules read it (SC-05)."""
+        text = cls(raw)
+        text.folded  # noqa: B018
+        text.spaceless  # noqa: B018
+        return text
+
+    @classmethod
     def read(cls, raw: str) -> "DocumentText":
         """The text with everything in it found at once: for a worker thread, so that the
         event loop does not wait for long texts."""
@@ -699,6 +715,16 @@ class DocumentText:
     @cached_property
     def normalised(self) -> str:
         return normalise(self.raw)
+
+    @cached_property
+    def folded(self) -> str:
+        """`normalised` with umlauts written as `ae`/`oe`/`ue`."""
+        return fold_umlauts(self.normalised)
+
+    @cached_property
+    def spaceless(self) -> str:
+        """`normalised` without spaces."""
+        return self.normalised.replace(" ", "")
 
     @cached_property
     def dates(self) -> set[date]:
@@ -721,7 +747,7 @@ class DocumentText:
         return text_currencies(self.raw, self.normalised)
 
     def contains(self, value: str) -> bool:
-        return contains(self.normalised, value)
+        return contains(self.normalised, value, folded=self.folded, spaceless=self.spaceless)
 
     def has_date(self, value: date) -> bool:
         return value in self.dates

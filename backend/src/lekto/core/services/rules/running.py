@@ -6,6 +6,7 @@ stores the result (`prepare`), so no transaction waits for a slow pattern. Patte
 values (short) run inside it, on the state that is stored.
 """
 
+import asyncio
 import logging
 import time
 from collections.abc import Collection, Iterable, Mapping, Sequence
@@ -253,10 +254,16 @@ async def prepare(
         markdown = await load_text(store, document.id)
     except NotFoundError:
         return Prepared(codes=codes)
-    text = pattern_text(markdown, max_text)
+    text = await asyncio.to_thread(_searchable, markdown, max_text)
     keys = {key for rule in rules for key in rule.definition.patterns() if key[0] == TEXT_TARGET}
-    results, problems = await _search(matcher, {key: text for key in keys}, budget)
-    return Prepared(DocumentText(text), results, problems, codes)
+    results, problems = await _search(matcher, {key: text.raw for key in keys}, budget)
+    return Prepared(text, results, problems, codes)
+
+
+def _searchable(markdown: str, max_text: int) -> DocumentText:
+    """The text the conditions read, with what `contains` searches: computed in a worker
+    thread, as the patterns run there, not in the transaction of the rules (SC-05)."""
+    return DocumentText.searchable(pattern_text(markdown, max_text))
 
 
 async def field_patterns(

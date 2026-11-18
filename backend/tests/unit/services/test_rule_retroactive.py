@@ -1,7 +1,10 @@
 """Applying a rule to existing documents: the preview and the background job."""
 
+import threading
+
 import pytest
 
+from lekto.core.domain import evidence, rule_conditions
 from lekto.core.domain.documents import DocumentChanges
 from lekto.core.domain.errors import NotFoundError, ValidationError
 from lekto.core.domain.ids import DocumentId, new_id
@@ -17,7 +20,7 @@ from lekto.core.domain.rules import (
     SetTitle,
 )
 from lekto.core.domain.spaces import SpaceRole
-from lekto.core.services.rules import retroactive
+from lekto.core.services.rules import retroactive, running
 from lekto.core.services.rules.retroactive import BATCH
 from lekto.core.services.rules.running import Prepared, prepare
 from tests import builders
@@ -360,6 +363,45 @@ async def test_a_worker_overtaken_applies_what_it_prepared_to_no_other_document(
         assert (await r.stored(item)).tag_ids == set()
     done = await r.applications.get(owner.id, application.id)
     assert (done.status, done.applied) == (ApplicationStatus.DONE, 1)
+
+
+async def test_the_text_is_read_for_the_rules_outside_the_event_loop(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Cutting and folding a long text take a while: done once per document in a worker
+    thread, not again for each condition in the event loop (SC-05)."""
+    folds: list[int] = []
+    cuts: list[int] = []
+    fold, cut = evidence.fold_umlauts, rule_conditions.pattern_text
+
+    def folding(text: str) -> str:
+        if len(text) > 100:  # the document's text, not a condition's value
+            folds.append(threading.get_ident())
+        return fold(text)
+
+    def cutting(markdown: str, limit: int) -> str:
+        cuts.append(threading.get_ident())
+        return cut(markdown, limit)
+
+    monkeypatch.setattr(evidence, "fold_umlauts", folding)
+    monkeypatch.setattr(running, "pattern_text", cutting)
+    r = await rule_world(world)
+    owner = await world.user()
+    tax = await r.tag("tax")
+    await r.arrive(owner, text="# Gebuehr\n" + "Zeile mit Inhalt\n" * 20)
+    contains = [
+        Condition(field=ConditionField.TEXT, op=Operator.CONTAINS, value=value)
+        for value in ("Gebühr", "Prüfung", "Übersicht")
+    ]
+    rule = await r.personal_rule(owner, definition("Fee", all_of(*contains), add_tags(tax.id)))
+    folds.clear()
+    cuts.clear()
+
+    preview = await r.applications.preview(owner.id, rule.id)
+
+    assert preview.looked_at == 1
+    assert len(folds) == 1 and len(cuts) == 1
+    assert threading.get_ident() not in folds + cuts
 
 
 async def test_an_unexpected_error_ends_the_application(world: World) -> None:
