@@ -19,8 +19,15 @@ import aioboto3
 from aiobotocore.config import AioConfig
 from botocore.exceptions import ClientError
 
+from lekto.adapters.outbound.http_client import CONNECT_TIMEOUT
 from lekto.core.domain.errors import NotFoundError
 from lekto.core.ports.object_store import check_key, check_readable
+
+ATTEMPTS = 3
+READ_TIMEOUT = 30.0
+"""Seconds the store may take between two pieces of an answer. With `CONNECT_TIMEOUT` and
+`ATTEMPTS`, a call to a store that does not answer ends after about 105 s, within
+`WORK_LEASE_MARGIN` (botocore's defaults, 60 s each, took over three minutes; AD-10)."""
 
 _NOT_FOUND = {"404", "NoSuchKey", "NotFound"}
 
@@ -48,7 +55,9 @@ class S3ObjectStore:
             s3={"addressing_style": "path" if path_style else "virtual"},
             request_checksum_calculation="when_required",
             response_checksum_validation="when_required",
-            retries={"mode": "standard", "max_attempts": 3},
+            retries={"mode": "standard", "max_attempts": ATTEMPTS},
+            connect_timeout=CONNECT_TIMEOUT,
+            read_timeout=READ_TIMEOUT,
         )
         self._bucket = bucket
         self._prefix = prefix
