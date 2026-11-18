@@ -7,6 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.schemas import DocumentRefOut
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.versions import DocumentVersion, VersionKind
 from lekto.core.ports.metadata import FileMetadata, MetadataSource
@@ -67,11 +68,6 @@ class StoredFileOut(BaseModel):
         )
 
 
-class VersionOriginOut(BaseModel):
-    id: UUID
-    title: str = Field(description="Its title now.")
-
-
 class DocumentVersionOut(BaseModel):
     """A version of the document's original: its number (from 1), whether it is the current
     one, its file, how and when it came, by whom (null where nobody is known), and what it was
@@ -109,7 +105,7 @@ class DocumentVersionOut(BaseModel):
             "taken over in a merge: `moved`, the `document`, `title` and `version` it was there."
         )
     )
-    origin: VersionOriginOut | None = Field(
+    origin: DocumentRefOut | None = Field(
         description="`split`: the document it was split off as it is now (`detail.title` is "
         "its title then); null where it is gone, the caller may not read it, or for another "
         "kind.",
@@ -123,7 +119,7 @@ class DocumentVersionOut(BaseModel):
         origin = None
         if version.kind is VersionKind.SPLIT and isinstance(named, str):
             title = origins.get(DocumentId(UUID(named)))
-            origin = None if title is None else VersionOriginOut(id=UUID(named), title=title)
+            origin = None if title is None else DocumentRefOut(id=UUID(named), title=title)
         return cls(
             number=version.number,
             current=current,

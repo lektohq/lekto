@@ -19026,7 +19026,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ReparseOut"
+                  "$ref": "#/components/schemas/QueuedOut"
                 }
               }
             }
@@ -27945,11 +27945,11 @@
           },
           "places": {
             "items": {
-              "$ref": "#/components/schemas/CodePlaceOut"
+              "$ref": "#/components/schemas/LocationOut"
             },
             "type": "array",
             "title": "Places",
-            "description": "The pages it stands on, in order."
+            "description": "The pages it stands on, in order, a box per copy of the code on the page."
           },
           "giro": {
             "anyOf": [
@@ -27964,7 +27964,7 @@
           },
           "identifiers": {
             "items": {
-              "$ref": "#/components/schemas/IdentifierFoundOut"
+              "$ref": "#/components/schemas/IdentifierKeyOut"
             },
             "type": "array",
             "title": "Identifiers"
@@ -27990,30 +27990,6 @@
         ],
         "title": "CodeOut",
         "description": "A code once for its format and text, however often the pages show it."
-      },
-      "CodePlaceOut": {
-        "properties": {
-          "page": {
-            "type": "integer",
-            "title": "Page",
-            "description": "From 1."
-          },
-          "boxes": {
-            "items": {
-              "$ref": "#/components/schemas/BoxOut"
-            },
-            "type": "array",
-            "title": "Boxes",
-            "description": "One per copy of the code on the page."
-          }
-        },
-        "type": "object",
-        "required": [
-          "page",
-          "boxes"
-        ],
-        "title": "CodePlaceOut",
-        "description": "Where a code stands on a page of the archive."
       },
       "ConditionField": {
         "type": "string",
@@ -30644,7 +30620,7 @@
           "origin": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/VersionOriginOut"
+                "$ref": "#/components/schemas/DocumentRefOut"
               },
               {
                 "type": "null"
@@ -30962,7 +30938,7 @@
           "number": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SeriesNumberOut"
+                "$ref": "#/components/schemas/IdentifierKeyOut"
               },
               {
                 "type": "null"
@@ -31601,7 +31577,7 @@
             },
             "type": "array",
             "title": "Locations",
-            "description": "Where the quote stands in the archive PDF: at most a few places, in page order; empty if it was not found there or the check is older than this."
+            "description": "Where the quote stands in the archive PDF, a box per line it covers: at most a few places, in page order; empty if it was not found there or the check is older than this."
           },
           "candidates": {
             "items": {
@@ -32919,23 +32895,6 @@
         ],
         "title": "HoldersOut"
       },
-      "IdentifierFoundOut": {
-        "properties": {
-          "kind": {
-            "$ref": "#/components/schemas/IdentifierKind"
-          },
-          "value": {
-            "type": "string",
-            "title": "Value"
-          }
-        },
-        "type": "object",
-        "required": [
-          "kind",
-          "value"
-        ],
-        "title": "IdentifierFoundOut"
-      },
       "IdentifierIn": {
         "properties": {
           "kind": {
@@ -32991,6 +32950,25 @@
             "value": "1234-5678"
           }
         ]
+      },
+      "IdentifierKeyOut": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/IdentifierKind"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value",
+            "description": "Normalised, as Lekto compares it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "value"
+        ],
+        "title": "IdentifierKeyOut",
+        "description": "An identifier by its kind and its value (RA-12)."
       },
       "IdentifierKind": {
         "type": "string",
@@ -33376,25 +33354,6 @@
         ],
         "title": "IndexStatsOut"
       },
-      "JobDocumentOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "title"
-        ],
-        "title": "JobDocumentOut"
-      },
       "JobDurationsOut": {
         "properties": {
           "kinds": {
@@ -33477,7 +33436,7 @@
           "document": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/JobDocumentOut"
+                "$ref": "#/components/schemas/DocumentRefOut"
               },
               {
                 "type": "null"
@@ -35016,7 +34975,7 @@
             },
             "type": "array",
             "title": "Boxes",
-            "description": "One per line the quote covers."
+            "description": "What it covers on the page."
           }
         },
         "type": "object",
@@ -35025,7 +34984,7 @@
           "boxes"
         ],
         "title": "LocationOut",
-        "description": "Where a quote stands in the archive PDF."
+        "description": "Where something stands on a page of the archive PDF: a quote, a code, a fact (RA-12)."
       },
       "LogEntry": {
         "properties": {
@@ -37728,7 +37687,8 @@
           "id",
           "name"
         ],
-        "title": "NamedOut"
+        "title": "NamedOut",
+        "description": "Something by its id and its name (RA-12)."
       },
       "Node": {
         "type": "string",
@@ -37981,25 +37941,6 @@
         ],
         "title": "OpenAction"
       },
-      "OpenContactOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "OpenContactOut"
-      },
       "OpenCountsOut": {
         "properties": {
           "learned": {
@@ -38138,7 +38079,7 @@
           },
           "contacts": {
             "items": {
-              "$ref": "#/components/schemas/OpenContactOut"
+              "$ref": "#/components/schemas/NamedOut"
             },
             "type": "array",
             "title": "Contacts"
@@ -38146,13 +38087,13 @@
           "person": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/OpenPersonOut"
+                "$ref": "#/components/schemas/NamedOut"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "A suggestion for this person's profile."
+            "description": "A suggestion for this person's profile: the user, by their display name, else the username."
           },
           "documents": {
             "type": "integer",
@@ -38295,27 +38236,6 @@
           "to_confirm"
         ],
         "title": "OpenPageOut"
-      },
-      "OpenPersonOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id",
-            "description": "The user."
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "Their display name, else the username."
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "OpenPersonOut"
       },
       "OpenSearchIn": {
         "properties": {
@@ -40223,20 +40143,6 @@
         ],
         "title": "Removed"
       },
-      "ReparseOut": {
-        "properties": {
-          "queued": {
-            "type": "integer",
-            "title": "Queued",
-            "description": "Documents whose text is read again (not those queued already)."
-          }
-        },
-        "type": "object",
-        "required": [
-          "queued"
-        ],
-        "title": "ReparseOut"
-      },
       "ReprocessNode": {
         "type": "string",
         "enum": [
@@ -41883,24 +41789,6 @@
         ],
         "title": "SentTask",
         "description": "A task: answer it at `callback` with `token` as `Authorization: Bearer` by `deadline`\n(`POST /api/v1/external/tasks/{id}/result`)."
-      },
-      "SeriesNumberOut": {
-        "properties": {
-          "kind": {
-            "$ref": "#/components/schemas/IdentifierKind"
-          },
-          "value": {
-            "type": "string",
-            "title": "Value",
-            "description": "Normalised, as Lekto compares it."
-          }
-        },
-        "type": "object",
-        "required": [
-          "kind",
-          "value"
-        ],
-        "title": "SeriesNumberOut"
       },
       "SeriesState": {
         "type": "string",
@@ -44010,26 +43898,6 @@
           "merged"
         ],
         "title": "VersionKind"
-      },
-      "VersionOriginOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title",
-            "description": "Its title now."
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "title"
-        ],
-        "title": "VersionOriginOut"
       },
       "VisibilityOut": {
         "properties": {

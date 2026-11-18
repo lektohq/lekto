@@ -3,10 +3,12 @@
 from collections.abc import Callable
 from datetime import timedelta
 from typing import Annotated
+from uuid import UUID
 
-from pydantic import ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.schemas import RequestBody
+from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.validation import MAX_NAME
 
 Name = Annotated[str, Field(min_length=1, max_length=MAX_NAME, examples=["ACME Energy"])]
@@ -18,6 +20,20 @@ class NameIn(RequestBody):
     )
 
     name: Name
+
+
+class NamedOut(BaseModel):
+    """Something by its id and its name (RA-12)."""
+
+    id: UUID
+    name: str
+
+
+class IdentifierKeyOut(BaseModel):
+    """An identifier by its kind and its value (RA-12)."""
+
+    kind: IdentifierKind
+    value: str = Field(description="Normalised, as Lekto compares it.")
 
 
 def following_offset(offset: int, count: int, total: int) -> int | None:

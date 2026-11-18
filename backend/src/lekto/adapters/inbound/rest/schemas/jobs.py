@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from lekto.adapters.inbound.rest.schemas.common import following_offset, ms
+from lekto.adapters.inbound.schemas import DocumentRefOut
 from lekto.core.domain.jobs import JobState
 from lekto.core.domain.pipeline import Node
 from lekto.core.services.jobs import (
@@ -67,11 +68,6 @@ class JobsSummaryOut(BaseModel):
         )
 
 
-class JobDocumentOut(BaseModel):
-    id: UUID
-    title: str
-
-
 class JobOut(BaseModel):
     id: UUID
     kind: str = KIND
@@ -85,7 +81,7 @@ class JobOut(BaseModel):
         description="When its latest attempt began; null before the first."
     )
     finished_at: datetime | None = Field(description="When it was done or given up.")
-    document: JobDocumentOut | None = Field(
+    document: DocumentRefOut | None = Field(
         description="The document it works on, if the caller may read it."
     )
     document_hidden: bool = Field(
@@ -117,7 +113,7 @@ class JobOut(BaseModel):
             document=(
                 None
                 if view.document is None
-                else JobDocumentOut(id=view.document.id, title=view.document.title)
+                else DocumentRefOut(id=view.document.id, title=view.document.title)
             ),
             document_hidden=view.document_hidden,
             node=view.node,

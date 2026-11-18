@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.limits import in_words
+from lekto.adapters.inbound.rest.schemas.common import NamedOut
 from lekto.adapters.inbound.rest.schemas.inbox import LocationOut
 from lekto.adapters.inbound.rest.schemas.refs import seal
 from lekto.adapters.inbound.schemas import ReasonOut, RequestBody
@@ -31,16 +32,6 @@ from lekto.core.services.open_identifiers import (
     OpenPage,
 )
 from lekto.core.services.places import PLACES, Place
-
-
-class OpenContactOut(BaseModel):
-    id: UUID
-    name: str
-
-
-class OpenPersonOut(BaseModel):
-    id: UUID = Field(description="The user.")
-    name: str = Field(description="Their display name, else the username.")
 
 
 class RecommendationOut(BaseModel):
@@ -74,9 +65,13 @@ class OpenIdentifierOut(BaseModel):
         "domain whose name fits `contacts[0]`, the contact of its documents, which has none "
         "entered, or an IBAN its documents give to the person in `person`."
     )
-    contacts: list[OpenContactOut]
-    person: OpenPersonOut | None = Field(
-        default=None, description="A suggestion for this person's profile."
+    contacts: list[NamedOut]
+    person: NamedOut | None = Field(
+        default=None,
+        description=(
+            "A suggestion for this person's profile: the user, by their display name, else the "
+            "username."
+        ),
     )
     documents: int = Field(description="Confirmed documents that show it.")
     last: date | None = Field(description="The date of the newest of them.")
@@ -98,10 +93,10 @@ class OpenIdentifierOut(BaseModel):
             ref=seal(refs, item.kind, item.value),
             written=item.written,
             source=item.source,
-            contacts=[OpenContactOut(id=id, name=names.get(id, "")) for id in item.contacts],
+            contacts=[NamedOut(id=id, name=names.get(id, "")) for id in item.contacts],
             person=None
             if item.person is None
-            else OpenPersonOut(id=item.person, name=persons.get(item.person, "")),
+            else NamedOut(id=item.person, name=persons.get(item.person, "")),
             documents=len(item.seen),
             last=item.last,
             recommendation=None

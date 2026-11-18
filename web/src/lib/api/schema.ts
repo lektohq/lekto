@@ -4044,34 +4044,18 @@ export interface components {
 			text: string;
 			/**
 			 * Places
-			 * @description The pages it stands on, in order.
+			 * @description The pages it stands on, in order, a box per copy of the code on the page.
 			 */
-			places: components['schemas']['CodePlaceOut'][];
+			places: components['schemas']['LocationOut'][];
 			/** @description A GiroCode, read as its credit transfer. */
 			giro: components['schemas']['GiroCodeOut'] | null;
 			/** Identifiers */
-			identifiers: components['schemas']['IdentifierFoundOut'][];
+			identifiers: components['schemas']['IdentifierKeyOut'][];
 			/**
 			 * Fields
 			 * @description Amount fields of the document with the GiroCode's amount as their value.
 			 */
 			fields: string[];
-		};
-		/**
-		 * CodePlaceOut
-		 * @description Where a code stands on a page of the archive.
-		 */
-		CodePlaceOut: {
-			/**
-			 * Page
-			 * @description From 1.
-			 */
-			page: number;
-			/**
-			 * Boxes
-			 * @description One per copy of the code on the page.
-			 */
-			boxes: components['schemas']['BoxOut'][];
 		};
 		/**
 		 * ConditionField
@@ -5342,7 +5326,7 @@ export interface components {
 				[key: string]: unknown;
 			};
 			/** @description `split`: the document it was split off as it is now (`detail.title` is its title then); null where it is gone, the caller may not read it, or for another kind. */
-			origin: components['schemas']['VersionOriginOut'] | null;
+			origin: components['schemas']['DocumentRefOut'] | null;
 		};
 		/**
 		 * DryRunMailOut
@@ -5503,7 +5487,7 @@ export interface components {
 			contact: components['schemas']['NamedOut'];
 			document_type: components['schemas']['NamedOut'];
 			/** @description The contract or customer number the series follows, if its documents show one. */
-			number: components['schemas']['SeriesNumberOut'] | null;
+			number: components['schemas']['IdentifierKeyOut'] | null;
 			/** @description A calendar step (`weekly` to `yearly`) or `days` (see `interval_days`). */
 			cadence: components['schemas']['Cadence'];
 			/**
@@ -5868,7 +5852,7 @@ export interface components {
 			quote_shows_value?: boolean | null;
 			/**
 			 * Locations
-			 * @description Where the quote stands in the archive PDF: at most a few places, in page order; empty if it was not found there or the check is older than this.
+			 * @description Where the quote stands in the archive PDF, a box per line it covers: at most a few places, in page order; empty if it was not found there or the check is older than this.
 			 */
 			locations?: components['schemas']['LocationOut'][];
 			/**
@@ -6451,12 +6435,6 @@ export interface components {
 			/** @description The open list's recommendation, every kind. */
 			recommendation: components['schemas']['TallyOut'];
 		};
-		/** IdentifierFoundOut */
-		IdentifierFoundOut: {
-			kind: components['schemas']['IdentifierKind'];
-			/** Value */
-			value: string;
-		};
 		/**
 		 * IdentifierIn
 		 * @description Written as in documents; lekto stores it normalised (an IBAN without spaces, a domain
@@ -6483,6 +6461,18 @@ export interface components {
 			 * @description The user a customer, contract or personnel number belongs to (Erika's contract): found in a document, it is hard evidence for whose it is. Not for other kinds, not for a rejected one.
 			 */
 			user_id?: string | null;
+		};
+		/**
+		 * IdentifierKeyOut
+		 * @description An identifier by its kind and its value (RA-12).
+		 */
+		IdentifierKeyOut: {
+			kind: components['schemas']['IdentifierKind'];
+			/**
+			 * Value
+			 * @description Normalised, as Lekto compares it.
+			 */
+			value: string;
 		};
 		/**
 		 * IdentifierKind
@@ -6695,16 +6685,6 @@ export interface components {
 			 */
 			size_bytes: number | null;
 		};
-		/** JobDocumentOut */
-		JobDocumentOut: {
-			/**
-			 * Id
-			 * Format: uuid
-			 */
-			id: string;
-			/** Title */
-			title: string;
-		};
 		/** JobDurationsOut */
 		JobDurationsOut: {
 			/**
@@ -6755,7 +6735,7 @@ export interface components {
 			 */
 			finished_at: string | null;
 			/** @description The document it works on, if the caller may read it. */
-			document: components['schemas']['JobDocumentOut'] | null;
+			document: components['schemas']['DocumentRefOut'] | null;
 			/**
 			 * Document Hidden
 			 * @description It works on a document the caller may not read (or one deleted since).
@@ -7419,7 +7399,7 @@ export interface components {
 		};
 		/**
 		 * LocationOut
-		 * @description Where a quote stands in the archive PDF.
+		 * @description Where something stands on a page of the archive PDF: a quote, a code, a fact (RA-12).
 		 */
 		LocationOut: {
 			/**
@@ -7429,7 +7409,7 @@ export interface components {
 			page: number;
 			/**
 			 * Boxes
-			 * @description One per line the quote covers.
+			 * @description What it covers on the page.
 			 */
 			boxes: components['schemas']['BoxOut'][];
 		};
@@ -8655,7 +8635,10 @@ export interface components {
 			 */
 			spans: components['schemas']['SpanOut'][];
 		};
-		/** NamedOut */
+		/**
+		 * NamedOut
+		 * @description Something by its id and its name (RA-12).
+		 */
 		NamedOut: {
 			/**
 			 * Id
@@ -8782,16 +8765,6 @@ export interface components {
 		 * @enum {string}
 		 */
 		OpenAction: 'confirm' | 'reject';
-		/** OpenContactOut */
-		OpenContactOut: {
-			/**
-			 * Id
-			 * Format: uuid
-			 */
-			id: string;
-			/** Name */
-			name: string;
-		};
 		/** OpenCountsOut */
 		OpenCountsOut: {
 			/** Learned */
@@ -8869,9 +8842,9 @@ export interface components {
 			/** @description `learned`: training found it at `contacts[0]`; `suggested`: an e-mail domain whose name fits `contacts[0]`, the contact of its documents, which has none entered, or an IBAN its documents give to the person in `person`. */
 			source: components['schemas']['OpenSource'];
 			/** Contacts */
-			contacts: components['schemas']['OpenContactOut'][];
-			/** @description A suggestion for this person's profile. */
-			person?: components['schemas']['OpenPersonOut'] | null;
+			contacts: components['schemas']['NamedOut'][];
+			/** @description A suggestion for this person's profile: the user, by their display name, else the username. */
+			person?: components['schemas']['NamedOut'] | null;
 			/**
 			 * Documents
 			 * @description Confirmed documents that show it.
@@ -8936,20 +8909,6 @@ export interface components {
 			 * @description How many of them have one to confirm: what `POST /recommended` confirms (of every source and kind, without the words).
 			 */
 			to_confirm: number;
-		};
-		/** OpenPersonOut */
-		OpenPersonOut: {
-			/**
-			 * Id
-			 * Format: uuid
-			 * @description The user.
-			 */
-			id: string;
-			/**
-			 * Name
-			 * @description Their display name, else the username.
-			 */
-			name: string;
 		};
 		/**
 		 * OpenSearchIn
@@ -10184,14 +10143,6 @@ export interface components {
 			/** Removed */
 			removed: number;
 		};
-		/** ReparseOut */
-		ReparseOut: {
-			/**
-			 * Queued
-			 * @description Documents whose text is read again (not those queued already).
-			 */
-			queued: number;
-		};
 		/**
 		 * ReprocessNode
 		 * @enum {string}
@@ -10982,15 +10933,6 @@ export interface components {
 			 * Format: date-time
 			 */
 			deadline: string;
-		};
-		/** SeriesNumberOut */
-		SeriesNumberOut: {
-			kind: components['schemas']['IdentifierKind'];
-			/**
-			 * Value
-			 * @description Normalised, as Lekto compares it.
-			 */
-			value: string;
 		};
 		/**
 		 * SeriesState
@@ -11986,19 +11928,6 @@ export interface components {
 		 * @enum {string}
 		 */
 		VersionKind: 'received' | 'replaced' | 'edited' | 'split' | 'separated' | 'merged';
-		/** VersionOriginOut */
-		VersionOriginOut: {
-			/**
-			 * Id
-			 * Format: uuid
-			 */
-			id: string;
-			/**
-			 * Title
-			 * @description Its title now.
-			 */
-			title: string;
-		};
 		/**
 		 * VisibilityOut
 		 * @description Who sees the document: the members of its space; readers only once it is green.
@@ -27636,7 +27565,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					'application/json': components['schemas']['ReparseOut'];
+					'application/json': components['schemas']['QueuedOut'];
 				};
 			};
 			/** @description Unauthorized */

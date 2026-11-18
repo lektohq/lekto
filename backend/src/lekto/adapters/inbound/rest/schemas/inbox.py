@@ -44,10 +44,10 @@ class BoxOut(BaseModel):
 
 
 class LocationOut(BaseModel):
-    """Where a quote stands in the archive PDF."""
+    """Where something stands on a page of the archive PDF: a quote, a code, a fact (RA-12)."""
 
     page: int = Field(description="From 1.")
-    boxes: list[BoxOut] = Field(description="One per line the quote covers.")
+    boxes: list[BoxOut] = Field(description="What it covers on the page.")
 
     @classmethod
     def of(cls, location: Location) -> "LocationOut":
@@ -250,8 +250,9 @@ class FieldCheckOut(BaseModel):
     locations: list[LocationOut] = Field(
         default_factory=list,
         description=(
-            "Where the quote stands in the archive PDF: at most a few places, in page order; "
-            "empty if it was not found there or the check is older than this."
+            "Where the quote stands in the archive PDF, a box per line it covers: at most a "
+            "few places, in page order; empty if it was not found there or the check is older "
+            "than this."
         ),
     )
     candidates: list[CandidateOut] = Field(

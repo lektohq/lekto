@@ -5,7 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from lekto.adapters.inbound.rest.schemas.inbox import BoxOut, LocationOut
+from lekto.adapters.inbound.rest.schemas.common import IdentifierKeyOut
+from lekto.adapters.inbound.rest.schemas.inbox import LocationOut
 from lekto.adapters.inbound.schemas import MoneyValue, RequestBody
 from lekto.core.domain.document_facts import (
     FactOrigin,
@@ -214,11 +215,6 @@ class FoundPersonOut(BaseModel):
     spans: list[SpanOut] = Field(description="Where their names and identifiers stand.")
 
 
-class IdentifierFoundOut(BaseModel):
-    kind: IdentifierKind
-    value: str
-
-
 class GiroCodeOut(BaseModel):
     """The credit transfer of a GiroCode (EPC QR code)."""
 
@@ -229,21 +225,16 @@ class GiroCodeOut(BaseModel):
     purpose: str | None
 
 
-class CodePlaceOut(BaseModel):
-    """Where a code stands on a page of the archive."""
-
-    page: int = Field(description="From 1.")
-    boxes: list[BoxOut] = Field(description="One per copy of the code on the page.")
-
-
 class CodeOut(BaseModel):
     """A code once for its format and text, however often the pages show it."""
 
     format: str = Field(examples=["QR Code", "Code 128", "Data Matrix"])
     text: str = Field(description="What it holds, as it holds it; someone else's text.")
-    places: list[CodePlaceOut] = Field(description="The pages it stands on, in order.")
+    places: list[LocationOut] = Field(
+        description="The pages it stands on, in order, a box per copy of the code on the page."
+    )
     giro: GiroCodeOut | None = Field(description="A GiroCode, read as its credit transfer.")
-    identifiers: list[IdentifierFoundOut]
+    identifiers: list[IdentifierKeyOut]
     fields: list[UUID] = Field(
         description="Amount fields of the document with the GiroCode's amount as their value."
     )
@@ -265,13 +256,10 @@ class CodeOut(BaseModel):
         return cls(
             format=item.format,
             text=item.text,
-            places=[
-                CodePlaceOut(page=place.page, boxes=[BoxOut.of(box) for box in place.boxes])
-                for place in item.places
-            ],
+            places=[LocationOut.of(place) for place in item.places],
             giro=giro,
             identifiers=[
-                IdentifierFoundOut(kind=kind, value=value) for kind, value in item.identifiers
+                IdentifierKeyOut(kind=kind, value=value) for kind, value in item.identifiers
             ],
             fields=list(item.fields),
         )
