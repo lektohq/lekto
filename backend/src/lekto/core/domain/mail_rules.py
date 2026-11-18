@@ -45,12 +45,16 @@ from lekto.core.domain.mail_traits import (
     importance_holds,
     keyword_holds,
 )
+from lekto.core.domain.master_data import DocumentType
+from lekto.core.domain.permissions import can_file_into
 from lekto.core.domain.reasons import Reason, ReasonCode
 from lekto.core.domain.rules import DEFAULT_PRIORITY as DEFAULT_PRIORITY
 from lekto.core.domain.rules import MAX_PRIORITY as MAX_PRIORITY
 from lekto.core.domain.rules import MIN_PRIORITY as MIN_PRIORITY
 from lekto.core.domain.rules import check_priority
 from lekto.core.domain.sorting import sort_key
+from lekto.core.domain.spaces import Space
+from lekto.core.domain.users import User
 from lekto.core.domain.validation import require_name, require_utc
 
 
@@ -358,3 +362,24 @@ def first_match(rules: list[MailRule], facts: MailFacts) -> MailRule | None:
     """The first active rule that matches, in `rule_order`."""
     ordered = sorted((rule for rule in rules if rule.enabled), key=rule_order)
     return next((rule for rule in ordered if rule.matches(facts)), None)
+
+
+def unfit(
+    rule: MailRule,
+    person: User | None,
+    space: Space | None,
+    document_type: DocumentType | None,
+) -> ReasonCode | None:
+    """Why the rule cannot take a mail: the person it takes mails for is gone or inactive, its
+    space is gone or not one the person files into, its type of the text is gone; None if it
+    can. `person`, `space` and `document_type`: those the rule names, as far as they exist.
+    Saving a rule refuses it, fetching pauses it: one check for both (SB-11)."""
+    if rule.user_id is None:
+        return None
+    if person is None or not person.active:
+        return ReasonCode.MAIL_RULE_PERSON_GONE
+    if rule.space_id is not None and (space is None or not can_file_into(person, space)):
+        return ReasonCode.MAIL_RULE_SPACE_UNREACHABLE
+    if rule.text_type_id is not None and document_type is None:
+        return ReasonCode.MAIL_RULE_TYPE_GONE
+    return None

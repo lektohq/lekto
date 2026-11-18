@@ -13,12 +13,11 @@ from lekto.core.domain.ids import MailboxId, MailRuleId, UserId
 from lekto.core.domain.mail import Fallback
 from lekto.core.domain.mail_intake import MailRecord
 from lekto.core.domain.mail_rules import MailRule, MailRuleChanges, first_match, record_facts
-from lekto.core.domain.permissions import can_file_into
-from lekto.core.domain.reasons import Action
+from lekto.core.domain.reasons import Action, ReasonCode
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import require_admin
-from lekto.core.services.mail_intake import schedule_fetch
+from lekto.core.services.mail_intake import rule_unfit, schedule_fetch
 
 DRY_RUN_MAILS = 50
 """The latest mails of a mailbox a dry run looks at, besides every mail still waiting for a
@@ -157,16 +156,17 @@ class MailRuleService:
             await uow.commit()
 
 
+_UNFIT = {
+    ReasonCode.MAIL_RULE_PERSON_GONE: "user_id: no such active user",
+    ReasonCode.MAIL_RULE_SPACE_UNREACHABLE: "space_id: a space the person files into",
+    ReasonCode.MAIL_RULE_TYPE_GONE: "text_type_id: no such document type",
+}
+"""What a rule that fetching would pause says when it is saved, by the part it names."""
+
+
 async def _check(uow: UnitOfWork, rule: MailRule) -> None:
-    """The person, space and type the rule names exist and fit (ValidationError)."""
-    if rule.user_id is None:
-        return
-    person = await uow.users.find(rule.user_id)
-    if person is None or not person.active:
-        raise ValidationError("user_id: no such active user")
-    if rule.space_id is not None:
-        space = await uow.spaces.find(rule.space_id)
-        if space is None or not can_file_into(person, space):
-            raise ValidationError("space_id: a space the person files into")
-    if rule.text_type_id is not None and await uow.document_types.find(rule.text_type_id) is None:
-        raise ValidationError("text_type_id: no such document type")
+    """The person, space and type the rule names exist and fit, as fetching asks
+    (`mail_intake.rule_unfit`); ValidationError naming the part otherwise."""
+    code = await rule_unfit(uow, rule)
+    if code is not None:
+        raise ValidationError(_UNFIT[code])

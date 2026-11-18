@@ -67,9 +67,9 @@ from lekto.core.domain.mail_rules import (
     first_match,
     mail_facts,
     record_facts,
+    unfit,
 )
 from lekto.core.domain.mail_traits import MailMarks
-from lekto.core.domain.permissions import can_file_into
 from lekto.core.domain.push import PushKind
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
 from lekto.core.ports.clock import Clock
@@ -562,21 +562,9 @@ class MailIntakeService:
 
     async def _unfit(self, rule: MailRule) -> Reason | None:
         """Why the rule cannot take a mail now; None if it can."""
-        if rule.user_id is None:
-            return None
         async with self._uow() as uow:
-            person = await uow.users.find(rule.user_id)
-            if person is None or not person.active:
-                return because(ReasonCode.MAIL_RULE_PERSON_GONE)
-            if rule.space_id is not None:
-                space = await uow.spaces.find(rule.space_id)
-                if space is None or not can_file_into(person, space):
-                    return because(ReasonCode.MAIL_RULE_SPACE_UNREACHABLE)
-            if rule.text_type_id is not None and (
-                await uow.document_types.find(rule.text_type_id) is None
-            ):
-                return because(ReasonCode.MAIL_RULE_TYPE_GONE)
-        return None
+            code = await rule_unfit(uow, rule)
+        return None if code is None else because(code)
 
     async def _pause(self, rule: MailRule, reason: Reason) -> None:
         async def store() -> None:
@@ -810,6 +798,16 @@ async def _mark(
         await session.mark(folder, uid, add=system(add), remove=system(remove))
     if own(add) or own(remove):
         await session.mark(folder, uid, add=own(add), remove=own(remove))
+
+
+async def rule_unfit(uow: UnitOfWork, rule: MailRule) -> ReasonCode | None:
+    """Why the rule cannot take a mail (`mail_rules.unfit`), with what it names loaded."""
+    if rule.user_id is None:
+        return None
+    person = await uow.users.find(rule.user_id)
+    space = None if rule.space_id is None else await uow.spaces.find(rule.space_id)
+    kind = None if rule.text_type_id is None else await uow.document_types.find(rule.text_type_id)
+    return unfit(rule, person, space, kind)
 
 
 def _written(message: MailMessage) -> bytes:
