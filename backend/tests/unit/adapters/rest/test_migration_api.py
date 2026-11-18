@@ -747,14 +747,9 @@ async def test_an_admin_token_creates_users_without_password(api: Api) -> None:
 
 
 async def test_rules_run_and_trust_the_imported_values(api: Api) -> None:
-    admin, owner, reader = await api.admin(), await api.user(), await api.user()
+    admin, owner = await api.admin(), await api.user()
     data = await master_data(api, admin)
     shared = await post(api, "/spaces", {"name": "Shared"}, auth(owner))
-    await api.client.put(
-        f"{PREFIX}/spaces/{shared['id']}/shares/{reader.id}",
-        json={"level": "read"},
-        headers=auth(owner),
-    )
     await post(
         api,
         "/rules",
