@@ -8,8 +8,9 @@ from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.lenses import LensCreate, LensOrder, LensOut, LensPatch
+from lekto.core.domain.changes import UNSET
 from lekto.core.domain.ids import FieldId, LensId
-from lekto.core.domain.lenses import UNSET, LensChanges
+from lekto.core.domain.lenses import LensChanges
 
 router = APIRouter(prefix="/lenses", tags=["lenses"], dependencies=PROTECTED)
 

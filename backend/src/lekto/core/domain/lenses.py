@@ -10,11 +10,12 @@ Master data a lens names may be deleted after; the services drop what is gone wh
 lens out, so a lens never fails for it.
 """
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
-from enum import Enum, StrEnum
+from enum import StrEnum
 from typing import Self
 
+from lekto.core.domain.changes import UNSET, Unset, apply_changes
 from lekto.core.domain.document_facts import FactCriterion
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import (
@@ -218,41 +219,28 @@ class Lens:
             raise ValidationError("grouping: by when it is due only with a due_field_id")
 
     def change(self, changes: "LensChanges", *, now: datetime) -> None:
-        """Apply what `changes` sets; ValidationError (and nothing changed) if the result does
-        not fit together, or a filter it sets names too many values (`check_values`)."""
-        if not isinstance(changes.filter, _Unset):
+        """Apply what `changes` sets, normalised as a new lens is (`apply_changes`, DB-07);
+        ValidationError (and nothing changed) if the result does not fit together, or a filter
+        it sets names too many values (`check_values`)."""
+        if not isinstance(changes.filter, Unset):
             changes.filter.check_values()
-        updated = replace(
-            self,
-            **{name: value for name, value in vars(changes).items() if value is not UNSET},
-            updated_at=now,
-        )
-        for name in vars(changes):
-            setattr(self, name, getattr(updated, name))
+        apply_changes(self, changes, self.__post_init__)
         self.updated_at = now
-
-
-class _Unset(Enum):
-    UNSET = "unset"
-
-
-UNSET = _Unset.UNSET
-"""Marks a part of `LensChanges` that stays as it is."""
 
 
 @dataclass(frozen=True, kw_only=True)
 class LensChanges:
     """A change of a lens; parts left UNSET stay as they are."""
 
-    name: str | _Unset = UNSET
-    filter: LensFilter | _Unset = UNSET
-    query: str | _Unset | None = UNSET
-    sort: LensSort | _Unset | None = UNSET
-    sort_field_id: FieldId | _Unset | None = UNSET
-    grouping: Grouping | _Unset = UNSET
-    layout: Layout | _Unset = UNSET
-    card_field_ids: tuple[FieldId, ...] | _Unset = UNSET
-    due_field_id: FieldId | _Unset | None = UNSET
+    name: str | Unset = UNSET
+    filter: LensFilter | Unset = UNSET
+    query: str | Unset | None = UNSET
+    sort: LensSort | Unset | None = UNSET
+    sort_field_id: FieldId | Unset | None = UNSET
+    grouping: Grouping | Unset = UNSET
+    layout: Layout | Unset = UNSET
+    card_field_ids: tuple[FieldId, ...] | Unset = UNSET
+    due_field_id: FieldId | Unset | None = UNSET
 
 
 def _query(text: str | None) -> str | None:

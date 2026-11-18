@@ -13,10 +13,11 @@ from dataclasses import dataclass, replace
 from datetime import date
 from uuid import UUID
 
+from lekto.core.domain.changes import UNSET
 from lekto.core.domain.errors import ConflictError, NotFoundError, ValidationError
 from lekto.core.domain.fields import SORTABLE_TYPES, FieldDefinition, FieldType
 from lekto.core.domain.ids import FieldId, LensId, TagId, UserId
-from lekto.core.domain.lenses import UNSET, Grouping, Lens, LensChanges
+from lekto.core.domain.lenses import Grouping, Lens, LensChanges
 from lekto.core.domain.periods import Period
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.users import User

@@ -4,6 +4,7 @@ from datetime import date
 
 import pytest
 
+from lekto.core.domain.changes import UNSET
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import FieldId, TagId, UserId, new_id
 from lekto.core.domain.lenses import (
@@ -84,6 +85,12 @@ def test_a_change_applies_what_it_sets() -> None:
     assert made.updated_at == NOW + HOUR
     made.change(LensChanges(name="Bills"), now=NOW + 2 * HOUR)
     assert made.name == "Bills" and made.sort_field_id == FIELD
+
+
+def test_a_part_left_out_is_unset_as_in_every_change() -> None:
+    """One marker for every change given part by part, not one of the lenses' own (DB-07)."""
+    left_out = LensChanges()
+    assert all(value is UNSET for value in vars(left_out).values())
 
 
 def test_a_filter_takes_each_value_once_and_one_kind_of_period() -> None:
