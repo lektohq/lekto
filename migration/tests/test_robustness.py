@@ -1,6 +1,7 @@
 """Edge cases found in review: inactive uploaders, the executing admin among the members, spaces
 that cannot be made, lost answers, big values, documents moved in Lekto, old state files."""
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -71,6 +72,21 @@ async def test_a_run_that_failed_for_an_inactive_uploader_wakes_the_user_for_the
     assert await setup.run("run") == 0
     assert titled(setup, "Extra 30")["uploaded_by"] == gone["id"]
     assert gone["active"] is False
+
+
+async def test_a_stopped_run_puts_the_users_it_woke_to_sleep_again(setup: Setup) -> None:
+    """Inactive in Lekto as in Paperless, not active until the next whole run (MI-05)."""
+    assert await setup.migrate() == 0
+    for id in (30, 31):
+        add_document(setup, id, 4)
+    stop = asyncio.Event()
+    setup.lekto.after_upload = lambda count: stop.set()
+    assert await setup.run("run", stop=stop, concurrency=1) == 130
+    gone = next(u for u in setup.lekto.users.values() if u["username"] == "gone")
+    assert gone["active"] is False
+    setup.lekto.after_upload = None
+    assert await setup.run("run") == 0
+    assert titled(setup, "Extra 31")["uploaded_by"] == gone["id"] and gone["active"] is False
 
 
 async def test_prepare_wakes_a_user_it_deactivated_to_make_them_a_member(setup: Setup) -> None:

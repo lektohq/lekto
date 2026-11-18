@@ -83,10 +83,14 @@ class Run:
 
     async def execute(self) -> Totals:
         started = self._clock()
-        await self._wake()
-        await self._documents()
-        if not self._stop.is_set():
-            await self._deactivate()
+        try:
+            await self._wake()
+            await self._documents()
+            if not self._stop.is_set():
+                await self._deactivate()
+        finally:
+            # However the run ends, stopped or failed: inactive in Lekto as in Paperless (MI-05).
+            await self._put_to_sleep()
         self.totals.seconds["total"] = self._clock() - started
         return self.totals
 
@@ -131,15 +135,29 @@ class Run:
                 found = directory.find("user", name or "")
                 if found is not None and str(found["id"]) in self._loaded.ours:
                     targets[str(found["id"])] = str(found["username"])
-        targets.update(dict(self._sleeping))
         for id, name in targets.items():
             found = directory.by_id("user", id)
             if found is not None and found.get("active") is False:
                 continue
-            try:
-                await self._target.set_active(id, False)
-            except ApiError as error:
-                self._progress(f"cannot deactivate {name}: {error}")
+            await self._asleep(id, name)
+
+    async def _put_to_sleep(self) -> None:
+        """Deactivate the users `_wake` woke for this run again, those `_deactivate` left."""
+        while self._sleeping:
+            id, name = self._sleeping.pop()
+            found = self._loaded.directory.by_id("user", id)
+            if found is None or found.get("active") is not False:
+                await self._asleep(id, name)
+
+    async def _asleep(self, id: str, name: str) -> None:
+        try:
+            await self._target.set_active(id, False)
+        except ApiError as error:
+            self._progress(f"cannot deactivate {name}: {error}")
+            return
+        found = self._loaded.directory.by_id("user", id)
+        if found is not None:
+            found["active"] = False
 
     # --- documents ---------------------------------------------------------------------------
 
