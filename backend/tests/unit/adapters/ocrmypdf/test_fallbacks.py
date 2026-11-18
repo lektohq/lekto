@@ -86,6 +86,9 @@ class Runs:
         self.hidden_text = False  # the source carries the invisible layer of another OCR
         self.unreadable_text = False  # the source has text in a font without a character map
         self.vision_error: str | None = None  # what the vision plugin leaves of a failed page
+        self.timeouts: list[timedelta] = []  # the time each run was given
+        self.took = timedelta(0)  # how long each run takes on the clock
+        self.clock = 0.0  # seconds, as `monotonic` gives them
 
     async def __call__(
         self,
@@ -100,6 +103,8 @@ class Runs:
             return Completed(returncode=0, stdout="tesseract 5.5.0\n", stderr="")
         self.calls.append(list(args))
         self.tails.append(tail)
+        self.timeouts.append(timeout)
+        self.clock += self.took.total_seconds()
         code, stderr = self.outcomes.pop(0)
         assert env is not None and "--keep-temporary-files" in args
         kept = Path(env["TMPDIR"]) / "ocrmypdf.io.test"
@@ -124,6 +129,7 @@ def runs(monkeypatch: pytest.MonkeyPatch) -> Runs:
     runs = Runs()
     monkeypatch.setattr(module, "run_process", runs)
     monkeypatch.setattr(module, "count_pages", lambda path: 1)
+    monkeypatch.setattr(module, "monotonic", lambda: runs.clock)
 
     async def text_layer(path: Path, **limits: object) -> TextLayer:
         unreadable = runs.unreadable_text
@@ -233,6 +239,21 @@ async def test_a_signed_pdf_is_processed_again_without_its_signature(
     result, _ = await convert(runs, tmp_path)
     assert (result.pdfa, text_of(result.notes)) == (True, SIGNATURE_NOTE.text)
     assert [options(call) for call in runs.calls] == [("pdfa", False), ("pdfa", True)]
+
+
+async def test_the_time_limit_holds_for_all_runs_together(runs: Runs, tmp_path: Path) -> None:
+    """A second run gets what the first left of the minute; with nothing left there is no
+    further run (AD-05)."""
+    runs.took = timedelta(seconds=40)
+    runs.outcomes = [(2, SIGNATURE), (0, "")]
+    await convert(runs, tmp_path)
+    assert runs.timeouts == [timedelta(minutes=1), timedelta(seconds=20)]
+    runs.calls, runs.timeouts, runs.clock = [], [], 0.0
+    runs.took = timedelta(seconds=61)
+    runs.outcomes = [(2, SIGNATURE), (0, "")]
+    with pytest.raises(TimeoutError):
+        await convert(runs, tmp_path)
+    assert len(runs.calls) == 1
 
 
 def converts_colours(call: list[str]) -> bool:

@@ -64,6 +64,7 @@ from collections.abc import Sequence
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
+from time import monotonic
 
 from PIL import Image, ImageSequence, TiffImagePlugin
 
@@ -265,8 +266,14 @@ class OcrmypdfEngine:
         plugin."""
         notes: list[Reason] = []
         invalidate = False
+        # `timeout` holds for all runs together, as the job's lease and the setting reckon
+        # with it: each run gets what is left (AD-05).
+        deadline = monotonic() + timeout.total_seconds()
 
         async def run(*, pdfa: bool, invalidate: bool, colours: bool = False) -> Completed:
+            left = deadline - monotonic()
+            if left <= 0:
+                raise TimeoutError(f"OCR took longer than {timeout} in all its runs")
             return await self._run(
                 source,
                 output,
@@ -275,7 +282,7 @@ class OcrmypdfEngine:
                 pdfa=pdfa,
                 invalidate=invalidate,
                 env=env,
-                timeout=timeout,
+                timeout=timedelta(seconds=left),
             )
 
         completed = await run(pdfa=True, invalidate=False)
