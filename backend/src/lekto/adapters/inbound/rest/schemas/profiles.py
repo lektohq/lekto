@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.rest.schemas.common import IdentifierKeyOut
 from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.documents import UNSET
 from lekto.core.domain.identifiers import (
@@ -44,11 +45,6 @@ class PersonIdentifierIn(BaseModel):
         )
     )
     value: str = Field(min_length=1, max_length=MAX_IDENTIFIER_VALUE)
-
-
-class PersonIdentifierOut(BaseModel):
-    kind: IdentifierKind
-    value: str = Field(description="Normalised.")
 
 
 class ContactNumberIn(BaseModel):
@@ -122,7 +118,7 @@ class ProfileOut(BaseModel):
     aliases: list[str] = Field(description="Other names (a maiden name), to find the person.")
     birth_date: date | None
     email: str | None = Field(description="Also counts as an identifier.")
-    identifiers: list[PersonIdentifierOut]
+    identifiers: list[IdentifierKeyOut]
     numbers: list[ContactNumberOut] = Field(
         description="The user's customer and personnel numbers at contacts, by contact: found "
         "in a document, they are evidence for the contact and for the user. Only the user and "
@@ -139,8 +135,7 @@ class ProfileOut(BaseModel):
             birth_date=profile.birth_date,
             email=profile.email,
             identifiers=[
-                PersonIdentifierOut(kind=item.kind, value=item.value)
-                for item in profile.identifiers
+                IdentifierKeyOut(kind=item.kind, value=item.value) for item in profile.identifiers
             ],
             numbers=[ContactNumberOut.of(number) for number in found.numbers],
         )

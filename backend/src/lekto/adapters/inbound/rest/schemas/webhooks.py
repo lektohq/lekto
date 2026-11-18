@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.rest.schemas.common import following_offset
-from lekto.adapters.inbound.schemas import ReasonOut, RequestBody
+from lekto.adapters.inbound.schemas import DocumentRefOut, ReasonOut, RequestBody
 from lekto.core.domain.documents import UNSET, Unset
 from lekto.core.domain.tasks import DEFAULT_TIMEOUT, MAX_TIMEOUT, MIN_TIMEOUT
 from lekto.core.domain.validation import MAX_URL_LENGTH
@@ -292,11 +292,6 @@ class WebhookCreated(WebhookOut):
         return cls(**WebhookOut.of(created.webhook).model_dump(), secret=created.secret)
 
 
-class DeliveryDocumentOut(BaseModel):
-    id: UUID
-    title: str
-
-
 class DeliveryOut(BaseModel):
     id: UUID
     webhook_id: UUID
@@ -324,7 +319,7 @@ class DeliveryOut(BaseModel):
         )
     )
     next_attempt_at: datetime | None
-    document: DeliveryDocumentOut | None = Field(
+    document: DocumentRefOut | None = Field(
         description="The document of the event, if the caller may read it."
     )
     document_hidden: bool = Field(
@@ -358,9 +353,7 @@ class DeliveryOut(BaseModel):
             reason=None if delivery.reason is None else ReasonOut.of(delivery.reason),
             next_attempt_at=delivery.next_attempt_at,
             document=(
-                None
-                if document is None
-                else DeliveryDocumentOut(id=document.id, title=document.title)
+                None if document is None else DocumentRefOut(id=document.id, title=document.title)
             ),
             document_hidden=hidden,
         )

@@ -407,6 +407,23 @@ async def test_every_object_in_a_request_body_refuses_unknown_keys(api: Api) -> 
     assert not lenient
 
 
+async def test_one_response_model_per_shape(api: Api) -> None:
+    """Two answers of the same fields share one model, so the generated client has one type
+    for them; what a copy would describe goes to the field that uses it (RA-12)."""
+    components = (await openapi(api))["components"]["schemas"]
+    loose = {"description", "title", "examples", "default"}
+    shapes: dict[str, list[str]] = {}
+    for name, schema in components.items():
+        if name.endswith("Out") and schema.get("properties"):
+            fields = {
+                key: {k: v for k, v in value.items() if k not in loose}
+                for key, value in schema["properties"].items()
+            }
+            shape = json.dumps([fields, sorted(schema.get("required", []))], sort_keys=True)
+            shapes.setdefault(shape, []).append(name)
+    assert [names for names in shapes.values() if len(names) > 1] == []
+
+
 def _models() -> dict[str, list[type[BaseModel]]]:
     found: dict[str, list[type[BaseModel]]] = {}
     for info in pkgutil.walk_packages(lekto.adapters.inbound.__path__, "lekto.adapters.inbound."):

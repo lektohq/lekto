@@ -4447,16 +4447,6 @@ export interface components {
 		 * @enum {string}
 		 */
 		Decider: 'rule' | 'other' | 'fallback' | 'nothing';
-		/** DeliveryDocumentOut */
-		DeliveryDocumentOut: {
-			/**
-			 * Id
-			 * Format: uuid
-			 */
-			id: string;
-			/** Title */
-			title: string;
-		};
 		/** DeliveryOut */
 		DeliveryOut: {
 			/**
@@ -4508,7 +4498,7 @@ export interface components {
 			/** Next Attempt At */
 			next_attempt_at: string | null;
 			/** @description The document of the event, if the caller may read it. */
-			document: components['schemas']['DeliveryDocumentOut'] | null;
+			document: components['schemas']['DocumentRefOut'] | null;
 			/**
 			 * Document Hidden
 			 * @description It is about a document the caller may not read (or one deleted since).
@@ -9096,15 +9086,6 @@ export interface components {
 			/** Value */
 			value: string;
 		};
-		/** PersonIdentifierOut */
-		PersonIdentifierOut: {
-			kind: components['schemas']['IdentifierKind'];
-			/**
-			 * Value
-			 * @description Normalised.
-			 */
-			value: string;
-		};
 		/**
 		 * PipelineOut
 		 * @example {
@@ -9247,7 +9228,7 @@ export interface components {
 			 */
 			email: string | null;
 			/** Identifiers */
-			identifiers: components['schemas']['PersonIdentifierOut'][];
+			identifiers: components['schemas']['IdentifierKeyOut'][];
 			/**
 			 * Numbers
 			 * @description The user's customer and personnel numbers at contacts, by contact: found in a document, they are evidence for the contact and for the user. Only the user and admins see them, here and at the contact.

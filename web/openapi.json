@@ -28800,25 +28800,6 @@
         "title": "Decider",
         "description": "Who would decide a mail now."
       },
-      "DeliveryDocumentOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "title"
-        ],
-        "title": "DeliveryDocumentOut"
-      },
       "DeliveryOut": {
         "properties": {
           "id": {
@@ -28921,7 +28902,7 @@
           "document": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DeliveryDocumentOut"
+                "$ref": "#/components/schemas/DocumentRefOut"
               },
               {
                 "type": "null"
@@ -38567,24 +38548,6 @@
           }
         ]
       },
-      "PersonIdentifierOut": {
-        "properties": {
-          "kind": {
-            "$ref": "#/components/schemas/IdentifierKind"
-          },
-          "value": {
-            "type": "string",
-            "title": "Value",
-            "description": "Normalised."
-          }
-        },
-        "type": "object",
-        "required": [
-          "kind",
-          "value"
-        ],
-        "title": "PersonIdentifierOut"
-      },
       "PipelineOut": {
         "properties": {
           "nodes": {
@@ -38831,7 +38794,7 @@
           },
           "identifiers": {
             "items": {
-              "$ref": "#/components/schemas/PersonIdentifierOut"
+              "$ref": "#/components/schemas/IdentifierKeyOut"
             },
             "type": "array",
             "title": "Identifiers"
