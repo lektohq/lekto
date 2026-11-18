@@ -1,5 +1,8 @@
+import threading
+
 import pytest
 
+from lekto.core.domain import names
 from lekto.core.domain.documents import DocumentChanges
 from lekto.core.domain.errors import (
     ConflictError,
@@ -238,6 +241,36 @@ async def test_required_fields_and_title_patterns(world: World) -> None:
     assert not optional.is_required_for(payslip.id)
     with pytest.raises(ValidationError):
         await service.change_field(admin.id, period.id, required=True)
+
+
+async def test_names_are_compared_outside_the_event_loop_and_only_when_they_change(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every contact's names against each other take a while with thousands; an identifier
+    changes no name (SB-07)."""
+    threads: list[int] = []
+    key = names.match_key
+
+    def keyed(name: str) -> str:
+        threads.append(threading.get_ident())
+        return key(name)
+
+    admin = await world.user(role=Role.ADMIN)
+    service = world.master_data
+    nord = await service.create_contact(admin.id, "Nord Versicherungsgruppe")
+    await service.create_contact(admin.id, "Muster Bank", ["Muster"])
+    monkeypatch.setattr(master_data, "match_key", keyed)
+    renamed = await service.change_contact(admin.id, nord.id, aliases=["Nord Leben"])
+    assert renamed.aliases == ["Nord Leben"] and threads
+    with pytest.raises(ConflictError):
+        await service.change_contact(admin.id, nord.id, aliases=["Muster AG"])  # too close
+    async with world.uow() as uow:
+        assert await learn_alias(uow, nord.id, "Nord Kranken", threshold=SUGGEST) is not None
+    assert threading.get_ident() not in threads
+    threads.clear()
+    number = Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "12345")
+    await service.add_identifier(admin.id, nord.id, number)
+    assert threads == []
 
 
 async def test_learn_alias(world: World) -> None:

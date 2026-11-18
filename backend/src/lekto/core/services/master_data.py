@@ -1,5 +1,6 @@
+import asyncio
 import logging
-from collections.abc import Awaitable, Callable, Collection, Iterator, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from uuid import UUID
@@ -31,7 +32,7 @@ from lekto.core.domain.master_data import (
     one_line,
 )
 from lekto.core.domain.names import match_key, related
-from lekto.core.domain.reasons import Action, ReasonCode, because
+from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
 from lekto.core.domain.rules import References, Rule, RuleScope, title_rule
 from lekto.core.domain.rules_json import definition_to_json
 from lekto.core.domain.sorting import sort_key
@@ -226,7 +227,7 @@ class MasterDataService:
                 if entered is None:
                     entered = [entry for entry in item.identifiers if entry.source is MANUAL]
                 item.set_identifiers(entered, rejected_identifiers)
-            await _check_contact(uow, item)
+            await _check_contact(uow, item, names=name is not None or aliases is not None)
 
         return await self._change(
             actor,
@@ -267,7 +268,7 @@ class MasterDataService:
             _contacts,
             id,
             change,
-            check=lambda uow, item: _check_contact(uow, item),
+            check=lambda uow, item: _check_contact(uow, item, names=False),
             after=lambda uow, item: self._logo_for(uow, item, known),
         )
 
@@ -291,7 +292,11 @@ class MasterDataService:
             item.set_identifiers(manual, [*rejected, dropped])
 
         return await self._change(
-            actor, _contacts, id, change, check=lambda uow, item: _check_contact(uow, item)
+            actor,
+            _contacts,
+            id,
+            change,
+            check=lambda uow, item: _check_contact(uow, item, names=False),
         )
 
     async def _logo_for(self, uow: UnitOfWork, contact: Contact, known: Collection[str]) -> None:
@@ -1214,8 +1219,11 @@ async def _title_rule(uow: UnitOfWork, document_type: DocumentTypeId) -> Rule | 
     return None
 
 
-async def _check_contact(uow: UnitOfWork, contact: Contact) -> None:
-    await _check_contact_names(uow, contact)
+async def _check_contact(uow: UnitOfWork, contact: Contact, *, names: bool = True) -> None:
+    """`names`: whether its name or aliases changed, which the other contacts' are checked
+    against then (SB-07)."""
+    if names:
+        await _check_contact_names(uow, contact)
     await _check_contact_identifiers(uow, contact)
 
 
@@ -1271,28 +1279,28 @@ async def replace_learned_identifiers(
 async def _check_contact_names(uow: UnitOfWork, contact: Contact) -> None:
     """No name or alias of the contact is a name or an alias of another contact. An alias
     must not even match another contact's name or alias the way classification compares
-    names (legal forms and punctuation aside): both would always be equally close."""
-    for other in await uow.contacts.list_all():
-        if other.id == contact.id:
-            continue
+    names (legal forms and punctuation aside): both would always be equally close. Compared
+    in a worker thread, each name's key once: thousands of contacts take a while (SB-07)."""
+    others = [other for other in await uow.contacts.list_all() if other.id != contact.id]
+    conflict = await asyncio.to_thread(_name_conflict, contact, others)
+    if conflict is not None:
+        raise ConflictError(conflict)
+
+
+def _name_conflict(contact: Contact, others: Sequence[Contact]) -> Reason | None:
+    mine = [(name, match_key(name), name in contact.aliases) for name in contact.names()]
+    for other in others:
         for name in contact.names():
             if other.is_named(name):
-                raise ConflictError(
-                    because(ReasonCode.NAME_OF_CONTACT, name=name, contact=other.name)
-                )
-        for mine, theirs in _alias_pairs(contact, other):
-            if match_key(mine) and match_key(mine) == match_key(theirs):
-                raise ConflictError(
-                    because(ReasonCode.NAME_TOO_CLOSE, name=mine, other=theirs, contact=other.name)
-                )
-
-
-def _alias_pairs(contact: Contact, other: Contact) -> Iterator[tuple[str, str]]:
-    """Pairs of their names in which at least one is an alias."""
-    for mine in contact.names():
-        for theirs in other.names():
-            if mine in contact.aliases or theirs in other.aliases:
-                yield mine, theirs
+                return because(ReasonCode.NAME_OF_CONTACT, name=name, contact=other.name)
+        theirs = [(name, match_key(name), name in other.aliases) for name in other.names()]
+        for name, key, alias in mine:
+            for their_name, their_key, their_alias in theirs:
+                if (alias or their_alias) and key and key == their_key:
+                    return because(
+                        ReasonCode.NAME_TOO_CLOSE, name=name, other=their_name, contact=other.name
+                    )
+    return None
 
 
 async def learn_alias(
@@ -1310,9 +1318,27 @@ async def learn_alias(
 
     An alias of another contact that it matches moves (the person's choice is the newer word).
     """
+    contacts = await uow.contacts.list_all()
+    # Every contact's names compared: in a worker thread (SB-07).
+    learned = await asyncio.to_thread(_learned, contacts, contact_id, alias, threshold)
+    if learned is None:
+        return None
+    target, word, giving = learned
+    for other, kept in giving:
+        other.set_aliases(kept)
+        await uow.contacts.update(other)
+    target.set_aliases([*target.aliases, word])
+    await uow.contacts.update(target)
+    return target
+
+
+def _learned(
+    contacts: Sequence[Contact], contact_id: ContactId, alias: str, threshold: float
+) -> tuple[Contact, str, list[tuple[Contact, list[str]]]] | None:
+    """The contact that learns the alias, as written once, and the others that give it up with
+    the aliases they keep; None if nothing is learned (`learn_alias`)."""
     alias = one_line(alias)
     key = match_key(alias)
-    contacts = await uow.contacts.list_all()
     target = next((item for item in contacts if item.id == contact_id), None)
     if not key or target is None or target.is_named(alias):
         return None
@@ -1321,14 +1347,12 @@ async def learn_alias(
     others = [item for item in contacts if item.id != contact_id]
     if any(match_key(other.name) == key for other in others):
         return None
+    giving = []
     for other in others:
         kept = [item for item in other.aliases if match_key(item) != key]
         if len(kept) < len(other.aliases):
-            other.set_aliases(kept)
-            await uow.contacts.update(other)
-    target.set_aliases([*target.aliases, alias])
-    await uow.contacts.update(target)
-    return target
+            giving.append((other, kept))
+    return target, alias, giving
 
 
 def _related(key: str, contact: Contact, threshold: float) -> bool:
