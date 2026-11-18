@@ -224,6 +224,17 @@ async def test_an_answer_nested_deeper_than_the_parser_goes_is_none(world: World
         await world.tasks.answer(task_of(request), token_of(request), b'{"status": "ok"}')
 
 
+async def test_an_answer_with_a_number_that_is_not_finite_is_none(world: World) -> None:
+    """A consumer in Python writes `NaN` by default: refused as JSON, not a node that fails on
+    comparing it or a database that does not store it (DB-04)."""
+    f = await flow(world)
+    await f.arrive()
+    (request,) = f.asked()
+    body = b'{"status": "ok", "answer": {"paid": NaN}}'
+    taken = await world.tasks.answer(task_of(request), token_of(request), body)
+    assert taken.problem == "the answer is not JSON"
+
+
 async def test_an_answer_that_is_not_taken_counts_as_none(world: World) -> None:
     f = await flow(world)
     first, second, third = await f.arrive(), await f.arrive(), await f.arrive()

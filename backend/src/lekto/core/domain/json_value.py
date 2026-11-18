@@ -3,6 +3,7 @@ holds of the expected type, None (or nothing) for anything else. The `require_` 
 input that must fit: a ValidationError that names the place otherwise."""
 
 import json
+import math
 from datetime import date
 from typing import Any
 from uuid import UUID
@@ -16,11 +17,24 @@ type JsonObject = dict[str, JsonValue]
 def loads(text: str | bytes) -> Any:
     """`json.loads` for what someone else wrote: a document nested deeper than the parser goes
     (some 10,000 brackets, 10 KB) is a ValueError like any that is no JSON, not the
-    RecursionError the parser raises, which callers of foreign JSON do not expect (XB-08)."""
+    RecursionError the parser raises, which callers of foreign JSON do not expect (XB-08). So is
+    a number that is not finite (`NaN`, `Infinity`, `1e999`), which JSON does not know and
+    Python writes by default: no comparison, template or `jsonb` takes it (DB-04)."""
     try:
-        return json.loads(text)
+        return json.loads(text, parse_constant=_not_finite, parse_float=_finite)
     except RecursionError:
         raise ValueError("the JSON is nested too deeply") from None
+
+
+def _not_finite(name: str) -> float:
+    raise ValueError(f"{name} is no JSON number")
+
+
+def _finite(written: str) -> float:
+    number = float(written)
+    if not math.isfinite(number):
+        raise ValueError(f"{written} is too large a number")
+    return number
 
 
 def same_json(first: JsonValue, second: JsonValue) -> bool:

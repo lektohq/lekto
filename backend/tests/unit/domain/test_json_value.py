@@ -91,3 +91,11 @@ def test_json_nested_deeper_than_the_parser_goes_is_none() -> None:
     for deep in ("[" * 10_000, b"[" * 100_000):
         with pytest.raises(ValueError, match="nested too deeply"):
             loads(deep)
+
+
+def test_a_number_that_is_not_finite_is_no_json() -> None:
+    """Python writes `NaN` by default; no comparison, template or `jsonb` takes it (DB-04)."""
+    assert loads('{"paid": 1.5, "big": 1e300}') == {"paid": 1.5, "big": 1e300}
+    for text in ('{"paid": NaN}', "[Infinity]", "[-Infinity]", '{"big": 1e999}'):
+        with pytest.raises(ValueError):
+            loads(text)
