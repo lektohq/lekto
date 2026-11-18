@@ -8,6 +8,7 @@ import pytest
 
 from lekto.core.domain.documents import Document, DocumentChanges
 from lekto.core.domain.errors import NotFoundError, PermissionDeniedError, ValidationError
+from lekto.core.domain.ids import DocumentId, new_id
 from lekto.core.domain.inbox import DONE_PERIOD, Departure, Done, InboxTab
 from lekto.core.domain.master_data import Assignment, Contact
 from lekto.core.domain.pipeline import Lane, Node
@@ -369,6 +370,27 @@ async def test_done_goes_by_when_documents_left(world: World) -> None:
     await world.inbox.mark_unseen(owner.id, older.id)
     with pytest.raises(ValidationError, match="cursor"):
         await world.inbox.items(owner.id, tab=InboxTab.DONE, after=older.id)
+
+
+async def test_a_cursor_of_done_tells_nothing_about_others_documents(world: World) -> None:
+    """Another's confirmed document is refused like one that does not exist, as `GET
+    /documents` refuses it; an admin of every inbox may name any (#74; SB-04)."""
+    owner, other = await world.user(), await world.user()
+    admin = await world.user(role=Role.ADMIN)
+    mine = await arrive(world, owner)
+    await world.inbox.mark_seen(owner.id, mine.id)
+    world.clock.advance(MINUTE)
+    theirs = await arrive(world, other, {Node.JUDGE: Returns(UNCERTAIN)})
+    await world.pipeline().confirm(other.id, theirs.id, DocumentChanges())
+    await world.drain()
+    for cursor in (theirs.id, DocumentId(new_id())):
+        with pytest.raises(ValidationError, match="cursor"):
+            await world.inbox.items(owner.id, tab=InboxTab.DONE, after=cursor)
+    # Within reach: the page after it, of the owner's own and of every inbox alike.
+    assert await world.inbox.items(owner.id, tab=InboxTab.DONE, after=mine.id) == []
+    assert (
+        await world.inbox.items(admin.id, tab=InboxTab.DONE, after=theirs.id, all_users=True) == []
+    )
 
 
 async def test_lists_say_whether_a_document_stands_in_the_callers_inbox(world: World) -> None:
