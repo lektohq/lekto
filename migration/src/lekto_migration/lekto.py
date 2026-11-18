@@ -12,6 +12,10 @@ RETRY_STATUS = {500, 502, 503, 504}
 DELAYS = (1.0, 3.0, 10.0)
 
 
+PAGE_SIZE = 200
+"""Documents of one page of `GET /documents`: as many as Lekto gives (`PAGE_LIMIT`)."""
+
+
 class ApiError(Exception):
     """A request Lekto refused. `existing` is the document a duplicate upload collided with."""
 
@@ -108,7 +112,7 @@ class Lekto:
         return cast("list[dict[str, Any]]", await self.request("GET", path, params=params))
 
     async def documents(self, *, cursor: str | None = None) -> dict[str, Any]:
-        params: dict[str, Any] = {"all_users": "true", "limit": 200}
+        params: dict[str, Any] = {"all_users": "true", "limit": PAGE_SIZE}
         if cursor:
             params["cursor"] = cursor
         return await self._object("GET", "/documents", params=params)

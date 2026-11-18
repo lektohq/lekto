@@ -109,6 +109,9 @@ SHARES = "{shares}"  # before 0.5, when a space had an owner; now an error
 
 MAX_REVIEW_REASON = 500
 """The longest reason for a review, as Lekto takes it (`imports.MAX_REVIEW_REASON`)."""
+MAX_REVIEWS = 50
+"""Reasons for a review of one document at most, as Lekto takes them (`imports.MAX_REVIEWS`):
+more refuse the document's upload (MI-08)."""
 
 
 def norm(name: str) -> str:

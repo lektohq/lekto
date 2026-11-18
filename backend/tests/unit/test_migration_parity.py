@@ -5,11 +5,14 @@ reasons may be. These tests keep each copy equal to Lekto's."""
 from pathlib import Path
 
 import pytest
-from lekto_migration import check, config, expect, mapping, plan
+from lekto_migration import check, config, expect, lekto, mapping, plan, resolve
 
+from lekto.adapters.inbound.rest.schemas.documents import METADATA_LIMIT
 from lekto.composition.env_file import read_env_file
 from lekto.composition.errors import ConfigurationError
-from lekto.core.domain import imports, media_types, validation
+from lekto.core.domain import documents, imports, media_types, spaces, validation
+from lekto.core.domain.fields import FieldType
+from lekto.core.ports.repository import PAGE_LIMIT
 
 SAMPLES = Path(__file__).parent.parent / "samples"
 
@@ -85,3 +88,16 @@ def test_the_client_compares_names_as_lekto_does(name: str) -> None:
 def test_the_client_limits_names_and_review_reasons_as_lekto_does() -> None:
     assert mapping.NAME_LIMIT == validation.MAX_NAME
     assert plan.MAX_REVIEW_REASON == imports.MAX_REVIEW_REASON
+
+
+def test_the_client_keeps_lektos_other_limits_codes_and_names() -> None:
+    """The copies the tests above leave out: a title, the reasons of a review, the kinds of
+    fields, the metadata of an upload, the personal space, a page of documents (MI-08)."""
+    assert mapping.TITLE_LIMIT == documents.MAX_TITLE
+    assert plan.MAX_REVIEWS == imports.MAX_REVIEWS
+    assert {kind.value for kind in FieldType} == plan.DATA_TYPES
+    assert set(plan.REVIEW_CODES.values()) == {code.value for code in imports.PAPERLESS_REVIEWS}
+    assert set(expect.REVIEWED.values()) <= imports.REVIEWABLE
+    assert resolve.METADATA_LIMIT < METADATA_LIMIT
+    assert validation.name_key(spaces.PERSONAL_SPACE_NAME) in plan.PERSONAL_NAMES
+    assert lekto.PAGE_SIZE == PAGE_LIMIT

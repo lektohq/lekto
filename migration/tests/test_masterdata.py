@@ -1,6 +1,7 @@
 """What Lekto needs before the documents come, `prepare` creating it, and documents in terms of
 Lekto's ids."""
 
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -22,6 +23,7 @@ from lekto_migration.masterdata import (
     needs,
     prepare,
 )
+from lekto_migration.plan import MAX_REVIEWS, Review
 from lekto_migration.resolve import resolve
 from tests import fake_lekto
 from tests.fake_lekto import FakeLekto
@@ -324,6 +326,16 @@ def test_names_that_do_not_resolve_are_missing() -> None:
     world = World()
     ten = resolve(world.all()[0], world.directory)
     assert "user 'tobias'" in ten.missing and "contact 'ACME Energy'" in ten.missing
+
+
+def test_a_document_takes_as_many_reasons_for_a_review_as_lekto_does() -> None:
+    """More refuse its upload (MI-08)."""
+    world = World()
+    item = world.all()[0]
+    reasons = tuple((Review(f"look {n}", None, "test"), None) for n in range(MAX_REVIEWS + 3))
+    resolved = resolve(replace(item, review=reasons), world.directory)
+    assert len(resolved.review) == MAX_REVIEWS
+    assert f"3 reasons for a review left out: Lekto takes {MAX_REVIEWS}" in resolved.notes
 
 
 async def test_users_get_their_names_and_e_mail_from_paperless() -> None:
