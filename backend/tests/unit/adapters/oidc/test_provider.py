@@ -4,6 +4,7 @@ token. No network."""
 import time
 from typing import Any
 
+import httpx2
 import pytest
 
 from lekto.adapters.outbound.oidc import AuthlibOidcProvider
@@ -167,6 +168,23 @@ async def test_a_refused_code(oidc_provider: AuthlibOidcProvider, idp: Simulated
     await oidc_provider.authorization_url(state="s", nonce=NONCE, code_verifier=VERIFIER)
     with pytest.raises(AuthenticationError):
         await oidc_provider.authenticate(code="made-up", code_verifier=VERIFIER, nonce=NONCE)
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        httpx2.Response(200, text="<html>maintenance</html>"),
+        httpx2.Response(403, text="<html>forbidden</html>"),
+        httpx2.Response(200, json=["not", "a", "token"]),
+        httpx2.Response(500, json="broken"),
+    ],
+    ids=["html", "html-403", "list", "text-500"],
+)
+async def test_an_unusable_token_answer(idp: SimulatedIdp, answer: httpx2.Response) -> None:
+    """The provider answers unusably, not the sign-in refused, and no raw exception (AD-03)."""
+    idp.token_answer = answer
+    with pytest.raises(IdentityProviderError):
+        await sign_in(provider_for(idp), idp)
 
 
 async def test_a_wrong_client_secret(idp: SimulatedIdp) -> None:

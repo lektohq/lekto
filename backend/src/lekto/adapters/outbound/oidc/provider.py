@@ -15,7 +15,7 @@ import asyncio
 import hmac
 import logging
 import time
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Mapping
 from typing import Any, TypeGuard
 
 import httpx2
@@ -98,6 +98,17 @@ class AuthlibOidcProvider:
         except httpx2.HTTPError as error:
             log.warning("identity provider unreachable", extra={"error": type(error).__name__})
             raise IdentityProviderError("the identity provider cannot be reached") from None
+        except (ValueError, TypeError, AttributeError) as error:
+            # Authlib reads the answer as JSON without checking its form (AD-03).
+            log.warning(
+                "identity provider answered unusably", extra={"error": type(error).__name__}
+            )
+            raise IdentityProviderError("the identity provider answered unusably") from None
+        if not isinstance(token, Mapping):
+            log.warning(
+                "identity provider answered unusably", extra={"error": type(token).__name__}
+            )
+            raise IdentityProviderError("the identity provider answered unusably")
         id_token = token.get("id_token")
         if not isinstance(id_token, str):
             log.warning("identity provider sent no ID token")
