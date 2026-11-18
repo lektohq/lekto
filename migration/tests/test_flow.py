@@ -71,6 +71,18 @@ async def test_a_plan_belongs_to_one_paperless_and_one_lekto(setup: Setup) -> No
     assert await setup.run("check", paperless_url="http://other") == 2
 
 
+@pytest.mark.parametrize("written", ["", "- a list\n", "settings: [\n"])
+async def test_a_plan_file_that_is_no_plan_stops_every_command_alike(
+    setup: Setup, written: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Empty, a list or no YAML at all: a problem of the plan for `plan` too, no traceback
+    (MI-06)."""
+    setup.plan_path.write_text(written, encoding="utf-8")
+    for command in ("plan", "check"):
+        assert await setup.run(command) == 2
+        assert "migration-plan.yaml" in capsys.readouterr().err
+
+
 async def test_a_plan_with_problems_is_reported(setup: Setup) -> None:
     assert await setup.run("plan") == 0
     setup.edit("tags", "tax", "{to: shelf, name: x}")

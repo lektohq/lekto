@@ -241,9 +241,9 @@ async def _plan(
     path, written = config.plan, False
     if path.exists():
         try:
-            document = plans.yaml().load(path.read_text(encoding="utf-8"))
-        except Exception as error:  # ruamel.yaml raises several of its own
-            raise MigrationError(f"{path} is no valid YAML: {error}") from None
+            document = plans.read_yaml(path)
+        except plans.PlanError as error:
+            raise MigrationError("; ".join(error.problems)) from None
         bound(document, config)
         changes = merge(document, snapshot, directory, today)
         if changes:

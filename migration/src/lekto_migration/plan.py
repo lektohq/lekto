@@ -251,6 +251,13 @@ def yaml() -> YAML:
 
 def load(path: Path) -> tuple[Plan, CommentedMap]:
     """The plan in `path` and its YAML (to write it back with comments)."""
+    data = read_yaml(path)
+    return parse(data), data
+
+
+def read_yaml(path: Path) -> CommentedMap:
+    """The YAML of the plan in `path`, unchecked but for being a mapping; PlanError saying what
+    is wrong. For every command, `plan` too (MI-06)."""
     try:
         data = yaml().load(path.read_text(encoding="utf-8"))
     except OSError as error:
@@ -259,7 +266,7 @@ def load(path: Path) -> tuple[Plan, CommentedMap]:
         raise PlanError([f"{path}: not valid YAML ({type(error).__name__}: {error})"]) from None
     if not isinstance(data, CommentedMap):
         raise PlanError([f"{path}: the plan is a mapping of settings and sections"])
-    return parse(data), data
+    return data
 
 
 def parse(data: Mapping[str, Any]) -> Plan:
