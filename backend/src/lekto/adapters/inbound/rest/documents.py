@@ -103,6 +103,7 @@ from lekto.core.domain.ids import (
 )
 from lekto.core.domain.imports import ImportedMetadata, ImportedReview
 from lekto.core.domain.inbox import DONE_PERIOD, InboxTab
+from lekto.core.domain.lenses import LensSort
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.validation import to_utc
@@ -118,48 +119,34 @@ inbox = APIRouter(prefix="/inbox", tags=["inbox"], dependencies=PROTECTED)
 EDITORS = "Editors of the document's space and admins"
 
 
-class DocumentSort(StrEnum):
-    """A key to sort by, descending with a `-` before it. Documents without a date come last
-    either way."""
-
-    CREATED = "created_at"
-    CREATED_DESC = "-created_at"
-    DOCUMENT_DATE = "document_date"
-    DOCUMENT_DATE_DESC = "-document_date"
-    TITLE = "title"
-    TITLE_DESC = "-title"
-
-    @property
-    def order(self) -> DocumentOrder:
-        return DocumentOrder(SortKey(self.value.lstrip("-")), ascending=not self.startswith("-"))
-
-
-class DocumentListSort(StrEnum):
-    """The keys of `DocumentSort`, and `field`: by the value of the field `sort_field_id`.
-    Only the list sorts by a field; the search index holds no field values."""
-
-    CREATED = "created_at"
-    CREATED_DESC = "-created_at"
-    DOCUMENT_DATE = "document_date"
-    DOCUMENT_DATE_DESC = "-document_date"
-    TITLE = "title"
-    TITLE_DESC = "-title"
-    FIELD = "field"
-    FIELD_DESC = "-field"
-
-    def order(self, field: FieldId | None) -> DocumentOrder:
-        """ValidationError unless `field` is given exactly for `field` and `-field`."""
-        return DocumentOrder(
-            SortKey(self.value.lstrip("-")), ascending=not self.startswith("-"), field=field
-        )
+DocumentListSort = StrEnum(  # type: ignore[misc]
+    "DocumentListSort",
+    {sort.name: sort.value for sort in LensSort if sort is not LensSort.RELEVANCE},
+)
+DocumentListSort.__doc__ = (
+    "The keys of `DocumentSort`, and `field`: by the value of the field `sort_field_id`.\n"
+    "Only the list sorts by a field; the search index holds no field values."
+)
+DocumentSort = StrEnum(  # type: ignore[misc]
+    "DocumentSort",
+    {
+        sort.name: sort.value
+        for sort in LensSort
+        if sort is not LensSort.RELEVANCE and not sort.by_field
+    },
+)
+DocumentSort.__doc__ = (
+    "A key to sort by, descending with a `-` before it. Documents without a date come last\n"
+    "either way."
+)
+# Both are a lens's sorts (`LensSort`) without `relevance`, the search's without `field` too:
+# a key the lenses gain reaches the list and the search (RA-08).
 
 
-# The list's keys are the search's and `field`: one key more must reach both (fails at import).
-if {key.value for key in DocumentListSort} != {key.value for key in DocumentSort} | {
-    "field",
-    "-field",
-}:
-    raise RuntimeError("DocumentListSort must hold the keys of DocumentSort and field")
+def order_of(sort: str, field: FieldId | None = None) -> DocumentOrder:
+    """A key of `DocumentListSort` or `DocumentSort` as an order; ValidationError unless
+    `field` is given exactly for `field` and `-field`."""
+    return DocumentOrder(SortKey(sort.lstrip("-")), ascending=not sort.startswith("-"), field=field)
 
 
 _UPLOAD_BODY = upload_body(
@@ -474,7 +461,7 @@ async def list_documents(
     user: CurrentUser,
     context: Context,
     filter: Listed,
-    sort: DocumentListSort = DocumentListSort.CREATED_DESC,
+    sort: DocumentListSort = DocumentListSort.CREATED_DESC,  # type: ignore[attr-defined]
     sort_field_id: Annotated[
         UUID | None, Query(description="The field to sort by with `sort=field` or `-field`.")
     ] = None,
@@ -493,7 +480,7 @@ async def list_documents(
     views = await context.documents.query(
         user,
         filter,
-        order=sort.order(None if sort_field_id is None else FieldId(sort_field_id)),
+        order=order_of(sort, None if sort_field_id is None else FieldId(sort_field_id)),
         after=decode_cursor(cursor),
         offset=offset,
         limit=limit,
