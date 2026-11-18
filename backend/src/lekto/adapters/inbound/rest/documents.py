@@ -246,7 +246,7 @@ async def upload(
             via=principal.via,
         )
     finally:
-        await asyncio.shield(asyncio.to_thread(received.file.path.unlink, missing_ok=True))
+        await received.remove()
     url = str(request.url_for("get_document", id=document.id).path)
     response.headers["Location"] = url
     return DocumentAccepted(id=document.id, status_url=url)
@@ -280,7 +280,7 @@ async def new_version(
             user, DocumentId(id), received.file, filename=received.filename
         )
     finally:
-        await asyncio.shield(asyncio.to_thread(received.file.path.unlink, missing_ok=True))
+        await received.remove()
     return _details(view)
 
 
@@ -308,7 +308,7 @@ async def preview_pages(
     try:
         images = await context.editing.preview(user, DocumentId(id), received.file)
     finally:
-        await asyncio.shield(asyncio.to_thread(received.file.path.unlink, missing_ok=True))
+        await received.remove()
     return PagePreviews(pages=await asyncio.to_thread(_data_urls, images))
 
 

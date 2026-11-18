@@ -313,7 +313,7 @@ async def upload_logo(
     try:
         data = await asyncio.to_thread(received.file.path.read_bytes)
     finally:
-        await asyncio.shield(asyncio.to_thread(received.file.path.unlink, missing_ok=True))
+        await received.remove()
     return ContactOut.of(await context.logos.upload(user, ContactId(id), data))
 
 

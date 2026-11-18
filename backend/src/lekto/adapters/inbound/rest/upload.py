@@ -44,11 +44,26 @@ class MalformedUploadError(Exception):
     """The request is not the expected multipart form."""
 
 
+async def remove_files(paths: Collection[Path]) -> None:
+    """Remove temporary files, shielded as a whole: a request cancelled while it waits leaves
+    none of them behind (RA-05)."""
+
+    def remove() -> None:
+        for path in paths:
+            path.unlink(missing_ok=True)
+
+    await asyncio.shield(asyncio.to_thread(remove))
+
+
 @dataclass
 class Upload:
     file: IncomingFile
     filename: str
     fields: dict[str, str]
+
+    async def remove(self) -> None:
+        """Remove the temporary file."""
+        await remove_files([self.file.path])
 
 
 @dataclass(frozen=True)
@@ -64,8 +79,7 @@ class Uploads:
 
     async def remove(self) -> None:
         """Remove the temporary files."""
-        for item in self.files:
-            await asyncio.shield(asyncio.to_thread(item.file.path.unlink, missing_ok=True))
+        await remove_files([item.file.path for item in self.files])
 
 
 async def read_upload(
