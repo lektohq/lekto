@@ -267,23 +267,28 @@ class OcrmypdfEngine:
         notes: list[Reason] = []
         invalidate = False
         # `timeout` holds for all runs together, as the job's lease and the setting reckon
-        # with it: each run gets what is left (AD-05).
-        deadline = monotonic() + timeout.total_seconds()
+        # with it: each run gets what the runs before it left (AD-05).
+        spent = timedelta(0)
 
         async def run(*, pdfa: bool, invalidate: bool, colours: bool = False) -> Completed:
-            left = deadline - monotonic()
-            if left <= 0:
+            nonlocal spent
+            left = timeout - spent
+            if left <= timedelta(0):
                 raise TimeoutError(f"OCR took longer than {timeout} in all its runs")
-            return await self._run(
-                source,
-                output,
-                [*extra, *COLOUR_OPTIONS] if colours else extra,
-                work,
-                pdfa=pdfa,
-                invalidate=invalidate,
-                env=env,
-                timeout=timedelta(seconds=left),
-            )
+            started = monotonic()
+            try:
+                return await self._run(
+                    source,
+                    output,
+                    [*extra, *COLOUR_OPTIONS] if colours else extra,
+                    work,
+                    pdfa=pdfa,
+                    invalidate=invalidate,
+                    env=env,
+                    timeout=left,
+                )
+            finally:
+                spent += timedelta(seconds=monotonic() - started)
 
         completed = await run(pdfa=True, invalidate=False)
         if completed.returncode == _INPUT_FILE and _SIGNATURE_HINT in completed.stderr:
