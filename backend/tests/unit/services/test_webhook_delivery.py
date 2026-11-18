@@ -7,12 +7,18 @@ import json
 from dataclasses import replace
 from datetime import timedelta
 from decimal import Decimal
+from typing import Any
 
 import pytest
 
 from lekto.adapters.inbound.rest.schemas.outgoing import EventBody
 from lekto.core.domain.documents import Document
-from lekto.core.domain.errors import ConflictError, NotFoundError, TooManyAttemptsError
+from lekto.core.domain.errors import (
+    ConcurrencyError,
+    ConflictError,
+    NotFoundError,
+    TooManyAttemptsError,
+)
 from lekto.core.domain.events import (
     DocumentDeleted,
     DocumentFiled,
@@ -41,8 +47,9 @@ from lekto.core.domain.webhooks import (
     WebhookDelivery,
 )
 from lekto.core.ports.webhook_sender import WebhookRequest
+from lekto.core.services import _jobs
 from lekto.core.services._push_queue import PUSH_JOB
-from lekto.core.services.webhooks import DELIVER_JOB, WebhookDeliveryService
+from lekto.core.services.webhooks import DELIVER_JOB, WebhookDeliveryService, delivery
 from lekto.core.services.webhooks.delivery import queue_rule_send
 from lekto.core.services.webhooks.management import serving_model_call
 from tests import builders
@@ -312,6 +319,39 @@ async def test_a_delivery_is_signed_sent_and_logged(world: World) -> None:
     assert row.event_id == event.id and row.document_id == document.id
     assert [j.status for j in deliveries(world)] == [JobStatus.DONE]
     assert not await service.run_next_job()
+
+
+async def test_the_result_is_stored_however_often_the_webhook_changed_meanwhile(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """As every job's result (`JobRunner.storing`): read again while the claim holds. Three
+    conflicts in a row lost the result, and the request went out again after the lease
+    (SC-08)."""
+    user = await world.user()
+    document = await seed(world, user)
+    webhook, _ = await hook(world, user)
+    service = world.webhook_delivery()
+    await queue(world, document, service)
+    row, conflicts = delivery._row, 4
+
+    def changed_meanwhile(*args: Any) -> WebhookDelivery:
+        nonlocal conflicts
+        if conflicts:
+            conflicts -= 1
+            raise ConcurrencyError("the webhook changed meanwhile")
+        return row(*args)
+
+    async def at_once(attempt: int) -> None:
+        return None
+
+    monkeypatch.setattr(delivery, "_row", changed_meanwhile)
+    monkeypatch.setattr(_jobs, "_backoff", at_once)
+
+    assert await service.run_next_job()
+    assert len(world.sender.requests) == 1
+    (logged,) = await log(world, webhook)
+    assert logged.outcome is DeliveryOutcome.DELIVERED
+    assert [j.status for j in deliveries(world)] == [JobStatus.DONE]
 
 
 async def test_a_renewed_secret_signs_next_to_the_new_one_during_the_grace_period(

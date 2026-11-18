@@ -116,7 +116,6 @@ TASK_RETRY = RetryPolicy(
 5 minutes."""
 
 _RETRY_STATUS = frozenset({408, 425, 429})
-_RESULT_ROUNDS = 3  # tries to write the result when the webhook is changed at the same time
 ATTEMPT_LEASE_MARGIN = timedelta(seconds=60)
 """Time a delivery job may take beyond the timeout of its attempt: one request needs no files,
 only writing its outcome (less than `WORK_LEASE_MARGIN` of the jobs that move files)."""
@@ -415,54 +414,50 @@ class WebhookDeliveryService:
     ) -> None:
         """One transaction: log row (if the webhook is still there), the task (delivered, or
         failed: its node goes on as without an answer), the job. If the task changed at the
-        same moment (answered at once), read it again."""
-        for round_ in range(_RESULT_ROUNDS):
+        same moment (answered at once), read it again (`JobRunner.storing`, SC-08)."""
+
+        async def store() -> None:
             now = self._clock.now()
             next_attempt = (
                 TASK_RETRY.next_run(attempt, now) if outcome is DeliveryOutcome.RETRYING else None
             )
-            try:
-                async with self._uow() as uow:
-                    webhook = await uow.webhooks.find(task.webhook_id)
-                    if webhook is not None:
-                        await uow.webhooks.add_delivery(
-                            _row(
-                                webhook,
-                                EventId(task.id),
-                                event_type,
-                                task.document_id,
-                                attempt,
-                                started,
-                                response,
-                                outcome,
-                                next_attempt,
-                            )
+            async with self._uow() as uow:
+                webhook = await uow.webhooks.find(task.webhook_id)
+                if webhook is not None:
+                    await uow.webhooks.add_delivery(
+                        _row(
+                            webhook,
+                            EventId(task.id),
+                            event_type,
+                            task.document_id,
+                            attempt,
+                            started,
+                            response,
+                            outcome,
+                            next_attempt,
                         )
-                    current = await uow.tasks.find(task.id)
-                    if current is not None and current.status is TaskStatus.OPEN:
-                        if outcome is DeliveryOutcome.DELIVERED:
-                            current.delivered()
-                            await uow.tasks.update(current)
-                        elif next_attempt is None:
-                            name = webhook.name if webhook is not None else str(task.webhook_id)
-                            error = response.error or _status_text(response)
-                            current.fail(
-                                because(ReasonCode.TASK_UNDELIVERED, webhook=name, error=error),
-                                now,
-                            )
-                            await end_task(uow, current, now)
-                    if next_attempt is not None:
-                        await uow.jobs.reschedule(
-                            job, run_at=next_attempt, error=response.error or _status_text(response)
+                    )
+                current = await uow.tasks.find(task.id)
+                if current is not None and current.status is TaskStatus.OPEN:
+                    if outcome is DeliveryOutcome.DELIVERED:
+                        current.delivered()
+                        await uow.tasks.update(current)
+                    elif next_attempt is None:
+                        name = webhook.name if webhook is not None else str(task.webhook_id)
+                        error = response.error or _status_text(response)
+                        current.fail(
+                            because(ReasonCode.TASK_UNDELIVERED, webhook=name, error=error), now
                         )
-                    else:
-                        await uow.jobs.complete(job, now=now)
-                    await uow.commit()
-            except ConcurrencyError:
-                if round_ + 1 == _RESULT_ROUNDS:
-                    raise
-                continue
-            return
+                        await end_task(uow, current, now)
+                if next_attempt is not None:
+                    await uow.jobs.reschedule(
+                        job, run_at=next_attempt, error=response.error or _status_text(response)
+                    )
+                else:
+                    await uow.jobs.complete(job, now=now)
+                await uow.commit()
+
+        await self._jobs.storing(job, store)
 
     def _outcome(self, response: WebhookResponse, attempt: int) -> DeliveryOutcome:
         if _is_success(response):
@@ -578,57 +573,59 @@ class WebhookDeliveryService:
         outcome: DeliveryOutcome,
     ) -> None:
         """One transaction: log row, counter of the webhook, job. If the webhook is changed at
-        the same moment, read it again and retry."""
-        for round_ in range(_RESULT_ROUNDS):
+        the same moment, read it again and retry (`JobRunner.storing`, SC-08)."""
+        switched_off: bool | None = None
+        owner: UserId | None = None
+
+        async def store() -> None:
+            nonlocal switched_off, owner
             now = self._clock.now()
             next_attempt = (
                 self._retry.next_run(attempt, now) if outcome is DeliveryOutcome.RETRYING else None
             )
-            switched_off: bool | None = None
-            try:
-                async with self._uow() as uow:
-                    webhook = await uow.webhooks.find(webhook_id)
-                    if webhook is not None:
-                        delivery = _row(
-                            webhook,
-                            event_id,
-                            event_type,
-                            document_id,
-                            attempt,
-                            started,
-                            response,
-                            outcome,
-                            next_attempt,
+            off: bool | None = None
+            async with self._uow() as uow:
+                webhook = await uow.webhooks.find(webhook_id)
+                if webhook is not None:
+                    delivery = _row(
+                        webhook,
+                        event_id,
+                        event_type,
+                        document_id,
+                        attempt,
+                        started,
+                        response,
+                        outcome,
+                        next_attempt,
+                    )
+                    await uow.webhooks.add_delivery(delivery)
+                    off = await self._count(uow, webhook, outcome, now)
+                    if off is not None:
+                        await uow.webhooks.update(webhook)
+                    if off:
+                        await queue_push(
+                            uow,
+                            now,
+                            [webhook.owner_id],
+                            PushKind.WEBHOOK_DISABLED,
+                            {"webhook_id": str(webhook.id), "name": webhook.name},
                         )
-                        await uow.webhooks.add_delivery(delivery)
-                        switched_off = await self._count(uow, webhook, outcome, now)
-                        if switched_off is not None:
-                            await uow.webhooks.update(webhook)
-                        if switched_off:
-                            await queue_push(
-                                uow,
-                                now,
-                                [webhook.owner_id],
-                                PushKind.WEBHOOK_DISABLED,
-                                {"webhook_id": str(webhook.id), "name": webhook.name},
-                            )
-                    if next_attempt is not None:
-                        await uow.jobs.reschedule(
-                            job, run_at=next_attempt, error=response.error or _status_text(response)
-                        )
-                    else:
-                        await uow.jobs.complete(job, now=self._clock.now())
-                    await uow.commit()
-            except ConcurrencyError:
-                if round_ + 1 == _RESULT_ROUNDS:
-                    raise
-                continue
-            if webhook is not None and switched_off:
-                log.warning(
-                    "webhook switched off after repeated failures",
-                    extra={"webhook_id": str(webhook_id), "owner_id": str(webhook.owner_id)},
-                )
-            return
+                if next_attempt is not None:
+                    await uow.jobs.reschedule(
+                        job, run_at=next_attempt, error=response.error or _status_text(response)
+                    )
+                else:
+                    await uow.jobs.complete(job, now=self._clock.now())
+                await uow.commit()
+            # Only what was stored counts.
+            switched_off, owner = off, None if webhook is None else webhook.owner_id
+
+        await self._jobs.storing(job, store)
+        if switched_off:
+            log.warning(
+                "webhook switched off after repeated failures",
+                extra={"webhook_id": str(webhook_id), "owner_id": str(owner)},
+            )
 
     async def _count(
         self, uow: UnitOfWork, webhook: Webhook, outcome: DeliveryOutcome, now: datetime
