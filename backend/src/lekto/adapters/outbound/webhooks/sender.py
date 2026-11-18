@@ -34,13 +34,11 @@ class HttpWebhookSender:
         self,
         *,
         user_agent: str,
-        connect_timeout: float = CONNECT_TIMEOUT,
         transport: httpx2.AsyncBaseTransport | None = None,
         resolver: Resolver = system_resolver,
     ) -> None:
         """`transport` and `resolver` replace the network and the name server in tests."""
         self._user_agent = user_agent
-        self._connect_timeout = connect_timeout
         self._transport = transport
         self._resolve = resolver
 
@@ -70,7 +68,7 @@ class HttpWebhookSender:
                         transport=self._transport,
                         follow_redirects=False,
                         trust_env=False,
-                        timeout=httpx2.Timeout(limit, connect=min(self._connect_timeout, limit)),
+                        timeout=httpx2.Timeout(limit, connect=min(CONNECT_TIMEOUT, limit)),
                     ) as client,
                     client.stream(
                         "POST",

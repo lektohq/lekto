@@ -63,7 +63,6 @@ _IMAGE_FORMATS = ("PNG", "JPEG", "WEBP")
 @dataclass(frozen=True)
 class Answer:
     url: httpx2.URL  # the last one, after redirects
-    content_type: str
     body: bytes
 
     @property
@@ -212,7 +211,7 @@ class HttpLogoFetcher:
                     if kind not in accept:
                         raise LogoFetchError(f"content type '{kind}'")
                     body = await self._body(response, whole)
-                    return Answer(target, kind, body)
+                    return Answer(target, body)
                 finally:
                     await response.aclose()
         raise LogoFetchError(f"more than {MAX_REDIRECTS} redirects")

@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from lekto.adapters.outbound.sklearn import SklearnClassifier
-from lekto.adapters.outbound.sklearn.classifier import FORMAT, _Model, analyze, fit
+from lekto.adapters.outbound.sklearn.classifier import FORMAT, _Model, analyze, fit, fitted
 from lekto.core.domain.errors import ClassifierError
 from lekto.core.ports.classifier import TrainingExample
 from tests.contracts.classifier import INSURER, INVOICE, ClassifierContract, corpus
@@ -43,31 +43,32 @@ def test_words_and_pairs() -> None:
     ],
 )
 def test_the_prediction_is_scikit_learns(text: str) -> None:
-    data, _, fitted = fit(corpus())
+    examples = corpus()
+    (data, _), found = fit(examples), fitted(examples)
     prediction = _Model.load(data).predict(text)
-    vector = fitted.vectorizer.transform([text])
-    assert fitted.contact is not None and fitted.document_type is not None
+    vector = found.vectorizer.transform([text])
+    assert found.contact is not None and found.document_type is not None
     expected = dict(
-        zip(fitted.contact.classes_, fitted.contact.predict_proba(vector)[0], strict=True)
+        zip(found.contact.classes_, found.contact.predict_proba(vector)[0], strict=True)
     )
     assert {str(key): value for key, value in prediction.contacts} == pytest.approx(expected)
     kinds = dict(
         zip(
-            fitted.document_type.classes_,
-            fitted.document_type.predict_proba(vector)[0],
+            found.document_type.classes_,
+            found.document_type.predict_proba(vector)[0],
             strict=True,
         )
     )
     assert {str(key): value for key, value in prediction.document_types} == pytest.approx(kinds)
-    for tag, model in fitted.tags.items():
+    for tag, model in found.tags.items():
         assert prediction.tags[tag] == pytest.approx(model.predict_proba(vector)[0][1], abs=1e-5)
-    assert fitted.topic is not None
-    topics = dict(zip(fitted.topic.classes_, fitted.topic.predict_proba(vector)[0], strict=True))
+    assert found.topic is not None
+    topics = dict(zip(found.topic.classes_, found.topic.predict_proba(vector)[0], strict=True))
     assert {str(key): value for key, value in prediction.topics} == pytest.approx(topics)
 
 
 def test_a_model_is_plain_arrays() -> None:
-    data, summary, _ = fit(corpus())
+    data, summary = fit(corpus())
     with np.load(io.BytesIO(data), allow_pickle=False) as archive:
         assert str(archive["format"]) == FORMAT
         # Two classes: one row, for the second one (as scikit-learn keeps it).
@@ -82,7 +83,7 @@ def test_a_model_is_plain_arrays() -> None:
 
 
 def test_a_model_from_before_topics_knows_none() -> None:
-    data, _, _ = fit(corpus())
+    data, _ = fit(corpus())
     with np.load(io.BytesIO(data), allow_pickle=False) as archive:
         arrays = {name: archive[name] for name in archive.files if not name.startswith("topic_")}
     buffer = io.BytesIO()
@@ -93,7 +94,7 @@ def test_a_model_from_before_topics_knows_none() -> None:
 
 def test_a_model_from_before_spaces_knows_none() -> None:
     examples = [replace(item, space=str(index % 2)) for index, item in enumerate(corpus())]
-    data, summary, _ = fit(examples)
+    data, summary = fit(examples)
     classes = summary["classes"]
     assert isinstance(classes, dict) and classes["space"] == 2
     with np.load(io.BytesIO(data), allow_pickle=False) as archive:
@@ -116,11 +117,12 @@ def test_with_more_classes_too() -> None:
         TrainingExample(f"Nord Versicherung Beitragsrechnung Police {n}", INSURER, INVOICE)
         for n in range(3)
     ]
-    data, _, fitted = fit([*corpus(), *insurer])
+    examples = [*corpus(), *insurer]
+    (data, _), found = fit(examples), fitted(examples)
     text = "Nord Versicherung Beitrag"
     prediction = _Model.load(data).predict(text)
-    assert fitted.contact is not None and len(fitted.contact.classes_) == 3
-    probabilities = fitted.contact.predict_proba(fitted.vectorizer.transform([text]))[0]
-    expected = dict(zip(fitted.contact.classes_, probabilities, strict=True))
+    assert found.contact is not None and len(found.contact.classes_) == 3
+    probabilities = found.contact.predict_proba(found.vectorizer.transform([text]))[0]
+    expected = dict(zip(found.contact.classes_, probabilities, strict=True))
     assert {str(key): value for key, value in prediction.contacts} == pytest.approx(expected)
     assert prediction.contacts[0][0] == INSURER

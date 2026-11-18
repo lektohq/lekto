@@ -116,14 +116,12 @@ class WebPushSender:
         *,
         private_key: str,
         subject: str,
-        timeout: float = TIMEOUT,
         user_agent: str,
         transport: httpx2.AsyncBaseTransport | None = None,
     ) -> None:
         """`transport` replaces the network in tests."""
         self._key = private_key_of(private_key)
         self._subject = subject
-        self._timeout = timeout
         self._user_agent = user_agent
         self._transport = transport
 
@@ -147,19 +145,17 @@ class WebPushSender:
         error: str | None = None
         try:
             body = encrypt(payload, device.public_key, device.auth_secret)
-            async with asyncio.timeout(self._timeout):
+            async with asyncio.timeout(TIMEOUT):
                 async with httpx2.AsyncClient(
                     transport=self._transport,
                     follow_redirects=False,
                     trust_env=False,
-                    timeout=httpx2.Timeout(
-                        self._timeout, connect=min(CONNECT_TIMEOUT, self._timeout)
-                    ),
+                    timeout=httpx2.Timeout(TIMEOUT, connect=min(CONNECT_TIMEOUT, TIMEOUT)),
                 ) as client:
                     response = await client.post(device.endpoint, content=body, headers=headers)
                     status = response.status_code
         except (TimeoutError, httpx2.TimeoutException):
-            error = f"no answer within {self._timeout:g} seconds"
+            error = f"no answer within {TIMEOUT:g} seconds"
         except httpx2.HTTPError as failure:
             error = describe_failure(failure)
         except (httpx2.InvalidURL, ValueError, OSError) as failure:
