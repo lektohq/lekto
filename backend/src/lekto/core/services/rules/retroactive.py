@@ -440,19 +440,18 @@ class RuleApplicationService:
             await self._abort(job, error)
 
     async def _abort(self, job: Job, error: Exception) -> None:
-        """An unexpected error: end the application, so it does not run again and again."""
-        try:
-            async with self._uow() as uow:
-                await uow.jobs.fail(job, now=self._clock.now(), error=reason_of(error))
-                application = await uow.rule_applications.find(
-                    RuleApplicationId(UUID(str(job.payload.get("application_id"))))
-                )
-                if application is not None and application.finished_at is None:
-                    application.finish(self._clock.now(), error="stopped by an internal error")
-                    await uow.rule_applications.update(application)
-                await uow.commit()
-        except (ConcurrencyError, ValueError):
-            log.warning("could not end a failed rule application", extra={"job_id": str(job.id)})
+        """An unexpected error: end the application, so it does not run again and again, and
+        fail its job as every given up job fails, the admins told (`JobRunner.end`; SB-08). The
+        payload was read before (`_run` ends an unreadable one as invalid)."""
+        id = RuleApplicationId(UUID(str(job.payload.get("application_id"))))
+
+        async def stop(uow: UnitOfWork) -> None:
+            application = await uow.rule_applications.find(id)
+            if application is not None and application.finished_at is None:
+                application.finish(self._clock.now(), error="stopped by an internal error")
+                await uow.rule_applications.update(application)
+
+        await self._jobs.end(job, error=reason_of(error), also=stop)
 
     async def _run(self, job: Job) -> None:
         try:

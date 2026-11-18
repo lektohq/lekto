@@ -23,11 +23,13 @@ from lekto.core.domain.ids import (
 )
 from lekto.core.domain.pipeline import Lane, Node
 from lekto.core.domain.progress import ProgressStatus
+from lekto.core.domain.push import PushKind
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.rules import ForceReview
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.ports.repository import DocumentFilter
 from lekto.core.services import bulk
+from lekto.core.services._push_queue import PUSH_JOB
 from lekto.core.services.bulk import BulkService, Selection
 from lekto.core.services.search import SearchItem, SearchMode, SearchPage, SearchService
 from tests import builders
@@ -218,6 +220,31 @@ def test_a_selection_takes_ids_or_a_filter_and_words_not_both() -> None:
         with pytest.raises(ValidationError) as caught:
             Selection(ids=ids, **selection)
         assert caught.value.reason == because(ReasonCode.BULK_IDS_AND_FILTER)
+
+
+async def test_an_unexpected_error_ends_the_operation_and_tells_the_admins(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """As every job given up (`JobRunner.end`; SB-08)."""
+    r = await rule_world(world)
+    owner = await world.user()
+    document = await r.arrive(owner)
+    bulk_service = service(r)
+    operation = await bulk_service.start(owner.id, ids(document), BulkAction(BulkKind.CONFIRM))
+
+    async def broken(id: object) -> bool:
+        raise RuntimeError("broken")
+
+    monkeypatch.setattr(bulk_service, "_next_document", broken)
+    assert await bulk_service.run_next_job()
+    done = await bulk_service.get(owner.id, operation.id)
+    assert (done.status, done.error) == (ProgressStatus.FAILED, "stopped by an internal error")
+    told = [
+        job.payload.get("params")
+        for job in world.database.jobs.values()
+        if job.kind == PUSH_JOB and job.payload.get("kind") == PushKind.JOB_FAILED.value
+    ]
+    assert told == [{"kind": bulk.BULK_JOB}]
 
 
 async def test_a_selection_is_bounded(world: World, monkeypatch: pytest.MonkeyPatch) -> None:

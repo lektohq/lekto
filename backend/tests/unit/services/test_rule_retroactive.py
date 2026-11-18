@@ -11,6 +11,7 @@ from lekto.core.domain.errors import NotFoundError, ValidationError
 from lekto.core.domain.ids import DocumentId, new_id
 from lekto.core.domain.pipeline import RULES_APPLY, Lane
 from lekto.core.domain.progress import ProgressStatus
+from lekto.core.domain.push import PushKind
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.rules import (
     Condition,
@@ -23,6 +24,7 @@ from lekto.core.domain.rules import (
 )
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import User
+from lekto.core.services._push_queue import PUSH_JOB
 from lekto.core.services.rules import retroactive, running
 from lekto.core.services.rules.retroactive import BATCH
 from lekto.core.services.rules.running import Prepared, prepare
@@ -504,6 +506,17 @@ async def test_an_unexpected_error_ends_the_application(world: World) -> None:
     done = await r.applications.get(owner.id, application.id)
     assert (done.status, done.error) == (ProgressStatus.FAILED, "stopped by an internal error")
     assert (await r.stored(document)).tag_ids == set()
+    # Given up as every job is: the admins hear of it (SB-08).
+    assert failed_jobs_told(world) == [{"kind": retroactive.APPLY_JOB}]
+
+
+def failed_jobs_told(world: World) -> list[object]:
+    """What the admins are told of jobs given up."""
+    return [
+        job.payload.get("params")
+        for job in world.database.jobs.values()
+        if job.kind == PUSH_JOB and job.payload.get("kind") == PushKind.JOB_FAILED.value
+    ]
 
 
 async def test_applying_a_rule_moves_nothing_where_the_person_could_not_move_it(

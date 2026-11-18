@@ -182,17 +182,17 @@ class BulkService:
             await self._abort(job, error)
 
     async def _abort(self, job: Job, error: Exception) -> None:
-        """An unexpected error: end the operation, so it does not run again and again."""
-        try:
-            async with self._uow() as uow:
-                await uow.jobs.fail(job, now=self._clock.now(), error=reason_of(error))
-                operation = await uow.bulk_operations.find(_operation_id(job))
-                if operation is not None and not operation.finished:
-                    operation.finish(self._clock.now(), error="stopped by an internal error")
-                    await uow.bulk_operations.update(operation)
-                await uow.commit()
-        except (ConcurrencyError, KeyError, ValueError):
-            log.warning("could not end a failed bulk operation", extra={"job_id": str(job.id)})
+        """An unexpected error: end the operation, so it does not run again and again, and fail
+        its job as every given up job fails, the admins told (`JobRunner.end`; SB-08). The
+        payload was read before (`_run` ends an unreadable one as invalid)."""
+
+        async def stop(uow: UnitOfWork) -> None:
+            operation = await uow.bulk_operations.find(_operation_id(job))
+            if operation is not None and not operation.finished:
+                operation.finish(self._clock.now(), error="stopped by an internal error")
+                await uow.bulk_operations.update(operation)
+
+        await self._jobs.end(job, error=reason_of(error), also=stop)
 
     async def _run(self, job: Job) -> None:
         try:
