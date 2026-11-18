@@ -41,7 +41,7 @@ async def test_admins_list_spaces_of_everyone_and_manage_them(world: World) -> N
         await world.spaces.list_spaces(stranger.id, all_users=True)
     assert (await world.spaces.get(admin.id, office.id)).id == office.id
 
-    renamed = await world.spaces.rename(admin.id, office.id, "Büro")
+    renamed = await world.spaces.change(admin.id, office.id, name="Büro")
     assert renamed.name == "Büro"
     assert renamed.members == {owner.id: SpaceRole.EDIT, friend.id: SpaceRole.READ}
     shared = await world.spaces.set_member(admin.id, office.id, stranger.id, SpaceRole.EDIT)
@@ -56,7 +56,7 @@ async def test_admins_list_spaces_of_everyone_and_manage_them(world: World) -> N
     # Nobody else gains anything.
     for user in (friend, stranger):
         with pytest.raises((PermissionDeniedError, NotFoundError)):
-            await world.spaces.rename(user.id, office.id, "Mine")
+            await world.spaces.change(user.id, office.id, name="Mine")
 
     await world.spaces.delete(admin.id, office.id)
     with pytest.raises(NotFoundError):
@@ -66,7 +66,7 @@ async def test_admins_list_spaces_of_everyone_and_manage_them(world: World) -> N
     other = await world.spaces.create(owner.id, "Other")
     await world.users.update(boss.id, admin.id, active=False)
     with pytest.raises(AuthenticationError):
-        await world.spaces.rename(admin.id, other.id, "Gone")
+        await world.spaces.change(admin.id, other.id, name="Gone")
     with pytest.raises(AuthenticationError):
         await world.spaces.list_spaces(admin.id)
 
@@ -86,9 +86,11 @@ async def test_admins_control_other_users_documents_in_every_lane(world: World) 
 
     assert await world.documents.processing_log(admin.id, yellow.id)
     assert (await world.documents.review(admin.id, yellow.id)).document.id == yellow.id
-    changed = await world.documents.update_metadata(
-        admin.id, yellow.id, DocumentChanges(title="By the admin")
-    )
+    changed = (
+        await world.documents.change_metadata(
+            admin.id, yellow.id, DocumentChanges(title="By the admin")
+        )
+    ).document
     assert changed.title == "By the admin"
 
     # Its space's editor has it in the inbox; the admin not, unless they ask for all users.

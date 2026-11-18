@@ -431,7 +431,7 @@ async def test_values_set_meanwhile_are_kept(world: World) -> None:
     async with world.uow() as uow:
         await uow.contacts.add(chosen)
         await uow.commit()
-    await world.documents.update_metadata(
+    await world.documents.change_metadata(
         s.owner.id, s.document.id, DocumentChanges(contact_id=chosen.id)
     )
     await s.pipeline.confirm(

@@ -792,7 +792,7 @@ async def test_classified_tags_are_added_to_the_documents_tags(world: World) -> 
         await uow.commit()
     pipeline = world.pipeline({Node.JUDGE: Changes(DocumentChanges(), frozenset({strom.id}))})
     owner, document = await receive(world, pipeline)
-    await world.documents.update_metadata(
+    await world.documents.change_metadata(
         owner.id, document.id, DocumentChanges(tag_ids=frozenset({mine.id}))
     )
     await world.drain(pipeline)

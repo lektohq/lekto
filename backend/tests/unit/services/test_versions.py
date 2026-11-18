@@ -270,7 +270,7 @@ async def test_a_new_version_keeps_what_a_person_confirmed_and_waits_in_the_inbo
     contact = await world.master_data.create_contact(admin.id, "INTER")
     document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
     await world.drain()
-    await world.documents.update_metadata(
+    await world.documents.change_metadata(
         owner.id,
         document.id,
         DocumentChanges(contact_id=contact.id, document_date=date(2022, 11, 25)),

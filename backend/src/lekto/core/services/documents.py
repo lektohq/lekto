@@ -1139,20 +1139,6 @@ class DocumentService:
             log = await readable_log(uow, user, await uow.processing_log.list_for(id))
         return Review(document, access, open_nodes(document, log), node_reviews(log))
 
-    async def update_metadata(
-        self,
-        actor: UserId,
-        id: DocumentId,
-        changes: DocumentChanges,
-        *,
-        via: ViaToken | None = None,
-    ) -> Document:
-        """Needs write access. Referenced contact, type, topic, tags and fields must exist; the
-        topic is one the contact enables, or an admin's choice enables it there
-        (`_access.checked_changes`). A change of confirming metadata confirms the document,
-        unless it only adds or removes tags set by hand (`documents.confirms`)."""
-        return (await self.change_metadata(actor, id, changes, via=via)).document
-
     async def change_metadata(
         self,
         actor: UserId,
@@ -1163,9 +1149,13 @@ class DocumentService:
         confirm: bool = True,
         via: ViaToken | None = None,
     ) -> MetadataChange:
-        """As `update_metadata`, and the change rules of the document's space and the global
-        ones run (see `rules.changes`). The rules' report is for its editors and admins. With
-        `dry_run`, nothing is stored: what would happen. Without `confirm` (an admin, on a
+        """Needs write access. Referenced contact, type, topic, tags and fields must exist; the
+        topic is one the contact enables, or an admin's choice enables it there
+        (`_access.checked_changes`). A change of confirming metadata confirms the document,
+        unless it only adds or removes tags set by hand (`documents.confirms`). The change
+        rules of the document's space and the global ones run (see `rules.changes`). The
+        rules' report is for its editors and admins. With `dry_run`, nothing is stored: what
+        would happen. Without `confirm` (an admin, on a
         document taken over from another system: the migration aligns it with its source), the
         change neither confirms the document nor counts as a person's decision; the checks and
         the rules are the same. `via`: the API token the caller acts through, kept with the

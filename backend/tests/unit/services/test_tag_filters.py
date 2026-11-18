@@ -77,7 +77,7 @@ async def tags(world: World) -> Tags:
         ("Schreiben d", DocumentChanges()),
     ):
         document = await setup.document(owner, text)
-        await world.documents.update_metadata(owner.id, document.id, changes)
+        await world.documents.change_metadata(owner.id, document.id, changes)
         documents.append(document)
     await setup.settle()
     return Tags(

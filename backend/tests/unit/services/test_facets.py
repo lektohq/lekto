@@ -88,7 +88,7 @@ async def scene(world: World) -> Scene:
         )
     ):
         document = await setup.document(user, f"Schreiben {number}")
-        await world.documents.update_metadata(user.id, document.id, changes)
+        await world.documents.change_metadata(user.id, document.id, changes)
         documents.append(document)
     await setup.settle()
     return Scene(

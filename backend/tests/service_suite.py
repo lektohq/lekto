@@ -180,10 +180,15 @@ class ServicesOverPersistence:
         async with uow_factory() as uow:
             await uow.documents.add(document)
             await uow.commit()
-        await documents.update_metadata(owner.id, document.id, DocumentChanges(contact_id=nord.id))
+        await documents.change_metadata(owner.id, document.id, DocumentChanges(contact_id=nord.id))
+
+        async def with_topic() -> Document:
+            changes = DocumentChanges(topic_id=work.id)
+            return (await documents.change_metadata(owner.id, document.id, changes)).document
+
         results = await asyncio.gather(
             master.change_contact(admin.id, nord.id, topic_ids=[]),
-            documents.update_metadata(owner.id, document.id, DocumentChanges(topic_id=work.id)),
+            with_topic(),
             return_exceptions=True,
         )
         assert sorted(type(result).__name__ for result in results) in (

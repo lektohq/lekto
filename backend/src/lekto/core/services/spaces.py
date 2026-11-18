@@ -100,9 +100,6 @@ class SpaceService:
             await uow.commit()
         return space
 
-    async def rename(self, actor: UserId, id: SpaceId, name: str) -> Space:
-        return await self.change(actor, id, name=name)
-
     async def change(
         self,
         actor: UserId,

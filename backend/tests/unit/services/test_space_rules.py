@@ -239,7 +239,7 @@ async def test_change_rules_that_file_it_run_the_target_s_rules(world: World) ->
     )
     document = await rules.arrive(tobi)
     assert document.lane is Lane.GREEN
-    await rules.documents.update_metadata(
+    await rules.documents.change_metadata(
         tobi.id, document.id, DocumentChanges(contact_id=utility.id)
     )
     changed = await rules.stored(document)

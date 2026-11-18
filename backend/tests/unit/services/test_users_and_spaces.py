@@ -54,7 +54,7 @@ async def test_a_creator_edits_renames_and_shares_spaces(world: World) -> None:
     creator, other = await world.user(), await world.user()
     space = await world.spaces.create(creator.id, "Household")
     assert space.members == {creator.id: SpaceRole.EDIT}
-    renamed = await world.spaces.rename(creator.id, space.id, "Home")
+    renamed = await world.spaces.change(creator.id, space.id, name="Home")
     assert renamed.name == "Home"
     shared = await world.spaces.set_member(creator.id, space.id, other.id, SpaceRole.READ)
     assert shared.members == {creator.id: SpaceRole.EDIT, other.id: SpaceRole.READ}
@@ -91,8 +91,8 @@ async def test_names_of_shared_spaces_are_unique(world: World) -> None:
         await world.spaces.create(other.id, "taxes")
     second = await world.spaces.create(owner.id, "Insurance")
     with pytest.raises(ConflictError):
-        await world.spaces.rename(owner.id, second.id, "TAXES")
-    assert (await world.spaces.rename(owner.id, first.id, "TAXES")).name == "TAXES"
+        await world.spaces.change(owner.id, second.id, name="TAXES")
+    assert (await world.spaces.change(owner.id, first.id, name="TAXES")).name == "TAXES"
     # The personal spaces share their stored name and are apart.
     assert (await world.spaces.create(owner.id, "Personal")).name == "Personal"
 
@@ -103,17 +103,17 @@ async def test_editors_manage_a_space_readers_do_not(world: World) -> None:
     space = await world.spaces.create(creator.id, "Household")
     await world.spaces.set_member(creator.id, space.id, editor.id, SpaceRole.EDIT)
     await world.spaces.set_member(creator.id, space.id, reader.id, SpaceRole.READ)
-    assert (await world.spaces.rename(editor.id, space.id, "Ours")).name == "Ours"
+    assert (await world.spaces.change(editor.id, space.id, name="Ours")).name == "Ours"
     await world.spaces.set_member(editor.id, space.id, stranger.id, SpaceRole.READ)
     await world.spaces.remove_member(editor.id, space.id, stranger.id)
     with pytest.raises(PermissionDeniedError):
-        await world.spaces.rename(reader.id, space.id, "Mine")
+        await world.spaces.change(reader.id, space.id, name="Mine")
     with pytest.raises(PermissionDeniedError):
         await world.spaces.set_member(reader.id, space.id, stranger.id, SpaceRole.READ)
     with pytest.raises(NotFoundError):
-        await world.spaces.rename(stranger.id, space.id, "Mine")
+        await world.spaces.change(stranger.id, space.id, name="Mine")
     with pytest.raises(NotFoundError):
-        await world.spaces.rename(creator.id, SpaceId(new_id()), "Mine")
+        await world.spaces.change(creator.id, SpaceId(new_id()), name="Mine")
     # A space keeps an editor.
     await world.spaces.remove_member(editor.id, space.id, creator.id)
     with pytest.raises(ValidationError, match="one editor"):
@@ -129,7 +129,7 @@ async def test_a_personal_space_is_shared_by_its_user(world: World) -> None:
     with pytest.raises(PermissionDeniedError, match="its user"):
         await world.spaces.set_member(other.id, personal.id, third.id, SpaceRole.READ)
     with pytest.raises(ValidationError, match="keeps its name"):
-        await world.spaces.rename(user.id, personal.id, "Mine")
+        await world.spaces.change(user.id, personal.id, name="Mine")
     with pytest.raises(ConflictError):
         await world.spaces.delete(user.id, personal.id)
     with pytest.raises(ValidationError, match="always edits"):

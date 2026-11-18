@@ -372,7 +372,7 @@ async def test_only_unused_master_data_is_deleted_by_admins(world: World) -> Non
     unused = await world.master_data.create_tag(admin.id, "unused")
     document = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 x"), filename="x.pdf")
     await world.drain()
-    await world.documents.update_metadata(
+    await world.documents.change_metadata(
         owner.id,
         document.id,
         DocumentChanges(contact_id=contact.id, tag_ids=frozenset({tag.id})),
@@ -403,7 +403,7 @@ async def test_field_definitions_change_without_breaking_values(world: World) ->
     )
     document = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 x"), filename="x.pdf")
     await world.drain()
-    await world.documents.update_metadata(
+    await world.documents.change_metadata(
         owner.id,
         document.id,
         DocumentChanges(document_type_id=invoice.id, fields={kind.id: "a"}),
@@ -518,7 +518,7 @@ async def test_a_tag_is_deleted_only_without_tags_below_it_and_unused(world: Wor
         await uow.commit()
     document = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 x"), filename="x.pdf")
     await world.drain()
-    await world.documents.update_metadata(
+    await world.documents.change_metadata(
         owner.id, document.id, DocumentChanges(tag_ids=frozenset({used.id}))
     )
     for tag, reason in (
@@ -558,18 +558,22 @@ async def test_documents_carry_document_tags_normalised(world: World) -> None:
     document = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 x"), filename="x.pdf")
     await world.drain()
     with pytest.raises(ValidationError, match="not a document tag"):
-        await world.documents.update_metadata(
+        await world.documents.change_metadata(
             owner.id, document.id, DocumentChanges(tag_ids=frozenset({group.id}))
         )
-    changed = await world.documents.update_metadata(
-        owner.id,
-        document.id,
-        DocumentChanges(tag_ids=frozenset({insurance.id, health.id, paid.id})),
-    )
+    changed = (
+        await world.documents.change_metadata(
+            owner.id,
+            document.id,
+            DocumentChanges(tag_ids=frozenset({insurance.id, health.id, paid.id})),
+        )
+    ).document
     assert changed.tag_ids == {health.id, paid.id}
-    parent_only = await world.documents.update_metadata(
-        owner.id, document.id, DocumentChanges(tag_ids=frozenset({insurance.id}))
-    )
+    parent_only = (
+        await world.documents.change_metadata(
+            owner.id, document.id, DocumentChanges(tag_ids=frozenset({insurance.id}))
+        )
+    ).document
     assert parent_only.tag_ids == {insurance.id}
 
 

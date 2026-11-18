@@ -197,15 +197,16 @@ async def test_the_filter_is_applied_to_the_database_state_too(scene: Scene) -> 
     world = scene.setup.world
     admin = await world.user(role=Role.ADMIN)
     contact = await world.master_data.create_contact(admin.id, "Stadtwerke")
-    await world.documents.update_metadata(
+    await world.documents.change_metadata(
         scene.owner.id, scene.shared_document.id, DocumentChanges(contact_id=contact.id)
     )
     await scene.setup.settle()
     only = DocumentFilter(contacts=frozenset({contact.id}))
     assert await scene.ids(scene.owner, "Stromrechnung", only) == {scene.shared_document.id}
-    await world.documents.update_metadata(
+    # The index still says the contact.
+    await world.documents.change_metadata(
         scene.owner.id, scene.shared_document.id, DocumentChanges(contact_id=None)
-    )  # the index still says the contact
+    )
     assert await scene.ids(scene.owner, "Stromrechnung", only) == set()
 
 
