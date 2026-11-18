@@ -224,7 +224,10 @@ class Walker:
                             match, tuple(actions), steps, notes=tuple(notes), log=tuple(log)
                         )
                     if evaluate(group, facts, self.definitions, distrust=True) is not True:
-                        distrusted = (*match.distrusted, *distrusted_fields(group, facts))
+                        distrusted = (
+                            *match.distrusted,
+                            *distrusted_fields(group, facts, self.definitions),
+                        )
                         match = replace(
                             match, trusted=False, distrusted=tuple(dict.fromkeys(distrusted))
                         )

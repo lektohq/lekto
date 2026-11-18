@@ -160,6 +160,22 @@ def test_match_says_which_unconfirmed_values_it_relies_on() -> None:
     ]
 
 
+def test_a_condition_on_a_confirmed_tag_does_not_rely_on_another_unconfirmed_one() -> None:
+    """The contact is unconfirmed, PAID confirmed, OPEN not: the rule relies on the contact
+    alone; naming the tags made their check uncertain on arrival (DB-05)."""
+    filing = rule(
+        SetSpace(SHARED),
+        when=all_(*FROM_ACME.items, cond(ConditionField.TAGS, Operator.CONTAINS, str(PAID))),
+    )
+    facts = Facts.of(
+        doc(contact_id=ACME, tag_ids={PAID, OPEN}),
+        unverified=frozenset({"contact"}),
+        unverified_tags=frozenset({OPEN}),
+    )
+    (match,) = matches([filing], facts, {})
+    assert (match.trusted, match.distrusted) == (False, ("contact",))
+
+
 def test_change_acts_on_the_edge_only() -> None:
     becomes_true = rule(AddTags(frozenset({PAID})), when=FROM_ACME)
     was_true = rule(AddTags(frozenset({URGENT})))
