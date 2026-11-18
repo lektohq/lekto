@@ -144,7 +144,8 @@ class FakeMetadataReader:
     """The metadata of any file it can read: a PDF of one page from the fake producer, an
     image of its kind, one pixel square."""
 
-    async def read_metadata(self, data: bytes) -> FileMetadata:
+    async def read_metadata(self, source: Path) -> FileMetadata:
+        data = await asyncio.to_thread(source.read_bytes)
         _check(data)
         kind = media_types.detect(data[: media_types.SNIFF_SIZE])
         if kind == media_types.PDF:

@@ -3,6 +3,7 @@ import copy
 import hashlib
 import json
 import logging
+import tempfile
 from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -383,6 +384,11 @@ async def _position(
     if last is None:
         raise ValidationError("cursor: its document is gone; start from the first page")
     return DocumentPosition.of(last, order)
+
+
+def _size_and_digest(path: Path) -> tuple[int, str]:
+    with path.open("rb") as handle:
+        return path.stat().st_size, hashlib.file_digest(handle, "sha256").hexdigest()
 
 
 def _code_facts(codes: Sequence[Code], amounts: dict[FieldId, FieldValue]) -> tuple[CodeFacts, ...]:
@@ -946,17 +952,23 @@ class DocumentService:
         return FileInfo(version.media_type, version.original_filename)
 
     async def _stored(self, key: str) -> StoredFile:
-        data = await self._object_store.get(key)
-        digest = await asyncio.to_thread(lambda: hashlib.sha256(data).hexdigest())
-        metadata = None
-        if self._metadata is not None:
-            try:
-                metadata = await self._metadata.read_metadata(data)
-            except UnprocessableDocumentError as error:
-                log.warning(
-                    "a file's metadata cannot be read", extra={"key": key, "reason": str(error)}
-                )
-        return StoredFile(size=len(data), sha256=digest, metadata=metadata)
+        """Size, SHA-256 and metadata of a stored file, read from a temporary copy: an
+        original may be as large as an upload, and the files of a document are a reader's to
+        look at (SB-09)."""
+        with tempfile.TemporaryDirectory(prefix="lekto-file-") as work:
+            path = Path(work) / "file"
+            await self._object_store.download(key, path)
+            size, digest = await asyncio.to_thread(_size_and_digest, path)
+            metadata = None
+            if self._metadata is not None:
+                try:
+                    metadata = await self._metadata.read_metadata(path)
+                except UnprocessableDocumentError as error:
+                    log.warning(
+                        "a file's metadata cannot be read",
+                        extra={"key": key, "reason": str(error)},
+                    )
+        return StoredFile(size=size, sha256=digest, metadata=metadata)
 
     async def document_counts(
         self, actor: UserId, by: CountBy, *, all_users: bool = False

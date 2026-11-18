@@ -9,9 +9,10 @@ are in. A file that cannot be read, or an encrypted PDF, is unprocessable.
 
 import asyncio
 import email.policy
-import io
 import re
 from email.parser import BytesHeaderParser
+from pathlib import Path
+from typing import BinaryIO
 
 import pikepdf
 from PIL import ExifTags, Image, UnidentifiedImageError
@@ -38,18 +39,20 @@ _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
 
 class FileMetadataReader:
-    async def read_metadata(self, data: bytes) -> FileMetadata:
-        return await asyncio.to_thread(_read, data)
+    async def read_metadata(self, source: Path) -> FileMetadata:
+        return await asyncio.to_thread(_read, source)
 
 
-def _read(data: bytes) -> FileMetadata:
-    kind = media_types.detect(data[: media_types.SNIFF_SIZE])
+def _read(source: Path) -> FileMetadata:
+    with source.open("rb") as handle:
+        kind = media_types.detect(handle.read(media_types.SNIFF_SIZE))
+        if kind == media_types.EML:
+            handle.seek(0)
+            return _mail(handle)
     if kind == media_types.PDF:
-        return _pdf(data)
+        return _pdf(source)
     if kind in (media_types.JPEG, media_types.PNG, media_types.TIFF):
-        return _image(data)
-    if kind == media_types.EML:
-        return _mail(data)
+        return _image(source)
     raise UnprocessableDocumentError(because(ReasonCode.FILE_NOT_PDF_OR_IMAGE))
 
 
@@ -66,9 +69,9 @@ def _text(value: object) -> str | None:
 _DAMAGED = (pikepdf.PdfError, RuntimeError)
 
 
-def _pdf(data: bytes) -> FileMetadata:
+def _pdf(source: Path) -> FileMetadata:
     try:
-        pdf = pikepdf.open(io.BytesIO(data))
+        pdf = pikepdf.open(source)
     except pikepdf.PasswordError:
         raise UnprocessableDocumentError(because(ReasonCode.PDF_ENCRYPTED)) from None
     except _DAMAGED:
@@ -110,9 +113,9 @@ def _read_pdf(pdf: pikepdf.Pdf) -> FileMetadata:
     )
 
 
-def _image(data: bytes) -> FileMetadata:
+def _image(source: Path) -> FileMetadata:
     try:
-        with Image.open(io.BytesIO(data)) as image:
+        with Image.open(source) as image:
             dpi = image.info.get("dpi")
             entries: list[MetadataEntry] = []
             exif = image.getexif()
@@ -150,9 +153,9 @@ _MAIL_HEADERS = frozenset(
 """The header lines of a mail its file information shows; the routing ones stay out."""
 
 
-def _mail(data: bytes) -> FileMetadata:
+def _mail(handle: BinaryIO) -> FileMetadata:
     # The header lines alone: the parts of a large mail are not read for them.
-    message = BytesHeaderParser(policy=email.policy.default).parsebytes(data)
+    message = BytesHeaderParser(policy=email.policy.default).parse(handle)
     entries = []
     for name, value in message.items():
         if name.lower() not in _MAIL_HEADERS:

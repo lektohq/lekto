@@ -124,6 +124,27 @@ async def test_the_files_name_the_versions_and_give_an_earlier_one(
             await world.documents.download_version(actor, document.id, number, target)
 
 
+async def test_the_files_are_read_from_a_copy_not_held_in_memory(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An original may be as large as an upload, and every reader may look: copied to a file,
+    hashed and read from there (SB-09)."""
+    owner = await world.user()
+    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
+
+    copied: list[str] = []
+    download = world.object_store.download
+
+    async def copying(key: str, target: Path) -> None:
+        copied.append(key)
+        await download(key, target)
+
+    monkeypatch.setattr(world.object_store, "download", copying)
+    files = await world.documents.files(owner.id, document.id)
+    assert copied == [original_key(document.sha256)]
+    assert (files.original.size, files.original.sha256) == (len(STACK), str(document.sha256))
+
+
 async def test_a_new_version_takes_the_original_s_place_and_runs_anew(world: World) -> None:
     owner = await world.user()
     document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
