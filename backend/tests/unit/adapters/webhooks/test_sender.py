@@ -9,6 +9,7 @@ import pytest
 
 from lekto import __version__
 from lekto.adapters.outbound.webhooks import HttpWebhookSender
+from lekto.composition.container import USER_AGENT
 from lekto.core.ports.webhook_sender import WebhookRequest, WebhookSender
 from tests.contracts.webhook_sender import Receiver, WebhookSenderContract, request
 from tests.webhook_receiver import LocalReceiver
@@ -43,7 +44,7 @@ class TestHttpWebhookSender(WebhookSenderContract):
         self, receiver: LocalReceiver
     ) -> None:
         # The receiver speaks plain HTTP: the TLS handshake fails.
-        sender = HttpWebhookSender()
+        sender = HttpWebhookSender(user_agent=USER_AGENT)
         response = await sender.send(
             request(receiver.url.replace("http://", "https://") + "/hooks/token")
         )
@@ -86,7 +87,9 @@ class _Network:
 
 
 def _sender(network: _Network) -> HttpWebhookSender:
-    return HttpWebhookSender(transport=network.transport(), resolver=network.resolve)
+    return HttpWebhookSender(
+        user_agent=USER_AGENT, transport=network.transport(), resolver=network.resolve
+    )
 
 
 async def test_a_public_target_is_reached_at_the_address_that_was_checked() -> None:

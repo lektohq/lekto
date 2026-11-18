@@ -14,6 +14,7 @@ from PIL import Image
 
 from lekto.adapters.outbound.logos import HttpLogoFetcher
 from lekto.adapters.outbound.logos.fetcher import MAX_REDIRECTS, _pixels
+from lekto.composition.container import USER_AGENT
 from lekto.core.domain.errors import LogoFetchError
 from tests.contracts.images import LOGO_PNG, image
 from tests.contracts.logos import LogoFetcherContract
@@ -54,7 +55,12 @@ def web() -> Web:
 
 
 def fetcher(web: Web, **options: float) -> HttpLogoFetcher:
-    return HttpLogoFetcher(resolver=web.resolve, transport=web.transport, **options)  # type: ignore[arg-type]
+    return HttpLogoFetcher(
+        user_agent=USER_AGENT,
+        resolver=web.resolve,
+        transport=web.transport,
+        **options,  # type: ignore[arg-type]
+    )
 
 
 @pytest.fixture
@@ -309,7 +315,9 @@ async def test_refuses_what_is_too_slow(web: Web) -> None:
         await asyncio.sleep(1)
         return [PUBLIC]
 
-    slow_names = HttpLogoFetcher(resolver=hang, transport=web.transport, deadline=0.05)
+    slow_names = HttpLogoFetcher(
+        user_agent=USER_AGENT, resolver=hang, transport=web.transport, deadline=0.05
+    )
     with pytest.raises(LogoFetchError, match="no logo within"):
         await slow_names.fetch("nord.example")
 
@@ -341,7 +349,7 @@ async def test_sends_no_cookies_and_ignores_proxies_of_the_environment(
     await fetcher(web).fetch("nord.example")
     # The transport saw both (the web stand-in checks that no cookie came along).
     assert len(web.requests) == 2
-    assert web.requests[0].headers["user-agent"] == "Lekto"
+    assert web.requests[0].headers["user-agent"] == USER_AGENT
 
 
 @pytest.mark.parametrize(

@@ -117,7 +117,7 @@ class WebPushSender:
         private_key: str,
         subject: str,
         timeout: float = TIMEOUT,
-        user_agent: str = "Lekto",
+        user_agent: str,
         transport: httpx2.AsyncBaseTransport | None = None,
     ) -> None:
         """`transport` replaces the network in tests."""

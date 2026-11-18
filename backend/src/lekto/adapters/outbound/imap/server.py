@@ -25,7 +25,7 @@ class ImapMailServer:
     def __init__(
         self,
         *,
-        timeout: timedelta = timedelta(seconds=30),
+        timeout: timedelta,
         ssl_context: ssl.SSLContext | None = None,
     ) -> None:
         self._timeout = timeout.total_seconds()

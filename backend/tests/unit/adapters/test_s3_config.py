@@ -15,6 +15,7 @@ def test_a_store_that_does_not_answer_ends_within_the_margin_of_a_lease() -> Non
         bucket="lekto",
         access_key_id="id",
         secret_access_key="secret",
+        path_style=True,
     )
     config = store._config
     assert (config.connect_timeout, config.read_timeout) == (CONNECT_TIMEOUT, READ_TIMEOUT)

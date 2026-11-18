@@ -41,7 +41,7 @@ class S3ObjectStore:
         bucket: str,
         access_key_id: str,
         secret_access_key: str,
-        path_style: bool = True,
+        path_style: bool,
         prefix: str = "",
     ) -> None:
         """`prefix` is put in front of every key, e.g. `tests/<id>/` to keep tests apart."""

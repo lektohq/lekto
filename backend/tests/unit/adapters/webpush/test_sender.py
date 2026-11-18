@@ -18,6 +18,7 @@ from lekto.adapters.outbound.webpush.sender import (
     unb64url,
     vapid_header,
 )
+from lekto.composition.container import USER_AGENT
 from lekto.core.domain.ids import UserId, new_id
 from lekto.core.domain.push import PushKind, PushMessage
 from lekto.core.ports.push import PushOutcome, PushSender
@@ -42,7 +43,10 @@ class TestWebPushSender(PushSenderContract):
     @pytest.fixture
     def sender(self) -> PushSender:
         return WebPushSender(
-            private_key=new_private_key(), subject=SUBJECT, transport=answering(201)
+            private_key=new_private_key(),
+            subject=SUBJECT,
+            user_agent=USER_AGENT,
+            transport=answering(201),
         )
 
 
@@ -86,7 +90,10 @@ def test_the_vapid_token_is_signed_for_the_push_services_origin() -> None:
 async def test_it_posts_an_encrypted_body_with_its_headers() -> None:
     seen: list[httpx2.Request] = []
     sender = WebPushSender(
-        private_key=new_private_key(), subject=SUBJECT, transport=answering(201, seen)
+        private_key=new_private_key(),
+        subject=SUBJECT,
+        user_agent=USER_AGENT,
+        transport=answering(201, seen),
     )
     message = PushMessage(
         kind=PushKind.WAITING, url="/ui/", params={"count": 3}, topic="waiting", ttl_seconds=60
@@ -115,7 +122,10 @@ async def test_it_posts_an_encrypted_body_with_its_headers() -> None:
 )
 async def test_the_answer_decides_the_outcome(status: int, outcome: PushOutcome) -> None:
     sender = WebPushSender(
-        private_key=new_private_key(), subject=SUBJECT, transport=answering(status)
+        private_key=new_private_key(),
+        subject=SUBJECT,
+        user_agent=USER_AGENT,
+        transport=answering(status),
     )
     result = await sender.send(a_device(UserId(new_id())), TEST_MESSAGE)
     assert (result.outcome, result.status_code) == (outcome, status)
@@ -126,7 +136,10 @@ async def test_a_failure_on_the_way_does_not_name_the_address() -> None:
         raise httpx2.ConnectError("refused", request=request)
 
     sender = WebPushSender(
-        private_key=new_private_key(), subject=SUBJECT, transport=httpx2.MockTransport(broken)
+        private_key=new_private_key(),
+        subject=SUBJECT,
+        user_agent=USER_AGENT,
+        transport=httpx2.MockTransport(broken),
     )
     result = await sender.send(a_device(UserId(new_id())), TEST_MESSAGE)
     assert result.outcome is PushOutcome.FAILED and result.status_code is None
@@ -135,4 +148,4 @@ async def test_a_failure_on_the_way_does_not_name_the_address() -> None:
 
 def test_a_key_must_be_32_bytes() -> None:
     with pytest.raises(ValueError):
-        WebPushSender(private_key="c2hvcnQ", subject=SUBJECT)
+        WebPushSender(private_key="c2hvcnQ", subject=SUBJECT, user_agent=USER_AGENT)

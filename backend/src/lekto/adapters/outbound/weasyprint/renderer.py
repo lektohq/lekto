@@ -20,7 +20,6 @@ CHILD = "lekto.adapters.outbound.weasyprint"
 """The module the child process runs (`__main__`)."""
 NO_MAIL = 3
 """Exit code of the child process when the file is no mail."""
-DEFAULT_TIMEOUT = timedelta(minutes=2)
 
 PDF_VARIANT = "pdf/a-3b"
 """PDF/A-3b: an archive like the others (PDF/A-2b and later allow what WeasyPrint writes)."""
@@ -87,9 +86,7 @@ class WeasyPrintMailRenderer:
     `timeout`: TimeoutError after it, the child killed; `memory`: the address space the child
     may take (`run_process`)."""
 
-    def __init__(
-        self, language: str = "de", timeout: timedelta = DEFAULT_TIMEOUT, memory: int | None = None
-    ) -> None:
+    def __init__(self, language: str, *, timeout: timedelta, memory: int | None = None) -> None:
         self._locale = language
         self._timeout = timeout
         self._memory = memory
