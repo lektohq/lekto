@@ -9,12 +9,14 @@ from typing import Any
 import httpx2
 import pytest
 
+from lekto.adapters.inbound.rest.paths import MCP_PATH
 from lekto.adapters.outbound.crypto import Argon2PasswordHasher, PyotpTotp
 from lekto.adapters.outbound.filesystem import FilesystemObjectStore
 from lekto.adapters.outbound.http_client.resolver import system_resolver
 from lekto.adapters.outbound.logos import HttpLogoFetcher
 from lekto.adapters.outbound.meilisearch import MeilisearchIndex
 from lekto.adapters.outbound.memory import FakeLogoFetcher, FakeOcr, FakeParser, ManualClock
+from lekto.adapters.outbound.memory.oidc import FakeOidcProvider
 from lekto.adapters.outbound.ocrmypdf import OcrmypdfEngine
 from lekto.adapters.outbound.ocrmypdf import engine as ocrmypdf_engine
 from lekto.adapters.outbound.ocrmypdf.vision import CONFIG_ENV
@@ -22,13 +24,16 @@ from lekto.adapters.outbound.oidc import AuthlibOidcProvider
 from lekto.adapters.outbound.openai_compat import OpenAiCompatEmbeddings, OpenAiCompatLanguageModel
 from lekto.adapters.outbound.pdfium import LayoutParser
 from lekto.adapters.outbound.pillow import PillowImageNormaliser
+from lekto.adapters.outbound.regex.matcher import RegexPatternMatcher
 from lekto.adapters.outbound.s3 import S3ObjectStore
 from lekto.adapters.outbound.sql import Database, SqlEventBus, SqlUnitOfWorkFactory, migrate
 from lekto.adapters.outbound.system import Completed, SystemClock
 from lekto.adapters.outbound.weasyprint import WeasyPrintMailRenderer
+from lekto.adapters.outbound.webpush.sender import WebPushSender, new_private_key
 from lekto.composition import container
-from lekto.composition.api import health_checks
+from lekto.composition.api import build_app, health_checks
 from lekto.composition.container import (
+    USER_AGENT,
     Closer,
     Opened,
     Persistence,
@@ -38,6 +43,7 @@ from lekto.composition.container import (
 )
 from lekto.composition.errors import AdapterNotAvailableError
 from lekto.composition.settings import Settings
+from lekto.composition.worker import build_worker
 from lekto.core.domain import media_types
 from lekto.core.domain.events import DocumentReceived, DomainEvent, LaneChanged, ReviewRequired
 from lekto.core.domain.ids import DocumentId, new_id
@@ -48,6 +54,7 @@ from lekto.core.domain.users import Role
 from lekto.core.ports.ocr import VisionModel
 from lekto.core.services.nodes import OcrNode, ParseNode
 from lekto.core.services.pipeline import PipelineService
+from lekto.core.services.rules.nodes import ApplyRulesNode
 from tests import builders
 from tests.builders import NOW, SAMPLES, incoming
 from tests.contracts.language_model import REQUEST
@@ -391,6 +398,17 @@ async def test_language_model_and_embeddings_from_settings(network: Network) -> 
     assert timeout_of(embedded) == 20
     assert model.aclose in built.closers and embeddings.aclose in built.closers
     await built.aclose()
+    keyed = build_container(
+        settings(
+            embedding_base_url="http://ollama:11434/v1",
+            embedding_model="bge-m3",
+            embedding_api_key="sk-2",
+        )
+    )
+    assert keyed.embeddings is not None
+    await keyed.embeddings.embed(["Rechnung"])
+    assert network.requests[-1].headers["Authorization"] == "Bearer sk-2"  # TC-06
+    await keyed.aclose()
 
 
 @pytest.mark.usefixtures("offline_adapters")
@@ -514,6 +532,98 @@ def test_the_services_are_tuned_by_the_settings() -> None:
     # Three rounds of embedding and writing, and a margin.
     assert policy.job_lease == 3 * timedelta(minutes=3) + WORK_LEASE_MARGIN
     assert container.indexing_policy_of(settings()).document_prefix == ""
+
+
+def test_the_policies_take_each_setting_as_set() -> None:
+    """A value that is no default for each, so a policy that took another setting or the
+    default would fail ([[review-error-classes]] G-03; TC-06)."""
+    values = settings(
+        session_idle_timeout=timedelta(hours=5),
+        session_max_age=timedelta(days=9),
+        webhooks_per_user=7,
+        webhook_secret_grace=timedelta(hours=3),
+        webhook_timeout=timedelta(seconds=17),
+        webhook_max_attempts=4,
+        webhook_retry_delay=timedelta(seconds=11),
+        webhook_disable_after=6,
+        webhook_private_targets="all",
+        events_max_attempts=3,
+        llm_input_budget=9000,
+        llm_max_tags=40,
+        default_currency="CHF",
+        poor_reading_threshold=0.2,
+        classifier_min_examples=7,
+        classifier_retrain_after=9,
+        classifier_threshold=0.6,
+        confidence_threshold=0.95,
+        contact_suggest_threshold=0.65,
+        search_meaning_min_score=0.4,
+        separator_codes="PATCHT, SEP",
+    )
+    sessions = container.session_policy_of(values)
+    assert (sessions.idle, sessions.max_age) == (timedelta(hours=5), timedelta(days=9))
+    webhooks = container.webhook_policy_of(values)
+    assert (webhooks.per_user, webhooks.secret_grace, webhooks.timeout) == (
+        7,
+        timedelta(hours=3),
+        timedelta(seconds=17),
+    )
+    assert (webhooks.max_attempts, webhooks.retry_delay, webhooks.disable_after) == (
+        4,
+        timedelta(seconds=11),
+        6,
+    )
+    assert webhooks.private_targets.value == "all"
+    assert container.event_retry_of(values).max_attempts == 3
+    policy = container.policy_of(values)
+    assert (policy.input_budget, policy.max_tags, policy.default_currency) == (9000, 40, "CHF")
+    assert policy.poor_reading == 0.2
+    classifier = container.classifier_policy_of(values)
+    assert (classifier.min_examples, classifier.retrain_after, classifier.threshold) == (7, 9, 0.6)
+    thresholds = container.thresholds_of(values)
+    assert (thresholds.accept, thresholds.suggest, thresholds.classifier) == (0.95, 0.65, 0.6)
+    assert container.search_policy_of(values).meaning_min_score == 0.4
+    assert container.separators_of(values) == ("PATCHT", "SEP")
+
+
+async def test_the_services_take_each_setting_as_set() -> None:
+    """The rules, the sign-in through a provider, the worker, the MCP endpoint, push and the
+    patterns' time limit (TC-06)."""
+    key = new_private_key()
+    values = settings(
+        rules_max_text=5000,
+        rules_apply_max_documents=50,
+        rules_pattern_timeout=timedelta(seconds=0.5),
+        oidc_display_name="Muster Login",
+        worker_concurrency=3,
+        worker_shutdown_timeout=timedelta(seconds=12),
+        mcp_enabled=False,
+        push_vapid_private_key=key,
+        push_subject="mailto:jane.doe@example.org",
+    )
+    built = build_container(values)
+    assert isinstance(built.patterns, RegexPatternMatcher)
+    assert built.patterns._timeout == 0.5
+    assert isinstance(built.push_sender, WebPushSender)
+    assert built.push_sender._subject == "mailto:jane.doe@example.org"
+    same_key = WebPushSender(private_key=key, subject="mailto:x", user_agent=USER_AGENT)
+    assert built.push_sender.public_key == same_key.public_key
+    await built.aclose()
+
+    memory = replace(build_memory_container(), oidc=FakeOidcProvider())
+    services = build_services(memory, values)
+    assert (services.rule_applications._max_text, services.rule_applications._max_documents) == (
+        5000,
+        50,
+    )
+    applying = services.pipeline.executor(Node.APPLY_RULES)
+    assert isinstance(applying, ApplyRulesNode) and applying._max_text == 5000
+    assert services.oidc is not None and services.oidc.display_name == "Muster Login"
+    worker = build_worker(memory, values, services)
+    assert (worker._concurrency, worker._shutdown_timeout) == (3, timedelta(seconds=12))
+    paths = {getattr(route, "path", "") for route in build_app(memory, values, services).routes}
+    with_mcp = build_app(build_memory_container(), settings()).routes
+    assert MCP_PATH not in paths and MCP_PATH in {getattr(r, "path", "") for r in with_mcp}
 
 
 async def test_memory_container_runs_the_core() -> None:
