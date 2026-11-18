@@ -21,8 +21,10 @@ from lekto.adapters.inbound.schemas import MAX_POSITION
 from lekto.adapters.outbound.memory import ManualClock
 from lekto.composition.container import build_memory_container, build_services
 from lekto.core.domain.classification import FieldCheck, checks_to_json
+from lekto.core.domain.document_facts import DocumentFact, FactOrigin, FactRole
 from lekto.core.domain.documents import DocumentChanges
 from lekto.core.domain.fields import FieldType, Money
+from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.identity import TokenScope
 from lekto.core.domain.ids import DocumentId, new_id, short_id
 from lekto.core.domain.master_data import TagScope
@@ -575,6 +577,42 @@ async def test_facts_decide_adds_and_rejects_a_fact(api: Api, scene: Scene) -> N
         value="R-1001",
     )
     assert error(reader)
+
+
+async def test_facts_show_an_identifiers_role_and_decision(api: Api, scene: Scene) -> None:
+    """As the web UI shows them: a rejected identifier is no longer shown as found (RA-10)."""
+    await api.container.object_store.put(
+        text_key(DocumentId(UUID(scene.green))),
+        f"{TEXT}Kundennummer 12345678\n".encode(),
+        content_type="text/markdown",
+    )
+    owner = scene.headers["owner"]
+    found = data(await call(api, owner, "documents_get", id=scene.green, include=["facts"]))
+    (fact,) = [fact for fact in found["facts"] if fact["kind"] == "customer_number"]
+    assert (fact["value"], fact["role"], fact.get("state")) == ("12345678", "contact", None)
+    # The facts signal keeps it; then the owner rejects it.
+    number = DocumentFact(
+        kind=IdentifierKind.CUSTOMER_NUMBER,
+        value="12345678",
+        role=FactRole.CONTACT,
+        origins=frozenset({FactOrigin.PATTERN}),
+    )
+    async with api.container.unit_of_work() as uow:
+        await uow.document_facts.replace_found(DocumentId(UUID(scene.green)), [number])
+        await uow.commit()
+    rejected = data(
+        await call(
+            api,
+            owner,
+            "facts_decide",
+            id=scene.green,
+            action="reject",
+            kind="customer_number",
+            value="12345678",
+        )
+    )
+    (fact,) = [fact for fact in rejected["facts"] if fact["kind"] == "customer_number"]
+    assert (fact["role"], fact["state"]) == ("contact", "rejected")
 
 
 async def test_master_data_are_read_by_name(api: Api, scene: Scene) -> None:

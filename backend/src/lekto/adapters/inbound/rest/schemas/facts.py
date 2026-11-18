@@ -1,5 +1,6 @@
 """What a document shows of its contact: names, identifiers and codes."""
 
+from collections.abc import Mapping
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -13,11 +14,16 @@ from lekto.core.domain.document_facts import (
     Holder,
     HolderKind,
     HolderSource,
-    role_of,
 )
-from lekto.core.domain.facts import FoundIdentifier, Span, Strength
-from lekto.core.domain.identifiers import MAX_IDENTIFIER_VALUE, IdentifierKind
-from lekto.core.services.documents import CodeFacts, DocumentFacts, DocumentNumber
+from lekto.core.domain.facts import Span, Strength
+from lekto.core.domain.identifiers import MAX_IDENTIFIER_VALUE, IdentifierKind, Key
+from lekto.core.domain.ids import ContactId
+from lekto.core.services.documents import (
+    CodeFacts,
+    DocumentFacts,
+    DocumentNumber,
+    IdentifierFact,
+)
 from lekto.core.services.fact_decisions import FactAction, FactDecision
 
 
@@ -132,6 +138,31 @@ class FoundIdentifierOut(BaseModel):
             "null for others."
         ),
     )
+
+    @classmethod
+    def of(
+        cls, item: IdentifierFact, others: Mapping[Key, frozenset[ContactId]] | None
+    ) -> "FoundIdentifierOut":
+        found = item.found
+        return cls(
+            kind=found.kind,
+            value=found.value,
+            contact_id=found.contact_id,
+            topic_id=found.topic_id,
+            in_text=found.in_text,
+            in_code=found.in_code,
+            spans=[SpanOut.of(span) for span in found.spans],
+            role=item.role,
+            origins=sorted(item.origins),
+            state=item.state,
+            kept=item.kept,
+            rejected_at=found.rejected_at,
+            holder=HolderOut.of(item.holder),
+            other_contacts=None if others is None else len(others.get(found.key, ())),
+            other_contact_ids=(
+                None if others is None else sorted(others.get(found.key, frozenset()))
+            ),
+        )
 
 
 class DocumentNumberOut(BaseModel):
@@ -348,28 +379,7 @@ class FactsOut(BaseModel):
                 )
                 for item in report.facts.named
             ],
-            identifiers=[
-                FoundIdentifierOut(
-                    kind=item.kind,
-                    value=item.value,
-                    contact_id=item.contact_id,
-                    topic_id=item.topic_id,
-                    in_text=item.in_text,
-                    in_code=item.in_code,
-                    spans=[SpanOut.of(span) for span in item.spans],
-                    role=_role(report, item),
-                    origins=_origins(report, item),
-                    state=_state(report, item),
-                    kept=item.key in report.stored,
-                    rejected_at=item.rejected_at,
-                    holder=HolderOut.of(_holder(report, item)),
-                    other_contacts=None if others is None else len(others.get(item.key, ())),
-                    other_contact_ids=(
-                        None if others is None else sorted(others.get(item.key, frozenset()))
-                    ),
-                )
-                for item in report.facts.identifiers
-            ],
+            identifiers=[FoundIdentifierOut.of(item, others) for item in report.identifiers],
             codes=None if report.codes is None else [CodeOut.of(item) for item in report.codes],
             numbers=[DocumentNumberOut.of(item) for item in report.numbers],
             decided=[DocumentNumberOut.of(item) for item in report.decided],
@@ -389,34 +399,6 @@ class FactsOut(BaseModel):
                 ]
             ),
         )
-
-
-def _role(report: DocumentFacts, item: FoundIdentifier) -> FactRole:
-    kept = report.stored.get(item.key)
-    return role_of(item.kind) if kept is None else kept.role
-
-
-def _holder(report: DocumentFacts, item: FoundIdentifier) -> Holder | None:
-    kept = report.stored.get(item.key)
-    return None if kept is None else kept.holder
-
-
-def _state(report: DocumentFacts, item: FoundIdentifier) -> FactState:
-    kept = report.stored.get(item.key)
-    return FactState.FOUND if kept is None else kept.state
-
-
-def _origins(report: DocumentFacts, item: FoundIdentifier) -> list[FactOrigin]:
-    """The text's patterns and a code as the facts are found now (a row taken over by revision
-    0047 does not know whether a code held it), other sources as kept."""
-    kept = report.stored.get(item.key)
-    found = {
-        *([FactOrigin.PATTERN] if item.in_text else []),
-        *([FactOrigin.CODE] if item.in_code else []),
-    }
-    if kept is not None:
-        found |= kept.origins - {FactOrigin.PATTERN, FactOrigin.CODE}
-    return sorted(found)
 
 
 class FactDecisionIn(RequestBody):

@@ -505,21 +505,32 @@ def _fields(given: dict[str, Any] | Unset, names: Names) -> dict[FieldId, object
 def facts_out(report: DocumentFacts, names: Names) -> list[FactOut]:
     """The facts the document shows as the web UI shows them to the caller: the identifiers of
     contacts (a person's only to who may see them), then its own numbers and those it refers
-    to, with a person's decisions."""
+    to, each with its role and a person's decision (RA-10)."""
     found = [
-        FactOut(kind=item.kind.value, value=item.value, contact=names.contact(item.contact_id))
-        for item in report.facts.identifiers
+        FactOut(
+            kind=item.found.kind.value,
+            value=item.found.value,
+            role=item.role.value,
+            contact=names.contact(item.found.contact_id),
+            state=_decided(item.state),
+        )
+        for item in report.identifiers
     ]
     numbers = [
         FactOut(
             kind=item.fact.kind.value,
             value=item.fact.written or item.fact.value,
             role=item.fact.role.value,
-            state=None if item.fact.state is FactState.FOUND else item.fact.state.value,
+            state=_decided(item.fact.state),
         )
         for item in (*report.numbers, *report.decided)
     ]
     return found + numbers
+
+
+def _decided(state: FactState) -> str | None:
+    """A person's decision; None for a fact as the sources found it."""
+    return None if state is FactState.FOUND else state.value
 
 
 def open_out(item: OpenNode, names: Names) -> OpenOut:

@@ -5,7 +5,13 @@ the facts, and an admin's correction at the contact too."""
 import pytest
 
 from lekto.adapters.outbound.memory import FakeCodeReader
-from lekto.core.domain.document_facts import FactOrigin, FactRole, FactState
+from lekto.core.domain.document_facts import (
+    DocumentFact,
+    FactOrigin,
+    FactRole,
+    FactState,
+    role_of,
+)
 from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import (
     ConflictError,
@@ -13,6 +19,7 @@ from lekto.core.domain.errors import (
     PermissionDeniedError,
     ValidationError,
 )
+from lekto.core.domain.facts import FoundIdentifier
 from lekto.core.domain.first_runs import FACTS, Verdict
 from lekto.core.domain.identifiers import Identifier, IdentifierKind, IdentifierSource
 from lekto.core.domain.identifiers.visibility import seen_by
@@ -20,6 +27,7 @@ from lekto.core.domain.master_data import Contact
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.services.classification.signals import FactsSignal
+from lekto.core.services.documents import IdentifierFact
 from lekto.core.services.fact_decisions import FactAction, FactDecision
 from lekto.core.services.master_data import replace_learned_identifiers
 from lekto.core.services.objects import text_key
@@ -94,6 +102,15 @@ async def test_a_person_adds_corrects_rejects_and_withdraws(world: World) -> Non
         ),
         (K.ORDER_NUMBER, "A77881"): (FactRole.OWN, FactState.ADDED, person),
     }
+    # The report shows the identifier found as the fact kept for it tells (RA-10).
+    report = await service.facts(owner.id, document.id)
+    (customer,) = [item for item in report.identifiers if item.found.kind is K.CUSTOMER_NUMBER]
+    assert (customer.role, customer.state, customer.origins, customer.kept) == (
+        FactRole.CONTACT,
+        FactState.REJECTED,
+        pattern | person,
+        True,
+    )
 
     # A new run of the facts signal leaves the person's decisions as they are.
     before = await kept(world, document)
@@ -118,6 +135,36 @@ async def test_a_person_adds_corrects_rejects_and_withdraws(world: World) -> Non
     assert report.editable
     states = {item.fact.value: item.fact.state for item in report.numbers}
     assert states["M77"] is FactState.REJECTED and states["M78"] is FactState.CORRECTED
+
+
+def test_an_identifier_shows_the_fact_kept_for_it() -> None:
+    """Role and state as kept, else the kind's and found; the text's patterns and a code as
+    found now, other sources as kept (RA-10)."""
+    found = FoundIdentifier(
+        kind=K.CUSTOMER_NUMBER, value="12345678", contact_id=None, in_text=True, in_code=False
+    )
+    fresh = IdentifierFact.of(found, None)
+    assert (fresh.role, fresh.state, fresh.origins, fresh.holder, fresh.kept) == (
+        role_of(K.CUSTOMER_NUMBER),
+        FactState.FOUND,
+        frozenset({FactOrigin.PATTERN}),
+        None,
+        False,
+    )
+    fact = DocumentFact(
+        kind=K.CUSTOMER_NUMBER,
+        value="12345678",
+        role=FactRole.REFERS,
+        origins=frozenset({FactOrigin.CODE, FactOrigin.MODEL}),
+        state=FactState.CORRECTED,
+    )
+    merged = IdentifierFact.of(found, fact)
+    assert (merged.role, merged.state, merged.origins, merged.kept) == (
+        FactRole.REFERS,
+        FactState.CORRECTED,
+        frozenset({FactOrigin.PATTERN, FactOrigin.MODEL}),
+        True,
+    )
 
 
 async def test_what_a_decision_needs(world: World) -> None:

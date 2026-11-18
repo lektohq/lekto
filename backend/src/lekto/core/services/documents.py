@@ -20,9 +20,12 @@ from lekto.core.domain.document_facts import (
     NUMBER_KINDS,
     DocumentFact,
     FactCriterion,
+    FactOrigin,
     FactRole,
     FactState,
+    Holder,
     person_only,
+    role_of,
 )
 from lekto.core.domain.documents import (
     MAX_TAGS,
@@ -39,7 +42,14 @@ from lekto.core.domain.errors import (
     ValidationError,
 )
 from lekto.core.domain.exchanges import RunExchange, exchanges_from_json
-from lekto.core.domain.facts import Facts, Span, facts_in, identifier_spans, on_pages
+from lekto.core.domain.facts import (
+    Facts,
+    FoundIdentifier,
+    Span,
+    facts_in,
+    identifier_spans,
+    on_pages,
+)
 from lekto.core.domain.fields import SORTABLE_TYPES, FieldType, FieldValue
 from lekto.core.domain.first_runs import Decision
 from lekto.core.domain.identifiers import TYPES, IdentifierKind
@@ -228,6 +238,54 @@ class DocumentFacts:
     decided: tuple["DocumentNumber", ...] = ()
     # Whether the caller decides about the facts: an editor of the space or an admin.
     editable: bool = False
+
+    @property
+    def identifiers(self) -> tuple["IdentifierFact", ...]:
+        """The identifiers found (`facts.identifiers`), each with the fact kept for it: what REST
+        and MCP show alike (RA-10)."""
+        return tuple(
+            IdentifierFact.of(item, self.stored.get(item.key)) for item in self.facts.identifiers
+        )
+
+
+@dataclass(frozen=True, kw_only=True)
+class IdentifierFact:
+    """An identifier the document shows (`found`) as the fact kept for it tells: its role (the
+    kind's while none is kept), its state, whose it is, where it comes from, and whether it is
+    `kept`."""
+
+    found: FoundIdentifier
+    role: FactRole
+    state: FactState
+    origins: frozenset[FactOrigin]
+    holder: Holder | None
+    kept: bool
+
+    @classmethod
+    def of(cls, found: FoundIdentifier, kept: DocumentFact | None) -> "IdentifierFact":
+        """The text's patterns and a code as the facts are found now (a row taken over by
+        revision 0047 does not know whether a code held it), other sources as kept."""
+        origins = {
+            *([FactOrigin.PATTERN] if found.in_text else []),
+            *([FactOrigin.CODE] if found.in_code else []),
+        }
+        if kept is None:
+            return cls(
+                found=found,
+                role=role_of(found.kind),
+                state=FactState.FOUND,
+                origins=frozenset(origins),
+                holder=None,
+                kept=False,
+            )
+        return cls(
+            found=found,
+            role=kept.role,
+            state=kept.state,
+            origins=frozenset(origins | (kept.origins - {FactOrigin.PATTERN, FactOrigin.CODE})),
+            holder=kept.holder,
+            kept=True,
+        )
 
 
 @dataclass(frozen=True)
