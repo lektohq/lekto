@@ -21,7 +21,13 @@ from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import User
 from lekto.core.domain.webhooks import RULE_SEND, Webhook
 from lekto.core.services.rules.changes import ChangeRules
-from lekto.core.services.rules.running import SENDS, SENDS_REFUSED, Prepared, refusal
+from lekto.core.services.rules.running import (
+    CHANGES_UNFIT,
+    SENDS,
+    SENDS_REFUSED,
+    Prepared,
+    refusal,
+)
 from lekto.core.services.webhooks import DELIVER_JOB
 from tests import builders
 from tests.builders import TEMPLATES
@@ -278,3 +284,26 @@ async def test_one_check_tells_whether_a_rule_may_send_or_ask(world: World) -> N
     assert await check(WebhookId(new_id()), owner.id, mine) is ReasonCode.RULE_WEBHOOK_GONE
     assert await check(webhook.id, other.id, mine) is ReasonCode.RULE_WEBHOOK_GONE
     assert await check(webhook.id, owner.id, theirs) is ReasonCode.RULE_WEBHOOK_UNREADABLE
+
+
+async def test_a_rule_whose_change_does_not_fit_waits_once_and_sends_nothing(
+    world: World,
+) -> None:
+    """Confirmed, the rules run again and their change does not fit again: only reported then,
+    the document leaves the inbox (SC-11); nothing of the change applied, nothing is sent."""
+    r = await rule_world(world)
+    owner = await world.user()
+    webhook = await hook(world, owner)
+    too_long = SetTitle("{% for i in (1..501) %}x{% endfor %}")
+    await notifying(r, owner, webhook, too_long)
+    document = await r.arrive(owner)
+    assert document.lane is Lane.YELLOW
+    (entry,) = await r.rule_entries(document, RULES)
+    assert [reason.code for reason in entry.result.reasons] == [ReasonCode.RULES_CHANGE_UNFIT]
+    pipeline = r.pipeline()
+    await pipeline.confirm(owner.id, document.id, DocumentChanges(), accept_suggestions=True)
+    await world.drain(pipeline)
+    assert (await r.stored(document)).lane is Lane.GREEN
+    latest = (await r.rule_entries(document, RULES))[-1]
+    assert latest.result.output[CHANGES_UNFIT] != []
+    assert sent(world) == []

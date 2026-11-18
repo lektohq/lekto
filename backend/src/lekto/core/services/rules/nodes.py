@@ -34,6 +34,7 @@ from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import field_definitions
 from lekto.core.services.inbox import MODEL_NODES, latest_entries
 from lekto.core.services.rules.running import (
+    CHANGES_UNFIT,
     SENDS,
     SENDS_REFUSED,
     STEPS_LOG,
@@ -191,6 +192,7 @@ class RulesResult:
         reasons: list[Reason] = []
         sends: list[Send] = []
         refused: list[Reason] = []
+        unfit: list[Reason] = []
         asks: list[Ask] = []
         waiting = False
         failures: list[Reason] = []
@@ -237,13 +239,15 @@ class RulesResult:
                 problem = await apply_plan(
                     uow, document, replace(run.plan, space=None), definitions, now, arrive=not probe
                 )
-                reasons += [problem] if problem else []
+                unfit += [problem] if problem else []
                 break
             problem = await apply_plan(uow, document, run.plan, definitions, now, arrive=not probe)
-            reasons += [problem] if problem else []
-            ok, not_sent = await deliverable(uow, run.sends, document)
-            sends += ok
-            refused += not_sent
+            if problem is not None:
+                unfit.append(problem)  # nothing applied: its requests do not go either (SC-02)
+            else:
+                ok, not_sent = await deliverable(uow, run.sends, document)
+                sends += ok
+                refused += not_sent
             chain.record(run.plan, document)
             if document.space_id == visited[-1]:
                 break
@@ -275,6 +279,13 @@ class RulesResult:
             output[SENDS_REFUSED] = reasons_to_json(refused)
             if not document.processing.decided:
                 reasons += refused
+        if unfit:
+            output[CHANGES_UNFIT] = reasons_to_json(unfit)
+            # Confirming runs the rules again, and their change does not fit again: after a
+            # person decided it is only reported, else the document never leaves the inbox
+            # (SC-11).
+            if not document.processing.decided:
+                reasons += unfit
         # A new version of the original ends in the inbox, whatever it reads, until a person
         # confirmed it there (Tobi, 10.11.2026).
         if document.processing.new_version and not document.processing.decided:

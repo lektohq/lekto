@@ -766,6 +766,9 @@ STEPS_REPORTED = "steps_reported"
 """Key of the answers that did not come after a person decided, only reported."""
 SENDS_REFUSED = "sends_refused"
 """Key of the requests it could not send, with why, in its log entry's output."""
+CHANGES_UNFIT = "changes_unfit"
+"""Key of why the change of the rules of a space did not apply (it does not fit), in the log
+entry's output of the node `apply_rules`."""
 
 
 async def deliverable(
