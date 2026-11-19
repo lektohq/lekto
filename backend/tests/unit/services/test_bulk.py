@@ -25,9 +25,10 @@ from lekto.core.domain.pipeline import Lane, Node
 from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.push import PushKind
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.domain.rights import Actor
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.rules import ForceReview
 from lekto.core.domain.spaces import SpaceRole
+from lekto.core.domain.users import Role
 from lekto.core.ports.repository import DocumentFilter
 from lekto.core.services import bulk
 from lekto.core.services._push_queue import PUSH_JOB
@@ -389,3 +390,28 @@ async def test_only_its_person_and_admins_follow_an_operation(world: World) -> N
     with pytest.raises(NotFoundError):
         await bulk_service.get(Actor(other.id), operation.id)
     assert (await bulk_service.get(Actor(r.admin.id), operation.id)).id == operation.id
+
+
+async def test_an_operation_works_with_the_rights_it_was_started_with(world: World) -> None:
+    """The worker acts as the token the operation came through: an admin's token without
+    `admin:documents_all` changes nothing of another user's (`.knowledge/plans/token-rights.md`)."""
+    r = await rule_world(world)
+    admin, owner = await world.user(role=Role.ADMIN), await world.user()
+    tax = await r.tag("tax")
+    document = await r.arrive(owner)
+    bulk_service = service(r)
+    action = BulkAction(BulkKind.CHANGE_TAGS, add=frozenset({tax.id}))
+
+    limited = Actor(admin.id, frozenset({TokenRight.DOCUMENTS_WRITE}))
+    operation = await bulk_service.start(limited, ids(document), action)
+    assert operation.rights == limited.rights
+    assert await builders.drain(bulk_service) == 1
+    done = await bulk_service.get(Actor(admin.id), operation.id)
+    assert (done.changed, [id for id, _ in done.skipped]) == (0, [document.id])
+    assert (await r.stored(document)).tag_ids == set()
+
+    reaching = Actor(admin.id, frozenset({TokenRight.ADMIN_DOCUMENTS_ALL}))
+    operation = await bulk_service.start(reaching, ids(document), action)
+    assert await builders.drain(bulk_service) == 1
+    assert (await bulk_service.get(Actor(admin.id), operation.id)).changed == 1
+    assert (await r.stored(document)).tag_ids == {tax.id}
