@@ -58,5 +58,6 @@ def build_worker(container: Container, settings: Settings, services: Services) -
         logos=services.logos,
         master_data=services.master_data,
         mail=services.mail_intake,
+        updates=services.updates,
         push=services.push,
     )

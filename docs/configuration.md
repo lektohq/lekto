@@ -297,7 +297,8 @@ logos. Set both variables or neither; without them Lekto sends no notification.
 
 | Variable | Role | Default | Values | Meaning |
 | --- | --- | --- | --- | --- |
-| `LEKTO_LOGO_FETCH` | both | `false` | `true`, `false` | Fetch the logos of contacts from their own websites (the worker fetches, the API offers the button): HTTPS to public addresses only. Off, Lekto never asks the web on its own; uploads work either way |
+| `LEKTO_LOGO_FETCH` | both | `false` | `true`, `false` | Fetch the logos of contacts from their own websites (the worker fetches, the API offers the button): HTTPS to public addresses only. Off, Lekto never asks the websites of contacts; uploads work either way |
+| `LEKTO_UPDATE_CHECK` | both | `true` | `true`, `false` | Look for a newer Lekto: the worker asks GitHub every hour for the releases of `lektohq/lekto` (GitHub sees the address and the user agent `Lekto/<version>`, nothing else); `GET /api/v1/version` and the page System tell what it found. A beta hears of newer betas and stable releases, a stable release of stable ones. Off, Lekto never asks; a development state never asks either |
 
 ## Rules and templates
 

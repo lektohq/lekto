@@ -24,6 +24,7 @@ from lekto.adapters.outbound.crypto import (
     decode_key,
 )
 from lekto.adapters.outbound.filesystem import FilesystemObjectStore
+from lekto.adapters.outbound.github.releases import GitHubReleaseFeed
 from lekto.adapters.outbound.imap import ImapMailServer
 from lekto.adapters.outbound.liquid import LiquidTemplateRenderer
 from lekto.adapters.outbound.logos import HttpLogoFetcher
@@ -102,6 +103,7 @@ from lekto.core.ports.pages import PageRenderer
 from lekto.core.ports.parser import DocumentParser
 from lekto.core.ports.patterns import PatternMatcher
 from lekto.core.ports.push import PushSender
+from lekto.core.ports.releases import ReleaseFeed
 from lekto.core.ports.search_index import SearchIndex
 from lekto.core.ports.templates import TemplateRenderer
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
@@ -156,6 +158,7 @@ from lekto.core.services.spaces import SpaceService
 from lekto.core.services.stream import StreamService
 from lekto.core.services.tasks.desk import TaskDesk
 from lekto.core.services.tasks.service import TaskService
+from lekto.core.services.updates import UpdateService
 from lekto.core.services.users import UserService
 from lekto.core.services.webhooks import (
     WebhookDeliveryService,
@@ -430,6 +433,8 @@ class Container:
     classifier: Classifier | None
     # With `LEKTO_LOGO_FETCH`: Lekto asks the websites of contacts for their logos.
     logo_fetcher: LogoFetcher | None = None
+    # With `LEKTO_UPDATE_CHECK`: the worker asks for Lekto's releases.
+    release_feed: ReleaseFeed | None = None
     closers: tuple[Closer, ...] = field(default=(), repr=False)
 
     async def aclose(self) -> None:
@@ -516,6 +521,7 @@ def build_container(settings: Settings) -> Container:
             else _select(settings.classifier, CLASSIFIERS, settings)
         ),
         logo_fetcher=(_select("httpx2", LOGO_FETCHERS, settings) if settings.logo_fetch else None),
+        release_feed=GitHubReleaseFeed(user_agent=USER_AGENT) if settings.update_check else None,
         closers=tuple(closers),
     )
 
@@ -592,6 +598,7 @@ class Services:
     pipeline: PipelineService
     editing: EditingService
     maintenance: MaintenanceService
+    updates: UpdateService
     jobs: JobsService
     automation: AutomationService
     indexing: IndexingService | None  # with a search index
@@ -978,6 +985,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
             max_attachment=int(settings.upload_max_size),
         ),
         bulk=BulkService(uow, clock, documents, pipeline, search),
+        updates=UpdateService(uow, clock, container.release_feed, running=__version__),
         maintenance=MaintenanceService(
             uow,
             clock,

@@ -3,7 +3,7 @@
   "info": {
     "title": "Lekto DMS API",
     "description": "Lekto is a headless document management system; this API is the only way in.\n\nErrors are problem details (RFC 9457, `application/problem+json`).\n\nAuthentication: a session cookie from `POST /auth/login` (web UI; changing requests also send\nthe header `X-CSRF-Token`) or a personal API token as `Authorization: Bearer lekto_…`. Every\nendpoint needs one of them (401 without), except health, the sign-in endpoints (`POST\n/auth/login` and, below `/auth/oidc`, information, start and callback) and the answer to a task\n(`/external/tasks/{id}/result`, with the task's own token).\n\nAn API token carries rights: the read and write right of each area (`documents`,\n`master_data`, `rules`, `spaces`, `webhooks`, `lenses`, `push`, `system`), `documents:upload`,\n`documents:count` (the numbers alone), and for an admin's token the admin rights one by one\n(`admin:count_all`, `admin:documents_all`, `admin:mailboxes`, `admin:private_webhooks`,\n`admin:manage`), which count only while the user is an active admin. Each operation names the\nright it needs as `x-right` (`any`: every token; `session`: no token); without it a token gets\n403 (`token_lacks_right`). The presets `read`, `read_write` and `upload` give a token the rights\nit had as a scope (`POST /auth/tokens`).\n\nA session is needed, and a token gets 403, for the own account (profile, password, sessions,\nTOTP, API tokens, provider links) and, for admins, for creating a user with a password or the\nrole admin, resetting a user's sign-in and deleting a user. Documents and spaces the caller may\nnot see are \"not found\" (404), the same as ones that do not exist.\n\nThe same services are available to AI clients over MCP (Streamable HTTP, stateless) at\n`/api/v1/mcp`, with the same API tokens as bearer; it is not part of this OpenAPI document.\nTools are named `<area>_<verb>` (such as `documents_search` or `inbox_confirm`); each needs the\nright of its area, a tool for admins also an admin right. `tools/list` names the tools the\ncaller may use.\n",
-    "version": "0.1",
+    "version": "0.2",
     "x-lekto-version": "0.0.0.dev0"
   },
   "paths": {
@@ -25658,6 +25658,85 @@
         ]
       }
     },
+    "/api/v1/version": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "The version and whether a newer one is out",
+        "description": "The running versions of Lekto and of this API, and what the last look at Lekto's releases found (the worker asks GitHub every hour unless `LEKTO_UPDATE_CHECK` is off).",
+        "operationId": "version_api_v1_version_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unauthorized",
+                  "status": 401,
+                  "detail": "authentication is required"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Forbidden",
+                  "status": 403,
+                  "detail": "only editors and admins control the processing of this document"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Internal Server Error",
+                  "status": 500,
+                  "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          }
+        },
+        "x-right": "system:read",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "token": []
+          }
+        ]
+      }
+    },
     "/api/v1/automation": {
       "get": {
         "tags": [
@@ -37347,7 +37426,7 @@
         "title": "Me",
         "examples": [
           {
-            "api_version": "0.1",
+            "api_version": "0.2",
             "authenticated_with": "token",
             "has_password": true,
             "instance_id": "6f1c2a9e-3b4d-4e8f-9a1b-2c3d4e5f6a7b",
@@ -40274,6 +40353,34 @@
         ],
         "title": "RelativePeriod",
         "description": "A period that moves with the day the lens is opened (the quick picks of the filters)."
+      },
+      "ReleaseOut": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "examples": [
+              "0.16.0"
+            ]
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "The release's page on GitHub, with its notes."
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "published_at",
+          "url"
+        ],
+        "title": "ReleaseOut"
       },
       "RemoveTagsAction": {
         "properties": {
@@ -44166,6 +44273,78 @@
           "merged"
         ],
         "title": "VersionKind"
+      },
+      "VersionOut": {
+        "properties": {
+          "lekto_version": {
+            "type": "string",
+            "title": "Lekto Version",
+            "description": "The version of Lekto that answers (its release)."
+          },
+          "api_version": {
+            "type": "string",
+            "title": "Api Version",
+            "description": "The version of this API (`info.version`)."
+          },
+          "update_check": {
+            "type": "boolean",
+            "title": "Update Check",
+            "description": "Whether this instance looks for releases (`LEKTO_UPDATE_CHECK`, and not a development state)."
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At",
+            "description": "The last look; null before the first."
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReleaseOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The newest release that was news at the last look: newer, and stable if the running version is; null if there was none."
+          },
+          "update_available": {
+            "type": "boolean",
+            "title": "Update Available",
+            "description": "Whether `latest` is newer than the running one."
+          }
+        },
+        "type": "object",
+        "required": [
+          "lekto_version",
+          "api_version",
+          "update_check",
+          "checked_at",
+          "latest",
+          "update_available"
+        ],
+        "title": "VersionOut",
+        "examples": [
+          {
+            "api_version": "0.2",
+            "checked_at": "2026-11-19T21:00:00Z",
+            "latest": {
+              "published_at": "2026-11-19T20:12:00Z",
+              "url": "https://github.com/lektohq/lekto/releases/tag/v0.16.0",
+              "version": "0.16.0"
+            },
+            "lekto_version": "0.15.6",
+            "update_available": true,
+            "update_check": true
+          }
+        ]
       },
       "VisibilityOut": {
         "properties": {

@@ -2987,6 +2987,26 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/v1/version': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/**
+		 * The version and whether a newer one is out
+		 * @description The running versions of Lekto and of this API, and what the last look at Lekto's releases found (the worker asks GitHub every hour unless `LEKTO_UPDATE_CHECK` is off).
+		 */
+		get: operations['version_api_v1_version_get'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/v1/automation': {
 		parameters: {
 			query?: never;
@@ -8286,7 +8306,7 @@ export interface components {
 		/**
 		 * Me
 		 * @example {
-		 *       "api_version": "0.1",
+		 *       "api_version": "0.2",
 		 *       "authenticated_with": "token",
 		 *       "has_password": true,
 		 *       "instance_id": "6f1c2a9e-3b4d-4e8f-9a1b-2c3d4e5f6a7b",
@@ -10129,6 +10149,24 @@ export interface components {
 		 * @enum {string}
 		 */
 		RelativePeriod: 'this_year' | 'last_12_months' | 'last_year';
+		/** ReleaseOut */
+		ReleaseOut: {
+			/**
+			 * Version
+			 * @example 0.16.0
+			 */
+			version: string;
+			/**
+			 * Published At
+			 * Format: date-time
+			 */
+			published_at: string;
+			/**
+			 * Url
+			 * @description The release's page on GitHub, with its notes.
+			 */
+			url: string;
+		};
 		/** RemoveTagsAction */
 		RemoveTagsAction: {
 			/**
@@ -11984,6 +12022,50 @@ export interface components {
 		 * @enum {string}
 		 */
 		VersionKind: 'received' | 'replaced' | 'edited' | 'split' | 'separated' | 'merged';
+		/**
+		 * VersionOut
+		 * @example {
+		 *       "api_version": "0.2",
+		 *       "checked_at": "2026-11-19T21:00:00Z",
+		 *       "latest": {
+		 *         "published_at": "2026-11-19T20:12:00Z",
+		 *         "url": "https://github.com/lektohq/lekto/releases/tag/v0.16.0",
+		 *         "version": "0.16.0"
+		 *       },
+		 *       "lekto_version": "0.15.6",
+		 *       "update_available": true,
+		 *       "update_check": true
+		 *     }
+		 */
+		VersionOut: {
+			/**
+			 * Lekto Version
+			 * @description The version of Lekto that answers (its release).
+			 */
+			lekto_version: string;
+			/**
+			 * Api Version
+			 * @description The version of this API (`info.version`).
+			 */
+			api_version: string;
+			/**
+			 * Update Check
+			 * @description Whether this instance looks for releases (`LEKTO_UPDATE_CHECK`, and not a development state).
+			 */
+			update_check: boolean;
+			/**
+			 * Checked At
+			 * @description The last look; null before the first.
+			 */
+			checked_at: string | null;
+			/** @description The newest release that was news at the last look: newer, and stable if the running version is; null if there was none. */
+			latest: components['schemas']['ReleaseOut'] | null;
+			/**
+			 * Update Available
+			 * @description Whether `latest` is newer than the running one.
+			 */
+			update_available: boolean;
+		};
 		/**
 		 * VisibilityOut
 		 * @description Who sees the document: the members of its space; readers only once it is green.
@@ -33083,6 +33165,77 @@ export interface operations {
 					 *       "title": "Unprocessable Content",
 					 *       "status": 422,
 					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Internal Server Error */
+			500: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Internal Server Error",
+					 *       "status": 500,
+					 *       "detail": "an unexpected error occurred"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+		};
+	};
+	version_api_v1_version_get: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['VersionOut'];
+				};
+			};
+			/** @description Unauthorized */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unauthorized",
+					 *       "status": 401,
+					 *       "detail": "authentication is required"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Forbidden */
+			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Forbidden",
+					 *       "status": 403,
+					 *       "detail": "only editors and admins control the processing of this document"
 					 *     }
 					 */
 					'application/problem+json': components['schemas']['Problem'];

@@ -3,10 +3,11 @@
 import uuid
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.transaction import Transaction
+from lekto.core.domain.releases import Release, UpdateCheck
 
 _KEY = 1
 
@@ -29,3 +30,31 @@ class SqlInstanceRepository:
     async def _read(self) -> UUID | None:
         row = (await self._tx.read(select(t.instance.c.id).where(t.instance.c.key == _KEY))).first()
         return None if row is None else UUID(str(row.id))
+
+    async def update_check(self) -> UpdateCheck | None:
+        table = t.instance
+        row = (await self._tx.read(select(table).where(table.c.key == _KEY))).first()
+        if row is None or row.update_checked_at is None:
+            return None
+        latest = None
+        if row.latest_version is not None:
+            latest = Release(
+                version=row.latest_version,
+                published_at=row.latest_published_at,
+                url=row.latest_url,
+            )
+        return UpdateCheck(checked_at=row.update_checked_at, latest=latest)
+
+    async def record_update_check(self, check: UpdateCheck) -> None:
+        await self.id()  # the row, made if it is missing
+        latest = check.latest
+        await self._tx.write(
+            update(t.instance)
+            .where(t.instance.c.key == _KEY)
+            .values(
+                update_checked_at=check.checked_at,
+                latest_version=None if latest is None else latest.version,
+                latest_published_at=None if latest is None else latest.published_at,
+                latest_url=None if latest is None else latest.url,
+            )
+        )

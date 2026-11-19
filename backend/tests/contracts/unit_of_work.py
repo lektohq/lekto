@@ -59,6 +59,7 @@ from lekto.core.domain.profiles import Profile
 from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.reasons import ReasonCode, because, written
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState
+from lekto.core.domain.releases import Release, UpdateCheck
 from lekto.core.domain.rules import (
     AddTags,
     Condition,
@@ -212,6 +213,31 @@ def _repository_of(item: object) -> str:
 
 class UnitOfWorkContract:
     # --- transactions ---------------------------------------------------------------------------
+
+    async def test_the_instance_keeps_its_last_update_check(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        async with uow_factory() as uow:
+            assert await uow.instance.update_check() is None
+        found = Release(
+            version="0.16.0",
+            published_at=datetime(2026, 11, 19, 20, 12, tzinfo=UTC),
+            url="https://github.com/lektohq/lekto/releases/tag/v0.16.0",
+        )
+        first = UpdateCheck(checked_at=datetime(2026, 11, 19, 21, tzinfo=UTC), latest=found)
+        async with uow_factory() as uow:
+            await uow.instance.record_update_check(first)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.instance.update_check() == first
+            id = await uow.instance.id()
+        nothing = UpdateCheck(checked_at=datetime(2026, 11, 19, 22, tzinfo=UTC), latest=None)
+        async with uow_factory() as uow:
+            await uow.instance.record_update_check(nothing)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.instance.update_check() == nothing
+            assert await uow.instance.id() == id  # the id stays
 
     async def test_the_instance_has_one_id_that_stays(self, uow_factory: UnitOfWorkFactory) -> None:
         """Made once (by revision 0083, else by the first unit that asks) and kept; units that

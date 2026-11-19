@@ -40,6 +40,7 @@ from lekto.adapters.inbound.rest import (
     problems,
     push,
     relations,
+    releases,
     rules,
     search,
     spaces,
@@ -247,6 +248,7 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
         relations.router,
         expected.router,
         jobs.router,
+        releases.router,
         automation.router,
         health.router,
     ):

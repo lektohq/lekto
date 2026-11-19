@@ -54,6 +54,7 @@ from lekto.core.services.pipeline import PipelineService
 from lekto.core.services.push import PushService
 from lekto.core.services.rules.retroactive import RuleApplicationService
 from lekto.core.services.tasks.service import TaskService
+from lekto.core.services.updates import UpdateService
 from lekto.core.services.webhooks import WebhookDeliveryService
 
 log = logging.getLogger(__name__)
@@ -108,11 +109,13 @@ class Worker:
         master_data: MasterDataService | None = None,
         mail: MailIntakeService | None = None,
         push: PushService | None = None,
+        updates: UpdateService | None = None,
     ) -> None:
         self._pipeline = pipeline
         self._master_data = master_data
         self._mail = mail
         self._push = push
+        self._updates = updates
         self._logos = logos
         self._classifier = classifier
         self._rules = rules
@@ -142,6 +145,8 @@ class Worker:
         """Run until `stop()`."""
         log.info("worker started", extra={"concurrency": self._concurrency})
         await self._maintenance.schedule()
+        if self._updates is not None:
+            await self._updates.schedule()
         if self._indexing is not None:
             await self._indexing.schedule()
         if self._classifier is not None:
@@ -277,6 +282,7 @@ class Worker:
             self._classifier,
             self._mail,
             self._push,
+            self._updates,
         )
         return tuple(
             kind for service in services if service is not None for kind in service.job_kinds
@@ -304,6 +310,8 @@ class Worker:
             or (self._logos is not None and await self._logos.run_next_job())
             # Training waits for a quiet moment: during a bulk ingest it would be outdated soon.
             or (self._classifier is not None and await self._classifier.run_next_job())
+            # A look for a newer Lekto, once an hour, behind everything.
+            or (self._updates is not None and await self._updates.run_next_job())
         )
 
     async def _deliver(self) -> bool:

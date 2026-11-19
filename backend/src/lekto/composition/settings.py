@@ -331,8 +331,12 @@ class Settings(BaseSettings):
     shortcut_url: Annotated[str, Field(pattern=r"^https://\S+$")] | None = None
 
     # Logos of contacts: fetched from the contact's own website (its domain entered among its
-    # identifiers) when on. Off, Lekto never asks the web on its own; uploads work either way.
+    # identifiers) when on. Off, Lekto never asks their websites; uploads work either way.
     logo_fetch: bool = False
+
+    # Whether a newer Lekto is out: the worker asks GitHub every hour for the releases of
+    # lektohq/lekto (it sees the address and `Lekto/<version>`, nothing else). Off, it never asks.
+    update_check: bool = True
 
     # Rules: the time limit of one regular expression, the characters of document text that
     # text conditions see, and the documents one retroactive application may cover.

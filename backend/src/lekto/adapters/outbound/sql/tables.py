@@ -836,6 +836,11 @@ instance = Table(
     # One row (key 1): the instance's id, random, made by revision 0083; a restore keeps it.
     Column("key", Integer, primary_key=True, autoincrement=False),
     Column("id", Uuid, nullable=False),
+    # The last look at Lekto's releases (revision 0084): when, and the newest that was news.
+    Column("update_checked_at", UtcDateTime, nullable=True),
+    Column("latest_version", Text, nullable=True),
+    Column("latest_published_at", UtcDateTime, nullable=True),
+    Column("latest_url", Text, nullable=True),
 )
 
 api_tokens = Table(
