@@ -1,16 +1,23 @@
 """Every contract suite in `tests/contracts` runs against the in-memory adapter of its port and
-against at least one real adapter (CLAUDE.md, Architecture rules). The test reads the test
-modules instead of importing them: a class that names a suite, directly or through a class of the
-same module, among its bases runs it."""
+against at least one real adapter, and the SQL adapter runs its suites on SQLite and Postgres
+alike (CLAUDE.md, Architecture rules). The test reads the test modules instead of importing them:
+a class that names a suite, directly or through a class of the same module, among its bases runs
+it."""
 
 import ast
 from collections.abc import Iterator
 from pathlib import Path
 
+import pytest
+
+from tests.sql_suite import SQL_SUITES
+
 TESTS = Path(__file__).parents[1]
 CONTRACTS = TESTS / "contracts"
 MEMORY = TESTS / "unit" / "adapters" / "memory"
 ADAPTER_TESTS = (TESTS / "unit" / "adapters", TESTS / "integration" / "adapters")
+SQLITE = TESTS / "unit" / "adapters" / "sql" / "test_sqlite.py"
+POSTGRES = TESTS / "integration" / "adapters" / "sql" / "test_postgres.py"
 
 # The ports without an in-memory adapter: their real adapters need no service and serve the
 # memory container too (architektur.md, Ports und Adapter).
@@ -80,3 +87,10 @@ def test_every_suite_runs_against_a_real_adapter() -> None:
     suites = contracts()
     _, real = heirs(suites)
     assert sorted(suites - real) == []
+
+
+@pytest.mark.parametrize("module", [SQLITE, POSTGRES], ids=lambda path: path.stem)
+def test_the_sql_adapter_runs_its_suites_on_sqlite_and_postgres(module: Path) -> None:
+    """Without it a suite missing on Postgres would run nowhere there, and nothing would fail."""
+    every = contracts() | {"SqlAdapterSuite", "MigrationSuite"}
+    assert sorted(suites_run_by(module, every)) == sorted(SQL_SUITES)

@@ -62,6 +62,33 @@ from tests.service_suite import ServicesOverPersistence
 
 LEASE = timedelta(minutes=5)
 
+SQL_SUITES = frozenset(
+    {
+        "EventBusContract",
+        "IdentityRepositoriesContract",
+        "InboxRepositoryContract",
+        "JobQueueContract",
+        "LensRepositoryContract",
+        "MailOriginRepositoryContract",
+        "MailRecordRepositoryContract",
+        "MailRuleRepositoryContract",
+        "MailboxRepositoryContract",
+        "ProcessingFactsContract",
+        "PushDeviceRepositoryContract",
+        "PushPreferencesRepositoryContract",
+        "RuleRepositoriesContract",
+        "TaskRepositoryContract",
+        "UnitOfWorkContract",
+        "WakeupContract",
+        "WebhookRepositoryContract",
+        "SqlAdapterSuite",
+        "MigrationSuite",
+    }
+)
+"""The suites the SQL adapter runs, on SQLite (`tests/unit/adapters/sql/test_sqlite.py`) and on
+Postgres (`tests/integration/adapters/sql/test_postgres.py`) alike; `test_contract_coverage`
+checks that both run each (TA-01)."""
+
 
 class SqlAdapterSuite(ServicesOverPersistence):
     """The SQL adapter's own tests, and those of services over persistence."""
