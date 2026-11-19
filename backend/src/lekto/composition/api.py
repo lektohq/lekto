@@ -103,6 +103,7 @@ def api_context(container: Container, settings: Settings, services: Services) ->
         expected=services.expected,
         stream=services.stream,
         jobs=services.jobs,
+        updates=services.updates,
         automation=services.automation,
         event_bus=container.event_bus,
         wakeup=container.wakeup,

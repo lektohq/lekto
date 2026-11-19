@@ -35,13 +35,16 @@ from lekto.adapters.outbound.memory import (
     MemoryUnitOfWorkFactory,
     MemoryWakeup,
 )
+from lekto.adapters.outbound.memory.releases import FakeReleaseFeed
 from lekto.core.domain.errors import EmbeddingsError, LanguageModelError
 from lekto.core.domain.jobs import RetryPolicy
+from lekto.core.domain.releases import Release
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.embeddings import EmbeddingResult
 from lekto.core.ports.event_bus import EventBus
 from lekto.core.ports.llm import StructuredRequest
 from lekto.core.ports.object_store import ObjectStore
+from lekto.core.ports.releases import ReleaseFeed
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from tests import builders
 from tests.builders import DEFAULT_SETTINGS
@@ -85,6 +88,7 @@ from tests.contracts.push import (
     PushPreferencesRepositoryContract,
     PushSenderContract,
 )
+from tests.contracts.release_feed import ReleaseFeedContract
 from tests.contracts.rules import RuleRepositoriesContract
 from tests.contracts.search_index import DIMENSIONS, SearchIndexContract
 from tests.contracts.tasks import TaskRepositoryContract
@@ -436,3 +440,13 @@ class TestFakePushSender(PushSenderContract):
 
 class TestMemoryPushPreferences(PushPreferencesRepositoryContract):
     pass
+
+
+class TestMemoryReleaseFeed(ReleaseFeedContract):
+    def feed(self, releases: list[Release], *, draft: str | None = None) -> ReleaseFeed:
+        return FakeReleaseFeed(releases)  # it knows no drafts
+
+    def failing(self) -> ReleaseFeed:
+        feed = FakeReleaseFeed()
+        feed.error = "offline"
+        return feed

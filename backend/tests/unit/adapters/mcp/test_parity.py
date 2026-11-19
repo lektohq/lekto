@@ -25,7 +25,7 @@ class Excluded(StrEnum):
     VLM = "sending pages to a VLM is a person's decision"
     BROWSER = "for the browser: event streams, files, page layout, references in addresses"
     INTERNALS = "raw internals of the processing: the calls of the language model"
-    NOT_FOR_CLIENTS = "health checks and the callbacks of external tasks"
+    NOT_FOR_CLIENTS = "health checks, the versions and the callbacks of external tasks"
 
 
 ACCOUNT, MANAGING, MASTER_DATA = Excluded.ACCOUNT, Excluded.MANAGING, Excluded.MASTER_DATA
@@ -234,6 +234,7 @@ ENDPOINTS: dict[str, str | Excluded] = {
     "POST /webhooks/{id}/test": MANAGING,
     # not for clients
     "GET /health": Excluded.NOT_FOR_CLIENTS,
+    "GET /version": Excluded.NOT_FOR_CLIENTS,
     "POST /external/tasks/{id}/result": Excluded.NOT_FOR_CLIENTS,
     "GET /external/tasks/{id}/files/{name}": Excluded.NOT_FOR_CLIENTS,
 }

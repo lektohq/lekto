@@ -4378,6 +4378,34 @@ class MigrationSuite:
         async with empty_database.reading() as connection:
             assert await connection.run_sync(_schema) == schema
 
+    async def test_revision_0084_keeps_the_last_update_check_and_back(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0084: the instance's row gets room for the last look at the releases; the
+        id stays; the downgrade drops the room."""
+        await migrate(empty_database, "0083")
+        async with empty_database.reading() as connection:
+            schema = await connection.run_sync(_schema)
+            before = await _read_all(connection, sa.text("SELECT id FROM instance"))
+        await migrate(empty_database)
+        async with empty_database.reading() as connection:
+            columns = await connection.run_sync(
+                lambda sync: {item["name"] for item in sa.inspect(sync).get_columns("instance")}
+            )
+            after = await _read_all(connection, sa.select(t.instance.c.id))
+        assert {
+            "update_checked_at",
+            "latest_version",
+            "latest_published_at",
+            "latest_url",
+        } <= columns
+        assert [str(row[0]).replace("-", "") for row in after] == [
+            str(row[0]).replace("-", "") for row in before
+        ]
+        await downgrade(empty_database, "0083")
+        async with empty_database.reading() as connection:
+            assert await connection.run_sync(_schema) == schema
+
     async def test_revision_0067_turns_the_json_null_into_null(
         self, empty_database: Database
     ) -> None:

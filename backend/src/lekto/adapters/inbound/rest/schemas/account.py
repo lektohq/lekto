@@ -133,7 +133,7 @@ class Me(BaseModel):
                     "totp_enabled": False,
                     "linked_accounts": [],
                     "lekto_version": "0.8.0",
-                    "api_version": "0.1",
+                    "api_version": "0.2",
                     "instance_id": "6f1c2a9e-3b4d-4e8f-9a1b-2c3d4e5f6a7b",
                     "shortcut_url": "https://www.icloud.com/shortcuts/8d752558e38f4f64bf9c61faa4694a75",
                 }

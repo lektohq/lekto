@@ -564,3 +564,13 @@ async def test_me_names_the_version_of_the_api(api: Api) -> None:
     me = (await api.client.get(f"{PREFIX}/auth/me", headers=auth(user))).json()
     assert me["api_version"] == API_VERSION
     assert me["lekto_version"] == __version__
+
+
+async def test_version_tells_the_versions_and_the_last_look(api: Api) -> None:
+    user = await api.user()
+    answer = await api.client.get(f"{PREFIX}/version", headers=auth(user))
+    assert answer.status_code == 200, answer.text
+    body = answer.json()
+    assert (body["lekto_version"], body["api_version"]) == (__version__, API_VERSION)
+    assert body["update_check"] is False  # a development state, and no feed in memory
+    assert (body["latest"], body["update_available"], body["checked_at"]) == (None, False, None)

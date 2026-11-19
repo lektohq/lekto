@@ -474,6 +474,7 @@
 	"job_kind_tags_normalise": "Verschobenen Tag nachziehen",
 	"job_kind_rules_apply": "Regel anwenden",
 	"job_kind_maintenance_cleanup": "Aufräumen",
+	"job_kind_updates_check": "Nach neuer Version sehen",
 	"job_kind_documents_remove_files": "Dateien eines gelöschten Dokuments entfernen",
 	"job_kind_mail_fetch": "Mails abrufen",
 	"job_kind_push_send": "Benachrichtigung senden",

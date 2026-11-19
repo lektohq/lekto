@@ -34,6 +34,7 @@ const KINDS: Record<string, () => string> = {
 	'tags.normalise': m.job_kind_tags_normalise,
 	'rules.apply': m.job_kind_rules_apply,
 	'maintenance.cleanup': m.job_kind_maintenance_cleanup,
+	'updates.check': m.job_kind_updates_check,
 	'documents.remove_files': m.job_kind_documents_remove_files,
 	'documents.bulk': m.job_kind_documents_bulk,
 	'mail.fetch': m.job_kind_mail_fetch,
