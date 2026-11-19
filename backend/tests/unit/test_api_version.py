@@ -33,7 +33,8 @@ def fingerprint(document: dict[str, Any]) -> str:
 
 
 def test_the_version_is_major_dot_minor() -> None:
-    assert re.fullmatch(r"[1-9]\d*\.(0|[1-9]\d*)", API_VERSION)
+    assert re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)", API_VERSION)
+    assert API_VERSION != "0.0"
 
 
 def test_the_version_rises_with_the_api() -> None:
@@ -41,7 +42,8 @@ def test_the_version_rises_with_the_api() -> None:
     assert document["info"]["version"] == API_VERSION  # type: ignore[index]
     current = fingerprint(document)
     assert current == FINGERPRINT, (
-        "The API changed: raise API_VERSION in adapters/inbound/rest/version.py (MAJOR for a "
-        "change that breaks a client, with the label breaking-change; MINOR for one that only "
-        f'adds), and set FINGERPRINT = "{current}".'
+        "The API changed: raise API_VERSION in adapters/inbound/rest/version.py (during the "
+        "beta MINOR, for every change; after it MAJOR for a change that breaks a client, with "
+        "the label breaking-change, MINOR for one that only adds), and set "
+        f'FINGERPRINT = "{current}".'
     )

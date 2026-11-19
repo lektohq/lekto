@@ -133,9 +133,10 @@ sentence on what changes for them; it stands under the title in the release note
 that changes the REST API (`web/openapi.json`) fills `## API` with one line on what changes in it;
 the release notes list it in the section "REST API" with that line.
 Such a pull request also raises `API_VERSION` (`backend/src/lekto/adapters/inbound/rest/version.py`,
-`MAJOR.MINOR`): MAJOR for a change that breaks a client, only with the label `breaking-change`,
-MINOR for one that adds; a test fails while the API changed and the version did not (it names the
-new `FINGERPRINT`). The line under `## API` names the new version.
+`MAJOR.MINOR`): during the beta `0.MINOR`, MINOR for every change; from the first release without
+beta, starting at 1.0, MAJOR for a change that breaks a client (only with the label
+`breaking-change`), MINOR for one that adds. A test fails while the API changed and the version did
+not (it names the new `FINGERPRINT`). The line under `## API` names the new version.
 
 ## Language
 
