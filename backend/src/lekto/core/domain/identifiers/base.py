@@ -10,6 +10,7 @@ from typing import ClassVar
 
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.vocabulary import DATE_MONTH_WORDS
 
 MAX_IDENTIFIER_VALUE = 200
 """Characters an identifier's value has at most, as written: at contacts and persons, as a
@@ -78,14 +79,9 @@ WRITTEN_SEPARATORS = r"[\s./\u00ad-]*"
 """Between the characters of a number as a text writes it: separators, also several (two
 spaces, a line break and its indent of an OCR text) and soft hyphens, or none."""
 
-_MONTHS = (
-    r"(?:jan(?:uar|uary)?|feb(?:ruar|ruary)?|(?:mär|maer)z?|mar(?:ch)?|apr(?:il)?|mai|may"
-    r"|jun(?:i|e)?|jul(?:i|y)?|aug(?:ust)?|sep(?:t|tember)?|okt(?:ober)?|oct(?:ober)?"
-    r"|nov(?:ember)?|dez(?:ember)?|dec(?:ember)?)\.?"
-)
+_MONTHS = rf"(?:{'|'.join(sorted(map(re.escape, DATE_MONTH_WORDS), key=len, reverse=True))})\.?"
 """A month's name or its abbreviation as a whole word (`März`, `Nov.`): `SEPA`, `Main` or `Mark`
-before a number made a date of it, and a number no number (DA-01). Narrowed only: what is no
-date now was none before either, so a rule's stored value stays one."""
+before a number made a date of it, and a number no number (DA-01)."""
 _DATE = re.compile(
     rf"(?P<day>\d{{1,2}})[./-](?P<month>\d{{1,2}})[./-](?:\d{{4}}|\d{{2}})"
     rf"|\d{{4}}-(?P<iso_month>\d{{2}})-(?P<iso_day>\d{{2}})"

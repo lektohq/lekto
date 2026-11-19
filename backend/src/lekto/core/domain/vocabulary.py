@@ -1,8 +1,8 @@
 """The words Lekto reads and writes in documents, by language, in one module of the core
 (Tobi, 09.11.2026; the search's stop words and synonyms stay in language files): the names of
 the months and their other spellings, the words between the ends of a span, of a week, of yes
-and no, and of currencies. `periods`, `evidence` and the index build their patterns from them;
-a further language or spelling is added here."""
+and no, and of currencies. `periods`, `evidence`, the identifiers and the index build their
+patterns from them; a further language or spelling is added here."""
 
 MONTH_NAMES: dict[str, tuple[str, ...]] = {
     "de": (
@@ -51,6 +51,24 @@ OTHER_MONTH_SPELLINGS = (
     ("nov",),
     ("dez", "dec"),
 )
+
+DATE_MONTH_WORDS: tuple[str, ...] = (
+    *("jan", "januar", "january"),
+    *("feb", "februar", "february"),
+    *("mär", "märz", "maer", "maerz", "mar", "march"),
+    *("apr", "april"),
+    *("mai", "may"),
+    *("jun", "juni", "june"),
+    *("jul", "juli", "july"),
+    *("aug", "august"),
+    *("sep", "sept", "september"),
+    *("okt", "oktober", "oct", "october"),
+    *("nov", "november"),
+    *("dez", "dezember", "dec", "december"),
+)
+"""A month before a year that makes a value a date and no number (`März 2019`, `Nov. 2023`),
+lower case, each optionally with a full stop (`identifiers.base.is_date`). Narrowed only, never
+widened: a rule's stored value that is no date now was none before either (DA-01)."""
 
 SPAN_WORDS: tuple[str, ...] = (
     "bis",

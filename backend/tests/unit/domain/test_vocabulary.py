@@ -1,21 +1,29 @@
 """The words Lekto reads in documents stand in `vocabulary` alone, not in the modules that
 build their patterns from them."""
 
-import inspect
+from pathlib import Path
 
 import pytest
 
-from lekto.core.domain import evidence, periods
-from lekto.core.domain.identifiers import letter_date
-from lekto.core.services import indexing
+import lekto.core
+from lekto.core.domain import evidence, vocabulary
+
+CORE = Path(lekto.core.__file__).parent
 
 
-@pytest.mark.parametrize("module", [evidence, periods, indexing, letter_date])
 @pytest.mark.parametrize(
-    "word", ['"Januar"', '"nein"', '"KW ', "kalenderwoche", '"pfund"', "jänner"]
+    "word", ['"Januar"', '"nein"', '"KW ', "kalenderwoche", '"pfund"', "jänner", "okt"]
 )
-def test_a_module_holds_no_words_of_its_own(module: object, word: str) -> None:
-    assert word not in inspect.getsource(module)  # type: ignore[arg-type]
+def test_no_module_of_the_core_holds_words_of_its_own(word: str) -> None:
+    """Forms no docstring has: every word in lower case would hit "may", "no" or "true" in the
+    text of a hundred modules (TB-01)."""
+    words = Path(vocabulary.__file__)
+    holding = [
+        str(path.relative_to(CORE))
+        for path in sorted(CORE.rglob("*.py"))
+        if path != words and word in path.read_text(encoding="utf-8")
+    ]
+    assert holding == []
 
 
 @pytest.mark.parametrize(
