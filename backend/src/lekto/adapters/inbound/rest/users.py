@@ -11,6 +11,8 @@ from lekto.adapters.inbound.rest.auth import (
     Authenticated,
     CurrentUser,
     SessionPrincipal,
+    area,
+    right,
 )
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.params import ADMINS_ONLY, SESSION_ONLY_NOTE
@@ -26,9 +28,11 @@ from lekto.adapters.inbound.rest.schemas.users import (
     UserRemovalOut,
 )
 from lekto.core.domain.ids import SpaceId, UserId
+from lekto.core.domain.rights import TokenRight
 from lekto.core.services.users import Account
 
-router = APIRouter(prefix="/users", tags=["users"], dependencies=PROTECTED)
+SYSTEM_AREA = area(TokenRight.SYSTEM_READ, TokenRight.SYSTEM_WRITE)
+router = APIRouter(route_class=SYSTEM_AREA, prefix="/users", tags=["users"], dependencies=PROTECTED)
 
 
 def _account(account: Account, personal_space: SpaceId | None) -> AccountOut:
@@ -42,6 +46,7 @@ def _account(account: Account, personal_space: SpaceId | None) -> AccountOut:
 
 @router.get(
     "",
+    openapi_extra=right(TokenRight.SPACES_READ),
     summary="List users",
     description=(
         "Admins see all users with role and state; others see the active users' id, name and "
@@ -84,6 +89,7 @@ async def create_user(body: UserCreate, admin: Authenticated, context: Context) 
 
 @router.get(
     "/{id}",
+    openapi_extra=right(TokenRight.SPACES_READ),
     summary="A user",
     description=(
         "Admins see the account with its sign-in methods; others only active users' id, name and "

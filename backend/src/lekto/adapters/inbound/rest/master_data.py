@@ -12,7 +12,7 @@ from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel
 
 from lekto.adapters.inbound.limits import in_words
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, area
 from lekto.adapters.inbound.rest.context import ApiContext, Context
 from lekto.adapters.inbound.rest.params import ADMINS_ONLY, CountAll, DocumentCounts
 from lekto.adapters.inbound.rest.paths import PREFIX
@@ -40,12 +40,14 @@ from lekto.core.domain.documents import UNSET, Unset
 from lekto.core.domain.identifiers import Identifier
 from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, TagId, UserId
 from lekto.core.domain.master_data import MasterData, TagScope
-from lekto.core.domain.rights import Actor
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.tag_tree import MAX_LEVELS, TagTree
 from lekto.core.ports.images import LOGO_SIZE
 from lekto.core.ports.repository import CountBy
 from lekto.core.services.logos import LOGO_MAX_SIZE, LOGO_TYPE
 from lekto.core.services.master_data import MasterDataService
+
+MASTER_DATA_AREA = area(TokenRight.MASTER_DATA_READ, TokenRight.MASTER_DATA_WRITE)
 
 COUNTS = (
     "Everyone reads them. With `document_counts`, each comes with how many documents within "
@@ -84,7 +86,12 @@ def _simple[K: UUID, E: MasterData, C: BaseModel, P: BaseModel, O: MasterDataOut
 ) -> APIRouter:
     """List, create, read, change and delete one kind of named master data; a patch passes
     only the fields given."""
-    router = APIRouter(prefix=f"/{kind.path}", tags=["master data"], dependencies=PROTECTED)
+    router = APIRouter(
+        route_class=MASTER_DATA_AREA,
+        prefix=f"/{kind.path}",
+        tags=["master data"],
+        dependencies=PROTECTED,
+    )
 
     @router.get(
         "",
@@ -393,7 +400,9 @@ document_types = _simple(
         arguments=_document_type_arguments,
     )
 )
-tags = APIRouter(prefix="/tags", tags=["master data"], dependencies=PROTECTED)
+tags = APIRouter(
+    route_class=MASTER_DATA_AREA, prefix="/tags", tags=["master data"], dependencies=PROTECTED
+)
 
 
 async def _tree(context: ApiContext, user: Actor) -> TagTree:
@@ -551,7 +560,9 @@ async def assign_fields(
     ]
 
 
-fields = APIRouter(prefix="/fields", tags=["master data"], dependencies=PROTECTED)
+fields = APIRouter(
+    route_class=MASTER_DATA_AREA, prefix="/fields", tags=["master data"], dependencies=PROTECTED
+)
 
 
 @fields.get(

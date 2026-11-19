@@ -2,13 +2,17 @@
 
 from fastapi import APIRouter, Response
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, area
 from lekto.adapters.inbound.rest.context import Classifier
 from lekto.adapters.inbound.rest.params import ADMINS_ONLY
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.classifier import ClassifierModelOut, ClassifierStatusOut
+from lekto.core.domain.rights import TokenRight
 
-router = APIRouter(prefix="/classifier", tags=["classifier"], dependencies=PROTECTED)
+SYSTEM_AREA = area(TokenRight.SYSTEM_READ, TokenRight.SYSTEM_WRITE)
+router = APIRouter(
+    route_class=SYSTEM_AREA, prefix="/classifier", tags=["classifier"], dependencies=PROTECTED
+)
 
 
 @router.get(

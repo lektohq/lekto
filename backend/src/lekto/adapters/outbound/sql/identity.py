@@ -22,7 +22,12 @@ from sqlalchemy import (
 )
 
 from lekto.adapters.outbound.sql import tables as t
-from lekto.adapters.outbound.sql.repositories import SqlRepository, Values
+from lekto.adapters.outbound.sql.repositories import (
+    SqlRepository,
+    Values,
+    rights_column,
+    stored_rights,
+)
 from lekto.adapters.outbound.sql.transaction import Transaction
 from lekto.core.domain.identity import (
     ApiToken,
@@ -33,7 +38,6 @@ from lekto.core.domain.identity import (
     LoginMethod,
     Session,
     ThrottleRule,
-    TokenScope,
     TotpSetting,
 )
 from lekto.core.domain.ids import (
@@ -177,7 +181,7 @@ class SqlApiTokenRepository:
                 id=token.id,
                 user_id=token.user_id,
                 name=token.name,
-                scope=token.scope.value,
+                rights=rights_column(token.rights),
                 token_hash=token.token_hash,
                 created_at=token.created_at,
                 expires_at=token.expires_at,
@@ -226,7 +230,7 @@ def _api_token(row: Row[Any]) -> ApiToken:
         id=ApiTokenId(row.id),
         user_id=UserId(row.user_id),
         name=row.name,
-        scope=TokenScope(row.scope),
+        rights=stored_rights(row.rights) or frozenset(),
         token_hash=row.token_hash,
         created_at=row.created_at,
         expires_at=row.expires_at,

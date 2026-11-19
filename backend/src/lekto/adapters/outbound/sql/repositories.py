@@ -18,8 +18,19 @@ from lekto.adapters.outbound.sql.transaction import Transaction
 from lekto.core.domain.entity import Entity
 from lekto.core.domain.errors import ConcurrencyError, NotFoundError
 from lekto.core.domain.identity import ViaToken
+from lekto.core.domain.rights import TokenRight
 
 type Values = dict[str, Any]
+
+
+def rights_column(rights: frozenset[TokenRight] | None) -> list[str] | None:
+    """Rights as stored: their names in order; None for every right."""
+    return None if rights is None else sorted(right.value for right in rights)
+
+
+def stored_rights(value: list[str] | None) -> frozenset[TokenRight] | None:
+    """Rights as `rights_column` stored them."""
+    return None if value is None else frozenset(TokenRight(item) for item in value)
 
 
 def via_columns(via: ViaToken | None) -> Values:

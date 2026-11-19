@@ -3,7 +3,7 @@
 
 from fastapi import APIRouter
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, area
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.params import ADMINS_ONLY
 from lekto.adapters.inbound.rest.problems import problem_responses
@@ -14,8 +14,10 @@ from lekto.adapters.inbound.rest.schemas.pipeline import (
     VisionOut,
 )
 from lekto.core.domain.pipeline import NODES
+from lekto.core.domain.rights import TokenRight
 
-router = APIRouter(tags=["pipeline"], dependencies=PROTECTED)
+SYSTEM_AREA = area(TokenRight.SYSTEM_READ, TokenRight.SYSTEM_WRITE)
+router = APIRouter(route_class=SYSTEM_AREA, tags=["pipeline"], dependencies=PROTECTED)
 
 
 @router.get(

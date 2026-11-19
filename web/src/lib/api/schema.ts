@@ -283,7 +283,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * Create an API token
-		 * @description `read` allows reading only; `read_write` everything the caller may do, except managing the own sign-in. The token is shown only now. Needs a session; API tokens are refused (403).
+		 * @description With the rights of a preset (`scope`) or chosen one by one (`rights`); each operation names the right it needs (`x-right`). `read` allows reading only; `read_write` everything the caller may do, except managing the own sign-in; `upload` only uploading. An admin's `read` and `read_write` carry every admin right. 422 without rights, and for admin rights of a user who is no admin. The token is shown only now. Needs a session; API tokens are refused (403).
 		 */
 		post: operations['create_token_api_v1_auth_tokens_post'];
 		delete?: never;
@@ -8290,6 +8290,10 @@ export interface components {
 		 *       "has_password": true,
 		 *       "lekto_version": "0.8.0",
 		 *       "linked_accounts": [],
+		 *       "rights": [
+		 *         "documents:count",
+		 *         "documents:read"
+		 *       ],
 		 *       "shortcut_url": "https://www.icloud.com/shortcuts/8d752558e38f4f64bf9c61faa4694a75",
 		 *       "token_scope": "read",
 		 *       "totp_enabled": false,
@@ -8316,8 +8320,13 @@ export interface components {
 			csrf_token: string | null;
 			/** Session Expires At */
 			session_expires_at: string | null;
-			/** @description With an API token: its scope. */
+			/** @description With an API token: the preset its rights match; null for rights chosen one by one. */
 			token_scope: components['schemas']['TokenScope'] | null;
+			/**
+			 * Rights
+			 * @description What the caller may: with an API token its rights (an admin right only while the user is an active admin), with a session every right of the user.
+			 */
+			rights: components['schemas']['TokenRight'][];
 			/** Has Password */
 			has_password: boolean;
 			/** Totp Enabled */
@@ -9726,6 +9735,8 @@ export interface components {
 			| 'upload_only_token'
 			| 'upload_only_token_fields'
 			| 'token_lacks_right'
+			| 'token_rights_empty'
+			| 'token_admin_rights'
 			| 'push_off'
 			| 'push_endpoint_refused'
 			| 'push_keys_invalid'
@@ -11660,6 +11671,13 @@ export interface components {
 		 *       "name": "scanner",
 		 *       "scope": "read_write"
 		 *     }
+		 * @example {
+		 *       "name": "Home Assistant",
+		 *       "rights": [
+		 *         "documents:read",
+		 *         "admin:count_all"
+		 *       ]
+		 *     }
 		 */
 		TokenCreate: {
 			/**
@@ -11667,7 +11685,13 @@ export interface components {
 			 * @example scanner
 			 */
 			name: string;
-			scope: components['schemas']['TokenScope'];
+			/** @description A preset of rights: `read`, `read_write` (for an admin with every admin right) or `upload`. Either this or `rights`. */
+			scope?: components['schemas']['TokenScope'] | null;
+			/**
+			 * Rights
+			 * @description The rights one by one; admin rights only for an admin. Either this or `scope`.
+			 */
+			rights?: components['schemas']['TokenRight'][] | null;
 			/** Expires At */
 			expires_at?: string | null;
 		};
@@ -11678,7 +11702,10 @@ export interface components {
 		 *       "expires_at": "2027-01-01T00:00:00Z",
 		 *       "id": "01999d5e-6666-7c1e-b6a3-2f4d5e6f7a8b",
 		 *       "name": "scanner",
-		 *       "scope": "read_write",
+		 *       "rights": [
+		 *         "documents:upload"
+		 *       ],
+		 *       "scope": "upload",
 		 *       "token": "lekto_<token shown once>"
 		 *     }
 		 */
@@ -11690,7 +11717,10 @@ export interface components {
 			id: string;
 			/** Name */
 			name: string;
-			scope: components['schemas']['TokenScope'];
+			/** @description The preset the rights match; null for rights chosen one by one. */
+			scope: components['schemas']['TokenScope'] | null;
+			/** Rights */
+			rights: components['schemas']['TokenRight'][];
 			/**
 			 * Created At
 			 * Format: date-time
@@ -11715,7 +11745,10 @@ export interface components {
 		 *       "id": "01999d5e-6666-7c1e-b6a3-2f4d5e6f7a8b",
 		 *       "last_used_at": "2026-04-02T07:30:00Z",
 		 *       "name": "scanner",
-		 *       "scope": "read_write"
+		 *       "rights": [
+		 *         "documents:upload"
+		 *       ],
+		 *       "scope": "upload"
 		 *     }
 		 */
 		TokenOut: {
@@ -11726,7 +11759,10 @@ export interface components {
 			id: string;
 			/** Name */
 			name: string;
-			scope: components['schemas']['TokenScope'];
+			/** @description The preset the rights match; null for rights chosen one by one. */
+			scope: components['schemas']['TokenScope'] | null;
+			/** Rights */
+			rights: components['schemas']['TokenRight'][];
 			/**
 			 * Created At
 			 * Format: date-time
@@ -11738,9 +11774,39 @@ export interface components {
 			last_used_at: string | null;
 		};
 		/**
+		 * TokenRight
+		 * @enum {string}
+		 */
+		TokenRight:
+			| 'documents:count'
+			| 'documents:read'
+			| 'documents:write'
+			| 'documents:upload'
+			| 'master_data:read'
+			| 'master_data:write'
+			| 'rules:read'
+			| 'rules:write'
+			| 'spaces:read'
+			| 'spaces:write'
+			| 'webhooks:read'
+			| 'webhooks:write'
+			| 'lenses:read'
+			| 'lenses:write'
+			| 'push:read'
+			| 'push:write'
+			| 'system:read'
+			| 'system:write'
+			| 'admin:count_all'
+			| 'admin:documents_all'
+			| 'admin:mailboxes'
+			| 'admin:private_webhooks'
+			| 'admin:manage';
+		/**
 		 * TokenScope
-		 * @description What an API token may do: read, read and write, or only upload documents (a shortcut
-		 *     on a phone that sends shared files; it reads nothing, not even what it uploaded).
+		 * @description A preset of rights for an API token (`rights`): read, read and write, or only upload
+		 *     documents (a shortcut on a phone that sends shared files; it reads nothing, not even what it
+		 *     uploaded). What a token may is its rights; the scope is how they were chosen, or the preset
+		 *     they match.
 		 * @enum {string}
 		 */
 		TokenScope: 'read' | 'read_write' | 'upload';

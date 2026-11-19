@@ -639,6 +639,7 @@ rule_applications = Table(
     Column("unchanged", Integer, nullable=False),
     Column("skipped", json_type(), nullable=False),
     Column("error", Text, nullable=True),
+    Column("rights", json_type(), nullable=True),  # None: every right of its user
     Column("created_at", UtcDateTime, nullable=False),
     Column("finished_at", UtcDateTime, nullable=True),
     *_via_token(),
@@ -659,6 +660,7 @@ bulk_operations = Table(
     Column("unchanged", Integer, nullable=False),
     Column("skipped", json_type(), nullable=False),
     Column("error", Text, nullable=True),
+    Column("rights", json_type(), nullable=True),  # None: every right of its user
     Column("created_at", UtcDateTime, nullable=False),
     Column("finished_at", UtcDateTime, nullable=True),
     *_via_token(),
@@ -834,7 +836,7 @@ api_tokens = Table(
     Column("id", Uuid, primary_key=True),
     Column("user_id", Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True),
     Column("name", Text, nullable=False),
-    Column("scope", Text, nullable=False),
+    Column("rights", json_type(), nullable=False),
     Column("token_hash", String(64), nullable=False, unique=True),
     Column("created_at", UtcDateTime, nullable=False),
     Column("expires_at", UtcDateTime, nullable=True),

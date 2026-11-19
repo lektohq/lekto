@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, READS, CurrentUser
+from lekto.adapters.inbound.rest.auth import PROTECTED, READS, CurrentUser, area
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.mail_rules import (
@@ -15,9 +15,13 @@ from lekto.adapters.inbound.rest.schemas.mail_rules import (
     MailRulePatch,
 )
 from lekto.core.domain.ids import MailboxId, MailRuleId
+from lekto.core.domain.rights import TokenRight
 from lekto.core.services.mail_rules import DRY_RUN_MAILS
 
-router = APIRouter(prefix="/mail-rules", tags=["mail rules"], dependencies=PROTECTED)
+SYSTEM_AREA = area(TokenRight.SYSTEM_READ, TokenRight.SYSTEM_WRITE)
+router = APIRouter(
+    route_class=SYSTEM_AREA, prefix="/mail-rules", tags=["mail rules"], dependencies=PROTECTED
+)
 
 WHO = "Only admins (403)."
 HOW = (

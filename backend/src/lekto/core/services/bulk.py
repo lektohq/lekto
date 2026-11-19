@@ -114,7 +114,12 @@ class BulkService:
             await _check_action(uow, action)
             now = self._clock.now()
             operation = BulkOperation.create(
-                user_id=user.id, action=action, documents=documents, now=now, via=via
+                user_id=user.id,
+                action=action,
+                documents=documents,
+                now=now,
+                via=via,
+                rights=actor.rights,
             )
             await uow.bulk_operations.add(operation)
             await _enqueue(uow, operation.id, now)
@@ -247,7 +252,8 @@ class BulkService:
         """Do the operation's action to the document as its person would by hand: True if it
         changed, False if it was as the action wants it already, else the reason it was
         skipped. Raises the errors of the services."""
-        actor, action, via = Actor(operation.user_id), operation.action, operation.via
+        actor = Actor(operation.user_id, operation.rights)
+        action, via = operation.action, operation.via
         try:
             view = await self._documents.view(actor, id)
         except NotFoundError:

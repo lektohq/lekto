@@ -313,6 +313,8 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	upload_only_token: entry(m.reason_upload_only_token),
 	upload_only_token_fields: entry(m.reason_upload_only_token_fields, { fields: 'list' }),
 	token_lacks_right: entry(m.reason_token_lacks_right),
+	token_rights_empty: entry(m.reason_token_rights_empty),
+	token_admin_rights: entry(m.reason_token_admin_rights),
 	push_off: entry(m.reason_push_off),
 	push_endpoint_refused: entry(m.reason_push_endpoint_refused),
 	push_keys_invalid: entry(m.reason_push_keys_invalid),

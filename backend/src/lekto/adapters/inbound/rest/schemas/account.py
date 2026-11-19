@@ -1,10 +1,10 @@
 """Sign-in and the caller's own account: password, TOTP, sessions, API tokens, provider links."""
 
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, SecretStr
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, SecretStr, model_validator
 
 from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.identity import (
@@ -15,6 +15,7 @@ from lekto.core.domain.identity import (
     TokenScope,
 )
 from lekto.core.domain.ids import SpaceId
+from lekto.core.domain.rights import TokenRight
 from lekto.core.domain.users import MAX_USERNAME, Role, SeenUser, User
 
 Password = Annotated[SecretStr, Field(min_length=1, max_length=1024)]
@@ -127,6 +128,7 @@ class Me(BaseModel):
                     "csrf_token": None,
                     "session_expires_at": None,
                     "token_scope": "read",
+                    "rights": ["documents:count", "documents:read"],
                     "has_password": True,
                     "totp_enabled": False,
                     "linked_accounts": [],
@@ -141,7 +143,14 @@ class Me(BaseModel):
     authenticated_with: Literal["session", "token"]
     csrf_token: str | None = Field(description="With a session: for `X-CSRF-Token`.")
     session_expires_at: datetime | None
-    token_scope: TokenScope | None = Field(description="With an API token: its scope.")
+    token_scope: TokenScope | None = Field(
+        description="With an API token: the preset its rights match; null for rights chosen one "
+        "by one."
+    )
+    rights: list[TokenRight] = Field(
+        description="What the caller may: with an API token its rights (an admin right only while "
+        "the user is an active admin), with a session every right of the user."
+    )
     has_password: bool
     totp_enabled: bool
     linked_accounts: list[LinkOut]
@@ -199,14 +208,35 @@ class TokenCreate(RequestBody):
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
-                {"name": "scanner", "scope": "read_write", "expires_at": "2027-01-01T00:00:00Z"}
+                {"name": "scanner", "scope": "read_write", "expires_at": "2027-01-01T00:00:00Z"},
+                {"name": "Home Assistant", "rights": ["documents:read", "admin:count_all"]},
             ]
         },
     )
 
     name: str = Field(min_length=1, max_length=MAX_TOKEN_NAME, examples=["scanner"])
-    scope: TokenScope
+    scope: TokenScope | None = Field(
+        default=None,
+        description="A preset of rights: `read`, `read_write` (for an admin with every admin "
+        "right) or `upload`. Either this or `rights`.",
+    )
+    rights: list[TokenRight] | None = Field(
+        default=None,
+        max_length=len(TokenRight),
+        description="The rights one by one; admin rights only for an admin. Either this or "
+        "`scope`.",
+    )
     expires_at: AwareDatetime | None = None
+
+    @model_validator(mode="after")
+    def _one_way(self) -> Self:
+        if (self.scope is None) == (self.rights is None):
+            raise ValueError("give either scope or rights")
+        return self
+
+    def chosen(self) -> TokenScope | frozenset[TokenRight]:
+        """The preset or the rights the token is to carry."""
+        return self.scope if self.scope is not None else frozenset(self.rights or ())
 
 
 class TokenOut(BaseModel):
@@ -216,7 +246,8 @@ class TokenOut(BaseModel):
                 {
                     "id": "01999d5e-6666-7c1e-b6a3-2f4d5e6f7a8b",
                     "name": "scanner",
-                    "scope": "read_write",
+                    "scope": "upload",
+                    "rights": ["documents:upload"],
                     "created_at": "2026-04-01T10:00:00Z",
                     "expires_at": "2027-01-01T00:00:00Z",
                     "last_used_at": "2026-04-02T07:30:00Z",
@@ -227,17 +258,22 @@ class TokenOut(BaseModel):
 
     id: UUID
     name: str
-    scope: TokenScope
+    scope: TokenScope | None = Field(
+        description="The preset the rights match; null for rights chosen one by one."
+    )
+    rights: list[TokenRight]
     created_at: datetime
     expires_at: datetime | None
     last_used_at: datetime | None
 
     @classmethod
-    def of(cls, token: ApiToken) -> "TokenOut":
+    def of(cls, token: ApiToken, *, admin: bool) -> "TokenOut":
+        """`token` of a user who is an admin or not (whose presets carry the admin rights)."""
         return cls(
             id=token.id,
             name=token.name,
-            scope=token.scope,
+            scope=TokenScope.matching(token.rights, admin=admin),
+            rights=sorted(token.rights),
             created_at=token.created_at,
             expires_at=token.expires_at,
             last_used_at=token.last_used_at,
@@ -251,7 +287,8 @@ class TokenCreated(TokenOut):
                 {
                     "id": "01999d5e-6666-7c1e-b6a3-2f4d5e6f7a8b",
                     "name": "scanner",
-                    "scope": "read_write",
+                    "scope": "upload",
+                    "rights": ["documents:upload"],
                     "created_at": "2026-04-01T10:00:00Z",
                     "expires_at": "2027-01-01T00:00:00Z",
                     "last_used_at": None,

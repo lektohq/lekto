@@ -33,6 +33,7 @@ from lekto.core.domain.documents import Document, DocumentChanges
 from lekto.core.domain.errors import ConflictError, ValidationError
 from lekto.core.domain.events import DomainEvent
 from lekto.core.domain.fields import FieldDefinition, FieldType, Money, field_to_json
+from lekto.core.domain.identity import TokenScope
 from lekto.core.domain.ids import DocumentTypeId, RuleId, UserId, new_id
 from lekto.core.domain.jobs import Job
 from lekto.core.domain.mail import MailAction, MailStep
@@ -46,6 +47,7 @@ from lekto.core.domain.mail_rules import (
 from lekto.core.domain.periods import Period
 from lekto.core.domain.pipeline import NODES, Node, NodeResult, NodeRun, Outcome
 from lekto.core.domain.reasons import ReasonCode
+from lekto.core.domain.rights import TokenRight
 from lekto.core.domain.rules import ForceReview, RuleScope
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.templates import TemplateValue
@@ -4279,6 +4281,68 @@ class MigrationSuite:
                 connection, sa.text("SELECT key, failures, version FROM login_failures")
             )
         assert back == [("account:jane", 2, 1)]
+
+    async def test_revision_0081_gives_tokens_the_rights_of_their_scope_and_back(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0081: each API token gets the rights of its scope as the presets give them
+        now (an admin's with the admin rights, but for uploading); bulk operations and rule
+        applications get room for the rights they start with. The downgrade gives each token the
+        scope whose rights it holds."""
+        await migrate(empty_database, "0080")
+        async with empty_database.reading() as connection:
+            schema = await connection.run_sync(_schema)
+        tokens = sa.table(
+            "api_tokens",
+            *(sa.column(c.name, c.type) for c in t.api_tokens.c if c.name != "rights"),
+            sa.column("scope", sa.Text()),
+        )
+        admin, user = new_id(), new_id()
+        scopes = {(admin, scope): new_id() for scope in TokenScope} | {
+            (user, scope): new_id() for scope in TokenScope
+        }
+        await _insert(
+            empty_database,
+            [
+                (t.users, _user(user)),
+                (t.users, {"id": admin, "username": "b", "username_key": "b", "role": "admin"}),
+                *(
+                    (
+                        tokens,
+                        {
+                            "id": id,
+                            "user_id": owner,
+                            "name": f"{scope.value} {id}",
+                            "scope": scope.value,
+                            "token_hash": id.hex,
+                        },
+                    )
+                    for (owner, scope), id in scopes.items()
+                ),
+            ],
+        )
+        await migrate(empty_database)
+        async with empty_database.reading() as connection:
+            rights = dict(
+                await _read_all(connection, sa.select(t.api_tokens.c.id, t.api_tokens.c.rights))
+            )
+            columns = await connection.run_sync(
+                lambda sync: {
+                    table: {item["name"] for item in sa.inspect(sync).get_columns(table)}
+                    for table in ("api_tokens", "bulk_operations", "rule_applications")
+                }
+            )
+        for (owner, scope), id in scopes.items():
+            assert frozenset(TokenRight(item) for item in rights[id]) == scope.rights(
+                admin=owner == admin
+            ), scope
+        assert "scope" not in columns["api_tokens"]
+        assert "rights" in columns["bulk_operations"] & columns["rule_applications"]
+        await downgrade(empty_database, "0080")
+        async with empty_database.reading() as connection:
+            assert await connection.run_sync(_schema) == schema
+            back = dict(await _read_all(connection, sa.select(tokens.c.id, tokens.c.scope)))
+        assert back == {id: scope.value for (_, scope), id in scopes.items()}
 
     async def test_revision_0067_turns_the_json_null_into_null(
         self, empty_database: Database

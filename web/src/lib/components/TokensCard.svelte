@@ -128,7 +128,9 @@
 							</p>
 						</div>
 						<Badge variant="note">
-							{SCOPE_LABELS[token.scope]()}
+							{token.scope
+								? SCOPE_LABELS[token.scope]()
+								: m.token_scope_custom({ count: token.rights.length })}
 						</Badge>
 						<IconButton
 							label={m.token_revoke_named({ name: token.name })}

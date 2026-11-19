@@ -282,6 +282,8 @@ class ReasonCode(StrEnum):
     UPLOAD_ONLY_TOKEN = "upload_only_token"
     UPLOAD_ONLY_TOKEN_FIELDS = "upload_only_token_fields"
     TOKEN_LACKS_RIGHT = "token_lacks_right"
+    TOKEN_RIGHTS_EMPTY = "token_rights_empty"
+    TOKEN_ADMIN_RIGHTS = "token_admin_rights"
     PUSH_OFF = "push_off"
     PUSH_ENDPOINT_REFUSED = "push_endpoint_refused"
     PUSH_KEYS_INVALID = "push_keys_invalid"
@@ -800,6 +802,8 @@ TEMPLATES: Mapping[ReasonCode, str] = {
         "this API token uploads only for its own user, without {fields:list}"
     ),
     ReasonCode.TOKEN_LACKS_RIGHT: "this API token lacks the right {right}",
+    ReasonCode.TOKEN_RIGHTS_EMPTY: "an API token needs at least one right",
+    ReasonCode.TOKEN_ADMIN_RIGHTS: "only an admin's API token carries admin rights",
     ReasonCode.PUSH_OFF: "notifications are off on this server",
     ReasonCode.PUSH_ENDPOINT_REFUSED: "the device's push address is no known push service's",
     ReasonCode.PUSH_KEYS_INVALID: "the device's keys are not valid",

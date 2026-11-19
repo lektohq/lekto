@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Response
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, Authenticated
+from lekto.adapters.inbound.rest.auth import PROTECTED, Authenticated, area
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.params import AllSpaces
 from lekto.adapters.inbound.rest.problems import problem_responses
@@ -13,10 +13,14 @@ from lekto.adapters.inbound.rest.schemas.spaces import MemberIn, SpaceCreate, Sp
 from lekto.core.domain.documents import UNSET
 from lekto.core.domain.ids import SpaceId, UserId
 from lekto.core.domain.permissions import space_role
+from lekto.core.domain.rights import TokenRight
 from lekto.core.domain.spaces import Space
 from lekto.core.services.auth import Principal
 
-router = APIRouter(prefix="/spaces", tags=["spaces"], dependencies=PROTECTED)
+SPACES_AREA = area(TokenRight.SPACES_READ, TokenRight.SPACES_WRITE)
+router = APIRouter(
+    route_class=SPACES_AREA, prefix="/spaces", tags=["spaces"], dependencies=PROTECTED
+)
 
 EDITORS = "Editors of the space and admins."
 

@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query, Response
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, READS, CurrentUser
+from lekto.adapters.inbound.rest.auth import PROTECTED, READS, CurrentUser, area, right
 from lekto.adapters.inbound.rest.context import Indexing, Search
 from lekto.adapters.inbound.rest.documents import DocumentSort, order_of
 from lekto.adapters.inbound.rest.params import ADMINS_ONLY, AllDocuments, Filter
@@ -22,9 +22,11 @@ from lekto.adapters.inbound.rest.schemas.search import (
 )
 from lekto.adapters.inbound.schemas import ReasonOut
 from lekto.core.domain.ids import DocumentId
+from lekto.core.domain.rights import TokenRight
 from lekto.core.ports.search_index import MAX_HITS, MAX_LIMIT, SEARCH_PAGE
 
-router = APIRouter(tags=["search"], dependencies=PROTECTED)
+DOCUMENTS_AREA = area(TokenRight.DOCUMENTS_READ, TokenRight.DOCUMENTS_WRITE)
+router = APIRouter(route_class=DOCUMENTS_AREA, tags=["search"], dependencies=PROTECTED)
 
 
 @router.post(
@@ -120,6 +122,7 @@ async def search_places(
 
 @router.post(
     "/documents/search/warm",
+    openapi_extra=right(TokenRight.DOCUMENTS_READ),
     status_code=204,
     summary="Get the search ready",
     description=(
@@ -135,6 +138,7 @@ async def warm_search(user: CurrentUser, search: Search) -> None:
 
 @router.post(
     "/search/reindex",
+    openapi_extra=right(TokenRight.SYSTEM_WRITE),
     status_code=202,
     summary="Rebuild the search index",
     description=(
@@ -153,6 +157,7 @@ async def reindex(user: CurrentUser, indexing: Indexing) -> Response:
 
 @router.get(
     "/search/status",
+    openapi_extra=right(TokenRight.SYSTEM_READ),
     summary="The state of the search index",
     description=(
         "How many documents the database and the index hold, how many have vectors, the index "
@@ -178,7 +183,7 @@ async def search_status(user: CurrentUser, indexing: Indexing) -> SearchStatusOu
     ),
     response_model=IndexCheckOut,
     responses=problem_responses(401, 403, 503),
-    openapi_extra=READS,
+    openapi_extra={**READS, **right(TokenRight.SYSTEM_READ)},
 )
 async def check_index(user: CurrentUser, indexing: Indexing) -> IndexCheckOut:
     return IndexCheckOut.of(await indexing.check(user))

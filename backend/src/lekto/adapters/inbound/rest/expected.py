@@ -4,14 +4,18 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, area
 from lekto.adapters.inbound.rest.automation import Zone
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.params import AllDocuments
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.expected import ExpectedOut
+from lekto.core.domain.rights import TokenRight
 
-router = APIRouter(prefix="/expected", tags=["expected"], dependencies=PROTECTED)
+DOCUMENTS_AREA = area(TokenRight.DOCUMENTS_READ, TokenRight.DOCUMENTS_WRITE)
+router = APIRouter(
+    route_class=DOCUMENTS_AREA, prefix="/expected", tags=["expected"], dependencies=PROTECTED
+)
 
 
 @router.get(

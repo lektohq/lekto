@@ -12,9 +12,11 @@
   token cannot be used to take over an account.
 """
 
-from typing import Annotated, Literal, TypedDict
+from collections.abc import Callable
+from typing import Annotated, Any, Literal, TypedDict
 
 from fastapi import Depends, Request, Response
+from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
 
 from lekto.adapters.inbound.bearer import bearer_token
@@ -29,7 +31,7 @@ from lekto.core.domain.identity import (
 )
 from lekto.core.domain.ids import UserId
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.domain.rights import Actor
+from lekto.core.domain.rights import ADMIN_RIGHTS, READ_RIGHTS, Actor, TokenRight
 from lekto.core.services.auth import Principal, SignedIn
 from lekto.core.services.oidc import FLOW_LIFETIME
 
@@ -44,9 +46,23 @@ CSRF_HEADER = "X-CSRF-Token"
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 READS_KEY = "x-reads"
 READS = {READS_KEY: True}
-"""`openapi_extra` of a POST that only reads, such as a search with its words in the body."""
-UPLOADS_KEY = "x-uploads"
-UPLOADS = {UPLOADS_KEY: True}
+"""`openapi_extra` of a POST that only reads, such as a search with its words in the body: it
+needs the read right of its area."""
+RIGHT_KEY = "x-right"
+"""The mark of the right an API token needs for an operation: a `TokenRight`, `SESSION` or
+`ANY` (`.knowledge/plans/token-rights.md`)."""
+SESSION = "session"
+"""The mark of an operation only a session reaches, never an API token."""
+ANY = "any"
+"""The mark of an operation every API token reaches (who the caller is)."""
+
+
+def right(value: TokenRight | str) -> dict[str, str]:
+    """`openapi_extra` of an operation that needs `value`, whatever its area's right."""
+    return {RIGHT_KEY: str(value)}
+
+
+UPLOADS = right(TokenRight.DOCUMENTS_UPLOAD)
 """`openapi_extra` of the upload, the one operation a token of the scope `upload` reaches."""
 
 # Security schemes of the OpenAPI document; `app.openapi` sets them per operation from the
@@ -66,10 +82,10 @@ SECURITY_SCHEMES = {
         "type": "http",
         "scheme": "bearer",
         "description": (
-            "Personal API token (`lekto_…`); scope `read` allows reading only: GET, and the "
-            f"POST operations marked `{READS_KEY}` (a search with its words in the body, a dry "
-            "run, a preview, a check); scope "
-            f"`upload` allows only the operation marked `{UPLOADS_KEY}` (`POST /documents`)."
+            "Personal API token (`lekto_…`) with its rights: each operation names the right "
+            f"it needs as `{RIGHT_KEY}` (`{SESSION}`: no token reaches it; `{ANY}`: every "
+            "token). An admin right also needs an active admin; an admin token without one "
+            "acts as a user with the same spaces."
         ),
     },
     "taskToken": {
@@ -110,19 +126,15 @@ def device_cookie_name(context: ApiContext) -> str:
 
 async def authenticate(request: Request, context: Context) -> Principal:
     """The caller, checked once per request; AuthenticationError (401) without valid
-    credentials, PermissionDeniedError (403) for a change without CSRF token or with a `read`
-    token."""
+    credentials, PermissionDeniedError (403) for a change without CSRF token, and for an API
+    token without the right the operation needs (`RIGHT_KEY`)."""
     cached: Principal | None = getattr(request.state, "principal", None)
     if cached is not None:
         return cached
     header = request.headers.get("authorization")
     if header is not None:
         principal = await context.auth.authenticate_token(bearer_token(header))
-        if principal.only_uploads:
-            if not _marked(request, UPLOADS_KEY):
-                raise PermissionDeniedError(because(ReasonCode.UPLOAD_ONLY_TOKEN))
-        elif request.method not in SAFE_METHODS and not principal.can_write and not _reads(request):
-            raise PermissionDeniedError(because(ReasonCode.READ_ONLY_TOKEN))
+        _check_right(request, principal)
     else:
         session_token = request.cookies.get(session_cookie_name(context))
         if not session_token:
@@ -136,15 +148,57 @@ async def authenticate(request: Request, context: Context) -> Principal:
     return principal
 
 
-def _reads(request: Request) -> bool:
-    """Whether the request's route only reads although its method is not safe (`READS`)."""
-    return _marked(request, READS_KEY)
-
-
-def _marked(request: Request, key: str) -> bool:
-    """Whether the request's route carries the mark `key` in its `openapi_extra`."""
+def _check_right(request: Request, principal: Principal) -> None:
+    """PermissionDeniedError unless the caller's token carries the right the request's route
+    needs. A route without a mark is refused, as one only a session reaches. A token that only
+    uploads reaches nothing else, not even `ANY`; one of a preset is refused as before the
+    rights (one that only reads)."""
     route = request.scope.get("route")
-    return isinstance(route, APIRoute) and bool((route.openapi_extra or {}).get(key))
+    marked = (route.openapi_extra or {}).get(RIGHT_KEY) if isinstance(route, APIRoute) else None
+    if marked is None or marked == SESSION:
+        raise PermissionDeniedError(because(ReasonCode.SESSION_NEEDED))
+    needed = None if marked == ANY else TokenRight(marked)
+    if principal.only_uploads and needed is not TokenRight.DOCUMENTS_UPLOAD:
+        # It reads nothing, not even who it is (`.knowledge/architecture/pwa-and-push.md`).
+        raise PermissionDeniedError(because(ReasonCode.UPLOAD_ONLY_TOKEN))
+    if needed is None or principal.may(needed):
+        return
+    rights = principal.rights or frozenset()
+    if needed not in READ_RIGHTS and rights <= READ_RIGHTS | ADMIN_RIGHTS:
+        raise PermissionDeniedError(because(ReasonCode.READ_ONLY_TOKEN))
+    raise PermissionDeniedError(because(ReasonCode.TOKEN_LACKS_RIGHT, right=needed.value))
+
+
+def _needs_session(dependant: Dependant) -> bool:
+    """Whether `dependant` (an operation's dependencies) asks for a session."""
+    return any(
+        item.call is session_principal or _needs_session(item) for item in dependant.dependencies
+    )
+
+
+class MarkedRoute(APIRoute):
+    """A route that marks the right an API token needs (`RIGHT_KEY`): `SESSION` if it asks
+    for a session; else what its `openapi_extra` names, or for a router of an area (`area`)
+    its read right for GET and an operation marked `READS`, its write right for the rest."""
+
+    reads: TokenRight | None = None
+    writes: TokenRight | None = None
+
+    def __init__(self, path: str, endpoint: Callable[..., Any], **kwargs: Any) -> None:
+        super().__init__(path, endpoint, **kwargs)
+        extra = dict(self.openapi_extra or {})
+        if _needs_session(self.dependant):
+            extra[RIGHT_KEY] = SESSION
+        elif RIGHT_KEY not in extra and self.reads is not None and self.writes is not None:
+            safe = self.methods is not None and self.methods <= SAFE_METHODS
+            reading = safe or bool(extra.get(READS_KEY))
+            extra[RIGHT_KEY] = (self.reads if reading else self.writes).value
+        self.openapi_extra = extra or None
+
+
+def area(reads: TokenRight, writes: TokenRight) -> type[MarkedRoute]:
+    """The route class of a router whose operations need `reads` or `writes` by default."""
+    return type(f"{reads.name.title()}Route", (MarkedRoute,), {"reads": reads, "writes": writes})
 
 
 async def still_authenticated(request: Request, context: ApiContext, user: UserId) -> bool:

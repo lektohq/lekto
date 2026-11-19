@@ -8,13 +8,15 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, still_authenticated
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, area, still_authenticated
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.events import EventHub, message
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.core.domain.ids import DocumentId
+from lekto.core.domain.rights import TokenRight
 
-router = APIRouter(tags=["events"], dependencies=PROTECTED)
+DOCUMENTS_AREA = area(TokenRight.DOCUMENTS_READ, TokenRight.DOCUMENTS_WRITE)
+router = APIRouter(route_class=DOCUMENTS_AREA, tags=["events"], dependencies=PROTECTED)
 
 # The first line of a stream (an SSE comment, which EventSource clients ignore): from here on,
 # the stream receives the events. Without it, a client could not tell when that is.

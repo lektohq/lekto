@@ -414,6 +414,7 @@ class RuleApplicationService:
                 accept_conflicts=frozenset(accept_conflicts),
                 now=self._clock.now(),
                 via=via,
+                rights=actor.rights,
             )
             await uow.rule_applications.add(application)
             await _enqueue(uow, application.id, self._clock.now())
@@ -498,6 +499,8 @@ class RuleApplicationService:
                 await uow.rule_applications.update(application)
                 await uow.commit()
                 return True
+            if application.rights is not None:
+                user = replace(user, rights=application.rights)  # as the token it came through
             rule = replace(
                 rule, current=await uow.rules.get_version(rule.id, application.rule_version)
             )

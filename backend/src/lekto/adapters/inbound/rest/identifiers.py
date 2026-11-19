@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Query
 
 from lekto.adapters.inbound.limits import in_words
-from lekto.adapters.inbound.rest.auth import PROTECTED, READS, Authenticated, CurrentUser
+from lekto.adapters.inbound.rest.auth import PROTECTED, READS, Authenticated, CurrentUser, area
 from lekto.adapters.inbound.rest.context import ApiContext, Context
 from lekto.adapters.inbound.rest.params import ADMINS_ONLY
 from lekto.adapters.inbound.rest.problems import problem_responses
@@ -24,11 +24,17 @@ from lekto.adapters.inbound.rest.schemas.refs import MAX_REF, RefIn, RefOut, ope
 from lekto.adapters.inbound.schemas import MAX_POSITION
 from lekto.core.domain.identifiers import IdentifierKind, normalise_identifier
 from lekto.core.domain.open_identifiers import OpenSource
-from lekto.core.domain.rights import Actor
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE
 from lekto.core.services.places import PLACES
 
-router = APIRouter(prefix="/identifiers/open", tags=["identifiers"], dependencies=PROTECTED)
+MASTER_DATA_AREA = area(TokenRight.MASTER_DATA_READ, TokenRight.MASTER_DATA_WRITE)
+router = APIRouter(
+    route_class=MASTER_DATA_AREA,
+    prefix="/identifiers/open",
+    tags=["identifiers"],
+    dependencies=PROTECTED,
+)
 
 _OPEN = (
     "Open are the identifiers no person has confirmed: those training learned at a contact "
@@ -179,7 +185,12 @@ async def confirm_recommended(principal: Authenticated, context: Context) -> lis
     return [OutcomeOut.of(outcome) for outcome in outcomes]
 
 
-refs_router = APIRouter(prefix="/identifiers/refs", tags=["identifiers"], dependencies=PROTECTED)
+refs_router = APIRouter(
+    route_class=MASTER_DATA_AREA,
+    prefix="/identifiers/refs",
+    tags=["identifiers"],
+    dependencies=PROTECTED,
+)
 
 
 @refs_router.post(
@@ -225,7 +236,10 @@ async def read_ref(
 
 
 places_router = APIRouter(
-    prefix="/identifiers/places", tags=["identifiers"], dependencies=PROTECTED
+    route_class=MASTER_DATA_AREA,
+    prefix="/identifiers/places",
+    tags=["identifiers"],
+    dependencies=PROTECTED,
 )
 
 
