@@ -68,6 +68,7 @@ from lekto.adapters.outbound.memory.identity import (
     MemorySessionRepository,
 )
 from lekto.adapters.outbound.memory.inbox import MemoryInboxRepository, SeenKey
+from lekto.adapters.outbound.memory.instance import MemoryInstanceRepository
 from lekto.adapters.outbound.memory.lenses import MemoryLensRepository
 from lekto.adapters.outbound.memory.mail_records import (
     MemoryMailOriginRepository,
@@ -204,6 +205,7 @@ class MemoryUnitOfWork:
         self.known_devices = MemoryKnownDeviceRepository(self, KNOWN_DEVICES)
         self.push_devices = MemoryPushDeviceRepository(self, PUSH_DEVICES)
         self.push_preferences = MemoryPushPreferencesRepository(self, PUSH_PREFERENCES)
+        self.instance = MemoryInstanceRepository(self)
         self.external_identities = MemoryExternalIdentityRepository(self, EXTERNAL_IDENTITIES)
         self.login_failures = MemoryLoginFailureRepository(self, LOGIN_FAILURES)
 

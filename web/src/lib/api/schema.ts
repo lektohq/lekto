@@ -8288,6 +8288,7 @@ export interface components {
 		 * @example {
 		 *       "authenticated_with": "token",
 		 *       "has_password": true,
+		 *       "instance_id": "6f1c2a9e-3b4d-4e8f-9a1b-2c3d4e5f6a7b",
 		 *       "lekto_version": "0.8.0",
 		 *       "linked_accounts": [],
 		 *       "rights": [
@@ -8338,6 +8339,12 @@ export interface components {
 			 * @description The version of Lekto that answers (its release).
 			 */
 			lekto_version: string;
+			/**
+			 * Instance Id
+			 * Format: uuid
+			 * @description The id of this instance: random, made once, kept in the database (a restore keeps it). Tells instances apart, e.g. for Home Assistant.
+			 */
+			instance_id: string;
 			/**
 			 * Shortcut Url
 			 * @description The link that adds the shortcut "An Lekto senden" for iPhone, iPad and Mac (`LEKTO_SHORTCUT_URL`); null: the server offers none.

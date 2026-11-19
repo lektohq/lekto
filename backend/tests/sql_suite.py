@@ -4362,6 +4362,22 @@ class MigrationSuite:
         async with empty_database.reading() as connection:
             assert await connection.run_sync(_schema) == schema
 
+    async def test_revision_0083_makes_the_instance_id_and_back(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0083: the instance gets one random id; the downgrade drops it."""
+        await migrate(empty_database, "0082")
+        async with empty_database.reading() as connection:
+            schema = await connection.run_sync(_schema)
+        await migrate(empty_database)
+        async with empty_database.reading() as connection:
+            rows = await _read_all(connection, sa.select(t.instance.c.key, t.instance.c.id))
+        assert len(rows) == 1 and rows[0][0] == 1
+        assert UUID(str(rows[0][1])).version == 4
+        await downgrade(empty_database, "0082")
+        async with empty_database.reading() as connection:
+            assert await connection.run_sync(_schema) == schema
+
     async def test_revision_0067_turns_the_json_null_into_null(
         self, empty_database: Database
     ) -> None:

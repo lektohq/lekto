@@ -9,6 +9,7 @@ import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from uuid import UUID
 
 from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import (
@@ -114,6 +115,15 @@ class UserService:
         """The caller's own account."""
         async with self._uow() as uow:
             return await _account(uow, await load_actor(uow, actor))
+
+    async def instance_id(self, actor: Actor) -> UUID:
+        """The id of this instance, for every caller (`GET /auth/me`; Home Assistant tells
+        instances apart by it, `.knowledge/open/instance-id-fas.md`)."""
+        async with self._uow() as uow:
+            await load_actor(uow, actor)
+            id = await uow.instance.id()
+            await uow.commit()  # made now if it was missing
+            return id
 
     async def account(self, actor: Actor, id: UserId) -> Account:
         """Admins only."""

@@ -830,6 +830,14 @@ push_preferences = Table(
     Column("version", Integer, nullable=False),
 )
 
+instance = Table(
+    "instance",
+    metadata,
+    # One row (key 1): the instance's id, random, made by revision 0083; a restore keeps it.
+    Column("key", Integer, primary_key=True, autoincrement=False),
+    Column("id", Uuid, nullable=False),
+)
+
 api_tokens = Table(
     "api_tokens",
     metadata,

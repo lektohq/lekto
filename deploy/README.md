@@ -327,7 +327,9 @@ claude mcp add --transport http lekto http://localhost:8000/api/v1/mcp \
 What to back up: the **database** and the **object store** (the original files and their
 derivatives). **Not** Meilisearch: the index is derived; after a restore `lekto reindex` rebuilds
 it. Keep the secrets (`LEKTO_SECRET_KEY` above all) in your password manager, not only in the
-backup. Back up the database first, then the objects: the originals never change (their key is the SHA-256
+backup. The database also holds the id of the instance (`instance_id` in
+`GET /api/v1/auth/me`): a restore keeps it, so Home Assistant finds the same instance again; a
+copy of the database on a second instance has the same id, and Home Assistant takes both for one. Back up the database first, then the objects: the originals never change (their key is the SHA-256
 of the content), so objects that came in after the database copy are only unused files, while the
 other order could leave documents without a file. The derivatives (archive PDF, text, preview,
 page images) are written again when a document is processed again; a copy of an older state is
