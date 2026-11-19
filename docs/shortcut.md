@@ -41,9 +41,9 @@ Uploaded documents go into your personal space and through the inbox, like every
 
 ## The token
 
-A token of the scope **upload** ("Nur hochladen") reaches only `POST /api/v1/documents`. It reads
-nothing, not even what it uploaded; every other request answers `403` (`upload_only_token`), and
-the MCP server refuses it. If a device is lost, revoke its token in **Settings › API-Tokens**:
+A token of the preset **upload** ("Nur hochladen", [API tokens](api-tokens.md)) reaches only
+`POST /api/v1/documents`. It reads nothing, not even what it uploaded; every other request
+answers `403` (`upload_only_token`), and the MCP server refuses it. If a device is lost, revoke its token in **Settings › API-Tokens**:
 the shortcut on that device stops working at once.
 
 ## Without the shortcut
