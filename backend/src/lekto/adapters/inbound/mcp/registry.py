@@ -2,9 +2,11 @@
 
 Every tool has a class: a `read` tool only reads, a `write` tool changes, but nothing a person
 could not undo (Tobi, 01.11.2026: no deleting, moving or reprocessing; the client links to the
-web UI for those). A token with scope `read` sees the read tools only, a tool for admins only
-admins see. The list of tools is filtered per caller, and a call of a tool the caller does not
-see is refused with the reason (`Visibility`).
+web UI for those); the class gives the annotations. Every tool names the rights it needs (the
+right of its area, and for a tool for admins an admin right; `.knowledge/plans/token-rights.md`):
+a token sees the tools its rights open, a session every tool its user may use. The list of tools
+is filtered per caller, and a call of a tool the caller does not see is refused with the reason
+(`Visibility`).
 
 A name is `<domain>_<verb>`: one of `DOMAINS`, then one of `VERBS`. The underscore separates
 them; the protocol allows dots, but clients refuse them.
@@ -26,6 +28,7 @@ from starlette.requests import Request
 from lekto.adapters.inbound.mcp.names import similar_names
 from lekto.adapters.inbound.schemas import refuse_nul
 from lekto.core.domain.errors import DomainError, SearchUnavailableError
+from lekto.core.domain.rights import ADMIN_RIGHTS, READ_RIGHTS, TokenRight
 from lekto.core.services.auth import Principal
 
 DOMAINS = (
@@ -83,7 +86,7 @@ def split_name(name: str) -> tuple[str, str] | None:
 class ToolSpec:
     name: str
     tool_class: ToolClass
-    admin: bool = False
+    needs: frozenset[TokenRight]  # what the caller's token must carry (an admin right: an admin)
     idempotent: bool = False
     parameters: frozenset[str] = frozenset()  # the arguments it takes (`_parameters`)
 
@@ -106,10 +109,15 @@ class ToolSpec:
         """Why `principal` may not use the tool; None if they may."""
         if principal is None:
             return "authentication is required"
-        if self.tool_class is ToolClass.WRITE and not principal.can_write:
-            return "this API token may only read"
-        if self.admin and not principal.user.is_active_admin:
-            return "only admins may use this tool"
+        for right in sorted(self.needs):
+            if principal.may(right):
+                continue
+            if right.for_admins and not principal.user.is_active_admin:
+                return "only admins may use this tool"
+            rights = principal.rights or frozenset()
+            if self.tool_class is ToolClass.WRITE and rights <= READ_RIGHTS | ADMIN_RIGHTS:
+                return "this API token may only read"
+            return f"this API token lacks the right {right.value}"
         return None
 
     def unknown(self, arguments: object) -> str | None:
@@ -131,6 +139,10 @@ class ToolSpec:
         return None
 
 
+def _needs(right: TokenRight, admin: TokenRight | None) -> frozenset[TokenRight]:
+    return frozenset({right} if admin is None else {right, admin})
+
+
 type Tool = Callable[..., Awaitable[Any]]
 
 
@@ -142,13 +154,24 @@ class Tools:
         self._server = server
         self._specs = specs
 
-    def read(self, name: str, description: str, *, admin: bool = False) -> Callable[[Tool], Tool]:
-        return self._add(ToolSpec(name, ToolClass.READ, admin=admin), description)
+    def read(
+        self, name: str, description: str, *, needs: TokenRight, admin: TokenRight | None = None
+    ) -> Callable[[Tool], Tool]:
+        """A tool that reads, for a caller with `needs` (and the admin right `admin`)."""
+        spec = ToolSpec(name, ToolClass.READ, _needs(needs, admin))
+        return self._add(spec, description)
 
     def write(
-        self, name: str, description: str, *, idempotent: bool, admin: bool = False
+        self,
+        name: str,
+        description: str,
+        *,
+        needs: TokenRight,
+        idempotent: bool,
+        admin: TokenRight | None = None,
     ) -> Callable[[Tool], Tool]:
-        spec = ToolSpec(name, ToolClass.WRITE, admin=admin, idempotent=idempotent)
+        """A tool that changes, for a caller with `needs` (and the admin right `admin`)."""
+        spec = ToolSpec(name, ToolClass.WRITE, _needs(needs, admin), idempotent=idempotent)
         return self._add(spec, description)
 
     def _add(self, spec: ToolSpec, description: str) -> Callable[[Tool], Tool]:

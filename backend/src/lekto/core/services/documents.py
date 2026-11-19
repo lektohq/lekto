@@ -1074,9 +1074,10 @@ class DocumentService:
             undated=days.get(None, 0),
         )
 
-    async def filter_readers(self, id: DocumentId, candidates: Collection[UserId]) -> set[UserId]:
-        """Those of `candidates` who may read the document now (admins: always); none if it does
-        not exist. For pushing events to users (SSE), so it reads the current state."""
+    async def filter_readers(self, id: DocumentId, candidates: Collection[Actor]) -> set[Actor]:
+        """Those of `candidates` who may read the document now with their rights (an admin with
+        `admin:documents_all`: always); none if it does not exist. For pushing events to users
+        (SSE), so it reads the current state."""
         if not candidates:
             return set()
         async with self._uow() as uow:
@@ -1084,26 +1085,29 @@ class DocumentService:
             if document is None:
                 return set()
             space = await uow.spaces.get(document.space_id)
-            readers: set[UserId] = set()
+            readers: set[Actor] = set()
             for candidate in set(candidates):
-                user = await uow.users.find(candidate)
-                if user is not None and can_read_document(user, document, space):
+                user = await uow.users.find(candidate.id)
+                if user is None:
+                    continue
+                if can_read_document(replace(user, rights=candidate.rights), document, space):
                     readers.add(candidate)
             return readers
 
-    async def active_admins(self, candidates: Collection[UserId]) -> set[UserId]:
-        """Those of `candidates` who are active admins: they hear of every document event (SSE),
-        also of a deletion, whose stored readers name only those who had it within reach, and of
-        a training of the classifier."""
+    async def who_may(self, candidates: Collection[Actor], right: TokenRight) -> set[Actor]:
+        """Those of `candidates` who may `right`, an admin right, with their rights: who hears of
+        every document event (SSE, `admin:documents_all`), also of a deletion, whose stored
+        readers name only those who had it within reach, and of a fetched mailbox
+        (`admin:mailboxes`)."""
         if not candidates:
             return set()
         async with self._uow() as uow:
-            admins: set[UserId] = set()
+            allowed: set[Actor] = set()
             for candidate in set(candidates):
-                user = await uow.users.find(candidate)
-                if user is not None and user.is_active_admin:
-                    admins.add(candidate)
-            return admins
+                user = await uow.users.find(candidate.id)
+                if user is not None and replace(user, rights=candidate.rights).may(right):
+                    allowed.add(candidate)
+            return allowed
 
     async def processing_log(self, actor: Actor, id: DocumentId) -> list[NodeRun]:
         """Editors and admins: the log may hold technical details of failed runs. Similar

@@ -22,7 +22,7 @@ from lekto.core.domain.fields import FieldType
 from lekto.core.domain.ids import FieldId, LensId, short_id
 from lekto.core.domain.lenses import MAX_FILTER_VALUES, MAX_QUERY_LENGTH
 from lekto.core.domain.periods import Period
-from lekto.core.domain.rights import Actor
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.ports.repository import DocumentFilter, each_tag
 
 LIST_SIZE = 20
@@ -74,6 +74,7 @@ def add_listing_tools(tools: Tools, context: ApiContext) -> None:
         "documents_search, lane, document_date_from/_to (YYYY-MM-DD); query: with these "
         "words; lens: the filters of a lens (others given replace its own). fields: names of "
         "fields to show.",
+        needs=TokenRight.DOCUMENTS_READ,
     )
     async def documents_list(
         ctx: Context,

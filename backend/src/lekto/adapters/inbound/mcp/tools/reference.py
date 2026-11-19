@@ -25,7 +25,7 @@ from lekto.core.domain.identifiers import MAX_IDENTIFIER_VALUE, normalise_identi
 from lekto.core.domain.ids import short_id
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.open_identifiers import OpenSource
-from lekto.core.domain.rights import Actor
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.rules import Rule
 from lekto.core.domain.rules_json import definition_to_json
 from lekto.core.domain.spaces import Space
@@ -122,6 +122,7 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
         "Whose an identifier is (IBAN, customer number, ...: the kinds as documents_get "
         "include facts names them) and the newest of your documents that show it, with the "
         "text around it.",
+        needs=TokenRight.MASTER_DATA_READ,
     )
     async def identifiers_find(
         ctx: Context,
@@ -162,7 +163,8 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
         "Identifiers no person confirmed yet: learned by training at a contact, or suggested "
         "(a domain that fits its contact's name, an IBAN for a person's profile); the most "
         "documents first, with Lekto's recommendation. Decided in the web UI.",
-        admin=True,
+        admin=TokenRight.ADMIN_MANAGE,
+        needs=TokenRight.MASTER_DATA_READ,
     )
     async def identifiers_open(
         ctx: Context,
@@ -207,6 +209,7 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
         "The rules that act on your documents, in the order they apply: global ones and "
         "those of the spaces you edit, with triggers (ingest, change, ...) and whether they "
         "are enabled. Made and changed in the web UI.",
+        needs=TokenRight.RULES_READ,
     )
     async def rules_list(ctx: Context) -> str:
         user = principal_of(ctx).actor
@@ -219,6 +222,7 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
         "A rule by name: its conditions and actions as stored, with names for the ids of "
         "contacts, types, tags, topics, fields and spaces. space: where two rules share the "
         "name, the space as rules_list names it, or global.",
+        needs=TokenRight.RULES_READ,
     )
     async def rules_get(ctx: Context, name: str, space: str | None = None) -> str:
         user = principal_of(ctx).actor
@@ -253,6 +257,7 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
         "system_status",
         "How Lekto is doing: jobs by kind (running, due, planned, failed), the search index "
         "(documents, with meaning) and the classifier's model.",
+        needs=TokenRight.SYSTEM_READ,
     )
     async def system_status(ctx: Context) -> str:
         user = principal_of(ctx).actor

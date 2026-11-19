@@ -147,11 +147,6 @@ class Principal:
         return holds(self.rights, right) and (not right.for_admins or self.user.is_active_admin)
 
     @property
-    def can_write(self) -> bool:
-        """Whether the caller may change documents (the MCP tools of the class `write`)."""
-        return self.may(TokenRight.DOCUMENTS_WRITE)
-
-    @property
     def only_uploads(self) -> bool:
         """Whether the caller's token may do nothing but upload documents."""
         return self.rights is not None and self.rights <= {TokenRight.DOCUMENTS_UPLOAD}

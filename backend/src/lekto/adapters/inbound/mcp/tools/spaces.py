@@ -14,7 +14,7 @@ from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
 from lekto.core.domain.ids import SpaceId
 from lekto.core.domain.lenses import Lens
-from lekto.core.domain.rights import Actor
+from lekto.core.domain.rights import Actor, TokenRight
 
 
 class MemberOut(BaseModel):
@@ -55,6 +55,7 @@ def add_space_tools(tools: Tools, context: ApiContext) -> None:
         "spaces_list",
         "The spaces you are a member of: a personal space by its person's name, your role "
         "(read or edit) and who else sees its documents.",
+        needs=TokenRight.SPACES_READ,
     )
     async def spaces_list(ctx: Context) -> str:
         user = principal_of(ctx).actor
@@ -83,6 +84,7 @@ def add_space_tools(tools: Tools, context: ApiContext) -> None:
         "lenses_list",
         "Your lenses (saved views of the documents) with their words and filters; "
         "documents_list takes one by name.",
+        needs=TokenRight.LENSES_READ,
     )
     async def lenses_list(ctx: Context) -> str:
         user = principal_of(ctx).actor

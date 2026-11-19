@@ -14,6 +14,7 @@ from lekto.adapters.inbound.mcp.registry import Tools, principal_of
 from lekto.core.domain.identifiers import IdentifierSource
 from lekto.core.domain.ids import TagId
 from lekto.core.domain.master_data import Contact, TagScope
+from lekto.core.domain.rights import TokenRight
 from lekto.core.domain.tag_tree import TagTree
 from lekto.core.ports.repository import CountBy
 
@@ -84,6 +85,7 @@ def add_master_data_tools(tools: Tools, context: ApiContext) -> None:
         "The contacts by name, with aliases, groups, topics and how many of your documents "
         "they have; query keeps those whose name or alias holds it. Master data are changed "
         "in the web UI.",
+        needs=TokenRight.MASTER_DATA_READ,
     )
     async def contacts_list(
         ctx: Context, query: Annotated[str | None, Field(max_length=100)] = None
@@ -107,6 +109,7 @@ def add_master_data_tools(tools: Tools, context: ApiContext) -> None:
         "contacts_get",
         "A contact by name with its identifiers you may see (IBAN, customer number, ...): "
         "entered by hand or learned by training, with their topic.",
+        needs=TokenRight.MASTER_DATA_READ,
     )
     async def contacts_get(ctx: Context, name: str) -> str:
         user = principal_of(ctx).actor
@@ -131,6 +134,7 @@ def add_master_data_tools(tools: Tools, context: ApiContext) -> None:
         "The document types by name, with groups, the fields that apply to them, whether "
         "relations point to them (relation_target: contracts) and how many of your documents "
         "they have.",
+        needs=TokenRight.MASTER_DATA_READ,
     )
     async def document_types_list(ctx: Context) -> str:
         user = principal_of(ctx).actor
@@ -157,6 +161,7 @@ def add_master_data_tools(tools: Tools, context: ApiContext) -> None:
         "fields_list",
         "The custom fields in their order with their type (text, number, amount, date, boolean, "
         "choice, link, period), choices, the document types they apply to (none: every type).",
+        needs=TokenRight.MASTER_DATA_READ,
     )
     async def fields_list(ctx: Context) -> str:
         user = principal_of(ctx).actor
@@ -191,6 +196,7 @@ def add_master_data_tools(tools: Tools, context: ApiContext) -> None:
         "between names; the other tools take a tag's own name. document: tags of documents "
         "(a tag finds those below it too); topic: topics (the topic of a document); contact "
         "and document_type: groups of contacts and types.",
+        needs=TokenRight.MASTER_DATA_READ,
     )
     async def tags_list(
         ctx: Context, scope: Annotated[Scope | None, Field(description="Default: all.")] = None
