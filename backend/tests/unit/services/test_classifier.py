@@ -26,6 +26,7 @@ from lekto.core.domain.events import ClassifierTrained
 from lekto.core.domain.identifiers import Identifier, IdentifierKind, IdentifierSource, Key
 from lekto.core.domain.ids import ContactId
 from lekto.core.domain.master_data import Assignment, Contact, Tag, TagScope
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.repository import DocumentFilter
@@ -222,7 +223,7 @@ async def test_a_learned_number_knows_whose_it_is_and_where_it_was_learned(world
         await uow.contacts.add(utility)
         await uow.commit()
     own = await world.personal_space(erika)
-    family = await world.spaces.create(erika.id, "Familie")
+    family = await world.spaces.create(Actor(erika.id), "Familie")
     for number in range(2):
         await confirmed(
             world,
@@ -325,7 +326,7 @@ async def test_a_contact_changed_meanwhile_stores_the_model_again(
         calls += 1
         staged = await replace_learned_identifiers(uow, learned, **options)
         if calls == 1:
-            await world.master_data.change_contact(admin.id, utility.id, aliases=["SWM"])
+            await world.master_data.change_contact(Actor(admin.id), utility.id, aliases=["SWM"])
         return staged
 
     monkeypatch.setattr("lekto.core.services.classifier.replace_learned_identifiers", meanwhile)
@@ -374,13 +375,13 @@ async def test_the_check_queues_a_training_when_enough_was_confirmed(world: Worl
 async def test_every_user_sees_the_status_admins_train_on_request(world: World) -> None:
     admin, user = await world.user(role=Role.ADMIN), await world.user()
     classifier = service(world)
-    assert (await classifier.status(user.id)).confirmed == 0
+    assert (await classifier.status(Actor(user.id))).confirmed == 0
     with pytest.raises(PermissionDeniedError):
-        await classifier.request_training(user.id)
+        await classifier.request_training(Actor(user.id))
     with pytest.raises(ConflictError):  # too few confirmed documents
-        await classifier.request_training(admin.id)
+        await classifier.request_training(Actor(admin.id))
     await corpus(world)
-    await classifier.request_training(admin.id)
-    await classifier.request_training(admin.id)  # queued once
-    status = await classifier.status(user.id)
+    await classifier.request_training(Actor(admin.id))
+    await classifier.request_training(Actor(admin.id))  # queued once
+    status = await classifier.status(Actor(user.id))
     assert (status.model, status.confirmed, status.since) == (None, 4, 4)

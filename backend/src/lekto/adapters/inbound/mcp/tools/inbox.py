@@ -71,7 +71,7 @@ def add_inbox_tools(tools: Tools, context: ApiContext) -> None:
         limit: Annotated[int, Field(ge=1, le=INBOX_MAX)] = INBOX_SIZE,
         after: Annotated[str | None, Field(description="next_after of the page before.")] = None,
     ) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         names = await Names.load(context, user)
         position = None if after is None else await context.documents.resolve(user, after)
         items = await context.inbox.items(
@@ -132,7 +132,7 @@ def add_inbox_tools(tools: Tools, context: ApiContext) -> None:
         accept_suggestions: bool = False,
     ) -> str:
         principal = principal_of(ctx)
-        user = principal.id
+        user = principal.actor
         names = await Names.load(context, user)
         document = await context.documents.resolve(user, id)
         try:
@@ -165,11 +165,11 @@ def add_inbox_tools(tools: Tools, context: ApiContext) -> None:
     )
     async def inbox_mark_seen(ctx: Context, id: str, seen: bool = True) -> str:
         principal = principal_of(ctx)
-        document = await context.documents.resolve(principal.id, id)
+        document = await context.documents.resolve(principal.actor, id)
         if seen:
-            await context.inbox.mark_seen(principal.id, document, via=principal.via)
+            await context.inbox.mark_seen(principal.actor, document, via=principal.via)
         else:
-            await context.inbox.mark_unseen(principal.id, document)
+            await context.inbox.mark_unseen(principal.actor, document)
         return compact(UpdateOut(id=short_id(document)))
 
 

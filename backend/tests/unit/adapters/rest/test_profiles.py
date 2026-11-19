@@ -14,6 +14,7 @@ from lekto.core.domain.identity import TokenScope
 from lekto.core.domain.ids import DocumentId, UserId
 from lekto.core.domain.labels import grid_layout
 from lekto.core.domain.pipeline import Node
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import SpaceRole
 from tests.api import auth, bearer
 from tests.person_numbers import tax_id
@@ -118,7 +119,7 @@ async def test_a_profile_needs_a_session_and_an_admin_token_fills_name_and_email
     refused = await patch(api, path, {"aliases": []}, auth(admin))
     assert refused.status_code == 403
     assert (await read_profile(api, erika)).json()["aliases"] == ["E. Mustermann"]
-    _, read_only = await api.services.auth.create_api_token(admin.id, "r", TokenScope.READ)
+    _, read_only = await api.services.auth.create_api_token(Actor(admin.id), "r", TokenScope.READ)
     assert (await patch(api, path, {"email": None}, bearer(read_only))).status_code == 403
 
 
@@ -168,7 +169,7 @@ async def test_identifiers_of_persons_and_of_contacts(api: Api) -> None:
     assert future.status_code == 422
 
     iban = "DE89370400440532013000"
-    bank = await api.services.master_data.create_contact(admin.id, "Bank")
+    bank = await api.services.master_data.create_contact(Actor(admin.id), "Bank")
     mine = await change_profile(api, erika, {"identifiers": [{"kind": "iban", "value": iban}]})
     assert mine.status_code == 200, mine.text
     # A contact carries no IBAN since #215: neither hers nor any other.
@@ -217,8 +218,8 @@ async def test_the_persons_a_document_names(api: Api) -> None:
         erika,
         {"display_name": "Erika Mustermann", "identifiers": [{"kind": "tax_id", "value": TAX_ID}]},
     )
-    shared = await api.services.spaces.create(erika.id, "Shared")
-    await api.services.spaces.set_member(erika.id, shared.id, reader.id, SpaceRole.READ)
+    shared = await api.services.spaces.create(Actor(erika.id), "Shared")
+    await api.services.spaces.set_member(Actor(erika.id), shared.id, reader.id, SpaceRole.READ)
     document = await upload(api, auth(erika), space=str(shared.id))
 
     facts = (await get(api, f"/documents/{document}/facts", auth(erika))).json()
@@ -249,7 +250,7 @@ async def test_a_deleted_user_takes_their_profile_along(api: Api) -> None:
     erika, admin = await api.user("erika"), await api.admin()
     await change_profile(api, erika, {"display_name": "E. Mustermann", "aliases": ["Ann"]})
     bank = await api.services.master_data.create_contact(
-        admin.id,
+        Actor(admin.id),
         "Bank",
         identifiers=[
             Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "K-4711", user_id=UserId(erika.id))
@@ -287,8 +288,8 @@ async def test_what_is_private_finds_a_person_only_for_them_and_admins(api: Api)
     (entry,) = [item for item in log if item["node"] == "signal_facts"]
     assert entry["output"]["persons"] == []
     # He shares his space with her: she sees herself, as the admin does.
-    personal = (await api.services.spaces.list_spaces(bob.id))[0]
-    await api.services.spaces.set_member(bob.id, personal.id, erika.id, SpaceRole.EDIT)
+    personal = (await api.services.spaces.list_spaces(Actor(bob.id)))[0]
+    await api.services.spaces.set_member(Actor(bob.id), personal.id, erika.id, SpaceRole.EDIT)
     for viewer in (erika, admin):
         (person,) = (await get(api, f"/documents/{document}/facts", auth(viewer))).json()["persons"]
         assert (person["strength"], person["evidence"]) == ("hard", ["tax_id", "alias"])

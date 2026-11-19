@@ -12,6 +12,7 @@ from lekto.core.domain.ids import DocumentId, new_id
 from lekto.core.domain.inbox import DONE_PERIOD, Departure, Done, InboxTab
 from lekto.core.domain.master_data import Assignment, Contact
 from lekto.core.domain.pipeline import Lane, Node
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.repository import DocumentFilter
@@ -31,14 +32,14 @@ async def arrive(
     """A document of `owner`, processed with `executors` (each node OK otherwise)."""
     pipeline = world.pipeline(executors)
     content = f"%PDF-1.7 {next(_numbers)}".encode()
-    document = await pipeline.receive(owner.id, incoming(content), filename="a.pdf")
+    document = await pipeline.receive(Actor(owner.id), incoming(content), filename="a.pdf")
     await world.drain(pipeline)
-    return await world.documents.get(owner.id, document.id)
+    return await world.documents.get(Actor(owner.id), document.id)
 
 
 async def contact(world: World, name: str) -> Contact:
     admin = await world.user(role=Role.ADMIN)
-    return await world.master_data.create_contact(admin.id, name)
+    return await world.master_data.create_contact(Actor(admin.id), name)
 
 
 def tabs(items: list[InboxItem]) -> list[tuple[str, InboxTab]]:
@@ -48,43 +49,43 @@ def tabs(items: list[InboxItem]) -> list[tuple[str, InboxTab]]:
 async def test_a_document_green_by_itself_is_new_until_its_owner_sees_it(world: World) -> None:
     owner = await world.user()
     pipeline = world.pipeline()
-    received = await pipeline.receive(owner.id, incoming(b"%PDF-1.7 a"), filename="a.pdf")
-    (item,) = await world.inbox.items(owner.id)
+    received = await pipeline.receive(Actor(owner.id), incoming(b"%PDF-1.7 a"), filename="a.pdf")
+    (item,) = await world.inbox.items(Actor(owner.id))
     assert (item.state.tab, item.open, item.access) == (
         InboxTab.PROCESSING,
         (),
         SpaceRole.EDIT,
     )
-    summary = await world.inbox.summary(owner.id)
+    summary = await world.inbox.summary(Actor(owner.id))
     assert (summary.counts[InboxTab.PROCESSING], summary.open, summary.worst_lane) == (1, 1, None)
 
     await world.drain(pipeline)
-    (item,) = await world.inbox.items(owner.id)
+    (item,) = await world.inbox.items(Actor(owner.id))
     assert (item.document.id, item.state.tab, item.document.new_at) == (
         received.id,
         InboxTab.NEW,
         NOW,
     )
-    assert (await world.inbox.summary(owner.id)).worst_lane is Lane.GREEN
+    assert (await world.inbox.summary(Actor(owner.id))).worst_lane is Lane.GREEN
 
     world.clock.advance(MINUTE)
-    await world.inbox.mark_seen(owner.id, received.id)
-    assert await world.inbox.items(owner.id) == []
-    (done,) = await world.inbox.items(owner.id, tab=InboxTab.DONE)
+    await world.inbox.mark_seen(Actor(owner.id), received.id)
+    assert await world.inbox.items(Actor(owner.id)) == []
+    (done,) = await world.inbox.items(Actor(owner.id), tab=InboxTab.DONE)
     assert done.state.done == Done(Departure.SEEN, NOW + MINUTE, owner.id)
-    summary = await world.inbox.summary(owner.id)
+    summary = await world.inbox.summary(Actor(owner.id))
     assert (summary.open, summary.counts[InboxTab.DONE], summary.worst_lane) == (0, 1, None)
 
-    await world.inbox.mark_unseen(owner.id, received.id)  # new again
-    assert tabs(await world.inbox.items(owner.id)) == [("a", InboxTab.NEW)]
+    await world.inbox.mark_unseen(Actor(owner.id), received.id)  # new again
+    assert tabs(await world.inbox.items(Actor(owner.id))) == [("a", InboxTab.NEW)]
 
 
 async def test_seen_changes_nothing_but_the_inbox(world: World) -> None:
     owner = await world.user()
     document = await arrive(world, owner)
     world.clock.advance(MINUTE)
-    await world.inbox.mark_seen(owner.id, document.id)
-    after = await world.documents.get(owner.id, document.id)
+    await world.inbox.mark_seen(Actor(owner.id), document.id)
+    after = await world.documents.get(Actor(owner.id), document.id)
     assert after == document  # not confirmed, same lane, same version
     assert world.events()[-1].occurred_at == NOW  # no event
 
@@ -92,9 +93,9 @@ async def test_seen_changes_nothing_but_the_inbox(world: World) -> None:
 async def test_reading_through_the_api_sets_nothing(world: World) -> None:
     owner = await world.user()
     document = await arrive(world, owner)
-    await world.documents.view(owner.id, document.id)
-    await world.documents.get(owner.id, document.id)
-    assert tabs(await world.inbox.items(owner.id)) == [("a", InboxTab.NEW)]
+    await world.documents.view(Actor(owner.id), document.id)
+    await world.documents.get(Actor(owner.id), document.id)
+    assert tabs(await world.inbox.items(Actor(owner.id))) == [("a", InboxTab.NEW)]
 
 
 async def test_reprocessing_makes_it_new_again_only_if_the_metadata_changed(
@@ -104,20 +105,20 @@ async def test_reprocessing_makes_it_new_again_only_if_the_metadata_changed(
     acme = await contact(world, "ACME")
     document = await arrive(world, owner)
     world.clock.advance(MINUTE)
-    await world.inbox.mark_seen(owner.id, document.id)
+    await world.inbox.mark_seen(Actor(owner.id), document.id)
 
     world.clock.advance(MINUTE)
     unchanged = world.pipeline()
-    await unchanged.reprocess_from(owner.id, document.id, Node.JUDGE)
-    assert tabs(await world.inbox.items(owner.id)) == [("a", InboxTab.PROCESSING)]
+    await unchanged.reprocess_from(Actor(owner.id), document.id, Node.JUDGE)
+    assert tabs(await world.inbox.items(Actor(owner.id))) == [("a", InboxTab.PROCESSING)]
     await world.drain(unchanged)
-    assert await world.inbox.items(owner.id) == []  # seen, and nothing changed
+    assert await world.inbox.items(Actor(owner.id)) == []  # seen, and nothing changed
 
     world.clock.advance(MINUTE)
     changed = world.pipeline({Node.JUDGE: Classifies(contact=acme.id)})
-    await changed.reprocess_from(owner.id, document.id, Node.JUDGE)
+    await changed.reprocess_from(Actor(owner.id), document.id, Node.JUDGE)
     await world.drain(changed)
-    (item,) = await world.inbox.items(owner.id)
+    (item,) = await world.inbox.items(Actor(owner.id))
     assert (item.state.tab, item.document.contact_id) == (InboxTab.NEW, acme.id)
     assert item.document.new_at == NOW + 3 * MINUTE
 
@@ -130,19 +131,21 @@ async def test_a_confirmed_document_is_new_for_no_one(world: World, by: Role) ->
     admin = await world.user(role=Role.ADMIN)
     confirming = owner if by is Role.USER else admin
     yellow = await arrive(world, owner, {Node.JUDGE: Returns(UNCERTAIN)})
-    (item,) = await world.inbox.items(owner.id, tab=InboxTab.REVIEW)
+    (item,) = await world.inbox.items(Actor(owner.id), tab=InboxTab.REVIEW)
     assert [open.node for open in item.open] == [Node.JUDGE]
-    assert (await world.inbox.summary(owner.id)).worst_lane is Lane.YELLOW
+    assert (await world.inbox.summary(Actor(owner.id))).worst_lane is Lane.YELLOW
 
     world.clock.advance(MINUTE)
     pipeline = world.pipeline()
-    await pipeline.confirm(confirming.id, yellow.id, DocumentChanges(), accept_suggestions=True)
+    await pipeline.confirm(
+        Actor(confirming.id), yellow.id, DocumentChanges(), accept_suggestions=True
+    )
     await world.drain(pipeline)
 
     expected = Done(Departure.CONFIRMED, NOW + MINUTE, confirming.id)
     for viewer, all_users in ((owner, False), (admin, True)):
-        assert await world.inbox.items(viewer.id, all_users=all_users) == []
-        (done,) = await world.inbox.items(viewer.id, tab=InboxTab.DONE, all_users=all_users)
+        assert await world.inbox.items(Actor(viewer.id), all_users=all_users) == []
+        (done,) = await world.inbox.items(Actor(viewer.id), tab=InboxTab.DONE, all_users=all_users)
         assert (done.document.lane, done.document.new_at, done.state.done) == (
             Lane.GREEN,
             None,
@@ -157,19 +160,19 @@ async def test_a_retry_from_red_ending_green_by_itself(world: World) -> None:
     acme = await contact(world, "ACME")
     filing = await arrive(world, owner, {Node.FILE: Returns(FAILED)})
     reading = await arrive(world, owner, {Node.OCR: Returns(FAILED)})
-    assert [item.state.tab for item in await world.inbox.items(owner.id)] == [
+    assert [item.state.tab for item in await world.inbox.items(Actor(owner.id))] == [
         InboxTab.INTERVENE,
         InboxTab.INTERVENE,
     ]
-    assert (await world.inbox.summary(owner.id)).worst_lane is Lane.RED
+    assert (await world.inbox.summary(Actor(owner.id))).worst_lane is Lane.RED
 
     world.clock.advance(MINUTE)
     pipeline = world.pipeline({Node.JUDGE: Classifies(contact=acme.id)})
     for document in (filing, reading):
-        await pipeline.retry(owner.id, document.id)
+        await pipeline.retry(Actor(owner.id), document.id)
     await world.drain(pipeline)
-    assert tabs(await world.inbox.items(owner.id)) == [("a", InboxTab.NEW)] * 2
-    filed = await world.documents.get(owner.id, filing.id)
+    assert tabs(await world.inbox.items(Actor(owner.id))) == [("a", InboxTab.NEW)] * 2
+    filed = await world.documents.get(Actor(owner.id), filing.id)
     assert (filed.lane, filed.contact_id, filed.new_at) == (Lane.GREEN, None, NOW + MINUTE)
 
 
@@ -178,9 +181,9 @@ async def test_a_yellow_document_reprocessed_green_by_itself_is_new(world: World
     yellow = await arrive(world, owner, {Node.JUDGE: Returns(UNCERTAIN)})
     world.clock.advance(MINUTE)
     pipeline = world.pipeline()
-    await pipeline.reprocess_from(owner.id, yellow.id, Node.JUDGE)
+    await pipeline.reprocess_from(Actor(owner.id), yellow.id, Node.JUDGE)
     await world.drain(pipeline)
-    (item,) = await world.inbox.items(owner.id)
+    (item,) = await world.inbox.items(Actor(owner.id))
     assert (item.document.id, item.state.tab, item.document.new_at) == (
         yellow.id,
         InboxTab.NEW,
@@ -195,39 +198,41 @@ async def test_seen_is_per_user(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     document = await arrive(world, owner)
     world.clock.advance(MINUTE)
-    await world.inbox.mark_seen(owner.id, document.id)
-    assert await world.inbox.items(owner.id) == []
-    (item,) = await world.inbox.items(admin.id, all_users=True)
+    await world.inbox.mark_seen(Actor(owner.id), document.id)
+    assert await world.inbox.items(Actor(owner.id)) == []
+    (item,) = await world.inbox.items(Actor(admin.id), all_users=True)
     assert item.state.tab is InboxTab.NEW
-    assert await world.inbox.items(admin.id) == []  # the admin's own inbox
+    assert await world.inbox.items(Actor(admin.id)) == []  # the admin's own inbox
 
     world.clock.advance(MINUTE)
-    await world.inbox.mark_seen(admin.id, document.id)
-    (done,) = await world.inbox.items(admin.id, tab=InboxTab.DONE, all_users=True)
+    await world.inbox.mark_seen(Actor(admin.id), document.id)
+    (done,) = await world.inbox.items(Actor(admin.id), tab=InboxTab.DONE, all_users=True)
     assert done.state.done == Done(Departure.SEEN, NOW + 2 * MINUTE, admin.id)
-    await world.inbox.mark_unseen(owner.id, document.id)
-    assert tabs(await world.inbox.items(owner.id)) == [("a", InboxTab.NEW)]
-    assert await world.inbox.items(admin.id, all_users=True) == []
+    await world.inbox.mark_unseen(Actor(owner.id), document.id)
+    assert tabs(await world.inbox.items(Actor(owner.id))) == [("a", InboxTab.NEW)]
+    assert await world.inbox.items(Actor(admin.id), all_users=True) == []
 
 
 async def test_reading_a_space_never_brings_a_document_into_an_inbox(world: World) -> None:
     owner, reader, editor = await world.user(), await world.user(), await world.user()
-    shared = await world.spaces.create(owner.id, "Shared")
-    await world.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
-    await world.spaces.set_member(owner.id, shared.id, editor.id, SpaceRole.EDIT)
+    shared = await world.spaces.create(Actor(owner.id), "Shared")
+    await world.spaces.set_member(Actor(owner.id), shared.id, reader.id, SpaceRole.READ)
+    await world.spaces.set_member(Actor(owner.id), shared.id, editor.id, SpaceRole.EDIT)
     pipeline = world.pipeline()
     received = await pipeline.receive(
-        owner.id, incoming(b"%PDF-1.7 s"), filename="s.pdf", space=shared.id
+        Actor(owner.id), incoming(b"%PDF-1.7 s"), filename="s.pdf", space=shared.id
     )
     await world.drain(pipeline)
-    assert await world.documents.get(reader.id, received.id)
-    await world.inbox.mark_seen(reader.id, received.id)  # nothing to see for them
+    assert await world.documents.get(Actor(reader.id), received.id)
+    await world.inbox.mark_seen(Actor(reader.id), received.id)  # nothing to see for them
     async with world.uow() as uow:
         assert await uow.inbox.seen(reader.id, [received.id]) == {}
-    assert await world.inbox.items(reader.id) == []
-    assert (await world.inbox.summary(reader.id)).open == 0
-    assert tabs(await world.inbox.items(owner.id)) == [("s", InboxTab.NEW)]
-    assert tabs(await world.inbox.items(editor.id)) == [("s", InboxTab.NEW)]  # every editor's
+    assert await world.inbox.items(Actor(reader.id)) == []
+    assert (await world.inbox.summary(Actor(reader.id))).open == 0
+    assert tabs(await world.inbox.items(Actor(owner.id))) == [("s", InboxTab.NEW)]
+    assert tabs(await world.inbox.items(Actor(editor.id))) == [
+        ("s", InboxTab.NEW)
+    ]  # every editor's
 
 
 async def test_seeing_it_again_keeps_when_it_left(world: World) -> None:
@@ -235,15 +240,17 @@ async def test_seeing_it_again_keeps_when_it_left(world: World) -> None:
     owner = await world.user()
     document = await arrive(world, owner)
     world.clock.advance(MINUTE)
-    await world.inbox.mark_seen(owner.id, document.id)
+    await world.inbox.mark_seen(Actor(owner.id), document.id)
     world.clock.advance(MINUTE)
-    await world.inbox.mark_seen(owner.id, document.id)
-    (done,) = await world.inbox.items(owner.id, tab=InboxTab.DONE)
+    await world.inbox.mark_seen(Actor(owner.id), document.id)
+    (done,) = await world.inbox.items(Actor(owner.id), tab=InboxTab.DONE)
     assert done.state.done == Done(Departure.SEEN, NOW + MINUTE, owner.id)
     world.clock.advance(DONE_PERIOD - 2 * MINUTE)
-    await world.inbox.mark_seen(owner.id, document.id)
+    await world.inbox.mark_seen(Actor(owner.id), document.id)
     world.clock.advance(2 * MINUTE)
-    assert await world.inbox.items(owner.id, tab=InboxTab.DONE) == []  # gone after its 14 days
+    assert (
+        await world.inbox.items(Actor(owner.id), tab=InboxTab.DONE) == []
+    )  # gone after its 14 days
 
 
 async def test_metadata_a_person_sets_during_the_run_is_their_decision(world: World) -> None:
@@ -251,33 +258,33 @@ async def test_metadata_a_person_sets_during_the_run_is_their_decision(world: Wo
     by hand alone: the run ends green, and the document is not new."""
     owner = await world.user()
     admin = await world.user(role=Role.ADMIN)
-    acme = await world.master_data.create_contact(admin.id, "ACME")
-    paid = await world.master_data.create_tag(admin.id, "Paid", assignment=Assignment.MANUAL)
+    acme = await world.master_data.create_contact(Actor(admin.id), "ACME")
+    paid = await world.master_data.create_tag(Actor(admin.id), "Paid", assignment=Assignment.MANUAL)
     pipeline = world.pipeline()
     by_hand = []
     for number, change in enumerate(
         (DocumentChanges(contact_id=acme.id), DocumentChanges(tag_ids=frozenset({paid.id})))
     ):
         content = f"%PDF-1.7 by hand {number}".encode()
-        received = await pipeline.receive(owner.id, incoming(content), filename="h.pdf")
-        await world.documents.change_metadata(owner.id, received.id, change)
+        received = await pipeline.receive(Actor(owner.id), incoming(content), filename="h.pdf")
+        await world.documents.change_metadata(Actor(owner.id), received.id, change)
         by_hand.append(received.id)
     imported = MetadataResult(OK, DocumentChanges(contact_id=acme.id), confirms=True)
     taken_over = await arrive(world, owner, {Node.JUDGE: Returns(imported)})
     await world.drain(pipeline)
     for id in (*by_hand, taken_over.id):
-        document = await world.documents.get(owner.id, id)
+        document = await world.documents.get(Actor(owner.id), id)
         assert (document.lane, document.new_at) == (Lane.GREEN, None)
-    assert await world.inbox.items(owner.id) == []
+    assert await world.inbox.items(Actor(owner.id)) == []
 
 
 async def test_a_deleted_users_seen_marks_go(world: World) -> None:
     owner = await world.user()
     admin, other = await world.user(role=Role.ADMIN), await world.user(role=Role.ADMIN)
     document = await arrive(world, owner)
-    await world.inbox.mark_seen(admin.id, document.id)
-    await world.inbox.mark_seen(owner.id, document.id)
-    await world.users.delete_user(other.id, admin.id)
+    await world.inbox.mark_seen(Actor(admin.id), document.id)
+    await world.inbox.mark_seen(Actor(owner.id), document.id)
+    await world.users.delete_user(Actor(other.id), admin.id)
     assert list(world.database.seen) == [(owner.id, document.id)]
 
 
@@ -286,8 +293,8 @@ async def test_seen_needs_read_access_and_counts_for_new_documents_only(world: W
     yellow = await arrive(world, owner, {Node.JUDGE: Returns(UNCERTAIN)})
     for mark in (world.inbox.mark_seen, world.inbox.mark_unseen):
         with pytest.raises(NotFoundError):
-            await mark(stranger.id, yellow.id)
-    await world.inbox.mark_seen(owner.id, yellow.id)  # new for no one: nothing to see
+            await mark(Actor(stranger.id), yellow.id)
+    await world.inbox.mark_seen(Actor(owner.id), yellow.id)  # new for no one: nothing to see
     async with world.uow() as uow:
         assert await uow.inbox.seen(owner.id, [yellow.id]) == {}
 
@@ -295,12 +302,12 @@ async def test_seen_needs_read_access_and_counts_for_new_documents_only(world: W
 async def test_done_lasts_fourteen_days(world: World) -> None:
     owner = await world.user()
     document = await arrive(world, owner)
-    await world.inbox.mark_seen(owner.id, document.id)
+    await world.inbox.mark_seen(Actor(owner.id), document.id)
     world.clock.advance(DONE_PERIOD)
-    assert len(await world.inbox.items(owner.id, tab=InboxTab.DONE)) == 1
+    assert len(await world.inbox.items(Actor(owner.id), tab=InboxTab.DONE)) == 1
     world.clock.advance(MINUTE)
-    assert await world.inbox.items(owner.id, tab=InboxTab.DONE) == []
-    assert await world.inbox.items(owner.id) == []  # and it stays seen
+    assert await world.inbox.items(Actor(owner.id), tab=InboxTab.DONE) == []
+    assert await world.inbox.items(Actor(owner.id)) == []  # and it stays seen
 
 
 async def test_all_as_seen_marks_what_is_new(world: World) -> None:
@@ -310,29 +317,31 @@ async def test_all_as_seen_marks_what_is_new(world: World) -> None:
     await arrive(world, owner, {Node.JUDGE: Returns(UNCERTAIN)})
     theirs = await arrive(world, other)
     world.clock.advance(MINUTE)
-    assert await world.inbox.mark_all_seen(owner.id) == 2
-    assert [item.state.tab for item in await world.inbox.items(owner.id)] == [InboxTab.REVIEW]
-    done = await world.inbox.items(owner.id, tab=InboxTab.DONE)
+    assert await world.inbox.mark_all_seen(Actor(owner.id)) == 2
+    assert [item.state.tab for item in await world.inbox.items(Actor(owner.id))] == [
+        InboxTab.REVIEW
+    ]
+    done = await world.inbox.items(Actor(owner.id), tab=InboxTab.DONE)
     assert [item.document.id for item in done] == [second.id, first.id]
-    assert await world.inbox.mark_all_seen(admin.id, all_users=True) == 3
-    assert [item.document.id for item in await world.inbox.items(other.id)] == [theirs.id]
+    assert await world.inbox.mark_all_seen(Actor(admin.id), all_users=True) == 3
+    assert [item.document.id for item in await world.inbox.items(Actor(other.id))] == [theirs.id]
 
 
 async def test_every_users_inbox_is_for_admins(world: World) -> None:
     user = await world.user()
     with pytest.raises(PermissionDeniedError, match="only admins"):
-        await world.inbox.items(user.id, all_users=True)
+        await world.inbox.items(Actor(user.id), all_users=True)
     with pytest.raises(PermissionDeniedError, match="only admins"):
-        await world.inbox.summary(user.id, all_users=True)
+        await world.inbox.summary(Actor(user.id), all_users=True)
     with pytest.raises(PermissionDeniedError, match="only admins"):
-        await world.inbox.mark_all_seen(user.id, all_users=True)
+        await world.inbox.mark_all_seen(Actor(user.id), all_users=True)
 
 
 async def test_pages_of_the_inbox(world: World) -> None:
     owner = await world.user()
     documents = [await arrive(world, owner) for _ in range(3)]
-    first = await world.inbox.items(owner.id, limit=2)
-    rest = await world.inbox.items(owner.id, after=first[-1].document.id, limit=2)
+    first = await world.inbox.items(Actor(owner.id), limit=2)
+    rest = await world.inbox.items(Actor(owner.id), after=first[-1].document.id, limit=2)
     assert [item.document.id for item in [*first, *rest]] == [
         document.id for document in reversed(documents)
     ]
@@ -348,13 +357,13 @@ async def test_done_goes_by_when_documents_left(world: World) -> None:
         await arrive(world, owner, {Node.JUDGE: Returns(UNCERTAIN)}),
     )
     world.clock.advance(MINUTE)
-    await world.inbox.mark_seen(owner.id, newer.id)
+    await world.inbox.mark_seen(Actor(owner.id), newer.id)
     world.clock.advance(MINUTE)
-    await world.pipeline().confirm(owner.id, confirmed.id, DocumentChanges())
+    await world.pipeline().confirm(Actor(owner.id), confirmed.id, DocumentChanges())
     await world.drain()
     world.clock.advance(MINUTE)
-    await world.inbox.mark_seen(owner.id, older.id)
-    done = await world.inbox.items(owner.id, tab=InboxTab.DONE)
+    await world.inbox.mark_seen(Actor(owner.id), older.id)
+    done = await world.inbox.items(Actor(owner.id), tab=InboxTab.DONE)
     expected = [older.id, confirmed.id, newer.id]
     assert [item.document.id for item in done] == expected
     assert [item.state.done.at for item in done if item.state.done] == [
@@ -363,13 +372,13 @@ async def test_done_goes_by_when_documents_left(world: World) -> None:
         NOW + MINUTE,
     ]
     found, after = [], None
-    while page := await world.inbox.items(owner.id, tab=InboxTab.DONE, after=after, limit=1):
+    while page := await world.inbox.items(Actor(owner.id), tab=InboxTab.DONE, after=after, limit=1):
         found.append(page[0].document.id)
         after = page[0].document.id
     assert found == expected
-    await world.inbox.mark_unseen(owner.id, older.id)
+    await world.inbox.mark_unseen(Actor(owner.id), older.id)
     with pytest.raises(ValidationError, match="cursor"):
-        await world.inbox.items(owner.id, tab=InboxTab.DONE, after=older.id)
+        await world.inbox.items(Actor(owner.id), tab=InboxTab.DONE, after=older.id)
 
 
 async def test_a_cursor_of_done_tells_nothing_about_others_documents(world: World) -> None:
@@ -378,18 +387,19 @@ async def test_a_cursor_of_done_tells_nothing_about_others_documents(world: Worl
     owner, other = await world.user(), await world.user()
     admin = await world.user(role=Role.ADMIN)
     mine = await arrive(world, owner)
-    await world.inbox.mark_seen(owner.id, mine.id)
+    await world.inbox.mark_seen(Actor(owner.id), mine.id)
     world.clock.advance(MINUTE)
     theirs = await arrive(world, other, {Node.JUDGE: Returns(UNCERTAIN)})
-    await world.pipeline().confirm(other.id, theirs.id, DocumentChanges())
+    await world.pipeline().confirm(Actor(other.id), theirs.id, DocumentChanges())
     await world.drain()
     for cursor in (theirs.id, DocumentId(new_id())):
         with pytest.raises(ValidationError, match="cursor"):
-            await world.inbox.items(owner.id, tab=InboxTab.DONE, after=cursor)
+            await world.inbox.items(Actor(owner.id), tab=InboxTab.DONE, after=cursor)
     # Within reach: the page after it, of the owner's own and of every inbox alike.
-    assert await world.inbox.items(owner.id, tab=InboxTab.DONE, after=mine.id) == []
+    assert await world.inbox.items(Actor(owner.id), tab=InboxTab.DONE, after=mine.id) == []
     assert (
-        await world.inbox.items(admin.id, tab=InboxTab.DONE, after=theirs.id, all_users=True) == []
+        await world.inbox.items(Actor(admin.id), tab=InboxTab.DONE, after=theirs.id, all_users=True)
+        == []
     )
 
 
@@ -398,17 +408,19 @@ async def test_lists_say_whether_a_document_stands_in_the_callers_inbox(world: W
     in an admin's of every user; never in the inbox of someone who only reads its space."""
     owner, reader = await world.user(), await world.user()
     admin = await world.user(role=Role.ADMIN)
-    shared = await world.spaces.create(owner.id, "Shared")
-    await world.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
+    shared = await world.spaces.create(Actor(owner.id), "Shared")
+    await world.spaces.set_member(Actor(owner.id), shared.id, reader.id, SpaceRole.READ)
     seen, new = await arrive(world, owner), await arrive(world, owner)
     yellow = await arrive(world, owner, {Node.JUDGE: Returns(UNCERTAIN)})
-    await world.documents.move(owner.id, new.id, shared.id)
-    await world.inbox.mark_seen(owner.id, seen.id)
-    processing = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 p"), filename="p.pdf")
+    await world.documents.move(Actor(owner.id), new.id, shared.id)
+    await world.inbox.mark_seen(Actor(owner.id), seen.id)
+    processing = await world.pipeline().receive(
+        Actor(owner.id), incoming(b"%PDF-1.7 p"), filename="p.pdf"
+    )
 
     async def listed(user: User, *, all_users: bool = False) -> dict[str, bool]:
         names = {seen.id: "seen", new.id: "new", yellow.id: "yellow", processing.id: "processing"}
-        views = await world.documents.query(user.id, DocumentFilter(), all_users=all_users)
+        views = await world.documents.query(Actor(user.id), DocumentFilter(), all_users=all_users)
         return {names[view.document.id]: view.in_inbox for view in views}
 
     assert await listed(owner) == {
@@ -435,25 +447,27 @@ async def test_a_moved_document_is_new_for_who_could_not_read_it_before(world: W
         await world.user(),
         await world.user(role=Role.ADMIN),
     )
-    household = await world.spaces.create(owner.id, "Household")
-    await world.spaces.set_member(owner.id, household.id, partner.id, SpaceRole.EDIT)
+    household = await world.spaces.create(Actor(owner.id), "Household")
+    await world.spaces.set_member(Actor(owner.id), household.id, partner.id, SpaceRole.EDIT)
     seen, unseen = await arrive(world, owner), await arrive(world, owner)
-    await world.inbox.mark_seen(owner.id, seen.id)
+    await world.inbox.mark_seen(Actor(owner.id), seen.id)
     world.clock.advance(MINUTE)
     for document in (seen, unseen):
-        await world.documents.move(owner.id, document.id, household.id)
+        await world.documents.move(Actor(owner.id), document.id, household.id)
 
-    owners = {item.document.id: item.state.tab for item in await world.inbox.items(owner.id)}
+    owners = {item.document.id: item.state.tab for item in await world.inbox.items(Actor(owner.id))}
     assert owners == {unseen.id: InboxTab.NEW}  # moving is no seeing
     # Nor is it done for whoever knew it: the move's mark is silent (Tobi, 22.10.2026).
-    assert await world.inbox.items(owner.id, tab=InboxTab.DONE) == []
-    partners = {item.document.id: item.state.tab for item in await world.inbox.items(partner.id)}
+    assert await world.inbox.items(Actor(owner.id), tab=InboxTab.DONE) == []
+    partners = {
+        item.document.id: item.state.tab for item in await world.inbox.items(Actor(partner.id))
+    }
     assert partners == {seen.id: InboxTab.NEW, unseen.id: InboxTab.NEW}
 
     # An admin who moves it from outside the space has seen it.
     personal = await world.personal_space(partner)
-    await world.inbox.mark_seen(partner.id, seen.id)
-    await world.spaces.set_member(partner.id, personal.id, admin.id, SpaceRole.EDIT)
-    await world.documents.move(admin.id, seen.id, personal.id)
-    assert await world.inbox.items(admin.id) == []
-    assert await world.inbox.items(admin.id, tab=InboxTab.DONE, all_users=True) == []
+    await world.inbox.mark_seen(Actor(partner.id), seen.id)
+    await world.spaces.set_member(Actor(partner.id), personal.id, admin.id, SpaceRole.EDIT)
+    await world.documents.move(Actor(admin.id), seen.id, personal.id)
+    assert await world.inbox.items(Actor(admin.id)) == []
+    assert await world.inbox.items(Actor(admin.id), tab=InboxTab.DONE, all_users=True) == []

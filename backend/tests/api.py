@@ -17,6 +17,7 @@ from fastapi import FastAPI
 from lekto.adapters.inbound.rest import PREFIX, close_event_streams
 from lekto.core.domain.identity import TokenScope
 from lekto.core.domain.ids import UserId
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import User
 from lekto.core.services.auth import AuthService
 
@@ -26,7 +27,7 @@ _TOKENS: dict[UserId, str] = {}
 
 async def issue_token(auth_service: AuthService, user: User) -> str:
     """A `read_write` token for `user`, remembered for `auth(user)`."""
-    _, token = await auth_service.create_api_token(user.id, "tests", TokenScope.READ_WRITE)
+    _, token = await auth_service.create_api_token(Actor(user.id), "tests", TokenScope.READ_WRITE)
     _TOKENS[user.id] = token
     return token
 

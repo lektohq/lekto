@@ -28,6 +28,7 @@ from lekto.core.domain.ids import DocumentId, new_id, short_id
 from lekto.core.domain.master_data import TagScope
 from lekto.core.domain.pipeline import Node, NodeResult, Outcome
 from lekto.core.domain.reasons import written
+from lekto.core.domain.rights import Actor
 from lekto.core.services.objects import page_key, text_key
 from tests import builders
 from tests.api import auth, serving
@@ -192,7 +193,7 @@ async def test_the_server_works_over_a_real_connection() -> None:
     async with api_with(mcp=True) as api:  # Uvicorn runs its lifespan
         user = await api.user()
         received = await api.services.pipeline.receive(
-            user.id, builders.incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
+            Actor(user.id), builders.incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
         )
         await api.drain()
         async with (
@@ -210,8 +211,8 @@ async def test_the_server_works_over_a_real_connection() -> None:
 async def test_documents_list_lists_by_filters_and_counts_by_groups(api: Api, scene: Scene) -> None:
     owner = scene.headers["owner"]
     admin = await api.admin()
-    await api.services.master_data.create_field(admin.id, "Betrag", FieldType.AMOUNT)
-    await api.services.master_data.create_field(admin.id, "Notiz", FieldType.TEXT)
+    await api.services.master_data.create_field(Actor(admin.id), "Betrag", FieldType.AMOUNT)
+    await api.services.master_data.create_field(Actor(admin.id), "Notiz", FieldType.TEXT)
     for id, dated, amount in (
         (scene.green, "2025-03-31", "80.10"),
         (scene.yellow, "2026-01-31", "79.90"),
@@ -280,8 +281,8 @@ async def test_documents_list_lists_and_counts_the_hits_of_words(api: Api, scene
 async def test_documents_list_takes_the_filters_of_a_lens(api: Api, scene: Scene) -> None:
     owner = scene.headers["owner"]
     admin = await api.admin()
-    urgent = await api.services.master_data.create_tag(admin.id, "Dringend")
-    await api.services.master_data.create_tag(admin.id, "Später")
+    urgent = await api.services.master_data.create_tag(Actor(admin.id), "Dringend")
+    await api.services.master_data.create_tag(Actor(admin.id), "Später")
     data(await call(api, owner, "documents_update", id=scene.yellow, tags=["Dringend"]))
     data(await call(api, owner, "documents_update", id=scene.green, tags=["Später"]))
     lens = {"name": "Dringendes", "filter": {"tag_ids": [str(urgent.id)]}}
@@ -312,13 +313,13 @@ async def test_documents_go_by_a_short_id_or_the_whole_one(api: Api, scene: Scen
 async def test_documents_get_names_what_the_document_refers_to(api: Api, scene: Scene) -> None:
     master = api.services.master_data
     admin = await api.admin()
-    contact = await master.create_contact(admin.id, "Stadtwerke")
-    kind = await master.create_document_type(admin.id, "Rechnung")
-    tag = await master.create_tag(admin.id, "Strom")
-    amount = await master.create_field(admin.id, "Betrag", FieldType.AMOUNT)
+    contact = await master.create_contact(Actor(admin.id), "Stadtwerke")
+    kind = await master.create_document_type(Actor(admin.id), "Rechnung")
+    tag = await master.create_tag(Actor(admin.id), "Strom")
+    amount = await master.create_field(Actor(admin.id), "Betrag", FieldType.AMOUNT)
 
     await api.services.documents.change_metadata(
-        scene.owner.id,
+        Actor(scene.owner.id),
         DocumentId(UUID(scene.green)),
         DocumentChanges(
             contact_id=contact.id,
@@ -342,7 +343,7 @@ async def test_documents_get_names_what_the_document_refers_to(api: Api, scene: 
 async def test_documents_get_names_its_relations_one_may_read(api: Api, scene: Scene) -> None:
     """Read only (#145): the reader does not read the yellow document, so not the relation."""
     green, yellow = DocumentId(UUID(scene.green)), DocumentId(UUID(scene.yellow))
-    await api.services.relations.relate(scene.owner.id, green, yellow)
+    await api.services.relations.relate(Actor(scene.owner.id), green, yellow)
     wanted = {"id": scene.green, "include": ["relations"]}
     owner = data(await call(api, scene.headers["owner"], "documents_get", **wanted))
     (relation,) = owner["relations"]
@@ -446,7 +447,7 @@ async def test_documents_update_names_a_space_a_rule_moves_it_to(api: Api, scene
     the tag, without ids (decision 7, CO-05)."""
     owner = scene.headers["owner"]
     household = await post(api, "/spaces", {"name": "Household"}, owner)
-    strom = await api.services.master_data.create_tag((await api.admin()).id, "Strom")
+    strom = await api.services.master_data.create_tag(Actor((await api.admin()).id), "Strom")
     await post(
         api,
         "/rules",
@@ -477,7 +478,7 @@ async def test_a_suggested_space_is_named_as_the_caller_reads_it(api: Api) -> No
     (CO-05)."""
     owner, other = await api.user(), await api.user("Jane Doe")
     household = await post(api, "/spaces", {"name": "Household"}, auth(owner))
-    handed = (await api.services.users.personal_spaces(owner.id))[other.id]
+    handed = (await api.services.users.personal_spaces(Actor(owner.id)))[other.id]
     for target, named in (
         (household["id"], "Household"),
         (str(handed), "Jane Doe"),
@@ -658,9 +659,11 @@ async def test_facts_show_an_identifiers_role_and_decision(api: Api, scene: Scen
 async def test_master_data_are_read_by_name(api: Api, scene: Scene) -> None:
     owner, admin = scene.headers["owner"], await api.admin()
     master = api.services.master_data
-    invoice = await master.create_document_type(admin.id, "Rechnung")
-    await master.create_field(admin.id, "Betrag", FieldType.AMOUNT, document_type_ids=[invoice.id])
-    await master.create_field(admin.id, "Notiz", FieldType.TEXT)
+    invoice = await master.create_document_type(Actor(admin.id), "Rechnung")
+    await master.create_field(
+        Actor(admin.id), "Betrag", FieldType.AMOUNT, document_type_ids=[invoice.id]
+    )
+    await master.create_field(Actor(admin.id), "Notiz", FieldType.TEXT)
     data(await call(api, owner, "documents_update", id=scene.green, contact="ACME"))
     data(await call(api, owner, "documents_update", id=scene.green, document_type="Rechnung"))
 
@@ -696,7 +699,7 @@ async def test_master_data_count_without_the_facets(
 
     monkeypatch.setattr(api.services.documents, "facets", no_facets)
     owner, admin = scene.headers["owner"], await api.admin()
-    await api.services.master_data.create_document_type(admin.id, "Rechnung")
+    await api.services.master_data.create_document_type(Actor(admin.id), "Rechnung")
     data(await call(api, owner, "documents_update", id=scene.green, contact="ACME"))
     assert {"name": "ACME", "documents": 1} in data(await call(api, owner, "contacts_list"))[
         "contacts"
@@ -764,7 +767,7 @@ async def test_identifiers_open_is_for_admins(api: Api, scene: Scene) -> None:
 
 async def test_rules_are_read_with_names(api: Api, scene: Scene) -> None:
     owner, admin = scene.headers["owner"], await api.admin()
-    tax = await api.services.master_data.create_tag(admin.id, "Steuer")
+    tax = await api.services.master_data.create_tag(Actor(admin.id), "Steuer")
     await post(
         api,
         "/rules",
@@ -868,10 +871,10 @@ async def test_a_document_without_text_says_so(api: Api, scene: Scene) -> None:
 async def test_tags_list_gives_each_tag_as_its_path_by_scope(api: Api, scene: Scene) -> None:
     admin = await api.admin()
     master = api.services.master_data
-    zeta = await master.create_tag(admin.id, "Zeta")
-    await master.create_tag(admin.id, "alpha")
-    await master.create_tag(admin.id, "Child", parent_id=zeta.id)
-    await master.create_tag(admin.id, "Insurer", scope=TagScope.CONTACT)
+    zeta = await master.create_tag(Actor(admin.id), "Zeta")
+    await master.create_tag(Actor(admin.id), "alpha")
+    await master.create_tag(Actor(admin.id), "Child", parent_id=zeta.id)
+    await master.create_tag(Actor(admin.id), "Insurer", scope=TagScope.CONTACT)
     tags = data(await call(api, scene.headers["read_token"], "tags_list"))
     assert tags == {"document": ["alpha", "Zeta", "Zeta / Child"], "contact": ["Insurer"]}
     groups = data(await call(api, scene.headers["read_token"], "tags_list", scope="contact"))
@@ -919,12 +922,12 @@ async def test_search_finds_what_the_caller_may_read(api: Api, scene: Scene) -> 
 async def test_search_filters_by_name(api: Api, scene: Scene) -> None:
     admin = await api.admin()
     master = api.services.master_data
-    energy = await master.create_tag(admin.id, "Energie")
-    tag = await master.create_tag(admin.id, "Strom", parent_id=energy.id)
-    await master.create_tag(admin.id, "Gruppe", scope=TagScope.CONTACT)
+    energy = await master.create_tag(Actor(admin.id), "Energie")
+    tag = await master.create_tag(Actor(admin.id), "Strom", parent_id=energy.id)
+    await master.create_tag(Actor(admin.id), "Gruppe", scope=TagScope.CONTACT)
 
     await api.services.documents.change_metadata(
-        scene.owner.id,
+        Actor(scene.owner.id),
         DocumentId(UUID(scene.green)),
         DocumentChanges(tag_ids=frozenset({tag.id})),
     )
@@ -954,15 +957,15 @@ async def test_search_filters_by_topics(api: Api, scene: Scene) -> None:
     """Several topics: the documents with one of them, each with the topics below it."""
     admin = await api.admin()
     master = api.services.master_data
-    work = await master.create_tag(admin.id, "Arbeit", scope=TagScope.TOPIC)
-    insurance = await master.create_tag(admin.id, "Versicherung", scope=TagScope.TOPIC)
+    work = await master.create_tag(Actor(admin.id), "Arbeit", scope=TagScope.TOPIC)
+    insurance = await master.create_tag(Actor(admin.id), "Versicherung", scope=TagScope.TOPIC)
     health = await master.create_tag(
-        admin.id, "Krankenversicherung", scope=TagScope.TOPIC, parent_id=insurance.id
+        Actor(admin.id), "Krankenversicherung", scope=TagScope.TOPIC, parent_id=insurance.id
     )
-    nord = await master.create_contact(admin.id, "Nord", topic_ids=[work.id, health.id])
+    nord = await master.create_contact(Actor(admin.id), "Nord", topic_ids=[work.id, health.id])
     for which, topic in ((scene.green, work), (scene.yellow, health)):
         await api.services.documents.change_metadata(
-            scene.owner.id,
+            Actor(scene.owner.id),
             DocumentId(UUID(which)),
             DocumentChanges(contact_id=nord.id, topic_id=topic.id),
         )
@@ -996,10 +999,10 @@ async def test_search_without_an_index_says_so() -> None:
 async def test_documents_update_changes_what_is_given(api: Api, scene: Scene) -> None:
     admin = await api.admin()
     master = api.services.master_data
-    await master.create_contact(admin.id, "Stadtwerke")
-    await master.create_tag(admin.id, "Strom")
-    await master.create_tag(admin.id, "Wohnung")
-    await master.create_field(admin.id, "Zählerstand", FieldType.NUMBER)
+    await master.create_contact(Actor(admin.id), "Stadtwerke")
+    await master.create_tag(Actor(admin.id), "Strom")
+    await master.create_tag(Actor(admin.id), "Wohnung")
+    await master.create_field(Actor(admin.id), "Zählerstand", FieldType.NUMBER)
     result = data(
         await call(
             api,
@@ -1063,9 +1066,9 @@ async def test_a_change_carries_the_token(api: Api, scene: Scene) -> None:
 async def test_the_topic_is_read_and_set_by_its_name(api: Api, scene: Scene) -> None:
     admin = await api.admin()
     master = api.services.master_data
-    work = await master.create_tag(admin.id, "Arbeit", scope=TagScope.TOPIC)
-    other = await master.create_tag(admin.id, "Girokonto", scope=TagScope.TOPIC)
-    await master.create_contact(admin.id, "Nord", topic_ids=[work.id])
+    work = await master.create_tag(Actor(admin.id), "Arbeit", scope=TagScope.TOPIC)
+    other = await master.create_tag(Actor(admin.id), "Girokonto", scope=TagScope.TOPIC)
+    await master.create_contact(Actor(admin.id), "Nord", topic_ids=[work.id])
     writer = scene.headers["writer"]
     result = data(
         await call(api, writer, "documents_update", id=scene.green, contact="nord", topic="arbeit")
@@ -1111,7 +1114,7 @@ async def test_documents_update_refuses_unknown_names_and_bad_values(
     api: Api, scene: Scene
 ) -> None:
     admin = await api.admin()
-    await api.services.master_data.create_field(admin.id, "Betrag", FieldType.AMOUNT)
+    await api.services.master_data.create_field(Actor(admin.id), "Betrag", FieldType.AMOUNT)
     owner = scene.headers["owner"]
     cases: list[tuple[dict[str, Any], str]] = [
         ({"contact": "Nobody"}, "no contact named 'Nobody'"),
@@ -1194,7 +1197,7 @@ async def test_expected_list_names_the_series_one_may_read(api: Api, scene: Scen
 async def test_an_upload_token_gets_no_tool(api: Api, scene: Scene) -> None:
     """A token of the scope `upload` sends shared files from a phone; MCP is closed to it."""
     _, token = await api.services.auth.create_api_token(
-        scene.owner.id, "shortcut", TokenScope.UPLOAD
+        Actor(scene.owner.id), "shortcut", TokenScope.UPLOAD
     )
     response = await api.client.post(
         f"{PREFIX}/mcp",

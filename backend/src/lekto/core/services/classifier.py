@@ -38,6 +38,7 @@ from lekto.core.domain.jobs import Job, RetryPolicy
 from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.profiles import Person
 from lekto.core.domain.reasons import Action, ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.text import shorten
 from lekto.core.ports.classifier import Classifier, Prediction, TrainedModel, TrainingExample
@@ -168,7 +169,7 @@ class ClassifierService:
                 await uow.commit()
         return due
 
-    async def request_training(self, actor: UserId) -> None:
+    async def request_training(self, actor: Actor) -> None:
         """Admins only: queue a training, unless one is queued or running. ConflictError with
         fewer decisions (confirmed documents, decided spaces) than a first model needs."""
         async with self._uow() as uow:
@@ -185,7 +186,7 @@ class ClassifierService:
             await uow.jobs.enqueue(TRAIN_JOB, {}, run_at=self._clock.now(), dedup_key=TRAIN_JOB)
             await uow.commit()
 
-    async def status(self, actor: UserId) -> ClassifierStatus:
+    async def status(self, actor: Actor) -> ClassifierStatus:
         """The latest model and the confirmations since; every user sees them (the page
         "System")."""
         async with self._uow() as uow:
@@ -199,7 +200,7 @@ class ClassifierService:
             )
         return ClassifierStatus(latest, confirmed, since, self.policy)
 
-    async def models(self, actor: UserId) -> list[ClassifierModel]:
+    async def models(self, actor: Actor) -> list[ClassifierModel]:
         """Every model trained, oldest first: what each learned and how well it did (the
         history on the page "System"; only the latest ones keep their files). Every user sees
         them."""

@@ -18,6 +18,7 @@ from lekto.core.domain.jobs import JobStatus
 from lekto.core.domain.pipeline import Lane, Node, NodeResult, NodeRun, Outcome, ProcessingStatus
 from lekto.core.domain.reading import PageReading, VisionAdvice
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.ocr import OcrResult
 from lekto.core.services.nodes import OcrNode, PagesNode, ParseNode
@@ -39,7 +40,7 @@ def pipeline(world: World, ocr: FakeOcr, text: str = "Rechnung") -> PipelineServ
 
 
 async def ocr_runs(world: World, owner: User, document: Document) -> list[NodeRun]:
-    log = await world.documents.processing_log(owner.id, document.id)
+    log = await world.documents.processing_log(Actor(owner.id), document.id)
     return [entry for entry in log if entry.node is Node.OCR]
 
 
@@ -49,12 +50,12 @@ async def test_the_model_reads_only_when_a_person_asks(world: World) -> None:
     owner, document = await ingest(world, service)
     assert (document.processing.vision, ocr.vision_calls) == (False, [])
 
-    asked = (await service.read_with_vision(owner.id, document.id)).document
+    asked = (await service.read_with_vision(Actor(owner.id), document.id)).document
     assert asked.processing.vision
     assert asked.processing.run == document.processing.run + 1
     assert asked.processing.status is ProcessingStatus.PROCESSING
     await world.drain(service)
-    document = await world.documents.get(owner.id, document.id)
+    document = await world.documents.get(Actor(owner.id), document.id)
     assert document.processing.status is ProcessingStatus.COMPLETED
     assert len(ocr.vision_calls) == 1
 
@@ -88,7 +89,7 @@ async def test_the_model_reads_only_when_a_person_asks(world: World) -> None:
     assert read.result.model_version == "fake-ocr 1, vision language model fake-vlm"
     # What was sent is kept like the language model's prompts.
     assert await world.object_store.exists(exchanges_key(document.id, Node.OCR))
-    (exchange,) = await world.documents.exchanges(owner.id, document.id, Node.OCR)
+    (exchange,) = await world.documents.exchanges(Actor(owner.id), document.id, Node.OCR)
     assert exchange.run == asked.processing.run
     (call,) = exchange.calls
     assert (call.model, call.usage["prompt_tokens"]) == ("fake-vlm", 1500)
@@ -118,7 +119,7 @@ async def test_the_ocr_the_model_reads_holds_its_job_longer(world: World) -> Non
         vision_lease=timedelta(minutes=32),
     )
     owner, document = await ingest(world, service)
-    await service.read_with_vision(owner.id, document.id)
+    await service.read_with_vision(Actor(owner.id), document.id)
     await world.drain(service)
     # Tesseract within the lease of every node (the service's default), the model with its own.
     assert held == [timedelta(minutes=10), timedelta(minutes=32)]
@@ -128,9 +129,9 @@ async def test_reprocessing_reads_with_tesseract_again(world: World) -> None:
     ocr = FakeOcr(vision=FAKE_VISION)
     service = pipeline(world, ocr)
     owner, document = await ingest(world, service)
-    await service.read_with_vision(owner.id, document.id)
+    await service.read_with_vision(Actor(owner.id), document.id)
     await world.drain(service)
-    again = (await service.reprocess_from(owner.id, document.id, Node.OCR)).document
+    again = (await service.reprocess_from(Actor(owner.id), document.id, Node.OCR)).document
     assert not again.processing.vision
     await world.drain(service)
     assert len(ocr.vision_calls) == 1
@@ -156,11 +157,11 @@ async def test_a_retry_after_the_model_failed_asks_it_again(world: World) -> Non
     ocr = Flaky(vision=FAKE_VISION)
     service = pipeline(world, ocr)
     owner, document = await ingest(world, service)
-    await service.read_with_vision(owner.id, document.id)
+    await service.read_with_vision(Actor(owner.id), document.id)
     await world.drain(service)
     world.clock.advance(timedelta(minutes=10))
     await world.drain(service)
-    document = await world.documents.get(owner.id, document.id)
+    document = await world.documents.get(Actor(owner.id), document.id)
     assert document.processing.status is ProcessingStatus.COMPLETED
     assert document.processing.vision
     assert len(ocr.vision_calls) == 1
@@ -172,16 +173,18 @@ async def test_without_a_model_nobody_can_ask_for_it(world: World) -> None:
     service = pipeline(world, FakeOcr())
     owner, document = await ingest(world, service)
     with pytest.raises(InvalidTransitionError, match="no vision language model is configured"):
-        await service.read_with_vision(owner.id, document.id)
+        await service.read_with_vision(Actor(owner.id), document.id)
 
 
 async def test_a_model_configured_away_fails_the_ocr(world: World) -> None:
     """Asked for while there was one; the worker that runs the OCR has none."""
     owner, document = await ingest(world, pipeline(world, FakeOcr(vision=FAKE_VISION)))
-    await pipeline(world, FakeOcr(vision=FAKE_VISION)).read_with_vision(owner.id, document.id)
+    await pipeline(world, FakeOcr(vision=FAKE_VISION)).read_with_vision(
+        Actor(owner.id), document.id
+    )
     without = pipeline(world, FakeOcr())
     await world.drain(without)
-    document = await world.documents.get(owner.id, document.id)
+    document = await world.documents.get(Actor(owner.id), document.id)
     assert document.lane is Lane.RED
     *_, last = await ocr_runs(world, owner, document)
     assert last.result.outcome is Outcome.FAILED
@@ -193,24 +196,24 @@ async def test_the_owner_and_admins_ask_for_the_model(world: World) -> None:
     _, document = await ingest(world, service)
     stranger = await world.user()
     with pytest.raises(NotFoundError):
-        await service.read_with_vision(stranger.id, document.id)
+        await service.read_with_vision(Actor(stranger.id), document.id)
     with pytest.raises(NotFoundError):
-        await service.reading(stranger.id, document.id)
+        await service.reading(Actor(stranger.id), document.id)
     admin = await world.user(role=Role.ADMIN)
-    assert (await service.read_with_vision(admin.id, document.id)).document.processing.vision
+    assert (await service.read_with_vision(Actor(admin.id), document.id)).document.processing.vision
 
 
 async def test_no_text_advises_the_model(world: World) -> None:
     service = pipeline(world, FakeOcr(vision=FAKE_VISION), text="")
     owner, document = await ingest(world, service)
     assert document.lane is Lane.RED
-    reading = await service.reading(owner.id, document.id)
+    reading = await service.reading(Actor(owner.id), document.id)
     assert reading.advice is VisionAdvice.NO_TEXT
     assert (reading.vision, reading.pages, reading.poor) == (False, (FAKE_READING,), ())
     # Once the model has read it, reading again would change nothing.
-    await service.read_with_vision(owner.id, document.id)
+    await service.read_with_vision(Actor(owner.id), document.id)
     await world.drain(service)
-    after = await service.reading(owner.id, document.id)
+    after = await service.reading(Actor(owner.id), document.id)
     assert (after.vision, after.advice) == (True, None)
 
 
@@ -234,7 +237,7 @@ async def test_a_poorly_read_page_advises_the_model_while_a_person_must_look(
     service = pipeline(world, PoorAndPlain(vision=FAKE_VISION))
     owner, document = await ingest(world, service)
     assert document.lane is Lane.YELLOW
-    reading = await service.reading(owner.id, document.id)
+    reading = await service.reading(Actor(owner.id), document.id)
     assert reading.poor == (2,)
     assert reading.advice is VisionAdvice.POOR_PAGE
 
@@ -244,5 +247,5 @@ async def test_a_green_document_gets_no_advice(world: World) -> None:
     service = pipeline(world, poor)
     owner, document = await ingest(world, service)
     assert document.lane is Lane.GREEN
-    reading = await service.reading(owner.id, document.id)
+    reading = await service.reading(Actor(owner.id), document.id)
     assert (reading.poor, reading.advice) == ((1,), None)

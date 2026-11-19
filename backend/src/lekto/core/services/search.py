@@ -38,6 +38,7 @@ from lekto.core.domain.ids import DocumentId, SpaceId, UserId
 from lekto.core.domain.occurrences import Occurrence
 from lekto.core.domain.permissions import Reach, document_access, reach_access
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.search import Segment, Visibility
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.text_places import TextPlaces
@@ -192,7 +193,7 @@ class SearchService:
         """Hand `SearchMeaningReady` to `listener` (the event streams of the API)."""
         self._listeners.append(listener)
 
-    async def warm(self, actor: UserId) -> bool:
+    async def warm(self, actor: Actor) -> bool:
         """Have the model of the embeddings loaded before a search needs it (a person starts
         typing): one embedding in the background, at most once in `WARM_EVERY`. Whether one
         was started. AuthenticationError for a deactivated caller."""
@@ -213,7 +214,7 @@ class SearchService:
 
     async def hits(
         self,
-        actor: UserId,
+        actor: Actor,
         text: str,
         filter: DocumentFilter | None = None,
         *,
@@ -233,7 +234,7 @@ class SearchService:
 
     async def search(
         self,
-        actor: UserId,
+        actor: Actor,
         text: str,
         filter: DocumentFilter | None = None,
         *,
@@ -260,7 +261,7 @@ class SearchService:
         async with self._uow() as uow:
             user = await load_lister(uow, actor, all_users, Action.SEARCH_ALL_DOCUMENTS)
             check_fact_filter(user, filter)
-            spaces = await uow.spaces.list_accessible(actor)
+            spaces = await uow.spaces.list_accessible(actor.id)
             filter = await expanded(uow, filter)
         if offset >= MAX_HITS:
             return SearchPage([], 0, None, SearchMode.WORDS)
@@ -272,7 +273,7 @@ class SearchService:
                 SearchQuery(
                     text=text,
                     visibility=replace(
-                        Visibility.of(Reach.of(actor, spaces)), everything=all_users
+                        Visibility.of(Reach.of(actor.id, spaces)), everything=all_users
                     ),
                     filter=filter,
                     vector=meaning.vector,
@@ -313,13 +314,13 @@ class SearchService:
                     continue  # the index is behind: a membership or a lane has changed
                 items.append(SearchItem(document, access, hit.score, hit.snippet))
             waiting = await in_inbox(
-                uow, actor, [item.document for item in items], all_users=all_users
+                uow, actor.id, [item.document for item in items], all_users=all_users
             )
         items = [replace(item, in_inbox=item.document.id in waiting) for item in items]
         if len(items) < len(result.hits):
             log.info(
                 "search hits dropped after the check against the database",
-                extra={"user_id": str(actor), "dropped": len(result.hits) - len(items)},
+                extra={"user_id": str(actor.id), "dropped": len(result.hits) - len(items)},
             )
 
         end = offset + len(result.hits)
@@ -341,7 +342,7 @@ class SearchService:
             word_total=words,
         )
 
-    async def places(self, actor: UserId, document: DocumentId, text: str) -> SearchPlaces:
+    async def places(self, actor: Actor, document: DocumentId, text: str) -> SearchPlaces:
         """Where the words of a search for `text` stand in `document`, as the search matches
         them, for one who reads it: what the Beam marks for a hit. ValidationError for an empty
         text, NotFoundError for a document they do not read, SearchUnavailableError if the index
@@ -377,7 +378,7 @@ class SearchService:
         )
         return SearchPlaces(len(matches), occurrences)
 
-    async def _meaning(self, actor: UserId, text: str) -> _Meaning:
+    async def _meaning(self, actor: Actor, text: str) -> _Meaning:
         """The vector of the query, or why there is none: without embeddings, or with the
         service down, too slow or answering with a vector of another length, the search goes
         by words alone (it should not depend on it). A vector is kept for the same query; one
@@ -401,7 +402,7 @@ class SearchService:
             reason = because(ReasonCode.SEARCH_EMBED_TIMEOUT, seconds=waited)
             if task is None:
                 return _Meaning(None, reason)
-            self._waiting[key].add((actor, text))
+            self._waiting[key].add((actor.id, text))
             return _Meaning(None, reason, pending=True)
         except EmbeddingsError as error:
             log.warning("searching without meaning, the query was not embedded: %s", error)

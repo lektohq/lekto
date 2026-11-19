@@ -9,6 +9,7 @@ from lekto.core.domain.classification import FieldCheck, checks_to_json
 from lekto.core.domain.documents import Document
 from lekto.core.domain.pipeline import Node, NodeRun, Outcome
 from lekto.core.domain.reasons import written
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
 from tests import builders
@@ -22,9 +23,9 @@ async def _scene(world: World) -> tuple[User, User, User, Document]:
     Erika by her tax ID and display name, Bob by his birth date, Carla (no member) by an alias;
     the judge also had Bob as the recipient, by his display name."""
     tobi, erika, bob, carla = [await world.user() for _ in range(4)]
-    shared = await world.spaces.create(tobi.id, "Shared")
+    shared = await world.spaces.create(Actor(tobi.id), "Shared")
     for member in (erika, bob):
-        await world.spaces.set_member(tobi.id, shared.id, member.id, SpaceRole.EDIT)
+        await world.spaces.set_member(Actor(tobi.id), shared.id, member.id, SpaceRole.EDIT)
     document = builders.processed(tobi, shared, content="letter")
     facts: dict[str, object] = {
         "persons": [
@@ -69,7 +70,7 @@ def _unseen(log: list[NodeRun]) -> Any:
 
 async def test_another_editor_sees_a_person_only_by_their_display_name(world: World) -> None:
     erika, bob, carla, document = await _scene(world)
-    log = await world.documents.processing_log(bob.id, document.id)
+    log = await world.documents.processing_log(Actor(bob.id), document.id)
     assert _persons(log, Node.SIGNAL_FACTS) == [
         {"user_id": str(erika.id), "strength": "weak", "evidence": ["name"]},
         {"user_id": str(bob.id), "strength": "medium", "evidence": ["birth_date"]},
@@ -80,10 +81,10 @@ async def test_another_editor_sees_a_person_only_by_their_display_name(world: Wo
     ]
     # Erika is named weakly in public: that she is unseen would tell her tax ID stands there.
     assert _unseen(log) == [str(bob.id)]
-    review = await world.documents.review(bob.id, document.id)
+    review = await world.documents.review(Actor(bob.id), document.id)
     (judge,) = [node for node in review.nodes if node.node is Node.JUDGE]
     assert judge.fields[0].unseen_by == (str(bob.id),)
-    log = await world.documents.processing_log(erika.id, document.id)
+    log = await world.documents.processing_log(Actor(erika.id), document.id)
     assert _unseen(log) == [str(erika.id), str(bob.id)]
     assert {item["user_id"] for item in _persons(log, Node.SIGNAL_FACTS)} == {str(erika.id)}
     assert str(carla.id) not in str(log)
@@ -92,6 +93,6 @@ async def test_another_editor_sees_a_person_only_by_their_display_name(world: Wo
 async def test_admins_see_every_person_found(world: World) -> None:
     erika, bob, carla, document = await _scene(world)
     admin = await world.user(role=Role.ADMIN)
-    log = await world.documents.processing_log(admin.id, document.id)
+    log = await world.documents.processing_log(Actor(admin.id), document.id)
     assert len(_persons(log, Node.SIGNAL_FACTS)) == 3
     assert _unseen(log) == [str(erika.id), str(bob.id), str(carla.id)]

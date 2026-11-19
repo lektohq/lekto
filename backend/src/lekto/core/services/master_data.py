@@ -19,7 +19,7 @@ from lekto.core.domain.identifiers import (
     Key,
     normalise_identifier,
 )
-from lekto.core.domain.ids import ContactId, DocumentId, DocumentTypeId, FieldId, TagId, UserId
+from lekto.core.domain.ids import ContactId, DocumentId, DocumentTypeId, FieldId, TagId
 from lekto.core.domain.jobs import Job, RetryPolicy
 from lekto.core.domain.master_data import (
     MAX_ALIASES,
@@ -33,6 +33,7 @@ from lekto.core.domain.master_data import (
 )
 from lekto.core.domain.names import match_key, related
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rules import References, Rule, RuleScope, title_rule
 from lekto.core.domain.rules_json import definition_to_json
 from lekto.core.domain.sorting import sort_key
@@ -156,7 +157,7 @@ class MasterDataService:
 
     async def create_contact(
         self,
-        actor: UserId,
+        actor: Actor,
         name: str,
         aliases: Collection[str] = (),
         identifiers: Collection[Identifier] = (),
@@ -180,7 +181,7 @@ class MasterDataService:
 
     async def change_contact(
         self,
-        actor: UserId,
+        actor: Actor,
         id: ContactId,
         *,
         name: str | None = None,
@@ -242,7 +243,7 @@ class MasterDataService:
             lock=None if topic_ids is None else contact_topics_lock(id),
         )
 
-    async def add_identifier(self, actor: UserId, id: ContactId, identifier: Identifier) -> Contact:
+    async def add_identifier(self, actor: Actor, id: ContactId, identifier: Identifier) -> Contact:
         """Enter one identifier by hand for the contact (admins), from a document that shows
         it, with its topic (one the contact enables, ValidationError otherwise) or none; the
         others stay as they are. One the contact learned or rejected is then entered; one
@@ -272,7 +273,7 @@ class MasterDataService:
             after=lambda uow, item: self._logo_for(uow, item, known),
         )
 
-    async def reject_identifier(self, actor: UserId, id: ContactId, key: Key) -> Contact:
+    async def reject_identifier(self, actor: Actor, id: ContactId, key: Key) -> Contact:
         """Reject one identifier at the contact (admins): one it learned no longer counts, one
         no contact has is noted there; training learns neither again. The others stay as they
         are. One the contact entered by hand is a conflict (change the contact instead); one
@@ -306,7 +307,7 @@ class MasterDataService:
 
     async def create_document_type(
         self,
-        actor: UserId,
+        actor: Actor,
         name: str,
         description: str | None = None,
         title_pattern: str | None = None,
@@ -345,7 +346,7 @@ class MasterDataService:
 
     async def change_document_type(
         self,
-        actor: UserId,
+        actor: Actor,
         id: DocumentTypeId,
         *,
         name: str | None = None,
@@ -391,7 +392,7 @@ class MasterDataService:
 
     async def create_tag(
         self,
-        actor: UserId,
+        actor: Actor,
         name: str,
         *,
         scope: TagScope = TagScope.DOCUMENT,
@@ -425,7 +426,7 @@ class MasterDataService:
 
     async def change_tag(
         self,
-        actor: UserId,
+        actor: Actor,
         id: TagId,
         *,
         name: str | None = None,
@@ -517,7 +518,7 @@ class MasterDataService:
 
     async def create_field(
         self,
-        actor: UserId,
+        actor: Actor,
         name: str,
         data_type: FieldType,
         *,
@@ -555,7 +556,7 @@ class MasterDataService:
 
     async def change_field(
         self,
-        actor: UserId,
+        actor: Actor,
         id: FieldId,
         *,
         name: str | None = None,
@@ -637,7 +638,7 @@ class MasterDataService:
         return await self._change(actor, _fields, id, change, check=check, after=after)
 
     async def assign_fields(
-        self, actor: UserId, id: DocumentTypeId, fields: Mapping[FieldId, bool]
+        self, actor: Actor, id: DocumentTypeId, fields: Mapping[FieldId, bool]
     ) -> list[FieldDefinition]:
         """Admins only. The fields of a document type, from the type: exactly `fields` belong
         to it besides the global ones, each required (True) or optional. A field taken off
@@ -711,7 +712,7 @@ class MasterDataService:
 
     # --- reading (every signed-in user) ----------------------------------------------------------
 
-    async def holders_of(self, actor: UserId, kind: IdentifierKind, value: str) -> list[Contact]:
+    async def holders_of(self, actor: Actor, kind: IdentifierKind, value: str) -> list[Contact]:
         """The contacts that hold the identifier `value` of `kind` (normalised here), by name,
         each as the caller sees it (`list_contacts`): a number of a person, or one learned in a
         space, only for those who may see it."""
@@ -722,7 +723,7 @@ class MasterDataService:
             if any(item.kind is kind and item.value == normal for item in contact.identifiers)
         ]
 
-    async def list_contacts(self, actor: UserId) -> list[Contact]:
+    async def list_contacts(self, actor: Actor) -> list[Contact]:
         """By name, each with the identifiers the caller sees (`identifiers.seen_by`): a
         number that names a user only for admins and that user, a learned one only for the
         members of the spaces it was learned in."""
@@ -734,19 +735,19 @@ class MasterDataService:
             (as_seen(item, user, spaces) for item in items), key=lambda item: sort_key(item.name)
         )
 
-    async def list_document_types(self, actor: UserId) -> list[DocumentType]:
+    async def list_document_types(self, actor: Actor) -> list[DocumentType]:
         return await self._list(actor, _document_types)
 
-    async def list_tags(self, actor: UserId, scope: TagScope | None = None) -> list[Tag]:
+    async def list_tags(self, actor: Actor, scope: TagScope | None = None) -> list[Tag]:
         """All tags, or those of `scope`; by name."""
         tags = await self._list(actor, _tags)
         return [tag for tag in tags if scope is None or tag.scope is scope]
 
-    async def list_fields(self, actor: UserId) -> list[FieldDefinition]:
+    async def list_fields(self, actor: Actor) -> list[FieldDefinition]:
         """By position, the same by name (`field_order`)."""
         return sorted(await self._list(actor, _fields), key=field_order)
 
-    async def tag_members(self, actor: UserId) -> TagMembers:
+    async def tag_members(self, actor: Actor) -> TagMembers:
         """What the groups and topics hold, as their filters find it (`TagTree.holders`):
         the contacts of each contact group and topic (in it or one below it, each once) and
         the document types of each type group. Master data are global: no reach."""
@@ -762,24 +763,24 @@ class MasterDataService:
             document_types=tree.holders(item.group_ids for item in types),
         )
 
-    async def get_contact(self, actor: UserId, id: ContactId) -> Contact:
+    async def get_contact(self, actor: Actor, id: ContactId) -> Contact:
         """With the identifiers the caller sees (`list_contacts`)."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             return as_seen(await uow.contacts.get(id), user, await member_spaces(uow, user))
 
-    async def get_document_type(self, actor: UserId, id: DocumentTypeId) -> DocumentType:
+    async def get_document_type(self, actor: Actor, id: DocumentTypeId) -> DocumentType:
         return await self._get(actor, _document_types, id)
 
-    async def get_tag(self, actor: UserId, id: TagId) -> Tag:
+    async def get_tag(self, actor: Actor, id: TagId) -> Tag:
         return await self._get(actor, _tags, id)
 
-    async def get_field(self, actor: UserId, id: FieldId) -> FieldDefinition:
+    async def get_field(self, actor: Actor, id: FieldId) -> FieldDefinition:
         return await self._get(actor, _fields, id)
 
     # --- deleting (admins; only what no document uses) -------------------------------------------
 
-    async def delete_contact(self, actor: UserId, id: ContactId) -> None:
+    async def delete_contact(self, actor: Actor, id: ContactId) -> None:
         """Not while a document has it; its logo goes with it."""
         store = self._store
 
@@ -796,7 +797,7 @@ class MasterDataService:
             before=drop,
         )
 
-    async def delete_document_type(self, actor: UserId, id: DocumentTypeId) -> None:
+    async def delete_document_type(self, actor: Actor, id: DocumentTypeId) -> None:
         async def used(uow: UnitOfWork) -> bool:
             if await uow.documents.exists(document_type=id):
                 return True
@@ -820,7 +821,7 @@ class MasterDataService:
             before=drop_title_rule,
         )
 
-    async def delete_tag(self, actor: UserId, id: TagId) -> None:
+    async def delete_tag(self, actor: Actor, id: TagId) -> None:
         """Only a tag without tags below it that nothing uses: no document carries it (as a
         tag or its topic), no contact or type is in it, no contact enables it as a topic and
         no identifier points to it, no rule refers to it (ConflictError naming what does)."""
@@ -861,7 +862,7 @@ class MasterDataService:
 
         await self._delete(actor, _tags, id, used, ("tag", lambda refs: refs.tags))
 
-    async def delete_field(self, actor: UserId, id: FieldId) -> None:
+    async def delete_field(self, actor: Actor, id: FieldId) -> None:
         """Not while a document has a value or a template uses it (a title pattern's, a
         rule's, a webhook's body)."""
 
@@ -908,7 +909,7 @@ class MasterDataService:
             and field_used(self._templates.check(item.title_pattern), key)
         ]
 
-    async def _rename_in_patterns(self, uow: UnitOfWork, actor: UserId, old: str, new: str) -> None:
+    async def _rename_in_patterns(self, uow: UnitOfWork, actor: Actor, old: str, new: str) -> None:
         """Title patterns that use `field.<old>` take the new key, and so do their rules."""
         for document_type in await self._patterns_using(uow, old):
             pattern = document_type.title_pattern or ""
@@ -934,7 +935,7 @@ class MasterDataService:
             )
 
     async def _keep_title_rule(
-        self, uow: UnitOfWork, actor: UserId, document_type: DocumentType
+        self, uow: UnitOfWork, actor: Actor, document_type: DocumentType
     ) -> None:
         """The type's rule as its pattern says: made, given a new version, or deleted."""
         rule = await _title_rule(uow, document_type.id)
@@ -951,19 +952,19 @@ class MasterDataService:
                     scope=RuleScope.GLOBAL,
                     space_id=None,
                     definition=definition,
-                    by=actor,
+                    by=actor.id,
                     now=now,
                     managed_by=document_type.id,
                 )
             )
         elif definition_to_json(rule.definition) != definition_to_json(definition):
-            rule.change(definition, actor, now)
+            rule.change(definition, actor.id, now)
             await uow.rules.update(rule)
 
-    async def _rename_in_rules(self, uow: UnitOfWork, actor: UserId, old: str, new: str) -> None:
+    async def _rename_in_rules(self, uow: UnitOfWork, actor: Actor, old: str, new: str) -> None:
         """The templates of rules that use `field.<old>` take the new key (a new version)."""
         for rule in await self._rules_using(uow, old):
-            rule.change(renamed_field(rule.definition, old, new), actor, self._now())
+            rule.change(renamed_field(rule.definition, old, new), actor.id, self._now())
             await uow.rules.update(rule)
 
     async def _webhooks_using(self, uow: UnitOfWork, key: str) -> list[Webhook]:
@@ -983,20 +984,20 @@ class MasterDataService:
             webhook.set_body(webhook.body, template, now=self._now())
             await uow.webhooks.update(webhook)
 
-    async def _list[K, E: MasterData](self, actor: UserId, repository: Repo[K, E]) -> list[E]:
+    async def _list[K, E: MasterData](self, actor: Actor, repository: Repo[K, E]) -> list[E]:
         async with self._uow() as uow:
             await load_actor(uow, actor)
             items = await repository(uow).list_all()
         return sorted(items, key=lambda item: sort_key(item.name))
 
-    async def _get[K, E: MasterData](self, actor: UserId, repository: Repo[K, E], id: K) -> E:
+    async def _get[K, E: MasterData](self, actor: Actor, repository: Repo[K, E], id: K) -> E:
         async with self._uow() as uow:
             await load_actor(uow, actor)
             return await repository(uow).get(id)
 
     async def _delete[K, E: MasterData](
         self,
-        actor: UserId,
+        actor: Actor,
         repository: Repo[K, E],
         id: K,
         used: Callable[[UnitOfWork], Awaitable[bool]],
@@ -1028,7 +1029,7 @@ class MasterDataService:
 
     async def _create[K, E: MasterData](
         self,
-        actor: UserId,
+        actor: Actor,
         repository: Repo[K, E],
         item: E,
         check: Callable[[UnitOfWork], Awaitable[None]] | None = None,
@@ -1058,7 +1059,7 @@ class MasterDataService:
 
     async def _change[K, E: MasterData](
         self,
-        actor: UserId,
+        actor: Actor,
         repository: Repo[K, E],
         id: K,
         change: Callable[[E], None],

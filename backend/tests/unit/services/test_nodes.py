@@ -18,6 +18,7 @@ from lekto.core.domain.locations import Box
 from lekto.core.domain.pipeline import Lane, Node, NodeRun, Outcome
 from lekto.core.domain.reading import PageReading, PageWords, ReadWord, reading_from_json
 from lekto.core.domain.reasons import written
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import User
 from lekto.core.ports.ocr import OcrResult
 from lekto.core.services.nodes import OcrNode, PagesNode, ParseNode, has_text
@@ -108,7 +109,8 @@ async def test_ocr_pages_and_parse_store_their_derivatives(world: World, sample:
     assert store.content_type(structure_key(document.id)) == "application/json"
 
     log = {
-        entry.node: entry for entry in await world.documents.processing_log(owner.id, document.id)
+        entry.node: entry
+        for entry in await world.documents.processing_log(Actor(owner.id), document.id)
     }
     ocr, pages, parse = log[Node.OCR].result, log[Node.PAGES].result, log[Node.PARSE].result
     assert ocr.input == {"original": original_key(document.sha256)}
@@ -133,7 +135,7 @@ async def test_ocr_pages_and_parse_store_their_derivatives(world: World, sample:
 
 async def logged(world: World, owner: User, document: Document, node: Node) -> NodeRun:
     """The log entry of `node`."""
-    log = await world.documents.processing_log(owner.id, document.id)
+    log = await world.documents.processing_log(Actor(owner.id), document.id)
     return next(entry for entry in log if entry.node is node)
 
 
@@ -146,7 +148,7 @@ async def test_a_damaged_file_goes_red_at_once(world: World) -> None:
     failed = document.processing.failed()
     assert failed and set(failed) <= {Node.OCR, Node.PAGES}
     assert 1 <= len(ocr.calls) + len(pages.calls) <= 2
-    log = await world.documents.processing_log(owner.id, document.id)
+    log = await world.documents.processing_log(Actor(owner.id), document.id)
     for node in failed:
         entry = next(entry for entry in log if entry.node is node)
         assert entry.result.reason == "the file is damaged or not a valid document"
@@ -194,7 +196,7 @@ async def test_a_document_without_text_goes_red(world: World) -> None:
     owner, document = await ingest(world, pipeline(world, text="\n\f\n  \n"), "blank.pdf")
     assert document.lane is Lane.RED
     assert document.processing.failed() == (Node.PARSE,)
-    entry = (await world.documents.processing_log(owner.id, document.id))[-1]
+    entry = (await world.documents.processing_log(Actor(owner.id), document.id))[-1]
     assert entry.result.reason == "no text recognised: the pages are blank or hold only pictures"
     assert await world.object_store.exists(text_key(document.id))  # kept for inspection
 
@@ -209,7 +211,7 @@ async def test_the_markdown_of_before_goes_once_the_text_is_read_again(world: Wo
     await store.delete(text_key(document.id))
     await store.put(legacy_text_key(document.id), b"# Docling", content_type="text/markdown")
     assert await load_text(store, document.id) == "# Docling"
-    await service.reprocess_from(owner.id, document.id, Node.PARSE)
+    await service.reprocess_from(Actor(owner.id), document.id, Node.PARSE)
     await world.drain(service)
     assert await load_text(store, document.id) == read
     assert not await store.exists(legacy_text_key(document.id))
@@ -248,17 +250,17 @@ async def test_reprocessing_from_parse_reuses_the_archive(world: World) -> None:
     ocr = FakeOcr()
     service = pipeline(world, ocr=ocr)
     owner, document = await ingest(world, service, "scan.pdf")
-    await service.reprocess_from(owner.id, document.id, Node.PARSE)
+    await service.reprocess_from(Actor(owner.id), document.id, Node.PARSE)
     await world.drain(service)
     assert len(ocr.calls) == 1
-    assert (await world.documents.get(owner.id, document.id)).lane is Lane.GREEN
+    assert (await world.documents.get(Actor(owner.id), document.id)).lane is Lane.GREEN
 
 
 async def test_reprocessing_from_parse_keeps_the_words_of_the_archive(world: World) -> None:
     service = pipeline(world, ocr=FakeOcr(words=WORDS))
     owner, document = await ingest(world, service, "scan.pdf")
     kept = await world.object_store.get(reading_key(document.id))
-    await service.reprocess_from(owner.id, document.id, Node.PARSE)
+    await service.reprocess_from(Actor(owner.id), document.id, Node.PARSE)
     await world.drain(service)
     assert await world.object_store.get(reading_key(document.id)) == kept
 
@@ -284,9 +286,11 @@ async def test_a_mail_is_set_not_read(world: World) -> None:
     mail, ocr, pages = FakeMailRenderer(), FakeOcr(), FakePageRenderer(2)
     service = pipeline(world, ocr=ocr, pages=pages, mail=mail)
     owner = await world.user()
-    received = await service.receive(owner.id, incoming(plain_mail()), filename="Rechnung.eml")
+    received = await service.receive(
+        Actor(owner.id), incoming(plain_mail()), filename="Rechnung.eml"
+    )
     await world.drain(service)
-    document = await world.documents.get(owner.id, received.id)
+    document = await world.documents.get(Actor(owner.id), received.id)
     assert document.media_type == "message/rfc822"
     assert document.lane is Lane.GREEN
     assert document.page_count == 2
@@ -295,7 +299,8 @@ async def test_a_mail_is_set_not_read(world: World) -> None:
     assert await world.object_store.get(archive_key(document.id)) == FAKE_PDF
     assert pages.calls and pages.calls[0].suffix == ".pdf"
     log = {
-        entry.node: entry for entry in await world.documents.processing_log(owner.id, document.id)
+        entry.node: entry
+        for entry in await world.documents.processing_log(Actor(owner.id), document.id)
     }
     assert log[Node.OCR].result.model_version == "fake-mail 1"
     assert log[Node.OCR].result.output["pdfa"] is True
@@ -308,9 +313,11 @@ async def test_the_pages_of_a_mail_take_the_archive_where_it_is_set_already(
     mail = FakeMailRenderer()
     service = pipeline(world, mail=mail)
     owner = await world.user()
-    received = await service.receive(owner.id, incoming(plain_mail()), filename="Rechnung.eml")
+    received = await service.receive(
+        Actor(owner.id), incoming(plain_mail()), filename="Rechnung.eml"
+    )
     await world.drain(service)
-    document = await world.documents.get(owner.id, received.id)
+    document = await world.documents.get(Actor(owner.id), received.id)
     store = world.object_store
     before = len(mail.calls)
     await PagesNode(store, FakePageRenderer(1), mail).run(document)
@@ -323,7 +330,9 @@ async def test_the_pages_of_a_mail_take_the_archive_where_it_is_set_already(
 async def test_a_mail_without_a_renderer_fails(world: World) -> None:
     service = pipeline(world)
     owner = await world.user()
-    received = await service.receive(owner.id, incoming(plain_mail()), filename="Rechnung.eml")
+    received = await service.receive(
+        Actor(owner.id), incoming(plain_mail()), filename="Rechnung.eml"
+    )
     await world.drain(service)
-    document = await world.documents.get(owner.id, received.id)
+    document = await world.documents.get(Actor(owner.id), received.id)
     assert document.lane is Lane.RED

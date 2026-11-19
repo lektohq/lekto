@@ -70,6 +70,7 @@ from lekto.core.domain.links import Links
 from lekto.core.domain.permissions import in_reach
 from lekto.core.domain.push import PushKind
 from lekto.core.domain.reasons import Reason, ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.tasks import Task, TaskKind, TaskStatus
 from lekto.core.domain.templates import RULE
 from lekto.core.domain.webhooks import (
@@ -206,7 +207,7 @@ class WebhookDeliveryService:
         owner = await uow.users.find(webhook.owner_id)
         return self._policy.private_targets.allow(owner is not None and owner.is_active_admin)
 
-    async def send_test(self, actor: UserId, id: WebhookId) -> WebhookDelivery:
+    async def send_test(self, actor: Actor, id: WebhookId) -> WebhookDelivery:
         """Owner or admin: send a `webhook.test` request now, once, and return the log row. Works
         for a switched-off webhook too; does not count towards switching it off. A test request
         goes to any address at once, so each user gets `policy.test_requests` per
@@ -241,9 +242,9 @@ class WebhookDeliveryService:
             await uow.commit()
         return delivery
 
-    def _count_test_request(self, actor: UserId, now: datetime) -> None:
+    def _count_test_request(self, actor: Actor, now: datetime) -> None:
         window, limit = self._policy.test_window, self._policy.test_requests
-        sent = self._test_requests.setdefault(actor, deque())
+        sent = self._test_requests.setdefault(actor.id, deque())
         while sent and sent[0] <= now - window:
             sent.popleft()
         if len(sent) >= limit:

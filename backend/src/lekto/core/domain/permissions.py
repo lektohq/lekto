@@ -26,6 +26,7 @@ from typing import Protocol
 from lekto.core.domain.documents import Document
 from lekto.core.domain.ids import SpaceId, UserId
 from lekto.core.domain.pipeline import Lane
+from lekto.core.domain.rights import TokenRight
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import User
 
@@ -78,8 +79,9 @@ class Reach:
 
 
 def space_role(user: User, space: Space) -> SpaceRole | None:
-    """The user's role in the space; an active admin edits every space."""
-    if user.is_active_admin:
+    """The user's role in the space; an active admin edits every space (as caller: with the
+    right `admin:documents_all`)."""
+    if user.may(TokenRight.ADMIN_DOCUMENTS_ALL):
         return SpaceRole.EDIT
     return member_role(user, space)
 
@@ -95,7 +97,7 @@ def document_access(user: User, document: Document, space: Space) -> SpaceRole |
     """Access of `user` to `document`, which lies in `space`."""
     if document.space_id != space.id:
         raise ValueError(f"document {document.id} is not in space {space.id}")
-    if user.is_active_admin:
+    if user.may(TokenRight.ADMIN_DOCUMENTS_ALL):
         return SpaceRole.EDIT
     return reach_access(user, document, space)
 
@@ -147,5 +149,7 @@ def can_manage_space(user: User, space: Space) -> bool:
 def can_choose_members(user: User, space: Space) -> bool:
     """Add, change and remove members: the space's editors; of a personal space, its user."""
     if space.personal_of is not None:
-        return (user.active and space.personal_of == user.id) or user.is_active_admin
+        return (user.active and space.personal_of == user.id) or user.may(
+            TokenRight.ADMIN_DOCUMENTS_ALL
+        )
     return can_manage_space(user, space)

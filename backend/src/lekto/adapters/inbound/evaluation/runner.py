@@ -61,6 +61,7 @@ from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.labels import grid_layout
 from lekto.core.domain.master_data import TagScope
 from lekto.core.domain.pipeline import CORRECTED, TRUNCATED, Lane, Node, NodeRun, ProcessingStatus
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.sorting import sort_key
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.object_store import ObjectStore
@@ -186,7 +187,7 @@ async def _relations(
     """The documents `relate` related the case with, by name, and how sure."""
     if environment.relations is None:
         return frozenset()
-    found = await environment.relations.relations(owner.id, result.document_id)
+    found = await environment.relations.relations(Actor(owner.id), result.document_id)
     return frozenset(
         (names.get(item.other.id, "corpus"), item.relation.state.value)
         for item in (*found.refers_to, *found.referred_by, *found.suggested)
@@ -199,7 +200,7 @@ async def _accounts(environment: Environment) -> tuple[User, User]:
     admin = await environment.users.bootstrap_admin(ADMIN, secrets.token_urlsafe(24))
     if admin is None:
         raise RuntimeError("the evaluation needs a database without an admin")
-    owner = await environment.users.create_user(admin.id, OWNER, Role.USER)
+    owner = await environment.users.create_user(Actor(admin.id), OWNER, Role.USER)
     return admin, owner
 
 
@@ -212,12 +213,12 @@ async def _people(
     for item in spec.users:
         user = users.get(item.username)
         if user is None:
-            user = await environment.users.create_user(admin.id, item.username, Role.USER)
+            user = await environment.users.create_user(Actor(admin.id), item.username, Role.USER)
             users[item.username] = user
         if environment.profiles is None:
             continue
         await environment.profiles.update(
-            admin.id,
+            Actor(admin.id),
             user.id,
             ProfileChanges(
                 display_name=item.display_name,
@@ -230,7 +231,7 @@ async def _people(
             ),
         )
     names = {user.id: user.username for user in (admin, *users.values())}
-    personal = await environment.users.personal_spaces(admin.id)
+    personal = await environment.users.personal_spaces(Actor(admin.id))
     return {
         space: "own" if user == owner.id else f"personal space of {names[user]}"
         for user, space in personal.items()
@@ -243,7 +244,7 @@ async def _seed(environment: Environment, spec: MasterDataSpec, admin: User) -> 
     topics: dict[str, TagId] = {}
     for name, parent in spec.topics:
         topic = await master_data.create_tag(
-            admin.id,
+            Actor(admin.id),
             name,
             scope=TagScope.TOPIC,
             parent_id=None if parent is None else topics[parent],
@@ -251,7 +252,7 @@ async def _seed(environment: Environment, spec: MasterDataSpec, admin: User) -> 
         topics[name] = topic.id
     contacts = [
         await master_data.create_contact(
-            admin.id,
+            Actor(admin.id),
             name,
             spec.contact_aliases.get(name, ()),
             [
@@ -268,18 +269,18 @@ async def _seed(environment: Environment, spec: MasterDataSpec, admin: User) -> 
     ]
     types = [
         await master_data.create_document_type(
-            admin.id,
+            Actor(admin.id),
             name,
             spec.type_descriptions.get(name),
             spec.title_patterns.get(name),
         )
         for name in spec.document_types
     ]
-    tags = [await master_data.create_tag(admin.id, name) for name in spec.tags]
+    tags = [await master_data.create_tag(Actor(admin.id), name) for name in spec.tags]
     type_ids = {item.name: item.id for item in types}
     fields = [
         await master_data.create_field(
-            admin.id,
+            Actor(admin.id),
             item.name,
             item.data_type,
             document_type_ids=(
@@ -342,7 +343,7 @@ async def _take_over(
         if item.topic is not None:
             topic = _ids(master.topics)[item.topic]
             await environment.documents.change_metadata(
-                owner.id, received.id, DocumentChanges(topic_id=topic)
+                Actor(owner.id), received.id, DocumentChanges(topic_id=topic)
             )
         await environment.indexing.index_document(received.id)
     await environment.classifier.train()
@@ -367,7 +368,7 @@ async def _receive(
         # A distinct file per document: every file exists once per installation.
         path.write_bytes(f"%PDF-1.7\n% evaluation {marker}\n%%EOF\n".encode())
         received = await pipeline.receive(
-            actor,
+            Actor(actor),
             IncomingFile.of(path),
             filename=filename,
             channel=channel,
@@ -403,9 +404,9 @@ async def _run(
     started = time.perf_counter()
     await _drain(pipeline)
     seconds = time.perf_counter() - started
-    document = await environment.documents.get(owner.id, received.id)
-    log = await environment.documents.processing_log(owner.id, received.id)
-    stored = (await environment.documents.facts(owner.id, received.id)).stored
+    document = await environment.documents.get(Actor(owner.id), received.id)
+    log = await environment.documents.processing_log(Actor(owner.id), received.id)
+    stored = (await environment.documents.facts(Actor(owner.id), received.id)).stored
     facts = frozenset(
         (fact.kind, fact.value, fact.role)
         for fact in stored.values()
@@ -435,9 +436,9 @@ async def _corrected(
     if result.lane not in (Lane.GREEN, Lane.YELLOW):
         return result
     id = result.document_id
-    document = await environment.documents.get(owner.id, id)
+    document = await environment.documents.get(Actor(owner.id), id)
     if result.lane is Lane.YELLOW and result.status is ProcessingStatus.REVIEW:
-        log = await environment.documents.processing_log(owner.id, id)
+        log = await environment.documents.processing_log(Actor(owner.id), id)
         open = {check.field for item in open_nodes(document, log) for check in item.fields}
         pipeline = environment.pipeline_for(result.case)
         changes = _expected_changes(result.case.expected, document, master, decide=open)
@@ -449,15 +450,15 @@ async def _corrected(
                 id: value for id, value in changes.fields.items() if not master.fields[id].is_read
             }
             changes, resume = replace(changes, fields=kept), Node.FIELDS
-        await pipeline.confirm(owner.id, id, changes, resume_at=resume)
+        await pipeline.confirm(Actor(owner.id), id, changes, resume_at=resume)
         await _drain(pipeline)
     else:
         changes = _expected_changes(result.case.expected, document, master)
         if changes != DocumentChanges():
-            await environment.documents.change_metadata(owner.id, id, changes)
+            await environment.documents.change_metadata(Actor(owner.id), id, changes)
     corrected = {
         _field_label(name, master)
-        for entry in await environment.documents.processing_log(owner.id, id)
+        for entry in await environment.documents.processing_log(Actor(owner.id), id)
         for record in (entry.result.input, entry.result.output)
         for name in _strings(record.get(CORRECTED))
     }

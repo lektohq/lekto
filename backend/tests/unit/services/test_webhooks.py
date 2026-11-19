@@ -14,6 +14,7 @@ from lekto.core.domain.errors import (
 )
 from lekto.core.domain.ids import DocumentId, EventId, WebhookId, new_id
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role
 from lekto.core.domain.webhooks import (
     BodyFormat,
@@ -40,7 +41,7 @@ URL = "http://n8n.lan:5678/webhook/lekto"
 async def test_a_user_creates_a_webhook_and_sees_the_secret_once(world: World) -> None:
     user = await world.user()
     created = await world.webhooks.create(
-        user.id, name="n8n", url=URL, event_types=["document.filed"]
+        Actor(user.id), name="n8n", url=URL, event_types=["document.filed"]
     )
     assert created.secret is not None and created.secret.startswith("whsec_")
     assert created.webhook.owner_id == user.id and created.webhook.active
@@ -53,17 +54,17 @@ async def test_a_user_creates_a_webhook_and_sees_the_secret_once(world: World) -
         world.cipher.decrypt(stored.encrypted_secret, context=secret_context(stored.id)).decode()
         == created.secret
     )
-    listed = await world.webhooks.list_webhooks(user.id)
+    listed = await world.webhooks.list_webhooks(Actor(user.id))
     assert [webhook.id for webhook in listed] == [created.webhook.id]
 
 
 async def test_a_bad_url_or_event_type_is_refused(world: World) -> None:
     user = await world.user()
     with pytest.raises(ValidationError):
-        await world.webhooks.create(user.id, name="x", url="ftp://x", event_types=["*"])
+        await world.webhooks.create(Actor(user.id), name="x", url="ftp://x", event_types=["*"])
     with pytest.raises(ValidationError):
-        await world.webhooks.create(user.id, name="x", url=URL, event_types=["nonsense"])
-    assert await world.webhooks.list_webhooks(user.id) == []
+        await world.webhooks.create(Actor(user.id), name="x", url=URL, event_types=["nonsense"])
+    assert await world.webhooks.list_webhooks(Actor(user.id)) == []
 
 
 @pytest.mark.parametrize(
@@ -81,36 +82,36 @@ async def test_only_an_admins_webhook_names_an_address_in_the_own_network(
 ) -> None:
     user, admin = await world.user(), await world.user(role=Role.ADMIN)
     with pytest.raises(ValidationError) as refused:
-        await world.webhooks.create(user.id, name="x", url=url, event_types=["*"])
+        await world.webhooks.create(Actor(user.id), name="x", url=url, event_types=["*"])
     assert refused.value.reason is not None
     assert refused.value.reason.code is ReasonCode.WEBHOOK_PRIVATE_ADMINS
-    created = await world.webhooks.create(admin.id, name="x", url=url, event_types=["*"])
+    created = await world.webhooks.create(Actor(admin.id), name="x", url=url, event_types=["*"])
     assert created.webhook.url == url
     # A name is checked when it is resolved, before sending.
-    await world.webhooks.create(user.id, name="y", url="http://n8n.lan/", event_types=["*"])
+    await world.webhooks.create(Actor(user.id), name="y", url="http://n8n.lan/", event_types=["*"])
 
 
 async def test_an_admin_does_not_point_a_users_webhook_into_the_own_network(
     world: World,
 ) -> None:
     user, admin = await world.user(), await world.user(role=Role.ADMIN)
-    created = await world.webhooks.create(user.id, name="x", url=URL, event_types=["*"])
+    created = await world.webhooks.create(Actor(user.id), name="x", url=URL, event_types=["*"])
     with pytest.raises(ValidationError):
-        await world.webhooks.update(admin.id, created.webhook.id, url="http://127.0.0.1/")
+        await world.webhooks.update(Actor(admin.id), created.webhook.id, url="http://127.0.0.1/")
     # The rest of the webhook may change.
-    await world.webhooks.update(user.id, created.webhook.id, name="renamed")
+    await world.webhooks.update(Actor(user.id), created.webhook.id, name="renamed")
 
 
 async def test_with_none_no_webhook_names_an_address_in_the_own_network(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     service = replace_policy(world, PrivateTargets.NONE)
     with pytest.raises(ValidationError) as refused:
-        await service.create(admin.id, name="x", url="http://127.0.0.1/", event_types=["*"])
+        await service.create(Actor(admin.id), name="x", url="http://127.0.0.1/", event_types=["*"])
     assert refused.value.reason is not None
     assert refused.value.reason.code is ReasonCode.WEBHOOK_PRIVATE_NONE
     everyone = replace_policy(world, PrivateTargets.ALL)
     user = await world.user()
-    await everyone.create(user.id, name="x", url="http://127.0.0.1/", event_types=["*"])
+    await everyone.create(Actor(user.id), name="x", url="http://127.0.0.1/", event_types=["*"])
 
 
 def replace_policy(world: World, targets: PrivateTargets) -> WebhookService:
@@ -135,61 +136,65 @@ async def test_the_number_of_webhooks_per_user_is_limited(world: World) -> None:
         retention=builders.RETENTION,
     )
     for _ in range(2):
-        await service.create(user.id, name="x", url=URL, event_types=["*"])
+        await service.create(Actor(user.id), name="x", url=URL, event_types=["*"])
     with pytest.raises(ConflictError):
-        await service.create(user.id, name="x", url=URL, event_types=["*"])
-    await service.create(other.id, name="x", url=URL, event_types=["*"])
+        await service.create(Actor(user.id), name="x", url=URL, event_types=["*"])
+    await service.create(Actor(other.id), name="x", url=URL, event_types=["*"])
 
 
 async def test_others_do_not_find_a_webhook_but_admins_read_it(world: World) -> None:
     owner, other = await world.user(), await world.user()
     admin = await world.user(role=Role.ADMIN)
     service = world.webhooks
-    hook = (await service.create(owner.id, name="x", url=URL, event_types=["*"])).webhook
+    hook = (await service.create(Actor(owner.id), name="x", url=URL, event_types=["*"])).webhook
     with pytest.raises(NotFoundError):
-        await service.get(other.id, hook.id)
+        await service.get(Actor(other.id), hook.id)
     with pytest.raises(NotFoundError):
-        await service.deliveries(other.id, hook.id)
+        await service.deliveries(Actor(other.id), hook.id)
     with pytest.raises(NotFoundError):
-        await service.update(other.id, hook.id, name="mine")
-    assert await service.list_webhooks(other.id) == []
-    assert (await service.get(admin.id, hook.id)).id == hook.id
-    assert (await service.deliveries(admin.id, hook.id)).deliveries == ()
-    assert [webhook.id for webhook in await service.list_webhooks(admin.id)] == [hook.id]
-    owned = await service.list_webhooks(admin.id, owner=owner.id)
+        await service.update(Actor(other.id), hook.id, name="mine")
+    assert await service.list_webhooks(Actor(other.id)) == []
+    assert (await service.get(Actor(admin.id), hook.id)).id == hook.id
+    assert (await service.deliveries(Actor(admin.id), hook.id)).deliveries == ()
+    assert [webhook.id for webhook in await service.list_webhooks(Actor(admin.id))] == [hook.id]
+    owned = await service.list_webhooks(Actor(admin.id), owner=owner.id)
     assert [webhook.id for webhook in owned] == [hook.id]
-    assert await service.list_webhooks(admin.id, owner=other.id) == []
-    assert await service.list_webhooks(other.id, owner=owner.id) == []
+    assert await service.list_webhooks(Actor(admin.id), owner=other.id) == []
+    assert await service.list_webhooks(Actor(other.id), owner=owner.id) == []
 
 
 async def test_admins_change_renew_and_delete_other_users_webhooks(world: World) -> None:
     owner, admin = await world.user(), await world.user(role=Role.ADMIN)
     service = world.webhooks
-    hook = (await service.create(owner.id, name="x", url=URL, event_types=["*"])).webhook
-    assert (await service.update(admin.id, hook.id, name="by admin")).name == "by admin"
-    renewed = await service.renew_secret(admin.id, hook.id)
+    hook = (await service.create(Actor(owner.id), name="x", url=URL, event_types=["*"])).webhook
+    assert (await service.update(Actor(admin.id), hook.id, name="by admin")).name == "by admin"
+    renewed = await service.renew_secret(Actor(admin.id), hook.id)
     assert renewed.secret is not None and renewed.secret.startswith("whsec_")
-    assert (await service.get(owner.id, hook.id)).owner_id == owner.id
-    await service.delete(admin.id, hook.id)
+    assert (await service.get(Actor(owner.id), hook.id)).owner_id == owner.id
+    await service.delete(Actor(admin.id), hook.id)
     with pytest.raises(NotFoundError):
-        await service.get(owner.id, hook.id)
+        await service.get(Actor(owner.id), hook.id)
 
 
 async def test_the_owner_changes_and_switches_off_and_on(world: World) -> None:
     user = await world.user()
     service = world.webhooks
-    hook = (await service.create(user.id, name="x", url=URL, event_types=["*"])).webhook
+    hook = (await service.create(Actor(user.id), name="x", url=URL, event_types=["*"])).webhook
     changed = await service.update(
-        user.id, hook.id, name="HA", url="https://ha.example.org/h", event_types=["document.filed"]
+        Actor(user.id),
+        hook.id,
+        name="HA",
+        url="https://ha.example.org/h",
+        event_types=["document.filed"],
     )
     assert (changed.name, changed.url, changed.event_types) == (
         "HA",
         "https://ha.example.org/h",
         frozenset({"document.filed"}),
     )
-    assert not (await service.update(user.id, hook.id, active=False)).active
+    assert not (await service.update(Actor(user.id), hook.id, active=False)).active
     with pytest.raises(ValidationError):
-        await service.update(user.id, hook.id, url="javascript:x")
+        await service.update(Actor(user.id), hook.id, url="javascript:x")
     async with world.uow() as uow:
         webhook = await uow.webhooks.get(hook.id)
         webhook.active, webhook.disabled_reason, webhook.failed_streak = (
@@ -199,17 +204,17 @@ async def test_the_owner_changes_and_switches_off_and_on(world: World) -> None:
         )
         await uow.webhooks.update(webhook)
         await uow.commit()
-    again = await service.update(user.id, hook.id, active=True)
+    again = await service.update(Actor(user.id), hook.id, active=True)
     assert (again.active, again.disabled_reason, again.failed_streak) == (True, None, 0)
 
 
 async def test_renewing_the_secret_keeps_the_old_one_for_the_grace_period(world: World) -> None:
     user = await world.user()
     service = world.webhooks
-    created = await service.create(user.id, name="x", url=URL, event_types=["*"])
-    renewed = await service.renew_secret(user.id, created.webhook.id)
+    created = await service.create(Actor(user.id), name="x", url=URL, event_types=["*"])
+    renewed = await service.renew_secret(Actor(user.id), created.webhook.id)
     assert renewed.secret != created.secret
-    webhook = await service.get(user.id, created.webhook.id)
+    webhook = await service.get(Actor(user.id), created.webhook.id)
     assert webhook.previous_valid_until == world.clock.now() + timedelta(hours=24)
     secrets = [
         world.cipher.decrypt(item, context=secret_context(webhook.id)).decode()
@@ -221,40 +226,42 @@ async def test_renewing_the_secret_keeps_the_old_one_for_the_grace_period(world:
 async def test_delete_removes_the_webhook_and_a_deleted_user_loses_theirs(world: World) -> None:
     admin, user = await world.user(role=Role.ADMIN), await world.user()
     service = world.webhooks
-    first = (await service.create(user.id, name="x", url=URL, event_types=["*"])).webhook
-    await service.create(user.id, name="y", url=URL, event_types=["*"])
-    await service.delete(user.id, first.id)
+    first = (await service.create(Actor(user.id), name="x", url=URL, event_types=["*"])).webhook
+    await service.create(Actor(user.id), name="y", url=URL, event_types=["*"])
+    await service.delete(Actor(user.id), first.id)
     with pytest.raises(NotFoundError):
-        await service.get(user.id, first.id)
+        await service.get(Actor(user.id), first.id)
     with pytest.raises(NotFoundError):
-        await service.delete(user.id, WebhookId(new_id()))
-    await world.users.delete_user(admin.id, user.id)
+        await service.delete(Actor(user.id), WebhookId(new_id()))
+    await world.users.delete_user(Actor(admin.id), user.id)
     async with world.uow() as uow:
         assert await uow.webhooks.list_all() == []
 
 
 async def test_a_deactivated_user_cannot_use_webhooks(world: World) -> None:
     admin, user = await world.user(role=Role.ADMIN), await world.user()
-    await world.webhooks.create(user.id, name="x", url=URL, event_types=["*"])
-    await world.users.update(admin.id, user.id, active=False)
+    await world.webhooks.create(Actor(user.id), name="x", url=URL, event_types=["*"])
+    await world.users.update(Actor(admin.id), user.id, active=False)
     with pytest.raises(AuthenticationError):
-        await world.webhooks.list_webhooks(user.id)
+        await world.webhooks.list_webhooks(Actor(user.id))
     with pytest.raises(AuthenticationError):
-        await world.webhooks.create(user.id, name="y", url=URL, event_types=["*"])
+        await world.webhooks.create(Actor(user.id), name="y", url=URL, event_types=["*"])
 
 
 async def test_a_webhook_may_go_unsigned_and_sign_again_later(world: World) -> None:
     user = await world.user()
     service = world.webhooks
-    created = await service.create(user.id, name="HA", url=URL, event_types=["*"], signed=False)
+    created = await service.create(
+        Actor(user.id), name="HA", url=URL, event_types=["*"], signed=False
+    )
     assert created.secret is None and not created.webhook.signed
-    renewed = await service.renew_secret(user.id, created.webhook.id)
+    renewed = await service.renew_secret(Actor(user.id), created.webhook.id)
     assert renewed.secret is not None and renewed.webhook.signed
     # Nothing signed before: no old secret with a grace period.
     assert renewed.webhook.previous_valid_until is None
-    removed = await service.remove_secret(user.id, created.webhook.id)
+    removed = await service.remove_secret(Actor(user.id), created.webhook.id)
     assert not removed.signed and removed.previous_secret is None
-    assert not (await service.get(user.id, created.webhook.id)).signed
+    assert not (await service.get(Actor(user.id), created.webhook.id)).signed
 
 
 def stored_headers(world: World, webhook_id: WebhookId, encrypted: bytes | None) -> dict[str, str]:
@@ -270,23 +277,27 @@ async def test_the_header_values_go_to_another_address_only_when_given_anew(
     owner, admin = await world.user(), await world.user(role=Role.ADMIN)
     service = world.webhooks
     created = await service.create(
-        owner.id, name="n8n", url=URL, event_types=["*"], headers=[("Authorization", "Bearer x")]
+        Actor(owner.id),
+        name="n8n",
+        url=URL,
+        event_types=["*"],
+        headers=[("Authorization", "Bearer x")],
     )
     hook = created.webhook
     other = "http://n8n.example.net/webhook/lekto"
 
     with pytest.raises(ValidationError) as kept:
-        await service.update(admin.id, hook.id, url=other)
+        await service.update(Actor(admin.id), hook.id, url=other)
     assert kept.value.reason.code is ReasonCode.WEBHOOK_HEADERS_AGAIN
     with pytest.raises(ValidationError):
-        await service.update(admin.id, hook.id, url=other, headers=[("Authorization", None)])
-    await service.update(admin.id, hook.id, name="renamed")  # the address stays: fine
+        await service.update(Actor(admin.id), hook.id, url=other, headers=[("Authorization", None)])
+    await service.update(Actor(admin.id), hook.id, name="renamed")  # the address stays: fine
     moved = await service.update(
-        admin.id, hook.id, url=other, headers=[("Authorization", "Bearer y")]
+        Actor(admin.id), hook.id, url=other, headers=[("Authorization", "Bearer y")]
     )
     assert moved.url == other
     assert stored_headers(world, hook.id, moved.encrypted_headers) == {"Authorization": "Bearer y"}
-    back = await service.update(owner.id, hook.id, url=URL)
+    back = await service.update(Actor(owner.id), hook.id, url=URL)
     assert back.url == URL
 
 
@@ -294,7 +305,7 @@ async def test_header_values_are_stored_encrypted_and_kept_by_name(world: World)
     user = await world.user()
     service = world.webhooks
     created = await service.create(
-        user.id,
+        Actor(user.id),
         name="HA",
         url=URL,
         event_types=["*"],
@@ -309,7 +320,7 @@ async def test_header_values_are_stored_encrypted_and_kept_by_name(world: World)
     }
     # A value left out keeps the stored one (by name, ignoring case); the order follows.
     changed = await service.update(
-        user.id, hook.id, headers=[("X-Tenant", "work"), ("authorization", None)]
+        Actor(user.id), hook.id, headers=[("X-Tenant", "work"), ("authorization", None)]
     )
     assert changed.header_names == ("X-Tenant", "authorization")
     assert stored_headers(world, hook.id, changed.encrypted_headers) == {
@@ -317,8 +328,8 @@ async def test_header_values_are_stored_encrypted_and_kept_by_name(world: World)
         "authorization": "Bearer t0ken",
     }
     with pytest.raises(ValidationError, match="new header 'X-New'"):
-        await service.update(user.id, hook.id, headers=[("X-New", None)])
-    cleared = await service.update(user.id, hook.id, headers=[])
+        await service.update(Actor(user.id), hook.id, headers=[("X-New", None)])
+    cleared = await service.update(Actor(user.id), hook.id, headers=[])
     assert cleared.header_names == () and cleared.encrypted_headers is None
 
 
@@ -332,16 +343,16 @@ async def test_reserved_or_broken_headers_are_refused(world: World) -> None:
     ):
         with pytest.raises(ValidationError):
             await world.webhooks.create(
-                user.id, name="x", url=URL, event_types=["*"], headers=headers
+                Actor(user.id), name="x", url=URL, event_types=["*"], headers=headers
             )
-    assert await world.webhooks.list_webhooks(user.id) == []
+    assert await world.webhooks.list_webhooks(Actor(user.id)) == []
 
 
 async def test_header_values_that_cannot_be_decrypted_must_be_given_anew(world: World) -> None:
     user = await world.user()
     hook = (
         await world.webhooks.create(
-            user.id, name="x", url=URL, event_types=["*"], headers=[("X-Token", "a")]
+            Actor(user.id), name="x", url=URL, event_types=["*"], headers=[("X-Token", "a")]
         )
     ).webhook
     async with world.uow() as uow:
@@ -350,8 +361,8 @@ async def test_header_values_that_cannot_be_decrypted_must_be_given_anew(world: 
         await uow.webhooks.update(webhook)
         await uow.commit()
     with pytest.raises(ValidationError, match="new header 'X-Token'"):
-        await world.webhooks.update(user.id, hook.id, headers=[("X-Token", None)])
-    changed = await world.webhooks.update(user.id, hook.id, headers=[("X-Token", "b")])
+        await world.webhooks.update(Actor(user.id), hook.id, headers=[("X-Token", None)])
+    changed = await world.webhooks.update(Actor(user.id), hook.id, headers=[("X-Token", "b")])
     assert stored_headers(world, hook.id, changed.encrypted_headers) == {"X-Token": "b"}
 
 
@@ -363,7 +374,7 @@ async def test_a_template_body_is_checked_when_saved(world: World) -> None:
     )
     hook = (
         await service.create(
-            user.id,
+            Actor(user.id),
             name="HA",
             url=URL,
             event_types=["*"],
@@ -379,10 +390,12 @@ async def test_a_template_body_is_checked_when_saved(world: World) -> None:
         ('{"x": {% if %}}', "invalid template"),
     ):
         with pytest.raises(ValidationError, match=error):
-            await service.update(user.id, hook.id, body=BodyFormat.TEMPLATE, body_template=template)
+            await service.update(
+                Actor(user.id), hook.id, body=BodyFormat.TEMPLATE, body_template=template
+            )
     with pytest.raises(ValidationError):
-        await service.update(user.id, hook.id, body_template=good)  # without the body
-    full = await service.update(user.id, hook.id, body=BodyFormat.FULL)
+        await service.update(Actor(user.id), hook.id, body_template=good)  # without the body
+    full = await service.update(Actor(user.id), hook.id, body=BodyFormat.FULL)
     assert (full.body, full.body_template) == (BodyFormat.FULL, None)
 
 
@@ -394,23 +407,27 @@ async def test_an_admin_makes_an_admins_webhook_serve_as_a_model_call(world: Wor
     admin, user = await world.user(role=Role.ADMIN), await world.user()
     service = world.webhooks
     role = ModelCallRole(ModelCallKind.PROPOSE, timedelta(minutes=10))
-    created = await service.create(admin.id, name="agent", url=URL, event_types=[], model_call=role)
+    created = await service.create(
+        Actor(admin.id), name="agent", url=URL, event_types=[], model_call=role
+    )
     assert created.webhook.model_call == role
     async with world.uow() as uow:
         assert await serving_model_call(uow, ModelCallKind.PROPOSE) == created.webhook
         assert await serving_model_call(uow, ModelCallKind.EXTRACT) is None
     # Not on a user's webhook, not by a user, not even an admin on a user's.
-    own = (await service.create(user.id, name="x", url=URL, event_types=[])).webhook
+    own = (await service.create(Actor(user.id), name="x", url=URL, event_types=[])).webhook
     extract = ModelCallRole(ModelCallKind.EXTRACT)
     with pytest.raises(PermissionDeniedError):
-        await service.create(user.id, name="x", url=URL, event_types=[], model_call=extract)
+        await service.create(Actor(user.id), name="x", url=URL, event_types=[], model_call=extract)
     with pytest.raises(PermissionDeniedError):
-        await service.update(user.id, own.id, model_call=extract)
+        await service.update(Actor(user.id), own.id, model_call=extract)
     with pytest.raises(PermissionDeniedError):
-        await service.update(admin.id, own.id, model_call=extract)
+        await service.update(Actor(admin.id), own.id, model_call=extract)
     # A change that leaves it alone keeps it; None ends it.
-    assert (await service.update(admin.id, created.webhook.id, name="a")).model_call == role
-    assert (await service.update(admin.id, created.webhook.id, model_call=None)).model_call is None
+    assert (await service.update(Actor(admin.id), created.webhook.id, name="a")).model_call == role
+    assert (
+        await service.update(Actor(admin.id), created.webhook.id, model_call=None)
+    ).model_call is None
 
 
 async def test_one_active_webhook_serves_each_model_call(world: World) -> None:
@@ -418,33 +435,41 @@ async def test_one_active_webhook_serves_each_model_call(world: World) -> None:
     service = world.webhooks
     propose = ModelCallRole(ModelCallKind.PROPOSE)
     first = (
-        await service.create(admin.id, name="first", url=URL, event_types=[], model_call=propose)
+        await service.create(
+            Actor(admin.id), name="first", url=URL, event_types=[], model_call=propose
+        )
     ).webhook
     with pytest.raises(ConflictError, match="'first' serves as the model call 'propose'"):
-        await service.create(other.id, name="second", url=URL, event_types=[], model_call=propose)
+        await service.create(
+            Actor(other.id), name="second", url=URL, event_types=[], model_call=propose
+        )
     # Switched off, it serves no more: another may, and switching it on again conflicts.
     off = await service.create(
-        other.id, name="off", url=URL, event_types=[], active=False, model_call=propose
+        Actor(other.id), name="off", url=URL, event_types=[], active=False, model_call=propose
     )
-    await service.update(admin.id, first.id, active=False)
+    await service.update(Actor(admin.id), first.id, active=False)
     second = (
-        await service.create(other.id, name="second", url=URL, event_types=[], model_call=propose)
+        await service.create(
+            Actor(other.id), name="second", url=URL, event_types=[], model_call=propose
+        )
     ).webhook
     with pytest.raises(ConflictError):
-        await service.update(admin.id, first.id, active=True)
+        await service.update(Actor(admin.id), first.id, active=True)
     with pytest.raises(ConflictError):
-        await service.update(other.id, off.webhook.id, active=True)
+        await service.update(Actor(other.id), off.webhook.id, active=True)
     async with world.uow() as uow:
         assert await serving_model_call(uow, ModelCallKind.PROPOSE) == second
     # The other kind is free.
     extract = ModelCallRole(ModelCallKind.EXTRACT)
-    assert (await service.update(admin.id, first.id, model_call=extract)).model_call == extract
+    assert (
+        await service.update(Actor(admin.id), first.id, model_call=extract)
+    ).model_call == extract
 
 
 async def test_a_model_call_of_an_admin_no_more_serves_no_more(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     created = await world.webhooks.create(
-        admin.id,
+        Actor(admin.id),
         name="agent",
         url=URL,
         event_types=[],
@@ -458,18 +483,22 @@ async def test_a_model_call_of_an_admin_no_more_serves_no_more(world: World) -> 
     async with world.uow() as uow:
         assert await serving_model_call(uow, ModelCallKind.EXTRACT) is None
     # Its owner may still take the role away.
-    webhook = await world.webhooks.update(admin.id, created.webhook.id, model_call=None)
+    webhook = await world.webhooks.update(Actor(admin.id), created.webhook.id, model_call=None)
     assert webhook.model_call is None
 
 
 async def test_the_log_names_documents_as_far_as_the_viewer_may_read_them(world: World) -> None:
     owner, stranger = await world.user("owner"), await world.user("stranger")
     admin = await world.user(role=Role.ADMIN)
-    mine = await world.pipeline().receive(owner.id, builders.incoming(b"%PDF-1"), filename="a.pdf")
-    theirs = await world.pipeline().receive(
-        stranger.id, builders.incoming(b"%PDF-2"), filename="b.pdf"
+    mine = await world.pipeline().receive(
+        Actor(owner.id), builders.incoming(b"%PDF-1"), filename="a.pdf"
     )
-    hook = (await world.webhooks.create(owner.id, name="x", url=URL, event_types=["*"])).webhook
+    theirs = await world.pipeline().receive(
+        Actor(stranger.id), builders.incoming(b"%PDF-2"), filename="b.pdf"
+    )
+    hook = (
+        await world.webhooks.create(Actor(owner.id), name="x", url=URL, event_types=["*"])
+    ).webhook
 
     def entry(
         document: DocumentId | None, outcome: DeliveryOutcome, event: str = "document.filed"
@@ -499,7 +528,7 @@ async def test_the_log_names_documents_as_far_as_the_viewer_may_read_them(world:
 
     seen = {
         view.delivery.event_type + str(view.delivery.document_id): view
-        for view in (await world.webhooks.deliveries(owner.id, hook.id)).deliveries
+        for view in (await world.webhooks.deliveries(Actor(owner.id), hook.id)).deliveries
     }
     readable = seen[f"document.filed{mine.id}"]
     assert readable.document is not None and readable.document.title == mine.title
@@ -514,22 +543,22 @@ async def test_the_log_names_documents_as_far_as_the_viewer_may_read_them(world:
         False,
     )
     as_admin = (
-        await world.webhooks.deliveries(admin.id, hook.id, event_type="document.filed")
+        await world.webhooks.deliveries(Actor(admin.id), hook.id, event_type="document.filed")
     ).deliveries
     assert {view.document.title for view in as_admin if view.document} == {mine.title, theirs.title}
 
     problems = await world.webhooks.deliveries(
-        owner.id, hook.id, outcomes={DeliveryOutcome.GAVE_UP, DeliveryOutcome.RETRYING}
+        Actor(owner.id), hook.id, outcomes={DeliveryOutcome.GAVE_UP, DeliveryOutcome.RETRYING}
     )
     assert {view.delivery.event_type for view in problems.deliveries} == {
         "document.filed",
         "document.deleted",
     }
     assert problems.total == 2
-    rest = await world.webhooks.deliveries(owner.id, hook.id, offset=3)
+    rest = await world.webhooks.deliveries(Actor(owner.id), hook.id, offset=3)
     assert (len(rest.deliveries), rest.total) == (1, 4)
 
-    summary = await world.webhooks.delivery_summary(owner.id, hook.id)
+    summary = await world.webhooks.delivery_summary(Actor(owner.id), hook.id)
     assert summary.counts == {
         DeliveryOutcome.DELIVERED: 2,
         DeliveryOutcome.GAVE_UP: 1,
@@ -537,7 +566,9 @@ async def test_the_log_names_documents_as_far_as_the_viewer_may_read_them(world:
     }
     assert summary.event_types == ("document.deleted", "document.filed", "webhook.test")
     assert summary.kept_since == world.clock.now() - builders.RETENTION
-    filed = await world.webhooks.delivery_summary(owner.id, hook.id, event_type="document.filed")
+    filed = await world.webhooks.delivery_summary(
+        Actor(owner.id), hook.id, event_type="document.filed"
+    )
     assert filed.counts == {DeliveryOutcome.DELIVERED: 1, DeliveryOutcome.GAVE_UP: 1}
     with pytest.raises(NotFoundError):
-        await world.webhooks.delivery_summary(stranger.id, hook.id)
+        await world.webhooks.delivery_summary(Actor(stranger.id), hook.id)

@@ -20,10 +20,11 @@ from enum import StrEnum
 
 from lekto.core.domain.document_facts import DocumentFact
 from lekto.core.domain.documents import Document
-from lekto.core.domain.ids import DocumentId, DocumentTypeId, SpaceId, UserId
+from lekto.core.domain.ids import DocumentId, DocumentTypeId, SpaceId
 from lekto.core.domain.permissions import document_access
 from lekto.core.domain.reasons import Action
 from lekto.core.domain.relations import Relation, RelationState
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.series import Dated, Series, SeriesState, series_of
 from lekto.core.domain.spaces import Space
 from lekto.core.ports.clock import Clock
@@ -78,7 +79,7 @@ class StreamService:
         self._clock = clock
 
     async def stream(
-        self, actor: UserId, filter: DocumentFilter, *, all_users: bool = False
+        self, actor: Actor, filter: DocumentFilter, *, all_users: bool = False
     ) -> Stream:
         """The stream of the documents `filter` finds among those the caller reads (with
         `all_users`, an admin's, every user's); documents in processing included."""
@@ -89,7 +90,7 @@ class StreamService:
             if all_users:
                 found = await uow.documents.query(filter, limit=LIMIT + 1)
             else:
-                found = await uow.documents.query_visible(actor, filter, limit=LIMIT + 1)
+                found = await uow.documents.query_visible(actor.id, filter, limit=LIMIT + 1)
             # Each is checked against the permission rules once more, as the list does.
             spaces: dict[SpaceId, Space] = {}
             documents = []
@@ -99,7 +100,7 @@ class StreamService:
                 if document_access(user, document, spaces[document.space_id]) is None:
                     log.error(
                         "the repository listed a document the user may not read",
-                        extra={"document_id": str(document.id), "user_id": str(actor)},
+                        extra={"document_id": str(document.id), "user_id": str(actor.id)},
                     )
                     continue
                 documents.append(document)

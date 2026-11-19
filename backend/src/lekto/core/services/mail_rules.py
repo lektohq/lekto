@@ -10,11 +10,12 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from lekto.core.domain.errors import ValidationError
-from lekto.core.domain.ids import MailboxId, MailRuleId, UserId
+from lekto.core.domain.ids import MailboxId, MailRuleId
 from lekto.core.domain.mail import Fallback
 from lekto.core.domain.mail_intake import MailRecord
 from lekto.core.domain.mail_rules import MailRule, MailRuleChanges, first_match, record_facts
 from lekto.core.domain.reasons import Action, ReasonCode
+from lekto.core.domain.rights import Actor
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import require_admin
@@ -54,18 +55,18 @@ class MailRuleService:
         self._uow = uow
         self._clock = clock
 
-    async def list_rules(self, actor: UserId) -> list[MailRule]:
+    async def list_rules(self, actor: Actor) -> list[MailRule]:
         """Every mail rule, by mailbox, priority and name."""
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.MANAGE_MAILBOXES)
             return await uow.mail_rules.list_all()
 
-    async def get(self, actor: UserId, id: MailRuleId) -> MailRule:
+    async def get(self, actor: Actor, id: MailRuleId) -> MailRule:
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.MANAGE_MAILBOXES)
             return await uow.mail_rules.get(id)
 
-    async def create(self, actor: UserId, mailbox: MailboxId, changes: MailRuleChanges) -> MailRule:
+    async def create(self, actor: Actor, mailbox: MailboxId, changes: MailRuleChanges) -> MailRule:
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.MANAGE_MAILBOXES)
             await uow.mailboxes.get(mailbox)
@@ -77,7 +78,7 @@ class MailRuleService:
             await uow.commit()
             return rule
 
-    async def change(self, actor: UserId, id: MailRuleId, changes: MailRuleChanges) -> MailRule:
+    async def change(self, actor: Actor, id: MailRuleId, changes: MailRuleChanges) -> MailRule:
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.MANAGE_MAILBOXES)
             rule = await uow.mail_rules.get(id)
@@ -99,7 +100,7 @@ class MailRuleService:
 
     async def dry_run(
         self,
-        actor: UserId,
+        actor: Actor,
         mailbox: MailboxId,
         changes: MailRuleChanges,
         *,
@@ -150,7 +151,7 @@ class MailRuleService:
             )
         return found
 
-    async def delete(self, actor: UserId, id: MailRuleId) -> None:
+    async def delete(self, actor: Actor, id: MailRuleId) -> None:
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.MANAGE_MAILBOXES)
             await uow.mail_rules.remove(id)

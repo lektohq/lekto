@@ -48,6 +48,7 @@ from lekto.core.domain.events import DocumentReceived, DomainEvent, LaneChanged,
 from lekto.core.domain.ids import DocumentId, new_id
 from lekto.core.domain.jobs import WORK_LEASE_MARGIN, RetryPolicy
 from lekto.core.domain.pipeline import Lane, Node
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.templates import TemplateValue
 from lekto.core.domain.users import Role
 from lekto.core.ports.ocr import VisionModel
@@ -636,7 +637,7 @@ async def test_memory_container_runs_the_core() -> None:
     services = build_services(built)
 
     admin = await builders.seed_user(built.unit_of_work, role=Role.ADMIN)
-    user = await services.users.create_user(admin.id, "dana", Role.USER)
+    user = await services.users.create_user(Actor(admin.id), "dana", Role.USER)
 
     received: list[DomainEvent] = []
 
@@ -645,13 +646,13 @@ async def test_memory_container_runs_the_core() -> None:
 
     built.event_bus.subscribe("test", record)
     document = await services.pipeline.receive(
-        user.id, incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
+        Actor(user.id), incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
     )
     await builders.drain(services.pipeline)
     # Without a language model, a person classifies the document.
-    stored = await services.documents.get(user.id, document.id)
+    stored = await services.documents.get(Actor(user.id), document.id)
     assert stored.lane is Lane.YELLOW
-    log = await services.documents.processing_log(user.id, document.id)
+    log = await services.documents.processing_log(Actor(user.id), document.id)
     classify = next(entry for entry in log if entry.node is Node.JUDGE)
     assert "no language model" in (classify.result.reason or "")
     await built.event_bus.dispatch()

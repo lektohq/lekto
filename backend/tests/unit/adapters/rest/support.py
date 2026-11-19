@@ -28,6 +28,7 @@ from lekto.composition.settings import Settings
 from lekto.core.domain.identity import TokenScope
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.pipeline import SIGNALS, Node
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.services.imports import ImportedFieldsNode, ImportedJudgeNode, ImportedSignal
@@ -259,11 +260,11 @@ async def build_scene(api: Api) -> Scene:
     gone = await api.user("deactivated")
     retired = await api.admin("retired")
     spaces = api.services.spaces
-    shared = await spaces.create(owner.id, "Shared")
+    shared = await spaces.create(Actor(owner.id), "Shared")
     for user, level in [(reader, SpaceRole.READ), (writer, SpaceRole.EDIT)]:
-        await spaces.set_member(owner.id, shared.id, user.id, level)
-    await spaces.set_member(owner.id, shared.id, gone.id, SpaceRole.EDIT)
-    own_space = await spaces.create(owner.id, "Private")
+        await spaces.set_member(Actor(owner.id), shared.id, user.id, level)
+    await spaces.set_member(Actor(owner.id), shared.id, gone.id, SpaceRole.EDIT)
+    own_space = await spaces.create(Actor(owner.id), "Private")
 
     async def put(name: str, *, drain: bool = True) -> str:
         return await upload(
@@ -277,7 +278,9 @@ async def build_scene(api: Api) -> Scene:
 
     green = await put("green")
     yellow = await put("yellow")
-    await api.services.pipeline.reprocess_from(owner.id, DocumentId(UUID(yellow)), Node.JUDGE)
+    await api.services.pipeline.reprocess_from(
+        Actor(owner.id), DocumentId(UUID(yellow)), Node.JUDGE
+    )
     pipeline = api.services.pipeline
     # yellow: the classification is uncertain
     judge = pipeline.replace_executor(Node.JUDGE, Returns(UNCERTAIN))
@@ -288,19 +291,22 @@ async def build_scene(api: Api) -> Scene:
         document = DocumentId(UUID(id))
         await api.container.object_store.put(archive_key(document), b"%PDF", content_type="x")
         await api.container.object_store.put(preview_key(document), b"RIFF", content_type="x")
-    contact = await api.services.master_data.create_contact(admin.id, "ACME")
+    contact = await api.services.master_data.create_contact(Actor(admin.id), "ACME")
 
-    _, read_token = await api.services.auth.create_api_token(owner.id, "r", TokenScope.READ)
+    _, read_token = await api.services.auth.create_api_token(Actor(owner.id), "r", TokenScope.READ)
     _, expired = await api.services.auth.create_api_token(
-        owner.id, "e", TokenScope.READ_WRITE, expires_at=api.clock.now() + timedelta(seconds=1)
+        Actor(owner.id),
+        "e",
+        TokenScope.READ_WRITE,
+        expires_at=api.clock.now() + timedelta(seconds=1),
     )
     revoked_token, revoked = await api.services.auth.create_api_token(
-        owner.id, "x", TokenScope.READ_WRITE
+        Actor(owner.id), "x", TokenScope.READ_WRITE
     )
-    await api.services.auth.revoke_api_token(owner.id, revoked_token.id)
+    await api.services.auth.revoke_api_token(Actor(owner.id), revoked_token.id)
     api.clock.advance(timedelta(seconds=1))
-    await api.services.users.update(admin.id, gone.id, active=False)
-    await api.services.users.update(admin.id, retired.id, active=False)
+    await api.services.users.update(Actor(admin.id), gone.id, active=False)
+    await api.services.users.update(Actor(admin.id), retired.id, active=False)
     headers = {
         "owner": auth(owner),
         "reader": auth(reader),

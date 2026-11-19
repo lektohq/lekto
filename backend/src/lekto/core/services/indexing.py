@@ -70,12 +70,13 @@ from lekto.core.domain.events import (
     NodeStarted,
 )
 from lekto.core.domain.fields import FieldValue, Money, Url
-from lekto.core.domain.ids import ContactId, DocumentId, DocumentTypeId, TagId, UserId
+from lekto.core.domain.ids import ContactId, DocumentId, DocumentTypeId, TagId
 from lekto.core.domain.jobs import OPEN_STATES, FinishedJob, Job, JobState, RetryPolicy
 from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.periods import Period, PeriodKind
 from lekto.core.domain.pipeline import SIGNALS
 from lekto.core.domain.reasons import Action
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.search import LAYOUT, EmbeddingStamp, IndexDocument, IndexState
 from lekto.core.domain.statistics import median, percentile
 from lekto.core.domain.vocabulary import MONTH_NAMES, WEEK_ABBREVIATION
@@ -355,7 +356,7 @@ class IndexingService:
             await uow.jobs.enqueue(RECONCILE_JOB, {"once": True}, run_at=self._clock.now())
             await uow.commit()
 
-    async def request_rebuild(self, actor: UserId) -> None:
+    async def request_rebuild(self, actor: Actor) -> None:
         """Admins only: queue a rebuild of the index, unless one is queued or running."""
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.REBUILD_INDEX)
@@ -702,7 +703,7 @@ class IndexingService:
             tuple(asked),
         )
 
-    async def check(self, actor: UserId) -> IndexCheck:
+    async def check(self, actor: Actor) -> IndexCheck:
         """Admins only: compare the index with the database (`compare`) and count; nothing is
         queued or removed (the next reconciliation does that)."""
         async with self._uow() as uow:
@@ -711,7 +712,7 @@ class IndexingService:
         comparison = await self.compare()
         return IndexCheck(comparison, self._clock.now() - started)
 
-    async def status(self, actor: UserId) -> IndexStatus:
+    async def status(self, actor: Actor) -> IndexStatus:
         """The state of the index for every user (`IndexStatus`). The durations come from the
         latest done index jobs (`_SAMPLE`), counted at most once a minute; the rate from the
         jobs done in the last ten minutes, every time."""

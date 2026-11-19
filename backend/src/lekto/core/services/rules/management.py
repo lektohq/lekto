@@ -33,12 +33,12 @@ from lekto.core.domain.ids import (
     FieldId,
     RuleId,
     SpaceId,
-    UserId,
     new_id,
 )
 from lekto.core.domain.links import Links
 from lekto.core.domain.permissions import can_file_into, space_role
 from lekto.core.domain.reasons import Action, ReasonCode, because
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.rules import (
     MAX_TEXT,
     TEMPLATE_MARKUP,
@@ -126,7 +126,7 @@ class RuleService:
 
     async def list_rules(
         self,
-        actor: UserId,
+        actor: Actor,
         *,
         scope: RuleScope | None = None,
         space: SpaceId | None = None,
@@ -140,7 +140,7 @@ class RuleService:
             user = await load_lister(uow, actor, all_users, Action.LIST_ALL_RULES)
             edited = None if all_users else await _edited_spaces(uow, user)
             if space is not None:
-                anyone = edited is None or user.is_active_admin
+                anyone = edited is None or user.may(TokenRight.ADMIN_DOCUMENTS_ALL)
                 edited = [space] if anyone or space in (edited or ()) else []
             rules = await uow.rules.list_for(
                 spaces=edited,
@@ -155,28 +155,28 @@ class RuleService:
             key=lambda rule: rule.order,
         )
 
-    async def get(self, actor: UserId, id: RuleId) -> Rule:
+    async def get(self, actor: Actor, id: RuleId) -> Rule:
         async with self._uow() as uow:
             rule = await visible_rule(uow, await load_actor(uow, actor), id)
             if rule.deleted_at is not None:
                 raise NotFoundError("rule", id)
             return rule
 
-    async def versions(self, actor: UserId, id: RuleId) -> list[RuleVersion]:
+    async def versions(self, actor: Actor, id: RuleId) -> list[RuleVersion]:
         """All versions, oldest first; also of a deleted rule, so the processing log can be
         read."""
         async with self._uow() as uow:
             await visible_rule(uow, await load_actor(uow, actor), id)
             return await uow.rules.versions(id)
 
-    async def version(self, actor: UserId, id: RuleId, number: int) -> RuleVersion:
+    async def version(self, actor: Actor, id: RuleId, number: int) -> RuleVersion:
         async with self._uow() as uow:
             await visible_rule(uow, await load_actor(uow, actor), id)
             return await uow.rules.get_version(id, number)
 
     async def create(
         self,
-        actor: UserId,
+        actor: Actor,
         scope: RuleScope,
         definition: RuleDefinition,
         *,
@@ -211,7 +211,7 @@ class RuleService:
 
     async def preview_template(
         self,
-        actor: UserId,
+        actor: Actor,
         template: str,
         *,
         document: DocumentId | None = None,
@@ -304,7 +304,7 @@ class RuleService:
 
     async def change(
         self,
-        actor: UserId,
+        actor: Actor,
         id: RuleId,
         definition: RuleDefinition,
         *,
@@ -348,7 +348,7 @@ class RuleService:
                 "a step that asks a webhook needs LEKTO_PUBLIC_URL: its consumer answers there"
             )
 
-    async def set_enabled(self, actor: UserId, id: RuleId, enabled: bool) -> Rule:
+    async def set_enabled(self, actor: Actor, id: RuleId, enabled: bool) -> Rule:
         """Enabling checks the references again (they may have been deleted meanwhile)."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
@@ -368,7 +368,7 @@ class RuleService:
             await uow.commit()
         return rule
 
-    async def delete(self, actor: UserId, id: RuleId) -> None:
+    async def delete(self, actor: Actor, id: RuleId) -> None:
         """Soft delete: the rule never runs again, its versions stay readable."""
         async with self._uow() as uow:
             rule = await _managed_rule(uow, await load_actor(uow, actor), id)
@@ -510,7 +510,9 @@ async def visible_rule(uow: UnitOfWork, user: User, id: RuleId) -> Rule:
     Includes deleted rules."""
     rule = await uow.rules.find(id)
     if rule is None or not (
-        rule.space_id is None or user.is_active_admin or await _edits(uow, user, rule.space_id)
+        rule.space_id is None
+        or user.may(TokenRight.ADMIN_DOCUMENTS_ALL)
+        or await _edits(uow, user, rule.space_id)
     ):
         raise NotFoundError("rule", id)
     return rule
@@ -526,13 +528,13 @@ async def _managed_rule(uow: UnitOfWork, user: User, id: RuleId) -> Rule:
         document_type = await uow.document_types.find(rule.managed_by)
         name = rule.definition.name if document_type is None else document_type.name
         raise ConflictError(because(ReasonCode.RULE_FOLLOWS_TYPE, type=name))
-    if user.is_active_admin:
-        return rule
-    if rule.scope is RuleScope.GLOBAL:
+    if rule.scope is not RuleScope.GLOBAL:
+        return rule  # visible: the caller edits its space, or reaches every space
+    if not user.may(TokenRight.ADMIN_MANAGE):
         raise PermissionDeniedError(
             because(ReasonCode.ADMINS_ONLY, action=Action.CHANGE_GLOBAL_RULES.value)
         )
-    return rule  # visible: the caller edits its space
+    return rule
 
 
 async def _author(uow: UnitOfWork, rule: Rule) -> User | None:

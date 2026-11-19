@@ -36,8 +36,8 @@ EDITORS = "Editors of the space and admins."
 async def list_spaces(
     principal: Authenticated, context: Context, all_users: AllSpaces = False
 ) -> list[SpaceOut]:
-    spaces = await context.spaces.list_spaces(principal.id, all_users)
-    people = await context.spaces.members(principal.id, spaces)
+    spaces = await context.spaces.list_spaces(principal.actor, all_users)
+    people = await context.spaces.members(principal.actor, spaces)
     return [SpaceOut.of(space, principal.user, people) for space in spaces]
 
 
@@ -61,7 +61,7 @@ async def create_space(body: SpaceCreate, principal: Authenticated, context: Con
         else {UserId(member.user_id): member.role for member in body.members}
     )
     space = await context.spaces.create(
-        principal.id, body.name, members=members, description=body.description
+        principal.actor, body.name, members=members, description=body.description
     )
     return await _out(space, principal, context)
 
@@ -73,7 +73,7 @@ async def create_space(body: SpaceCreate, principal: Authenticated, context: Con
     responses=problem_responses(401, 404, 422),
 )
 async def get_space(id: UUID, principal: Authenticated, context: Context) -> SpaceOut:
-    return await _out(await context.spaces.get(principal.id, SpaceId(id)), principal, context)
+    return await _out(await context.spaces.get(principal.actor, SpaceId(id)), principal, context)
 
 
 @router.patch(
@@ -89,7 +89,7 @@ async def change_space(
     id: UUID, body: SpacePatch, principal: Authenticated, context: Context
 ) -> SpaceOut:
     space = await context.spaces.change(
-        principal.id,
+        principal.actor,
         SpaceId(id),
         name=body.name,
         description=body.description if "description" in body.model_fields_set else UNSET,
@@ -107,7 +107,7 @@ async def change_space(
     responses=problem_responses(401, 403, 404, 409, 422),
 )
 async def delete_space(id: UUID, principal: Authenticated, context: Context) -> None:
-    await context.spaces.delete(principal.id, SpaceId(id))
+    await context.spaces.delete(principal.actor, SpaceId(id))
 
 
 @router.put(
@@ -125,7 +125,9 @@ async def delete_space(id: UUID, principal: Authenticated, context: Context) -> 
 async def set_member(
     id: UUID, user_id: UUID, body: MemberIn, principal: Authenticated, context: Context
 ) -> SpaceOut:
-    space = await context.spaces.set_member(principal.id, SpaceId(id), UserId(user_id), body.role)
+    space = await context.spaces.set_member(
+        principal.actor, SpaceId(id), UserId(user_id), body.role
+    )
     return await _out(space, principal, context)
 
 
@@ -146,11 +148,13 @@ async def set_member(
 async def remove_member(
     id: UUID, user_id: UUID, principal: Authenticated, context: Context
 ) -> SpaceOut | Response:
-    space = await context.spaces.remove_member(principal.id, SpaceId(id), UserId(user_id))
+    space = await context.spaces.remove_member(principal.actor, SpaceId(id), UserId(user_id))
     if space_role(principal.user, space) is None:
         return Response(status_code=204)
     return await _out(space, principal, context)
 
 
 async def _out(space: Space, principal: Principal, context: Context) -> SpaceOut:
-    return SpaceOut.of(space, principal.user, await context.spaces.members(principal.id, [space]))
+    return SpaceOut.of(
+        space, principal.user, await context.spaces.members(principal.actor, [space])
+    )

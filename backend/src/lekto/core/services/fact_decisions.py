@@ -48,9 +48,10 @@ from lekto.core.domain.identifiers import (
     Key,
 )
 from lekto.core.domain.identity import ViaToken
-from lekto.core.domain.ids import DocumentId, UserId
+from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.pipeline import ProcessingHistory
 from lekto.core.domain.reasons import Action, ReasonCode, because
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.object_store import ObjectStore
@@ -95,7 +96,7 @@ async def decide_fact(
     uow_factory: UnitOfWorkFactory,
     store: ObjectStore,
     clock: Clock,
-    actor: UserId,
+    actor: Actor,
     id: DocumentId,
     decision: FactDecision,
     *,
@@ -128,7 +129,7 @@ async def decide_fact(
         document, _ = await controllable_document(uow, user, id, Action.DECIDE_FACTS)
         if text is None:
             raise ConflictError(because(ReasonCode.NO_TEXT_YET))
-        if person_only(decision.kind) and not user.is_active_admin:
+        if person_only(decision.kind) and not user.may(TokenRight.ADMIN_MANAGE):
             raise PermissionDeniedError(because(ReasonCode.FACT_OF_PERSON))
         facts = {fact.key: fact for fact in await uow.document_facts.of_document(id)}
         key: Key = (decision.kind, decision.value)
@@ -224,7 +225,7 @@ async def _at_contact(
 ) -> None:
     """The correction of `old` at the document's contact: its value there gives way to the
     corrected one, entered by hand with the old one's topic and user."""
-    if not user.is_active_admin:
+    if not user.may(TokenRight.ADMIN_MANAGE):
         raise PermissionDeniedError(because(ReasonCode.FACT_AT_CONTACT_ADMIN))
     if document.contact_id is None or old.kind not in CONTACT_KINDS:
         raise ValidationError(because(ReasonCode.FACT_NOT_AT_CONTACT, kind=old.kind.value))

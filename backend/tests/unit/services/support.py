@@ -34,6 +34,7 @@ from lekto.core.domain.links import Links
 from lekto.core.domain.master_data import Contact, DocumentType
 from lekto.core.domain.pipeline import NODES, Node, NodeResult, NodeRun, Outcome, ProcessingHistory
 from lekto.core.domain.reasons import ReasonCode, written
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.logos import LogoFetcher
@@ -327,7 +328,9 @@ class World:
 async def received(world: World) -> tuple[User, Document]:
     """A user and their document of three pages (`STACK`), processed."""
     owner = await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(STACK), filename="stack.pdf"
+    )
     await world.drain()
     return owner, document
 
@@ -394,9 +397,9 @@ async def ingest(
     """A user's upload of a file of `SAMPLES`, processed by `service`."""
     owner = await world.user()
     data = (SAMPLES / sample).read_bytes()
-    document = await service.receive(owner.id, incoming(data), filename=sample)
+    document = await service.receive(Actor(owner.id), incoming(data), filename=sample)
     await world.drain(service)
-    return owner, await world.documents.get(owner.id, document.id)
+    return owner, await world.documents.get(Actor(owner.id), document.id)
 
 
 CONFIRMED_ON = date(2022, 11, 25)
@@ -417,11 +420,15 @@ class Confirmed:
 async def confirmed(world: World) -> Confirmed:
     owner = await world.user()
     admin = await world.user(role=Role.ADMIN)
-    contact = await world.master_data.create_contact(admin.id, "Muster Versicherung")
-    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
+    contact = await world.master_data.create_contact(Actor(admin.id), "Muster Versicherung")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(STACK), filename="stack.pdf"
+    )
     await world.drain()
     await world.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(contact_id=contact.id, document_date=CONFIRMED_ON)
+        Actor(owner.id),
+        document.id,
+        DocumentChanges(contact_id=contact.id, document_date=CONFIRMED_ON),
     )
     rules = ApplyRulesNode(
         world.uow, world.object_store, RegexPatternMatcher(0.2), TEMPLATES, max_text=200_000
@@ -431,7 +438,7 @@ async def confirmed(world: World) -> Confirmed:
 
 async def held_as_a_new_version(world: World, owner: User, document: Document) -> bool:
     """Whether the last run of the rules holds `document` for a review as a new version."""
-    log = await world.documents.processing_log(owner.id, document.id)
+    log = await world.documents.processing_log(Actor(owner.id), document.id)
     entry = ProcessingHistory(log).latest(Node.APPLY_RULES)
     return entry is not None and ReasonCode.NEW_VERSION in {
         reason.code for reason in entry.result.reasons

@@ -33,7 +33,7 @@ from lekto.core.domain.errors import (
     ValidationError,
 )
 from lekto.core.domain.identity import ViaToken
-from lekto.core.domain.ids import DocumentId, RuleApplicationId, RuleId, SpaceId, UserId
+from lekto.core.domain.ids import DocumentId, RuleApplicationId, RuleId, SpaceId
 from lekto.core.domain.jobs import Job
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.occurrences import Occurrence
@@ -48,6 +48,7 @@ from lekto.core.domain.pipeline import (
     via_entry,
 )
 from lekto.core.domain.reasons import Reason, ReasonCode, because, reasons_to_json
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.rule_planner import Effect, Mode, Note, NoteKind
 from lekto.core.domain.rules import (
     ConditionField,
@@ -225,7 +226,7 @@ class RuleApplicationService:
 
     async def preview(
         self,
-        actor: UserId,
+        actor: Actor,
         id: RuleId,
         *,
         before: DocumentId | None = None,
@@ -242,7 +243,7 @@ class RuleApplicationService:
             wanted = prefilter(rule.definition.conditions, await tag_tree(uow), _looked_at(rule))
             if wanted is None:
                 return ApplyPreview(rule, (), None, 0, 0)
-            if not user.is_active_admin:
+            if not user.may(TokenRight.ADMIN_DOCUMENTS_ALL):
                 # Only the documents of the spaces the caller edits, one by one and in the
                 # counts alike: those they only read are not theirs to change (SC-10).
                 edited = frozenset(await edited_spaces(uow, user.id))
@@ -300,7 +301,11 @@ class RuleApplicationService:
             current = await uow.documents.find(id)
             if current is None or not await _candidate(uow, user, rule, current):
                 return None
-            edited = None if user.is_admin else await edited_spaces(uow, user.id)
+            edited = (
+                None
+                if user.may(TokenRight.ADMIN_DOCUMENTS_ALL)
+                else await edited_spaces(uow, user.id)
+            )
             shown = copy.deepcopy(current)
             played = await self._play(uow, user, rule, current, prepared, accept=False)
             outcome = _as_seen(
@@ -333,7 +338,7 @@ class RuleApplicationService:
             played.refused,
         )
 
-    async def hits(self, actor: UserId, id: RuleId, document: DocumentId) -> list[TextHit]:
+    async def hits(self, actor: Actor, id: RuleId, document: DocumentId) -> list[TextHit]:
         """Where the text conditions of the rule's current version (`contains`, `matches`)
         hit the document, on its pages, for those who apply the rule and read the document;
         none without text or the words of its pages. Each searches the text the rules read
@@ -385,7 +390,7 @@ class RuleApplicationService:
 
     async def start(
         self,
-        actor: UserId,
+        actor: Actor,
         id: RuleId,
         *,
         version: int,
@@ -415,12 +420,14 @@ class RuleApplicationService:
             await uow.commit()
         return application
 
-    async def get(self, actor: UserId, id: RuleApplicationId) -> RuleApplication:
+    async def get(self, actor: Actor, id: RuleApplicationId) -> RuleApplication:
         """For the user who started it and for admins."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             application = await uow.rule_applications.find(id)
-        if application is None or not (application.user_id == actor or user.is_active_admin):
+        if application is None or not (
+            application.user_id == actor.id or user.may(TokenRight.ADMIN_DOCUMENTS_ALL)
+        ):
             raise NotFoundError("rule application", id)
         return application
 

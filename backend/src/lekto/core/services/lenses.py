@@ -15,10 +15,11 @@ from uuid import UUID
 from lekto.core.domain.changes import UNSET
 from lekto.core.domain.errors import ConflictError, NotFoundError, ValidationError
 from lekto.core.domain.fields import SORTABLE_TYPES, FieldDefinition, FieldType
-from lekto.core.domain.ids import FieldId, LensId, UserId
+from lekto.core.domain.ids import FieldId, LensId
 from lekto.core.domain.lenses import Grouping, Lens, LensChanges
 from lekto.core.domain.periods import Period
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.repository import DocumentFilter
@@ -39,7 +40,7 @@ class LensService:
         self._uow = uow
         self._clock = clock
 
-    async def list_lenses(self, actor: UserId) -> list[Lens]:
+    async def list_lenses(self, actor: Actor) -> list[Lens]:
         """The caller's lenses in their order."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
@@ -67,13 +68,13 @@ class LensService:
             facts=chosen.facts,
         )
 
-    async def get(self, actor: UserId, id: LensId) -> Lens:
+    async def get(self, actor: Actor, id: LensId) -> Lens:
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             lens = await _own(uow, user, id)
             return (await _existing(uow, user)).prune(lens)
 
-    async def create(self, actor: UserId, name: str, changes: LensChanges) -> Lens:
+    async def create(self, actor: Actor, name: str, changes: LensChanges) -> Lens:
         """A new lens at the end of the caller's. ValidationError for parts that do not fit or
         fields that do not (see the module), ConflictError for a name the caller has already
         or more than `MAX_LENSES`."""
@@ -92,7 +93,7 @@ class LensService:
             await uow.commit()
             return lens
 
-    async def update(self, actor: UserId, id: LensId, changes: LensChanges) -> Lens:
+    async def update(self, actor: Actor, id: LensId, changes: LensChanges) -> Lens:
         """Change what `changes` sets, on the lens without what is gone; errors as `create`."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
@@ -105,13 +106,13 @@ class LensService:
             await uow.commit()
             return lens
 
-    async def delete(self, actor: UserId, id: LensId) -> None:
+    async def delete(self, actor: Actor, id: LensId) -> None:
         async with self._uow() as uow:
             lens = await _own(uow, await load_actor(uow, actor), id)
             await uow.lenses.remove(lens.id)
             await uow.commit()
 
-    async def reorder(self, actor: UserId, ids: Sequence[LensId]) -> list[Lens]:
+    async def reorder(self, actor: Actor, ids: Sequence[LensId]) -> list[Lens]:
         """Put the caller's lenses in the order of `ids`, which must name each of them once
         (ValidationError otherwise)."""
         async with self._uow() as uow:
@@ -206,7 +207,7 @@ async def _existing(uow: UnitOfWork, user: User) -> _Existing:
     one for an admin)."""
     spaces = (
         await uow.spaces.list_all()
-        if user.is_active_admin
+        if user.may(TokenRight.ADMIN_DOCUMENTS_ALL)
         else await uow.spaces.list_accessible(user.id)
     )
     return _Existing(
@@ -215,5 +216,5 @@ async def _existing(uow: UnitOfWork, user: User) -> _Existing:
         tags=frozenset(item.id for item in await uow.tags.list_all()),
         spaces=frozenset(space.id for space in spaces),
         fields=await field_definitions(uow),
-        admin=user.is_active_admin,
+        admin=user.may(TokenRight.ADMIN_MANAGE),
     )

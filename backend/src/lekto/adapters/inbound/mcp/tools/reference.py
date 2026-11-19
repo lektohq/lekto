@@ -22,9 +22,10 @@ from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.identifiers import MAX_IDENTIFIER_VALUE, normalise_identifier
-from lekto.core.domain.ids import UserId, short_id
+from lekto.core.domain.ids import short_id
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.open_identifiers import OpenSource
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rules import Rule
 from lekto.core.domain.rules_json import definition_to_json
 from lekto.core.domain.spaces import Space
@@ -127,7 +128,7 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
         kind: str,
         value: Annotated[str, Field(min_length=1, max_length=MAX_IDENTIFIER_VALUE)],
     ) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         chosen = identifier_kind(kind, "identifier")
         normal = normalise_identifier(chosen, value)
         holders = [
@@ -169,7 +170,7 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
         query: Annotated[str | None, Field(max_length=100)] = None,
         offset: Annotated[int, Field(ge=0)] = 0,
     ) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         page = await context.open_identifiers.page(
             user,
             source=None if source is None else OpenSource(source),
@@ -208,7 +209,7 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
         "are enabled. Made and changed in the web UI.",
     )
     async def rules_list(ctx: Context) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         rules = await context.rules.list_rules(user)
         spaces = await _spaces(context, user)
         return compact(RulesOut(rules=[_rule(rule, spaces) for rule in rules]))
@@ -220,7 +221,7 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
         "name, the space as rules_list names it, or global.",
     )
     async def rules_get(ctx: Context, name: str, space: str | None = None) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         spaces = await _spaces(context, user)
         found = _named_rule(await context.rules.list_rules(user), name, space, spaces)
         rule = await context.rules.get(user, found.id)
@@ -254,7 +255,7 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
         "(documents, with meaning) and the classifier's model.",
     )
     async def system_status(ctx: Context) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         jobs = await context.jobs.summary(user)
         search = None
         if context.indexing is not None:
@@ -294,7 +295,7 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
         )
 
 
-async def _spaces(context: ApiContext, user: UserId) -> dict[UUID, tuple[Space, str]]:
+async def _spaces(context: ApiContext, user: Actor) -> dict[UUID, tuple[Space, str]]:
     """The caller's spaces with how they read them (a personal one by its person's name)."""
     spaces = await context.spaces.list_spaces(user)
     people = await member_labels(context, user, spaces)

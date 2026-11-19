@@ -9,6 +9,7 @@ from lekto.core.domain.ids import UserId, WebhookId, new_id
 from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.pipeline import RULES, Lane, Node
 from lekto.core.domain.reasons import ReasonCode
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rules import (
     Action,
     ForceReview,
@@ -46,7 +47,7 @@ URL = "http://ha.lan:8123/api/webhook/lekto"
 
 
 async def hook(world: World, owner: User, name: str = "HA") -> Webhook:
-    created = await world.webhooks.create(owner.id, name=name, url=URL, event_types=[])
+    created = await world.webhooks.create(Actor(owner.id), name=name, url=URL, event_types=[])
     return created.webhook
 
 
@@ -91,7 +92,7 @@ async def test_a_yellow_document_sends_once_confirmed_and_only_once(world: World
     assert document.lane is Lane.YELLOW
     assert sent(world) == []  # waiting in the inbox: nothing goes yet
     pipeline = r.pipeline()
-    await pipeline.confirm(owner.id, document.id, DocumentChanges(), accept_suggestions=True)
+    await pipeline.confirm(Actor(owner.id), document.id, DocumentChanges(), accept_suggestions=True)
     await world.drain(pipeline)
     assert (await r.stored(document)).lane is Lane.GREEN
     assert [payload["document_id"] for payload in sent(world)] == [str(document.id)]
@@ -111,7 +112,7 @@ async def test_a_webhook_whose_owner_cannot_read_the_document_turns_it_yellow(
     (entry,) = await r.rule_entries(document, RULES)
     assert [reason.code for reason in entry.result.reasons] == [ReasonCode.RULE_WEBHOOK_UNREADABLE]
     pipeline = r.pipeline()
-    await pipeline.confirm(owner.id, document.id, DocumentChanges(), accept_suggestions=True)
+    await pipeline.confirm(Actor(owner.id), document.id, DocumentChanges(), accept_suggestions=True)
     await world.drain(pipeline)
     assert (await r.stored(document)).lane is Lane.GREEN
     assert sent(world) == []
@@ -138,8 +139,8 @@ async def test_deleting_the_webhook_disables_its_rules(world: World) -> None:
     owner = await world.user()
     webhook = await hook(world, owner)
     await notifying(r, owner, webhook)
-    await world.webhooks.delete(owner.id, webhook.id)
-    (rule,) = await r.rules.list_rules(owner.id)
+    await world.webhooks.delete(Actor(owner.id), webhook.id)
+    (rule,) = await r.rules.list_rules(Actor(owner.id))
     assert not rule.enabled
     assert rule.disabled_reason is not None
     assert rule.disabled_reason.code is ReasonCode.RULE_DISABLED_DELETED
@@ -157,14 +158,14 @@ async def test_a_change_rule_sends_once_the_change_is_stored(world: World) -> No
     document = await r.arrive(owner)
     assert sent(world) == []
     preview = await r.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(tag_ids=frozenset({tag.id})), dry_run=True
+        Actor(owner.id), document.id, DocumentChanges(tag_ids=frozenset({tag.id})), dry_run=True
     )
     assert preview.rules is not None and [send.webhook_id for send in preview.rules.sends] == [
         webhook.id
     ]
     assert sent(world) == []  # a preview sends nothing
     await r.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(tag_ids=frozenset({tag.id}))
+        Actor(owner.id), document.id, DocumentChanges(tag_ids=frozenset({tag.id}))
     )
     assert [payload["document_id"] for payload in sent(world)] == [str(document.id)]
 
@@ -179,7 +180,7 @@ async def test_applying_to_existing_documents_sends_per_document(world: World) -
         owner, definition("Backfill", channel_api(), add_tags(tag.id), SendWebhook(webhook.id))
     )
     world.database.jobs.clear()
-    preview = await r.applications.preview(owner.id, rule.id)
+    preview = await r.applications.preview(Actor(owner.id), rule.id)
     assert {
         item.document.id: [send.webhook_id for send in item.sends] for item in preview.items
     } == {
@@ -188,7 +189,7 @@ async def test_applying_to_existing_documents_sends_per_document(world: World) -
     }
     assert sent(world) == []
     await r.applications.start(
-        owner.id, rule.id, version=1, documents=[first.id, second.id], accept_conflicts=[]
+        Actor(owner.id), rule.id, version=1, documents=[first.id, second.id], accept_conflicts=[]
     )
     await builders.drain(r.applications)
     assert sorted(str(payload["document_id"]) for payload in sent(world)) == sorted(
@@ -209,8 +210,8 @@ async def test_a_move_whose_rules_change_does_not_fit_sends_nothing(world: World
     """As after a change: what is not applied does not send either (SC-02)."""
     r = await rule_world(world)
     owner, other = await world.user(), await world.user()
-    shared = await world.spaces.create(owner.id, "Haushalt")
-    await world.spaces.set_member(owner.id, shared.id, other.id, SpaceRole.EDIT)
+    shared = await world.spaces.create(Actor(owner.id), "Haushalt")
+    await world.spaces.set_member(Actor(owner.id), shared.id, other.id, SpaceRole.EDIT)
     webhook = await hook(world, other)
     too_long = SetTitle("{% for i in (1..501) %}x{% endfor %}")
     await r.space_rule(
@@ -221,7 +222,7 @@ async def test_a_move_whose_rules_change_does_not_fit_sends_nothing(world: World
         ),
     )
     document = await r.arrive(owner)
-    await r.documents.move(owner.id, document.id, shared.id)
+    await r.documents.move(Actor(owner.id), document.id, shared.id)
     assert (await r.stored(document)).title == document.title
     assert sent(world) == []
 
@@ -230,8 +231,8 @@ async def test_rules_that_move_it_back_send_nothing(world: World) -> None:
     """The chain stops where rules would move it back; that space's requests stay (SC-02)."""
     r = await rule_world(world)
     owner, other = await world.user(), await world.user()
-    shared = await world.spaces.create(owner.id, "Haushalt")
-    await world.spaces.set_member(owner.id, shared.id, other.id, SpaceRole.EDIT)
+    shared = await world.spaces.create(Actor(owner.id), "Haushalt")
+    await world.spaces.set_member(Actor(owner.id), shared.id, other.id, SpaceRole.EDIT)
     theirs = await world.personal_space(other)
     webhook = await hook(world, other)
     ingest = (Trigger.INGEST,)
@@ -301,7 +302,7 @@ async def test_a_rule_whose_change_does_not_fit_waits_once_and_sends_nothing(
     (entry,) = await r.rule_entries(document, RULES)
     assert [reason.code for reason in entry.result.reasons] == [ReasonCode.RULES_CHANGE_UNFIT]
     pipeline = r.pipeline()
-    await pipeline.confirm(owner.id, document.id, DocumentChanges(), accept_suggestions=True)
+    await pipeline.confirm(Actor(owner.id), document.id, DocumentChanges(), accept_suggestions=True)
     await world.drain(pipeline)
     assert (await r.stored(document)).lane is Lane.GREEN
     latest = (await r.rule_entries(document, RULES))[-1]

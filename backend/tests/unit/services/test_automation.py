@@ -15,6 +15,7 @@ from lekto.core.domain.fields import FieldDefinition, FieldType
 from lekto.core.domain.first_runs import FACTS, Decision, FieldVerdict, FirstRun, Verdict
 from lekto.core.domain.ids import FieldId, new_id
 from lekto.core.domain.pipeline import Lane, Node
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import User
 from lekto.core.services.automation import AutomationService, Flow, Month, Period, Times
 from tests import builders
@@ -82,7 +83,7 @@ async def test_the_report_counts_lanes_flow_and_who_decided(world: World) -> Non
     await seed(world, owner, lane=Lane.RED)
     await seed(world, owner, channel=Channel.MIGRATION)  # not by default
 
-    report = await service(world).report(owner.id, zone=UTC)
+    report = await service(world).report(Actor(owner.id), zone=UTC)
 
     assert report.channels == {Channel.WEB, Channel.API, Channel.MAIL}
     assert report.lanes == {Lane.GREEN: 2, Lane.YELLOW: 1, Lane.RED: 1}
@@ -93,7 +94,7 @@ async def test_the_report_counts_lanes_flow_and_who_decided(world: World) -> Non
     )
     assert (report.decided, report.untouched) == (2, 1)
     every = await service(world).report(
-        owner.id, channels={Channel.WEB, Channel.MIGRATION}, zone=UTC
+        Actor(owner.id), channels={Channel.WEB, Channel.MIGRATION}, zone=UTC
     )
     assert every.lanes[Lane.GREEN] == 3
 
@@ -108,7 +109,7 @@ async def test_times_are_median_and_p90_per_document_and_step(world: World) -> N
             steps={Node.RECEIVE: SECOND, Node.SIGNAL_LLM: seconds * SECOND},
         )
 
-    report = await service(world).report(owner.id, zone=UTC)
+    report = await service(world).report(Actor(owner.id), zone=UTC)
 
     assert report.duration == Times(5, 30 * SECOND, 1000 * SECOND)
     assert report.work == Times(5, 31 * SECOND, 1001 * SECOND)
@@ -118,7 +119,7 @@ async def test_times_are_median_and_p90_per_document_and_step(world: World) -> N
 
 async def test_no_documents_no_times(world: World) -> None:
     owner = await world.user()
-    report = await service(world).report(owner.id, zone=UTC)
+    report = await service(world).report(Actor(owner.id), zone=UTC)
     assert report.duration == Times(0, None, None)
     assert report.lanes == {Lane.GREEN: 0, Lane.YELLOW: 0, Lane.RED: 0}
     assert len(report.months) == 12
@@ -130,7 +131,7 @@ async def test_the_months_begin_in_the_viewers_time_zone(world: World) -> None:
     await seed(world, owner, stopped=datetime(2026, 9, 30, 22, 30, tzinfo=UTC))
     await seed(world, owner, lane=Lane.YELLOW, stopped=datetime(2026, 8, 15, tzinfo=UTC))
 
-    report = await service(world).report(owner.id, zone=BERLIN)
+    report = await service(world).report(Actor(owner.id), zone=BERLIN)
 
     assert [month.start for month in report.months][-3:] == [
         date(2026, 8, 1),
@@ -150,12 +151,14 @@ async def test_the_period_limits_what_is_counted(world: World) -> None:
     await seed(world, owner, stopped=NOW - timedelta(days=800))
 
     counted = {
-        period: sum((await service(world).report(owner.id, period=period, zone=UTC)).lanes.values())
+        period: sum(
+            (await service(world).report(Actor(owner.id), period=period, zone=UTC)).lanes.values()
+        )
         for period in Period
     }
 
     assert counted == {Period.DAYS_30: 1, Period.MONTHS_12: 2, Period.ALL: 3}
-    every = await service(world).report(owner.id, period=Period.ALL, zone=UTC)
+    every = await service(world).report(Actor(owner.id), period=Period.ALL, zone=UTC)
     assert every.months[0].start == date(2024, 7, 1)  # from the first month with documents
     assert every.since is None
 
@@ -183,7 +186,7 @@ async def test_verdicts_per_field_with_custom_fields_by_name(world: World) -> No
         verdicts={CONTACT: Verdict.CORRECTED, SPACE: Verdict.TAKEN, FACTS: Verdict.CORRECTED},
     )
 
-    report = await service(world).report(owner.id, zone=UTC)
+    report = await service(world).report(Actor(owner.id), zone=UTC)
 
     fields = {item.field: item for item in report.fields}
     # The facts after the fields every document has, before the custom ones.
@@ -211,7 +214,7 @@ async def test_signals_hit_and_the_language_model_reads_the_date(world: World) -
     )
     await seed(world, owner, verdicts={DOCUMENT_DATE: Verdict.ADDED, CONTACT: Verdict.ADDED})
 
-    report = await service(world).signals(owner.id, zone=UTC)
+    report = await service(world).signals(Actor(owner.id), zone=UTC)
 
     found = {(item.field, item.signal): item for item in report.signals}
     assert list(found) == [(CONTACT, llm), (CONTACT, classifier), (DOCUMENT_DATE, llm)]
@@ -224,10 +227,10 @@ async def test_a_report_is_kept_for_a_minute(world: World) -> None:
     owner = await world.user()
     automation = service(world)
     await seed(world, owner)
-    assert (await automation.report(owner.id, zone=UTC)).lanes[Lane.GREEN] == 1
+    assert (await automation.report(Actor(owner.id), zone=UTC)).lanes[Lane.GREEN] == 1
 
     await seed(world, owner)
-    assert (await automation.report(owner.id, zone=UTC)).lanes[Lane.GREEN] == 1
-    assert (await automation.report(owner.id, zone=BERLIN)).lanes[Lane.GREEN] == 2  # another
+    assert (await automation.report(Actor(owner.id), zone=UTC)).lanes[Lane.GREEN] == 1
+    assert (await automation.report(Actor(owner.id), zone=BERLIN)).lanes[Lane.GREEN] == 2  # another
     world.clock.advance(timedelta(minutes=1))
-    assert (await automation.report(owner.id, zone=UTC)).lanes[Lane.GREEN] == 2
+    assert (await automation.report(Actor(owner.id), zone=UTC)).lanes[Lane.GREEN] == 2

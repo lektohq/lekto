@@ -7,6 +7,7 @@ from lekto.adapters.inbound.rest import PREFIX
 from lekto.adapters.outbound.memory import FakeWebhookSender
 from lekto.core.domain.identity import TokenScope
 from lekto.core.domain.ids import DocumentId, EventId, WebhookId, new_id
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role
 from lekto.core.domain.webhooks import DeliveryOutcome, WebhookDelivery
 from tests.api import auth, bearer
@@ -205,7 +206,7 @@ async def test_users_see_only_their_webhooks_and_admins_all(api: Api) -> None:
 async def test_a_read_token_reads_but_changes_nothing(api: Api) -> None:
     user = await api.user()
     created = await post(api, "/webhooks", BODY, auth(user))
-    _, token = await api.services.auth.create_api_token(user.id, "reader", TokenScope.READ)
+    _, token = await api.services.auth.create_api_token(Actor(user.id), "reader", TokenScope.READ)
     headers = bearer(token)
     url = f"{PREFIX}/webhooks"
     assert (await api.client.get(url, headers=headers)).status_code == 200
@@ -341,7 +342,7 @@ async def test_a_test_request_is_sent_and_logged(api: Api) -> None:
     assert [item["id"] for item in listed.json()["items"]] == [row["id"]]
 
     assert (await api.client.post(url, headers=auth(other))).status_code == 404
-    _, token = await api.services.auth.create_api_token(user.id, "reader", TokenScope.READ)
+    _, token = await api.services.auth.create_api_token(Actor(user.id), "reader", TokenScope.READ)
     assert (await api.client.post(url, headers=bearer(token))).status_code == 403
     assert (await api.client.post(url)).status_code == 401
     assert len(sender.requests) == 1

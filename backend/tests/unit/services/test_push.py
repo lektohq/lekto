@@ -13,6 +13,7 @@ from lekto.core.domain.events import ReviewRequired
 from lekto.core.domain.jobs import Job, JobStatus
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.push import PushKind, PushMessage
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.push import PushOutcome
 from lekto.core.services import _jobs
@@ -35,7 +36,7 @@ def push(world: World, sender: FakePushSender) -> PushService:
 
 async def with_device(world: World, service: PushService, user: User, number: int = 0) -> None:
     await service.register(
-        user.id,
+        Actor(user.id),
         endpoint=f"https://web.push.apple.com/device-{user.username}-{number}",
         p256dh=FAKE_PUBLIC_KEY,
         auth=AUTH,
@@ -48,12 +49,12 @@ async def waiting(world: World, service: PushService, owner: User) -> Document:
     """A document of `owner` that comes to wait (yellow); the push service hears of it."""
     pipeline = world.pipeline({Node.JUDGE: Returns(UNCERTAIN)})
     content = f"%PDF-1.7 {next(_numbers)}".encode()
-    received = await pipeline.receive(owner.id, incoming(content), filename="a.pdf")
+    received = await pipeline.receive(Actor(owner.id), incoming(content), filename="a.pdf")
     await world.drain(pipeline)
     for event in world.events():
         if isinstance(event, ReviewRequired) and event.document_id == received.id:
             await service.on_event(event)
-    return await world.documents.get(owner.id, received.id)
+    return await world.documents.get(Actor(owner.id), received.id)
 
 
 async def told(world: World, service: PushService, sender: FakePushSender) -> list[PushMessage]:
@@ -85,7 +86,9 @@ async def test_many_go_into_one_and_titles_can_stay_off_the_screen(world: World)
     service = push(world, sender)
     owner = await world.user()
     await with_device(world, service, owner)
-    await service.set_preferences(owner.id, kinds=frozenset({PushKind.WAITING}), titles=False)
+    await service.set_preferences(
+        Actor(owner.id), kinds=frozenset({PushKind.WAITING}), titles=False
+    )
     for _ in range(4):
         await waiting(world, service, owner)
     (message,) = await told(world, service, sender)
@@ -98,7 +101,7 @@ async def test_nobody_is_told_who_switched_it_off_or_has_no_device(world: World)
     service = push(world, sender)
     quiet, deviceless = await world.user(), await world.user()
     await with_device(world, service, quiet)
-    await service.set_preferences(quiet.id, kinds=frozenset(), titles=True)
+    await service.set_preferences(Actor(quiet.id), kinds=frozenset(), titles=True)
     await waiting(world, service, quiet)
     await waiting(world, service, deviceless)
     assert await told(world, service, sender) == []
@@ -111,8 +114,8 @@ async def test_a_document_confirmed_meanwhile_is_not_told(world: World) -> None:
     owner = await world.user()
     await with_device(world, service, owner)
     document = await waiting(world, service, owner)
-    await world.inbox.mark_seen(owner.id, document.id)
-    await world.documents.delete(owner.id, document.id)
+    await world.inbox.mark_seen(Actor(owner.id), document.id)
+    await world.documents.delete(Actor(owner.id), document.id)
     assert await told(world, service, sender) == []
 
 
@@ -127,7 +130,7 @@ async def test_a_document_noted_while_the_notification_is_made_is_told_with_it(
     await with_device(world, service, owner)
     await waiting(world, service, owner)
     pipeline = world.pipeline({Node.JUDGE: Returns(UNCERTAIN)})
-    late = await pipeline.receive(owner.id, incoming(b"%PDF-1.7 late"), filename="b.pdf")
+    late = await pipeline.receive(Actor(owner.id), incoming(b"%PDF-1.7 late"), filename="b.pdf")
     await world.drain(pipeline)
     (event,) = [
         item

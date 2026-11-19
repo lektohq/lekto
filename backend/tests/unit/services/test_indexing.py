@@ -30,6 +30,7 @@ from lekto.core.domain.jobs import JobStatus
 from lekto.core.domain.master_data import TagScope
 from lekto.core.domain.periods import Period
 from lekto.core.domain.pipeline import Lane, Node, Outcome
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.search import LAYOUT, EmbeddingStamp, IndexDocument
 from lekto.core.domain.users import Role
 from lekto.core.services.classification.signals import FactsSignal
@@ -66,7 +67,7 @@ def setup(world: World) -> Setup:
 async def test_a_document_in_processing_is_indexed_in_its_space(setup: Setup) -> None:
     owner = await setup.world.user()
     received = await setup.world.pipeline().receive(
-        owner.id, incoming(b"%PDF-1 a"), filename="a.pdf"
+        Actor(owner.id), incoming(b"%PDF-1 a"), filename="a.pdf"
     )
     await setup.put_text(received.id, "Stromrechnung")
     await setup.settle(pipeline=False)
@@ -113,20 +114,20 @@ async def test_the_lane_follows_the_pipeline(setup: Setup) -> None:
     document = await setup.document(owner)
     assert (setup.entry(document.id).lane_value, document.lane) == ("green", Lane.GREEN)
 
-    await setup.world.pipeline().reprocess_from(owner.id, document.id, Node.JUDGE)
+    await setup.world.pipeline().reprocess_from(Actor(owner.id), document.id, Node.JUDGE)
     await setup.settle(pipeline_service=setup.world.pipeline({Node.JUDGE: Returns(UNCERTAIN)}))
     assert setup.entry(document.id).lane_value == "yellow"
 
 
 async def test_metadata_reaches_the_index_with_names_and_ids(setup: Setup) -> None:
     admin, owner = await setup.world.user(role=Role.ADMIN), await setup.world.user()
-    contact = await setup.master_data.create_contact(admin.id, "Stadtwerke")
-    kind = await setup.master_data.create_document_type(admin.id, "Rechnung")
-    tag = await setup.master_data.create_tag(admin.id, "Energie")
-    meter = await setup.master_data.create_field(admin.id, "Zähler", FieldType.TEXT)
+    contact = await setup.master_data.create_contact(Actor(admin.id), "Stadtwerke")
+    kind = await setup.master_data.create_document_type(Actor(admin.id), "Rechnung")
+    tag = await setup.master_data.create_tag(Actor(admin.id), "Energie")
+    meter = await setup.master_data.create_field(Actor(admin.id), "Zähler", FieldType.TEXT)
     document = await setup.document(owner)
     await setup.world.documents.change_metadata(
-        owner.id,
+        Actor(owner.id),
         document.id,
         DocumentChanges(
             title="Strom 2026",
@@ -148,12 +149,14 @@ async def test_metadata_reaches_the_index_with_names_and_ids(setup: Setup) -> No
     assert (entry.tag_ids, entry.tags) == ((tag.id,), ("Energie",))
     assert entry.fields == ("4711",)
     assert entry.document_date == date(2026, 9, 30)
-    assert entry.version == (await setup.world.documents.get(owner.id, document.id)).version
+    assert entry.version == (await setup.world.documents.get(Actor(owner.id), document.id)).version
 
 
 async def test_a_period_is_found_as_it_is_written(setup: Setup) -> None:
     admin, owner = await setup.world.user(role=Role.ADMIN), await setup.world.user()
-    period = await setup.master_data.create_field(admin.id, "Bezugszeitraum", FieldType.PERIOD)
+    period = await setup.master_data.create_field(
+        Actor(admin.id), "Bezugszeitraum", FieldType.PERIOD
+    )
     document = await setup.document(owner)
     for value, words in (
         (Period.month(2026, 9), "September 2026 09/2026 09.2026 2026-09"),
@@ -163,7 +166,7 @@ async def test_a_period_is_found_as_it_is_written(setup: Setup) -> None:
         (Period.day(date(2026, 9, 15)), "2026-09-15 15.09.2026"),
     ):
         await setup.world.documents.change_metadata(
-            owner.id, document.id, DocumentChanges(fields={period.id: value})
+            Actor(owner.id), document.id, DocumentChanges(fields={period.id: value})
         )
         await setup.settle()
         (text,) = setup.entry(document.id).fields
@@ -174,7 +177,7 @@ async def test_a_period_is_found_as_it_is_written(setup: Setup) -> None:
 async def test_a_deleted_document_leaves_the_index(setup: Setup) -> None:
     owner = await setup.world.user()
     document = await setup.document(owner)
-    await setup.world.documents.delete(owner.id, document.id)
+    await setup.world.documents.delete(Actor(owner.id), document.id)
     await setup.settle()
     assert document.id not in setup.index.documents
 
@@ -182,16 +185,16 @@ async def test_a_deleted_document_leaves_the_index(setup: Setup) -> None:
 async def test_a_move_changes_the_space(setup: Setup) -> None:
     owner = await setup.world.user()
     document = await setup.document(owner)
-    target = await setup.world.spaces.create(owner.id, "Archive")
-    await setup.world.documents.move(owner.id, document.id, target.id)
+    target = await setup.world.spaces.create(Actor(owner.id), "Archive")
+    await setup.world.documents.move(Actor(owner.id), document.id, target.id)
     await setup.settle()
     assert setup.entry(document.id).space_id == target.id
 
 
 async def test_renaming_master_data_updates_the_documents_that_carry_it(setup: Setup) -> None:
     admin, owner = await setup.world.user(role=Role.ADMIN), await setup.world.user()
-    contact = await setup.master_data.create_contact(admin.id, "Stadtwerke")
-    tag = await setup.master_data.create_tag(admin.id, "Energie")
+    contact = await setup.master_data.create_contact(Actor(admin.id), "Stadtwerke")
+    tag = await setup.master_data.create_tag(Actor(admin.id), "Energie")
     with_contact = await setup.document(owner, "a")
     with_tag = await setup.document(owner, "b")
     neither = await setup.document(owner, "c")
@@ -199,11 +202,11 @@ async def test_renaming_master_data_updates_the_documents_that_carry_it(setup: S
         (with_contact.id, DocumentChanges(contact_id=contact.id)),
         (with_tag.id, DocumentChanges(tag_ids=frozenset({tag.id}))),
     ):
-        await setup.world.documents.change_metadata(owner.id, id, changes)
+        await setup.world.documents.change_metadata(Actor(owner.id), id, changes)
     await setup.settle()
 
-    await setup.master_data.change_contact(admin.id, contact.id, name="Energie AG")
-    await setup.master_data.change_tag(admin.id, tag.id, name="Strom")
+    await setup.master_data.change_contact(Actor(admin.id), contact.id, name="Energie AG")
+    await setup.master_data.change_tag(Actor(admin.id), tag.id, name="Strom")
     assert sorted(
         job.kind for job in setup.world.database.jobs.values() if job.status.is_active
     ) == [
@@ -219,20 +222,20 @@ async def test_renaming_master_data_updates_the_documents_that_carry_it(setup: S
 async def test_an_entry_holds_tags_with_ancestors_and_the_groups(setup: Setup) -> None:
     admin, owner = await setup.world.user(role=Role.ADMIN), await setup.world.user()
     master = setup.master_data
-    insurance = await master.create_tag(admin.id, "Insurance")
-    health = await master.create_tag(admin.id, "Health", parent_id=insurance.id)
-    insurer = await master.create_tag(admin.id, "Insurer", scope=TagScope.CONTACT)
+    insurance = await master.create_tag(Actor(admin.id), "Insurance")
+    health = await master.create_tag(Actor(admin.id), "Health", parent_id=insurance.id)
+    insurer = await master.create_tag(Actor(admin.id), "Insurer", scope=TagScope.CONTACT)
     health_insurer = await master.create_tag(
-        admin.id, "Health insurer", scope=TagScope.CONTACT, parent_id=insurer.id
+        Actor(admin.id), "Health insurer", scope=TagScope.CONTACT, parent_id=insurer.id
     )
-    bills = await master.create_tag(admin.id, "Bills", scope=TagScope.DOCUMENT_TYPE)
-    contact = await master.create_contact(admin.id, "Nord", group_ids=[health_insurer.id])
-    kind = await master.create_document_type(admin.id, "Invoice", group_ids=[bills.id])
+    bills = await master.create_tag(Actor(admin.id), "Bills", scope=TagScope.DOCUMENT_TYPE)
+    contact = await master.create_contact(Actor(admin.id), "Nord", group_ids=[health_insurer.id])
+    kind = await master.create_document_type(Actor(admin.id), "Invoice", group_ids=[bills.id])
     document = await setup.document(owner)
     changes = DocumentChanges(
         contact_id=contact.id, document_type_id=kind.id, tag_ids=frozenset({health.id})
     )
-    await setup.world.documents.change_metadata(owner.id, document.id, changes)
+    await setup.world.documents.change_metadata(Actor(owner.id), document.id, changes)
     await setup.settle()
     entry = setup.entry(document.id)
     assert set(entry.tag_ids) == {health.id, insurance.id}
@@ -251,21 +254,21 @@ async def test_nesting_a_tag_or_changing_groups_refreshes_the_documents_concerne
 ) -> None:
     admin, owner = await setup.world.user(role=Role.ADMIN), await setup.world.user()
     master = setup.master_data
-    insurance = await master.create_tag(admin.id, "Insurance")
-    health = await master.create_tag(admin.id, "Health", parent_id=insurance.id)
-    car = await master.create_tag(admin.id, "Car")
-    insurer = await master.create_tag(admin.id, "Insurer", scope=TagScope.CONTACT)
+    insurance = await master.create_tag(Actor(admin.id), "Insurance")
+    health = await master.create_tag(Actor(admin.id), "Health", parent_id=insurance.id)
+    car = await master.create_tag(Actor(admin.id), "Car")
+    insurer = await master.create_tag(Actor(admin.id), "Insurer", scope=TagScope.CONTACT)
     health_insurer = await master.create_tag(
-        admin.id, "Health insurer", scope=TagScope.CONTACT, parent_id=insurer.id
+        Actor(admin.id), "Health insurer", scope=TagScope.CONTACT, parent_id=insurer.id
     )
-    contact = await master.create_contact(admin.id, "Nord", group_ids=[health_insurer.id])
+    contact = await master.create_contact(Actor(admin.id), "Nord", group_ids=[health_insurer.id])
     with_health, with_contact = await setup.document(owner, "a"), await setup.document(owner, "b")
     await setup.document(owner, "c")
     for id, changes in (
         (with_health.id, DocumentChanges(tag_ids=frozenset({health.id}))),
         (with_contact.id, DocumentChanges(contact_id=contact.id)),
     ):
-        await setup.world.documents.change_metadata(owner.id, id, changes)
+        await setup.world.documents.change_metadata(Actor(owner.id), id, changes)
     await setup.settle()
 
     async def refreshed(change: Awaitable[object]) -> set[DocumentId]:
@@ -279,36 +282,38 @@ async def test_nesting_a_tag_or_changing_groups_refreshes_the_documents_concerne
         await setup.settle()
         return queued
 
-    assert await refreshed(master.change_tag(admin.id, insurance.id, name="Insurances")) == {
+    assert await refreshed(master.change_tag(Actor(admin.id), insurance.id, name="Insurances")) == {
         with_health.id
     }
-    assert await refreshed(master.change_tag(admin.id, car.id, parent_id=insurance.id)) == set()
+    assert (
+        await refreshed(master.change_tag(Actor(admin.id), car.id, parent_id=insurance.id)) == set()
+    )
     assert await master.run_next_job()  # normalising after the move: no document carries Car
-    assert await refreshed(master.change_tag(admin.id, insurer.id, name="Insurers")) == {
+    assert await refreshed(master.change_tag(Actor(admin.id), insurer.id, name="Insurers")) == {
         with_contact.id
     }
-    assert await refreshed(master.change_contact(admin.id, contact.id, group_ids=[insurer.id])) == {
-        with_contact.id
-    }
+    assert await refreshed(
+        master.change_contact(Actor(admin.id), contact.id, group_ids=[insurer.id])
+    ) == {with_contact.id}
     # Nothing the index holds changed: nothing is refreshed.
-    await master.change_contact(admin.id, contact.id, group_ids=[insurer.id])
-    await master.change_tag(admin.id, insurance.id, shown=False)
+    await master.change_contact(Actor(admin.id), contact.id, group_ids=[insurer.id])
+    await master.change_tag(Actor(admin.id), insurance.id, shown=False)
     assert not [job for job in setup.world.database.jobs.values() if job.status.is_active]
 
 
 async def test_an_entry_holds_the_topic_with_those_above_it(setup: Setup) -> None:
     admin, owner = await setup.world.user(role=Role.ADMIN), await setup.world.user()
     master = setup.master_data
-    insurance = await master.create_tag(admin.id, "Insurance", scope=TagScope.TOPIC)
+    insurance = await master.create_tag(Actor(admin.id), "Insurance", scope=TagScope.TOPIC)
     health = await master.create_tag(
-        admin.id, "Health", scope=TagScope.TOPIC, parent_id=insurance.id
+        Actor(admin.id), "Health", scope=TagScope.TOPIC, parent_id=insurance.id
     )
-    work = await master.create_tag(admin.id, "Work", scope=TagScope.TOPIC)
-    contact = await master.create_contact(admin.id, "Nord", topic_ids=[health.id, work.id])
+    work = await master.create_tag(Actor(admin.id), "Work", scope=TagScope.TOPIC)
+    contact = await master.create_contact(Actor(admin.id), "Nord", topic_ids=[health.id, work.id])
     insured, other = await setup.document(owner, "a"), await setup.document(owner, "b")
     for id, topic in ((insured.id, health.id), (other.id, work.id)):
         changes = DocumentChanges(contact_id=contact.id, topic_id=topic)
-        await setup.world.documents.change_metadata(owner.id, id, changes)
+        await setup.world.documents.change_metadata(Actor(owner.id), id, changes)
     await setup.settle()
     entry = setup.entry(insured.id)
     assert set(entry.topic_ids) == {health.id, insurance.id}
@@ -321,7 +326,7 @@ async def test_an_entry_holds_the_topic_with_those_above_it(setup: Setup) -> Non
         for header in headers
     )
     # A topic renamed or nested elsewhere refreshes the documents with it or one below it.
-    await master.change_tag(admin.id, insurance.id, name="Insurances")
+    await master.change_tag(Actor(admin.id), insurance.id, name="Insurances")
     assert await setup.indexing.run_next_job()
     queued = {
         DocumentId(UUID(str(job.payload["document_id"])))
@@ -335,8 +340,8 @@ async def test_an_entry_holds_the_topic_with_those_above_it(setup: Setup) -> Non
 
 async def test_renaming_queues_nothing_without_a_search_index(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
-    contact = await world.master_data.create_contact(admin.id, "Stadtwerke")
-    await world.master_data.change_contact(admin.id, contact.id, name="Energie AG")
+    contact = await world.master_data.create_contact(Actor(admin.id), "Stadtwerke")
+    await world.master_data.change_contact(Actor(admin.id), contact.id, name="Energie AG")
     assert not world.database.jobs
 
 
@@ -348,14 +353,14 @@ async def test_a_change_without_new_text_keeps_the_vectors(setup: Setup) -> None
     stamp = (await setup.index.state(document.id)).embedding  # type: ignore[union-attr]
     assert stamp is not None
 
-    target = await setup.world.spaces.create(owner.id, "Archive")
-    await setup.world.documents.move(owner.id, document.id, target.id)
+    target = await setup.world.spaces.create(Actor(owner.id), "Archive")
+    await setup.world.documents.move(Actor(owner.id), document.id, target.id)
     await setup.settle()
     assert len(setup.embeddings.calls) == calls
     assert (await setup.index.state(document.id)).embedding == stamp  # type: ignore[union-attr]
 
     await setup.world.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(title="Anderer Titel")
+        Actor(owner.id), document.id, DocumentChanges(title="Anderer Titel")
     )
     await setup.settle()
     assert len(setup.embeddings.calls) == calls + 1  # the title is part of the first section
@@ -373,7 +378,7 @@ async def test_a_new_title_embeds_only_the_first_section(setup: Setup) -> None:
     assert before is not None and len(before) == 3
 
     await setup.world.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(title="Anderer Titel")
+        Actor(owner.id), document.id, DocumentChanges(title="Anderer Titel")
     )
     await setup.settle()
 
@@ -389,7 +394,7 @@ async def test_an_index_job_counts_the_sections_it_embedded(setup: Setup) -> Non
     owner = await setup.world.user()
     document = await setup.document(owner, LONG_TEXT)
     await setup.world.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(title="Anderer Titel")
+        Actor(owner.id), document.id, DocumentChanges(title="Anderer Titel")
     )
     assert (await setup.indexing.index_document(document.id)).sections == 1
     assert (await setup.indexing.index_document(document.id)).sections == 0
@@ -428,11 +433,11 @@ async def test_an_entry_without_section_digests_is_embedded_whole_once(setup: Se
     # Unchanged, it stays as it is: nothing is embedded for the digests alone.
     assert (await setup.indexing.index_document(document.id)).sections == 0
     await setup.world.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(title="Anderer Titel")
+        Actor(owner.id), document.id, DocumentChanges(title="Anderer Titel")
     )
     assert (await setup.indexing.index_document(document.id)).sections == 3
     await setup.world.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(title="Noch ein Titel")
+        Actor(owner.id), document.id, DocumentChanges(title="Noch ein Titel")
     )
     assert (await setup.indexing.index_document(document.id)).sections == 1
 
@@ -467,7 +472,7 @@ async def test_a_document_without_text_is_indexed_by_what_it_says_about_itself(
 ) -> None:
     owner = await setup.world.user()
     received = await setup.world.pipeline().receive(
-        owner.id, incoming(b"%PDF-1 b"), filename="b.pdf"
+        Actor(owner.id), incoming(b"%PDF-1 b"), filename="b.pdf"
     )
     await setup.settle(pipeline=False)  # no text stored yet
     entry = setup.entry(received.id)
@@ -481,7 +486,9 @@ async def test_a_document_without_text_is_indexed_by_what_it_says_about_itself(
 async def test_a_failing_embedding_service_is_waited_for(world: World) -> None:
     setup = Setup(world, embeddings=BrokenEmbeddings())
     owner = await world.user()
-    received = await world.pipeline().receive(owner.id, incoming(b"%PDF-1 c"), filename="c.pdf")
+    received = await world.pipeline().receive(
+        Actor(owner.id), incoming(b"%PDF-1 c"), filename="c.pdf"
+    )
     await setup.put_text(received.id, "Text")
     await setup.bus.dispatch()
     indexing = setup.indexing
@@ -506,7 +513,9 @@ async def test_the_last_attempt_writes_without_vectors_and_the_reconciliation_ad
     broken = BrokenEmbeddings()
     setup = Setup(world, embeddings=broken)
     owner = await world.user()
-    received = await world.pipeline().receive(owner.id, incoming(b"%PDF-1 d"), filename="d.pdf")
+    received = await world.pipeline().receive(
+        Actor(owner.id), incoming(b"%PDF-1 d"), filename="d.pdf"
+    )
     await setup.put_text(received.id, "Text")
     await setup.bus.dispatch()
     indexing = setup.indexing
@@ -534,7 +543,9 @@ async def test_an_embedding_failure_keeps_the_vectors_that_are_there(world: Worl
     stamp = before.embedding
 
     broken.up = False
-    await world.documents.change_metadata(owner.id, document.id, DocumentChanges(title="Neu"))
+    await world.documents.change_metadata(
+        Actor(owner.id), document.id, DocumentChanges(title="Neu")
+    )
     await setup.settle(pipeline=False)
     entry = setup.entry(document.id)
     assert entry.title == "Neu"  # the words follow at once
@@ -552,7 +563,9 @@ async def test_vectors_of_another_length_are_refused(world: World) -> None:
         world, policy=replace(builders.INDEXING, dimensions=3)
     )  # the fake vectors have more
     owner = await world.user()
-    received = await world.pipeline().receive(owner.id, incoming(b"%PDF-1 f"), filename="f.pdf")
+    received = await world.pipeline().receive(
+        Actor(owner.id), incoming(b"%PDF-1 f"), filename="f.pdf"
+    )
     await setup.put_text(received.id, "Text")
     with pytest.raises(EmbeddingsError, match="do not have the 3 dimensions configured"):
         await setup.indexing.index_document(received.id)
@@ -568,7 +581,7 @@ async def test_a_job_that_keeps_failing_is_given_up(world: World) -> None:
 
     setup = Setup(world, index=Failing(), embeddings=None)
     owner = await world.user()
-    await world.pipeline().receive(owner.id, incoming(b"%PDF-1 e"), filename="e.pdf")
+    await world.pipeline().receive(Actor(owner.id), incoming(b"%PDF-1 e"), filename="e.pdf")
     await setup.bus.dispatch()
     indexing = setup.indexing
     for _ in range(10):
@@ -600,10 +613,14 @@ async def test_two_jobs_for_one_document_leave_the_newest_state_in_the_index(wor
     async def newer_job() -> None:
         # While the first job is about to write the old state, the title changes and a second
         # job writes the new state: the first one then overwrites it with the old one.
-        await world.documents.change_metadata(owner.id, document.id, DocumentChanges(title="Neu"))
+        await world.documents.change_metadata(
+            Actor(owner.id), document.id, DocumentChanges(title="Neu")
+        )
         await setup.indexing.index_document(document.id)
 
-    await world.documents.change_metadata(owner.id, document.id, DocumentChanges(title="Alt"))
+    await world.documents.change_metadata(
+        Actor(owner.id), document.id, DocumentChanges(title="Alt")
+    )
     index.before_write = newer_job
     await setup.indexing.index_document(document.id)
     assert setup.entry(document.id).title == "Neu"
@@ -615,7 +632,7 @@ async def test_a_document_deleted_while_it_is_indexed_leaves_no_entry(world: Wor
     owner = await world.user()
     document = await setup.document(owner)
 
-    index.before_write = lambda: world.documents.delete(owner.id, document.id)
+    index.before_write = lambda: world.documents.delete(Actor(owner.id), document.id)
     await setup.indexing.index_document(document.id)
     assert document.id not in index.documents
 
@@ -630,7 +647,7 @@ async def test_the_reconciliation_queues_what_is_missing_or_stale_and_removes_or
     current = await setup.document(owner, "current")
     stale = await setup.document(owner, "stale")
     missing = await setup.world.pipeline().receive(
-        owner.id, incoming(b"%PDF-1 f"), filename="f.pdf"
+        Actor(owner.id), incoming(b"%PDF-1 f"), filename="f.pdf"
     )
     await setup.index.upsert([index_document(id=stale.id, version=stale.version - 1)])
     orphan = index_document()
@@ -701,7 +718,9 @@ async def test_a_rebuild_notices_changes_made_while_it_ran(world: World) -> None
     earlier = min(first.id, second.id)  # the build takes the documents in the order of the ids
 
     async def change() -> None:
-        await world.documents.change_metadata(owner.id, earlier, DocumentChanges(title="Geändert"))
+        await world.documents.change_metadata(
+            Actor(owner.id), earlier, DocumentChanges(title="Geändert")
+        )
 
     index.after_first_batch = change
     result = await setup.indexing.rebuild()
@@ -715,15 +734,15 @@ async def test_a_rebuild_notices_a_rename_made_while_it_ran(world: World) -> Non
     setup = Setup(world, index=index, policy=replace(builders.INDEXING, batch_size=1))
     owner, admin = await world.user(), await world.user(role=Role.ADMIN)
     first, second = await setup.document(owner, "one"), await setup.document(owner, "two")
-    contact = await setup.master_data.create_contact(admin.id, "Stadtwerke")
+    contact = await setup.master_data.create_contact(Actor(admin.id), "Stadtwerke")
     for document in (first, second):
         changes = DocumentChanges(contact_id=contact.id)
-        await world.documents.change_metadata(owner.id, document.id, changes)
+        await world.documents.change_metadata(Actor(owner.id), document.id, changes)
     await setup.settle(pipeline=False)
 
     async def rename() -> None:
         # The refresh and index jobs run now and write to the index that is about to be replaced.
-        await setup.master_data.change_contact(admin.id, contact.id, name="Energie AG")
+        await setup.master_data.change_contact(Actor(admin.id), contact.id, name="Energie AG")
         await setup.settle(pipeline=False)
 
     index.after_first_batch = rename
@@ -736,10 +755,10 @@ async def test_a_rebuild_notices_a_rename_made_while_it_ran(world: World) -> Non
 async def test_only_admins_request_a_rebuild(setup: Setup) -> None:
     admin, user = await setup.world.user(role=Role.ADMIN), await setup.world.user()
     with pytest.raises(PermissionDeniedError):
-        await setup.indexing.request_rebuild(user.id)
+        await setup.indexing.request_rebuild(Actor(user.id))
     document = await setup.document(user)
-    await setup.indexing.request_rebuild(admin.id)
-    await setup.indexing.request_rebuild(admin.id)  # one is queued already
+    await setup.indexing.request_rebuild(Actor(admin.id))
+    await setup.indexing.request_rebuild(Actor(admin.id))  # one is queued already
     setup.index.replace_all({})
     assert await setup.indexing.run_next_job()
     assert not await setup.indexing.run_next_job()
@@ -759,7 +778,9 @@ async def test_an_index_job_reports_the_sections_it_embedded(setup: Setup) -> No
 async def test_a_job_whose_embedding_failed_measures_no_duration(world: World) -> None:
     setup = Setup(world, policy=replace(builders.INDEXING, dimensions=3))  # the fakes have more
     owner = await world.user()
-    received = await world.pipeline().receive(owner.id, incoming(b"%PDF-1 f"), filename="f.pdf")
+    received = await world.pipeline().receive(
+        Actor(owner.id), incoming(b"%PDF-1 f"), filename="f.pdf"
+    )
     await setup.put_text(received.id, "Text")
     indexed = await setup.indexing.index_document(received.id, tolerate_embedding_failure=True)
     assert (indexed.sections, indexed.embedding_failed) == (0, True)
@@ -776,7 +797,7 @@ async def test_a_job_whose_embedding_failed_measures_no_duration(world: World) -
     assert done.status is JobStatus.DONE
     assert done.result == {"sections": 0, "embedding_failed": True}
 
-    status = await setup.indexing.status(owner.id)
+    status = await setup.indexing.status(Actor(owner.id))
 
     assert (status.embedded, status.plain, status.per_section) == (None, None, None)
 
@@ -785,15 +806,15 @@ async def test_a_check_counts_without_queuing_or_removing(setup: Setup) -> None:
     admin, owner = await setup.world.user(role=Role.ADMIN), await setup.world.user()
     await setup.document(owner, "current")
     stale = await setup.document(owner, "stale")
-    await setup.world.pipeline().receive(owner.id, incoming(b"%PDF-1 f"), filename="f.pdf")
+    await setup.world.pipeline().receive(Actor(owner.id), incoming(b"%PDF-1 f"), filename="f.pdf")
     await setup.index.upsert([index_document(id=stale.id, version=stale.version - 1)])
     orphan = index_document()
     await setup.index.upsert([orphan])
     jobs = len(index_jobs(setup.world))
 
     with pytest.raises(PermissionDeniedError):
-        await setup.indexing.check(owner.id)
-    checked = await setup.indexing.check(admin.id)
+        await setup.indexing.check(Actor(owner.id))
+    checked = await setup.indexing.check(Actor(admin.id))
 
     found = checked.comparison
     assert (found.current, len(found.missing), len(found.outdated), found.extra) == (
@@ -816,7 +837,7 @@ async def test_the_status_of_the_index(setup: Setup) -> None:
             await uow.jobs.enqueue(INDEX_JOB, {"document_id": str(first.id)}, run_at=NOW + HOUR)
         await uow.commit()
 
-    status = await setup.indexing.status(owner.id)
+    status = await setup.indexing.status(Actor(owner.id))
 
     assert (status.documents, status.stats.documents, status.stats.embedded) == (2, 2, 2)
     assert (status.running, status.queued) == (0, 3)
@@ -872,7 +893,7 @@ async def test_a_person_s_decision_about_a_fact_reaches_the_index(setup: Setup) 
     owner = await setup.world.user()
     document = await setup.document(owner, "Mahnung zur Rechnung R-2026-0815")
     await setup.world.documents.decide_fact(
-        owner.id,
+        Actor(owner.id),
         document.id,
         FactDecision(
             action=FactAction.ADD,

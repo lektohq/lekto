@@ -13,6 +13,7 @@ from lekto.core.domain.pipeline import RULES_APPLY, Lane
 from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.push import PushKind
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rules import (
     Condition,
     ConditionField,
@@ -61,9 +62,11 @@ async def test_the_preview_lists_changes_and_the_job_applies_the_pinned_version(
     second = await r.arrive(owner, filename="Second.pdf")
     third = await r.arrive(owner, filename="Third.pdf")
     for document, title in ((first, "Mine 1"), (second, "Mine 2")):
-        await r.documents.change_metadata(owner.id, document.id, DocumentChanges(title=title))
+        await r.documents.change_metadata(
+            Actor(owner.id), document.id, DocumentChanges(title=title)
+        )
     await r.arrive(other)
-    await r.pipeline().receive(owner.id, incoming_pdf(), filename="Busy.pdf")  # processing
+    await r.pipeline().receive(Actor(owner.id), incoming_pdf(), filename="Busy.pdf")  # processing
     rule = await r.personal_rule(
         owner,
         definition(
@@ -75,11 +78,11 @@ async def test_the_preview_lists_changes_and_the_job_applies_the_pinned_version(
         ),
     )
 
-    preview = await r.applications.preview(owner.id, rule.id)
+    preview = await r.applications.preview(Actor(owner.id), rule.id)
 
     assert preview.next_cursor is None
     assert preview.looked_at == 3
-    assert (await r.applications.preview(owner.id, rule.id, limit=1)).looked_at == 1
+    assert (await r.applications.preview(Actor(owner.id), rule.id, limit=1)).looked_at == 1
     items = {item.document.id: item for item in preview.items}
     assert set(items) == {first.id, second.id, third.id}
     assert [effect.field for effect in items[first.id].effects] == ["tags"]
@@ -89,7 +92,7 @@ async def test_the_preview_lists_changes_and_the_job_applies_the_pinned_version(
     assert items[third.id].conflicts == ()
 
     application = await r.applications.start(
-        owner.id,
+        Actor(owner.id),
         rule.id,
         version=1,
         documents=[first.id, second.id, third.id],
@@ -97,11 +100,11 @@ async def test_the_preview_lists_changes_and_the_job_applies_the_pinned_version(
     )
     # A new version meanwhile does not change what the application does.
     await r.rules.change(
-        owner.id, rule.id, definition("Tax v2", channel_api(), SetTitle("V2 {{ filename }}"))
+        Actor(owner.id), rule.id, definition("Tax v2", channel_api(), SetTitle("V2 {{ filename }}"))
     )
     assert await run_jobs(r) == 1
 
-    done = await r.applications.get(owner.id, application.id)
+    done = await r.applications.get(Actor(owner.id), application.id)
     assert (done.status, done.applied, done.unchanged, done.skipped) == (
         ProgressStatus.DONE,
         3,
@@ -139,7 +142,7 @@ async def test_the_dry_run_looks_only_at_documents_the_conditions_leave(
         document = await r.arrive(owner, text=text, filename=f"{name}.pdf")
         contact_id = None if contact is None else contact.id
         await r.documents.change_metadata(
-            owner.id, document.id, DocumentChanges(contact_id=contact_id)
+            Actor(owner.id), document.id, DocumentChanges(contact_id=contact_id)
         )
         arrived[name] = document.id
     securities = Condition(field=ConditionField.TEXT, op=Operator.CONTAINS, value="Securities")
@@ -147,13 +150,13 @@ async def test_the_dry_run_looks_only_at_documents_the_conditions_leave(
         owner, definition("Depot", all_of(contact_is(acme.id), securities), add_tags(depot.id))
     )
 
-    preview = await r.applications.preview(owner.id, rule.id)
+    preview = await r.applications.preview(Actor(owner.id), rule.id)
     assert (preview.total, preview.looked_at) == (2, 2)
     assert [item.document.id for item in preview.items] == [arrived["a1"]]
 
     # Without the filter the dry run looks at every document and finds the same.
     monkeypatch.setattr(retroactive, "prefilter", lambda group, tree, base: base)
-    unfiltered = await r.applications.preview(owner.id, rule.id)
+    unfiltered = await r.applications.preview(Actor(owner.id), rule.id)
     assert (unfiltered.total, unfiltered.looked_at) == (4, 4)
     assert [item.document.id for item in unfiltered.items] == [arrived["a1"]]
 
@@ -164,14 +167,14 @@ async def test_a_dry_run_counts_only_the_documents_the_caller_may_edit(world: Wo
     r = await rule_world(world)
     owner, reader = await world.user(), await world.user()
     tax = await r.tag("tax")
-    shared = await world.spaces.create(owner.id, "Haushalt")
-    await world.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
+    shared = await world.spaces.create(Actor(owner.id), "Haushalt")
+    await world.spaces.set_member(Actor(owner.id), shared.id, reader.id, SpaceRole.READ)
     for _ in range(3):
         await r.arrive(owner, space=shared.id)
     mine = await r.arrive(reader)
     rule = await r.global_rule(definition("Tax", channel_api(), add_tags(tax.id)))
 
-    preview = await r.applications.preview(reader.id, rule.id)
+    preview = await r.applications.preview(Actor(reader.id), rule.id)
 
     assert [item.document.id for item in preview.items] == [mine.id]
     assert (preview.looked_at, preview.total) == (1, 1)
@@ -187,7 +190,7 @@ async def test_a_dry_run_whose_conditions_no_document_meets_looks_at_none(world:
         owner,
         definition("Both", all_of(contact_is(acme.id), contact_is(bank.id)), add_tags(seen.id)),
     )
-    preview = await r.applications.preview(owner.id, rule.id)
+    preview = await r.applications.preview(Actor(owner.id), rule.id)
     assert (preview.items, preview.next_cursor, preview.looked_at, preview.total) == (
         (),
         None,
@@ -202,10 +205,10 @@ async def test_the_job_checks_the_rights_again_and_a_global_rule_moves_nothing(
     r = await rule_world(world)
     owner, editor = await world.user(), await world.user()
     seen = await r.tag("seen")
-    shared = await world.spaces.create(owner.id, "Shared")
-    readable = await world.spaces.create(owner.id, "Readable")
-    await world.spaces.set_member(owner.id, shared.id, editor.id, SpaceRole.EDIT)
-    await world.spaces.set_member(owner.id, readable.id, editor.id, SpaceRole.READ)
+    shared = await world.spaces.create(Actor(owner.id), "Shared")
+    readable = await world.spaces.create(Actor(owner.id), "Readable")
+    await world.spaces.set_member(Actor(owner.id), shared.id, editor.id, SpaceRole.EDIT)
+    await world.spaces.set_member(Actor(owner.id), readable.id, editor.id, SpaceRole.READ)
     in_shared = await r.arrive(owner, space=shared.id)
     await r.arrive(owner, space=readable.id)
     private = await r.arrive(owner)
@@ -215,16 +218,16 @@ async def test_the_job_checks_the_rights_again_and_a_global_rule_moves_nothing(
     )
 
     # A global rule: by anyone, on the documents they may write to.
-    preview = await r.applications.preview(editor.id, rule.id)
+    preview = await r.applications.preview(Actor(editor.id), rule.id)
     assert {item.document.id for item in preview.items} == {in_shared.id, own.id}
 
     application = await r.applications.start(
-        editor.id, rule.id, version=1, documents=[in_shared.id, own.id, private.id]
+        Actor(editor.id), rule.id, version=1, documents=[in_shared.id, own.id, private.id]
     )
-    await world.spaces.set_member(owner.id, shared.id, editor.id, SpaceRole.READ)
+    await world.spaces.set_member(Actor(owner.id), shared.id, editor.id, SpaceRole.READ)
     await run_jobs(r)
 
-    done = await r.applications.get(editor.id, application.id)
+    done = await r.applications.get(Actor(editor.id), application.id)
     assert (done.status, done.applied) == (ProgressStatus.DONE, 1)
     assert done.skipped == [(in_shared.id, NOT_AVAILABLE), (private.id, NOT_AVAILABLE)]
     assert (await r.stored(in_shared)).tag_ids == set()
@@ -241,45 +244,46 @@ async def test_a_user_rule_is_applied_by_its_owner_to_their_own_documents(world:
     r = await rule_world(world)
     owner, colleague = await world.user(), await world.user()
     tax = await r.tag("tax")
-    office = await world.spaces.create(colleague.id, "Office")
-    await world.spaces.set_member(colleague.id, office.id, owner.id, SpaceRole.EDIT)
+    office = await world.spaces.create(Actor(colleague.id), "Office")
+    await world.spaces.set_member(Actor(colleague.id), office.id, owner.id, SpaceRole.EDIT)
     theirs = await r.arrive(colleague, space=office.id)
     mine = await r.arrive(owner)
     rule = await r.personal_rule(owner, definition("Tax", channel_api(), add_tags(tax.id)))
 
-    preview = await r.applications.preview(owner.id, rule.id)
+    preview = await r.applications.preview(Actor(owner.id), rule.id)
     assert [item.document.id for item in preview.items] == [mine.id]
     application = await r.applications.start(
-        owner.id, rule.id, version=1, documents=[theirs.id, mine.id]
+        Actor(owner.id), rule.id, version=1, documents=[theirs.id, mine.id]
     )
     await run_jobs(r)
 
-    done = await r.applications.get(owner.id, application.id)
+    done = await r.applications.get(Actor(owner.id), application.id)
     assert (done.applied, done.skipped) == (1, [(theirs.id, NOT_AVAILABLE)])
     assert (await r.stored(theirs)).tag_ids == set()
 
     # Nobody else applies it or reads the application, but admins do (Tobi, 08.10.2026):
     # on the documents of the rule's owner only.
     with pytest.raises(NotFoundError):
-        await r.applications.preview(colleague.id, rule.id)
+        await r.applications.preview(Actor(colleague.id), rule.id)
     with pytest.raises(NotFoundError):
-        await r.applications.get(colleague.id, application.id)
-    assert (await r.applications.get(r.admin.id, application.id)).id == application.id
+        await r.applications.get(Actor(colleague.id), application.id)
+    assert (await r.applications.get(Actor(r.admin.id), application.id)).id == application.id
     assert [
-        item.document.id for item in (await r.applications.preview(r.admin.id, rule.id)).items
+        item.document.id
+        for item in (await r.applications.preview(Actor(r.admin.id), rule.id)).items
     ] == []
     by_admin = await r.applications.start(
-        r.admin.id, rule.id, version=1, documents=[theirs.id, mine.id]
+        Actor(r.admin.id), rule.id, version=1, documents=[theirs.id, mine.id]
     )
     await run_jobs(r)
-    done = await r.applications.get(r.admin.id, by_admin.id)
+    done = await r.applications.get(Actor(r.admin.id), by_admin.id)
     assert (done.applied, done.unchanged, done.skipped) == (0, 1, [(theirs.id, NOT_AVAILABLE)])
 
     with pytest.raises(NotFoundError):
-        await r.applications.start(owner.id, rule.id, version=2, documents=[mine.id])
+        await r.applications.start(Actor(owner.id), rule.id, version=2, documents=[mine.id])
     too_many = [DocumentId(new_id()) for _ in range(MAX_DOCUMENTS + 1)]
     with pytest.raises(ValidationError):
-        await r.applications.start(owner.id, rule.id, version=1, documents=too_many)
+        await r.applications.start(Actor(owner.id), rule.id, version=1, documents=too_many)
 
 
 async def test_a_long_application_continues_in_a_new_job(world: World) -> None:
@@ -289,11 +293,11 @@ async def test_a_long_application_continues_in_a_new_job(world: World) -> None:
     documents = [await r.arrive(owner) for _ in range(BATCH + 1)]
     rule = await r.personal_rule(owner, definition("Tax", channel_api(), add_tags(tax.id)))
     application = await r.applications.start(
-        owner.id, rule.id, version=1, documents=[document.id for document in documents]
+        Actor(owner.id), rule.id, version=1, documents=[document.id for document in documents]
     )
 
     assert await r.applications.run_next_job()
-    progress = await r.applications.get(owner.id, application.id)
+    progress = await r.applications.get(Actor(owner.id), application.id)
     assert (progress.status, progress.position, progress.finished_at) == (
         ProgressStatus.RUNNING,
         BATCH,
@@ -301,7 +305,7 @@ async def test_a_long_application_continues_in_a_new_job(world: World) -> None:
     )
 
     assert await run_jobs(r) == 1
-    done = await r.applications.get(owner.id, application.id)
+    done = await r.applications.get(Actor(owner.id), application.id)
     assert (done.status, done.applied) == (ProgressStatus.DONE, BATCH + 1)
     for document in documents:
         assert (await r.stored(document)).tag_ids == {tax.id}
@@ -313,16 +317,18 @@ async def test_an_application_ends_when_its_rule_is_deleted(world: World) -> Non
     tax = await r.tag("tax")
     document = await r.arrive(owner)
     rule = await r.personal_rule(owner, definition("Tax", channel_api(), add_tags(tax.id)))
-    application = await r.applications.start(owner.id, rule.id, version=1, documents=[document.id])
-    await r.rules.delete(owner.id, rule.id)
+    application = await r.applications.start(
+        Actor(owner.id), rule.id, version=1, documents=[document.id]
+    )
+    await r.rules.delete(Actor(owner.id), rule.id)
 
     await run_jobs(r)
 
-    done = await r.applications.get(owner.id, application.id)
+    done = await r.applications.get(Actor(owner.id), application.id)
     assert (done.status, done.error) == (ProgressStatus.FAILED, "the rule or its user is gone")
     assert (await r.stored(document)).tag_ids == set()
     with pytest.raises(NotFoundError):
-        await r.applications.preview(owner.id, rule.id)
+        await r.applications.preview(Actor(owner.id), rule.id)
 
 
 async def test_filing_on_an_unconfirmed_contact_is_a_conflict_until_accepted(
@@ -331,24 +337,24 @@ async def test_filing_on_an_unconfirmed_contact_is_a_conflict_until_accepted(
     r = await rule_world(world)
     owner, reader = await world.user(), await world.user()
     acme = await r.contact("ACME")
-    shared = await world.spaces.create(owner.id, "Shared")
-    await world.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
+    shared = await world.spaces.create(Actor(owner.id), "Shared")
+    await world.spaces.set_member(Actor(owner.id), shared.id, reader.id, SpaceRole.READ)
     # The model set the contact; no person confirmed it.
     document = await r.arrive(owner, classify=Classifies(contact=acme.id))
     rule = await r.personal_rule(
         owner, definition("ACME", contact_is(acme.id), SetSpace(shared.id))
     )
 
-    (item,) = (await r.applications.preview(owner.id, rule.id)).items
+    (item,) = (await r.applications.preview(Actor(owner.id), rule.id)).items
     assert item.effects == ()
     assert [(note.field, note.kind) for note in item.conflicts] == [("space", "conflict")]
 
-    await r.applications.start(owner.id, rule.id, version=1, documents=[document.id])
+    await r.applications.start(Actor(owner.id), rule.id, version=1, documents=[document.id])
     await run_jobs(r)
     assert (await r.stored(document)).space_id == document.space_id
 
     await r.applications.start(
-        owner.id, rule.id, version=1, documents=[document.id], accept_conflicts=[document.id]
+        Actor(owner.id), rule.id, version=1, documents=[document.id], accept_conflicts=[document.id]
     )
     await run_jobs(r)
     assert (await r.stored(document)).space_id == shared.id
@@ -366,7 +372,7 @@ async def test_a_worker_overtaken_applies_what_it_prepared_to_no_other_document(
     others = [await r.arrive(owner, text="# Strom") for _ in range(2)]
     rule = await r.personal_rule(owner, definition("Tax", text_matches("Rech"), add_tags(tax.id)))
     application = await r.applications.start(
-        owner.id, rule.id, version=1, documents=[invoice.id, *(item.id for item in others)]
+        Actor(owner.id), rule.id, version=1, documents=[invoice.id, *(item.id for item in others)]
     )
     real, calls = prepare, 0
 
@@ -385,7 +391,7 @@ async def test_a_worker_overtaken_applies_what_it_prepared_to_no_other_document(
     assert (await r.stored(invoice)).tag_ids == {tax.id}
     for item in others:
         assert (await r.stored(item)).tag_ids == set()
-    done = await r.applications.get(owner.id, application.id)
+    done = await r.applications.get(Actor(owner.id), application.id)
     assert (done.status, done.applied) == (ProgressStatus.DONE, 1)
 
 
@@ -421,7 +427,7 @@ async def test_the_text_is_read_for_the_rules_outside_the_event_loop(
     folds.clear()
     cuts.clear()
 
-    preview = await r.applications.preview(owner.id, rule.id)
+    preview = await r.applications.preview(Actor(owner.id), rule.id)
 
     assert preview.looked_at == 1
     assert len(folds) == 1 and len(cuts) == 1
@@ -447,7 +453,7 @@ async def pages(r: RuleWorld, owner: User, rule: Rule) -> list[list[DocumentId]]
     shown: list[list[DocumentId]] = []
     before = None
     while True:
-        preview = await r.applications.preview(owner.id, rule.id, before=before)
+        preview = await r.applications.preview(Actor(owner.id), rule.id, before=before)
         shown.append([item.document.id for item in preview.items])
         if preview.next_cursor is None:
             return shown
@@ -499,11 +505,13 @@ async def test_an_unexpected_error_ends_the_application(world: World) -> None:
         raise RuntimeError("broken")
 
     r.matcher.search = broken  # type: ignore[method-assign]
-    application = await r.applications.start(owner.id, rule.id, version=1, documents=[document.id])
+    application = await r.applications.start(
+        Actor(owner.id), rule.id, version=1, documents=[document.id]
+    )
 
     assert await r.applications.run_next_job()
     assert not await r.applications.run_next_job()
-    done = await r.applications.get(owner.id, application.id)
+    done = await r.applications.get(Actor(owner.id), application.id)
     assert (done.status, done.error) == (ProgressStatus.FAILED, "stopped by an internal error")
     assert (await r.stored(document)).tag_ids == set()
     # Given up as every job is: the admins hear of it (SB-08).
@@ -527,10 +535,10 @@ async def test_applying_a_rule_moves_nothing_where_the_person_could_not_move_it(
     r = await rule_world(world)
     editor, colleague, outsider = await world.user(), await world.user(), await world.user()
     home = await world.personal_space(editor)
-    await world.spaces.set_member(editor.id, home.id, colleague.id, SpaceRole.EDIT)
-    closed = await world.spaces.create(colleague.id, "Closed")
-    elsewhere = await world.spaces.create(r.admin.id, "Elsewhere")
-    await world.spaces.set_member(r.admin.id, elsewhere.id, outsider.id, SpaceRole.READ)
+    await world.spaces.set_member(Actor(editor.id), home.id, colleague.id, SpaceRole.EDIT)
+    closed = await world.spaces.create(Actor(colleague.id), "Closed")
+    elsewhere = await world.spaces.create(Actor(r.admin.id), "Elsewhere")
+    await world.spaces.set_member(Actor(r.admin.id), elsewhere.id, outsider.id, SpaceRole.READ)
     document = await r.arrive(editor)
     rules = [
         await r.global_rule(definition("Global", channel_api(), SetSpace(elsewhere.id))),
@@ -539,15 +547,19 @@ async def test_applying_a_rule_moves_nothing_where_the_person_could_not_move_it(
         ),
     ]
     for rule in rules:
-        assert (await r.applications.preview(editor.id, rule.id)).items == ()
+        assert (await r.applications.preview(Actor(editor.id), rule.id)).items == ()
         await r.applications.start(
-            editor.id, rule.id, version=1, documents=[document.id], accept_conflicts=[document.id]
+            Actor(editor.id),
+            rule.id,
+            version=1,
+            documents=[document.id],
+            accept_conflicts=[document.id],
         )
         await run_jobs(r)
         assert (await r.stored(document)).space_id == home.id
     # The colleague, who edits both, applies their own rule.
-    (item,) = (await r.applications.preview(colleague.id, rules[1].id)).items
+    (item,) = (await r.applications.preview(Actor(colleague.id), rules[1].id)).items
     assert [effect.field for effect in item.effects] == ["space"]
-    await r.applications.start(colleague.id, rules[1].id, version=1, documents=[document.id])
+    await r.applications.start(Actor(colleague.id), rules[1].id, version=1, documents=[document.id])
     await run_jobs(r)
     assert (await r.stored(document)).space_id == closed.id

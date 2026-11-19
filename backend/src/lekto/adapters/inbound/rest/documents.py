@@ -106,6 +106,7 @@ from lekto.core.domain.inbox import DONE_PERIOD, InboxTab
 from lekto.core.domain.lenses import LensSort
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.validation import to_utc
 from lekto.core.ports.pages import PAGE_MEDIA_TYPE
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE, DocumentOrder, SortKey
@@ -220,10 +221,10 @@ async def upload(
         imported = (
             None
             if form.metadata is None
-            else await _imported_metadata(form.metadata, principal.id, context)
+            else await _imported_metadata(form.metadata, principal.actor, context)
         )
         document = await context.pipeline.receive(
-            principal.id,
+            principal.actor,
             received.file,
             filename=received.filename,
             space=None if form.space_id is None else SpaceId(form.space_id),
@@ -606,7 +607,7 @@ async def preview_change(
     context: Context,
     confirm: Confirm = True,
 ) -> DocumentPreviewOut:
-    user = principal.id
+    user = principal.actor
     changes = await _changes(body, user, context)
     change = await context.documents.change_metadata(
         user, DocumentId(id), changes, dry_run=True, confirm=confirm
@@ -730,7 +731,7 @@ async def get_document_page(
 
 async def _download(
     context: Context,
-    user: UserId,
+    user: Actor,
     id: DocumentId,
     file: DocumentFile,
     disposition: str,
@@ -1187,7 +1188,7 @@ def _details(view: DocumentView) -> DocumentDetails:
     return DocumentDetails.of(view.document, view.access)
 
 
-async def _changes(body: DocumentPatch, user: UserId, context: Context) -> DocumentChanges:
+async def _changes(body: DocumentPatch, user: Actor, context: Context) -> DocumentChanges:
     given = body.model_fields_set
     fields: dict[FieldId, object] = {}
     if body.fields:
@@ -1224,7 +1225,7 @@ def _given[T](
 
 
 async def _imported_metadata(
-    body: ImportedMetadataIn, user: UserId, context: Context
+    body: ImportedMetadataIn, user: Actor, context: Context
 ) -> ImportedMetadata:
     """The metadata field as domain values (field values by their definitions; a review may
     name existing fields only)."""

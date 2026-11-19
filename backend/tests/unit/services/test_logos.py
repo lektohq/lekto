@@ -27,6 +27,7 @@ from lekto.core.domain.identifiers import Identifier, IdentifierKind
 from lekto.core.domain.ids import ContactId, UserId, new_id
 from lekto.core.domain.jobs import JobStatus
 from lekto.core.domain.master_data import Contact
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role
 from lekto.core.ports.logos import FetchedLogo
 from lekto.core.services.logos import FETCHING_OFF, LOGO_JOB, LOGO_MAX_SIZE, LogoService
@@ -42,8 +43,8 @@ PNG = image((200, 100))
 
 async def test_an_admin_uploads_a_logo_everyone_reads(world: World) -> None:
     admin, user = await world.user(role=Role.ADMIN), await world.user()
-    contact = await world.master_data.create_contact(admin.id, "Nord")
-    stored = await world.logos.upload(admin.id, contact.id, PNG)
+    contact = await world.master_data.create_contact(Actor(admin.id), "Nord")
+    stored = await world.logos.upload(Actor(admin.id), contact.id, PNG)
     assert stored.logo is not None
     assert (stored.logo.source, stored.logo.stored_at, stored.logo.domain) == (
         LogoSource.UPLOADED,
@@ -51,23 +52,23 @@ async def test_an_admin_uploads_a_logo_everyone_reads(world: World) -> None:
         None,
     )
     assert await world.object_store.get(logo_key(contact.id)) == FAKE_LOGO
-    read = await world.logos.logo(user.id, contact.id)
+    read = await world.logos.logo(Actor(user.id), contact.id)
     assert (read.data, read.logo) == (FAKE_LOGO, stored.logo)
     with pytest.raises(PermissionDeniedError):
-        await world.logos.upload(user.id, contact.id, PNG)
+        await world.logos.upload(Actor(user.id), contact.id, PNG)
     with pytest.raises(PermissionDeniedError):
-        await world.logos.remove(user.id, contact.id)
+        await world.logos.remove(Actor(user.id), contact.id)
 
-    removed = await world.logos.remove(admin.id, contact.id)
+    removed = await world.logos.remove(Actor(admin.id), contact.id)
     assert removed.logo is None
     assert not await world.object_store.exists(logo_key(contact.id))
     with pytest.raises(NotFoundError):
-        await world.logos.logo(user.id, contact.id)
+        await world.logos.logo(Actor(user.id), contact.id)
 
 
 async def test_what_is_no_logo_changes_nothing(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
-    contact = await world.master_data.create_contact(admin.id, "Nord")
+    contact = await world.master_data.create_contact(Actor(admin.id), "Nord")
     for data, error in (
         (SVG, UnsupportedMediaTypeError),
         (image((40, 40), "ICO"), UnsupportedMediaTypeError),
@@ -75,22 +76,22 @@ async def test_what_is_no_logo_changes_nothing(world: World) -> None:
         (b"\x89PNG\r\n\x1a\n" + bytes(LOGO_MAX_SIZE), ValidationError),
     ):
         with pytest.raises(error):
-            await world.logos.upload(admin.id, contact.id, data)
+            await world.logos.upload(Actor(admin.id), contact.id, data)
     async with world.uow() as uow:
         assert (await uow.contacts.get(contact.id)).logo is None
     assert not await world.object_store.exists(logo_key(contact.id))
     with pytest.raises(NotFoundError):
-        await world.logos.upload(admin.id, ContactId(new_id()), PNG)
+        await world.logos.upload(Actor(admin.id), ContactId(new_id()), PNG)
 
 
 async def test_a_logo_goes_with_its_contact_also_while_one_is_stored(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
-    contact = await world.master_data.create_contact(admin.id, "Nord")
+    contact = await world.master_data.create_contact(Actor(admin.id), "Nord")
     # An upload and the deletion at once: whichever comes second sees the first's result, so
     # no file stays behind without its contact.
     upload, deletion = await asyncio.gather(
-        world.logos.upload(admin.id, contact.id, PNG),
-        world.master_data.delete_contact(admin.id, contact.id),
+        world.logos.upload(Actor(admin.id), contact.id, PNG),
+        world.master_data.delete_contact(Actor(admin.id), contact.id),
         return_exceptions=True,
     )
     assert deletion is None
@@ -127,9 +128,9 @@ async def test_a_new_domain_queues_the_fetch_of_the_logo(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     fetcher = FakeLogoFetcher({"nord.example": PNG})
     master, logos = world.fetching(fetcher)
-    nord = await master.create_contact(admin.id, "Nord", identifiers=[DOMAIN, NUMBER])
+    nord = await master.create_contact(Actor(admin.id), "Nord", identifiers=[DOMAIN, NUMBER])
     plain = await master.create_contact(
-        admin.id, "Süd", identifiers=[Identifier(IdentifierKind.CUSTOMER_NUMBER, "4711")]
+        Actor(admin.id), "Süd", identifiers=[Identifier(IdentifierKind.CUSTOMER_NUMBER, "4711")]
     )
     assert await queued(world) == [
         {"contact_id": str(nord.id), "domain": "nord.example", "asked": False}
@@ -141,11 +142,11 @@ async def test_a_new_domain_queues_the_fetch_of_the_logo(world: World) -> None:
     assert await world.object_store.get(logo_key(nord.id)) == FAKE_LOGO
 
     # A rename, another identifier: nothing to fetch.
-    await master.change_contact(admin.id, nord.id, name="Nord AG")
-    await master.change_contact(admin.id, nord.id, identifiers=[DOMAIN, NUMBER])
+    await master.change_contact(Actor(admin.id), nord.id, name="Nord AG")
+    await master.change_contact(Actor(admin.id), nord.id, identifiers=[DOMAIN, NUMBER])
     # Attached from a document, a domain of a contact without a logo.
     attached = Identifier(IdentifierKind.EMAIL_DOMAIN, "sued.example")
-    await master.add_identifier(admin.id, plain.id, attached)
+    await master.add_identifier(Actor(admin.id), plain.id, attached)
     assert await queued(world) == [
         {"contact_id": str(plain.id), "domain": "sued.example", "asked": False}
     ]
@@ -157,13 +158,13 @@ async def test_a_fetched_logo_is_fetched_again_for_a_new_domain(world: World) ->
     admin = await world.user(role=Role.ADMIN)
     fetcher = FakeLogoFetcher({"nord.example": PNG, "nord-ag.example": image((300, 300))})
     master, logos = world.fetching(fetcher)
-    nord = await master.create_contact(admin.id, "Nord", identifiers=[DOMAIN])
+    nord = await master.create_contact(Actor(admin.id), "Nord", identifiers=[DOMAIN])
     await run_all(logos)
     first = (await stored(world, nord.id)).logo
     assert first is not None and first.domain == "nord.example"
     world.clock.advance(timedelta(minutes=1))
     nothing = Identifier(IdentifierKind.EMAIL_DOMAIN, "n.example")
-    await master.change_contact(admin.id, nord.id, identifiers=[DOMAIN, nothing])
+    await master.change_contact(Actor(admin.id), nord.id, identifiers=[DOMAIN, nothing])
     assert await queued(world) == [
         {"contact_id": str(nord.id), "domain": "n.example", "asked": False}
     ]
@@ -171,7 +172,7 @@ async def test_a_fetched_logo_is_fetched_again_for_a_new_domain(world: World) ->
     kept = await stored(world, nord.id)
     assert kept.logo == first and kept.logo_failure is not None
     attached = Identifier(IdentifierKind.EMAIL_DOMAIN, "nord-ag.example")
-    await master.add_identifier(admin.id, nord.id, attached)
+    await master.add_identifier(Actor(admin.id), nord.id, attached)
     await run_all(logos)
     assert fetcher.calls == ["nord.example", "n.example", "nord-ag.example"]
     again = (await stored(world, nord.id)).logo
@@ -179,13 +180,13 @@ async def test_a_fetched_logo_is_fetched_again_for_a_new_domain(world: World) ->
         source=LogoSource.FETCHED, stored_at=world.clock.now(), domain="nord-ag.example"
     )
     # The domain the logo came from, taken away and entered again: nothing new to fetch.
-    await master.change_contact(admin.id, nord.id, identifiers=[DOMAIN])
-    await master.change_contact(admin.id, nord.id, identifiers=[DOMAIN, attached])
+    await master.change_contact(Actor(admin.id), nord.id, identifiers=[DOMAIN])
+    await master.change_contact(Actor(admin.id), nord.id, identifiers=[DOMAIN, attached])
     assert await queued(world) == []
     # An uploaded logo stays whatever domain comes.
-    await logos.upload(admin.id, nord.id, PNG)
+    await logos.upload(Actor(admin.id), nord.id, PNG)
     other = Identifier(IdentifierKind.EMAIL_DOMAIN, "nord-neu.example")
-    await master.add_identifier(admin.id, nord.id, other)
+    await master.add_identifier(Actor(admin.id), nord.id, other)
     assert await queued(world) == []
     # fetch-logos still asks only for contacts without a logo.
     assert await logos.request_all() == 0
@@ -196,7 +197,7 @@ async def test_a_fetch_queued_before_fetching_was_switched_off_ends_at_once(
 ) -> None:
     admin = await world.user(role=Role.ADMIN)
     master, _ = world.fetching(FakeLogoFetcher({"nord.example": PNG}))
-    contact = await master.create_contact(admin.id, "Nord", identifiers=[DOMAIN])
+    contact = await master.create_contact(Actor(admin.id), "Nord", identifiers=[DOMAIN])
     (job,) = [job for job in world.database.jobs.values() if job.kind == LOGO_JOB]
     assert await world.logos.run_next_job() is True  # without fetching now
     ended = world.database.jobs[job.id]
@@ -211,15 +212,15 @@ async def test_a_fetch_queued_before_fetching_was_switched_off_ends_at_once(
 
 async def test_without_fetching_nothing_is_queued(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
-    contact = await world.master_data.create_contact(admin.id, "Nord", identifiers=[DOMAIN])
+    contact = await world.master_data.create_contact(Actor(admin.id), "Nord", identifiers=[DOMAIN])
     await world.master_data.add_identifier(
-        admin.id, contact.id, Identifier(IdentifierKind.EMAIL_DOMAIN, "n.example")
+        Actor(admin.id), contact.id, Identifier(IdentifierKind.EMAIL_DOMAIN, "n.example")
     )
     assert await queued(world) == []
     assert not world.logos.fetching
     assert await world.logos.run_next_job() is False
     with pytest.raises(LogoFetchDisabledError):
-        await world.logos.request_fetch(admin.id, contact.id)
+        await world.logos.request_fetch(Actor(admin.id), contact.id)
     with pytest.raises(LogoFetchDisabledError):
         await world.logos.request_all()
 
@@ -230,7 +231,7 @@ async def test_a_failed_fetch_is_noted_and_tried_again_only_for_another_domain(
     admin = await world.user(role=Role.ADMIN)
     fetcher = FakeLogoFetcher({"n.example": PNG})
     master, logos = world.fetching(fetcher)
-    contact = await master.create_contact(admin.id, "Nord", identifiers=[DOMAIN])
+    contact = await master.create_contact(Actor(admin.id), "Nord", identifiers=[DOMAIN])
     await run_all(logos)
     failed = await stored(world, contact.id)
     assert failed.logo is None
@@ -238,13 +239,13 @@ async def test_a_failed_fetch_is_noted_and_tried_again_only_for_another_domain(
         domains=frozenset({"nord.example"}), failed_at=NOW
     )
     # The same domain again (taken away and entered anew), a run of fetch-logos: no new try.
-    await master.change_contact(admin.id, contact.id, identifiers=[])
-    await master.change_contact(admin.id, contact.id, identifiers=[DOMAIN])
+    await master.change_contact(Actor(admin.id), contact.id, identifiers=[])
+    await master.change_contact(Actor(admin.id), contact.id, identifiers=[DOMAIN])
     assert await logos.request_all() == 0
     assert await queued(world) == []
     # Another domain is tried.
     await master.add_identifier(
-        admin.id, contact.id, Identifier(IdentifierKind.EMAIL_DOMAIN, "n.example")
+        Actor(admin.id), contact.id, Identifier(IdentifierKind.EMAIL_DOMAIN, "n.example")
     )
     await run_all(logos)
     assert fetcher.calls == ["nord.example", "n.example"]
@@ -259,7 +260,7 @@ async def test_fetch_logos_tries_no_domain_twice(world: World) -> None:
     fetcher = FakeLogoFetcher()
     master = world.master_data  # entered without fetching on
     other = Identifier(IdentifierKind.EMAIL_DOMAIN, "zz-nord.example")
-    contact = await master.create_contact(admin.id, "Nord", identifiers=[DOMAIN, other])
+    contact = await master.create_contact(Actor(admin.id), "Nord", identifiers=[DOMAIN, other])
     _, logos = world.fetching(fetcher)
     for _ in range(4):
         await logos.request_all()
@@ -268,7 +269,7 @@ async def test_fetch_logos_tries_no_domain_twice(world: World) -> None:
     failed = (await stored(world, contact.id)).logo_failure
     assert failed is not None and failed.domains == {"nord.example", "zz-nord.example"}
     # An admin's request tries them again, all of them.
-    await logos.request_fetch(admin.id, contact.id)
+    await logos.request_fetch(Actor(admin.id), contact.id)
     await run_all(logos)
     assert fetcher.calls[2:] == ["nord.example", "zz-nord.example"]
 
@@ -279,17 +280,17 @@ async def test_a_learned_domain_is_asked_only_once_taken_over(world: World) -> N
     admin = await world.user(role=Role.ADMIN)
     fetcher = FakeLogoFetcher({"nord.example": PNG})
     master, logos = world.fetching(fetcher)
-    contact = await master.create_contact(admin.id, "Nord")
+    contact = await master.create_contact(Actor(admin.id), "Nord")
     async with world.uow() as uow:
         await replace_learned_identifiers(uow, {contact.id: [DOMAIN]})
         await uow.commit()
     assert await queued(world) == []
     assert await logos.request_all() == 0
     with pytest.raises(ValidationError):
-        await logos.request_fetch(admin.id, contact.id)
+        await logos.request_fetch(Actor(admin.id), contact.id)
     assert await run_all(logos) == 0
     assert fetcher.calls == []
-    await master.change_contact(admin.id, contact.id, identifiers=[DOMAIN])
+    await master.change_contact(Actor(admin.id), contact.id, identifiers=[DOMAIN])
     assert await queued(world) == [
         {"contact_id": str(contact.id), "domain": "nord.example", "asked": False}
     ]
@@ -303,13 +304,13 @@ async def test_an_uploaded_logo_is_never_replaced(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     fetcher = FakeLogoFetcher({"nord.example": PNG})
     master, logos = world.fetching(fetcher)
-    contact = await master.create_contact(admin.id, "Nord", identifiers=[DOMAIN])
-    uploaded = await logos.upload(admin.id, contact.id, image((90, 90), "JPEG"))
+    contact = await master.create_contact(Actor(admin.id), "Nord", identifiers=[DOMAIN])
+    uploaded = await logos.upload(Actor(admin.id), contact.id, image((90, 90), "JPEG"))
     assert await run_all(logos) == 1
     assert fetcher.calls == []  # nothing asked: the upload wins
     assert (await stored(world, contact.id)).logo == uploaded.logo
     with pytest.raises(ConflictError):
-        await logos.request_fetch(admin.id, contact.id)
+        await logos.request_fetch(Actor(admin.id), contact.id)
     assert await logos.fetch(contact.id, asked=True) is False
 
 
@@ -319,11 +320,11 @@ async def test_an_upload_during_a_fetch_wins(world: World) -> None:
     class Slow(FakeLogoFetcher):
         async def fetch(self, domain: str) -> FetchedLogo:
             found = await super().fetch(domain)
-            await logos.upload(admin.id, contact.id, PNG)  # meanwhile
+            await logos.upload(Actor(admin.id), contact.id, PNG)  # meanwhile
             return found
 
     master, logos = world.fetching(Slow({"nord.example": PNG}))
-    contact = await master.create_contact(admin.id, "Nord", identifiers=[DOMAIN])
+    contact = await master.create_contact(Actor(admin.id), "Nord", identifiers=[DOMAIN])
     assert await logos.fetch(contact.id, domain="nord.example") is False
     logo = (await stored(world, contact.id)).logo
     assert logo is not None and logo.source is LogoSource.UPLOADED
@@ -334,19 +335,19 @@ async def test_an_admin_asks_again_for_each_domain(world: World) -> None:
     fetcher = FakeLogoFetcher({"zz-nord.example": PNG})
     master, logos = world.fetching(fetcher)
     other = Identifier(IdentifierKind.EMAIL_DOMAIN, "zz-nord.example")
-    contact = await master.create_contact(admin.id, "Nord", identifiers=[DOMAIN])
+    contact = await master.create_contact(Actor(admin.id), "Nord", identifiers=[DOMAIN])
     await run_all(logos)
     assert (await stored(world, contact.id)).logo_failure is not None
-    await master.change_contact(admin.id, contact.id, identifiers=[DOMAIN, other])
+    await master.change_contact(Actor(admin.id), contact.id, identifiers=[DOMAIN, other])
     await run_all(logos)  # the new domain, on its own
     first = (await stored(world, contact.id)).logo
     assert first is not None and first.domain == "zz-nord.example"
 
     with pytest.raises(PermissionDeniedError):
-        await logos.request_fetch(user.id, contact.id)
+        await logos.request_fetch(Actor(user.id), contact.id)
     world.clock.advance(timedelta(minutes=1))
-    await logos.request_fetch(admin.id, contact.id)
-    await logos.request_fetch(admin.id, contact.id)  # once while it waits
+    await logos.request_fetch(Actor(admin.id), contact.id)
+    await logos.request_fetch(Actor(admin.id), contact.id)  # once while it waits
     assert await queued(world) == [{"contact_id": str(contact.id), "domain": None, "asked": True}]
     await run_all(logos)
     # Asked, it tries the failed domain again and goes on to the next; a new fetched logo.
@@ -354,23 +355,25 @@ async def test_an_admin_asks_again_for_each_domain(world: World) -> None:
     again = await stored(world, contact.id)
     assert again.logo is not None and again.logo.stored_at > first.stored_at
 
-    bare = await master.create_contact(admin.id, "Bare")
+    bare = await master.create_contact(Actor(admin.id), "Bare")
     with pytest.raises(ValidationError):
-        await logos.request_fetch(admin.id, bare.id)
+        await logos.request_fetch(Actor(admin.id), bare.id)
     with pytest.raises(NotFoundError):
-        await logos.request_fetch(admin.id, ContactId(new_id()))
+        await logos.request_fetch(Actor(admin.id), ContactId(new_id()))
 
 
 async def test_fetch_logos_queues_the_contacts_without_one(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     fetcher = FakeLogoFetcher({"nord.example": PNG})
     master = world.master_data  # identifiers entered without fetching on
-    with_domain = await master.create_contact(admin.id, "Nord", identifiers=[DOMAIN])
-    await master.create_contact(admin.id, "Bare", identifiers=[NUMBER])
+    with_domain = await master.create_contact(Actor(admin.id), "Nord", identifiers=[DOMAIN])
+    await master.create_contact(Actor(admin.id), "Bare", identifiers=[NUMBER])
     with_logo = await master.create_contact(
-        admin.id, "Logo", identifiers=[Identifier(IdentifierKind.EMAIL_DOMAIN, "logo.example")]
+        Actor(admin.id),
+        "Logo",
+        identifiers=[Identifier(IdentifierKind.EMAIL_DOMAIN, "logo.example")],
     )
-    await world.logos.upload(admin.id, with_logo.id, PNG)
+    await world.logos.upload(Actor(admin.id), with_logo.id, PNG)
     _, logos = world.fetching(fetcher)
     assert await logos.request_all() == 1
     assert await queued(world) == [
@@ -396,8 +399,8 @@ async def test_a_logo_that_breaks_the_normaliser_is_a_failed_fetch(world: World)
     world.images = Broken()
     other = Identifier(IdentifierKind.EMAIL_DOMAIN, "zz-nord.example")
     master, logos = world.fetching(FakeLogoFetcher({"nord.example": b"broken"}))
-    contact = await master.create_contact(admin.id, "Nord", identifiers=[DOMAIN, other])
-    await logos.request_fetch(admin.id, contact.id)
+    contact = await master.create_contact(Actor(admin.id), "Nord", identifiers=[DOMAIN, other])
+    await logos.request_fetch(Actor(admin.id), contact.id)
     await run_all(logos)
     jobs = [job for job in world.database.jobs.values() if job.kind == LOGO_JOB]
     assert {job.status for job in jobs} == {JobStatus.DONE}
@@ -417,7 +420,7 @@ async def test_a_broken_job_is_tried_again_and_given_up(world: World) -> None:
 
     world.object_store = Down()
     master, logos = world.fetching(FakeLogoFetcher({"nord.example": PNG}))
-    await master.create_contact(admin.id, "Nord", identifiers=[DOMAIN])
+    await master.create_contact(Actor(admin.id), "Nord", identifiers=[DOMAIN])
     for attempt in range(3):
         assert await logos.run_next_job()
         world.clock.advance(timedelta(minutes=5 * (attempt + 1)))
@@ -429,8 +432,8 @@ async def test_a_broken_job_is_tried_again_and_given_up(world: World) -> None:
 async def test_a_contact_gone_meanwhile_gets_no_logo(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     master, logos = world.fetching(FakeLogoFetcher({"nord.example": PNG}))
-    contact = await master.create_contact(admin.id, "Nord", identifiers=[DOMAIN])
-    await master.delete_contact(admin.id, contact.id)
+    contact = await master.create_contact(Actor(admin.id), "Nord", identifiers=[DOMAIN])
+    await master.delete_contact(Actor(admin.id), contact.id)
     assert await run_all(logos) == 1
     assert not await world.object_store.exists(logo_key(contact.id))
 
@@ -446,7 +449,9 @@ class Meanwhile(MemoryObjectStore):
     async def put(self, key: str, data: bytes, *, content_type: str) -> None:
         self.puts += 1
         if self.puts == 1:
-            await self.world.master_data.change_contact(self.admin, self.contact, name=self.name)
+            await self.world.master_data.change_contact(
+                Actor(self.admin), self.contact, name=self.name
+            )
         await super().put(key, data, content_type=content_type)
 
 
@@ -455,10 +460,10 @@ async def test_a_contact_changed_while_its_logo_is_stored_is_stored_again(world:
     lock) fails the version check, and the step starts again on the new state, so that file
     and row tell the same logo."""
     admin = await world.user(role=Role.ADMIN)
-    contact = await world.master_data.create_contact(admin.id, "Nord", identifiers=[DOMAIN])
+    contact = await world.master_data.create_contact(Actor(admin.id), "Nord", identifiers=[DOMAIN])
     store = Meanwhile(world, admin.id, contact.id, "Nord AG")
     world.object_store = store
-    uploaded = await world.logos.upload(admin.id, contact.id, PNG)
+    uploaded = await world.logos.upload(Actor(admin.id), contact.id, PNG)
     assert store.puts == 2
     final = await stored(world, contact.id)
     assert (final.name, final.logo) == ("Nord AG", uploaded.logo)
@@ -467,7 +472,7 @@ async def test_a_contact_changed_while_its_logo_is_stored_is_stored_again(world:
 
     # The same for a fetched logo.
     sued = Identifier(IdentifierKind.EMAIL_DOMAIN, "sued.example")
-    other = await world.master_data.create_contact(admin.id, "Süd", identifiers=[sued])
+    other = await world.master_data.create_contact(Actor(admin.id), "Süd", identifiers=[sued])
     store = Meanwhile(world, admin.id, other.id, "Süd AG")
     world.object_store = store
     _, logos = world.fetching(FakeLogoFetcher({"sued.example": PNG}))
@@ -479,7 +484,7 @@ async def test_a_contact_changed_while_its_logo_is_stored_is_stored_again(world:
 
 async def test_the_row_is_written_before_the_file(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
-    contact = await world.master_data.create_contact(admin.id, "Nord")
+    contact = await world.master_data.create_contact(Actor(admin.id), "Nord")
     order: list[str] = []
 
     class Recording(MemoryObjectStore):
@@ -502,7 +507,7 @@ async def test_the_row_is_written_before_the_file(world: World) -> None:
         return uow
 
     logos = LogoService(recording, world.clock, world.object_store, world.images)
-    await logos.upload(admin.id, contact.id, PNG)
+    await logos.upload(Actor(admin.id), contact.id, PNG)
     assert order == ["update", "put"]
 
 
@@ -510,13 +515,13 @@ async def test_only_admins_have_the_missing_logos_fetched(world: World) -> None:
     """The page "System", tab "Maintenance": fetch-logos as an admin asks; a user may not,
     and without fetching nobody can."""
     admin, user = await world.user(role=Role.ADMIN), await world.user()
-    contact = await world.master_data.create_contact(admin.id, "Nord", identifiers=[DOMAIN])
+    contact = await world.master_data.create_contact(Actor(admin.id), "Nord", identifiers=[DOMAIN])
     with pytest.raises(LogoFetchDisabledError):
-        await world.logos.request_fetch_all(admin.id)
+        await world.logos.request_fetch_all(Actor(admin.id))
     _, logos = world.fetching(FakeLogoFetcher({"nord.example": PNG}))
     with pytest.raises(PermissionDeniedError):
-        await logos.request_fetch_all(user.id)
-    assert await logos.request_fetch_all(admin.id) == 1
-    assert await logos.request_fetch_all(admin.id) == 0  # queued already
+        await logos.request_fetch_all(Actor(user.id))
+    assert await logos.request_fetch_all(Actor(admin.id)) == 1
+    assert await logos.request_fetch_all(Actor(admin.id)) == 0  # queued already
     await run_all(logos)
     assert (await stored(world, contact.id)).logo is not None

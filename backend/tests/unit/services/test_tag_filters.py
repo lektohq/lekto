@@ -8,6 +8,7 @@ import pytest
 from lekto.core.domain.documents import Document, DocumentChanges
 from lekto.core.domain.ids import DocumentId, FieldId, TagId, new_id
 from lekto.core.domain.master_data import Tag, TagScope
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.repository import CountBy, DocumentFilter
 from lekto.core.services._tags import matches
@@ -35,12 +36,12 @@ class Tags:
     plain: Document
 
     async def listed(self, filter: DocumentFilter, user: User | None = None) -> set[DocumentId]:
-        views = await self.setup.world.documents.query((user or self.owner).id, filter)
+        views = await self.setup.world.documents.query(Actor((user or self.owner).id), filter)
         return {view.document.id for view in views}
 
     async def searched(self, filter: DocumentFilter) -> set[DocumentId]:
         search = SearchService(self.setup.world.uow, self.setup.index, builders.SEARCH)
-        page = await search.search(self.owner.id, "Schreiben", filter)
+        page = await search.search(Actor(self.owner.id), "Schreiben", filter)
         return {item.document.id for item in page.items}
 
 
@@ -56,19 +57,19 @@ async def tags(world: World) -> Tags:
     setup = Setup(world, embeddings=None)
     admin, owner = await world.user(role=Role.ADMIN), await world.user()
     master = setup.master_data
-    insurance = await master.create_tag(admin.id, "Insurance")
-    health = await master.create_tag(admin.id, "Health", parent_id=insurance.id)
-    car = await master.create_tag(admin.id, "Car", parent_id=insurance.id)
-    insurer = await master.create_tag(admin.id, "Insurer", scope=TagScope.CONTACT)
+    insurance = await master.create_tag(Actor(admin.id), "Insurance")
+    health = await master.create_tag(Actor(admin.id), "Health", parent_id=insurance.id)
+    car = await master.create_tag(Actor(admin.id), "Car", parent_id=insurance.id)
+    insurer = await master.create_tag(Actor(admin.id), "Insurer", scope=TagScope.CONTACT)
     health_insurer = await master.create_tag(
-        admin.id, "Health insurer", scope=TagScope.CONTACT, parent_id=insurer.id
+        Actor(admin.id), "Health insurer", scope=TagScope.CONTACT, parent_id=insurer.id
     )
-    bills = await master.create_tag(admin.id, "Bills", scope=TagScope.DOCUMENT_TYPE)
+    bills = await master.create_tag(Actor(admin.id), "Bills", scope=TagScope.DOCUMENT_TYPE)
     medical = await master.create_tag(
-        admin.id, "Medical bills", scope=TagScope.DOCUMENT_TYPE, parent_id=bills.id
+        Actor(admin.id), "Medical bills", scope=TagScope.DOCUMENT_TYPE, parent_id=bills.id
     )
-    contact = await master.create_contact(admin.id, "Nord", group_ids=[health_insurer.id])
-    kind = await master.create_document_type(admin.id, "Invoice", group_ids=[medical.id])
+    contact = await master.create_contact(Actor(admin.id), "Nord", group_ids=[health_insurer.id])
+    kind = await master.create_document_type(Actor(admin.id), "Invoice", group_ids=[medical.id])
     documents = []
     for text, changes in (
         ("Schreiben a", DocumentChanges(tag_ids=frozenset({health.id}))),
@@ -77,7 +78,7 @@ async def tags(world: World) -> Tags:
         ("Schreiben d", DocumentChanges()),
     ):
         document = await setup.document(owner, text)
-        await world.documents.change_metadata(owner.id, document.id, changes)
+        await world.documents.change_metadata(Actor(owner.id), document.id, changes)
         documents.append(document)
     await setup.settle()
     return Tags(
@@ -126,9 +127,11 @@ async def test_a_group_finds_the_documents_of_its_contacts_and_types(tags: Tags)
 
 
 async def test_the_search_checks_groups_against_the_database(tags: Tags) -> None:
-    document = await tags.setup.world.documents.get(tags.owner.id, tags.of_insurer.id)
+    document = await tags.setup.world.documents.get(Actor(tags.owner.id), tags.of_insurer.id)
     assert document.contact_id is not None
-    await tags.setup.master_data.change_contact(tags.admin.id, document.contact_id, group_ids=[])
+    await tags.setup.master_data.change_contact(
+        Actor(tags.admin.id), document.contact_id, group_ids=[]
+    )
     # The index still holds the group: its refresh has not run yet.
     assert tags.setup.index.documents[document.id].contact_group_ids
     assert await tags.searched(DocumentFilter(contact_groups=sets(tags.insurer))) == set()
@@ -136,7 +139,7 @@ async def test_the_search_checks_groups_against_the_database(tags: Tags) -> None
 
 async def test_counts_take_each_document_once_at_a_tag_above(tags: Tags) -> None:
     documents = tags.setup.world.documents
-    counts = await documents.document_counts(tags.owner.id, CountBy.TAG)
+    counts = await documents.document_counts(Actor(tags.owner.id), CountBy.TAG)
     assert counts == {
         tags.insurance.id: 2,
         tags.health.id: 2,
@@ -147,8 +150,8 @@ async def test_counts_take_each_document_once_at_a_tag_above(tags: Tags) -> None
         tags.medical.id: 1,
     }
     stranger = await tags.setup.world.user()
-    assert await documents.document_counts(stranger.id, CountBy.TAG) == {}
-    every = await documents.document_counts(tags.admin.id, CountBy.TAG, all_users=True)
+    assert await documents.document_counts(Actor(stranger.id), CountBy.TAG) == {}
+    every = await documents.document_counts(Actor(tags.admin.id), CountBy.TAG, all_users=True)
     assert every == counts
 
 

@@ -8,6 +8,7 @@ from lekto.adapters.inbound.rest import PREFIX
 from lekto.core.domain.identifiers import Identifier, IdentifierKind, IdentifierSource
 from lekto.core.domain.ids import ContactId, SpaceId, UserId
 from lekto.core.domain.master_data import Contact, TagScope
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import User
 from tests.api import auth
@@ -54,7 +55,7 @@ async def test_a_contact_shows_each_user_what_they_may_see(api: Api) -> None:
     erika, bob, admin = await api.user("erika"), await api.user("bob"), await api.admin()
     own = await personal_space(api, erika)
     insurer = await api.services.master_data.create_contact(
-        admin.id,
+        Actor(admin.id),
         "Insurer",
         identifiers=[
             Identifier.parse(CUSTOMER, PUBLIC),
@@ -70,7 +71,7 @@ async def test_a_contact_shows_each_user_what_they_may_see(api: Api) -> None:
         Identifier(CUSTOMER, "K7007", learned),  # before 0040: no spaces
     )
     await api.services.master_data.change_contact(
-        admin.id,
+        Actor(admin.id),
         insurer.id,
         rejected_identifiers=[Identifier.parse(IdentifierKind.EMAIL_DOMAIN, "insurer.example")],
     )
@@ -86,17 +87,17 @@ async def test_a_contact_shows_each_user_what_they_may_see(api: Api) -> None:
     assert await values(api, erika, insurer.id) == [PUBLIC, "K4711", "12345", LEARNED]
     assert await values(api, bob, insurer.id) == [PUBLIC]
     # A member of the space it was learned in sees what was learned there, not her numbers.
-    await api.services.spaces.set_member(erika.id, own, bob.id, SpaceRole.READ)
+    await api.services.spaces.set_member(Actor(erika.id), own, bob.id, SpaceRole.READ)
     assert await values(api, bob, insurer.id) == [PUBLIC, LEARNED]
 
 
 async def test_a_user_keeps_their_numbers_in_their_profile(api: Api) -> None:
     erika, bob, admin = await api.user("erika"), await api.user("bob"), await api.admin()
-    work = await api.services.master_data.create_tag(admin.id, "Work", scope=TagScope.TOPIC)
+    work = await api.services.master_data.create_tag(Actor(admin.id), "Work", scope=TagScope.TOPIC)
     employer = await api.services.master_data.create_contact(
-        admin.id, "Employer", topic_ids=[work.id]
+        Actor(admin.id), "Employer", topic_ids=[work.id]
     )
-    insurer = await api.services.master_data.create_contact(admin.id, "Insurer")
+    insurer = await api.services.master_data.create_contact(Actor(admin.id), "Insurer")
     mine = UserId(erika.id)
     learned = IdentifierSource.LEARNED
     await learn(
@@ -159,9 +160,11 @@ async def test_a_user_keeps_their_numbers_in_their_profile(api: Api) -> None:
 async def test_a_number_moves_between_contacts_in_one_change(api: Api) -> None:
     erika, admin = await api.user("erika"), await api.admin()
     first = await api.services.master_data.create_contact(
-        admin.id, "First", identifiers=[Identifier.parse(CUSTOMER, "K4711", user_id=erika.id)]
+        Actor(admin.id),
+        "First",
+        identifiers=[Identifier.parse(CUSTOMER, "K4711", user_id=erika.id)],
     )
-    second = await api.services.master_data.create_contact(admin.id, "Second")
+    second = await api.services.master_data.create_contact(Actor(admin.id), "Second")
     moved = {"contact_id": str(second.id), "kind": "customer_number", "value": "K4711"}
     changed = await change_profile(api, erika, {"numbers": [moved]})
     assert changed.status_code == 200, changed.text
@@ -171,9 +174,9 @@ async def test_a_number_moves_between_contacts_in_one_change(api: Api) -> None:
 
 async def test_a_taken_number_tells_whose_only_to_who_sees_it(api: Api) -> None:
     erika, bob, admin = await api.user("erika"), await api.user("bob"), await api.admin()
-    employer = await api.services.master_data.create_contact(admin.id, "Employer")
+    employer = await api.services.master_data.create_contact(Actor(admin.id), "Employer")
     insurer = await api.services.master_data.create_contact(
-        admin.id,
+        Actor(admin.id),
         "Insurer",
         identifiers=[
             Identifier.parse(CUSTOMER, "K9009", user_id=bob.id),

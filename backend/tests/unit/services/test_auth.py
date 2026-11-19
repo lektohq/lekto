@@ -24,6 +24,7 @@ from lekto.core.domain.identity import (
     hash_token,
 )
 from lekto.core.domain.ids import ApiTokenId, new_id
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.identity import PasswordHasher
 from lekto.core.services.auth import AuthService
@@ -44,8 +45,10 @@ async def set_active(world: World, user: User, active: bool) -> None:
 
 
 async def enable_totp(world: World, user: User) -> tuple[str, list[str]]:
-    setup = await world.auth.begin_totp(user.id)
-    codes = await world.auth.confirm_totp(user.id, world.totp.code(setup.secret, world.clock.now()))
+    setup = await world.auth.begin_totp(Actor(user.id))
+    codes = await world.auth.confirm_totp(
+        Actor(user.id), world.totp.code(setup.secret, world.clock.now())
+    )
     world.clock.advance(timedelta(seconds=30))  # the confirming code is used up
     return setup.secret, codes
 
@@ -243,7 +246,7 @@ async def test_changing_the_password_forgets_the_known_devices(world: World) -> 
     here = await world.auth.login("alice", PASSWORD)
     elsewhere = (await world.auth.login("alice", PASSWORD)).devices
     changed = await world.auth.change_password(
-        user.id, PASSWORD, NEW_PASSWORD, session=here.session.id, devices=here.devices
+        Actor(user.id), PASSWORD, NEW_PASSWORD, session=here.session.id, devices=here.devices
     )
     assert changed is not None
     [token] = changed.devices
@@ -489,7 +492,7 @@ async def test_end_other_sessions(world: World) -> None:
     user = await world.account("alice")
     mine = await world.auth.login("alice", PASSWORD)
     other = await world.auth.login("alice", PASSWORD)
-    assert await world.auth.end_other_sessions(user.id, keep=mine.session.id) == 1
+    assert await world.auth.end_other_sessions(Actor(user.id), keep=mine.session.id) == 1
     await world.auth.authenticate_session(mine.token)
     with pytest.raises(AuthenticationError):
         await world.auth.authenticate_session(other.token)
@@ -502,10 +505,10 @@ async def test_changing_the_password_ends_other_sessions_and_keeps_tokens(world:
     user = await world.account("alice")
     mine = await world.auth.login("alice", PASSWORD)
     other = await world.auth.login("alice", PASSWORD)
-    _, token = await world.auth.create_api_token(user.id, "cli", TokenScope.READ)
+    _, token = await world.auth.create_api_token(Actor(user.id), "cli", TokenScope.READ)
 
     renewed = await world.auth.change_password(
-        user.id, PASSWORD, NEW_PASSWORD, session=mine.session.id
+        Actor(user.id), PASSWORD, NEW_PASSWORD, session=mine.session.id
     )
 
     assert renewed is not None and renewed.token != mine.token
@@ -521,9 +524,9 @@ async def test_changing_the_password_ends_other_sessions_and_keeps_tokens(world:
 
 async def test_changing_the_password_can_revoke_tokens(world: World) -> None:
     user = await world.account("alice")
-    _, token = await world.auth.create_api_token(user.id, "cli", TokenScope.READ)
+    _, token = await world.auth.create_api_token(Actor(user.id), "cli", TokenScope.READ)
     assert (
-        await world.auth.change_password(user.id, PASSWORD, NEW_PASSWORD, revoke_tokens=True)
+        await world.auth.change_password(Actor(user.id), PASSWORD, NEW_PASSWORD, revoke_tokens=True)
         is None
     )
     with pytest.raises(AuthenticationError):
@@ -533,12 +536,12 @@ async def test_changing_the_password_can_revoke_tokens(world: World) -> None:
 async def test_changing_the_password_needs_the_current_one_and_the_policy(world: World) -> None:
     user = await world.account("alice")
     with pytest.raises(PermissionDeniedError):
-        await world.auth.change_password(user.id, "wrong password!", NEW_PASSWORD)
+        await world.auth.change_password(Actor(user.id), "wrong password!", NEW_PASSWORD)
     for weak in ("short", "alice", "ALICE"):
         with pytest.raises(ValidationError):
-            await world.auth.change_password(user.id, PASSWORD, weak)
+            await world.auth.change_password(Actor(user.id), PASSWORD, weak)
     with pytest.raises(ValidationError):
-        await world.auth.change_password(user.id, PASSWORD, "x" * 257)
+        await world.auth.change_password(Actor(user.id), PASSWORD, "x" * 257)
     await world.auth.login("alice", PASSWORD)
 
 
@@ -546,7 +549,7 @@ async def test_rejected_new_passwords_do_not_count_as_failures(world: World) -> 
     user = await world.account("alice")
     for _ in range(10):
         with pytest.raises(ValidationError):
-            await world.auth.change_password(user.id, PASSWORD, "short")
+            await world.auth.change_password(Actor(user.id), PASSWORD, "short")
     async with world.uow() as uow:
         assert await uow.login_failures.find("account:alice") is None
     await world.auth.login("alice", PASSWORD)
@@ -592,9 +595,9 @@ async def test_a_sign_in_does_not_outlive_a_reset_or_deactivation(
 
     async def meanwhile() -> None:
         if change == "reset":
-            await world.users.reset_password(admin.id, user.id, NEW_PASSWORD)
+            await world.users.reset_password(Actor(admin.id), user.id, NEW_PASSWORD)
         else:
-            await world.users.update(admin.id, user.id, active=False)
+            await world.users.update(Actor(admin.id), user.id, active=False)
 
     hasher.meanwhile = meanwhile
     with pytest.raises(AuthenticationError):
@@ -610,7 +613,7 @@ async def test_a_sign_in_does_not_outlive_a_reset_or_deactivation(
 
 async def test_totp_setup_is_confirmed_by_a_code(world: World) -> None:
     user = await world.account("alice")
-    setup = await world.auth.begin_totp(user.id)
+    setup = await world.auth.begin_totp(Actor(user.id))
     assert setup.secret in setup.uri and "alice" in setup.uri
     async with world.uow() as uow:
         credential = await uow.credentials.get(user.id)
@@ -619,8 +622,10 @@ async def test_totp_setup_is_confirmed_by_a_code(world: World) -> None:
     await world.auth.login("alice", PASSWORD)  # not required before confirmation
 
     with pytest.raises(ValidationError):
-        await world.auth.confirm_totp(user.id, "000000")
-    codes = await world.auth.confirm_totp(user.id, world.totp.code(setup.secret, world.clock.now()))
+        await world.auth.confirm_totp(Actor(user.id), "000000")
+    codes = await world.auth.confirm_totp(
+        Actor(user.id), world.totp.code(setup.secret, world.clock.now())
+    )
 
     assert len(codes) == 10 and len(set(codes)) == 10
     async with world.uow() as uow:
@@ -628,7 +633,7 @@ async def test_totp_setup_is_confirmed_by_a_code(world: World) -> None:
     assert credential.totp_enabled
     assert all(code not in str(credential.recovery_codes) for code in codes)  # only hashes
     with pytest.raises(ConflictError):
-        await world.auth.begin_totp(user.id)
+        await world.auth.begin_totp(Actor(user.id))
 
 
 async def test_login_with_totp(world: World) -> None:
@@ -685,23 +690,25 @@ async def test_turning_totp_off_needs_a_code(world: World) -> None:
     user = await world.account("alice")
     secret, codes = await enable_totp(world, user)
     with pytest.raises(PermissionDeniedError):
-        await world.auth.disable_totp(user.id, "000000")
-    renewed = await world.auth.renew_recovery_codes(user.id, codes[0])
+        await world.auth.disable_totp(Actor(user.id), "000000")
+    renewed = await world.auth.renew_recovery_codes(Actor(user.id), codes[0])
     with pytest.raises(PermissionDeniedError):
-        await world.auth.disable_totp(user.id, codes[1])  # replaced by the renewed ones
-    await world.auth.disable_totp(user.id, renewed[0])
+        await world.auth.disable_totp(Actor(user.id), codes[1])  # replaced by the renewed ones
+    await world.auth.disable_totp(Actor(user.id), renewed[0])
     await world.auth.login("alice", PASSWORD)
     with pytest.raises(ConflictError):
-        await world.auth.disable_totp(user.id, world.totp.code(secret, world.clock.now()))
+        await world.auth.disable_totp(Actor(user.id), world.totp.code(secret, world.clock.now()))
 
 
 async def test_another_setup_replaces_an_unconfirmed_one(world: World) -> None:
     user = await world.account("alice")
-    first = await world.auth.begin_totp(user.id)
-    second = await world.auth.begin_totp(user.id)
+    first = await world.auth.begin_totp(Actor(user.id))
+    second = await world.auth.begin_totp(Actor(user.id))
     with pytest.raises(ValidationError):
-        await world.auth.confirm_totp(user.id, world.totp.code(first.secret, world.clock.now()))
-    await world.auth.confirm_totp(user.id, world.totp.code(second.secret, world.clock.now()))
+        await world.auth.confirm_totp(
+            Actor(user.id), world.totp.code(first.secret, world.clock.now())
+        )
+    await world.auth.confirm_totp(Actor(user.id), world.totp.code(second.secret, world.clock.now()))
 
 
 # --- API tokens ---------------------------------------------------------------------------------
@@ -709,24 +716,27 @@ async def test_another_setup_replaces_an_unconfirmed_one(world: World) -> None:
 
 async def test_api_tokens(world: World) -> None:
     user = await world.account("alice")
-    read, read_token = await world.auth.create_api_token(user.id, "cli", TokenScope.READ)
+    read, read_token = await world.auth.create_api_token(Actor(user.id), "cli", TokenScope.READ)
     world.clock.advance(timedelta(seconds=1))  # listed oldest first
     write, write_token = await world.auth.create_api_token(
-        user.id, "mcp", TokenScope.READ_WRITE, expires_at=world.clock.now() + timedelta(days=1)
+        Actor(user.id),
+        "mcp",
+        TokenScope.READ_WRITE,
+        expires_at=world.clock.now() + timedelta(days=1),
     )
     assert read_token.startswith("lekto_") and read.token_hash == hash_token(read_token)
-    assert [t.id for t in await world.auth.list_api_tokens(user.id)] == [read.id, write.id]
+    assert [t.id for t in await world.auth.list_api_tokens(Actor(user.id))] == [read.id, write.id]
 
     principal = await world.auth.authenticate_token(read_token)
     assert principal.id == user.id and not principal.can_write
     assert (await world.auth.authenticate_token(write_token)).can_write
-    [stored, _] = await world.auth.list_api_tokens(user.id)
+    [stored, _] = await world.auth.list_api_tokens(Actor(user.id))
     assert stored.last_used_at == world.clock.now()
 
     world.clock.advance(timedelta(days=1))
     with pytest.raises(AuthenticationError):
         await world.auth.authenticate_token(write_token)  # expired
-    await world.auth.revoke_api_token(user.id, read.id)
+    await world.auth.revoke_api_token(Actor(user.id), read.id)
     with pytest.raises(AuthenticationError):
         await world.auth.authenticate_token(read_token)
     with pytest.raises(AuthenticationError):
@@ -735,15 +745,15 @@ async def test_api_tokens(world: World) -> None:
 
 async def test_tokens_of_others_cannot_be_revoked(world: World) -> None:
     alice, bob = await world.account("alice"), await world.account("bob")
-    token, _ = await world.auth.create_api_token(alice.id, "cli", TokenScope.READ)
+    token, _ = await world.auth.create_api_token(Actor(alice.id), "cli", TokenScope.READ)
     for id in (token.id, ApiTokenId(new_id())):
         with pytest.raises(NotFoundError):
-            await world.auth.revoke_api_token(bob.id, id)
+            await world.auth.revoke_api_token(Actor(bob.id), id)
 
 
 async def test_tokens_of_deactivated_users_are_refused(world: World) -> None:
     user = await world.account("alice")
-    _, token = await world.auth.create_api_token(user.id, "cli", TokenScope.READ)
+    _, token = await world.auth.create_api_token(Actor(user.id), "cli", TokenScope.READ)
     await set_active(world, user, False)
     with pytest.raises(AuthenticationError):
         await world.auth.authenticate_token(token)
@@ -754,8 +764,8 @@ async def test_tokens_of_deactivated_users_are_refused(world: World) -> None:
 async def test_token_names_and_expiry_are_checked(world: World) -> None:
     user = await world.account("alice")
     with pytest.raises(ValidationError):
-        await world.auth.create_api_token(user.id, " ", TokenScope.READ)
+        await world.auth.create_api_token(Actor(user.id), " ", TokenScope.READ)
     with pytest.raises(ValidationError):
         await world.auth.create_api_token(
-            user.id, "old", TokenScope.READ, expires_at=world.clock.now()
+            Actor(user.id), "old", TokenScope.READ, expires_at=world.clock.now()
         )

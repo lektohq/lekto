@@ -14,6 +14,7 @@ from lekto.core.domain.ids import ContactId, DocumentId, DocumentTypeId, UserId
 from lekto.core.domain.periods import Period
 from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.reasons import Action
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.series import Dated, Series, SeriesKey, SeriesState, series_of
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.repository import DocumentFilter
@@ -40,14 +41,14 @@ class ExpectedService:
         self._clock = clock
 
     async def expected(
-        self, actor: UserId, *, all_users: bool = False, zone: tzinfo = UTC
+        self, actor: Actor, *, all_users: bool = False, zone: tzinfo = UTC
     ) -> list[Expected]:
         """The series among the documents the caller may read (with `all_users`, an admin's,
         of every user), the overdue first, then by their next date (the ended newest first);
         today as it is in `zone`."""
         async with self._uow() as uow:
             await load_lister(uow, actor, all_users, Action.LIST_ALL_DOCUMENTS)
-            documents = await _dated(uow, None if all_users else actor)
+            documents = await _dated(uow, None if all_users else actor.id)
             facts = await uow.document_facts.of_documents([item.id for item in documents])
             contacts = {item.id: item.name for item in await uow.contacts.list_all()}
             types = {item.id: item.name for item in await uow.document_types.list_all()}

@@ -40,7 +40,7 @@ def add_fact_tools(tools: Tools, context: ApiContext) -> None:
         ] = None,
     ) -> str:
         principal = principal_of(ctx)
-        user = principal.id
+        user = principal.actor
         document = await context.documents.resolve(user, id)
         decision = FactDecision(
             action=FactAction(action),

@@ -36,10 +36,11 @@ from lekto.core.domain.errors import (
     UnsupportedMediaTypeError,
     ValidationError,
 )
-from lekto.core.domain.ids import ContactId, UserId
+from lekto.core.domain.ids import ContactId
 from lekto.core.domain.jobs import Job, RetryPolicy
 from lekto.core.domain.master_data import Contact
 from lekto.core.domain.reasons import Action, ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.images import ImageNormaliser
 from lekto.core.ports.logos import LogoFetcher
@@ -103,7 +104,7 @@ class LogoService:
         """Whether logos are fetched from websites (`LEKTO_LOGO_FETCH`)."""
         return self._fetcher is not None
 
-    async def upload(self, actor: UserId, id: ContactId, data: bytes) -> Contact:
+    async def upload(self, actor: Actor, id: ContactId, data: bytes) -> Contact:
         """Admins only. `data`, a PNG, JPEG or WebP image of at most `LOGO_MAX_SIZE` bytes,
         becomes the contact's logo, in place of any other; a fetched one never replaces it.
         UnsupportedMediaTypeError for another kind (SVG: it can carry scripts),
@@ -131,7 +132,7 @@ class LogoService:
 
         return await retrying(store, attempts=_COMMIT_ATTEMPTS)
 
-    async def remove(self, actor: UserId, id: ContactId) -> Contact:
+    async def remove(self, actor: Actor, id: ContactId) -> Contact:
         """Admins only: the contact shows its initials again; a failed fetch noted is
         forgotten."""
 
@@ -150,7 +151,7 @@ class LogoService:
 
         return await retrying(drop, attempts=_COMMIT_ATTEMPTS)
 
-    async def logo(self, actor: UserId, id: ContactId) -> StoredLogo:
+    async def logo(self, actor: Actor, id: ContactId) -> StoredLogo:
         """Every signed-in user. NotFoundError if the contact has no logo."""
         async with self._uow() as uow:
             await load_actor(uow, actor)
@@ -161,7 +162,7 @@ class LogoService:
 
     # --- fetching ---------------------------------------------------------------------------
 
-    async def request_fetch(self, actor: UserId, id: ContactId) -> None:
+    async def request_fetch(self, actor: Actor, id: ContactId) -> None:
         """Admins only: fetch the contact's logo from its website now, trying its domains in
         turn, also one whose fetch failed before; a logo found replaces a fetched one.
         LogoFetchDisabledError without fetching; ConflictError while it has an uploaded logo;
@@ -180,7 +181,7 @@ class LogoService:
             await _enqueue(uow, contact.id, None, self._clock.now())
             await uow.commit()
 
-    async def request_fetch_all(self, actor: UserId) -> int:
+    async def request_fetch_all(self, actor: Actor) -> int:
         """Admins only: `request_all`."""
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.FETCH_LOGOS_ALL)

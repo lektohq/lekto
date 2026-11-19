@@ -22,6 +22,7 @@ from typing import Any
 from lekto.adapters.inbound.evaluation.cases import EvaluationSet, EvaluationSetError
 from lekto.adapters.inbound.evaluation.runner import Environment, evaluate
 from lekto.core.domain.ids import DocumentId, UserId
+from lekto.core.domain.rights import Actor
 from lekto.core.ports.embeddings import EmbeddingResult, Embeddings
 from lekto.core.ports.search_index import SearchIndex
 from lekto.core.services.indexing import IndexingService
@@ -323,7 +324,7 @@ async def _measure(
                 result.outcomes.append(await _ask(search, owner, case, ratio, names))
             if ratio > 0:
                 for text in NONSENSE:
-                    page = await search.search(owner, text, limit=1, semantic_ratio=ratio)
+                    page = await search.search(Actor(owner), text, limit=1, semantic_ratio=ratio)
                     scores = [item.score for item in page.items if item.score is not None]
                     result.nonsense.append(scores[0] if scores else 0.0)
             results.append(result)
@@ -345,7 +346,7 @@ async def _ask(
     names: dict[DocumentId, str],
 ) -> QueryOutcome:
     started = time.perf_counter()
-    page = await search.search(owner, case.query, limit=CUTOFF, semantic_ratio=ratio)
+    page = await search.search(Actor(owner), case.query, limit=CUTOFF, semantic_ratio=ratio)
     seconds = time.perf_counter() - started
     got = tuple(names[item.document.id] for item in page.items)
     rank = next((position for position, name in enumerate(got, 1) if name in case.expected), None)

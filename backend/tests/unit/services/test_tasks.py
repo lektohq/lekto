@@ -14,6 +14,7 @@ from lekto.core.domain.ids import RuleId, TaskId, WebhookId, new_id
 from lekto.core.domain.links import Links
 from lekto.core.domain.pipeline import Node, NodeResult, NodeStatus, Outcome
 from lekto.core.domain.reasons import ReasonCode
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.tasks import MAX_ANSWER_BYTES, Task, TaskKind, TaskStatus, TaskStep
 from lekto.core.domain.users import User
 from lekto.core.domain.webhooks import BodyFormat, Webhook
@@ -124,7 +125,7 @@ async def flow(
 ) -> Flow:
     owner = await world.user()
     created = await world.webhooks.create(
-        owner.id,
+        Actor(owner.id),
         name="Flow",
         url=URL,
         event_types=[],
@@ -326,7 +327,7 @@ async def test_more_room_lets_waiting_tasks_go(world: World) -> None:
     f = await flow(world, max_open_tasks=1)
     await f.arrive()
     second = await f.arrive()
-    await world.webhooks.update(f.owner.id, f.webhook.id, max_open_tasks=2)
+    await world.webhooks.update(Actor(f.owner.id), f.webhook.id, max_open_tasks=2)
     await f.run()
     (task,) = await f.tasks(second)
     assert task.status is TaskStatus.OPEN and len(f.asked()) == 2
@@ -335,7 +336,7 @@ async def test_more_room_lets_waiting_tasks_go(world: World) -> None:
 async def test_deleting_the_document_ends_its_tasks_and_frees_their_room(world: World) -> None:
     f = await flow(world, max_open_tasks=1)
     first, second = await f.arrive(), await f.arrive()
-    await world.documents.delete(f.owner.id, first.id)
+    await world.documents.delete(Actor(f.owner.id), first.id)
     async with world.uow() as uow:
         (cancelled,) = await uow.tasks.list_for_run(first.id, Node.APPLY_RULES, 1)
     assert cancelled.status is TaskStatus.CANCELLED
@@ -349,7 +350,7 @@ async def test_deleting_the_document_ends_its_tasks_and_frees_their_room(world: 
 async def test_a_deleted_webhook_fails_the_tasks_waiting_for_it(world: World) -> None:
     f = await flow(world, max_open_tasks=1)
     first, second = await f.arrive(), await f.arrive()
-    await world.webhooks.delete(f.owner.id, f.webhook.id)
+    await world.webhooks.delete(Actor(f.owner.id), f.webhook.id)
     await f.run()
     (waiting,) = await f.tasks(second)
     assert waiting.status is TaskStatus.FAILED

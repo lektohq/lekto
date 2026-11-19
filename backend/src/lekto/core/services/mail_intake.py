@@ -33,7 +33,7 @@ from lekto.core.domain.errors import (
     ValidationError,
 )
 from lekto.core.domain.events import MailboxFetched
-from lekto.core.domain.ids import DocumentId, MailboxId, UserId, new_id
+from lekto.core.domain.ids import DocumentId, MailboxId, new_id
 from lekto.core.domain.jobs import Job
 from lekto.core.domain.mail import (
     Fallback,
@@ -72,6 +72,7 @@ from lekto.core.domain.mail_rules import (
 from lekto.core.domain.mail_traits import MailMarks
 from lekto.core.domain.push import PushKind
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.identity import DecryptionError, SecretCipher
 from lekto.core.ports.mail_server import (
@@ -159,17 +160,17 @@ class MailIntakeService:
                     await schedule_fetch(uow, mailbox, self._clock.now())
             await uow.commit()
 
-    async def fetch_now(self, actor: UserId, id: MailboxId) -> None:
+    async def fetch_now(self, actor: Actor, id: MailboxId) -> None:
         """Fetch the mailbox as soon as a worker can (admins). ValidationError if it is paused."""
         async with self._uow() as uow:
-            await require_admin(uow, actor, Action.MANAGE_MAILBOXES)
+            await require_admin(uow, actor, Action.MANAGE_MAILBOXES, TokenRight.ADMIN_MAILBOXES)
             mailbox = await uow.mailboxes.get(id)
             if not mailbox.enabled:
                 raise ValidationError(because(ReasonCode.MAILBOX_PAUSED))
             await schedule_fetch(uow, mailbox, self._clock.now())
             await uow.commit()
 
-    async def origin(self, actor: UserId, id: DocumentId) -> MailOrigin | None:
+    async def origin(self, actor: Actor, id: DocumentId) -> MailOrigin | None:
         """Where the document came from if a mail brought it. NotFoundError if the caller does
         not read the document."""
         async with self._uow() as uow:
@@ -666,7 +667,7 @@ class MailIntakeService:
         file = await asyncio.to_thread(IncomingFile.of, path)
         try:
             document = await self._pipeline.receive(
-                decision.user_id,
+                Actor(decision.user_id),
                 file,
                 filename=name,
                 space=decision.space_id,

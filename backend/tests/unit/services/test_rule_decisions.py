@@ -5,6 +5,7 @@ from lekto.core.domain.classification import FieldCheck, checks_to_json
 from lekto.core.domain.documents import Document, DocumentChanges
 from lekto.core.domain.pipeline import PERSON_SPACE, RULES, Lane, NodeResult, Outcome
 from lekto.core.domain.reasons import ReasonCode, because, written
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rule_planner import Note, NoteKind
 from lekto.core.domain.rules import ForceReview, RemoveTags, SetSpace, Trigger
 from lekto.core.domain.spaces import SpaceRole
@@ -42,8 +43,8 @@ class UnsureOfTheContact:
 async def test_a_space_chosen_on_upload_stays(world: World) -> None:
     r = await rule_world(world)
     owner = await world.user()
-    chosen = await world.spaces.create(owner.id, "Chosen")
-    other = await world.spaces.create(owner.id, "Other")
+    chosen = await world.spaces.create(Actor(owner.id), "Chosen")
+    other = await world.spaces.create(Actor(owner.id), "Other")
     await r.space_rule(
         owner, chosen.id, definition("Other", channel_api(), SetSpace(other.id), triggers=INGEST)
     )
@@ -63,18 +64,18 @@ async def test_a_change_rule_leaves_the_space_the_owner_moved_the_document_into(
     r = await rule_world(world)
     owner = await world.user()
     acme = await r.contact("ACME")
-    mine = await world.spaces.create(owner.id, "Mine")
-    rules = await world.spaces.create(owner.id, "Rules")
+    mine = await world.spaces.create(Actor(owner.id), "Mine")
+    rules = await world.spaces.create(Actor(owner.id), "Rules")
     await r.space_rule(
         owner,
         mine.id,
         definition("ACME", contact_is(acme.id), SetSpace(rules.id), triggers=CHANGE),
     )
     document = await r.arrive(owner)
-    await r.documents.move(owner.id, document.id, mine.id)
+    await r.documents.move(Actor(owner.id), document.id, mine.id)
 
     change = await r.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(contact_id=acme.id)
+        Actor(owner.id), document.id, DocumentChanges(contact_id=acme.id)
     )
 
     assert change.rules is not None
@@ -95,11 +96,11 @@ async def test_a_change_rule_keeps_a_tag_the_person_added_earlier(world: World) 
     )
     document = await r.arrive(owner)
     await r.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(tag_ids=frozenset({keep.id}))
+        Actor(owner.id), document.id, DocumentChanges(tag_ids=frozenset({keep.id}))
     )
 
     change = await r.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(contact_id=acme.id)
+        Actor(owner.id), document.id, DocumentChanges(contact_id=acme.id)
     )
 
     assert change.rules is not None
@@ -118,11 +119,11 @@ async def test_a_review_the_confirmation_sets_off_still_holds_the_document(
     acme = await r.contact("ACME")
     await r.personal_rule(owner, definition("ACME", contact_is(acme.id), ForceReview("check")))
     pipeline = r.pipeline(UnsureOfTheContact())
-    received = await pipeline.receive(owner.id, incoming_pdf(), filename="a.pdf")
+    received = await pipeline.receive(Actor(owner.id), incoming_pdf(), filename="a.pdf")
     await world.drain(pipeline)
     assert (await r.stored(received)).lane is Lane.YELLOW
 
-    await pipeline.confirm(owner.id, received.id, DocumentChanges(contact_id=acme.id))
+    await pipeline.confirm(Actor(owner.id), received.id, DocumentChanges(contact_id=acme.id))
     await world.drain(pipeline)
 
     document = await r.stored(received)
@@ -131,7 +132,7 @@ async def test_a_review_the_confirmation_sets_off_still_holds_the_document(
         ("review", "review")
     ]
 
-    await pipeline.confirm(owner.id, document.id, DocumentChanges())
+    await pipeline.confirm(Actor(owner.id), document.id, DocumentChanges())
     await world.drain(pipeline)
     document = await r.stored(document)
     assert document.lane is Lane.GREEN
@@ -146,16 +147,16 @@ async def test_a_change_rule_into_a_space_no_longer_shared_is_only_reported(
     r = await rule_world(world)
     owner, colleague = await world.user(), await world.user()
     acme = await r.contact("ACME")
-    office = await world.spaces.create(colleague.id, "Office")
-    await world.spaces.set_member(colleague.id, office.id, owner.id, SpaceRole.EDIT)
+    office = await world.spaces.create(Actor(colleague.id), "Office")
+    await world.spaces.set_member(Actor(colleague.id), office.id, owner.id, SpaceRole.EDIT)
     await r.personal_rule(
         owner, definition("Office", contact_is(acme.id), SetSpace(office.id), triggers=CHANGE)
     )
-    await world.spaces.set_member(colleague.id, office.id, owner.id, SpaceRole.READ)
+    await world.spaces.set_member(Actor(colleague.id), office.id, owner.id, SpaceRole.READ)
     document = await r.arrive(owner)
 
     change = await r.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(contact_id=acme.id)
+        Actor(owner.id), document.id, DocumentChanges(contact_id=acme.id)
     )
 
     assert change.rules is not None

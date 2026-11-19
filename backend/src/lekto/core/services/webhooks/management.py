@@ -24,6 +24,7 @@ from lekto.core.domain.errors import (
 )
 from lekto.core.domain.ids import UserId, WebhookId, new_id
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.templates import WEBHOOK_NAMES, unknown_values
 from lekto.core.domain.users import User
 from lekto.core.domain.webhooks import (
@@ -123,7 +124,7 @@ class WebhookService:
 
     async def create(
         self,
-        actor: UserId,
+        actor: Actor,
         *,
         name: str,
         url: str,
@@ -173,12 +174,12 @@ class WebhookService:
             await uow.commit()
         return CreatedWebhook(webhook, secret)
 
-    async def list_webhooks(self, actor: UserId, *, owner: UserId | None = None) -> list[Webhook]:
+    async def list_webhooks(self, actor: Actor, *, owner: UserId | None = None) -> list[Webhook]:
         """The caller's webhooks, oldest first. Admins get everybody's; `owner` narrows to one
         user's."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
-            if not user.is_active_admin:
+            if not user.may(TokenRight.ADMIN_MANAGE):
                 if owner is not None and owner != user.id:
                     return []
                 return await uow.webhooks.list_for_owner(user.id)
@@ -186,13 +187,13 @@ class WebhookService:
                 return await uow.webhooks.list_for_owner(owner)
             return await uow.webhooks.list_all()
 
-    async def get(self, actor: UserId, id: WebhookId) -> Webhook:
+    async def get(self, actor: Actor, id: WebhookId) -> Webhook:
         async with self._uow() as uow:
             return await visible_webhook(uow, await load_actor(uow, actor), id)
 
     async def update(
         self,
-        actor: UserId,
+        actor: Actor,
         id: WebhookId,
         *,
         name: str | None = None,
@@ -270,7 +271,7 @@ class WebhookService:
         if names_private_address(webhook.url) and not targets.allow(admin):
             raise ValidationError(because(targets.refusal()))
 
-    async def delete(self, actor: UserId, id: WebhookId) -> None:
+    async def delete(self, actor: Actor, id: WebhookId) -> None:
         """The webhook and its log. Deliveries that are queued find it gone and stop; the rules
         that send through it are disabled, with the reason (as when master data they refer to
         is deleted). Its tasks that wait to be sent fail; its open tasks run to their deadline
@@ -283,7 +284,7 @@ class WebhookService:
             await uow.webhooks.remove(webhook.id)
             await uow.commit()
 
-    async def renew_secret(self, actor: UserId, id: WebhookId) -> CreatedWebhook:
+    async def renew_secret(self, actor: Actor, id: WebhookId) -> CreatedWebhook:
         """A new secret, shown once. The old one signs next to it for the grace period; a
         webhook that did not sign signs from now on."""
         async with self._uow() as uow:
@@ -298,7 +299,7 @@ class WebhookService:
             await uow.commit()
         return CreatedWebhook(webhook, secret)
 
-    async def remove_secret(self, actor: UserId, id: WebhookId) -> Webhook:
+    async def remove_secret(self, actor: Actor, id: WebhookId) -> Webhook:
         """The webhook signs no more: its requests go without `webhook-signature`."""
         async with self._uow() as uow:
             webhook = await manageable_webhook(uow, await load_actor(uow, actor), id)
@@ -309,7 +310,7 @@ class WebhookService:
 
     async def deliveries(
         self,
-        actor: UserId,
+        actor: Actor,
         id: WebhookId,
         *,
         outcomes: Collection[DeliveryOutcome] | None = None,
@@ -337,7 +338,7 @@ class WebhookService:
         return DeliveriesPage(views, total)
 
     async def delivery_summary(
-        self, actor: UserId, id: WebhookId, *, event_type: str | None = None
+        self, actor: Actor, id: WebhookId, *, event_type: str | None = None
     ) -> DeliverySummary:
         """How many entries the log of a webhook holds by outcome (of `event_type`, if
         given), its event types, and since when entries are kept."""
@@ -436,7 +437,7 @@ async def _check_model_call(
     if role is None:
         return
     admins = await _admins(uow, webhook)
-    if not granted and not (actor.is_active_admin and admins):
+    if not granted and not (actor.may(TokenRight.ADMIN_MANAGE) and admins):
         raise PermissionDeniedError(because(ReasonCode.MODEL_CALL_ADMINS))
     if not (webhook.active and admins):
         return  # it does not serve
@@ -449,7 +450,7 @@ async def _check_model_call(
 
 async def visible_webhook(uow: UnitOfWork, user: User, id: WebhookId) -> Webhook:
     webhook = await uow.webhooks.find(id)
-    if webhook is None or not (webhook.owner_id == user.id or user.is_active_admin):
+    if webhook is None or not (webhook.owner_id == user.id or user.may(TokenRight.ADMIN_MANAGE)):
         raise NotFoundError("webhook", id)
     return webhook
 

@@ -46,7 +46,7 @@ def add_expected_tools(tools: Tools, context: ApiContext) -> None:
             bool, Field(description="Also the series that ended (two dates missed).")
         ] = False,
     ) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         series = []
         for item in await context.expected.expected(user):
             if item.state is SeriesState.ENDED and not include_ended:

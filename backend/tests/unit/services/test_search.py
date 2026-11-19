@@ -26,6 +26,7 @@ from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.labels import grid_layout
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.embeddings import EmbeddingResult, Embeddings
@@ -85,7 +86,7 @@ class Scene:
     async def ids(
         self, user: User, text: str, filter: DocumentFilter | None = None
     ) -> set[DocumentId]:
-        page = await self.search(embeddings=None).search(user.id, text, filter)
+        page = await self.search(embeddings=None).search(Actor(user.id), text, filter)
         return {item.document.id for item in page.items}
 
 
@@ -94,10 +95,10 @@ async def scene(world: World) -> Scene:
     setup = Setup(world)
     owner, reader = await world.user("owner"), await world.user("reader")
     stranger = await world.user("stranger")
-    shared = await world.spaces.create(owner.id, "Household")
-    await world.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
+    shared = await world.spaces.create(Actor(owner.id), "Household")
+    await world.spaces.set_member(Actor(owner.id), shared.id, reader.id, SpaceRole.READ)
     shared_document = await setup.document(owner, "Stromrechnung September")
-    await world.documents.move(owner.id, shared_document.id, shared.id)
+    await world.documents.move(Actor(owner.id), shared_document.id, shared.id)
     private_document = await setup.document(owner, "Mietvertrag Wohnung")
     await setup.settle()
     return Scene(setup, owner, reader, stranger, shared, shared_document, private_document)
@@ -107,7 +108,7 @@ async def test_the_owner_finds_everything_in_any_lane(scene: Scene) -> None:
     assert await scene.ids(scene.owner, "Stromrechnung") == {scene.shared_document.id}
     assert await scene.ids(scene.owner, "Mietvertrag") == {scene.private_document.id}
     await scene.setup.world.pipeline().reprocess_from(
-        scene.owner.id, scene.private_document.id, Node.JUDGE
+        Actor(scene.owner.id), scene.private_document.id, Node.JUDGE
     )
     await scene.setup.settle(
         pipeline_service=scene.setup.world.pipeline({Node.JUDGE: Returns(UNCERTAIN)})
@@ -120,12 +121,12 @@ async def test_hits_say_whether_they_stand_in_the_callers_inbox(scene: Scene) ->
     search = scene.search(embeddings=None)
 
     async def in_inbox(user: User) -> list[bool]:
-        page = await search.search(user.id, "Stromrechnung")
+        page = await search.search(Actor(user.id), "Stromrechnung")
         return [item.in_inbox for item in page.items]
 
     assert await in_inbox(scene.owner) == [True]
     assert await in_inbox(scene.reader) == [False]
-    await scene.setup.world.inbox.mark_seen(scene.owner.id, scene.shared_document.id)
+    await scene.setup.world.inbox.mark_seen(Actor(scene.owner.id), scene.shared_document.id)
     assert await in_inbox(scene.owner) == [False]
 
 
@@ -143,14 +144,14 @@ async def test_meaning_finds_only_what_the_caller_may_read(scene: Scene) -> None
         (scene.reader, {scene.shared_document.id}),
         (scene.stranger, set()),
     ):
-        page = await scene.search().search(user.id, "Stromrechnung", semantic_ratio=1.0)
+        page = await scene.search().search(Actor(user.id), "Stromrechnung", semantic_ratio=1.0)
         assert page.semantic
         assert {item.document.id for item in page.items} == expected
 
 
 async def test_a_yellow_document_is_not_found_by_others(scene: Scene) -> None:
     await scene.setup.world.pipeline().reprocess_from(
-        scene.owner.id, scene.shared_document.id, Node.JUDGE
+        Actor(scene.owner.id), scene.shared_document.id, Node.JUDGE
     )
     await scene.setup.settle(
         pipeline_service=scene.setup.world.pipeline({Node.JUDGE: Returns(UNCERTAIN)})
@@ -160,35 +161,39 @@ async def test_a_yellow_document_is_not_found_by_others(scene: Scene) -> None:
 
 
 async def test_a_withdrawn_share_hides_the_documents_at_once(scene: Scene) -> None:
-    await scene.setup.world.spaces.remove_member(scene.owner.id, scene.shared.id, scene.reader.id)
+    await scene.setup.world.spaces.remove_member(
+        Actor(scene.owner.id), scene.shared.id, scene.reader.id
+    )
     assert await scene.ids(scene.reader, "Stromrechnung") == set()
 
 
 async def test_the_database_is_asked_again_when_the_index_is_behind(scene: Scene) -> None:
     world = scene.setup.world
     # Changes the index has not heard of yet: no event is delivered, no job runs.
-    await world.pipeline().reprocess_from(scene.owner.id, scene.shared_document.id, Node.JUDGE)
+    await world.pipeline().reprocess_from(
+        Actor(scene.owner.id), scene.shared_document.id, Node.JUDGE
+    )
     await world.drain(world.pipeline({Node.JUDGE: Returns(UNCERTAIN)}))
     state = await scene.setup.index.state(scene.shared_document.id)
     assert state is not None
     assert scene.setup.entry(scene.shared_document.id).lane_value == "green"  # the index is behind
     assert await scene.ids(scene.reader, "Stromrechnung") == set()
 
-    await world.documents.move(scene.owner.id, scene.private_document.id, scene.shared.id)
+    await world.documents.move(Actor(scene.owner.id), scene.private_document.id, scene.shared.id)
     assert scene.setup.entry(scene.private_document.id).space_id != scene.shared.id
     assert await scene.ids(scene.reader, "Mietvertrag") == set()  # not in the index for reader
 
 
 async def test_a_document_moved_out_of_a_shared_space_is_dropped(scene: Scene) -> None:
     world = scene.setup.world
-    private = await world.spaces.create(scene.owner.id, "Private")
-    await world.documents.move(scene.owner.id, scene.shared_document.id, private.id)
+    private = await world.spaces.create(Actor(scene.owner.id), "Private")
+    await world.documents.move(Actor(scene.owner.id), scene.shared_document.id, private.id)
     assert scene.setup.entry(scene.shared_document.id).space_id == scene.shared.id  # still
     assert await scene.ids(scene.reader, "Stromrechnung") == set()
 
 
 async def test_a_deleted_document_is_dropped(scene: Scene) -> None:
-    await scene.setup.world.documents.delete(scene.owner.id, scene.shared_document.id)
+    await scene.setup.world.documents.delete(Actor(scene.owner.id), scene.shared_document.id)
     assert scene.shared_document.id in scene.setup.index.documents  # not removed yet
     assert await scene.ids(scene.owner, "Stromrechnung") == set()
 
@@ -196,34 +201,34 @@ async def test_a_deleted_document_is_dropped(scene: Scene) -> None:
 async def test_the_filter_is_applied_to_the_database_state_too(scene: Scene) -> None:
     world = scene.setup.world
     admin = await world.user(role=Role.ADMIN)
-    contact = await world.master_data.create_contact(admin.id, "Stadtwerke")
+    contact = await world.master_data.create_contact(Actor(admin.id), "Stadtwerke")
     await world.documents.change_metadata(
-        scene.owner.id, scene.shared_document.id, DocumentChanges(contact_id=contact.id)
+        Actor(scene.owner.id), scene.shared_document.id, DocumentChanges(contact_id=contact.id)
     )
     await scene.setup.settle()
     only = DocumentFilter(contacts=frozenset({contact.id}))
     assert await scene.ids(scene.owner, "Stromrechnung", only) == {scene.shared_document.id}
     # The index still says the contact.
     await world.documents.change_metadata(
-        scene.owner.id, scene.shared_document.id, DocumentChanges(contact_id=None)
+        Actor(scene.owner.id), scene.shared_document.id, DocumentChanges(contact_id=None)
     )
     assert await scene.ids(scene.owner, "Stromrechnung", only) == set()
 
 
 async def test_a_deactivated_user_finds_nothing(scene: Scene) -> None:
     admin = await scene.setup.world.user(role=Role.ADMIN)
-    await scene.setup.world.users.update(admin.id, scene.reader.id, active=False)
+    await scene.setup.world.users.update(Actor(admin.id), scene.reader.id, active=False)
     with pytest.raises(AuthenticationError):
         await scene.ids(scene.reader, "Stromrechnung")
 
 
 async def test_the_page_carries_access_score_and_snippet(scene: Scene) -> None:
-    page = await scene.search().search(scene.reader.id, "Stromrechnung")
+    page = await scene.search().search(Actor(scene.reader.id), "Stromrechnung")
     (item,) = page.items
     assert item.access is SpaceRole.READ
     assert item.score is not None
     assert any(segment.match for segment in item.snippet)
-    owner_page = await scene.search().search(scene.owner.id, "Stromrechnung")
+    owner_page = await scene.search().search(Actor(scene.owner.id), "Stromrechnung")
     assert owner_page.items[0].access is SpaceRole.EDIT
 
 
@@ -235,7 +240,7 @@ async def test_paging_goes_through_all_hits(scene: Scene) -> None:
     pages = 0
     while offset is not None:
         page = await scene.search(embeddings=None).search(
-            scene.owner.id, "Rechnung", offset=offset, limit=2
+            Actor(scene.owner.id), "Rechnung", offset=offset, limit=2
         )
         seen += [item.document.id for item in page.items]
         offset = page.next_offset
@@ -248,17 +253,17 @@ async def test_a_page_with_dropped_hits_still_leads_to_the_next(scene: Scene) ->
     world = scene.setup.world
     for number in range(3):
         await scene.setup.document(scene.owner, f"Rechnung {number}")
-    first = await scene.search().search(scene.owner.id, "Rechnung", limit=1)
-    await world.documents.delete(scene.owner.id, first.items[0].document.id)
-    page = await scene.search().search(scene.owner.id, "Rechnung", limit=1)
+    first = await scene.search().search(Actor(scene.owner.id), "Rechnung", limit=1)
+    await world.documents.delete(Actor(scene.owner.id), first.items[0].document.id)
+    page = await scene.search().search(Actor(scene.owner.id), "Rechnung", limit=1)
     assert page.next_offset == 1  # the index still counts the deleted one
     assert page.items == [] or page.items[0].document.id != first.items[0].document.id
 
 
 async def test_paging_stops_at_the_hits_an_index_can_reach(scene: Scene) -> None:
-    far = await scene.search().search(scene.owner.id, "Stromrechnung", offset=1000)
+    far = await scene.search().search(Actor(scene.owner.id), "Stromrechnung", offset=1000)
     assert (far.items, far.next_offset) == ([], None)
-    near = await scene.search().search(scene.owner.id, "Stromrechnung", offset=995, limit=20)
+    near = await scene.search().search(Actor(scene.owner.id), "Stromrechnung", offset=995, limit=20)
     assert near.next_offset is None
 
 
@@ -277,15 +282,17 @@ async def test_a_search_with_meaning_pages_on_whatever_the_words_estimate(scene:
     service = SearchService(
         scene.setup.world.uow, index, builders.SEARCH, embeddings=scene.setup.embeddings
     )
-    with_meaning = await service.search(scene.owner.id, "Rechnung", limit=1, semantic_ratio=0.5)
+    with_meaning = await service.search(
+        Actor(scene.owner.id), "Rechnung", limit=1, semantic_ratio=0.5
+    )
     assert (with_meaning.semantic, with_meaning.next_offset) == (True, 1)
-    words = await service.search(scene.owner.id, "Rechnung", limit=1, semantic_ratio=0)
+    words = await service.search(Actor(scene.owner.id), "Rechnung", limit=1, semantic_ratio=0)
     assert (words.semantic, words.next_offset) == (False, None)
 
 
 async def test_a_query_vector_of_another_length_goes_by_words(scene: Scene) -> None:
     service = scene.search(replace(builders.SEARCH, dimensions=3))  # the fake vectors have more
-    page = await service.search(scene.owner.id, "Stromrechnung", semantic_ratio=0.5)
+    page = await service.search(Actor(scene.owner.id), "Stromrechnung", semantic_ratio=0.5)
     assert page.semantic is False
     assert page.reason == because(ReasonCode.SEARCH_EMBED_DIMENSIONS, got=16, wanted=3)
     assert [item.document.id for item in page.items] == [scene.shared_document.id]
@@ -295,7 +302,7 @@ async def test_with_embeddings_the_meaning_takes_part(scene: Scene) -> None:
     embeddings = scene.setup.embeddings
     assert isinstance(embeddings, FakeEmbeddings)
     before = len(embeddings.calls)
-    page = await scene.search().search(scene.owner.id, "Stromrechnung")
+    page = await scene.search().search(Actor(scene.owner.id), "Stromrechnung")
     assert page.semantic
     assert embeddings.calls[before:] == [["Stromrechnung"]]
 
@@ -304,7 +311,7 @@ async def test_the_query_gets_its_prefix(scene: Scene) -> None:
     embeddings = scene.setup.embeddings
     assert isinstance(embeddings, FakeEmbeddings)
     await scene.search(replace(builders.SEARCH, query_prefix="query: ")).search(
-        scene.owner.id, "Strom"
+        Actor(scene.owner.id), "Strom"
     )
     assert embeddings.calls[-1] == ["query: Strom"]
 
@@ -313,13 +320,13 @@ async def test_a_ratio_of_zero_embeds_nothing(scene: Scene) -> None:
     embeddings = scene.setup.embeddings
     assert isinstance(embeddings, FakeEmbeddings)
     before = len(embeddings.calls)
-    page = await scene.search().search(scene.owner.id, "Strom", semantic_ratio=0)
+    page = await scene.search().search(Actor(scene.owner.id), "Strom", semantic_ratio=0)
     assert (page.mode, page.reason) == (SearchMode.WORDS, None)  # asked for: no reason
     assert len(embeddings.calls) == before
 
 
 async def test_without_embeddings_it_is_full_text(scene: Scene) -> None:
-    page = await scene.search(embeddings=None).search(scene.owner.id, "Stromrechnung")
+    page = await scene.search(embeddings=None).search(Actor(scene.owner.id), "Stromrechnung")
     assert (page.mode, page.reason) == (
         SearchMode.WORDS,
         because(ReasonCode.SEARCH_NO_EMBEDDINGS),
@@ -328,7 +335,9 @@ async def test_without_embeddings_it_is_full_text(scene: Scene) -> None:
 
 
 async def test_a_down_embedding_service_leaves_full_text(scene: Scene) -> None:
-    page = await scene.search(embeddings=BrokenEmbeddings()).search(scene.owner.id, "Stromrechnung")
+    page = await scene.search(embeddings=BrokenEmbeddings()).search(
+        Actor(scene.owner.id), "Stromrechnung"
+    )
     assert (page.semantic, page.reason) == (False, because(ReasonCode.SEARCH_EMBED_FAILED))
     assert not page.meaning_pending
     assert [item.document.id for item in page.items] == [scene.shared_document.id]
@@ -343,14 +352,14 @@ async def test_a_slow_meaning_leaves_the_words_and_comes_later(scene: Scene) -> 
     service = scene.search(policy, slow)
     ready: list[SearchMeaningReady] = []
     service.listen(ready.append)
-    page = await service.search(scene.owner.id, "Stromrechnung")
+    page = await service.search(Actor(scene.owner.id), "Stromrechnung")
     assert (page.mode, page.meaning_pending) == (SearchMode.WORDS, True)
     assert page.reason == because(ReasonCode.SEARCH_EMBED_TIMEOUT, seconds=0.02)
     assert len(page.items) == 1
     slow.gate.set()
     await service.settled()
     assert [(event.user_id, event.query) for event in ready] == [(scene.owner.id, "Stromrechnung")]
-    again = await service.search(scene.owner.id, "Stromrechnung")
+    again = await service.search(Actor(scene.owner.id), "Stromrechnung")
     assert (again.mode, again.reason, again.meaning_pending) == (SearchMode.HYBRID, None, False)
     assert slow.calls == [["Stromrechnung"]]
 
@@ -360,11 +369,11 @@ async def test_a_meaning_that_fails_later_tells_nobody(scene: Scene) -> None:
     service = scene.search(replace(builders.SEARCH, embed_timeout=timedelta(milliseconds=20)), slow)
     ready: list[SearchMeaningReady] = []
     service.listen(ready.append)
-    assert (await service.search(scene.owner.id, "Strom")).meaning_pending
+    assert (await service.search(Actor(scene.owner.id), "Strom")).meaning_pending
     slow.gate.set()
     await service.settled()
     assert ready == []
-    assert not (await service.search(scene.owner.id, "Strom")).semantic
+    assert not (await service.search(Actor(scene.owner.id), "Strom")).semantic
 
 
 async def test_the_meaning_of_a_query_is_kept_a_while(scene: Scene) -> None:
@@ -375,11 +384,11 @@ async def test_the_meaning_of_a_query_is_kept_a_while(scene: Scene) -> None:
         scene.setup.world.uow, scene.setup.index, builders.SEARCH, embeddings, clock
     )
     for offset in (0, 1):
-        page = await service.search(scene.owner.id, "Rechnung", offset=offset, limit=1)
+        page = await service.search(Actor(scene.owner.id), "Rechnung", offset=offset, limit=1)
         assert page.semantic
     assert embeddings.calls == [["Rechnung"]]
     clock.advance(KEEP_VECTORS)
-    await service.search(scene.owner.id, "Rechnung")
+    await service.search(Actor(scene.owner.id), "Rechnung")
     assert embeddings.calls == [["Rechnung"], ["Rechnung"]]
 
 
@@ -389,14 +398,14 @@ async def test_warming_loads_the_model_at_most_once_a_minute(scene: Scene) -> No
     service = SearchService(
         scene.setup.world.uow, scene.setup.index, builders.SEARCH, embeddings, clock
     )
-    assert await service.warm(scene.owner.id)
-    assert not await service.warm(scene.reader.id)
+    assert await service.warm(Actor(scene.owner.id))
+    assert not await service.warm(Actor(scene.reader.id))
     await service.settled()
     clock.advance(WARM_EVERY)
-    assert await service.warm(scene.owner.id)
+    assert await service.warm(Actor(scene.owner.id))
     await service.settled()
     assert len(embeddings.calls) == 2
-    assert not await scene.search(embeddings=None).warm(scene.owner.id)
+    assert not await scene.search(embeddings=None).warm(Actor(scene.owner.id))
 
 
 async def test_an_unreachable_index_raises(scene: Scene) -> None:
@@ -406,7 +415,7 @@ async def test_an_unreachable_index_raises(scene: Scene) -> None:
 
     service = SearchService(scene.setup.world.uow, Down(), builders.SEARCH)  # type: ignore[arg-type]
     with pytest.raises(SearchUnavailableError) as raised:
-        await service.search(scene.owner.id, "Strom")
+        await service.search(Actor(scene.owner.id), "Strom")
     assert raised.value.reason == because(ReasonCode.SEARCH_INDEX_UNAVAILABLE)
 
 
@@ -420,7 +429,7 @@ async def test_the_query_is_checked(scene: Scene) -> None:
         {"text": "x", "offset": -1},
     ):
         with pytest.raises(ValidationError):
-            await service.search(scene.owner.id, **options)
+            await service.search(Actor(scene.owner.id), **options)
 
 
 async def test_the_index_never_sees_a_query_without_the_callers_rights(scene: Scene) -> None:
@@ -432,7 +441,7 @@ async def test_the_index_never_sees_a_query_without_the_callers_rights(scene: Sc
             return SearchResult(hits=[], estimated_total=0, semantic=False)
 
     service = SearchService(scene.setup.world.uow, Spy(), builders.SEARCH)  # type: ignore[arg-type]
-    await service.search(scene.reader.id, "Strom")
+    await service.search(Actor(scene.reader.id), "Strom")
     (query,) = seen
     assert query.visibility.reads == {scene.shared.id}
     assert query.visibility.edits == {(await scene.setup.world.personal_space(scene.reader)).id}
@@ -455,7 +464,9 @@ async def test_the_floor_of_the_meaning_goes_to_the_index(scene: Scene) -> None:
 
     index: Any = Spy()
     policy = replace(builders.SEARCH, meaning_min_score=0.7)
-    page = await SearchService(scene.setup.world.uow, index, policy).search(scene.owner.id, "x")
+    page = await SearchService(scene.setup.world.uow, index, policy).search(
+        Actor(scene.owner.id), "x"
+    )
     assert seen[0].meaning_min_score == 0.7
     assert page.word_total == 3
 
@@ -465,22 +476,22 @@ async def test_admins_search_their_reach_or_everything(scene: Scene) -> None:
     every user, and `all_users` widens it to every document. Nobody else may ask for it."""
     admin = await scene.setup.world.user("admin", role=Role.ADMIN)
     search = scene.search(embeddings=None)
-    assert (await search.search(admin.id, "Stromrechnung")).items == []
+    assert (await search.search(Actor(admin.id), "Stromrechnung")).items == []
     for text, document in (
         ("Stromrechnung", scene.shared_document),
         ("Mietvertrag", scene.private_document),
     ):
-        everything = await search.search(admin.id, text, all_users=True)
+        everything = await search.search(Actor(admin.id), text, all_users=True)
         assert [(item.document.id, item.access) for item in everything.items] == [
             (document.id, SpaceRole.EDIT)
         ]
     for user in (scene.owner, scene.reader, scene.stranger):
         with pytest.raises(PermissionDeniedError):
-            await search.search(user.id, "Stromrechnung", all_users=True)
+            await search.search(Actor(user.id), "Stromrechnung", all_users=True)
     other = await scene.setup.world.user("other admin", role=Role.ADMIN)
-    await scene.setup.world.users.update(other.id, admin.id, active=False)
+    await scene.setup.world.users.update(Actor(other.id), admin.id, active=False)
     with pytest.raises(AuthenticationError):
-        await search.search(admin.id, "Stromrechnung", all_users=True)
+        await search.search(Actor(admin.id), "Stromrechnung", all_users=True)
 
 
 async def test_the_search_tells_whether_it_takes_the_meaning_into_account(scene: Scene) -> None:
@@ -499,7 +510,7 @@ async def test_the_search_finds_documents_by_their_facts(scene: Scene) -> None:
         (IdentifierKind.TAX_ID, "86095742001", FactRole.PERSON),
     ):
         await world.documents.decide_fact(
-            admin.id,
+            Actor(admin.id),
             document.id,
             FactDecision(action=FactAction.ADD, kind=kind, value=value, role=role),
         )
@@ -547,10 +558,10 @@ async def test_the_places_of_a_hit_leave_out_leftovers_and_mark_the_best(scene: 
 
     index: Any = Named()
     service = SearchService(scene.setup.world.uow, index, builders.SEARCH, store=store)
-    places = await service.places(scene.owner.id, document, "Weihnachtsgeld HU")
+    places = await service.places(Actor(scene.owner.id), document, "Weihnachtsgeld HU")
     assert places.matched == 4  # the leftover is no place
     assert [occurrence.own for occurrence in places.occurrences] == [False, True, False, False]
     with pytest.raises(NotFoundError):
-        await service.places(scene.stranger.id, document, "Weihnachtsgeld")
+        await service.places(Actor(scene.stranger.id), document, "Weihnachtsgeld")
     with pytest.raises(ValidationError):
-        await service.places(scene.owner.id, document, " ")
+        await service.places(Actor(scene.owner.id), document, " ")

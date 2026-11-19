@@ -19,6 +19,7 @@ from lekto.core.domain.identifiers import (
 from lekto.core.domain.ids import SpaceId
 from lekto.core.domain.master_data import Contact
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import TokenRight
 from lekto.core.domain.users import User
 from lekto.core.ports.unit_of_work import UnitOfWork
 
@@ -37,7 +38,7 @@ async def member_spaces(uow: UnitOfWork, user: User) -> frozenset[SpaceId]:
 def as_seen(contact: Contact, user: User, spaces: frozenset[SpaceId]) -> Contact:
     """`contact` as `user` sees it (`spaces`: those they are a member of): everything for an
     admin, else only the identifiers `seen_by` them."""
-    if user.is_active_admin:
+    if user.may(TokenRight.ADMIN_MANAGE):
         return contact
     shown = [item for item in contact.identifiers if seen_by(item, user.id, spaces)]
     if len(shown) == len(contact.identifiers):
@@ -55,7 +56,7 @@ async def claim_identifiers(
     caller to store; the others are updated here. A conflict names the other contact, or the
     person's value, only where `viewer` sees it (None: an admin, who sees everything)."""
     spaces = None
-    if viewer is not None and not viewer.is_active_admin:
+    if viewer is not None and not viewer.may(TokenRight.ADMIN_MANAGE):
         spaces = await member_spaces(uow, viewer)
     persons = await person_identifiers(uow)
     own: set[tuple[IdentifierKind, str]] = set()

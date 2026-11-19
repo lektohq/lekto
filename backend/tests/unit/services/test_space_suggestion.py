@@ -14,6 +14,7 @@ from lekto.core.domain.identifiers import Identifier, IdentifierKind
 from lekto.core.domain.inbox import InboxTab
 from lekto.core.domain.pipeline import Lane, Node, Outcome, ProcessingStatus
 from lekto.core.domain.profiles import Profile
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rules import RuleScope
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import User
@@ -232,7 +233,9 @@ async def arrive(world: World, uploader: User, answer: dict[str, Any]) -> Docume
         Node.APPLY_RULES: rules_step(world),
     }
     pipeline = world.pipeline(executors)
-    received = await pipeline.receive(uploader.id, incoming(b"%PDF-1.7\n%%EOF\n"), filename="a.pdf")
+    received = await pipeline.receive(
+        Actor(uploader.id), incoming(b"%PDF-1.7\n%%EOF\n"), filename="a.pdf"
+    )
     await world.object_store.put(
         text_key(received.id), INVOICE.encode(), content_type="text/markdown; charset=utf-8"
     )
@@ -251,10 +254,10 @@ async def test_accepting_the_suggestion_moves_it_and_it_is_new_for_the_others(
     assert document.processing.status is ProcessingStatus.REVIEW
     assert document.space_id == (await world.personal_space(tobi)).id
     with pytest.raises(NotFoundError):  # not shown to her yet
-        await world.documents.get(erika.id, document.id)
+        await world.documents.get(Actor(erika.id), document.id)
 
     await world.pipeline({Node.APPLY_RULES: rules_step(world)}).confirm(
-        tobi.id, document.id, DocumentChanges(), accept_suggestions=True
+        Actor(tobi.id), document.id, DocumentChanges(), accept_suggestions=True
     )
     await world.drain(world.pipeline({Node.APPLY_RULES: rules_step(world)}))
     async with world.uow() as uow:
@@ -262,7 +265,7 @@ async def test_accepting_the_suggestion_moves_it_and_it_is_new_for_the_others(
     assert moved.space_id == shared.id
     assert moved.space_confirmed_at is not None
     assert moved.lane is Lane.GREEN
-    tabs = await world.inbox.summary(erika.id)
+    tabs = await world.inbox.summary(Actor(erika.id))
     assert tabs.counts.get(InboxTab.NEW, 0) == 1
 
 
@@ -272,7 +275,7 @@ async def test_keeping_the_space_is_a_decision(world: World) -> None:
     home = await world.personal_space(tobi)
     document = await arrive(world, tobi, proposal(space="s2"))
     await world.pipeline({Node.APPLY_RULES: rules_step(world)}).confirm(
-        tobi.id, document.id, DocumentChanges()
+        Actor(tobi.id), document.id, DocumentChanges()
     )
     async with world.uow() as uow:
         kept = await uow.documents.get(document.id)
@@ -286,7 +289,7 @@ async def test_sure_it_stays_does_not_hold_back_a_rule_that_files_it(world: Worl
     await seed(world)
     tobi, _, shared = await household(world)
     rules = RuleService(world.uow, world.clock, builders.TEMPLATES, FakeMatcher())
-    await rules.create(tobi.id, RuleScope.SPACE, files_into(shared))
+    await rules.create(Actor(tobi.id), RuleScope.SPACE, files_into(shared))
     document = await arrive(world, tobi, proposal(space="s1"))
     assert document.space_id == shared.id
     assert document.lane is Lane.GREEN
@@ -298,7 +301,7 @@ async def test_rules_that_file_it_into_the_suggested_space_settle_the_suggestion
     await seed(world)
     tobi, _, shared = await household(world)
     rules = RuleService(world.uow, world.clock, builders.TEMPLATES, FakeMatcher())
-    await rules.create(tobi.id, RuleScope.SPACE, files_into(shared))
+    await rules.create(Actor(tobi.id), RuleScope.SPACE, files_into(shared))
     document = await arrive(world, tobi, proposal(space="s2"))
     assert document.space_id == shared.id
     assert document.lane is Lane.GREEN
@@ -324,7 +327,7 @@ async def test_a_suggestion_the_confirming_editor_cannot_take_keeps_the_space(
     document = await arrive(world, tobi, proposal(space="s2"))
     assert document.lane is Lane.YELLOW
     await world.pipeline({Node.APPLY_RULES: rules_step(world)}).confirm(
-        bob.id, document.id, DocumentChanges(), accept_suggestions=True
+        Actor(bob.id), document.id, DocumentChanges(), accept_suggestions=True
     )
     async with world.uow() as uow:
         kept = await uow.documents.get(document.id)

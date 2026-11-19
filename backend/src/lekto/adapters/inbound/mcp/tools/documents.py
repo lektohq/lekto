@@ -37,6 +37,7 @@ from lekto.core.domain.mail_intake import OriginRole
 from lekto.core.domain.mail_message import address_line
 from lekto.core.domain.pipeline import ACTOR, CONFIRMED_BY, VIA_TOKEN, NodeRun
 from lekto.core.domain.relations import RelationState
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rule_planner import RuleReport
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.validation import to_utc
@@ -253,7 +254,7 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
         tags: Annotated[list[str] | None, Field(max_length=MAX_FILTER_VALUES)] = None,
         topics: Annotated[list[str] | None, Field(max_length=MAX_FILTER_VALUES)] = None,
     ) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         searching = context.require_search()
         names = await Names.load(context, user)
         page = await searching.search(
@@ -307,7 +308,7 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
         id: str,
         include: Annotated[list[Include] | None, Field(max_length=4)] = None,
     ) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         view = await context.documents.view(user, await context.documents.resolve(user, id))
         document, wanted = view.document, set(include or ())
         names = await Names.load(context, user)
@@ -343,7 +344,7 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
         "poorly read page, a table or a signature.",
     )
     async def documents_page(ctx: Context, id: str, page: Annotated[int, Field(ge=1)]) -> Image:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         document = await context.documents.resolve(user, id)
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "page"
@@ -360,7 +361,7 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
         "every run.",
     )
     async def documents_log(ctx: Context, id: str, every_run: bool = False) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         document = await context.documents.resolve(user, id)
         log = await context.documents.processing_log(user, document)
         latest = max((entry.run for entry in log), default=0)
@@ -382,7 +383,7 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
         offset: Annotated[int, Field(ge=0)] = 0,
         limit: Annotated[int, Field(ge=1)] = text_max,
     ) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         piece = await context.documents.read_text(
             user,
             await context.documents.resolve(user, id),
@@ -405,7 +406,7 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
         idempotent=False,
     )
     async def documents_retry(ctx: Context, id: str) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         view = await context.pipeline.retry(user, await context.documents.resolve(user, id))
         status = view.document.processing.status.value
         return compact(RetryOut(id=short_id(view.document.id), status=status))
@@ -434,7 +435,7 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
         dry_run: bool = False,
     ) -> str:
         principal = principal_of(ctx)
-        user = principal.id
+        user = principal.actor
         names = await Names.load(context, user)
         # The parameters were checked as `ChangesIn` checks its fields (the same aliases).
         given = ChangesIn.model_construct(
@@ -494,7 +495,7 @@ def document_out(document: Document, access: SpaceRole, names: Names) -> Documen
 
 
 async def relations(
-    context: ApiContext, user: UserId, id: DocumentId, names: Names
+    context: ApiContext, user: Actor, id: DocumentId, names: Names
 ) -> list[RelationOut]:
     """The document's relations with documents `user` reads too."""
     related = await context.relations.relations(user, id)
@@ -669,7 +670,7 @@ def changes_of(given: ChangesIn, names: Names) -> DocumentChanges:
 
 async def update_out(
     context: ApiContext,
-    user: UserId,
+    user: Actor,
     before: Document,
     after: Document,
     access: SpaceRole,
@@ -688,7 +689,7 @@ async def update_out(
 
 
 async def _changed(
-    context: ApiContext, user: UserId, key: str, after: Document, names: Names
+    context: ApiContext, user: Actor, key: str, after: Document, names: Names
 ) -> tuple[str, JsonValue]:
     """The name of a changed field and its value after the change."""
     match key:

@@ -13,6 +13,7 @@ from lekto.core.domain.errors import InvalidTransitionError, NotFoundError, Vali
 from lekto.core.domain.fields import FieldDefinition, FieldType
 from lekto.core.domain.pipeline import RULES, Lane, Node, NodeStatus, Outcome
 from lekto.core.domain.reasons import ReasonCode
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rules import (
     Action,
     AskWebhook,
@@ -96,9 +97,9 @@ async def steps_world(world: World, *, body: BodyFormat = BodyFormat.FULL) -> St
     r = await rule_world(world)
     owner = await world.user()
     created = await world.webhooks.create(
-        owner.id, name="Node-RED", url=URL, event_types=[], signed=False, body=body
+        Actor(owner.id), name="Node-RED", url=URL, event_types=[], signed=False, body=body
     )
-    beleg = await world.master_data.create_field(r.admin.id, "Beleg", FieldType.TEXT)
+    beleg = await world.master_data.create_field(Actor(r.admin.id), "Beleg", FieldType.TEXT)
     pipeline = builders.skip_classification(r.pipeline())
     return Steps(r, owner, created.webhook, beleg, pipeline)
 
@@ -212,7 +213,9 @@ async def test_confirming_without_a_change_does_not_ask_again(world: World) -> N
     await s.answer(s.asked()[0], {"paid": True})
     document = await s.r.stored(document)
     assert document.lane is Lane.YELLOW
-    await s.pipeline.confirm(s.owner.id, document.id, DocumentChanges(), accept_suggestions=True)
+    await s.pipeline.confirm(
+        Actor(s.owner.id), document.id, DocumentChanges(), accept_suggestions=True
+    )
     await s.run()
     document = await s.r.stored(document)
     assert document.lane is Lane.GREEN and tag.id in document.tag_ids
@@ -226,7 +229,7 @@ async def test_confirming_with_a_change_asks_again(world: World) -> None:
     await s.answer(s.asked()[0], {})
     document = await s.r.stored(document)
     await s.pipeline.confirm(
-        s.owner.id, document.id, DocumentChanges(title="Strom März"), accept_suggestions=True
+        Actor(s.owner.id), document.id, DocumentChanges(title="Strom März"), accept_suggestions=True
     )
     await s.run()
     assert len(s.asked()) == 2
@@ -242,7 +245,7 @@ async def test_after_a_confirmation_a_missing_answer_is_only_reported(world: Wor
     await s.answer(s.asked()[0], {})
     document = await s.r.stored(document)
     await s.pipeline.confirm(
-        s.owner.id, document.id, DocumentChanges(title="Neu"), accept_suggestions=True
+        Actor(s.owner.id), document.id, DocumentChanges(title="Neu"), accept_suggestions=True
     )
     await s.run()
     world.clock.advance(5 * MINUTE)
@@ -254,7 +257,7 @@ async def test_after_a_confirmation_a_missing_answer_is_only_reported(world: Wor
 async def test_a_rule_asks_only_through_its_author_s_webhook(world: World) -> None:
     s = await steps_world(world)
     other = await world.user()
-    theirs = await world.webhooks.create(other.id, name="x", url=URL, event_types=[])
+    theirs = await world.webhooks.create(Actor(other.id), name="x", url=URL, event_types=[])
     with pytest.raises(NotFoundError):
         await s.rule(AskWebhook("flow", theirs.webhook.id))
 
@@ -262,7 +265,7 @@ async def test_a_rule_asks_only_through_its_author_s_webhook(world: World) -> No
 async def test_a_webhook_whose_owner_cannot_read_the_document_holds_it(world: World) -> None:
     s = await steps_world(world)
     admin_hook = await world.webhooks.create(
-        s.r.admin.id, name="Admin", url=URL, event_types=[], signed=False
+        Actor(s.r.admin.id), name="Admin", url=URL, event_types=[], signed=False
     )
     await s.r.global_rule(
         definition(
@@ -284,7 +287,7 @@ async def test_steps_refer_only_to_steps_before_and_need_the_public_url(world: W
     without = RuleService(world.uow, world.clock, builders.TEMPLATES, s.r.matcher)
     with pytest.raises(ValidationError, match="LEKTO_PUBLIC_URL"):
         await without.create(
-            s.owner.id,
+            Actor(s.owner.id),
             RuleScope.SPACE,
             definition("x", channel_api(), AskWebhook("flow", s.webhook.id), triggers=INGEST),
         )
@@ -293,15 +296,15 @@ async def test_steps_refer_only_to_steps_before_and_need_the_public_url(world: W
 async def test_a_rule_that_asks_is_not_applied_to_existing_documents(world: World) -> None:
     s = await steps_world(world)
     await s.rule(AskWebhook("flow", s.webhook.id))
-    (rule,) = await s.r.rules.list_rules(s.owner.id)
+    (rule,) = await s.r.rules.list_rules(Actor(s.owner.id))
     with pytest.raises(InvalidTransitionError):
-        await s.r.applications.preview(s.owner.id, rule.id)
+        await s.r.applications.preview(Actor(s.owner.id), rule.id)
 
 
 async def test_moved_by_hand_a_rule_does_not_ask_and_ends_there(world: World) -> None:
     s = await steps_world(world)
     before, after = await s.r.tag("before"), await s.r.tag("after")
-    archive = await world.spaces.create(s.owner.id, "Archiv")
+    archive = await world.spaces.create(Actor(s.owner.id), "Archiv")
     await s.r.space_rule(
         s.owner,
         archive.id,
@@ -315,7 +318,7 @@ async def test_moved_by_hand_a_rule_does_not_ask_and_ends_there(world: World) ->
         ),
     )
     document = await s.arrive()
-    await s.r.documents.move(s.owner.id, document.id, archive.id)
+    await s.r.documents.move(Actor(s.owner.id), document.id, archive.id)
     await s.run()
     document = await s.r.stored(document)
     assert before.id in document.tag_ids and after.id not in document.tag_ids

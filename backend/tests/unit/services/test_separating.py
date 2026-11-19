@@ -26,6 +26,7 @@ from lekto.core.domain.pipeline import (
     ProcessingStatus,
 )
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.separating import MAX_STACK_PAGES, separated_parts, separator_pages
 from lekto.core.domain.users import Role, User
 from lekto.core.domain.versions import VersionKind
@@ -81,7 +82,7 @@ async def received(
     owner = await world.user(role=Role.ADMIN)
     pipeline = separating(world, reader, separators)
     document = await pipeline.receive(
-        owner.id,
+        Actor(owner.id),
         incoming(data),
         filename="scan_2026-11-10.pdf",
         **options,  # type: ignore[arg-type]
@@ -193,10 +194,10 @@ async def test_a_stack_is_split_at_its_sheets(world: World) -> None:
 
 async def test_the_parts_keep_the_space_a_person_chose(world: World) -> None:
     owner = await world.user(role=Role.ADMIN)
-    space = await world.spaces.create(owner.id, "Office")
+    space = await world.spaces.create(Actor(owner.id), "Office")
     pipeline = separating(world, sheets(5))
     stack = await pipeline.receive(
-        owner.id, incoming(STACK), filename="scan_2026-11-10.pdf", space=space.id
+        Actor(owner.id), incoming(STACK), filename="scan_2026-11-10.pdf", space=space.id
     )
     await world.drain(pipeline)
     _, part = await documents(world)
@@ -211,7 +212,7 @@ async def test_the_parts_of_a_mailed_stack_keep_its_mail(world: World) -> None:
     owner = await world.user()
     pipeline = separating(world, sheets(4))
     stack = await pipeline.receive(
-        owner.id, incoming(STACK), filename="scans.pdf", channel=Channel.MAIL
+        Actor(owner.id), incoming(STACK), filename="scans.pdf", channel=Channel.MAIL
     )
     origin = await mailed(world, stack, "scans.pdf")
     await world.drain(pipeline)
@@ -327,7 +328,7 @@ async def test_parts_stored_as_storing_was_cancelled_keep_their_files(world: Wor
         {**world.executors, Node.SEPARATE: ThenCancelled()},
     )
     owner = await world.user(role=Role.ADMIN)
-    await pipeline.receive(owner.id, incoming(STACK), filename="scan_2026-11-10.pdf")
+    await pipeline.receive(Actor(owner.id), incoming(STACK), filename="scan_2026-11-10.pdf")
     with pytest.raises(asyncio.CancelledError):
         await world.drain(pipeline)
     async with world.uow() as uow:
@@ -341,7 +342,9 @@ async def test_a_new_version_is_not_split(world: World) -> None:
     reader = sheets(3)
     owner, stack = await received(world, reader, separators=())
     pipeline = separating(world, reader)
-    await pipeline.new_version(owner.id, stack.id, incoming(fake_pdf(5, "new")), filename="new.pdf")
+    await pipeline.new_version(
+        Actor(owner.id), stack.id, incoming(fake_pdf(5, "new")), filename="new.pdf"
+    )
     await world.drain(pipeline)
     assert reader.calls == []
     async with world.uow() as uow:
@@ -355,12 +358,12 @@ async def test_pages_a_person_split_off_and_a_mail_are_not_looked_through(world:
     owner, stack = await received(world, reader, fake_pdf(3, "three pages"), separators=())
     pipeline = separating(world, reader)
     result = await world.editing.edit(
-        owner.id,
+        Actor(owner.id),
         stack.id,
         [EditPart((PagePick(0, 1),), replaces=True), EditPart((PagePick(0, 2), PagePick(0, 3)))],
     )
     mail = b"From: a@example.org\r\nSubject: Hi\r\n\r\nHello\r\n"
-    letter = await pipeline.receive(owner.id, incoming(mail), filename="m.eml")
+    letter = await pipeline.receive(Actor(owner.id), incoming(mail), filename="m.eml")
     await world.drain(pipeline)
     assert reader.calls == []
     edited, split = result.documents
@@ -380,7 +383,7 @@ async def test_pages_a_person_split_off_and_a_mail_are_not_looked_through(world:
 async def test_separating_is_not_processed_again(world: World) -> None:
     owner, stack = await received(world, sheets(3), separators=())
     with pytest.raises(InvalidTransitionError) as raised:
-        await world.pipeline().reprocess_from(owner.id, stack.id, Node.SEPARATE)
+        await world.pipeline().reprocess_from(Actor(owner.id), stack.id, Node.SEPARATE)
     assert raised.value.reason.code is ReasonCode.SEPARATE_NOT_REPEATABLE
 
 
@@ -395,7 +398,7 @@ class DeletedMeanwhile:
         result = await self._node.run(document)
         assert isinstance(result, Separation)
         self.parts = [original_key(part.file.sha256) for part in result.parts]
-        await self._world.documents.delete(self._actor.id, document.id)
+        await self._world.documents.delete(Actor(self._actor.id), document.id)
         return result
 
 
@@ -411,7 +414,7 @@ async def test_the_parts_files_go_if_the_stack_is_deleted_first(world: World) ->
     )
     deleting = DeletedMeanwhile(world, node, owner)
     pipeline = world.pipeline(executors={Node.SEPARATE: deleting})
-    await pipeline.receive(owner.id, incoming(STACK), filename="scan.pdf")
+    await pipeline.receive(Actor(owner.id), incoming(STACK), filename="scan.pdf")
     await world.drain(pipeline)
     assert len(deleting.parts) == 2
     for key in deleting.parts:
@@ -457,7 +460,7 @@ async def test_the_parts_files_go_if_the_result_is_not_stored(world: World) -> N
     )
     failing = FailsToStore(node)
     pipeline = world.pipeline(executors={Node.SEPARATE: failing})
-    await pipeline.receive(owner.id, incoming(STACK), filename="scan.pdf")
+    await pipeline.receive(Actor(owner.id), incoming(STACK), filename="scan.pdf")
     with pytest.raises(RuntimeError):
         await world.drain(pipeline)
     assert len(failing.parts) == 2

@@ -19,6 +19,7 @@ from lekto.core.domain.jobs import JobStatus
 from lekto.core.domain.periods import Period
 from lekto.core.domain.pipeline import Node, NodeResult, NodeRun, Outcome
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rules import AddTags, Condition, ConditionField, Operator
 from lekto.core.services import pipeline as pipeline_module
 from lekto.core.services import relating
@@ -239,7 +240,9 @@ async def test_what_a_person_decided_stays(world: World) -> None:
         contact=shop, dated=date(2026, 6, 10), facts=((K.INVOICE_NUMBER, "VB1", FactRole.REFERS),)
     )
     await s.relate(reminder)
-    await RelationService(world.uow, world.clock).unrelate(s.owner.id, reminder.id, invoice.id)
+    await RelationService(world.uow, world.clock).unrelate(
+        Actor(s.owner.id), reminder.id, invoice.id
+    )
     assert await s.relate(reminder) == []
     (kept,) = await s.relations(invoice)
     assert kept.state is RelationState.REJECTED
@@ -353,7 +356,7 @@ async def test_the_rules_of_the_run_see_the_relation(world: World) -> None:
     r = await rule_world(world)
     owner = await world.user()
     shop = await r.contact("Versandhaus")
-    invoice_type = await world.master_data.create_document_type(r.admin.id, "Rechnung")
+    invoice_type = await world.master_data.create_document_type(Actor(r.admin.id), "Rechnung")
     reminder_tag = await r.tag("Mahnung")
     refers = Condition(field=ConditionField.RELATION, op=Operator.IS, value=str(invoice_type.id))
     await r.personal_rule(
@@ -488,7 +491,7 @@ async def test_a_rule_sees_only_relations_its_author_may_read(world: World) -> N
     """A personal rule tells nothing of another user's document (#145 review)."""
     r = await rule_world(world)
     owner, other = await world.user(), await world.user()
-    invoice_type = await world.master_data.create_document_type(r.admin.id, "Rechnung")
+    invoice_type = await world.master_data.create_document_type(Actor(r.admin.id), "Rechnung")
     tag = await r.tag("Mahnung")
     refers = Condition(field=ConditionField.RELATION, op=Operator.IS, value=str(invoice_type.id))
     await r.personal_rule(owner, definition("Mahnungen", refers, AddTags(frozenset({tag.id}))))
@@ -510,7 +513,7 @@ async def test_a_rule_sees_only_relations_its_author_may_read(world: World) -> N
         assert len(await uow.document_relations.of_document(reminder.id)) == 1
     assert tag.id not in reminder.tag_ids
     # Nor does the log of `relate` name the other user's invoice.
-    log = await world.documents.processing_log(owner.id, reminder.id)
+    log = await world.documents.processing_log(Actor(owner.id), reminder.id)
     (entry,) = [item for item in log if item.node is Node.RELATE]
     assert entry.result.output["relations"] == []
 
@@ -547,7 +550,7 @@ async def test_the_log_names_no_removed_relation_to_a_document_the_reader_does_n
             )
         )
         await uow.commit()
-    log = await world.documents.processing_log(owner.id, reminder.id)
+    log = await world.documents.processing_log(Actor(owner.id), reminder.id)
     (entry,) = [item for item in log if item.node is Node.RELATE]
     assert entry.result.output["dropped"] == [removed(visible)]
 

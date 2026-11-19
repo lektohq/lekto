@@ -3,6 +3,7 @@ move, after a rule applied to existing documents; each space at most once in a c
 
 from lekto.core.domain.documents import DocumentChanges
 from lekto.core.domain.pipeline import RULES, RULES_CHANGE, Lane, Node
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rules import (
     Condition,
     ConditionField,
@@ -36,8 +37,8 @@ async def household(rules: RuleWorld) -> tuple[User, User, Space]:
     """Tobi and Erika edit "Haushalt"."""
     world = rules.world
     tobi, erika = await world.user("tobi"), await world.user("erika")
-    space = await world.spaces.create(tobi.id, "Haushalt")
-    space = await world.spaces.set_member(tobi.id, space.id, erika.id, SpaceRole.EDIT)
+    space = await world.spaces.create(Actor(tobi.id), "Haushalt")
+    space = await world.spaces.set_member(Actor(tobi.id), space.id, erika.id, SpaceRole.EDIT)
     return tobi, erika, space
 
 
@@ -96,7 +97,7 @@ async def test_a_person_s_move_runs_the_target_s_rules_which_leave_the_space(
     )
     document = await rules.arrive(tobi)
     assert document.lane is Lane.GREEN
-    await rules.documents.move(tobi.id, document.id, shared.id)
+    await rules.documents.move(Actor(tobi.id), document.id, shared.id)
     moved = await rules.stored(document)
     assert moved.space_id == shared.id
     assert tag.id in moved.tag_ids
@@ -153,9 +154,9 @@ async def test_a_chain_keeps_values_set_on_unconfirmed_values_unconfirmed(world:
     rests on the unconfirmed contact, so the move that shows it to Erika waits for a click."""
     rules = await rule_world(world)
     tobi, erika, shared = await household(rules)
-    archive = await world.spaces.create(tobi.id, "Archiv")
+    archive = await world.spaces.create(Actor(tobi.id), "Archiv")
     utility = await rules.contact("Stadtwerke")
-    bill = await world.master_data.create_document_type(rules.admin.id, "Rechnung")
+    bill = await world.master_data.create_document_type(Actor(rules.admin.id), "Rechnung")
     await rules.personal_rule(
         tobi,
         definition(
@@ -184,7 +185,7 @@ async def test_the_loop_guard_remembers_the_chain_across_a_click(world: World) -
     contact), Haushalt → Personal: after the click the chain still stops at going back."""
     rules = await rule_world(world)
     tobi, _, shared = await household(rules)
-    archive = await world.spaces.create(tobi.id, "Archiv")
+    archive = await world.spaces.create(Actor(tobi.id), "Archiv")
     home = await world.personal_space(tobi)
     utility = await rules.contact("Stadtwerke")
     await rules.personal_rule(tobi, files_into(archive, "To archive"))
@@ -201,7 +202,7 @@ async def test_the_loop_guard_remembers_the_chain_across_a_click(world: World) -
     assert document.lane is Lane.YELLOW
 
     pipeline = rules.pipeline()
-    await pipeline.confirm(tobi.id, document.id, DocumentChanges())
+    await pipeline.confirm(Actor(tobi.id), document.id, DocumentChanges())
     await world.drain(pipeline)
     after = await rules.stored(document)
     assert after.space_id == shared.id  # not back home: it was there in this chain
@@ -236,7 +237,7 @@ async def test_change_rules_that_file_it_run_the_target_s_rules(world: World) ->
     document = await rules.arrive(tobi)
     assert document.lane is Lane.GREEN
     await rules.documents.change_metadata(
-        tobi.id, document.id, DocumentChanges(contact_id=utility.id)
+        Actor(tobi.id), document.id, DocumentChanges(contact_id=utility.id)
     )
     changed = await rules.stored(document)
     assert changed.space_id == shared.id
@@ -262,7 +263,7 @@ async def test_deleting_a_user_runs_the_rules_of_the_space_their_documents_move_
     document = await rules.arrive(erika)
     erikas = await world.personal_space(erika)
     await rules.users.delete_user(
-        rules.admin.id, erika.id, {erikas.id: Settlement(Settle.MOVE_TO, move_to=shared.id)}
+        Actor(rules.admin.id), erika.id, {erikas.id: Settlement(Settle.MOVE_TO, move_to=shared.id)}
     )
     moved = await rules.stored(document)
     assert (moved.space_id, moved.lane) == (shared.id, Lane.GREEN)
@@ -287,7 +288,7 @@ async def test_the_preview_of_applying_a_rule_shows_the_chain_and_stores_nothing
         definition("Rechnungen", channel_api(), add_tags(tag.id), triggers=(Trigger.INGEST,)),
     )
 
-    (item,) = (await rules.applications.preview(tobi.id, rule.id)).items
+    (item,) = (await rules.applications.preview(Actor(tobi.id), rule.id)).items
 
     assert [effect.field for effect in item.effects] == ["space"]
     assert item.outcome.space_id == shared.id
@@ -310,13 +311,13 @@ async def test_the_preview_of_applying_a_rule_shows_the_chain_and_stores_nothing
 async def test_the_preview_shows_where_a_chain_stops_going_back(world: World) -> None:
     rules = await rule_world(world)
     _, erika, shared = await household(rules)
-    office = await world.spaces.create(erika.id, "Büro")
+    office = await world.spaces.create(Actor(erika.id), "Büro")
     await rules.arrive(erika)
     rule = await rules.personal_rule(erika, files_into(shared))
     await rules.space_rule(erika, shared.id, files_into(office, "To the office"))
     await rules.space_rule(erika, office.id, files_into(shared, "Back"))
 
-    (item,) = (await rules.applications.preview(erika.id, rule.id)).items
+    (item,) = (await rules.applications.preview(Actor(erika.id), rule.id)).items
 
     first, second = item.outcome.chain
     assert (first.space_id, first.moved_to) == (shared.id, office.id)
@@ -337,7 +338,7 @@ async def test_the_preview_ends_where_the_caller_hands_the_document_over(world: 
     await rules.space_rule(erika, shared.id, files_into(erikas, "To Erika"))
     await rules.space_rule(erika, erikas.id, files_into(shared, "Back"))
 
-    (item,) = (await rules.applications.preview(tobi.id, rule.id)).items
+    (item,) = (await rules.applications.preview(Actor(tobi.id), rule.id)).items
 
     first, second = item.outcome.chain
     assert (first.space_id, first.moved_to) == (shared.id, erikas.id)
@@ -369,7 +370,7 @@ async def test_the_preview_shows_the_chain_of_an_accepted_conflict(world: World)
         definition("Rechnungen", channel_api(), add_tags(tag.id), triggers=(Trigger.INGEST,)),
     )
 
-    (item,) = (await rules.applications.preview(tobi.id, rule.id)).items
+    (item,) = (await rules.applications.preview(Actor(tobi.id), rule.id)).items
 
     assert [(note.field, note.kind) for note in item.conflicts] == [("space", "conflict")]
     assert (item.outcome.space_id, item.outcome.chain) == (home.id, ())

@@ -22,6 +22,7 @@ from lekto.core.domain.errors import (
     ValidationError,
 )
 from lekto.core.domain.pipeline import Lane, Node, ProcessingHistory
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import User
 from lekto.core.domain.versions import VersionKind
 from lekto.core.ports.composer import PageSource
@@ -55,7 +56,7 @@ async def test_a_part_replaces_the_document_and_the_others_become_new_documents(
     owner, document = await received(world)
     world.clock.advance(HOUR)
     result = await world.editing.edit(
-        owner.id, document.id, [part(1, 2, replaces=True), part((0, 3, 90))]
+        Actor(owner.id), document.id, [part(1, 2, replaces=True), part((0, 3, 90))]
     )
     assert not result.deleted
     edited, new = (view.document for view in result.documents)
@@ -110,11 +111,13 @@ async def test_pages_split_off_a_mailed_document_keep_its_mail(world: World) -> 
     """As the parts of a stack do (`_intake.store_part`)."""
     owner = await world.user()
     document = await world.pipeline().receive(
-        owner.id, incoming(STACK), filename="stack.pdf", channel=Channel.MAIL
+        Actor(owner.id), incoming(STACK), filename="stack.pdf", channel=Channel.MAIL
     )
     origin = await mailed(world, document, "stack.pdf")
     await world.drain()
-    result = await world.editing.edit(owner.id, document.id, [part(1, 2, replaces=True), part(3)])
+    result = await world.editing.edit(
+        Actor(owner.id), document.id, [part(1, 2, replaces=True), part(3)]
+    )
     _, new = (view.document for view in result.documents)
     assert new.channel is Channel.MAIL
     async with world.uow() as uow:
@@ -123,12 +126,12 @@ async def test_pages_split_off_a_mailed_document_keep_its_mail(world: World) -> 
 
 async def test_without_a_part_that_replaces_it_the_document_is_deleted(world: World) -> None:
     owner, document = await received(world)
-    result = await world.editing.edit(owner.id, document.id, [part(1), part(2, 3)])
+    result = await world.editing.edit(Actor(owner.id), document.id, [part(1), part(2, 3)])
     assert result.deleted
     first, second = (view.document for view in result.documents)
     assert document.id not in (first.id, second.id)
     with pytest.raises(NotFoundError):
-        await world.documents.get(owner.id, document.id)
+        await world.documents.get(Actor(owner.id), document.id)
     assert "document.deleted" in world.event_types()
     service = world.maintenance()
     while await service.run_next_job():
@@ -146,7 +149,7 @@ async def test_added_files_bring_their_pages_but_are_no_originals(world: World) 
     owner, document = await received(world)
     forgotten = added(FORGOTTEN)
     result = await world.editing.edit(
-        owner.id,
+        Actor(owner.id),
         document.id,
         [part(1, (1, 1), (1, 2, 180), 2, 3, replaces=True)],
         [forgotten],
@@ -160,7 +163,7 @@ async def test_added_files_bring_their_pages_but_are_no_originals(world: World) 
     assert versions[-1].detail["added"] == ["forgotten.pdf"]
     assert not await world.object_store.exists(original_key(forgotten.file.sha256))
     # The added file may come in as a document of its own.
-    await world.pipeline().receive(owner.id, incoming(FORGOTTEN), filename="forgotten.pdf")
+    await world.pipeline().receive(Actor(owner.id), incoming(FORGOTTEN), filename="forgotten.pdf")
 
 
 @pytest.mark.parametrize(
@@ -182,28 +185,30 @@ async def test_parts_must_fit_the_pages(
     before = world.object_store.keys()
     extra = [added(fake_pdf(1, f"file {number}")) for number in range(files)]
     with pytest.raises(ValidationError, match=message):
-        await world.editing.edit(owner.id, document.id, parts, extra)
+        await world.editing.edit(Actor(owner.id), document.id, parts, extra)
     assert world.object_store.keys() == before
-    assert (await world.documents.get(owner.id, document.id)).sha256 == document.sha256
+    assert (await world.documents.get(Actor(owner.id), document.id)).sha256 == document.sha256
 
 
 async def test_who_may_edit_and_what(world: World) -> None:
     owner, stranger = await world.user(), await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(STACK), filename="stack.pdf"
+    )
     with pytest.raises(InvalidTransitionError):  # still processed
-        await world.editing.edit(owner.id, document.id, [part(1, replaces=True)])
+        await world.editing.edit(Actor(owner.id), document.id, [part(1, replaces=True)])
     await world.drain()
     with pytest.raises(NotFoundError):
-        await world.editing.edit(stranger.id, document.id, [part(1, replaces=True)])
+        await world.editing.edit(Actor(stranger.id), document.id, [part(1, replaces=True)])
     mail = b"From: a@example.org\r\nSubject: Hi\r\n\r\nHello\r\n"
     with pytest.raises(UnsupportedMediaTypeError):
         await world.editing.edit(
-            owner.id, document.id, [part(1, (1, 1), replaces=True)], [added(mail, "m.eml")]
+            Actor(owner.id), document.id, [part(1, (1, 1), replaces=True)], [added(mail, "m.eml")]
         )
-    letter = await world.pipeline().receive(owner.id, incoming(mail), filename="m.eml")
+    letter = await world.pipeline().receive(Actor(owner.id), incoming(mail), filename="m.eml")
     await world.drain()
     with pytest.raises(UnsupportedMediaTypeError, match="mail"):
-        await world.editing.edit(owner.id, letter.id, [part(1)])
+        await world.editing.edit(Actor(owner.id), letter.id, [part(1)])
 
 
 class Meddling(FakePageComposer):
@@ -219,7 +224,10 @@ class Meddling(FakePageComposer):
         await super().compose(sources, pages, target)
         if len(self.calls) == 1:
             await self.world.pipeline().new_version(
-                self.owner.id, self.document.id, incoming(MEANWHILE), filename="meanwhile.pdf"
+                Actor(self.owner.id),
+                self.document.id,
+                incoming(MEANWHILE),
+                filename="meanwhile.pdf",
             )
 
 
@@ -228,7 +236,7 @@ async def test_a_file_changed_meanwhile_stops_the_edit_and_leaves_nothing(world:
     world.composer = Meddling(world, owner, document)
     originals = world.object_store.keys("originals/")
     with pytest.raises(ConcurrencyError):
-        await world.editing.edit(owner.id, document.id, [part(1), part(2, 3, replaces=True)])
+        await world.editing.edit(Actor(owner.id), document.id, [part(1), part(2, 3, replaces=True)])
     # Only the file put in its place meanwhile is new; no part is left, no document made.
     assert world.object_store.keys("originals/") == sorted(
         [*originals, original_key(Sha256.of(MEANWHILE))]
@@ -254,7 +262,7 @@ async def test_a_part_that_cannot_be_stored_leaves_no_other(
 
     monkeypatch.setattr(world.object_store, "upload", second_fails)
     with pytest.raises(OSError):
-        await world.editing.edit(owner.id, document.id, [part(1), part(2, 3, replaces=True)])
+        await world.editing.edit(Actor(owner.id), document.id, [part(1), part(2, 3, replaces=True)])
     assert calls == 2
     assert world.object_store.keys("originals/") == originals
 
@@ -274,7 +282,7 @@ async def test_an_edit_stored_as_it_was_cancelled_keeps_its_files(world: World) 
     )
     cancelled.armed = True
     with pytest.raises(asyncio.CancelledError):
-        await editing.edit(owner.id, document.id, [part(1), part(2, 3)])  # none replaces it
+        await editing.edit(Actor(owner.id), document.id, [part(1), part(2, 3)])  # none replaces it
     async with world.uow() as uow:
         documents = await uow.documents.list_all()
     assert document.id not in {item.id for item in documents} and len(documents) == 2
@@ -287,10 +295,10 @@ async def test_every_result_waits_in_the_inbox_and_what_was_confirmed_stays(
 ) -> None:
     c = await confirmed(world)
     edits = [part(3, replaces=True), part(1, 2)]
-    result = await world.editing.edit(c.owner.id, c.document.id, edits)
+    result = await world.editing.edit(Actor(c.owner.id), c.document.id, edits)
     await world.drain(c.pipeline)
     edited, new = [
-        await world.documents.get(c.owner.id, view.document.id) for view in result.documents
+        await world.documents.get(Actor(c.owner.id), view.document.id) for view in result.documents
     ]
     assert (edited.contact_id, edited.document_date) == (c.contact, CONFIRMED_ON)
     assert new.contact_id is None
@@ -304,19 +312,19 @@ async def test_the_pages_of_a_file_to_add_are_shown_before(world: World) -> None
     owner, document = await received(world)
     stranger = await world.user()
     before = world.object_store.keys()
-    pages = await world.editing.preview(owner.id, document.id, incoming(FORGOTTEN))
+    pages = await world.editing.preview(Actor(owner.id), document.id, incoming(FORGOTTEN))
     assert len(pages) == 2 and all(page.startswith(b"RIFF") for page in pages)
     assert world.object_store.keys() == before
     with pytest.raises(NotFoundError):
-        await world.editing.preview(stranger.id, document.id, incoming(FORGOTTEN))
+        await world.editing.preview(Actor(stranger.id), document.id, incoming(FORGOTTEN))
     with pytest.raises(UnsupportedMediaTypeError):
-        await world.editing.preview(owner.id, document.id, incoming(b"From: a@b.c\r\n\r\nx"))
+        await world.editing.preview(Actor(owner.id), document.id, incoming(b"From: a@b.c\r\n\r\nx"))
 
 
 async def test_an_edit_is_logged(world: World, caplog: pytest.LogCaptureFixture) -> None:
     """With the level of the service (the tests run quieter), the record is made."""
     owner, document = await received(world)
     caplog.set_level(logging.INFO, logger="lekto.core.services.editing")
-    await world.editing.edit(owner.id, document.id, [part(1), part(2, 3, replaces=True)])
+    await world.editing.edit(Actor(owner.id), document.id, [part(1), part(2, 3, replaces=True)])
     (record,) = [item for item in caplog.records if item.getMessage() == "pages edited"]
     assert (record.new_documents, record.deleted) == (1, False)  # type: ignore[attr-defined]

@@ -10,6 +10,7 @@ from lekto.core.domain.errors import NotFoundError, ValidationError
 from lekto.core.domain.master_data import TagScope
 from lekto.core.domain.pipeline import RULES_CHANGE, Lane, Outcome, ProcessingStatus
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rule_planner import Note, NoteKind
 from lekto.core.domain.rules import (
     Condition,
@@ -63,13 +64,13 @@ async def test_a_change_rule_acts_when_it_starts_to_hold(world: World) -> None:
     assert (document.tag_ids, document.title) == (set(), "scan")  # not on arrival
 
     change = await r.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(contact_id=beta.id)
+        Actor(owner.id), document.id, DocumentChanges(contact_id=beta.id)
     )
     assert change.rules is not None and change.rules.plan.reports == []
 
     # The person's title wins over the rule's; the rule's tag is set.
     change = await r.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(contact_id=acme.id, title="Mine")
+        Actor(owner.id), document.id, DocumentChanges(contact_id=acme.id, title="Mine")
     )
     assert applied(change) == ["tags"]
     assert reported(change) == [
@@ -91,16 +92,20 @@ async def test_a_change_rule_acts_when_it_starts_to_hold(world: World) -> None:
 
     # It held before: another change does not apply it again.
     change = await r.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(document_date=date(2026, 3, 1), tag_ids=frozenset())
+        Actor(owner.id),
+        document.id,
+        DocumentChanges(document_date=date(2026, 3, 1), tag_ids=frozenset()),
     )
     assert change.rules is not None and change.rules.plan.reports == []
     assert (await r.stored(document)).tag_ids == set()
 
     # Once it stops holding, it can start to hold again; the tag the person removed stays
     # removed.
-    await r.documents.change_metadata(owner.id, document.id, DocumentChanges(contact_id=None))
+    await r.documents.change_metadata(
+        Actor(owner.id), document.id, DocumentChanges(contact_id=None)
+    )
     change = await r.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(contact_id=acme.id)
+        Actor(owner.id), document.id, DocumentChanges(contact_id=acme.id)
     )
     assert change.rules is not None and len(change.rules.plan.reports) == 1
     assert Note(
@@ -117,10 +122,10 @@ async def test_a_change_rule_keeps_what_the_person_decided_earlier(world: World)
         owner, definition("ACME", contact_is(acme.id), SetTitle("ACME bill"), triggers=CHANGE)
     )
     document = await r.arrive(owner)
-    await r.documents.change_metadata(owner.id, document.id, DocumentChanges(title="Mine"))
+    await r.documents.change_metadata(Actor(owner.id), document.id, DocumentChanges(title="Mine"))
 
     change = await r.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(contact_id=acme.id)
+        Actor(owner.id), document.id, DocumentChanges(contact_id=acme.id)
     )
 
     assert applied(change) == []
@@ -137,8 +142,8 @@ async def test_nothing_turns_yellow_on_a_change(world: World) -> None:
     owner, reader = await world.user(), await world.user()
     acme = await r.contact("ACME")
     paid, seen = await r.tag("paid"), await r.tag("seen")
-    shared = await world.spaces.create(owner.id, "Shared")
-    await world.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
+    shared = await world.spaces.create(Actor(owner.id), "Shared")
+    await world.spaces.set_member(Actor(owner.id), shared.id, reader.id, SpaceRole.READ)
     # The model set the contact and no person confirmed it.
     document = await r.arrive(owner, classify=Classifies(contact=acme.id))
     assert (document.lane, document.contact_id) == (Lane.GREEN, acme.id)
@@ -156,7 +161,7 @@ async def test_nothing_turns_yellow_on_a_change(world: World) -> None:
     )
 
     change = await r.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(tag_ids=frozenset({paid.id}))
+        Actor(owner.id), document.id, DocumentChanges(tag_ids=frozenset({paid.id}))
     )
 
     kinds = {(note.field, note.kind) for note in reported(change)}
@@ -179,8 +184,8 @@ async def test_tags_the_person_sets_in_the_change_are_trusted(world: World) -> N
     owner, reader = await world.user(), await world.user()
     acme = await r.contact("ACME")
     tax = await r.tag("tax")
-    shared = await world.spaces.create(owner.id, "Shared")
-    await world.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
+    shared = await world.spaces.create(Actor(owner.id), "Shared")
+    await world.spaces.set_member(Actor(owner.id), shared.id, reader.id, SpaceRole.READ)
     document = await r.arrive(owner, classify=Classifies(tags=[tax.id]))
     await r.personal_rule(
         owner,
@@ -194,7 +199,7 @@ async def test_tags_the_person_sets_in_the_change_are_trusted(world: World) -> N
 
     # The person sets contact and tags; the tag the model proposed is now theirs.
     change = await r.documents.change_metadata(
-        owner.id,
+        Actor(owner.id),
         document.id,
         DocumentChanges(contact_id=acme.id, tag_ids=frozenset({tax.id})),
     )
@@ -216,7 +221,7 @@ async def test_change_rules_wait_until_processing_is_complete(world: World) -> N
     assert document.lane is Lane.YELLOW
 
     change = await r.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(contact_id=acme.id)
+        Actor(owner.id), document.id, DocumentChanges(contact_id=acme.id)
     )
 
     assert change.rules is None
@@ -242,10 +247,12 @@ async def test_rules_do_not_set_each_other_off(world: World) -> None:
     document = await r.arrive(owner)
 
     change = await r.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(contact_id=acme.id)
+        Actor(owner.id), document.id, DocumentChanges(contact_id=acme.id)
     )
     assert applied(change) == ["tags"]
-    change = await r.documents.change_metadata(owner.id, document.id, DocumentChanges(title="X"))
+    change = await r.documents.change_metadata(
+        Actor(owner.id), document.id, DocumentChanges(title="X")
+    )
     assert change.rules is not None and change.rules.plan.reports == []
 
     stored = await r.stored(document)
@@ -257,8 +264,8 @@ async def test_an_editor_sets_off_the_rules_of_the_space(world: World) -> None:
     owner, editor = await world.user(), await world.user()
     acme = await r.contact("ACME")
     owners, editors, everyone = await r.tag("owner"), await r.tag("editor"), await r.tag("all")
-    shared = await world.spaces.create(owner.id, "Shared")
-    await world.spaces.set_member(owner.id, shared.id, editor.id, SpaceRole.EDIT)
+    shared = await world.spaces.create(Actor(owner.id), "Shared")
+    await world.spaces.set_member(Actor(owner.id), shared.id, editor.id, SpaceRole.EDIT)
     mine = await r.space_rule(
         owner,
         shared.id,
@@ -276,7 +283,7 @@ async def test_an_editor_sets_off_the_rules_of_the_space(world: World) -> None:
     document = await r.arrive(owner, space=shared.id)
 
     change = await r.documents.change_metadata(
-        editor.id, document.id, DocumentChanges(contact_id=acme.id)
+        Actor(editor.id), document.id, DocumentChanges(contact_id=acme.id)
     )
 
     assert change.rules is not None  # the rules' report is for the editors
@@ -297,9 +304,9 @@ async def test_a_dry_run_stores_nothing_and_shows_the_caller_only_their_own(
     owner, editor = await world.user(), await world.user()
     acme = await r.contact("ACME")
     filed, editors = await r.tag("filed"), await r.tag("editor")
-    shared = await world.spaces.create(owner.id, "Shared")
-    private = await world.spaces.create(owner.id, "Private")
-    await world.spaces.set_member(owner.id, shared.id, editor.id, SpaceRole.EDIT)
+    shared = await world.spaces.create(Actor(owner.id), "Shared")
+    private = await world.spaces.create(Actor(owner.id), "Private")
+    await world.spaces.set_member(Actor(owner.id), shared.id, editor.id, SpaceRole.EDIT)
     await r.space_rule(
         owner,
         shared.id,
@@ -324,13 +331,13 @@ async def test_a_dry_run_stores_nothing_and_shows_the_caller_only_their_own(
     acme_now = DocumentChanges(contact_id=acme.id)
 
     # The editor would lose sight of the document: no access, no report of the rules.
-    tried = await r.documents.change_metadata(editor.id, document.id, acme_now, dry_run=True)
+    tried = await r.documents.change_metadata(Actor(editor.id), document.id, acme_now, dry_run=True)
     assert tried.access is None
     assert tried.rules is None
     assert tried.document.tag_ids == {filed.id}  # the space's rule, not the editor's own
 
     # The owner, who edits the private space too, sees what the rules would do.
-    tried = await r.documents.change_metadata(owner.id, document.id, acme_now, dry_run=True)
+    tried = await r.documents.change_metadata(Actor(owner.id), document.id, acme_now, dry_run=True)
     assert tried.access is SpaceRole.EDIT
     assert tried.space.id == private.id
     assert tried.rules is not None
@@ -343,10 +350,10 @@ async def test_a_dry_run_stores_nothing_and_shows_the_caller_only_their_own(
     assert world.event_types() == events
 
     # The change itself takes the document out of the editor's sight.
-    changed = await r.documents.change_metadata(editor.id, document.id, acme_now)
+    changed = await r.documents.change_metadata(Actor(editor.id), document.id, acme_now)
     assert changed.access is None
     with pytest.raises(NotFoundError):
-        await r.documents.get(editor.id, document.id)
+        await r.documents.get(Actor(editor.id), document.id)
     assert (await r.stored(document)).space_id == private.id
 
 
@@ -356,11 +363,11 @@ async def test_a_rule_on_a_contact_group_acts_for_a_contact_in_a_group_below(
     r = await rule_world(world)
     owner = await world.user()
     master = world.master_data
-    insurer = await master.create_tag(r.admin.id, "Insurer", scope=TagScope.CONTACT)
+    insurer = await master.create_tag(Actor(r.admin.id), "Insurer", scope=TagScope.CONTACT)
     health = await master.create_tag(
-        r.admin.id, "Health insurer", scope=TagScope.CONTACT, parent_id=insurer.id
+        Actor(r.admin.id), "Health insurer", scope=TagScope.CONTACT, parent_id=insurer.id
     )
-    nord = await master.create_contact(r.admin.id, "Nord", group_ids=[health.id])
+    nord = await master.create_contact(Actor(r.admin.id), "Nord", group_ids=[health.id])
     other = await r.contact("Beta")
     tag = await r.tag("Insurance")
     in_group = Condition(
@@ -372,11 +379,11 @@ async def test_a_rule_on_a_contact_group_acts_for_a_contact_in_a_group_below(
     )
     document = await r.arrive(owner)
     change = await r.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(contact_id=other.id)
+        Actor(owner.id), document.id, DocumentChanges(contact_id=other.id)
     )
     assert change.rules is not None and change.rules.plan.reports == []
     change = await r.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(contact_id=nord.id)
+        Actor(owner.id), document.id, DocumentChanges(contact_id=nord.id)
     )
     assert sorted(applied(change)) == ["tags", "title"]
     stored = await r.stored(document)
@@ -388,8 +395,8 @@ async def test_rules_take_tags_of_the_scope_their_place_asks_for(world: World) -
     owner = await world.user()
     master = world.master_data
     tag = await r.tag("Paid")
-    group = await master.create_tag(r.admin.id, "Insurer", scope=TagScope.CONTACT)
-    kinds = await master.create_tag(r.admin.id, "Bills", scope=TagScope.DOCUMENT_TYPE)
+    group = await master.create_tag(Actor(r.admin.id), "Insurer", scope=TagScope.CONTACT)
+    kinds = await master.create_tag(Actor(r.admin.id), "Bills", scope=TagScope.DOCUMENT_TYPE)
 
     def on(field: ConditionField, id: object) -> Condition:
         return Condition(field=field, op=Operator.IN, value=[str(id)])

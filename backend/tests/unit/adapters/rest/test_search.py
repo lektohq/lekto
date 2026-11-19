@@ -12,6 +12,7 @@ from lekto.core.domain.errors import SearchUnavailableError
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.labels import grid_layout
 from lekto.core.domain.pipeline import Node
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.services.objects import structure_key, text_key
 from tests import builders
@@ -107,9 +108,9 @@ async def test_a_removed_member_finds_nothing_at_once(api: Api) -> None:
     scene = await indexed_scene(api)
     assert await found(scene, "reader") == {scene.green}
     owner_spaces = api.services.spaces
-    shared = await owner_spaces.get(scene.owner.id, scene.shared.id)
+    shared = await owner_spaces.get(Actor(scene.owner.id), scene.shared.id)
     reader_id = next(user for user, role in shared.members.items() if role is SpaceRole.READ)
-    await owner_spaces.remove_member(scene.owner.id, scene.shared.id, reader_id)
+    await owner_spaces.remove_member(Actor(scene.owner.id), scene.shared.id, reader_id)
     assert await found(scene, "reader") == set()
     assert scene.green in await found(scene, "writer")
 
@@ -117,7 +118,7 @@ async def test_a_removed_member_finds_nothing_at_once(api: Api) -> None:
 async def test_a_lane_that_changed_before_the_index_heard_of_it(api: Api) -> None:
     scene = await indexed_scene(api)
     pipeline = api.services.pipeline
-    await pipeline.reprocess_from(scene.owner.id, DocumentId(UUID(scene.green)), Node.JUDGE)
+    await pipeline.reprocess_from(Actor(scene.owner.id), DocumentId(UUID(scene.green)), Node.JUDGE)
     assert await found(scene, "reader") == set()  # in processing again; the index says green
     assert await found(scene, "owner") >= {scene.green}
 

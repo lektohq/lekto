@@ -11,6 +11,7 @@ from lekto.core.domain.ids import JobId
 from lekto.core.domain.jobs import OPEN_STATES, Job, JobState, JobStatus, RetryPolicy
 from lekto.core.domain.master_data import Contact
 from lekto.core.domain.pipeline import Node
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role
 from lekto.core.services._jobs import NODE_JOB, JobRunner, NodeJob
 from lekto.core.services.jobs import JobsService, KindSummary, RetryWay
@@ -49,7 +50,9 @@ async def queue(world: World, kind: str, payload: dict[str, object], at: timedel
 async def document_of(world: World) -> tuple[Document, JobId]:
     """A document of a new user received, and a failed job of one of its steps."""
     owner = await world.user("owner")
-    document = await world.pipeline().receive(owner.id, incoming(b"%PDF-1"), filename="a.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(b"%PDF-1"), filename="a.pdf"
+    )
     async with world.uow() as uow:
         failed = await uow.jobs.enqueue(
             NODE_JOB, NodeJob(document.id, Node.OCR, 99).to_json(), run_at=NOW - timedelta(1)
@@ -70,7 +73,7 @@ async def test_the_summary_counts_the_jobs_by_kind_and_state(world: World) -> No
     await finish(world, kinds=["search.index"])
     await finish(world, error="timeout", kinds=["contacts.logo"])
 
-    summary = await jobs(world).summary(viewer.id)
+    summary = await jobs(world).summary(Actor(viewer.id))
 
     assert summary.kinds == (
         KindSummary("contacts.logo", failed=1),
@@ -88,8 +91,8 @@ async def test_a_job_names_a_document_only_to_those_who_may_read_it(world: World
     assert owner is not None
     stranger = await world.user("stranger")
 
-    mine = await jobs(world).list(owner, states=[JobState.FAILED])
-    theirs = await jobs(world).list(stranger.id, states=[JobState.FAILED])
+    mine = await jobs(world).list(Actor(owner), states=[JobState.FAILED])
+    theirs = await jobs(world).list(Actor(stranger.id), states=[JobState.FAILED])
 
     [view] = mine.jobs
     assert (view.job.id, view.state, view.node) == (failed, JobState.FAILED, Node.OCR)
@@ -111,8 +114,8 @@ async def test_errors_and_retries_are_for_admins(world: World) -> None:
     admin = await world.user("admin", role=Role.ADMIN)
     assert document.uploaded_by is not None
 
-    seen = await jobs(world).list(admin.id, states=[JobState.FAILED])
-    by_user = await jobs(world).list(document.uploaded_by, states=[JobState.FAILED])
+    seen = await jobs(world).list(Actor(admin.id), states=[JobState.FAILED])
+    by_user = await jobs(world).list(Actor(document.uploaded_by), states=[JobState.FAILED])
 
     views = {view.job.id: view for view in seen.jobs}
     assert (views[failed].error, views[failed].retry) == (
@@ -136,17 +139,17 @@ async def test_an_admin_queues_a_failed_job_again(world: World) -> None:
     world.clock.advance(timedelta(minutes=1))
 
     with pytest.raises(PermissionDeniedError):
-        await jobs(world).retry(document.uploaded_by, logo)
+        await jobs(world).retry(Actor(document.uploaded_by), logo)
     with pytest.raises(ConflictError) as raised:
-        await jobs(world).retry(admin.id, failed)
+        await jobs(world).retry(Actor(admin.id), failed)
     assert raised.value.reason is not None
     assert raised.value.reason.code == "job_retry_in_document"
-    retried = await jobs(world).retry(admin.id, logo)
+    retried = await jobs(world).retry(Actor(admin.id), logo)
 
     assert (retried.job.id, retried.state, retried.retry) == (logo, JobState.DUE, None)
     assert retried.job.run_at == NOW + timedelta(minutes=1)
     with pytest.raises(ConflictError):
-        await jobs(world).retry(admin.id, logo)
+        await jobs(world).retry(Actor(admin.id), logo)
 
 
 async def test_the_list_pages_through_the_open_jobs_of_a_kind(world: World) -> None:
@@ -157,10 +160,10 @@ async def test_the_list_pages_through_the_open_jobs_of_a_kind(world: World) -> N
     world.clock.advance(timedelta(seconds=10))
 
     first = await jobs(world).list(
-        viewer.id, states=OPEN_STATES, kind="search.index", offset=0, limit=2
+        Actor(viewer.id), states=OPEN_STATES, kind="search.index", offset=0, limit=2
     )
     rest = await jobs(world).list(
-        viewer.id, states=OPEN_STATES, kind="search.index", offset=2, limit=10
+        Actor(viewer.id), states=OPEN_STATES, kind="search.index", offset=2, limit=10
     )
 
     assert (len(first.jobs), len(rest.jobs), first.total, rest.total) == (2, 3, 5, 5)
@@ -186,7 +189,7 @@ async def test_durations_of_the_jobs_done_within_the_retention(world: World) -> 
             await uow.jobs.complete(job, now=world.clock.now(), result={"sections": 1})
             await uow.commit()
 
-    durations = await jobs(world).durations(viewer.id)
+    durations = await jobs(world).durations(Actor(viewer.id))
 
     [index] = durations.kinds
     assert (index.kind, index.count) == ("search.index", 3)
@@ -211,7 +214,7 @@ async def test_durations_come_from_the_latest_jobs_of_a_kind_and_are_kept_a_minu
     await queue(world, "contacts.logo", {}, world.clock.now() - NOW)
     await finish(world, kinds=["contacts.logo"])
 
-    first = await service.durations(viewer.id)
+    first = await service.durations(Actor(viewer.id))
     [logo, index] = first.kinds
     assert (index.count, index.run_median, index.run_p90) == (
         2,
@@ -223,9 +226,9 @@ async def test_durations_come_from_the_latest_jobs_of_a_kind_and_are_kept_a_minu
     await queue(world, "search.index", {}, world.clock.now() - NOW)
     await finish(world, kinds=["search.index"])
     world.clock.advance(timedelta(seconds=59))
-    assert await service.durations(viewer.id) == first  # kept
+    assert await service.durations(Actor(viewer.id)) == first  # kept
     world.clock.advance(timedelta(seconds=2))
-    [_, counted] = (await service.durations(viewer.id)).kinds
+    [_, counted] = (await service.durations(Actor(viewer.id))).kinds
     assert (counted.count, counted.run_median) == (2, timedelta(seconds=0))
 
 
