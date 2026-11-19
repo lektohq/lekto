@@ -15,9 +15,9 @@ from tests.api import auth
 from tests.unit.adapters.rest.support import Api
 
 URL = f"{PREFIX}/identifiers/open"
-CUSTOMER = (IdentifierKind.CUSTOMER_NUMBER, "20047718")
+CUSTOMER = (IdentifierKind.CUSTOMER_NUMBER, "12345678")
 SITE = (IdentifierKind.EMAIL_DOMAIN, "stadtwerke-nord.example")
-TEXT = "Kundennummer 20047718, service@stadtwerke-nord.example"
+TEXT = "Kundennummer 12345678, service@stadtwerke-nord.example"
 
 
 async def seeded(api: Api, owner: User | None = None) -> Contact:
@@ -68,9 +68,9 @@ async def test_admins_see_the_open_identifiers(api: Api) -> None:
     assert page["items"] == [
         {
             "kind": "customer_number",
-            "value": "20047718",
-            "ref": api.container.refs.seal("20047718", context="customer_number"),
-            "written": "20047718",
+            "value": "12345678",
+            "ref": api.container.refs.seal("12345678", context="customer_number"),
+            "written": "12345678",
             "source": "learned",
             "contacts": [{"id": str(contact.id), "name": "Stadtwerke"}],
             "person": None,
@@ -106,7 +106,7 @@ async def test_admins_see_the_open_identifiers(api: Api) -> None:
     (place, _) = detail.json()["places"]
     assert place["role"] == "contact"
     assert place["excerpt"] == {
-        "before": "Kundennummer 20047718, service@",
+        "before": "Kundennummer 12345678, service@",
         "match": "stadtwerke-nord.example",
         "after": "",
     }
@@ -131,10 +131,10 @@ async def test_open_identifiers_are_found_by_words_in_the_body(api: Api) -> None
     search = f"{URL}/search"
     assert (await api.client.post(search, json={"q": "x"}, headers=auth(user))).status_code == 403
     found = await api.client.post(
-        search, params={"source": "learned"}, json={"q": "2004 7718"}, headers=auth(admin)
+        search, params={"source": "learned"}, json={"q": "1234 5678"}, headers=auth(admin)
     )
     assert found.status_code == 200, found.text
-    assert [item["value"] for item in found.json()["items"]] == ["20047718"]
+    assert [item["value"] for item in found.json()["items"]] == ["12345678"]
     none = await api.client.post(search, json={"q": "Gaswerke"}, headers=auth(admin))
     assert none.json()["items"] == []
     assert (await api.client.post(search, json={}, headers=auth(admin))).status_code == 422
@@ -193,7 +193,7 @@ async def test_decisions_come_back_one_by_one(api: Api) -> None:
         f"{URL}/decisions",
         json={
             "decisions": [
-                {"kind": "customer_number", "value": "20047718", "action": "confirm"},
+                {"kind": "customer_number", "value": "12345678", "action": "confirm"},
                 {"kind": "vat_id", "value": "DE999", "action": "reject"},
             ]
         },
@@ -248,7 +248,7 @@ async def test_where_an_identifier_stands_in_the_documents_the_caller_reads(api:
     assert found.status_code == 200, found.text
     listed = found.json()["places"]
     assert len(listed) == 2
-    assert listed[0]["excerpt"]["match"] == "20047718"
+    assert listed[0]["excerpt"]["match"] == "12345678"
     assert [item["own"] for item in listed[0]["occurrences"]] == [True]
     # Another user reads none of them; a person's kind is for admins; a broken reference.
     other = await api.user()
@@ -269,7 +269,7 @@ async def test_where_an_identifier_stands_in_one_document(api: Api) -> None:
     url = f"{PREFIX}/documents/{first.id}/places/customer_number/{customer}"
     found = await api.client.get(url, headers=auth(owner))
     assert found.status_code == 200, found.text
-    assert found.json()["excerpt"]["match"] == "20047718"
+    assert found.json()["excerpt"]["match"] == "12345678"
     assert [item["own"] for item in found.json()["occurrences"]] == [True]
     # A value the document does not have; a document the caller does not read.
     other = api.container.refs.seal("99999999", context="customer_number")

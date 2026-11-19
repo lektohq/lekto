@@ -95,7 +95,7 @@ describe('the classifier tab', () => {
 
 	it('shows a user the model without the training', async () => {
 		session.start({
-			user: { id: 'user', username: 'anna', role: 'user' },
+			user: { id: 'user', username: 'erika', role: 'user' },
 			method: 'password',
 			expires_at: '2026-10-14T12:00:00Z',
 			csrf_token: 'token'

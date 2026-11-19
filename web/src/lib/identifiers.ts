@@ -5,7 +5,7 @@ import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 
 /** The longest value of an identifier the API takes (`tests/api-limits.test.ts`). */
-export const IDENTIFIER_VALUE_MAX = 100;
+export const IDENTIFIER_VALUE_MAX = 200;
 
 export type IdentifierIn = components['schemas']['IdentifierIn'];
 export type IdentifierOut = components['schemas']['IdentifierOut'];
@@ -110,9 +110,9 @@ export function printed(kind: string, value: string): string {
 }
 
 /** One row of the editor; `key` keeps a row apart while its value is typed. `topic_id`: the
- * contact's topic it points to (empty: none); `user_id`: the user a customer or personnel number
- * belongs to (empty: none); `contact_id`: the contact of a user's number (the profile; empty:
- * none chosen yet). */
+ * contact's topic it points to (empty: none); `user_id`: the user a customer, contract or
+ * personnel number belongs to (empty: none); `contact_id`: the contact of a user's number (the
+ * profile; empty: none chosen yet). */
 export interface IdentifierRow {
 	key: number;
 	kind: IdentifierKind;

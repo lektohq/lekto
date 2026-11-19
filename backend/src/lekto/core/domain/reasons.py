@@ -38,6 +38,7 @@ class ReasonCode(StrEnum):
     ONLY_IDENTIFIER = "only_identifier"
     CONTACT_IS_RECIPIENT = "contact_is_recipient"
     CONTACT_IDENTIFIERS_SEVERAL = "contact_identifiers_several"
+    CONTACT_IDENTIFIER_OF_OTHER = "contact_identifier_of_other"
     CONTACT_NEW_PROPOSED = "contact_new_proposed"
     CONTACT_NONE = "contact_none"
     CONTACT_NONE_NO_MODEL = "contact_none_no_model"
@@ -144,9 +145,13 @@ class ReasonCode(StrEnum):
     PDF_ENCRYPTED = "pdf_encrypted"
     PDF_UNREADABLE = "pdf_unreadable"
     PDF_UNREADABLE_DETAIL = "pdf_unreadable_detail"
+    PDF_TOO_COMPLEX = "pdf_too_complex"
     IMAGE_UNREADABLE = "image_unreadable"
     IMAGE_UNREADABLE_DETAIL = "image_unreadable_detail"
+    IMAGE_TOO_LARGE = "image_too_large"
     DOCUMENT_NO_PAGES = "document_no_pages"
+    DOCUMENT_TOO_MANY_PAGES = "document_too_many_pages"
+    PREVIEW_TOO_MANY_PAGES = "preview_too_many_pages"
     OCR_FAILED = "ocr_failed"
     TEXT_UNREADABLE = "text_unreadable"
     SIGNATURE_DROPPED = "signature_dropped"
@@ -215,6 +220,7 @@ class ReasonCode(StrEnum):
     TAG_USED_BY_RULES = "tag_used_by_rules"
     FIELD_USED_BY_PATTERNS = "field_used_by_patterns"
     FIELD_USED_BY_RULES = "field_used_by_rules"
+    FIELD_USED_BY_WEBHOOKS = "field_used_by_webhooks"
     FIELD_KEY_TAKEN = "field_key_taken"
     IDENTIFIER_OF_PERSON = "identifier_of_person"
     IDENTIFIER_OF_CONTACT = "identifier_of_contact"
@@ -274,6 +280,7 @@ class ReasonCode(StrEnum):
     CODE_INVALID = "code_invalid"
     READ_ONLY_TOKEN = "read_only_token"
     UPLOAD_ONLY_TOKEN = "upload_only_token"
+    UPLOAD_ONLY_TOKEN_FIELDS = "upload_only_token_fields"
     PUSH_OFF = "push_off"
     PUSH_ENDPOINT_REFUSED = "push_endpoint_refused"
     PUSH_KEYS_INVALID = "push_keys_invalid"
@@ -441,6 +448,8 @@ class ReasonCode(StrEnum):
     MAIL_FOLDER_MISSING = "mail_folder_missing"
     MAIL_SERVER_ERROR = "mail_server_error"
     MAIL_PASSWORD_UNREADABLE = "mail_password_unreadable"
+    MAIL_FETCH_FAILED = "mail_fetch_failed"
+    MAIL_PASSWORD_AGAIN = "mail_password_again"
     MAILBOX_PAUSED = "mailbox_paused"
     MAIL_TOO_LARGE = "mail_too_large"
     MAIL_STEP_FAILED = "mail_step_failed"
@@ -455,6 +464,7 @@ class ReasonCode(StrEnum):
     DELIVERY_OWNER_NO_ADMIN = "delivery_owner_no_admin"
     DELIVERY_WEBHOOK_DELETED = "delivery_webhook_deleted"
     DELIVERY_SECRET_UNUSABLE = "delivery_secret_unusable"
+    WEBHOOK_HEADERS_AGAIN = "webhook_headers_again"
     MAIL_RULE_UNREADABLE = "mail_rule_unreadable"
 
 
@@ -467,6 +477,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.ONLY_IDENTIFIER: "only an identifier points to '{name}'",
     ReasonCode.CONTACT_IS_RECIPIENT: "'{contact}' is the recipient, not the sender",
     ReasonCode.CONTACT_IDENTIFIERS_SEVERAL: "identifiers of several contacts stand in the text",
+    ReasonCode.CONTACT_IDENTIFIER_OF_OTHER: "an identifier of '{other}' stands in the text",
     ReasonCode.CONTACT_NEW_PROPOSED: "no contact matches '{sender}'; a new contact is proposed",
     ReasonCode.CONTACT_NONE: "no contact recognised",
     ReasonCode.CONTACT_NONE_NO_MODEL: "no contact recognised (the language model did not answer)",
@@ -606,9 +617,20 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.PDF_ENCRYPTED: "the PDF is encrypted",
     ReasonCode.PDF_UNREADABLE: "the PDF cannot be read",
     ReasonCode.PDF_UNREADABLE_DETAIL: "the PDF cannot be read: {detail}",
+    ReasonCode.PDF_TOO_COMPLEX: "the PDF needs more memory or time than Lekto gives it",
     ReasonCode.IMAGE_UNREADABLE: "the image cannot be read",
     ReasonCode.IMAGE_UNREADABLE_DETAIL: "the image cannot be read: {detail}",
+    ReasonCode.IMAGE_TOO_LARGE: (
+        "the image has {pixels:number} megapixels; Lekto reads images of up to {max:number} "
+        "megapixels"
+    ),
     ReasonCode.DOCUMENT_NO_PAGES: "the document has no pages",
+    ReasonCode.DOCUMENT_TOO_MANY_PAGES: (
+        "the document has {pages:number} pages; Lekto reads documents of up to {max:number} pages"
+    ),
+    ReasonCode.PREVIEW_TOO_MANY_PAGES: (
+        "the file has {pages:number} pages; the preview shows files of up to {max:number} pages"
+    ),
     ReasonCode.OCR_FAILED: "{problem:reason}: {detail}",
     ReasonCode.TEXT_UNREADABLE: (
         "the text in the PDF cannot be read (a font without a character map); every page was "
@@ -694,6 +716,9 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.FIELD_USED_BY_RULES: (
         "field.{key} is used by the templates of the rules {rules:list}"
     ),
+    ReasonCode.FIELD_USED_BY_WEBHOOKS: (
+        "field.{key} is used by the templates of the webhooks {webhooks:list}"
+    ),
     ReasonCode.FIELD_KEY_TAKEN: "'{field}' would be field.{key} in templates, as '{other}' is",
     ReasonCode.IDENTIFIER_OF_PERSON: "'{value}' is an identifier of a person",
     ReasonCode.IDENTIFIER_OF_CONTACT: (
@@ -770,10 +795,13 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.CODE_INVALID: "the code is not valid",
     ReasonCode.READ_ONLY_TOKEN: "this API token may only read",
     ReasonCode.UPLOAD_ONLY_TOKEN: "this API token may only upload documents",
+    ReasonCode.UPLOAD_ONLY_TOKEN_FIELDS: (
+        "this API token uploads only for its own user, without {fields:list}"
+    ),
     ReasonCode.PUSH_OFF: "notifications are off on this server",
     ReasonCode.PUSH_ENDPOINT_REFUSED: "the device's push address is no known push service's",
     ReasonCode.PUSH_KEYS_INVALID: "the device's keys are not valid",
-    ReasonCode.PUSH_DEVICES_LIMIT: "at most 20 devices receive notifications",
+    ReasonCode.PUSH_DEVICES_LIMIT: "at most {max:number} devices receive notifications",
     ReasonCode.CSRF_MISSING: "the header {header} is missing or wrong",
     ReasonCode.SESSION_NEEDED: "this needs a signed-in session, not an API token",
     ReasonCode.OIDC_MISMATCH: "the sign-in does not match the one started here",
@@ -868,10 +896,12 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ),
     ReasonCode.NOT_OF_KIND: "'{value}' is no valid {kind:identifier_kind}",
     ReasonCode.NOT_CUSTOMER_NUMBER: (
-        "'{value}' is no customer number (4 to 30 letters and digits, one a digit)"
+        "'{value}' is no customer number ({min:number} to {max:number} letters and digits, "
+        "one a digit)"
     ),
     ReasonCode.NOT_PERSONNEL_NUMBER: (
-        "'{value}' is no personnel number (3 to 30 letters and digits, one a digit)"
+        "'{value}' is no personnel number ({min:number} to {max:number} letters and digits, "
+        "one a digit)"
     ),
     ReasonCode.NOT_DOMAIN: "'{value}' is not a domain",
     ReasonCode.FREE_MAIL_DOMAIN: "'{value}' is a free mail provider, not one contact's",
@@ -898,7 +928,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.CONTACT_TOO_MANY_ALIASES: "a contact has at most {max:number} aliases",
     ReasonCode.CONTACT_TOO_MANY_IDENTIFIERS: "a contact has at most {max:number} identifiers",
     ReasonCode.ONLY_NUMBERS_NAME_USERS: (
-        "only a customer or personnel number names the user it belongs to"
+        "only a customer, contract or personnel number names the user it belongs to"
     ),
     ReasonCode.IDENTIFIER_TAKEN: "'{value}' is already taken",
     ReasonCode.IDENTIFIER_ENTERED: "'{value}' is entered at the contact by hand",
@@ -1010,6 +1040,12 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.MAIL_PASSWORD_UNREADABLE: (
         "the stored password cannot be read (was the secret key changed?); enter it again"
     ),
+    ReasonCode.MAIL_FETCH_FAILED: (
+        "fetching stopped at an error in Lekto; the next fetch tries again"
+    ),
+    ReasonCode.MAIL_PASSWORD_AGAIN: (
+        "for another server, port, encryption or user, enter the password again"
+    ),
     ReasonCode.MAILBOX_PAUSED: "the mailbox is paused; activate it to fetch",
     ReasonCode.MAIL_TOO_LARGE: (
         "the mail '{subject}' has {size:number} MB; Lekto fetches mails of up to {max:number} MB "
@@ -1030,6 +1066,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.DELIVERY_DOCUMENT_UNAVAILABLE: "the document is not available to the owner",
     ReasonCode.DELIVERY_OWNER_NO_ADMIN: "the owner is no admin any more",
     ReasonCode.DELIVERY_WEBHOOK_DELETED: "the webhook was deleted",
+    ReasonCode.WEBHOOK_HEADERS_AGAIN: "for another address, enter the values of the headers again",
     ReasonCode.DELIVERY_SECRET_UNUSABLE: (
         "the secret or the header values cannot be used (was the secret key changed?)"
     ),

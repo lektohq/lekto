@@ -220,6 +220,16 @@ class WebhookService:
             ):
                 await uow.lock(MODEL_CALLS_LOCK)
             more_room = max_open_tasks is not None and max_open_tasks > webhook.max_open_tasks
+            if (
+                url is not None
+                and url != webhook.url
+                and webhook.owner_id != user.id
+                and webhook.header_names
+                and (headers is None or any(value is None for _, value in headers))
+            ):
+                # The values of the headers (an `Authorization` for the owner's n8n) are never
+                # shown again: they go to another address only when given anew, or by the owner.
+                raise ValidationError(because(ReasonCode.WEBHOOK_HEADERS_AGAIN))
             webhook.change(
                 now=now,
                 name=name,

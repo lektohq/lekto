@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 
 from lekto.adapters.outbound.memory.database import DOCUMENTS
 from lekto.core.domain.documents import Document
-from lekto.core.domain.errors import ConflictError
 from lekto.core.domain.first_runs import FieldVerdict, FirstRun, Verdict
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.pipeline import Lane, Node
@@ -56,9 +55,8 @@ class MemoryProcessingFacts:
     async def lane_counts(self, scope: FactsScope) -> list[LaneCount]:
         decided = {id for id, _ in self._verdicts()}
         counts = Counter(
-            (document.first_lane, document.lane, document.id in decided)
-            for document, _ in self._first_runs(scope)
-            if document.first_lane is not None
+            (first, document.lane, document.id in decided)
+            for document, first, _ in self._first_runs(scope)
         )
         return [
             LaneCount(first_lane=first, lane=lane, decided=was_decided, count=count)
@@ -69,18 +67,16 @@ class MemoryProcessingFacts:
         self, scope: FactsScope, starts: Sequence[datetime]
     ) -> list[dict[Lane, int]]:
         periods: list[dict[Lane, int]] = [{} for _ in starts]
-        for document, run in self._first_runs(scope):
-            if document.first_lane is None:
-                continue
+        for _, first, run in self._first_runs(scope):
             index = _period(run.stopped_at, starts)
             if index is not None:
                 lanes = periods[index]
-                lanes[document.first_lane] = lanes.get(document.first_lane, 0) + 1
+                lanes[first] = lanes.get(first, 0) + 1
         return periods
 
     async def run_times(self, scope: FactsScope) -> RunTimes:
         times = RunTimes(durations=[], work=[], steps={})
-        for _, run in self._first_runs(scope):
+        for _, _, run in self._first_runs(scope):
             times.durations.append(run.duration // MICROSECOND)
             times.work.append(run.work // MICROSECOND)
             for node, step in run.steps.items():
@@ -102,16 +98,17 @@ class MemoryProcessingFacts:
 
     # --- rows -----------------------------------------------------------------------------------
 
-    def _first_runs(self, scope: FactsScope) -> Iterator[tuple[Document, FirstRun]]:
-        """The documents of `scope` with their first runs (not copied)."""
+    def _first_runs(self, scope: FactsScope) -> Iterator[tuple[Document, Lane, FirstRun]]:
+        """The documents of `scope` with their first lanes and runs (not copied); not one whose
+        first lane is unknown, as the port says and SQL's `_runs_of` does (PM-05)."""
         runs = self._runs()
         for document in self._uow._rows(DOCUMENTS):
             run = runs.get(document.id)
-            if run is None or not _in(document, scope):
+            if run is None or document.first_lane is None or not _in(document, scope):
                 continue
             if scope.since is not None and run.stopped_at < scope.since:
                 continue
-            yield document, run
+            yield document, document.first_lane, run
 
     def _judged(self, scope: FactsScope) -> Iterator[FieldVerdict]:
         """The verdicts of `scope` (not copied)."""
@@ -128,7 +125,9 @@ class MemoryProcessingFacts:
         """ConflictError for a fact of a document that does not exist, as the SQL schema's
         foreign key refuses it."""
         if self._uow._row(DOCUMENTS, document) is None:
-            raise ConflictError(f"processing fact of a document that does not exist: {document}")
+            raise self._uow._violated(
+                f"processing fact of a document that does not exist: {document}"
+            )
 
     def _runs(self) -> dict[DocumentId, FirstRun]:
         """The first runs committed, with this unit's."""

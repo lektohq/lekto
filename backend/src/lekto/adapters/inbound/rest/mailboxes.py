@@ -18,6 +18,7 @@ from lekto.adapters.inbound.rest.schemas.mailboxes import (
     MailPageOut,
     MailSummaryOut,
 )
+from lekto.adapters.inbound.schemas import MAX_POSITION
 from lekto.core.domain.ids import MailboxId, MailRuleId
 from lekto.core.domain.mail_intake import MailOutcome
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE
@@ -125,7 +126,7 @@ async def list_mails(
     context: Context,
     outcome: Annotated[list[MailOutcome] | None, Query(description="Repeat for several.")] = None,
     rule_id: Annotated[UUID | None, Query(description="Only the mails this rule took.")] = None,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    offset: Annotated[int, Query(ge=0, le=MAX_POSITION)] = 0,
     limit: Annotated[int, Query(ge=1, le=PAGE_LIMIT)] = PAGE_SIZE,
 ) -> MailPageOut:
     page = await context.mailboxes.mails(

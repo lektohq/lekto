@@ -2,11 +2,19 @@
 replaces it is its next version, the others new documents, the document gone without one."""
 
 import json
+from pathlib import Path
 from typing import Any
 
+import pytest
+
 from lekto.adapters.outbound.memory import fake_pdf
+from lekto.adapters.outbound.pdfium import PdfiumPageRenderer
+from lekto.adapters.outbound.pikepdf import PikepdfPageComposer
+from lekto.core.domain.editing import MAX_PREVIEW_PAGES
+from tests import builders
 from tests.api import auth
-from tests.unit.adapters.rest.support import DOCUMENTS, Api, file_part, upload
+from tests.pdfs import missing_page
+from tests.unit.adapters.rest.support import DOCUMENTS, Api, api_with, file_part, upload
 
 
 def form(parts: Any, *files: tuple[str, bytes], **fields: str) -> dict[str, Any]:
@@ -179,3 +187,71 @@ async def test_the_pages_of_a_file_to_add_are_shown_not_stored(api: Api) -> None
         url, files=file_part("more.pdf", fake_pdf(1, "more")), headers=auth(stranger)
     )
     assert hidden.status_code == 404
+
+
+async def test_the_pages_of_a_longer_file_are_not_shown(api: Api) -> None:
+    """They are rendered in the API and sent in one answer, some 75 KB each."""
+    owner = await api.user()
+    id = await upload(api, auth(owner))
+    url = f"{DOCUMENTS}/{id}/edit/pages"
+    longest = fake_pdf(MAX_PREVIEW_PAGES, "longest")
+    shown = await api.client.post(url, files=file_part("a.pdf", longest), headers=auth(owner))
+    assert shown.status_code == 200, shown.text
+    longer = fake_pdf(MAX_PREVIEW_PAGES + 1, "longer")
+    refused = await api.client.post(url, files=file_part("b.pdf", longer), headers=auth(owner))
+    assert refused.status_code == 422
+    reason = refused.json()["reason"]
+    assert (reason["code"], reason["params"]) == (
+        "preview_too_many_pages",
+        {"pages": MAX_PREVIEW_PAGES + 1, "max": MAX_PREVIEW_PAGES},
+    )
+
+
+async def test_a_file_whose_pages_cannot_be_read_is_refused_saying_why(tmp_path: Path) -> None:
+    """With the adapters that read files: their error (as the worker's nodes have it) is the
+    request's, 422 with its reason, not 500."""
+    adapters = {"composer": PikepdfPageComposer(), "pages": PdfiumPageRenderer()}
+    async with api_with(adapters=adapters) as api:
+        client = api.client
+        owner = await api.user()
+        text = (builders.SAMPLES / "text.pdf").read_bytes()
+        id = await upload(api, auth(owner), content=text)
+        damaged = (builders.SAMPLES / "damaged.pdf").read_bytes()
+        missing = missing_page(tmp_path / "missing.pdf").read_bytes()  # PDFium fails page 2
+        url = f"{DOCUMENTS}/{id}/edit"
+        parts = [{"pages": [{"page": 1}, {"source": 1, "page": 1}], "replaces": True}]
+        answers = [
+            await client.post(
+                f"{url}/pages", files=file_part("d.pdf", damaged), headers=auth(owner)
+            ),
+            await client.post(
+                f"{url}/pages", files=file_part("m.pdf", missing), headers=auth(owner)
+            ),
+            await client.post(url, **form(parts, ("d.pdf", damaged)), headers=auth(owner)),
+        ]
+        for answer in answers:
+            assert answer.status_code == 422, answer.text
+            assert answer.json()["reason"]["code"].startswith("pdf_unreadable")
+        assert "page 2: Failed to load page" in answers[1].json()["detail"]
+
+
+@pytest.mark.parametrize("route", ["versions", "edit/pages", "edit"])
+async def test_a_file_above_the_request_limit_is_no_upload_too_large(route: str) -> None:
+    """A new version and a file added to an edit are uploads: their limit is
+    `LEKTO_UPLOAD_MAX_SIZE`, not the bound on request bodies (`LEKTO_REQUEST_MAX_SIZE`)."""
+    limit = int(builders.DEFAULT_SETTINGS.request_max_size)
+    async with api_with(max_upload=4 * limit) as api:
+        client = api.client
+        owner = await api.user()
+        id = await upload(api, auth(owner))
+        big = fake_pdf(1, "x" * 2 * limit)
+        url = f"{DOCUMENTS}/{id}/{route}"
+        if route == "edit":
+            parts = [
+                {"pages": [{"page": 1}], "replaces": True},
+                {"pages": [{"source": 1, "page": 1}]},
+            ]
+            response = await client.post(url, **form(parts, ("big.pdf", big)), headers=auth(owner))
+        else:
+            response = await client.post(url, files=file_part("big.pdf", big), headers=auth(owner))
+    assert response.status_code in (200, 202), response.text

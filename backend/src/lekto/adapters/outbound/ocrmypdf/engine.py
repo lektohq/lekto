@@ -64,11 +64,12 @@ from collections.abc import Sequence
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
+from time import monotonic
 
 from PIL import Image, ImageSequence, TiffImagePlugin
 
 from lekto.adapters.outbound.http_client import endpoint_of
-from lekto.adapters.outbound.imaging import flatten_on_white, image_dpi
+from lekto.adapters.outbound.imaging import check_pixels, flatten_on_white, image_dpi
 from lekto.adapters.outbound.ocrmypdf.hocr import read_hocr
 from lekto.adapters.outbound.ocrmypdf.vision import (
     PROMPT,
@@ -78,7 +79,7 @@ from lekto.adapters.outbound.ocrmypdf.vision import (
     read_error,
     read_records,
 )
-from lekto.adapters.outbound.pdfium import count_pages, has_hidden_text, has_unreadable_text
+from lekto.adapters.outbound.pdfium import PDF_TIMEOUT, count_pages, text_layer
 from lekto.adapters.outbound.system import Completed, run_process
 from lekto.core.domain import media_types
 from lekto.core.domain.errors import LanguageModelError, UnprocessableDocumentError
@@ -140,15 +141,19 @@ class OcrmypdfEngine:
         vision: VisionSettings | None = None,
         vision_timeout: timedelta,
         memory: int | None = None,
+        pdf_timeout: timedelta = PDF_TIMEOUT,
     ) -> None:
         """`languages`: Tesseract language codes, e.g. `deu`, `eng`. `jobs`: CPU cores for
         the pages of one document. `vision`: the model that reads pages when asked to, all
         pages of a document within `vision_timeout` (a setting, like `timeout`). `memory`: the
-        address space OCRmyPDF and each program it starts may take (`run_process`)."""
+        address space OCRmyPDF and each program it starts may take (`run_process`), and the
+        child that reads a PDF's text layer before (`pdfium.text_layer`) within
+        `pdf_timeout`."""
         if not languages:
             raise ValueError("at least one OCR language is needed")
         self._languages = "+".join(languages)
         self._memory = memory
+        self._pdf_timeout = pdf_timeout
         self._timeout = timeout
         self._jobs = jobs
         self._vision = vision
@@ -179,8 +184,8 @@ class OcrmypdfEngine:
                 source, dpi = await asyncio.to_thread(prepare_image, source, prepared)
                 extra = ["--image-dpi", str(dpi)]
             elif not vision:
-                unreadable = await asyncio.to_thread(has_unreadable_text, source)
-                hidden = not unreadable and await asyncio.to_thread(has_hidden_text, source)
+                layer = await text_layer(source, timeout=self._pdf_timeout, memory=self._memory)
+                unreadable, hidden = layer.unreadable, layer.hidden
             if vision:
                 assert self._vision is not None
                 await asyncio.to_thread(records.mkdir)
@@ -261,18 +266,29 @@ class OcrmypdfEngine:
         plugin."""
         notes: list[Reason] = []
         invalidate = False
+        # `timeout` holds for all runs together, as the job's lease and the setting reckon
+        # with it: each run gets what the runs before it left (AD-05).
+        spent = timedelta(0)
 
         async def run(*, pdfa: bool, invalidate: bool, colours: bool = False) -> Completed:
-            return await self._run(
-                source,
-                output,
-                [*extra, *COLOUR_OPTIONS] if colours else extra,
-                work,
-                pdfa=pdfa,
-                invalidate=invalidate,
-                env=env,
-                timeout=timeout,
-            )
+            nonlocal spent
+            left = timeout - spent
+            if left <= timedelta(0):
+                raise TimeoutError(f"OCR took longer than {timeout} in all its runs")
+            started = monotonic()
+            try:
+                return await self._run(
+                    source,
+                    output,
+                    [*extra, *COLOUR_OPTIONS] if colours else extra,
+                    work,
+                    pdfa=pdfa,
+                    invalidate=invalidate,
+                    env=env,
+                    timeout=left,
+                )
+            finally:
+                spent += timedelta(seconds=monotonic() - started)
 
         completed = await run(pdfa=True, invalidate=False)
         if completed.returncode == _INPUT_FILE and _SIGNATURE_HINT in completed.stderr:
@@ -387,6 +403,7 @@ def prepare_image(source: Path, prepared: Path) -> tuple[Path, int]:
     all of them at once took gigabytes."""
     try:
         with Image.open(source) as image:
+            check_pixels(image)
             dpi = image_dpi(image.size, image.info.get("dpi"))
             if getattr(image, "n_frames", 1) == 1:
                 ready = _ocr_ready(image)
@@ -396,6 +413,7 @@ def prepare_image(source: Path, prepared: Path) -> tuple[Path, int]:
                 return prepared, dpi
             with _PageWriter(str(prepared), new=True) as tiff:
                 for frame in ImageSequence.Iterator(image):
+                    check_pixels(frame)
                     _ocr_ready(frame).save(tiff, "TIFF", dpi=(dpi, dpi), compression="tiff_lzw")
                     tiff.newFrame()
     except (OSError, ValueError, Image.DecompressionBombError) as error:

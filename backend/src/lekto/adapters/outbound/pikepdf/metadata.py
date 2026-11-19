@@ -9,9 +9,10 @@ are in. A file that cannot be read, or an encrypted PDF, is unprocessable.
 
 import asyncio
 import email.policy
-import io
 import re
 from email.parser import BytesHeaderParser
+from pathlib import Path
+from typing import BinaryIO
 
 import pikepdf
 from PIL import ExifTags, Image, UnidentifiedImageError
@@ -38,18 +39,20 @@ _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
 
 class FileMetadataReader:
-    async def read_metadata(self, data: bytes) -> FileMetadata:
-        return await asyncio.to_thread(_read, data)
+    async def read_metadata(self, source: Path) -> FileMetadata:
+        return await asyncio.to_thread(_read, source)
 
 
-def _read(data: bytes) -> FileMetadata:
-    kind = media_types.detect(data[: media_types.SNIFF_SIZE])
+def _read(source: Path) -> FileMetadata:
+    with source.open("rb") as handle:
+        kind = media_types.detect(handle.read(media_types.SNIFF_SIZE))
+        if kind == media_types.EML:
+            handle.seek(0)
+            return _mail(handle)
     if kind == media_types.PDF:
-        return _pdf(data)
+        return _pdf(source)
     if kind in (media_types.JPEG, media_types.PNG, media_types.TIFF):
-        return _image(data)
-    if kind == media_types.EML:
-        return _mail(data)
+        return _image(source)
     raise UnprocessableDocumentError(because(ReasonCode.FILE_NOT_PDF_OR_IMAGE))
 
 
@@ -61,45 +64,58 @@ def _text(value: object) -> str | None:
     return text[:MAX_VALUE] if text else None
 
 
-def _pdf(data: bytes) -> FileMetadata:
+# What qpdf raises for a damaged file: on opening, and on reading an object later (it reads
+# them as they are used), as `RuntimeError` too ("/Count is wrong after flattening pages tree").
+_DAMAGED = (pikepdf.PdfError, RuntimeError)
+
+
+def _pdf(source: Path) -> FileMetadata:
     try:
-        pdf = pikepdf.open(io.BytesIO(data))
+        pdf = pikepdf.open(source)
     except pikepdf.PasswordError:
         raise UnprocessableDocumentError(because(ReasonCode.PDF_ENCRYPTED)) from None
-    except pikepdf.PdfError:
+    except _DAMAGED:
         raise UnprocessableDocumentError(because(ReasonCode.PDF_UNREADABLE)) from None
-    with pdf:
-        entries: list[MetadataEntry] = []
-        for key, value in pdf.docinfo.items():
-            text = _text(value)
-            if text is not None:
-                entries.append(MetadataEntry(MetadataSource.INFO, str(key).lstrip("/"), text))
-        # Read only: opened outside a `with`, nothing is written back.
-        xmp = pdf.open_metadata(set_pikepdf_as_editor=False, update_docinfo=False)
-        pdfa = xmp.pdfa_status or None
-        for qualified, value in xmp.items():
-            text = _text(value)
-            if text is None:
-                continue
-            match = _QUALIFIED.fullmatch(qualified)
-            if match is None:
-                key = qualified
-            else:
-                prefix = xmp.REVERSE_NS.get(match.group(1))
-                key = f"{prefix}:{match.group(2)}" if prefix else match.group(2)
-            entries.append(MetadataEntry(MetadataSource.XMP, key, text))
-        return FileMetadata(
-            format="PDF",
-            pdf_version=pdf.pdf_version,
-            pdfa=pdfa,
-            pages=len(pdf.pages),
-            entries=tuple(entries),
-        )
-
-
-def _image(data: bytes) -> FileMetadata:
     try:
-        with Image.open(io.BytesIO(data)) as image:
+        with pdf:
+            return _read_pdf(pdf)
+    except _DAMAGED:
+        raise UnprocessableDocumentError(because(ReasonCode.PDF_UNREADABLE)) from None
+
+
+def _read_pdf(pdf: pikepdf.Pdf) -> FileMetadata:
+    """What the open PDF says about itself (qpdf reads its objects here)."""
+    entries: list[MetadataEntry] = []
+    for key, value in pdf.docinfo.items():
+        text = _text(value)
+        if text is not None:
+            entries.append(MetadataEntry(MetadataSource.INFO, str(key).lstrip("/"), text))
+    # Read only: opened outside a `with`, nothing is written back.
+    xmp = pdf.open_metadata(set_pikepdf_as_editor=False, update_docinfo=False)
+    pdfa = xmp.pdfa_status or None
+    for qualified, value in xmp.items():
+        text = _text(value)
+        if text is None:
+            continue
+        match = _QUALIFIED.fullmatch(qualified)
+        if match is None:
+            key = qualified
+        else:
+            prefix = xmp.REVERSE_NS.get(match.group(1))
+            key = f"{prefix}:{match.group(2)}" if prefix else match.group(2)
+        entries.append(MetadataEntry(MetadataSource.XMP, key, text))
+    return FileMetadata(
+        format="PDF",
+        pdf_version=pdf.pdf_version,
+        pdfa=pdfa,
+        pages=len(pdf.pages),
+        entries=tuple(entries),
+    )
+
+
+def _image(source: Path) -> FileMetadata:
+    try:
+        with Image.open(source) as image:
             dpi = image.info.get("dpi")
             entries: list[MetadataEntry] = []
             exif = image.getexif()
@@ -116,7 +132,7 @@ def _image(data: bytes) -> FileMetadata:
                 dpi=round(float(dpi[0]), 1) if dpi else None,
                 entries=tuple(entries),
             )
-    except (UnidentifiedImageError, OSError, ValueError):
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
         raise UnprocessableDocumentError(because(ReasonCode.IMAGE_UNREADABLE)) from None
 
 
@@ -137,9 +153,9 @@ _MAIL_HEADERS = frozenset(
 """The header lines of a mail its file information shows; the routing ones stay out."""
 
 
-def _mail(data: bytes) -> FileMetadata:
+def _mail(handle: BinaryIO) -> FileMetadata:
     # The header lines alone: the parts of a large mail are not read for them.
-    message = BytesHeaderParser(policy=email.policy.default).parsebytes(data)
+    message = BytesHeaderParser(policy=email.policy.default).parse(handle)
     entries = []
     for name, value in message.items():
         if name.lower() not in _MAIL_HEADERS:

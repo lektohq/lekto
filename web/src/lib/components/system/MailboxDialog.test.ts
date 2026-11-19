@@ -54,7 +54,7 @@ const FOUND: ConnectionTest = {
 
 beforeEach(() => {
 	session.start({
-		user: { id: 'anna', username: 'anna', role: 'admin' },
+		user: { id: 'erika', username: 'erika', role: 'admin' },
 		method: 'password',
 		expires_at: '2026-11-06T12:00:00Z',
 		csrf_token: 'token'
@@ -68,7 +68,7 @@ beforeEach(() => {
 		sent.push({ method: request.method, path, body });
 		if (failing.has(path)) return json({ detail: 'down' }, 500);
 		if (path === '/api/v1/users')
-			return json([{ id: 'anna', username: 'anna', display_name: 'Anna', active: true }]);
+			return json([{ id: 'erika', username: 'erika', display_name: 'Erika', active: true }]);
 		if (path === '/api/v1/document-types') return json([]);
 		if (path === '/api/v1/mailboxes/test') return json(FOUND);
 		if (request.method === 'POST' && path === '/api/v1/mailboxes') return json(STORED, 201);

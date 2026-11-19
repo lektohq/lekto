@@ -3,22 +3,20 @@ an API token (`tests.api.auth`) or sign in with their password (`Api.sign_in`)."
 
 from collections.abc import AsyncIterator
 
-import httpx2
 import pytest
 
-from lekto.adapters.outbound.memory import ManualClock
-from lekto.composition.container import build_memory_container, build_services
-from tests import builders
-from tests.unit.adapters.rest.support import Api, make_app
+from lekto.adapters.outbound.memory import FAKE_VISION, FakeOcr
+from tests.unit.adapters.rest.support import Api, api_with
 
 
 @pytest.fixture
 async def api() -> AsyncIterator[Api]:
-    clock = ManualClock(builders.NOW)
-    container = build_memory_container(clock)
-    services = build_services(container)
-    builders.skip_classification(services.pipeline)
-    app = make_app(container, services)
-    transport = httpx2.ASGITransport(app=app)
-    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
-        yield Api(container, services, app, client, clock)
+    async with api_with() as made:
+        yield made
+
+
+@pytest.fixture
+async def vision_api() -> AsyncIterator[Api]:
+    """The API with a vision language model (`FAKE_VISION`)."""
+    async with api_with(adapters={"ocr": FakeOcr(vision=FAKE_VISION)}) as made:
+        yield made

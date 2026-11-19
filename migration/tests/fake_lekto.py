@@ -14,6 +14,8 @@ from uuid import uuid4
 
 import httpx2
 
+from lekto_migration.plan import REVIEW_CODES
+
 TOKEN = "lekto-test-key"
 PREFIX = "/api/v1"
 ADMIN: dict[str, Any] = {"id": "admin-id", "username": "root", "role": "admin", "active": True}
@@ -36,7 +38,7 @@ class FakeLekto:
     ticks: int = 1  # polls until a document's pipeline is through
     lanes: dict[str, str] = field(default_factory=dict)  # file name -> lane (default green)
     errors: dict[str, tuple[int, int]] = field(default_factory=dict)  # file name -> (status, times)
-    review_codes: bool = True  # whether it takes the codes of reviews (`takes_review_codes`)
+    review_codes: bool = True  # whether it takes the codes of reviews (`x-reasons`)
     log: list[tuple[str, str]] = field(default_factory=list)
     texts: dict[str, str] = field(default_factory=dict)  # file name -> the archive's text
     advice: dict[str, str] = field(default_factory=dict)  # file name -> reading advice
@@ -62,11 +64,9 @@ class FakeLekto:
         path = request.url.path.removeprefix(PREFIX)
         method = request.method
         if path == "/openapi.json":
-            properties: dict[str, Any] = {"reason": {}, "field": {}}
-            if self.review_codes:
-                properties["code"] = {}
-            schemas = {"ImportedReviewIn": {"properties": properties}}
-            return httpx2.Response(200, json={"components": {"schemas": schemas}})
+            codes = ["text", "error", *(REVIEW_CODES.values() if self.review_codes else ())]
+            reasons: dict[str, Any] = {code: {} for code in codes}
+            return httpx2.Response(200, json={"x-reasons": reasons})
         if path == "/auth/me":
             return httpx2.Response(
                 200,
@@ -337,6 +337,8 @@ class FakeLekto:
             if document["channel"] != "migration":
                 return _problem(422, "only a document of the channel 'migration'")
             after = self._public(document) | {k: v for k, v in body.items() if k != "fields"}
+            if body.get("topic_id") is not None and after.get("contact_id") is None:
+                return _problem(422, "a topic is one of the contact's: give the document a contact")
             fields = dict(document["fields"])
             for key, value in (body.get("fields") or {}).items():
                 if value is None:

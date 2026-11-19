@@ -5,19 +5,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from lekto.core.domain.identifiers import IdentifierKind
+from lekto.adapters.inbound.rest.schemas.common import IdentifierKeyOut, NamedOut
 from lekto.core.domain.series import Cadence, SeriesState
 from lekto.core.services.expected import Expected
-
-
-class NamedOut(BaseModel):
-    id: UUID
-    name: str
-
-
-class SeriesNumberOut(BaseModel):
-    kind: IdentifierKind
-    value: str = Field(description="Normalised, as Lekto compares it.")
 
 
 class LastDocumentOut(BaseModel):
@@ -31,7 +21,7 @@ class ExpectedOut(BaseModel):
 
     contact: NamedOut
     document_type: NamedOut
-    number: SeriesNumberOut | None = Field(
+    number: IdentifierKeyOut | None = Field(
         description="The contract or customer number the series follows, if its documents show one."
     )
     cadence: Cadence = Field(
@@ -56,7 +46,9 @@ class ExpectedOut(BaseModel):
         series = item.series
         key = series.key
         number = (
-            None if key.number is None else SeriesNumberOut(kind=key.number[0], value=key.number[1])
+            None
+            if key.number is None
+            else IdentifierKeyOut(kind=key.number[0], value=key.number[1])
         )
         last = item.last
         assert last.document_date is not None

@@ -11,7 +11,6 @@ from lekto.adapters.inbound.rest.schemas.pipeline import (
     GraphNodeOut,
     PipelineOut,
     QueuedOut,
-    ReparseOut,
     VisionOut,
 )
 from lekto.core.domain.pipeline import NODES
@@ -64,11 +63,11 @@ async def pipeline(user: CurrentUser, context: Context) -> PipelineOut:
         "classifier afterwards (`POST /classifier/train`). A document queued already is not "
         "queued twice."
     ),
-    response_model=ReparseOut,
+    response_model=QueuedOut,
     responses=problem_responses(401, 403),
 )
-async def reparse(user: CurrentUser, context: Context) -> ReparseOut:
-    return ReparseOut(queued=await context.pipeline.request_reparse(user))
+async def reparse(user: CurrentUser, context: Context) -> QueuedOut:
+    return QueuedOut(queued=await context.pipeline.request_reparse(user))
 
 
 @router.post(

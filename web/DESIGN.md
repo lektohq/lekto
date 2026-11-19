@@ -699,7 +699,7 @@ list pages the same way (see [Lists](#lists)).
   `FormDialog`'s too (`md` unless a form needs fields side by side, `lg`). A
   `class="max-w-*"` on dialog content is not used.
 - **Phone editor bar:** "Abbrechen" · title · "Speichern", fixed on top. The body scrolls. The
-  action is a short verb there: a longer label of the desktop ("Ins Profil von Anna") becomes its
+  action is a short verb there: a longer label of the desktop ("Ins Profil von Erika") becomes its
   verb ("Übernehmen"), and the body names the rest (Tobi 29.10.2026). It is `PhoneEditorBar`, in
   `FormDialog` and `EditorShell` alike, with `FULL_SCREEN` for the dialog; a picker's "Fertig" on
   a phone takes its `BAR_ACTION`. An editor whose parts save themselves (`EditorShell` without
@@ -1478,7 +1478,7 @@ they are kept (`printed` in `lib/identifiers.ts`). An input holds the value as k
 
 A person reads as their display name, else their username, everywhere: `userLabel` where the UI
 has the user, and a `name` the API sends for a user follows the same rule (`User.label`). A
-choice among users adds the username where it differs (`userChoice`: "Jane Doe (anna)").
+choice among users adds the username where it differs (`userChoice`: "Jane Doe (erika)").
 
 A decision a person made through an API token (a script, an assistant over MCP) names the token
 after them, as it was named then: "Tobi über Token „Claude“", "Bestätigt von Dir über Token

@@ -58,7 +58,7 @@ class SklearnClassifier:
         return f"scikit-learn {sklearn.__version__} {FORMAT}"
 
     async def train(self, examples: Sequence[TrainingExample]) -> TrainedModel:
-        data, summary, _ = await asyncio.to_thread(fit, list(examples))
+        data, summary = await asyncio.to_thread(fit, list(examples))
         return TrainedModel(data, summary)
 
     async def predict(self, model: bytes, text: str) -> Prediction:
@@ -85,30 +85,16 @@ class Fitted:
     space: LogisticRegression | None = None
 
 
-def fit(examples: list[TrainingExample]) -> tuple[bytes, JsonObject, Fitted]:
-    """The model of the examples as an npz archive, a summary, and what was fitted."""
-    texts = [example.text for example in examples]
-    if not any(analyze(text) for text in texts):
-        raise ClassifierError("no example has any text")
-    small = len(texts) < SMALL
-    vectorizer = TfidfVectorizer(
-        analyzer=analyze,
-        sublinear_tf=True,
-        min_df=1 if small else MIN_DF,
-        max_df=1.0 if small else MAX_DF,
-        max_features=MAX_TERMS,
-        dtype=np.float32,
+def fit(examples: list[TrainingExample]) -> tuple[bytes, JsonObject]:
+    """The model of the examples as an npz archive, and a summary."""
+    found = fitted(examples)
+    vectorizer, tags = found.vectorizer, found.tags
+    contact, document_type, topic, space = (
+        found.contact,
+        found.document_type,
+        found.topic,
+        found.space,
     )
-    try:
-        matrix = vectorizer.fit_transform(texts)
-    except ValueError as error:
-        raise ClassifierError(f"the examples have too few words: {error}") from None
-    # Metadata only from the examples a person confirmed it of; the space from every one.
-    contact = _single(matrix, [_if(example, example.contact) for example in examples])
-    document_type = _single(matrix, [_if(example, example.document_type) for example in examples])
-    topic = _single(matrix, [_if(example, example.topic) for example in examples])
-    space = _single(matrix, [example.space for example in examples])
-    tags = _tags(matrix, examples)
     vocabulary = vectorizer.vocabulary_
     terms = sorted(vocabulary, key=vocabulary.__getitem__)
     arrays: dict[str, _Array] = {
@@ -137,8 +123,35 @@ def fit(examples: list[TrainingExample]) -> tuple[bytes, JsonObject, Fitted]:
         "terms": len(terms),
         "classes": classes,
     }
-    fitted = Fitted(vectorizer, contact, document_type, tags, topic, space)
-    return buffer.getvalue(), summary, fitted
+    return buffer.getvalue(), summary
+
+
+def fitted(examples: list[TrainingExample]) -> Fitted:
+    """What scikit-learn fits to the examples: `fit` writes it down, the tests compare its
+    predictions with the model's (AD-12)."""
+    texts = [example.text for example in examples]
+    if not any(analyze(text) for text in texts):
+        raise ClassifierError("no example has any text")
+    small = len(texts) < SMALL
+    vectorizer = TfidfVectorizer(
+        analyzer=analyze,
+        sublinear_tf=True,
+        min_df=1 if small else MIN_DF,
+        max_df=1.0 if small else MAX_DF,
+        max_features=MAX_TERMS,
+        dtype=np.float32,
+    )
+    try:
+        matrix = vectorizer.fit_transform(texts)
+    except ValueError as error:
+        raise ClassifierError(f"the examples have too few words: {error}") from None
+    # Metadata only from the examples a person confirmed it of; the space from every one.
+    contact = _single(matrix, [_if(example, example.contact) for example in examples])
+    document_type = _single(matrix, [_if(example, example.document_type) for example in examples])
+    topic = _single(matrix, [_if(example, example.topic) for example in examples])
+    space = _single(matrix, [example.space for example in examples])
+    tags = _tags(matrix, examples)
+    return Fitted(vectorizer, contact, document_type, tags, topic, space)
 
 
 def _if[T](example: TrainingExample, label: T | None) -> T | None:

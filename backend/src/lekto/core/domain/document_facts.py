@@ -9,7 +9,7 @@ code. Its role says what it is to the document (`FactRole`): the same number is 
 own on the invoice and a reference on the reminder. The role follows the kind (`role_of`)
 unless the language model read the fact (`with_read`).
 
-An IBAN, a creditor ID, a VAT ID or an e-mail domain also has its holder (`Holder`,
+An IBAN, an e-mail domain or a customer number in a booking also has its holder (`Holder`,
 `HOLDER_KINDS`): whose it is where it stands, the sender's, the recipient's or another party's.
 A bank statement names the payees' IBANs beside its own.
 
@@ -27,6 +27,7 @@ from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.evidence import contains, normalise
 from lekto.core.domain.facts import identifier_spans
 from lekto.core.domain.identifiers import (
+    PERSON_ONLY_KINDS,
     TYPES,
     IdentifierKind,
     Key,
@@ -125,10 +126,6 @@ MODEL_HOLDER_KINDS = frozenset({IdentifierKind.IBAN})
 """The kinds whose holder the language model is asked for (`facts-3`); the others' the rule
 tells alone (Tobi, 28.10.2026)."""
 
-SURE_HOLDER_KINDS = frozenset({IdentifierKind.EMAIL_DOMAIN})
-"""The kinds training learns for a contact only where the rule tells they are its: a domain
-names its holder, and one that names no one is often another party's (Tobi, 28.10.2026)."""
-
 ROLES: Mapping[IdentifierKind, FactRole] = {
     IdentifierKind.IBAN: FactRole.CONTACT,
     IdentifierKind.VAT_ID: FactRole.CONTACT,
@@ -161,10 +158,7 @@ ROLES: Mapping[IdentifierKind, FactRole] = {
 missing)."""
 
 NUMBER_KINDS = frozenset(
-    kind
-    for kind in IdentifierKind
-    if not TYPES[kind].at_contacts
-    and not (TYPES[kind].for_persons and not TYPES[kind].for_contacts)
+    kind for kind in IdentifierKind if not TYPES[kind].at_contacts and kind not in PERSON_ONLY_KINDS
 )
 """The kinds of the numbers the facts report lists as the document's: no contact's identifiers
 and no person's alone. Its own, a strand's, another document's it refers to (invoice number,
@@ -179,7 +173,7 @@ def role_of(kind: IdentifierKind) -> FactRole:
 def person_only(kind: IdentifierKind) -> bool:
     """A kind of a person's and no contact's (the IBAN is both): only admins and that person
     see such a fact, only admins decide or find documents by it."""
-    return TYPES[kind].for_persons and not TYPES[kind].for_contacts
+    return kind in PERSON_ONLY_KINDS
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -233,18 +227,38 @@ def found_facts(
     codes on its pages (`code_identifiers`), each once, as the text reads (those only in a code
     last), with the role of its kind; a document's own number the text shows only as another's
     (`referred_in`: "Ihre Rechnung Nr. 4711") refers to that document ("Ihre Vertragsnummer" is
-    still the contract's). Where one stands first is where its
-    reader took it (`places`: in the normalised text, `places_in`), else where its value stands
-    first."""
-    texts, codes = set(in_text), set(in_codes)
+    still the contract's). Where one stands is `standing`."""
+    return facts_at(text, standing(text, in_text, places), in_codes, referred)
+
+
+def standing(
+    text: str, in_text: Iterable[Key], places: Mapping[Key, int] | None = None
+) -> dict[Key, tuple[int, int] | None]:
+    """Where each identifier in `text` (`in_text`) stands first: where its reader took it
+    (`places`: in the normalised text, `places_in`), else where its value stands first; None
+    if it stands nowhere as its kind writes it. A search of the whole text for each: one long
+    text with many takes seconds (`kept_facts.TextFacts` keeps it)."""
     normalised = normalise(text) if places else ""
+    return {
+        key: _first(text, normalised, *key, None if places is None else places.get(key))
+        for key in in_text
+    }
+
+
+def facts_at(
+    text: str,
+    standing: Mapping[Key, tuple[int, int] | None],
+    in_codes: Iterable[Key] = (),
+    referred: Collection[Key] = (),
+) -> tuple[DocumentFact, ...]:
+    """`found_facts` with where the identifiers in the text stand (`standing`) known."""
+    codes = set(in_codes)
     facts = []
-    for kind, value in texts | codes:
-        origins = {FactOrigin.PATTERN} if (kind, value) in texts else set()
+    for kind, value in standing.keys() | codes:
+        origins = {FactOrigin.PATTERN} if (kind, value) in standing else set()
         if (kind, value) in codes:
             origins.add(FactOrigin.CODE)
-        at = None if places is None else places.get((kind, value))
-        where = _first(text, normalised, kind, value, at) if (kind, value) in texts else None
+        where = standing.get((kind, value))
         facts.append(
             DocumentFact(
                 kind=kind,
@@ -336,13 +350,14 @@ def checked_read(
     kinds: Collection[IdentifierKind],
     roles: Collection[FactRole],
     personal: Collection[Key] = (),
+    normalised: str | None = None,
 ) -> DocumentFact | Reason:
     """The fact `read` gives, checked as a field's value is: one of the `kinds` in one of the
     `roles` the reader was asked for, a value of the kind, standing in the text, and a passage
     of the text that shows it (`QUOTE_*`); for the day of a letter, the passage names the letter
     ("Ihr Schreiben vom"). A value that is one of a person's (`personal`: their numbers in the
     text and in the users' profiles, `of_person`), under whatever kind, is none. Its role as
-    given. Why not, otherwise."""
+    given. Why not, otherwise. `normalised` is `normalise(text)`, if known."""
     try:
         kind = IdentifierKind(read.kind)
         role = FactRole(read.role)
@@ -361,13 +376,12 @@ def checked_read(
     where = _first(text, "", kind, value, None)
     if where is None:
         return because(ReasonCode.FACT_NOT_IN_TEXT, value=read.value)
+    quoted = quote_reason(
+        normalise(text) if normalised is None else normalised, read.evidence, kind, value
+    )
+    if quoted is not None:
+        return quoted
     evidence = (read.evidence or "").strip()
-    if not evidence:
-        return because(ReasonCode.QUOTE_MISSING)
-    if not contains(normalise(text), evidence):
-        return because(ReasonCode.QUOTE_NOT_IN_TEXT)
-    if re.search(type_of(kind).written(value), evidence, re.IGNORECASE) is None:
-        return because(ReasonCode.QUOTE_WITHOUT_VALUE)
     if kind is IdentifierKind.LETTER_DATE and not any(type_of(kind).find(normalise(evidence))):
         return because(ReasonCode.QUOTE_WITHOUT_VALUE)
     return DocumentFact(
@@ -378,6 +392,23 @@ def checked_read(
         written=text[where[0] : where[1]],
         position=where[0],
     )
+
+
+def quote_reason(
+    normalised: str, evidence: str | None, kind: IdentifierKind, value: str
+) -> Reason | None:
+    """Why the passage a reader quotes for a value of `kind` does not show it in the text
+    (`normalised`: the document's, normalised once by the caller): none given, not in the text,
+    or without the value as its kind writes it (`QUOTE_*`); None if it shows it. What the
+    facts and the holders the language model read are checked by alike (DA-08)."""
+    quote = (evidence or "").strip()
+    if not quote:
+        return because(ReasonCode.QUOTE_MISSING)
+    if not contains(normalised, quote):
+        return because(ReasonCode.QUOTE_NOT_IN_TEXT)
+    if re.search(type_of(kind).written(value), quote, re.IGNORECASE) is None:
+        return because(ReasonCode.QUOTE_WITHOUT_VALUE)
+    return None
 
 
 def with_read(found: Iterable[DocumentFact], read: Iterable[DocumentFact]) -> list[DocumentFact]:

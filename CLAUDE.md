@@ -124,7 +124,7 @@ Every pull request carries exactly one category label from `.github/labels.yml` 
 `dependencies`, `dev-deps`, `breaking-change`); the Release Drafter builds the release notes from
 them. Renovate (`renovate.json`, the hosted app) labels its own: `dependencies`, `dev-deps`
 (development dependencies, the devcontainer), `ci` (actions); it suggests a version 10 days after
-its release at the earliest.
+its release at the earliest, a fix of a known vulnerability (OSV, `[SECURITY]`) at once.
 The version bump follows the labels (`breaking-change` or `major`: major; `new-feature` or
 `minor`: minor; else patch). Tobi publishes and tags the release from the draft.
 A pull request a user notices fills the section `## Release notes` of its description with one
@@ -136,6 +136,23 @@ the release notes list it in the section "REST API" with that line.
 
 Code, comments, commit messages and documentation (README, docstrings) are English. The notes in
 `.idea/` are German.
+
+## Public repository
+
+This repository is public. No real data goes into code, tests, comments, documentation, commit
+messages or pull request texts: no names of persons or companies, no numbers, addresses, IP
+addresses or host names from a real instance, not even when a test recreates a case from one. The
+placeholders are fixed:
+
+| What | Placeholder |
+| --- | --- |
+| A company | a name with "Muster" in it (`Muster Bäckerei`, `Muster Versicherung`) |
+| A woman, a man | `Jane Doe`, `John Doe`; a second woman `Erika Mustermann` |
+| A surname alone | `Mustermann` |
+| A number | `12345` |
+| An IP address | `127.128.129.23` |
+
+Before every push, read the diff, the commit message and the pull request text for real values.
 
 ## Working style
 

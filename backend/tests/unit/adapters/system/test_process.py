@@ -1,4 +1,6 @@
+import asyncio
 import json
+import subprocess
 import sys
 from datetime import timedelta
 
@@ -88,3 +90,91 @@ async def test_the_programs_a_child_starts_inherit_its_limit() -> None:
     )
     assert completed.returncode == 0, completed.stderr
     assert int(completed.stdout) == 512 * MiB
+
+
+async def test_every_child_is_limited_from_its_first_instruction() -> None:
+    """Many children at once on a busy machine, each allocating at once: a limit set from the
+    parent after the start came too late for some of them."""
+    children = [
+        run_process(
+            [sys.executable, "-I", "-c", ALLOCATE, "300"],
+            timeout=timedelta(seconds=60),
+            memory=256 * MiB,
+        )
+        for _ in range(12)
+    ]
+    for completed in await asyncio.gather(*children):
+        assert completed.returncode != 0
+        assert "MemoryError" in completed.stderr
+
+
+LOWER_HARD_LIMIT = """
+import asyncio, resource, sys
+SHOW_HARD_LIMIT = "import resource; print(resource.getrlimit(resource.RLIMIT_AS)[1])"
+from datetime import timedelta
+from lekto.adapters.outbound.system import run_process
+hard, wanted = int(sys.argv[1]), int(sys.argv[2])
+resource.setrlimit(resource.RLIMIT_AS, (hard, hard))
+async def main():
+    completed = await run_process(
+        [sys.executable, "-I", "-c", SHOW_HARD_LIMIT],
+        timeout=timedelta(seconds=30),
+        memory=wanted,
+    )
+    print(completed.returncode, completed.stdout.strip())
+asyncio.run(main())
+"""
+
+
+def test_a_lower_hard_limit_of_the_process_is_the_childs() -> None:
+    """A container's `--ulimit as=` below `LEKTO_CHILD_MAX_MEMORY`: the child gets that one
+    (raising it failed, and the child ran on without a limit, unsupervised)."""
+    hard, wanted = 2048 * MiB, 4096 * MiB
+    ran = subprocess.run(
+        [sys.executable, "-c", LOWER_HARD_LIMIT, str(hard), str(wanted)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert ran.returncode == 0, ran.stderr
+    assert ran.stdout.split() == ["0", str(hard)]
+
+
+async def test_a_program_that_is_not_there_is_not_found() -> None:
+    with pytest.raises(FileNotFoundError):
+        await run_process(["lekto-no-such-program"], timeout=timedelta(seconds=5), memory=MiB)
+
+
+NOISY = """
+import asyncio, json, resource, sys
+from datetime import timedelta
+from lekto.adapters.outbound.system import run_process
+WRITE = (
+    "import sys\\n"
+    "chunk = b'x' * (1 << 20)\\n"
+    "for _ in range(200): sys.stderr.buffer.write(chunk)\\n"
+    "sys.stderr.buffer.write('the end: ü'.encode())\\n"
+    "sys.stdout.write('answer')\\n"
+)
+async def main():
+    before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    completed = await run_process(
+        [sys.executable, "-I", "-c", WRITE], timeout=timedelta(seconds=60), tail=10
+    )
+    grown = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss - before  # KiB on Linux
+    print(json.dumps([completed.returncode, completed.stdout, completed.stderr, grown]))
+asyncio.run(main())
+"""
+
+
+def test_what_a_child_writes_to_its_error_output_is_not_held_in_full() -> None:
+    """Only the end is kept, and only the end is held while it runs: 200 MB of messages took
+    as much in the worker before (XB-07). In a process of its own, to measure it."""
+    ran = subprocess.run(
+        [sys.executable, "-c", NOISY], capture_output=True, text=True, timeout=120, check=False
+    )
+    assert ran.returncode == 0, ran.stderr
+    code, stdout, stderr, grown = json.loads(ran.stdout)
+    assert (code, stdout, stderr) == (0, "answer", "the end: ü")
+    assert grown < 50 * 1024

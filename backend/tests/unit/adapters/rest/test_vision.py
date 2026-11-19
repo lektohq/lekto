@@ -1,30 +1,9 @@
 """Reading a document with the vision language model over HTTP: the model in `GET /pipeline`,
 the request (`POST /documents/{id}/vision`), the reading and its advice, the prompt."""
 
-import dataclasses
-from collections.abc import AsyncIterator
-
-import httpx2
-import pytest
-
 from lekto.adapters.inbound.rest import PREFIX
-from lekto.adapters.outbound.memory import FAKE_VISION, FakeOcr, ManualClock
-from lekto.composition.container import build_memory_container, build_services
-from tests import builders
 from tests.api import auth
-from tests.unit.adapters.rest.support import DOCUMENTS, Api, make_app, upload
-
-
-@pytest.fixture
-async def vision_api() -> AsyncIterator[Api]:
-    clock = ManualClock(builders.NOW)
-    container = dataclasses.replace(build_memory_container(clock), ocr=FakeOcr(vision=FAKE_VISION))
-    services = build_services(container)
-    builders.skip_classification(services.pipeline)
-    app = make_app(container, services)
-    transport = httpx2.ASGITransport(app=app)
-    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
-        yield Api(container, services, app, client, clock)
+from tests.unit.adapters.rest.support import DOCUMENTS, Api, upload
 
 
 async def test_the_pipeline_names_the_model(api: Api, vision_api: Api) -> None:

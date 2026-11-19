@@ -4,8 +4,6 @@ and how a user keeps the numbers that name them in their profile."""
 from typing import Any
 from uuid import UUID
 
-import httpx2
-
 from lekto.adapters.inbound.rest import PREFIX
 from lekto.core.domain.identifiers import Identifier, IdentifierKind, IdentifierSource
 from lekto.core.domain.ids import ContactId, SpaceId, UserId
@@ -13,24 +11,16 @@ from lekto.core.domain.master_data import Contact, TagScope
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import User
 from tests.api import auth
-from tests.unit.adapters.rest.support import Api
+from tests.unit.adapters.rest.support import OWN_PROFILE, Api, change_profile, read_profile
 
-OWN = "/auth/me/profile"
 PUBLIC = "K1000"  # a customer number that names nobody
 LEARNED = "V778899"  # a contract number learned in a space
 CUSTOMER = IdentifierKind.CUSTOMER_NUMBER
 PERSONNEL = IdentifierKind.PERSONNEL_NUMBER
 
 
-async def change(api: Api, user: User, body: object, path: str = OWN) -> httpx2.Response:
-    """Change a profile signed in as `user` (a profile needs a session)."""
-    async with api.sign_in(user) as session:
-        return await session.client.patch(f"{PREFIX}{path}", json=body, headers=session.headers)
-
-
-async def read(api: Api, user: User, path: str = OWN) -> dict[str, Any]:
-    async with api.sign_in(user) as session:
-        response = await session.client.get(f"{PREFIX}{path}")
+async def read(api: Api, user: User, path: str = OWN_PROFILE) -> dict[str, Any]:
+    response = await read_profile(api, user, path)
     assert response.status_code == 200, response.text
     body: dict[str, Any] = response.json()
     return body
@@ -61,14 +51,14 @@ async def personal_space(api: Api, user: User) -> SpaceId:
 
 
 async def test_a_contact_shows_each_user_what_they_may_see(api: Api) -> None:
-    anna, bob, admin = await api.user("anna"), await api.user("bob"), await api.admin()
-    own = await personal_space(api, anna)
+    erika, bob, admin = await api.user("erika"), await api.user("bob"), await api.admin()
+    own = await personal_space(api, erika)
     insurer = await api.services.master_data.create_contact(
         admin.id,
         "Insurer",
         identifiers=[
             Identifier.parse(CUSTOMER, PUBLIC),
-            Identifier.parse(CUSTOMER, "K-4711", user_id=UserId(anna.id)),
+            Identifier.parse(CUSTOMER, "K-4711", user_id=UserId(erika.id)),
         ],
     )
     learned = IdentifierSource.LEARNED
@@ -76,7 +66,7 @@ async def test_a_contact_shows_each_user_what_they_may_see(api: Api) -> None:
         api,
         insurer.id,
         Identifier(IdentifierKind.CONTRACT_NUMBER, LEARNED, learned, learned_in=frozenset({own})),
-        Identifier(PERSONNEL, "12345", learned, None, UserId(anna.id), frozenset({own})),
+        Identifier(PERSONNEL, "12345", learned, None, UserId(erika.id), frozenset({own})),
         Identifier(CUSTOMER, "K7007", learned),  # before 0040: no spaces
     )
     await api.services.master_data.change_contact(
@@ -93,21 +83,21 @@ async def test_a_contact_shows_each_user_what_they_may_see(api: Api) -> None:
         LEARNED,
         "insurer.example",
     ]
-    assert await values(api, anna, insurer.id) == [PUBLIC, "K4711", "12345", LEARNED]
+    assert await values(api, erika, insurer.id) == [PUBLIC, "K4711", "12345", LEARNED]
     assert await values(api, bob, insurer.id) == [PUBLIC]
     # A member of the space it was learned in sees what was learned there, not her numbers.
-    await api.services.spaces.set_member(anna.id, own, bob.id, SpaceRole.READ)
+    await api.services.spaces.set_member(erika.id, own, bob.id, SpaceRole.READ)
     assert await values(api, bob, insurer.id) == [PUBLIC, LEARNED]
 
 
 async def test_a_user_keeps_their_numbers_in_their_profile(api: Api) -> None:
-    anna, bob, admin = await api.user("anna"), await api.user("bob"), await api.admin()
+    erika, bob, admin = await api.user("erika"), await api.user("bob"), await api.admin()
     work = await api.services.master_data.create_tag(admin.id, "Work", scope=TagScope.TOPIC)
     employer = await api.services.master_data.create_contact(
         admin.id, "Employer", topic_ids=[work.id]
     )
     insurer = await api.services.master_data.create_contact(admin.id, "Insurer")
-    mine = UserId(anna.id)
+    mine = UserId(erika.id)
     learned = IdentifierSource.LEARNED
     await learn(
         api,
@@ -115,7 +105,7 @@ async def test_a_user_keeps_their_numbers_in_their_profile(api: Api) -> None:
         Identifier(CUSTOMER, "K2002", learned, user_id=mine),
         Identifier(CUSTOMER, "K3003", learned, user_id=mine),
     )
-    assert (await read(api, anna))["numbers"] == [
+    assert (await read(api, erika))["numbers"] == [
         number(insurer, "customer_number", "K2002", "learned"),
         number(insurer, "customer_number", "K3003", "learned"),
     ]
@@ -134,7 +124,7 @@ async def test_a_user_keeps_their_numbers_in_their_profile(api: Api) -> None:
             {"contact_id": str(insurer.id), "kind": "customer_number", "value": "K3003"}
         ],
     }
-    changed = await change(api, anna, body)
+    changed = await change_profile(api, erika, body)
     assert changed.status_code == 200, changed.text
     assert changed.json()["numbers"] == [
         number(employer, "personnel_number", "12345", "manual", work.id),
@@ -149,38 +139,38 @@ async def test_a_user_keeps_their_numbers_in_their_profile(api: Api) -> None:
     assert await values(api, bob, employer.id) == []
     # Learned ones left out stay; what she entered and leaves out goes.
     await learn(api, insurer.id, Identifier(CUSTOMER, "K4004", learned, user_id=mine))
-    emptied = await change(api, anna, {"numbers": []})
+    emptied = await change_profile(api, erika, {"numbers": []})
     assert emptied.json()["numbers"] == [number(insurer, "customer_number", "K4004", "learned")]
     assert await values(api, admin, employer.id) == []
 
     # An admin keeps them too, with a session; an admin's token may not.
-    path = f"/users/{anna.id}/profile"
-    by_admin = await change(api, admin, {"numbers": [body["numbers"][1]]}, path)
+    path = f"/users/{erika.id}/profile"
+    by_admin = await change_profile(api, admin, {"numbers": [body["numbers"][1]]}, path)
     assert by_admin.status_code == 200, by_admin.text
     token = await api.client.patch(f"{PREFIX}{path}", json={"numbers": []}, headers=auth(admin))
     assert token.status_code == 403
 
     unknown = {"contact_id": str(UUID(int=1)), "kind": "customer_number", "value": "K5005"}
-    assert (await change(api, anna, {"numbers": [unknown]})).status_code == 404
+    assert (await change_profile(api, erika, {"numbers": [unknown]})).status_code == 404
     vat = {"contact_id": str(insurer.id), "kind": "vat_id", "value": "DE123456789"}
-    assert (await change(api, anna, {"numbers": [vat]})).status_code == 422
+    assert (await change_profile(api, erika, {"numbers": [vat]})).status_code == 422
 
 
 async def test_a_number_moves_between_contacts_in_one_change(api: Api) -> None:
-    anna, admin = await api.user("anna"), await api.admin()
+    erika, admin = await api.user("erika"), await api.admin()
     first = await api.services.master_data.create_contact(
-        admin.id, "First", identifiers=[Identifier.parse(CUSTOMER, "K4711", user_id=anna.id)]
+        admin.id, "First", identifiers=[Identifier.parse(CUSTOMER, "K4711", user_id=erika.id)]
     )
     second = await api.services.master_data.create_contact(admin.id, "Second")
     moved = {"contact_id": str(second.id), "kind": "customer_number", "value": "K4711"}
-    changed = await change(api, anna, {"numbers": [moved]})
+    changed = await change_profile(api, erika, {"numbers": [moved]})
     assert changed.status_code == 200, changed.text
     assert changed.json()["numbers"] == [number(second, "customer_number", "K4711", "manual")]
     assert await values(api, admin, first.id) == []
 
 
 async def test_a_taken_number_tells_whose_only_to_who_sees_it(api: Api) -> None:
-    anna, bob, admin = await api.user("anna"), await api.user("bob"), await api.admin()
+    erika, bob, admin = await api.user("erika"), await api.user("bob"), await api.admin()
     employer = await api.services.master_data.create_contact(admin.id, "Employer")
     insurer = await api.services.master_data.create_contact(
         admin.id,
@@ -197,12 +187,12 @@ async def test_a_taken_number_tells_whose_only_to_who_sees_it(api: Api) -> None:
         }
 
     for contact in (employer, insurer):
-        taken = await change(api, anna, entered(contact, "K9009"))
+        taken = await change_profile(api, erika, entered(contact, "K9009"))
         assert taken.status_code == 409, taken.text
         assert taken.json()["reason"] == {"code": "identifier_taken", "params": {"value": "K9009"}}
         assert "Insurer" not in taken.json()["detail"]
     # The contact's own number everyone sees: the conflict names it.
-    public = await change(api, anna, entered(employer, "K7007"))
+    public = await change_profile(api, erika, entered(employer, "K7007"))
     assert public.status_code == 409
     assert public.json()["reason"]["code"] == "identifier_of_contact"
     assert public.json()["reason"]["params"]["contact"] == "Insurer"

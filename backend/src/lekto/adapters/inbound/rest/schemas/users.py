@@ -8,13 +8,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from lekto.adapters.inbound.problems import BlockingSpaceOut
 from lekto.adapters.inbound.rest.schemas.account import LinkOut, Password, UserOut
 from lekto.adapters.inbound.rest.schemas.common import each_once
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.ids import SpaceId, UserId
 from lekto.core.domain.users import MAX_DISPLAY_NAME, MAX_USERNAME, Role, Settle, Settlement
+from lekto.core.domain.validation import MAX_REFERENCES
 
 
-class UserCreate(BaseModel):
+class UserCreate(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [{"username": "bob", "role": "user", "password": "********"}]
         },
@@ -32,9 +33,8 @@ class UserCreate(BaseModel):
     )
 
 
-class UserPatch(BaseModel):
+class UserPatch(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"role": "admin", "active": True}]},
     )
 
@@ -44,9 +44,8 @@ class UserPatch(BaseModel):
     )
 
 
-class PasswordReset(BaseModel):
+class PasswordReset(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"password": "********", "revoke_tokens": True}]},
     )
 
@@ -107,11 +106,10 @@ class SpaceSettlementIn(BaseModel):
         return Settlement(Settle.REMOVE)
 
 
-class UserRemovalIn(BaseModel):
+class UserRemovalIn(RequestBody):
     """The decisions on the spaces that stop deleting a user (`GET /users/{id}/removal`)."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -130,7 +128,9 @@ class UserRemovalIn(BaseModel):
         },
     )
 
-    spaces: list[SpaceSettlementIn] = Field(default_factory=list, description="Each space once.")
+    spaces: list[SpaceSettlementIn] = Field(
+        default_factory=list, max_length=MAX_REFERENCES, description="Each space once."
+    )
 
     @field_validator("spaces")
     @classmethod

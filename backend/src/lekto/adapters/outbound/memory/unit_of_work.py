@@ -2,7 +2,9 @@
 
 Behaves like a database transaction with read-committed isolation and optimistic locking:
 reads see committed data plus the unit's own changes; commit checks that every row written
-still has the version it had when the unit first touched it, and that uniqueness holds.
+still has the version it had when the unit first touched it, that uniqueness holds, and that
+every reference points to a row, after removing what goes with a removed one
+(`references.REFERENCES`, as the SQL schema's foreign keys).
 """
 
 import asyncio
@@ -79,6 +81,7 @@ from lekto.adapters.outbound.memory.push import (
     MemoryPushDeviceRepository,
     MemoryPushPreferencesRepository,
 )
+from lekto.adapters.outbound.memory.references import REFERENCES, OnDelete, Reference
 from lekto.adapters.outbound.memory.rows import _REMOVED, MemoryRepository, _copy
 from lekto.adapters.outbound.memory.rules import (
     MemoryBulkOperationRepository,
@@ -128,7 +131,7 @@ from lekto.core.domain.relations import Relation
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
 from lekto.core.domain.validation import name_key, require_utc
-from lekto.core.domain.verdict import KnownLabels
+from lekto.core.domain.verdict import KnownLabels, known_space
 from lekto.core.domain.versions import DocumentVersion
 from lekto.core.ports.repository import (
     NEWEST_FIRST,
@@ -146,9 +149,12 @@ class MemoryUnitOfWork:
     def __init__(self, database: MemoryDatabase) -> None:
         self._db = database
         self._closed = False
+        self._failed = False  # a write broke a constraint: only rollback remains (PM-04)
         self._writes: dict[str, dict[UUID, Identified[UUID] | None]] = {}
         self._tables: dict[str, Table[Any]] = {}  # the tables written to, of any kind
         self._base_versions: dict[tuple[str, UUID], int | None] = {}
+        # The timestamps only `_touch` moved forward, by row: laid on the row at the commit.
+        self._touched: dict[tuple[str, UUID], dict[str, datetime]] = {}
         self._log: list[NodeRun] = []
         self._events: list[DomainEvent] = []
         self._jobs: dict[JobId, Job] = {}
@@ -230,16 +236,21 @@ class MemoryUnitOfWork:
             self._held = None
 
     async def commit(self) -> None:
+        """Closes the unit, also if the commit fails, as the SQL transaction does."""
         self._check_open()
         try:
             self._commit()
         finally:
+            self._closed = True
             self._release()
 
     def _commit(self) -> None:
+        self._settle_touches()
         self._check_versions()
         self._check_uniqueness()
         self._check_jobs()
+        self._cascade()
+        self._check_references()
         for table_name, writes in self._writes.items():
             rows = self._db.tables.setdefault(table_name, {})
             for id, row in writes.items():
@@ -297,13 +308,24 @@ class MemoryUnitOfWork:
             del self._db.verdicts[key]
 
     async def rollback(self) -> None:
-        self._check_open()
+        if self._closed:
+            raise RuntimeError("the unit of work is closed")
         self._closed = True
         self._release()
 
     def _check_open(self) -> None:
+        """RuntimeError if the unit is closed, or a write of it failed (`_violated`)."""
         if self._closed:
             raise RuntimeError("the unit of work is closed")
+        if self._failed:
+            raise RuntimeError("a write of this unit of work failed; it can only roll back")
+
+    def _violated(self, message: str) -> ConflictError:
+        """The error of a write that breaks a constraint of the SQL schema (a key, a foreign
+        key, a unique index); the unit fails with it, as the database's transaction does: only
+        rollback remains (PM-04)."""
+        self._failed = True
+        return ConflictError(message)
 
     def _check_versions(self) -> None:
         for (table_name, id), base in self._base_versions.items():
@@ -316,27 +338,29 @@ class MemoryUnitOfWork:
             self._unique_or_fail(self._tables[table_name], self._rows(self._tables[table_name]))
 
     def _check_jobs(self) -> None:
+        """ConcurrencyError if a job this unit changed was changed meanwhile. A job this unit
+        added whose key another unit's job took meanwhile (an active one's `dedup_key`, a queued
+        one's `coalesce_key`) is dropped, the rest commits: SQL's insert with ON CONFLICT DO
+        NOTHING waits for the other unit and adds nothing (PM-10). A job changed here whose key
+        another took is a ConflictError, as the unique index refuses the update."""
         for id, base in self._job_base.items():
             if self._db.jobs.get(id) != base:
                 raise ConcurrencyError(f"job {id} was changed concurrently")
-        for job in self._jobs.values():
-            if job.dedup_key is not None and job.status.is_active:
-                for other in self._db.jobs.values():
-                    if (
-                        other.id not in self._jobs
-                        and other.id not in self._purged_jobs
-                        and other.dedup_key == job.dedup_key
-                        and other.status.is_active
-                    ):
-                        raise ConflictError(f"an active job with key {job.dedup_key} exists")
-            if job.coalesce_key is not None:
-                for other in self._db.jobs.values():
-                    if (
-                        other.id not in self._jobs
-                        and other.id not in self._purged_jobs
-                        and other.coalesce_key == job.coalesce_key
-                    ):
-                        raise ConflictError(f"a queued job with key {job.coalesce_key} exists")
+        for job in list(self._jobs.values()):
+            if not any(self._takes(other, job) for other in self._db.jobs.values()):
+                continue
+            if self._job_base.get(job.id) is not None:  # changed here, not added
+                raise ConflictError(f"another job holds the key of job {job.id}")
+            del self._jobs[job.id]
+
+    def _takes(self, other: Job, job: Job) -> bool:
+        """Whether another unit's job `other` holds the key of the added `job`."""
+        if other.id in self._jobs or other.id in self._purged_jobs:
+            return False
+        deduplicated = job.dedup_key is not None and job.status.is_active
+        if deduplicated and other.dedup_key == job.dedup_key and other.status.is_active:
+            return True
+        return job.coalesce_key is not None and other.coalesce_key == job.coalesce_key
 
     # --- rows -----------------------------------------------------------------------------------
     # A table holds rows of its own kind only: those of `Table[E]` are `E`.
@@ -354,9 +378,39 @@ class MemoryUnitOfWork:
         row = writes[id] if id in writes else self._db.tables.get(table.name, {}).get(id)
         return cast(E | None, row)
 
+    def _touch[E: Identified[UUID]](
+        self, table: Table[E], id: UUID, field: str, value: datetime, row: E
+    ) -> None:
+        """Move `field` of the row `id` forward to `value` (`row`: the row with it, which this
+        unit reads from now on). No change: no base version; on a row this unit did not write
+        otherwise, the commit lays the timestamp on the row as it then is, and on none if
+        another unit removed it meanwhile, as SQL's update of no row (PM-09)."""
+        self._check_open()
+        key = (table.name, id)
+        if key not in self._base_versions:
+            self._touched.setdefault(key, {})[field] = value
+        self._tables[table.name] = table
+        self._writes.setdefault(table.name, {})[id] = row
+
+    def _settle_touches(self) -> None:
+        """The rows only touched as the commit writes them: the committed row with the touched
+        timestamps moved forward, or none if it is gone (`_touch`)."""
+        for (name, id), fields in self._touched.items():
+            committed = self._db.tables.get(name, {}).get(id)
+            if committed is None:
+                del self._writes[name][id]
+                continue
+            changed = _copy(committed)
+            for name_of, value in fields.items():
+                current = getattr(changed, name_of)
+                if current is None or current < value:
+                    setattr(changed, name_of, value)
+            self._writes[name][id] = changed
+
     def _write[E: Identified[UUID]](self, table: Table[E], id: UUID, row: E | None) -> None:
         self._check_open()
         key = (table.name, id)
+        self._touched.pop(key, None)  # written as a whole: the version counts
         if key not in self._base_versions:
             committed = self._db.tables.get(table.name, {}).get(id)
             # Rows that only insert (`Identified`) have no version: None, as absent ones.
@@ -366,49 +420,78 @@ class MemoryUnitOfWork:
 
     def _check_unreferenced[E: Identified[UUID]](self, table: Table[E], id: UUID) -> None:
         """ConflictError if a row refers to the row `id` of `table`: the SQL schema's foreign
-        keys without a cascade refuse its removal so."""
-        for referring, refers in _REFERRERS.get(table.name, ()):
-            if any(refers(row, id) for row in self._rows(referring)):
-                raise ConflictError(f"a {referring.name} still refers to {table.name} {id}")
+        keys without a cascade refuse its removal so (`OnDelete.RESTRICT`)."""
+        for reference in REFERENCES:
+            if reference.target.name != table.name or reference.on_delete is not OnDelete.RESTRICT:
+                continue
+            if any(id in reference.ids(row) for row in self._rows(reference.table)):
+                raise self._violated(f"a {reference.table.name} still refers to {table.name} {id}")
 
-    @staticmethod
-    def _unique_or_fail[E: Identified[UUID]](table: Table[E], rows: Iterable[E]) -> None:
+    def _removed(self) -> dict[str, set[UUID]]:
+        """The ids of the rows this unit removed, by table."""
+        removed: dict[str, set[UUID]] = {}
+        for name, writes in self._writes.items():
+            ids = {id for id, row in writes.items() if row is _REMOVED}
+            if ids:
+                removed[name] = ids
+        return removed
+
+    def _cascade(self) -> None:
+        """Remove the rows that refer to a row this unit removed where the foreign key cascades
+        (`OnDelete.CASCADE`), also those other units committed meanwhile, as the database does
+        on the removal. Without a base version: a cascade conflicts with no change (PM-03)."""
+        gone = self._removed()
+        while gone:
+            more: dict[str, set[UUID]] = {}
+            for reference in REFERENCES:
+                ids = gone.get(reference.target.name)
+                if not ids or reference.on_delete is not OnDelete.CASCADE:
+                    continue
+                for row in self._rows(reference.table):
+                    if not ids.isdisjoint(reference.ids(row)):
+                        self._tables[reference.table.name] = reference.table
+                        self._writes.setdefault(reference.table.name, {})[row.id] = _REMOVED
+                        more.setdefault(reference.table.name, set()).add(row.id)
+            gone = more
+
+    def _check_references(self) -> None:
+        """ConflictError if a row this unit wrote refers to a row that does not exist (any
+        more), or a row refers to one this unit removed, or a processing log entry to no
+        document: the SQL schema's foreign keys refuse such a commit (PM-03)."""
+        removed = self._removed()
+        existing: dict[str, set[UUID]] = {}
+
+        def exists(reference: Reference, id: UUID) -> bool:
+            name = reference.target.name
+            if name not in existing:
+                existing[name] = {row.id for row in self._rows(reference.target)}
+            return id in existing[name]
+
+        for reference in REFERENCES:
+            if reference.target.name in removed:
+                rows: Iterable[Identified[UUID]] = self._rows(reference.table)
+            else:
+                written = self._writes.get(reference.table.name, {}).values()
+                rows = [row for row in written if row is not _REMOVED]
+            for row in rows:
+                for id in reference.ids(row):
+                    if id is not None and not exists(reference, id):
+                        raise ConflictError(
+                            f"{reference.table.name} {row.id} refers to "
+                            f"{reference.target.name} {id}, which does not exist"
+                        )
+        documents = {row.id for row in self._rows(DOCUMENTS)} | removed.get(DOCUMENTS.name, set())
+        for run in self._log:
+            if run.document_id not in documents:
+                raise ConflictError(f"a processing log entry refers to document {run.document_id}")
+
+    def _unique_or_fail[E: Identified[UUID]](self, table: Table[E], rows: Iterable[E]) -> None:
         seen: set[Hashable] = set()
         for row in rows:
             for key in table.unique_keys(row):
                 if key in seen:
-                    raise ConflictError(f"{table.name} already exists: {key}")
+                    raise self._violated(f"{table.name} already exists: {key}")
                 seen.add(key)
-
-
-# What refers to a row, as the SQL schema's foreign keys without ON DELETE CASCADE do.
-_REFERRERS: dict[str, tuple[tuple[Table[Any], Callable[[Any, UUID], bool]], ...]] = {
-    USERS.name: (
-        (SPACES, lambda space, id: space.personal_of == id or id in space.members),
-        (MAILBOXES, lambda mailbox, id: mailbox.fallback_user_id == id),
-    ),
-    SPACES.name: ((DOCUMENTS, lambda document, id: document.space_id == id),),
-    CONTACTS.name: ((DOCUMENTS, lambda document, id: document.contact_id == id),),
-    DOCUMENT_TYPES.name: (
-        (DOCUMENTS, lambda document, id: document.document_type_id == id),
-        (FIELDS, lambda field, id: id in (field.document_type_ids or ())),
-        (MAILBOXES, lambda mailbox, id: mailbox.body_type_id == id),
-    ),
-    TAGS.name: (
-        (TAGS, lambda tag, id: tag.parent_id == id),
-        (
-            CONTACTS,
-            lambda contact, id: (
-                id in contact.group_ids
-                or id in contact.topic_ids
-                or any(item.topic_id == id for item in contact.identifiers)
-            ),
-        ),
-        (DOCUMENT_TYPES, lambda kind, id: id in kind.group_ids),
-        (DOCUMENTS, lambda document, id: document.topic_id == id or id in document.tag_ids),
-    ),
-    FIELDS.name: ((DOCUMENTS, lambda document, id: id in document.fields),),
-}
 
 
 class MemoryNamedRepository[K: UUID, E: MasterData](MemoryRepository[K, E]):
@@ -432,8 +515,10 @@ class MemoryUserRepository(MemoryRepository[UserId, User]):
         return next((_copy(row) for row in self._all() if name_key(row.username) == key), None)
 
     async def remove(self, id: UserId) -> None:
-        """As the SQL schema's foreign keys: the user's documents keep no uploader (SET NULL),
-        the contacts' identifiers that named them and their profile go with them (CASCADE)."""
+        """As the SQL schema's foreign keys: the user's documents keep no uploader, the
+        relations they decided no decider, the versions they made no maker (SET NULL); the
+        contacts' identifiers that named them, their profile and their bulk operations go with
+        them (CASCADE)."""
         await self.get(id)
         self._uow._check_unreferenced(self._table, id)
         for row in self._uow._rows(DOCUMENTS):
@@ -441,6 +526,21 @@ class MemoryUserRepository(MemoryRepository[UserId, User]):
                 changed = _copy(row)
                 changed.uploaded_by = None
                 self._uow._write(DOCUMENTS, row.id, changed)
+        for relation in self._uow._rows(DOCUMENT_RELATIONS):
+            if relation.relation.decided_by == id:
+                undecided = dataclasses.replace(relation.relation, decided_by=None)
+                self._uow._write(
+                    DOCUMENT_RELATIONS,
+                    relation.id,
+                    RelationRow(relation.id, undecided, relation.version),
+                )
+        for version in self._uow._rows(DOCUMENT_VERSIONS):
+            if version.version.created_by == id:
+                made = dataclasses.replace(version.version, created_by=None)
+                self._uow._write(DOCUMENT_VERSIONS, version.id, VersionRow(version.id, made))
+        for operation in self._uow._rows(BULK_OPERATIONS):
+            if operation.user_id == id:
+                self._uow._write(BULK_OPERATIONS, operation.id, _REMOVED)
         for contact in self._uow._rows(CONTACTS):
             if any(item.user_id == id for item in contact.identifiers):
                 updated = _copy(contact)
@@ -496,7 +596,8 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
     async def find_by_sha256(self, sha256: Sha256) -> Document | None:
         return next((_copy(row) for row in self._all() if row.sha256 == sha256), None)
 
-    async def list_visible_to(self, user: UserId) -> list[Document]:
+    async def _visible_to(self, user: UserId) -> list[Document]:
+        """The documents within the user's reach, as `query_visible` reads them."""
         reach = Reach.of(user, await self._uow.spaces.list_accessible(user))
         return [_copy(row) for row in self._all() if reach.allows(row)]
 
@@ -524,7 +625,7 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
         limit: int,
         offset: int = 0,
     ) -> list[Document]:
-        visible = await self.list_visible_to(user)
+        visible = await self._visible_to(user)
         return _query(
             visible, filter, self._groups(), order=order, after=after, limit=limit, offset=offset
         )
@@ -545,9 +646,7 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
 
     async def _matching(self, filter: DocumentFilter, user: UserId | None) -> list[Document]:
         documents = (
-            [_copy(row) for row in self._all()]
-            if user is None
-            else await self.list_visible_to(user)
+            [_copy(row) for row in self._all()] if user is None else await self._visible_to(user)
         )
         groups = self._groups()
         return [document for document in documents if filter.matches(groups.view(document))]
@@ -592,9 +691,7 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
 
     async def count_by(self, by: CountBy, user: UserId | None) -> dict[UUID, int]:
         documents = (
-            [_copy(row) for row in self._all()]
-            if user is None
-            else await self.list_visible_to(user)
+            [_copy(row) for row in self._all()] if user is None else await self._visible_to(user)
         )
         counts: dict[UUID, int] = {}
         for document in documents:
@@ -625,14 +722,12 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
         )
 
     async def confirmed_labels(self, reader: UserId) -> KnownLabels:
-        readable = await self.list_visible_to(reader)
+        readable = await self._visible_to(reader)
         confirmed = [row for row in readable if row.confirmed_at is not None]
         spaces = {space.id: space for space in self._uow._rows(SPACES)}
         own = next((space.id for space in spaces.values() if space.personal_of == reader), None)
         decided = frozenset(
-            own
-            if own is not None and spaces[row.space_id].personal_of == row.uploaded_by
-            else row.space_id
+            known_space(row.space_id, spaces[row.space_id].personal_of, row.uploaded_by, own)
             for row in confirmed
             if row.space_confirmed_at is not None and row.space_id in spaces
         )
@@ -680,14 +775,14 @@ class MemoryProcessingLog:
 
     async def append(self, run: NodeRun) -> None:
         self._uow._check_open()
-        self._uow._log.append(run)
+        self._uow._log.append(copy.deepcopy(run))
 
     async def list_for(self, document: DocumentId) -> list[NodeRun]:
         self._uow._check_open()
         if self._uow._row(DOCUMENTS, document) is _REMOVED:
             return []
         entries = [*self._uow._db.processing_log, *self._uow._log]
-        return [entry for entry in entries if entry.document_id == document]
+        return [copy.deepcopy(entry) for entry in entries if entry.document_id == document]
 
 
 class MemoryDocumentVersionRepository:
@@ -698,13 +793,13 @@ class MemoryDocumentVersionRepository:
         self._uow._check_open()
         id = version_row_id(version.document_id, version.number)
         if self._uow._row(DOCUMENT_VERSIONS, id) not in (None, _REMOVED):
-            raise ConflictError(f"document version already exists: {version.number}")
-        self._uow._write(DOCUMENT_VERSIONS, id, VersionRow(id, version))
+            raise self._uow._violated(f"document version already exists: {version.number}")
+        self._uow._write(DOCUMENT_VERSIONS, id, VersionRow(id, copy.deepcopy(version)))
 
     async def of_document(self, document: DocumentId) -> list[DocumentVersion]:
         self._uow._check_open()
         found = [
-            row.version
+            copy.deepcopy(row.version)
             for row in self._uow._rows(DOCUMENT_VERSIONS)
             if row.version.document_id == document
         ]
@@ -714,7 +809,7 @@ class MemoryDocumentVersionRepository:
         self._uow._check_open()
         return next(
             (
-                row.version
+                copy.deepcopy(row.version)
                 for row in self._uow._rows(DOCUMENT_VERSIONS)
                 if row.version.sha256 == sha256
             ),
@@ -735,9 +830,9 @@ class MemoryDocumentRelationRepository:
         self._uow = uow
 
     def _live(self) -> list[Relation]:
-        """The relations whose documents are both there (the database cascades)."""
+        """The relations whose documents are both there (the database cascades), copied."""
         return [
-            row.relation
+            copy.deepcopy(row.relation)
             for row in self._uow._rows(DOCUMENT_RELATIONS)
             if self._uow._row(DOCUMENTS, row.relation.newer) is not _REMOVED
             and self._uow._row(DOCUMENTS, row.relation.older) is not _REMOVED
@@ -761,7 +856,7 @@ class MemoryDocumentRelationRepository:
         id = relation_row_id(relation.newer, relation.older)
         current = self._uow._row(DOCUMENT_RELATIONS, id)
         version = 1 if current is _REMOVED else current.version + 1
-        self._uow._write(DOCUMENT_RELATIONS, id, RelationRow(id, relation, version))
+        self._uow._write(DOCUMENT_RELATIONS, id, RelationRow(id, copy.deepcopy(relation), version))
 
     async def remove(self, newer: DocumentId, older: DocumentId) -> None:
         self._uow._check_open()

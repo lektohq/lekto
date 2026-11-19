@@ -6,16 +6,18 @@ import asyncio
 
 from lekto.adapters.outbound.memory import ManualClock, MemoryObjectStore
 from lekto.core.domain.documents import Document, DocumentChanges
+from lekto.core.domain.errors import DuplicateDocumentError
 from lekto.core.domain.identifiers import Identifier, IdentifierKind
 from lekto.core.domain.master_data import TagScope
-from lekto.core.domain.pipeline import Lane
+from lekto.core.domain.pipeline import NODES, Lane, Node
 from lekto.core.domain.users import User
+from lekto.core.ports.repository import DocumentFilter
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from lekto.core.services.documents import DocumentService
 from lekto.core.services.master_data import MasterDataService
 from lekto.core.services.profiles import ContactNumber, ProfileChanges, ProfileService
 from tests import builders
-from tests.builders import NOW
+from tests.builders import NOW, PlaceholderNode, incoming
 from tests.contracts.unit_of_work import owner_with_space
 
 
@@ -28,6 +30,29 @@ async def _admin(uow_factory: UnitOfWorkFactory) -> User:
 
 
 class ServicesOverPersistence:
+    async def test_concurrent_uploads_of_the_same_file_create_one_document(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """Three uploads of the same file at once: one document, the others refused as
+        duplicates (TA-03)."""
+        owner, _ = await owner_with_space(uow_factory)
+        pipeline = builders.pipeline_service(
+            uow_factory,
+            ManualClock(NOW),
+            MemoryObjectStore(),
+            {node: PlaceholderNode() for node in NODES if node is not Node.RECEIVE},
+        )
+
+        async def upload() -> Document:
+            return await pipeline.receive(owner.id, incoming(b"%PDF-1.7 same"), filename="a.pdf")
+
+        results = await asyncio.gather(*(upload() for _ in range(3)), return_exceptions=True)
+        assert len([r for r in results if isinstance(r, Document)]) == 1, results
+        assert all(isinstance(r, Document | DuplicateDocumentError) for r in results), results
+        async with uow_factory() as uow:
+            found = await uow.documents.query_visible(owner.id, DocumentFilter(), limit=10)
+            assert len(found) == 1
+
     async def test_concurrent_tag_moves_make_no_cycle(self, uow_factory: UnitOfWorkFactory) -> None:
         """Moving A under B and B under A at once: one move waits for the other and sees it."""
         admin = await _admin(uow_factory)
@@ -157,10 +182,15 @@ class ServicesOverPersistence:
         async with uow_factory() as uow:
             await uow.documents.add(document)
             await uow.commit()
-        await documents.update_metadata(owner.id, document.id, DocumentChanges(contact_id=nord.id))
+        await documents.change_metadata(owner.id, document.id, DocumentChanges(contact_id=nord.id))
+
+        async def with_topic() -> Document:
+            changes = DocumentChanges(topic_id=work.id)
+            return (await documents.change_metadata(owner.id, document.id, changes)).document
+
         results = await asyncio.gather(
             master.change_contact(admin.id, nord.id, topic_ids=[]),
-            documents.update_metadata(owner.id, document.id, DocumentChanges(topic_id=work.id)),
+            with_topic(),
             return_exceptions=True,
         )
         assert sorted(type(result).__name__ for result in results) in (

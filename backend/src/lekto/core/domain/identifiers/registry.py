@@ -5,7 +5,12 @@ a value."""
 from collections.abc import Mapping
 
 from lekto.core.domain.errors import ValidationError
-from lekto.core.domain.identifiers.base import IdentifierKind, IdentifierType, is_date
+from lekto.core.domain.identifiers.base import (
+    MAX_IDENTIFIER_VALUE,
+    IdentifierKind,
+    IdentifierType,
+    is_date,
+)
 from lekto.core.domain.identifiers.child_benefit_number import ChildBenefitNumber
 from lekto.core.domain.identifiers.claim_number import ClaimNumber
 from lekto.core.domain.identifiers.commercial_register import CommercialRegister
@@ -75,11 +80,12 @@ LEARNED_KINDS = frozenset(kind for kind, item in TYPES.items() if item.learned)
 PERSON_KINDS = frozenset(kind for kind, item in TYPES.items() if item.for_persons)
 """The kinds a person's identifiers have."""
 NAMING_KINDS = frozenset(kind for kind, item in TYPES.items() if item.names_user)
-"""The kinds of a contact's identifiers that may name the user they belong to (a contract, a
-policy, a personnel number)."""
-OWN_KINDS = PERSON_KINDS - {kind for kind, item in TYPES.items() if item.for_contacts}
+"""The kinds of numbers that may name the user they belong to: a contact's customer, contract
+or personnel number; read alike, a meter number, a mandate reference or a licence plate, which
+no contact carries since #215 (`reading.identifiers_from`)."""
+PERSON_ONLY_KINDS = PERSON_KINDS - {kind for kind, item in TYPES.items() if item.for_contacts}
 """The kinds only a person has (not the IBAN: a contact has one too, though no longer as its
-identifier)."""
+identifier): only admins and that person see such a fact (`document_facts.person_only`)."""
 
 
 def type_of(kind: IdentifierKind) -> IdentifierType:
@@ -91,7 +97,10 @@ def normalise_identifier(kind: IdentifierKind, raw: str) -> str:
     spaces and separators in upper case (an IBAN with a valid check sum, a personnel number
     without leading zeros, a person's number with a valid check digit), a domain or an e-mail
     address in lower case; ValidationError if `raw` is none of its kind, or a date where a
-    number is meant (`is_date`: whoever read it, a pattern or the language model)."""
+    number is meant (`is_date`: whoever read it, a pattern or the language model), or longer
+    than `MAX_IDENTIFIER_VALUE`."""
+    if len(raw) > MAX_IDENTIFIER_VALUE:
+        raise ValidationError(because(ReasonCode.INPUT_TOO_LONG, max=MAX_IDENTIFIER_VALUE))
     if kind is not IdentifierKind.LETTER_DATE and is_date(raw):
         raise ValidationError(because(ReasonCode.NOT_OF_KIND, kind=kind.value, value=raw))
     return TYPES[kind].normalise(raw)

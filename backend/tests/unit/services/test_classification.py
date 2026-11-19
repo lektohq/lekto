@@ -2,9 +2,10 @@
 every check, the answer handling, and the way through the pipeline."""
 
 import json
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass, replace
-from datetime import date, timedelta
+import threading
+from collections.abc import Sequence
+from dataclasses import replace
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -14,12 +15,10 @@ import pytest
 from lekto.adapters.outbound.memory import FakeLanguageModel, FakeOcr, FakeParser, FakeTextLocator
 from lekto.adapters.outbound.memory.processing import FAKE_PDF
 from lekto.adapters.outbound.ocrmypdf.hocr import hocr_words
-from lekto.adapters.outbound.regex import RegexPatternMatcher
 from lekto.core.domain.classification import (
     CHECKS,
     TITLE,
     FieldCheck,
-    checks_from_json,
     checks_to_json,
     field_key,
 )
@@ -36,14 +35,14 @@ from lekto.core.domain.events import DocumentFiled
 from lekto.core.domain.exchanges import RunExchange, exchanges_from_json
 from lekto.core.domain.fields import FieldDefinition, FieldType, Money
 from lekto.core.domain.identifiers import Identifier, IdentifierKind
-from lekto.core.domain.json_value import JsonObject, JsonValue
+from lekto.core.domain.identifiers import identifiers_in as identifiers_in
+from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.locations import Box, Location
 from lekto.core.domain.master_data import Assignment, Contact, DocumentType, Tag, TagScope
 from lekto.core.domain.pipeline import (
     Lane,
     Node,
     NodeResult,
-    NodeRun,
     Outcome,
     ProcessingHistory,
     ProcessingStatus,
@@ -51,258 +50,57 @@ from lekto.core.domain.pipeline import (
 from lekto.core.domain.reading import PageReading, PageWords, reading_to_json, readings_to_json
 from lekto.core.domain.reasons import ReasonCode, written
 from lekto.core.domain.users import Role
-from lekto.core.domain.verdict import Thresholds
+from lekto.core.domain.verdict import judge_contact
 from lekto.core.ports.llm import StructuredRequest
+from lekto.core.services.classification import nodes
 from lekto.core.services.classification.nodes import (
-    ClassificationPolicy,
+    MOST_MODEL_CALLS,
     FieldsNode,
     JudgeNode,
     LlmSignal,
-    ModelFactsResult,
 )
 from lekto.core.services.classification.prompts import FACTS_SCHEMA, SYSTEM
 from lekto.core.services.classification.signals import (
     ABSTAINED,
     ClassifierSignal,
-    FactsResult,
     FactsSignal,
     NeighboursSignal,
 )
 from lekto.core.services.nodes import OcrNode, ParseNode
-from lekto.core.services.objects import archive_key, exchanges_key, reading_key, text_key
+from lekto.core.services.objects import (
+    archive_key,
+    exchanges_key,
+    load_text,
+    reading_key,
+    text_key,
+)
 from lekto.core.services.pipeline import MetadataResult, NodeExecutor
-from lekto.core.services.rules.nodes import ApplyRulesNode
 from tests import builders
 from tests.builders import NOW, SAMPLES, PlaceholderNode, incoming
 from tests.scans import BAD_TABLE, PAYSLIP, PAYSLIP_TEXT, ScanLine, hocr, scan
+from tests.unit.services.classification_support import (
+    FIELDS,
+    IBAN,
+    INVOICE,
+    Seeded,
+    checks,
+    document_with,
+    extraction,
+    fields_step,
+    judge,
+    model,
+    output,
+    policy_with,
+    proposal,
+    record,
+    responder,
+    rules_step,
+    seed,
+    signal_step,
+)
 from tests.unit.services.support import World
 
 NO_MODEL = "no language model is configured"
-
-INVOICE = """\
-# Stadtwerke Musterstadt GmbH
-Postfach 12 34, 12345 Musterstadt
-
-Herrn Max Nord, Musterweg 1, 12345 Musterstadt
-
-Musterstadt, 31.03.2026
-
-## Rechnung Nr. R-2026-0815
-
-Stromverbrauch vom 01.01.2026 bis 31.03.2026
-
-| Position | Betrag |
-| --- | --- |
-| Arbeitspreis | 70,76 € |
-| Gesamtbetrag | 84,20 € |
-
-Zahlbar bis 15.04.2026.
-"""
-IBAN = "DE89 3704 0044 0532 0130 00"
-
-
-@dataclass
-class Seeded:
-    contacts: dict[str, Contact]
-    types: dict[str, DocumentType]
-    tags: dict[str, Tag]
-    fields: dict[str, FieldDefinition]
-
-
-async def seed(world: World, contacts: tuple[str, ...] = ()) -> Seeded:
-    names = contacts or ("Stadtwerke Musterstadt GmbH", "Stadtwerke Beispielstadt", "AOK Bayern")
-    seeded = Seeded(
-        contacts={name: Contact.create(name=name, now=NOW) for name in names},
-        types={name: DocumentType.create(name=name, now=NOW) for name in ("Rechnung", "Vertrag")},
-        tags={name: Tag.create(name=name, now=NOW) for name in ("Strom", "Versicherung")},
-        fields={},
-    )
-    invoice = seeded.types["Rechnung"].id
-    for name, data_type, scope in [
-        ("Rechnungsbetrag", FieldType.AMOUNT, [invoice]),
-        ("Rechnungsnummer", FieldType.TEXT, [invoice]),
-        ("Fällig am", FieldType.DATE, [invoice]),
-        ("Bezahlt", FieldType.BOOLEAN, None),
-    ]:
-        # Bound to the invoice, the fields are required for it; the global one is optional.
-        seeded.fields[name] = FieldDefinition.create(
-            name=name,
-            data_type=data_type,
-            document_type_ids=scope,
-            required_types=scope or (),
-            now=NOW,
-        )
-    async with world.uow() as uow:
-        for contact in seeded.contacts.values():
-            await uow.contacts.add(contact)
-        for kind in seeded.types.values():
-            await uow.document_types.add(kind)
-        for tag in seeded.tags.values():
-            await uow.tags.add(tag)
-        for field in seeded.fields.values():
-            await uow.fields.add(field)
-        await uow.commit()
-    return seeded
-
-
-FIELDS: list[JsonValue] = [
-    # Keys by name: a1 Bezahlt, a2 Fällig am, a3 Rechnungsbetrag, a4 Rechnungsnummer.
-    {"key": "a2", "value": "15.04.2026", "evidence": "Zahlbar bis 15.04.2026."},
-    {"key": "a3", "value": "84,20 €", "evidence": "Gesamtbetrag | 84,20 €"},
-    {"key": "a4", "value": "R-2026-0815", "evidence": "Rechnung Nr. R-2026-0815"},
-]
-
-
-def proposal(**changes: Any) -> JsonObject:
-    """The language model's answer to the signal's request."""
-    answer: JsonObject = {
-        "sender": {"value": "Stadtwerke Musterstadt GmbH", "evidence": None},
-        "recipient": "Max Nord",
-        "document_type": "Rechnung",
-        "new_document_type": None,
-        "topic": None,
-        "tags": ["Strom"],
-        "new_tags": [],
-        "document_date": {"value": "2026-03-31", "evidence": "Musterstadt, 31.03.2026"},
-        "title": "Stromrechnung März 2026",
-        "language": "de",
-        "fields": FIELDS,
-    }
-    return answer | changes
-
-
-def extraction(**values: Any) -> JsonObject:
-    """Answer of the fields node's own request, for the fields in key order: Bezahlt, Fällig
-    am, Rechnungsbetrag, Rechnungsnummer (sorted by name)."""
-    defaults: dict[str, Any] = {
-        "a1": {"value": None, "evidence": None},
-        "a2": {"value": "2026-04-15", "evidence": "Zahlbar bis 15.04.2026."},
-        "a3": {
-            "value": {"amount": "84.20", "currency": "EUR"},
-            "evidence": "Gesamtbetrag | 84,20 €",
-        },
-        "a4": {"value": "R-2026-0815", "evidence": "Rechnung Nr. R-2026-0815"},
-    }
-    return {"fields": defaults | values}
-
-
-def model(*answers: JsonObject | str, facts: JsonObject | str | None = None) -> FakeLanguageModel:
-    """Answers in turn; the last one again and again. The request for the facts (`facts-3`)
-    it answers with `facts`, by default with none."""
-    remaining = list(answers)
-
-    def respond(request: StructuredRequest) -> JsonObject | str:
-        if request.schema_name == FACTS_SCHEMA:
-            return {"facts": []} if facts is None else facts
-        return remaining.pop(0) if len(remaining) > 1 else remaining[0]
-
-    return FakeLanguageModel(respond)
-
-
-async def document_with(
-    world: World, text: str = INVOICE, type: DocumentType | None = None
-) -> Document:
-    owner = await world.user()
-    document = builders.document(owner, await world.personal_space(owner))
-    document.document_type_id = None if type is None else type.id
-    async with world.uow() as uow:
-        await uow.documents.add(document)
-        await uow.commit()
-    await world.object_store.put(
-        text_key(document.id), text.encode(), content_type="text/markdown; charset=utf-8"
-    )
-    return document
-
-
-def rules_step(world: World) -> ApplyRulesNode:
-    return ApplyRulesNode(
-        world.uow,
-        world.object_store,
-        RegexPatternMatcher(0.2),
-        builders.TEMPLATES,
-        max_text=200_000,
-    )
-
-
-def policy_with(**overrides: Any) -> ClassificationPolicy:
-    return replace(builders.CLASSIFICATION, **overrides)
-
-
-def thresholds_for(policy: ClassificationPolicy) -> Thresholds:
-    """The judge's thresholds as the composition derives them from the same settings."""
-    return replace(builders.THRESHOLDS, accept=policy.accept, suggest=policy.suggest_contact)
-
-
-class ModelSignal(LlmSignal):
-    """The language model's signal without a webhook to hand its request to: a result at
-    once (the facts it read are kept when the pipeline stores it)."""
-
-    async def run(self, document: Document) -> NodeResult:
-        result = await super().run(document)
-        if isinstance(result, ModelFactsResult):
-            return result.result
-        assert isinstance(result, NodeResult)
-        return result
-
-
-def signal_step(world: World, fake: FakeLanguageModel | None, **policy: Any) -> ModelSignal:
-    return ModelSignal(world.uow, world.object_store, fake, world.clock, policy_with(**policy))
-
-
-def fields_step(world: World, fake: FakeLanguageModel | None) -> FieldsNode:
-    return FieldsNode(world.uow, world.object_store, fake, world.clock, builders.CLASSIFICATION)
-
-
-async def record(world: World, document: Document, node: Node, result: NodeResult) -> None:
-    async with world.uow() as uow:
-        await uow.processing_log.append(
-            NodeRun(
-                document_id=document.id,
-                node=node,
-                run=document.processing.run,
-                result=result,
-                pipeline_version="test",
-                started_at=NOW,
-                duration=timedelta(0),
-            )
-        )
-        await uow.commit()
-
-
-async def judge(
-    world: World,
-    document: Document,
-    fake: FakeLanguageModel | None,
-    *,
-    locator: FakeTextLocator | None = None,
-    **policy: Any,
-) -> NodeResult | MetadataResult:
-    """The model's signal and the facts as the pipeline logs them, then the judge; the
-    signal's result if it fails."""
-    signals: list[tuple[Node, ModelSignal | FactsSignal]] = [
-        (Node.SIGNAL_LLM, signal_step(world, fake, **policy)),
-        (Node.SIGNAL_FACTS, FactsSignal(world.uow, world.object_store)),
-    ]
-    for node, signal in signals:
-        ran = await signal.run(document)
-        result = ran.result if isinstance(ran, FactsResult) else ran
-        if result.outcome is Outcome.FAILED:
-            return result
-        await record(world, document, node, result)
-    chosen = policy_with(**policy)
-    step = JudgeNode(
-        world.uow,
-        world.object_store,
-        world.clock,
-        chosen,
-        thresholds=thresholds_for(chosen),
-        locator=locator,
-    )
-    return await step.run(document)
-
-
-def checks(result: NodeResult) -> dict[str, FieldCheck]:
-    return {check.field: check for check in checks_from_json(result.output["fields"])}
 
 
 async def classify(world: World, answer: JsonObject, text: str = INVOICE) -> MetadataResult:
@@ -310,10 +108,6 @@ async def classify(world: World, answer: JsonObject, text: str = INVOICE) -> Met
     result = await judge(world, document, model(answer))
     assert isinstance(result, MetadataResult)
     return result
-
-
-def output(result: NodeResult) -> Any:
-    return result.output
 
 
 # --- the language model's signal -------------------------------------------------------------
@@ -420,6 +214,18 @@ async def test_two_unfit_answers_fail_the_signal(world: World) -> None:
     )
     assert output(result)["attempts"] == 2
     assert len(output(result)["answers"]) == 2
+
+
+async def test_the_signal_asks_the_model_at_most_as_often_as_a_node_lease_allows(
+    world: World,
+) -> None:
+    """The proposal and the facts, each once more after an unfit answer: `MOST_MODEL_CALLS`,
+    which the lease of a node's job counts (CO-06)."""
+    await seed(world)
+    fake = model("Sure! Here is the JSON.", proposal(), facts="not json")
+    result = await signal_step(world, fake).run(await document_with(world))
+    assert result.outcome is Outcome.OK
+    assert len(fake.requests) == MOST_MODEL_CALLS
 
 
 async def test_an_unreachable_model_raises_for_a_retry(world: World) -> None:
@@ -536,7 +342,7 @@ async def test_contacts_the_text_names_most_are_listed(world: World) -> None:
     await add_contact(world, "Südstädter Versicherung")
     await add_contact(world, "Nord Sport")
     fake = model(proposal())
-    text = EXAMPLE_LETTER + "\nINTER, Südstadt\n"
+    text = EXAMPLE_LETTER + "\nMuster Bäckerei, Südstadt\n"
     result = await signal_step(world, fake, max_contacts=3).run(await document_with(world, text))
     contacts = fake.requests[0].task.split("\n\nFields:")[0].split("\n\n", 1)[1]
     assert contacts == (
@@ -600,7 +406,7 @@ async def test_the_contact_is_matched_and_shown_in_the_text(world: World, name: 
     result = await classify(world, proposal(sender={"value": name, "evidence": None}))
     contact = checks(result.result)["contact"]
     assert contact.ok
-    assert contact.confidence >= builders.CLASSIFICATION.accept
+    assert contact.confidence >= builders.THRESHOLDS.accept
     assert result.changes.contact_id == seeded.contacts["Stadtwerke Musterstadt GmbH"].id
 
 
@@ -628,7 +434,7 @@ async def test_a_contact_absent_from_the_text_is_only_suggested(world: World) ->
     assert contact.outcome is Outcome.UNCERTAIN
     assert contact.reason == "the contact 'AOK Bayern' does not appear in the text"
     assert contact.suggestion == str(seeded.contacts["AOK Bayern"].id)
-    assert contact.confidence < builders.CLASSIFICATION.accept
+    assert contact.confidence < builders.THRESHOLDS.accept
 
 
 async def test_a_similar_contact_is_suggested(world: World) -> None:
@@ -642,8 +448,8 @@ async def test_a_similar_contact_is_suggested(world: World) -> None:
     assert contact.reason == (
         "'Stadtwerk Musterstadt Netz' is only similar to the contact 'Stadtwerke Musterstadt GmbH'"
     )
-    policy = builders.CLASSIFICATION
-    assert policy.suggest_contact <= contact.confidence < policy.accept
+    thresholds = builders.THRESHOLDS
+    assert thresholds.suggest <= contact.confidence < thresholds.accept
 
 
 async def test_the_contact_itself_must_be_named(world: World) -> None:
@@ -1878,23 +1684,12 @@ async def test_a_new_version_keeps_the_machine_s_title_a_person_confirmed(world:
 # --- through the pipeline ---------------------------------------------------------------------
 
 
-def responder(
-    propose: JsonObject, extract: JsonObject
-) -> Callable[[StructuredRequest], JsonObject]:
-    def respond(request: StructuredRequest) -> JsonObject:
-        if request.schema_name == FACTS_SCHEMA:
-            return {"facts": []}
-        return propose if request.schema_name == "proposal" else extract
-
-    return respond
-
-
 async def run(world: World, fake: FakeLanguageModel, text: str = INVOICE) -> tuple[Any, Document]:
     owner = await world.user()
     executors: dict[Node, NodeExecutor] = {
         Node.SIGNAL_LLM: LlmSignal(world.uow, world.object_store, fake, world.clock, policy_with()),
         Node.SIGNAL_FACTS: FactsSignal(world.uow, world.object_store),
-        Node.SIGNAL_CLASSIFIER: ClassifierSignal(world.object_store, None),
+        Node.SIGNAL_CLASSIFIER: ClassifierSignal(world.object_store, None, world.uow),
         Node.SIGNAL_NEIGHBOURS: NeighboursSignal(
             world.uow, world.object_store, None, None, builders.NEIGHBOURS
         ),
@@ -2236,3 +2031,46 @@ def test_the_facts_signal_does_not_wait_for_the_model() -> None:
     joins both)."""
     assert Node.SIGNAL_FACTS.waits_for == {Node.PARSE}
     assert Node.SIGNAL_FACTS not in Node.SIGNAL_LLM.descendants
+
+
+async def test_the_names_and_patterns_are_matched_outside_the_event_loop(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Matching the names the model read with every contact's, and every kind's patterns over
+    the text sent, take a while with many contacts or a long text (SA-03)."""
+    threads: dict[str, list[int]] = {"contact": [], "identifiers": []}
+    contact, identifiers = judge_contact, identifiers_in
+
+    def judging(*args: Any) -> Any:
+        threads["contact"].append(threading.get_ident())
+        return contact(*args)
+
+    def reading(text: str) -> Any:
+        threads["identifiers"].append(threading.get_ident())
+        return identifiers(text)
+
+    monkeypatch.setattr(nodes, "judge_contact", judging)
+    monkeypatch.setattr(nodes, "identifiers_in", reading)
+    await seed(world)
+    document = await document_with(world)
+    await signal_step(world, model(proposal())).run(document)
+    await judge(world, document, model(proposal()))
+    assert threads["contact"] and threads["identifiers"]
+    assert threading.get_ident() not in threads["contact"] + threads["identifiers"]
+
+
+async def test_a_text_with_a_byte_that_is_no_utf_8_is_read_with_a_replacement(
+    world: World,
+) -> None:
+    """The model's signal read the text strictly: one such byte failed the node, while every
+    other reader took a replacement character (SA-12)."""
+    await seed(world)
+    document = await document_with(world)
+    await world.object_store.put(
+        text_key(document.id),
+        INVOICE.encode() + b"\nKundennummer 4711 \xff\n",
+        content_type="text/markdown; charset=utf-8",
+    )
+    assert "�" in await load_text(world.object_store, document.id)
+    result = await signal_step(world, model(proposal())).run(document)
+    assert result.outcome is Outcome.OK, result.reason

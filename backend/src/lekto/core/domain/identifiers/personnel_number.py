@@ -17,7 +17,10 @@ from lekto.core.domain.identifiers.base import (
 )
 from lekto.core.domain.reasons import ReasonCode, because
 
-_FORM = re.compile(r"(?=[A-Z0-9]*\d)[A-Z0-9]{3,30}")
+MIN_LENGTH = 3
+MAX_LENGTH = 30
+"""The letters and digits a personnel number has at least and at most, as written."""
+_FORM = re.compile(rf"(?=[A-Z0-9]*\d)[A-Z0-9]{{{MIN_LENGTH},{MAX_LENGTH}}}")
 _LABEL = re.compile(
     r"(?<![a-z])(?:personal[-\s]*(?:nummer|nr)|pers[-.\s]*nr|mitarbeiter[-\s]*(?:nummer|nr)"
     r"|employee[-\s]*(?:no|number|id)|personnel[-\s]*(?:no|number))" + VALUE
@@ -32,12 +35,14 @@ class PersonnelNumber(IdentifierType):
     names_user = True
 
     def normalise(self, raw: str) -> str:
-        """Without separators and leading zeros, in upper case: 3 to 30 letters and digits as
-        written, one a digit."""
+        """Without separators and leading zeros, in upper case: `MIN_LENGTH` to `MAX_LENGTH`
+        letters and digits as written, one a digit."""
         written = SEPARATORS.sub("", raw.strip()).upper()
         value = written.lstrip("0")
         if not _FORM.fullmatch(written) or not value:
-            raise ValidationError(because(ReasonCode.NOT_PERSONNEL_NUMBER, value=raw))
+            raise ValidationError(
+                because(ReasonCode.NOT_PERSONNEL_NUMBER, value=raw, min=MIN_LENGTH, max=MAX_LENGTH)
+            )
         return value
 
     def find(self, text: str) -> Iterator[Candidate]:

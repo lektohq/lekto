@@ -196,7 +196,7 @@ describe('DocumentHeader', () => {
 		const lookup = {
 			users: [
 				{ id: OWNER, username: 'tobi', role: 'user', personal_space_id: 'space-2' },
-				{ id: 'user-2', username: 'anna', role: 'user', personal_space_id: 'space-3' }
+				{ id: 'user-2', username: 'erika', role: 'user', personal_space_id: 'space-3' }
 			],
 			spaces: [
 				{
@@ -206,7 +206,7 @@ describe('DocumentHeader', () => {
 					role: 'edit',
 					members: [
 						{ user_id: OWNER, role: 'edit', username: 'tobi', active: true },
-						{ user_id: 'user-2', role: 'read', username: 'anna', active: true }
+						{ user_id: 'user-2', role: 'read', username: 'erika', active: true }
 					]
 				},
 				{
@@ -222,7 +222,7 @@ describe('DocumentHeader', () => {
 					personal_of: 'user-2',
 					role: 'read',
 					members: [
-						{ user_id: 'user-2', role: 'edit', username: 'anna', active: true },
+						{ user_id: 'user-2', role: 'edit', username: 'erika', active: true },
 						{ user_id: OWNER, role: 'read', username: 'tobi', active: true }
 					]
 				}
@@ -232,12 +232,12 @@ describe('DocumentHeader', () => {
 		it('names the space and who else sees the document: readers once it is green', () => {
 			const green = { ...document(), lane: 'green' } as Document;
 			const { unmount } = render(DocumentHeader, props({ lookup, document: green }));
-			expect(screen.getByText(new RegExp(m.visible_to({ names: 'anna' })))).toBeTruthy();
+			expect(screen.getByText(new RegExp(m.visible_to({ names: 'erika' })))).toBeTruthy();
 			unmount();
 			render(DocumentHeader, props({ lookup }));
 			expect(screen.getByText(new RegExp(m.visible_to_you()))).toBeTruthy();
 			expect(
-				screen.getByText(new RegExp(m.visible_to_readers_later({ names: 'anna' })))
+				screen.getByText(new RegExp(m.visible_to_readers_later({ names: 'erika' })))
 			).toBeTruthy();
 		});
 
@@ -251,7 +251,7 @@ describe('DocumentHeader', () => {
 			const field = within(dialog).getByLabelText(m.field_space());
 			expect(await optionsOf(field)).toEqual([
 				{ value: 'space-2', label: m.space_personal() },
-				{ value: 'space-3', label: m.move_hand_over({ name: 'anna' }) }
+				{ value: 'space-3', label: m.move_hand_over({ name: 'erika' }) }
 			]);
 			await user.click(within(dialog).getByRole('button', { name: m.move_title() }));
 			await waitFor(() => expect(onchanged).toHaveBeenCalled());

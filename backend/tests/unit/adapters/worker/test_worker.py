@@ -36,6 +36,7 @@ def worker(
     services: Services,
     *,
     shutdown_timeout: timedelta = timedelta(seconds=5),
+    concurrency: int = 2,
     **extra: Any,
 ) -> Worker:
     """A worker that polls often; `extra` are further arguments (`indexing`, `master_data`)."""
@@ -46,7 +47,7 @@ def worker(
         unit_of_work=container.unit_of_work,
         clock=container.clock,
         wakeup=container.wakeup,
-        concurrency=2,
+        concurrency=concurrency,
         poll_interval=FAST,
         dispatch_interval=FAST,
         shutdown_timeout=shutdown_timeout,
@@ -254,6 +255,36 @@ async def test_jobs_still_running_after_the_timeout_are_released() -> None:
         claimed = [await uow.jobs.claim(now=now, lease=FAST, kinds=[NODE_JOB]) for _ in "12"]
     (job,) = [job for job in claimed if job is not None and job.payload["node"] == Node.OCR]
     assert (job.attempts, job.last_error) == (2, "interrupted: the worker stopped")
+
+
+@pytest.mark.parametrize("loops", [2, 1])
+async def test_a_long_job_holds_up_no_other_loop(loops: int) -> None:
+    """One loop sits at an OCR that does not end; a document that comes in meanwhile starts in
+    another loop at once, not after it. With one loop, it waits."""
+    container = build_memory_container()
+    node = Slow(None)
+    services = with_ocr(build_services(container), node)
+    user = await owner(container)
+    first = await services.pipeline.receive(
+        user.id, incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
+    )
+    async with running(worker(container, services, shutdown_timeout=FAST, concurrency=loops)):
+        await node.started.wait()  # the first document's OCR holds a loop
+        second = await services.pipeline.receive(
+            user.id, incoming((SAMPLES / "text.pdf").read_bytes()), filename="b.pdf"
+        )
+
+        async def separated() -> bool:
+            log = await services.documents.processing_log(user.id, second.id)
+            return any(entry.node is Node.SEPARATE for entry in log)
+
+        if loops == 1:
+            await asyncio.sleep(0.3)
+            assert not await separated()
+            return
+        await until(separated, timeout=2)
+        log = await services.documents.processing_log(user.id, first.id)
+        assert Node.OCR not in {entry.node for entry in log}  # still at it
 
 
 async def test_a_failing_loop_keeps_running(monkeypatch: pytest.MonkeyPatch) -> None:

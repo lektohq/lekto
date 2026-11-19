@@ -4,10 +4,17 @@ import asyncio
 import json
 import sqlite3
 from collections import Counter
+from collections.abc import Callable
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
+import httpx2
+import pytest
+
 from lekto_migration import plan as plans
+from lekto_migration.basis import Basis
+from lekto_migration.directory import takes_review_codes
 from tests import fake_lekto
 from tests.conftest import Setup
 
@@ -67,6 +74,46 @@ async def test_a_plan_belongs_to_one_paperless_and_one_lekto(setup: Setup) -> No
     assert await setup.run("check", paperless_url="http://other") == 2
 
 
+@pytest.mark.parametrize("written", ["", "- a list\n", "settings: [\n"])
+async def test_a_plan_file_that_is_no_plan_stops_every_command_alike(
+    setup: Setup, written: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Empty, a list or no YAML at all: a problem of the plan for `plan` too, no traceback
+    (MI-06)."""
+    setup.plan_path.write_text(written, encoding="utf-8")
+    for command in ("plan", "check"):
+        assert await setup.run(command) == 2
+        assert "migration-plan.yaml" in capsys.readouterr().err
+
+
+def answering(status: int, **response: Any) -> Callable[[], httpx2.MockTransport]:
+    return lambda: httpx2.MockTransport(lambda request: httpx2.Response(status, **response))
+
+
+async def test_an_answer_that_is_no_json_stops_with_a_word_not_a_traceback(
+    setup: Setup, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An address that is sent on (`http` to `https`) or a proxy's sign-in page: what went
+    wrong, exit 2 (MI-07)."""
+    real = setup.paperless.transport
+    page = {"text": "<html>Sign in</html>", "headers": {"content-type": "text/html"}}
+    for transport, said in (
+        (answering(301, headers={"location": "https://paperless.example/"}), "sent on to"),
+        (answering(200, **page), "no JSON in the answer (text/html)"),
+    ):
+        setup.paperless.transport = transport  # type: ignore[method-assign]
+        assert await setup.run("plan") == 2
+        assert said in capsys.readouterr().err
+    setup.paperless.transport = real  # type: ignore[method-assign]
+    for transport, said in (
+        (answering(308, headers={"location": "https://lekto.example/"}), "sent on to"),
+        (answering(200, **page), "no JSON in the answer (text/html)"),
+    ):
+        setup.lekto.transport = transport  # type: ignore[method-assign]
+        assert await setup.run("plan") == 2
+        assert said in capsys.readouterr().err
+
+
 async def test_a_plan_with_problems_is_reported(setup: Setup) -> None:
     assert await setup.run("plan") == 0
     setup.edit("tags", "tax", "{to: shelf, name: x}")
@@ -106,7 +153,7 @@ async def test_the_cold_run_says_what_would_happen_and_writes_nothing(setup: Set
 
 
 async def test_the_cold_run_says_who_sees_a_document_beyond_paperless(setup: Setup) -> None:
-    """The plan puts ACME's documents of tobias (10) and anna (12) into one space: each sees
+    """The plan puts ACME's documents of tobias (10) and erika (12) into one space: each sees
     the other's there, which Paperless did not let them."""
     assert await setup.run("plan") == 0
     setup.edit(
@@ -118,10 +165,10 @@ async def test_the_cold_run_says_who_sees_a_document_beyond_paperless(setup: Set
     assert await setup.run("check") == 0
     report = setup.report("check")
     ten, twelve = row(report, 10), row(report, 12)
-    assert ten["becomes"]["members"] == ["anna: edit", "tobias: edit"]
-    assert (ten["becomes"]["beyond"], twelve["becomes"]["beyond"]) == (["anna"], ["tobias"])
+    assert ten["becomes"]["members"] == ["erika: edit", "tobias: edit"]
+    assert (ten["becomes"]["beyond"], twelve["becomes"]["beyond"]) == (["erika"], ["tobias"])
     space = next(a for a in report["actions"] if a["kind"] == "space" and a["name"] == "Energie")
-    assert "anna and tobias see each other's documents in 'Energie'" in space["notes"]
+    assert "erika and tobias see each other's documents in 'Energie'" in space["notes"]
     text = (setup.directory / "reports" / "check.md").read_text()
     assert "## New documents visible beyond Paperless' permissions" in text
     # In their personal spaces only the uploader sees a document.
@@ -129,6 +176,12 @@ async def test_the_cold_run_says_who_sees_a_document_beyond_paperless(setup: Set
     assert await setup.run("check") == 0
     ten = row(setup.report("check"), 10)
     assert (ten["becomes"]["members"], ten["becomes"]["beyond"]) == (["tobias: edit"], [])
+
+
+async def test_a_bound_that_does_not_fit_its_field_stops_the_commands(setup: Setup) -> None:
+    assert await setup.run("plan") == 0
+    setup.edit("documents", "exclude", "{custom_fields: {Due: {from: 2024}}}")
+    assert await setup.run("check") == 2  # a date field: from a day
 
 
 async def test_a_plan_cannot_name_a_shared_space_like_a_personal_one(setup: Setup) -> None:
@@ -158,7 +211,7 @@ async def test_prepare_asks_and_creates_the_master_data(setup: Setup) -> None:
     assert {u["username"] for u in lekto.users.values()} == {
         "root",
         "tobias",
-        "anna",
+        "erika",
         "bob",
         "gone",
     }
@@ -199,17 +252,17 @@ async def test_profiles_are_filled_once_and_never_hold_the_run_back(setup: Setup
     for user in setup.archive.users:
         if user["username"] == "tobias":
             user["email"] = "tobias@mail.example"
-        elif user["username"] == "anna":
-            user["email"] = "anna@localhost"
+        elif user["username"] == "erika":
+            user["email"] = "erika@localhost"
     assert await setup.run("plan") == 0
     assert await setup.run("prepare") == 0
     assert lekto.profiles["u-tobias"]["email"] == "tobias@mail.example"
-    anna = named(lekto.users, "anna")
-    assert anna["display_name"] == "Anna Example"
-    assert not lekto.profiles[anna["id"]]["email"]
+    erika = named(lekto.users, "erika")
+    assert erika["display_name"] == "Erika Mustermann"
+    assert not lekto.profiles[erika["id"]]["email"]
     assert not named(lekto.users, "bob").get("display_name")
     notes = {a["name"]: a["notes"] for a in setup.report("prepare")["actions"]}
-    assert any("refused by Lekto" in note for note in notes["anna"])
+    assert any("refused by Lekto" in note for note in notes["erika"])
     assert any("is taken" in note for note in notes["bob"])
     assert await setup.run("check") == 0
     users = [a for a in setup.report("check")["actions"] if a["kind"] == "user"]
@@ -257,13 +310,13 @@ async def test_the_migration_takes_everything_over(setup: Setup) -> None:
     assert by_title(setup, "Document 12")["space_id"].startswith("personal:")
     shared = by_title(setup, "Document 13")
     space = lekto.spaces[shared["space_id"]]
-    assert space["name"] == "Geteilt: anna (bearbeiten), bob (lesen), tobias (bearbeiten)"
-    anna = named(lekto.users, "anna")["id"]
-    assert shared["uploaded_by"] == anna
-    assert {"user_id": anna, "role": "edit"} in space["members"]
+    assert space["name"] == "Geteilt: bob (lesen), erika (bearbeiten), tobias (bearbeiten)"
+    erika = named(lekto.users, "erika")["id"]
+    assert shared["uploaded_by"] == erika
+    assert {"user_id": erika, "role": "edit"} in space["members"]
     upload = next(u for u in lekto.uploads if u["filename"] == "scan-13.pdf")
     assert upload["channel"] == "migration" and upload["space_id"] == space["id"]
-    assert upload["uploaded_by"] == anna
+    assert upload["uploaded_by"] == erika
     assert json.loads(upload["metadata"])["review"] == []
     report = setup.report("run")
     assert report["document_results"] == {"done": 8, "skipped": 2}
@@ -295,9 +348,42 @@ async def test_a_member_taken_out_of_a_migration_space_stays_out(setup: Setup) -
     bob = named(setup.lekto.users, "bob")
     space["members"] = [m for m in space["members"] if m["user_id"] != bob["id"]]
     writes = len(setup.lekto.writes())
-    assert await setup.run("prepare") == 0  # its uploader anna is in: nothing to do
+    assert await setup.run("prepare") == 0  # its uploader erika is in: nothing to do
     assert len(setup.lekto.writes()) == writes
     assert bob["id"] not in {m["user_id"] for m in space["members"]}
+
+
+async def test_a_field_named_notes_is_aligned_as_any_other(setup: Setup) -> None:
+    """Once the notes field of migrations before the plan, which the alignment left alone: a
+    field the plan names `notes` kept its values after `drop` (MI-11)."""
+    assert await setup.run("plan") == 0
+    setup.edit("custom_fields", "Text", "{to: field, name: notes, create: true}")
+    assert await setup.migrate() == 0
+    notes = named(setup.lekto.fields, "notes")
+    assert by_title(setup, "Document 10")["fields"][notes["id"]] == "Hello"
+    setup.edit("custom_fields", "Text", "drop")
+    assert await setup.run("run") == 0
+    assert notes["id"] not in by_title(setup, "Document 10")["fields"]
+
+
+async def test_check_shows_the_alignment_run_makes(
+    setup: Setup, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both stand on one `Basis`: the same base and the same wish for every document (MI-09)."""
+    assert await setup.migrate() == 0
+    setup.edit("custom_fields", "Count", "drop")
+    seen: list[str] = []
+    real = Basis.align
+
+    def spying(self: Basis, base: dict[str, Any], details: dict[str, Any], resolved: Any) -> Any:
+        seen.append(json.dumps([base, self.want(resolved)], sort_keys=True))
+        return real(self, base, details, resolved)
+
+    monkeypatch.setattr(Basis, "align", spying)
+    assert await setup.run("check") == 0
+    checked, seen[:] = sorted(seen), []
+    assert await setup.run("run") == 0
+    assert sorted(seen) == checked and checked
 
 
 async def test_a_changed_plan_aligns_what_was_migrated(setup: Setup) -> None:
@@ -322,6 +408,23 @@ async def test_a_changed_plan_aligns_what_was_migrated(setup: Setup) -> None:
     assert "Count" not in {setup.lekto.fields[k]["name"] for k in first["fields"]}
     aligned = [body for _, body in setup.lekto.aligned]
     assert any("topic_id" in body for body in aligned)
+    assert await setup.run("check") == 0
+    assert row(setup.report("check"), 10)["status"] == "same"
+
+
+async def test_a_topic_without_a_contact_is_not_taken_over(setup: Setup) -> None:
+    """Lekto keeps a topic only with a contact: it refused the alignment at every run (MI-04)."""
+    assert await setup.run("plan") == 0
+    setup.edit("correspondents", "ACME Energy", "drop")
+    setup.edit("tags", "tax", "{to: topic, name: Taxes, create: true}")
+    assert await setup.run("check") == 0, setup.report("check")["problems"]
+    note = (
+        "topic 'Taxes' is not taken over: a topic is one of the contact's, and the document "
+        "has none"
+    )
+    assert note in row(setup.report("check"), 10)["notes"]
+    assert await setup.migrate() == 0, setup.messages
+    assert by_title(setup, "Document 10")["topic_id"] is None
     assert await setup.run("check") == 0
     assert row(setup.report("check"), 10)["status"] == "same"
 
@@ -536,9 +639,9 @@ async def test_the_same_file_is_a_duplicate_wherever_it_lies(setup: Setup) -> No
     """Every file exists once per installation: a copy is a duplicate also for a user who
     cannot see the document that holds it."""
     assert await setup.migrate() == 0
-    twelve = setup.archive.documents[2]  # anna's, in her personal space
+    twelve = setup.archive.documents[2]  # erika's, in her personal space
     setup.archive.documents += [
-        {**twelve, "id": 30, "title": "Anna's copy"},
+        {**twelve, "id": 30, "title": "Erika's copy"},
         {**twelve, "id": 31, "title": "Bob's copy", "owner": 3},
     ]
     setup.archive.files[30] = setup.archive.files[31] = setup.archive.files[12]
@@ -552,8 +655,8 @@ async def test_the_same_file_is_a_duplicate_wherever_it_lies(setup: Setup) -> No
 
 
 async def test_a_copy_of_another_users_document_leaves_it_as_it_is(setup: Setup) -> None:
-    """tobias may change anna's document 13 in Paperless and has a copy of his own: Lekto
-    finds the file in the space he edits, and that document stays anna's, where it is."""
+    """tobias may change erika's document 13 in Paperless and has a copy of his own: Lekto
+    finds the file in the space he edits, and that document stays erika's, where it is."""
     assert await setup.migrate() == 0
     thirteen = next(d for d in setup.archive.documents if d["id"] == 13)
     original = row(setup.report("run"), 13)["lekto_id"]
@@ -622,17 +725,31 @@ async def test_a_group_of_the_same_name_is_no_tag(setup: Setup) -> None:
     assert sorted(t.get("scope", "document") for t in tags) == ["contact", "document"]
 
 
-async def test_reviews_go_with_their_codes_where_lekto_takes_them(setup: Setup) -> None:
+@pytest.mark.parametrize("takes", [True, False])
+async def test_reviews_go_with_their_codes_where_lekto_takes_them(
+    setup: Setup, takes: bool
+) -> None:
     assert await setup.run("plan") == 0
     setup.edit("tags", "tax", "{to: tag, name: tax, create: true, review: true}")
-
-    def reviews() -> list[dict[str, Any]]:
-        return [
-            review
-            for upload in setup.lekto.uploads
-            for review in json.loads(upload.get("metadata", "{}")).get("review", [])
-        ]
-
-    setup.lekto.review_codes = False  # a Lekto from before the codes refuses them
+    setup.lekto.review_codes = takes  # a Lekto from before the codes refuses them
     assert await setup.migrate() == 0, setup.messages
-    assert reviews() and all("code" not in review for review in reviews())
+    reviews = [
+        review
+        for upload in setup.lekto.uploads
+        for review in json.loads(upload.get("metadata", "{}")).get("review", [])
+    ]
+    assert reviews
+    if takes:
+        assert {(review["code"], review["params"]["name"]) for review in reviews} == {
+            ("paperless_tag_review", "tax")
+        }
+    else:
+        assert all("code" not in review for review in reviews)
+
+
+def test_lekto_takes_the_codes_of_reviews_by_its_openapi_document() -> None:
+    """By the document Lekto serves (`web/openapi.json`, written from it): the upload's
+    metadata are a form field, so the reasons it knows tell, not a schema (MI-01)."""
+    document = json.loads((Path(__file__).parents[2] / "web" / "openapi.json").read_text())
+    assert takes_review_codes(document["x-reasons"])
+    assert not takes_review_codes({"text": {}, "error": {}})

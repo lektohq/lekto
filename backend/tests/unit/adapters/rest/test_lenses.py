@@ -1,6 +1,9 @@
 """`/lenses`: a user's saved looks at the documents over the API."""
 
+from uuid import uuid4
+
 from lekto.adapters.inbound.rest import PREFIX
+from lekto.core.domain.lenses import MAX_FILTER_VALUES
 from tests.api import auth
 from tests.unit.adapters.rest.support import Api, post
 
@@ -95,3 +98,20 @@ async def test_lenses_that_do_not_fit_are_refused(api: Api) -> None:
         assert response.status_code == status, (body, response.text)
     order = await api.client.put(f"{PREFIX}/lenses/order", json={"ids": []}, headers=auth(user))
     assert order.status_code == 422
+
+
+async def test_a_lens_holds_no_more_values_than_the_list_takes(api: Api) -> None:
+    """What a lens holds, the documents list opens: one more value of a kind is refused."""
+    user = await api.user()
+    most = [str(uuid4()) for _ in range(MAX_FILTER_VALUES)]
+    saved = await post(
+        api, "/lenses", {"name": "Many", "filter": {"contact_ids": most}}, auth(user)
+    )
+    assert saved["filter"]["contact_ids"] == most
+    listed = await api.client.get(
+        f"{PREFIX}/documents", params=[("contact_id", id) for id in most], headers=auth(user)
+    )
+    assert listed.status_code == 200, listed.text
+    more = {"name": "More", "filter": {"contact_ids": [*most, str(uuid4())]}}
+    refused = await api.client.post(f"{PREFIX}/lenses", json=more, headers=auth(user))
+    assert refused.status_code == 422

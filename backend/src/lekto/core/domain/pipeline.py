@@ -394,8 +394,15 @@ class Processing:
         self.nodes = {node: self.nodes[node] for node in NODES}
         if self.run < 1:
             raise ValidationError("run starts at 1")
-        if (self.status is ProcessingStatus.COMPLETED) == self.is_open():
-            raise ValidationError("exactly the completed processing has no open node")
+        open_nodes = self.is_open()
+        if self.status is ProcessingStatus.COMPLETED and open_nodes:
+            raise ValidationError("completed processing has no open node")
+        if not open_nodes and self.status not in (
+            ProcessingStatus.COMPLETED,
+            ProcessingStatus.FAILED,
+        ):
+            # Failed with none open: filing, the last node, failed.
+            raise ValidationError("processing without an open node is completed or failed")
         if self.status is ProcessingStatus.FAILED and not self.failed():
             raise ValidationError("failed processing names a failed node")
         if self.status is ProcessingStatus.REVIEW and not self.nodes[Node.FILE].open:

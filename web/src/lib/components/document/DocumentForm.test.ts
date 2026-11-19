@@ -505,9 +505,9 @@ describe('DocumentForm', () => {
 	});
 
 	describe('the filing box', () => {
-		const ANNA = '0199a6c4-0000-7000-8000-000000000002';
+		const ERIKA = '0199a6c4-0000-7000-8000-000000000002';
 		const MINE = '0199a6c4-0000-7000-8000-0000000000d3';
-		const ANNAS = '0199a6c4-0000-7000-8000-0000000000d2';
+		const ERIKAS = '0199a6c4-0000-7000-8000-0000000000d2';
 		const household = {
 			...lookup,
 			spaces: [
@@ -525,13 +525,13 @@ describe('DocumentForm', () => {
 					role: 'edit',
 					members: [
 						{ user_id: OWNER, role: 'edit', username: 'tobi', active: true },
-						{ user_id: ANNA, role: 'read', username: 'anna', active: true }
+						{ user_id: ERIKA, role: 'read', username: 'erika', active: true }
 					]
 				}
 			],
 			users: [
 				{ id: OWNER, username: 'tobi', role: 'user', personal_space_id: MINE },
-				{ id: ANNA, username: 'anna', role: 'user', personal_space_id: ANNAS }
+				{ id: ERIKA, username: 'erika', role: 'user', personal_space_id: ERIKAS }
 			]
 		} as unknown as Lookup;
 		const waitingOn = (fields: Record<string, unknown>) =>
@@ -561,10 +561,10 @@ describe('DocumentForm', () => {
 		});
 		const handingOver = waitingOn({
 			reason: 'suggests another space, which shows it to more people',
-			suggestion: ANNAS,
+			suggestion: ERIKAS,
 			candidates: [
 				{
-					value: ANNAS,
+					value: ERIKAS,
 					label: "another user's personal space",
 					contradicted: true,
 					sources: [{ signal: 'signal_llm', names: true, recipient: true }]
@@ -579,7 +579,7 @@ describe('DocumentForm', () => {
 		});
 		const disagreeing = waitingOn({
 			reason: 'the signals name different spaces',
-			unseen_by: [ANNA],
+			unseen_by: [ERIKA],
 			candidates: [
 				{
 					value: SPACE,
@@ -634,9 +634,9 @@ describe('DocumentForm', () => {
 			expect(screen.getByText(m.filing_lead_move({ space: 'Haushalt' }))).toBeTruthy();
 			const option = radio(m.filing_move({ space: 'Haushalt' })) as HTMLInputElement;
 			expect(option.checked).toBe(true);
-			expect(screen.getByText(m.filing_new_readers({ names: 'anna' }))).toBeTruthy();
+			expect(screen.getByText(m.filing_new_readers({ names: 'erika' }))).toBeTruthy();
 			expect(screen.getByTestId('filing-hint').textContent).toContain(
-				m.filing_hint_move_readers({ space: 'Haushalt', names: 'anna' })
+				m.filing_hint_move_readers({ space: 'Haushalt', names: 'erika' })
 			);
 			await userEvent.click(confirmButton());
 			expect(await fetchMock.mock.calls[0][0].json()).toEqual({
@@ -669,18 +669,18 @@ describe('DocumentForm', () => {
 				DocumentForm,
 				props({ document: mine(), review: handingOver, lookup: household, next: null })
 			);
-			expect(screen.getByText(m.filing_lead_hand_over({ name: 'anna' }))).toBeTruthy();
-			expect((radio(m.move_hand_over({ name: 'anna' })) as HTMLInputElement).checked).toBe(true);
-			expect(screen.getByText(m.filing_chip_recipient({ name: 'anna' }))).toBeTruthy();
+			expect(screen.getByText(m.filing_lead_hand_over({ name: 'erika' }))).toBeTruthy();
+			expect((radio(m.move_hand_over({ name: 'erika' })) as HTMLInputElement).checked).toBe(true);
+			expect(screen.getByText(m.filing_chip_recipient({ name: 'erika' }))).toBeTruthy();
 			expect(screen.getByText(m.filing_chip_neighbours({ votes: 5, found: 5 }))).toBeTruthy();
-			expect(screen.getByText(m.filing_hand_over_consequence({ name: 'anna' }))).toBeTruthy();
+			expect(screen.getByText(m.filing_hand_over_consequence({ name: 'erika' }))).toBeTruthy();
 			expect(screen.getByTestId('filing-hint').textContent).toContain(
-				m.filing_hint_hand_over({ name: 'anna' })
+				m.filing_hint_hand_over({ name: 'erika' })
 			);
 			await userEvent.click(confirmButton());
 			expect(await fetchMock.mock.calls[0][0].json()).toMatchObject({ accept_suggestions: true });
 			await waitFor(() =>
-				expect(success).toHaveBeenCalledWith(m.move_handed_over({ name: 'anna' }))
+				expect(success).toHaveBeenCalledWith(m.move_handed_over({ name: 'erika' }))
 			);
 		});
 
@@ -697,7 +697,7 @@ describe('DocumentForm', () => {
 			).toBe(true);
 			expect(screen.getByText(m.filing_chip_neighbours({ votes: 4, found: 5 }))).toBeTruthy();
 			expect(screen.getByTestId('filing-unseen').textContent).toContain(
-				m.space_named_unseen({ names: 'anna' })
+				m.space_named_unseen({ names: 'erika' })
 			);
 			expect(screen.getByTestId('filing-hint').textContent).toContain(m.filing_choose_first());
 			expect(confirmButton().disabled).toBe(true);
@@ -751,16 +751,16 @@ describe('DocumentForm', () => {
 			await choose(
 				userEvent.setup({ pointerEventsCheck: 0 }),
 				screen.getByRole('combobox', { name: m.filing_other() }),
-				ANNAS
+				ERIKAS
 			);
 			expect((radio(m.filing_other()) as HTMLInputElement).checked).toBe(true);
 			expect(screen.getByTestId('filing-hint').textContent).toContain(
-				m.filing_hint_hand_over({ name: 'anna' })
+				m.filing_hint_hand_over({ name: 'erika' })
 			);
 			await userEvent.click(confirmButton());
 			await waitFor(() => expect(onconfirmed).toHaveBeenCalledWith(null));
-			expect(await fetchMock.mock.calls[0][0].json()).toMatchObject({ space_id: ANNAS });
-			expect(success).toHaveBeenCalledWith(m.move_handed_over({ name: 'anna' }));
+			expect(await fetchMock.mock.calls[0][0].json()).toMatchObject({ space_id: ERIKAS });
+			expect(success).toHaveBeenCalledWith(m.move_handed_over({ name: 'erika' }));
 		});
 
 		it('shows where a settled document lies, who sees it, and moves it on request', async () => {
@@ -774,7 +774,7 @@ describe('DocumentForm', () => {
 			const calm = screen.getByTestId('filing-calm');
 			expect(within(calm).getByText('Haushalt')).toBeTruthy();
 			expect(within(calm).getByText(m.filing_you_edit())).toBeTruthy();
-			expect(within(calm).getByText(m.filing_member_read({ name: 'anna' }))).toBeTruthy();
+			expect(within(calm).getByText(m.filing_member_read({ name: 'erika' }))).toBeTruthy();
 			expect(within(calm).getByText(m.filing_uploader_you({ name: 'tobi' }))).toBeTruthy();
 			expect(within(calm).queryByText(m.filing_decided_lekto())).toBeNull();
 			await userEvent.click(within(calm).getByRole('button', { name: m.filing_move_action() }));
@@ -808,7 +808,7 @@ describe('DocumentForm', () => {
 				})
 			);
 			const calm = screen.getByTestId('filing-calm');
-			expect(within(calm).getByText(m.filing_member_read_later({ name: 'anna' }))).toBeTruthy();
+			expect(within(calm).getByText(m.filing_member_read_later({ name: 'erika' }))).toBeTruthy();
 			expect(within(calm).getByText(m.filing_decided_lekto())).toBeTruthy();
 		});
 
@@ -823,7 +823,7 @@ describe('DocumentForm', () => {
 							check('space', {
 								outcome: 'ok',
 								reason: 'names someone who would not see it there',
-								unseen_by: [ANNA]
+								unseen_by: [ERIKA]
 							})
 						]
 					}
@@ -831,7 +831,7 @@ describe('DocumentForm', () => {
 			} as unknown as Review;
 			render(DocumentForm, props({ document: mine('green'), review: settled, lookup: household }));
 			expect(screen.getByTestId('filing-unseen').textContent).toContain(
-				m.space_named_unseen({ names: 'anna' })
+				m.space_named_unseen({ names: 'erika' })
 			);
 		});
 	});

@@ -1,5 +1,8 @@
+import threading
+
 import pytest
 
+from lekto.core.domain import names
 from lekto.core.domain.documents import DocumentChanges
 from lekto.core.domain.errors import (
     ConflictError,
@@ -240,6 +243,36 @@ async def test_required_fields_and_title_patterns(world: World) -> None:
         await service.change_field(admin.id, period.id, required=True)
 
 
+async def test_names_are_compared_outside_the_event_loop_and_only_when_they_change(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every contact's names against each other take a while with thousands; an identifier
+    changes no name (SB-07)."""
+    threads: list[int] = []
+    key = names.match_key
+
+    def keyed(name: str) -> str:
+        threads.append(threading.get_ident())
+        return key(name)
+
+    admin = await world.user(role=Role.ADMIN)
+    service = world.master_data
+    nord = await service.create_contact(admin.id, "Nord Versicherungsgruppe")
+    await service.create_contact(admin.id, "Muster Bank", ["Muster"])
+    monkeypatch.setattr(master_data, "match_key", keyed)
+    renamed = await service.change_contact(admin.id, nord.id, aliases=["Nord Leben"])
+    assert renamed.aliases == ["Nord Leben"] and threads
+    with pytest.raises(ConflictError):
+        await service.change_contact(admin.id, nord.id, aliases=["Muster AG"])  # too close
+    async with world.uow() as uow:
+        assert await learn_alias(uow, nord.id, "Nord Kranken", threshold=SUGGEST) is not None
+    assert threading.get_ident() not in threads
+    threads.clear()
+    number = Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "12345")
+    await service.add_identifier(admin.id, nord.id, number)
+    assert threads == []
+
+
 async def test_learn_alias(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
@@ -339,7 +372,7 @@ async def test_only_unused_master_data_is_deleted_by_admins(world: World) -> Non
     unused = await world.master_data.create_tag(admin.id, "unused")
     document = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 x"), filename="x.pdf")
     await world.drain()
-    await world.documents.update_metadata(
+    await world.documents.change_metadata(
         owner.id,
         document.id,
         DocumentChanges(contact_id=contact.id, tag_ids=frozenset({tag.id})),
@@ -370,7 +403,7 @@ async def test_field_definitions_change_without_breaking_values(world: World) ->
     )
     document = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 x"), filename="x.pdf")
     await world.drain()
-    await world.documents.update_metadata(
+    await world.documents.change_metadata(
         owner.id,
         document.id,
         DocumentChanges(document_type_id=invoice.id, fields={kind.id: "a"}),
@@ -485,7 +518,7 @@ async def test_a_tag_is_deleted_only_without_tags_below_it_and_unused(world: Wor
         await uow.commit()
     document = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 x"), filename="x.pdf")
     await world.drain()
-    await world.documents.update_metadata(
+    await world.documents.change_metadata(
         owner.id, document.id, DocumentChanges(tag_ids=frozenset({used.id}))
     )
     for tag, reason in (
@@ -525,18 +558,22 @@ async def test_documents_carry_document_tags_normalised(world: World) -> None:
     document = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 x"), filename="x.pdf")
     await world.drain()
     with pytest.raises(ValidationError, match="not a document tag"):
-        await world.documents.update_metadata(
+        await world.documents.change_metadata(
             owner.id, document.id, DocumentChanges(tag_ids=frozenset({group.id}))
         )
-    changed = await world.documents.update_metadata(
-        owner.id,
-        document.id,
-        DocumentChanges(tag_ids=frozenset({insurance.id, health.id, paid.id})),
-    )
+    changed = (
+        await world.documents.change_metadata(
+            owner.id,
+            document.id,
+            DocumentChanges(tag_ids=frozenset({insurance.id, health.id, paid.id})),
+        )
+    ).document
     assert changed.tag_ids == {health.id, paid.id}
-    parent_only = await world.documents.update_metadata(
-        owner.id, document.id, DocumentChanges(tag_ids=frozenset({insurance.id}))
-    )
+    parent_only = (
+        await world.documents.change_metadata(
+            owner.id, document.id, DocumentChanges(tag_ids=frozenset({insurance.id}))
+        )
+    ).document
     assert parent_only.tag_ids == {insurance.id}
 
 
@@ -669,16 +706,16 @@ async def test_a_document_type_comes_with_its_fields_or_not_at_all(world: World)
 async def test_holders_of_an_identifier_are_those_the_caller_sees(world: World) -> None:
     """Whose an identifier is, in the service for REST and MCP alike (review 0.12.2, A-12): a
     value as written finds its normal form; a person's number only for admins and the person."""
-    admin, anna, bob = (
+    admin, erika, bob = (
         await world.user(role=Role.ADMIN),
-        await world.user("anna"),
+        await world.user("erika"),
         await world.user("bob"),
     )
     utility = await world.master_data.create_contact(admin.id, "Stadtwerke")
     employer = await world.master_data.create_contact(admin.id, "Arbeitgeber")
     kind = IdentifierKind.CUSTOMER_NUMBER
     async with world.uow() as uow:
-        for contact, number, user in ((utility, "KD20047718", None), (employer, "P4711", anna.id)):
+        for contact, number, user in ((utility, "KD12345678", None), (employer, "P4711", erika.id)):
             stored = await uow.contacts.get(contact.id)
             stored.set_identifiers([Identifier(kind, number, user_id=user)])
             await uow.contacts.update(stored)
@@ -689,7 +726,7 @@ async def test_holders_of_an_identifier_are_those_the_caller_sees(world: World) 
             contact.name for contact in await world.master_data.holders_of(user.id, kind, written)
         ]
 
-    assert await holders(bob, " kd-20 047 718 ") == ["Stadtwerke"]
+    assert await holders(bob, " kd-12 345 678 ") == ["Stadtwerke"]
     assert await holders(admin, "p-4711") == ["Arbeitgeber"]
-    assert await holders(anna, "p-4711") == ["Arbeitgeber"]
+    assert await holders(erika, "p-4711") == ["Arbeitgeber"]
     assert await holders(bob, "p-4711") == []

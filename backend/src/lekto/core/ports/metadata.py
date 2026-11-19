@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import Protocol
 
 
@@ -39,7 +40,8 @@ class MetadataReader(Protocol):
 
     Reading runs outside the event loop (adapters use a thread)."""
 
-    async def read_metadata(self, data: bytes) -> FileMetadata:
-        """The metadata of the file `data`. UnprocessableDocumentError if it cannot be read
-        (damaged, encrypted, of no supported kind)."""
+    async def read_metadata(self, source: Path) -> FileMetadata:
+        """The metadata of the file at `source`, read from the file, not held in memory (an
+        original may be as large as an upload; SB-09). UnprocessableDocumentError if it cannot
+        be read (damaged, encrypted, of no supported kind)."""
         ...

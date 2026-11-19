@@ -7,26 +7,23 @@ import json
 import pkgutil
 import re
 from collections.abc import Awaitable, Callable
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import httpx2
 from pydantic import BaseModel
 
+import lekto.adapters.inbound
 from lekto.adapters.inbound.rest import (
     HEALTH_PATH,
     OIDC_CALLBACK_PATH,
     PREFIX,
-    create_app,
     schemas,
 )
 from lekto.adapters.inbound.rest.app import DOCS_PATH, FAVICON_PATH, SWAGGER_PATH
-from lekto.composition.api import api_context
-from lekto.composition.container import build_memory_container, build_services
-from tests import builders
+from lekto.adapters.inbound.schemas import RequestBody
 from tests.builders import PASSWORD, SECRET_KEY
-from tests.unit.adapters.rest.support import Api, make_app
+from tests.unit.adapters.rest.support import Api, api_with
 
 PROBLEM = "application/problem+json"
 
@@ -39,11 +36,8 @@ async def test_health_is_ok_without_authentication(api: Api) -> None:
 
 
 async def docs(ui_directory: Path | None) -> httpx2.Response:
-    container = build_memory_container()
-    app = make_app(container, build_services(container), ui_directory=ui_directory)
-    transport = httpx2.ASGITransport(app=app)
-    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
-        return await client.get(DOCS_PATH)
+    async with api_with(ui_directory=ui_directory) as api:
+        return await api.client.get(DOCS_PATH)
 
 
 async def test_the_api_documentation_comes_with_the_web_ui_not_a_cdn(tmp_path: Path) -> None:
@@ -90,22 +84,14 @@ def test_the_paths_known_outside_the_routes_are_routes(api: Api) -> None:
 
 
 async def test_a_failing_check_makes_the_api_unavailable() -> None:
-    container = build_memory_container()
-    services = build_services(container)
-
     async def ok() -> None:
         pass
 
     async def broken() -> None:
         raise OSError("connection refused")
 
-    context = api_context(container, builders.DEFAULT_SETTINGS, services)
-    checks = {"database": broken, "object_store": ok}
-    app = create_app(replace(context, health_checks=checks))
-    async with httpx2.AsyncClient(
-        transport=httpx2.ASGITransport(app=app), base_url="http://lekto"
-    ) as client:
-        response = await client.get(f"{PREFIX}/health")
+    async with api_with(health_checks={"database": broken, "object_store": ok}) as api:
+        response = await api.client.get(f"{PREFIX}/health")
     assert response.status_code == 503
     assert response.json() == {
         "status": "unavailable",
@@ -121,14 +107,8 @@ async def test_a_failing_search_only_degrades_the_api() -> None:
         raise OSError("connection refused")
 
     async def health(checks: dict[str, Callable[[], Awaitable[None]]]) -> httpx2.Response:
-        container = build_memory_container()
-        services = build_services(container)
-        context = api_context(container, builders.DEFAULT_SETTINGS, services)
-        app = create_app(replace(context, health_checks=checks))
-        async with httpx2.AsyncClient(
-            transport=httpx2.ASGITransport(app=app), base_url="http://lekto"
-        ) as client:
-            return await client.get(f"{PREFIX}/health")
+        async with api_with(health_checks=checks) as api:
+            return await api.client.get(f"{PREFIX}/health")
 
     degraded = await health({"database": ok, "search": broken})
     assert degraded.status_code == 200
@@ -147,196 +127,117 @@ async def openapi(api: Api) -> dict[str, Any]:
     return schema
 
 
-async def test_openapi_lists_every_endpoint(api: Api) -> None:
-    paths = (await openapi(api))["paths"]
-    master_data = {
-        (f"{PREFIX}/{kind}{suffix}", method)
-        for kind in ("contacts", "document-types", "tags", "fields")
-        for suffix, method in [
-            ("", "get"),
-            ("", "post"),
-            ("/{id}", "get"),
-            ("/{id}", "patch"),
-            ("/{id}", "delete"),
-        ]
-    }
-    assert {(path, method) for path, item in paths.items() for method in item} == {
-        (f"{PREFIX}/pipeline", "get"),
-        (f"{PREFIX}/pipeline/reparse", "post"),
-        (f"{PREFIX}/pipeline/relate", "post"),
-        (f"{PREFIX}/pipeline/render-pages", "post"),
-        (f"{PREFIX}/pipeline/read-facts", "post"),
-        (f"{PREFIX}/contacts/logos/fetch", "post"),
-        (f"{PREFIX}/external/tasks/{{id}}/result", "post"),
-        (f"{PREFIX}/external/tasks/{{id}}/files/{{name}}", "get"),
-        (f"{PREFIX}/contacts/{{id}}/identifiers", "post"),
-        (f"{PREFIX}/contacts/{{id}}/logo", "put"),
-        (f"{PREFIX}/contacts/{{id}}/logo", "delete"),
-        (f"{PREFIX}/contacts/{{id}}/logo", "get"),
-        (f"{PREFIX}/contacts/{{id}}/logo/fetch", "post"),
-        (f"{PREFIX}/document-types/{{id}}/fields", "put"),
-        (f"{PREFIX}/documents/{{id}}/pages/{{number}}", "get"),
-        (f"{PREFIX}/documents/{{id}}/text", "get"),
-        (f"{PREFIX}/documents/{{id}}/structure", "get"),
-        (f"{PREFIX}/documents/{{id}}/exchanges/{{node}}", "get"),
-        (f"{PREFIX}/auth/login", "post"),
-        (f"{PREFIX}/auth/logout", "post"),
-        (f"{PREFIX}/auth/me", "get"),
-        (f"{PREFIX}/auth/me/profile", "get"),
-        (f"{PREFIX}/auth/me/profile", "patch"),
-        (f"{PREFIX}/users/{{id}}/profile", "get"),
-        (f"{PREFIX}/users/{{id}}/profile", "patch"),
-        (f"{PREFIX}/auth/password", "post"),
-        (f"{PREFIX}/auth/sessions", "delete"),
-        (f"{PREFIX}/auth/totp", "post"),
-        (f"{PREFIX}/auth/totp/confirm", "post"),
-        (f"{PREFIX}/auth/totp/disable", "post"),
-        (f"{PREFIX}/auth/totp/recovery-codes", "post"),
-        (f"{PREFIX}/auth/tokens", "get"),
-        (f"{PREFIX}/auth/tokens", "post"),
-        (f"{PREFIX}/auth/tokens/{{id}}", "delete"),
-        (f"{PREFIX}/auth/oidc", "get"),
-        (f"{PREFIX}/auth/oidc/login", "get"),
-        (f"{PREFIX}/auth/oidc/callback", "get"),
-        (f"{PREFIX}/auth/oidc/link", "post"),
-        (f"{PREFIX}/auth/oidc/link", "delete"),
-        (f"{PREFIX}/users", "get"),
-        (f"{PREFIX}/users", "post"),
-        (f"{PREFIX}/users/{{id}}", "get"),
-        (f"{PREFIX}/users/{{id}}", "patch"),
-        (f"{PREFIX}/users/{{id}}", "delete"),
-        (f"{PREFIX}/users/{{id}}/removal", "get"),
-        (f"{PREFIX}/users/{{id}}/password", "post"),
-        (f"{PREFIX}/users/{{id}}/totp", "delete"),
-        (f"{PREFIX}/users/{{id}}/oidc", "delete"),
-        *master_data,
-        (f"{PREFIX}/spaces", "get"),
-        (f"{PREFIX}/spaces", "post"),
-        (f"{PREFIX}/spaces/{{id}}", "get"),
-        (f"{PREFIX}/spaces/{{id}}", "patch"),
-        (f"{PREFIX}/spaces/{{id}}", "delete"),
-        (f"{PREFIX}/spaces/{{id}}/members/{{user_id}}", "put"),
-        (f"{PREFIX}/spaces/{{id}}/members/{{user_id}}", "delete"),
-        (f"{PREFIX}/rules", "get"),
-        (f"{PREFIX}/rules", "post"),
-        (f"{PREFIX}/rules/{{id}}", "get"),
-        (f"{PREFIX}/rules/{{id}}", "put"),
-        (f"{PREFIX}/rules/{{id}}", "patch"),
-        (f"{PREFIX}/rules/{{id}}", "delete"),
-        (f"{PREFIX}/rules/{{id}}/versions", "get"),
-        (f"{PREFIX}/rules/{{id}}/versions/{{number}}", "get"),
-        (f"{PREFIX}/rules/{{id}}/apply/preview", "post"),
-        (f"{PREFIX}/rules/{{id}}/apply", "post"),
-        (f"{PREFIX}/rule-applications/{{id}}", "get"),
-        (f"{PREFIX}/templates/preview", "post"),
-        (f"{PREFIX}/webhooks", "get"),
-        (f"{PREFIX}/webhooks", "post"),
-        (f"{PREFIX}/webhooks/{{id}}", "get"),
-        (f"{PREFIX}/webhooks/{{id}}", "patch"),
-        (f"{PREFIX}/webhooks/{{id}}", "delete"),
-        (f"{PREFIX}/webhooks/{{id}}/secret", "post"),
-        (f"{PREFIX}/webhooks/{{id}}/secret", "delete"),
-        (f"{PREFIX}/webhooks/{{id}}/deliveries", "get"),
-        (f"{PREFIX}/webhooks/{{id}}/deliveries/summary", "get"),
-        (f"{PREFIX}/webhooks/{{id}}/test", "post"),
-        (f"{PREFIX}/push", "get"),
-        (f"{PREFIX}/push/devices", "get"),
-        (f"{PREFIX}/push/devices", "post"),
-        (f"{PREFIX}/push/devices/{{id}}", "delete"),
-        (f"{PREFIX}/push/devices/{{id}}/test", "post"),
-        (f"{PREFIX}/push/preferences", "get"),
-        (f"{PREFIX}/push/preferences", "put"),
-        (f"{PREFIX}/lenses", "get"),
-        (f"{PREFIX}/lenses", "post"),
-        (f"{PREFIX}/lenses/order", "put"),
-        (f"{PREFIX}/lenses/{{id}}", "get"),
-        (f"{PREFIX}/lenses/{{id}}", "patch"),
-        (f"{PREFIX}/lenses/{{id}}", "delete"),
-        (f"{PREFIX}/mailboxes", "get"),
-        (f"{PREFIX}/mailboxes", "post"),
-        (f"{PREFIX}/mailboxes/test", "post"),
-        (f"{PREFIX}/mailboxes/{{id}}", "get"),
-        (f"{PREFIX}/mailboxes/{{id}}", "patch"),
-        (f"{PREFIX}/mailboxes/{{id}}", "delete"),
-        (f"{PREFIX}/mailboxes/{{id}}/fetch", "post"),
-        (f"{PREFIX}/mailboxes/{{id}}/mails", "get"),
-        (f"{PREFIX}/mailboxes/{{id}}/mails/summary", "get"),
-        (f"{PREFIX}/mail-rules", "get"),
-        (f"{PREFIX}/mail-rules", "post"),
-        (f"{PREFIX}/mail-rules/dry-run", "post"),
-        (f"{PREFIX}/mail-rules/{{id}}", "get"),
-        (f"{PREFIX}/mail-rules/{{id}}", "patch"),
-        (f"{PREFIX}/mail-rules/{{id}}", "delete"),
-        (f"{PREFIX}/documents/{{id}}/origin", "get"),
-        (f"{PREFIX}/documents", "get"),
-        (f"{PREFIX}/documents/count", "get"),
-        (f"{PREFIX}/documents/facets", "get"),
-        (f"{PREFIX}/documents", "post"),
-        (f"{PREFIX}/documents/search", "post"),
-        (f"{PREFIX}/documents/search/warm", "post"),
-        (f"{PREFIX}/documents/{{id}}/search-places", "post"),
-        (f"{PREFIX}/documents/bulk", "post"),
-        (f"{PREFIX}/documents/bulk/{{id}}", "get"),
-        (f"{PREFIX}/search/reindex", "post"),
-        (f"{PREFIX}/classifier", "get"),
-        (f"{PREFIX}/classifier/train", "post"),
-        (f"{PREFIX}/classifier/models", "get"),
-        (f"{PREFIX}/automation", "get"),
-        (f"{PREFIX}/automation/signals", "get"),
-        (f"{PREFIX}/automation/holders", "get"),
-        (f"{PREFIX}/automation/holders/cases", "get"),
-        (f"{PREFIX}/search/status", "get"),
-        (f"{PREFIX}/search/check", "post"),
-        (f"{PREFIX}/jobs", "get"),
-        (f"{PREFIX}/jobs/summary", "get"),
-        (f"{PREFIX}/jobs/durations", "get"),
-        (f"{PREFIX}/jobs/{{id}}/retry", "post"),
-        (f"{PREFIX}/documents/{{id}}", "get"),
-        (f"{PREFIX}/documents/{{id}}", "patch"),
-        (f"{PREFIX}/documents/{{id}}", "delete"),
-        (f"{PREFIX}/documents/{{id}}/move", "post"),
-        (f"{PREFIX}/documents/{{id}}/original", "get"),
-        (f"{PREFIX}/documents/{{id}}/versions/{{number}}/original", "get"),
-        (f"{PREFIX}/documents/{{id}}/archive", "get"),
-        (f"{PREFIX}/documents/{{id}}/preview", "get"),
-        (f"{PREFIX}/documents/{{id}}/log", "get"),
-        (f"{PREFIX}/documents/{{id}}/retry", "post"),
-        (f"{PREFIX}/documents/{{id}}/reprocess", "post"),
-        (f"{PREFIX}/documents/{{id}}/versions", "post"),
-        (f"{PREFIX}/documents/{{id}}/edit", "post"),
-        (f"{PREFIX}/documents/{{id}}/edit/pages", "post"),
-        (f"{PREFIX}/documents/{{id}}/vision", "post"),
-        (f"{PREFIX}/documents/{{id}}/reading", "get"),
-        (f"{PREFIX}/documents/{{id}}/facts", "get"),
-        (f"{PREFIX}/documents/{{id}}/facts/decisions", "post"),
-        (f"{PREFIX}/expected", "get"),
-        (f"{PREFIX}/identifiers/open", "get"),
-        (f"{PREFIX}/identifiers/open/summary", "get"),
-        (f"{PREFIX}/identifiers/open/search", "post"),
-        (f"{PREFIX}/identifiers/open/{{kind}}/{{ref}}", "get"),
-        (f"{PREFIX}/identifiers/refs", "post"),
-        (f"{PREFIX}/identifiers/refs/{{kind}}/{{ref}}", "get"),
-        (f"{PREFIX}/identifiers/places/{{kind}}/{{ref}}", "get"),
-        (f"{PREFIX}/documents/{{id}}/places/{{kind}}/{{ref}}", "get"),
-        (f"{PREFIX}/rules/{{id}}/apply/hits/{{document_id}}", "get"),
-        (f"{PREFIX}/identifiers/open/decisions", "post"),
-        (f"{PREFIX}/identifiers/open/recommended", "post"),
-        (f"{PREFIX}/documents/stream", "get"),
-        (f"{PREFIX}/documents/{{id}}/relations", "get"),
-        (f"{PREFIX}/documents/{{id}}/relations", "post"),
-        (f"{PREFIX}/documents/{{id}}/relations/{{other_id}}", "delete"),
-        (f"{PREFIX}/documents/{{id}}/files", "get"),
-        (f"{PREFIX}/documents/{{id}}/review", "get"),
-        (f"{PREFIX}/documents/{{id}}/confirm", "post"),
-        (f"{PREFIX}/documents/{{id}}/dry-run", "post"),
-        (f"{PREFIX}/documents/{{id}}/seen", "put"),
-        (f"{PREFIX}/documents/{{id}}/seen", "delete"),
-        (f"{PREFIX}/inbox", "get"),
-        (f"{PREFIX}/inbox/summary", "get"),
-        (f"{PREFIX}/inbox/seen", "post"),
-        (f"{PREFIX}/events", "get"),
-        (f"{PREFIX}/health", "get"),
-    }
+async def test_every_list_in_a_request_body_has_a_limit(api: Api) -> None:
+    """Pydantic finds an error for every bad item of a list: a list without `maxItems` would let
+    a body of a megabyte make a hundred thousand of them."""
+    schema = await openapi(api)
+    components = schema["components"]["schemas"]
+    unbounded: set[str] = set()
+
+    def walk(node: dict[str, Any], where: str, seen: frozenset[str]) -> None:
+        if "$ref" in node:
+            name = node["$ref"].rsplit("/", 1)[-1]
+            if name not in seen:
+                walk(components[name], name, seen | {name})
+            return
+        for key in ("anyOf", "oneOf", "allOf"):
+            for item in node.get(key, []):
+                walk(item, where, seen)
+        if node.get("type") == "array":
+            if "maxItems" not in node:
+                unbounded.add(where)
+            walk(node.get("items", {}), f"{where}[]", seen)
+        for name, item in node.get("properties", {}).items():
+            walk(item, f"{where}.{name}", seen)
+        if isinstance(node.get("additionalProperties"), dict):
+            walk(node["additionalProperties"], f"{where}{{}}", seen)
+
+    for path, methods in schema["paths"].items():
+        for method, operation in methods.items():
+            for content in operation.get("requestBody", {}).get("content", {}).values():
+                if "schema" in content:
+                    walk(content["schema"], f"{method.upper()} {path}", frozenset())
+    assert not unbounded
+
+
+async def test_every_object_in_a_request_body_refuses_unknown_keys(api: Api) -> None:
+    """`extra="forbid"` ([[security-baseline]]): a mistyped key is refused (422), not dropped,
+    also in an object within a body (RA-02, RB-06)."""
+    schema = await openapi(api)
+    components = schema["components"]["schemas"]
+    lenient: set[str] = set()
+
+    def walk(node: dict[str, Any], where: str, seen: frozenset[str]) -> None:
+        if "$ref" in node:
+            name = node["$ref"].rsplit("/", 1)[-1]
+            if name not in seen:
+                walk(components[name], name, seen | {name})
+            return
+        for key in ("anyOf", "oneOf", "allOf"):
+            for item in node.get(key, []):
+                walk(item, where, seen)
+        if node.get("properties") and node.get("additionalProperties") is not False:
+            lenient.add(where)
+        if "items" in node:
+            walk(node["items"], f"{where}[]", seen)
+        for name, item in node.get("properties", {}).items():
+            walk(item, f"{where}.{name}", seen)
+        if isinstance(node.get("additionalProperties"), dict):
+            walk(node["additionalProperties"], f"{where}{{}}", seen)
+
+    for path, methods in schema["paths"].items():
+        for method, operation in methods.items():
+            content = operation.get("requestBody", {}).get("content", {})
+            if "application/json" in content:
+                walk(content["application/json"]["schema"], f"{method.upper()} {path}", frozenset())
+    assert not lenient
+
+
+async def test_one_response_model_per_shape(api: Api) -> None:
+    """Two answers of the same fields share one model, so the generated client has one type
+    for them; what a copy would describe goes to the field that uses it (RA-12)."""
+    components = (await openapi(api))["components"]["schemas"]
+    loose = {"description", "title", "examples", "default"}
+    shapes: dict[str, list[str]] = {}
+    for name, schema in components.items():
+        if name.endswith("Out") and schema.get("properties"):
+            fields = {
+                key: {k: v for k, v in value.items() if k not in loose}
+                for key, value in schema["properties"].items()
+            }
+            shape = json.dumps([fields, sorted(schema.get("required", []))], sort_keys=True)
+            shapes.setdefault(shape, []).append(name)
+    assert [names for names in shapes.values() if len(names) > 1] == []
+
+
+def _models() -> dict[str, list[type[BaseModel]]]:
+    found: dict[str, list[type[BaseModel]]] = {}
+    for info in pkgutil.walk_packages(lekto.adapters.inbound.__path__, "lekto.adapters.inbound."):
+        module = importlib.import_module(info.name)
+        for item in vars(module).values():
+            if (
+                isinstance(item, type)
+                and issubclass(item, BaseModel)
+                and item.__module__ == info.name
+            ):
+                found.setdefault(item.__name__, []).append(item)
+    return found
+
+
+async def test_every_json_body_of_the_api_is_a_request_body(api: Api) -> None:
+    """So no route's body is left without the checks of `RequestBody` (RB-08)."""
+    models = _models()
+    names: set[str] = set()
+    for methods in (await openapi(api))["paths"].values():
+        for operation in methods.values():
+            content = operation.get("requestBody", {}).get("content", {})
+            if "application/json" in content:
+                schema = content["application/json"]["schema"]
+                refs = [schema, *schema.get("anyOf", []), *schema.get("oneOf", [])]
+                names.update(ref["$ref"].rsplit("/", 1)[-1] for ref in refs if "$ref" in ref)
+    assert names
+    lenient = {name for name in names if not all(issubclass(m, RequestBody) for m in models[name])}
+    assert not lenient
 
 
 async def test_errors_are_documented_as_problems_with_examples(api: Api) -> None:

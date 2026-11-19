@@ -11,25 +11,41 @@ which process documents of unknown origin, have no use for them. What a child ne
 
 A child may get a limit of its address space (`memory`, `LEKTO_CHILD_MAX_MEMORY`), which the
 programs it starts inherit: a document built to make them allocate without end fails the child,
-not the worker. The limit is set right after the start (`prlimit`), not in the child before it
-runs: that hook is not safe in a process with threads. The child is then still starting its
-interpreter, long before it starts a program of its own.
+not the worker. A short Python prelude (`_LIMITED`) sets it in the child and then becomes the
+program (`exec`): the limit holds from the program's first instruction. Set from the parent
+after the start (`prlimit`), it came late on a busy machine, and a child allocated without it;
+set before the start in the parent's fork (`preexec_fn`), it would not be safe in a process
+with threads. Where the process's own hard limit is lower (a container's `--ulimit as=`), the
+child gets that one: it cannot be raised.
 """
 
 import asyncio
 import contextlib
 import os
-import resource
+import shutil
 import signal
+import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 
 # Output kept for error messages, unless the caller asks for more (`tail`).
 TAIL = 4000
+# Bytes of the error output read at a time.
+_CHUNK = 64 * 1024
 # The prefix of Lekto's configuration variables (`composition/settings.py`); none of them
 # reaches a child.
 _SETTINGS_PREFIX = "LEKTO_"
+# The prelude of a child with a memory limit: `python -I -c _LIMITED LIMIT PROGRAM ARGS...`.
+_LIMITED = (
+    "import os, resource, sys\n"
+    "limit = int(sys.argv[1])\n"
+    "_, hard = resource.getrlimit(resource.RLIMIT_AS)\n"
+    "if hard != resource.RLIM_INFINITY:\n"
+    "    limit = min(limit, hard)\n"
+    "resource.setrlimit(resource.RLIMIT_AS, (limit, limit))\n"
+    "os.execvp(sys.argv[2], sys.argv[2:])\n"
+)
 
 
 @dataclass(frozen=True)
@@ -46,25 +62,29 @@ async def run_process(
     env: Mapping[str, str] | None = None,
     tail: int = TAIL,
     memory: int | None = None,
+    input: bytes | None = None,
 ) -> Completed:
     """Run `args` and wait for it. TimeoutError after `timeout`; the process group is killed
     then, and also when the caller is cancelled. `env` adds to the child's environment (see the
     module); `tail` is how much of the end of its error output is kept; `memory` the bytes of
-    address space the child and what it starts may take each (see the module)."""
+    address space the child and what it starts may take each (see the module); `input` what it
+    reads from its standard input (else nothing)."""
+    command = list(args)
+    if memory is not None:
+        if shutil.which(command[0]) is None:  # as starting it without the prelude would
+            raise FileNotFoundError(f"no program {command[0]!r}")
+        command = [sys.executable, "-I", "-c", _LIMITED, str(memory), *command]
     process = await asyncio.create_subprocess_exec(
-        *args,
-        stdin=asyncio.subprocess.DEVNULL,
+        *command,
+        stdin=asyncio.subprocess.DEVNULL if input is None else asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         start_new_session=True,
         env=child_environment(env),
     )
-    if memory is not None:
-        with contextlib.suppress(ProcessLookupError):  # it ended already
-            resource.prlimit(process.pid, resource.RLIMIT_AS, (memory, memory))
     try:
         stdout, stderr = await asyncio.wait_for(
-            process.communicate(), timeout=timeout.total_seconds()
+            _converse(process, input, tail), timeout=timeout.total_seconds()
         )
     except TimeoutError:
         await _kill(process)
@@ -80,6 +100,39 @@ async def run_process(
         stdout=stdout.decode(errors="replace"),
         stderr=stderr.decode(errors="replace")[-tail:],
     )
+
+
+async def _converse(
+    process: asyncio.subprocess.Process, input: bytes | None, tail: int
+) -> tuple[bytes, bytes]:
+    """`input` to the child, all of its output and the end of its error output (enough bytes
+    for `tail` characters), until it ends. Read as it comes: what a program writes about a
+    document of unknown origin (OCRmyPDF passes on Ghostscript's and Tesseract's messages)
+    would otherwise be held in the worker in full, whatever the child's own limit (XB-07)."""
+    assert process.stdout is not None and process.stderr is not None
+
+    async def feed() -> None:
+        if input is None or process.stdin is None:
+            return
+        with contextlib.suppress(BrokenPipeError, ConnectionResetError):
+            process.stdin.write(input)
+            await process.stdin.drain()
+        process.stdin.close()
+
+    async def last(stream: asyncio.StreamReader, keep: int) -> bytes:
+        kept = bytearray()
+        while chunk := await stream.read(_CHUNK):
+            kept += chunk
+            if len(kept) > 2 * keep:
+                del kept[:-keep]
+        return bytes(kept[-keep:]) if keep else b""
+
+    # A character takes up to four bytes in UTF-8.
+    _, stdout, stderr = await asyncio.gather(
+        feed(), process.stdout.read(), last(process.stderr, 4 * tail)
+    )
+    await process.wait()
+    return stdout, stderr
 
 
 def child_environment(extra: Mapping[str, str] | None = None) -> dict[str, str]:

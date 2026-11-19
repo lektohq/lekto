@@ -7,10 +7,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.rest.schemas.documents import ReprocessNode
 from lekto.adapters.inbound.rest.schemas.rules import SkippedOut
-from lekto.core.domain.bulk import MAX_IDS, BulkAction, BulkKind, BulkOperation, BulkStatus
+from lekto.adapters.inbound.schemas import RequestBody
+from lekto.core.domain.bulk import MAX_IDS, BulkAction, BulkKind, BulkOperation
+from lekto.core.domain.documents import MAX_TAGS
 from lekto.core.domain.ids import ContactId, DocumentTypeId, SpaceId, TagId
 from lekto.core.domain.lenses import MAX_QUERY_LENGTH
 from lekto.core.domain.pipeline import Node
+from lekto.core.domain.progress import ProgressStatus
 
 
 class BulkActionIn(BaseModel):
@@ -25,10 +28,10 @@ class BulkActionIn(BaseModel):
 
     kind: BulkKind
     add_tag_ids: list[UUID] = Field(
-        default_factory=list, description="`change_tags`: the tags to add.", max_length=50
+        default_factory=list, description="`change_tags`: the tags to add.", max_length=MAX_TAGS
     )
     remove_tag_ids: list[UUID] = Field(
-        default_factory=list, description="`change_tags`: the tags to remove.", max_length=50
+        default_factory=list, description="`change_tags`: the tags to remove.", max_length=MAX_TAGS
     )
     contact_id: UUID | None = Field(default=None, description="`set_contact`; none: clear it.")
     document_type_id: UUID | None = Field(
@@ -55,9 +58,8 @@ class BulkActionIn(BaseModel):
         )
 
 
-class BulkRequest(BaseModel):
+class BulkRequest(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -89,7 +91,7 @@ class BulkRequest(BaseModel):
 class BulkOperationOut(BaseModel):
     id: UUID
     kind: BulkKind
-    status: BulkStatus
+    status: ProgressStatus
     total: int = Field(description="Selected documents.")
     done: int = Field(description="Documents worked through so far.")
     changed: int

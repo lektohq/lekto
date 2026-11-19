@@ -18,6 +18,7 @@ from lekto.core.domain.document_facts import FactCriterion, FactRole
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, SpaceId, TagId, id_reference
+from lekto.core.domain.lenses import MAX_FILTER_FACTS, MAX_FILTER_VALUES
 from lekto.core.domain.periods import Period
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.identity import RefCipher
@@ -26,10 +27,10 @@ from lekto.core.ports.repository import DocumentFilter
 ADMINS_ONLY = "Admins only."
 SESSION_ONLY_NOTE = " Needs a session; API tokens are refused (403)."
 
-MAX_IDS = 50
-"""Ids of one kind a filter names at most."""
-MAX_FACTS = 5
-"""Facts a filter names at most."""
+MAX_IDS = MAX_FILTER_VALUES
+"""Ids of one kind a filter names at most: as many as a lens holds."""
+MAX_FACTS = MAX_FILTER_FACTS
+"""Facts a filter names at most: as many as a lens holds."""
 
 
 type Ids = Annotated[list[UUID] | None, Query(max_length=MAX_IDS)]
@@ -71,27 +72,19 @@ def document_filter(
     them. `document_date_from`, `document_date_to`: the document date lies between them, both
     days included (either end may stay open)."""
 
-    def sets(ids: list[UUID] | None) -> tuple[frozenset[TagId], ...]:
-        return tuple(frozenset({TagId(id)}) for id in dict.fromkeys(ids or ()))
-
-    def either(ids: list[UUID] | None) -> tuple[frozenset[TagId], ...]:
-        return (frozenset(TagId(id) for id in ids),) if ids else ()
-
-    return DocumentFilter(
-        contacts=frozenset(ContactId(id) for id in contact_id) if contact_id else None,
-        document_types=(
-            frozenset(DocumentTypeId(id) for id in document_type_id) if document_type_id else None
-        ),
-        tags=sets(tag_id),
-        contact_groups=either(contact_group_id),
-        document_type_groups=either(document_type_group_id),
-        topics=frozenset(TagId(id) for id in topic_id) if topic_id else None,
-        spaces=frozenset(SpaceId(id) for id in space_id) if space_id else None,
-        lanes=None if not lane else frozenset(LANES[item] for item in lane),
+    chosen = DocumentFilter.chosen(
+        contacts=(ContactId(id) for id in contact_id or ()),
+        document_types=(DocumentTypeId(id) for id in document_type_id or ()),
+        tags=(TagId(id) for id in tag_id or ()),
+        contact_groups=(TagId(id) for id in contact_group_id or ()),
+        document_type_groups=(TagId(id) for id in document_type_group_id or ()),
+        topics=(TagId(id) for id in topic_id or ()),
+        spaces=(SpaceId(id) for id in space_id or ()),
         field=None if field_id is None else FieldId(field_id),
         document_dates=_dates(document_date_from, document_date_to),
-        facts=tuple(_fact(item, context.refs) for item in dict.fromkeys(fact or ())),
+        facts=(_fact(item, context.refs) for item in dict.fromkeys(fact or ())),
     )
+    return replace(chosen, lanes=frozenset(LANES[item] for item in lane) if lane else None)
 
 
 def _fact(written: str, refs: RefCipher) -> FactCriterion:
@@ -115,8 +108,7 @@ def _fact(written: str, refs: RefCipher) -> FactCriterion:
 
 
 def _dates(start: date | None, end: date | None) -> Period | None:
-    if start is None and end is None:
-        return None
+    """The period of the document dates; an end before the start is a 422 at its place."""
     if start is not None and end is not None and end < start:
         raise RequestValidationError(
             [
@@ -128,7 +120,7 @@ def _dates(start: date | None, end: date | None) -> Period | None:
                 }
             ]
         )
-    return Period(start or date.min, end or date.max)
+    return Period.between(start, end)
 
 
 Filter = Annotated[DocumentFilter, Depends(document_filter)]

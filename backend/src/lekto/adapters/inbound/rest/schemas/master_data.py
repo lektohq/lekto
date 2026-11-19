@@ -8,9 +8,21 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from lekto.adapters.inbound.rest.paths import logo_url
 from lekto.adapters.inbound.rest.schemas.common import Name, NameIn, each_once
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.appearance import MAX_ICON, ContactLogo, LogoSource, PaletteColor
-from lekto.core.domain.fields import FieldDefinition, FieldType
-from lekto.core.domain.identifiers import MAX_IDENTIFIERS, IdentifierKind, IdentifierSource
+from lekto.core.domain.fields import (
+    MAX_CHOICES,
+    MAX_FIELD_POSITION,
+    MAX_TYPE_FIELDS,
+    FieldDefinition,
+    FieldType,
+)
+from lekto.core.domain.identifiers import (
+    MAX_IDENTIFIER_VALUE,
+    MAX_IDENTIFIERS,
+    IdentifierKind,
+    IdentifierSource,
+)
 from lekto.core.domain.master_data import (
     MAX_ALIASES,
     MAX_DESCRIPTION,
@@ -24,6 +36,7 @@ from lekto.core.domain.master_data import (
     TagScope,
 )
 from lekto.core.domain.tag_tree import TagTree
+from lekto.core.domain.validation import MAX_NAME, MAX_REFERENCES
 from lekto.core.ports.images import LOGO_SIZE
 
 
@@ -54,17 +67,18 @@ Aliases = Annotated[
 ]
 
 
-class IdentifierIn(BaseModel):
+class IdentifierIn(RequestBody):
     """Written as in documents; lekto stores it normalised (an IBAN without spaces, a domain
     without `www.`)."""
 
     model_config = ConfigDict(
-        extra="forbid",
-        json_schema_extra={"examples": [{"kind": "customer_number", "value": "2004-7718"}]},
+        json_schema_extra={"examples": [{"kind": "customer_number", "value": "1234-5678"}]},
     )
 
     kind: IdentifierKind
-    value: str = Field(min_length=1, max_length=100, examples=["DE89 3704 0044 0532 0130 00"])
+    value: str = Field(
+        min_length=1, max_length=MAX_IDENTIFIER_VALUE, examples=["DE89 3704 0044 0532 0130 00"]
+    )
     topic_id: UUID | None = Field(
         default=None,
         description="One of the contact's topics it points to (a personnel number to work): "
@@ -73,9 +87,9 @@ class IdentifierIn(BaseModel):
     )
     user_id: UUID | None = Field(
         default=None,
-        description="The user a customer or personnel number belongs to (Anna's contract): "
-        "found in a document, it is hard evidence for whose it is. Not for other kinds, not "
-        "for a rejected one.",
+        description="The user a customer, contract or personnel number belongs to (Erika's "
+        "contract): found in a document, it is hard evidence for whose it is. Not for other "
+        "kinds, not for a rejected one.",
     )
 
 
@@ -94,8 +108,8 @@ class IdentifierOut(BaseModel):
     )
     user_id: UUID | None = Field(
         default=None,
-        description="The user a customer or personnel number belongs to: entered by hand, or "
-        "found by training when all its documents are surely theirs alone.",
+        description="The user a customer, contract or personnel number belongs to: entered by "
+        "hand, or found by training when all its documents are surely theirs alone.",
     )
 
 
@@ -212,7 +226,6 @@ ContactTopics = Annotated[
 
 class ContactCreate(NameIn):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"name": "ACME Energy", "aliases": ["ACME Strom"]}]},
     )
 
@@ -222,7 +235,7 @@ class ContactCreate(NameIn):
     topic_ids: ContactTopics = Field(default_factory=list)
 
 
-class ContactPatch(BaseModel):
+class ContactPatch(RequestBody):
     """Fields left out stay; `aliases` replaces all aliases, `identifiers` those entered by
     hand and `rejected_identifiers` the rejected ones. A value another contact learned or
     rejected moves here; one another contact entered by hand is a conflict (409)."""
@@ -333,7 +346,6 @@ class FieldAssignmentIn(BaseModel):
 
 class DocumentTypeCreate(NameIn):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [{"name": "Pay slip", "description": "Entgeltbescheinigung"}]
         },
@@ -353,7 +365,7 @@ class DocumentTypeCreate(NameIn):
     )
     fields: list[FieldAssignmentIn] = Field(
         default_factory=list,
-        max_length=500,
+        max_length=MAX_TYPE_FIELDS,
         description="The fields of the type besides the global ones, each once, required or "
         "optional: set with it in one transaction (as `PUT /document-types/{id}/fields`).",
     )
@@ -364,7 +376,7 @@ class DocumentTypeCreate(NameIn):
         return each_once(fields, lambda item: item.field_id, "field")
 
 
-class DocumentTypePatch(BaseModel):
+class DocumentTypePatch(RequestBody):
     """Fields left out stay; a `description` or `title_pattern` of null or empty removes
     it."""
 
@@ -427,7 +439,6 @@ class TagCreate(NameIn):
     `assignment` and `shown` follow the scope unless given."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {"name": "Health insurance", "parent_id": "01999d5e-2222-7c1e-b6a3-2f4d5e6f7a8b"},
@@ -449,7 +460,7 @@ class TagCreate(NameIn):
     color: Color | None = None
 
 
-class TagPatch(BaseModel):
+class TagPatch(RequestBody):
     """Fields left out stay; a `parent_id` of null makes it a top-level tag. The scope stays."""
 
     model_config = ConfigDict(
@@ -519,8 +530,8 @@ class TagOut(MasterDataOut):
     )
 
     @classmethod
-    def of(cls, item: Tag, tree: TagTree | None = None) -> "TagOut":
-        path = [item.name] if tree is None or item.id not in tree else tree.path(item.id)
+    def of(cls, item: Tag, tree: TagTree) -> "TagOut":
+        path = tree.path(item.id) if item.id in tree else [item.name]
         return cls(
             id=item.id,
             name=item.name,
@@ -545,26 +556,26 @@ Required = Annotated[
 Position = Annotated[
     int,
     Field(
-        ge=-9999,
-        le=9999,
+        ge=-MAX_FIELD_POSITION,
+        le=MAX_FIELD_POSITION,
         description="Where the field stands among the fields: smaller first, the same by name.",
     ),
 ]
 RequiredTypes = Annotated[
     list[UUID],
     Field(
+        max_length=MAX_REFERENCES,
         description=(
             "A typed field: the document types (of its own) it is required for; for the others "
             "it is optional. Extraction must find a required field; an optional one may stay "
             "empty, but a value it gives must be shown by the text."
-        )
+        ),
     ),
 ]
 
 
-class FieldCreate(BaseModel):
+class FieldCreate(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -580,10 +591,12 @@ class FieldCreate(BaseModel):
     name: Name
     data_type: FieldType
     document_type_ids: list[UUID] | None = Field(
-        default=None, description="null: global; otherwise only for these document types."
+        default=None,
+        max_length=MAX_REFERENCES,
+        description="null: global; otherwise only for these document types.",
     )
-    choices: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(
-        default_factory=list, max_length=200, description="For `choice` only."
+    choices: list[Annotated[str, Field(min_length=1, max_length=MAX_NAME)]] = Field(
+        default_factory=list, max_length=MAX_CHOICES, description="For `choice` only."
     )
     required: Required = False
     required_document_type_ids: RequiredTypes = Field(default_factory=list)
@@ -596,25 +609,25 @@ class FieldCreate(BaseModel):
     position: Position = 0
 
 
-class FieldPatch(BaseModel):
+class FieldPatch(RequestBody):
     """Fields left out stay; a `description` of null or empty removes it. The data type
     cannot change."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [{"name": "Payment method", "choices": ["Card", "Transfer", "Cash"]}]
         },
     )
 
     name: Name | None = None
-    choices: list[Annotated[str, Field(min_length=1, max_length=200)]] | None = Field(
+    choices: list[Annotated[str, Field(min_length=1, max_length=MAX_NAME)]] | None = Field(
         default=None,
-        max_length=200,
+        max_length=MAX_CHOICES,
         description="All choices; removing one that documents use is a conflict (409).",
     )
     document_type_ids: list[UUID] | None = Field(
         default=None,
+        max_length=MAX_REFERENCES,
         description=(
             "null: global. Narrowing is a conflict (409) while documents outside the new scope "
             "have values; the types it is required for narrow with it."
@@ -699,11 +712,10 @@ class FieldOut(BaseModel):
         )
 
 
-class FieldAssignmentsIn(BaseModel):
+class FieldAssignmentsIn(RequestBody):
     """The fields of a document type, global ones aside."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -716,7 +728,9 @@ class FieldAssignmentsIn(BaseModel):
         },
     )
 
-    fields: list[FieldAssignmentIn] = Field(max_length=500, description="Each field once.")
+    fields: list[FieldAssignmentIn] = Field(
+        max_length=MAX_TYPE_FIELDS, description="Each field once."
+    )
 
     @field_validator("fields")
     @classmethod

@@ -5,7 +5,7 @@ from datetime import timedelta
 
 import pytest
 
-from lekto.core.domain.errors import ConcurrencyError, NotFoundError
+from lekto.core.domain.errors import ConcurrencyError
 from lekto.core.domain.ids import DocumentId, RuleId, UserId, WebhookId, new_id
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.reasons import ReasonCode, because
@@ -73,20 +73,18 @@ class TaskRepositoryContract:
         await store(uow_factory, queued, sent, answered, failed, null, proposed)
         async with uow_factory() as uow:
             for task in (queued, sent, answered, failed, null, proposed):
-                assert await uow.tasks.get(task.id) == task
                 assert await uow.tasks.find(task.id) == task
 
     async def test_a_missing_task_is_not_found(self, uow_factory: UnitOfWorkFactory) -> None:
         async with uow_factory() as uow:
             assert await uow.tasks.find(a_task().id) is None
-            with pytest.raises(NotFoundError):
-                await uow.tasks.get(a_task().id)
 
     async def test_update_checks_the_version(self, uow_factory: UnitOfWorkFactory) -> None:
         task = a_task()
         await store(uow_factory, task)
         async with uow_factory() as first, uow_factory() as second:
-            one, other = await first.tasks.get(task.id), await second.tasks.get(task.id)
+            one, other = await first.tasks.find(task.id), await second.tasks.find(task.id)
+            assert one is not None and other is not None
             one.open("hash", b"\x01request", NOW)
             await first.tasks.update(one)
             await first.commit()
@@ -95,7 +93,8 @@ class TaskRepositoryContract:
                 await second.tasks.update(other)
                 await second.commit()
         async with uow_factory() as uow:
-            stored = await uow.tasks.get(task.id)
+            stored = await uow.tasks.find(task.id)
+        assert stored is not None
         assert (stored.status, stored.version) == (TaskStatus.OPEN, 2)
 
     async def test_the_tasks_of_a_run_oldest_first(self, uow_factory: UnitOfWorkFactory) -> None:

@@ -15,7 +15,7 @@ from lekto.core.domain.classification import (
     TOPIC,
     field_id_of,
 )
-from lekto.core.domain.documents import UNSET, DocumentChanges
+from lekto.core.domain.documents import MAX_TAGS, UNSET, DocumentChanges
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldDefinition, FieldValue, field_from_json, field_to_json
 from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, TagId
@@ -127,6 +127,8 @@ class ImportedMetadata:
     def __post_init__(self) -> None:
         if len(self.review) > MAX_REVIEWS:
             raise ValidationError(f"review: at most {MAX_REVIEWS} reasons")
+        if len(self.tag_ids) > MAX_TAGS:
+            raise ValidationError(f"tags: at most {MAX_TAGS}")
 
     def classification(self) -> DocumentChanges:
         """Title, contact, type and date as a change; the tags are added separately."""

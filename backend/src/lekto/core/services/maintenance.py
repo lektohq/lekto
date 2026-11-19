@@ -30,7 +30,7 @@ from lekto.core.ports.event_bus import EventBus
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._jobs import LEASE, JobRunner, document_payload, lost, payload_document
-from lekto.core.services.objects import derivative_keys, original_key
+from lekto.core.services.objects import derivative_keys, remove_unnamed
 
 log = logging.getLogger(__name__)
 
@@ -134,7 +134,7 @@ class MaintenanceService:
 
     async def run_next_job(self) -> bool:
         """Run a due housekeeping job. Returns False if none was due."""
-        return await self._jobs.run_next([CLEANUP_JOB, REMOVE_FILES_JOB], LEASE, self._run)
+        return await self._jobs.run_next(self.job_kinds, LEASE, self._run)
 
     async def _run(self, job: Job) -> None:
         if job.kind == REMOVE_FILES_JOB:
@@ -150,24 +150,12 @@ class MaintenanceService:
             return
         assert self._store is not None, "removing files needs the object store"
         document, pages = files.document_id, files.page_count
-        kept: list[Sha256] = []
         try:
             for key in derivative_keys(document, pages):
                 await self._store.delete(key)
-            # One original at a time under the lock of its key, which an upload of the same
-            # file takes too; a retry after a failure deletes what is left.
-            for sha256 in files.originals:
-                original = original_key(sha256)
-                async with self._uow() as uow:
-                    await uow.lock(original)
-                    # Another document came in with the same file meanwhile: it stays.
-                    if await uow.documents.exists(sha256=sha256) or (
-                        await uow.document_versions.find_by_sha256(sha256) is not None
-                    ):
-                        kept.append(sha256)
-                    else:
-                        await self._store.delete(original)
-                    await uow.commit()
+            # Another document may have come in with the same file meanwhile: it stays. A retry
+            # after a failure deletes what is left.
+            kept = await remove_unnamed(self._uow, self._store, files.originals)
             async with self._uow() as uow:
                 await uow.jobs.complete(job, now=self._clock.now())
                 await uow.commit()

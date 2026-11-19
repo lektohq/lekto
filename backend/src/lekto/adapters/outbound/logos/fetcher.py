@@ -35,10 +35,15 @@ import httpx2
 from PIL import Image, UnidentifiedImageError
 
 from lekto.adapters.outbound.http_client import CONNECT_TIMEOUT, describe_failure
-from lekto.adapters.outbound.http_client.resolver import Resolver, system_resolver
+from lekto.adapters.outbound.http_client.resolver import (
+    NotPublicError,
+    Resolver,
+    checked_address,
+    pinned,
+    system_resolver,
+)
 from lekto.adapters.outbound.logos.icons import Candidate, manifest_icons, page_icons, ranked
 from lekto.core.domain import media_types
-from lekto.core.domain.addresses import is_public, literal
 from lekto.core.domain.errors import LogoFetchError
 from lekto.core.ports.images import LOGO_SIZE, MAX_ICON_ENTRIES, MAX_PIXELS
 from lekto.core.ports.logos import MIN_LOGO_SIZE, FetchedLogo
@@ -63,7 +68,6 @@ _IMAGE_FORMATS = ("PNG", "JPEG", "WEBP")
 @dataclass(frozen=True)
 class Answer:
     url: httpx2.URL  # the last one, after redirects
-    content_type: str
     body: bytes
 
     @property
@@ -75,7 +79,7 @@ class HttpLogoFetcher:
     def __init__(
         self,
         *,
-        user_agent: str = "Lekto",
+        user_agent: str,
         resolver: Resolver = system_resolver,
         transport: httpx2.AsyncBaseTransport | None = None,
         timeout: float = TIMEOUT,
@@ -179,7 +183,13 @@ class HttpLogoFetcher:
     async def _follow(self, target: httpx2.URL, accept: Collection[str], whole: bool) -> Answer:
         for _ in range(MAX_REDIRECTS + 1):
             host = target.raw_host.decode("ascii")
-            address = await self._address(host)
+            try:
+                address = await checked_address(self._resolve, host)
+            except OSError:
+                raise LogoFetchError(f"{host} cannot be resolved") from None
+            except NotPublicError:
+                raise LogoFetchError(f"{host} has an address that is not public") from None
+            url, host_header, extensions = pinned(target, address)
             async with httpx2.AsyncClient(
                 transport=self._transport,
                 follow_redirects=False,
@@ -188,14 +198,14 @@ class HttpLogoFetcher:
             ) as client:
                 request = client.build_request(
                     "GET",
-                    target.copy_with(host=address),
+                    url,
                     headers={
-                        "Host": f"[{host}]" if ":" in host else host,
+                        "Host": host_header,
                         "User-Agent": self._user_agent,
                         "Accept": ", ".join(sorted(accept)),
                         "Accept-Encoding": "identity",
                     },
-                    extensions={"sni_hostname": host},
+                    extensions=extensions,
                 )
                 response = await client.send(request, stream=True)
                 try:
@@ -212,27 +222,10 @@ class HttpLogoFetcher:
                     if kind not in accept:
                         raise LogoFetchError(f"content type '{kind}'")
                     body = await self._body(response, whole)
-                    return Answer(target, kind, body)
+                    return Answer(target, body)
                 finally:
                     await response.aclose()
         raise LogoFetchError(f"more than {MAX_REDIRECTS} redirects")
-
-    async def _address(self, host: str) -> str:
-        """The address to connect to: the host's own, or the first its name resolves to, once
-        every one of them is public."""
-        own = literal(host)
-        if own is not None:
-            addresses: list[str] = [own]
-        else:
-            try:
-                addresses = list(await self._resolve(host))
-            except OSError:
-                raise LogoFetchError(f"{host} cannot be resolved") from None
-        if not addresses:
-            raise LogoFetchError(f"{host} cannot be resolved")
-        if not all(is_public(address) for address in addresses):
-            raise LogoFetchError(f"{host} has an address that is not public")
-        return addresses[0]
 
     async def _body(self, response: httpx2.Response, whole: bool) -> bytes:
         limit = self._max_size

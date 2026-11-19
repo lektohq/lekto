@@ -40,12 +40,12 @@ from lekto.core.domain.ids import BulkOperationId, DocumentId, UserId
 from lekto.core.domain.jobs import Job
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.pipeline import Lane
-from lekto.core.domain.reasons import Reason, ReasonCode, because
+from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.repository import PAGE_LIMIT, DocumentFilter
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
-from lekto.core.services._access import load_actor
-from lekto.core.services._jobs import LEASE, JobRunner, lost
+from lekto.core.services._access import load_actor, load_lister
+from lekto.core.services._jobs import LEASE, JobRunner, lost, reason_of
 from lekto.core.services.documents import DocumentService
 from lekto.core.services.pipeline import PipelineService
 from lekto.core.services.search import SearchService
@@ -67,6 +67,11 @@ class Selection:
     filter: DocumentFilter = field(default_factory=DocumentFilter)
     text: str | None = None
     all_users: bool = False
+
+    def __post_init__(self) -> None:
+        """Ids or a filter and words, not both: neither would be dropped silently (RA-09)."""
+        if self.ids is not None and (self.text is not None or self.filter != DocumentFilter()):
+            raise ValidationError(because(ReasonCode.BULK_IDS_AND_FILTER))
 
 
 class BulkService:
@@ -128,6 +133,9 @@ class BulkService:
         if selection.ids is not None:
             if len(selection.ids) > MAX_IDS:
                 raise ValidationError(because(ReasonCode.BULK_TOO_MANY, max=MAX_IDS))
+            if selection.all_users:  # as a filter over every user's documents asks (RA-09)
+                async with self._uow() as uow:
+                    await load_lister(uow, actor, True, Action.LIST_ALL_DOCUMENTS)
             return tuple(dict.fromkeys(selection.ids))
         if selection.text is not None:
             return await self._hits(actor, selection)
@@ -162,7 +170,7 @@ class BulkService:
 
     async def run_next_job(self) -> bool:
         """Claim and run a due bulk job. Returns False if none was due."""
-        return await self._jobs.run_next([BULK_JOB], LEASE, self._attempt)
+        return await self._jobs.run_next(self.job_kinds, LEASE, self._attempt)
 
     async def _attempt(self, job: Job) -> None:
         try:
@@ -174,19 +182,17 @@ class BulkService:
             await self._abort(job, error)
 
     async def _abort(self, job: Job, error: Exception) -> None:
-        """An unexpected error: end the operation, so it does not run again and again."""
-        try:
-            async with self._uow() as uow:
-                await uow.jobs.fail(
-                    job, now=self._clock.now(), error=f"{type(error).__name__}: {error}"
-                )
-                operation = await uow.bulk_operations.find(_operation_id(job))
-                if operation is not None and not operation.finished:
-                    operation.finish(self._clock.now(), error="stopped by an internal error")
-                    await uow.bulk_operations.update(operation)
-                await uow.commit()
-        except (ConcurrencyError, KeyError, ValueError):
-            log.warning("could not end a failed bulk operation", extra={"job_id": str(job.id)})
+        """An unexpected error: end the operation, so it does not run again and again, and fail
+        its job as every given up job fails, the admins told (`JobRunner.end`; SB-08). The
+        payload was read before (`_run` ends an unreadable one as invalid)."""
+
+        async def stop(uow: UnitOfWork) -> None:
+            operation = await uow.bulk_operations.find(_operation_id(job))
+            if operation is not None and not operation.finished:
+                operation.finish(self._clock.now(), error="stopped by an internal error")
+                await uow.bulk_operations.update(operation)
+
+        await self._jobs.end(job, error=reason_of(error), also=stop)
 
     async def _run(self, job: Job) -> None:
         try:

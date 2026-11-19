@@ -31,6 +31,7 @@ from lekto.core.domain.validation import require_utc
 
 MAX_NAME = 100
 MAX_HOST = 255
+MIN_PORT, MAX_PORT = 1, 65535
 MAX_USERNAME = 320
 MAX_FOLDERS = 20
 MAX_FOLDER = 1000  # characters of a folder's name
@@ -288,8 +289,8 @@ class Mailbox:
             raise ValidationError("host: a server name or address")
         if len(self.host) > MAX_HOST:
             raise ValidationError(f"host: at most {MAX_HOST} characters")
-        if not 1 <= self.port <= 65535:
-            raise ValidationError("port: 1 to 65535")
+        if not MIN_PORT <= self.port <= MAX_PORT:
+            raise ValidationError(f"port: {MIN_PORT} to {MAX_PORT}")
         self.username = self.username.strip()
         if not self.username or len(self.username) > MAX_USERNAME:
             raise ValidationError(f"username: 1 to {MAX_USERNAME} characters")

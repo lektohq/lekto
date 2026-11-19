@@ -16,7 +16,7 @@ from lekto_migration.lekto import ApiError, Lekto
 from lekto_migration.masterdata import Action, needs
 from lekto_migration.paperless import Paperless, PaperlessError, Snapshot
 from lekto_migration.plan import Plan, PlanError
-from lekto_migration.select import Names, names_of, selected
+from lekto_migration.select import Names, mismatches, names_of, selected
 from lekto_migration.state import State
 from lekto_migration.survey import defaults
 
@@ -126,6 +126,8 @@ async def load(
     plan, document = load_plan(config)
     snapshot, directory = await read(source, target, write=write, progress=progress)
     names = names_of(snapshot)
+    if problems := mismatches(plan.selection, names):
+        raise MigrationError(f"the plan {config.plan} cannot be used:\n  " + "\n  ".join(problems))
     chosen = [d for d in snapshot.documents if selected(plan.selection, d, names)]
     if config.limit is not None:
         chosen = chosen[: config.limit]
@@ -170,12 +172,3 @@ async def load(
         outdated=outdated(plan, snapshot, directory),
         ours=ours,
     )
-
-
-def unmanaged(state: State) -> set[str]:
-    """Fields the alignment leaves alone: the notes field of migrations before the plan."""
-    return {
-        str(o["lekto_id"])
-        for o in state.objects("field")
-        if o["source_id"] == "notes" and o["lekto_id"] is not None
-    }

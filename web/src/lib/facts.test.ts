@@ -66,7 +66,7 @@ const FACTS: Facts = {
 		},
 		{
 			kind: 'customer_number',
-			value: '20047718',
+			value: '12345678',
 			contact_id: null,
 			in_text: true,
 			in_code: false,
@@ -139,7 +139,7 @@ describe('facts', () => {
 		expect(groups.others.map((item) => ('value' in item ? item.value : ''))).toEqual([
 			'DE312456789'
 		]);
-		expect(groups.unknown.map((item) => item.value)).toEqual(['20047718']);
+		expect(groups.unknown.map((item) => item.value)).toEqual(['12345678']);
 		expect(factCounts(FACTS)).toEqual({ evidence: 2, unknown: 1, codes: 1 });
 	});
 
@@ -173,7 +173,7 @@ describe('facts', () => {
 		expect(shown({ kind: 'iban', value: 'DE89370400440532013000' })).toBe(
 			'DE89 3704 0044 0532 0130 00'
 		);
-		expect(shown({ kind: 'customer_number', value: '20047718' })).toBe('20047718');
+		expect(shown({ kind: 'customer_number', value: '12345678' })).toBe('12345678');
 	});
 
 	it('finds the content of a code in the text', () => {

@@ -48,9 +48,10 @@ from lekto.core.services.tasks.files import file_link
 from lekto.core.services.tasks.settling import Delegation
 from tests import builders
 from tests.builders import OK
+from tests.unit.services.classification_support import FIELDS, INVOICE, Seeded, proposal, seed
+from tests.unit.services.flows import answer_task, arrive, run_due, sent_to, stored
 from tests.unit.services.rules_support import incoming_pdf
 from tests.unit.services.support import World
-from tests.unit.services.test_classification import FIELDS, INVOICE, Seeded, proposal, seed
 
 URL = "http://agent.lan:8080/lekto"
 STRUCTURE = b'{"pages": []}'
@@ -104,34 +105,20 @@ class Calls:
     pipeline: PipelineService
 
     async def arrive(self, by: User | None = None) -> Document:
-        uploader = (by or self.admin).id
-        received = await self.pipeline.receive(uploader, incoming_pdf(), filename="a.pdf")
-        await self.run()
-        return await self.stored(received)
+        return await arrive(self.world, self.pipeline, (by or self.admin).id)
 
     async def run(self) -> None:
-        delivery = self.world.webhook_delivery()
-        while (
-            await self.pipeline.run_next_job()
-            or await delivery.run_next_job()
-            or await self.world.tasks.run_next_job()
-        ):
-            pass
+        await run_due(self.world, self.pipeline)
 
     async def stored(self, document: Document) -> Document:
-        async with self.world.uow() as uow:
-            return await uow.documents.get(document.id)
+        return await stored(self.world, document)
 
     def sent(self) -> list[WebhookRequest]:
-        return [request for request in self.world.sender.requests if request.url == URL]
+        return sent_to(self.world, URL)
 
     async def answer(self, request: WebhookRequest, envelope: object) -> str | None:
         """Answer the request; why it was not taken, if it was not."""
-        receipt = await self.world.tasks.answer(
-            TaskId(UUID(request.headers["lekto-task-id"])),
-            request.headers["lekto-task-token"],
-            json.dumps(envelope).encode(),
-        )
+        receipt = await answer_task(self.world, request, json.dumps(envelope).encode())
         await self.run()
         return receipt.problem
 
@@ -311,8 +298,8 @@ async def test_a_file_the_document_lacks_is_not_found(world: World) -> None:
     link = urlsplit(body(request)["document"]["structure"])
     id = TaskId(UUID(link.path.split("/tasks/", 1)[1].split("/files/", 1)[0]))
     async with world.uow() as uow:
-        task = await uow.tasks.get(id)
-    assert task.deadline is not None
+        task = await uow.tasks.find(id)
+    assert task is not None and task.deadline is not None
     # Signed as Lekto signs, for a page the document does not have.
     beyond = urlsplit(file_link(builders.LINKS, world.cipher, task, "pages/3.webp", task.deadline))
     query = {key: values[0] for key, values in parse_qs(beyond.query).items()}
@@ -372,7 +359,8 @@ async def test_a_task_that_ends_meanwhile_lets_the_node_run_anew(world: World) -
     assert state is not None and state.sent
     async with world.uow() as uow:
         assert state.task is not None
-        task = await uow.tasks.get(state.task.id)
+        task = await uow.tasks.find(state.task.id)
+        assert task is not None
         task.answered(proposal(), None, world.clock.now())
         await uow.tasks.update(task)
         await uow.commit()
@@ -480,6 +468,10 @@ async def test_a_run_that_failed_meanwhile_sends_nothing_and_frees_the_queue(
     for document in (second, third):  # another signal failed meanwhile
         async with world.uow() as uow:
             stored = await uow.documents.get(document.id)
+            # As the domain allows it: the run failed with a failed node (TD-05).
+            facts = stored.processing.nodes[Node.SIGNAL_FACTS]
+            assert facts.status is NodeStatus.DONE  # the other signals are done by now
+            facts.outcome = Outcome.FAILED
             stored.processing.status = ProcessingStatus.FAILED
             await uow.documents.update(stored)
             await uow.commit()

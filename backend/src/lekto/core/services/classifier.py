@@ -24,7 +24,7 @@ from lekto.core.domain.errors import (
 )
 from lekto.core.domain.events import ClassifierTrained
 from lekto.core.domain.facts import Strength, persons_in
-from lekto.core.domain.holders import unlearned
+from lekto.core.domain.holders import foreign
 from lekto.core.domain.identifiers import (
     Confirmed,
     Identifier,
@@ -47,7 +47,7 @@ from lekto.core.ports.repository import DocumentFilter
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import load_actor, require_admin
 from lekto.core.services._identifiers import person_identifiers
-from lekto.core.services._jobs import LEASE, JobRunner, Step, retrying
+from lekto.core.services._jobs import LEASE, JobRunner, Step, reason_of, retrying
 from lekto.core.services._pages import document_pages
 from lekto.core.services.master_data import replace_learned_identifiers
 from lekto.core.services.objects import classifier_key, load_text
@@ -115,10 +115,9 @@ class _Example:
 
 
 class ClassifierService:
-    job_kinds = (
-        CHECK_JOB,
-        TRAIN_JOB,
-    )
+    _CHECKING = (CHECK_JOB,)
+    _TRAINING = (TRAIN_JOB,)  # with a lease of its own, as long as a training may take
+    job_kinds = (*_CHECKING, *_TRAINING)
     """The kinds of jobs `run_next_job` runs."""
 
     def __init__(
@@ -152,8 +151,8 @@ class ClassifierService:
     async def run_next_job(self) -> bool:
         """Claim and run a due check or training; False if none was due."""
         return await self._jobs.run_next(
-            [CHECK_JOB], LEASE, self._run_claimed
-        ) or await self._jobs.run_next([TRAIN_JOB], self.policy.train_lease, self._run_claimed)
+            self._CHECKING, LEASE, self._run_claimed
+        ) or await self._jobs.run_next(self._TRAINING, self.policy.train_lease, self._run_claimed)
 
     async def check(self) -> bool:
         """Queue a training if one is due; returns whether it is."""
@@ -333,16 +332,14 @@ class ClassifierService:
         ]
         examples = []
         async with self._uow() as uow:
-            kept = {
-                document.id: await uow.document_facts.of_document(document.id)
-                for document in documents
-            }
+            # In one query, not one for each document (SA-04).
+            kept = await uow.document_facts.of_documents([document.id for document in documents])
         for document in documents:
             try:
                 raw = await load_text(self._store, document.id)
             except NotFoundError:
                 continue
-            text = shorten(raw.decode("utf-8", "replace"), self.policy.text_limit).text
+            text = shorten(raw, self.policy.text_limit).text
             example = TrainingExample(
                 text=text,
                 contact=document.contact_id,
@@ -373,7 +370,7 @@ class ClassifierService:
                         for fact in facts
                         if fact.state in (FactState.ADDED, FactState.CORRECTED)
                     ),
-                    foreign=frozenset(fact.key for fact in facts if unlearned(fact, own)),
+                    foreign=frozenset(fact.key for fact in facts if foreign(fact.holder, own)),
                     personal=frozenset(
                         fact.key
                         for fact in facts
@@ -453,13 +450,11 @@ class ClassifierService:
             await self._jobs.end(job, error=str(error), also=self._after(job))
             return
         except Exception as error:
-            log.warning("classifier job failed", extra={"kind": job.kind}, exc_info=True)
-            reason = f"{type(error).__name__}: {error}"
             if job.kind == CHECK_JOB:  # the next check comes anyway
-                await self._jobs.end(job, error=reason, also=self._next_check)
+                log.warning("classifier check failed", extra={"kind": job.kind}, exc_info=True)
+                await self._jobs.end(job, error=reason_of(error), also=self._next_check)
             else:
-                run_at = _TRAIN_RETRY.next_run(job.tries, self._clock.now())
-                await self._jobs.again(job, reason, run_at)
+                await self._jobs.failed(job, error, _TRAIN_RETRY, "classifier job failed")
             return
         await self._jobs.end(job, also=self._after(job))
 

@@ -7,16 +7,22 @@ from datetime import datetime
 
 from lekto.adapters.outbound.memory.database import DOCUMENTS, MAILBOXES
 from lekto.adapters.outbound.memory.rows import MemoryRows, _copy
-from lekto.core.domain.errors import ConflictError, NotFoundError
+from lekto.core.domain.errors import NotFoundError
 from lekto.core.domain.ids import DocumentId, MailboxId, MailRecordId, MailRuleId
-from lekto.core.domain.mail_intake import SETTLED, MailOrigin, MailOutcome, MailRecord
+from lekto.core.domain.mail_intake import (
+    SETTLED,
+    TAKEN_OUTCOMES,
+    MailOrigin,
+    MailOutcome,
+    MailRecord,
+)
 from lekto.core.ports.repository import PAGE_SIZE
 
 
 class MemoryMailRecordRepository(MemoryRows[MailRecordId, MailRecord]):
     async def add(self, record: MailRecord) -> None:
         if self._uow._row(MAILBOXES, record.mailbox_id) is None:
-            raise ConflictError("mail record: no such mailbox")  # as the foreign key
+            raise self._uow._violated("mail record: no such mailbox")  # as the foreign key
         await super().add(record)
 
     async def known_uids(self, mailbox: MailboxId, folder: str, uidvalidity: int) -> set[int]:
@@ -27,7 +33,9 @@ class MemoryMailRecordRepository(MemoryRows[MailRecordId, MailRecord]):
         }
 
     async def has_message(self, message_id: str) -> bool:
-        return any(row.message_id == message_id for row in self._all())
+        return any(
+            row.message_id == message_id and row.outcome in TAKEN_OUTCOMES for row in self._all()
+        )
 
     async def recent(self, mailbox: MailboxId, *, limit: int) -> list[MailRecord]:
         rows = [row for row in self._all() if row.mailbox_id == mailbox]
@@ -99,7 +107,7 @@ class MemoryMailOriginRepository(MemoryRows[DocumentId, MailOrigin]):
 
     async def add(self, origin: MailOrigin) -> None:
         if self._uow._row(DOCUMENTS, origin.document_id) is None:
-            raise ConflictError("mail origin: no such document")  # as the foreign key
+            raise self._uow._violated("mail origin: no such document")  # as the foreign key
         await super().add(origin)
 
     async def find(self, document: DocumentId) -> MailOrigin | None:

@@ -23,7 +23,7 @@ from pathlib import Path
 import pikepdf
 from PIL import ExifTags, Image, ImageOps, ImageSequence
 
-from lekto.adapters.outbound.imaging import flatten_on_white, image_dpi
+from lekto.adapters.outbound.imaging import check_pixels, flatten_on_white, image_dpi
 from lekto.core.domain import media_types
 from lekto.core.domain.editing import PagePick
 from lekto.core.domain.errors import UnprocessableDocumentError
@@ -97,16 +97,26 @@ def _as_pdf(source: PageSource) -> Iterator[pikepdf.Pdf]:
         raise UnprocessableDocumentError(because(ReasonCode.FILE_NOT_PDF_OR_IMAGE))
 
 
+# What qpdf raises for a damaged file: on opening, and on reading an object later (it reads
+# them as they are used), as `RuntimeError` too ("/Count is wrong after flattening pages tree").
+_DAMAGED = (pikepdf.PdfError, RuntimeError)
+
+
 @contextmanager
 def _opened_pdf(path: Path) -> Iterator[pikepdf.Pdf]:
+    """The PDF at `path`, open for the `with` block; UnprocessableDocumentError if it is
+    damaged, found on opening or when the block reads it (its pages, saving its pages)."""
     try:
         pdf = pikepdf.open(path)
     except pikepdf.PasswordError:
         raise UnprocessableDocumentError(because(ReasonCode.PDF_ENCRYPTED)) from None
-    except pikepdf.PdfError:
+    except _DAMAGED:
         raise UnprocessableDocumentError(because(ReasonCode.PDF_UNREADABLE)) from None
     with pdf:
-        yield pdf
+        try:
+            yield pdf
+        except _DAMAGED:
+            raise UnprocessableDocumentError(because(ReasonCode.PDF_UNREADABLE)) from None
 
 
 def _image_pdf(path: Path) -> pikepdf.Pdf:
@@ -116,7 +126,11 @@ def _image_pdf(path: Path) -> pikepdf.Pdf:
         with Image.open(path) as image:
             as_is = image.format == "JPEG" and image.mode in ("L", "RGB")
             for frame in ImageSequence.Iterator(image):
+                check_pixels(frame)
                 _add_page(pdf, frame, path.read_bytes() if as_is else None)
+    except UnprocessableDocumentError:
+        pdf.close()
+        raise
     except (OSError, ValueError, Image.DecompressionBombError) as error:
         pdf.close()
         raise _unreadable_image(error) from None

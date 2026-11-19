@@ -23,8 +23,7 @@ from lekto.core.ports.ocr import OcrResult
 from lekto.core.services.nodes import OcrNode, PagesNode, ParseNode
 from lekto.core.services.objects import archive_key, exchanges_key, original_key
 from lekto.core.services.pipeline import PipelineService
-from tests.builders import SAMPLES, incoming
-from tests.unit.services.support import World
+from tests.unit.services.support import World, ingest
 
 
 def pipeline(world: World, ocr: FakeOcr, text: str = "Rechnung") -> PipelineService:
@@ -37,16 +36,6 @@ def pipeline(world: World, ocr: FakeOcr, text: str = "Rechnung") -> PipelineServ
         },
         vision=ocr.vision,
     )
-
-
-async def ingest(
-    world: World, service: PipelineService, sample: str = "scan.pdf"
-) -> tuple[User, Document]:
-    owner = await world.user()
-    data = (SAMPLES / sample).read_bytes()
-    document = await service.receive(owner.id, incoming(data), filename=sample)
-    await world.drain(service)
-    return owner, await world.documents.get(owner.id, document.id)
 
 
 async def ocr_runs(world: World, owner: User, document: Document) -> list[NodeRun]:
@@ -131,8 +120,8 @@ async def test_the_ocr_the_model_reads_holds_its_job_longer(world: World) -> Non
     owner, document = await ingest(world, service)
     await service.read_with_vision(owner.id, document.id)
     await world.drain(service)
-    # Tesseract within the lease of every node, the model with its own.
-    assert held == [service.lease, timedelta(minutes=32)]
+    # Tesseract within the lease of every node (the service's default), the model with its own.
+    assert held == [timedelta(minutes=10), timedelta(minutes=32)]
 
 
 async def test_reprocessing_reads_with_tesseract_again(world: World) -> None:

@@ -44,7 +44,7 @@ documents:                       # which documents
 
 users:
   Tobias: {to: user, name: tobi}
-  anna: [{to: user, name: anna, create: true}, {to: tag, name: Anna, create: true}]
+  erika: [{to: user, name: erika, create: true}, {to: tag, name: Erika, create: true}]
 
 correspondents:
   Telekom: {to: contact, name: Deutsche Telekom AG}
@@ -87,7 +87,7 @@ asn: {to: field, name: ASN}
 - `review: true`, or a reason: every document with the object waits in Lekto's inbox (yellow)
   with the reason, the field it is about open; with `drop`, that field stays empty for a person
   to decide. The default reason of `review: true` goes with its code, so Lekto shows it in the
-  user's language (a Lekto from before 0.6.2 is asked first and gets the text alone); a reason
+  user's language (a Lekto from before 0.6.3 is asked first and gets the text alone); a reason
   you write stays as written. A document left without a contact, document type or date (Paperless has none, or
   the plan drops it) waits as well, with that field open: Lekto decides so, as for documents
   of its own, whatever the plan says.
@@ -100,7 +100,7 @@ asn: {to: field, name: ASN}
   its documents edits it, so they see their own documents: `prepare` creates it with them, or
   adds those missing to an existing one (it never removes a member or lowers a role); its
   other members see the documents, too. `check` and `prepare` say who gains access, and who
-  sees documents there that Paperless kept from them ("anna and tobias see each other's
+  sees documents there that Paperless kept from them ("erika and tobias see each other's
   documents in 'Steuer'"); `check` lists such documents apart. Personal spaces are not named
   in the plan (`Personal` and `Persönlich` are refused as names): a document without further
   permissions and without a space goes to its uploader's. A **group** puts the
@@ -112,7 +112,10 @@ asn: {to: field, name: ASN}
   `{matches: <regex>}`), `mime_type`, `correspondent`, `document_type`, `storage_path`, `owner`
   (a name or list; `null` for none), `tags` (a list, `{any}`, `{all}`, `{none}`),
   `shared_with`, `created`, `added`, `modified` (`{from, to}`), `has_notes`, `custom_fields`
-  (`{<name>: true | false | <value> | [<values>] | {from, to}}`).
+  (`{<name>: true | false | <value> | [<values>] | {from, to}}`). A criterion in another form
+  (a key mistyped, a regular expression that does not compile, a day that is none) is a
+  problem of the plan, as is a bound of a custom field that does not fit its type (a day for a
+  date field, else a number).
 
 ## Defaults of the first plan
 

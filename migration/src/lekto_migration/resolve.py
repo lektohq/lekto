@@ -8,7 +8,7 @@ from typing import Any
 
 from lekto_migration.directory import Directory
 from lekto_migration.expect import Expected
-from lekto_migration.plan import MAX_REVIEW_REASON
+from lekto_migration.plan import MAX_REVIEW_REASON, MAX_REVIEWS
 
 METADATA_LIMIT = 45_000  # bytes of the metadata field (Lekto allows 48 KiB)
 
@@ -85,7 +85,10 @@ def resolve(item: Expected, directory: Directory) -> Resolved:
         if reason.code is not None and directory.review_codes:
             entry |= {"code": reason.code, "params": {"name": reason.name}}
         review.append(entry)
-    resolved = Resolved(str(uploader["id"]), space_id, values, review, missing)
+    resolved = Resolved(str(uploader["id"]), space_id, values, review[:MAX_REVIEWS], missing)
+    if len(review) > MAX_REVIEWS:
+        left = len(review) - MAX_REVIEWS
+        resolved.notes.append(f"{left} reasons for a review left out: Lekto takes {MAX_REVIEWS}")
     _fit(resolved)
     return resolved
 

@@ -15,8 +15,7 @@ from lekto.core.domain.pipeline import Node, Outcome
 from lekto.core.services.classification import nodes
 from lekto.core.services.objects import structure_key
 from lekto.core.services.pipeline import MetadataResult
-from tests.unit.services.support import World
-from tests.unit.services.test_classification import (
+from tests.unit.services.classification_support import (
     FIELDS,
     INVOICE,
     Seeded,
@@ -29,6 +28,7 @@ from tests.unit.services.test_classification import (
     record,
     seed,
 )
+from tests.unit.services.support import World
 
 # Keys by name: a1 Bezahlt, a2 Fällig am, a3 Rechnungsbetrag, a4 Rechnungsnummer.
 LABELS = {"a1": "Bezahlt", "a2": "Zahlbar bis", "a3": "Gesamtbetrag", "a4": "Rechnung Nr."}

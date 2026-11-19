@@ -5,14 +5,12 @@ does not come does what the step says."""
 import json
 from dataclasses import dataclass
 from datetime import timedelta
-from uuid import UUID
 
 import pytest
 
 from lekto.core.domain.documents import Document, DocumentChanges
 from lekto.core.domain.errors import InvalidTransitionError, NotFoundError, ValidationError
 from lekto.core.domain.fields import FieldDefinition, FieldType
-from lekto.core.domain.ids import TaskId
 from lekto.core.domain.pipeline import RULES, Lane, Node, NodeStatus, Outcome
 from lekto.core.domain.reasons import ReasonCode
 from lekto.core.domain.rules import (
@@ -36,12 +34,12 @@ from lekto.core.services.pipeline import PipelineService
 from lekto.core.services.rules.management import RuleService
 from lekto.core.services.rules.running import STEPS_LOG
 from tests import builders
+from tests.unit.services.flows import answer_task, arrive, run_due, sent_to
 from tests.unit.services.rules_support import (
     RuleWorld,
     add_tags,
     channel_api,
     definition,
-    incoming_pdf,
     rule_world,
 )
 from tests.unit.services.support import World
@@ -79,28 +77,17 @@ class Steps:
         )
 
     async def arrive(self) -> Document:
-        received = await self.pipeline.receive(self.owner.id, incoming_pdf(), filename="a.pdf")
-        await self.run()
-        return await self.r.stored(received)
+        return await arrive(self.world, self.pipeline, self.owner.id)
 
     async def run(self) -> None:
-        delivery = self.world.webhook_delivery()
-        while (
-            await self.pipeline.run_next_job()
-            or await delivery.run_next_job()
-            or await self.world.tasks.run_next_job()
-        ):
-            pass
+        await run_due(self.world, self.pipeline)
 
     def asked(self) -> list[WebhookRequest]:
-        return [request for request in self.world.sender.requests if request.url == URL]
+        return sent_to(self.world, URL)
 
     async def answer(self, request: WebhookRequest, answer: object) -> None:
         body = json.dumps({"status": "ok", "producer": "node-red", "answer": answer})
-        task = TaskId(UUID(request.headers["lekto-task-id"]))
-        receipt = await self.world.tasks.answer(
-            task, request.headers["lekto-task-token"], body.encode()
-        )
+        receipt = await answer_task(self.world, request, body.encode())
         assert receipt.problem is None
         await self.run()
 

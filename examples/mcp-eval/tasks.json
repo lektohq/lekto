@@ -85,7 +85,7 @@
     "kind": "field",
     "question": "Welche Kundennummer habe ich bei den Stadtwerken Musterstadt?",
     "expect": [
-      "2004 7718"
+      "1234 5678"
     ]
   },
   {

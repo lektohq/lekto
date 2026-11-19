@@ -241,17 +241,19 @@ class MetadataReaderContract:
     """Needs the fixture `metadata_reader`."""
 
     async def test_reads_a_pdf(self, metadata_reader: MetadataReader) -> None:
-        metadata = await metadata_reader.read_metadata((SAMPLES / "text.pdf").read_bytes())
+        metadata = await metadata_reader.read_metadata(SAMPLES / "text.pdf")
         assert (metadata.format, metadata.pages) == ("PDF", 1)
         assert metadata.pdf_version
 
     async def test_reads_an_image(self, metadata_reader: MetadataReader) -> None:
-        metadata = await metadata_reader.read_metadata((SAMPLES / "photo.jpg").read_bytes())
+        metadata = await metadata_reader.read_metadata(SAMPLES / "photo.jpg")
         assert metadata.format == "JPEG"
         assert metadata.width and metadata.height
 
-    async def test_reads_a_mail(self, metadata_reader: MetadataReader) -> None:
-        metadata = await metadata_reader.read_metadata(plain_mail())
+    async def test_reads_a_mail(self, metadata_reader: MetadataReader, tmp_path: Path) -> None:
+        mail = tmp_path / "mail.eml"
+        mail.write_bytes(plain_mail())
+        metadata = await metadata_reader.read_metadata(mail)
         assert metadata.format == "E-Mail"
 
     @pytest.mark.parametrize("name", ["damaged.pdf", "unsupported.docx"])
@@ -259,7 +261,7 @@ class MetadataReaderContract:
         self, metadata_reader: MetadataReader, name: str
     ) -> None:
         with pytest.raises(UnprocessableDocumentError):
-            await metadata_reader.read_metadata((SAMPLES / name).read_bytes())
+            await metadata_reader.read_metadata(SAMPLES / name)
 
 
 SCAN = PageSource(SAMPLES / "scan.pdf", media_types.PDF)

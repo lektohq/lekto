@@ -26,6 +26,7 @@ from lekto.core.domain.identifiers import (
 )
 from lekto.core.domain.ids import ContactId, UserId
 from lekto.core.domain.open_identifiers import (
+    MAX_DECISIONS,
     OPEN_KINDS,
     OpenIdentifier,
     OpenSource,
@@ -199,6 +200,8 @@ class OpenIdentifierService:
         """Keep each of `decisions` (admins), each a change of its contact or profile on its
         own; one that cannot be done says why, and the others are done all the same. A
         decision about a person's suggestion needs a `session`."""
+        if len(decisions) > MAX_DECISIONS:
+            raise ValidationError(because(ReasonCode.INPUT_TOO_MANY, max=MAX_DECISIONS))
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.CHANGE_MASTER_DATA)
             found, _, _, learned = await _open(uow)

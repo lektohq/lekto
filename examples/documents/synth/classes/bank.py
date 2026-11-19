@@ -42,8 +42,8 @@ def _month_bookings(month: date, rng: random.Random, salary: Decimal) -> list[Bo
             (
                 "Lastschrift",
                 c.STADTWERKE.name,
-                f"Abschlag Strom {m:02d}/{y} Kd 20047718",
-                "Mandatsref. SWM-20047718-0" + ("1" if month < MOVED else "2"),
+                f"Abschlag Strom {m:02d}/{y} Kd 12345678",
+                "Mandatsref. SWM-12345678-0" + ("1" if month < MOVED else "2"),
             ),
             D("-98.00") if month < MOVED else D("-95.00"),
         ),

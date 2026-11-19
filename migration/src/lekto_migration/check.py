@@ -12,14 +12,16 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from lekto_migration.align import Alignment, align, current, foreign, uploaded
+from lekto_migration.align import Alignment, current
+from lekto_migration.basis import Basis
 from lekto_migration.config import Config
 from lekto_migration.expect import Expected
 from lekto_migration.lekto import ApiError, Lekto
-from lekto_migration.masterdata import MISSING, visible_to
+from lekto_migration.masterdata import MISSING, missing, visible_to
 from lekto_migration.paperless import Paperless, PaperlessError, checksum
-from lekto_migration.resolve import resolve, space_of
-from lekto_migration.session import Loaded, Progress, unmanaged
+from lekto_migration.report import actions
+from lekto_migration.resolve import resolve
+from lekto_migration.session import Loaded, Progress
 from lekto_migration.state import DocumentRow, State
 
 MIGRATED = ("done", "duplicate", "uploaded")
@@ -110,12 +112,7 @@ async def check(
         problems.append(
             f"the plan lacks {len(loaded.outdated)} Paperless objects ({shown}): run plan"
         )
-    for action in loaded.actions:
-        if action.status == MISSING:
-            problems.append(
-                f"{action.kind.replace('_', ' ')} '{action.name}' does not exist in Lekto "
-                f"and the plan may not create it ({action.source})"
-            )
+    problems += [missing(action) for action in loaded.actions if action.status == MISSING]
     in_lekto = await _lekto_documents(target)
     rows = {row.source_id: row for row in state.documents()}
     documents: list[dict[str, Any]] = []
@@ -152,17 +149,7 @@ async def check(
     return {
         "command": "check",
         "problems": problems,
-        "actions": [
-            {
-                "kind": a.kind,
-                "name": a.name,
-                "status": a.status,
-                "source": a.source,
-                "detail": a.detail,
-                "notes": a.notes,
-            }
-            for a in loaded.actions
-        ],
+        "actions": actions(loaded.actions),
         "documents": documents,
         "document_results": dict(Counter(d["status"] for d in documents)),
         "texts": texts,
@@ -175,13 +162,7 @@ class _Checker:
     def __init__(self, loaded: Loaded, target: Lekto | None, state: State) -> None:
         self._loaded = loaded
         self._target = target
-        directory = loaded.directory
-        self._parents = {
-            str(tag["id"]): tag.get("parent_id") for tag in directory.tags["document"].values()
-        }
-        self._types = {str(f["id"]): str(f.get("data_type")) for f in directory.fields.values()}
-        self._unmanaged = unmanaged(state)
-        self._state = state
+        self._basis = Basis(loaded, state, target)
 
     def new(self, item: Expected, row: DocumentRow | None) -> dict[str, Any]:
         entry = _entry(item.id, item.title, "new", row, item=item)
@@ -200,27 +181,15 @@ class _Checker:
         if details.get("channel") != "migration":
             reason = "the document in Lekto was not taken over by the migration"
             return _entry(item.id, item.title, "not aligned", row, item=item, reason=reason)
-        space = space_of(resolved, self._loaded.directory)
         if row.status == "duplicate":
-            claimant = self._state.claimant(row.lekto_id, item.id)
-            why = foreign(claimant, details.get("space_id"), space)
+            why = self._basis.foreign(item, row.lekto_id, details, resolved)
             if why is not None:
                 return _entry(item.id, item.title, "not aligned", row, item=item, reason=why)
-        base = row.applied
-        if base is None and self._target is not None:
-            try:
-                log = await self._target.log(row.lekto_id)
-            except ApiError:
-                log = []
-            base = uploaded(log, details.get("space_id"))
-        alignment = align(
-            base or current(details),
-            current(details),
-            {**resolved.values, "space_id": space},
-            parents=self._parents,
-            types=self._types,
-            unmanaged=self._unmanaged,
-        )
+        try:
+            base = await self._basis.baseline(row.lekto_id, row.applied, details)
+        except ApiError:  # `check` only looks: as without a log
+            base = current(details)
+        alignment = self._basis.align(base, details, resolved)
         status = "differs" if alignment.differences else "same"
         entry = _entry(item.id, item.title, status, row, item=item)
         entry["lane"] = details.get("lane")

@@ -281,7 +281,7 @@ contact_identifiers = Table(
     Column("value", Text, primary_key=True),
     Column("source", Text, nullable=False),
     Column("topic_id", Uuid, ForeignKey("tags.id"), nullable=True),
-    # The user a customer or personnel number belongs to, if one does; it goes with them.
+    # The user a customer, contract or personnel number belongs to, if one does; it goes with them.
     Column("user_id", Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=True),
     # A learned one: the ids of the spaces it was learned in (a JSON list; null: none).
     Column("learned_in", json_type(), nullable=True),
@@ -687,6 +687,9 @@ jobs = Table(
     Column("finished_at", UtcDateTime, nullable=True),
     Column("result", json_type(), nullable=True),
     Index(None, "status", "run_at"),
+    # The jobs of a kind due first, in the order a claim takes them (`JobQueue.claim`,
+    # `next_due`; revision 0080).
+    Index(None, "kind", "status", "run_at", "id"),
     # The durations of the jobs done lately (`JobQueue.finished`).
     Index(None, "finished_at"),
     # Claims of running jobs whose lease ran out.
@@ -781,7 +784,6 @@ sessions = Table(
     Column("created_at", UtcDateTime, nullable=False),
     Column("last_seen_at", UtcDateTime, nullable=False, index=True),
     Column("expires_at", UtcDateTime, nullable=False, index=True),
-    Column("version", Integer, nullable=False),
 )
 
 # Browsers that signed in with the password (revision 0074): their failed sign-ins count under
@@ -794,7 +796,6 @@ known_devices = Table(
     Column("token_hash", String(64), nullable=False, unique=True),
     Column("created_at", UtcDateTime, nullable=False),
     Column("expires_at", UtcDateTime, nullable=False, index=True),
-    Column("version", Integer, nullable=False),
 )
 
 # The browsers a person receives notifications on (web push); a browser's address at its push
@@ -838,7 +839,6 @@ api_tokens = Table(
     Column("created_at", UtcDateTime, nullable=False),
     Column("expires_at", UtcDateTime, nullable=True),
     Column("last_used_at", UtcDateTime, nullable=True),
-    Column("version", Integer, nullable=False),
 )
 
 external_identities = Table(
@@ -849,7 +849,6 @@ external_identities = Table(
     Column("subject", Text, nullable=False),
     Column("user_id", Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True),
     Column("created_at", UtcDateTime, nullable=False),
-    Column("version", Integer, nullable=False),
     Index(None, "issuer", "subject", unique=True),
 )
 
@@ -861,7 +860,6 @@ login_failures = Table(
     Column("failures", Integer, nullable=False),
     Column("first_failure_at", UtcDateTime, nullable=False),
     Column("blocked_until", UtcDateTime, nullable=True),
-    Column("version", Integer, nullable=False),
 )
 
 # --- webhooks: rows go with their owner (ON DELETE CASCADE) ---------------------------------------

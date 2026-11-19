@@ -16,7 +16,12 @@ from lekto.adapters.outbound.memory import (
 from lekto.adapters.outbound.memory.processing import FAKE_PDF
 from lekto.core.domain.document_facts import FactRole
 from lekto.core.domain.documents import DocumentChanges
-from lekto.core.domain.errors import EmbeddingsError, PermissionDeniedError, SearchIndexError
+from lekto.core.domain.errors import (
+    ConcurrencyError,
+    EmbeddingsError,
+    PermissionDeniedError,
+    SearchIndexError,
+)
 from lekto.core.domain.events import NodeCompleted, NodeDeferred, NodeStarted
 from lekto.core.domain.fields import FieldType
 from lekto.core.domain.identifiers import IdentifierKind
@@ -34,6 +39,7 @@ from lekto.core.services.indexing import (
     INDEX_JOB,
     RECONCILE_JOB,
     REFRESH_JOB,
+    IndexingService,
     split_sections,
 )
 from lekto.core.services.objects import archive_key
@@ -119,7 +125,7 @@ async def test_metadata_reaches_the_index_with_names_and_ids(setup: Setup) -> No
     tag = await setup.master_data.create_tag(admin.id, "Energie")
     meter = await setup.master_data.create_field(admin.id, "Zähler", FieldType.TEXT)
     document = await setup.document(owner)
-    await setup.world.documents.update_metadata(
+    await setup.world.documents.change_metadata(
         owner.id,
         document.id,
         DocumentChanges(
@@ -156,7 +162,7 @@ async def test_a_period_is_found_as_it_is_written(setup: Setup) -> None:
         (Period.year(2025), "2025"),
         (Period.day(date(2026, 9, 15)), "2026-09-15 15.09.2026"),
     ):
-        await setup.world.documents.update_metadata(
+        await setup.world.documents.change_metadata(
             owner.id, document.id, DocumentChanges(fields={period.id: value})
         )
         await setup.settle()
@@ -193,7 +199,7 @@ async def test_renaming_master_data_updates_the_documents_that_carry_it(setup: S
         (with_contact.id, DocumentChanges(contact_id=contact.id)),
         (with_tag.id, DocumentChanges(tag_ids=frozenset({tag.id}))),
     ):
-        await setup.world.documents.update_metadata(owner.id, id, changes)
+        await setup.world.documents.change_metadata(owner.id, id, changes)
     await setup.settle()
 
     await setup.master_data.change_contact(admin.id, contact.id, name="Energie AG")
@@ -226,7 +232,7 @@ async def test_an_entry_holds_tags_with_ancestors_and_the_groups(setup: Setup) -
     changes = DocumentChanges(
         contact_id=contact.id, document_type_id=kind.id, tag_ids=frozenset({health.id})
     )
-    await setup.world.documents.update_metadata(owner.id, document.id, changes)
+    await setup.world.documents.change_metadata(owner.id, document.id, changes)
     await setup.settle()
     entry = setup.entry(document.id)
     assert set(entry.tag_ids) == {health.id, insurance.id}
@@ -259,7 +265,7 @@ async def test_nesting_a_tag_or_changing_groups_refreshes_the_documents_concerne
         (with_health.id, DocumentChanges(tag_ids=frozenset({health.id}))),
         (with_contact.id, DocumentChanges(contact_id=contact.id)),
     ):
-        await setup.world.documents.update_metadata(owner.id, id, changes)
+        await setup.world.documents.change_metadata(owner.id, id, changes)
     await setup.settle()
 
     async def refreshed(change: Awaitable[object]) -> set[DocumentId]:
@@ -302,7 +308,7 @@ async def test_an_entry_holds_the_topic_with_those_above_it(setup: Setup) -> Non
     insured, other = await setup.document(owner, "a"), await setup.document(owner, "b")
     for id, topic in ((insured.id, health.id), (other.id, work.id)):
         changes = DocumentChanges(contact_id=contact.id, topic_id=topic)
-        await setup.world.documents.update_metadata(owner.id, id, changes)
+        await setup.world.documents.change_metadata(owner.id, id, changes)
     await setup.settle()
     entry = setup.entry(insured.id)
     assert set(entry.topic_ids) == {health.id, insurance.id}
@@ -348,7 +354,7 @@ async def test_a_change_without_new_text_keeps_the_vectors(setup: Setup) -> None
     assert len(setup.embeddings.calls) == calls
     assert (await setup.index.state(document.id)).embedding == stamp  # type: ignore[union-attr]
 
-    await setup.world.documents.update_metadata(
+    await setup.world.documents.change_metadata(
         owner.id, document.id, DocumentChanges(title="Anderer Titel")
     )
     await setup.settle()
@@ -366,7 +372,7 @@ async def test_a_new_title_embeds_only_the_first_section(setup: Setup) -> None:
     before = setup.entry(document.id).vectors
     assert before is not None and len(before) == 3
 
-    await setup.world.documents.update_metadata(
+    await setup.world.documents.change_metadata(
         owner.id, document.id, DocumentChanges(title="Anderer Titel")
     )
     await setup.settle()
@@ -382,7 +388,7 @@ async def test_a_new_title_embeds_only_the_first_section(setup: Setup) -> None:
 async def test_an_index_job_counts_the_sections_it_embedded(setup: Setup) -> None:
     owner = await setup.world.user()
     document = await setup.document(owner, LONG_TEXT)
-    await setup.world.documents.update_metadata(
+    await setup.world.documents.change_metadata(
         owner.id, document.id, DocumentChanges(title="Anderer Titel")
     )
     assert (await setup.indexing.index_document(document.id)).sections == 1
@@ -421,11 +427,11 @@ async def test_an_entry_without_section_digests_is_embedded_whole_once(setup: Se
 
     # Unchanged, it stays as it is: nothing is embedded for the digests alone.
     assert (await setup.indexing.index_document(document.id)).sections == 0
-    await setup.world.documents.update_metadata(
+    await setup.world.documents.change_metadata(
         owner.id, document.id, DocumentChanges(title="Anderer Titel")
     )
     assert (await setup.indexing.index_document(document.id)).sections == 3
-    await setup.world.documents.update_metadata(
+    await setup.world.documents.change_metadata(
         owner.id, document.id, DocumentChanges(title="Noch ein Titel")
     )
     assert (await setup.indexing.index_document(document.id)).sections == 1
@@ -528,7 +534,7 @@ async def test_an_embedding_failure_keeps_the_vectors_that_are_there(world: Worl
     stamp = before.embedding
 
     broken.up = False
-    await world.documents.update_metadata(owner.id, document.id, DocumentChanges(title="Neu"))
+    await world.documents.change_metadata(owner.id, document.id, DocumentChanges(title="Neu"))
     await setup.settle(pipeline=False)
     entry = setup.entry(document.id)
     assert entry.title == "Neu"  # the words follow at once
@@ -594,10 +600,10 @@ async def test_two_jobs_for_one_document_leave_the_newest_state_in_the_index(wor
     async def newer_job() -> None:
         # While the first job is about to write the old state, the title changes and a second
         # job writes the new state: the first one then overwrites it with the old one.
-        await world.documents.update_metadata(owner.id, document.id, DocumentChanges(title="Neu"))
+        await world.documents.change_metadata(owner.id, document.id, DocumentChanges(title="Neu"))
         await setup.indexing.index_document(document.id)
 
-    await world.documents.update_metadata(owner.id, document.id, DocumentChanges(title="Alt"))
+    await world.documents.change_metadata(owner.id, document.id, DocumentChanges(title="Alt"))
     index.before_write = newer_job
     await setup.indexing.index_document(document.id)
     assert setup.entry(document.id).title == "Neu"
@@ -695,7 +701,7 @@ async def test_a_rebuild_notices_changes_made_while_it_ran(world: World) -> None
     earlier = min(first.id, second.id)  # the build takes the documents in the order of the ids
 
     async def change() -> None:
-        await world.documents.update_metadata(owner.id, earlier, DocumentChanges(title="Geändert"))
+        await world.documents.change_metadata(owner.id, earlier, DocumentChanges(title="Geändert"))
 
     index.after_first_batch = change
     result = await setup.indexing.rebuild()
@@ -712,7 +718,7 @@ async def test_a_rebuild_notices_a_rename_made_while_it_ran(world: World) -> Non
     contact = await setup.master_data.create_contact(admin.id, "Stadtwerke")
     for document in (first, second):
         changes = DocumentChanges(contact_id=contact.id)
-        await world.documents.update_metadata(owner.id, document.id, changes)
+        await world.documents.change_metadata(owner.id, document.id, changes)
     await setup.settle(pipeline=False)
 
     async def rename() -> None:
@@ -898,3 +904,23 @@ async def test_the_facts_read_outside_processing_reach_the_index(setup: Setup) -
     assert await pipeline.request_facts() == 1
     await setup.settle(pipeline_service=pipeline)
     assert any(token.startswith("iban|") for token in setup.entry(document.id).facts)
+
+
+async def test_a_conflict_while_indexing_fails_the_attempt_not_the_claim(
+    setup: Setup, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A deadlock or a row changed meanwhile is no lost claim while the job is still this
+    worker's: the job runs again later, not left running until its lease ran out (SA-08)."""
+    document = DocumentId(new_id())
+    await setup.indexing.on_event(
+        NodeCompleted(document_id=document, occurred_at=NOW, node=Node.JUDGE, run=1, outcome=OK)
+    )
+
+    async def conflict(*args: object, **kwargs: object) -> None:
+        raise ConcurrencyError("could not serialize access")
+
+    monkeypatch.setattr(IndexingService, "index_document", conflict)
+    assert await setup.indexing.run_next_job()
+    (job,) = index_jobs(setup.world)
+    assert job.status is JobStatus.QUEUED
+    assert job.last_error is not None and "ConcurrencyError" in job.last_error

@@ -6,8 +6,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.rest.schemas.common import IdentifierKeyOut
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.documents import UNSET
 from lekto.core.domain.identifiers import (
+    MAX_IDENTIFIER_VALUE,
     MAX_IDENTIFIERS,
     Identifier,
     IdentifierKind,
@@ -41,16 +44,12 @@ class PersonIdentifierIn(BaseModel):
             "kinds are a contact's (422)."
         )
     )
-    value: str = Field(min_length=1, max_length=100)
-
-
-class PersonIdentifierOut(BaseModel):
-    kind: IdentifierKind
-    value: str = Field(description="Normalised.")
+    value: str = Field(min_length=1, max_length=MAX_IDENTIFIER_VALUE)
 
 
 class ContactNumberIn(BaseModel):
-    """A customer or personnel number of the user at a contact, written as in documents."""
+    """A customer, contract or personnel number of the user at a contact, written as in
+    documents."""
 
     model_config = ConfigDict(
         extra="forbid",
@@ -70,7 +69,7 @@ class ContactNumberIn(BaseModel):
         description="`customer_number` (also a contract or policy number) or `personnel_number`; "
         "other kinds name nobody (422)."
     )
-    value: str = Field(min_length=1, max_length=100)
+    value: str = Field(min_length=1, max_length=MAX_IDENTIFIER_VALUE)
     topic_id: UUID | None = Field(
         default=None,
         description="One of the contact's topics it points to (a personnel number to work).",
@@ -119,7 +118,7 @@ class ProfileOut(BaseModel):
     aliases: list[str] = Field(description="Other names (a maiden name), to find the person.")
     birth_date: date | None
     email: str | None = Field(description="Also counts as an identifier.")
-    identifiers: list[PersonIdentifierOut]
+    identifiers: list[IdentifierKeyOut]
     numbers: list[ContactNumberOut] = Field(
         description="The user's customer and personnel numbers at contacts, by contact: found "
         "in a document, they are evidence for the contact and for the user. Only the user and "
@@ -136,24 +135,22 @@ class ProfileOut(BaseModel):
             birth_date=profile.birth_date,
             email=profile.email,
             identifiers=[
-                PersonIdentifierOut(kind=item.kind, value=item.value)
-                for item in profile.identifiers
+                IdentifierKeyOut(kind=item.kind, value=item.value) for item in profile.identifiers
             ],
             numbers=[ContactNumberOut.of(number) for number in found.numbers],
         )
 
 
-class ProfilePatch(BaseModel):
+class ProfilePatch(RequestBody):
     """What is given changes; null removes the display name, birth date or e-mail; `aliases`,
     `identifiers` and `numbers` replace all of them."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
-                    "display_name": "Anna Example",
-                    "aliases": ["Anna Sample"],
+                    "display_name": "Erika Mustermann",
+                    "aliases": ["E. Mustermann"],
                     "birth_date": "1980-06-15",
                 }
             ]
@@ -167,7 +164,7 @@ class ProfilePatch(BaseModel):
     )
     aliases: list[Alias] = Field(default_factory=list, max_length=MAX_ALIASES)
     birth_date: date | None = None
-    email: str | None = Field(default=None, max_length=254)
+    email: str | None = Field(default=None, max_length=MAX_IDENTIFIER_VALUE)
     identifiers: list[PersonIdentifierIn] = Field(
         default_factory=list,
         max_length=MAX_PERSON_IDENTIFIERS,

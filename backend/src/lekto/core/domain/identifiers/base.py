@@ -10,6 +10,11 @@ from typing import ClassVar
 
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.vocabulary import DATE_MONTH_WORDS
+
+MAX_IDENTIFIER_VALUE = 200
+"""Characters an identifier's value has at most, as written: at contacts and persons, as a
+fact, a reference, an open identifier, in REST and MCP alike (Tobi, 17.11.2026; RA-03)."""
 
 
 class IdentifierKind(StrEnum):
@@ -74,11 +79,13 @@ WRITTEN_SEPARATORS = r"[\s./\u00ad-]*"
 """Between the characters of a number as a text writes it: separators, also several (two
 spaces, a line break and its indent of an OCR text) and soft hyphens, or none."""
 
-_MONTHS = r"(?:jan|feb|mär|maer|mar|apr|mai|may|jun|jul|aug|sep|okt|oct|nov|dez|dec)[a-zäöü]*\.?"
+_MONTHS = rf"(?:{'|'.join(sorted(map(re.escape, DATE_MONTH_WORDS), key=len, reverse=True))})\.?"
+"""A month's name or its abbreviation as a whole word (`März`, `Nov.`): `SEPA`, `Main` or `Mark`
+before a number made a date of it, and a number no number (DA-01)."""
 _DATE = re.compile(
     rf"(?P<day>\d{{1,2}})[./-](?P<month>\d{{1,2}})[./-](?:\d{{4}}|\d{{2}})"
     rf"|\d{{4}}-(?P<iso_month>\d{{2}})-(?P<iso_day>\d{{2}})"
-    rf"|{_MONTHS}\s*(?:\d{{4}}|\d{{2}})"
+    rf"|{_MONTHS}\s*(?:(?:19|20)\d{{2}}|\d{{2}})"
 )
 
 
@@ -118,7 +125,9 @@ Schaden-Nummer lautet 12-34-567/890123-X", "Your customer number is 4711"), also
 filler and its word ("Die Vertragsnummer bei Muster lautet 123/456789-X-01")."""
 # A label, then the value: its first word, and further words that hold a digit (`DE 123 456
 # 789`, `123 456`), not the words after it (`DE123456789 Steuernummer`, `4711 Tel.1: 0621`).
-VALUE = rf"{_BEFORE}({_WORDS})"
+VALUE = rf"(?![a-zäöüß]){_BEFORE}({_WORDS})"
+"""A value after its label, the label a whole word as in `labelled`: "Kundennummern 2024" or
+"Customer notes 2024" read no customer number (DA-02)."""
 
 
 class IdentifierType:

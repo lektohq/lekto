@@ -18,6 +18,7 @@ from lekto.core.domain.errors import (
 from lekto.core.domain.identity import (
     KNOWN_DEVICE_LIFETIME,
     KNOWN_DEVICES_PER_BROWSER,
+    KNOWN_DEVICES_PER_USER,
     TokenScope,
     csrf_token,
     hash_token,
@@ -221,6 +222,44 @@ async def test_a_device_known_for_another_user_counts_under_the_account(world: W
     await world.auth.login("bob", PASSWORD, devices=bobs)  # Bob's device counted nothing
 
 
+async def test_a_user_keeps_their_newest_known_devices(world: World) -> None:
+    """Each known device counts its failed sign-ins by itself: a user has at most
+    `KNOWN_DEVICES_PER_USER`, a new one replaces the oldest (XA-05)."""
+    await world.account("alice")
+    signed = []
+    for _ in range(KNOWN_DEVICES_PER_USER + 1):
+        signed.append((await world.auth.login("alice", PASSWORD)).devices[-1])
+        world.clock.advance(timedelta(seconds=1))
+    async with world.uow() as uow:
+        found = [await uow.known_devices.find_by_token(hash_token(token)) for token in signed]
+    assert found[0] is None
+    assert all(device is not None for device in found[1:])
+
+
+async def test_changing_the_password_forgets_the_known_devices(world: World) -> None:
+    """Who knew the old password keeps no device that counts their guesses by itself; the
+    browser the password is changed in is known again, by a new token (XA-05)."""
+    user = await world.account("alice")
+    here = await world.auth.login("alice", PASSWORD)
+    elsewhere = (await world.auth.login("alice", PASSWORD)).devices
+    changed = await world.auth.change_password(
+        user.id, PASSWORD, NEW_PASSWORD, session=here.session.id, devices=here.devices
+    )
+    assert changed is not None
+    [token] = changed.devices
+    assert token not in (*here.devices, *elsewhere)
+    async with world.uow() as uow:
+        for gone in (*here.devices, *elsewhere):
+            assert await uow.known_devices.find_by_token(hash_token(gone)) is None
+        device = await uow.known_devices.find_by_token(hash_token(token))
+    assert device is not None and device.user_id == user.id
+    for _ in range(6):
+        with pytest.raises((AuthenticationError, TooManyAttemptsError)):
+            await world.auth.login("alice", "wrong password!", devices=elsewhere)
+    with pytest.raises(TooManyAttemptsError):
+        await world.auth.login("alice", NEW_PASSWORD)  # their guesses counted on the account
+
+
 async def test_a_known_device_still_needs_the_second_factor(world: World) -> None:
     user = await world.account("alice")
     secret, _ = await enable_totp(world, user)
@@ -370,8 +409,11 @@ async def test_failed_sign_ins_do_not_log_the_typed_username(
         pytest.raises(AuthenticationError),
     ):
         await world.auth.login(typed_into_the_wrong_field, "x", source=SOURCE)
+    [record] = [r for r in caplog.records if r.getMessage() == "sign-in failed"]
+    assert record.__dict__["account_known"] is False
+    # In no record, under no field (TD-01: one field alone was looked at, which was gone).
     for record in caplog.records:
-        logged = record.getMessage() + repr(record.__dict__.get("keys"))
+        logged = record.getMessage() + repr(record.__dict__)
         assert typed_into_the_wrong_field.casefold() not in logged.casefold(), logged
 
 

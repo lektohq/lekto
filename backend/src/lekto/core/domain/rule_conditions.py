@@ -193,23 +193,30 @@ def evaluate(
     return result
 
 
-def distrusted_fields(group: Group[Condition], facts: Facts) -> tuple[str, ...]:
-    """The unconfirmed model fields the conditions look at."""
-    found: list[str] = []
-    for condition in group.conditions():
-        match condition.field:
-            case ConditionField.CONTACT if CONTACT in facts.unverified:
-                found.append(CONTACT)
-            case ConditionField.DOCUMENT_TYPE if DOCUMENT_TYPE in facts.unverified:
-                found.append(DOCUMENT_TYPE)
-            case ConditionField.CONTACT_GROUP if CONTACT in facts.unverified:
-                found.append(CONTACT)
-            case ConditionField.DOCUMENT_TYPE_GROUP if DOCUMENT_TYPE in facts.unverified:
-                found.append(DOCUMENT_TYPE)
-            case ConditionField.TOPIC if TOPIC in facts.unverified:
-                found.append(TOPIC)
-            case ConditionField.TAGS if facts.unverified_tags:
-                found.append(TAGS)
+_DISTRUSTED = {
+    ConditionField.CONTACT: CONTACT,
+    ConditionField.CONTACT_GROUP: CONTACT,
+    ConditionField.DOCUMENT_TYPE: DOCUMENT_TYPE,
+    ConditionField.DOCUMENT_TYPE_GROUP: DOCUMENT_TYPE,
+    ConditionField.TOPIC: TOPIC,
+    ConditionField.TAGS: TAGS,
+}
+"""The model field a condition on each of these fields depends on."""
+
+
+def distrusted_fields(
+    group: Group[Condition], facts: Facts, definitions: Mapping[FieldId, FieldDefinition]
+) -> tuple[str, ...]:
+    """The unconfirmed model fields the conditions depend on: those of the conditions that are
+    unknown with `distrust` and known without, as `evaluate` sees them. A condition on a tag a
+    person confirmed does not depend on another tag the model set (DB-05)."""
+    found = [
+        _DISTRUSTED[condition.field]
+        for condition in group.conditions()
+        if condition.field in _DISTRUSTED
+        and _condition(condition, facts, definitions, True) is None
+        and _condition(condition, facts, definitions, False) is not None
+    ]
     return tuple(dict.fromkeys(found))
 
 
@@ -571,5 +578,6 @@ def matches(
         if before is not None and evaluate(conditions, before, definitions):
             continue
         trusted = evaluate(conditions, facts, definitions, distrust=True) is True
-        found.append(Match(rule, trusted, () if trusted else distrusted_fields(conditions, facts)))
+        distrusted = () if trusted else distrusted_fields(conditions, facts, definitions)
+        found.append(Match(rule, trusted, distrusted))
     return found

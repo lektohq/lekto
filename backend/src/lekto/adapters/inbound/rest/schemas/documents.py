@@ -9,8 +9,14 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, Json, field_validator
 
 from lekto.adapters.inbound.rest.schemas.spaces import MemberOut
-from lekto.adapters.inbound.schemas import FieldJson, ReasonOut, RuleReportOut, field_json
-from lekto.core.domain.documents import MAX_TITLE, Channel, Document
+from lekto.adapters.inbound.schemas import (
+    FieldJson,
+    ReasonOut,
+    RequestBody,
+    RuleReportOut,
+    field_json,
+)
+from lekto.core.domain.documents import MAX_TAGS, MAX_TITLE, REPROCESSABLE_NODES, Channel, Document
 from lekto.core.domain.exchanges import ModelCall, RunExchange
 from lekto.core.domain.imports import MAX_REVIEW_REASON, MAX_REVIEWS
 from lekto.core.domain.json_value import JsonObject
@@ -30,11 +36,10 @@ from lekto.core.services.documents import DocumentFacets
 from lekto.core.services.objects import EXCHANGE_NODES
 
 ReprocessNode = StrEnum(  # type: ignore[misc]
-    "ReprocessNode",
-    {node.name: node.value for node in Node if node not in (Node.RECEIVE, Node.SEPARATE)},
+    "ReprocessNode", {node.name: node.value for node in REPROCESSABLE_NODES}
 )
-"""Nodes processing can restart from; receiving and separating (only when a document comes in)
-cannot be repeated."""
+"""Nodes processing can restart from (`documents.REPROCESSABLE_NODES`); receiving and
+separating (only when a document comes in) cannot be repeated."""
 
 ExchangeNode = StrEnum(  # type: ignore[misc]
     "ExchangeNode", {node.name: node.value for node in EXCHANGE_NODES}
@@ -361,13 +366,12 @@ class DocumentFacetsOut(BaseModel):
         )
 
 
-class DocumentPatch(BaseModel):
+class DocumentPatch(RequestBody):
     """Fields left out stay as they are; null removes a value. A new contact that does not
     enable the document's topic removes the topic; a topic given must be one the contact
     enables (422), unless an admin gives it: it is then enabled at the contact."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -390,7 +394,7 @@ class DocumentPatch(BaseModel):
     contact_id: UUID | None = None
     document_type_id: UUID | None = None
     topic_id: UUID | None = None
-    tag_ids: list[UUID] | None = Field(default=None, max_length=500)
+    tag_ids: list[UUID] | None = Field(default=None, max_length=MAX_TAGS)
     document_date: date | None = None
     fields: dict[UUID, Any] | None = Field(
         default=None,
@@ -455,7 +459,7 @@ class ImportedMetadataIn(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=MAX_TITLE)
     contact_id: UUID | None = None
     document_type_id: UUID | None = None
-    tag_ids: list[UUID] = Field(default_factory=list, max_length=500)
+    tag_ids: list[UUID] = Field(default_factory=list, max_length=MAX_TAGS)
     document_date: date | None = None
     fields: dict[UUID, Any] = Field(
         default_factory=dict, description="Values by field id, as in `PATCH /documents/{id}`."
@@ -539,9 +543,8 @@ class UploadFields(BaseModel):
         return value
 
 
-class MoveRequest(BaseModel):
+class MoveRequest(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"space_id": "01999d5e-3333-7c1e-b6a3-2f4d5e6f7a8b"}]},
     )
 
@@ -661,7 +664,7 @@ class RunExchangeOut(BaseModel):
         return cls(run=exchange.run, calls=[ModelCallOut.of(call) for call in exchange.calls])
 
 
-class ReprocessRequest(BaseModel):
+class ReprocessRequest(RequestBody):
     model_config = ConfigDict(
         extra="forbid", json_schema_extra={"examples": [{"from_node": "judge"}]}
     )

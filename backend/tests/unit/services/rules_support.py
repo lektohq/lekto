@@ -24,8 +24,10 @@ from lekto.core.domain.rules import (
     Rule,
     RuleDefinition,
     RuleScope,
+    SetSpace,
     Trigger,
 )
+from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import Role, User
 from lekto.core.services.documents import DocumentService
 from lekto.core.services.objects import text_key
@@ -172,6 +174,11 @@ def has_tag(tag: TagId) -> Condition:
 
 def text_matches(pattern: str) -> Condition:
     return Condition(field=ConditionField.TEXT, op=Operator.MATCHES, value=pattern)
+
+
+def files_into(space: Space, name: str = "File") -> RuleDefinition:
+    """A rule that files every arrival through the API into `space`."""
+    return definition(name, channel_api(), SetSpace(space.id), triggers=(Trigger.INGEST,))
 
 
 def definition(

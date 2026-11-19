@@ -171,7 +171,7 @@ async def test_nothing_turns_yellow_on_a_change(world: World) -> None:
     assert stored.processing.status is ProcessingStatus.COMPLETED
     assert stored.space_id == (await world.personal_space(owner)).id
     assert (stored.title, stored.tag_ids) == ("scan", {paid.id, seen.id})
-    assert await world.documents.list_visible(reader.id) == []
+    assert await world.visible(reader.id) == []
 
 
 async def test_tags_the_person_sets_in_the_change_are_trusted(world: World) -> None:

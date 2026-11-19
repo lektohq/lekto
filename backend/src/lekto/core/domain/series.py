@@ -138,7 +138,15 @@ class Series:
 
 
 def series_of(key: SeriesKey, documents: Sequence[Dated]) -> Series | None:
-    """The series the documents make, or None: too few, or no steady interval."""
+    """The series the documents make, or None: too few, no steady interval, or one whose next
+    step lies beyond the calendar (year 9999; DB-10)."""
+    try:
+        return _series_of(key, documents)
+    except (ValueError, OverflowError):
+        return None
+
+
+def _series_of(key: SeriesKey, documents: Sequence[Dated]) -> Series | None:
     kept = _once(documents)
     if len(kept) < MIN_DOCUMENTS:
         return None

@@ -4,13 +4,15 @@ and the tokens (Tobi, 01.11.2026, `.idea/decisions/2026-11-01-mcp.md`, decision 
     python run.py --url http://localhost:8010 --token lekto_... [--model sonnet] [--only t01,t05]
 
 Runs `claude -p` once per task, with only Lekto's tools (`--strict-mcp-config`), and checks
-whether the answer contains one of the task's `expect` (case, spaces and dots in numbers aside).
+whether the answer contains one of the task's `expect` as a whole (case and spaces aside):
+`30` is not in `300`, `Rechnung` not in `Lohnabrechnung`, `693,61` not in `1.693,61`.
 Writes `results.json` beside it and prints a table. Costs what the calls cost: run it by hand,
 not in CI. Standard library only.
 """
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -20,13 +22,16 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 
 
-def normal(text: str) -> str:
-    return "".join(text.casefold().split())
+def whole(item: str) -> re.Pattern[str]:
+    """Where `item` stands as a whole, case and spaces aside: not part of a longer word or
+    number (a digit, a letter, or a digit after a dot or comma beside it)."""
+    words = r"\s*".join(re.escape(char) for char in "".join(item.casefold().split()))
+    return re.compile(r"(?<![^\W_])(?<!\d[.,])" + words + r"(?![^\W_])(?![.,]\d)")
 
 
 def hit(answer: str, expect: list[str]) -> bool:
-    said = normal(answer)
-    return any(normal(item) in said for item in expect)
+    said = answer.casefold()
+    return any(whole(item).search(said) for item in expect)
 
 
 def ask(question: str, config: Path, model: str | None) -> dict[str, Any]:

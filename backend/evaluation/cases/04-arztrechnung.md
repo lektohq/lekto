@@ -1,4 +1,4 @@
-Dr. med. Anna Beispiel
+Dr. med. Jane Doe
 Fachärztin für Allgemeinmedizin
 Praxisweg 2, 12345 Musterstadt
 

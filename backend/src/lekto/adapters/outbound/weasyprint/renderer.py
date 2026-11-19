@@ -20,7 +20,6 @@ CHILD = "lekto.adapters.outbound.weasyprint"
 """The module the child process runs (`__main__`)."""
 NO_MAIL = 3
 """Exit code of the child process when the file is no mail."""
-DEFAULT_TIMEOUT = timedelta(minutes=2)
 
 PDF_VARIANT = "pdf/a-3b"
 """PDF/A-3b: an archive like the others (PDF/A-2b and later allow what WeasyPrint writes)."""
@@ -82,16 +81,19 @@ _SCRIPT = re.compile(r"<script\b[^>]*>.*?</script>", re.IGNORECASE | re.DOTALL)
 class WeasyPrintMailRenderer:
     """Sets each mail in a child process (`python -m lekto.adapters.outbound.weasyprint`) with a
     time limit: a mail's HTML comes from anyone, and WeasyPrint has no limit of its own, so a
-    page built to take forever would hold the worker. `locale`: the language of the head
-    (`de`, else English); `timeout`: TimeoutError after it, the child killed; `memory`: the
-    address space the child may take (`run_process`)."""
+    page built to take forever would hold the worker. `language`: the language of the head
+    (ISO 639-1: `de`, else English; the composition takes it from the templates' locale);
+    `timeout`: TimeoutError after it, the child killed; `memory`: the address space the child
+    may take (`run_process`)."""
 
-    def __init__(
-        self, locale: str = "de", timeout: timedelta = DEFAULT_TIMEOUT, memory: int | None = None
-    ) -> None:
-        self._locale = locale
+    def __init__(self, language: str, *, timeout: timedelta, memory: int | None = None) -> None:
+        self._locale = language
         self._timeout = timeout
         self._memory = memory
+
+    @property
+    def language(self) -> str:
+        return self._locale
 
     async def render(self, mail: Path, target: Path) -> RenderedMail:
         completed = await run_process(

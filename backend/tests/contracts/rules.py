@@ -19,10 +19,10 @@ from lekto.core.domain.ids import (
     new_id,
 )
 from lekto.core.domain.master_data import DocumentType
+from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.reasons import ReasonCode, because, written
 from lekto.core.domain.rules import (
     AddTags,
-    ApplicationStatus,
     Condition,
     ConditionField,
     ForceReview,
@@ -256,6 +256,19 @@ class RuleRepositoriesContract:
             listed = await uow.rules.list_for(spaces=[], include_global=True)
         assert stored == rule and stored.managed_by == kind.id
         assert [item.managed_by for item in listed] == [kind.id]
+        # A second living rule of the same type is refused (PM-08).
+        second = Rule.create(
+            scope=RuleScope.GLOBAL,
+            space_id=None,
+            definition=title,
+            by=admin.id,
+            now=NOW,
+            managed_by=kind.id,
+        )
+        with pytest.raises(ConflictError):
+            async with uow_factory() as uow:
+                await uow.rules.add(second)
+                await uow.commit()
         # Deleted, it is no type's rule any more: the type may get another one.
         stored.delete(NOW)
         async with uow_factory() as uow:
@@ -477,9 +490,9 @@ class RuleRepositoriesContract:
             (found,) = await uow.rules.list_for(spaces=[at_bob.id], include_global=False)
         assert found == of_bob  # with the current version
 
-    async def test_remove_for_space(self, uow_factory: UnitOfWorkFactory) -> None:
-        """The space's rules with their versions and applications go for good; nothing else
-        does."""
+    async def test_a_space_that_goes_takes_its_rules(self, uow_factory: UnitOfWorkFactory) -> None:
+        """The space's rules with their versions and applications go with it, for good;
+        nothing else does (SQL: ON DELETE CASCADE)."""
         (admin,) = await users(uow_factory, 1)
         owner, owned = await owner_with_space(uow_factory)
         other, elsewhere = await owner_with_space(uow_factory)
@@ -493,7 +506,7 @@ class RuleRepositoriesContract:
         await store(uow_factory, applications=(*removed_applications, *kept_applications))
 
         async with uow_factory() as uow:
-            assert await uow.rules.remove_for_space(owned.id) == 2
+            await uow.spaces.remove(owned.id)
             await uow.commit()
 
         async with uow_factory() as uow:
@@ -511,7 +524,6 @@ class RuleRepositoriesContract:
             assert [v.number for v in await uow.rules.versions(everyone.id)] == [1, 2]
             remaining = await uow.rules.list_for(spaces=None, include_global=True)
             assert {rule.id for rule in remaining} == {others.id, everyone.id}
-            assert await uow.rules.remove_for_space(owned.id) == 0
 
     async def test_remove_applications_by(self, uow_factory: UnitOfWorkFactory) -> None:
         (admin,) = await users(uow_factory, 1)
@@ -595,7 +607,7 @@ class RuleRepositoriesContract:
                 raise LookupError
         async with uow_factory() as uow:
             await uow.rules.add(space_rule(owner, owned.id))
-            assert await uow.rules.remove_for_space(owned.id) == 2
+            await uow.spaces.remove(owned.id)
             await uow.rollback()
         async with uow_factory() as uow:
             assert await uow.rules.get(rule.id) == rule
@@ -622,7 +634,7 @@ class RuleRepositoriesContract:
         assert stored.via == VIA
         assert stored.documents == item.documents  # in the order selected
         assert stored.accept_conflicts == frozenset(item.documents[:1])
-        assert (stored.status, stored.position, stored.skipped) == (ApplicationStatus.QUEUED, 0, [])
+        assert (stored.status, stored.position, stored.skipped) == (ProgressStatus.QUEUED, 0, [])
         assert (stored.rule_id, stored.rule_version, stored.user_id) == (rule.id, 1, owner.id)
         assert stored.remaining == item.documents
 
@@ -644,7 +656,7 @@ class RuleRepositoriesContract:
             stored = await uow.rule_applications.get(item.id)
         assert stored == running
         assert (stored.status, stored.position, stored.applied, stored.unchanged) == (
-            ApplicationStatus.RUNNING,
+            ProgressStatus.RUNNING,
             3,
             1,
             1,
@@ -661,7 +673,7 @@ class RuleRepositoriesContract:
             failed = await uow.rule_applications.get(item.id)
         assert failed == stored
         assert (failed.status, failed.error, failed.finished_at, failed.version) == (
-            ApplicationStatus.FAILED,
+            ProgressStatus.FAILED,
             "the rule was deleted",
             LATER,
             3,
@@ -677,7 +689,7 @@ class RuleRepositoriesContract:
         async with uow_factory() as uow:
             stored = await uow.rule_applications.get(item.id)
         assert stored == item
-        assert (stored.status, stored.error, stored.remaining) == (ApplicationStatus.DONE, None, ())
+        assert (stored.status, stored.error, stored.remaining) == (ProgressStatus.DONE, None, ())
 
     async def test_missing_applications(self, uow_factory: UnitOfWorkFactory) -> None:
         owner, owned = await owner_with_space(uow_factory)
@@ -710,7 +722,7 @@ class RuleRepositoriesContract:
                 await second.commit()
         async with uow_factory() as uow:
             stored = await uow.rule_applications.get(item.id)
-        assert (stored.status, stored.position, stored.version) == (ApplicationStatus.RUNNING, 1, 2)
+        assert (stored.status, stored.position, stored.version) == (ProgressStatus.RUNNING, 1, 2)
 
     async def test_application_reads_are_copies(self, uow_factory: UnitOfWorkFactory) -> None:
         owner, owned = await owner_with_space(uow_factory)

@@ -2,17 +2,17 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.tasks import MAX_PRODUCER, MAX_REASON
 
 
-class TaskAnswer(BaseModel):
+class TaskAnswer(RequestBody):
     """The envelope of an answer to a task. Lekto reads it itself (an envelope that is not
     valid uses the token up); this model describes it."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {"status": "ok", "producer": "my-flow 1.2", "answer": {"paid": True}},

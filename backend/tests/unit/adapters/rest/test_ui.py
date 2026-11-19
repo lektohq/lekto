@@ -8,8 +8,7 @@ import pytest
 
 from lekto.adapters.inbound.rest import PREFIX
 from lekto.adapters.inbound.rest.ui import IMMUTABLE, REVALIDATE, SECURITY_HEADERS
-from lekto.composition.container import build_memory_container, build_services
-from tests.unit.adapters.rest.support import make_app
+from tests.unit.adapters.rest.support import api_with
 
 INDEX = "<!doctype html><title>lekto</title>"
 SCRIPT = "export const x = 1;"
@@ -32,16 +31,10 @@ def build(tmp_path: Path) -> Path:
     return root
 
 
-async def client_for(directory: Path | None) -> httpx2.AsyncClient:
-    container = build_memory_container()
-    app = make_app(container, build_services(container), ui_directory=directory)
-    return httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="https://lekto")
-
-
 @pytest.fixture
 async def client(build: Path) -> AsyncIterator[httpx2.AsyncClient]:
-    async with await client_for(build) as client:
-        yield client
+    async with api_with(ui_directory=build) as api:
+        yield api.client
 
 
 def assert_secured(response: httpx2.Response) -> None:
@@ -190,8 +183,8 @@ async def test_the_api_keeps_its_paths(client: httpx2.AsyncClient) -> None:
 
 
 async def test_without_a_build_there_is_no_ui() -> None:
-    async with await client_for(None) as client:
+    async with api_with(ui_directory=None) as api:
         for path in ("/", "/ui", "/ui/", "/ui/documents"):
-            response = await client.get(path)
+            response = await api.client.get(path)
             assert response.status_code == 404, path
             assert response.headers["content-type"] == "application/problem+json"

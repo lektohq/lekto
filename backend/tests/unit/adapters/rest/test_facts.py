@@ -12,25 +12,22 @@ from lekto.adapters.outbound.memory import (
     FAKE_GIRO_CODE,
     FakeCodeReader,
     FakeParser,
-    ManualClock,
 )
-from lekto.composition.container import build_memory_container, build_services
 from lekto.core.domain.codes import Code
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.labels import grid_layout
 from lekto.core.domain.locations import Box
-from tests import builders
 from tests.api import auth
-from tests.unit.adapters.rest.support import DOCUMENTS, Api, make_app, upload
+from tests.unit.adapters.rest.support import DOCUMENTS, Api, api_with, upload
 
 TEXT = """\
 Lekto Test GmbH
-Kundennummer 2004-7718
+Kundennummer 1234-5678
 IBAN DE89 3704 0044 0532 0130 00
 Lastschrift von DE02 1203 0000 0000 2020 51
 """
 # The GiroCode twice on page 1 and once on page 2, a bar code in between.
-BAR_CODE = Code(page=1, format="Code 128", text="K-20047718", box=Box(0.1, 0.5, 0.27, 0.08))
+BAR_CODE = Code(page=1, format="Code 128", text="K-12345678", box=Box(0.1, 0.5, 0.27, 0.08))
 CODES = [
     FAKE_GIRO_CODE,
     BAR_CODE,
@@ -41,18 +38,9 @@ CODES = [
 
 @pytest.fixture
 async def facts_api() -> AsyncIterator[Api]:
-    clock = ManualClock(builders.NOW)
-    container = dataclasses.replace(
-        build_memory_container(clock),
-        parser=FakeParser(TEXT, grid_layout(TEXT)),
-        codes=FakeCodeReader(CODES),
-    )
-    services = build_services(container)
-    builders.skip_classification(services.pipeline)
-    app = make_app(container, services)
-    transport = httpx2.ASGITransport(app=app)
-    async with httpx2.AsyncClient(transport=transport, base_url="https://lekto") as client:
-        yield Api(container, services, app, client, clock)
+    adapters = {"parser": FakeParser(TEXT, grid_layout(TEXT)), "codes": FakeCodeReader(CODES)}
+    async with api_with(adapters=adapters) as made:
+        yield made
 
 
 async def post(api: Api, path: str, body: object, headers: dict[str, str]) -> httpx2.Response:
@@ -67,7 +55,7 @@ async def test_names_identifiers_and_codes_with_their_places(facts_api: Api) -> 
         "/contacts",
         {
             "name": "Lekto Test GmbH",
-            "identifiers": [{"kind": "customer_number", "value": "2004-7718"}],
+            "identifiers": [{"kind": "customer_number", "value": "1234-5678"}],
         },
         auth(admin),
     )
@@ -95,15 +83,15 @@ async def test_names_identifiers_and_codes_with_their_places(facts_api: Api) -> 
     assert (named["contact_id"], named["in_text"], named["in_code"]) == (contact_id, True, True)
     assert [TEXT[span["start"] : span["end"]] for span in named["spans"]] == ["Lekto Test"]
     by_value = {item["value"]: item for item in facts["identifiers"]}
-    customer = by_value["20047718"]
+    customer = by_value["12345678"]
     assert customer["contact_id"] == contact_id
     assert customer["holder"] is None  # outside bookings: none told
     # IBANs are numbers of the document since #215; the GiroCode's payee holds it.
     numbers = {item["value"]: item for item in facts["numbers"]}
     iban = numbers["DE89370400440532013000"]
     assert iban["holder"] == {"kind": "sender", "name": "Lekto Test GmbH", "source": "rule"}
-    assert set(by_value) == {"20047718"}
-    assert [TEXT[span["start"] : span["end"]] for span in customer["spans"]] == ["2004-7718"]
+    assert set(by_value) == {"12345678"}
+    assert [TEXT[span["start"] : span["end"]] for span in customer["spans"]] == ["1234-5678"]
     # Where it stands on the page, a box per line: the word on the grid of the parsed text.
     assert customer["spans"][0]["locations"] == [
         {"page": 1, "boxes": [{"x": 0.1625, "y": 0.0192, "width": 0.1125, "height": 0.0116}]}
@@ -125,7 +113,7 @@ async def test_names_identifiers_and_codes_with_their_places(facts_api: Api) -> 
     ]
     assert (bar["format"], bar["text"], [place["page"] for place in bar["places"]]) == (
         "Code 128",
-        "K-20047718",
+        "K-12345678",
         [1],
     )
     assert code["giro"] == {
@@ -142,7 +130,7 @@ async def test_names_identifiers_and_codes_with_their_places(facts_api: Api) -> 
     assert {
         item["value"]: (item["other_contacts"], item["other_contact_ids"])
         for item in as_admin["identifiers"]
-    } == {"20047718": (0, [])}
+    } == {"12345678": (0, [])}
 
 
 async def test_facts_need_read_access_and_a_text(facts_api: Api) -> None:
@@ -163,7 +151,7 @@ async def test_an_admin_attaches_an_identifier_from_a_document(facts_api: Api) -
     bank = (await post(api, "/contacts", {"name": "Bank"}, auth(admin))).json()
     url = f"{DOCUMENTS}/{await upload(api, auth(owner))}"
     path = f"/contacts/{utility['id']}/identifiers"
-    body = {"kind": "customer_number", "value": "2004-7718"}
+    body = {"kind": "customer_number", "value": "1234-5678"}
 
     assert (await post(api, path, body, auth(owner))).status_code == 403
     attached = await post(api, path, body, auth(admin))
@@ -171,7 +159,7 @@ async def test_an_admin_attaches_an_identifier_from_a_document(facts_api: Api) -
     assert attached.json()["identifiers"] == [
         {
             "kind": "customer_number",
-            "value": "20047718",
+            "value": "12345678",
             "source": "manual",
             "topic_id": None,
             "user_id": None,
@@ -179,7 +167,7 @@ async def test_an_admin_attaches_an_identifier_from_a_document(facts_api: Api) -
     ]
     # Counts at once in the document's facts.
     facts = (await api.client.get(f"{url}/facts", headers=auth(owner))).json()
-    customer = next(item for item in facts["identifiers"] if item["value"] == "20047718")
+    customer = next(item for item in facts["identifiers"] if item["value"] == "12345678")
     assert customer["contact_id"] == utility["id"]
     # Another contact has it entered by hand; a value of no such kind.
     taken = await post(api, f"/contacts/{bank['id']}/identifiers", body, auth(admin))

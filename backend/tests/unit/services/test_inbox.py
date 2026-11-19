@@ -431,7 +431,7 @@ async def test_values_set_meanwhile_are_kept(world: World) -> None:
     async with world.uow() as uow:
         await uow.contacts.add(chosen)
         await uow.commit()
-    await world.documents.update_metadata(
+    await world.documents.change_metadata(
         s.owner.id, s.document.id, DocumentChanges(contact_id=chosen.id)
     )
     await s.pipeline.confirm(
@@ -541,7 +541,7 @@ async def test_a_confirmed_document_becomes_visible_to_the_spaces_readers(world:
         s.owner.id, incoming(b"%PDF-1.7 shared\n"), filename="b.pdf", space=space.id
     )
     await world.drain(s.pipeline)
-    assert await world.documents.list_visible(reader.id) == []  # yellow: the editors' only
+    assert await world.visible(reader.id) == []  # yellow: the editors' only
     await s.pipeline.confirm(
         s.owner.id,
         document.id,
@@ -549,7 +549,7 @@ async def test_a_confirmed_document_becomes_visible_to_the_spaces_readers(world:
         accept_suggestions=True,
     )
     await world.drain(s.pipeline)
-    (visible,) = await world.documents.list_visible(reader.id)
+    (visible,) = await world.visible(reader.id)
     assert (visible.id, visible.lane) == (document.id, Lane.GREEN)
 
 

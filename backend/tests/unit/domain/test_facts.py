@@ -19,7 +19,7 @@ from tests.builders import NOW
 
 TEXT = """\
 Stadtwerke   Müllheim-Süd GmbH
-Kundennummer 2004-7718
+Kundennummer 1234-5678
 service@stadtwerke-muellheim.example
 IBAN DE89 3704 0044 0532 0130 00
 Lastschrift von DE02120300000000202051
@@ -47,12 +47,12 @@ def test_a_name_is_found_however_it_is_spaced_and_spelt() -> None:
 def test_an_identifier_is_found_as_it_is_written() -> None:
     iban = identifier_spans(TEXT, IdentifierKind.IBAN, "DE89370400440532013000")
     assert spanned(TEXT, iban) == ["DE89 3704 0044 0532 0130 00"]
-    customer = identifier_spans(TEXT, IdentifierKind.CUSTOMER_NUMBER, "20047718")
-    assert spanned(TEXT, customer) == ["2004-7718"]
+    customer = identifier_spans(TEXT, IdentifierKind.CUSTOMER_NUMBER, "12345678")
+    assert spanned(TEXT, customer) == ["1234-5678"]
     domain = identifier_spans(TEXT, IdentifierKind.EMAIL_DOMAIN, "stadtwerke-muellheim.example")
     assert spanned(TEXT, domain) == ["stadtwerke-muellheim.example"]
     # Not inside a longer value.
-    assert identifier_spans("X20047718", IdentifierKind.CUSTOMER_NUMBER, "20047718") == ()
+    assert identifier_spans("X12345678", IdentifierKind.CUSTOMER_NUMBER, "12345678") == ()
     apart = "IBAN: DE 89 3704 0044 0532 0130 00"
     assert spanned(
         apart, identifier_spans(apart, IdentifierKind.IBAN, "DE89370400440532013000")
@@ -65,7 +65,7 @@ def test_an_identifier_is_found_as_it_is_written() -> None:
 
 
 def test_facts_of_text_and_codes_with_their_places() -> None:
-    customer = Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "2004-7718")
+    customer = Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "1234-5678")
     rejected = Identifier.parse(IdentifierKind.EMAIL_DOMAIN, "stadtwerke-muellheim.example")
     utility = Contact.create(name="Stadtwerke Müllheim-Süd", now=NOW, identifiers=[customer])
     bank = Contact.create(name="Bank", now=NOW)
@@ -86,13 +86,13 @@ def test_facts_of_text_and_codes_with_their_places() -> None:
         ),
     )
     by_value = {item.value: item for item in facts.identifiers}
-    assert by_value["20047718"] == FoundIdentifier(
+    assert by_value["12345678"] == FoundIdentifier(
         kind=IdentifierKind.CUSTOMER_NUMBER,
-        value="20047718",
+        value="12345678",
         contact_id=utility.id,
         in_text=True,
         in_code=False,
-        spans=(Span(TEXT.index("2004-7718"), TEXT.index("2004-7718") + 9),),
+        spans=(Span(TEXT.index("1234-5678"), TEXT.index("1234-5678") + 9),),
     )
     # IBANs, the GiroCode's too, are no contact's identifiers since #215; the rejected domain
     # is neither shown nor evidence.
@@ -115,7 +115,7 @@ def test_on_the_pages_each_span_has_its_places() -> None:
         Location(1, (Box(0.0, 0.0025, 0.125, 0.0117), Box(0.1625, 0.0025, 0.15, 0.0117))),
     )
     by_value = {item.value: item for item in facts.identifiers}
-    ((customer,),) = [by_value["20047718"].spans]
+    ((customer,),) = [by_value["12345678"].spans]
     assert [location.page for location in customer.locations] == [1]
     # No words with boxes: no places.
     assert on_pages(facts, TextPlaces(TEXT, {})).named[0].spans[0].locations == ()

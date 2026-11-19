@@ -184,7 +184,7 @@ def test_similar_documents_contradict_only_with_a_proof_of_their_contact() -> No
 
 
 def test_a_payslip_of_a_new_employer_is_green_by_its_proof() -> None:
-    """Tobi, 22.10.2026, Anna's payslip among Tobi's: the model reads the new employer (a
+    """Tobi, 22.10.2026, Erika's payslip among Tobi's: the model reads the new employer (a
     full match), its personnel number and its name stand in the text; four of the five
     similar payslips are from Tobi's employer, one from another, the classifier leans to
     Tobi's employer (52 %) without naming it. The old employer is not in the text: no
@@ -240,7 +240,16 @@ def test_a_payslip_of_a_new_employer_is_green_by_its_proof() -> None:
                 model=model(sender="Stadtwerke Musterstadt"),
                 facts=FactsView(named=frozenset({UTILITY.id}), identifiers={BANK.id: ("iban",)}),
             ),
-            "only one signal names 'Stadtwerke Musterstadt'",
+            "an identifier of 'Beispielbank' stands in the text",
+        ),
+        (
+            # Two signals name the contact: the identifier of another one is what is wrong.
+            Signals(
+                model=model(sender="Stadtwerke Musterstadt"),
+                classifier=classifier(UTILITY.id),
+                facts=FactsView(named=frozenset({UTILITY.id}), identifiers={BANK.id: ("iban",)}),
+            ),
+            "an identifier of 'Beispielbank' stands in the text",
         ),
         (
             # A pay slip: the model takes the employee, an unknown name, for the sender.
@@ -258,6 +267,21 @@ def test_a_contradiction_is_never_green(signals: Signals, reason: str) -> None:
     check = judge_contact(signals, CONTACTS)
     assert check.outcome is Outcome.UNCERTAIN
     assert check.reason == reason
+
+
+def test_an_uncertain_value_shows_a_confidence_below_the_threshold() -> None:
+    """`LEKTO_CONFIDENCE_THRESHOLD` set lower: an uncertain contact stays below it all the
+    same (the classifier is surer, yet another contact's identifier stands in the text)."""
+    signals = Signals(
+        model=model(sender="Stadtwerke Musterstadt"),
+        classifier=classifier(UTILITY.id),
+        facts=FactsView(named=frozenset({UTILITY.id}), identifiers={BANK.id: ("iban",)}),
+    )
+    for accept in (0.9, 0.8):
+        thresholds = replace(builders.THRESHOLDS, accept=accept, suggest=min(0.75, accept))
+        check = verdict.judge_contact(signals, CONTACTS, thresholds)
+        assert check.outcome is Outcome.UNCERTAIN
+        assert check.confidence == pytest.approx(accept - 0.01)
 
 
 def test_similar_documents_cover_only_what_confirmed_documents_carry() -> None:

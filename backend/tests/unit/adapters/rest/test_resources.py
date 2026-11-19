@@ -1,13 +1,17 @@
 """Endpoints for users, master data, spaces and document metadata: they do what they say."""
 
+import json
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
+from lekto.adapters.inbound.problems import MAX_INPUT_ERRORS
 from lekto.adapters.inbound.rest import PREFIX
+from lekto.adapters.inbound.rest.account import LOGIN_MAX_BODY
 from lekto.core.domain.ids import DocumentId, new_id
 from lekto.core.domain.users import Role
+from lekto.core.domain.validation import MAX_REFERENCES
 from lekto.core.services.objects import archive_key
 from tests.api import auth
 from tests.builders import PASSWORD, SAMPLES
@@ -651,9 +655,9 @@ async def test_the_last_admin_stays(api: Api) -> None:
 
 async def test_deleting_a_user_settles_the_spaces_that_stop_it(api: Api) -> None:
     """Tobi, 22.10.2026: the API names the spaces, the admin decides in one request."""
-    admin, anna = await api.admin("root"), await api.user("anna")
-    document = await upload(api, auth(anna), content=unique_pdf("anna"))
-    url = f"{PREFIX}/users/{anna.id}"
+    admin, erika = await api.admin("root"), await api.user("erika")
+    document = await upload(api, auth(erika), content=unique_pdf("erika"))
+    url = f"{PREFIX}/users/{erika.id}"
     removal = await api.client.get(f"{url}/removal", headers=auth(admin))
     assert removal.status_code == 200, removal.text
     (blocking,) = removal.json()["blocking_spaces"]
@@ -662,7 +666,7 @@ async def test_deleting_a_user_settles_the_spaces_that_stop_it(api: Api) -> None
         1,
         ["move_to"],
     )
-    assert (await api.client.get(f"{url}/removal", headers=auth(anna))).status_code == 403
+    assert (await api.client.get(f"{url}/removal", headers=auth(erika))).status_code == 403
     target = (await api.client.get(f"{PREFIX}/users/{admin.id}", headers=auth(admin))).json()[
         "personal_space_id"
     ]
@@ -926,6 +930,36 @@ async def test_json_bodies_are_bounded(api: Api) -> None:
         f"{PREFIX}/auth/login", content=huge, headers={"content-type": "application/json"}
     )
     assert response.status_code == 413, response.status_code
+
+
+async def test_the_sign_in_takes_a_small_body(api: Api) -> None:
+    """The sign-in is public: it reads at most `LOGIN_MAX_BODY`, not the megabyte of other
+    requests, so unknown keys cannot make FastAPI validate a hundred thousand errors."""
+    body = json.dumps({"username": "a", "password": "x", **{f"k{i}": 0 for i in range(2000)}})
+    assert LOGIN_MAX_BODY < len(body) < 1024 * 1024
+    response = await api.client.post(
+        f"{PREFIX}/auth/login", content=body, headers={"content-type": "application/json"}
+    )
+    assert response.status_code == 413
+
+
+async def test_a_422_names_the_first_errors_and_how_many_there_are(api: Api) -> None:
+    user = await api.user()
+    body = {"name": "Haushalt", **{f"unknown{i}": 0 for i in range(300)}}
+    response = await api.client.post(f"{PREFIX}/spaces", json=body, headers=auth(user))
+    assert response.status_code == 422
+    problem = response.json()
+    assert len(problem["errors"]) == MAX_INPUT_ERRORS
+    assert problem["detail"].endswith(f"(the first {MAX_INPUT_ERRORS} of 300 errors)")
+
+
+async def test_a_list_above_its_limit_is_one_error(api: Api) -> None:
+    user = await api.user()
+    member = {"user_id": str(new_id()), "role": "read"}
+    body = {"name": "Haushalt", "members": [member] * (MAX_REFERENCES + 1)}
+    response = await api.client.post(f"{PREFIX}/spaces", json=body, headers=auth(user))
+    assert response.status_code == 422
+    assert [error["field"] for error in response.json()["errors"]] == ["members"]
 
 
 async def test_bodies_without_length_are_bounded_while_read(api: Api) -> None:

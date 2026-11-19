@@ -19,7 +19,7 @@ type LogEntry = components['schemas']['LogEntry'];
 const BAKERY = '0199a6c4-0000-7000-8000-0000000000c1';
 const MUSTERVEREIN = '0199a6c4-0000-7000-8000-0000000000c2';
 const PAYSLIP = '0199a6c4-0000-7000-8000-0000000000e1';
-const ANNA = '0199a6c4-0000-7000-8000-0000000000a1';
+const ERIKA = '0199a6c4-0000-7000-8000-0000000000a1';
 const lookup = {
 	contacts: [
 		{ id: BAKERY, name: 'Muster Bäckerei' },
@@ -28,7 +28,7 @@ const lookup = {
 	documentTypes: [{ id: PAYSLIP, name: 'Lohnabrechnung' }],
 	tags: [],
 	spaces: [],
-	users: [{ id: ANNA, username: 'anna', display_name: 'Jane Doe' }]
+	users: [{ id: ERIKA, username: 'erika', display_name: 'Jane Doe' }]
 } as unknown as Lookup;
 
 const entry = (node: string, output: Record<string, unknown>) =>
@@ -154,7 +154,7 @@ describe('step details', () => {
 				identifiers: [{ kind: 'personnel_number', value: '12345', contact_id: BAKERY }],
 				// As the API keeps it; shown as printed.
 				unknown_identifiers: [{ kind: 'iban', value: 'DE89370400440532013000' }],
-				persons: [{ user_id: ANNA, strength: 'weak' }]
+				persons: [{ user_id: ERIKA, strength: 'weak' }]
 			},
 			lookup
 		);

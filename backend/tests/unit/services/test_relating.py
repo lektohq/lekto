@@ -1,60 +1,40 @@
 """Recognising relations (#145 PR 11, `services.relating`): the sources, how sure each is, both
 directions, and what a person decided stays."""
 
-from datetime import date
+from dataclasses import replace
+from datetime import date, timedelta
+from typing import Any
 
 import pytest
 
 from lekto.core.domain.document_facts import DocumentFact, FactOrigin, FactRole
 from lekto.core.domain.documents import Document, DocumentChanges
+from lekto.core.domain.errors import ConcurrencyError
 from lekto.core.domain.events import DocumentUpdated
 from lekto.core.domain.fields import FieldDefinition, FieldType
 from lekto.core.domain.first_runs import RELATIONS
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import ContactId, DocumentId, DocumentTypeId
-from lekto.core.domain.master_data import Contact, DocumentType
+from lekto.core.domain.jobs import JobStatus
 from lekto.core.domain.periods import Period
-from lekto.core.domain.pipeline import Node
+from lekto.core.domain.pipeline import Node, NodeResult, NodeRun, Outcome
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState
 from lekto.core.domain.rules import AddTags, Condition, ConditionField, Operator
-from lekto.core.domain.spaces import Space
-from lekto.core.domain.users import User
+from lekto.core.services import pipeline as pipeline_module
 from lekto.core.services import relating
 from lekto.core.services.classification.signals import FactsSignal
-from lekto.core.services.relating import RELATE, queue_relate, relate
+from lekto.core.services.relating import RELATE, RELATE_JOB, queue_relate, relate
 from lekto.core.services.relations import RELATIONS_LOCK, RelationService
 from tests import builders
 from tests.unit.services.rules_support import Classifies, definition, rule_world
-from tests.unit.services.support import World
+from tests.unit.services.support import StoredScene, World
 
 K = IdentifierKind
 NOW = builders.NOW
 
 
-class Scene:
+class Scene(StoredScene):
     """A user's documents with contacts, types, dates, fields and facts, stored directly."""
-
-    def __init__(self, world: World, owner: User, space: Space) -> None:
-        self.world, self.owner, self.space = world, owner, space
-
-    @classmethod
-    async def of(cls, world: World) -> "Scene":
-        owner = await world.user()
-        return cls(world, owner, await world.personal_space(owner))
-
-    async def contact(self, name: str) -> ContactId:
-        contact = Contact.create(name=name, now=NOW)
-        async with self.world.uow() as uow:
-            await uow.contacts.add(contact)
-            await uow.commit()
-        return contact.id
-
-    async def document_type(self, name: str, *, target: bool = False) -> DocumentTypeId:
-        kind = DocumentType.create(name=name, now=NOW, relation_target=target)
-        async with self.world.uow() as uow:
-            await uow.document_types.add(kind)
-            await uow.commit()
-        return kind.id
 
     async def document(
         self,
@@ -265,6 +245,37 @@ async def test_what_a_person_decided_stays(world: World) -> None:
     assert kept.state is RelationState.REJECTED
 
 
+async def test_what_a_person_decided_stays_when_they_are_gone(world: World) -> None:
+    """Removing a user leaves their decisions without a decider (`decided_by` NULL): a
+    relation they set stays when no source finds it any more."""
+    s = await Scene.of(world)
+    shop, other = await s.contact("Versandhaus"), await s.contact("Stadtwerke")
+    await s.document(
+        contact=shop, dated=date(2026, 5, 12), facts=((K.INVOICE_NUMBER, "VB1", FactRole.OWN),)
+    )
+    reminder = await s.document(
+        contact=shop, dated=date(2026, 6, 10), facts=((K.INVOICE_NUMBER, "VB1", FactRole.REFERS),)
+    )
+    (made,) = await s.relate(reminder)
+    leaving = builders.user()
+    accepted = replace(made, decided_by=leaving.id, decided_at=NOW)
+    async with world.uow() as uow:
+        await uow.users.add(leaving)
+        await uow.document_relations.put(accepted)
+        await uow.commit()
+    async with world.uow() as uow:
+        await uow.users.remove(leaving.id)
+        await uow.commit()
+    reminder.apply_changes(DocumentChanges(contact_id=other), {}, NOW)
+    async with world.uow() as uow:
+        await uow.documents.update(reminder)
+        await uow.lock(RELATIONS_LOCK)
+        related = await relate(uow, reminder, NOW)
+        await uow.commit()
+    assert related.dropped == ()
+    assert await s.relations(reminder) == [replace(accepted, decided_by=None)]
+
+
 async def test_the_node_relates_a_reminder_on_arrival(world: World) -> None:
     """In processing, after the fields and before the rules; again by `lekto relate`."""
     r = await rule_world(world)
@@ -386,6 +397,29 @@ async def test_a_relation_lekto_made_goes_when_no_source_finds_it_any_more(world
     assert await s.relations(reminder) == []
 
 
+async def test_a_suggestion_without_a_contact_stays_when_the_other_end_looks_again(
+    world: World,
+) -> None:
+    """The invoice of a contact does not find the reminder without one (`_with_fact`), which
+    found the invoice: the suggestion stays when the invoice looks again."""
+    s = await Scene.of(world)
+    shop = await s.contact("Versandhaus")
+    invoice = await s.document(
+        contact=shop, dated=date(2026, 5, 12), facts=((K.INVOICE_NUMBER, "VB1", FactRole.OWN),)
+    )
+    reminder = await s.document(
+        dated=date(2026, 6, 10), facts=((K.INVOICE_NUMBER, "VB1", FactRole.REFERS),)
+    )
+    suggested = {(reminder.id, invoice.id, RelationState.SUGGESTED)}
+    assert pairs(await s.relate(reminder)) == suggested
+    async with world.uow() as uow:
+        await uow.lock(RELATIONS_LOCK)
+        related = await relate(uow, invoice, NOW)
+        await uow.commit()
+    assert (related.made, related.dropped) == ((), ())
+    assert pairs(await s.relations(invoice)) == suggested
+
+
 async def test_two_relation_targets_are_not_related_by_a_customer_number(world: World) -> None:
     s = await Scene.of(world)
     insurer = await s.contact("Nord Versicherung")
@@ -479,3 +513,70 @@ async def test_a_rule_sees_only_relations_its_author_may_read(world: World) -> N
     log = await world.documents.processing_log(owner.id, reminder.id)
     (entry,) = [item for item in log if item.node is Node.RELATE]
     assert entry.result.output["relations"] == []
+
+
+async def test_the_log_names_no_removed_relation_to_a_document_the_reader_does_not_read(
+    world: World,
+) -> None:
+    """Made or removed, a relation to a document the reader may not read is none of theirs
+    (#145): the relations `relate` removed were shown with the other document's id."""
+    owner, other = await world.user(), await world.user()
+    space = await world.personal_space(owner)
+    reminder = builders.processed(owner, space)
+    visible = builders.processed(owner, space)
+    hidden = builders.processed(other, await world.personal_space(other))
+
+    def removed(document: Document) -> dict[str, Any]:
+        return {"document_id": str(document.id), "direction": "refers_to", "state": "suggested"}
+
+    async with world.uow() as uow:
+        for document in (reminder, visible, hidden):
+            await uow.documents.add(document)
+        await uow.processing_log.append(
+            NodeRun(
+                document_id=reminder.id,
+                node=Node.RELATE,
+                run=1,
+                result=NodeResult(
+                    outcome=Outcome.OK,
+                    output={"relations": [], "dropped": [removed(visible), removed(hidden)]},
+                ),
+                pipeline_version="1",
+                started_at=NOW,
+                duration=timedelta(seconds=1),
+            )
+        )
+        await uow.commit()
+    log = await world.documents.processing_log(owner.id, reminder.id)
+    (entry,) = [item for item in log if item.node is Node.RELATE]
+    assert entry.result.output["dropped"] == [removed(visible)]
+
+
+async def test_a_conflict_while_relating_aside_is_tried_again(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A deadlock or a row changed meanwhile is no lost claim while the job is still this
+    worker's: it was left running until its lease ran out (SA-08)."""
+    r = await rule_world(world)
+    owner = await world.user()
+    facts = FactsSignal(world.uow, world.object_store)
+    invoice = await r.arrive(owner, text="Rechnungsnummer: VB-889911", facts=facts)
+    reminder = await r.arrive(owner, text="Ihre Rechnung Nr. VB-889911 ist offen.", facts=facts)
+    pipeline = r.pipeline(facts=facts)
+    async with world.uow() as uow:
+        await uow.document_relations.remove(reminder.id, invoice.id)
+        await queue_relate(uow, reminder.id, NOW)
+        await uow.commit()
+    conflicts = [ConcurrencyError("could not serialize access")]
+
+    async def relating(*args: Any) -> Any:
+        if conflicts:
+            raise conflicts.pop()
+        return await relate(*args)
+
+    monkeypatch.setattr(pipeline_module, "relate", relating)
+    await world.drain(pipeline)
+    assert not conflicts
+    assert len(await stored_relations(world, reminder)) == 1
+    relate_jobs = [job for job in world.database.jobs.values() if job.kind == RELATE_JOB]
+    assert relate_jobs and all(job.status is JobStatus.DONE for job in relate_jobs)

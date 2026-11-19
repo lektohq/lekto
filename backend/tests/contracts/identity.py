@@ -116,7 +116,6 @@ class IdentityRepositoriesContract:
             found = await uow.sessions.find_by_token(session.token_hash)
             assert found is not None
             assert found.last_seen_at == NOW + HOUR
-            assert found.version == session.version  # touching is no change
 
     async def test_concurrent_touches_do_not_conflict(self, uow_factory: UnitOfWorkFactory) -> None:
         user = await a_user(uow_factory)
@@ -131,6 +130,42 @@ class IdentityRepositoriesContract:
                 await second.commit()
             await first.sessions.touch(session.id, NOW + 2 * HOUR)
             await first.commit()
+
+    async def test_a_touch_after_a_concurrent_removal_does_not_conflict(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """Signing out in one tab while a request in another touches the session (or renews the
+        device): the touch changes nothing, its commit goes through, and what was removed
+        stays removed (PM-09)."""
+        user = await a_user(uow_factory)
+        session = a_session(user)
+        device, token = KnownDevice.issue(user_id=user.id, now=NOW)
+        async with uow_factory() as uow:
+            await uow.sessions.add(session)
+            await uow.known_devices.add(device)
+            await uow.commit()
+        touched = asyncio.Event()
+
+        async def touch() -> None:
+            async with uow_factory() as uow:
+                await uow.sessions.touch(session.id, NOW + HOUR)
+                await uow.known_devices.renew(device.id, device.expires_at + HOUR)
+                touched.set()
+                await asyncio.sleep(0)  # the other unit removes them meanwhile, or waits
+                await uow.commit()
+
+        async def remove() -> None:
+            async with asyncio.timeout(10):
+                await touched.wait()
+            async with uow_factory() as uow:
+                await uow.sessions.remove(session.id)
+                await uow.known_devices.remove_for_user(user.id)
+                await uow.commit()
+
+        await asyncio.gather(touch(), remove())
+        async with uow_factory() as uow:
+            assert await uow.sessions.find_by_token(session.token_hash) is None
+            assert await uow.known_devices.find_by_token(hash_token(token)) is None
 
     async def test_session_tokens_are_unique(self, uow_factory: UnitOfWorkFactory) -> None:
         user = await a_user(uow_factory)
@@ -187,7 +222,6 @@ class IdentityRepositoriesContract:
             found = await uow.known_devices.find_by_token(device.token_hash)
             assert found is not None
             assert found.expires_at == device.expires_at + HOUR
-            assert found.version == device.version  # renewing is no change
 
     async def test_known_device_tokens_are_unique(self, uow_factory: UnitOfWorkFactory) -> None:
         user = await a_user(uow_factory)
@@ -223,6 +257,34 @@ class IdentityRepositoriesContract:
             ]
             assert [d.id if d else None for d in remaining] == [None, None, kept.id, None]
 
+    async def test_a_user_keeps_the_newest_known_devices(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        user, other = await a_user(uow_factory), await a_user(uow_factory)
+        oldest, _ = KnownDevice.issue(user_id=user.id, now=NOW)
+        older, _ = KnownDevice.issue(user_id=user.id, now=NOW + HOUR)
+        newest, _ = KnownDevice.issue(user_id=user.id, now=NOW + 2 * HOUR)
+        theirs, _ = KnownDevice.issue(user_id=other.id, now=NOW)
+        async with uow_factory() as uow:
+            for device in (newest, oldest, theirs, older):
+                await uow.known_devices.add(device)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.known_devices.keep_newest(user.id, 2) == 1
+            assert await uow.known_devices.keep_newest(user.id, 2) == 0
+            await uow.commit()
+        async with uow_factory() as uow:
+            remaining = [
+                await uow.known_devices.find_by_token(d.token_hash)
+                for d in (oldest, older, newest, theirs)
+            ]
+            assert [d.id if d else None for d in remaining] == [
+                None,
+                older.id,
+                newest.id,
+                theirs.id,
+            ]
+
     # --- API tokens -----------------------------------------------------------------------------
 
     async def test_api_tokens(self, uow_factory: UnitOfWorkFactory) -> None:
@@ -250,7 +312,6 @@ class IdentityRepositoriesContract:
         async with uow_factory() as uow:
             [stored] = await uow.api_tokens.list_for(user.id)
             assert stored.last_used_at == NOW + HOUR
-            assert stored.version == first.version
             assert await uow.api_tokens.remove_for_user(other.id) == 1
             await uow.commit()
         async with uow_factory() as uow:
@@ -285,8 +346,7 @@ class IdentityRepositoriesContract:
                 )
                 await uow.commit()
         async with uow_factory() as uow:
-            await uow.external_identities.remove(link.id)
-            assert await uow.external_identities.remove_for_user(user.id) == 1
+            assert await uow.external_identities.remove_for_user(user.id) == 2
             await uow.commit()
         async with uow_factory() as uow:
             assert await uow.external_identities.list_for(user.id) == []
@@ -326,6 +386,21 @@ class IdentityRepositoriesContract:
         fresh = await stored()
         assert fresh.failures == 1 and fresh.first_failure_at == NOW + 2 * HOUR
         assert fresh.blocked_until is None
+
+    async def test_a_release_keeps_the_block_the_rest_earns(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """Released, an attempt lifts a block only where the attempts left earn none."""
+        rule = ThrottleRule(free=2, window=HOUR, base=timedelta(minutes=1), limit=HOUR)
+        async with uow_factory() as uow:
+            for at in (0, 0, 0, 2):
+                await uow.login_failures.reserve("account:alice", rule, NOW + timedelta(minutes=at))
+            await uow.login_failures.release("account:alice", rule)  # three remain
+            await uow.commit()
+        async with uow_factory() as uow:
+            found = await uow.login_failures.find("account:alice")
+        assert found is not None and found.failures == 3
+        assert found.blocked_until == NOW + timedelta(minutes=4)  # the fourth's
 
     async def test_concurrent_reservations_are_all_counted(
         self, uow_factory: UnitOfWorkFactory

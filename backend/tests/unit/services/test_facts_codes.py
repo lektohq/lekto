@@ -20,8 +20,8 @@ from lekto.core.services.classification.signals import FactsResult, FactsSignal
 from lekto.core.services.nodes import OcrNode
 from lekto.core.services.objects import archive_key, codes_key, original_key
 from tests import builders
+from tests.unit.services.classification_support import contacts, output, stored
 from tests.unit.services.support import World
-from tests.unit.services.test_signals import contacts, stored
 
 GIRO_IBAN = "DE89370400440532013000"
 OWN_IBAN = "DE02120300000000202051"
@@ -46,12 +46,12 @@ async def test_the_identifiers_and_the_payee_of_a_code_count(world: World) -> No
     text = "Rechnung 4711\nBetrag 123,45 EUR\n"  # neither the payee nor its IBAN in the text
     document = await with_archive(world, await stored(world, await world.user(), text))
     result = await facts(world, document, FakeCodeReader([FAKE_GIRO_CODE]))
-    assert result.output["named"] == [
+    assert output(result)["named"] == [
         {"contact_id": str(payee.id), "name": "Lekto Test GmbH", "alias": False, "in_code": True}
     ]
     # The code's IBAN is a fact; no contact carries IBANs as identifiers since #215.
-    assert result.output["identifiers"] == []
-    assert result.output["codes"] == 1
+    assert output(result)["identifiers"] == []
+    assert output(result)["codes"] == 1
     assert {fact.key for fact in result.facts} == {(IdentifierKind.IBAN, GIRO_IBAN)}
 
 
@@ -80,12 +80,12 @@ class Broken(FakeCodeReader):
 async def test_codes_that_cannot_be_read_leave_the_facts_of_the_text(world: World) -> None:
     document = await with_archive(world, await stored(world, await world.user(), TEXT))
     result = await facts(world, document, Broken())
-    assert "codes" not in result.output
+    assert "codes" not in output(result)
     assert {fact.key for fact in result.facts} == {(IdentifierKind.IBAN, OWN_IBAN), CUSTOMER}
     assert not await world.object_store.exists(codes_key(document.id))
     # Without an archive (or a reader) there are no codes either.
     other = await stored(world, await world.user(), TEXT)
-    assert "codes" not in (await facts(world, other, FakeCodeReader([FAKE_GIRO_CODE]))).output
+    assert "codes" not in output(await facts(world, other, FakeCodeReader([FAKE_GIRO_CODE])))
 
 
 async def confirmed(world: World, contact: Contact, codes: list[Code]) -> Document:
@@ -178,7 +178,7 @@ async def test_the_report_lists_the_document_s_numbers(world: World) -> None:
     reads, with where they stand; a customer number stays among the identifiers."""
     owner = await world.user()
     text = (
-        "Mahnung\nRechnungsnummer: M-77\nIhre Rechnung Nr. 4711 ist offen.\nKundennummer 20047718\n"
+        "Mahnung\nRechnungsnummer: M-77\nIhre Rechnung Nr. 4711 ist offen.\nKundennummer 12345678\n"
     )
     document = await stored(world, owner, text)
     result = await facts(world, document, FakeCodeReader([]))
@@ -239,5 +239,5 @@ async def test_the_report_shows_an_identifier_rejected_at_a_contact(world: World
     assert (customer.contact_id, customer.rejected_at) == (None, bank.id)
     assert report.decided == ()
     # The signal's evidence still leaves it out.
-    assert result.output["identifiers"] == []
-    assert CUSTOMER[1] not in str(result.output["unknown_identifiers"])
+    assert output(result)["identifiers"] == []
+    assert CUSTOMER[1] not in str(output(result)["unknown_identifiers"])

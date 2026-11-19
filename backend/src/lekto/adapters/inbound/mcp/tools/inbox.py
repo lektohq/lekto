@@ -19,6 +19,7 @@ from lekto.adapters.inbound.mcp.tools.documents import (
     UpdateOut,
     changes_of,
     open_out,
+    suggests_space,
     update_out,
 )
 from lekto.core.domain.classification import SPACE
@@ -80,6 +81,8 @@ def add_inbox_tools(tools: Tools, context: ApiContext) -> None:
             limit=limit,
         )
         summary = await context.inbox.summary(user)
+        if any(suggests_space(item.open) for item in items):
+            names = await names.with_spaces(context, user)
         people = {person.id: person.label for person in await context.users.list_users(user)}
         return compact(
             InboxOut(

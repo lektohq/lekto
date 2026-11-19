@@ -182,7 +182,9 @@ class ChangeRules:
             looping = target is not None and target != here and target in visited
             plan = replace(run.plan, space=None) if looping else run.plan
             problem = await apply_plan(uow, document, plan, definitions, now)
-            output |= await send_now(uow, run.sends, document, now)
+            # Neither a change that does not fit nor rules that move it back send (SC-02).
+            if problem is None and not looping:
+                output |= await send_now(uow, run.sends, document, now)
             chain.record(plan, document)
             if looping:
                 assert target is not None

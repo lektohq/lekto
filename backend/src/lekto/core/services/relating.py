@@ -28,6 +28,9 @@ from lekto.core.domain.classification import (
     CUSTOM_FIELDS,
     DOCUMENT_DATE,
     DOCUMENT_TYPE,
+    RELATED,
+    RELATED_DOCUMENT,
+    RELATED_DROPPED,
 )
 from lekto.core.domain.document_facts import (
     DocumentFact,
@@ -43,11 +46,17 @@ from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.mail_intake import OriginRole
 from lekto.core.domain.periods import Period
 from lekto.core.domain.pipeline import NodeResult, Outcome
-from lekto.core.domain.relations import Relation, RelationOrigin, RelationState, ordered
+from lekto.core.domain.relations import (
+    EvidenceKind,
+    Relation,
+    RelationOrigin,
+    RelationState,
+    ordered,
+)
 from lekto.core.ports.repository import DocumentFilter
 from lekto.core.ports.unit_of_work import UnitOfWork
 from lekto.core.services._jobs import document_payload
-from lekto.core.services.relations import RELATIONS_LOCK, find_pair, relation_events
+from lekto.core.services.relations import RELATIONS_LOCK, Direction, find_pair, relation_events
 
 RELATE = "relate-1"
 """The version of the recognition, in the log entries of the node."""
@@ -110,11 +119,6 @@ async def recognise(uow: UnitOfWork, document: Document) -> list[Found]:
     return list(found.values())
 
 
-MAIL_EVIDENCE = "mail"
-"""The evidence of a relation between documents one mail brought: it holds once made, as the
-mail did (an attachment Lekto had before has no origin to find it again by)."""
-
-
 async def _mail(uow: UnitOfWork, document: Document) -> list[Found]:
     """The documents of the same mail: a letter's text and its attachments, an outer letter
     and the others, and the attachments Lekto had already that a letter refers to."""
@@ -122,7 +126,7 @@ async def _mail(uow: UnitOfWork, document: Document) -> list[Found]:
     if origin is None:
         return []
     evidence: JsonObject = {
-        "kind": MAIL_EVIDENCE,
+        "kind": EvidenceKind.MAIL.value,
         "message_id": origin.message_id,
         "subject": origin.subject,
     }
@@ -156,17 +160,23 @@ class Relating:
 
 async def relate(uow: UnitOfWork, document: Document, now: datetime) -> Relating:
     """Store what the sources find for `document` (`recognise`) in the unit, which holds
-    `RELATIONS_LOCK`, and drop Lekto's undecided relations of it they no longer find."""
+    `RELATIONS_LOCK`, and drop Lekto's undecided relations of it that neither end finds any
+    more: a document without a contact finds one of a contact that does not find it back
+    (`_with_fact`), and its suggestion stays when the other end looks again."""
     found = await recognise(uow, document)
     seen = {item.other.id for item in found}
     dropped = []
     for relation in await uow.document_relations.of_document(document.id):
+        other = relation.other(document.id)
         if (
             relation.origin is RelationOrigin.LEKTO
-            and relation.decided_by is None
+            and relation.decided_at is None  # its person may be gone (decided_by NULL)
             and relation.state is not RelationState.REJECTED
-            and relation.other(document.id) not in seen
-            and relation.evidence.get("kind") != MAIL_EVIDENCE
+            and other not in seen
+            # It holds once made, as the mail did (an attachment Lekto had before has no
+            # origin to find it again by).
+            and relation.evidence.get("kind") != EvidenceKind.MAIL
+            and not await _finds(uow, other, document.id)
         ):
             await uow.document_relations.remove(relation.newer, relation.older)
             dropped.append(relation)
@@ -229,11 +239,9 @@ class RelateResult:
         await uow.lock(RELATIONS_LOCK)
         related = await relate(uow, document, now)
         await uow.outbox.add(relation_events([*related.made, *related.dropped], now))
-        output: JsonObject = {
-            "relations": [relation_json(item, document.id) for item in related.made]
-        }
+        output: JsonObject = {RELATED: [relation_json(item, document.id) for item in related.made]}
         if related.dropped:
-            output["dropped"] = [relation_json(item, document.id) for item in related.dropped]
+            output[RELATED_DROPPED] = [relation_json(item, document.id) for item in related.dropped]
         return NodeResult(outcome=Outcome.OK, model_version=RELATE, output=output)
 
 
@@ -241,8 +249,10 @@ def relation_json(relation: Relation, document: DocumentId) -> JsonObject:
     """A relation as the log of `document` names it: the other document, which way, how sure,
     and why."""
     return {
-        "document_id": str(relation.other(document)),
-        "direction": "refers_to" if relation.newer == document else "referred_by",
+        RELATED_DOCUMENT: str(relation.other(document)),
+        "direction": (
+            Direction.REFERS_TO if relation.newer == document else Direction.REFERRED_BY
+        ).value,
         "state": relation.state.value,
         "evidence": dict(relation.evidence),
     }
@@ -269,6 +279,14 @@ def _fits(document: Document, other: Document) -> bool | None:
 
 def _sure(fit: bool | None, alone: bool) -> RelationState:
     return RelationState.SET if fit and alone else RelationState.SUGGESTED
+
+
+async def _finds(uow: UnitOfWork, id: DocumentId, other: DocumentId) -> bool:
+    """Whether the sources find `other` for the document `id` (False if it is gone)."""
+    document = await uow.documents.find(id)
+    return document is not None and any(
+        item.other.id == other for item in await recognise(uow, document)
+    )
 
 
 async def _with_fact(
@@ -310,7 +328,11 @@ async def _numbers(
     for fact in kept:
         if fact.kind not in OWN_KINDS:
             continue
-        evidence: JsonObject = {"kind": "fact", "fact_kind": fact.kind.value, "value": fact.shown}
+        evidence: JsonObject = {
+            "kind": EvidenceKind.FACT.value,
+            "fact_kind": fact.kind.value,
+            "value": fact.shown,
+        }
         if fact.role is FactRole.REFERS:
             owners = [
                 item
@@ -346,7 +368,7 @@ async def _targets(
             continue
         seen.add(fact.key)
         evidence: JsonObject = {
-            "kind": "target",
+            "kind": EvidenceKind.TARGET.value,
             "fact_kind": fact.kind.value,
             "value": fact.shown,
         }
@@ -434,7 +456,11 @@ async def _periods(
             and item.document_date != document.document_date
             and not _apart(kept, await _kept(uow, item))
         ]
-        evidence: JsonObject = {"kind": "period", "field_id": str(field), "period": period.notation}
+        evidence: JsonObject = {
+            "kind": EvidenceKind.PERIOD.value,
+            "field_id": str(field),
+            "period": period.notation,
+        }
         state = RelationState.SET if len(same) == 1 else RelationState.SUGGESTED
         found += [Found(item, state, evidence) for item in same]
     return found
@@ -460,7 +486,7 @@ async def _letters(
             )
             if item.id != document.id
         ]
-        evidence: JsonObject = {"kind": "letter_date", "date": fact.value}
+        evidence: JsonObject = {"kind": EvidenceKind.LETTER_DATE.value, "date": fact.value}
         state = RelationState.SET if len(dated) == 1 else RelationState.SUGGESTED
         found += [Found(item, state, evidence) for item in dated]
     if document.document_date is not None:
@@ -469,7 +495,7 @@ async def _letters(
             DocumentFilter(contacts=contact, document_dates=Period.day(document.document_date)),
             limit=LIMIT,
         )
-        evidence = {"kind": "letter_date", "date": day_value}
+        evidence = {"kind": EvidenceKind.LETTER_DATE.value, "date": day_value}
         state = RelationState.SET if len(same_day) <= 1 else RelationState.SUGGESTED
         referring = await uow.documents.query(
             DocumentFilter(

@@ -10,11 +10,12 @@ Master data a lens names may be deleted after; the services drop what is gone wh
 lens out, so a lens never fails for it.
 """
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
-from enum import Enum, StrEnum
+from enum import StrEnum
 from typing import Self
 
+from lekto.core.domain.changes import UNSET, Unset, apply_changes
 from lekto.core.domain.document_facts import FactCriterion
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import (
@@ -35,7 +36,11 @@ MAX_CARD_FIELDS = 3
 MAX_QUERY_LENGTH = 500  # as the search takes it
 MAX_FILTER_FACTS = 5
 """Facts a lens's filter names at most."""
-MAX_FILTER_VALUES = 200  # of each kind
+MAX_FILTER_VALUES = 50
+"""Values of one kind (contacts, types, tags, spaces) a filter names at most: the documents list
+takes them as query parameters (`rest.params`, the MCP tools), and 200 ids would burst the 8 KiB
+nginx allows the request line. A lens holds no more (`Lens.change`); one stored with more before
+is read as it is, to be shortened."""
 
 
 class Grouping(StrEnum):
@@ -122,23 +127,23 @@ class LensFilter:
     relative_period: RelativePeriod | None = None
     facts: tuple[FactCriterion, ...] = ()
 
+    _KINDS = (
+        "contact_ids",
+        "document_type_ids",
+        "contact_group_ids",
+        "document_type_group_ids",
+        "topic_ids",
+        "tag_ids",
+        "space_ids",
+    )
+
     def __post_init__(self) -> None:
         facts = tuple(dict.fromkeys(self.facts))
         if len(facts) > MAX_FILTER_FACTS:
             raise ValidationError(f"facts: at most {MAX_FILTER_FACTS}")
         object.__setattr__(self, "facts", facts)
-        for name in (
-            "contact_ids",
-            "document_type_ids",
-            "contact_group_ids",
-            "document_type_group_ids",
-            "topic_ids",
-            "tag_ids",
-            "space_ids",
-        ):
+        for name in self._KINDS:
             values = tuple(dict.fromkeys(getattr(self, name)))  # once each, in order
-            if len(values) > MAX_FILTER_VALUES:
-                raise ValidationError(f"{name}: at most {MAX_FILTER_VALUES}")
             object.__setattr__(self, name, values)
         if self.relative_period is not None and (
             self.date_from is not None or self.date_to is not None
@@ -150,6 +155,13 @@ class LensFilter:
             and self.date_from > self.date_to
         ):
             raise ValidationError("document_date_from: after document_date_to")
+
+    def check_values(self) -> None:
+        """ValidationError if it names more than `MAX_FILTER_VALUES` of a kind: checked when a
+        lens takes the filter, not when one is read."""
+        for name in self._KINDS:
+            if len(getattr(self, name)) > MAX_FILTER_VALUES:
+                raise ValidationError(f"{name}: at most {MAX_FILTER_VALUES}")
 
 
 @dataclass(kw_only=True)
@@ -207,39 +219,28 @@ class Lens:
             raise ValidationError("grouping: by when it is due only with a due_field_id")
 
     def change(self, changes: "LensChanges", *, now: datetime) -> None:
-        """Apply what `changes` sets; ValidationError (and nothing changed) if the result does
-        not fit together."""
-        updated = replace(
-            self,
-            **{name: value for name, value in vars(changes).items() if value is not UNSET},
-            updated_at=now,
-        )
-        for name in vars(changes):
-            setattr(self, name, getattr(updated, name))
+        """Apply what `changes` sets, normalised as a new lens is (`apply_changes`, DB-07);
+        ValidationError (and nothing changed) if the result does not fit together, or a filter
+        it sets names too many values (`check_values`)."""
+        if not isinstance(changes.filter, Unset):
+            changes.filter.check_values()
+        apply_changes(self, changes, self.__post_init__)
         self.updated_at = now
-
-
-class _Unset(Enum):
-    UNSET = "unset"
-
-
-UNSET = _Unset.UNSET
-"""Marks a part of `LensChanges` that stays as it is."""
 
 
 @dataclass(frozen=True, kw_only=True)
 class LensChanges:
     """A change of a lens; parts left UNSET stay as they are."""
 
-    name: str | _Unset = UNSET
-    filter: LensFilter | _Unset = UNSET
-    query: str | _Unset | None = UNSET
-    sort: LensSort | _Unset | None = UNSET
-    sort_field_id: FieldId | _Unset | None = UNSET
-    grouping: Grouping | _Unset = UNSET
-    layout: Layout | _Unset = UNSET
-    card_field_ids: tuple[FieldId, ...] | _Unset = UNSET
-    due_field_id: FieldId | _Unset | None = UNSET
+    name: str | Unset = UNSET
+    filter: LensFilter | Unset = UNSET
+    query: str | Unset | None = UNSET
+    sort: LensSort | Unset | None = UNSET
+    sort_field_id: FieldId | Unset | None = UNSET
+    grouping: Grouping | Unset = UNSET
+    layout: Layout | Unset = UNSET
+    card_field_ids: tuple[FieldId, ...] | Unset = UNSET
+    due_field_id: FieldId | Unset | None = UNSET
 
 
 def _query(text: str | None) -> str | None:

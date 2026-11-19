@@ -3,7 +3,6 @@ API hold here too."""
 
 import base64
 import json
-from dataclasses import replace
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -15,13 +14,15 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp_types import ImageContent, Tool
 
 from lekto.adapters.inbound.limits import MAX_SELECTED
+from lekto.adapters.inbound.mcp.names import OTHER_SPACE
 from lekto.adapters.inbound.mcp.server import instructions
 from lekto.adapters.inbound.rest import PREFIX
-from lekto.adapters.outbound.memory import ManualClock
-from lekto.composition.container import build_memory_container, build_services
+from lekto.adapters.inbound.schemas import MAX_POSITION
 from lekto.core.domain.classification import FieldCheck, checks_to_json
+from lekto.core.domain.document_facts import DocumentFact, FactOrigin, FactRole
 from lekto.core.domain.documents import DocumentChanges
 from lekto.core.domain.fields import FieldType, Money
+from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.identity import TokenScope
 from lekto.core.domain.ids import DocumentId, new_id, short_id
 from lekto.core.domain.master_data import TagScope
@@ -32,7 +33,14 @@ from tests import builders
 from tests.api import auth, serving
 from tests.builders import SAMPLES
 from tests.unit.adapters.mcp.support import TEXT, call, connected, data, error, running
-from tests.unit.adapters.rest.support import Api, Scene, make_app, post, unique_pdf, upload
+from tests.unit.adapters.rest.support import (
+    Api,
+    Scene,
+    api_with,
+    post,
+    unique_pdf,
+    upload,
+)
 
 # --- the endpoint -------------------------------------------------------------------------------
 
@@ -64,6 +72,22 @@ WRITES = {"documents_update", "documents_retry", "inbox_confirm", "inbox_mark_se
 async def tools_of(api: Api, headers: dict[str, str]) -> dict[str, Tool]:
     async with connected(api, headers) as client:
         return {tool.name: tool for tool in (await client.list_tools()).tools}
+
+
+async def test_an_argument_a_tool_does_not_take_is_refused_with_what_it_may_mean(
+    api: Api, scene: Scene
+) -> None:
+    """A name the model guesses or mistypes dropped out silently: a filter counted every
+    document, an update changed nothing and said it had."""
+    headers = scene.headers["owner"]
+    for tool in sorted(READS | WRITES):
+        refused = await call(api, headers, tool, nonsense=1)
+        assert "unknown argument 'nonsense'" in error(refused), tool
+    listed = await call(api, headers, "documents_list", contakt="Stadtwerke")
+    assert "unknown argument 'contakt'; did you mean 'contact'?" in error(listed)
+    updated = await call(api, headers, "documents_update", id="x", titel="Neu")
+    assert "did you mean 'title'?" in error(updated)
+    assert not (await call(api, headers, "documents_list", lane="green")).is_error
 
 
 async def test_the_server_lists_its_tools_with_their_class(api: Api, scene: Scene) -> None:
@@ -159,37 +183,24 @@ async def test_a_session_cookie_does_not_open_the_endpoint(api: Api, scene: Scen
 
 
 async def test_the_endpoint_is_absent_when_switched_off() -> None:
-
-    container = build_memory_container(ManualClock(builders.NOW))
-    app = make_app(container, build_services(container), mcp=False)
-    async with httpx2.AsyncClient(
-        transport=httpx2.ASGITransport(app=app), base_url="https://lekto"
-    ) as client:
-        response = await client.post(f"{PREFIX}/mcp", json={})
+    async with api_with(mcp=False) as api:
+        response = await api.client.post(f"{PREFIX}/mcp", json={})
     assert response.status_code == 404
 
 
 async def test_the_server_works_over_a_real_connection() -> None:
-
-    clock = ManualClock(builders.NOW)
-    container = build_memory_container(clock)
-    services = build_services(container)
-    builders.skip_classification(services.pipeline)
-    app = make_app(container, services, mcp=True)  # Uvicorn runs its lifespan
-    client = httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="https://lekto")
-    api = Api(container, services, app, client, clock)
-    user = await api.user()
-    received = await services.pipeline.receive(
-        user.id, builders.incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
-    )
-    await api.drain()
-    async with (
-        serving(app) as base,
-        httpx2.AsyncClient(headers=auth(user)) as http,
-        Client(streamable_http_client(f"{base}{PREFIX}/mcp", http_client=http)) as mcp,
-    ):
-        result = await mcp.call_tool("documents_get", {"id": str(received.id)})
-    await client.aclose()
+    async with api_with(mcp=True) as api:  # Uvicorn runs its lifespan
+        user = await api.user()
+        received = await api.services.pipeline.receive(
+            user.id, builders.incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
+        )
+        await api.drain()
+        async with (
+            serving(api.app) as base,
+            httpx2.AsyncClient(headers=auth(user)) as http,
+            Client(streamable_http_client(f"{base}{PREFIX}/mcp", http_client=http)) as mcp,
+        ):
+            result = await mcp.call_tool("documents_get", {"id": str(received.id)})
     assert data(result)["id"] == short_id(received.id)
 
 
@@ -401,24 +412,100 @@ async def test_documents_update_tries_a_change_without_storing_it(api: Api, scen
     assert stored["title"] != "Probe"
 
 
+async def test_documents_list_refuses_an_offset_beyond_what_the_database_holds(
+    api: Api, scene: Scene
+) -> None:
+    """Not "Error executing tool" from the database (RB-04)."""
+    owner = scene.headers["owner"]
+    refused = await call(api, owner, "documents_list", offset=MAX_POSITION + 1)
+    assert refused.is_error
+    assert not (await call(api, owner, "documents_list", offset=MAX_POSITION)).is_error
+
+
+async def test_a_nul_in_a_tool_s_argument_is_refused(api: Api, scene: Scene) -> None:
+    """As in a REST body (RB-08)."""
+    owner = scene.headers["owner"]
+    refused = await call(api, owner, "documents_update", id=scene.green, title="a\x00b")
+    assert "title holds a NUL character" in error(refused)
+
+
+async def test_documents_update_refuses_a_moment_beyond_the_calendar(
+    api: Api, scene: Scene
+) -> None:
+    """Not "Error executing tool" (RA-13)."""
+    owner = scene.headers["owner"]
+    refused = await call(
+        api, owner, "documents_update", id=scene.green, created_at="9999-12-31T23:59:59-14:00"
+    )
+    assert "beyond the calendar" in error(refused)
+
+
 async def test_documents_update_names_a_space_a_rule_moves_it_to(api: Api, scene: Scene) -> None:
     """What changed is what REST reports (`changed_fields`, review 0.12.2 A-01): a rule's move
-    to another space the caller reads too, by its name."""
+    to another space the caller reads too, by its name; the rule's report names the spaces and
+    the tag, without ids (decision 7, CO-05)."""
     owner = scene.headers["owner"]
     household = await post(api, "/spaces", {"name": "Household"}, owner)
+    strom = await api.services.master_data.create_tag((await api.admin()).id, "Strom")
     await post(
         api,
         "/rules",
         {
             "name": "ACME",
             "conditions": {"all": [{"field": "contact", "op": "is", "value": scene.contact}]},
-            "actions": [{"type": "set_space", "space_id": household["id"]}],
+            "actions": [
+                {"type": "set_space", "space_id": household["id"]},
+                {"type": "add_tags", "tag_ids": [str(strom.id)]},
+            ],
         },
         owner,
     )
     id = await upload(api, owner)
     tried = data(await call(api, owner, "documents_update", id=id, contact="ACME", dry_run=True))
-    assert tried["set"] == {"contact": "ACME", "space": "Household"}
+    assert tried["set"] == {"contact": "ACME", "space": "Household", "tags": ["Strom"]}
+    (rule,) = tried["rules"]
+    assert set(rule) == {"name", "scope", "applied"}
+    assert sorted(rule["applied"], key=lambda effect: effect["field"]) == [
+        {"field": "space", "old": "owner", "new": "Household"},
+        {"field": "tags", "new": "Strom"},
+    ]
+
+
+async def test_a_suggested_space_is_named_as_the_caller_reads_it(api: Api) -> None:
+    """In the review of `documents_get` and in `inbox_list`: a space of the caller's by its name,
+    another person's personal space by that person's name, one the caller does not read as such
+    (CO-05)."""
+    owner, other = await api.user(), await api.user("Jane Doe")
+    household = await post(api, "/spaces", {"name": "Household"}, auth(owner))
+    handed = (await api.services.users.personal_spaces(owner.id))[other.id]
+    for target, named in (
+        (household["id"], "Household"),
+        (str(handed), "Jane Doe"),
+        (str(new_id()), OTHER_SPACE),
+    ):
+        check = FieldCheck(
+            field="space",
+            outcome=Outcome.UNCERTAIN,
+            confidence=0.5,
+            reasons=(written("two spaces fit"),),
+            suggestion=target,
+        )
+        api.services.pipeline.replace_executor(
+            Node.JUDGE,
+            builders.Returns(
+                NodeResult(
+                    outcome=Outcome.UNCERTAIN,
+                    reasons=(written("space"),),
+                    output={"fields": checks_to_json([check])},
+                )
+            ),
+        )
+        id = await upload(api, auth(owner), content=unique_pdf(named))
+        got = data(await call(api, auth(owner), "documents_get", id=id, include=["review"]))
+        assert got["open"][0]["fields"][0]["suggestion"] == named
+        listed = data(await call(api, auth(owner), "inbox_list", tab="review"))
+        (item,) = [item for item in listed["items"] if {item["id"]} == shorts(id)]
+        assert item["open"][0]["fields"][0]["suggestion"] == named
 
 
 async def test_inbox_list_tells_what_waits_and_why(api: Api, scene: Scene) -> None:
@@ -530,6 +617,42 @@ async def test_facts_decide_adds_and_rejects_a_fact(api: Api, scene: Scene) -> N
         value="R-1001",
     )
     assert error(reader)
+
+
+async def test_facts_show_an_identifiers_role_and_decision(api: Api, scene: Scene) -> None:
+    """As the web UI shows them: a rejected identifier is no longer shown as found (RA-10)."""
+    await api.container.object_store.put(
+        text_key(DocumentId(UUID(scene.green))),
+        f"{TEXT}Kundennummer 12345678\n".encode(),
+        content_type="text/markdown",
+    )
+    owner = scene.headers["owner"]
+    found = data(await call(api, owner, "documents_get", id=scene.green, include=["facts"]))
+    (fact,) = [fact for fact in found["facts"] if fact["kind"] == "customer_number"]
+    assert (fact["value"], fact["role"], fact.get("state")) == ("12345678", "contact", None)
+    # The facts signal keeps it; then the owner rejects it.
+    number = DocumentFact(
+        kind=IdentifierKind.CUSTOMER_NUMBER,
+        value="12345678",
+        role=FactRole.CONTACT,
+        origins=frozenset({FactOrigin.PATTERN}),
+    )
+    async with api.container.unit_of_work() as uow:
+        await uow.document_facts.replace_found(DocumentId(UUID(scene.green)), [number])
+        await uow.commit()
+    rejected = data(
+        await call(
+            api,
+            owner,
+            "facts_decide",
+            id=scene.green,
+            action="reject",
+            kind="customer_number",
+            value="12345678",
+        )
+    )
+    (fact,) = [fact for fact in rejected["facts"] if fact["kind"] == "customer_number"]
+    assert (fact["role"], fact["state"]) == ("contact", "rejected")
 
 
 async def test_master_data_are_read_by_name(api: Api, scene: Scene) -> None:
@@ -660,6 +783,30 @@ async def test_rules_are_read_with_names(api: Api, scene: Scene) -> None:
     assert "no rule named 'Stuer'; similar: Steuer" in error(
         await call(api, owner, "rules_get", name="Stuer")
     )
+
+
+async def test_two_rules_of_one_name_are_told_apart_by_their_space(api: Api, scene: Scene) -> None:
+    """Rule names are not unique, also not in a space: the second of a name hid the first."""
+    owner = scene.headers["owner"]
+    for space in (None, scene.shared.id):
+        body = {
+            "name": "Ablage",
+            "scope": "space",
+            "conditions": {"all": [{"field": "channel", "op": "is", "value": "api"}]},
+            "actions": [{"type": "force_review", "reason": f"in {space}"}],
+        }
+        await post(
+            api, "/rules", body if space is None else {**body, "space_id": str(space)}, owner
+        )
+    places = {rule["space"] for rule in data(await call(api, owner, "rules_list"))["rules"]}
+    assert "Shared" in places and len(places) == 2
+    (personal,) = places - {"Shared"}
+    both = error(await call(api, owner, "rules_get", name="ablage"))
+    assert "2 rules are named 'ablage'" in both and "'Shared'" in both and "give space" in both
+    shared = data(await call(api, owner, "rules_get", name="Ablage", space="shared"))
+    mine = data(await call(api, owner, "rules_get", name="Ablage", space=personal))
+    assert (shared["space"], mine["space"]) == ("Shared", personal)
+    assert "it is in" in error(await call(api, owner, "rules_get", name="Ablage", space="global"))
 
 
 async def test_system_status_names_what_is_running(api: Api, scene: Scene) -> None:
@@ -837,18 +984,7 @@ async def test_search_filters_by_topics(api: Api, scene: Scene) -> None:
 
 
 async def test_search_without_an_index_says_so() -> None:
-
-    container = build_memory_container(ManualClock(builders.NOW))
-    services = replace(build_services(container), search=None)
-    app = make_app(container, services, mcp=True)
-    async with running(app):
-        api = Api(
-            container,
-            services,
-            app,
-            httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="https://lekto"),
-            ManualClock(builders.NOW),
-        )
+    async with api_with(replaced={"search": None}, mcp=True) as api, running(api.app):
         user = await api.user()
         result = await call(api, auth(user), "documents_search", query="anything")
     assert "search is not available" in error(result)

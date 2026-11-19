@@ -7,7 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.rest.schemas import groups
-from lekto.adapters.inbound.schemas import ReasonOut
+from lekto.adapters.inbound.schemas import ReasonOut, RequestBody
 from lekto.core.domain.changes import UNSET, Unset
 from lekto.core.domain.condition_tree import MAX_CONDITIONS, MAX_DEPTH
 from lekto.core.domain.ids import DocumentTypeId, SpaceId, UserId
@@ -102,9 +102,7 @@ def _group_out(conditions: MailConditions | None) -> MailGroup | None:
     return MailAnyGroup.model_validate(data) if "any" in data else MailAllGroup.model_validate(data)
 
 
-class _Rule(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class _Rule(RequestBody):
     priority: int | None = Field(
         default=None, ge=MIN_PRIORITY, le=MAX_PRIORITY, description="Higher first."
     )
@@ -158,7 +156,6 @@ class MailRuleCreate(_Rule):
     conditions: every mail, takes the attachments and the text, leaves the mail, active)."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -189,15 +186,13 @@ class MailRulePatch(_Rule):
     `user_id` given as null clear it (no conditions: every mail). Switching it
     on clears why it was paused."""
 
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [{"enabled": False}]})
+    model_config = ConfigDict(json_schema_extra={"examples": [{"enabled": False}]})
 
     name: str | None = Field(default=None, min_length=1, max_length=MAX_NAME)
 
 
 class MailRuleDryRun(MailRuleCreate):
     """A rule as the editor holds it, saved or not; `rule_id`: the stored one it stands for."""
-
-    model_config = ConfigDict(extra="forbid")
 
     rule_id: UUID | None = Field(
         default=None, description="The rule being edited: the dry run puts this one in its place."

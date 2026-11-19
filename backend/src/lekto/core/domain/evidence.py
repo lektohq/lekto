@@ -9,7 +9,7 @@ or word. Everything works on a normalised text (see `normalise`).
 import html
 import re
 import unicodedata
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Collection, Iterable, Iterator
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -18,6 +18,7 @@ from itertools import pairwise
 
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.periods import Period
+from lekto.core.domain.traced import Traced
 from lekto.core.domain.vocabulary import (
     CURRENCY_WORDS,
     MONTH_NAMES,
@@ -63,6 +64,61 @@ def normalise(text: str, *, columns: bool = False) -> str:
         text = _COLUMN_GAP.sub(COLUMN_GAP, text)
     text = _MARKUP.sub(" ", _STARS.sub("xxx", text))
     return _WHITESPACE.sub(_collapsed if columns else " ", text.casefold()).strip()
+
+
+# What `html.unescape` replaces (CPython's `html._charref`), to apply it match by match.
+_CHARREF = re.compile(r"&(#[0-9]+;?|#[xX][0-9a-fA-F]+;?|[^\t\n\f <&#;]{1,32};?)")
+_SOFT_HYPHEN = re.compile("\xad")
+
+
+def traced_normalise(text: str) -> Traced:
+    """`normalise(text)` (without `columns`), each of its characters traced to the characters
+    of `text` it comes from: where a value found in the normalised text stands in the text."""
+    traced = Traced.of(text)
+    if "&" in text:
+        traced = traced.sub(_CHARREF, lambda match: html.unescape(match.group()))
+    traced = _traced_nfkc(traced).sub(_SOFT_HYPHEN, "").sub(_HYPHENATION, "")
+    traced = traced.sub(_STARS, "xxx").sub(_MARKUP, " ")
+    folded = traced.text.casefold()
+    if len(folded) == len(traced.text):  # each character folded into one
+        traced = Traced(folded, traced.start, traced.end)
+    else:
+        traced = traced.each(str.casefold)
+    return traced.sub(_WHITESPACE, " ").strip()
+
+
+def traced_without_markup(text: str) -> Traced:
+    """`without_markup(text)`, each of its characters traced to those of `text`."""
+    return Traced.of(text).sub(_MARKUP, " ").sub(_WHITESPACE, " ").strip()
+
+
+def _traced_nfkc(traced: Traced) -> Traced:
+    """NFKC, a character with the combining ones after it at a time, so that each part of the
+    result is traced to the characters it comes from."""
+    whole = unicodedata.normalize("NFKC", traced.text)
+    if whole == traced.text:
+        return traced
+    grouped = traced.grouped(_begins_group, lambda part: unicodedata.normalize("NFKC", part))
+    if grouped.text == whole:
+        return grouped
+    # Composed across groups (seldom: scripts that join letters that stand alone): the text as
+    # NFKC makes it, each character traced to about where it stands.
+    length, made = len(traced.text), len(whole)
+    places = [min(length - 1, index * length // made) for index in range(made)]
+    return Traced(
+        whole,
+        tuple(traced.start[place] for place in places),
+        tuple(traced.end[place] for place in places),
+    )
+
+
+def _begins_group(character: str) -> bool:
+    """A character NFKC does not join to the one before it: not combining, no Hangul vowel or
+    final consonant (they compose with the syllable before)."""
+    code = ord(character)
+    return unicodedata.combining(character) == 0 and not (
+        0x1160 <= code <= 0x11FF or 0xD7B0 <= code <= 0xD7FF
+    )
 
 
 def _collapsed(match: re.Match[str]) -> str:
@@ -162,11 +218,16 @@ def _words(words: tuple[str, ...]) -> str:
 # Between the ends of a span: `01.09.2026 - 30.09.2026`, `1. bis 30. September 2026`.
 _TO = rf"\s*(?:-|\u2013|\u2014|{_words(SPAN_WORDS)})\s*"
 _YEAR = r"((?:19|20)\d{2})"
+_WHOLE_MONTH = rf"(?<![^\W\d_]){_MONTH}(?![^\W\d_])"
+"""A month's name as a whole word: "Weimar 2025" is no March, "Mainz" no May (DA-10)."""
 _WEEK_WORD = rf"(?:{_words(WEEK_WORDS)})\.?"
 # A month, week or quarter with its year, or without one (`für September`, `KW 38`).
 _PERIOD_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     # September 2026, Sept. 2026, september, 2026
-    (re.compile(rf"(?<![\d.]\s)(?<![\d.]){_MONTH}(?:,?\s*{_YEAR})?(?![\d])"), "month name"),
+    (
+        re.compile(rf"(?<![\d.]\s)(?<![\d.]){_WHOLE_MONTH}(?:,?\s*{_YEAR})?(?![\d])"),
+        "month name",
+    ),
     # 09/2026, 9.2026 (not inside a date: 01.09.2026)
     (re.compile(rf"(?<![\d./-])(\d{{1,2}})[./]{_YEAR}(?![\d./])"), "month number"),
     # 2026-09 (not a date: 2026-09-30)
@@ -189,7 +250,7 @@ _SPAN_PATTERNS: tuple[re.Pattern[str], ...] = (
         rf"(?<![\d.])(\d{{1,2}})\.(\d{{1,2}})\.?{_TO}(\d{{1,2}})\.(\d{{1,2}})\.(\d{{4}}|\d{{2}})(?!\d)"
     ),
     re.compile(rf"(?<![\d.])(\d{{1,2}})\.?{_TO}(\d{{1,2}})\.(\d{{1,2}})\.(\d{{4}}|\d{{2}})(?!\d)"),
-    re.compile(rf"(?<![\d.])(\d{{1,2}})\.?{_TO}(\d{{1,2}})\.?\s*{_MONTH}\s*(\d{{4}})(?!\d)"),
+    re.compile(rf"(?<![\d.])(\d{{1,2}})\.?{_TO}(\d{{1,2}})\.?\s*{_WHOLE_MONTH}\s*(\d{{4}})(?!\d)"),
 )
 _GAP = re.compile(_TO)
 
@@ -405,14 +466,16 @@ def _reading(token: str, decimal_mark: str, groups: str) -> Decimal | None:
         return None
 
 
-def amounts_in(text: str) -> set[Decimal]:
+def amounts_in(text: str, codes: Collection[str] | None = None) -> set[Decimal]:
     """The numbers the normalised `text` writes as amounts: with two decimal places
     (`620,00`, `1,234.56`), or with a currency or a dash beside them (`620 €`, `eur 620`,
-    `620,-`). A bare number (`620`) is none: on a scan it may be any fragment."""
+    `620,-`). A bare number (`620`) is none: on a scan it may be any fragment. `codes`: the
+    currency codes that count beside a number (`written_codes`; None: every one); an
+    abbreviation (`Fr.`, `kr`) makes no bare number an amount."""
     found: set[Decimal] = set()
     for match in _NUMBER.finditer(text):
         readings = _readings(match.group())
-        if _beside_currency(text, match.start(), match.end()):
+        if _beside_currency(text, match.start(), match.end(), codes):
             found.update(readings)
         else:
             found.update(number for number in readings if number.as_tuple().exponent == -2)
@@ -424,13 +487,15 @@ _AFTER = re.compile(r" ?(?:[^\W\d_]+\.?|[€$£¥])")
 _DASH_AFTER = re.compile(r"[.,][-\u2013]")
 
 
-def _beside_currency(text: str, start: int, end: int) -> bool:
+def _beside_currency(text: str, start: int, end: int, codes: Collection[str] | None) -> bool:
     if _DASH_AFTER.match(text, end):
         return True
     before = _BEFORE.search(text[max(0, start - 12) : start])
     after = _AFTER.match(text, end)
     return any(
-        currencies_in(found.group().strip()) for found in (before, after) if found is not None
+        currencies_in(found.group().strip(), codes=codes, abbreviations=codes is None)
+        for found in (before, after)
+        if found is not None
     )
 
 
@@ -456,19 +521,51 @@ def is_currency_code(code: str) -> bool:
     return code in _ISO_4217
 
 
-def currencies_in(text: str) -> set[str]:
+def currencies_in(
+    text: str, *, codes: Collection[str] | None = None, abbreviations: bool = True
+) -> set[str]:
     """ISO 4217 codes the normalised `text` shows: as code (`EUR`), sign (`€`) or word
-    (`Euro`)."""
+    (`Euro`). `codes`: the codes that count as a word (None: every one); `abbreviations`:
+    whether `Fr.`, `sFr`, `kr` count, words of a text that are no currency as often."""
     found: set[str] = set()
     for match in _WORD.finditer(text):
         word = match.group()
-        found.update(CURRENCY_WORDS.get(word, ()))
         bare = word.rstrip(".")
-        found.update(CURRENCY_WORDS.get(bare, ()))
-        if bare.upper() in _ISO_4217:
-            found.add(bare.upper())
+        for key in (word, bare):
+            if abbreviations or key not in _ABBREVIATIONS:
+                found.update(CURRENCY_WORDS.get(key, ()))
+        code = bare.upper()
+        if code in _ISO_4217 and (codes is None or code in codes):
+            found.add(code)
     if "us$" in text:
         found.add("USD")
+    return found
+
+
+_ABBREVIATIONS = frozenset({"fr.", "sfr", "sfr.", "kr", "kr."})
+"""Currency words that are as often none (`Fr.` Friday, `kr` an initial): a currency only
+right beside an amount with decimals (`Fr. 12.50`, `120,00 kr`)."""
+_CODE = re.compile(r"(?<![^\W\d_])[A-Z]{3}(?![^\W\d_])")
+_DECIMALS = r"\d(?:[\d.,'\u202f ]*\d)?[.,]\d{2}(?!\d)"
+_ABBREVIATED = re.compile(
+    rf"(?<![^\W\d_])(?P<before>sfr\.?|fr\.|kr\.?) ?{_DECIMALS}"
+    rf"|{_DECIMALS} ?(?P<after>sfr\.?|fr\.|kr\.?)(?![^\W\d_])"
+)
+
+
+def written_codes(raw: str) -> frozenset[str]:
+    """The ISO 4217 codes `raw` writes in capitals, as a code is written: a word that is one in
+    lower case (`all`, `top`, `Sek.`) is none (DA-09)."""
+    return frozenset(code for code in _CODE.findall(raw) if code in _ISO_4217)
+
+
+def text_currencies(raw: str, normalised: str) -> set[str]:
+    """The currencies a document's text shows (`raw`, and `normalised` it): its codes in
+    capitals, its signs and names of a currency, an abbreviation (`Fr.`, `kr`) only right beside
+    an amount with decimals, not beside a time (`Mo. - Fr. 8-12 Uhr`) (DA-09)."""
+    found = currencies_in(normalised, codes=written_codes(raw), abbreviations=False)
+    for match in _ABBREVIATED.finditer(normalised):
+        found.update(CURRENCY_WORDS[match["before"] or match["after"]])
     return found
 
 
@@ -554,27 +651,40 @@ def read_amount(
 
 # --- text -------------------------------------------------------------------------------------
 
-_SHORTEST_SPACELESS = 8  # characters; shorter values compared without spaces match too easily
+SHORTEST_SPACELESS = 8  # characters; shorter values compared without spaces match too easily
 
 
-def contains(text: str, value: str) -> bool:
+def contains(
+    text: str, value: str, *, folded: str | None = None, spaceless: str | None = None
+) -> bool:
     """Whether the normalised `text` contains `value` (normalised here) as whole words: as is,
     with umlauts written as `ae`/`oe`/`ue`, or, for longer values, ignoring spaces (an IBAN in
-    groups). `Z-3` is not in `Z-3141`."""
+    groups). `Z-3` is not in `Z-3141`. `folded` and `spaceless`: those forms of `text`, if
+    computed already (`DocumentText`)."""
     needle = normalise(value)
     if not needle:
         return False
-    if _whole(needle, text) or _whole(fold_umlauts(needle), fold_umlauts(text)):
+    if _whole(needle, text):
         return True
-    spaceless = needle.replace(" ", "")
-    return len(spaceless) >= _SHORTEST_SPACELESS and spaceless in text.replace(" ", "")
+    if _whole(fold_umlauts(needle), fold_umlauts(text) if folded is None else folded):
+        return True
+    joined = needle.replace(" ", "")
+    if len(joined) < SHORTEST_SPACELESS:
+        return False
+    return joined in (text.replace(" ", "") if spaceless is None else spaceless)
+
+
+def whole_words(needle: str) -> re.Pattern[str]:
+    """Where `needle` stands as whole words: not next to a letter or digit, nor joined to one
+    by `-`, `.`, `/` or `,` (`R-2026` is not in `R-2026-0815`, `31` not in `31.03.2026`)."""
+    return re.compile(
+        r"(?<![^\W_])(?<![^\W_][-./,])" + re.escape(needle) + r"(?![^\W_])(?![-./,][^\W_])"
+    )
 
 
 def _whole(needle: str, text: str) -> bool:
-    """`needle` occurs in `text` as whole words: not next to a letter or digit, nor joined to
-    one by `-`, `.`, `/` or `,` (`R-2026` is not in `R-2026-0815`, `31` not in `31.03.2026`)."""
-    pattern = r"(?<![^\W_])(?<![^\W_][-./,])" + re.escape(needle) + r"(?![^\W_])(?![-./,][^\W_])"
-    return re.search(pattern, text) is not None
+    """`needle` occurs in `text` as whole words (`whole_words`)."""
+    return whole_words(needle).search(text) is not None
 
 
 @dataclass(frozen=True)
@@ -582,6 +692,15 @@ class DocumentText:
     """A document's text with what has been found in it, computed once."""
 
     raw: str
+
+    @classmethod
+    def searchable(cls, raw: str) -> "DocumentText":
+        """The text with the forms `contains` searches computed at once: for a worker thread,
+        as the rules read it (SC-05)."""
+        text = cls(raw)
+        text.folded  # noqa: B018
+        text.spaceless  # noqa: B018
+        return text
 
     @classmethod
     def read(cls, raw: str) -> "DocumentText":
@@ -598,6 +717,16 @@ class DocumentText:
         return normalise(self.raw)
 
     @cached_property
+    def folded(self) -> str:
+        """`normalised` with umlauts written as `ae`/`oe`/`ue`."""
+        return fold_umlauts(self.normalised)
+
+    @cached_property
+    def spaceless(self) -> str:
+        """`normalised` without spaces."""
+        return self.normalised.replace(" ", "")
+
+    @cached_property
     def dates(self) -> set[date]:
         return dates_in(self.normalised)
 
@@ -611,14 +740,14 @@ class DocumentText:
 
     @cached_property
     def amounts(self) -> set[Decimal]:
-        return amounts_in(self.normalised)
+        return amounts_in(self.normalised, written_codes(self.raw))
 
     @cached_property
     def currencies(self) -> set[str]:
-        return currencies_in(self.normalised)
+        return text_currencies(self.raw, self.normalised)
 
     def contains(self, value: str) -> bool:
-        return contains(self.normalised, value)
+        return contains(self.normalised, value, folded=self.folded, spaceless=self.spaceless)
 
     def has_date(self, value: date) -> bool:
         return value in self.dates

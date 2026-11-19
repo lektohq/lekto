@@ -84,10 +84,10 @@ async def scene(world: World) -> Scene:
 async def test_visibility(world: World, scene: Scene) -> None:
     for user in (scene.owner, scene.reader, scene.writer):
         assert (await world.documents.get(user.id, scene.document.id)).id == scene.document.id
-        assert [d.id for d in await world.documents.list_visible(user.id)] == [scene.document.id]
+        assert [d.id for d in await world.visible(user.id)] == [scene.document.id]
     with pytest.raises(NotFoundError):
         await world.documents.get(scene.stranger.id, scene.document.id)
-    assert await world.documents.list_visible(scene.stranger.id) == []
+    assert await world.visible(scene.stranger.id) == []
     with pytest.raises(NotFoundError):
         await world.documents.get(scene.owner.id, DocumentId(new_id()))
 
@@ -101,7 +101,7 @@ async def test_a_yellow_document_is_hidden_from_readers(world: World, scene: Sce
         assert (await world.documents.get(user.id, scene.document.id)).lane is Lane.YELLOW
     with pytest.raises(NotFoundError):
         await world.documents.get(scene.reader.id, scene.document.id)
-    assert await world.documents.list_visible(scene.reader.id) == []
+    assert await world.visible(scene.reader.id) == []
 
 
 async def test_writer_updates_metadata(world: World, scene: Scene) -> None:
@@ -109,16 +109,18 @@ async def test_writer_updates_metadata(world: World, scene: Scene) -> None:
     contact = await world.master_data.create_contact(admin.id, "Stadtwerke")
     tag = await world.master_data.create_tag(admin.id, "Energy")
     note = await world.master_data.create_field(admin.id, "Meter", FieldType.TEXT)
-    updated = await world.documents.update_metadata(
-        scene.writer.id,
-        scene.document.id,
-        DocumentChanges(
-            contact_id=contact.id,
-            tag_ids=frozenset({tag.id}),
-            document_date=date(2026, 9, 30),
-            fields={note.id: "4711"},
-        ),
-    )
+    updated = (
+        await world.documents.change_metadata(
+            scene.writer.id,
+            scene.document.id,
+            DocumentChanges(
+                contact_id=contact.id,
+                tag_ids=frozenset({tag.id}),
+                document_date=date(2026, 9, 30),
+                fields={note.id: "4711"},
+            ),
+        )
+    ).document
     assert updated.contact_id == contact.id
     assert updated.fields == {note.id: "4711"}
     stored = await world.documents.get(scene.owner.id, scene.document.id)
@@ -131,14 +133,14 @@ async def test_writer_updates_metadata(world: World, scene: Scene) -> None:
 async def test_reader_cannot_update(world: World, scene: Scene) -> None:
     # One code for a reader who changes a document, the action says which (review 0.12.2, C-13).
     with pytest.raises(PermissionDeniedError) as refused:
-        await world.documents.update_metadata(
+        await world.documents.change_metadata(
             scene.reader.id, scene.document.id, DocumentChanges(title="Mine")
         )
     assert refused.value.reason == because(
         ReasonCode.EDITORS_ONLY, action=Action.CHANGE_DOCUMENT.value
     )
     with pytest.raises(NotFoundError):
-        await world.documents.update_metadata(
+        await world.documents.change_metadata(
             scene.stranger.id, scene.document.id, DocumentChanges(title="Mine")
         )
     assert world.events() == []
@@ -150,14 +152,14 @@ async def test_references_must_exist(world: World, scene: Scene) -> None:
         DocumentChanges(tag_ids=frozenset({TagId(new_id())})),
     ):
         with pytest.raises(NotFoundError):
-            await world.documents.update_metadata(scene.owner.id, scene.document.id, changes)
+            await world.documents.change_metadata(scene.owner.id, scene.document.id, changes)
 
 
 async def test_field_values_are_checked(world: World, scene: Scene) -> None:
     admin = await world.user(role=Role.ADMIN)
     total = await world.master_data.create_field(admin.id, "Total", FieldType.NUMBER)
     with pytest.raises(ValidationError):
-        await world.documents.update_metadata(
+        await world.documents.change_metadata(
             scene.owner.id, scene.document.id, DocumentChanges(fields={total.id: "12"})
         )
     assert world.events() == []

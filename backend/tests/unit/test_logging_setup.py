@@ -6,6 +6,7 @@ import pytest
 import structlog
 
 from lekto.adapters.outbound.webhooks import HttpWebhookSender
+from lekto.composition.container import USER_AGENT
 from lekto.composition.logging_setup import configure_logging
 from lekto.composition.settings import Settings
 from tests.contracts.webhook_sender import request
@@ -127,7 +128,9 @@ def test_the_access_log_leaves_out_the_health_checks(capsys: pytest.CaptureFixtu
 async def test_a_webhook_url_never_reaches_the_log(capsys: pytest.CaptureFixture[str]) -> None:
     configure_logging(settings(log_format="json", log_level="DEBUG"))
     async with LocalReceiver() as receiver:
-        await HttpWebhookSender().send(request(f"{receiver.url}/hooks/capability-token?key=abc"))
+        await HttpWebhookSender(user_agent=USER_AGENT).send(
+            request(f"{receiver.url}/hooks/capability-token?key=abc")
+        )
 
     assert "capability-token" not in capsys.readouterr().err
 

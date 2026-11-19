@@ -258,8 +258,12 @@ process (`services/_kept.py`).
 - OCRmyPDF (`adapters/outbound/ocrmypdf`) runs as a child process per document with a time
   limit (`LEKTO_OCR_TIMEOUT`); on timeout or cancellation the process group is killed. So does
   WeasyPrint (`adapters/outbound/weasyprint`), which sets a mail as a PDF
-  (`LEKTO_MAIL_RENDER_TIMEOUT`): a mail's HTML comes from anyone. The job
-  lease is the longest limit of a node (OCR, the setting of a mail, or twice `LEKTO_LLM_TIMEOUT`) plus two minutes, so a
+  (`LEKTO_MAIL_RENDER_TIMEOUT`): a mail's HTML comes from anyone. So does PDFium wherever it
+  reads the pages of a PDF (`adapters/outbound/pdfium/child.py`, `LEKTO_PDF_TIMEOUT`): a PDF of
+  62 KB can ask for 3.4 GB; a PDF that needs more memory (`LEKTO_CHILD_MAX_MEMORY`) or time
+  fails its step at once (`pdf_too_complex`). The job
+  lease is the longest limit of a node (OCR, the setting of a mail, or four times
+  `LEKTO_LLM_TIMEOUT`) and `LEKTO_PDF_TIMEOUT` plus two minutes, so a
   node normally keeps its claim; if it overruns (e.g. a slow S3 transfer), another worker takes
   the job over and the late result is discarded. The OCR of a document a person has read with
   the vision model extends its claim to `LEKTO_VLM_TIMEOUT` plus two minutes when it starts
@@ -320,7 +324,7 @@ process (`services/_kept.py`).
   messages. Such a document is yellow until an editor of its space confirms it; the file cannot be made
   PDF/A without changing its content.
 - The text is read from the archive's text layer as it is set (`adapters/outbound/pdfium/
-  layout.py`, in a thread, milliseconds per page): every line as printed, its words in columns
+  layout.py`, in a child, milliseconds per page): every line as printed, its words in columns
   on the page's grid, so a label keeps its amount and columns of figures line up; a printout
   in a fixed-pitch font keeps its exact columns; a page whose text runs across it (a table
   printed sideways, a scan OCR read sideways) is read that way, text up the margin along its
@@ -333,9 +337,9 @@ process (`services/_kept.py`).
   It replaced Docling in 0.2: on the documents compared (`.idea/decisions/2026-10-14-layout-text-not-docling.md`) Docling
   dropped headers and footers, merged the rows of forms and needed a minute and 2 GB per
   document.
-- Previews: PDFium (pypdfium2) renders, Pillow encodes WebP. PDFium is not thread-safe; all
-  its use in a process shares one lock.
-- Codes: `CodeReader` (`adapters/outbound/zxing`) renders each page of the archive in grey at
+- Previews: PDFium (pypdfium2) renders, in a child, Pillow encodes WebP. PDFium is not
+  thread-safe; all its use in a process shares one lock.
+- Codes: `CodeReader` (`adapters/outbound/zxing`) renders, in a child, each page of the archive in grey at
   300 dpi (an edge of at most 5000 px, at most 50 pages) and reads every format zxing-cpp knows
   (QR, Data Matrix, Aztec, PDF417, Code 128/39, EAN, ITF): format, text and box in fractions of
   the page; invalid and empty results are dropped, the same code on a page counts once. About
@@ -720,7 +724,7 @@ and the space, the fields node reads the fields of the decided type and the titl
   its groups (`12 345 678 901`), a social security number anywhere, a health insurance number
   after its label (`Versichertennummer`, `Krankenversicherungsnummer`); a customer or personnel
   number that is one of these, stands in one or overlaps it is none (a pension fund writes
-  "Versicherungsnummer: 65 170839 J 003"). A person's own numbers, a user's IBAN among them, are
+  "Versicherungsnummer: 12 010145 M 122"). A person's own numbers, a user's IBAN among them, are
   no unknown identifiers. The judge weighs the persons for the space (below), and adds the
   model's recipient: every user whose display name or alias stands whole in it, else one whose
   name matches it from `LEKTO_CONFIDENCE_THRESHOLD` on, unless another user's name matches it
@@ -731,8 +735,8 @@ and the space, the fields node reads the fields of the decided type and the titl
   them only for admins and that person: the log, the review and the facts show anyone else a
   user only where the text has their display name (`weak`, or `medium` as the recipient), and
   `unseen_by` names another user only for a public `medium`; their numbers then show as unknown
-  identifiers. Inherent, and accepted: a suggestion to hand a document over to Anna tells its
-  uploader that something in it is Anna's.
+  identifiers. Inherent, and accepted: a suggestion to hand a document over to Erika tells its
+  uploader that something in it is Erika's.
 
 A signal *names* a value it is sure of: the model, a contact whose name or alias its sender
 matches at least `LEKTO_CONFIDENCE_THRESHOLD` (legal forms and punctuation aside) with no other

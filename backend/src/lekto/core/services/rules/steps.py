@@ -32,7 +32,6 @@ from lekto.core.domain.fields import FieldDefinition
 from lekto.core.domain.ids import FieldId, RuleId, UserId
 from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.links import Links
-from lekto.core.domain.permissions import in_reach
 from lekto.core.domain.pipeline import (
     CHOSEN_SPACE,
     CORRECTED,
@@ -42,7 +41,7 @@ from lekto.core.domain.pipeline import (
     Node,
     NodeRun,
 )
-from lekto.core.domain.reasons import Reason, ReasonCode, because
+from lekto.core.domain.reasons import Reason
 from lekto.core.domain.rule_conditions import (
     Facts,
     MailOf,
@@ -68,6 +67,7 @@ from lekto.core.services.rules.running import (
     Send,
     facts,
     field_patterns,
+    refusal,
     situation,
     taxonomy,
 )
@@ -224,7 +224,10 @@ class Walker:
                             match, tuple(actions), steps, notes=tuple(notes), log=tuple(log)
                         )
                     if evaluate(group, facts, self.definitions, distrust=True) is not True:
-                        distrusted = (*match.distrusted, *distrusted_fields(group, facts))
+                        distrusted = (
+                            *match.distrusted,
+                            *distrusted_fields(group, facts, self.definitions),
+                        )
                         match = replace(
                             match, trusted=False, distrusted=tuple(dict.fromkeys(distrusted))
                         )
@@ -330,16 +333,10 @@ class Walker:
         return Walk(match, tuple(actions), steps, failure=reason, log=tuple(log))
 
     async def _refused(self, rule: Rule, step: AskWebhook) -> Reason | None:
-        """Why the rule may not ask through the step's webhook now: it is gone, no longer its
-        author's, or its owner may not read the document."""
-        webhook = await self.uow.webhooks.find(step.webhook_id)
-        owner = None if webhook is None else await self.uow.users.find(webhook.owner_id)
-        if owner is None or not owner.active or owner.id != rule.current.created_by:
-            return because(ReasonCode.RULE_WEBHOOK_GONE, rule=rule.definition.name)
-        space = await self.uow.spaces.find(self.document.space_id)
-        if space is None or not in_reach(owner, self.document, space):
-            return because(ReasonCode.RULE_WEBHOOK_UNREADABLE, rule=rule.definition.name)
-        return None
+        """Why the rule may not ask through the step's webhook now (`running.refusal`)."""
+        return await refusal(
+            self.uow, step.webhook_id, rule.current.created_by, rule.definition.name, self.document
+        )
 
     async def _after(
         self, match: Match, actions: Sequence[Action], steps: Mapping[str, JsonValue]

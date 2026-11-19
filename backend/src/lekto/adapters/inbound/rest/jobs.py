@@ -15,6 +15,7 @@ from lekto.adapters.inbound.rest.schemas.jobs import (
     JobPageOut,
     JobsSummaryOut,
 )
+from lekto.adapters.inbound.schemas import MAX_POSITION
 from lekto.core.domain.ids import JobId
 from lekto.core.domain.jobs import OPEN_STATES, JobState
 from lekto.core.ports.repository import PAGE_SIZE
@@ -59,7 +60,7 @@ async def list_jobs(
     context: Context,
     state: Annotated[list[JobState] | None, Query(description="Repeat for several.")] = None,
     kind: Annotated[str | None, Query(max_length=100)] = None,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    offset: Annotated[int, Query(ge=0, le=MAX_POSITION)] = 0,
     limit: Annotated[int, Query(ge=1, le=PAGE_LIMIT)] = PAGE_SIZE,
 ) -> JobPageOut:
     page = await context.jobs.list(

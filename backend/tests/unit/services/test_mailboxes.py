@@ -41,6 +41,15 @@ async def _create(world: World, admin: User, name: str = "Household", **changes:
     )
 
 
+async def test_mailboxes_are_listed_as_every_list_sorts_names(world: World) -> None:
+    """`Ärzte` beside `Arzt`, not behind `Zahnarzt`, in every database alike (SQ-08)."""
+    admin = await _admin(world)
+    for name in ("Zahnarzt", "Ärzte", "Bank"):
+        await _create(world, admin, name)
+    listed = [item.name for item in await world.mailboxes.list_mailboxes(admin.id)]
+    assert listed == ["Ärzte", "Bank", "Zahnarzt"]
+
+
 async def test_only_admins_see_and_change_mailboxes(world: World) -> None:
     admin, user = await _admin(world), await world.user()
     mailbox = await _create(world, admin)
@@ -166,6 +175,48 @@ async def test_a_mailbox_is_tested_with_its_stored_password(world: World) -> Non
         await world.mailboxes.test_connection(
             admin.id, host="h", port=1, security=MailSecurity.NONE, username="u"
         )
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        {"host": "imap.example.net"},
+        {"port": 143},
+        {"security": MailSecurity.NONE},
+        {"username": "other@example.test"},
+    ],
+)
+async def test_the_stored_password_goes_only_where_it_was_given_for(
+    world: World, target: dict[str, Any]
+) -> None:
+    """The password is never shown again: another server, port, encryption or user gets it only
+    when given anew, in a test as in a change (else an admin token could send it anywhere)."""
+    admin = await _admin(world)
+    mailbox = await _create(world, admin)
+    login: dict[str, Any] = {
+        "host": f" {LOGIN.host} ",
+        "port": LOGIN.port,
+        "security": LOGIN.security,
+        "username": LOGIN.username,
+    }
+    world.mail_server.add_account(LOGIN)
+    found = await world.mailboxes.test_connection(admin.id, **login, mailbox_id=mailbox.id)
+    assert found.folders == ("INBOX",)
+
+    with pytest.raises(ValidationError) as tested:
+        await world.mailboxes.test_connection(
+            admin.id, **{**login, **target}, mailbox_id=mailbox.id
+        )
+    assert tested.value.reason.code is ReasonCode.MAIL_PASSWORD_AGAIN
+    with pytest.raises(ValidationError) as changed:
+        await world.mailboxes.change(admin.id, mailbox.id, MailboxChanges(**target))
+    assert changed.value.reason.code is ReasonCode.MAIL_PASSWORD_AGAIN
+    moved = await world.mailboxes.change(
+        admin.id, mailbox.id, MailboxChanges(**target), password="anew"
+    )
+    assert world.cipher.decrypt(moved.encrypted_password, context=password_context(mailbox.id)) == (
+        b"anew"
+    )
 
 
 async def test_an_unreadable_password_says_so(world: World) -> None:

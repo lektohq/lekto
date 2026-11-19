@@ -5,7 +5,7 @@ processes inside it:
 
 | Service | Type | Purpose |
 | --- | --- | --- |
-| `init-lekto` | oneshot | check `PUID`/`PGID`, prepare the volume, validate the configuration |
+| `init-lekto` | oneshot | check `PUID`/`PGID`, validate the configuration, prepare the volume |
 | `init-migrations` | oneshot | `LEKTO_ROLE` `all`/`api`: migrate the database; `worker`: nothing |
 | `svc-api` | longrun | Uvicorn with FastAPI: REST, MCP, SSE, and the web UI below `/ui` |
 | `svc-worker` | longrun | waits for the schema (role `worker`), then pipeline jobs, outbox dispatch, webhook delivery |
@@ -39,6 +39,11 @@ pre-release such as `1.2.0-beta.1`), `stable` the newest stable release, `latest
 release and, while there is none, the newest beta. The image knows its version (`LEKTO_VERSION`,
 set from the tag): the API description, the MCP server and the processing log name it. Building
 it yourself (above) is for development.
+
+Releases build one after the other, and GitHub keeps only one waiting: a release published while
+one builds and another waits replaces the waiting one, which ends as cancelled and leaves its
+release without an image. Run the workflow `Release` by hand (Actions, Run workflow) with that
+release's tag; an older release built again takes no channel tag from a newer one.
 
 Last, a published release whose image got `latest` tells the homelab its version: the job
 `homelab` checks the version (`0.7.0`, `1.2.0-beta.1`) and sends a `repository_dispatch`
@@ -149,7 +154,10 @@ answer, `LEKTO_MAIL_RENDER_TIMEOUT` (two minutes) the setting of a mail as a PDF
 
 `LEKTO_ROLE` decides which services s6 starts. Before they start, the hook `stage2-hook`
 (`S6_STAGE2_HOOK`) leaves the service the role does not run out of the bundle `user`; it is never
-started and stays down (`s6-svstat` shows it).
+started and stays down (`s6-svstat` shows it). The scripts of the image go by the settings as
+Lekto reads them (`lekto check --environment`: whitespace removed, a blank value as not set, any
+case): `init-lekto` writes them to the container's environment, where the services and the health
+check take them from; `stage2-hook`, which runs before it, reads the role alike.
 
 | Role | Starts | Migrates | Health |
 | --- | --- | --- | --- |

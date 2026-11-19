@@ -227,7 +227,8 @@ def test_a_suggestion_beside_an_ok_check_is_accepted_when_taken() -> None:
     topic = FieldCheck(field=TOPIC, outcome=Outcome.OK, confidence=1, suggestion=A)
     assert getattr(judge(TOPIC, None, A, topic), "verdict", None) is Verdict.ACCEPTED
     assert getattr(judge(TOPIC, None, B, topic), "verdict", None) is Verdict.CORRECTED
-    assert judge(TOPIC, None, None, topic) is not None  # left empty against the suggestion
+    # Left empty against the suggestion.
+    assert getattr(judge(TOPIC, None, None, topic), "verdict", None) is Verdict.CORRECTED
     tags = FieldCheck(field=TAGS, outcome=Outcome.OK, confidence=1, value=[A], suggestion=[B, C])
     assert getattr(judge(TAGS, [A], [A, B], tags), "verdict", None) is Verdict.ACCEPTED
     assert getattr(judge(TAGS, [A], [C, B, A], tags), "verdict", None) is Verdict.ACCEPTED

@@ -5,7 +5,13 @@ the facts, and an admin's correction at the contact too."""
 import pytest
 
 from lekto.adapters.outbound.memory import FakeCodeReader
-from lekto.core.domain.document_facts import FactOrigin, FactRole, FactState
+from lekto.core.domain.document_facts import (
+    DocumentFact,
+    FactOrigin,
+    FactRole,
+    FactState,
+    role_of,
+)
 from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import (
     ConflictError,
@@ -13,6 +19,7 @@ from lekto.core.domain.errors import (
     PermissionDeniedError,
     ValidationError,
 )
+from lekto.core.domain.facts import FoundIdentifier
 from lekto.core.domain.first_runs import FACTS, Verdict
 from lekto.core.domain.identifiers import Identifier, IdentifierKind, IdentifierSource
 from lekto.core.domain.identifiers.visibility import seen_by
@@ -20,15 +27,16 @@ from lekto.core.domain.master_data import Contact
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.services.classification.signals import FactsSignal
+from lekto.core.services.documents import IdentifierFact
 from lekto.core.services.fact_decisions import FactAction, FactDecision
 from lekto.core.services.master_data import replace_learned_identifiers
 from lekto.core.services.objects import text_key
 from tests import builders
+from tests.unit.services.classification_support import contacts, output, stored
 from tests.unit.services.support import World
-from tests.unit.services.test_signals import contacts, stored
 
 K = IdentifierKind
-TEXT = "Mahnung\nRechnungsnummer: M-77\nIhre Rechnung Nr. 4711 ist offen.\nKundennummer 20047718\n"
+TEXT = "Mahnung\nRechnungsnummer: M-77\nIhre Rechnung Nr. 4711 ist offen.\nKundennummer 12345678\n"
 
 
 async def run_facts(world: World, document: Document) -> None:
@@ -81,19 +89,28 @@ async def test_a_person_adds_corrects_rejects_and_withdraws(world: World) -> Non
         decide(FactAction.CORRECT, K.INVOICE_NUMBER, "4711", role=FactRole.THREAD),
     )
     await service.decide_fact(
-        owner.id, document.id, decide(FactAction.REJECT, K.CUSTOMER_NUMBER, "20047718")
+        owner.id, document.id, decide(FactAction.REJECT, K.CUSTOMER_NUMBER, "12345678")
     )
     assert await kept(world, document) == {
         (K.INVOICE_NUMBER, "M77"): (FactRole.OWN, FactState.REJECTED, pattern | person),
         (K.INVOICE_NUMBER, "M78"): (FactRole.OWN, FactState.CORRECTED, person),
         (K.INVOICE_NUMBER, "4711"): (FactRole.THREAD, FactState.CORRECTED, pattern | person),
-        (K.CUSTOMER_NUMBER, "20047718"): (
+        (K.CUSTOMER_NUMBER, "12345678"): (
             FactRole.CONTACT,
             FactState.REJECTED,
             pattern | person,
         ),
         (K.ORDER_NUMBER, "A77881"): (FactRole.OWN, FactState.ADDED, person),
     }
+    # The report shows the identifier found as the fact kept for it tells (RA-10).
+    report = await service.facts(owner.id, document.id)
+    (customer,) = [item for item in report.identifiers if item.found.kind is K.CUSTOMER_NUMBER]
+    assert (customer.role, customer.state, customer.origins, customer.kept) == (
+        FactRole.CONTACT,
+        FactState.REJECTED,
+        pattern | person,
+        True,
+    )
 
     # A new run of the facts signal leaves the person's decisions as they are.
     before = await kept(world, document)
@@ -103,13 +120,13 @@ async def test_a_person_adds_corrects_rejects_and_withdraws(world: World) -> Non
     # Withdrawn: a fact is as the sources find it now (its role too), one only a person gave
     # goes.
     for key in (
-        (K.CUSTOMER_NUMBER, "20047718"),
+        (K.CUSTOMER_NUMBER, "12345678"),
         (K.ORDER_NUMBER, "A77881"),
         (K.INVOICE_NUMBER, "4711"),
     ):
         await service.decide_fact(owner.id, document.id, decide(FactAction.WITHDRAW, *key))
     after = await kept(world, document)
-    assert after[(K.CUSTOMER_NUMBER, "20047718")] == (FactRole.CONTACT, FactState.FOUND, pattern)
+    assert after[(K.CUSTOMER_NUMBER, "12345678")] == (FactRole.CONTACT, FactState.FOUND, pattern)
     assert after[(K.INVOICE_NUMBER, "4711")] == (FactRole.REFERS, FactState.FOUND, pattern)
     assert (K.ORDER_NUMBER, "A77881") not in after
 
@@ -118,6 +135,36 @@ async def test_a_person_adds_corrects_rejects_and_withdraws(world: World) -> Non
     assert report.editable
     states = {item.fact.value: item.fact.state for item in report.numbers}
     assert states["M77"] is FactState.REJECTED and states["M78"] is FactState.CORRECTED
+
+
+def test_an_identifier_shows_the_fact_kept_for_it() -> None:
+    """Role and state as kept, else the kind's and found; the text's patterns and a code as
+    found now, other sources as kept (RA-10)."""
+    found = FoundIdentifier(
+        kind=K.CUSTOMER_NUMBER, value="12345678", contact_id=None, in_text=True, in_code=False
+    )
+    fresh = IdentifierFact.of(found, None)
+    assert (fresh.role, fresh.state, fresh.origins, fresh.holder, fresh.kept) == (
+        role_of(K.CUSTOMER_NUMBER),
+        FactState.FOUND,
+        frozenset({FactOrigin.PATTERN}),
+        None,
+        False,
+    )
+    fact = DocumentFact(
+        kind=K.CUSTOMER_NUMBER,
+        value="12345678",
+        role=FactRole.REFERS,
+        origins=frozenset({FactOrigin.CODE, FactOrigin.MODEL}),
+        state=FactState.CORRECTED,
+    )
+    merged = IdentifierFact.of(found, fact)
+    assert (merged.role, merged.state, merged.origins, merged.kept) == (
+        FactRole.REFERS,
+        FactState.CORRECTED,
+        frozenset({FactOrigin.PATTERN, FactOrigin.MODEL}),
+        True,
+    )
 
 
 async def test_what_a_decision_needs(world: World) -> None:
@@ -175,21 +222,21 @@ async def test_the_first_decision_about_the_facts_is_a_verdict(world: World) -> 
 
 
 async def test_a_rejected_fact_is_no_evidence_of_a_contact(world: World) -> None:
-    number = Identifier.parse(K.CUSTOMER_NUMBER, "20047718")
+    number = Identifier.parse(K.CUSTOMER_NUMBER, "12345678")
     bank = Contact.create(name="Bank", now=builders.NOW, identifiers=[number])
     await contacts(world, bank)
     owner = await world.user()
     document = await with_facts(world, owner)
     await world.documents.decide_fact(
-        owner.id, document.id, decide(FactAction.REJECT, K.CUSTOMER_NUMBER, "20047718")
+        owner.id, document.id, decide(FactAction.REJECT, K.CUSTOMER_NUMBER, "12345678")
     )
     result = await FactsSignal(world.uow, world.object_store, FakeCodeReader([])).run(document)
-    assert result.output["identifiers"] == []
+    assert output(result)["identifiers"] == []
 
 
 async def test_an_admin_corrects_a_number_at_the_contact_too(world: World) -> None:
     """The old value is rejected there; one entered by hand gives way to one entered by hand."""
-    entered = Identifier(K.CUSTOMER_NUMBER, "20047718")
+    entered = Identifier(K.CUSTOMER_NUMBER, "12345678")
     bank = Contact.create(name="Bank", now=builders.NOW, identifiers=[entered])
     await contacts(world, bank)
     admin = await world.user(role=Role.ADMIN)
@@ -200,7 +247,7 @@ async def test_an_admin_corrects_a_number_at_the_contact_too(world: World) -> No
         decide(
             FactAction.CORRECT,
             K.CUSTOMER_NUMBER,
-            "20047718",
+            "12345678",
             new_value="20047719",
             at_contact=True,
         ),
@@ -208,7 +255,7 @@ async def test_an_admin_corrects_a_number_at_the_contact_too(world: World) -> No
     async with world.uow() as uow:
         identifiers = (await uow.contacts.get(bank.id)).identifiers
     assert sorted((item.value, item.source) for item in identifiers) == [
-        ("20047718", IdentifierSource.REJECTED),
+        ("12345678", IdentifierSource.REJECTED),
         ("20047719", IdentifierSource.MANUAL),
     ]
     # Only on a document with a contact and for a contact's kind.
@@ -235,7 +282,7 @@ async def test_a_learned_number_corrected_at_the_contact_stays_learned_where_it_
     space = await world.personal_space(owner)
     learned = Identifier(
         K.CUSTOMER_NUMBER,
-        "20047718",
+        "12345678",
         IdentifierSource.LEARNED,
         learned_in=frozenset({space.id}),
     )
@@ -249,14 +296,14 @@ async def test_a_learned_number_corrected_at_the_contact_stays_learned_where_it_
         decide(
             FactAction.CORRECT,
             K.CUSTOMER_NUMBER,
-            "20047718",
+            "12345678",
             new_value="20047719",
             at_contact=True,
         ),
     )
     async with world.uow() as uow:
         identifiers = {item.value: item for item in (await uow.contacts.get(bank.id)).identifiers}
-    assert identifiers["20047718"].source is IdentifierSource.REJECTED
+    assert identifiers["12345678"].source is IdentifierSource.REJECTED
     corrected = identifiers["20047719"]
     assert (corrected.source, corrected.learned_in) == (
         IdentifierSource.LEARNED,

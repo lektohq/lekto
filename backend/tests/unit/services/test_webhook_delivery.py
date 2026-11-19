@@ -7,12 +7,18 @@ import json
 from dataclasses import replace
 from datetime import timedelta
 from decimal import Decimal
+from typing import Any
 
 import pytest
 
 from lekto.adapters.inbound.rest.schemas.outgoing import EventBody
 from lekto.core.domain.documents import Document
-from lekto.core.domain.errors import NotFoundError, TooManyAttemptsError
+from lekto.core.domain.errors import (
+    ConcurrencyError,
+    ConflictError,
+    NotFoundError,
+    TooManyAttemptsError,
+)
 from lekto.core.domain.events import (
     DocumentDeleted,
     DocumentFiled,
@@ -27,6 +33,7 @@ from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.master_data import Contact, DocumentType
 from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rules import AskWebhook, Trigger
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.domain.webhooks import (
@@ -34,15 +41,20 @@ from lekto.core.domain.webhooks import (
     TEST_EVENT,
     BodyFormat,
     DeliveryOutcome,
+    ModelCallKind,
+    ModelCallRole,
     Webhook,
     WebhookDelivery,
 )
 from lekto.core.ports.webhook_sender import WebhookRequest
+from lekto.core.services import _jobs
 from lekto.core.services._push_queue import PUSH_JOB
-from lekto.core.services.webhooks import DELIVER_JOB, WebhookDeliveryService
+from lekto.core.services.webhooks import DELIVER_JOB, WebhookDeliveryService, delivery
 from lekto.core.services.webhooks.delivery import queue_rule_send
+from lekto.core.services.webhooks.management import serving_model_call
 from tests import builders
 from tests.builders import NOW
+from tests.unit.services.rules_support import channel_api, definition, rule_world
 from tests.unit.services.support import World
 
 URL = "http://n8n.lan:5678/webhook/lekto"
@@ -309,6 +321,39 @@ async def test_a_delivery_is_signed_sent_and_logged(world: World) -> None:
     assert not await service.run_next_job()
 
 
+async def test_the_result_is_stored_however_often_the_webhook_changed_meanwhile(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """As every job's result (`JobRunner.storing`): read again while the claim holds. Three
+    conflicts in a row lost the result, and the request went out again after the lease
+    (SC-08)."""
+    user = await world.user()
+    document = await seed(world, user)
+    webhook, _ = await hook(world, user)
+    service = world.webhook_delivery()
+    await queue(world, document, service)
+    row, conflicts = delivery._row, 4
+
+    def changed_meanwhile(*args: Any) -> WebhookDelivery:
+        nonlocal conflicts
+        if conflicts:
+            conflicts -= 1
+            raise ConcurrencyError("the webhook changed meanwhile")
+        return row(*args)
+
+    async def at_once(attempt: int) -> None:
+        return None
+
+    monkeypatch.setattr(delivery, "_row", changed_meanwhile)
+    monkeypatch.setattr(_jobs, "_backoff", at_once)
+
+    assert await service.run_next_job()
+    assert len(world.sender.requests) == 1
+    (logged,) = await log(world, webhook)
+    assert logged.outcome is DeliveryOutcome.DELIVERED
+    assert [j.status for j in deliveries(world)] == [JobStatus.DONE]
+
+
 async def test_a_renewed_secret_signs_next_to_the_new_one_during_the_grace_period(
     world: World,
 ) -> None:
@@ -440,6 +485,40 @@ async def test_a_webhook_is_switched_off_after_repeated_failures_and_success_res
     assert len(deliveries(world)) == before
 
 
+async def test_a_webhook_that_takes_tasks_is_never_switched_off(world: World) -> None:
+    """Its events give up one by one; it goes on serving its model call and the rule that asks
+    it (Tobi, 25.10.2026)."""
+    r = await rule_world(world)
+    admin = r.admin
+    document = await seed(world, admin)
+    asked, _ = await hook(world, admin)
+    ask = AskWebhook("flow", asked.id)
+    await r.personal_rule(
+        admin, definition("Fragen", channel_api(), ask, triggers=[Trigger.INGEST])
+    )
+    role = ModelCallRole(ModelCallKind.PROPOSE, timedelta(minutes=10))
+    created = await world.webhooks.create(
+        admin.id, name="agent", url=URL, event_types=["*"], model_call=role
+    )
+    model = created.webhook
+    events_only, _ = await hook(world, admin)
+    service = world.webhook_delivery(replace(builders.WEBHOOKS, disable_after=3))
+    world.sender.answers = lambda request: 404
+    for _ in range(4):
+        await service.on_event(lane_changed(document))
+        while await service.run_next_job():
+            pass
+    async with world.uow() as uow:
+        states = {
+            item.id: (item.active, item.failed_streak) for item in await uow.webhooks.list_all()
+        }
+        serving = await serving_model_call(uow, ModelCallKind.PROPOSE)
+    assert states[asked.id] == (True, 4)
+    assert states[model.id] == (True, 4)
+    assert states[events_only.id] == (False, 3)  # switched off as before, then sent nothing
+    assert serving is not None and serving.id == model.id
+
+
 async def test_own_headers_go_with_the_request_and_an_unsigned_one_has_no_signature(
     world: World,
 ) -> None:
@@ -555,6 +634,58 @@ async def test_a_template_body_is_what_the_template_makes(world: World) -> None:
         "topic": None,
         "open": f"https://lekto.example.org/ui/documents/{document.id}",
     }
+
+
+async def test_a_field_renamed_is_renamed_in_the_template_and_not_deleted_while_used(
+    world: World,
+) -> None:
+    """As in title patterns and rules: renaming a field rewrites a webhook's template that
+    uses it; deleting it is refused while one does."""
+    user, admin = await world.user(), await world.user(role=Role.ADMIN)
+    document = await described(world, user)
+    async with world.uow() as uow:
+        (amount,) = await uow.fields.list_all()
+    template = '{"amount": {{ field.betrag.amount | json }}, "betrag": {{ title | json }}}'
+    created = await world.webhooks.create(
+        user.id,
+        name="HA",
+        url=URL,
+        event_types=["*"],
+        signed=False,
+        body=BodyFormat.TEMPLATE,
+        body_template=template,
+    )
+    other = await world.webhooks.create(
+        user.id,
+        name="Andere",
+        url=URL,
+        event_types=["*"],
+        body=BodyFormat.TEMPLATE,
+        body_template='{"title": {{ title | json }}}',
+    )
+    await world.master_data.change_field(admin.id, amount.id, name="Summe")
+    async with world.uow() as uow:
+        renamed = await uow.webhooks.get(created.webhook.id)
+        untouched = await uow.webhooks.get(other.webhook.id)
+    assert renamed.body_template == (
+        '{"amount": {{ field.summe.amount | json }}, "betrag": {{ title | json }}}'
+    )
+    assert untouched.body_template == '{"title": {{ title | json }}}'
+    service = world.webhook_delivery()
+    await queue(world, document, service)
+    while await service.run_next_job():
+        pass
+    bodies = [json.loads(request.body) for request in world.sender.requests]
+    assert {"amount": "120.50", "betrag": "Strom März"} in bodies
+    async with world.uow() as uow:  # no document has a value of it any more
+        stored = await uow.documents.get(document.id)
+        stored.fields = {}
+        await uow.documents.update(stored)
+        await uow.commit()
+    with pytest.raises(
+        ConflictError, match=r"field\.summe is used by the templates of the webhooks 'HA'"
+    ):
+        await world.master_data.delete_field(admin.id, amount.id)
 
 
 @pytest.mark.parametrize(

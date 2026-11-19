@@ -33,9 +33,9 @@ from lekto.core.services.objects import (
     text_key,
 )
 from lekto.core.services.pipeline import PipelineService
-from tests.builders import SAMPLES, incoming
+from tests.builders import incoming
 from tests.mails import plain_mail
-from tests.unit.services.support import World
+from tests.unit.services.support import World, ingest
 
 
 class NotPdfa(FakeOcr):
@@ -90,14 +90,6 @@ def pipeline(
             Node.PARSE: ParseNode(store, FakeParser(text)),
         }
     )
-
-
-async def ingest(world: World, service: PipelineService, sample: str) -> tuple[User, Document]:
-    owner = await world.user()
-    data = (SAMPLES / sample).read_bytes()
-    document = await service.receive(owner.id, incoming(data), filename=sample)
-    await world.drain(service)
-    return owner, await world.documents.get(owner.id, document.id)
 
 
 @pytest.mark.parametrize("sample", ["scan.pdf", "photo.jpg"])
@@ -216,7 +208,7 @@ async def test_the_markdown_of_before_goes_once_the_text_is_read_again(world: Wo
     read = await load_text(store, document.id)
     await store.delete(text_key(document.id))
     await store.put(legacy_text_key(document.id), b"# Docling", content_type="text/markdown")
-    assert await load_text(store, document.id) == b"# Docling"
+    assert await load_text(store, document.id) == "# Docling"
     await service.reprocess_from(owner.id, document.id, Node.PARSE)
     await world.drain(service)
     assert await load_text(store, document.id) == read

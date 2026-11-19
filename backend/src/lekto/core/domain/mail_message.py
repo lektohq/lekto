@@ -2,26 +2,49 @@
 
 What a mail says about itself (sender, recipients, date, subject, Message-ID), its text (the HTML
 part and the plain one, as far as there are), its attachments, the pictures its HTML shows by
-`cid:`, and the mails attached to it. A part that cannot be decoded is read with replacement
-characters rather than failing the mail.
+`cid:`, and the mails attached to it, `MAX_FORWARDS` deep: one attached deeper stays an
+attachment (`.eml`). A part that cannot be decoded is read with replacement characters rather
+than failing the mail.
+
+A header is read from its raw value, at most `MAX_RAW_HEADER` characters of it (`_raw`): the
+standard library parses a list of addresses in a time that grows with its square, 16 000
+recipients took 19 s.
 """
 
 import email
 import email.policy
+import logging
 import re
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.message import EmailMessage, Message
 from email.utils import getaddresses, parsedate_to_datetime
+from functools import cached_property, partial
 
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.mail_traits import Importance, importance_of
+from lekto.core.domain.pixels import pixels
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.validation import MAX_NAME, clean_filename, without_control
+
+log = logging.getLogger(__name__)
 
 RFC822 = "message/rfc822"
+MAX_FORWARDS = 5
+"""Levels of attached mails read (`mail_intake.letters` unwraps them); a mail attached deeper
+stays an attachment of the last (`.eml`). Each level is written again as the file of its mail
+(`MailMessage.raw`): a hundred levels of 16 MB took 91 s and 1.6 GB."""
 MAX_HEADER = 1000
-"""Characters of a header value kept (a subject, a list of recipients)."""
+"""Characters of a header value kept (a subject, a Message-ID)."""
+MAX_RAW_HEADER = 10_000
+"""Characters of the raw values of a header read at most, all of its lines together: a list of
+addresses is cut at the last comma before (some 200 to 300 addresses)."""
+MAX_ADDRESS = 254
+"""Characters of an address at most (RFC 5321); a longer one is left out. A name is cut to
+`MAX_NAME`."""
+_SMTP = email.policy.SMTP.clone(refold_source="none")
+"""Writes an attached mail's headers as they are: folding them again would parse them."""
 
 _SPACE = re.compile(r"\s+")
 
@@ -59,13 +82,18 @@ class MailPart:
     content_id: str | None = None
     inline: bool = False
 
+    @cached_property
+    def pixels(self) -> tuple[int, int] | None:
+        """Width and height of an image, as its head says (`pixels.pixels`); None for another
+        file or a head that does not say."""
+        return pixels(self.data)
+
 
 @dataclass(frozen=True, kw_only=True)
 class MailMessage:
     sender: tuple[Address, ...]
     to: tuple[Address, ...]
     cc: tuple[Address, ...]
-    reply_to: tuple[Address, ...]
     subject: str
     date: datetime | None  # UTC
     message_id: str | None  # without angle brackets
@@ -77,22 +105,40 @@ class MailMessage:
     pictures: tuple[MailPart, ...]
     """Parts the HTML can show by `cid:`."""
     messages: tuple["MailMessage", ...]
-    """Mails attached to this one (a forward as attachment)."""
-    raw: bytes = field(repr=False, default=b"")
-    """The mail as a file (`.eml`): as received, or an attached one as it stands in it."""
+    """Mails attached to this one (a forward as attachment), `MAX_FORWARDS` deep."""
+    source: bytes | Callable[[], bytes] = field(repr=False, compare=False, default=b"")
+    """The mail as a file, or how to write it (`raw`)."""
     importance: Importance = Importance.NORMAL
     """As its header gives it (`mail_traits.importance_of`)."""
 
+    @cached_property
+    def raw(self) -> bytes:
+        """The mail as a file (`.eml`): as received, or an attached one as it stands in it,
+        written when first asked for: a mail that only wraps another needs none."""
+        return self.source if isinstance(self.source, bytes) else self.source()
+
 
 def read_mail(data: bytes) -> MailMessage:
-    """The mail `data`; UnprocessableDocumentError if it has no header of a mail at all."""
-    message = email.message_from_bytes(data, policy=email.policy.default)
-    if not isinstance(message, EmailMessage) or not (message["From"] or message["Date"]):
-        raise UnprocessableDocumentError(because(ReasonCode.FILE_DAMAGED))
-    return _read(message, data)
+    """The mail `data`; UnprocessableDocumentError if it has no header of a mail at all, or if
+    reading it fails in any other way: a mail comes from anyone, and the mail intake records a
+    mail it cannot read as failed and goes on with the next (mails attached a hundred deep make
+    the standard library recurse too deep, for one)."""
+    try:
+        message = email.message_from_bytes(data, policy=email.policy.default)
+        if not isinstance(message, EmailMessage) or not (
+            _raw(message, "From").strip() or _raw(message, "Date").strip()
+        ):
+            raise UnprocessableDocumentError(because(ReasonCode.FILE_DAMAGED))
+        return _read(message, data, 0)
+    except UnprocessableDocumentError:
+        raise
+    except Exception:
+        log.warning("a mail could not be read", exc_info=True)
+        raise UnprocessableDocumentError(because(ReasonCode.FILE_DAMAGED)) from None
 
 
-def _read(message: EmailMessage, raw: bytes) -> MailMessage:
+def _read(message: EmailMessage, source: bytes | Callable[[], bytes], depth: int) -> MailMessage:
+    """`message`, attached `depth` levels deep."""
     html = _body(message, "html")
     text = _body(message, "plain")
     shown = _html_of(message)
@@ -103,8 +149,12 @@ def _read(message: EmailMessage, raw: bytes) -> MailMessage:
         kind = part.get_content_type()
         if kind == RFC822:
             inner = _attached(part)
-            if inner is not None:
-                messages.append(_read(inner, _bytes(inner)))
+            if inner is None:
+                continue
+            if depth < MAX_FORWARDS:
+                messages.append(_read(inner, partial(_bytes, inner), depth + 1))
+            else:
+                attachments.append(MailPart(_filename(part), RFC822, _bytes(inner)))
             continue
         if _is_body(part, html, text):
             continue
@@ -128,7 +178,6 @@ def _read(message: EmailMessage, raw: bytes) -> MailMessage:
         sender=_addresses(message, "From"),
         to=_addresses(message, "To"),
         cc=_addresses(message, "Cc"),
-        reply_to=_addresses(message, "Reply-To"),
         subject=_header(message, "Subject"),
         date=_date(message),
         message_id=_bare(_header(message, "Message-ID")) or None,
@@ -137,7 +186,7 @@ def _read(message: EmailMessage, raw: bytes) -> MailMessage:
         attachments=tuple(attachments),
         pictures=tuple(pictures),
         messages=tuple(messages),
-        raw=raw,
+        source=source,
         importance=importance_of(
             {
                 name: _header(message, name) or None
@@ -149,7 +198,7 @@ def _read(message: EmailMessage, raw: bytes) -> MailMessage:
 
 def _bytes(message: EmailMessage) -> bytes:
     try:
-        return message.as_bytes(policy=email.policy.SMTP)
+        return message.as_bytes(policy=_SMTP)
     except (LookupError, UnicodeError, ValueError):
         return message.as_bytes(policy=email.policy.compat32)
 
@@ -230,7 +279,7 @@ def _filename(part: Message) -> str | None:
         name = part.get_filename()
     except (LookupError, UnicodeError, ValueError):
         return None
-    return _SPACE.sub(" ", name).strip() or None if name else None
+    return clean_filename(_SPACE.sub(" ", name)) or None if name else None
 
 
 def _content_id(part: Message) -> str | None:
@@ -242,23 +291,42 @@ def _bare(value: str) -> str:
     return value.strip().removeprefix("<").removesuffix(">").strip()
 
 
-def _header(message: EmailMessage, name: str) -> str:
+def _raw(message: Message, name: str, *, listed: bool = False) -> str:
+    """The raw value of the header `name` (its first line, as `Message.get` takes it), at most
+    `MAX_RAW_HEADER` characters; `listed`: a list of addresses, all its lines joined by `, `
+    (as `Message.get_all` takes them) and cut at the last comma before. Nothing parsed."""
+    values = [str(value) for key, value in message.raw_items() if key.lower() == name.lower()]
+    joined = ", ".join(values if listed else values[:1])
+    if len(joined) <= MAX_RAW_HEADER:
+        return joined
+    cut = joined[:MAX_RAW_HEADER]
+    return cut.rpartition(",")[0] if listed and "," in cut else cut
+
+
+def _parsed(message: Message, name: str, *, listed: bool = False) -> str:
+    """The header `name` decoded (encoded words), from its raw values (`_raw`); empty if it
+    cannot be read."""
+    raw = _raw(message, name, listed=listed)
+    if not raw:
+        return ""
     try:
-        value = message.get(name)
+        return str(email.policy.default.header_fetch_parse(name, raw))
     except (LookupError, UnicodeError, ValueError):
         return ""
-    return _SPACE.sub(" ", str(value)).strip()[:MAX_HEADER] if value is not None else ""
+
+
+def _header(message: EmailMessage, name: str) -> str:
+    value = _parsed(message, name)
+    return without_control(_SPACE.sub(" ", value)).strip()[:MAX_HEADER]
 
 
 def _addresses(message: EmailMessage, name: str) -> tuple[Address, ...]:
-    try:
-        values = message.get_all(name) or []
-    except (LookupError, UnicodeError, ValueError):
-        return ()
     found = []
-    for display, address in getaddresses([str(value) for value in values]):
-        if address or display:
-            found.append(Address(_SPACE.sub(" ", display).strip(), address.strip()))
+    for display, address in getaddresses([_parsed(message, name, listed=True)]):
+        address = without_control(address).strip()
+        if (address or display) and len(address) <= MAX_ADDRESS:
+            name_shown = without_control(_SPACE.sub(" ", display)).strip()[:MAX_NAME]
+            found.append(Address(name_shown, address))
     return tuple(found)
 
 
@@ -268,8 +336,9 @@ def _date(message: EmailMessage) -> datetime | None:
         return None
     try:
         moment = parsedate_to_datetime(value)
-    except (TypeError, ValueError, IndexError):
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=UTC)
+        return moment.astimezone(UTC)
+    except (TypeError, ValueError, IndexError, OverflowError):
+        # A date at the edge of the calendar (`31 Dec 9999 … -0100`) leaves it in UTC.
         return None
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=UTC)
-    return moment.astimezone(UTC)

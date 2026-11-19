@@ -41,15 +41,18 @@ class MemoryEventBus:
         async with self._lock:
             delivered = 0
             for name, handler in list(self._handlers.items()):
-                state = self._db.subscriptions[name]
+                # Removed as an orphan by another bus: it starts afresh, as on SQL.
+                state = self._db.subscriptions.setdefault(
+                    name, SubscriptionState(len(self._db.outbox))
+                )
                 delivered += await self._deliver(name, handler, state, limit)
             return delivered
 
     async def due_in(self) -> timedelta | None:
         times: list[datetime] = []
         for name in self._handlers:
-            state = self._db.subscriptions[name]
-            if state.cursor < len(self._db.outbox):
+            state = self._db.subscriptions.get(name)
+            if state is None or state.cursor < len(self._db.outbox):
                 return timedelta(0)
             times.extend(retry.due for retry in state.retries)
         due = min(times, default=None)
@@ -57,6 +60,7 @@ class MemoryEventBus:
 
     async def purge(self, *, before: datetime) -> int:
         async with self._lock:
+            self._remove_orphans(before)
             states = self._db.subscriptions.values()
             end = min((state.cursor for state in states), default=len(self._db.outbox))
             waiting = {retry.position for state in states for retry in state.retries}
@@ -75,6 +79,23 @@ class MemoryEventBus:
                 purged += 1
             return purged
 
+    def _remove_orphans(self, before: datetime) -> None:
+        """Remove the subscriptions no subscriber of this bus serves that an event recorded
+        before `before` still waits for (`EventBus.purge`)."""
+        if not self._handlers:
+            return
+        for name, state in list(self._db.subscriptions.items()):
+            if name in self._handlers:
+                continue
+            waiting = (
+                self._db.recorded_at.get(event.id)
+                for position, event in enumerate(self._db.outbox)
+                if position >= state.cursor and position not in self._db.purged
+            )
+            if any(recorded is not None and recorded < before for recorded in waiting):
+                del self._db.subscriptions[name]
+                log.warning("orphaned event subscriptions removed", extra={"subscribers": [name]})
+
     async def _deliver(
         self, name: str, handler: EventHandler, state: SubscriptionState, limit: int
     ) -> int:
@@ -86,11 +107,10 @@ class MemoryEventBus:
         attempts = {retry.position: retry.attempts for retry in due}
         end = min(len(self._db.outbox), state.cursor + limit)
         fresh = list(range(state.cursor, end))
-        state.cursor = end
-        failed: list[Retry] = []
         delivered = 0
         for position in [*attempts, *fresh]:
             event = self._db.outbox[position]
+            again: list[Retry] = []
             try:
                 await handler(event)
             except Exception:
@@ -101,19 +121,22 @@ class MemoryEventBus:
                         "event delivery given up",
                         extra={"subscriber": name, "event_id": str(event.id), "attempts": tries},
                     )
-                    continue
-                log.warning(
-                    "event handler failed",
-                    extra={"subscriber": name, "event_id": str(event.id), "attempts": tries},
-                    exc_info=True,
-                )
-                failed.append(Retry(position, tries, retry_at))
+                else:
+                    log.warning(
+                        "event handler failed",
+                        extra={"subscriber": name, "event_id": str(event.id), "attempts": tries},
+                        exc_info=True,
+                    )
+                    again.append(Retry(position, tries, retry_at))
             else:
                 delivered += 1
-        state.retries = [
-            *(retry for retry in state.retries if retry.position not in attempts),
-            *failed,
-        ]
+            # Kept after each event, not before the handlers: a dispatch cancelled in a handler
+            # (the worker stops) leaves that event and the later ones to the next (PM-06).
+            state.retries = [
+                *(retry for retry in state.retries if retry.position != position),
+                *again,
+            ]
+            state.cursor = max(state.cursor, position + 1)
         return delivered
 
     def _now(self) -> datetime:

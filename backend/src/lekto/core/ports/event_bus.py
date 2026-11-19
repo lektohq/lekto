@@ -57,7 +57,13 @@ class EventBus(Protocol):
         """Remove events recorded before `before` that every subscription has handled (delivered
         or given up); returns how many. Without subscriptions, every such event counts as
         handled. Keep `before` well in the past: a subscription is created on its first
-        dispatch and only then holds back events."""
+        dispatch and only then holds back events.
+
+        A subscription goes first, with its retries, if it is orphaned: no subscriber of this
+        bus serves it, and an event recorded before `before` still waits for it (a subscriber
+        no longer subscribed, as `search.index` without the search). One served here is never
+        removed, however long the process was stopped; one served by another process moves
+        on."""
         ...
 
 

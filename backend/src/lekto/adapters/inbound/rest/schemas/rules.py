@@ -13,10 +13,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from lekto.adapters.inbound.rest.schemas import groups
 from lekto.adapters.inbound.rest.schemas.open_identifiers import OccurrenceOut
 from lekto.adapters.inbound.schemas import (
+    MAX_POSITION,
     FieldJson,
     MoneyValue,
     PeriodValue,
     ReasonOut,
+    RequestBody,
     RuleEffectOut,
     RuleNoteOut,
     RuleReportOut,
@@ -24,6 +26,7 @@ from lekto.adapters.inbound.schemas import (
 from lekto.core.domain.document_facts import FactRole
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.json_value import JsonValue
+from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.rules import (
     DEFAULT_PRIORITY,
@@ -32,10 +35,10 @@ from lekto.core.domain.rules import (
     MAX_DEPTH,
     MAX_LIST,
     MAX_PRIORITY,
+    MAX_STEP_NAME,
     MAX_STEP_PATH,
     MAX_TEXT,
     MIN_PRIORITY,
-    ApplicationStatus,
     ConditionField,
     Missing,
     Operator,
@@ -51,7 +54,11 @@ from lekto.core.domain.validation import MAX_NAME
 from lekto.core.domain.webhooks import MAX_BODY_TEMPLATE
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE
 from lekto.core.services.rules.changes import ArrivalStep
-from lekto.core.services.rules.retroactive import Outcome, TextHit
+from lekto.core.services.rules.retroactive import MAX_APPLY_DOCUMENTS, Outcome, TextHit
+
+MAX_APPLIED = MAX_APPLY_DOCUMENTS
+"""Documents one application of a rule names (`ApplyRequest`): as many as
+`LEKTO_RULES_APPLY_MAX_DOCUMENTS` allows at most; the service bounds them by its value."""
 
 
 class ConditionSchema(BaseModel):
@@ -116,8 +123,8 @@ class ConditionSchema(BaseModel):
         | float
         | MoneyValue
         | PeriodValue
-        | list[str]
-        | list[str | bool | int | float]
+        | Annotated[list[str], Field(max_length=MAX_LIST)]
+        | Annotated[list[str | bool | int | float], Field(max_length=MAX_LIST)]
         | None
     ) = Field(
         default=None,
@@ -283,7 +290,7 @@ class AskWebhookAction(BaseModel):
     type: Literal["ask_webhook"]
     name: str = Field(
         min_length=1,
-        max_length=50,
+        max_length=MAX_STEP_NAME,
         examples=["accounting"],
         description=(
             "Small letters, digits and `_`, unique in the rule: the steps after it see the "
@@ -362,10 +369,10 @@ _RULE_EXAMPLE: dict[str, Any] = {
 }
 
 
-class RuleDefinitionIn(BaseModel):
+class RuleDefinitionIn(RequestBody):
     """The content of a rule; changing it makes a new version."""
 
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [_RULE_EXAMPLE]})
+    model_config = ConfigDict(json_schema_extra={"examples": [_RULE_EXAMPLE]})
 
     name: str = Field(min_length=1, max_length=MAX_NAME)
     priority: int = Field(
@@ -380,6 +387,7 @@ class RuleDefinitionIn(BaseModel):
     triggers: list[Trigger] = Field(
         default_factory=lambda: list(Trigger),
         min_length=1,
+        max_length=len(Trigger),
         description=(
             "`ingest`: when a document arrives; `change`: when a person changes it. A rule "
             "with a step that asks a webhook: `ingest` only."
@@ -399,7 +407,14 @@ class RuleDefinitionIn(BaseModel):
     )
 
     def to_json(self) -> JsonValue:
-        data: JsonValue = self.model_dump(mode="json", by_alias=True, exclude_defaults=True)
+        """The definition as `definition_from_json` reads it: not where the rule stands or
+        whether it is on, which `RuleCreate` and `RuleChange` add (RB-12)."""
+        data: JsonValue = self.model_dump(
+            mode="json",
+            by_alias=True,
+            exclude_defaults=True,
+            exclude={"scope", "space_id", "enabled"},
+        )
         return data
 
 
@@ -425,20 +440,11 @@ class RuleCreate(RuleDefinitionIn):
         "switched on.",
     )
 
-    def to_json(self) -> JsonValue:
-        data: JsonValue = self.model_dump(
-            mode="json",
-            by_alias=True,
-            exclude_defaults=True,
-            exclude={"scope", "space_id", "enabled"},
-        )
-        return data
-
 
 class RuleChange(RuleDefinitionIn):
     """The new content of a rule, and, with `scope`, where it moves."""
 
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [_RULE_EXAMPLE]})
+    model_config = ConfigDict(json_schema_extra={"examples": [_RULE_EXAMPLE]})
 
     scope: RuleScope | None = Field(
         default=None,
@@ -457,18 +463,9 @@ class RuleChange(RuleDefinitionIn):
         "a change switched off, to try it first); left out: as it was.",
     )
 
-    def to_json(self) -> JsonValue:
-        data: JsonValue = self.model_dump(
-            mode="json",
-            by_alias=True,
-            exclude_defaults=True,
-            exclude={"scope", "space_id", "enabled"},
-        )
-        return data
 
-
-class RulePatch(BaseModel):
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [{"enabled": False}]})
+class RulePatch(RequestBody):
+    model_config = ConfigDict(json_schema_extra={"examples": [{"enabled": False}]})
 
     enabled: bool
 
@@ -553,9 +550,8 @@ class RuleOut(_RuleDefinitionOut):
         )
 
 
-class TemplatePreviewIn(BaseModel):
+class TemplatePreviewIn(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -625,8 +621,8 @@ class TemplatePreviewOut(BaseModel):
     )
 
 
-class ApplyPreviewRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [{"limit": 50}]})
+class ApplyPreviewRequest(RequestBody):
+    model_config = ConfigDict(json_schema_extra={"examples": [{"limit": 50}]})
 
     cursor: str | None = Field(default=None, max_length=64, description="`next_cursor`.")
     limit: int = Field(default=PAGE_SIZE, ge=1, le=PAGE_LIMIT)
@@ -750,9 +746,8 @@ class ApplyPreviewOut(BaseModel):
     )
 
 
-class ApplyRequest(BaseModel):
+class ApplyRequest(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -764,10 +759,13 @@ class ApplyRequest(BaseModel):
         },
     )
 
-    version: int = Field(ge=1, description="The rule version to apply (from the preview).")
-    document_ids: list[UUID] = Field(min_length=1, max_length=100_000)
+    version: int = Field(
+        ge=1, le=MAX_POSITION, description="The rule version to apply (from the preview)."
+    )
+    document_ids: list[UUID] = Field(min_length=1, max_length=MAX_APPLIED)
     accept_conflicts: list[UUID] = Field(
         default_factory=list,
+        max_length=MAX_APPLIED,
         description="Selected documents where the rule's value replaces a different one.",
     )
 
@@ -786,7 +784,7 @@ class RuleApplicationOut(BaseModel):
     id: UUID
     rule_id: UUID
     version: int
-    status: ApplicationStatus
+    status: ProgressStatus
     total: int = Field(description="Selected documents.")
     done: int = Field(description="Documents worked through so far.")
     applied: int

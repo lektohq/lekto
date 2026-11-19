@@ -3,6 +3,7 @@
 import base64
 import hashlib
 from email.message import EmailMessage
+from urllib.parse import quote
 
 from lekto.core.domain.mail import MailLogin, MailSecurity
 from lekto.core.domain.mail_intake import SMALL_IMAGE
@@ -21,11 +22,11 @@ PDF = b"%PDF-1.7\n% a test attachment\n%%EOF\n"
 
 
 def plain_mail(
-    subject: str = "Ihre Rechnung Oktober", text: str = "Hallo Anna,\n\nanbei."
+    subject: str = "Ihre Rechnung Oktober", text: str = "Hallo Erika,\n\nanbei."
 ) -> bytes:
     message = EmailMessage()
     message["From"] = "Stadtwerke Musterstadt <rechnung@stadtwerke.example>"
-    message["To"] = "Anna Beispiel <anna@example.test>"
+    message["To"] = "Erika Mustermann <erika@example.test>"
     message["Date"] = "Wed, 04 Nov 2026 10:00:00 +0100"
     message["Message-ID"] = (
         f"<{hashlib.sha256(subject.encode()).hexdigest()[:16]}@stadtwerke.example>"
@@ -39,17 +40,17 @@ def rich_mail(html: str | None = None) -> bytes:
     """Text and HTML with a picture by `cid:`, a PDF attached, and a forwarded mail."""
     message = EmailMessage()
     message["From"] = "Stadtwerke Musterstadt <rechnung@stadtwerke.example>"
-    message["To"] = "Anna Beispiel <anna@example.test>, ben@example.test"
+    message["To"] = "Erika Mustermann <erika@example.test>, ben@example.test"
     message["Cc"] = "Buchhaltung <buchhaltung@example.test>"
     message["Date"] = "Wed, 04 Nov 2026 10:00:00 +0100"
     message["Message-ID"] = "<rechnung-4711@stadtwerke.example>"
     message["Subject"] = "=?utf-8?q?Ihre_Rechnung_=C3=BCber_123=2C45_=E2=82=AC?="
-    message.set_content("Hallo Anna,\n\nanbei die Rechnung über 123,45 €.\n")
+    message.set_content("Hallo Erika,\n\nanbei die Rechnung über 123,45 €.\n")
     message.add_alternative(
         html
         or (
             "<html><head><style>p { color: #333 }</style></head><body>"
-            "<p>Hallo <b>Anna</b>,</p><p>anbei die Rechnung über 123,45 €.</p>"
+            "<p>Hallo <b>Erika</b>,</p><p>anbei die Rechnung über 123,45 €.</p>"
             '<img src="cid:logo@stadtwerke"></body></html>'
         ),
         subtype="html",
@@ -75,7 +76,7 @@ def apple_mail() -> bytes:
     png = base64.b64encode(PNG).decode()
     photo = base64.b64encode(PNG + bytes(SMALL_IMAGE)).decode()  # larger than a logo
     return (
-        "From: Anna Beispiel <anna@example.test>\r\n"
+        "From: Erika Mustermann <erika@example.test>\r\n"
         "To: dms@example.test\r\n"
         "Subject: Ein Test mit Anhang\r\n"
         "Date: Fri, 06 Nov 2026 09:27:00 +0100\r\n"
@@ -120,3 +121,53 @@ def apple_mail() -> bytes:
         "--mix--\r\n"
         "--alt--\r\n"
     ).encode()
+
+
+def named_attachments_mail(*names: str, subject: str = "Ihre Unterlagen") -> bytes:
+    """A mail with a PDF under each of `names`, written as a sender may (RFC 2231, so path
+    separators and control characters come through), and `subject` as it stands (it may be an
+    encoded word)."""
+    message = EmailMessage()
+    message["From"] = "Muster Versicherung <post@versicherung.example>"
+    message["To"] = "Jane Doe <jane@example.test>"
+    message["Date"] = "Wed, 04 Nov 2026 10:00:00 +0100"
+    message["Message-ID"] = (
+        f"<{hashlib.sha256(repr(names).encode()).hexdigest()[:16]}@example.test>"
+    )
+    message["Subject"] = "placeholder"
+    message.set_content("Anbei die Unterlagen.")
+    for index, _ in enumerate(names):
+        message.add_attachment(
+            PDF + f"% {index}\n".encode(),
+            maintype="application",
+            subtype="pdf",
+            filename=f"placeholder-{index}.pdf",
+        )
+    data = bytes(message)
+    data = data.replace(b"Subject: placeholder", b"Subject: " + subject.encode(), 1)
+    for index, name in enumerate(names):
+        encoded = "utf-8''" + quote(name, safe="")
+        data = data.replace(
+            f'filename="placeholder-{index}.pdf"'.encode(), f"filename*={encoded}".encode(), 1
+        )
+    return data
+
+
+def nested_mail(depth: int) -> bytes:
+    """A mail attached in a mail, `depth` deep, written by hand: building it with `email` would
+    recurse as deep as reading it does."""
+    data = plain_mail("Innen")
+    for level in range(depth):
+        boundary = f"level-{level}".encode()
+        data = (
+            b"From: Jane Doe <jane@example.test>\r\nTo: John Doe <john@example.test>\r\n"
+            b"Subject: Weitergeleitet " + str(level).encode() + b"\r\n"
+            b"Date: Wed, 04 Nov 2026 10:00:00 +0100\r\n"
+            b"Message-ID: <nested-" + str(level).encode() + b"@example.test>\r\n"
+            b"MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="
+            + boundary
+            + b"\r\n\r\n"
+            b"--" + boundary + b"\r\nContent-Type: message/rfc822\r\n\r\n" + data + b"\r\n"
+            b"--" + boundary + b"--\r\n"
+        )
+    return data

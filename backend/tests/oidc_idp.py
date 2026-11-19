@@ -50,6 +50,8 @@ class SimulatedIdp:
     claim_overrides: dict[str, Any] = field(default_factory=dict)
     header_overrides: dict[str, Any] = field(default_factory=dict)
     unreachable: bool = False
+    # What the token endpoint answers instead of a token (an unusable answer).
+    token_answer: httpx2.Response | None = None
     grants: dict[str, Grant] = field(default_factory=dict)
     requests: list[str] = field(default_factory=list)
 
@@ -87,7 +89,7 @@ class SimulatedIdp:
             keys = KeySet([key(kid) for kid in self.published_keys])
             return httpx2.Response(200, json=keys.as_dict(private=False))
         if path == "/token" and request.method == "POST":
-            return self.token(request)
+            return self.token(request) if self.token_answer is None else self.token_answer
         return httpx2.Response(404)
 
     def discovery(self) -> dict[str, Any]:

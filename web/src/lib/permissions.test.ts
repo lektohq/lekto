@@ -39,7 +39,7 @@ const spaces = [
 	{ id: 'mine', role: 'edit' as const, personal_of: 'u1' },
 	{ id: 'house', role: 'edit' as const, personal_of: null },
 	{ id: 'tax', role: 'read' as const, personal_of: null },
-	{ id: 'anna', role: 'read' as const, personal_of: 'u2' }
+	{ id: 'erika', role: 'read' as const, personal_of: 'u2' }
 ];
 const ids = (list: readonly { id: string }[]) => list.map((space) => space.id);
 
@@ -48,8 +48,8 @@ describe('spaces', () => {
 		expect(ids(editableSpaces(spaces, me))).toEqual(['mine', 'house']);
 		// A personal space the caller edits stays theirs to file into, as an admin's every space.
 		const edited = spaces.map((space) => ({ ...space, role: 'edit' as const }));
-		expect(ids(editableSpaces(edited, me))).toEqual(['mine', 'house', 'tax', 'anna']);
-		expect(ids(editableSpaces(edited, admin))).toEqual(['mine', 'house', 'tax', 'anna']);
+		expect(ids(editableSpaces(edited, me))).toEqual(['mine', 'house', 'tax', 'erika']);
+		expect(ids(editableSpaces(edited, admin))).toEqual(['mine', 'house', 'tax', 'erika']);
 		expect(editableSpaces(spaces, null)).toEqual([]);
 	});
 
@@ -71,7 +71,7 @@ describe('spaces', () => {
 	it('hands over to the other active users, into their personal spaces', () => {
 		const users = [
 			{ id: 'u1', personal_space_id: 'mine' },
-			{ id: 'u2', personal_space_id: 'anna' },
+			{ id: 'u2', personal_space_id: 'erika' },
 			{ id: 'u4', personal_space_id: 'gone', active: false },
 			{ id: 'u5', personal_space_id: null }
 		];

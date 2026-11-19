@@ -467,7 +467,7 @@ class InboxService:
                 editor=None if all_users else actor,
                 tab=tab,
                 since=since,
-                after=await _position(uow, actor, tab, after),
+                after=await _position(uow, user, tab, after, everyone=all_users),
                 limit=limit,
             )
             spaces: dict[SpaceId, Space] = {}
@@ -608,16 +608,21 @@ async def confirmed_into(
 
 
 async def _position(
-    uow: UnitOfWork, viewer: UserId, tab: InboxTab | None, after: DocumentId | None
+    uow: UnitOfWork, viewer: User, tab: InboxTab | None, after: DocumentId | None, *, everyone: bool
 ) -> InboxPosition | None:
     """Where a page of the inbox ended: by the last document's id, and under done when it left
     the viewer's inbox (`domain.inbox.left_at`), looked up as `GET /documents` looks up a sort
-    value."""
+    value: within the viewer's reach (`everyone`: all documents), one they may not read counts
+    as gone, so that a cursor tells nothing about others' documents (#74; SB-04)."""
     if after is None:
         return None
     if tab is not InboxTab.DONE:
         return InboxPosition(after)
-    entry = await uow.inbox.entry(viewer, after)
+    entry = await uow.inbox.entry(viewer.id, after)
+    if entry is not None and not everyone:
+        space = await uow.spaces.find(entry.document.space_id)
+        if space is None or document_access(viewer, entry.document, space) is None:
+            entry = None
     left = (
         None
         if entry is None

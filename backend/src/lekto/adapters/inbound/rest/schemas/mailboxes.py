@@ -9,7 +9,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from lekto.adapters.inbound.rest.schemas.common import following_offset
-from lekto.adapters.inbound.schemas import DocumentRefOut, ReasonOut
+from lekto.adapters.inbound.schemas import DocumentRefOut, ReasonOut, RequestBody
 from lekto.core.domain.changes import UNSET
 from lekto.core.domain.ids import DocumentTypeId, UserId
 from lekto.core.domain.mail import (
@@ -18,8 +18,10 @@ from lekto.core.domain.mail import (
     MAX_HOST,
     MAX_INTERVAL,
     MAX_NAME,
+    MAX_PORT,
     MAX_USERNAME,
     MIN_INTERVAL,
+    MIN_PORT,
     Fallback,
     FetchStart,
     MailAction,
@@ -62,10 +64,8 @@ def _minutes(value: timedelta) -> int:
 type FolderName = Annotated[str, Field(min_length=1, max_length=MAX_FOLDER)]
 
 
-class _Settings(BaseModel):
+class _Settings(RequestBody):
     """What a mailbox does, beside where it signs in."""
-
-    model_config = ConfigDict(extra="forbid")
 
     folders: list[FolderName] | None = Field(
         default=None,
@@ -116,7 +116,6 @@ class MailboxCreate(_Settings):
     it was set up, nothing without a rule, no type for the mail text, enabled)."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -134,7 +133,7 @@ class MailboxCreate(_Settings):
 
     name: str = Field(min_length=1, max_length=MAX_NAME)
     host: str = Field(min_length=1, max_length=MAX_HOST)
-    port: int = Field(ge=1, le=65535)
+    port: int = Field(ge=MIN_PORT, le=MAX_PORT)
     security: MailSecurity = Field(description=SECURITY_HELP)
     username: str = Field(min_length=1, max_length=MAX_USERNAME)
     password: SecretStr = Field(
@@ -146,11 +145,11 @@ class MailboxPatch(_Settings):
     """What changes; what is left out stays. `since`, `fallback_user_id` and `body_type_id`
     given as null clear it."""
 
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [{"enabled": False}]})
+    model_config = ConfigDict(json_schema_extra={"examples": [{"enabled": False}]})
 
     name: str | None = Field(default=None, min_length=1, max_length=MAX_NAME)
     host: str | None = Field(default=None, min_length=1, max_length=MAX_HOST)
-    port: int | None = Field(default=None, ge=1, le=65535)
+    port: int | None = Field(default=None, ge=MIN_PORT, le=MAX_PORT)
     security: MailSecurity | None = Field(default=None, description=SECURITY_HELP)
     username: str | None = Field(default=None, min_length=1, max_length=MAX_USERNAME)
     password: SecretStr | None = Field(
@@ -258,11 +257,10 @@ class MailboxOut(BaseModel):
         )
 
 
-class ConnectionTestBody(BaseModel):
+class ConnectionTestBody(RequestBody):
     """Where and as whom to sign in. Without `password`, the stored one of `mailbox_id`."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -277,7 +275,7 @@ class ConnectionTestBody(BaseModel):
     )
 
     host: str = Field(min_length=1, max_length=MAX_HOST)
-    port: int = Field(ge=1, le=65535)
+    port: int = Field(ge=MIN_PORT, le=MAX_PORT)
     security: MailSecurity = Field(description=SECURITY_HELP)
     username: str = Field(min_length=1, max_length=MAX_USERNAME)
     password: SecretStr | None = Field(default=None, min_length=1, max_length=MAX_PASSWORD)

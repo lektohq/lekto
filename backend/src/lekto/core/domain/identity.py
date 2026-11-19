@@ -179,7 +179,6 @@ class Session:
     created_at: datetime
     last_seen_at: datetime
     expires_at: datetime
-    version: int = 1
 
     def __post_init__(self) -> None:
         self.created_at = require_utc(self.created_at, "created_at")
@@ -214,7 +213,16 @@ def csrf_token(session_token: str) -> str:
 
 
 def csrf_matches(session_token: str, candidate: str) -> bool:
-    return hmac.compare_digest(csrf_token(session_token), candidate)
+    return same_secret(csrf_token(session_token), candidate)
+
+
+def same_secret(expected: str, given: str) -> bool:
+    """Whether `given` is `expected`, compared in constant time; also for a `given` that is not
+    ASCII (a header, a query parameter), which `hmac.compare_digest` refuses as text with a
+    TypeError (RB-02)."""
+    return hmac.compare_digest(
+        expected.encode("utf-8", "surrogatepass"), given.encode("utf-8", "surrogatepass")
+    )
 
 
 class TokenScope(StrEnum):
@@ -246,7 +254,6 @@ class ApiToken:
     created_at: datetime
     expires_at: datetime | None = None
     last_used_at: datetime | None = None
-    version: int = 1
 
     def __post_init__(self) -> None:
         self.name = require_name(self.name, "token name", max_length=MAX_TOKEN_NAME)
@@ -318,7 +325,6 @@ class ExternalIdentity:
     subject: str
     user_id: UserId
     created_at: datetime
-    version: int = 1
 
     @classmethod
     def link(cls, *, issuer: str, subject: str, user_id: UserId, now: datetime) -> Self:
@@ -418,52 +424,28 @@ def source_key(address: str) -> str:
 
 @dataclass(kw_only=True)
 class LoginFailures:
-    """Failed sign-ins under one key (`account:<name>` or `source:<address>`)."""
+    """Failed sign-ins under one key (`account:<name>` or `source:<address>`). How an attempt
+    counts (`ThrottleRule`, the port's `reserve` and `release`) each adapter applies
+    atomically: SQL in one statement (`SqlLoginFailureRepository`), the memory in
+    `MemoryLoginFailureRepository` (PM-11)."""
 
     key: str
     failures: int
     first_failure_at: datetime
     blocked_until: datetime | None = None
-    version: int = 1
 
     @property
     def id(self) -> uuid.UUID:
         return failure_id(self.key)
-
-    @classmethod
-    def first(cls, key: str, now: datetime) -> Self:
-        return cls(key=key, failures=0, first_failure_at=now)
-
-    def retry_after(self, now: datetime) -> timedelta | None:
-        """How long further attempts are refused, if they are."""
-        if self.blocked_until is None or self.blocked_until <= now:
-            return None
-        return self.blocked_until - now
-
-    def reserve(self, rule: ThrottleRule, now: datetime) -> timedelta | None:
-        """Count an attempt before it is checked, and block as if it fails: so attempts that
-        arrive together cannot all pass. If blocked, count nothing and return how long."""
-        wait = self.retry_after(now)
-        if wait is not None:
-            return wait
-        if now - self.first_failure_at >= rule.window:
-            self.failures, self.first_failure_at = 0, now
-        self.failures += 1
-        block = rule.block(self.failures)
-        self.blocked_until = None if block is None else now + block
-        return None
-
-    def release(self, rule: ThrottleRule) -> None:
-        """Take back a reserved attempt that did not fail."""
-        self.failures = max(0, self.failures - 1)
-        if rule.block(self.failures) is None:
-            self.blocked_until = None
 
 
 KNOWN_DEVICE_LIFETIME = timedelta(days=365)
 """How long a known device stays known after its last sign-in with the password."""
 KNOWN_DEVICES_PER_BROWSER = 5
 """Accounts a browser stays known for at most (a household's browser); the oldest go first."""
+KNOWN_DEVICES_PER_USER = 20
+"""Known devices a user keeps at most; a new one replaces the oldest. Each counts its failed
+sign-ins by itself (`device_key`): many would give one who knew the password many guesses."""
 
 
 @dataclass(kw_only=True)
@@ -478,7 +460,6 @@ class KnownDevice:
     token_hash: str
     created_at: datetime
     expires_at: datetime
-    version: int = 1
 
     def __post_init__(self) -> None:
         self.created_at = require_utc(self.created_at, "created_at")

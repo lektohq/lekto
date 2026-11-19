@@ -1,11 +1,13 @@
 """What a document shows of its contact: names, identifiers and codes."""
 
+from collections.abc import Mapping
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from lekto.adapters.inbound.rest.schemas.inbox import BoxOut, LocationOut
-from lekto.adapters.inbound.schemas import MoneyValue
+from lekto.adapters.inbound.rest.schemas.common import IdentifierKeyOut
+from lekto.adapters.inbound.rest.schemas.inbox import LocationOut
+from lekto.adapters.inbound.schemas import MoneyValue, RequestBody
 from lekto.core.domain.document_facts import (
     FactOrigin,
     FactRole,
@@ -13,11 +15,16 @@ from lekto.core.domain.document_facts import (
     Holder,
     HolderKind,
     HolderSource,
-    role_of,
 )
-from lekto.core.domain.facts import FoundIdentifier, Span, Strength
-from lekto.core.domain.identifiers import IdentifierKind
-from lekto.core.services.documents import CodeFacts, DocumentFacts, DocumentNumber
+from lekto.core.domain.facts import Span, Strength
+from lekto.core.domain.identifiers import MAX_IDENTIFIER_VALUE, IdentifierKind, Key
+from lekto.core.domain.ids import ContactId
+from lekto.core.services.documents import (
+    CodeFacts,
+    DocumentFacts,
+    DocumentNumber,
+    IdentifierFact,
+)
 from lekto.core.services.fact_decisions import FactAction, FactDecision
 
 
@@ -133,6 +140,31 @@ class FoundIdentifierOut(BaseModel):
         ),
     )
 
+    @classmethod
+    def of(
+        cls, item: IdentifierFact, others: Mapping[Key, frozenset[ContactId]] | None
+    ) -> "FoundIdentifierOut":
+        found = item.found
+        return cls(
+            kind=found.kind,
+            value=found.value,
+            contact_id=found.contact_id,
+            topic_id=found.topic_id,
+            in_text=found.in_text,
+            in_code=found.in_code,
+            spans=[SpanOut.of(span) for span in found.spans],
+            role=item.role,
+            origins=sorted(item.origins),
+            state=item.state,
+            kept=item.kept,
+            rejected_at=found.rejected_at,
+            holder=HolderOut.of(item.holder),
+            other_contacts=None if others is None else len(others.get(found.key, ())),
+            other_contact_ids=(
+                None if others is None else sorted(others.get(found.key, frozenset()))
+            ),
+        )
+
 
 class DocumentNumberOut(BaseModel):
     """A fact kept for the document: a number that is no contact's identifier nor a person's
@@ -183,11 +215,6 @@ class FoundPersonOut(BaseModel):
     spans: list[SpanOut] = Field(description="Where their names and identifiers stand.")
 
 
-class IdentifierFoundOut(BaseModel):
-    kind: IdentifierKind
-    value: str
-
-
 class GiroCodeOut(BaseModel):
     """The credit transfer of a GiroCode (EPC QR code)."""
 
@@ -198,21 +225,16 @@ class GiroCodeOut(BaseModel):
     purpose: str | None
 
 
-class CodePlaceOut(BaseModel):
-    """Where a code stands on a page of the archive."""
-
-    page: int = Field(description="From 1.")
-    boxes: list[BoxOut] = Field(description="One per copy of the code on the page.")
-
-
 class CodeOut(BaseModel):
     """A code once for its format and text, however often the pages show it."""
 
     format: str = Field(examples=["QR Code", "Code 128", "Data Matrix"])
     text: str = Field(description="What it holds, as it holds it; someone else's text.")
-    places: list[CodePlaceOut] = Field(description="The pages it stands on, in order.")
+    places: list[LocationOut] = Field(
+        description="The pages it stands on, in order, a box per copy of the code on the page."
+    )
     giro: GiroCodeOut | None = Field(description="A GiroCode, read as its credit transfer.")
-    identifiers: list[IdentifierFoundOut]
+    identifiers: list[IdentifierKeyOut]
     fields: list[UUID] = Field(
         description="Amount fields of the document with the GiroCode's amount as their value."
     )
@@ -234,13 +256,10 @@ class CodeOut(BaseModel):
         return cls(
             format=item.format,
             text=item.text,
-            places=[
-                CodePlaceOut(page=place.page, boxes=[BoxOut.of(box) for box in place.boxes])
-                for place in item.places
-            ],
+            places=[LocationOut.of(place) for place in item.places],
             giro=giro,
             identifiers=[
-                IdentifierFoundOut(kind=kind, value=value) for kind, value in item.identifiers
+                IdentifierKeyOut(kind=kind, value=value) for kind, value in item.identifiers
             ],
             fields=list(item.fields),
         )
@@ -256,7 +275,7 @@ class FactsOut(BaseModel):
                     "identifiers": [
                         {
                             "kind": "customer_number",
-                            "value": "20047718",
+                            "value": "12345678",
                             "contact_id": None,
                             "in_text": True,
                             "in_code": False,
@@ -328,7 +347,7 @@ class FactsOut(BaseModel):
             "admins; null for readers. What is private about a person (aliases, birth date, "
             "identifiers, a contact's number that names them) finds them only for admins and "
             "that person: anyone else sees another user only where the text has their display "
-            "name (that a number is Anna's tax ID is Anna's)."
+            "name (that a number is Erika's tax ID is Erika's)."
         ),
     )
 
@@ -348,28 +367,7 @@ class FactsOut(BaseModel):
                 )
                 for item in report.facts.named
             ],
-            identifiers=[
-                FoundIdentifierOut(
-                    kind=item.kind,
-                    value=item.value,
-                    contact_id=item.contact_id,
-                    topic_id=item.topic_id,
-                    in_text=item.in_text,
-                    in_code=item.in_code,
-                    spans=[SpanOut.of(span) for span in item.spans],
-                    role=_role(report, item),
-                    origins=_origins(report, item),
-                    state=_state(report, item),
-                    kept=item.key in report.stored,
-                    rejected_at=item.rejected_at,
-                    holder=HolderOut.of(_holder(report, item)),
-                    other_contacts=None if others is None else len(others.get(item.key, ())),
-                    other_contact_ids=(
-                        None if others is None else sorted(others.get(item.key, frozenset()))
-                    ),
-                )
-                for item in report.facts.identifiers
-            ],
+            identifiers=[FoundIdentifierOut.of(item, others) for item in report.identifiers],
             codes=None if report.codes is None else [CodeOut.of(item) for item in report.codes],
             numbers=[DocumentNumberOut.of(item) for item in report.numbers],
             decided=[DocumentNumberOut.of(item) for item in report.decided],
@@ -391,35 +389,7 @@ class FactsOut(BaseModel):
         )
 
 
-def _role(report: DocumentFacts, item: FoundIdentifier) -> FactRole:
-    kept = report.stored.get(item.key)
-    return role_of(item.kind) if kept is None else kept.role
-
-
-def _holder(report: DocumentFacts, item: FoundIdentifier) -> Holder | None:
-    kept = report.stored.get(item.key)
-    return None if kept is None else kept.holder
-
-
-def _state(report: DocumentFacts, item: FoundIdentifier) -> FactState:
-    kept = report.stored.get(item.key)
-    return FactState.FOUND if kept is None else kept.state
-
-
-def _origins(report: DocumentFacts, item: FoundIdentifier) -> list[FactOrigin]:
-    """The text's patterns and a code as the facts are found now (a row taken over by revision
-    0047 does not know whether a code held it), other sources as kept."""
-    kept = report.stored.get(item.key)
-    found = {
-        *([FactOrigin.PATTERN] if item.in_text else []),
-        *([FactOrigin.CODE] if item.in_code else []),
-    }
-    if kept is not None:
-        found |= kept.origins - {FactOrigin.PATTERN, FactOrigin.CODE}
-    return sorted(found)
-
-
-class FactDecisionIn(BaseModel):
+class FactDecisionIn(RequestBody):
     """A person's decision about a fact of the document."""
 
     model_config = ConfigDict(
@@ -434,13 +404,13 @@ class FactDecisionIn(BaseModel):
                 {
                     "action": "correct",
                     "kind": "customer_number",
-                    "value": "20047718",
+                    "value": "12345678",
                     "new_value": "2004 7719",
                     "at_contact": True,
                 },
                 {"action": "add", "kind": "contract_number", "value": "V-123", "role": "target"},
             ]
-        }
+        },
     )
 
     action: FactAction = Field(
@@ -455,14 +425,17 @@ class FactDecisionIn(BaseModel):
     kind: IdentifierKind
     value: str = Field(
         min_length=1,
-        max_length=200,
+        max_length=MAX_IDENTIFIER_VALUE,
         description="`add`: as written; otherwise the fact's value, normalised.",
     )
     role: FactRole | None = Field(
         default=None, description="`add`: its role; `correct`: the role it has instead."
     )
     new_value: str | None = Field(
-        default=None, min_length=1, max_length=200, description="`correct`: the value, as written."
+        default=None,
+        min_length=1,
+        max_length=MAX_IDENTIFIER_VALUE,
+        description="`correct`: the value, as written.",
     )
     at_contact: bool = Field(
         default=False,

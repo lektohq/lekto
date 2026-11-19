@@ -24,6 +24,10 @@ from uuid import UUID
 from lekto.core.domain.classification import (
     CHECKS,
     DOCUMENT_DATE,
+    PERSON_PUBLIC,
+    PERSON_STRENGTH,
+    PERSON_USER,
+    PERSONS,
     TITLE,
     FieldCheck,
     checks_to_json,
@@ -89,7 +93,7 @@ from lekto.core.domain.reading import (
 )
 from lekto.core.domain.reasons import Reason, ReasonCode, because
 from lekto.core.domain.sorting import sort_key
-from lekto.core.domain.tasks import TaskKind, TaskStatus
+from lekto.core.domain.tasks import TaskKind
 from lekto.core.domain.text import Shortened, shorten
 from lekto.core.domain.validation import name_key
 from lekto.core.domain.verdict import (
@@ -125,9 +129,11 @@ from lekto.core.services.classification.answers import (
     read_holder_to_json,
 )
 from lekto.core.services.classification.external import (
+    Answered,
     ExternalCall,
     ListedSpace,
-    ModelCallState,
+    ModelCallContext,
+    by_webhook,
     extract_context,
     model_call_state,
     proposal_of,
@@ -165,7 +171,7 @@ from lekto.core.services.classification.signals import (
     model_proposal,
     signals_of,
 )
-from lekto.core.services.exchanges import keep_answer, keep_calls, keep_request
+from lekto.core.services.exchanges import keep_calls
 from lekto.core.services.nodes import ARCHIVE_FILE, work_directory
 from lekto.core.services.objects import (
     archive_key,
@@ -188,6 +194,14 @@ _LATEST_AHEAD = timedelta(days=366)
 JUDGE = "judge"
 """`model_version` of the judge's entry when the language model gave nothing."""
 
+ATTEMPTS = 2
+"""How often a node asks the language model the same question: once more after an unfit
+answer."""
+MOST_MODEL_CALLS = 2 * ATTEMPTS
+"""The most requests to the language model one node makes in a row: the proposal and the facts
+of `signal_llm` (#145), each `ATTEMPTS` times; how long a worker holds a node's job follows from
+it (`node_lease` of the composition)."""
+
 
 _NO_WORDS: Mapping[int, tuple[ReadWord, ...]] = MappingProxyType({})
 
@@ -198,17 +212,14 @@ names, few enough that the list does not crowd out the document (`architektur.md
 
 @dataclass(frozen=True, kw_only=True)
 class ClassificationPolicy:
-    """`accept`: a field with at least this confidence is applied; `suggest_contact`: an
-    existing contact at least this similar is suggested. Texts longer than `input_budget`
-    characters are shortened; at most `max_tags` tags and `max_contacts` contacts (those the
-    text names most) are listed in a prompt. `default_currency`: the currency of an amount in
-    a text that shows none. `poor_reading`: the share of unsure (content) words from which a
-    value's place counts as poorly read (`Surroundings.poor`, `PageReading.poor`). All but
-    `max_contacts` are configuration: the composition sets them from the settings, whose
-    defaults are the one source."""
+    """Texts longer than `input_budget` characters are shortened; at most `max_tags` tags and
+    `max_contacts` contacts (those the text names most) are listed in a prompt.
+    `default_currency`: the currency of an amount in a text that shows none. `poor_reading`:
+    the share of unsure (content) words from which a value's place counts as poorly read
+    (`Surroundings.poor`, `PageReading.poor`). All but `max_contacts` are configuration: the
+    composition sets them from the settings, whose defaults are the one source. How well a
+    name must match is the judge's (`verdict.Thresholds`)."""
 
-    accept: float
-    suggest_contact: float
     input_budget: int
     max_tags: int
     max_contacts: int = MAX_CONTACTS
@@ -226,7 +237,7 @@ class _UnfitAnswerError(Exception):
 
 
 async def _document_text(store: ObjectStore, id: DocumentId) -> str:
-    return (await load_text(store, id)).decode("utf-8")
+    return await load_text(store, id)
 
 
 async def _locate_quotes(
@@ -300,7 +311,7 @@ class _ModelStep:
         text = document_message(sent)
         retry: str | None = None
         try:
-            for _ in range(2):
+            for _ in range(ATTEMPTS):
                 answer = await self._model.complete(
                     StructuredRequest(
                         system=SYSTEM,
@@ -411,24 +422,38 @@ class LlmSignal(_ModelStep):
         if outside is None and self._model is None:
             return abstained(because(ReasonCode.NO_LANGUAGE_MODEL))
         text = await _document_text(self._store, document.id)
-        if outside is not None and outside.settled is not None:
-            return await self._answered(document, text, outside)
-        if outside is not None and outside.sent:
-            return ExternalCall(outside, None)
-        offer = await self._offer(document, text)
         if outside is not None:
-            context = propose_context(
-                document,
-                text,
-                contacts=offer.listed_contacts,
-                document_types=offer.typed,
-                general=offer.general,
-                tags=offer.tag_names,
-                spaces=offer.spaces,
-                schema=offer.schema,
+
+            async def context() -> ModelCallContext:
+                offer = await self._offer(document, text)
+                return propose_context(
+                    document,
+                    text,
+                    contacts=offer.listed_contacts,
+                    document_types=offer.typed,
+                    general=offer.general,
+                    tags=offer.tag_names,
+                    spaces=offer.spaces,
+                    schema=offer.schema,
+                )
+
+            called = await by_webhook(
+                outside, self._store, document, Node.SIGNAL_LLM, text, context, proposal_of
             )
-            await keep_request(self._store, document, Node.SIGNAL_LLM, context.logged())
-            return ExternalCall(outside, context)
+            if not isinstance(called, Answered):
+                return called
+            answer, fields, spaces = called.read
+            return NodeResult(
+                outcome=Outcome.OK,
+                model_version=outside.model_version,
+                input=called.input,
+                output={
+                    "attempts": 1,
+                    "answer": answer.raw,
+                    PROPOSAL: StoredProposal.of(answer, fields, spaces).to_json(),
+                },
+            )
+        offer = await self._offer(document, text)
         sent = shorten(text, self._policy.input_budget)
         input = self._input(document, text, sent, PROPOSE_PROMPT) | {
             "contacts": offer.contacts,
@@ -562,7 +587,9 @@ class LlmSignal(_ModelStep):
         answers, the facts and the holders (None: it read none). What goes wrong is in the
         output and never fails the signal, also an error that would pass with time (the
         proposal stands without facts; asking the model again reads them)."""
-        numbers = sorted(key for key in identifiers_in(sent.text) if key[0] in MODEL_HOLDER_KINDS)
+        # Every kind's patterns over the text: not in the loop (SA-03).
+        found = await asyncio.to_thread(identifiers_in, sent.text)
+        numbers = sorted(key for key in found if key[0] in MODEL_HOLDER_KINDS)
         try:
             (read, told), answers = await self._ask(
                 document,
@@ -589,36 +616,6 @@ class LlmSignal(_ModelStep):
             MODEL_HOLDERS: [read_holder_to_json(holder) for holder in told],
         }
         return output, answers, read, told
-
-    async def _answered(self, document: Document, text: str, outside: ModelCallState) -> NodeResult:
-        """What the webhook's task brought: its proposal, as the model's, or why none."""
-        task = outside.settled
-        assert task is not None
-        input = outside.input(document, text)
-        if task.status is not TaskStatus.ANSWERED:
-            return outside.failed(input)
-        try:
-            answer, fields, spaces = proposal_of(task)
-        except AnswerError as error:  # checked when it came: the contract changed since
-            return outside.unfit(input, str(error))
-        await keep_answer(
-            self._store, document, Node.SIGNAL_LLM, _answer_text(task.answer), outside.model_version
-        )
-        return NodeResult(
-            outcome=Outcome.OK,
-            model_version=outside.model_version,
-            input=input,
-            output={
-                "attempts": 1,
-                "answer": answer.raw,
-                PROPOSAL: StoredProposal.of(answer, fields, spaces).to_json(),
-            },
-        )
-
-
-def _answer_text(answer: JsonValue) -> str:
-    """A webhook's answer as the document keeps it beside what was sent."""
-    return json.dumps(answer, ensure_ascii=False, indent=2)
 
 
 def _listed_spaces(candidates: SpaceCandidates | None) -> dict[str, ListedSpace]:
@@ -664,6 +661,9 @@ class ModelFactsResult:
         if report is None:
             return self.result
         return replace(self.result, output=self.result.output | {READ_FACTS: report})
+
+
+type Persons = dict[UserId, Strength]
 
 
 class JudgeNode:
@@ -733,13 +733,25 @@ class JudgeNode:
                 self._today(),
                 document.created_at.date(),
             )
-        contact = judge_contact(signals, contacts, self._thresholds)
-        kind = judge_type(signals, types, self._thresholds)
-        topic = judge_topic(signals, contact, contacts, tags, self._thresholds)
-        tagged = judge_tags(signals, tags, self._thresholds)
         # The persons the document names: the facts' and the model's recipient (only names
         # are matched here; the facts matched the rest of the profiles).
         recipient = signals.model.recipient if signals.model is not None else None
+        thresholds = self._thresholds
+
+        def judged() -> tuple[FieldCheck, FieldCheck, FieldCheck, FieldCheck, Persons, Persons]:
+            contact = judge_contact(signals, contacts, thresholds)
+            return (
+                contact,
+                judge_type(signals, types, thresholds),
+                judge_topic(signals, contact, contacts, tags, thresholds),
+                judge_tags(signals, tags, thresholds),
+                recipient_persons(recipient, people, thresholds),
+                recipient_persons(recipient, shown, thresholds),
+            )
+
+        # Matching the names the model read with every contact's and every person's takes a
+        # while with many of them: not in the loop (SA-03).
+        contact, kind, topic, tagged, named, addressed = await asyncio.to_thread(judged)
         active = {person.user_id for person in matched}
         persons = named_persons(
             {  # facts of an earlier run may name a user deactivated since
@@ -747,9 +759,8 @@ class JudgeNode:
                 for user, strength in (signals.facts.persons if signals.facts else {}).items()
                 if user in active
             },
-            recipient_persons(recipient, people, self._thresholds),
+            named,
         )
-        addressed = recipient_persons(recipient, shown, self._thresholds)
         public = named_persons(
             {user: Strength.WEAK for user in (signals.facts.public if signals.facts else ())},
             addressed,
@@ -838,9 +849,6 @@ class JudgeNode:
         return self._clock.now().date()
 
 
-PERSONS = "persons"
-
-
 def _persons_json(
     persons: Mapping[UserId, Strength], public: Mapping[UserId, Strength]
 ) -> JsonValue:
@@ -850,9 +858,9 @@ def _persons_json(
     only by that (`_access.readable_log`)."""
     return [
         {
-            "user_id": str(user),
-            "strength": strength.value,
-            **({"public": public[user].value} if user in public else {}),
+            PERSON_USER: str(user),
+            PERSON_STRENGTH: strength.value,
+            **({PERSON_PUBLIC: public[user].value} if user in public else {}),
         }
         for user, strength in sorted(
             persons.items(), key=lambda item: (-item[1].rank, str(item[0]))
@@ -872,8 +880,9 @@ class FieldsNode(_ModelStep):
     holds, the required ones say why. A field set by hand is never asked for and keeps its
     value (the rules node checks that a required one has one).
 
-    The title comes from the type's title pattern, or from the model's proposal, as long as
-    the document's title is still the file name or the one set here before.
+    The title is the model's proposal, as long as the document's title is still the file name
+    or the one set here before. A type's title pattern is a rule (`rules.title_rule`): it sets
+    the title when the rules run.
 
     A webhook that serves as the model call `extract` (`external`) reads the missing fields
     instead of the model: the node sends it the context and waits for its answer, which
@@ -932,28 +941,20 @@ class FieldsNode(_ModelStep):
         )
         external: str | None = None  # what answered, if a webhook did
         if outside is not None:
-            task = outside.settled
-            if task is None and outside.sent:
-                return ExternalCall(outside, None)
-            if task is None:
-                context = extract_context(
-                    document,
-                    text,
-                    None if document_type is None else document_type.name,
-                    field_keys(missing),
-                )
-                await keep_request(self._store, document, Node.FIELDS, context.logged())
-                return ExternalCall(outside, context)
-            input |= outside.input(document, text)
-            if task.status is not TaskStatus.ANSWERED:
-                return outside.failed(input)
-            try:
-                read = values_of(task)
-            except AnswerError as error:  # checked when it came: the contract changed since
-                return outside.unfit(input, str(error))
-            await keep_answer(
-                self._store, document, Node.FIELDS, _answer_text(task.answer), outside.model_version
+
+            async def context() -> ModelCallContext:
+                name = None if document_type is None else document_type.name
+                return extract_context(document, text, name, field_keys(missing))
+
+            called = await by_webhook(
+                outside, self._store, document, Node.FIELDS, text, context, values_of
             )
+            if not isinstance(called, Answered):
+                if isinstance(called, NodeResult):  # what was taken over is input too
+                    return replace(called, input=input | called.input)
+                return called
+            input |= called.input
+            read = called.read
             external = outside.model_version
             # A field defined after the request went was not asked for: nothing read it.
             given |= {

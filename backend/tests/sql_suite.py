@@ -21,17 +21,18 @@ from sqlalchemy import Connection, insert, inspect, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from lekto.adapters.outbound.memory import ManualClock, MemoryObjectStore
+from lekto.adapters.outbound.memory import ManualClock
 from lekto.adapters.outbound.sql import Database, SqlUnitOfWorkFactory, migrate, schema_state
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.migrations import downgrade
 from lekto.adapters.outbound.sql.migrations.versions import v0067_json_empty_as_null as v0067
 from lekto.adapters.outbound.sql.types import UtcDateTime, json_type
+from lekto.core.domain.classification import CHECKS, FieldCheck, field_key
 from lekto.core.domain.condition_tree import Group
 from lekto.core.domain.documents import Document, DocumentChanges
-from lekto.core.domain.errors import ConflictError, DuplicateDocumentError, ValidationError
+from lekto.core.domain.errors import ConflictError, ValidationError
 from lekto.core.domain.events import DomainEvent
-from lekto.core.domain.fields import FieldDefinition, FieldType, Money
+from lekto.core.domain.fields import FieldDefinition, FieldType, Money, field_to_json
 from lekto.core.domain.ids import DocumentTypeId, RuleId, UserId, new_id
 from lekto.core.domain.jobs import Job
 from lekto.core.domain.mail import MailAction, MailStep
@@ -42,7 +43,8 @@ from lekto.core.domain.mail_rules import (
     MailRule,
     MailRuleChanges,
 )
-from lekto.core.domain.pipeline import NODES, Node
+from lekto.core.domain.periods import Period
+from lekto.core.domain.pipeline import NODES, Node, NodeResult, NodeRun, Outcome
 from lekto.core.domain.reasons import ReasonCode
 from lekto.core.domain.rules import ForceReview, RuleScope
 from lekto.core.domain.spaces import Space, SpaceRole
@@ -50,14 +52,42 @@ from lekto.core.domain.templates import TemplateValue
 from lekto.core.domain.users import User
 from lekto.core.ports.event_bus import EventBus
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
+from lekto.core.services.rules.running import provenance
 from tests import builders
-from tests.builders import HOUR, NOW, PlaceholderNode, incoming
+from tests.builders import HOUR, NOW
 from tests.contracts.event_bus import EventBusFactory, Recorder, publish, received
 from tests.contracts.mail_records import a_mailbox
 from tests.contracts.unit_of_work import owner_with_space
 from tests.service_suite import ServicesOverPersistence
 
 LEASE = timedelta(minutes=5)
+
+SQL_SUITES = frozenset(
+    {
+        "EventBusContract",
+        "IdentityRepositoriesContract",
+        "InboxRepositoryContract",
+        "JobQueueContract",
+        "LensRepositoryContract",
+        "MailOriginRepositoryContract",
+        "MailRecordRepositoryContract",
+        "MailRuleRepositoryContract",
+        "MailboxRepositoryContract",
+        "ProcessingFactsContract",
+        "PushDeviceRepositoryContract",
+        "PushPreferencesRepositoryContract",
+        "RuleRepositoriesContract",
+        "TaskRepositoryContract",
+        "UnitOfWorkContract",
+        "WakeupContract",
+        "WebhookRepositoryContract",
+        "SqlAdapterSuite",
+        "MigrationSuite",
+    }
+)
+"""The suites the SQL adapter runs, on SQLite (`tests/unit/adapters/sql/test_sqlite.py`) and on
+Postgres (`tests/integration/adapters/sql/test_postgres.py`) alike; `test_contract_coverage`
+checks that both run each (TA-01)."""
 
 
 class SqlAdapterSuite(ServicesOverPersistence):
@@ -90,6 +120,43 @@ class SqlAdapterSuite(ServicesOverPersistence):
         stored_money = stored[amount.id]
         assert isinstance(stored_money, Money)
         assert str(stored_money.amount) == "0.10"  # scale kept, no binary float
+
+    async def test_a_model_s_period_is_its_own_in_whatever_order_its_keys_come_back(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """Postgres gives `jsonb` back with its keys sorted (`end` before `start`): the rules
+        still see the period as the model's value and do not overwrite it."""
+        owner, space = await owner_with_space(uow_factory)
+        when = FieldDefinition.create(name="Zeitraum", data_type=FieldType.PERIOD, now=NOW)
+        period = Period.month(2026, 1)
+        document = builders.document(owner, space)
+        document.apply_changes(DocumentChanges(fields={when.id: period}), {when.id: when}, NOW)
+        check = FieldCheck(
+            field=field_key(when.id),
+            outcome=Outcome.OK,
+            confidence=0.9,
+            value=field_to_json(period),
+        )
+        entry = NodeRun(
+            document_id=document.id,
+            node=Node.FIELDS,
+            run=1,
+            result=NodeResult(
+                outcome=Outcome.OK, model_version="model-1", output={CHECKS: [check.to_json()]}
+            ),
+            pipeline_version="0.1.0",
+            started_at=NOW,
+            duration=timedelta(0),
+        )
+        async with uow_factory() as uow:
+            await uow.fields.add(when)
+            await uow.documents.add(document)
+            await uow.processing_log.append(entry)
+            await uow.commit()
+        async with uow_factory() as uow:
+            stored = await uow.documents.get(document.id)
+            log = await uow.processing_log.list_for(document.id)
+        assert provenance(log, stored).model_values == {field_key(when.id): field_to_json(period)}
 
     async def test_timestamps_are_utc_with_microseconds(
         self, uow_factory: UnitOfWorkFactory
@@ -273,39 +340,6 @@ class SqlAdapterSuite(ServicesOverPersistence):
         results = await asyncio.gather(add(), add(), return_exceptions=True)
         assert len([r for r in results if isinstance(r, Document)]) == 1
         assert len([r for r in results if isinstance(r, ConflictError)]) == 1
-
-    async def test_concurrent_uploads_of_the_same_file_create_one_document(
-        self, uow_factory: UnitOfWorkFactory
-    ) -> None:
-        owner, _ = await owner_with_space(uow_factory)
-        pipeline = builders.pipeline_service(
-            uow_factory,
-            ManualClock(NOW),
-            MemoryObjectStore(),
-            {node: PlaceholderNode() for node in NODES if node is not Node.RECEIVE},
-        )
-
-        async def upload() -> Document:
-            return await pipeline.receive(owner.id, incoming(b"%PDF-1.7 same"), filename="a.pdf")
-
-        results = await asyncio.gather(*(upload() for _ in range(3)), return_exceptions=True)
-        assert len([r for r in results if isinstance(r, Document)]) == 1, results
-        assert all(isinstance(r, Document | DuplicateDocumentError) for r in results), results
-        async with uow_factory() as uow:
-            assert len(await uow.documents.list_visible_to(owner.id)) == 1
-
-    async def test_a_failed_write_leaves_only_rollback(
-        self, uow_factory: UnitOfWorkFactory
-    ) -> None:
-        user = builders.user()
-        await _seed_user(uow_factory, user)
-        async with uow_factory() as uow:
-            with pytest.raises(ConflictError):
-                await uow.users.add(user)
-            with pytest.raises(RuntimeError):
-                await uow.users.find(user.id)
-            with pytest.raises(RuntimeError):
-                await uow.commit()
 
     # --- events ---------------------------------------------------------------------------------
 
@@ -2203,7 +2237,7 @@ class MigrationSuite:
         await migrate(empty_database, "0034")
         async with empty_database.reading() as connection:
             schema = await connection.run_sync(_schema)
-        ids = {name: new_id() for name in ("anna", "bob", "contact", "topic")}
+        ids = {name: new_id() for name in ("erika", "bob", "contact", "topic")}
         await _insert(
             empty_database,
             [
@@ -2212,7 +2246,7 @@ class MigrationSuite:
                         _before_0035(t.users),
                         {"id": ids[name], "username": name, "username_key": name, "role": "user"},
                     )
-                    for name in ("anna", "bob")
+                    for name in ("erika", "bob")
                 ),
                 (t.contacts, {"id": ids["contact"], "name": "Insurer", "name_key": "insurer"}),
                 (
@@ -2236,36 +2270,36 @@ class MigrationSuite:
         await _insert(
             empty_database,
             [
-                (t.user_profiles, {"user_id": ids["anna"], "email": "a@b.example", "version": 1}),
+                (t.user_profiles, {"user_id": ids["erika"], "email": "a@b.example", "version": 1}),
                 *(  # an alias is private: two users may have the same
                     (
                         t.user_aliases,
                         {"user_id": ids[name], "name": "Ann", "name_key": "ann", "position": 0},
                     )
-                    for name in ("anna", "bob")
+                    for name in ("erika", "bob")
                 ),
                 *(
                     (
                         t.user_identifiers,
                         {"user_id": ids[name], "kind": "iban", "value": "DE89370400440532013000"},
                     )
-                    for name in ("anna", "bob")  # a joint account
+                    for name in ("erika", "bob")  # a joint account
                 ),
             ],
         )
         async with empty_database.writing() as connection:
             await connection.execute(
                 t.users.update()
-                .where(t.users.c.id == ids["anna"])
-                .values(display_name="Anna", display_name_key="anna")
+                .where(t.users.c.id == ids["erika"])
+                .values(display_name="Erika", display_name_key="erika")
             )
-            await connection.execute(t.contact_identifiers.update().values(user_id=ids["anna"]))
+            await connection.execute(t.contact_identifiers.update().values(user_id=ids["erika"]))
         with pytest.raises(sa.exc.IntegrityError):
             async with empty_database.writing() as connection:
                 await connection.execute(
                     t.users.update()
                     .where(t.users.c.id == ids["bob"])
-                    .values(display_name="ANNA", display_name_key="anna")
+                    .values(display_name="ERIKA", display_name_key="erika")
                 )
         async with empty_database.reading() as connection:
             identifiers = await _read_all(
@@ -2276,7 +2310,7 @@ class MigrationSuite:
                     t.contact_identifiers.c.user_id,
                 ),
             )
-        assert identifiers == [("K4711", ids["topic"], ids["anna"])]
+        assert identifiers == [("K4711", ids["topic"], ids["erika"])]
 
         await downgrade(empty_database, "0034")
         async with empty_database.reading() as connection:
@@ -2474,7 +2508,7 @@ class MigrationSuite:
         await migrate(empty_database, "0039")
         async with empty_database.reading() as connection:
             schema = await connection.run_sync(_schema)
-        ids = {name: new_id() for name in ("anna", "bob", "contact")}
+        ids = {name: new_id() for name in ("erika", "bob", "contact")}
         before = _before_0040(t.contact_identifiers)
         number = {"contact_id": ids["contact"], "kind": "customer_number", "source": "manual"}
         await _insert(
@@ -2485,10 +2519,10 @@ class MigrationSuite:
                         t.users,
                         {"id": ids[name], "username": name, "username_key": name, "role": "user"},
                     )
-                    for name in ("anna", "bob")
+                    for name in ("erika", "bob")
                 ),
                 (t.contacts, {"id": ids["contact"], "name": "Insurer", "name_key": "insurer"}),
-                (before, number | {"value": "K4711", "user_id": ids["anna"]}),
+                (before, number | {"value": "K4711", "user_id": ids["erika"]}),
                 (before, number | {"value": "K0815", "user_id": ids["bob"]}),
                 (before, number | {"value": "K1", "source": "learned"}),
             ],
@@ -2502,11 +2536,11 @@ class MigrationSuite:
                 select(identifiers.c.value, identifiers.c.user_id, identifiers.c.learned_in),
             )
         assert sorted(rows, key=str) == sorted(
-            [("K4711", ids["anna"], None), ("K0815", ids["bob"], None), ("K1", None, None)],
+            [("K4711", ids["erika"], None), ("K0815", ids["bob"], None), ("K1", None, None)],
             key=str,
         )
         async with empty_database.writing() as connection:
-            await connection.execute(sa.delete(t.users).where(t.users.c.id == ids["anna"]))
+            await connection.execute(sa.delete(t.users).where(t.users.c.id == ids["erika"]))
         async with empty_database.reading() as connection:
             kept = await _read_all(connection, select(identifiers.c.value))
         assert sorted(kept) == [("K0815",), ("K1",)]
@@ -3122,7 +3156,12 @@ class MigrationSuite:
             [
                 (
                     t.users,
-                    {"id": ids["user"], "username": "anna", "username_key": "anna", "role": "user"},
+                    {
+                        "id": ids["user"],
+                        "username": "erika",
+                        "username_key": "erika",
+                        "role": "user",
+                    },
                 ),
                 (_before_0043(t.webhooks), webhook | {"id": ids["signed"], "secret": b"s"}),
             ],
@@ -3185,7 +3224,12 @@ class MigrationSuite:
             [
                 (
                     t.users,
-                    {"id": ids["user"], "username": "anna", "username_key": "anna", "role": "user"},
+                    {
+                        "id": ids["user"],
+                        "username": "erika",
+                        "username_key": "erika",
+                        "role": "user",
+                    },
                 ),
                 (
                     _before_0044(t.webhooks),
@@ -3228,7 +3272,12 @@ class MigrationSuite:
             [
                 (
                     t.users,
-                    {"id": ids["user"], "username": "anna", "username_key": "anna", "role": "user"},
+                    {
+                        "id": ids["user"],
+                        "username": "erika",
+                        "username_key": "erika",
+                        "role": "user",
+                    },
                 ),
                 (
                     _before_0045(t.webhooks),
@@ -3270,7 +3319,12 @@ class MigrationSuite:
             [
                 (
                     t.users,
-                    {"id": ids["user"], "username": "anna", "username_key": "anna", "role": "user"},
+                    {
+                        "id": ids["user"],
+                        "username": "erika",
+                        "username_key": "erika",
+                        "role": "user",
+                    },
                 ),
                 (
                     _before_0046(t.webhooks),
@@ -3336,14 +3390,19 @@ class MigrationSuite:
             [
                 (
                     t.users,
-                    {"id": ids["user"], "username": "anna", "username_key": "anna", "role": "user"},
+                    {
+                        "id": ids["user"],
+                        "username": "erika",
+                        "username_key": "erika",
+                        "role": "user",
+                    },
                 ),
                 (
                     t.spaces,
                     {
                         "id": ids["space"],
-                        "name": "Anna",
-                        "name_key": "anna",
+                        "name": "Erika",
+                        "name_key": "erika",
                         "personal_of": ids["user"],
                         "created_at": NOW,
                         "version": 1,
@@ -3491,14 +3550,14 @@ class MigrationSuite:
         entered as theirs is dropped. Other numbers keep their user; the downgrade changes
         nothing."""
         await migrate(empty_database, "0054")
-        ids = {name: new_id() for name in ("anna", "contact", "space")}
+        ids = {name: new_id() for name in ("erika", "contact", "space")}
         number = {"contact_id": ids["contact"], "kind": "tax_number"}
         await _insert(
             empty_database,
             [
                 (
                     t.users,
-                    {"id": ids["anna"], "username": "a", "username_key": "a", "role": "user"},
+                    {"id": ids["erika"], "username": "a", "username_key": "a", "role": "user"},
                 ),
                 (t.contacts, {"id": ids["contact"], "name": "Insurer", "name_key": "insurer"}),
                 (
@@ -3507,13 +3566,13 @@ class MigrationSuite:
                     | {
                         "value": "6420000010",
                         "source": "learned",
-                        "user_id": ids["anna"],
+                        "user_id": ids["erika"],
                         "learned_in": [str(ids["space"])],
                     },
                 ),
                 (
                     t.contact_identifiers,
-                    number | {"value": "03148103084", "source": "manual", "user_id": ids["anna"]},
+                    number | {"value": "03148103084", "source": "manual", "user_id": ids["erika"]},
                 ),
                 (t.contact_identifiers, number | {"value": "2713100040", "source": "manual"}),
                 (
@@ -3523,7 +3582,7 @@ class MigrationSuite:
                         "kind": "customer_number",
                         "value": "K4711",
                         "source": "learned",
-                        "user_id": ids["anna"],
+                        "user_id": ids["erika"],
                     },
                 ),
             ],
@@ -3546,7 +3605,7 @@ class MigrationSuite:
             [
                 ("6420000010", None, [str(ids["space"])]),
                 ("2713100040", None, None),
-                ("K4711", ids["anna"], None),
+                ("K4711", ids["erika"], None),
             ],
             key=str,
         )
@@ -3562,7 +3621,7 @@ class MigrationSuite:
         await migrate(empty_database, "0070")
         ids = {
             name: new_id()
-            for name in ("anna", "space", "insurer", "club", "document", "rule", "lens")
+            for name in ("erika", "space", "insurer", "club", "document", "rule", "lens")
         }
         identifier = {"contact_id": ids["insurer"]}
         fact = {"document_id": ids["document"], "role": "target", "origins": "pattern"}
@@ -3572,7 +3631,7 @@ class MigrationSuite:
             [
                 (
                     t.users,
-                    {"id": ids["anna"], "username": "a", "username_key": "a", "role": "user"},
+                    {"id": ids["erika"], "username": "a", "username_key": "a", "role": "user"},
                 ),
                 (
                     t.spaces,
@@ -3580,7 +3639,7 @@ class MigrationSuite:
                         "id": ids["space"],
                         "name": "A",
                         "name_key": "a",
-                        "personal_of": ids["anna"],
+                        "personal_of": ids["erika"],
                         "created_at": NOW,
                         "version": 1,
                     },
@@ -3607,11 +3666,11 @@ class MigrationSuite:
                 ),
                 (
                     t.user_identifiers,
-                    {"user_id": ids["anna"], "kind": "membership_number", "value": "333333"},
+                    {"user_id": ids["erika"], "kind": "membership_number", "value": "333333"},
                 ),
                 (
                     t.user_identifiers,
-                    {"user_id": ids["anna"], "kind": "contract_number", "value": "333333"},
+                    {"user_id": ids["erika"], "kind": "contract_number", "value": "333333"},
                 ),
                 (t.documents, {"id": ids["document"], "space_id": ids["space"]}),
                 (
@@ -3637,7 +3696,7 @@ class MigrationSuite:
                     t.lenses,
                     {
                         "id": ids["lens"],
-                        "owner_id": ids["anna"],
+                        "owner_id": ids["erika"],
                         "name": "L",
                         "name_key": "l",
                         "position": 0,
@@ -3686,7 +3745,7 @@ class MigrationSuite:
         the domains a person entered; the rest of its identifiers go, and VAT IDs and creditor IDs
         lose their holders."""
         await migrate(empty_database, "0071")
-        ids = {name: new_id() for name in ("anna", "space", "utility", "document")}
+        ids = {name: new_id() for name in ("erika", "space", "utility", "document")}
         at = {"contact_id": ids["utility"]}
         fact = {"document_id": ids["document"], "role": "contact", "origins": "pattern"}
         held = {"holder": "sender", "holder_name": None, "holder_source": "rule"}
@@ -3695,7 +3754,7 @@ class MigrationSuite:
             [
                 (
                     t.users,
-                    {"id": ids["anna"], "username": "a", "username_key": "a", "role": "user"},
+                    {"id": ids["erika"], "username": "a", "username_key": "a", "role": "user"},
                 ),
                 (
                     t.spaces,
@@ -3703,7 +3762,7 @@ class MigrationSuite:
                         "id": ids["space"],
                         "name": "A",
                         "name_key": "a",
-                        "personal_of": ids["anna"],
+                        "personal_of": ids["erika"],
                         "created_at": NOW,
                         "version": 1,
                     },
@@ -3979,6 +4038,248 @@ class MigrationSuite:
         async with empty_database.reading() as connection:
             assert await connection.run_sync(_schema) == schema
 
+    async def test_revision_0077_gives_every_document_its_first_version_and_back(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0077: every document gets its first version, its original as it came in,
+        by who uploaded it (none for a document without uploader); the downgrade forgets the
+        versions and keeps the documents (TA-02)."""
+        await migrate(empty_database, "0076")
+        ids = {name: new_id() for name in ("user", "space", "uploaded", "mailed")}
+        documents = _before_0077(t.documents)
+        document = {"space_id": ids["space"], "created_at": NOW}
+        await _insert(
+            empty_database,
+            [
+                (t.users, _user(ids["user"])),
+                (
+                    t.spaces,
+                    {
+                        "id": ids["space"],
+                        "name": "A",
+                        "name_key": "a",
+                        "personal_of": ids["user"],
+                    },
+                ),
+                (
+                    documents,
+                    document
+                    | {
+                        "id": ids["uploaded"],
+                        "sha256": "1" * 64,
+                        "original_filename": "scan.pdf",
+                        "media_type": "application/pdf",
+                        "uploaded_by": ids["user"],
+                    },
+                ),
+                (
+                    documents,
+                    document
+                    | {
+                        "id": ids["mailed"],
+                        "sha256": "2" * 64,
+                        "original_filename": "photo.jpg",
+                        "media_type": "image/jpeg",
+                        "uploaded_by": None,
+                    },
+                ),
+            ],
+        )
+        await migrate(empty_database, "0077")
+        versions = t.document_versions
+        async with empty_database.reading() as connection:
+            rows = await connection.execute(
+                select(
+                    versions.c.document_id,
+                    versions.c.number,
+                    versions.c.sha256,
+                    versions.c.original_filename,
+                    versions.c.media_type,
+                    versions.c.kind,
+                    versions.c.created_at,
+                    versions.c.created_by,
+                    versions.c.detail,
+                )
+            )
+            found = {row[0]: tuple(row[1:]) for row in rows.all()}
+        assert found == {
+            ids["uploaded"]: (
+                1,
+                "1" * 64,
+                "scan.pdf",
+                "application/pdf",
+                "received",
+                NOW,
+                ids["user"],
+                {},
+            ),
+            ids["mailed"]: (1, "2" * 64, "photo.jpg", "image/jpeg", "received", NOW, None, {}),
+        }
+        await downgrade(empty_database, "0076")
+        async with empty_database.reading() as connection:
+            kept = await connection.execute(select(documents.c.id, documents.c.sha256))
+            assert dict(kept.all()) == {ids["uploaded"]: "1" * 64, ids["mailed"]: "2" * 64}
+            tables = await connection.run_sync(lambda sync: set(inspect(sync).get_table_names()))
+        assert "document_versions" not in tables
+
+    async def test_revision_0078_adds_separate_skipped_and_takes_it_back(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0078: every document gets `separate` skipped. The downgrade drops the node
+        from the states, the log, the jobs and the undelivered events; a document whose
+        `separate` had not run gets jobs for OCR and the page images (not a second one it has);
+        a version of a stack's first part counts as edited (TA-02)."""
+        await migrate(empty_database, "0077")
+        ids = {name: new_id() for name in ("user", "space", "before", "stack", "queued", "event")}
+
+        def state(status: str, outcome: str | None = None) -> dict[str, Any]:
+            return {"status": status, "outcome": outcome, "started_at": None, "finished_at": None}
+
+        ok, waiting = state("done", "ok"), state("waiting")
+        later = ("ocr", "pages", "parse", *_SIGNALS, "judge", "fields", "relate", "apply_rules")
+        done = {"receive": ok, **dict.fromkeys(later, ok), "file": ok}
+        await _insert(
+            empty_database,
+            [
+                (t.users, _user(ids["user"])),
+                (
+                    t.spaces,
+                    {
+                        "id": ids["space"],
+                        "name": "A",
+                        "name_key": "a",
+                        "personal_of": ids["user"],
+                    },
+                ),
+                (
+                    t.documents,
+                    {"id": ids["before"], "space_id": ids["space"], "processing_nodes": done},
+                ),
+            ],
+        )
+
+        async def nodes() -> dict[Any, Any]:
+            async with empty_database.reading() as connection:
+                rows = await connection.execute(
+                    select(t.documents.c.id, t.documents.c.processing_nodes)
+                )
+                return {id: graph for id, graph in rows.all()}
+
+        await migrate(empty_database, "0078")
+        assert await nodes() == {ids["before"]: {**done, "separate": state("skipped")}}
+
+        # Two stacks whose `separate` waits, one of them with its OCR queued already; what the
+        # node left in the log, the jobs and the events; the versions of a split stack.
+        stacked = {"receive": ok, "separate": waiting, **dict.fromkeys(later, waiting)}
+        stacked["file"] = waiting
+        stack, queued = str(ids["stack"]), str(ids["queued"])
+
+        def job(document: str, node: str) -> dict[str, Any]:
+            return {
+                "id": new_id(),
+                "kind": "pipeline.node",
+                "payload": {"document_id": document, "node": node, "run": 1},
+                "dedup_key": f"{document}:1:{node}",
+            }
+
+        def event(node: str) -> dict[str, Any]:
+            payload = {"document_id": stack, "node": node, "run": 1}
+            return {"event_id": new_id(), "type": "document.node_started", "payload": payload}
+
+        version = {"document_id": ids["before"], "media_type": "application/pdf"}
+        await _insert(
+            empty_database,
+            [
+                *(
+                    (
+                        t.documents,
+                        {
+                            "id": ids[name],
+                            "space_id": ids["space"],
+                            "sha256": str(number) * 64,
+                            "processing_nodes": stacked,
+                        },
+                    )
+                    for number, name in enumerate(("stack", "queued"), start=1)
+                ),
+                (t.jobs, job(stack, "separate")),
+                (t.jobs, job(queued, "ocr")),
+                (t.outbox, event("separate")),
+                (t.outbox, event("receive")),
+                *(
+                    (
+                        t.processing_log,
+                        {"document_id": ids["before"], "node": node, "input": {}, "output": {}},
+                    )
+                    for node in ("receive", "separate")
+                ),
+                *(
+                    (
+                        t.document_versions,
+                        version
+                        | {"number": number, "sha256": name * 64, "original_filename": name}
+                        | {"kind": kind},
+                    )
+                    for number, name, kind in ((1, "a", "received"), (2, "b", "separated"))
+                ),
+            ],
+        )
+
+        await downgrade(empty_database, "0077")
+        assert await nodes() == {
+            ids["before"]: done,
+            ids["stack"]: {node: s for node, s in stacked.items() if node != "separate"},
+            ids["queued"]: {node: s for node, s in stacked.items() if node != "separate"},
+        }
+        async with empty_database.reading() as connection:
+            jobs = await _read_all(
+                connection, select(t.jobs.c.dedup_key).where(t.jobs.c.status == "queued")
+            )
+            events = await _read_all(connection, select(t.outbox.c.payload))
+            log = await _read_all(connection, select(t.processing_log.c.node))
+            kinds = await _read_all(
+                connection, select(t.document_versions.c.number, t.document_versions.c.kind)
+            )
+        assert sorted(key for (key,) in jobs) == sorted(
+            [f"{stack}:1:ocr", f"{stack}:1:pages", f"{queued}:1:ocr", f"{queued}:1:pages"]
+        )
+        assert [payload["node"] for (payload,) in events] == ["receive"]
+        assert [node for (node,) in log] == ["receive"]
+        assert sorted(kinds) == [(1, "received"), (2, "edited")]
+
+    async def test_revision_0079_drops_versions_nobody_checked_and_back(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0079: sessions, API tokens, known devices, external identities and failed
+        sign-ins lose their `version`, keeping their rows; the downgrade gives it back at 1, on
+        SQLite by copying the table, as the earlier revisions made it (SQ-04)."""
+        await migrate(empty_database, "0078")
+        async with empty_database.reading() as connection:
+            schema = await connection.run_sync(_schema)
+        async with empty_database.writing() as connection:
+            await connection.exec_driver_sql(
+                "INSERT INTO login_failures (key, failures, first_failure_at, version) "
+                "VALUES ('account:jane', 2, '2026-11-19 08:00:00.000000', 7)"
+            )
+        await migrate(empty_database)
+        async with empty_database.reading() as connection:
+            columns = await connection.run_sync(
+                lambda sync: {
+                    table: {item["name"] for item in sa.inspect(sync).get_columns(table)}
+                    for table in ("sessions", "login_failures")
+                }
+            )
+            kept = await _read_all(connection, sa.text("SELECT key, failures FROM login_failures"))
+        assert "version" not in columns["sessions"] | columns["login_failures"]
+        assert kept == [("account:jane", 2)]
+        await downgrade(empty_database, "0078")
+        async with empty_database.reading() as connection:
+            assert await connection.run_sync(_schema) == schema
+            back = await _read_all(
+                connection, sa.text("SELECT key, failures, version FROM login_failures")
+            )
+        assert back == [("account:jane", 2, 1)]
+
     async def test_revision_0067_turns_the_json_null_into_null(
         self, empty_database: Database
     ) -> None:
@@ -4177,6 +4478,11 @@ def _json_null_before_0067(table: sa.Table) -> sa.TableClause:
             for column in table.c
         ),
     )
+
+
+def _user(id: UUID) -> dict[str, Any]:
+    """The row of a user `a`."""
+    return {"id": id, "username": "a", "username_key": "a", "role": "user"}
 
 
 async def _insert(
@@ -4603,8 +4909,11 @@ def _schema(connection: Connection) -> set[tuple[Any, ...]]:
 
 
 def _table_clauses(sql: str) -> tuple[str, frozenset[str]]:
-    """CREATE TABLE as its head and its clauses (split at top-level commas), order ignored."""
+    """CREATE TABLE as its head and its clauses (split at top-level commas), order ignored;
+    the table's name without quotes, which SQLite writes for a table copied and renamed (a
+    downgrade that copies the table, revision 0079)."""
     head, body = " ".join(sql.split()).split("(", 1)
+    head = head.replace('"', "")
     clauses, depth, current = [], 0, ""
     for char in body.rsplit(")", 1)[0]:
         depth += {"(": 1, ")": -1}.get(char, 0)

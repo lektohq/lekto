@@ -15,14 +15,14 @@ from lekto.adapters.inbound.lanes import LANES, LaneFilter
 from lekto.adapters.inbound.mcp.names import Names, find
 from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
-from lekto.adapters.inbound.schemas import FieldJson, field_json
+from lekto.adapters.inbound.schemas import MAX_POSITION, FieldJson, field_json
 from lekto.core.domain.aggregates import Aggregate, GroupBy, GroupKey
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldType
 from lekto.core.domain.ids import FieldId, LensId, UserId, short_id
-from lekto.core.domain.lenses import MAX_QUERY_LENGTH
+from lekto.core.domain.lenses import MAX_FILTER_VALUES, MAX_QUERY_LENGTH
 from lekto.core.domain.periods import Period
-from lekto.core.ports.repository import DocumentFilter
+from lekto.core.ports.repository import DocumentFilter, each_tag
 
 LIST_SIZE = 20
 """Documents one list returns unless the client asks for more."""
@@ -78,8 +78,8 @@ def add_listing_tools(tools: Tools, context: ApiContext) -> None:
         ctx: Context,
         contact: str | None = None,
         document_type: str | None = None,
-        tags: Annotated[list[str] | None, Field(max_length=50)] = None,
-        topics: Annotated[list[str] | None, Field(max_length=50)] = None,
+        tags: Annotated[list[str] | None, Field(max_length=MAX_FILTER_VALUES)] = None,
+        topics: Annotated[list[str] | None, Field(max_length=MAX_FILTER_VALUES)] = None,
         lane: LaneName | None = None,
         document_date_from: date | None = None,
         document_date_to: date | None = None,
@@ -89,7 +89,7 @@ def add_listing_tools(tools: Tools, context: ApiContext) -> None:
         sum: str | None = None,
         fields: Annotated[list[str] | None, Field(max_length=10)] = None,
         limit: Annotated[int, Field(ge=1, le=LIST_MAX)] = LIST_SIZE,
-        offset: Annotated[int, Field(ge=0)] = 0,
+        offset: Annotated[int, Field(ge=0, le=MAX_POSITION)] = 0,
     ) -> str:
         user = principal_of(ctx).id
         names = await Names.load(context, user)
@@ -100,13 +100,13 @@ def add_listing_tools(tools: Tools, context: ApiContext) -> None:
             chosen = frozenset({names.find_document_type(document_type)})
             filter = replace(filter, document_types=chosen)
         if tags:
-            filter = replace(filter, tags=tuple(frozenset({names.find_tag(t)}) for t in tags))
+            filter = replace(filter, tags=each_tag(names.find_tag(t) for t in tags))
         if topics:
             filter = replace(filter, topics=frozenset(names.find_topic(t) for t in topics))
         if lane is not None:
             filter = replace(filter, lanes=frozenset({LANES[LaneFilter(lane)]}))
         if document_date_from is not None or document_date_to is not None:
-            period = Period(document_date_from or date.min, document_date_to or date.max)
+            period = Period.between(document_date_from, document_date_to)
             filter = replace(filter, document_dates=period)
         words = query or words
         if group_by is not None or sum is not None:

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Query, Response
 
 from lekto.adapters.inbound.rest.auth import PROTECTED, READS, CurrentUser
 from lekto.adapters.inbound.rest.context import Indexing, Search
-from lekto.adapters.inbound.rest.documents import DocumentSort
+from lekto.adapters.inbound.rest.documents import DocumentSort, order_of
 from lekto.adapters.inbound.rest.params import ADMINS_ONLY, AllDocuments, Filter
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.documents import ListedDocument
@@ -53,7 +53,8 @@ async def search_documents(
     search: Search,
     filter: Filter,
     sort: Annotated[
-        DocumentSort | Literal["relevance"], Query(description="`relevance` or a key.")
+        DocumentSort | Literal["relevance"],
+        Query(description="`relevance` or a key."),
     ] = "relevance",
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = SEARCH_PAGE,
     offset: Annotated[int, Query(ge=0, le=MAX_HITS)] = 0,
@@ -75,7 +76,7 @@ async def search_documents(
         offset=offset,
         limit=limit,
         semantic_ratio=semantic_ratio,
-        order=None if sort == "relevance" else sort.order,
+        order=None if sort == "relevance" else order_of(sort),
         all_users=all_users,
     )
     return SearchResultPage(

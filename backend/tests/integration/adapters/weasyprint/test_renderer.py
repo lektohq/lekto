@@ -20,7 +20,11 @@ from tests.webhook_receiver import LocalReceiver
 class TestWeasyPrintMailRenderer(MailRendererContract):
     @pytest.fixture
     def renderer(self) -> MailRenderer:
-        return WeasyPrintMailRenderer("de", memory=int(DEFAULT_SETTINGS.child_max_memory))
+        return WeasyPrintMailRenderer(
+            "de",
+            timeout=DEFAULT_SETTINGS.mail_render_timeout,
+            memory=int(DEFAULT_SETTINGS.child_max_memory),
+        )
 
 
 def _text(pdf: Path) -> str:
@@ -34,7 +38,9 @@ def _text(pdf: Path) -> str:
 async def _render(data: bytes, tmp_path: Path, locale: str = "de") -> str:
     mail, target = tmp_path / "mail.eml", tmp_path / "mail.pdf"
     mail.write_bytes(data)
-    await WeasyPrintMailRenderer(locale).render(mail, target)
+    await WeasyPrintMailRenderer(locale, timeout=DEFAULT_SETTINGS.mail_render_timeout).render(
+        mail, target
+    )
     return _text(target)
 
 
@@ -44,7 +50,7 @@ async def test_the_head_and_the_html(tmp_path: Path) -> None:
         "E-MAIL",
         "Ihre Rechnung über 123,45 €",
         "Von Stadtwerke Musterstadt <rechnung@stadtwerke.example>",
-        "An Anna Beispiel <anna@example.test>, ben@example.test",
+        "An Erika Mustermann <erika@example.test>, ben@example.test",
         "Kopie Buchhaltung <buchhaltung@example.test>",
         "Datum 04.11.2026, 09:00 UTC",
         "Anhänge Rechnung 4711.pdf",

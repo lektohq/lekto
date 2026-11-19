@@ -5,7 +5,18 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from uuid import UUID
 
-from lekto.core.domain.classification import CHECKS
+from lekto.core.domain.classification import (
+    CHECKS,
+    PERSON_EVIDENCE,
+    PERSON_PUBLIC,
+    PERSON_STRENGTH,
+    PERSON_USER,
+    PERSONS,
+    RELATED,
+    RELATED_DOCUMENT,
+    RELATED_DROPPED,
+    UNSEEN_BY,
+)
 from lekto.core.domain.document_facts import FactCriterion, FactRole, person_only
 from lekto.core.domain.documents import Document, DocumentChanges, Sha256, Unset
 from lekto.core.domain.errors import (
@@ -15,14 +26,18 @@ from lekto.core.domain.errors import (
     PermissionDeniedError,
     ValidationError,
 )
+from lekto.core.domain.facts import NAME, Strength
 from lekto.core.domain.fields import FieldDefinition
+from lekto.core.domain.identifiers import IdentifierKind, matches
+from lekto.core.domain.identifiers.visibility import seen_by
 from lekto.core.domain.ids import ContactId, DocumentId, FieldId, SpaceId, UserId
 from lekto.core.domain.json_value import JsonValue
-from lekto.core.domain.master_data import TagScope
+from lekto.core.domain.master_data import Contact, TagScope
 from lekto.core.domain.permissions import (
     can_edit_document,
     can_read_document,
     document_access,
+    in_reach,
     space_role,
 )
 from lekto.core.domain.pipeline import Node, NodeRun
@@ -103,6 +118,13 @@ async def load_lister(uow: UnitOfWork, actor: UserId, all_users: bool, action: A
     if all_users:
         admin_only(user, action)
     return user
+
+
+async def may_reach(uow: UnitOfWork, user: User, document: Document) -> bool:
+    """Whether `user` has `document` within reach where it lies now (`permissions.in_reach`);
+    False if its space is gone. What a webhook's owner must have to hear of it (SC-07)."""
+    space = await uow.spaces.find(document.space_id)
+    return space is not None and in_reach(user, document, space)
 
 
 async def readable_document(uow: UnitOfWork, user: User, id: DocumentId) -> tuple[Document, Space]:
@@ -296,26 +318,75 @@ async def readable_log(uow: UnitOfWork, user: User, log: Sequence[NodeRun]) -> l
         neighbours = run.node is Node.SIGNAL_NEIGHBOURS
         output = await _readable(run.result.output, may_read, neighbours=neighbours)
         assert isinstance(output, dict)
-        if run.node in (Node.SIGNAL_FACTS, Node.JUDGE) and "persons" in output:
+        if run.node in (Node.SIGNAL_FACTS, Node.JUDGE) and PERSONS in output:
             output = _persons_seen(output, str(user.id))
-        if run.node is Node.RELATE and isinstance(output.get("relations"), list):
-            # A relation to a document the reader may not read is none of theirs (#145).
-            relations = output["relations"]
-            assert isinstance(relations, list)
-            output = {
-                **output,
-                "relations": [
-                    item
-                    for item in relations
-                    if isinstance(item, dict) and await may_read(item.get("document_id"))
-                ],
-            }
+        if run.node is Node.SIGNAL_FACTS:
+            output = await _identifiers_seen(uow, user, output)
+        if run.node is Node.RELATE:
+            # A relation to a document the reader may not read is none of theirs (#145), made
+            # or removed.
+            for key in (RELATED, RELATED_DROPPED):
+                relations = output.get(key)
+                if isinstance(relations, list):
+                    output = {
+                        **output,
+                        key: [
+                            item
+                            for item in relations
+                            if isinstance(item, dict) and await may_read(item.get(RELATED_DOCUMENT))
+                        ],
+                    }
         result.append(replace(run, result=replace(run.result, output=output)))
     return result
 
 
-_NAME = "name"
-_WEAK, _MEDIUM = "weak", "medium"
+async def _identifiers_seen(
+    uow: UnitOfWork, user: User, output: dict[str, JsonValue]
+) -> dict[str, JsonValue]:
+    """`output` of the facts signal with the identifiers at a contact that `user` sees there
+    (`seen_by`: entered by hand, naming them, learned in a space of theirs); any other as an
+    unknown one, as the facts show it to them (XA-01)."""
+    spaces = frozenset(space.id for space in await uow.spaces.list_accessible(user.id))
+    contacts: dict[str, Contact | None] = {}
+
+    async def seen(item: Mapping[str, JsonValue]) -> bool:
+        id, kind, value = item.get("contact_id"), item.get("kind"), item.get("value")
+        if not isinstance(id, str) or not isinstance(kind, str) or not isinstance(value, str):
+            return False
+        if id not in contacts:
+            try:
+                contacts[id] = await uow.contacts.find(ContactId(UUID(id)))
+            except ValueError:
+                contacts[id] = None
+        contact = contacts[id]
+        try:
+            key = (IdentifierKind(kind), value)
+        except ValueError:
+            return False
+        return contact is not None and any(
+            identifier.counts and matches(identifier, key) and seen_by(identifier, user.id, spaces)
+            for identifier in contact.identifiers
+        )
+
+    result = dict(output)
+    unknown: list[JsonValue] = list(_items(output.get("unknown_identifiers")))
+    for name in ("identifiers", "foreign_identifiers"):
+        if name not in output:
+            continue
+        kept: list[JsonValue] = []
+        for item in _items(output[name]):
+            if await seen(item):
+                kept.append(item)
+            else:
+                unknown.append({k: v for k, v in item.items() if k in ("kind", "value", "in_code")})
+        result[name] = kept
+    if unknown or "unknown_identifiers" in output:
+        result["unknown_identifiers"] = unknown
+    return result
+
+
+def _items(value: JsonValue) -> list[dict[str, JsonValue]]:
+    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
 
 
 def _persons_seen(output: dict[str, JsonValue], viewer: str) -> dict[str, JsonValue]:
@@ -326,22 +397,24 @@ def _persons_seen(output: dict[str, JsonValue], viewer: str) -> dict[str, JsonVa
     evidence (it lists those named with medium or hard evidence)."""
     public: dict[str, str] = {}
     persons: list[JsonValue] = []
-    for value in output["persons"] if isinstance(output["persons"], list) else []:
-        if not isinstance(value, dict) or not isinstance(value.get("user_id"), str):
+    weak = Strength.WEAK.value
+    found = output[PERSONS]
+    for value in found if isinstance(found, list) else []:
+        if not isinstance(value, dict) or not isinstance(value.get(PERSON_USER), str):
             continue
-        user = value["user_id"]
+        user = value[PERSON_USER]
         assert isinstance(user, str)
-        evidence = value.get("evidence")
+        evidence = value.get(PERSON_EVIDENCE)
         if user == viewer:
             persons.append(value)
         elif isinstance(evidence, list):  # the facts
-            if _NAME in evidence:
-                public[user] = _WEAK
-                persons.append({"user_id": user, "strength": _WEAK, "evidence": [_NAME]})
-        elif isinstance(value.get("public"), str):  # the judge
-            public[user] = str(value["public"])
-            persons.append({"user_id": user, "strength": public[user]})
-    seen = {**output, "persons": persons}
+            if NAME in evidence:
+                public[user] = weak
+                persons.append({PERSON_USER: user, PERSON_STRENGTH: weak, PERSON_EVIDENCE: [NAME]})
+        elif isinstance(value.get(PERSON_PUBLIC), str):  # the judge
+            public[user] = str(value[PERSON_PUBLIC])
+            persons.append({PERSON_USER: user, PERSON_STRENGTH: public[user]})
+    seen = {**output, PERSONS: persons}
     checks = output.get(CHECKS)
     if isinstance(checks, list):
         seen[CHECKS] = [_unseen_seen(check, viewer, public) for check in checks]
@@ -349,14 +422,15 @@ def _persons_seen(output: dict[str, JsonValue], viewer: str) -> dict[str, JsonVa
 
 
 def _unseen_seen(check: JsonValue, viewer: str, public: Mapping[str, str]) -> JsonValue:
-    if not isinstance(check, dict) or not isinstance(check.get("unseen_by"), list):
+    if not isinstance(check, dict) or not isinstance(check.get(UNSEEN_BY), list):
         return check
-    unseen = check["unseen_by"]
+    unseen = check[UNSEEN_BY]
     assert isinstance(unseen, list)
-    kept = [user for user in unseen if user == viewer or public.get(str(user)) == _MEDIUM]
+    medium = Strength.MEDIUM.value
+    kept = [user for user in unseen if user == viewer or public.get(str(user)) == medium]
     if kept:
-        return {**check, "unseen_by": kept}
-    return {key: item for key, item in check.items() if key != "unseen_by"}
+        return {**check, UNSEEN_BY: kept}
+    return {key: item for key, item in check.items() if key != UNSEEN_BY}
 
 
 async def _readable(

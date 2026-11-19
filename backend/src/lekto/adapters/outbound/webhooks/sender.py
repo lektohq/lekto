@@ -20,8 +20,13 @@ import time
 import httpx2
 
 from lekto.adapters.outbound.http_client import CONNECT_TIMEOUT, describe_failure
-from lekto.adapters.outbound.http_client.resolver import Resolver, system_resolver
-from lekto.core.domain.addresses import is_public, literal
+from lekto.adapters.outbound.http_client.resolver import (
+    NotPublicError,
+    Resolver,
+    checked_address,
+    pinned,
+    system_resolver,
+)
 from lekto.core.ports.webhook_sender import WebhookRequest, WebhookResponse
 
 REFUSED = "the target has an address in the own network, which this webhook may not reach"
@@ -33,14 +38,12 @@ class HttpWebhookSender:
     def __init__(
         self,
         *,
-        user_agent: str = "Lekto",
-        connect_timeout: float = CONNECT_TIMEOUT,
+        user_agent: str,
         transport: httpx2.AsyncBaseTransport | None = None,
         resolver: Resolver = system_resolver,
     ) -> None:
         """`transport` and `resolver` replace the network and the name server in tests."""
         self._user_agent = user_agent
-        self._connect_timeout = connect_timeout
         self._transport = transport
         self._resolve = resolver
 
@@ -56,21 +59,18 @@ class HttpWebhookSender:
                 url = httpx2.URL(request.url)
                 extensions: dict[str, str] = {}
                 if not request.private:
-                    host = url.raw_host.decode("ascii")
-                    address = await self._public_address(host)
-                    if address is None:
+                    try:
+                        address = await checked_address(self._resolve, url.raw_host.decode("ascii"))
+                    except NotPublicError:
                         refused = True
-                        raise _RefusedError
-                    headers["Host"] = url.netloc.decode("ascii")
-                    if url.scheme == "https":
-                        extensions["sni_hostname"] = host
-                    url = url.copy_with(host=address)
+                        raise _RefusedError from None
+                    url, headers["Host"], extensions = pinned(url, address)
                 async with (
                     httpx2.AsyncClient(
                         transport=self._transport,
                         follow_redirects=False,
                         trust_env=False,
-                        timeout=httpx2.Timeout(limit, connect=min(self._connect_timeout, limit)),
+                        timeout=httpx2.Timeout(limit, connect=min(CONNECT_TIMEOUT, limit)),
                     ) as client,
                     client.stream(
                         "POST",
@@ -95,16 +95,6 @@ class HttpWebhookSender:
         return WebhookResponse(
             status_code=status, duration_ms=duration_ms, error=error, refused=refused
         )
-
-    async def _public_address(self, host: str) -> str | None:
-        """The address to connect to: the host's own, or the first its name resolves to, once
-        every one of them is public; None if one is not. OSError if the name resolves to
-        none (a failure like any other: it may resolve later)."""
-        own = literal(host)
-        addresses = [own] if own is not None else list(await self._resolve(host))
-        if not addresses or not all(is_public(address) for address in addresses):
-            return None
-        return addresses[0]
 
 
 class _RefusedError(Exception):

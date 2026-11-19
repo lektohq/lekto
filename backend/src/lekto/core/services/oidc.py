@@ -15,7 +15,6 @@ The flow (Authorization Code with PKCE):
 Signing in through the provider asks for no local TOTP code: the provider handles that.
 """
 
-import hmac
 import json
 import logging
 import secrets
@@ -25,7 +24,7 @@ from uuid import UUID
 
 from lekto.core.domain.encoding import base64url, from_base64url
 from lekto.core.domain.errors import AuthenticationError, ConflictError
-from lekto.core.domain.identity import ExternalIdentity, LoginMethod, safe_redirect
+from lekto.core.domain.identity import ExternalIdentity, LoginMethod, safe_redirect, same_secret
 from lekto.core.domain.ids import SessionId, UserId
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.users import Role
@@ -119,7 +118,7 @@ class OidcService:
         refuses, or no account may sign in; ConflictError if the provider's account is linked
         to another user."""
         flow = self._open(sealed_flow)
-        if not hmac.compare_digest(flow.state, state):
+        if not same_secret(flow.state, state):
             raise AuthenticationError(because(ReasonCode.OIDC_MISMATCH))
         identity = await self._provider.authenticate(
             code=code, code_verifier=flow.code_verifier, nonce=flow.nonce

@@ -97,6 +97,14 @@ def sort_value(value: FieldValue | None) -> date | Decimal | None:
     return None
 
 
+MAX_CHOICES = 200
+"""Choices of a `choice` field at most; each is a name (`MAX_NAME` characters; RB-09)."""
+MAX_FIELD_POSITION = 9999
+"""How far from 0 a field's `position` lies at most, either way (RB-09)."""
+MAX_TYPE_FIELDS = 500
+"""Fields that belong to a document type besides the global ones at most (RB-09)."""
+
+
 @dataclass(kw_only=True)
 class FieldDefinition(MasterData):
     """A freely definable field with a fixed data type.
@@ -132,6 +140,10 @@ class FieldDefinition(MasterData):
         super().__post_init__()
         if not isinstance(self.position, int) or isinstance(self.position, bool):
             raise ValidationError(f"position must be an int, got {self.position!r}")
+        if abs(self.position) > MAX_FIELD_POSITION:
+            raise ValidationError(
+                f"position: {-MAX_FIELD_POSITION} to {MAX_FIELD_POSITION}, got {self.position}"
+            )
         self.required_types = frozenset(self.required_types)
         self.description = checked_description(self.description)
         if self.document_type_ids is None:
@@ -148,6 +160,8 @@ class FieldDefinition(MasterData):
                 raise ValidationError(because(ReasonCode.CHOICE_NEEDS_CHOICES))
             if len(set(choices)) != len(choices):
                 raise ValidationError(because(ReasonCode.CHOICES_NOT_UNIQUE))
+            if len(choices) > MAX_CHOICES:
+                raise ValidationError(because(ReasonCode.INPUT_TOO_MANY, max=MAX_CHOICES))
             self.choices = choices
         elif self.choices:
             raise ValidationError(because(ReasonCode.ONLY_CHOICE_FIELDS_CHOICES))
@@ -357,10 +371,11 @@ def _numeric(value: object) -> bool:
 class Writing:
     """How templates write values (`TemplateRenderer.writing`): `language` (ISO 639-1, of
     `LEKTO_TEMPLATE_LOCALE`) the way an ambiguous number is meant, `currency` the one an amount
-    without its own has (`LEKTO_DEFAULT_CURRENCY`)."""
+    without its own has (`LEKTO_DEFAULT_CURRENCY`). No defaults: the settings hold them, and
+    whoever reads a value takes the renderer's (DA-15)."""
 
-    language: str = "de"
-    currency: str = "EUR"
+    language: str
+    currency: str
 
 
 _PLAIN_AMOUNT = re.compile(

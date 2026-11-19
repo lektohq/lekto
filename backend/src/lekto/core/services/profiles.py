@@ -10,10 +10,10 @@ a social security number): one a contact entered by hand is a conflict, a learne
 (a person's own number was learned by mistake, as an employer's from the pay slips that all
 carry it).
 
-A user's numbers at contacts (a customer or personnel number that names them, issue #82) are
-private like the profile and kept with it (`UserProfile.numbers`): the user enters them, takes
-over or declines those training found for them (`ProfileChanges.numbers`, `declined_numbers`);
-they are stored at their contacts (`Contact.set_numbers_of`).
+A user's numbers at contacts (a customer, contract or personnel number that names them, issue
+#82) are private like the profile and kept with it (`UserProfile.numbers`): the user enters
+them, takes over or declines those training found for them (`ProfileChanges.numbers`,
+`declined_numbers`); they are stored at their contacts (`Contact.set_numbers_of`).
 """
 
 import logging
@@ -57,8 +57,8 @@ two columns."""
 
 @dataclass(frozen=True)
 class ContactNumber:
-    """A customer or personnel number at a contact that names the user: entered by hand or
-    learned (`identifier.source`)."""
+    """A customer, contract or personnel number at a contact that names the user: entered by hand
+    or learned (`identifier.source`)."""
 
     contact_id: ContactId
     identifier: Identifier

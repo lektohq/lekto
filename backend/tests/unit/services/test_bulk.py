@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from lekto.core.domain.bulk import MAX_IDS, BulkAction, BulkKind, BulkStatus
+from lekto.core.domain.bulk import MAX_IDS, BulkAction, BulkKind
 from lekto.core.domain.documents import DocumentChanges
 from lekto.core.domain.errors import (
     NotFoundError,
@@ -22,11 +22,14 @@ from lekto.core.domain.ids import (
     new_id,
 )
 from lekto.core.domain.pipeline import Lane, Node
+from lekto.core.domain.progress import ProgressStatus
+from lekto.core.domain.push import PushKind
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.rules import ForceReview
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.ports.repository import DocumentFilter
 from lekto.core.services import bulk
+from lekto.core.services._push_queue import PUSH_JOB
 from lekto.core.services.bulk import BulkService, Selection
 from lekto.core.services.search import SearchItem, SearchMode, SearchPage, SearchService
 from tests import builders
@@ -105,12 +108,12 @@ async def test_tags_are_added_where_missing_and_the_others_are_skipped_with_why(
         Selection(ids=(first.id, tagged.id, read_only.id, busy.id, gone)),
         BulkAction(BulkKind.CHANGE_TAGS, add=frozenset({tax.id})),
     )
-    assert operation.status is BulkStatus.QUEUED
+    assert operation.status is ProgressStatus.QUEUED
     assert await builders.drain(bulk_service) == 1
 
     done = await bulk_service.get(owner.id, operation.id)
     assert (done.status, done.position, done.changed, done.unchanged) == (
-        BulkStatus.DONE,
+        ProgressStatus.DONE,
         5,
         1,
         1,
@@ -196,6 +199,52 @@ async def test_a_selection_by_filter_takes_what_the_person_reaches(world: World)
         r.admin.id, Selection(all_users=True), BulkAction(BulkKind.CONFIRM)
     )
     assert len(everyone.documents) == 4
+    # With ids too, every user's documents are an admin's to name (RA-09).
+    with pytest.raises(PermissionDeniedError):
+        await bulk_service.start(
+            owner.id, Selection(ids=(mine[0].id,), all_users=True), BulkAction(BulkKind.CONFIRM)
+        )
+    named = await bulk_service.start(
+        r.admin.id, Selection(ids=(mine[0].id,), all_users=True), BulkAction(BulkKind.CONFIRM)
+    )
+    assert named.documents == (mine[0].id,)
+
+
+def test_a_selection_takes_ids_or_a_filter_and_words_not_both() -> None:
+    """Neither would be dropped silently (RA-09)."""
+    ids = (DocumentId(new_id()),)
+    for selection in (
+        {"text": "Rechnung"},
+        {"filter": DocumentFilter(lanes=frozenset({Lane.GREEN}))},
+    ):
+        with pytest.raises(ValidationError) as caught:
+            Selection(ids=ids, **selection)
+        assert caught.value.reason == because(ReasonCode.BULK_IDS_AND_FILTER)
+
+
+async def test_an_unexpected_error_ends_the_operation_and_tells_the_admins(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """As every job given up (`JobRunner.end`; SB-08)."""
+    r = await rule_world(world)
+    owner = await world.user()
+    document = await r.arrive(owner)
+    bulk_service = service(r)
+    operation = await bulk_service.start(owner.id, ids(document), BulkAction(BulkKind.CONFIRM))
+
+    async def broken(id: object) -> bool:
+        raise RuntimeError("broken")
+
+    monkeypatch.setattr(bulk_service, "_next_document", broken)
+    assert await bulk_service.run_next_job()
+    done = await bulk_service.get(owner.id, operation.id)
+    assert (done.status, done.error) == (ProgressStatus.FAILED, "stopped by an internal error")
+    told = [
+        job.payload.get("params")
+        for job in world.database.jobs.values()
+        if job.kind == PUSH_JOB and job.payload.get("kind") == PushKind.JOB_FAILED.value
+    ]
+    assert told == [{"kind": bulk.BULK_JOB}]
 
 
 async def test_a_selection_is_bounded(world: World, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -286,7 +335,7 @@ async def test_the_job_hands_back_after_a_batch_and_continues(
 
     assert await builders.drain(bulk_service) == 3
     done = await bulk_service.get(owner.id, operation.id)
-    assert (done.status, done.changed) == (BulkStatus.DONE, 5)
+    assert (done.status, done.changed) == (ProgressStatus.DONE, 5)
 
 
 async def test_a_deactivated_person_stops_the_operation(world: World) -> None:
@@ -301,7 +350,7 @@ async def test_a_deactivated_person_stops_the_operation(world: World) -> None:
 
     done = await bulk_service.get(r.admin.id, operation.id)
     assert (done.status, done.position, done.error) == (
-        BulkStatus.FAILED,
+        ProgressStatus.FAILED,
         0,
         "the user is no longer active",
     )

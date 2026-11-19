@@ -8,7 +8,9 @@ environment. `--env-file FILE` takes them from a file of `KEY=value` lines inste
 stops (in the image: `lekto-run lekto ...` runs it as `PUID:PGID`), unless `PUID=0` says root is
 meant.
 
-- `check` (default): validate the configuration and print it without secrets.
+- `check [--environment]` (default): validate the configuration and print it without secrets;
+  with `--environment`, also the values the image's scripts go by (`IMAGE_SETTINGS`) as
+  `NAME=value` lines on stdout, as Lekto reads them (`init-lekto` hands them on).
 - `migrate`: validate, then bring the configured database to the newest schema. Run before the
   API and the worker start (in the image: `init-migrations`).
 - `check-schema [--wait SECONDS]`: exit 0 if the database is at the newest schema of this
@@ -217,6 +219,11 @@ def _parser() -> argparse.ArgumentParser:
         name: commands.add_parser(name, parents=[shared], help=HELP[name], description=HELP[name])
         for name in COMMANDS
     }
+    parsers["check"].add_argument(
+        "--environment",
+        action="store_true",
+        help="also print the values the image's scripts go by, as NAME=value lines",
+    )
     parsers["check-schema"].add_argument(
         "--wait", type=float, default=0, help="seconds to wait (default: 0)"
     )
@@ -266,8 +273,33 @@ def _run[T](
     return status(result)
 
 
+IMAGE_SETTINGS = (
+    "role",
+    "db_type",
+    "db_sqlite_path",
+    "storage_type",
+    "storage_path",
+    "api_host",
+    "api_port",
+)
+"""The settings the image's scripts go by (`check --environment`): which services start, which
+folders of the volume they own, where the health check asks the API. The scripts take them as
+Lekto reads them (whitespace removed, a blank value as not set, choices in lower case, its
+defaults), not from the environment as it is."""
+
+
 def _check(settings: Settings, arguments: argparse.Namespace) -> int:
-    return 0  # the configuration is valid and logged
+    if not getattr(arguments, "environment", False):
+        return 0  # the configuration is valid and logged
+    lines = []
+    for name in IMAGE_SETTINGS:
+        value = str(getattr(settings, name))
+        if "\n" in value or "\r" in value:
+            print(f"LEKTO_{name.upper()} must be a single line", file=sys.stderr)
+            return 1
+        lines.append(f"LEKTO_{name.upper()}={value}")
+    print("\n".join(lines))
+    return 0
 
 
 def _migrate(settings: Settings, arguments: argparse.Namespace) -> int:

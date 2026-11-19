@@ -1,37 +1,10 @@
 """In-process signals: a MemoryDatabase tells its wakeups what every commit queued."""
 
-import asyncio
-import contextlib
 from collections.abc import Collection
-from datetime import timedelta
 
 from lekto.adapters.outbound.memory.database import MemoryDatabase
+from lekto.adapters.outbound.signals import InProcessSignal
 from lekto.core.ports.wakeup import Channel
-
-
-class MemorySignal:
-    """A subscription: a flag that a signal set, cleared by the wait that saw it."""
-
-    def __init__(self, channel: Channel, kinds: Collection[str] | None, live: bool) -> None:
-        self.channel = channel
-        self.kinds = None if kinds is None else frozenset(kinds)
-        self.live = live
-        self._event = asyncio.Event()
-
-    def raise_for(self, channel: Channel, kind: str | None) -> None:
-        if channel is self.channel and (self.kinds is None or kind in self.kinds):
-            self._event.set()
-
-    def raise_now(self) -> None:
-        self._event.set()
-
-    async def wait(self, timeout: timedelta) -> bool:
-        with contextlib.suppress(TimeoutError):
-            await asyncio.wait_for(self._event.wait(), timeout=timeout.total_seconds())
-        if not self._event.is_set():
-            return False
-        self._event.clear()
-        return True
 
 
 class MemoryWakeup:
@@ -39,14 +12,16 @@ class MemoryWakeup:
     reach every receiver there is: the subscriptions are `live`."""
 
     def __init__(self, database: MemoryDatabase) -> None:
-        self._signals: list[MemorySignal] = []
+        self._signals: list[InProcessSignal] = []
         self._closed = False
         database.listeners.append(self._signal)
 
-    def subscribe(self, channel: Channel, *, kinds: Collection[str] | None = None) -> MemorySignal:
+    def subscribe(
+        self, channel: Channel, *, kinds: Collection[str] | None = None
+    ) -> InProcessSignal:
         if self._closed:
             raise RuntimeError("the wakeup is closed")
-        signal = MemorySignal(channel, kinds, live=True)
+        signal = InProcessSignal(channel, kinds, live=lambda: True)
         self._signals.append(signal)
         return signal
 

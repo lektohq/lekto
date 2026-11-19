@@ -4,7 +4,7 @@ Pure functions over a document and the names of what it references."""
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -126,11 +126,8 @@ def _text(value: Any, condition: Any) -> bool:
     """Contains the text (any case), or `{contains: ...}`, `{matches: <regular expression>}`."""
     text = str(value or "")
     if isinstance(condition, Mapping):
-        if "matches" in condition:
-            try:
-                return re.search(str(condition["matches"]), text) is not None
-            except re.error:
-                return False
+        if "matches" in condition:  # compiles: the plan checks it (`plan._criterion`)
+            return re.search(str(condition["matches"]), text) is not None
         condition = condition.get("contains", "")
     return str(condition).casefold() in text.casefold()
 
@@ -167,7 +164,7 @@ def _shared(document: dict[str, Any], names: Names) -> set[str]:
 def _custom_field(name: str, wanted: Any, document: dict[str, Any], names: Names) -> bool:
     """`true`/`false`: has a value or not; a value or list of them; `{from, to}` for numbers
     and dates."""
-    field = next((f for f in names.custom_fields.values() if norm(f["name"]) == norm(name)), None)
+    field = _field(name, names)
     value = None
     if field is not None:
         for item in document.get("custom_fields") or []:
@@ -191,6 +188,48 @@ def _custom_field(name: str, wanted: Any, document: dict[str, Any], names: Names
         except InvalidOperation:
             return False
     return norm(str(value)) in {norm(str(option)) for option in _list(wanted)}
+
+
+def mismatches(selection: Selection, names: Names) -> list[str]:
+    """The bounds of custom fields in `selection` that do not fit their field: a day for a
+    date field, a number for the others. The plan checks the form of a criterion
+    (`plan._criterion`); which type a field has, only Paperless knows."""
+    problems = []
+    for part, criteria in (("include", selection.include), ("exclude", selection.exclude)):
+        fields = criteria.get("custom_fields")
+        for name, wanted in fields.items() if isinstance(fields, Mapping) else ():
+            field = _field(str(name), names)
+            if field is None or not isinstance(wanted, Mapping):
+                continue
+            dated = field["data_type"] == "date"
+            for bound, value in wanted.items():
+                if not (_is_day(value) if dated else _is_decimal(value)):
+                    form = "a day such as 2024-01-31" if dated else "a number"
+                    problems.append(
+                        f"documents.{part}.custom_fields.{name}.{bound}: {form}, as the field "
+                        f"{field['name']} holds"
+                    )
+    return problems
+
+
+def _field(name: str, names: Names) -> dict[str, Any] | None:
+    return next((f for f in names.custom_fields.values() if norm(f["name"]) == norm(name)), None)
+
+
+def _is_day(value: Any) -> bool:
+    try:
+        _day(value)
+    except (TypeError, ValueError):
+        return False
+    return not isinstance(value, datetime)
+
+
+def _is_decimal(value: Any) -> bool:
+    try:
+        Decimal(str(value))
+    except InvalidOperation:
+        return False
+    return not isinstance(value, bool | date)
 
 
 def _list(value: Any) -> list[Any]:

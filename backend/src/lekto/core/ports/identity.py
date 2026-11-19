@@ -24,7 +24,6 @@ from lekto.core.domain.identity import (
 )
 from lekto.core.domain.ids import (
     ApiTokenId,
-    ExternalIdentityId,
     KnownDeviceId,
     SessionId,
     UserId,
@@ -93,6 +92,11 @@ class KnownDeviceRepository(Protocol):
 
     async def remove_for_user(self, user: UserId) -> int: ...
 
+    async def keep_newest(self, user: UserId, count: int) -> int:
+        """Remove the user's devices but the `count` newest (by `created_at`, then id);
+        returns how many went."""
+        ...
+
     async def purge(self, *, now: datetime) -> int:
         """Remove devices that expired (`expires_at <= now`); returns how many."""
         ...
@@ -105,8 +109,6 @@ class ExternalIdentityRepository(Protocol):
 
     async def list_for(self, user: UserId) -> list[ExternalIdentity]: ...
 
-    async def remove(self, id: ExternalIdentityId) -> None: ...
-
     async def remove_for_user(self, user: UserId) -> int: ...
 
 
@@ -115,7 +117,10 @@ class LoginFailureRepository(Protocol):
     (`reserve`) and taken back if they did not fail (`release`), so attempts that arrive at
     the same time cannot pass a throttle together."""
 
-    async def find(self, key: str) -> LoginFailures | None: ...
+    async def find(self, key: str) -> LoginFailures | None:
+        """The counts under `key`, for tests and diagnosis: no service reads them, they count
+        through `reserve` and `release` alone (PM-13, Tobi 17.11.2026)."""
+        ...
 
     async def reserve(self, key: str, rule: ThrottleRule, now: datetime) -> timedelta | None:
         """Atomically: if `key` is blocked at `now`, count nothing and return how long it

@@ -1,5 +1,6 @@
+import asyncio
 import logging
-from collections.abc import Awaitable, Callable, Collection, Iterator, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from uuid import UUID
@@ -10,7 +11,7 @@ from lekto.core.domain.errors import (
     NotFoundError,
     ValidationError,
 )
-from lekto.core.domain.fields import FieldDefinition, FieldType, field_order
+from lekto.core.domain.fields import MAX_TYPE_FIELDS, FieldDefinition, FieldType, field_order
 from lekto.core.domain.identifiers import (
     Identifier,
     IdentifierKind,
@@ -31,12 +32,13 @@ from lekto.core.domain.master_data import (
     one_line,
 )
 from lekto.core.domain.names import match_key, related
-from lekto.core.domain.reasons import Action, ReasonCode, because
+from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
 from lekto.core.domain.rules import References, Rule, RuleScope, title_rule
 from lekto.core.domain.rules_json import definition_to_json
 from lekto.core.domain.sorting import sort_key
 from lekto.core.domain.templates import rename_field_key, unknown_values
 from lekto.core.domain.templates import uses_field as field_used
+from lekto.core.domain.webhooks import BodyFormat, Webhook
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.repository import DocumentFilter, DocumentPosition, NamedRepository
@@ -225,7 +227,7 @@ class MasterDataService:
                 if entered is None:
                     entered = [entry for entry in item.identifiers if entry.source is MANUAL]
                 item.set_identifiers(entered, rejected_identifiers)
-            await _check_contact(uow, item)
+            await _check_contact(uow, item, names=name is not None or aliases is not None)
 
         return await self._change(
             actor,
@@ -266,7 +268,7 @@ class MasterDataService:
             _contacts,
             id,
             change,
-            check=lambda uow, item: _check_contact(uow, item),
+            check=lambda uow, item: _check_contact(uow, item, names=False),
             after=lambda uow, item: self._logo_for(uow, item, known),
         )
 
@@ -290,7 +292,11 @@ class MasterDataService:
             item.set_identifiers(manual, [*rejected, dropped])
 
         return await self._change(
-            actor, _contacts, id, change, check=lambda uow, item: _check_contact(uow, item)
+            actor,
+            _contacts,
+            id,
+            change,
+            check=lambda uow, item: _check_contact(uow, item, names=False),
         )
 
     async def _logo_for(self, uow: UnitOfWork, contact: Contact, known: Collection[str]) -> None:
@@ -478,7 +484,7 @@ class MasterDataService:
 
     async def run_next_job(self) -> bool:
         """Claim and run a due normalisation (`NORMALISE_JOB`); False if none was due."""
-        return await self._jobs.run_next([NORMALISE_JOB], LEASE, self._normalise)
+        return await self._jobs.run_next(self.job_kinds, LEASE, self._normalise)
 
     async def _normalise(self, job: Job) -> None:
         """One step: the batch, completing the job and queueing the next step commit together;
@@ -505,9 +511,7 @@ class MasterDataService:
                     )
                 await uow.commit()
         except Exception as error:  # a row changed meanwhile, or the database failed: again
-            log.warning("normalising tags failed", extra={"job_id": str(job.id)}, exc_info=True)
-            reason = f"{type(error).__name__}: {error}"
-            await self._jobs.again(job, reason, _NORMALISE_RETRY.next_run(job.tries, self._now()))
+            await self._jobs.failed(job, error, _NORMALISE_RETRY, "normalising tags failed")
             return
         log.info("tags normalised", extra={"tag_id": str(tag), "changed": changed})
 
@@ -585,6 +589,7 @@ class MasterDataService:
                 if definition.key != old_key:
                     await self._rename_in_patterns(uow, actor, old_key, definition.key)
                     await self._rename_in_rules(uow, actor, old_key, definition.key)
+                    await self._rename_in_webhooks(uow, old_key, definition.key)
             if choices is not None:
                 removed = definition.change_choices(choices)
                 if removed and await uow.documents.field_in_use(id, values=removed):
@@ -626,7 +631,7 @@ class MasterDataService:
                     uow,
                     self._now(),
                     because(ReasonCode.RULE_DISABLED_CHOICE, field=definition.name),
-                    misfits(definition.id, fields),
+                    misfits(definition.id, fields, self._templates.writing),
                 )
 
         return await self._change(actor, _fields, id, change, check=check, after=after)
@@ -652,6 +657,8 @@ class MasterDataService:
     ) -> list[FieldDefinition]:
         """Make `fields` the type's fields besides the global ones (`assign_fields`), in `uow`
         without committing; the fields that changed."""
+        if len(fields) > MAX_TYPE_FIELDS:
+            raise ValidationError(because(ReasonCode.INPUT_TOO_MANY, max=MAX_TYPE_FIELDS))
         id = document_type.id
         definitions = await field_definitions(uow)
         for field in fields:
@@ -855,7 +862,8 @@ class MasterDataService:
         await self._delete(actor, _tags, id, used, ("tag", lambda refs: refs.tags))
 
     async def delete_field(self, actor: UserId, id: FieldId) -> None:
-        """Not while a document has a value or a template of a rule uses it."""
+        """Not while a document has a value or a template uses it (a title pattern's, a
+        rule's, a webhook's body)."""
 
         async def used(uow: UnitOfWork) -> bool:
             if await uow.documents.exists(field=id):
@@ -872,6 +880,12 @@ class MasterDataService:
                 names = sorted((rule.definition.name for rule in rules), key=sort_key)
                 raise ConflictError(
                     because(ReasonCode.FIELD_USED_BY_RULES, key=definition.key, rules=names)
+                )
+            webhooks = await self._webhooks_using(uow, definition.key)
+            if webhooks:
+                names = sorted((webhook.name for webhook in webhooks), key=sort_key)
+                raise ConflictError(
+                    because(ReasonCode.FIELD_USED_BY_WEBHOOKS, key=definition.key, webhooks=names)
                 )
             return False
 
@@ -951,6 +965,23 @@ class MasterDataService:
         for rule in await self._rules_using(uow, old):
             rule.change(renamed_field(rule.definition, old, new), actor, self._now())
             await uow.rules.update(rule)
+
+    async def _webhooks_using(self, uow: UnitOfWork, key: str) -> list[Webhook]:
+        """The webhooks whose body template uses the field `key`."""
+        return [
+            webhook
+            for webhook in await uow.webhooks.list_all()
+            if webhook.body is BodyFormat.TEMPLATE
+            and webhook.body_template is not None
+            and field_used(self._templates.check(webhook.body_template), key)
+        ]
+
+    async def _rename_in_webhooks(self, uow: UnitOfWork, old: str, new: str) -> None:
+        """The body templates of webhooks that use `field.<old>` take the new key."""
+        for webhook in await self._webhooks_using(uow, old):
+            template = rename_field_key(webhook.body_template or "", old, new)
+            webhook.set_body(webhook.body, template, now=self._now())
+            await uow.webhooks.update(webhook)
 
     async def _list[K, E: MasterData](self, actor: UserId, repository: Repo[K, E]) -> list[E]:
         async with self._uow() as uow:
@@ -1188,8 +1219,11 @@ async def _title_rule(uow: UnitOfWork, document_type: DocumentTypeId) -> Rule | 
     return None
 
 
-async def _check_contact(uow: UnitOfWork, contact: Contact) -> None:
-    await _check_contact_names(uow, contact)
+async def _check_contact(uow: UnitOfWork, contact: Contact, *, names: bool = True) -> None:
+    """`names`: whether its name or aliases changed, which the other contacts' are checked
+    against then (SB-07)."""
+    if names:
+        await _check_contact_names(uow, contact)
     await _check_contact_identifiers(uow, contact)
 
 
@@ -1245,28 +1279,28 @@ async def replace_learned_identifiers(
 async def _check_contact_names(uow: UnitOfWork, contact: Contact) -> None:
     """No name or alias of the contact is a name or an alias of another contact. An alias
     must not even match another contact's name or alias the way classification compares
-    names (legal forms and punctuation aside): both would always be equally close."""
-    for other in await uow.contacts.list_all():
-        if other.id == contact.id:
-            continue
+    names (legal forms and punctuation aside): both would always be equally close. Compared
+    in a worker thread, each name's key once: thousands of contacts take a while (SB-07)."""
+    others = [other for other in await uow.contacts.list_all() if other.id != contact.id]
+    conflict = await asyncio.to_thread(_name_conflict, contact, others)
+    if conflict is not None:
+        raise ConflictError(conflict)
+
+
+def _name_conflict(contact: Contact, others: Sequence[Contact]) -> Reason | None:
+    mine = [(name, match_key(name), name in contact.aliases) for name in contact.names()]
+    for other in others:
         for name in contact.names():
             if other.is_named(name):
-                raise ConflictError(
-                    because(ReasonCode.NAME_OF_CONTACT, name=name, contact=other.name)
-                )
-        for mine, theirs in _alias_pairs(contact, other):
-            if match_key(mine) and match_key(mine) == match_key(theirs):
-                raise ConflictError(
-                    because(ReasonCode.NAME_TOO_CLOSE, name=mine, other=theirs, contact=other.name)
-                )
-
-
-def _alias_pairs(contact: Contact, other: Contact) -> Iterator[tuple[str, str]]:
-    """Pairs of their names in which at least one is an alias."""
-    for mine in contact.names():
-        for theirs in other.names():
-            if mine in contact.aliases or theirs in other.aliases:
-                yield mine, theirs
+                return because(ReasonCode.NAME_OF_CONTACT, name=name, contact=other.name)
+        theirs = [(name, match_key(name), name in other.aliases) for name in other.names()]
+        for name, key, alias in mine:
+            for their_name, their_key, their_alias in theirs:
+                if (alias or their_alias) and key and key == their_key:
+                    return because(
+                        ReasonCode.NAME_TOO_CLOSE, name=name, other=their_name, contact=other.name
+                    )
+    return None
 
 
 async def learn_alias(
@@ -1284,9 +1318,27 @@ async def learn_alias(
 
     An alias of another contact that it matches moves (the person's choice is the newer word).
     """
+    contacts = await uow.contacts.list_all()
+    # Every contact's names compared: in a worker thread (SB-07).
+    learned = await asyncio.to_thread(_learned, contacts, contact_id, alias, threshold)
+    if learned is None:
+        return None
+    target, word, giving = learned
+    for other, kept in giving:
+        other.set_aliases(kept)
+        await uow.contacts.update(other)
+    target.set_aliases([*target.aliases, word])
+    await uow.contacts.update(target)
+    return target
+
+
+def _learned(
+    contacts: Sequence[Contact], contact_id: ContactId, alias: str, threshold: float
+) -> tuple[Contact, str, list[tuple[Contact, list[str]]]] | None:
+    """The contact that learns the alias, as written once, and the others that give it up with
+    the aliases they keep; None if nothing is learned (`learn_alias`)."""
     alias = one_line(alias)
     key = match_key(alias)
-    contacts = await uow.contacts.list_all()
     target = next((item for item in contacts if item.id == contact_id), None)
     if not key or target is None or target.is_named(alias):
         return None
@@ -1295,14 +1347,12 @@ async def learn_alias(
     others = [item for item in contacts if item.id != contact_id]
     if any(match_key(other.name) == key for other in others):
         return None
+    giving = []
     for other in others:
         kept = [item for item in other.aliases if match_key(item) != key]
         if len(kept) < len(other.aliases):
-            other.set_aliases(kept)
-            await uow.contacts.update(other)
-    target.set_aliases([*target.aliases, alias])
-    await uow.contacts.update(target)
-    return target
+            giving.append((other, kept))
+    return target, alias, giving
 
 
 def _related(key: str, contact: Contact, threshold: float) -> bool:

@@ -290,12 +290,18 @@ class ProcessingFactsContract:
     async def test_run_times_give_each_documents_duration_work_and_steps(
         self, uow_factory: UnitOfWorkFactory
     ) -> None:
+        """Not of a document whose first lane is unknown (PM-05)."""
         owner, space = await owner_with_space(uow_factory)
         quick, slow = green(owner, space), green(owner, space)
-        await store(uow_factory, quick, slow)
+        unknown = builders.document(owner, space)
+        assert unknown.first_lane is None
+        await store(uow_factory, quick, slow, unknown)
         async with uow_factory() as uow:
             await uow.processing_facts.add_first_run(
                 first_run(quick, stopped=10 * SECOND, steps={Node.RECEIVE: SECOND})
+            )
+            await uow.processing_facts.add_first_run(
+                first_run(unknown, stopped=99 * SECOND, steps={Node.OCR: 9 * SECOND})
             )
             await uow.processing_facts.add_first_run(
                 first_run(

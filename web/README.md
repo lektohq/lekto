@@ -221,7 +221,7 @@ a personal one too: the language model reads what belongs in it when Lekto sugge
 (another user's personal space only by its user's name).
 
 The document's head names its space and who else sees it. Moving goes into a space the caller
-edits, or hands the document over into another user's personal space ("Hand over to Anna",
+edits, or hands the document over into another user's personal space ("Hand over to Erika",
 `spaceOptions`); the same choice stands where a document is confirmed into a space and in a
 rule's "File into space". The hand-overs come from the users list (`personal_space_id` of
 `GET /users`), as a hand-over needs no membership. A rule belongs to
@@ -236,7 +236,7 @@ Deleting a user (admin › users) asks for the spaces they leave behind (`UserDe
 with the user; one click deletes the user and settles all of them in one request.
 
 When Lekto suggests a space that shows the document to others (the judge's open `space` check
-with a `suggestion`), the inbox row says so ("Suggested: Haushalt (visible to anna)",
+with a `suggestion`), the inbox row says so ("Suggested: Haushalt (visible to erika)",
 `lib/space-suggestion.ts`) and the document form starts its space choice at the suggestion;
 confirming it sends `accept_suggestions: true`, another choice its `space_id`, the current space
 keeps it. The log names the spaces of the signals, the spaces a document went through

@@ -80,7 +80,7 @@ def test_the_identifiers_of_a_code() -> None:
 
 
 def test_codes_json_round_trip() -> None:
-    codes = (code(GIRO), code("K-20047718", "Code 128"))
+    codes = (code(GIRO), code("K-12345678", "Code 128"))
     data = codes_to_json(codes)
     assert data["version"] == CODES_VERSION
     assert codes_from_json(data) == codes

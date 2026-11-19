@@ -1,12 +1,18 @@
 """Signing in, against a stand-in for `imaplib`: the capabilities the session goes by are the
 server's after the login, not those of its greeting."""
 
-from collections.abc import Sequence
+import imaplib
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
+from types import MethodType
 
 import pytest
 
-from lekto.adapters.outbound.imap.server import ImapMailServer
+from lekto.adapters.outbound.imap.server import ImapMailServer, _folders, _guarded
 from lekto.core.domain.mail import MailLogin, MailSecurity
+from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.ports.mail_server import MailServerError
+from tests.builders import DEFAULT_SETTINGS
 
 
 class SigningIn:
@@ -53,3 +59,62 @@ def test_without_an_answer_the_greetings_capabilities_stay(
     imap = SigningIn(answer)
     _sign_in(imap)
     assert imap.capabilities == ("IMAP4REV1", "AUTH=PLAIN")
+
+
+class Listing:
+    def __init__(self, *names: bytes) -> None:
+        self._names = names
+
+    def list(self) -> tuple[str, list[bytes]]:
+        return "OK", [b'(\\HasNoChildren) "/" "' + name + b'"' for name in self._names]
+
+
+def test_the_folders_of_an_account_keep_names_sent_against_the_standard() -> None:
+    """One name the server sends in UTF-8 or with a bare `&` broke the whole list."""
+    listing = Listing(b"INBOX", b"R&D", "Entwürfe".encode(), b"Best&AOQ-tigungen")
+    assert _folders(listing) == ("INBOX", "Bestätigungen", "Entwürfe", "R&D")  # type: ignore[arg-type]
+
+
+LOGIN = MailLogin(
+    host="mail.example.org",
+    port=993,
+    security=MailSecurity.TLS,
+    username="someone",
+    password="secret",
+)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [TimeoutError("timed out"), OSError("reset"), imaplib.IMAP4.abort("socket error: EOF")],
+)
+def test_a_silent_or_lost_server_cannot_be_reached(error: Exception) -> None:
+    """Also in `account`: no raw TimeoutError, no "answered with an error" (AD-14)."""
+
+    def work(*_: object) -> None:
+        raise error
+
+    with pytest.raises(MailServerError) as caught:
+        _guarded(LOGIN.host, work)
+    assert caught.value.reason == because(ReasonCode.MAIL_UNREACHABLE, host=LOGIN.host)
+
+    @contextmanager
+    def session(self: ImapMailServer, login: MailLogin) -> Iterator[object]:
+        yield object()
+
+    server = ImapMailServer(timeout=DEFAULT_SETTINGS.mail_timeout)
+    server._session = MethodType(session, server)  # type: ignore[method-assign]
+    with pytest.raises(MailServerError) as caught:
+        server._run(LOGIN, work)
+    assert caught.value.reason == because(ReasonCode.MAIL_UNREACHABLE, host=LOGIN.host)
+
+
+def test_a_refusal_names_the_server_s_words() -> None:
+    def refused() -> None:
+        raise imaplib.IMAP4.error([b"[CANNOT] Invalid flags"])
+
+    with pytest.raises(MailServerError) as caught:
+        _guarded(LOGIN.host, refused)
+    assert caught.value.reason == because(
+        ReasonCode.MAIL_SERVER_ERROR, detail="[CANNOT] Invalid flags"
+    )

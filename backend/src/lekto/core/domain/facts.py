@@ -8,8 +8,9 @@ A found identifier is matched with the contacts' (`identifiers.matches`): one th
 rejected one is known, but neither evidence nor unknown.
 
 Persons (Tobi, 21.10.2026): a user is found by their identifiers (hard evidence: one of their
-own, or a contact's customer or personnel number that names them), their birth date (medium)
-and their display name or aliases (weak: an address block names everyone in a household). Only
+own, or a contact's customer, contract or personnel number that names them), their birth date
+(medium) and their display name or aliases (weak: an address block names everyone in a
+household). Only
 the persons given are found: a deactivated user, or one not given, never (also not by a
 contact's number); a person given in their public form (`Person.public`) only by their display
 name. A person's own numbers are no contact's: they never show as unknown identifiers (of a

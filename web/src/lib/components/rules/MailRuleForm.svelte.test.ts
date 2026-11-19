@@ -9,7 +9,7 @@ import MailRuleForm from './MailRuleForm.svelte';
 const mailboxes = [
 	{ id: 'm1', name: 'Household', folders: ['INBOX'], status: { keywords: [] } }
 ] as unknown as Mailbox[];
-const users = [{ id: 'u1', username: 'anna', display_name: 'Anna', active: true }] as UserName[];
+const users = [{ id: 'u1', username: 'erika', display_name: 'Erika', active: true }] as UserName[];
 const spaces = [
 	{ id: 's1', name: 'Haushalt', personal_of: null, members: [{ user_id: 'u1', role: 'edit' }] },
 	{ id: 's2', name: 'Fremd', personal_of: null, members: [] }

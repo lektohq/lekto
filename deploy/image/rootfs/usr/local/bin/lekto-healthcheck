@@ -1,10 +1,18 @@
-#!/bin/sh
+#!/command/with-contenv sh
 # Health of the container, for Docker's HEALTHCHECK. The API answers GET /api/v1/health; the
 # worker has no endpoint, so its service must be up for 10 seconds (not in a crash loop) and past
-# the wait for the schema (svc-worker writes /run/lekto-worker-ready).
+# the wait for the schema (svc-worker writes /run/lekto-worker-ready). The settings are those
+# init-lekto resolved; before it has, the container is not healthy.
 set -eu
 
-role=$(printf %s "${LEKTO_ROLE:-all}" | tr '[:upper:]' '[:lower:]')
+role=${LEKTO_ROLE:-}
+case "$role" in
+  all | api | worker) ;;
+  *)
+    echo "the container has not started yet (LEKTO_ROLE='$role')" >&2
+    exit 1
+    ;;
+esac
 
 case "$role" in
   all | api)
@@ -16,7 +24,7 @@ import urllib.request
 # Where the API listens (LEKTO_API_HOST, LEKTO_API_PORT): every address is asked on loopback,
 # one address of its own there.
 port = os.environ.get("LEKTO_API_PORT", "8000")
-host = os.environ.get("LEKTO_API_HOST", "").strip()
+host = os.environ.get("LEKTO_API_HOST", "")
 if host in ("", "0.0.0.0"):
     host = "127.0.0.1"
 elif host == "::":

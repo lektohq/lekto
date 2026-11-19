@@ -73,7 +73,7 @@ export interface paths {
 		};
 		/**
 		 * Return from the identity provider
-		 * @description The provider sends the browser here. Signs in (new session cookie; a session the browser had ends) or completes a link, then redirects to the path given at the start. If that fails, the browser goes to the web UI instead: `/ui/login?error=<code>` (while linking: `/ui/settings?error=<code>`) with `denied` (the provider did not sign the user in), `failed` (the flow expired or does not match, or no account is linked to this sign-in), `conflict` (the provider's account is linked to another user) or `provider` (the provider cannot be reached or answered wrongly).
+		 * @description The provider sends the browser here. Signs in (new session cookie; a session the browser had ends) or completes a link, then redirects to the path given at the start. If that fails, the browser goes to the web UI instead: `/ui/login?error=<code>` (while linking: `/ui/settings?error=<code>`) with `denied` (the provider did not sign the user in), `failed` (the flow expired or does not match, no account is linked to this sign-in, or none can be made of it), `conflict` (the provider's account is linked to another user) or `provider` (the provider cannot be reached or answered wrongly).
 		 */
 		get: operations['oidc_callback_api_v1_auth_oidc_callback_get'];
 		put?: never;
@@ -159,7 +159,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * Change the own password
-		 * @description Ends all sessions and starts a new one for the caller (new cookie and CSRF token). API tokens stay unless `revoke_tokens`. Needs a session; API tokens are refused (403).
+		 * @description Ends all sessions and starts a new one for the caller (new cookie and CSRF token). The caller's known devices are forgotten; this browser is known again by a new device cookie. API tokens stay unless `revoke_tokens`. Needs a session; API tokens are refused (403).
 		 */
 		post: operations['change_password_api_v1_auth_password_post'];
 		delete?: never;
@@ -1540,7 +1540,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * Show the pages of a file to add to an edit
-		 * @description Editors of the document's space and admins, before they add a file to an edit of the document's pages (`POST /documents/{id}/edit`): its pages as images, as large as a document's page images (`GET /documents/{id}/pages/{number}`). Nothing is stored. 415 for a file that is no PDF or image; 422 for one whose pages cannot be read.
+		 * @description Editors of the document's space and admins, before they add a file to an edit of the document's pages (`POST /documents/{id}/edit`): its pages as images, as large as a document's page images (`GET /documents/{id}/pages/{number}`). Nothing is stored. 415 for a file that is no PDF or image; 422 for one whose pages cannot be read, or of more than 200 pages.
 		 */
 		post: operations['preview_pages_api_v1_documents__id__edit_pages_post'];
 		delete?: never;
@@ -3344,11 +3344,6 @@ export interface components {
 			not: boolean;
 		};
 		/**
-		 * ApplicationStatus
-		 * @enum {string}
-		 */
-		ApplicationStatus: 'queued' | 'running' | 'done' | 'failed';
-		/**
 		 * ApplyOutcomeOut
 		 * @description Where applying the rule leaves the document.
 		 */
@@ -3746,7 +3741,7 @@ export interface components {
 			 */
 			id: string;
 			kind: components['schemas']['BulkKind'];
-			status: components['schemas']['BulkStatus'];
+			status: components['schemas']['ProgressStatus'];
 			/**
 			 * Total
 			 * @description Selected documents.
@@ -3810,11 +3805,6 @@ export interface components {
 			q?: string | null;
 			action: components['schemas']['BulkActionIn'];
 		};
-		/**
-		 * BulkStatus
-		 * @enum {string}
-		 */
-		BulkStatus: 'queued' | 'running' | 'done' | 'failed';
 		/**
 		 * Cadence
 		 * @enum {string}
@@ -4044,34 +4034,18 @@ export interface components {
 			text: string;
 			/**
 			 * Places
-			 * @description The pages it stands on, in order.
+			 * @description The pages it stands on, in order, a box per copy of the code on the page.
 			 */
-			places: components['schemas']['CodePlaceOut'][];
+			places: components['schemas']['LocationOut'][];
 			/** @description A GiroCode, read as its credit transfer. */
 			giro: components['schemas']['GiroCodeOut'] | null;
 			/** Identifiers */
-			identifiers: components['schemas']['IdentifierFoundOut'][];
+			identifiers: components['schemas']['IdentifierKeyOut'][];
 			/**
 			 * Fields
 			 * @description Amount fields of the document with the GiroCode's amount as their value.
 			 */
 			fields: string[];
-		};
-		/**
-		 * CodePlaceOut
-		 * @description Where a code stands on a page of the archive.
-		 */
-		CodePlaceOut: {
-			/**
-			 * Page
-			 * @description From 1.
-			 */
-			page: number;
-			/**
-			 * Boxes
-			 * @description One per copy of the code on the page.
-			 */
-			boxes: components['schemas']['BoxOut'][];
 		};
 		/**
 		 * ConditionField
@@ -4341,7 +4315,8 @@ export interface components {
 		};
 		/**
 		 * ContactNumberIn
-		 * @description A customer or personnel number of the user at a contact, written as in documents.
+		 * @description A customer, contract or personnel number of the user at a contact, written as in
+		 *     documents.
 		 * @example {
 		 *       "contact_id": "6f1c2a4e-0000-4000-8000-000000000001",
 		 *       "kind": "personnel_number",
@@ -4462,16 +4437,6 @@ export interface components {
 		 * @enum {string}
 		 */
 		Decider: 'rule' | 'other' | 'fallback' | 'nothing';
-		/** DeliveryDocumentOut */
-		DeliveryDocumentOut: {
-			/**
-			 * Id
-			 * Format: uuid
-			 */
-			id: string;
-			/** Title */
-			title: string;
-		};
 		/** DeliveryOut */
 		DeliveryOut: {
 			/**
@@ -4523,7 +4488,7 @@ export interface components {
 			/** Next Attempt At */
 			next_attempt_at: string | null;
 			/** @description The document of the event, if the caller may read it. */
-			document: components['schemas']['DeliveryDocumentOut'] | null;
+			document: components['schemas']['DocumentRefOut'] | null;
 			/**
 			 * Document Hidden
 			 * @description It is about a document the caller may not read (or one deleted since).
@@ -5325,7 +5290,7 @@ export interface components {
 			/** Media Type */
 			media_type: string;
 			/** @description `received`: how the document came in; `replaced`: a person put another file in its place; `edited`: a person edited its pages; `split`: the first version, pages split off another document (by a person, or at a separator sheet); `separated`: the first part of the stack the document came in as, split at its separator sheets; `merged`: a person merged other documents into it. A version that came from another document in a merge keeps its kind. */
-			kind: components['schemas']['VersionKindOut'];
+			kind: components['schemas']['VersionKind'];
 			/**
 			 * Created At
 			 * Format: date-time
@@ -5341,7 +5306,7 @@ export interface components {
 				[key: string]: unknown;
 			};
 			/** @description `split`: the document it was split off as it is now (`detail.title` is its title then); null where it is gone, the caller may not read it, or for another kind. */
-			origin: components['schemas']['VersionOriginOut'] | null;
+			origin: components['schemas']['DocumentRefOut'] | null;
 		};
 		/**
 		 * DryRunMailOut
@@ -5502,7 +5467,7 @@ export interface components {
 			contact: components['schemas']['NamedOut'];
 			document_type: components['schemas']['NamedOut'];
 			/** @description The contract or customer number the series follows, if its documents show one. */
-			number: components['schemas']['SeriesNumberOut'] | null;
+			number: components['schemas']['IdentifierKeyOut'] | null;
 			/** @description A calendar step (`weekly` to `yearly`) or `days` (see `interval_days`). */
 			cadence: components['schemas']['Cadence'];
 			/**
@@ -5585,7 +5550,7 @@ export interface components {
 		 *       "at_contact": true,
 		 *       "kind": "customer_number",
 		 *       "new_value": "2004 7719",
-		 *       "value": "20047718"
+		 *       "value": "12345678"
 		 *     }
 		 * @example {
 		 *       "action": "add",
@@ -5702,7 +5667,7 @@ export interface components {
 		 *               "start": 412
 		 *             }
 		 *           ],
-		 *           "value": "20047718"
+		 *           "value": "12345678"
 		 *         }
 		 *       ],
 		 *       "named": []
@@ -5744,7 +5709,7 @@ export interface components {
 			editable: boolean;
 			/**
 			 * Persons
-			 * @description The users the document names, the surest first: for the editors of its space and admins; null for readers. What is private about a person (aliases, birth date, identifiers, a contact's number that names them) finds them only for admins and that person: anyone else sees another user only where the text has their display name (that a number is Anna's tax ID is Anna's).
+			 * @description The users the document names, the surest first: for the editors of its space and admins; null for readers. What is private about a person (aliases, birth date, identifiers, a contact's number that names them) finds them only for admins and that person: anyone else sees another user only where the text has their display name (that a number is Erika's tax ID is Erika's).
 			 */
 			persons?: components['schemas']['FoundPersonOut'][] | null;
 		};
@@ -5867,7 +5832,7 @@ export interface components {
 			quote_shows_value?: boolean | null;
 			/**
 			 * Locations
-			 * @description Where the quote stands in the archive PDF: at most a few places, in page order; empty if it was not found there or the check is older than this.
+			 * @description Where the quote stands in the archive PDF, a box per line it covers: at most a few places, in page order; empty if it was not found there or the check is older than this.
 			 */
 			locations?: components['schemas']['LocationOut'][];
 			/**
@@ -6450,19 +6415,13 @@ export interface components {
 			/** @description The open list's recommendation, every kind. */
 			recommendation: components['schemas']['TallyOut'];
 		};
-		/** IdentifierFoundOut */
-		IdentifierFoundOut: {
-			kind: components['schemas']['IdentifierKind'];
-			/** Value */
-			value: string;
-		};
 		/**
 		 * IdentifierIn
 		 * @description Written as in documents; lekto stores it normalised (an IBAN without spaces, a domain
 		 *     without `www.`).
 		 * @example {
 		 *       "kind": "customer_number",
-		 *       "value": "2004-7718"
+		 *       "value": "1234-5678"
 		 *     }
 		 */
 		IdentifierIn: {
@@ -6479,9 +6438,21 @@ export interface components {
 			topic_id?: string | null;
 			/**
 			 * User Id
-			 * @description The user a customer or personnel number belongs to (Anna's contract): found in a document, it is hard evidence for whose it is. Not for other kinds, not for a rejected one.
+			 * @description The user a customer, contract or personnel number belongs to (Erika's contract): found in a document, it is hard evidence for whose it is. Not for other kinds, not for a rejected one.
 			 */
 			user_id?: string | null;
+		};
+		/**
+		 * IdentifierKeyOut
+		 * @description An identifier by its kind and its value (RA-12).
+		 */
+		IdentifierKeyOut: {
+			kind: components['schemas']['IdentifierKind'];
+			/**
+			 * Value
+			 * @description Normalised, as Lekto compares it.
+			 */
+			value: string;
 		};
 		/**
 		 * IdentifierKind
@@ -6533,7 +6504,7 @@ export interface components {
 			topic_id: string | null;
 			/**
 			 * User Id
-			 * @description The user a customer or personnel number belongs to: entered by hand, or found by training when all its documents are surely theirs alone.
+			 * @description The user a customer, contract or personnel number belongs to: entered by hand, or found by training when all its documents are surely theirs alone.
 			 */
 			user_id?: string | null;
 		};
@@ -6694,16 +6665,6 @@ export interface components {
 			 */
 			size_bytes: number | null;
 		};
-		/** JobDocumentOut */
-		JobDocumentOut: {
-			/**
-			 * Id
-			 * Format: uuid
-			 */
-			id: string;
-			/** Title */
-			title: string;
-		};
 		/** JobDurationsOut */
 		JobDurationsOut: {
 			/**
@@ -6754,7 +6715,7 @@ export interface components {
 			 */
 			finished_at: string | null;
 			/** @description The document it works on, if the caller may read it. */
-			document: components['schemas']['JobDocumentOut'] | null;
+			document: components['schemas']['DocumentRefOut'] | null;
 			/**
 			 * Document Hidden
 			 * @description It works on a document the caller may not read (or one deleted since).
@@ -7418,7 +7379,7 @@ export interface components {
 		};
 		/**
 		 * LocationOut
-		 * @description Where a quote stands in the archive PDF.
+		 * @description Where something stands on a page of the archive PDF: a quote, a code, a fact (RA-12).
 		 */
 		LocationOut: {
 			/**
@@ -7428,7 +7389,7 @@ export interface components {
 			page: number;
 			/**
 			 * Boxes
-			 * @description One per line the quote covers.
+			 * @description What it covers on the page.
 			 */
 			boxes: components['schemas']['BoxOut'][];
 		};
@@ -8654,7 +8615,10 @@ export interface components {
 			 */
 			spans: components['schemas']['SpanOut'][];
 		};
-		/** NamedOut */
+		/**
+		 * NamedOut
+		 * @description Something by its id and its name (RA-12).
+		 */
 		NamedOut: {
 			/**
 			 * Id
@@ -8781,16 +8745,6 @@ export interface components {
 		 * @enum {string}
 		 */
 		OpenAction: 'confirm' | 'reject';
-		/** OpenContactOut */
-		OpenContactOut: {
-			/**
-			 * Id
-			 * Format: uuid
-			 */
-			id: string;
-			/** Name */
-			name: string;
-		};
 		/** OpenCountsOut */
 		OpenCountsOut: {
 			/** Learned */
@@ -8821,7 +8775,7 @@ export interface components {
 		 *         {
 		 *           "action": "confirm",
 		 *           "kind": "customer_number",
-		 *           "value": "20047718"
+		 *           "value": "12345678"
 		 *         },
 		 *         {
 		 *           "action": "reject",
@@ -8868,9 +8822,9 @@ export interface components {
 			/** @description `learned`: training found it at `contacts[0]`; `suggested`: an e-mail domain whose name fits `contacts[0]`, the contact of its documents, which has none entered, or an IBAN its documents give to the person in `person`. */
 			source: components['schemas']['OpenSource'];
 			/** Contacts */
-			contacts: components['schemas']['OpenContactOut'][];
-			/** @description A suggestion for this person's profile. */
-			person?: components['schemas']['OpenPersonOut'] | null;
+			contacts: components['schemas']['NamedOut'][];
+			/** @description A suggestion for this person's profile: the user, by their display name, else the username. */
+			person?: components['schemas']['NamedOut'] | null;
 			/**
 			 * Documents
 			 * @description Confirmed documents that show it.
@@ -8936,24 +8890,10 @@ export interface components {
 			 */
 			to_confirm: number;
 		};
-		/** OpenPersonOut */
-		OpenPersonOut: {
-			/**
-			 * Id
-			 * Format: uuid
-			 * @description The user.
-			 */
-			id: string;
-			/**
-			 * Name
-			 * @description Their display name, else the username.
-			 */
-			name: string;
-		};
 		/**
 		 * OpenSearchIn
 		 * @example {
-		 *       "q": "2004 7718"
+		 *       "q": "1234 5678"
 		 *     }
 		 */
 		OpenSearchIn: {
@@ -9136,15 +9076,6 @@ export interface components {
 			/** Value */
 			value: string;
 		};
-		/** PersonIdentifierOut */
-		PersonIdentifierOut: {
-			kind: components['schemas']['IdentifierKind'];
-			/**
-			 * Value
-			 * @description Normalised.
-			 */
-			value: string;
-		};
 		/**
 		 * PipelineOut
 		 * @example {
@@ -9287,7 +9218,7 @@ export interface components {
 			 */
 			email: string | null;
 			/** Identifiers */
-			identifiers: components['schemas']['PersonIdentifierOut'][];
+			identifiers: components['schemas']['IdentifierKeyOut'][];
 			/**
 			 * Numbers
 			 * @description The user's customer and personnel numbers at contacts, by contact: found in a document, they are evidence for the contact and for the user. Only the user and admins see them, here and at the contact.
@@ -9300,10 +9231,10 @@ export interface components {
 		 *     `identifiers` and `numbers` replace all of them.
 		 * @example {
 		 *       "aliases": [
-		 *         "Anna Sample"
+		 *         "E. Mustermann"
 		 *       ],
 		 *       "birth_date": "1980-06-15",
-		 *       "display_name": "Anna Example"
+		 *       "display_name": "Erika Mustermann"
 		 *     }
 		 */
 		ProfilePatch: {
@@ -9334,6 +9265,11 @@ export interface components {
 			 */
 			declined_numbers?: components['schemas']['ContactNumberIn'][];
 		};
+		/**
+		 * ProgressStatus
+		 * @enum {string}
+		 */
+		ProgressStatus: 'queued' | 'running' | 'done' | 'failed';
 		/**
 		 * ProposeContext
 		 * @description `signal_llm`'s request (`external.propose`): the context to propose the document's
@@ -9552,6 +9488,7 @@ export interface components {
 			| 'only_identifier'
 			| 'contact_is_recipient'
 			| 'contact_identifiers_several'
+			| 'contact_identifier_of_other'
 			| 'contact_new_proposed'
 			| 'contact_none'
 			| 'contact_none_no_model'
@@ -9653,9 +9590,13 @@ export interface components {
 			| 'pdf_encrypted'
 			| 'pdf_unreadable'
 			| 'pdf_unreadable_detail'
+			| 'pdf_too_complex'
 			| 'image_unreadable'
 			| 'image_unreadable_detail'
+			| 'image_too_large'
 			| 'document_no_pages'
+			| 'document_too_many_pages'
+			| 'preview_too_many_pages'
 			| 'ocr_failed'
 			| 'text_unreadable'
 			| 'signature_dropped'
@@ -9723,6 +9664,7 @@ export interface components {
 			| 'tag_used_by_rules'
 			| 'field_used_by_patterns'
 			| 'field_used_by_rules'
+			| 'field_used_by_webhooks'
 			| 'field_key_taken'
 			| 'identifier_of_person'
 			| 'identifier_of_contact'
@@ -9782,6 +9724,7 @@ export interface components {
 			| 'code_invalid'
 			| 'read_only_token'
 			| 'upload_only_token'
+			| 'upload_only_token_fields'
 			| 'push_off'
 			| 'push_endpoint_refused'
 			| 'push_keys_invalid'
@@ -9945,6 +9888,8 @@ export interface components {
 			| 'mail_folder_missing'
 			| 'mail_server_error'
 			| 'mail_password_unreadable'
+			| 'mail_fetch_failed'
+			| 'mail_password_again'
 			| 'mailbox_paused'
 			| 'mail_too_large'
 			| 'mail_step_failed'
@@ -9959,6 +9904,7 @@ export interface components {
 			| 'delivery_owner_no_admin'
 			| 'delivery_webhook_deleted'
 			| 'delivery_secret_unusable'
+			| 'webhook_headers_again'
 			| 'mail_rule_unreadable';
 		/**
 		 * ReasonOut
@@ -10173,14 +10119,6 @@ export interface components {
 			/** Removed */
 			removed: number;
 		};
-		/** ReparseOut */
-		ReparseOut: {
-			/**
-			 * Queued
-			 * @description Documents whose text is read again (not those queued already).
-			 */
-			queued: number;
-		};
 		/**
 		 * ReprocessNode
 		 * @enum {string}
@@ -10247,7 +10185,7 @@ export interface components {
 			rule_id: string;
 			/** Version */
 			version: number;
-			status: components['schemas']['ApplicationStatus'];
+			status: components['schemas']['ProgressStatus'];
 			/**
 			 * Total
 			 * @description Selected documents.
@@ -10971,15 +10909,6 @@ export interface components {
 			 * Format: date-time
 			 */
 			deadline: string;
-		};
-		/** SeriesNumberOut */
-		SeriesNumberOut: {
-			kind: components['schemas']['IdentifierKind'];
-			/**
-			 * Value
-			 * @description Normalised, as Lekto compares it.
-			 */
-			value: string;
 		};
 		/**
 		 * SeriesState
@@ -11971,23 +11900,10 @@ export interface components {
 			added: number;
 		};
 		/**
-		 * VersionKindOut
+		 * VersionKind
 		 * @enum {string}
 		 */
-		VersionKindOut: 'received' | 'replaced' | 'edited' | 'split' | 'separated' | 'merged';
-		/** VersionOriginOut */
-		VersionOriginOut: {
-			/**
-			 * Id
-			 * Format: uuid
-			 */
-			id: string;
-			/**
-			 * Title
-			 * @description Its title now.
-			 */
-			title: string;
-		};
+		VersionKind: 'received' | 'replaced' | 'edited' | 'split' | 'separated' | 'merged';
 		/**
 		 * VisibilityOut
 		 * @description Who sees the document: the members of its space; readers only once it is green.
@@ -12467,7 +12383,7 @@ export interface components {
 			reason: components['schemas']['ReasonOut'] | null;
 			/**
 			 * Errors
-			 * @description A request that does not fit (422): what is wrong with each part.
+			 * @description A request that does not fit (422): what is wrong with each part, the first 50; `detail` then says how many there are.
 			 * @default null
 			 */
 			errors: components['schemas']['InputErrorOut'][] | null;
@@ -27625,7 +27541,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					'application/json': components['schemas']['ReparseOut'];
+					'application/json': components['schemas']['QueuedOut'];
 				};
 			};
 			/** @description Unauthorized */

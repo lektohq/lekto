@@ -16,12 +16,10 @@ from lekto_migration.config import Config
 from lekto_migration.fake_paperless import FakePaperless, sample_archive
 
 from lekto.adapters.inbound.rest import PREFIX
-from lekto.core.domain.pipeline import SIGNALS, Node
-from lekto.core.services.imports import ImportedFieldsNode, ImportedJudgeNode, ImportedSignal
 from tests import api as helpers
 from tests.api import until
-from tests.builders import SAMPLES, PlaceholderNode
-from tests.unit.adapters.rest.support import Api
+from tests.builders import SAMPLES
+from tests.unit.adapters.rest.support import Api, imported_nodes
 
 
 class Migrating:
@@ -90,12 +88,7 @@ async def migrating(api: Api, directory: Path) -> AsyncIterator[Migrating]:
     """The API with its worker running, an admin to migrate with, and the real signals, judge
     and fields node of a migration around nodes that do nothing (there is no language
     model)."""
-    uow = api.container.unit_of_work
-    pipeline = api.services.pipeline
-    for signal in SIGNALS:
-        pipeline.replace_executor(signal, ImportedSignal(uow, PlaceholderNode()))
-    pipeline.replace_executor(Node.JUDGE, ImportedJudgeNode(uow, PlaceholderNode()))
-    pipeline.replace_executor(Node.FIELDS, ImportedFieldsNode(uow, PlaceholderNode()))
+    imported_nodes(api)
     admin = await api.admin()
 
     async def work() -> None:
@@ -131,8 +124,8 @@ async def test_the_whole_migration_runs_against_the_api(api: Api, tmp_path: Path
             u["username"]: u
             for u in (await api.client.get(f"{PREFIX}/users", headers=helpers.auth(m.admin))).json()
         }
-        assert {"tobias", "anna", "bob", "gone"} <= set(users)
-        assert users["gone"]["active"] is False and users["anna"]["role"] == "user"
+        assert {"tobias", "erika", "bob", "gone"} <= set(users)
+        assert users["gone"]["active"] is False and users["erika"]["role"] == "user"
         by_title = {d["title"]: d for d in documents}
         assert by_title["Document 10"]["uploaded_by"] == users["tobias"]["id"]
         assert by_title["Document 14"]["uploaded_by"] == str(m.admin.id)  # no owner in Paperless
@@ -152,11 +145,11 @@ async def test_the_whole_migration_runs_against_the_api(api: Api, tmp_path: Path
         assert shared["personal_of"] is None
         # The uploader and the writers edit, the readers read; the admin is no member.
         assert {(s["user_id"], s["role"]) for s in shared["members"]} == {
-            (users["anna"]["id"], "edit"),
+            (users["erika"]["id"], "edit"),
             (users["bob"]["id"], "read"),
             (users["tobias"]["id"], "edit"),
         }
-        assert by_title["Document 13"]["uploaded_by"] == users["anna"]["id"]
+        assert by_title["Document 13"]["uploaded_by"] == users["erika"]["id"]
         assert by_title["Document 13"]["space_id"] == shared["id"]
         # Its members see it; a stranger does not.
         bob = await api.user("bob-session")

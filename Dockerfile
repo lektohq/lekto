@@ -26,7 +26,7 @@ FROM ghcr.io/astral-sh/uv:0.11.33 AS uv
 ARG TARGETARCH
 
 # --- base: Python and the system packages OCRmyPDF and WeasyPrint need ----------------------------
-FROM python:3.13.13-slim-trixie AS base
+FROM python:3.13.18-slim-trixie AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
@@ -36,6 +36,8 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 # apt gives up on a mirror that stops answering and tries again, instead of waiting without end
 # (on the CI runner it waited 15 minutes for one, 06.11.2026); the stages on `base` keep this.
+# The job `integration` installs the same packages but ca-certificates on the runner (`PACKAGES` in
+# .github/scripts/ocr-packages.sh); .github/scripts/test_ocr_packages.py compares the two.
 RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
         > /etc/apt/apt.conf.d/80-network \
     && apt-get update \

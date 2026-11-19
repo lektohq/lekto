@@ -13,6 +13,7 @@ from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
 from lekto.adapters.inbound.mcp.tools.documents import FactsOut, facts_out
 from lekto.core.domain.document_facts import FactRole
+from lekto.core.domain.identifiers import MAX_IDENTIFIER_VALUE
 from lekto.core.domain.ids import short_id
 from lekto.core.services.fact_decisions import FactAction, FactDecision
 
@@ -32,9 +33,11 @@ def add_fact_tools(tools: Tools, context: ApiContext) -> None:
         id: str,
         action: Action,
         kind: str,
-        value: Annotated[str, Field(min_length=1, max_length=200)],
+        value: Annotated[str, Field(min_length=1, max_length=MAX_IDENTIFIER_VALUE)],
         role: FactRole | None = None,
-        new_value: Annotated[str | None, Field(min_length=1, max_length=200)] = None,
+        new_value: Annotated[
+            str | None, Field(min_length=1, max_length=MAX_IDENTIFIER_VALUE)
+        ] = None,
     ) -> str:
         principal = principal_of(ctx)
         user = principal.id

@@ -50,6 +50,14 @@ class Action:
     notes: list[str] = field(default_factory=list)
 
 
+def missing(action: Action) -> str:
+    """The problem of an action Lekto needs and the plan may not create (`MISSING`)."""
+    return (
+        f"{action.kind.replace('_', ' ')} '{action.name}' does not exist in Lekto "
+        f"and the plan may not create it ({action.source})"
+    )
+
+
 def is_open(actions: Sequence[Action]) -> bool:
     return any(action.status in OPEN for action in actions)
 
@@ -225,11 +233,15 @@ def _objects(
                     above = directory.by_id(kind, str(found.get("parent_id") or ""))
                     if above is None or norm(above["name"]) != norm(parent):
                         action.notes.append(f"Lekto has it elsewhere; the plan says below {parent}")
-                add(parent, create, f"the tag above {name}")
 
     for target, where in named.values():
         assert target.name is not None
         add(target.name, target.create, where, target.parent)
+    # A tag the plan names only as the one above another, after every one it names: a child
+    # named first would take the middle of three levels without the tag above it.
+    for target, _ in named.values():
+        if scope is not None and target.parent is not None:
+            add(target.parent, target.create, f"the tag above {target.name}")
     for name in sorted(used, key=norm):
         add(name, by_value, "a value of a custom field")
     return _parents_first(list(actions.values()))

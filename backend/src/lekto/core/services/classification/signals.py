@@ -23,6 +23,7 @@ from datetime import datetime
 from uuid import UUID
 
 from lekto.core.domain import media_types
+from lekto.core.domain.classification import PERSON_EVIDENCE, PERSON_STRENGTH, PERSON_USER, PERSONS
 from lekto.core.domain.codes import (
     Code,
     code_identifiers,
@@ -88,7 +89,12 @@ from lekto.core.services.classification.answers import (
     read_fact_from_json,
     read_holder_from_json,
 )
-from lekto.core.services.classification.kept_facts import READ_FACTS, TextFacts, keep_facts
+from lekto.core.services.classification.kept_facts import (
+    READ_FACTS,
+    TextFacts,
+    facts_lock,
+    refresh_facts,
+)
 from lekto.core.services.classifier import ClassifierService
 from lekto.core.services.indexing import split_sections
 from lekto.core.services.nodes import ARCHIVE_FILE, work_directory
@@ -135,7 +141,7 @@ def abstained_reason(output: JsonObject) -> Reason | None:
 
 async def _text(store: ObjectStore, document: Document) -> str | None:
     try:
-        return (await load_text(store, document.id)).decode("utf-8", "replace")
+        return await load_text(store, document.id)
     except NotFoundError:
         return None
 
@@ -259,14 +265,13 @@ class FactsResult:
     in_codes: frozenset[tuple[IdentifierKind, str]] = frozenset()
     holders: Mapping[Key, Holder] = field(default_factory=dict)
 
-    @property
-    def output(self) -> JsonObject:
-        return self.result.output
-
     async def apply(self, uow: UnitOfWork, document: Document, now: datetime) -> NodeResult:
+        # The lock before the log: the model's signal may be keeping its half now, and its
+        # facts are read from its entry once it committed (SA-14).
+        await uow.lock(facts_lock(document.id))
         log = await uow.processing_log.list_for(document.id)
         signals = ProcessingHistory(log).signals()
-        report = await keep_facts(
+        report = await refresh_facts(
             uow,
             document.id,
             self.text,
@@ -372,11 +377,11 @@ def facts_of(
             for item in facts.identifiers
             if item.contact_id is None
         ],
-        "persons": [
+        PERSONS: [
             {
-                "user_id": str(item.user_id),
-                "strength": item.strength.value,
-                "evidence": list(item.evidence),
+                PERSON_USER: str(item.user_id),
+                PERSON_STRENGTH: item.strength.value,
+                PERSON_EVIDENCE: list(item.evidence),
             }
             for item in facts.persons
         ],
@@ -388,13 +393,10 @@ class ClassifierSignal:
     know it cannot name: the judge then goes by the other signals). Its spaces are the
     uploader's candidates only (`OWN_SPACE` their personal space); if those hold at least half
     of the probability, it is spread over them alone, otherwise they keep their small shares
-    and name nothing. Without `uow` it says nothing about spaces."""
+    and name nothing."""
 
     def __init__(
-        self,
-        store: ObjectStore,
-        classifier: ClassifierService | None,
-        uow: UnitOfWorkFactory | None = None,
+        self, store: ObjectStore, classifier: ClassifierService | None, uow: UnitOfWorkFactory
     ) -> None:
         self._store = store
         self._classifier = classifier
@@ -416,7 +418,7 @@ class ClassifierSignal:
         model, prediction = predicted
         spaces: list[tuple[SpaceId, float]] = []
         known_spaces: frozenset[SpaceId] = frozenset()
-        if prediction.spaces and self._uow is not None:
+        if prediction.spaces:
             async with self._uow() as uow:
                 candidates = await space_candidates(uow, document.uploaded_by)
             if candidates is not None:
@@ -810,12 +812,13 @@ def _facts_view(output: JsonObject | None) -> FactsView | None:
     )
     persons: dict[UserId, Strength] = {}
     public: set[UserId] = set()
-    for value in as_list(output.get("persons")):
+    for value in as_list(output.get(PERSONS)):
         item = as_object(value) or {}
-        user, strength = _id_of(UserId, item.get("user_id")), as_text(item.get("strength"))
+        user = _id_of(UserId, item.get(PERSON_USER))
+        strength = as_text(item.get(PERSON_STRENGTH))
         if user is not None and strength in set(Strength):
             persons[user] = Strength(strength)
-            if NAME in as_list(item.get("evidence")):
+            if NAME in as_list(item.get(PERSON_EVIDENCE)):
                 public.add(user)
     return FactsView(
         named=frozenset(contact for contact in named if contact is not None),

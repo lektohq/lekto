@@ -2,12 +2,12 @@
 
 from collections.abc import Mapping
 from datetime import datetime
-from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.schemas import DocumentRefOut
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.versions import DocumentVersion, VersionKind
 from lekto.core.ports.metadata import FileMetadata, MetadataSource
@@ -68,20 +68,6 @@ class StoredFileOut(BaseModel):
         )
 
 
-class VersionKindOut(StrEnum):
-    RECEIVED = "received"
-    REPLACED = "replaced"
-    EDITED = "edited"
-    SPLIT = "split"
-    SEPARATED = "separated"
-    MERGED = "merged"
-
-
-class VersionOriginOut(BaseModel):
-    id: UUID
-    title: str = Field(description="Its title now.")
-
-
 class DocumentVersionOut(BaseModel):
     """A version of the document's original: its number (from 1), whether it is the current
     one, its file, how and when it came, by whom (null where nobody is known), and what it was
@@ -92,7 +78,7 @@ class DocumentVersionOut(BaseModel):
     current: bool
     original_filename: str
     media_type: str
-    kind: VersionKindOut = Field(
+    kind: VersionKind = Field(
         description="`received`: how the document came in; `replaced`: a person put another "
         "file in its place; `edited`: a person edited its pages; `split`: the first version, "
         "pages split off another document (by a person, or at a separator sheet); `separated`: "
@@ -119,7 +105,7 @@ class DocumentVersionOut(BaseModel):
             "taken over in a merge: `moved`, the `document`, `title` and `version` it was there."
         )
     )
-    origin: VersionOriginOut | None = Field(
+    origin: DocumentRefOut | None = Field(
         description="`split`: the document it was split off as it is now (`detail.title` is "
         "its title then); null where it is gone, the caller may not read it, or for another "
         "kind.",
@@ -133,13 +119,13 @@ class DocumentVersionOut(BaseModel):
         origin = None
         if version.kind is VersionKind.SPLIT and isinstance(named, str):
             title = origins.get(DocumentId(UUID(named)))
-            origin = None if title is None else VersionOriginOut(id=UUID(named), title=title)
+            origin = None if title is None else DocumentRefOut(id=UUID(named), title=title)
         return cls(
             number=version.number,
             current=current,
             original_filename=version.original_filename,
             media_type=version.media_type,
-            kind=VersionKindOut(version.kind.value),
+            kind=version.kind,
             created_at=version.created_at,
             created_by=version.created_by,
             detail=dict(version.detail),

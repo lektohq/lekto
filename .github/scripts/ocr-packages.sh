@@ -17,6 +17,7 @@
 # Ubuntu's own archive instead of the runner's mirror.
 set -euo pipefail
 
+# The packages of the Dockerfile's stage `base` but ca-certificates (test_ocr_packages.py).
 PACKAGES=(
   ghostscript pngquant qpdf tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng unpaper
   libharfbuzz-subset0 libpango-1.0-0 libpangoft2-1.0-0

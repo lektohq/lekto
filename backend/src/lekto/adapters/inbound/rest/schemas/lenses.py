@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.rest.schemas.refs import MAX_REF, opened, seal
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.document_facts import FactCriterion, FactRole
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.identifiers import IdentifierKind
@@ -31,6 +32,7 @@ from lekto.core.domain.lenses import (
     RelativePeriod,
 )
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.validation import MAX_REFERENCES
 from lekto.core.ports.identity import RefCipher
 
 
@@ -166,9 +168,8 @@ CARD_FIELDS_HELP = f"The fields a card shows, in this order; at most {MAX_CARD_F
 DUE_HELP = "A date field: the deadline of the documents (yellow from seven days before, red after)."
 
 
-class LensCreate(BaseModel):
+class LensCreate(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -198,11 +199,11 @@ class LensCreate(BaseModel):
     due_field_id: UUID | None = Field(default=None, description=DUE_HELP)
 
 
-class LensPatch(BaseModel):
+class LensPatch(RequestBody):
     """Parts left out stay as they are; `null` clears `query`, `sort`, `sort_field_id` and
     `due_field_id`."""
 
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [{"name": "Bills"}]})
+    model_config = ConfigDict(json_schema_extra={"examples": [{"name": "Bills"}]})
 
     name: str | None = Field(default=None, min_length=1, max_length=MAX_NAME_LENGTH)
     filter: LensFilterBody | None = None
@@ -217,9 +218,8 @@ class LensPatch(BaseModel):
     due_field_id: UUID | None = Field(default=None, description=DUE_HELP)
 
 
-class LensOrder(BaseModel):
+class LensOrder(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -232,7 +232,10 @@ class LensOrder(BaseModel):
         },
     )
 
-    ids: list[UUID] = Field(description="Each of the caller's lenses once, in the new order.")
+    ids: list[UUID] = Field(
+        max_length=MAX_REFERENCES,
+        description="Each of the caller's lenses once, in the new order.",
+    )
 
 
 class LensOut(BaseModel):

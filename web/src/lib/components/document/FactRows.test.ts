@@ -5,13 +5,13 @@ import { m } from '#lib/paraglide/messages.js';
 import FactRows from './FactRows.svelte';
 
 const BAKERY = '0199a6c4-0000-7000-8000-0000000000c1';
-const ANNA = '0199a6c4-0000-7000-8000-0000000000a1';
+const ERIKA = '0199a6c4-0000-7000-8000-0000000000a1';
 const lookup = {
 	contacts: [{ id: BAKERY, name: 'Muster Bäckerei' }],
 	documentTypes: [],
 	tags: [],
 	spaces: [],
-	users: [{ id: ANNA, username: 'anna', display_name: 'Jane Doe' }]
+	users: [{ id: ERIKA, username: 'erika', display_name: 'Jane Doe' }]
 } as unknown as Lookup;
 
 describe('FactRows', () => {
@@ -21,7 +21,7 @@ describe('FactRows', () => {
 				named: [{ name: 'N26' }, { name: 'Muster Bäckerei' }],
 				identifiers: [{ kind: 'personnel_number', value: '12345', contact_id: BAKERY }],
 				unknown_identifiers: [],
-				persons: [{ user_id: ANNA, strength: 'hard' }]
+				persons: [{ user_id: ERIKA, strength: 'hard' }]
 			},
 			lookup
 		});

@@ -68,8 +68,7 @@ def run_documents(state: State, selected: set[int]) -> list[dict[str, Any]]:
             {
                 "id": row.source_id,
                 "title": row.detail.get("title"),
-                # Before 0.5 the state kept only the Paperless owner.
-                "uploaded_by": row.detail.get("uploaded_by", row.detail.get("owner")),
+                "uploaded_by": row.detail.get("uploaded_by"),
                 "space": row.detail.get("space"),
                 "status": row.status,
                 "lekto_id": row.lekto_id,

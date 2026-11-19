@@ -32,7 +32,7 @@ def lekto() -> Directory:
     directory = Directory({"id": "admin", "username": "root"})
     directory.add("contact", {"id": "c1", "name": "acme energy"})
     directory.add("field", {"id": "f1", "name": "Net", "data_type": "amount"})
-    directory.add("user", {"id": "u1", "username": "Anna"})
+    directory.add("user", {"id": "u1", "username": "Erika"})
     return directory
 
 
@@ -41,8 +41,8 @@ def test_the_first_plan_takes_everything_over_by_name() -> None:
     assert (plan.source, plan.target) == ("http://p", "http://l")
     assert plan.settings == plans.Settings()
 
-    anna, bob = plan.entry("users", "anna"), plan.entry("users", "bob")
-    assert anna is not None and anna.targets == (plans.Target("user", "anna"),)
+    erika, bob = plan.entry("users", "erika"), plan.entry("users", "bob")
+    assert erika is not None and erika.targets == (plans.Target("user", "erika"),)
     assert bob is not None and bob.targets == (plans.Target("user", "bob", create=True),)
     # "ACME Energy" and "acme energy" are one name; Lekto has it already.
     assert list(plan.entries["correspondents"]) == ["acme energy", "unused"]

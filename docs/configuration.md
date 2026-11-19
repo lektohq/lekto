@@ -195,7 +195,8 @@ Background jobs, the delivery of events and the cleanup.
 | `LEKTO_OCR_TIMEOUT` | Worker | `600` | duration | Time per document for OCR (OCRmyPDF) |
 | `LEKTO_SEPARATOR_CODES` | Worker | `PATCHT` | text | Codes of separator sheets, comma-separated: a page with a bar or QR code whose whole text is one of them (in any case) splits a stack that comes in there, and is left out; empty: stacks are never split. Not for the migration, new versions or reprocessing |
 | `LEKTO_MAIL_RENDER_TIMEOUT` | Worker | `120` | duration | Time per mail for setting it as a PDF (WeasyPrint, in a child process) |
-| `LEKTO_CHILD_MAX_MEMORY` | Worker | `2GiB` | size | Address space each program Lekto starts may take: OCRmyPDF with Ghostscript and Tesseract, the mail renderer. A document that needs more fails its step instead of the worker; documents need less than 1 GiB |
+| `LEKTO_PDF_TIMEOUT` | Worker | `600` | duration | Time for each step that reads the pages of a PDF with PDFium, in a child process: codes, the text layer before OCR, page images, the text as it is set, the places of quotes. About 0.1 to 0.2 s a page; a PDF that needs longer fails its step |
+| `LEKTO_CHILD_MAX_MEMORY` | Worker | `2GiB` | size | Address space each program Lekto starts may take: OCRmyPDF with Ghostscript and Tesseract, the mail renderer, PDFium. A document that needs more fails its step instead of the worker; documents need less than 1 GiB |
 | `LEKTO_MAIL_TIMEOUT` | both | `30` | duration | Time for connecting to a mail server (IMAP) and for each of its answers; the API tests connections, the worker fetches |
 
 ## Search
@@ -270,7 +271,7 @@ together or neither; off without them.
 
 | Variable | Role | Default | Values | Meaning |
 | --- | --- | --- | --- | --- |
-| `LEKTO_CONFIDENCE_THRESHOLD` | Worker | `0.9` | more than 0, at most 1 | A value passes (green) from this confidence on |
+| `LEKTO_CONFIDENCE_THRESHOLD` | Worker | `0.9` | more than 0, at most 1 | How well a name must match: the sender the model reads names an existing contact (a recipient's name a user) from this similarity on. A lower value matches names more loosely, not more values green. Also the lowest confidence shown for a value taken |
 | `LEKTO_CONTACT_SUGGEST_THRESHOLD` | Worker | `0.75` | more than 0, at most 1 | An existing contact is suggested from this similarity on; not above `LEKTO_CONFIDENCE_THRESHOLD` |
 | `LEKTO_POOR_READING_THRESHOLD` | Worker | `0.08` | more than 0, at most 1 | Share of unsure words around a value from which its place counts as poorly read, and the value is only suggested. The default lies between good scans (up to 7 %) and broken ones (from 9 %) |
 | `LEKTO_DEFAULT_CURRENCY` | both | `EUR` | text | ISO 4217 code: the currency of an amount in a document that shows none, and of the `currency` filter in templates |
@@ -304,7 +305,7 @@ logos. Set both variables or neither; without them Lekto sends no notification.
 | --- | --- | --- | --- | --- |
 | `LEKTO_RULES_PATTERN_TIMEOUT` | both | `0.2` | duration | Time a regular expression of a rule may run per text or value (worker: rules; API: previews) |
 | `LEKTO_RULES_MAX_TEXT` | both | `200000` | 1,000–10,000,000 | Characters of document text that rules look at |
-| `LEKTO_RULES_APPLY_MAX_DOCUMENTS` | both | `1000` | 1–100,000 | Documents per retroactive application of a rule |
+| `LEKTO_RULES_APPLY_MAX_DOCUMENTS` | both | `1000` | 1–100,000 | Documents per retroactive application of a rule; a request of `LEKTO_REQUEST_MAX_SIZE` (1 MiB) holds about 26,000 of their ids |
 | `LEKTO_TEMPLATE_LOCALE` | both | `de` | text | Locale in which templates write dates and amounts (Babel's names: `de`, `en_US`); the head of a mail set as a PDF speaks its language too (German, else English). See [templates.md](templates.md) |
 
 ## The image

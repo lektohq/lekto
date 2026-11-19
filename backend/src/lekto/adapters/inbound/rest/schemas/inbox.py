@@ -8,12 +8,13 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.rest.schemas.documents import DocumentDetails, DocumentPatch
-from lekto.adapters.inbound.schemas import ReasonOut
+from lekto.adapters.inbound.schemas import ReasonOut, RequestBody
 from lekto.core.domain.classification import Candidate, CandidateSource, FieldCheck
+from lekto.core.domain.documents import RESUMABLE_NODES
 from lekto.core.domain.inbox import DONE_PERIOD, Departure, Done, InboxTab
 from lekto.core.domain.labels import LABEL_LINES, LabelCheck, LabelOutcome
 from lekto.core.domain.locations import Box, Location
-from lekto.core.domain.pipeline import Lane, Node, Outcome
+from lekto.core.domain.pipeline import SIGNALS, Lane, Node, Outcome
 from lekto.core.services.inbox import (
     InboxItem,
     InboxSummary,
@@ -23,9 +24,9 @@ from lekto.core.services.inbox import (
 )
 
 ResumeNode = StrEnum(  # type: ignore[misc]
-    "ResumeNode", {node.name: node.value for node in (Node.FIELDS, Node.APPLY_RULES)}
+    "ResumeNode", {node.name: node.value for node in RESUMABLE_NODES}
 )
-"""Nodes processing can resume with after a confirmation."""
+"""Nodes processing can resume with after a confirmation (`documents.RESUMABLE_NODES`)."""
 
 
 class BoxOut(BaseModel):
@@ -43,10 +44,10 @@ class BoxOut(BaseModel):
 
 
 class LocationOut(BaseModel):
-    """Where a quote stands in the archive PDF."""
+    """Where something stands on a page of the archive PDF: a quote, a code, a fact (RA-12)."""
 
     page: int = Field(description="From 1.")
-    boxes: list[BoxOut] = Field(description="One per line the quote covers.")
+    boxes: list[BoxOut] = Field(description="What it covers on the page.")
 
     @classmethod
     def of(cls, location: Location) -> "LocationOut":
@@ -75,11 +76,11 @@ class LabelCheckOut(BaseModel):
         return cls(text=check.text, outcome=check.outcome)
 
 
-class Signal(StrEnum):
-    LLM = Node.SIGNAL_LLM.value
-    CLASSIFIER = Node.SIGNAL_CLASSIFIER.value
-    NEIGHBOURS = Node.SIGNAL_NEIGHBOURS.value
-    FACTS = Node.SIGNAL_FACTS.value
+Signal = StrEnum(  # type: ignore[misc]
+    "Signal",
+    {node.name.removeprefix("SIGNAL_"): node.value for node in Node if node in SIGNALS},
+)
+"""The signals that propose metadata (`pipeline.SIGNALS`, in the pipeline's order)."""
 
 
 class CandidateSourceOut(BaseModel):
@@ -249,8 +250,9 @@ class FieldCheckOut(BaseModel):
     locations: list[LocationOut] = Field(
         default_factory=list,
         description=(
-            "Where the quote stands in the archive PDF: at most a few places, in page order; "
-            "empty if it was not found there or the check is older than this."
+            "Where the quote stands in the archive PDF, a box per line it covers: at most a "
+            "few places, in page order; empty if it was not found there or the check is older "
+            "than this."
         ),
     )
     candidates: list[CandidateOut] = Field(
@@ -473,9 +475,8 @@ class ReviewOut(BaseModel):
         )
 
 
-class ConfirmRequest(BaseModel):
+class ConfirmRequest(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {

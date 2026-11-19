@@ -22,7 +22,6 @@ from lekto.core.domain.documents import (
     received_at,
 )
 from lekto.core.domain.errors import (
-    ConcurrencyError,
     ConflictError,
     InvalidTransitionError,
     NotFoundError,
@@ -92,7 +91,6 @@ from lekto.core.services._jobs import (
     NodeJob,
     document_payload,
     enqueue_nodes,
-    lost,
     payload_document,
     retrying,
 )
@@ -109,7 +107,7 @@ from lekto.core.services.inbox import (
     suggested_spaces,
 )
 from lekto.core.services.master_data import learn_alias
-from lekto.core.services.objects import original_key
+from lekto.core.services.objects import original_key, remove_unnamed
 from lekto.core.services.relating import RELATE_JOB, queue_relate, relate
 from lekto.core.services.relations import RELATIONS_LOCK, relation_events
 from lekto.core.services.rules.running import corrected_fields, person_record
@@ -148,7 +146,8 @@ class DeferredResult(Protocol):
 class Discardable(Protocol):
     """A deferred result that stored files before it is stored itself (the parts of a stack,
     `services.separating`): if it is never stored (the document was deleted, its run is over,
-    or storing failed), they go (`PipelineService._record`)."""
+    or storing failed), they go, unless a document names them after all (`remove_unnamed`: a
+    commit cancelled while the database answered it; `PipelineService._record`)."""
 
     async def discard(self) -> None: ...
 
@@ -314,21 +313,6 @@ class PipelineService:
     def vision(self) -> VisionModel | None:
         """The vision language model a person can have documents read with, if any."""
         return self._vision
-
-    @property
-    def retry_policy(self) -> RetryPolicy:
-        """How often and when a node that raised runs again."""
-        return self._retry
-
-    @property
-    def lease(self) -> timedelta:
-        """How long a worker holds the job of a node."""
-        return self._lease
-
-    @property
-    def vision_lease(self) -> timedelta | None:
-        """How long a worker holds the OCR of a document the vision model reads, if longer."""
-        return self._vision_lease
 
     # --- ingest ---------------------------------------------------------------------------------
 
@@ -578,14 +562,15 @@ class PipelineService:
                 raise error
         key = original_key(sha256)
         now = self._clock.now()
-        async with self._uow() as uow:
-            await uow.lock(key)
-            # A file there already may be another's (a deleted document's, its files not removed
-            # yet); one this call stores goes again, under the lock, if the version is not.
-            stored = not await self._store.exists(key)
-            if stored:
-                await self._store.upload(key, file.path, content_type=media_type)
-            try:
+        stored = False
+        try:
+            async with self._uow() as uow:
+                await uow.lock(key)
+                # A file there already may be another's (a deleted document's, its files not
+                # removed yet); one this call stores goes again if no version names it.
+                stored = not await self._store.exists(key)
+                if stored:
+                    await self._store.upload(key, file.path, content_type=media_type)
                 # Check again: rights, a duplicate or its processing may have changed meanwhile.
                 user = await load_actor(uow, actor)
                 document, _ = await controllable_document(uow, user, id, Action.CONTROL_PROCESSING)
@@ -605,10 +590,12 @@ class PipelineService:
                 )
                 await delete_derivatives(self._store, stale)
                 await uow.commit()
-            except BaseException:
-                if stored:
-                    await asyncio.shield(self._store.delete(key))
-                raise
+        except BaseException:
+            # Perhaps committed after all (cancelled while the database answered); out of the
+            # unit of work, whose lock of the key the removal takes.
+            if stored:
+                await asyncio.shield(remove_unnamed(self._uow, self._store, [sha256]))
+            raise
         return DocumentView(document, access)
 
     async def read_with_vision(self, actor: UserId, id: DocumentId) -> DocumentView:
@@ -692,8 +679,8 @@ class PipelineService:
         document where it lies now (handed over, or moved into a space they only read, where
         it is not green yet).
 
-        If the fields node does not run again, the type's title pattern is rendered with the
-        decided values, as long as the document has the machine's title (`titles`)."""
+        A type's title pattern is a rule (`rules.title_rule`): it sets the title when the rules
+        run again, as on arrival; confirming renders no title of its own."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             document, source = await controllable_document(uow, user, id, Action.CONTROL_PROCESSING)
@@ -943,11 +930,7 @@ class PipelineService:
         A catch-up job (`catch_up`) runs the same way, except that its node is not marked as
         running and its result changes neither the status nor the lane.
         """
-        return await self._jobs.run_next(
-            [NODE_JOB, CATCH_UP_JOB, REPARSE_JOB, FACTS_JOB, RELATE_JOB],
-            self._lease,
-            self._run_claimed,
-        )
+        return await self._jobs.run_next(self.job_kinds, self._lease, self._run_claimed)
 
     async def _run_claimed(self, job: Job) -> None:
         if job.kind == FACTS_JOB:
@@ -1073,7 +1056,8 @@ class PipelineService:
         except (KeyError, ValueError) as error:
             await self._jobs.invalid(job, error)
             return
-        try:
+
+        async def store() -> None:
             async with self._uow() as uow:
                 await uow.lock(RELATIONS_LOCK)
                 document = await uow.documents.find(document_id)
@@ -1089,8 +1073,11 @@ class PipelineService:
                 )
                 await uow.jobs.complete(job, now=now, result=result)
                 await uow.commit()
-        except ConcurrencyError:
-            lost(job)
+
+        # A conflict is a lost claim only if another worker owns the job now; else (a deadlock,
+        # a row changed meanwhile) it is tried again (SA-08).
+        try:
+            await self._jobs.storing(job, store)
         except Exception as error:
             await self._failed_aside(job, "finding the relations failed", document_id, error)
 
@@ -1149,11 +1136,7 @@ class PipelineService:
     ) -> None:
         """An attempt of a job beside processing (facts, reading again) raised: it runs again
         later, like a node, and is given up after as many attempts."""
-        log.warning(
-            message, extra={"document_id": str(document_id), "attempt": job.tries}, exc_info=True
-        )
-        reason = f"{type(error).__name__}: {error}"
-        await self._jobs.again(job, reason, self._retry.next_run(job.tries, self._clock.now()))
+        await self._jobs.failed(job, error, self._retry, message, document_id=str(document_id))
 
     async def _skipped(self, document_id: DocumentId, node: Node, run: int) -> Document | None:
         """The document, if its `node` is still to catch up on; None if the job is stale."""

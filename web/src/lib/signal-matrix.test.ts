@@ -7,9 +7,9 @@ import { decidedBy, matrixOf, verdictOf } from './signal-matrix.ts';
 type LogEntry = components['schemas']['LogEntry'];
 
 const TOBI = 'u-tobi';
-const ANNA = 'u-anna';
+const ERIKA = 'u-erika';
 const MINE = 's-mine';
-const ANNAS = 's-anna';
+const ERIKAS = 's-erika';
 const MUSTERVEREIN = 'c-musterverein';
 const BAKERY = 'c-bakery';
 const PAYSLIP = 't-payslip';
@@ -34,11 +34,11 @@ const lookup = {
 	users: [
 		{ id: TOBI, username: 'tobi', role: 'user', personal_space_id: MINE },
 		{
-			id: ANNA,
-			username: 'anna',
+			id: ERIKA,
+			username: 'erika',
 			display_name: 'Jane Doe',
 			role: 'user',
-			personal_space_id: ANNAS
+			personal_space_id: ERIKAS
 		}
 	]
 } as unknown as Lookup;
@@ -108,10 +108,10 @@ const type = {
 const space = {
 	field: 'space',
 	outcome: 'uncertain',
-	suggestion: ANNAS,
+	suggestion: ERIKAS,
 	candidates: [
 		{
-			value: ANNAS,
+			value: ERIKAS,
 			label: 'Jane Doe',
 			contradicted: true,
 			sources: [
@@ -213,7 +213,7 @@ describe('matrixOf', () => {
 		expect([...decided]).toEqual([['space', MINE]]);
 		const rows = matrixOf(verdict([space]), false, MINE, lookup, tobi, decided);
 		expect(rows[0]).toMatchObject({ open: false, chip: m.matrix_chip_by_hand() });
-		expect(rows[0].value).not.toContain('Anna');
+		expect(rows[0].value).not.toContain('Erika');
 	});
 });
 

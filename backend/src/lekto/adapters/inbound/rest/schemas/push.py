@@ -1,12 +1,15 @@
 """Bodies and answers of `/push`."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, get_args
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.push import (
+    DEFAULT_KINDS,
+    LOCALES,
     MAX_DEVICE_NAME,
     MAX_ENDPOINT,
     PushDevice,
@@ -14,6 +17,9 @@ from lekto.core.domain.push import (
     PushPreferences,
 )
 from lekto.core.ports.push import PushOutcome, PushResult
+
+Locale = Literal[LOCALES]  # type: ignore[valid-type]
+"""The languages notifications speak (`push.LOCALES`; RB-10)."""
 
 
 class PushSettingsOut(BaseModel):
@@ -27,13 +33,14 @@ class PushSettingsOut(BaseModel):
 
 
 class PushKeysIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     p256dh: str = Field(max_length=200, description="The browser's public key (base64url).")
     auth: str = Field(max_length=100, description="The browser's auth secret (base64url).")
 
 
-class PushDeviceIn(BaseModel):
+class PushDeviceIn(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -58,9 +65,7 @@ class PushDeviceIn(BaseModel):
     )
     keys: PushKeysIn
     name: str = Field(min_length=1, max_length=MAX_DEVICE_NAME, description="Which device it is.")
-    locale: Literal["de", "en"] = Field(
-        description="The language the device's notifications speak."
-    )
+    locale: Locale = Field(description="The language the device's notifications speak.")
 
 
 class PushDeviceOut(BaseModel):
@@ -100,23 +105,24 @@ class PushTestOut(BaseModel):
         return cls(outcome=result.outcome)
 
 
-NoticeKind = Literal["waiting", "mailbox_failed", "webhook_disabled", "job_failed"]
+NoticeKind = Literal[tuple(kind.value for kind in PushKind if kind in DEFAULT_KINDS)]  # type: ignore[valid-type]
+"""What a person may be told about (`push.DEFAULT_KINDS`; RB-10)."""
 
 
-class PushPreferencesBody(BaseModel):
+class PushPreferencesBody(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [{"kinds": ["waiting", "webhook_disabled"], "titles": True}]
         },
     )
 
-    kinds: list[NoticeKind] = Field(
+    kinds: list[NoticeKind] = Field(  # type: ignore[valid-type]
+        max_length=len(get_args(NoticeKind)),
         description=(
             "What the caller is told about: `waiting` (documents wait in their inbox), "
             "`webhook_disabled` (one of their webhooks was switched off), and for admins "
             "`mailbox_failed` (a mailbox fails to fetch) and `job_failed` (a job was given up)."
-        )
+        ),
     )
     titles: bool = Field(
         description=(
@@ -127,7 +133,7 @@ class PushPreferencesBody(BaseModel):
     @classmethod
     def of(cls, preferences: PushPreferences) -> "PushPreferencesBody":
         return cls(
-            kinds=sorted(kind.value for kind in preferences.kinds),  # type: ignore[misc]
+            kinds=sorted(kind.value for kind in preferences.kinds),
             titles=preferences.titles,
         )
 

@@ -12,6 +12,10 @@ RETRY_STATUS = {500, 502, 503, 504}
 DELAYS = (1.0, 3.0, 10.0)
 
 
+PAGE_SIZE = 200
+"""Documents of one page of `GET /documents`: as many as Lekto gives (`PAGE_LIMIT`)."""
+
+
 class ApiError(Exception):
     """A request Lekto refused. `existing` is the document a duplicate upload collided with."""
 
@@ -84,7 +88,16 @@ class Lekto:
                 continue
             if response.status_code >= 400:
                 raise _error(response)
-            return None if response.status_code == 204 else response.json()
+            if response.is_redirect:  # the client follows none: another address is meant
+                location = response.headers.get("location", "?")
+                raise ApiError(response.status_code, f"sent on to {location}: set that address")
+            if response.status_code == 204:
+                return None
+            try:
+                return response.json()
+            except ValueError:  # a proxy's page, say (MI-07)
+                kind = response.headers.get("content-type", "no content type")
+                raise ApiError(response.status_code, f"no JSON in the answer ({kind})") from None
         raise AssertionError("unreachable")
 
     async def _object(self, method: str, path: str, **arguments: Any) -> dict[str, Any]:
@@ -99,20 +112,19 @@ class Lekto:
         return cast("list[dict[str, Any]]", await self.request("GET", path, params=params))
 
     async def documents(self, *, cursor: str | None = None) -> dict[str, Any]:
-        params: dict[str, Any] = {"all_users": "true", "limit": 200}
+        params: dict[str, Any] = {"all_users": "true", "limit": PAGE_SIZE}
         if cursor:
             params["cursor"] = cursor
         return await self._object("GET", "/documents", params=params)
 
-    async def takes_review_codes(self) -> bool:
-        """Whether Lekto takes the code of a review's reason with an upload
-        (`ImportedReviewIn.code`, issue #83); an older Lekto refuses it."""
+    async def reason_codes(self) -> frozenset[str]:
+        """The codes of the reasons Lekto knows (`x-reasons` of its OpenAPI document); none if
+        it does not tell."""
         try:
             document = await self._object("GET", "/openapi.json")
         except ApiError:
-            return False
-        schemas = (document.get("components") or {}).get("schemas") or {}
-        return "code" in ((schemas.get("ImportedReviewIn") or {}).get("properties") or {})
+            return frozenset()
+        return frozenset(document.get("x-reasons") or ())
 
     async def document(self, id: str) -> dict[str, Any]:
         return await self._object("GET", f"/documents/{id}")

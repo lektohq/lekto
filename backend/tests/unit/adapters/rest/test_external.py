@@ -47,7 +47,9 @@ def url(task: Task | TaskId) -> str:
 
 async def stored(api: Api, task: Task) -> Task:
     async with api.container.unit_of_work() as uow:
-        return await uow.tasks.get(task.id)
+        found = await uow.tasks.find(task.id)
+    assert found is not None
+    return found
 
 
 async def test_an_answer_with_the_task_s_token_is_taken_once(api: Api) -> None:

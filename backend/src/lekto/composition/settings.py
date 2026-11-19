@@ -34,6 +34,7 @@ from lekto.adapters.outbound.liquid import parse_locale
 from lekto.adapters.outbound.webpush.sender import private_key_of as vapid_key_of
 from lekto.composition.errors import ConfigurationError
 from lekto.core.services.documents import TEXT_MAX
+from lekto.core.services.rules.retroactive import MAX_APPLY_DOCUMENTS
 
 ENV_PREFIX = "LEKTO_"
 FILE_SUFFIX = "_FILE"
@@ -214,6 +215,10 @@ class Settings(BaseSettings):
     # the archive's text layer as it is set (PDFium), which needs no settings.
     ocr_languages: Annotated[str, Field(pattern=r"^[a-z_]+(\+[a-z_]+)*$")] = "deu+eng"
     ocr_timeout: Seconds = timedelta(minutes=10)
+    # PDFium reads the pages of a PDF (codes, the text layer before OCR, page images, the text
+    # as it is set, the places of quotes) in a child process with a time limit: 0.1 to 0.2 s a
+    # page, a PDF of 1000 pages two minutes on a fast machine.
+    pdf_timeout: Seconds = timedelta(minutes=10)
     # Separator sheets: a page with a code whose whole text is one of these (comma-separated,
     # any case) splits a stack that comes in there; empty: stacks are never split.
     separator_codes: Annotated[str, Field(max_length=1000)] = "PATCHT"
@@ -221,9 +226,10 @@ class Settings(BaseSettings):
     # from anyone, and WeasyPrint has no limit of its own.
     mail_render_timeout: Seconds = timedelta(minutes=2)
     # The address space each program Lekto starts may take (OCRmyPDF with Ghostscript, Tesseract
-    # and its other tools; the mail renderer): a document built to make them allocate without
-    # end fails its step instead of the worker. Documents need less than 1 GiB (measured with 8
-    # OCR jobs); a page of 14 400 points a side took 6.9 GB in OCRmyPDF without it.
+    # and its other tools; the mail renderer; PDFium): a document built to make them allocate
+    # without end fails its step instead of the worker. Documents need less than 1 GiB
+    # (measured with 8 OCR jobs); a page of 14 400 points a side took 6.9 GB in OCRmyPDF without
+    # it, a PDF of 62 KB 3.4 GB in PDFium.
     child_max_memory: Annotated[ByteSize, Field(gt=0)] = ByteSize(2 * 1024**3)
     # Fetching mail (IMAP): connecting to the server, and each of its answers.
     mail_timeout: Seconds = timedelta(seconds=30)
@@ -290,8 +296,9 @@ class Settings(BaseSettings):
     vlm_api_key: SecretStr | None = None
     vlm_timeout: Seconds = timedelta(minutes=30)
 
-    # Classification: a field is accepted (ok) from this confidence on; an existing contact is
-    # suggested from the second.
+    # Classification: how well a name must match (`Thresholds.accept`): the model's sender names
+    # an existing contact, a recipient's name a user, from this similarity on (also the lowest
+    # confidence shown for a value taken); an existing contact is suggested from the second.
     confidence_threshold: Annotated[float, Field(gt=0, le=1)] = 0.9
     contact_suggest_threshold: Annotated[float, Field(gt=0, le=1)] = 0.75
     # Share of unsure content words (noise left out, `domain.reading.is_noise`) from which a
@@ -331,7 +338,7 @@ class Settings(BaseSettings):
     # text conditions see, and the documents one retroactive application may cover.
     rules_pattern_timeout: Seconds = timedelta(milliseconds=200)
     rules_max_text: Annotated[int, Field(ge=1000, le=10_000_000)] = 200_000
-    rules_apply_max_documents: Annotated[int, Field(ge=1, le=100_000)] = 1000
+    rules_apply_max_documents: Annotated[int, Field(ge=1, le=MAX_APPLY_DOCUMENTS)] = 1000
     # Templates of rules and title patterns write dates and amounts in this locale (`de`,
     # `en_US`, ...; Babel's names); the head of a mail set as a PDF speaks its language too
     # (German, else English).

@@ -39,12 +39,12 @@ const lookup = {
 			name: 'Haushalt',
 			personal_of: null,
 			role: 'edit',
-			members: [member('u1', 'tobi'), member('u2', 'anna', 'read'), member('u3', 'bob')]
+			members: [member('u1', 'tobi'), member('u2', 'erika', 'read'), member('u3', 'bob')]
 		}
 	],
 	users: [
 		{ id: 'u1', username: 'tobi', role: 'user', personal_space_id: 'mine' },
-		{ id: 'u2', username: 'anna', role: 'user', personal_space_id: 'annas' }
+		{ id: 'u2', username: 'erika', role: 'user', personal_space_id: 'erikas' }
 	]
 } as unknown as Lookup;
 
@@ -87,16 +87,16 @@ describe('the suggested space', () => {
 	});
 
 	it('names who sees the document there anew', () => {
-		expect(newReaders('house', 'mine', lookup)).toEqual(['anna', 'bob']);
+		expect(newReaders('house', 'mine', lookup)).toEqual(['erika', 'bob']);
 		// Another user's personal space the caller is no member of: that user.
-		expect(newReaders('annas', 'mine', lookup)).toEqual(['anna']);
+		expect(newReaders('erikas', 'mine', lookup)).toEqual(['erika']);
 		expect(newReaders('elsewhere', 'mine', lookup)).toEqual([]);
 		expect(newReaders('house', 'mine', null)).toEqual([]);
 	});
 
 	it('reads as a suggestion with the new readers', () => {
 		expect(suggestionText('house', 'mine', lookup)).toBe(
-			m.space_suggestion_for({ space: 'Haushalt', names: 'anna, bob' })
+			m.space_suggestion_for({ space: 'Haushalt', names: 'erika, bob' })
 		);
 		expect(suggestionText('mine', 'house', lookup)).toBe(
 			m.space_suggestion({ space: m.space_personal() })
@@ -104,22 +104,22 @@ describe('the suggested space', () => {
 	});
 
 	it('reads a suggested personal space of another user as a hand-over', () => {
-		expect(handedTo('annas', 'mine', lookup)).toBe('anna');
-		expect(suggestionText('annas', 'mine', lookup)).toBe(
-			m.space_suggestion_hand_over({ name: 'anna' })
+		expect(handedTo('erikas', 'mine', lookup)).toBe('erika');
+		expect(suggestionText('erikas', 'mine', lookup)).toBe(
+			m.space_suggestion_hand_over({ name: 'erika' })
 		);
-		// Anna reads Haushalt already: her personal space is no hand-over from there.
-		expect(handedTo('annas', 'house', lookup)).toBeNull();
+		// Erika reads Haushalt already: her personal space is no hand-over from there.
+		expect(handedTo('erikas', 'house', lookup)).toBeNull();
 		expect(handedTo('house', 'mine', lookup)).toBeNull();
 	});
 
 	it('says the hand-over in the words of the move dialog, in both languages', () => {
 		for (const locale of ['de', 'en'] as const) {
 			const options = { locale };
-			expect(m.space_suggestion_hand_over({ name: 'Anna' }, options)).toContain(
-				m.move_hand_over({ name: 'Anna' }, options)
+			expect(m.space_suggestion_hand_over({ name: 'Erika' }, options)).toContain(
+				m.move_hand_over({ name: 'Erika' }, options)
 			);
-			expect(m.move_handed_over({ name: 'Anna' }, options)).not.toMatch(/^An Anna/);
+			expect(m.move_handed_over({ name: 'Erika' }, options)).not.toMatch(/^An Erika/);
 		}
 	});
 
@@ -127,10 +127,10 @@ describe('the suggested space', () => {
 		const open = [node([{ field: 'space', suggestion: null, unseen_by: ['u2', 'u9'] }])];
 		expect(unseenBy(open)).toEqual(['u2', 'u9']);
 		expect(unseenBy([node([{ field: 'space' }])])).toEqual([]);
-		expect(unseenText(['u2'], lookup)).toBe(m.space_named_unseen({ names: 'anna' }));
+		expect(unseenText(['u2'], lookup)).toBe(m.space_named_unseen({ names: 'erika' }));
 		// Someone the caller cannot tell stays unnamed.
 		expect(unseenText(['u2', 'u9'], lookup)).toBe(
-			m.space_named_unseen({ names: `anna, ${m.space_named_someone()}` })
+			m.space_named_unseen({ names: `erika, ${m.space_named_someone()}` })
 		);
 		expect(unseenText([], lookup)).toBe('');
 	});
@@ -144,7 +144,7 @@ describe('the suggested space', () => {
 				}
 			] as never;
 		expect(unseenHere(judge('ok', ['u2', 'u9']), 'mine', lookup)).toEqual(['u2', 'u9']);
-		// Anna reads Haushalt: there she sees it.
+		// Erika reads Haushalt: there she sees it.
 		expect(unseenHere(judge('ok', ['u2']), 'house', lookup)).toEqual([]);
 		// An open check is the form's own warning.
 		expect(unseenHere(judge('uncertain', ['u2']), 'mine', lookup)).toEqual([]);

@@ -19,7 +19,7 @@ from collections.abc import Callable, Mapping
 from datetime import datetime
 
 from lekto.core.domain.errors import ValidationError
-from lekto.core.domain.fields import FieldDefinition
+from lekto.core.domain.fields import FieldDefinition, Writing
 from lekto.core.domain.ids import DocumentTypeId, FieldId, SpaceId, UserId
 from lekto.core.domain.mail_rules import MailRule
 from lekto.core.domain.reasons import Reason, ReasonCode, because
@@ -93,7 +93,7 @@ def refers_to(
 
 
 def misfits(
-    changed: FieldId, definitions: Mapping[FieldId, FieldDefinition]
+    changed: FieldId, definitions: Mapping[FieldId, FieldDefinition], writing: Writing
 ) -> Callable[[Rule], bool]:
     """`affected` for `disable_rules`: the rule refers to the `changed` field and its
     field conditions or values no longer fit `definitions` (all field definitions), e.g.
@@ -103,7 +103,7 @@ def misfits(
         if changed not in rule.definition.references().fields:
             return False
         try:
-            check_fields(rule.definition, definitions)
+            check_fields(rule.definition, definitions, writing)
         except ValidationError:
             return True
         return False

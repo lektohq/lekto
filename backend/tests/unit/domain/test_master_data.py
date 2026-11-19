@@ -1,5 +1,3 @@
-from datetime import UTC, datetime
-
 import pytest
 
 from lekto.core.domain.errors import ValidationError
@@ -15,8 +13,7 @@ from lekto.core.domain.master_data import (
     Tag,
     TagScope,
 )
-
-NOW = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
+from tests.builders import NOW
 
 
 @pytest.mark.parametrize("kind", [Contact, DocumentType, Tag])

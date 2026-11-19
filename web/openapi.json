@@ -286,7 +286,7 @@
           "auth"
         ],
         "summary": "Return from the identity provider",
-        "description": "The provider sends the browser here. Signs in (new session cookie; a session the browser had ends) or completes a link, then redirects to the path given at the start. If that fails, the browser goes to the web UI instead: `/ui/login?error=<code>` (while linking: `/ui/settings?error=<code>`) with `denied` (the provider did not sign the user in), `failed` (the flow expired or does not match, or no account is linked to this sign-in), `conflict` (the provider's account is linked to another user) or `provider` (the provider cannot be reached or answered wrongly).",
+        "description": "The provider sends the browser here. Signs in (new session cookie; a session the browser had ends) or completes a link, then redirects to the path given at the start. If that fails, the browser goes to the web UI instead: `/ui/login?error=<code>` (while linking: `/ui/settings?error=<code>`) with `denied` (the provider did not sign the user in), `failed` (the flow expired or does not match, no account is linked to this sign-in, or none can be made of it), `conflict` (the provider's account is linked to another user) or `provider` (the provider cannot be reached or answered wrongly).",
         "operationId": "oidc_callback_api_v1_auth_oidc_callback_get",
         "parameters": [
           {
@@ -755,7 +755,7 @@
           "auth"
         ],
         "summary": "Change the own password",
-        "description": "Ends all sessions and starts a new one for the caller (new cookie and CSRF token). API tokens stay unless `revoke_tokens`. Needs a session; API tokens are refused (403).",
+        "description": "Ends all sessions and starts a new one for the caller (new cookie and CSRF token). The caller's known devices are forgotten; this browser is known again by a new device cookie. API tokens stay unless `revoke_tokens`. Needs a session; API tokens are refused (403).",
         "operationId": "change_password_api_v1_auth_password_post",
         "requestBody": {
           "content": {
@@ -7171,6 +7171,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
               "minimum": 0,
               "default": 0,
               "title": "Offset"
@@ -7332,6 +7333,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
               "minimum": 0,
               "default": 0,
               "title": "Offset"
@@ -10158,6 +10160,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Number"
             }
           }
@@ -13332,6 +13336,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
               "minimum": 0,
               "description": "Skip so many documents (pages by number); with `cursor`, after it.",
               "default": 0,
@@ -13912,7 +13917,7 @@
           "documents"
         ],
         "summary": "Show the pages of a file to add to an edit",
-        "description": "Editors of the document's space and admins, before they add a file to an edit of the document's pages (`POST /documents/{id}/edit`): its pages as images, as large as a document's page images (`GET /documents/{id}/pages/{number}`). Nothing is stored. 415 for a file that is no PDF or image; 422 for one whose pages cannot be read.",
+        "description": "Editors of the document's space and admins, before they add a file to an edit of the document's pages (`POST /documents/{id}/edit`): its pages as images, as large as a document's page images (`GET /documents/{id}/pages/{number}`). Nothing is stored. 415 for a file that is no PDF or image; 422 for one whose pages cannot be read, or of more than 200 pages.",
         "operationId": "preview_pages_api_v1_documents__id__edit_pages_post",
         "parameters": [
           {
@@ -15996,6 +16001,7 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
               "minimum": 1,
               "title": "Number"
             }
@@ -19020,7 +19026,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ReparseOut"
+                  "$ref": "#/components/schemas/QueuedOut"
                 }
               }
             }
@@ -20383,6 +20389,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
               "minimum": 0,
               "default": 0,
               "title": "Offset"
@@ -23001,6 +23008,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
               "minimum": 0,
               "default": 0,
               "title": "Offset"
@@ -25178,6 +25186,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
               "minimum": 0,
               "default": 0,
               "title": "Offset"
@@ -26645,16 +26654,6 @@
         ],
         "title": "AnyGroup[MailConditionBody]"
       },
-      "ApplicationStatus": {
-        "type": "string",
-        "enum": [
-          "queued",
-          "running",
-          "done",
-          "failed"
-        ],
-        "title": "ApplicationStatus"
-      },
       "ApplyOutcomeOut": {
         "properties": {
           "space_id": {
@@ -26909,6 +26908,7 @@
         "properties": {
           "version": {
             "type": "integer",
+            "maximum": 2147483647.0,
             "minimum": 1.0,
             "title": "Version",
             "description": "The rule version to apply (from the preview)."
@@ -26929,6 +26929,7 @@
               "format": "uuid"
             },
             "type": "array",
+            "maxItems": 100000,
             "title": "Accept Conflicts",
             "description": "Selected documents where the rule's value replaces a different one."
           }
@@ -27408,7 +27409,7 @@
             "$ref": "#/components/schemas/BulkKind"
           },
           "status": {
-            "$ref": "#/components/schemas/BulkStatus"
+            "$ref": "#/components/schemas/ProgressStatus"
           },
           "total": {
             "type": "integer",
@@ -27542,16 +27543,6 @@
             }
           }
         ]
-      },
-      "BulkStatus": {
-        "type": "string",
-        "enum": [
-          "queued",
-          "running",
-          "done",
-          "failed"
-        ],
-        "title": "BulkStatus"
       },
       "Cadence": {
         "type": "string",
@@ -27934,11 +27925,11 @@
           },
           "places": {
             "items": {
-              "$ref": "#/components/schemas/CodePlaceOut"
+              "$ref": "#/components/schemas/LocationOut"
             },
             "type": "array",
             "title": "Places",
-            "description": "The pages it stands on, in order."
+            "description": "The pages it stands on, in order, a box per copy of the code on the page."
           },
           "giro": {
             "anyOf": [
@@ -27953,7 +27944,7 @@
           },
           "identifiers": {
             "items": {
-              "$ref": "#/components/schemas/IdentifierFoundOut"
+              "$ref": "#/components/schemas/IdentifierKeyOut"
             },
             "type": "array",
             "title": "Identifiers"
@@ -27979,30 +27970,6 @@
         ],
         "title": "CodeOut",
         "description": "A code once for its format and text, however often the pages show it."
-      },
-      "CodePlaceOut": {
-        "properties": {
-          "page": {
-            "type": "integer",
-            "title": "Page",
-            "description": "From 1."
-          },
-          "boxes": {
-            "items": {
-              "$ref": "#/components/schemas/BoxOut"
-            },
-            "type": "array",
-            "title": "Boxes",
-            "description": "One per copy of the code on the page."
-          }
-        },
-        "type": "object",
-        "required": [
-          "page",
-          "boxes"
-        ],
-        "title": "CodePlaceOut",
-        "description": "Where a code stands on a page of the archive."
       },
       "ConditionField": {
         "type": "string",
@@ -28064,7 +28031,8 @@
                 "items": {
                   "type": "string"
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 100
               },
               {
                 "items": {
@@ -28083,7 +28051,8 @@
                     }
                   ]
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 100
               },
               {
                 "type": "null"
@@ -28494,7 +28463,7 @@
           },
           "value": {
             "type": "string",
-            "maxLength": 100,
+            "maxLength": 200,
             "minLength": 1,
             "title": "Value"
           },
@@ -28520,7 +28489,7 @@
           "value"
         ],
         "title": "ContactNumberIn",
-        "description": "A customer or personnel number of the user at a contact, written as in documents.",
+        "description": "A customer, contract or personnel number of the user at a contact, written as in\ndocuments.",
         "examples": [
           {
             "contact_id": "6f1c2a4e-0000-4000-8000-000000000001",
@@ -28811,25 +28780,6 @@
         "title": "Decider",
         "description": "Who would decide a mail now."
       },
-      "DeliveryDocumentOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "title"
-        ],
-        "title": "DeliveryDocumentOut"
-      },
       "DeliveryOut": {
         "properties": {
           "id": {
@@ -28932,7 +28882,7 @@
           "document": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DeliveryDocumentOut"
+                "$ref": "#/components/schemas/DocumentRefOut"
               },
               {
                 "type": "null"
@@ -30076,7 +30026,7 @@
                   "format": "uuid"
                 },
                 "type": "array",
-                "maxItems": 500
+                "maxItems": 50
               },
               {
                 "type": "null"
@@ -30602,7 +30552,7 @@
             "title": "Media Type"
           },
           "kind": {
-            "$ref": "#/components/schemas/VersionKindOut",
+            "$ref": "#/components/schemas/VersionKind",
             "description": "`received`: how the document came in; `replaced`: a person put another file in its place; `edited`: a person edited its pages; `split`: the first version, pages split off another document (by a person, or at a separator sheet); `separated`: the first part of the stack the document came in as, split at its separator sheets; `merged`: a person merged other documents into it. A version that came from another document in a merge keeps its kind."
           },
           "created_at": {
@@ -30631,7 +30581,7 @@
           "origin": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/VersionOriginOut"
+                "$ref": "#/components/schemas/DocumentRefOut"
               },
               {
                 "type": "null"
@@ -30949,7 +30899,7 @@
           "number": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SeriesNumberOut"
+                "$ref": "#/components/schemas/IdentifierKeyOut"
               },
               {
                 "type": "null"
@@ -31128,6 +31078,7 @@
             "default": false
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "action",
@@ -31148,7 +31099,7 @@
             "at_contact": true,
             "kind": "customer_number",
             "new_value": "2004 7719",
-            "value": "20047718"
+            "value": "12345678"
           },
           {
             "action": "add",
@@ -31371,7 +31322,7 @@
               }
             ],
             "title": "Persons",
-            "description": "The users the document names, the surest first: for the editors of its space and admins; null for readers. What is private about a person (aliases, birth date, identifiers, a contact's number that names them) finds them only for admins and that person: anyone else sees another user only where the text has their display name (that a number is Anna's tax ID is Anna's)."
+            "description": "The users the document names, the surest first: for the editors of its space and admins; null for readers. What is private about a person (aliases, birth date, identifiers, a contact's number that names them) finds them only for admins and that person: anyone else sees another user only where the text has their display name (that a number is Erika's tax ID is Erika's)."
           }
         },
         "type": "object",
@@ -31416,7 +31367,7 @@
                     "start": 412
                   }
                 ],
-                "value": "20047718"
+                "value": "12345678"
               }
             ],
             "named": []
@@ -31587,7 +31538,7 @@
             },
             "type": "array",
             "title": "Locations",
-            "description": "Where the quote stands in the archive PDF: at most a few places, in page order; empty if it was not found there or the check is older than this."
+            "description": "Where the quote stands in the archive PDF, a box per line it covers: at most a few places, in page order; empty if it was not found there or the check is older than this."
           },
           "candidates": {
             "items": {
@@ -31664,7 +31615,8 @@
                   "type": "string",
                   "format": "uuid"
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 1000
               },
               {
                 "type": "null"
@@ -31696,6 +31648,7 @@
               "format": "uuid"
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Required Document Type Ids",
             "description": "A typed field: the document types (of its own) it is required for; for the others it is optional. Extraction must find a required field; an optional one may stay empty, but a value it gives must be shown by the text."
           },
@@ -31799,6 +31752,7 @@
               "format": "uuid"
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Required Document Type Ids",
             "description": "A typed field: the document types (of its own) it is required for; for the others it is optional. Extraction must find a required field; an optional one may stay empty, but a value it gives must be shown by the text."
           },
@@ -31917,7 +31871,8 @@
                   "type": "string",
                   "format": "uuid"
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 1000
               },
               {
                 "type": "null"
@@ -31946,6 +31901,7 @@
                   "format": "uuid"
                 },
                 "type": "array",
+                "maxItems": 1000,
                 "description": "A typed field: the document types (of its own) it is required for; for the others it is optional. Extraction must find a required field; an optional one may stay empty, but a value it gives must be shown by the text."
               },
               {
@@ -32900,23 +32856,6 @@
         ],
         "title": "HoldersOut"
       },
-      "IdentifierFoundOut": {
-        "properties": {
-          "kind": {
-            "$ref": "#/components/schemas/IdentifierKind"
-          },
-          "value": {
-            "type": "string",
-            "title": "Value"
-          }
-        },
-        "type": "object",
-        "required": [
-          "kind",
-          "value"
-        ],
-        "title": "IdentifierFoundOut"
-      },
       "IdentifierIn": {
         "properties": {
           "kind": {
@@ -32924,7 +32863,7 @@
           },
           "value": {
             "type": "string",
-            "maxLength": 100,
+            "maxLength": 200,
             "minLength": 1,
             "title": "Value",
             "examples": [
@@ -32955,7 +32894,7 @@
               }
             ],
             "title": "User Id",
-            "description": "The user a customer or personnel number belongs to (Anna's contract): found in a document, it is hard evidence for whose it is. Not for other kinds, not for a rejected one."
+            "description": "The user a customer, contract or personnel number belongs to (Erika's contract): found in a document, it is hard evidence for whose it is. Not for other kinds, not for a rejected one."
           }
         },
         "additionalProperties": false,
@@ -32969,9 +32908,28 @@
         "examples": [
           {
             "kind": "customer_number",
-            "value": "2004-7718"
+            "value": "1234-5678"
           }
         ]
+      },
+      "IdentifierKeyOut": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/IdentifierKind"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value",
+            "description": "Normalised, as Lekto compares it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "value"
+        ],
+        "title": "IdentifierKeyOut",
+        "description": "An identifier by its kind and its value (RA-12)."
       },
       "IdentifierKind": {
         "type": "string",
@@ -33046,7 +33004,7 @@
               }
             ],
             "title": "User Id",
-            "description": "The user a customer or personnel number belongs to: entered by hand, or found by training when all its documents are surely theirs alone."
+            "description": "The user a customer, contract or personnel number belongs to: entered by hand, or found by training when all its documents are surely theirs alone."
           }
         },
         "type": "object",
@@ -33357,25 +33315,6 @@
         ],
         "title": "IndexStatsOut"
       },
-      "JobDocumentOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "title"
-        ],
-        "title": "JobDocumentOut"
-      },
       "JobDurationsOut": {
         "properties": {
           "kinds": {
@@ -33458,7 +33397,7 @@
           "document": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/JobDocumentOut"
+                "$ref": "#/components/schemas/DocumentRefOut"
               },
               {
                 "type": "null"
@@ -33987,7 +33926,7 @@
               "format": "uuid"
             },
             "type": "array",
-            "maxItems": 200,
+            "maxItems": 50,
             "title": "Contact Ids"
           },
           "document_type_ids": {
@@ -33996,7 +33935,7 @@
               "format": "uuid"
             },
             "type": "array",
-            "maxItems": 200,
+            "maxItems": 50,
             "title": "Document Type Ids"
           },
           "contact_group_ids": {
@@ -34005,7 +33944,7 @@
               "format": "uuid"
             },
             "type": "array",
-            "maxItems": 200,
+            "maxItems": 50,
             "title": "Contact Group Ids"
           },
           "document_type_group_ids": {
@@ -34014,7 +33953,7 @@
               "format": "uuid"
             },
             "type": "array",
-            "maxItems": 200,
+            "maxItems": 50,
             "title": "Document Type Group Ids"
           },
           "topic_ids": {
@@ -34023,7 +33962,7 @@
               "format": "uuid"
             },
             "type": "array",
-            "maxItems": 200,
+            "maxItems": 50,
             "title": "Topic Ids"
           },
           "tag_ids": {
@@ -34032,7 +33971,7 @@
               "format": "uuid"
             },
             "type": "array",
-            "maxItems": 200,
+            "maxItems": 50,
             "title": "Tag Ids"
           },
           "space_ids": {
@@ -34041,7 +33980,7 @@
               "format": "uuid"
             },
             "type": "array",
-            "maxItems": 200,
+            "maxItems": 50,
             "title": "Space Ids"
           },
           "field_id": {
@@ -34244,6 +34183,7 @@
               "format": "uuid"
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Ids",
             "description": "Each of the caller's lenses once, in the new order."
           }
@@ -34996,7 +34936,7 @@
             },
             "type": "array",
             "title": "Boxes",
-            "description": "One per line the quote covers."
+            "description": "What it covers on the page."
           }
         },
         "type": "object",
@@ -35005,7 +34945,7 @@
           "boxes"
         ],
         "title": "LocationOut",
-        "description": "Where a quote stands in the archive PDF."
+        "description": "Where something stands on a page of the archive PDF: a quote, a code, a fact (RA-12)."
       },
       "LogEntry": {
         "properties": {
@@ -37556,6 +37496,7 @@
             ]
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "amount",
@@ -37707,7 +37648,8 @@
           "id",
           "name"
         ],
-        "title": "NamedOut"
+        "title": "NamedOut",
+        "description": "Something by its id and its name (RA-12)."
       },
       "Node": {
         "type": "string",
@@ -37960,25 +37902,6 @@
         ],
         "title": "OpenAction"
       },
-      "OpenContactOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "OpenContactOut"
-      },
       "OpenCountsOut": {
         "properties": {
           "learned": {
@@ -38004,6 +37927,7 @@
           },
           "value": {
             "type": "string",
+            "maxLength": 200,
             "title": "Value",
             "description": "Normalised, as the list gives it."
           },
@@ -38025,6 +37949,7 @@
             "description": "Where; without one, the learned one's contact or the one contact its documents name (to confirm one whose documents name several, give it)."
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "kind",
@@ -38045,6 +37970,7 @@
             "title": "Decisions"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "decisions"
@@ -38056,7 +37982,7 @@
               {
                 "action": "confirm",
                 "kind": "customer_number",
-                "value": "20047718"
+                "value": "12345678"
               },
               {
                 "action": "reject",
@@ -38114,7 +38040,7 @@
           },
           "contacts": {
             "items": {
-              "$ref": "#/components/schemas/OpenContactOut"
+              "$ref": "#/components/schemas/NamedOut"
             },
             "type": "array",
             "title": "Contacts"
@@ -38122,13 +38048,13 @@
           "person": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/OpenPersonOut"
+                "$ref": "#/components/schemas/NamedOut"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "A suggestion for this person's profile."
+            "description": "A suggestion for this person's profile: the user, by their display name, else the username."
           },
           "documents": {
             "type": "integer",
@@ -38272,27 +38198,6 @@
         ],
         "title": "OpenPageOut"
       },
-      "OpenPersonOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id",
-            "description": "The user."
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "Their display name, else the username."
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "OpenPersonOut"
-      },
       "OpenSearchIn": {
         "properties": {
           "q": {
@@ -38311,7 +38216,7 @@
         "title": "OpenSearchIn",
         "examples": [
           {
-            "q": "2004 7718"
+            "q": "1234 5678"
           }
         ]
       },
@@ -38587,6 +38492,7 @@
             ]
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "start",
@@ -38602,7 +38508,7 @@
           },
           "value": {
             "type": "string",
-            "maxLength": 100,
+            "maxLength": 200,
             "minLength": 1,
             "title": "Value"
           }
@@ -38621,24 +38527,6 @@
             "value": "..."
           }
         ]
-      },
-      "PersonIdentifierOut": {
-        "properties": {
-          "kind": {
-            "$ref": "#/components/schemas/IdentifierKind"
-          },
-          "value": {
-            "type": "string",
-            "title": "Value",
-            "description": "Normalised."
-          }
-        },
-        "type": "object",
-        "required": [
-          "kind",
-          "value"
-        ],
-        "title": "PersonIdentifierOut"
       },
       "PipelineOut": {
         "properties": {
@@ -38886,7 +38774,7 @@
           },
           "identifiers": {
             "items": {
-              "$ref": "#/components/schemas/PersonIdentifierOut"
+              "$ref": "#/components/schemas/IdentifierKeyOut"
             },
             "type": "array",
             "title": "Identifiers"
@@ -38953,7 +38841,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 254
+                "maxLength": 200
               },
               {
                 "type": "null"
@@ -38996,12 +38884,22 @@
         "examples": [
           {
             "aliases": [
-              "Anna Sample"
+              "E. Mustermann"
             ],
             "birth_date": "1980-06-15",
-            "display_name": "Anna Example"
+            "display_name": "Erika Mustermann"
           }
         ]
+      },
+      "ProgressStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "done",
+          "failed"
+        ],
+        "title": "ProgressStatus"
       },
       "ProposeContext": {
         "properties": {
@@ -39200,6 +39098,7 @@
             "description": "The browser's auth secret (base64url)."
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "p256dh",
@@ -39229,6 +39128,7 @@
               ]
             },
             "type": "array",
+            "maxItems": 4,
             "title": "Kinds",
             "description": "What the caller is told about: `waiting` (documents wait in their inbox), `webhook_disabled` (one of their webhooks was switched off), and for admins `mailbox_failed` (a mailbox fails to fetch) and `job_failed` (a job was given up)."
           },
@@ -39371,6 +39271,7 @@
           "only_identifier",
           "contact_is_recipient",
           "contact_identifiers_several",
+          "contact_identifier_of_other",
           "contact_new_proposed",
           "contact_none",
           "contact_none_no_model",
@@ -39472,9 +39373,13 @@
           "pdf_encrypted",
           "pdf_unreadable",
           "pdf_unreadable_detail",
+          "pdf_too_complex",
           "image_unreadable",
           "image_unreadable_detail",
+          "image_too_large",
           "document_no_pages",
+          "document_too_many_pages",
+          "preview_too_many_pages",
           "ocr_failed",
           "text_unreadable",
           "signature_dropped",
@@ -39542,6 +39447,7 @@
           "tag_used_by_rules",
           "field_used_by_patterns",
           "field_used_by_rules",
+          "field_used_by_webhooks",
           "field_key_taken",
           "identifier_of_person",
           "identifier_of_contact",
@@ -39601,6 +39507,7 @@
           "code_invalid",
           "read_only_token",
           "upload_only_token",
+          "upload_only_token_fields",
           "push_off",
           "push_endpoint_refused",
           "push_keys_invalid",
@@ -39764,6 +39671,8 @@
           "mail_folder_missing",
           "mail_server_error",
           "mail_password_unreadable",
+          "mail_fetch_failed",
+          "mail_password_again",
           "mailbox_paused",
           "mail_too_large",
           "mail_step_failed",
@@ -39778,6 +39687,7 @@
           "delivery_owner_no_admin",
           "delivery_webhook_deleted",
           "delivery_secret_unusable",
+          "webhook_headers_again",
           "mail_rule_unreadable"
         ],
         "title": "ReasonCode"
@@ -40186,20 +40096,6 @@
         ],
         "title": "Removed"
       },
-      "ReparseOut": {
-        "properties": {
-          "queued": {
-            "type": "integer",
-            "title": "Queued",
-            "description": "Documents whose text is read again (not those queued already)."
-          }
-        },
-        "type": "object",
-        "required": [
-          "queued"
-        ],
-        "title": "ReparseOut"
-      },
       "ReprocessNode": {
         "type": "string",
         "enum": [
@@ -40307,7 +40203,7 @@
             "title": "Version"
           },
           "status": {
-            "$ref": "#/components/schemas/ApplicationStatus"
+            "$ref": "#/components/schemas/ProgressStatus"
           },
           "total": {
             "type": "integer",
@@ -40470,6 +40366,7 @@
               "$ref": "#/components/schemas/Trigger"
             },
             "type": "array",
+            "maxItems": 2,
             "minItems": 1,
             "title": "Triggers",
             "description": "`ingest`: when a document arrives; `change`: when a person changes it. A rule with a step that asks a webhook: `ingest` only."
@@ -40654,6 +40551,7 @@
               "$ref": "#/components/schemas/Trigger"
             },
             "type": "array",
+            "maxItems": 2,
             "minItems": 1,
             "title": "Triggers",
             "description": "`ingest`: when a document arrives; `change`: when a person changes it. A rule with a step that asks a webhook: `ingest` only."
@@ -41845,24 +41743,6 @@
         "title": "SentTask",
         "description": "A task: answer it at `callback` with `token` as `Authorization: Bearer` by `deadline`\n(`POST /api/v1/external/tasks/{id}/result`)."
       },
-      "SeriesNumberOut": {
-        "properties": {
-          "kind": {
-            "$ref": "#/components/schemas/IdentifierKind"
-          },
-          "value": {
-            "type": "string",
-            "title": "Value",
-            "description": "Normalised, as Lekto compares it."
-          }
-        },
-        "type": "object",
-        "required": [
-          "kind",
-          "value"
-        ],
-        "title": "SeriesNumberOut"
-      },
       "SeriesState": {
         "type": "string",
         "enum": [
@@ -42241,7 +42121,8 @@
                 "items": {
                   "$ref": "#/components/schemas/SpaceMember"
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 1000
               },
               {
                 "type": "null"
@@ -43859,6 +43740,7 @@
               "$ref": "#/components/schemas/SpaceSettlementIn"
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Spaces",
             "description": "Each space once."
           }
@@ -43958,7 +43840,7 @@
         ],
         "title": "VerdictsOut"
       },
-      "VersionKindOut": {
+      "VersionKind": {
         "type": "string",
         "enum": [
           "received",
@@ -43968,27 +43850,7 @@
           "separated",
           "merged"
         ],
-        "title": "VersionKindOut"
-      },
-      "VersionOriginOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title",
-            "description": "Its title now."
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "title"
-        ],
-        "title": "VersionOriginOut"
+        "title": "VersionKind"
       },
       "VisibilityOut": {
         "properties": {
@@ -44062,6 +43924,7 @@
               "type": "string"
             },
             "type": "array",
+            "maxItems": 13,
             "title": "Event Types",
             "description": "Event types: `document.confirmed`, `document.deleted`, `document.filed`, `document.lane_changed`, `document.moved`, `document.node_completed`, `document.node_deferred`, `document.node_delegated`, `document.node_started`, `document.received`, `document.review_required`, `document.updated`, or `*` for all, also future ones. None: the webhook serves rules only.",
             "default": []
@@ -44526,7 +44389,8 @@
                 "items": {
                   "type": "string"
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 13
               },
               {
                 "type": "null"
@@ -44925,7 +44789,7 @@
               }
             ],
             "default": null,
-            "description": "A request that does not fit (422): what is wrong with each part.",
+            "description": "A request that does not fit (422): what is wrong with each part, the first 50; `detail` then says how many there are.",
             "title": "Errors"
           }
         },
@@ -44985,6 +44849,9 @@
       "contact": "text"
     },
     "contact_identifiers_several": {},
+    "contact_identifier_of_other": {
+      "other": "text"
+    },
     "contact_new_proposed": {
       "sender": "text"
     },
@@ -45213,11 +45080,24 @@
     "pdf_unreadable_detail": {
       "detail": "text"
     },
+    "pdf_too_complex": {},
     "image_unreadable": {},
     "image_unreadable_detail": {
       "detail": "text"
     },
+    "image_too_large": {
+      "pixels": "number",
+      "max": "number"
+    },
     "document_no_pages": {},
+    "document_too_many_pages": {
+      "pages": "number",
+      "max": "number"
+    },
+    "preview_too_many_pages": {
+      "pages": "number",
+      "max": "number"
+    },
     "ocr_failed": {
       "problem": "reason",
       "detail": "text"
@@ -45360,6 +45240,10 @@
       "key": "text",
       "rules": "list"
     },
+    "field_used_by_webhooks": {
+      "key": "text",
+      "webhooks": "list"
+    },
     "field_key_taken": {
       "field": "text",
       "key": "text",
@@ -45488,10 +45372,15 @@
     "code_invalid": {},
     "read_only_token": {},
     "upload_only_token": {},
+    "upload_only_token_fields": {
+      "fields": "list"
+    },
     "push_off": {},
     "push_endpoint_refused": {},
     "push_keys_invalid": {},
-    "push_devices_limit": {},
+    "push_devices_limit": {
+      "max": "number"
+    },
     "csrf_missing": {
       "header": "text"
     },
@@ -45612,7 +45501,9 @@
       "value": "text"
     },
     "not_customer_number": {
-      "value": "text"
+      "value": "text",
+      "min": "number",
+      "max": "number"
     },
     "not_of_kind": {
       "value": "text",
@@ -45660,7 +45551,9 @@
       "kind": "identifier_kind"
     },
     "not_personnel_number": {
-      "value": "text"
+      "value": "text",
+      "min": "number",
+      "max": "number"
     },
     "not_domain": {
       "value": "text"
@@ -45878,6 +45771,8 @@
       "detail": "text"
     },
     "mail_password_unreadable": {},
+    "mail_fetch_failed": {},
+    "mail_password_again": {},
     "mailbox_paused": {},
     "mail_too_large": {
       "subject": "text",
@@ -45900,6 +45795,7 @@
     "delivery_owner_no_admin": {},
     "delivery_webhook_deleted": {},
     "delivery_secret_unusable": {},
+    "webhook_headers_again": {},
     "mail_rule_unreadable": {
       "detail": "text"
     }

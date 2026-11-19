@@ -60,7 +60,7 @@ from lekto.adapters.inbound.rest.auth import (
 from lekto.adapters.inbound.rest.context import ApiContext
 from lekto.adapters.inbound.rest.events import EventHub
 from lekto.adapters.inbound.rest.middleware import LimitRequestBody, NoStore
-from lekto.adapters.inbound.rest.paths import HEALTH_PATH, MCP_PATH, PREFIX
+from lekto.adapters.inbound.rest.paths import HEALTH_PATH, LOGIN_PATH, MCP_PATH, PREFIX
 from lekto.adapters.inbound.rest.schemas.events import EventMessage
 from lekto.adapters.inbound.rest.schemas.external import TaskAnswer
 from lekto.adapters.inbound.rest.ui import UI_PREFIX, ui_routes
@@ -195,12 +195,18 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
     app.add_middleware(
         LimitRequestBody,
         limit=context.max_request_size,
-        # The uploads and the answers to tasks have their own limits.
+        # The uploads (every route that reads one with `read_upload(s)`) and the answers to
+        # tasks have their own limits.
         exempt={
             ("POST", f"{PREFIX}/documents"),
+            ("POST", f"{PREFIX}/documents/{{id}}/versions"),
+            ("POST", f"{PREFIX}/documents/{{id}}/edit"),
+            ("POST", f"{PREFIX}/documents/{{id}}/edit/pages"),
             ("PUT", master_data.LOGO_PATH),
             ("POST", PREFIX + TASK_RESULT),
         },
+        # The sign-in is public: what it may read and validate stays small.
+        limits={("POST", LOGIN_PATH): account.LOGIN_MAX_BODY},
     )
     app.add_middleware(
         NoStore,
@@ -342,20 +348,19 @@ def _docs(title: str, *, ui: bool) -> Callable[[Request], Awaitable[HTMLResponse
     the description stays at `openapi.json`."""
 
     async def docs(request: Request) -> HTMLResponse:
-        root = request.scope.get("root_path", "").rstrip("/")
         if not ui:
             return HTMLResponse(
                 "The API documentation comes with the web UI. The API's description: "
-                f"{root}{PREFIX}/openapi.json",
+                f"{PREFIX}/openapi.json",
                 status_code=404,
                 headers=_DOCS_HEADERS,
             )
         page = get_swagger_ui_html(
-            openapi_url=f"{root}{PREFIX}/openapi.json",
+            openapi_url=f"{PREFIX}/openapi.json",
             title=f"{title} - Swagger UI",
-            swagger_js_url=f"{root}{SWAGGER_PATH}/swagger-ui-bundle.js",
-            swagger_css_url=f"{root}{SWAGGER_PATH}/swagger-ui.css",
-            swagger_favicon_url=f"{root}{FAVICON_PATH}",
+            swagger_js_url=f"{SWAGGER_PATH}/swagger-ui-bundle.js",
+            swagger_css_url=f"{SWAGGER_PATH}/swagger-ui.css",
+            swagger_favicon_url=FAVICON_PATH,
         )
         scripts = " ".join(
             f"'sha256-{base64.b64encode(hashlib.sha256(script.encode()).digest()).decode()}'"

@@ -7,11 +7,9 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-import httpx2
 import pytest
 
 from lekto.adapters.inbound.rest.schemas.documents import UploadFields
-from lekto.composition.container import build_memory_container, build_services
 from lekto.composition.settings import Settings
 from lekto.core.domain.documents import Sha256
 from lekto.core.domain.errors import UnprocessableDocumentError
@@ -20,14 +18,13 @@ from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.services.objects import exchanges_key, original_key
-from tests import builders
-from tests.api import auth, issue_token
-from tests.builders import PASSWORD, SAMPLES
+from tests.api import auth
+from tests.builders import SAMPLES
 from tests.unit.adapters.rest.support import (
     DOCUMENTS,
     MAX_UPLOAD,
     Api,
-    make_app,
+    api_with,
     sample_file,
     unique_pdf,
     upload,
@@ -349,18 +346,10 @@ async def test_the_text_is_read_in_pieces(api: Api) -> None:
 async def test_one_piece_of_text_holds_what_the_setting_allows() -> None:
     """`LEKTO_MCP_TEXT_MAX` limits a piece over REST as over MCP: a larger `limit` gives a
     whole piece, the rest follows from `next_offset`."""
-    container = build_memory_container()
-    services = build_services(container, Settings.model_construct(mcp_text_max=4))
-    builders.skip_classification(services.pipeline)
-    app = make_app(container, services)
-    owner = await services.users.bootstrap_admin("root", PASSWORD)
-    assert owner is not None
-    await issue_token(services.auth, owner)
-    async with httpx2.AsyncClient(
-        transport=httpx2.ASGITransport(app=app), base_url="https://lekto"
-    ) as client:
+    async with api_with(settings=Settings.model_construct(mcp_text_max=4)) as api:
+        client, owner = api.client, await api.admin()
         response = await client.post(DOCUMENTS, files=sample_file(), headers=auth(owner))
-        await builders.drain(services.pipeline)
+        await api.drain()
         url = f"{response.json()['status_url']}/text"
         piece = (await client.get(url, headers=auth(owner))).json()
         larger = (await client.get(url, params={"limit": 5}, headers=auth(owner))).json()
@@ -537,16 +526,9 @@ async def test_unauthenticated_uploads_are_not_read(api: Api) -> None:
 
 
 async def test_the_limit_is_configured() -> None:
-    container = build_memory_container()
-    services = build_services(container)
-    app = make_app(container, services, max_upload=10)
-    owner = await services.users.bootstrap_admin("root", PASSWORD)
-    assert owner is not None
-    await issue_token(services.auth, owner)
-    async with httpx2.AsyncClient(
-        transport=httpx2.ASGITransport(app=app), base_url="http://lekto"
-    ) as client:
-        response = await client.post(DOCUMENTS, files=sample_file(), headers=auth(owner))
+    async with api_with(max_upload=10) as api:
+        owner = await api.admin()
+        response = await api.client.post(DOCUMENTS, files=sample_file(), headers=auth(owner))
     assert response.status_code == 413
 
 
@@ -558,10 +540,7 @@ async def test_unexpected_errors_are_problems_without_details(
 
     monkeypatch.setattr(api.services.documents, "view", broken)
     owner = await api.user()
-    async with httpx2.AsyncClient(
-        transport=httpx2.ASGITransport(app=api.app, raise_app_exceptions=False),
-        base_url="http://lekto",
-    ) as client:
+    async with api.new_client(raise_app_exceptions=False) as client:
         response = await client.get(f"{DOCUMENTS}/{UUID(int=1)}", headers=auth(owner))
     assert response.status_code == 500
     assert response.headers["content-type"] == PROBLEM
@@ -571,18 +550,11 @@ async def test_unexpected_errors_are_problems_without_details(
 
 async def test_uploads_have_their_own_limit() -> None:
     """M4-04: the general limit for request bodies (1 MiB) does not apply to uploads."""
-    container = build_memory_container()
-    services = build_services(container)
-    app = make_app(container, services, max_upload=2 * 1024 * 1024)
-    owner = await services.users.bootstrap_admin("root", PASSWORD)
-    assert owner is not None
-    await issue_token(services.auth, owner)
     content = b"%PDF-1.7\n%" + b"0" * (2 * 1024 * 1024 - 64 * 1024) + b"\n%%EOF\n"
-    async with httpx2.AsyncClient(
-        transport=httpx2.ASGITransport(app=app), base_url="http://lekto"
-    ) as client:
+    async with api_with(max_upload=2 * 1024 * 1024) as api:
+        owner = await api.admin()
         files = {"file": ("big.pdf", content, "application/pdf")}
-        response = await client.post(DOCUMENTS, files=files, headers=auth(owner))
+        response = await api.client.post(DOCUMENTS, files=files, headers=auth(owner))
     assert response.status_code == 202, response.text
 
 

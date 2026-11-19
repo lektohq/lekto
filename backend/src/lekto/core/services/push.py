@@ -17,7 +17,7 @@ from lekto.core.domain.errors import ConcurrencyError, ConflictError, NotFoundEr
 from lekto.core.domain.events import DomainEvent, ReviewRequired
 from lekto.core.domain.ids import PushDeviceId, UserId, new_id
 from lekto.core.domain.inbox import InboxTab
-from lekto.core.domain.jobs import Job
+from lekto.core.domain.jobs import Job, RetryPolicy
 from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.links import (
     DOCUMENT,
@@ -43,7 +43,7 @@ from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.push import PushOutcome, PushResult, PushSender
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
-from lekto.core.services._jobs import JobRunner
+from lekto.core.services._jobs import STORE_ATTEMPTS, JobRunner, retrying
 from lekto.core.services._push_queue import PUSH_JOB, queue_push
 from lekto.core.services.inbox import InboxService, in_inbox
 
@@ -53,6 +53,9 @@ SUBSCRIBER = "push"
 """The name of the event bus subscription that notes documents coming to wait."""
 
 LEASE = timedelta(minutes=2)
+RETRY = RetryPolicy(max_attempts=3, delay=timedelta(minutes=1))
+"""A notification whose attempt failed: again after one minute, then two; a later one says
+little more (SC-09)."""
 TITLES = 3
 """Titles of documents a notification names at most."""
 
@@ -126,7 +129,7 @@ class PushService:
 
     async def run_next_job(self) -> bool:
         """Claim and send a due notification; False if none was due."""
-        return await self._jobs.run_next([PUSH_JOB], LEASE, self._run)
+        return await self._jobs.run_next(self.job_kinds, LEASE, self._run)
 
     async def _run(self, job: Job) -> None:
         try:
@@ -137,8 +140,16 @@ class PushService:
         except (KeyError, ValueError, AssertionError) as error:
             await self._jobs.invalid(job, error)
             return
-        message = await self._message(user, kind, params)
-        sent = 0 if message is None else await self.send_to(user, message)
+        try:
+            # Another document noted for the user meanwhile changes their preferences: read
+            # them again (SC-09).
+            message = await retrying(
+                lambda: self._message(user, kind, params), attempts=STORE_ATTEMPTS, backoff=True
+            )
+            sent = 0 if message is None else await self.send_to(user, message)
+        except Exception as error:
+            await self._jobs.failed(job, error, RETRY, "push job failed")
+            return
         await self._jobs.end(job, result={"sent": sent})
 
     async def _message(
@@ -228,7 +239,7 @@ class PushService:
                 await uow.push_devices.update(device)
             else:
                 if len(await uow.push_devices.list_for(actor)) >= MAX_DEVICES:
-                    raise ConflictError(because(ReasonCode.PUSH_DEVICES_LIMIT))
+                    raise ConflictError(because(ReasonCode.PUSH_DEVICES_LIMIT, max=MAX_DEVICES))
                 await uow.push_devices.add(device)
             await uow.commit()
         log.info("push device registered", extra={"user_id": str(actor)})

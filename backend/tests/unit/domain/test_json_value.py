@@ -18,9 +18,11 @@ from lekto.core.domain.json_value import (
     as_text,
     as_texts,
     as_uuid,
+    loads,
     require_date,
     require_object,
     require_uuid,
+    same_json,
 )
 from lekto.core.domain.reading import readings_from_json
 
@@ -70,3 +72,30 @@ def test_input_that_must_fit_names_its_place(
 ) -> None:
     with pytest.raises(ValidationError, match=message):
         read(value, "document_date")
+
+
+def test_the_same_json_is_the_same_whatever_the_order_of_its_keys() -> None:
+    """Postgres gives `jsonb` back with its keys sorted."""
+    period: JsonObject = {"start": "2026-01-01", "end": "2026-01-31"}
+    sorted_back: JsonObject = {"end": "2026-01-31", "start": "2026-01-01"}
+    assert same_json(period, sorted_back)
+    assert same_json([period, 1], [sorted_back, 1])
+    assert not same_json(period, {"start": "2026-01-01", "end": "2026-02-28"})
+    assert not same_json(True, 1)
+    assert not same_json(1, 1.0)
+
+
+def test_json_nested_deeper_than_the_parser_goes_is_none() -> None:
+    """A RecursionError otherwise, which no caller of foreign JSON expects (XB-08)."""
+    assert loads('{"a": [1]}') == {"a": [1]}
+    for deep in ("[" * 10_000, b"[" * 100_000):
+        with pytest.raises(ValueError, match="nested too deeply"):
+            loads(deep)
+
+
+def test_a_number_that_is_not_finite_is_no_json() -> None:
+    """Python writes `NaN` by default; no comparison, template or `jsonb` takes it (DB-04)."""
+    assert loads('{"paid": 1.5, "big": 1e300}') == {"paid": 1.5, "big": 1e300}
+    for text in ('{"paid": NaN}', "[Infinity]", "[-Infinity]", '{"big": 1e999}'):
+        with pytest.raises(ValueError):
+            loads(text)

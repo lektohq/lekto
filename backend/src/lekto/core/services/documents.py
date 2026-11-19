@@ -3,6 +3,7 @@ import copy
 import hashlib
 import json
 import logging
+import tempfile
 from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -20,11 +21,21 @@ from lekto.core.domain.document_facts import (
     NUMBER_KINDS,
     DocumentFact,
     FactCriterion,
+    FactOrigin,
     FactRole,
     FactState,
+    Holder,
     person_only,
+    role_of,
 )
-from lekto.core.domain.documents import Channel, Document, DocumentChanges, confirms
+from lekto.core.domain.documents import (
+    MAX_TAGS,
+    Channel,
+    Document,
+    DocumentChanges,
+    Unset,
+    confirms,
+)
 from lekto.core.domain.errors import (
     ConflictError,
     NotFoundError,
@@ -32,7 +43,14 @@ from lekto.core.domain.errors import (
     ValidationError,
 )
 from lekto.core.domain.exchanges import RunExchange, exchanges_from_json
-from lekto.core.domain.facts import Facts, Span, facts_in, identifier_spans, on_pages
+from lekto.core.domain.facts import (
+    Facts,
+    FoundIdentifier,
+    Span,
+    facts_in,
+    identifier_spans,
+    on_pages,
+)
 from lekto.core.domain.fields import SORTABLE_TYPES, FieldType, FieldValue
 from lekto.core.domain.first_runs import Decision
 from lekto.core.domain.identifiers import TYPES, IdentifierKind
@@ -92,6 +110,7 @@ from lekto.core.services._access import (
     readable_log,
 )
 from lekto.core.services._first_runs import keep_verdicts
+from lekto.core.services._identifiers import as_seen, member_spaces
 from lekto.core.services._moves import move_by_person, move_target
 from lekto.core.services._tags import expand, expanded, tag_counts, tag_tree
 from lekto.core.services.fact_decisions import FactDecision, decide_fact
@@ -221,6 +240,54 @@ class DocumentFacts:
     # Whether the caller decides about the facts: an editor of the space or an admin.
     editable: bool = False
 
+    @property
+    def identifiers(self) -> tuple["IdentifierFact", ...]:
+        """The identifiers found (`facts.identifiers`), each with the fact kept for it: what REST
+        and MCP show alike (RA-10)."""
+        return tuple(
+            IdentifierFact.of(item, self.stored.get(item.key)) for item in self.facts.identifiers
+        )
+
+
+@dataclass(frozen=True, kw_only=True)
+class IdentifierFact:
+    """An identifier the document shows (`found`) as the fact kept for it tells: its role (the
+    kind's while none is kept), its state, whose it is, where it comes from, and whether it is
+    `kept`."""
+
+    found: FoundIdentifier
+    role: FactRole
+    state: FactState
+    origins: frozenset[FactOrigin]
+    holder: Holder | None
+    kept: bool
+
+    @classmethod
+    def of(cls, found: FoundIdentifier, kept: DocumentFact | None) -> "IdentifierFact":
+        """The text's patterns and a code as the facts are found now (a row taken over by
+        revision 0047 does not know whether a code held it), other sources as kept."""
+        origins = {
+            *([FactOrigin.PATTERN] if found.in_text else []),
+            *([FactOrigin.CODE] if found.in_code else []),
+        }
+        if kept is None:
+            return cls(
+                found=found,
+                role=role_of(found.kind),
+                state=FactState.FOUND,
+                origins=frozenset(origins),
+                holder=None,
+                kept=False,
+            )
+        return cls(
+            found=found,
+            role=kept.role,
+            state=kept.state,
+            origins=frozenset(origins | (kept.origins - {FactOrigin.PATTERN, FactOrigin.CODE})),
+            holder=kept.holder,
+            kept=True,
+        )
+
 
 @dataclass(frozen=True)
 class DocumentNumber:
@@ -317,6 +384,11 @@ async def _position(
     if last is None:
         raise ValidationError("cursor: its document is gone; start from the first page")
     return DocumentPosition.of(last, order)
+
+
+def _size_and_digest(path: Path) -> tuple[int, str]:
+    with path.open("rb") as handle:
+        return path.stat().st_size, hashlib.file_digest(handle, "sha256").hexdigest()
 
 
 def _code_facts(codes: Sequence[Code], amounts: dict[FieldId, FieldValue]) -> tuple[CodeFacts, ...]:
@@ -458,10 +530,9 @@ class DocumentService:
         async with self._uow() as uow:
             await readable_document(uow, await load_actor(uow, actor), id)
         try:
-            data = await load_text(store, id)
+            text = await load_text(store, id)
         except NotFoundError:
             raise ConflictError(because(ReasonCode.NO_TEXT_YET)) from None
-        text = data.decode("utf-8", errors="replace")
         end = offset + limit
         return DocumentText(
             text=text[offset:end],
@@ -482,14 +553,17 @@ class DocumentService:
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             document, space = await readable_document(uow, user, id)
-            contacts = await uow.contacts.list_all()
+            # The contacts' identifiers as the caller sees them (`as_seen`): another's number,
+            # one learned in a space not theirs or rejected shows as unknown (XA-01).
+            spaces = await member_spaces(uow, user)
+            contacts = [as_seen(item, user, spaces) for item in await uow.contacts.list_all()]
             definitions = await field_definitions(uow)
             editor = document_access(user, document, space) is SpaceRole.EDIT
             persons = await matching_persons(uow, user)
             labels = {item.id: item.label for item in await uow.users.list_all()}
             stored = {fact.key: fact for fact in await uow.document_facts.of_document(id)}
         try:
-            text = (await load_text(store, id)).decode("utf-8", errors="replace")
+            text = await load_text(store, id)
         except NotFoundError:
             raise ConflictError(because(ReasonCode.NO_TEXT_YET)) from None
         codes = await self._codes(id)
@@ -878,17 +952,23 @@ class DocumentService:
         return FileInfo(version.media_type, version.original_filename)
 
     async def _stored(self, key: str) -> StoredFile:
-        data = await self._object_store.get(key)
-        digest = await asyncio.to_thread(lambda: hashlib.sha256(data).hexdigest())
-        metadata = None
-        if self._metadata is not None:
-            try:
-                metadata = await self._metadata.read_metadata(data)
-            except UnprocessableDocumentError as error:
-                log.warning(
-                    "a file's metadata cannot be read", extra={"key": key, "reason": str(error)}
-                )
-        return StoredFile(size=len(data), sha256=digest, metadata=metadata)
+        """Size, SHA-256 and metadata of a stored file, read from a temporary copy: an
+        original may be as large as an upload, and the files of a document are a reader's to
+        look at (SB-09)."""
+        with tempfile.TemporaryDirectory(prefix="lekto-file-") as work:
+            path = Path(work) / "file"
+            await self._object_store.download(key, path)
+            size, digest = await asyncio.to_thread(_size_and_digest, path)
+            metadata = None
+            if self._metadata is not None:
+                try:
+                    metadata = await self._metadata.read_metadata(path)
+                except UnprocessableDocumentError as error:
+                    log.warning(
+                        "a file's metadata cannot be read",
+                        extra={"key": key, "reason": str(error)},
+                    )
+        return StoredFile(size=size, sha256=digest, metadata=metadata)
 
     async def document_counts(
         self, actor: UserId, by: CountBy, *, all_users: bool = False
@@ -985,11 +1065,6 @@ class DocumentService:
             undated=days.get(None, 0),
         )
 
-    async def list_visible(self, actor: UserId) -> list[Document]:
-        async with self._uow() as uow:
-            await load_actor(uow, actor)
-            return await uow.documents.list_visible_to(actor)
-
     async def filter_readers(self, id: DocumentId, candidates: Collection[UserId]) -> set[UserId]:
         """Those of `candidates` who may read the document now (admins: always); none if it does
         not exist. For pushing events to users (SSE), so it reads the current state."""
@@ -1059,20 +1134,6 @@ class DocumentService:
             log = await readable_log(uow, user, await uow.processing_log.list_for(id))
         return Review(document, access, open_nodes(document, log), node_reviews(log))
 
-    async def update_metadata(
-        self,
-        actor: UserId,
-        id: DocumentId,
-        changes: DocumentChanges,
-        *,
-        via: ViaToken | None = None,
-    ) -> Document:
-        """Needs write access. Referenced contact, type, topic, tags and fields must exist; the
-        topic is one the contact enables, or an admin's choice enables it there
-        (`_access.checked_changes`). A change of confirming metadata confirms the document,
-        unless it only adds or removes tags set by hand (`documents.confirms`)."""
-        return (await self.change_metadata(actor, id, changes, via=via)).document
-
     async def change_metadata(
         self,
         actor: UserId,
@@ -1083,13 +1144,19 @@ class DocumentService:
         confirm: bool = True,
         via: ViaToken | None = None,
     ) -> MetadataChange:
-        """As `update_metadata`, and the change rules of the document's space and the global
-        ones run (see `rules.changes`). The rules' report is for its editors and admins. With
-        `dry_run`, nothing is stored: what would happen. Without `confirm` (an admin, on a
+        """Needs write access. Referenced contact, type, topic, tags and fields must exist; the
+        topic is one the contact enables, or an admin's choice enables it there
+        (`_access.checked_changes`). A change of confirming metadata confirms the document,
+        unless it only adds or removes tags set by hand (`documents.confirms`). The change
+        rules of the document's space and the global ones run (see `rules.changes`). The
+        rules' report is for its editors and admins. With `dry_run`, nothing is stored: what
+        would happen. Without `confirm` (an admin, on a
         document taken over from another system: the migration aligns it with its source), the
         change neither confirms the document nor counts as a person's decision; the checks and
         the rules are the same. `via`: the API token the caller acts through, kept with the
         verdicts and in the log."""
+        if not isinstance(changes.tag_ids, Unset) and len(changes.tag_ids) > MAX_TAGS:
+            raise ValidationError(because(ReasonCode.INPUT_TOO_MANY, max=MAX_TAGS))
         # When the document came in is no metadata the rules decide on: changed alone, they
         # do not run (Tobi, 21.10.2026).
         rules = None if changes.only_receipt else self._rules

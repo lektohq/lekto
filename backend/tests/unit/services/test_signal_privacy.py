@@ -1,42 +1,27 @@
 """The similar documents a signal found are searched from the uploader's reach: an editor of
 the document's space, or who received it, sees only those they may read themselves."""
 
-from datetime import timedelta
+from functools import partial
 from typing import Any
 
 from lekto.core.domain.classification import Candidate, CandidateSource, FieldCheck, checks_to_json
 from lekto.core.domain.documents import Document
-from lekto.core.domain.pipeline import Node, NodeResult, NodeRun, Outcome
+from lekto.core.domain.pipeline import Node, NodeRun, Outcome
 from lekto.core.domain.reasons import written
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
 from tests import builders
-from tests.builders import NOW
-from tests.unit.services.support import World
+from tests.unit.services.support import World, node_run
 
-
-def _run(document: Document, node: Node, output: dict[str, object]) -> NodeRun:
-    return NodeRun(
-        document_id=document.id,
-        node=node,
-        run=1,
-        result=NodeResult(
-            outcome=Outcome.UNCERTAIN if node is Node.JUDGE else Outcome.OK,
-            reasons=(written("contact"),) if node is Node.JUDGE else (),
-            output=output,  # type: ignore[arg-type]
-        ),
-        pipeline_version="1",
-        started_at=NOW,
-        duration=timedelta(seconds=1),
-    )
+_run = partial(node_run, why="contact")
 
 
 async def _scene(world: World) -> tuple[User, User, Document, Document, Document]:
-    """Tobi's private document, one in a space he shares with Anna, and the new one there,
+    """Tobi's private document, one in a space he shares with Erika, and the new one there,
     whose signals found both."""
-    tobi, anna = await world.user(), await world.user()
+    tobi, erika = await world.user(), await world.user()
     shared = await world.spaces.create(tobi.id, "Shared")
-    await world.spaces.set_member(tobi.id, shared.id, anna.id, SpaceRole.EDIT)
+    await world.spaces.set_member(tobi.id, shared.id, erika.id, SpaceRole.EDIT)
     home = await world.personal_space(tobi)
     private = builders.processed(tobi, home, content="private")
     common = builders.processed(tobi, shared, content="common")
@@ -67,7 +52,7 @@ async def _scene(world: World) -> tuple[User, User, Document, Document, Document
         )
         await uow.processing_log.append(_run(new, Node.JUDGE, {"fields": checks_to_json([check])}))
         await uow.commit()
-    return tobi, anna, private, common, new
+    return tobi, erika, private, common, new
 
 
 def _neighbours(log: list[NodeRun]) -> tuple[list[object], bool]:
@@ -86,11 +71,11 @@ def _sources(log: list[NodeRun]) -> Any:
 
 
 async def test_a_co_editor_sees_only_the_similar_documents_they_may_read(world: World) -> None:
-    tobi, anna, private, common, new = await _scene(world)
-    log = await world.documents.processing_log(anna.id, new.id)
+    tobi, erika, private, common, new = await _scene(world)
+    log = await world.documents.processing_log(erika.id, new.id)
     assert _neighbours(log) == ([str(common.id)], False)
     assert _sources(log) == [str(common.id)]
-    review = await world.documents.review(anna.id, new.id)
+    review = await world.documents.review(erika.id, new.id)
     (judge,) = [node for node in review.nodes if node.node is Node.JUDGE]
     assert judge.fields[0].candidates[0].sources[0].documents == (str(common.id),)
     # The uploader reads both; what his documents carry stays with admins.

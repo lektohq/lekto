@@ -67,9 +67,9 @@ from lekto.core.domain.mail_rules import (
     first_match,
     mail_facts,
     record_facts,
+    unfit,
 )
 from lekto.core.domain.mail_traits import MailMarks
-from lekto.core.domain.permissions import can_file_into
 from lekto.core.domain.push import PushKind
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
 from lekto.core.ports.clock import Clock
@@ -203,6 +203,13 @@ class MailIntakeService:
             error = because(ReasonCode.MAIL_PASSWORD_UNREADABLE)
         except MailServerError as failure:
             error = failure.reason
+        except Exception:
+            # Anything else (the database gone for a moment, a bug) must not leave the job
+            # running and the mailbox silent: the fetch ends with the error at the mailbox, and
+            # the next one, at its time, tries the same mail again. Stopping the worker
+            # (`CancelledError`) is no `Exception` and goes through.
+            log.exception("fetching mail broke", extra={"mailbox_id": str(id)})
+            error = because(ReasonCode.MAIL_FETCH_FAILED)
         if error is not None:
             log.info("fetching mail failed", extra={"mailbox_id": str(id), "reason": error.text})
         await self._finish(job, id, started, count, error)
@@ -367,7 +374,7 @@ class MailIntakeService:
         now = self._clock.now()
         decided = replace(record, rule=decision.rule, rule_id=decision.rule_id, decided_at=now)
         try:
-            message = read_mail(data)
+            message = await asyncio.to_thread(read_mail, data)
         except UnprocessableDocumentError as error:
             await self._settle(replace(decided, outcome=MailOutcome.FAILED, reason=error.reason))
             return 0
@@ -467,7 +474,7 @@ class MailIntakeService:
         if data is None:
             return None
         try:
-            message = read_mail(data)
+            message = await asyncio.to_thread(read_mail, data)
         except UnprocessableDocumentError as error:
             await self._keep(replace(record, outcome=MailOutcome.FAILED, reason=error.reason))
             return 0
@@ -555,21 +562,9 @@ class MailIntakeService:
 
     async def _unfit(self, rule: MailRule) -> Reason | None:
         """Why the rule cannot take a mail now; None if it can."""
-        if rule.user_id is None:
-            return None
         async with self._uow() as uow:
-            person = await uow.users.find(rule.user_id)
-            if person is None or not person.active:
-                return because(ReasonCode.MAIL_RULE_PERSON_GONE)
-            if rule.space_id is not None:
-                space = await uow.spaces.find(rule.space_id)
-                if space is None or not can_file_into(person, space):
-                    return because(ReasonCode.MAIL_RULE_SPACE_UNREACHABLE)
-            if rule.text_type_id is not None and (
-                await uow.document_types.find(rule.text_type_id) is None
-            ):
-                return because(ReasonCode.MAIL_RULE_TYPE_GONE)
-        return None
+            code = await rule_unfit(uow, rule)
+        return None if code is None else because(code)
 
     async def _pause(self, rule: MailRule, reason: Reason) -> None:
         async def store() -> None:
@@ -617,7 +612,9 @@ class MailIntakeService:
                         related=tuple(related),
                         body_type_id=decision.body_type_id,
                     )
-                    found = await self._receive(folder, letter.message.raw, name, decision, cover)
+                    # An attached mail is written as a file only now, and may be large.
+                    raw = await asyncio.to_thread(_written, letter.message)
+                    found = await self._receive(folder, raw, name, decision, cover)
                     if found is not None and found[1]:
                         made += 1
         return made
@@ -801,6 +798,20 @@ async def _mark(
         await session.mark(folder, uid, add=system(add), remove=system(remove))
     if own(add) or own(remove):
         await session.mark(folder, uid, add=own(add), remove=own(remove))
+
+
+async def rule_unfit(uow: UnitOfWork, rule: MailRule) -> ReasonCode | None:
+    """Why the rule cannot take a mail (`mail_rules.unfit`), with what it names loaded."""
+    if rule.user_id is None:
+        return None
+    person = await uow.users.find(rule.user_id)
+    space = None if rule.space_id is None else await uow.spaces.find(rule.space_id)
+    kind = None if rule.text_type_id is None else await uow.document_types.find(rule.text_type_id)
+    return unfit(rule, person, space, kind)
+
+
+def _written(message: MailMessage) -> bytes:
+    return message.raw
 
 
 def _named(record: MailRecord, head: bytes | None) -> MailRecord:

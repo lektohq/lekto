@@ -7,6 +7,7 @@ import ssl
 from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import asynccontextmanager, contextmanager, suppress
 from datetime import timedelta
+from functools import partial
 
 from lekto.adapters.outbound.imap.names import listed
 from lekto.adapters.outbound.imap.session import ImapMailSession, folder_keywords
@@ -25,7 +26,7 @@ class ImapMailServer:
     def __init__(
         self,
         *,
-        timeout: timedelta = timedelta(seconds=30),
+        timeout: timedelta,
         ssl_context: ssl.SSLContext | None = None,
     ) -> None:
         self._timeout = timeout.total_seconds()
@@ -39,16 +40,13 @@ class ImapMailServer:
         imap = await asyncio.to_thread(self._connect, login)
         try:
             await asyncio.to_thread(self._sign_in, imap, login)
-            yield ImapMailSession(imap, _guarded)
+            yield ImapMailSession(imap, partial(_guarded, login.host))
         finally:
             await asyncio.to_thread(_leave, imap)
 
     def _run[T](self, login: MailLogin, work: Callable[[imaplib.IMAP4], T]) -> T:
         with self._session(login) as imap:
-            try:
-                return work(imap)
-            except imaplib.IMAP4.error as error:
-                raise MailServerError(_server_error(error)) from error
+            return _guarded(login.host, work, imap)
 
     @contextmanager
     def _session(self, login: MailLogin) -> Iterator[imaplib.IMAP4]:
@@ -131,16 +129,15 @@ def _leave(imap: imaplib.IMAP4) -> None:
         imap.logout()
 
 
-def _guarded[T](work: Callable[..., T], *args: object) -> T:
-    """`work` in a session: what the server answers as an error is a MailServerError; a lost
-    connection says the server cannot be reached."""
+def _guarded[T](host: str, work: Callable[..., T], *args: object) -> T:
+    """`work` in a session with the server at `host`: an error the server answers with is a
+    MailServerError in its words; a lost connection, or no answer within the timeout, says the
+    server cannot be reached (AD-14)."""
     try:
         return work(*args)
-    except imaplib.IMAP4.abort as error:
-        raise MailServerError(_server_error(error)) from error
+    except (imaplib.IMAP4.abort, OSError) as error:  # `abort` before the `error` it extends
+        raise MailServerError(because(ReasonCode.MAIL_UNREACHABLE, host=host)) from error
     except imaplib.IMAP4.error as error:
-        raise MailServerError(_server_error(error)) from error
-    except OSError as error:
         raise MailServerError(_server_error(error)) from error
 
 
@@ -160,7 +157,7 @@ def _folders(imap: imaplib.IMAP4) -> tuple[str, ...]:
     if status != "OK":
         raise imaplib.IMAP4.error(_text(entries))
     answer: list[bytes | tuple[bytes, bytes] | None] = list(entries)
-    names = {name for name, flags in listed(answer) if "\\noselect" not in flags}
+    names = {item.name for item in listed(answer) if "\\noselect" not in item.flags}
     names = {INBOX if name.upper() == INBOX else name for name in names}
     return tuple(sorted(names, key=lambda name: (name != INBOX, name.casefold())))
 
@@ -181,6 +178,10 @@ def _server_error(error: Exception) -> Reason:
 def _text(parts: object) -> str:
     """What the server said, short and as text."""
     items = parts if isinstance(parts, list | tuple) else [parts]
+    # A refusal carries the server's lines as a list (`NO [b'...']`): its words, not the list.
+    items = [
+        inner for item in items for inner in (item if isinstance(item, list | tuple) else [item])
+    ]
     words = [
         item.decode(errors="replace") if isinstance(item, bytes) else str(item)
         for item in items

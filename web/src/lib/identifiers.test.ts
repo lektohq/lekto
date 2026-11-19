@@ -95,13 +95,13 @@ describe('the user a number belongs to', () => {
 				value: 'K-4711',
 				source: 'manual',
 				topic_id: null,
-				user_id: 'anna'
+				user_id: 'erika'
 			},
 			{ kind: 'iban', value: 'DE89370400440532013000', source: 'manual', topic_id: null }
 		]);
-		rows[1].user_id = 'anna';
+		rows[1].user_id = 'erika';
 		expect(changesOf(rows).identifiers).toEqual([
-			{ kind: 'customer_number', value: 'K-4711', user_id: 'anna' },
+			{ kind: 'customer_number', value: 'K-4711', user_id: 'erika' },
 			{ kind: 'iban', value: 'DE89370400440532013000' }
 		]);
 	});

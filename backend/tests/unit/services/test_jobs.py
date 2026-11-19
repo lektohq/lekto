@@ -8,11 +8,11 @@ import pytest
 from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import ConflictError, PermissionDeniedError
 from lekto.core.domain.ids import JobId
-from lekto.core.domain.jobs import OPEN_STATES, JobState
+from lekto.core.domain.jobs import OPEN_STATES, Job, JobState, JobStatus, RetryPolicy
 from lekto.core.domain.master_data import Contact
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.users import Role
-from lekto.core.services._jobs import NODE_JOB, NodeJob
+from lekto.core.services._jobs import NODE_JOB, JobRunner, NodeJob
 from lekto.core.services.jobs import JobsService, KindSummary, RetryWay
 from tests.builders import NOW, incoming
 from tests.unit.services.support import World
@@ -227,3 +227,28 @@ async def test_durations_come_from_the_latest_jobs_of_a_kind_and_are_kept_a_minu
     world.clock.advance(timedelta(seconds=2))
     [_, counted] = (await service.durations(viewer.id)).kinds
     assert (counted.count, counted.run_median) == (2, timedelta(seconds=0))
+
+
+async def test_a_failed_attempt_runs_again_as_its_policy_says_then_is_given_up(
+    world: World, caplog: pytest.LogCaptureFixture
+) -> None:
+    """`JobRunner.failed`: what each service did by itself (SA-16)."""
+    runner = JobRunner(world.uow, world.clock)
+    policy = RetryPolicy(max_attempts=2, delay=timedelta(seconds=10))
+    async with world.uow() as uow:
+        await uow.jobs.enqueue("logo", {}, run_at=world.clock.now())
+        await uow.commit()
+
+    async def fail(job: Job) -> None:
+        await runner.failed(job, ValueError("broken"), policy, "logo job failed", contact="x")
+
+    assert await runner.run_next(["logo"], timedelta(minutes=1), fail)
+    (job,) = world.database.jobs.values()
+    assert (job.status, job.last_error) == (JobStatus.QUEUED, "ValueError: broken")
+    assert job.run_at == world.clock.now() + timedelta(seconds=10)
+    (record,) = [r for r in caplog.records if r.getMessage() == "logo job failed"]
+    assert (record.__dict__["attempt"], record.__dict__["contact"]) == (1, "x")
+    world.clock.advance(timedelta(seconds=10))
+    assert await runner.run_next(["logo"], timedelta(minutes=1), fail)
+    (job,) = world.database.jobs.values()
+    assert job.status is JobStatus.FAILED

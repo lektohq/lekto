@@ -3,17 +3,16 @@ document is its next version, every other part a new document in its space, the 
 without one; added files bring their pages but are no originals of their own; all of it in one
 transaction, and every result waits in the inbox."""
 
+import asyncio
 import logging
 from collections.abc import Sequence
 from dataclasses import replace
-from datetime import date
 from pathlib import Path
 
 import pytest
 
-from lekto.adapters.outbound.memory import FakePageComposer, fake_pdf
-from lekto.adapters.outbound.regex import RegexPatternMatcher
-from lekto.core.domain.documents import Channel, Document, DocumentChanges, Sha256
+from lekto.adapters.outbound.memory import FakePageComposer, FakePageRenderer, fake_pdf
+from lekto.core.domain.documents import Channel, Document, Sha256
 from lekto.core.domain.editing import MAX_ADDED, EditPart, PagePick
 from lekto.core.domain.errors import (
     ConcurrencyError,
@@ -22,47 +21,32 @@ from lekto.core.domain.errors import (
     UnsupportedMediaTypeError,
     ValidationError,
 )
-from lekto.core.domain.ids import MailboxId, MailRecordId, new_id
-from lekto.core.domain.mail_intake import MailOrigin, OriginRole
 from lekto.core.domain.pipeline import Lane, Node, ProcessingHistory
-from lekto.core.domain.reasons import ReasonCode
-from lekto.core.domain.users import Role, User
+from lekto.core.domain.users import User
 from lekto.core.domain.versions import VersionKind
 from lekto.core.ports.composer import PageSource
 from lekto.core.services._intake import SPLIT_FROM
-from lekto.core.services.editing import AddedFile
+from lekto.core.services.editing import AddedFile, EditingService
 from lekto.core.services.objects import original_key, page_key
-from lekto.core.services.rules.nodes import ApplyRulesNode
-from tests.builders import HOUR, NOW, TEMPLATES, incoming
-from tests.unit.services.support import World
-from tests.unit.services.test_maintenance import maintenance
+from tests.builders import HOUR, incoming
+from tests.unit.services.flows import mailed
+from tests.unit.services.support import (
+    CONFIRMED_ON,
+    STACK,
+    CancelledCommit,
+    World,
+    confirmed,
+    held_as_a_new_version,
+    part,
+    received,
+)
 
-STACK = fake_pdf(3, "three payslips")
 FORGOTTEN = fake_pdf(2, "forgotten pages")
 MEANWHILE = fake_pdf(1, "put in its place meanwhile")
 
 
-def part(*pages: int | tuple[int, int] | tuple[int, int, int], replaces: bool = False) -> EditPart:
-    """A part of pages of the original (a number), or of a source (source, page[, turn])."""
-    picks = []
-    for page in pages:
-        if isinstance(page, int):
-            picks.append(PagePick(0, page))
-        else:
-            picks.append(PagePick(*page))
-    return EditPart(tuple(picks), replaces=replaces)
-
-
 def added(data: bytes, name: str = "forgotten.pdf") -> AddedFile:
     return AddedFile(incoming(data), name)
-
-
-async def received(world: World) -> tuple[User, Document]:
-    """A user and their document of three pages, processed."""
-    owner = await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
-    await world.drain()
-    return owner, document
 
 
 async def test_a_part_replaces_the_document_and_the_others_become_new_documents(
@@ -128,26 +112,7 @@ async def test_pages_split_off_a_mailed_document_keep_its_mail(world: World) -> 
     document = await world.pipeline().receive(
         owner.id, incoming(STACK), filename="stack.pdf", channel=Channel.MAIL
     )
-    origin = MailOrigin(
-        document_id=document.id,
-        record_id=MailRecordId(new_id()),
-        mailbox_id=MailboxId(new_id()),
-        mailbox="Post",
-        rule="Scans",
-        role=OriginRole.ATTACHMENT,
-        letter=1,
-        message_id="<scans@example.org>",
-        sender=(),
-        to=(),
-        cc=(),
-        subject="Scans",
-        sent_at=None,
-        arrived_at=NOW,
-        filename="stack.pdf",
-    )
-    async with world.uow() as uow:
-        await uow.mail_origins.add(origin)
-        await uow.commit()
+    origin = await mailed(world, document, "stack.pdf")
     await world.drain()
     result = await world.editing.edit(owner.id, document.id, [part(1, 2, replaces=True), part(3)])
     _, new = (view.document for view in result.documents)
@@ -165,7 +130,7 @@ async def test_without_a_part_that_replaces_it_the_document_is_deleted(world: Wo
     with pytest.raises(NotFoundError):
         await world.documents.get(owner.id, document.id)
     assert "document.deleted" in world.event_types()
-    service = maintenance(world)
+    service = world.maintenance()
     while await service.run_next_job():
         pass
     # Its original goes; the parts are originals of their own.
@@ -294,36 +259,44 @@ async def test_a_part_that_cannot_be_stored_leaves_no_other(
     assert world.object_store.keys("originals/") == originals
 
 
+async def test_an_edit_stored_as_it_was_cancelled_keeps_its_files(world: World) -> None:
+    """Cancelled while the database answered the commit (the API stopped, the connection
+    lost): the edit is stored, and the files of its documents stay."""
+    owner, document = await received(world)
+    cancelled = CancelledCommit(world.uow)
+    editing = EditingService(
+        cancelled,
+        world.clock,
+        world.object_store,
+        world.composer,
+        FakePageRenderer(pages=2),
+        pipeline_version="test",
+    )
+    cancelled.armed = True
+    with pytest.raises(asyncio.CancelledError):
+        await editing.edit(owner.id, document.id, [part(1), part(2, 3)])  # none replaces it
+    async with world.uow() as uow:
+        documents = await uow.documents.list_all()
+    assert document.id not in {item.id for item in documents} and len(documents) == 2
+    for item in documents:
+        assert await world.object_store.exists(original_key(item.sha256))
+
+
 async def test_every_result_waits_in_the_inbox_and_what_was_confirmed_stays(
     world: World,
 ) -> None:
-    owner = await world.user()
-    admin = await world.user(role=Role.ADMIN)
-    contact = await world.master_data.create_contact(admin.id, "INTER")
-    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
-    await world.drain()
-    await world.documents.update_metadata(
-        owner.id,
-        document.id,
-        DocumentChanges(contact_id=contact.id, document_date=date(2022, 11, 25)),
-    )
-    rules = ApplyRulesNode(
-        world.uow, world.object_store, RegexPatternMatcher(0.2), TEMPLATES, max_text=200_000
-    )
-    pipeline = world.pipeline({Node.APPLY_RULES: rules})
-    result = await world.editing.edit(owner.id, document.id, [part(3, replaces=True), part(1, 2)])
-    await world.drain(pipeline)
+    c = await confirmed(world)
+    edits = [part(3, replaces=True), part(1, 2)]
+    result = await world.editing.edit(c.owner.id, c.document.id, edits)
+    await world.drain(c.pipeline)
     edited, new = [
-        await world.documents.get(owner.id, view.document.id) for view in result.documents
+        await world.documents.get(c.owner.id, view.document.id) for view in result.documents
     ]
-    assert (edited.contact_id, edited.document_date) == (contact.id, date(2022, 11, 25))
+    assert (edited.contact_id, edited.document_date) == (c.contact, CONFIRMED_ON)
     assert new.contact_id is None
     for item in (edited, new):
         assert item.lane is Lane.YELLOW
-        log = await world.documents.processing_log(owner.id, item.id)
-        entry = ProcessingHistory(log).latest(Node.APPLY_RULES)
-        assert entry is not None
-        assert ReasonCode.NEW_VERSION in {reason.code for reason in entry.result.reasons}
+        assert await held_as_a_new_version(world, c.owner, item)
     assert new.channel is Channel.API
 
 

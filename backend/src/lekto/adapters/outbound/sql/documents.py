@@ -56,7 +56,7 @@ from lekto.core.domain.pipeline import (
 )
 from lekto.core.domain.reasons import reasons_from_json, reasons_to_json
 from lekto.core.domain.sorting import sort_key
-from lekto.core.domain.verdict import KnownLabels
+from lekto.core.domain.verdict import KnownLabels, known_space
 from lekto.core.ports.repository import (
     NEWEST_FIRST,
     CountBy,
@@ -78,9 +78,6 @@ class SqlDocumentRepository(SqlRepository[DocumentId, Document]):
     async def find_by_sha256(self, sha256: Sha256) -> Document | None:
         found = await self._load(t.documents.c.sha256 == sha256.hex)
         return found[0] if found else None
-
-    async def list_visible_to(self, user: UserId) -> list[Document]:
-        return await self._load(visible_to(user))
 
     async def field_in_use(
         self,
@@ -296,12 +293,11 @@ class SqlDocumentRepository(SqlRepository[DocumentId, Document]):
         ).all()
         return KnownLabels(
             spaces=frozenset(
-                SpaceId(
-                    reader_space
-                    if reader_space is not None
-                    and row.personal_of is not None
-                    and row.personal_of == row.uploaded_by
-                    else row.space_id
+                known_space(
+                    SpaceId(row.space_id),
+                    None if row.personal_of is None else UserId(row.personal_of),
+                    None if row.uploaded_by is None else UserId(row.uploaded_by),
+                    None if reader_space is None else SpaceId(reader_space),
                 )
                 for row in decided
             ),

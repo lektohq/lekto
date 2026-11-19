@@ -137,14 +137,29 @@ class Paperless:
             raise _UnavailableError(f"GET {path}: HTTP {response.status_code}")
         if response.status_code >= 400:
             raise PaperlessError(f"GET {path}: HTTP {response.status_code}")
+        if response.is_redirect:  # the client follows none: another address is meant (MI-07)
+            raise PaperlessError(
+                f"GET {path}: HTTP {response.status_code}, sent on to "
+                f"{response.headers.get('location', '?')}: set the address it leads to"
+            )
         self.version = response.headers.get("x-version", self.version)
         return response
+
+    async def _json(self, path: str, **params: Any) -> Any:
+        """The JSON Paperless answers; a page that is none (a proxy's sign-in, say) is a
+        PaperlessError, not a traceback (MI-07)."""
+        response = await self._get(path, **params)
+        try:
+            return response.json()
+        except ValueError:
+            kind = response.headers.get("content-type", "no content type")
+            raise PaperlessError(f"GET {path}: no JSON in the answer ({kind})") from None
 
     async def pages(self, path: str, **params: Any) -> AsyncIterator[dict[str, Any]]:
         """Every result of a list endpoint, page by page."""
         page = 1
         while True:
-            data = (await self._get(path, page=page, page_size=100, **params)).json()
+            data = await self._json(path, page=page, page_size=100, **params)
             for item in data["results"]:
                 yield item
             if not data.get("next"):
@@ -155,7 +170,7 @@ class Paperless:
         return [item async for item in self.pages(path, **params)]
 
     async def count(self, path: str) -> int:
-        return int((await self._get(path, page_size=1)).json()["count"])
+        return int((await self._json(path, page_size=1))["count"])
 
     async def snapshot(self, *, limit: int | None = None) -> Snapshot:
         documents = await self.all(

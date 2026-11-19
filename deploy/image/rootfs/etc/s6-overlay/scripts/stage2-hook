@@ -3,11 +3,13 @@
 # LEKTO_ROLE to S6_RUNTIME_BUNDLEDIR (/run, so that /etc stays as built): a service the role does
 # not run is not in it, and s6 never starts it. Started only to stop at once, it raced s6-rc's wait
 # for it ("s6-ftrigrd: fatal: unable to flush asyncout: Broken pipe" in the log). An unknown role
-# keeps every service; init-lekto refuses it.
+# keeps every service; init-lekto refuses it. It runs before init-lekto, so it reads the role as
+# Lekto does itself (whitespace removed, a blank value as not set, any case).
 set -eu
 source=/etc/s6-overlay/user-bundles.d
 target=$(printenv S6_RUNTIME_BUNDLEDIR)
-role=$(printf %s "${LEKTO_ROLE:-all}" | tr '[:upper:]' '[:lower:]')
+role=$(printf %s "${LEKTO_ROLE:-}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+role=${role:-all}
 
 rm -rf "$target"
 mkdir -p "$target"

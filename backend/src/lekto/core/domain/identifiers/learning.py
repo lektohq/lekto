@@ -1,11 +1,10 @@
-"""Learning identifiers of contacts from confirmed documents (`mine_identifiers`): a value that
-stands in at least two of them, all of one contact. A value in documents of several contacts
-(the owner's own IBAN on every direct debit) is never learned. Where an IBAN or a creditor ID
-belongs to someone other than the document's contact (a payee's IBAN on a bank statement,
-`domain.holders`), it does not count for that contact; one a person holds anywhere is never
-learned. A learned one points to the
-topic all its documents carry, keeps the spaces they lie in, and a customer or personnel number
-the user they all surely belong to."""
+"""Learning identifiers of contacts from confirmed documents (`mine_identifiers`): a customer,
+contract or personnel number (`LEARNED_KINDS`) that stands in at least two of them, all of one
+contact. A value in documents of several contacts is never learned. Where a number belongs to
+someone other than the document's contact (a payee's customer number in the bookings of a bank
+statement, `domain.holders`), it does not count for that contact; one a person holds anywhere
+is never learned. A learned one points to the topic all its documents carry, keeps the spaces
+they lie in, and the user they all surely belong to."""
 
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
@@ -31,8 +30,8 @@ class Confirmed:
     """A confirmed document as training learns from it: its contact and topic, the identifiers
     in its text, the space it lies in, whose it surely is (`whose`: the user of the personal
     space it lies in and the users it names by more than their name), which of its identifiers
-    belong to someone other than its contact (`foreign`: an IBAN or a creditor ID of a person
-    or a third party, `domain.holders`) and which of those to a person (`personal`)."""
+    belong to someone other than its contact (`foreign`: a person's or a third party's, as
+    their holder tells, `domain.holders`) and which of those to a person (`personal`)."""
 
     contact: ContactId | None
     topic: TagId | None
@@ -55,8 +54,8 @@ def mine_identifiers(
     is one of the persons' values `personal` (`of_person`: also a customer number that stands
     in a social security number). A learned value points to a topic if all its documents carry
     that one; otherwise to none. It notes the spaces its documents lie in (`learned_in`); a
-    customer or personnel number belongs to a user if every one of its documents is surely that
-    user's alone (`Confirmed.whose`). Only the kinds training learns are learned
+    customer, contract or personnel number belongs to a user if every one of its documents is
+    surely that user's alone (`Confirmed.whose`). Only the kinds training learns are learned
     (`LEARNED_KINDS`: customer, contract, personnel number): a person's numbers never become a
     contact's. A value that belongs to someone other than a
     document's contact does not count in it (`Confirmed.foreign`); one a person holds in any of

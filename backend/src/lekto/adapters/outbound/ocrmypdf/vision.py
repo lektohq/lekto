@@ -43,6 +43,7 @@ from lekto.adapters.outbound.http_client.openai import (
     response_object,
 )
 from lekto.core.domain.exchanges import ModelCall
+from lekto.core.domain.json_value import loads
 
 PROMPT = "read-1"
 """The version of `SYSTEM` and `SCHEMA`, for the processing log."""
@@ -277,7 +278,7 @@ def parse_answer(content: str, size: tuple[int, int]) -> list[Line]:
     """The lines of the model's answer, their boxes within an image of `size`. ValueError if
     the answer does not fit `SCHEMA`."""
     try:
-        data = json.loads(_FENCE.sub("", content.strip()))
+        data = loads(_FENCE.sub("", content.strip()))
     except ValueError:
         raise ValueError("the answer is not JSON") from None
     items = data.get("lines") if isinstance(data, dict) else None

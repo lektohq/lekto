@@ -5,7 +5,7 @@ from uuid import UUID
 import pytest
 
 from lekto.core.domain.errors import ValidationError
-from lekto.core.domain.fields import FieldDefinition, FieldType
+from lekto.core.domain.fields import FieldDefinition, FieldType, Writing
 from lekto.core.domain.ids import (
     ContactId,
     DocumentId,
@@ -19,6 +19,7 @@ from lekto.core.domain.ids import (
 )
 from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.master_data import TagScope
+from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.reasons import written
 from lekto.core.domain.rules import (
     MAX_ACTIONS,
@@ -29,7 +30,6 @@ from lekto.core.domain.rules import (
     MAX_TEXT,
     Action,
     AddTags,
-    ApplicationStatus,
     Condition,
     ConditionField,
     ForceReview,
@@ -60,6 +60,7 @@ from lekto.core.domain.rules_json import (
 )
 from lekto.core.domain.validation import MAX_NAME
 from tests.builders import NOW
+from tests.unit.domain.rules_support import field
 
 OWNER = UserId(new_id())
 ADMIN = UserId(new_id())
@@ -71,6 +72,7 @@ OTHER_TAG = TagId(new_id())
 SPACE = SpaceId(new_id())
 FIELD = FieldId(new_id())
 ID = str(new_id())
+WRITING = Writing("de", "EUR")
 
 ALWAYS = Condition(field=ConditionField.CHANNEL, op=Operator.IN, value=["web", "api"])
 
@@ -86,12 +88,6 @@ def definition(
         name=name,
         conditions=conditions or group(ALWAYS),
         actions=actions or (AddTags(frozenset({TAG})),),
-    )
-
-
-def field(data_type: FieldType, choices: tuple[str, ...] = ()) -> FieldDefinition:
-    return FieldDefinition.create(
-        name=data_type.value, data_type=data_type, now=NOW, choices=choices
     )
 
 
@@ -334,12 +330,13 @@ def test_repeatable_actions() -> None:
     "template",
     [
         "Invoice",
-        "{contact}",
-        "{contact} {document_type} {document_date} {filename}",
-        "{document_date} - {contact}",
+        "{{ contact }}",
+        "{{ contact }} {{ document_type }} {{ document_date }} {{ filename }}",
+        "{{ document_date | date: '%Y-%m' }} - {{ contact }}",
     ],
 )
-def test_title_template_with_known_placeholders(template: str) -> None:
+def test_a_title_template_is_kept_as_written(template: str) -> None:
+    """Its syntax and values are checked where the rule is saved (the renderer is a port)."""
     assert SetTitle(template).template == template
 
 
@@ -433,9 +430,9 @@ def test_field_condition_fits_data_type(
     data_type: FieldType, op: Operator, value: JsonValue
 ) -> None:
     choices = ("monthly", "yearly") if data_type is FieldType.CHOICE else ()
-    attr = field(data_type, choices)
+    attr = field(data_type, *choices)
 
-    check_fields(field_rule(attr, op, value), {attr.id: attr})
+    check_fields(field_rule(attr, op, value), {attr.id: attr}, WRITING)
 
 
 @pytest.mark.parametrize(
@@ -460,10 +457,10 @@ def test_field_operator_must_fit_data_type(
     data_type: FieldType, op: Operator, value: JsonValue
 ) -> None:
     choices = ("monthly", "yearly") if data_type is FieldType.CHOICE else ()
-    attr = field(data_type, choices)
+    attr = field(data_type, *choices)
 
     with pytest.raises(ValidationError, match=f"operator '{op}' does not apply to field"):
-        check_fields(field_rule(attr, op, value), {attr.id: attr})
+        check_fields(field_rule(attr, op, value), {attr.id: attr}, WRITING)
 
 
 @pytest.mark.parametrize(
@@ -486,10 +483,10 @@ def test_field_condition_value_must_fit(
     data_type: FieldType, op: Operator, value: JsonValue
 ) -> None:
     choices = ("monthly", "yearly") if data_type is FieldType.CHOICE else ()
-    attr = field(data_type, choices)
+    attr = field(data_type, *choices)
 
     with pytest.raises(ValidationError, match="does not accept"):
-        check_fields(field_rule(attr, op, value), {attr.id: attr})
+        check_fields(field_rule(attr, op, value), {attr.id: attr}, WRITING)
 
 
 @pytest.mark.parametrize(
@@ -524,22 +521,22 @@ def test_set_field_value_must_fit(data_type: FieldType, value: JsonValue, fits: 
     """Text is a template for every type; without markup it writes itself and must be readable
     as the field's type has it (`fields.read_written`)."""
     choices = ("monthly", "yearly") if data_type is FieldType.CHOICE else ()
-    attr = field(data_type, choices)
+    attr = field(data_type, *choices)
     rule = definition(SetField(attr.id, value))
 
     if fits:
-        check_fields(rule, {attr.id: attr})
+        check_fields(rule, {attr.id: attr}, WRITING)
     else:
         with pytest.raises(ValidationError, match="does not accept"):
-            check_fields(rule, {attr.id: attr})
+            check_fields(rule, {attr.id: attr}, WRITING)
 
 
 def test_missing_field_is_rejected() -> None:
     attr = field(FieldType.TEXT)
     with pytest.raises(ValidationError, match=f"field {attr.id} does not exist"):
-        check_fields(field_rule(attr, Operator.PRESENT), {})
+        check_fields(field_rule(attr, Operator.PRESENT), {}, WRITING)
     with pytest.raises(ValidationError, match="does not exist"):
-        check_fields(definition(SetField(attr.id, "x")), {})
+        check_fields(definition(SetField(attr.id, "x")), {}, WRITING)
 
 
 def test_errors_of_stored_data_and_scope_name_the_place() -> None:
@@ -556,10 +553,10 @@ def test_errors_of_stored_data_and_scope_name_the_place() -> None:
     with pytest.raises(
         ValidationError, match=r"^conditions\.all\[1\]\.any\[1\]: .*does not accept"
     ):
-        check_fields(nested, {number.id: number})
+        check_fields(nested, {number.id: number}, WRITING)
     fitting = definition(SetField(number.id, "seven"), AddTags(frozenset({TAG})))
     with pytest.raises(ValidationError, match=r"^actions\[0\]: .*does not accept"):
-        check_fields(fitting, {number.id: number})
+        check_fields(fitting, {number.id: number}, WRITING)
     with pytest.raises(ValidationError, match=r"^actions\[2\]: an action sets the same field"):
         definition(SetTitle("A"), AddTags(frozenset({TAG})), SetTitle("B"))
 
@@ -788,7 +785,7 @@ def application(
 def test_application_progress() -> None:
     a, b, c, d = (DocumentId(new_id()) for _ in range(4))
     run = application(a, b, c, d, accept=frozenset({b}))
-    assert (run.status, run.remaining) == (ApplicationStatus.QUEUED, (a, b, c, d))
+    assert (run.status, run.remaining) == (ProgressStatus.QUEUED, (a, b, c, d))
 
     run.record_applied()
     run.record_unchanged()
@@ -796,14 +793,14 @@ def test_application_progress() -> None:
 
     assert (run.position, run.applied, run.unchanged) == (3, 1, 1)
     assert run.skipped == [(c, written("the space is read-only"))]
-    assert (run.status, run.remaining) == (ApplicationStatus.RUNNING, (d,))
+    assert (run.status, run.remaining) == (ProgressStatus.RUNNING, (d,))
 
     run.record_applied()
     later = NOW + timedelta(minutes=1)
     run.finish(later)
 
     assert not run.remaining
-    assert (run.status, run.error, run.finished_at) == (ApplicationStatus.DONE, None, later)
+    assert (run.status, run.error, run.finished_at) == (ProgressStatus.DONE, None, later)
 
 
 def test_application_fails_with_error() -> None:
@@ -811,7 +808,7 @@ def test_application_fails_with_error() -> None:
 
     run.finish(NOW, error="database gone")
 
-    assert run.status is ApplicationStatus.FAILED
+    assert run.status is ProgressStatus.FAILED
     assert run.error == "database gone"
 
 
@@ -831,6 +828,7 @@ def test_a_period_starts_after_and_ends_before_a_date() -> None:
         check_fields(
             field_rule(attr, Operator.GT, {"start": "2026-09-01", "end": "2026-09-30"}),
             {attr.id: attr},
+            WRITING,
         )
 
 

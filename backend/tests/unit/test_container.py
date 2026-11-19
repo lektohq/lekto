@@ -9,12 +9,14 @@ from typing import Any
 import httpx2
 import pytest
 
+from lekto.adapters.inbound.rest.paths import MCP_PATH
 from lekto.adapters.outbound.crypto import Argon2PasswordHasher, PyotpTotp
 from lekto.adapters.outbound.filesystem import FilesystemObjectStore
 from lekto.adapters.outbound.http_client.resolver import system_resolver
 from lekto.adapters.outbound.logos import HttpLogoFetcher
 from lekto.adapters.outbound.meilisearch import MeilisearchIndex
 from lekto.adapters.outbound.memory import FakeLogoFetcher, FakeOcr, FakeParser, ManualClock
+from lekto.adapters.outbound.memory.oidc import FakeOidcProvider
 from lekto.adapters.outbound.ocrmypdf import OcrmypdfEngine
 from lekto.adapters.outbound.ocrmypdf import engine as ocrmypdf_engine
 from lekto.adapters.outbound.ocrmypdf.vision import CONFIG_ENV
@@ -22,12 +24,16 @@ from lekto.adapters.outbound.oidc import AuthlibOidcProvider
 from lekto.adapters.outbound.openai_compat import OpenAiCompatEmbeddings, OpenAiCompatLanguageModel
 from lekto.adapters.outbound.pdfium import LayoutParser
 from lekto.adapters.outbound.pillow import PillowImageNormaliser
+from lekto.adapters.outbound.regex.matcher import RegexPatternMatcher
 from lekto.adapters.outbound.s3 import S3ObjectStore
 from lekto.adapters.outbound.sql import Database, SqlEventBus, SqlUnitOfWorkFactory, migrate
 from lekto.adapters.outbound.system import Completed, SystemClock
+from lekto.adapters.outbound.weasyprint import WeasyPrintMailRenderer
+from lekto.adapters.outbound.webpush.sender import WebPushSender, new_private_key
 from lekto.composition import container
-from lekto.composition.api import health_checks
+from lekto.composition.api import build_app, health_checks
 from lekto.composition.container import (
+    USER_AGENT,
     Closer,
     Opened,
     Persistence,
@@ -35,8 +41,8 @@ from lekto.composition.container import (
     build_memory_container,
     build_services,
 )
-from lekto.composition.errors import AdapterNotAvailableError
 from lekto.composition.settings import Settings
+from lekto.composition.worker import build_worker
 from lekto.core.domain import media_types
 from lekto.core.domain.events import DocumentReceived, DomainEvent, LaneChanged, ReviewRequired
 from lekto.core.domain.ids import DocumentId, new_id
@@ -45,7 +51,11 @@ from lekto.core.domain.pipeline import Lane, Node
 from lekto.core.domain.templates import TemplateValue
 from lekto.core.domain.users import Role
 from lekto.core.ports.ocr import VisionModel
+from lekto.core.services.classification.nodes import MOST_MODEL_CALLS
+from lekto.core.services.indexing import INDEX_ROUNDS
 from lekto.core.services.nodes import OcrNode, ParseNode
+from lekto.core.services.pipeline import PipelineService
+from lekto.core.services.rules.nodes import ApplyRulesNode
 from tests import builders
 from tests.builders import NOW, SAMPLES, incoming
 from tests.contracts.language_model import REQUEST
@@ -165,15 +175,12 @@ def timeout_of(request: httpx2.Request) -> float:
     return timeout
 
 
-def test_missing_adapter_is_reported_with_port_and_name(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_a_missing_adapter_is_a_key_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Only a test takes one out of a table: the settings allow no other name (CO-07)."""
     monkeypatch.setitem(container.PERSISTENCE, "sqlite", fake_persistence)
     monkeypatch.delitem(container.OBJECT_STORES, "filesystem")
-    with pytest.raises(AdapterNotAvailableError) as info:
+    with pytest.raises(KeyError, match="filesystem"):
         build_container(settings())
-    assert str(info.value) == "object_store: adapter 'filesystem' is not implemented yet"
-    assert (info.value.port, info.value.adapter) == ("object_store", "filesystem")
 
 
 def test_the_database_type_selects_the_sql_adapter(tmp_path: Path) -> None:
@@ -209,10 +216,10 @@ def test_each_port_is_checked_in_turn(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(container.PERSISTENCE, "sqlite", fake_persistence)
     monkeypatch.delitem(container.OCR_ENGINES, "ocrmypdf")
     monkeypatch.delitem(container.PARSERS, "layout")
-    with pytest.raises(AdapterNotAvailableError, match="ocr: adapter 'ocrmypdf'"):
+    with pytest.raises(KeyError, match="ocrmypdf"):
         build_container(settings())
     monkeypatch.setitem(container.OCR_ENGINES, "ocrmypdf", lambda _: object())
-    with pytest.raises(AdapterNotAvailableError, match="parser: adapter 'layout'"):
+    with pytest.raises(KeyError, match="layout"):
         build_container(settings())
 
 
@@ -234,7 +241,7 @@ async def test_processing_adapters_follow_the_settings(tmp_path: Path, ocr_runs:
 
 
 async def test_a_vision_model_reads_pages_when_configured(
-    tmp_path: Path, ocr_runs: OcrRuns
+    tmp_path: Path, ocr_runs: OcrRuns, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     configured = settings(
         vlm_base_url="https://user:pw@chat.example/api",
@@ -252,34 +259,57 @@ async def test_a_vision_model_reads_pages_when_configured(
     assert timeout == timedelta(minutes=10)  # for the whole document
     # Reading a document with the model may take longer than OCR: that OCR holds its job
     # longer, every other node as before.
-    # The model's signal may ask four times (proposal and facts, each once more): 4 times 5 min.
-    assert container.node_lease(configured) == timedelta(minutes=20) + WORK_LEASE_MARGIN
+    # The model's signal may ask four times (proposal and facts, each once more): 4 times 5 min,
+    # and read the PDF once more (10 min).
+    longest = MOST_MODEL_CALLS * timedelta(minutes=5) + timedelta(minutes=10)
+    assert container.node_lease(configured) == longest + WORK_LEASE_MARGIN
     assert container.vision_lease(configured) is None  # no longer than the others
-    slow = settings(vlm_base_url="https://chat.example/api", vlm_model="m", vlm_timeout="1800")
-    assert container.node_lease(slow) == timedelta(minutes=20) + WORK_LEASE_MARGIN
-    assert container.vision_lease(slow) == timedelta(minutes=30) + WORK_LEASE_MARGIN
-    assert build_services(build_memory_container(), slow).pipeline.vision_lease == (
-        timedelta(minutes=30) + WORK_LEASE_MARGIN
+    slow = settings(vlm_base_url="https://chat.example/api", vlm_model="m", vlm_timeout="2400")
+    assert container.node_lease(slow) == longest + WORK_LEASE_MARGIN
+    assert container.vision_lease(slow) == timedelta(minutes=40) + WORK_LEASE_MARGIN
+    assert pipeline_made(monkeypatch, slow)["vision_lease"] == (
+        timedelta(minutes=40) + WORK_LEASE_MARGIN
     )
     assert container.vision_lease(settings()) is None  # no vision model
 
 
-def test_services_take_their_tuning_from_the_settings() -> None:
+def pipeline_made(monkeypatch: pytest.MonkeyPatch, configured: Settings) -> dict[str, Any]:
+    """What `build_services` gives the pipeline of `configured`, by name."""
+    made: dict[str, Any] = {}
+
+    def pipeline(*args: Any, **named: Any) -> Any:
+        made.update(named)
+        return PipelineService(*args, **named)
+
+    with monkeypatch.context() as patched:
+        patched.setattr("lekto.composition.container.PipelineService", pipeline)
+        build_services(build_memory_container(), configured)
+    return made
+
+
+def test_services_take_their_tuning_from_the_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     configured = settings(
         node_max_attempts="5",
         node_retry_delay="10",
         ocr_timeout="300",
         llm_timeout="100",
+        pdf_timeout="60",
         cleanup_interval="60",
         retention="P1D",
     )
+    made = pipeline_made(monkeypatch, configured)
+    assert made["retry"] == RetryPolicy(max_attempts=5, delay=timedelta(seconds=10))
+    # The model's signal may ask four times: 4 times 100 s beyond the OCR's 300 s; a node may
+    # read a PDF besides (60 s).
+    asking = MOST_MODEL_CALLS * timedelta(seconds=100)
+    assert asking > timedelta(seconds=300)
+    assert made["lease"] == asking + timedelta(seconds=60) + WORK_LEASE_MARGIN
+    longer = pipeline_made(monkeypatch, settings(llm_timeout="400"))
+    assert longer["lease"] == (
+        MOST_MODEL_CALLS * timedelta(seconds=400) + timedelta(seconds=600) + WORK_LEASE_MARGIN
+    )
     services = build_services(build_memory_container(), configured)
     pipeline = services.pipeline
-    assert pipeline.retry_policy == RetryPolicy(max_attempts=5, delay=timedelta(seconds=10))
-    # The model's signal may ask four times: 4 times 100 s beyond the OCR's 300 s.
-    assert pipeline.lease == timedelta(seconds=400) + WORK_LEASE_MARGIN
-    longer = build_services(build_memory_container(), settings(llm_timeout="400")).pipeline
-    assert longer.lease == timedelta(seconds=1600) + WORK_LEASE_MARGIN
     assert isinstance(pipeline.executor(Node.OCR), OcrNode)
     assert isinstance(pipeline.executor(Node.PARSE), ParseNode)
     maintenance = services.maintenance
@@ -331,7 +361,7 @@ def test_optional_ports_are_only_selected_when_configured(
     monkeypatch.setitem(container.SEARCH_INDEXES, "meilisearch", lambda _: Opened(object()))
     assert build_container(settings(meilisearch_url="http://meilisearch:7700")).search_index
     monkeypatch.delitem(container.SEARCH_INDEXES, "meilisearch")
-    with pytest.raises(AdapterNotAvailableError, match="search_index: adapter 'meilisearch'"):
+    with pytest.raises(KeyError, match="meilisearch"):
         build_container(settings(meilisearch_url="http://meilisearch:7700"))
 
 
@@ -371,6 +401,17 @@ async def test_language_model_and_embeddings_from_settings(network: Network) -> 
     assert timeout_of(embedded) == 20
     assert model.aclose in built.closers and embeddings.aclose in built.closers
     await built.aclose()
+    keyed = build_container(
+        settings(
+            embedding_base_url="http://ollama:11434/v1",
+            embedding_model="bge-m3",
+            embedding_api_key="sk-2",
+        )
+    )
+    assert keyed.embeddings is not None
+    await keyed.embeddings.embed(["Rechnung"])
+    assert network.requests[-1].headers["Authorization"] == "Bearer sk-2"  # TC-06
+    await keyed.aclose()
 
 
 @pytest.mark.usefixtures("offline_adapters")
@@ -383,6 +424,14 @@ def test_templates_from_settings() -> None:
     assert built.templates.render(template, values) == "March CHF12.50"
     memory = build_memory_container()
     assert memory.templates.render(template, values) == "März 12,50\xa0€"
+
+
+@pytest.mark.usefixtures("offline_adapters")
+def test_the_head_of_a_mail_speaks_the_language_of_the_locale() -> None:
+    """`de_AT` makes a German head, not an English one (AD-04)."""
+    built = build_container(settings(template_locale="de_AT"))
+    assert isinstance(built.mail_renderer, WeasyPrintMailRenderer)
+    assert built.mail_renderer.language == "de"
 
 
 async def index_settings(index: MeilisearchIndex, network: Network) -> httpx2.Request:
@@ -483,9 +532,101 @@ def test_the_services_are_tuned_by_the_settings() -> None:
     assert policy.document_prefix == "passage: "
     assert policy.reconcile_interval == timedelta(hours=2)
     assert policy.rebuild_lease == timedelta(hours=9)
-    # Three rounds of embedding and writing, and a margin.
-    assert policy.job_lease == 3 * timedelta(minutes=3) + WORK_LEASE_MARGIN
+    # The rounds of embedding and writing, and a margin.
+    assert policy.job_lease == INDEX_ROUNDS * timedelta(minutes=3) + WORK_LEASE_MARGIN
     assert container.indexing_policy_of(settings()).document_prefix == ""
+
+
+def test_the_policies_take_each_setting_as_set() -> None:
+    """A value that is no default for each, so a policy that took another setting or the
+    default would fail ([[review-error-classes]] G-03; TC-06)."""
+    values = settings(
+        session_idle_timeout=timedelta(hours=5),
+        session_max_age=timedelta(days=9),
+        webhooks_per_user=7,
+        webhook_secret_grace=timedelta(hours=3),
+        webhook_timeout=timedelta(seconds=17),
+        webhook_max_attempts=4,
+        webhook_retry_delay=timedelta(seconds=11),
+        webhook_disable_after=6,
+        webhook_private_targets="all",
+        events_max_attempts=3,
+        llm_input_budget=9000,
+        llm_max_tags=40,
+        default_currency="CHF",
+        poor_reading_threshold=0.2,
+        classifier_min_examples=7,
+        classifier_retrain_after=9,
+        classifier_threshold=0.6,
+        confidence_threshold=0.95,
+        contact_suggest_threshold=0.65,
+        search_meaning_min_score=0.4,
+        separator_codes="PATCHT, SEP",
+    )
+    sessions = container.session_policy_of(values)
+    assert (sessions.idle, sessions.max_age) == (timedelta(hours=5), timedelta(days=9))
+    webhooks = container.webhook_policy_of(values)
+    assert (webhooks.per_user, webhooks.secret_grace, webhooks.timeout) == (
+        7,
+        timedelta(hours=3),
+        timedelta(seconds=17),
+    )
+    assert (webhooks.max_attempts, webhooks.retry_delay, webhooks.disable_after) == (
+        4,
+        timedelta(seconds=11),
+        6,
+    )
+    assert webhooks.private_targets.value == "all"
+    assert container.event_retry_of(values).max_attempts == 3
+    policy = container.policy_of(values)
+    assert (policy.input_budget, policy.max_tags, policy.default_currency) == (9000, 40, "CHF")
+    assert policy.poor_reading == 0.2
+    classifier = container.classifier_policy_of(values)
+    assert (classifier.min_examples, classifier.retrain_after, classifier.threshold) == (7, 9, 0.6)
+    thresholds = container.thresholds_of(values)
+    assert (thresholds.accept, thresholds.suggest, thresholds.classifier) == (0.95, 0.65, 0.6)
+    assert container.search_policy_of(values).meaning_min_score == 0.4
+    assert container.separators_of(values) == ("PATCHT", "SEP")
+
+
+async def test_the_services_take_each_setting_as_set() -> None:
+    """The rules, the sign-in through a provider, the worker, the MCP endpoint, push and the
+    patterns' time limit (TC-06)."""
+    key = new_private_key()
+    values = settings(
+        rules_max_text=5000,
+        rules_apply_max_documents=50,
+        rules_pattern_timeout=timedelta(seconds=0.5),
+        oidc_display_name="Muster Login",
+        worker_concurrency=3,
+        worker_shutdown_timeout=timedelta(seconds=12),
+        mcp_enabled=False,
+        push_vapid_private_key=key,
+        push_subject="mailto:jane.doe@example.org",
+    )
+    built = build_container(values)
+    assert isinstance(built.patterns, RegexPatternMatcher)
+    assert built.patterns._timeout == 0.5
+    assert isinstance(built.push_sender, WebPushSender)
+    assert built.push_sender._subject == "mailto:jane.doe@example.org"
+    same_key = WebPushSender(private_key=key, subject="mailto:x", user_agent=USER_AGENT)
+    assert built.push_sender.public_key == same_key.public_key
+    await built.aclose()
+
+    memory = replace(build_memory_container(), oidc=FakeOidcProvider())
+    services = build_services(memory, values)
+    assert (services.rule_applications._max_text, services.rule_applications._max_documents) == (
+        5000,
+        50,
+    )
+    applying = services.pipeline.executor(Node.APPLY_RULES)
+    assert isinstance(applying, ApplyRulesNode) and applying._max_text == 5000
+    assert services.oidc is not None and services.oidc.display_name == "Muster Login"
+    worker = build_worker(memory, values, services)
+    assert (worker._concurrency, worker._shutdown_timeout) == (3, timedelta(seconds=12))
+    paths = {getattr(route, "path", "") for route in build_app(memory, values, services).routes}
+    with_mcp = build_app(build_memory_container(), settings()).routes
+    assert MCP_PATH not in paths and MCP_PATH in {getattr(r, "path", "") for r in with_mcp}
 
 
 async def test_memory_container_runs_the_core() -> None:

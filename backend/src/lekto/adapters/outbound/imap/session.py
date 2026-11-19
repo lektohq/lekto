@@ -2,11 +2,12 @@
 
 import asyncio
 import imaplib
+import logging
 import re
 from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime, timedelta, timezone
 
-from lekto.adapters.outbound.imap.names import listed, quoted
+from lekto.adapters.outbound.imap.names import Listed, listed, quoted, quoted_raw
 from lekto.core.domain.mail_traits import shown_keywords
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.mail_server import (
@@ -16,6 +17,8 @@ from lekto.core.ports.mail_server import (
     MailSearch,
     MailServerError,
 )
+
+log = logging.getLogger(__name__)
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 _UID = re.compile(rb"UID (\d+)")
@@ -33,6 +36,7 @@ class ImapMailSession:
         self._run = run
         self._selected: str | None = None
         self._keywords: dict[str, tuple[tuple[str, ...], bool]] = {}
+        self._raw: dict[str, bytes] | None = None  # the folders as the server lists them
         self._lock = asyncio.Lock()
 
     async def search(self, folder: str, search: MailSearch) -> FolderMails:
@@ -70,7 +74,7 @@ class ImapMailSession:
     def _select(self, folder: str) -> None:
         if self._selected == folder:
             return
-        status, _ = self._imap.select(quoted(folder).decode())
+        status, _ = self._imap.select(self._mailbox(folder))  # type: ignore[arg-type]
         if status != "OK":
             raise MailServerError(because(ReasonCode.MAIL_FOLDER_MISSING, folder=folder))
         self._selected = folder
@@ -149,9 +153,10 @@ class ImapMailSession:
     def _move(self, folder: str, uid: int, target: str) -> None:
         self._select(folder)
         if "MOVE" in self._imap.capabilities:
-            status, _ = self._imap.uid("MOVE", str(uid), quoted(target).decode())
+            # imaplib sends bytes as they are (a name in UTF-8); its stubs say str only.
+            status, _ = self._imap.uid("MOVE", str(uid), self._mailbox(target))  # type: ignore[arg-type]
         else:
-            status, _ = self._imap.uid("COPY", str(uid), quoted(target).decode())
+            status, _ = self._imap.uid("COPY", str(uid), self._mailbox(target))  # type: ignore[arg-type]
             if status == "OK":
                 self._delete(folder, uid)
         if status != "OK":
@@ -179,11 +184,33 @@ class ImapMailSession:
         if status != "OK":
             return None
         folders = listed(list(entries))
-        for name, flags in folders:
-            if "\\trash" in flags:
-                return name
-        names = {name for name, _ in folders}
+        self._remember(folders)
+        for item in folders:
+            if "\\trash" in item.flags:
+                return item.name
+        names = {item.name for item in folders}
         return next((name for name in TRASH_NAMES if name in names), None)
+
+    def _mailbox(self, name: str) -> str | bytes:
+        """The folder `name` as the server listed it (once a session), quoted; as Lekto writes
+        it (modified UTF-7) for one it did not list. Bytes where the server's name is no
+        ASCII (UTF-8 it sends against the standard)."""
+        if self._raw is None:
+            status, entries = self._imap.list()
+            self._remember(listed(list(entries)) if status == "OK" else [])
+        assert self._raw is not None
+        raw = self._raw.get(name)
+        wire = quoted(name) if raw is None else quoted_raw(raw)
+        return wire.decode("ascii") if wire.isascii() else wire
+
+    def _remember(self, folders: Sequence[Listed]) -> None:
+        self._raw = {}
+        for item in folders:
+            if self._raw.setdefault(item.name, item.raw) != item.raw:
+                log.warning(
+                    "two folders are shown as one; the first is used",
+                    extra={"folder": item.name},
+                )
 
 
 def folder_keywords(imap: imaplib.IMAP4) -> tuple[tuple[str, ...], bool]:

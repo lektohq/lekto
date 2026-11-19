@@ -160,6 +160,22 @@ def test_match_says_which_unconfirmed_values_it_relies_on() -> None:
     ]
 
 
+def test_a_condition_on_a_confirmed_tag_does_not_rely_on_another_unconfirmed_one() -> None:
+    """The contact is unconfirmed, PAID confirmed, OPEN not: the rule relies on the contact
+    alone; naming the tags made their check uncertain on arrival (DB-05)."""
+    filing = rule(
+        SetSpace(SHARED),
+        when=all_(*FROM_ACME.items, cond(ConditionField.TAGS, Operator.CONTAINS, str(PAID))),
+    )
+    facts = Facts.of(
+        doc(contact_id=ACME, tag_ids={PAID, OPEN}),
+        unverified=frozenset({"contact"}),
+        unverified_tags=frozenset({OPEN}),
+    )
+    (match,) = matches([filing], facts, {})
+    assert (match.trusted, match.distrusted) == (False, ("contact",))
+
+
 def test_change_acts_on_the_edge_only() -> None:
     becomes_true = rule(AddTags(frozenset({PAID})), when=FROM_ACME)
     was_true = rule(AddTags(frozenset({URGENT})))
@@ -488,8 +504,8 @@ def test_a_topic_condition_matches_the_topics_below_it_and_is_unknown_unconfirme
 MAIL = MailOf(
     mailbox_id=UUID("01a1a7fc-702c-736e-a661-ff59645bdc52"),
     senders=("rechnung@stadtwerke.example", "Stadtwerke"),
-    recipients=("anna@example.test", "Anna", "ben@example.test"),
-    to=("anna@example.test", "Anna"),
+    recipients=("erika@example.test", "Erika", "ben@example.test"),
+    to=("erika@example.test", "Erika"),
     cc=("ben@example.test",),
     subject="Ihre Rechnung Oktober",
     importance=Importance.HIGH,
@@ -505,7 +521,7 @@ MAIL = MailOf(
         (cond(ConditionField.MAIL_MAILBOX, Operator.MISSING), False, True),
         (cond(ConditionField.MAIL_SENDER, Operator.ENDS_WITH, "@Stadtwerke.example"), True, False),
         (cond(ConditionField.MAIL_SENDER, Operator.STARTS_WITH, "info@"), False, False),
-        (cond(ConditionField.MAIL_RECIPIENT, Operator.IS, "anna@example.test"), True, False),
+        (cond(ConditionField.MAIL_RECIPIENT, Operator.IS, "erika@example.test"), True, False),
         (cond(ConditionField.MAIL_SUBJECT, Operator.CONTAINS, "rechnung"), True, False),
         (cond(ConditionField.MAIL_TO, Operator.IS, "ben@example.test"), False, False),
         (cond(ConditionField.MAIL_CC, Operator.IS, "ben@example.test"), True, False),

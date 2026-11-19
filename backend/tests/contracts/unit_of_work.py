@@ -9,7 +9,7 @@ from uuid import UUID
 import pytest
 
 from lekto.core.domain.appearance import ContactLogo, FailedLogoFetch, LogoSource
-from lekto.core.domain.bulk import BulkAction, BulkKind, BulkOperation, BulkStatus
+from lekto.core.domain.bulk import BulkAction, BulkKind, BulkOperation
 from lekto.core.domain.classifier import ClassifierModel
 from lekto.core.domain.document_facts import (
     DocumentFact,
@@ -31,6 +31,7 @@ from lekto.core.domain.errors import (
 )
 from lekto.core.domain.fields import FieldDefinition, FieldType, Money, Url
 from lekto.core.domain.identifiers import Identifier, IdentifierKind, IdentifierSource
+from lekto.core.domain.identity import LoginMethod, Session
 from lekto.core.domain.ids import (
     BulkOperationId,
     ContactId,
@@ -55,6 +56,7 @@ from lekto.core.domain.pipeline import (
     ProcessingStatus,
 )
 from lekto.core.domain.profiles import Profile
+from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.reasons import ReasonCode, because, written
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState
 from lekto.core.domain.rules import (
@@ -115,6 +117,79 @@ async def owner_with_space(uow_factory: UnitOfWorkFactory) -> tuple[User, Space]
     owner = await builders.seed_user(uow_factory)
     async with uow_factory() as uow:
         return owner, await uow.spaces.get_personal(owner.id)
+
+
+type Dangling = Callable[[UnitOfWork, User, Space, Document], Awaitable[None]]
+
+
+async def _in_no_space(uow: UnitOfWork, owner: User, space: Space, document: Document) -> None:
+    await uow.documents.add(builders.processed(owner, builders.space(owner)))
+
+
+async def _of_no_contact(uow: UnitOfWork, owner: User, space: Space, document: Document) -> None:
+    added = builders.processed(owner, space)
+    added.contact_id = ContactId(new_id())
+    await uow.documents.add(added)
+
+
+async def _by_no_user(uow: UnitOfWork, owner: User, space: Space, document: Document) -> None:
+    await uow.documents.add(builders.processed(builders.user(), space))
+
+
+async def _session_of_no_user(
+    uow: UnitOfWork, owner: User, space: Space, document: Document
+) -> None:
+    session, _ = Session.start(
+        user_id=builders.user().id,
+        method=LoginMethod.PASSWORD,
+        now=NOW,
+        max_age=timedelta(hours=24),
+    )
+    await uow.sessions.add(session)
+
+
+async def _member_no_user(uow: UnitOfWork, owner: User, space: Space, document: Document) -> None:
+    await uow.spaces.add(builders.space(owner, readers=[builders.user()]))
+
+
+async def _relation_to_no_document(
+    uow: UnitOfWork, owner: User, space: Space, document: Document
+) -> None:
+    relation = Relation(
+        newer=document.id,
+        older=DocumentId(new_id()),
+        origin=RelationOrigin.LEKTO,
+        state=RelationState.SUGGESTED,
+        evidence={},
+        created_at=NOW,
+    )
+    await uow.document_relations.put(relation)
+
+
+async def _log_of_no_document(
+    uow: UnitOfWork, owner: User, space: Space, document: Document
+) -> None:
+    entry = NodeRun(
+        document_id=DocumentId(new_id()),
+        node=Node.RECEIVE,
+        run=1,
+        result=OK,
+        pipeline_version="0.1.0",
+        started_at=NOW,
+        duration=timedelta(0),
+    )
+    await uow.processing_log.append(entry)
+
+
+_DANGLING: dict[str, Dangling] = {
+    "document in no space": _in_no_space,
+    "document of no contact": _of_no_contact,
+    "document by no user": _by_no_user,
+    "session of no user": _session_of_no_user,
+    "space member no user": _member_no_user,
+    "relation to no document": _relation_to_no_document,
+    "log entry of no document": _log_of_no_document,
+}
 
 
 _RULE_DEFINITION = RuleDefinition(
@@ -265,6 +340,40 @@ class UnitOfWorkContract:
         async with uow_factory() as uow:
             stored = await uow.users.get(owner.id)
         assert (stored.username, stored.version) == (winners[0], 2)
+
+    async def test_a_failed_write_leaves_only_rollback(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """A write that breaks a constraint fails the unit: on Postgres the transaction is
+        aborted anyway, so with every adapter only rollback remains (PM-04, TA-03)."""
+        user = builders.user()
+        await seed(uow_factory, user)
+        async with uow_factory() as uow:
+            with pytest.raises(ConflictError):
+                await uow.users.add(user)
+            with pytest.raises(RuntimeError):
+                await uow.users.find(user.id)
+            with pytest.raises(RuntimeError):
+                await uow.commit()
+            await uow.rollback()
+
+    async def test_a_failed_commit_closes_the_unit(self, uow_factory: UnitOfWorkFactory) -> None:
+        """Two units add users of the same name; the one refused, at its write or its commit,
+        is closed or failed after it: committing again is an error (PM-04)."""
+
+        async def add(name: str) -> str:
+            async with uow_factory() as uow:
+                try:
+                    await uow.users.add(builders.user(name))
+                    await asyncio.sleep(0)
+                    await uow.commit()
+                except ConflictError:
+                    with pytest.raises(RuntimeError):
+                        await uow.commit()
+                    return "refused"
+            return "added"
+
+        assert sorted(await asyncio.gather(add("Dora"), add("dora"))) == ["added", "refused"]
 
     async def test_update_of_missing_entity(self, uow_factory: UnitOfWorkFactory) -> None:
         async with uow_factory() as uow:
@@ -751,13 +860,13 @@ class UnitOfWorkContract:
     async def test_numbers_of_users(self, uow_factory: UnitOfWorkFactory) -> None:
         """A learned identifier keeps the user it belongs to and the spaces it was learned in;
         the numbers that name a user go with them (issue #82: nobody else's to see then)."""
-        anna, bob = builders.user(), builders.user()
-        await seed(uow_factory, anna, bob)
+        erika, bob = builders.user(), builders.user()
+        await seed(uow_factory, erika, bob)
         spaces = frozenset({SpaceId(new_id()), SpaceId(new_id())})
-        contract = Identifier(IdentifierKind.CUSTOMER_NUMBER, "K4711", user_id=anna.id)
+        contract = Identifier(IdentifierKind.CUSTOMER_NUMBER, "K4711", user_id=erika.id)
         learned = IdentifierSource.LEARNED
         personnel = Identifier(
-            IdentifierKind.PERSONNEL_NUMBER, "12345", learned, None, anna.id, spaces
+            IdentifierKind.PERSONNEL_NUMBER, "12345", learned, None, erika.id, spaces
         )
         iban = Identifier(  # a contract number that names nobody (an IBAN until #215)
             IdentifierKind.CONTRACT_NUMBER, "V778899", IdentifierSource.LEARNED, learned_in=spaces
@@ -775,7 +884,7 @@ class UnitOfWorkContract:
                 personnel,
                 iban,
             ]
-            await uow.users.remove(anna.id)
+            await uow.users.remove(erika.id)
             await uow.commit()
         async with uow_factory() as uow:
             assert (await uow.contacts.get(contact.id)).identifiers == [bobs, iban]
@@ -1013,7 +1122,7 @@ class UnitOfWorkContract:
         owner, space = await owner_with_space(uow_factory)
         utility, bank = (Contact.create(name=name, now=NOW) for name in ("Stadtwerke", "Bank"))
         own = (IdentifierKind.IBAN, "DE02120300000000202051")
-        customer = (IdentifierKind.CUSTOMER_NUMBER, "20047718")
+        customer = (IdentifierKind.CUSTOMER_NUMBER, "12345678")
         other = (IdentifierKind.VAT_ID, "DE312456789")
         documents = [builders.processed(owner, space) for _ in range(4)]
         shows = [{own, customer}, {own}, {other}, {own}]
@@ -1219,6 +1328,67 @@ class UnitOfWorkContract:
             await uow.document_versions.add(replace(second, document_id=other.id, number=1))
             await uow.commit()
 
+    async def test_versions_relations_and_the_log_are_copies(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """What a unit hands over or gets back is its own: changing it after the write or the
+        read changes nothing stored (PM-07)."""
+        owner, space = await owner_with_space(uow_factory)
+        newer, older = builders.processed(owner, space), builders.processed(owner, space)
+        version = DocumentVersion(
+            document_id=newer.id,
+            number=1,
+            sha256=newer.sha256,
+            original_filename="scan.pdf",
+            media_type="application/pdf",
+            kind=VersionKind.RECEIVED,
+            created_at=NOW,
+            created_by=owner.id,
+            detail={"pages": 1},
+        )
+        relation = Relation(
+            newer=newer.id,
+            older=older.id,
+            origin=RelationOrigin.LEKTO,
+            state=RelationState.SUGGESTED,
+            evidence={"kind": "mail"},
+            created_at=NOW,
+        )
+        run = NodeRun(
+            document_id=newer.id,
+            node=Node.RECEIVE,
+            run=1,
+            result=NodeResult(outcome=Outcome.OK, output={"pages": 1}),
+            pipeline_version="0.1.0",
+            started_at=NOW,
+            duration=timedelta(0),
+        )
+
+        def change(version: DocumentVersion, relation: Relation, run: NodeRun) -> None:
+            version.detail["pages"] = 9
+            relation.evidence["kind"] = "changed"
+            run.result.output["pages"] = 9
+
+        async with uow_factory() as uow:
+            for document in (newer, older):
+                await uow.documents.add(document)
+            await uow.document_versions.add(version)
+            await uow.document_relations.put(relation)
+            await uow.processing_log.append(run)
+            change(version, relation, run)
+            await uow.commit()
+        for _ in range(2):
+            async with uow_factory() as uow:
+                (stored_version,) = await uow.document_versions.of_document(newer.id)
+                stored_relation = await uow.document_relations.find(newer.id, older.id)
+                (stored_run,) = await uow.processing_log.list_for(newer.id)
+                assert stored_version.detail == {"pages": 1}
+                assert stored_relation is not None
+                assert stored_relation.evidence == {"kind": "mail"}
+                assert stored_run.result.output == {"pages": 1}
+                change(stored_version, stored_relation, stored_run)
+                await uow.commit()
+
     async def test_a_version_moves_to_another_document(
         self, uow_factory: UnitOfWorkFactory
     ) -> None:
@@ -1364,8 +1534,6 @@ class UnitOfWorkContract:
                     for document in documents
                     if can_read_document(user, document, spaces[document.space_id])
                 }
-                visible = {document.id for document in await uow.documents.list_visible_to(user.id)}
-                assert visible == expected, user.username
                 queried = await uow.documents.query_visible(user.id, DocumentFilter(), limit=100)
                 assert {document.id for document in queried} == expected, user.username
                 for lane in (Lane.YELLOW, Lane.RED, None):
@@ -1463,6 +1631,73 @@ class UnitOfWorkContract:
             assert known.spaces == {shared.id}
             assert (await uow.documents.confirmed_labels(owner.id)).spaces == {shared.id, home.id}
 
+    @pytest.mark.parametrize("write", list(_DANGLING.values()), ids=list(_DANGLING))
+    async def test_a_reference_to_no_row_is_refused(
+        self, uow_factory: UnitOfWorkFactory, write: Dangling
+    ) -> None:
+        """A row that refers to a row that does not exist is refused, at the commit at the
+        latest, as the SQL schema's foreign keys refuse it (PM-03)."""
+        owner, space = await owner_with_space(uow_factory)
+        document = builders.processed(owner, space)
+        async with uow_factory() as uow:
+            await uow.documents.add(document)
+            await uow.commit()
+        with pytest.raises(ConflictError):
+            async with uow_factory() as uow:
+                await write(uow, owner, space, document)
+                await uow.commit()
+
+    async def test_a_contact_removed_while_a_document_gets_it(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """One unit removes a contact while another files a document to it: one of them is
+        refused, and no document is left with a contact that is gone (PM-03)."""
+        owner, space = await owner_with_space(uow_factory)
+        contact = Contact.create(name="Muster Versicherung", now=NOW)
+        async with uow_factory() as uow:
+            await uow.contacts.add(contact)
+            await uow.commit()
+        document = builders.processed(owner, space)
+        document.contact_id = contact.id
+
+        async def remove() -> str:
+            async with uow_factory() as uow:
+                await uow.contacts.remove(contact.id)
+                await asyncio.sleep(0)
+                await uow.commit()
+            return "removed"
+
+        async def add() -> str:
+            async with uow_factory() as uow:
+                await uow.documents.add(document)
+                await asyncio.sleep(0)
+                await uow.commit()
+            return "added"
+
+        results = await asyncio.gather(add(), remove(), return_exceptions=True)
+        assert len([result for result in results if isinstance(result, str)]) == 1
+        assert any(isinstance(result, ConflictError) for result in results)
+        async with uow_factory() as uow:
+            stored = await uow.documents.find(document.id)
+            assert stored is None or await uow.contacts.find(contact.id) is not None
+
+    async def test_a_shared_space_stays_known_without_the_uploader(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """A confirmed document in a shared space whose uploader is gone (deleted, the column
+        emptied) is known in that space, not in the reader's personal space (PM-01)."""
+        owner, _ = await owner_with_space(uow_factory)
+        shared = builders.space(owner, "Haushalt")
+        orphan = builders.processed(None, shared)
+        orphan.confirm_space(NOW)
+        orphan.mark_confirmed(NOW)
+        async with uow_factory() as uow:
+            await uow.spaces.add(shared)
+            await uow.documents.add(orphan)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert (await uow.documents.confirmed_labels(owner.id)).spaces == {shared.id}
+
     async def test_a_space_s_description(self, uow_factory: UnitOfWorkFactory) -> None:
         editor = builders.user()
         space = builders.space(editor, "Haushalt")
@@ -1542,10 +1777,7 @@ class UnitOfWorkContract:
         async with uow_factory() as uow:
             assert await uow.classifier_models.latest() == second
             assert await uow.classifier_models.list_all() == [second, first]
-            await uow.classifier_models.remove(first.id)
-            await uow.commit()
         async with uow_factory() as uow:
-            assert await uow.classifier_models.list_all() == [second]
             with pytest.raises(ConflictError):
                 again = ClassifierModel.create(
                     number=2, now=NOW, examples=1, examples_until=None, object_key="x", summary={}
@@ -2163,6 +2395,23 @@ class UnitOfWorkContract:
 
     # --- removal and references -----------------------------------------------------------------
 
+    async def test_a_document_whose_filing_failed_is_read_back(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """Its processing has failed with no node open (filing is the last): a store that
+        builds the state anew reads it, the document and the list keep working."""
+        owner, space = await owner_with_space(uow_factory)
+        document = builders.processed(owner, space, {Node.FILE: builders.FAILED})
+        async with uow_factory() as uow:
+            await uow.documents.add(document)
+            await uow.commit()
+        async with uow_factory() as uow:
+            stored = await uow.documents.get(document.id)
+            listed = await uow.documents.query(DocumentFilter(), limit=10)
+        assert stored.processing == document.processing
+        assert stored.processing.status is ProcessingStatus.FAILED
+        assert [item.id for item in listed] == [document.id]
+
     async def test_users_keep_their_active_flag(self, uow_factory: UnitOfWorkFactory) -> None:
         user = builders.user()
         user.active = False
@@ -2200,6 +2449,61 @@ class UnitOfWorkContract:
             await uow.users.remove(other.id)  # no membership left
             await uow.commit()
 
+    async def test_a_user_removed_leaves_what_they_decided_and_made(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """As the schema's foreign keys: a relation they decided keeps its decision without
+        them, a version they made stays without its maker (SET NULL), their bulk operations go
+        (CASCADE)."""
+        owner, space = await owner_with_space(uow_factory)
+        leaving = builders.user()
+        await seed(uow_factory, leaving)
+        invoice, reminder = builders.processed(owner, space), builders.processed(owner, space)
+        decided = Relation(
+            newer=reminder.id,
+            older=invoice.id,
+            origin=RelationOrigin.LEKTO,
+            state=RelationState.SET,
+            evidence={"kind": "fact", "fact_kind": "invoice_number", "value": "4711"},
+            created_at=NOW,
+            decided_by=leaving.id,
+            decided_at=NOW + timedelta(minutes=1),
+        )
+        made = DocumentVersion(
+            document_id=invoice.id,
+            number=1,
+            sha256=invoice.sha256,
+            original_filename="invoice.pdf",
+            media_type="application/pdf",
+            kind=VersionKind.RECEIVED,
+            created_at=NOW,
+            created_by=leaving.id,
+        )
+        operation = BulkOperation.create(
+            user_id=leaving.id,
+            action=BulkAction(kind=BulkKind.CHANGE_TAGS, add=frozenset({TagId(new_id())})),
+            documents=(invoice.id,),
+            now=NOW,
+        )
+        async with uow_factory() as uow:
+            await uow.documents.add(invoice)
+            await uow.documents.add(reminder)
+            await uow.document_relations.put(decided)
+            await uow.document_versions.add(made)
+            await uow.bulk_operations.add(operation)
+            await uow.commit()
+        async with uow_factory() as uow:
+            await uow.users.remove(leaving.id)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert await uow.document_relations.of_document(invoice.id) == [
+                replace(decided, decided_by=None)
+            ]
+            assert await uow.document_versions.of_document(invoice.id) == [
+                replace(made, created_by=None)
+            ]
+            assert await uow.bulk_operations.find(operation.id) is None
+
     async def test_bulk_operations_round_trip(self, uow_factory: UnitOfWorkFactory) -> None:
         """An action on many documents keeps its action, documents and progress, with the
         reasons of the skipped ones."""
@@ -2221,7 +2525,7 @@ class UnitOfWorkContract:
             assert (stored.action, stored.documents, stored.status, stored.via) == (
                 BulkAction(kind=BulkKind.CHANGE_TAGS, add=tags),
                 documents,
-                BulkStatus.QUEUED,
+                ProgressStatus.QUEUED,
                 builders.VIA,
             )
             stored.record_changed()
@@ -2230,7 +2534,7 @@ class UnitOfWorkContract:
             await uow.commit()
         async with uow_factory() as uow:
             again = await uow.bulk_operations.get(operation.id)
-            assert (again.position, again.changed, again.status) == (2, 1, BulkStatus.RUNNING)
+            assert (again.position, again.changed, again.status) == (2, 1, ProgressStatus.RUNNING)
             assert [(id, reason.code) for id, reason in again.skipped] == [
                 (documents[1], ReasonCode.NO_DOCUMENT_TEXT)
             ]
@@ -2240,22 +2544,22 @@ class UnitOfWorkContract:
     async def test_profiles_round_trip_and_go_with_their_user(
         self, uow_factory: UnitOfWorkFactory
     ) -> None:
-        anna, bob = builders.user(), builders.user()
-        anna.display_name = "Anna Example"
-        await seed(uow_factory, anna, bob)
+        erika, bob = builders.user(), builders.user()
+        erika.display_name = "Erika Mustermann"
+        await seed(uow_factory, erika, bob)
         iban = Identifier(IdentifierKind.IBAN, "DE89370400440532013000")
         profile = Profile(
-            id=anna.id,
-            aliases=["Anna Sample", "Anna Muster"],
+            id=erika.id,
+            aliases=["E. Mustermann", "Erika M."],
             birth_date=date(1980, 6, 15),
-            email="anna@mail.example",
+            email="erika@mail.example",
             identifiers=[Identifier(IdentifierKind.TAX_ID, "12345678911"), iban],
             declined=[Identifier(IdentifierKind.IBAN, "DE02120300000000202051")],
             version=1,
         )
         contact = Contact.create(name="Insurer", now=NOW)
         contact.set_identifiers(
-            [Identifier(IdentifierKind.CUSTOMER_NUMBER, "K4711", user_id=anna.id)]
+            [Identifier(IdentifierKind.CUSTOMER_NUMBER, "K4711", user_id=erika.id)]
         )
         async with uow_factory() as uow:
             await uow.profiles.add(profile)
@@ -2263,11 +2567,11 @@ class UnitOfWorkContract:
             await uow.contacts.add(contact)
             await uow.commit()
         async with uow_factory() as uow:
-            assert (await uow.users.get(anna.id)).display_name == "Anna Example"
-            stored = await uow.profiles.get(anna.id)
-            assert stored.aliases == ["Anna Sample", "Anna Muster"]
+            assert (await uow.users.get(erika.id)).display_name == "Erika Mustermann"
+            stored = await uow.profiles.get(erika.id)
+            assert stored.aliases == ["E. Mustermann", "Erika M."]
             assert stored.birth_date == date(1980, 6, 15)
-            assert stored.email == "anna@mail.example"
+            assert stored.email == "erika@mail.example"
             assert {item.key for item in stored.identifiers} == {
                 (IdentifierKind.TAX_ID, "12345678911"),
                 iban.key,
@@ -2275,25 +2579,25 @@ class UnitOfWorkContract:
             assert [item.key for item in stored.declined] == [
                 (IdentifierKind.IBAN, "DE02120300000000202051")
             ]
-            assert (await uow.contacts.get(contact.id)).identifiers[0].user_id == anna.id
-            stored.aliases = ["Anna Muster"]
+            assert (await uow.contacts.get(contact.id)).identifiers[0].user_id == erika.id
+            stored.aliases = ["Erika M."]
             stored.birth_date = None
             await uow.profiles.update(stored)
             await uow.commit()
         async with uow_factory() as uow:
-            changed = await uow.profiles.get(anna.id)
+            changed = await uow.profiles.get(erika.id)
             assert (changed.aliases, changed.birth_date, changed.version) == (
-                ["Anna Muster"],
+                ["Erika M."],
                 None,
                 2,
             )
             assert await uow.profiles.find(UserId(new_id())) is None
-            for space in await uow.spaces.list_accessible(anna.id):
+            for space in await uow.spaces.list_accessible(erika.id):
                 await uow.spaces.remove(space.id)
-            await uow.users.remove(anna.id)
+            await uow.users.remove(erika.id)
             await uow.commit()
         async with uow_factory() as uow:
-            assert await uow.profiles.find(anna.id) is None
+            assert await uow.profiles.find(erika.id) is None
             # Her number at the contact went with her: nobody else's to see.
             assert (await uow.contacts.get(contact.id)).identifiers == []
             assert [item.id for item in await uow.profiles.list_all()] == [bob.id]
@@ -2301,17 +2605,17 @@ class UnitOfWorkContract:
     async def test_display_names_are_unique_and_aliases_need_not_be(
         self, uow_factory: UnitOfWorkFactory
     ) -> None:
-        anna, bob = builders.user(), builders.user()
-        anna.display_name = "Anna"
-        await seed(uow_factory, anna, bob)
-        bob.display_name = "ANNA"
+        erika, bob = builders.user(), builders.user()
+        erika.display_name = "Erika"
+        await seed(uow_factory, erika, bob)
+        bob.display_name = "ERIKA"
         async with uow_factory() as uow:
             with pytest.raises(ConflictError):
                 await uow.users.update(bob)
                 await uow.commit()
         # Aliases are private: two users may have the same (a conflict would tell whose it is).
         async with uow_factory() as uow:
-            await uow.profiles.add(Profile(id=anna.id, aliases=["Ann"], version=1))
+            await uow.profiles.add(Profile(id=erika.id, aliases=["Ann"], version=1))
             await uow.profiles.add(Profile(id=bob.id, aliases=["ann"], version=1))
             await uow.commit()
         async with uow_factory() as uow:

@@ -17,7 +17,7 @@ Common rules for every adapter:
 - `get` raises NotFoundError, `find` returns None.
 """
 
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -36,7 +36,6 @@ from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import (
     BulkOperationId,
-    ClassifierModelId,
     ContactId,
     DocumentId,
     DocumentTypeId,
@@ -162,6 +161,17 @@ class FieldDefinitionRepository(NamedRepository[FieldId, FieldDefinition], Proto
 type TagSets = tuple[frozenset[TagId], ...]
 
 
+def each_tag(tags: Iterable[TagId]) -> TagSets:
+    """Each tag a set of its own, each once: a document carries all of them."""
+    return tuple(frozenset({tag}) for tag in dict.fromkeys(tags))
+
+
+def any_group(groups: Iterable[TagId]) -> TagSets:
+    """The groups one set: a document's contact or type is in one of them."""
+    chosen = frozenset(groups)
+    return (chosen,) if chosen else ()
+
+
 @dataclass(frozen=True, kw_only=True)
 class DocumentFilter:
     """Criteria for listing documents; all given ones must match.
@@ -196,6 +206,37 @@ class DocumentFilter:
     document_dates: Period | None = None
     facts: tuple[FactCriterion, ...] = ()
     ids: frozenset[str] | None = None
+
+    @classmethod
+    def chosen(
+        cls,
+        *,
+        contacts: Iterable[ContactId] = (),
+        document_types: Iterable[DocumentTypeId] = (),
+        tags: Iterable[TagId] = (),
+        contact_groups: Iterable[TagId] = (),
+        document_type_groups: Iterable[TagId] = (),
+        topics: Iterable[TagId] = (),
+        spaces: Iterable[SpaceId] = (),
+        field: FieldId | None = None,
+        document_dates: Period | None = None,
+        facts: Iterable[FactCriterion] = (),
+    ) -> "DocumentFilter":
+        """The filter of what a person chose in a list of documents (a lens, the REST list,
+        MCP): several contacts, types, topics, spaces or groups of a kind, one of them; each
+        tag a set of its own, all of them; a kind none of which is chosen, any (SB-12)."""
+        return cls(
+            contacts=frozenset(contacts) or None,
+            document_types=frozenset(document_types) or None,
+            tags=each_tag(tags),
+            contact_groups=any_group(contact_groups),
+            document_type_groups=any_group(document_type_groups),
+            topics=frozenset(topics) or None,
+            spaces=frozenset(spaces) or None,
+            field=field,
+            document_dates=document_dates,
+            facts=tuple(dict.fromkeys(facts)),
+        )
 
     def __post_init__(self) -> None:
         for sets in (self.tags, self.contact_groups, self.document_type_groups):
@@ -381,12 +422,6 @@ class DocumentRepository(Repository[DocumentId, Document], Protocol):
         """The document with that original: every file exists once per installation."""
         ...
 
-    async def list_visible_to(self, user: UserId) -> list[Document]:
-        """Documents within the user's reach (`lekto.core.domain.permissions.within_reach`):
-        every document in the spaces they edit, the green ones in the spaces they read.
-        Whether the user is active the services check."""
-        ...
-
     async def field_in_use(
         self,
         field: FieldId,
@@ -409,8 +444,10 @@ class DocumentRepository(Repository[DocumentId, Document], Protocol):
         limit: int,
         offset: int = 0,
     ) -> list[Document]:
-        """Documents the user may read (as `list_visible_to`) that match `filter`, in `order`,
-        only those after `after` in it, skipping the first `offset` of them, at most `limit`."""
+        """Documents within the user's reach (`domain.permissions.within_reach`: every
+        document in the spaces they edit, the green ones in the spaces they read; whether the
+        user is active the services check) that match `filter`, in `order`, only those after
+        `after` in it, skipping the first `offset` of them, at most `limit`."""
         ...
 
     async def query(
@@ -426,7 +463,7 @@ class DocumentRepository(Repository[DocumentId, Document], Protocol):
         ...
 
     async def count(self, filter: DocumentFilter, user: UserId | None) -> int:
-        """How many documents match `filter` that the user may read (as `list_visible_to`;
+        """How many documents match `filter` that the user may read (as `query_visible`;
         None: every document)."""
         ...
 
@@ -439,7 +476,7 @@ class DocumentRepository(Repository[DocumentId, Document], Protocol):
         ...
 
     async def count_by(self, by: CountBy, user: UserId | None) -> dict[UUID, int]:
-        """How many documents the user may read (as `list_visible_to`; None: every document)
+        """How many documents the user may read (as `query_visible`; None: every document)
         have each contact, type, topic or tag, or a value for each field. Only ids with
         documents."""
         ...
@@ -766,10 +803,14 @@ class ProcessingFacts(Protocol):
         """Keep the verdicts; a field of a document that has a verdict keeps it."""
         ...
 
-    async def first_run(self, document: DocumentId) -> FirstRun | None: ...
+    async def first_run(self, document: DocumentId) -> FirstRun | None:
+        """The document's first run, for tests and diagnosis: the services read the counts
+        (Tobi, 19.11.2026; SQ-03)."""
+        ...
 
     async def verdicts(self, document: DocumentId) -> list[FieldVerdict]:
-        """The verdicts on the document's fields, by field."""
+        """The verdicts on the document's fields, by field, for tests and diagnosis (as
+        `first_run`)."""
         ...
 
     async def lane_counts(self, scope: FactsScope) -> list[LaneCount]:
@@ -831,11 +872,6 @@ class RuleRepository(Protocol):
         """NotFoundError if the rule or the version does not exist."""
         ...
 
-    async def remove_for_space(self, space: SpaceId) -> int:
-        """Delete the rules of the space with their versions and applications, for good;
-        returns how many rules."""
-        ...
-
     async def remove_applications_by(self, user: UserId) -> int:
         """Delete every application of a rule the user asked for, for good; returns how
         many."""
@@ -876,10 +912,8 @@ class ClassifierModelRepository(Protocol):
         ...
 
     async def list_all(self) -> list[ClassifierModel]:
-        """Newest first."""
+        """Newest first. The rows of older models stay; only their files go."""
         ...
-
-    async def remove(self, id: ClassifierModelId) -> None: ...
 
 
 class LensRepository(Protocol):
@@ -930,7 +964,7 @@ class MailboxRepository(Protocol):
         ...
 
     async def list_all(self) -> list[Mailbox]:
-        """All mailboxes by name."""
+        """All mailboxes, in no order: the service sorts them by name (`sort_key`)."""
         ...
 
 
@@ -946,7 +980,8 @@ class MailRecordRepository(Protocol):
         ...
 
     async def has_message(self, message_id: str) -> bool:
-        """Whether a mail with that Message-ID was fetched, from any folder or mailbox."""
+        """Whether a mail with that Message-ID was taken (`TAKEN_OUTCOMES`), from any folder or
+        mailbox: one no rule took, or that failed, does not count."""
         ...
 
     async def recent(self, mailbox: MailboxId, *, limit: int) -> list[MailRecord]:
@@ -1112,10 +1147,6 @@ class WebhookRepository(Protocol):
 class TaskRepository(Protocol):
     """Tasks (`domain.tasks`). They outlive their webhook (an open one runs to its deadline)
     and their document (a late answer is refused as stale)."""
-
-    async def get(self, id: TaskId) -> Task:
-        """NotFoundError if it does not exist."""
-        ...
 
     async def find(self, id: TaskId) -> Task | None: ...
 

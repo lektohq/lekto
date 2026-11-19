@@ -24,16 +24,19 @@ from lekto.core.domain.mail_rules import (
     mail_facts,
     steps_from_json,
     steps_to_json,
+    unfit,
 )
 from lekto.core.domain.mail_traits import FlagColor, Importance, MailMarks
+from lekto.core.domain.master_data import DocumentType
 from lekto.core.domain.reasons import ReasonCode, because
+from tests import builders
 from tests.builders import HOUR, NOW
 from tests.mails import plain_mail, rich_mail
 
 FACTS = MailFacts(
     senders=("rechnung@stadtwerke.example", "Stadtwerke Musterstadt"),
-    recipients=("anna@example.test", "ben@example.test"),
-    to=("anna@example.test",),
+    recipients=("erika@example.test", "ben@example.test"),
+    to=("erika@example.test",),
     cc=("ben@example.test",),
     subject="Ihre Rechnung Oktober",
     folder="INBOX",
@@ -265,3 +268,20 @@ def test_the_facts_of_a_mail() -> None:
     assert "buchhaltung@example.test" in facts.recipients
     assert (facts.folder, facts.attachments) == ("Rechnungen", True)
     assert not mail_facts(read_mail(plain_mail()), "INBOX").attachments
+
+
+def test_a_rule_is_unfit_for_a_person_gone_a_space_out_of_reach_or_a_type_gone() -> None:
+    """One check for saving a rule and for fetching with it (SB-11)."""
+    person = builders.user()
+    other = builders.user()
+    own, read_only = builders.space(person), builders.space(other, readers=[person])
+    kind = DocumentType.create(name="Rechnung", now=NOW)
+    full = rule(user_id=person.id, space_id=own.id, text_type_id=kind.id)
+    assert unfit(full, person, own, kind) is None
+    gone = replace(person, active=False)
+    assert unfit(full, gone, own, kind) is ReasonCode.MAIL_RULE_PERSON_GONE
+    assert unfit(full, None, own, kind) is ReasonCode.MAIL_RULE_PERSON_GONE
+    elsewhere = rule(user_id=person.id, space_id=read_only.id)
+    assert unfit(elsewhere, person, read_only, None) is ReasonCode.MAIL_RULE_SPACE_UNREACHABLE
+    assert unfit(full, person, None, kind) is ReasonCode.MAIL_RULE_SPACE_UNREACHABLE
+    assert unfit(full, person, own, None) is ReasonCode.MAIL_RULE_TYPE_GONE

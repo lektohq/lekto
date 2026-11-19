@@ -1,7 +1,7 @@
 """Composition root: choose the configured adapter for each port.
 
-Adapters register their factories in the tables below, keyed by the configured adapter name.
-A port whose configured adapter does not exist yet fails with AdapterNotAvailableError.
+Adapters register their factories in the tables below, keyed by the configured adapter name:
+a name the settings allow (their `Literal`s) or a fixed one.
 """
 
 import os
@@ -70,7 +70,6 @@ from lekto.adapters.outbound.webhooks import HttpWebhookSender
 from lekto.adapters.outbound.webpush.sender import WebPushSender
 from lekto.adapters.outbound.zxing import ZxingCodeReader
 from lekto.composition.database import open_database
-from lekto.composition.errors import AdapterNotAvailableError
 from lekto.composition.settings import Settings
 from lekto.core.domain.jobs import WORK_LEASE_MARGIN, RetryPolicy
 from lekto.core.domain.links import Links
@@ -112,6 +111,7 @@ from lekto.core.services.auth import AuthService, SessionPolicy
 from lekto.core.services.automation import AutomationService
 from lekto.core.services.bulk import BulkService
 from lekto.core.services.classification.nodes import (
+    MOST_MODEL_CALLS,
     ClassificationPolicy,
     FieldsNode,
     JudgeNode,
@@ -129,7 +129,7 @@ from lekto.core.services.editing import EditingService
 from lekto.core.services.expected import ExpectedService
 from lekto.core.services.imports import ImportedFieldsNode, ImportedJudgeNode, ImportedSignal
 from lekto.core.services.inbox import InboxService
-from lekto.core.services.indexing import IndexingPolicy, IndexingService
+from lekto.core.services.indexing import INDEX_ROUNDS, IndexingPolicy, IndexingService
 from lekto.core.services.jobs import JobsService
 from lekto.core.services.lenses import LensService
 from lekto.core.services.logos import LogoService
@@ -322,18 +322,31 @@ def ocrmypdf_engine(settings: Settings) -> OcrmypdfEngine:
         vision=vision,
         vision_timeout=settings.vlm_timeout,
         memory=int(settings.child_max_memory),
+        pdf_timeout=settings.pdf_timeout,
     )
 
 
 def layout_parser(settings: Settings) -> LayoutParser:
-    return LayoutParser()
+    return LayoutParser(timeout=settings.pdf_timeout, memory=int(settings.child_max_memory))
+
+
+def page_renderer(settings: Settings) -> PdfiumPageRenderer:
+    return PdfiumPageRenderer(timeout=settings.pdf_timeout, memory=int(settings.child_max_memory))
+
+
+def text_locator(settings: Settings) -> PdfiumTextLocator:
+    return PdfiumTextLocator(timeout=settings.pdf_timeout, memory=int(settings.child_max_memory))
+
+
+def code_reader(settings: Settings) -> ZxingCodeReader:
+    return ZxingCodeReader(timeout=settings.pdf_timeout, memory=int(settings.child_max_memory))
 
 
 OCR_ENGINES: dict[str, Factory[Ocr]] = {"ocrmypdf": ocrmypdf_engine}
 PARSERS: dict[str, Factory[DocumentParser]] = {"layout": layout_parser}
-PAGE_RENDERERS: dict[str, Factory[PageRenderer]] = {"pdfium": lambda _: PdfiumPageRenderer()}
-TEXT_LOCATORS: dict[str, Factory[TextLocator]] = {"pdfium": lambda _: PdfiumTextLocator()}
-CODE_READERS: dict[str, Factory[CodeReader]] = {"zxing": lambda _: ZxingCodeReader()}
+PAGE_RENDERERS: dict[str, Factory[PageRenderer]] = {"pdfium": page_renderer}
+TEXT_LOCATORS: dict[str, Factory[TextLocator]] = {"pdfium": text_locator}
+CODE_READERS: dict[str, Factory[CodeReader]] = {"zxing": code_reader}
 METADATA_READERS: dict[str, Factory[MetadataReader]] = {"pikepdf": lambda _: FileMetadataReader()}
 PAGE_COMPOSERS: dict[str, Factory[PageComposer]] = {"pikepdf": lambda _: PikepdfPageComposer()}
 IMAGE_NORMALISERS: dict[str, Factory[ImageNormaliser]] = {
@@ -432,31 +445,30 @@ class Container:
 
 
 def build_container(settings: Settings) -> Container:
-    """Create the adapter for every port. Raises AdapterNotAvailableError for a missing one."""
-    persistence = _select("persistence", settings.db_type, PERSISTENCE, settings)
+    """Create the adapter for every port."""
+    persistence = _select(settings.db_type, PERSISTENCE, settings)
     closers: list[Closer] = [persistence.close]
 
-    def opened[T](port: str, adapter: str, factories: Mapping[str, Factory[Opened[T]]]) -> T:
-        built = _select(port, adapter, factories, settings)
+    def opened[T](adapter: str, factories: Mapping[str, Factory[Opened[T]]]) -> T:
+        built = _select(adapter, factories, settings)
         if built.close is not None:
             closers.append(built.close)
         return built.adapter
 
-    object_store = opened("object_store", settings.storage_type, OBJECT_STORES)
+    object_store = opened(settings.storage_type, OBJECT_STORES)
     search_index = (
-        opened("search_index", "meilisearch", SEARCH_INDEXES)
-        if settings.meilisearch_url is not None
-        else None
+        opened("meilisearch", SEARCH_INDEXES) if settings.meilisearch_url is not None else None
     )
     language_model = (
-        opened("llm", "openai-compatible", LANGUAGE_MODELS)
-        if settings.llm_base_url is not None
-        else None
+        opened("openai-compatible", LANGUAGE_MODELS) if settings.llm_base_url is not None else None
     )
     embeddings = (
-        opened("embeddings", "openai-compatible", EMBEDDINGS)
-        if settings.embedding_base_url is not None
-        else None
+        opened("openai-compatible", EMBEDDINGS) if settings.embedding_base_url is not None else None
+    )
+    # The head of a mail set as a PDF speaks the language of the templates' locale (`de` of
+    # `de_AT`), not the locale as written (AD-04).
+    templates = LiquidTemplateRenderer(
+        locale=settings.template_locale, currency=settings.default_currency
     )
     return Container(
         unit_of_work=persistence.unit_of_work,
@@ -464,14 +476,14 @@ def build_container(settings: Settings) -> Container:
         wakeup=persistence.wakeup,
         clock=SystemClock(),
         object_store=object_store,
-        ocr=_select("ocr", "ocrmypdf", OCR_ENGINES, settings),
-        parser=_select("parser", "layout", PARSERS, settings),
-        pages=_select("pages", "pdfium", PAGE_RENDERERS, settings),
-        locator=_select("locator", "pdfium", TEXT_LOCATORS, settings),
-        codes=_select("codes", "zxing", CODE_READERS, settings),
-        metadata=_select("metadata", "pikepdf", METADATA_READERS, settings),
-        composer=_select("composer", "pikepdf", PAGE_COMPOSERS, settings),
-        images=_select("images", "pillow", IMAGE_NORMALISERS, settings),
+        ocr=_select("ocrmypdf", OCR_ENGINES, settings),
+        parser=_select("layout", PARSERS, settings),
+        pages=_select("pdfium", PAGE_RENDERERS, settings),
+        locator=_select("pdfium", TEXT_LOCATORS, settings),
+        codes=_select("zxing", CODE_READERS, settings),
+        metadata=_select("pikepdf", METADATA_READERS, settings),
+        composer=_select("pikepdf", PAGE_COMPOSERS, settings),
+        images=_select("pillow", IMAGE_NORMALISERS, settings),
         password_hasher=Argon2PasswordHasher(),
         cipher=secret_cipher(settings),
         refs=ref_cipher(settings),
@@ -487,31 +499,23 @@ def build_container(settings: Settings) -> Container:
         ),
         mail_server=ImapMailServer(timeout=settings.mail_timeout),
         mail_renderer=WeasyPrintMailRenderer(
-            settings.template_locale,
+            templates.writing.language,
             timeout=settings.mail_render_timeout,
             memory=int(settings.child_max_memory),
         ),
         totp=PyotpTotp(),
         patterns=RegexPatternMatcher(settings.rules_pattern_timeout.total_seconds()),
-        templates=LiquidTemplateRenderer(
-            locale=settings.template_locale, currency=settings.default_currency
-        ),
-        oidc=(
-            _select("oidc", "authlib", OIDC_PROVIDERS, settings) if settings.oidc_enabled else None
-        ),
+        templates=templates,
+        oidc=(_select("authlib", OIDC_PROVIDERS, settings) if settings.oidc_enabled else None),
         search_index=search_index,
         language_model=language_model,
         embeddings=embeddings,
         classifier=(
             None
             if settings.classifier == "none"
-            else _select("classifier", settings.classifier, CLASSIFIERS, settings)
+            else _select(settings.classifier, CLASSIFIERS, settings)
         ),
-        logo_fetcher=(
-            _select("logo_fetcher", "httpx2", LOGO_FETCHERS, settings)
-            if settings.logo_fetch
-            else None
-        ),
+        logo_fetcher=(_select("httpx2", LOGO_FETCHERS, settings) if settings.logo_fetch else None),
         closers=tuple(closers),
     )
 
@@ -599,20 +603,17 @@ VISION_REQUEST_TIMEOUT = timedelta(minutes=5)
 """How long the vision language model may take for one page."""
 
 
-MODEL_CALLS_PER_NODE = 4
-"""The most requests to the language model one node makes in a row: the proposal and the facts
-of `signal_llm` (#145), each once more after an unfit answer."""
-
-
 def node_lease(settings: Settings) -> timedelta:
     """How long a worker holds the job of a node: longer than any node may take, except the
-    OCR of a document the vision model reads (`vision_lease`)."""
+    OCR of a document the vision model reads (`vision_lease`). A node may read a PDF with
+    PDFium once besides (`pdf_timeout`): the text layer before the OCR, the page images after
+    setting a mail, the places of the quotes after asking the model."""
     longest = max(
         settings.ocr_timeout,
         settings.mail_render_timeout,
-        MODEL_CALLS_PER_NODE * settings.llm_timeout,
+        MOST_MODEL_CALLS * settings.llm_timeout,
     )
-    return longest + WORK_LEASE_MARGIN
+    return longest + settings.pdf_timeout + WORK_LEASE_MARGIN
 
 
 def vision_lease(settings: Settings) -> timedelta | None:
@@ -662,8 +663,6 @@ def session_policy_of(settings: Settings) -> SessionPolicy:
 def policy_of(settings: Settings) -> ClassificationPolicy:
     """Thresholds and limits of classification and field extraction."""
     return ClassificationPolicy(
-        accept=settings.confidence_threshold,
-        suggest_contact=settings.contact_suggest_threshold,
         input_budget=settings.llm_input_budget,
         max_tags=settings.llm_max_tags,
         default_currency=settings.default_currency,
@@ -716,8 +715,7 @@ def indexing_policy_of(settings: Settings) -> IndexingPolicy:
         document_prefix=_prefix(settings.embedding_document_prefix),
         dimensions=settings.embedding_dimensions,
         reconcile_interval=settings.search_reconcile_interval,
-        # An indexing job may embed and write up to three times (see `IndexingService`).
-        job_lease=3 * (settings.embedding_timeout + settings.meilisearch_task_timeout)
+        job_lease=INDEX_ROUNDS * (settings.embedding_timeout + settings.meilisearch_task_timeout)
         + WORK_LEASE_MARGIN,
         rebuild_lease=settings.search_rebuild_timeout,
         durations_window=settings.retention,
@@ -1001,11 +999,5 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
     )
 
 
-def _select[T](
-    port: str, adapter: str, factories: Mapping[str, Factory[T]], settings: Settings
-) -> T:
-    try:
-        factory = factories[adapter]
-    except KeyError:
-        raise AdapterNotAvailableError(port, adapter) from None
-    return factory(settings)
+def _select[T](adapter: str, factories: Mapping[str, Factory[T]], settings: Settings) -> T:
+    return factories[adapter](settings)

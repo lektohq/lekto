@@ -103,8 +103,8 @@ export function unseenText(ids: readonly string[], lookup: Lookup | null): strin
 	return m.space_named_unseen({ names: listed.join(', ') });
 }
 
-/** "Vorschlag: Haushalt (sichtbar für anna)": the suggested space and who sees it there anew;
- * another user's personal space as a hand-over ("Vorschlag: Übergeben an Anna"); a space the
+/** "Vorschlag: Haushalt (sichtbar für erika)": the suggested space and who sees it there anew;
+ * another user's personal space as a hand-over ("Vorschlag: Übergeben an Erika"); a space the
  * caller cannot see is not named (its id says nothing to them). */
 export function suggestionText(target: string, current: string, lookup: Lookup | null): string {
 	if (!knownSpace(target, lookup)) return m.space_suggestion({ space: m.space_unseen() });

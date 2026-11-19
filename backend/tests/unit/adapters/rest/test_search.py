@@ -224,16 +224,18 @@ async def test_only_admins_rebuild_the_index(api: Api) -> None:
 
 
 async def test_hits_by_relevance_or_sorted(api: Api) -> None:
+    """As the owner, who finds the three documents (an admin without `all_users` finds none):
+    by title, not in the order they came (TC-03)."""
     scene = await indexed_scene(api)
     by_title = await scene.api.client.post(
         SEARCH,
         json={"q": "pdf"},
         params={"sort": "title", "limit": 50},
-        headers=scene.headers["admin"],
+        headers=scene.headers["owner"],
     )
     assert by_title.status_code == 200, by_title.text
-    titles = [item["document"]["title"].casefold() for item in by_title.json()["items"]]
-    assert titles == sorted(titles)
+    titles = [item["document"]["title"] for item in by_title.json()["items"]]
+    assert titles == ["green", "new", "yellow"]
     relevance = await scene.api.client.post(
         SEARCH, json={"q": "pdf"}, params={"sort": "relevance"}, headers=scene.headers["admin"]
     )

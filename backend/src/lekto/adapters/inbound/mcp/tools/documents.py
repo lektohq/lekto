@@ -2,8 +2,8 @@
 
 import asyncio
 import tempfile
-from collections.abc import Callable
-from datetime import UTC, date, datetime
+from collections.abc import Callable, Iterable
+from datetime import date, datetime
 from pathlib import Path
 from typing import Annotated, Any, Literal
 from uuid import UUID
@@ -16,10 +16,11 @@ from lekto.adapters.inbound.mcp.names import FORMER_ACCOUNT, Names
 from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
 from lekto.adapters.inbound.mcp.tools.spaces import space_name
-from lekto.adapters.inbound.schemas import FieldJson, RuleReportOut, field_json
+from lekto.adapters.inbound.schemas import FieldJson, field_json
 from lekto.core.domain.classification import CheckField, field_id_of
 from lekto.core.domain.document_facts import FactState
 from lekto.core.domain.documents import (
+    MAX_TAGS,
     MAX_TITLE,
     UNSET,
     Channel,
@@ -29,14 +30,16 @@ from lekto.core.domain.documents import (
     changed_fields,
 )
 from lekto.core.domain.fields import FieldValue, field_from_json, field_to_json
-from lekto.core.domain.ids import DocumentId, FieldId, UserId, short_id
+from lekto.core.domain.ids import DocumentId, FieldId, SpaceId, UserId, short_id
 from lekto.core.domain.json_value import JsonValue
-from lekto.core.domain.lenses import MAX_QUERY_LENGTH
+from lekto.core.domain.lenses import MAX_FILTER_VALUES, MAX_QUERY_LENGTH
 from lekto.core.domain.mail_intake import OriginRole
 from lekto.core.domain.mail_message import address_line
 from lekto.core.domain.pipeline import ACTOR, CONFIRMED_BY, VIA_TOKEN, NodeRun
 from lekto.core.domain.relations import RelationState
+from lekto.core.domain.rule_planner import RuleReport
 from lekto.core.domain.spaces import SpaceRole
+from lekto.core.domain.validation import to_utc
 from lekto.core.ports.repository import DocumentFilter
 from lekto.core.ports.search_index import MAX_HITS
 from lekto.core.services.documents import DocumentFacts, DocumentFile
@@ -164,6 +167,28 @@ class LogOut(BaseModel):
     entries: list[LogEntryOut]
 
 
+class EffectOut(BaseModel):
+    field: str
+    old: JsonValue = None
+    new: JsonValue = None
+
+
+class NoteOut(BaseModel):
+    field: str
+    kind: str  # overruled, refused, conflict, skipped, review, yielded
+    reason: str
+
+
+class RuleRunOut(BaseModel):
+    """What one rule did, by names: what REST reports (`RuleReportOut`) without ids
+    (decision 7)."""
+
+    name: str
+    scope: str
+    applied: list[EffectOut] = []
+    notes: list[NoteOut] = []  # actions not applied, and why
+
+
 class UpdateOut(BaseModel):
     """What a change did: the values set and those removed, and what the rules did after it,
     not the whole document (decision 7)."""
@@ -174,7 +199,7 @@ class UpdateOut(BaseModel):
     access: SpaceRole | None = None
     set: dict[str, JsonValue] = {}
     removed: list[str] = []
-    rules: list[RuleReportOut] | None = None
+    rules: list[RuleRunOut] | None = None
 
 
 class RetryOut(BaseModel):
@@ -186,7 +211,7 @@ class RetryOut(BaseModel):
 # tool's schema): plain aliases, so that the schema names no definitions of its own.
 TitleIn = Annotated[str, Field(min_length=1, max_length=MAX_TITLE, default_factory=lambda: UNSET)]
 NameIn = Annotated[str | None, Field(default_factory=lambda: UNSET)]
-TagsIn = Annotated[list[str], Field(default_factory=lambda: UNSET, max_length=50)]
+TagsIn = Annotated[list[str], Field(default_factory=lambda: UNSET, max_length=MAX_TAGS)]
 DateIn = Annotated[date | None, Field(default_factory=lambda: UNSET)]
 FieldsIn = Annotated[dict[str, Any], Field(default_factory=lambda: UNSET)]
 CreatedIn = Annotated[AwareDatetime, Field(default_factory=lambda: UNSET)]
@@ -225,8 +250,8 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
         offset: Annotated[int, Field(ge=0, le=MAX_HITS)] = 0,
         contact: str | None = None,
         document_type: str | None = None,
-        tags: Annotated[list[str] | None, Field(max_length=50)] = None,
-        topics: Annotated[list[str] | None, Field(max_length=50)] = None,
+        tags: Annotated[list[str] | None, Field(max_length=MAX_FILTER_VALUES)] = None,
+        topics: Annotated[list[str] | None, Field(max_length=MAX_FILTER_VALUES)] = None,
     ) -> str:
         user = principal_of(ctx).id
         searching = context.require_search()
@@ -304,6 +329,8 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
             out.facts = facts_out(await context.documents.facts(user, document.id), names)
         if "review" in wanted and document.lane is not None:
             review = await context.documents.review(user, document.id)
+            if suggests_space(review.open):
+                names = await names.with_spaces(context, user)
             out.open = [open_out(item, names) for item in review.open]
         if "reading" in wanted:
             reading = await context.pipeline.reading(user, document.id)
@@ -434,8 +461,9 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
         assert change.before is not None  # a change the caller still reads
         out = await update_out(context, user, change.before, change.document, change.access, names)
         out.dry_run = tried
-        if change.rules is not None:
-            out.rules = [RuleReportOut.of(report) for report in change.rules.plan.reports]
+        if change.rules is not None and change.rules.plan.reports:
+            names = await names.with_spaces(context, user)
+            out.rules = [rule_run_out(report, names) for report in change.rules.plan.reports]
         return compact(out)
 
 
@@ -503,21 +531,32 @@ def _fields(given: dict[str, Any] | Unset, names: Names) -> dict[FieldId, object
 def facts_out(report: DocumentFacts, names: Names) -> list[FactOut]:
     """The facts the document shows as the web UI shows them to the caller: the identifiers of
     contacts (a person's only to who may see them), then its own numbers and those it refers
-    to, with a person's decisions."""
+    to, each with its role and a person's decision (RA-10)."""
     found = [
-        FactOut(kind=item.kind.value, value=item.value, contact=names.contact(item.contact_id))
-        for item in report.facts.identifiers
+        FactOut(
+            kind=item.found.kind.value,
+            value=item.found.value,
+            role=item.role.value,
+            contact=names.contact(item.found.contact_id),
+            state=_decided(item.state),
+        )
+        for item in report.identifiers
     ]
     numbers = [
         FactOut(
             kind=item.fact.kind.value,
             value=item.fact.written or item.fact.value,
             role=item.fact.role.value,
-            state=None if item.fact.state is FactState.FOUND else item.fact.state.value,
+            state=_decided(item.fact.state),
         )
         for item in (*report.numbers, *report.decided)
     ]
     return found + numbers
+
+
+def _decided(state: FactState) -> str | None:
+    """A person's decision; None for a fact as the sources found it."""
+    return None if state is FactState.FOUND else state.value
 
 
 def open_out(item: OpenNode, names: Names) -> OpenOut:
@@ -532,6 +571,35 @@ def open_out(item: OpenNode, names: Names) -> OpenOut:
                 suggestion=_named(check.field, check.suggestion, names),
             )
             for check in item.fields
+        ],
+    )
+
+
+def suggests_space(open: Iterable[OpenNode]) -> bool:
+    """Whether an open check suggests a space: its name needs `Names.with_spaces`."""
+    return any(
+        check.field == CheckField.SPACE and check.suggestion is not None
+        for item in open
+        for check in item.fields
+    )
+
+
+def rule_run_out(report: RuleReport, names: Names) -> RuleRunOut:
+    """`report` by names; `names` with spaces (`Names.with_spaces`)."""
+    return RuleRunOut(
+        name=report.name,
+        scope=report.scope.value,
+        applied=[
+            EffectOut(
+                field=_field_label(effect.field, names),
+                old=_named(effect.field, effect.old, names),
+                new=_named(effect.field, effect.new, names),
+            )
+            for effect in report.applied
+        ],
+        notes=[
+            NoteOut(field=_field_label(note.field, names), kind=note.kind, reason=note.reason.text)
+            for note in report.notes
         ],
     )
 
@@ -558,17 +626,21 @@ def _field_label(field: str, names: Names) -> str:
 
 
 def _named(field: str, value: JsonValue, names: Names) -> JsonValue:
-    """A suggested value with names for ids."""
+    """A value of `field` with names for ids: a suggestion, or what a rule changed (one tag)."""
     if not isinstance(value, str | list):
         return value
     match field:
-        case "contact" if isinstance(value, str):
+        case CheckField.CONTACT if isinstance(value, str):
             return names.contact(UUID(value))
-        case "document_type" if isinstance(value, str):
+        case CheckField.DOCUMENT_TYPE if isinstance(value, str):
             return names.document_type(UUID(value))
-        case "topic" if isinstance(value, str):
+        case CheckField.TOPIC if isinstance(value, str):
             return names.topic(UUID(value))
-        case "tags" if isinstance(value, list):
+        case CheckField.SPACE if isinstance(value, str):
+            return names.space(SpaceId(UUID(value)))
+        case CheckField.TAGS if isinstance(value, str):
+            return names.tag_names([UUID(value)])[0]
+        case CheckField.TAGS if isinstance(value, list):
             return list[JsonValue](names.tag_names(UUID(str(item)) for item in value))
     return value
 
@@ -590,7 +662,7 @@ def changes_of(given: ChangesIn, names: Names) -> DocumentChanges:
         created_at=(
             given.created_at
             if isinstance(given.created_at, Unset)
-            else given.created_at.astimezone(UTC)
+            else to_utc(given.created_at, "created_at")
         ),
     )
 

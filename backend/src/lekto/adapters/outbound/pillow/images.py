@@ -37,8 +37,7 @@ _QUALITY = 90
 
 
 class PillowImageNormaliser:
-    def __init__(self, *, size: int = LOGO_SIZE, max_pixels: int = MAX_PIXELS) -> None:
-        self._size = size
+    def __init__(self, *, max_pixels: int = MAX_PIXELS) -> None:
         self._max_pixels = max_pixels
 
     async def normalise(self, data: bytes) -> bytes:
@@ -63,7 +62,7 @@ class PillowImageNormaliser:
     def _logo(self, image: Image.Image) -> bytes:
         self._check_size(*image.size)
         if image.format == "JPEG":
-            image.draft("RGB", (self._size, self._size))
+            image.draft("RGB", (LOGO_SIZE, LOGO_SIZE))
         image.load()
         try:
             picture = ImageOps.exif_transpose(image)
@@ -71,7 +70,7 @@ class PillowImageNormaliser:
             picture = image
         transparent = picture.mode in ("RGBA", "LA", "PA") or "transparency" in picture.info
         picture = picture.convert("RGBA" if transparent else "RGB")
-        picture.thumbnail((self._size, self._size), Image.Resampling.LANCZOS)
+        picture.thumbnail((LOGO_SIZE, LOGO_SIZE), Image.Resampling.LANCZOS)
         out = io.BytesIO()
         picture.save(out, "WEBP", quality=_QUALITY, method=4)
         return out.getvalue()

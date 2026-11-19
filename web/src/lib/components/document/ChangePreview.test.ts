@@ -21,20 +21,20 @@ const lookup = {
 	],
 	fields: [{ id: NET, name: 'Netto', data_type: 'amount' }],
 	spaces: [
-		space('s-anna', 'Anna', [{ user_id: 'u-anna', role: 'edit' }]),
+		space('s-erika', 'Erika', [{ user_id: 'u-erika', role: 'edit' }]),
 		space('s-family', 'Familie', [
-			{ user_id: 'u-anna', role: 'edit' },
+			{ user_id: 'u-erika', role: 'edit' },
 			{ user_id: 'u-max', role: 'read' }
 		])
 	],
 	users: [
-		{ id: 'u-anna', username: 'anna', display_name: 'Jane Doe' },
+		{ id: 'u-erika', username: 'erika', display_name: 'Jane Doe' },
 		{ id: 'u-max', username: 'max', display_name: 'Max Muster' }
 	]
 } as unknown as Lookup;
 
 const before = documentOf({
-	space_id: 's-anna',
+	space_id: 's-erika',
 	tag_ids: ['t-review'],
 	fields: { [NET]: { amount: '4152.02', currency: 'EUR' } }
 });
@@ -68,7 +68,7 @@ describe('ChangePreview', () => {
 			lookup,
 			preview: previewOf({
 				changed: ['tags'],
-				visibility: { space_id: 's-anna', members: [{ user_id: 'u-anna', role: 'edit' }] }
+				visibility: { space_id: 's-erika', members: [{ user_id: 'u-erika', role: 'edit' }] }
 			})
 		});
 		expect(screen.getByText(m.dryrun_visible_same({ names: 'Jane Doe' }))).toBeTruthy();
@@ -87,7 +87,7 @@ describe('ChangePreview', () => {
 				visibility: {
 					space_id: 's-family',
 					members: [
-						{ user_id: 'u-anna', role: 'edit' },
+						{ user_id: 'u-erika', role: 'edit' },
 						{ user_id: 'u-max', role: 'read' }
 					]
 				}

@@ -21,6 +21,19 @@ mkdir -p /run/lekto-home
 chown "$puid:$pgid" /run/lekto-home
 chmod 700 /run/lekto-home
 
+# The settings the scripts go by, as Lekto reads them (whitespace removed, a blank value as not
+# set, choices in lower case, its defaults): for this script, and through the container's
+# environment for the services and the healthcheck, which run with with-contenv. `lekto check`
+# fails with a readable message for any invalid or missing setting; it runs as the user of the
+# services, so that secret files must be readable by them.
+resolved=$(lekto-run lekto check --environment) || exit 1
+while IFS= read -r line; do
+  printf %s "${line#*=}" >"/run/s6/container_environment/${line%%=*}"
+  export "$line"
+done <<RESOLVED
+$resolved
+RESOLVED
+
 # The folders of the volume are chowned: refuse relative paths, `..` and system folders, where a
 # typo in a setting would hand the image to PUID:PGID or leave the data outside a volume.
 safe() { # safe VARIABLE FOLDER
@@ -49,10 +62,8 @@ own() {
   fi
 }
 
-lower() { printf %s "$1" | tr '[:upper:]' '[:lower:]'; }
-
-if [ "$(lower "${LEKTO_DB_TYPE:-sqlite}")" = sqlite ]; then
-  database=${LEKTO_DB_SQLITE_PATH:-/data/lekto.db}
+if [ "$LEKTO_DB_TYPE" = sqlite ]; then
+  database=$LEKTO_DB_SQLITE_PATH
   safe LEKTO_DB_SQLITE_PATH "$(dirname "$database")"
   own "$(dirname "$database")"
   # A restored backup may have left the files with another owner.
@@ -62,12 +73,9 @@ if [ "$(lower "${LEKTO_DB_TYPE:-sqlite}")" = sqlite ]; then
     fi
   done
 fi
-if [ "$(lower "${LEKTO_STORAGE_TYPE:-filesystem}")" = filesystem ]; then
-  safe LEKTO_STORAGE_PATH "${LEKTO_STORAGE_PATH:-/data/objects}"
-  own "${LEKTO_STORAGE_PATH:-/data/objects}"
+if [ "$LEKTO_STORAGE_TYPE" = filesystem ]; then
+  safe LEKTO_STORAGE_PATH "$LEKTO_STORAGE_PATH"
+  own "$LEKTO_STORAGE_PATH"
 fi
 
-echo "init-lekto: Lekto runs as $puid:$pgid, LEKTO_ROLE=${LEKTO_ROLE:-all}"
-# Fails with a readable message for any invalid or missing setting. Runs as the user of the
-# services, so that secret files must be readable by them.
-exec lekto-run lekto check
+echo "init-lekto: Lekto runs as $puid:$pgid, LEKTO_ROLE=$LEKTO_ROLE"

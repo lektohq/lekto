@@ -16,12 +16,14 @@ from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import (
     BlockingSpace,
     Role,
+    SeenUser,
     Settle,
     Settlement,
     UserDeletionBlockedError,
 )
+from lekto.core.services.users import UserService
 from tests import builders
-from tests.builders import NOW, PASSWORD
+from tests.builders import NOW, PASSWORD, incoming
 from tests.unit.services.support import World
 
 NEW_PASSWORD = "another long passphrase"
@@ -52,6 +54,47 @@ async def test_an_api_token_creates_only_plain_users(world: World) -> None:
             await world.users.create_user(admin.id, "bob", role, password, session=False)
 
 
+async def test_a_non_admin_is_refused_before_any_work(world: World) -> None:
+    """Creating and deleting users check the admin first: a hash costs a place the sign-in
+    shares, and preparing a deletion reads the documents of the spaces named and runs rules on
+    their texts, so how long a refusal takes would tell a non-admin what they contain."""
+    user = await world.account("alice")
+    other = await world.account("bob")
+    async with world.uow() as uow:
+        bobs = next(
+            space for space in await uow.spaces.list_accessible(other.id) if space.personal_of
+        )
+        alices = next(
+            space for space in await uow.spaces.list_accessible(user.id) if space.personal_of
+        )
+
+    class Watching:
+        """Rules that only count how often the deletion asks them."""
+
+        asked = 0
+
+        async def arrival_rules(self, *args: object, **kwargs: object) -> list[object]:
+            Watching.asked += 1
+            return []
+
+        async def prepare(self, *args: object, **kwargs: object) -> object:
+            Watching.asked += 1
+            return None
+
+    users = UserService(world.uow, world.clock, world.hasher, rules=Watching())  # type: ignore[arg-type]
+    await world.pipeline().receive(
+        other.id, incoming(b"%PDF-1.7 x"), filename="x.pdf", space=bobs.id
+    )
+    hashed = world.hasher.hashed
+    with pytest.raises(PermissionDeniedError):
+        await users.create_user(user.id, "eve", Role.USER, password="short")
+    with pytest.raises(PermissionDeniedError):
+        await users.delete_user(
+            user.id, other.id, settle={bobs.id: Settlement(Settle.MOVE_TO, move_to=alices.id)}
+        )
+    assert (world.hasher.hashed, Watching.asked) == (hashed, 0)
+
+
 async def test_only_admins_manage_accounts(world: World) -> None:
     user = await world.account("alice")
     other = await world.account("bob")
@@ -74,8 +117,14 @@ async def test_users_see_active_users_and_admins_all(world: World) -> None:
     admin = await world.account("root", Role.ADMIN)
     alice, bob = await world.account("alice"), await world.account("Bob")
     await world.users.update(admin.id, bob.id, active=False)
-    assert [u.username for u in await world.users.list_users(alice.id)] == ["alice", "root"]
-    assert [u.username for u in await world.users.list_users(admin.id)] == ["alice", "Bob", "root"]
+    seen = await world.users.list_users(alice.id)
+    assert [u.username for u in seen] == ["alice", "root"]
+    # Others see names alone, admins also role, state and creation (RB-11).
+    assert {(u.role, u.active, u.created_at) for u in seen} == {(None, None, None)}
+    every = await world.users.list_users(admin.id)
+    assert [u.username for u in every] == ["alice", "Bob", "root"]
+    assert [u.active for u in every] == [True, False, True]
+    assert (await world.users.get(alice.id, admin.id)).role is None
     with pytest.raises(NotFoundError):
         await world.users.get(alice.id, bob.id)
     assert (await world.users.get(admin.id, bob.id)).active is False
@@ -247,25 +296,25 @@ async def test_spaces_that_stop_deleting_a_user_need_a_decision(world: World) ->
 
 async def test_deleting_a_user_settles_their_spaces(world: World) -> None:
     admin = await world.account("root", Role.ADMIN)
-    anna, tobi = await world.account("anna"), await world.account("tobi")
-    annas, tobis = await world.personal_space(anna), await world.personal_space(tobi)
-    household = await world.spaces.create(anna.id, "Household")
-    await world.spaces.set_member(anna.id, household.id, tobi.id, SpaceRole.READ)
-    empty = await world.spaces.create(anna.id, "Empty")
-    archive = await world.spaces.create(anna.id, "Archive")
+    erika, tobi = await world.account("erika"), await world.account("tobi")
+    erikas, tobis = await world.personal_space(erika), await world.personal_space(tobi)
+    household = await world.spaces.create(erika.id, "Household")
+    await world.spaces.set_member(erika.id, household.id, tobi.id, SpaceRole.READ)
+    empty = await world.spaces.create(erika.id, "Empty")
+    archive = await world.spaces.create(erika.id, "Archive")
     target = await world.spaces.create(admin.id, "Target")
     async with world.uow() as uow:
-        letters = [builders.processed(anna, annas) for _ in range(2)]
-        bill, kept = builders.processed(anna, household), builders.processed(anna, archive)
+        letters = [builders.processed(erika, erikas) for _ in range(2)]
+        bill, kept = builders.processed(erika, household), builders.processed(erika, archive)
         for document in [*letters, bill, kept]:
             await uow.documents.add(document)
         await uow.commit()
 
     await world.users.delete_user(
         admin.id,
-        anna.id,
+        erika.id,
         {
-            annas.id: Settlement(Settle.MOVE_TO, move_to=tobis.id),
+            erikas.id: Settlement(Settle.MOVE_TO, move_to=tobis.id),
             household.id: Settlement(Settle.MOVE_TO, move_to=target.id),
             empty.id: Settlement(Settle.REMOVE),
             archive.id: Settlement(Settle.EDITOR, editor=tobi.id),
@@ -273,8 +322,8 @@ async def test_deleting_a_user_settles_their_spaces(world: World) -> None:
     )
 
     async with world.uow() as uow:
-        assert await uow.users.find(anna.id) is None
-        for gone in (annas, household, empty):
+        assert await uow.users.find(erika.id) is None
+        for gone in (erikas, household, empty):
             assert await uow.spaces.find(gone.id) is None
         assert (await uow.spaces.get(archive.id)).members == {tobi.id: SpaceRole.EDIT}
         for letter in letters:
@@ -287,35 +336,35 @@ async def test_deleting_a_user_settles_their_spaces(world: World) -> None:
 
 async def test_a_deletion_that_cannot_settle_changes_nothing(world: World) -> None:
     admin = await world.account("root", Role.ADMIN)
-    anna, tobi = await world.account("anna"), await world.account("tobi")
-    annas = await world.personal_space(anna)
-    full = await world.spaces.create(anna.id, "Full")
+    erika, tobi = await world.account("erika"), await world.account("tobi")
+    erikas = await world.personal_space(erika)
+    full = await world.spaces.create(erika.id, "Full")
     async with world.uow() as uow:
-        for space in (annas, full):
-            await uow.documents.add(builders.processed(anna, space))
+        for space in (erikas, full):
+            await uow.documents.add(builders.processed(erika, space))
         await uow.commit()
     elsewhere = await world.spaces.create(tobi.id, "Elsewhere")
-    settle = {annas.id: Settlement(Settle.MOVE_TO, move_to=full.id)}
+    settle = {erikas.id: Settlement(Settle.MOVE_TO, move_to=full.id)}
     # Into a space that goes as well, or: removing a space that holds documents.
     with pytest.raises(NotFoundError):
         await world.users.delete_user(
-            admin.id, anna.id, {**settle, full.id: Settlement(Settle.MOVE_TO, move_to=annas.id)}
+            admin.id, erika.id, {**settle, full.id: Settlement(Settle.MOVE_TO, move_to=erikas.id)}
         )
     with pytest.raises(ValidationError, match="cannot be settled by remove"):
         await world.users.delete_user(
             admin.id,
-            anna.id,
+            erika.id,
             {
-                annas.id: Settlement(Settle.MOVE_TO, move_to=elsewhere.id),
+                erikas.id: Settlement(Settle.MOVE_TO, move_to=elsewhere.id),
                 full.id: Settlement(Settle.REMOVE),
             },
         )
     with pytest.raises(ValidationError, match="does not stop deleting the user"):
         await world.users.delete_user(
             admin.id,
-            anna.id,
+            erika.id,
             {
-                annas.id: Settlement(Settle.MOVE_TO, move_to=elsewhere.id),
+                erikas.id: Settlement(Settle.MOVE_TO, move_to=elsewhere.id),
                 full.id: Settlement(Settle.EDITOR, editor=tobi.id),
                 elsewhere.id: Settlement(Settle.REMOVE),
             },
@@ -323,19 +372,19 @@ async def test_a_deletion_that_cannot_settle_changes_nothing(world: World) -> No
     with pytest.raises(NotFoundError):
         await world.users.delete_user(
             admin.id,
-            anna.id,
+            erika.id,
             {
-                annas.id: Settlement(Settle.MOVE_TO, move_to=elsewhere.id),
-                full.id: Settlement(Settle.EDITOR, editor=anna.id),
+                erikas.id: Settlement(Settle.MOVE_TO, move_to=elsewhere.id),
+                full.id: Settlement(Settle.EDITOR, editor=erika.id),
             },
         )
     async with world.uow() as uow:
-        assert await uow.users.find(anna.id) is not None
-        assert {space.id for space in await uow.spaces.list_accessible(anna.id)} >= {
-            annas.id,
+        assert await uow.users.find(erika.id) is not None
+        assert {space.id for space in await uow.spaces.list_accessible(erika.id)} >= {
+            erikas.id,
             full.id,
         }
-        assert await uow.documents.exists(space=annas.id)
+        assert await uow.documents.exists(space=erikas.id)
 
 
 # --- first admin --------------------------------------------------------------------------------
@@ -419,4 +468,5 @@ async def test_role_and_state_change_together(world: World) -> None:
     with pytest.raises(ConflictError):  # nothing changes when one part is refused
         await world.users.update(admin.id, admin.id, role=Role.ADMIN, active=False)
     assert (await world.users.get(admin.id, admin.id)).active is True
-    assert await world.users.update(admin.id, admin.id) == await world.users.get(admin.id, admin.id)
+    unchanged = await world.users.update(admin.id, admin.id)
+    assert SeenUser.of(unchanged, by_admin=True) == await world.users.get(admin.id, admin.id)

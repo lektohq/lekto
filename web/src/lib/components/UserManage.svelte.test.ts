@@ -36,7 +36,7 @@ const profile = {
 
 beforeEach(() => {
 	session.start({
-		user: { id: 'anna', username: 'anna', role: 'admin' },
+		user: { id: 'erika', username: 'erika', role: 'admin' },
 		method: 'password',
 		expires_at: '2026-10-14T12:00:00Z',
 		csrf_token: 'token'

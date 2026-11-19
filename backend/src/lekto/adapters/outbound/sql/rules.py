@@ -21,6 +21,7 @@ from lekto.core.domain.ids import (
     UserId,
 )
 from lekto.core.domain.json_value import JsonValue
+from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.reasons import (
     Reason,
     ReasonCode,
@@ -29,7 +30,6 @@ from lekto.core.domain.reasons import (
     reasons_to_json,
 )
 from lekto.core.domain.rules import (
-    ApplicationStatus,
     Rule,
     RuleApplication,
     RuleScope,
@@ -96,11 +96,6 @@ class SqlRuleRepository(SqlRepository[RuleId, Rule]):
                 because(ReasonCode.RULE_VERSION_NOT_FOUND, number=number, id=str(id)),
             )
         return _version(row)
-
-    async def remove_for_space(self, space: SpaceId) -> int:
-        """Versions and applications go with their rule (ON DELETE CASCADE)."""
-        result = await self._tx.write(delete(t.rules).where(t.rules.c.space_id == space))
-        return int(result.rowcount)
 
     async def remove_applications_by(self, user: UserId) -> int:
         applications = t.rule_applications
@@ -229,7 +224,7 @@ class SqlRuleApplicationRepository(SqlRepository[RuleApplicationId, RuleApplicat
             documents=tuple(DocumentId(UUID(item)) for item in row.documents),
             via=ViaToken.stored(row.via_token_id, row.via_token_name),
             accept_conflicts=frozenset(DocumentId(UUID(item)) for item in row.accept_conflicts),
-            status=ApplicationStatus(row.status),
+            status=ProgressStatus(row.status),
             position=row.position,
             applied=row.applied,
             unchanged=row.unchanged,

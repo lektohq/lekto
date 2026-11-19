@@ -57,7 +57,7 @@ from lekto.core.domain.rules import (
     RuleDefinition,
     RuleScope,
 )
-from lekto.core.domain.text_hits import MAX_HITS, collapsed, contained
+from lekto.core.domain.text_hits import MAX_HITS, contained, pattern_text
 from lekto.core.domain.text_places import TextPlaces
 from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
@@ -68,11 +68,12 @@ from lekto.core.ports.templates import TemplateRenderer
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import (
     check_rule_facts,
+    edited_spaces,
     field_definitions,
     load_actor,
     readable_document,
 )
-from lekto.core.services._jobs import LEASE, JobRunner, lost
+from lekto.core.services._jobs import LEASE, JobRunner, lost, reason_of
 from lekto.core.services._tags import tag_tree
 from lekto.core.services.objects import load_layout, load_text
 from lekto.core.services.rules.changes import ArrivalStep, ChangeRules
@@ -116,6 +117,22 @@ class Outcome:
 
     space_id: SpaceId
     chain: tuple[ArrivalStep, ...]
+
+
+def _as_seen(outcome: Outcome, edited: set[SpaceId] | None) -> Outcome:
+    """The outcome as a user who edits the spaces `edited` (None: an admin, every space) may see
+    it: the chain up to the first space they do not edit, which shows only that the document
+    goes there. Whoever does not edit a space does not learn that its rules exist
+    (`rules.management`); where the document ends up is that space, as far as they know."""
+    if edited is None:
+        return outcome
+    shown: list[ArrivalStep] = []
+    for step in outcome.chain:
+        if step.space_id not in edited:
+            shown.append(ArrivalStep(step.space_id, (), None, None, None))
+            return Outcome(step.space_id, tuple(shown))
+        shown.append(step)
+    return outcome
 
 
 @dataclass(frozen=True)
@@ -166,6 +183,12 @@ class ApplyPreview:
     total: int
     """Documents the whole dry run looks at: those its conditions do not rule out
     (`prefilter`), earlier pages included."""
+
+
+MAX_APPLY_DOCUMENTS = 100_000
+"""Documents one retroactive application of a rule names at most: the upper bound of
+`LEKTO_RULES_APPLY_MAX_DOCUMENTS`, which the service takes as its own (`max_documents`). A
+request of `LEKTO_REQUEST_MAX_SIZE` (1 MiB) holds about 26,000 ids (Tobi, 17.11.2026; RB-09)."""
 
 
 class RuleApplicationService:
@@ -219,14 +242,16 @@ class RuleApplicationService:
             wanted = prefilter(rule.definition.conditions, await tag_tree(uow), _looked_at(rule))
             if wanted is None:
                 return ApplyPreview(rule, (), None, 0, 0)
-            if user.is_active_admin:
-                documents = await uow.documents.query(wanted, after=_position(before), limit=SCAN)
-                total = await uow.documents.count(wanted, None)
-            else:
-                documents = await uow.documents.query_visible(
-                    actor, wanted, after=_position(before), limit=SCAN
-                )
-                total = await uow.documents.count(wanted, actor)
+            if not user.is_active_admin:
+                # Only the documents of the spaces the caller edits, one by one and in the
+                # counts alike: those they only read are not theirs to change (SC-10).
+                edited = frozenset(await edited_spaces(uow, user.id))
+                spaces = edited if wanted.spaces is None else wanted.spaces & edited
+                if not spaces:
+                    return ApplyPreview(rule, (), None, 0, 0)
+                wanted = replace(wanted, spaces=spaces)
+            documents = await uow.documents.query(wanted, after=_position(before), limit=SCAN)
+            total = await uow.documents.count(wanted, None)
         items: list[PreviewItem] = []
         next_cursor = documents[-1].id if len(documents) == SCAN else None
         budget = PatternBudget(PREVIEW_BUDGET)
@@ -239,19 +264,28 @@ class RuleApplicationService:
             if budget.exhausted and last is not None:
                 next_cursor = last
                 break
-            last = document.id
-            looked_at += 1
             async with self._uow() as uow:
-                if not await _candidate(uow, user, rule, document):
-                    continue
+                candidate = await _candidate(uow, user, rule, document)
+            if not candidate:
+                last = document.id
+                looked_at += 1
+                continue
+            # The first document of a page has the time of one document, so the dry run goes
+            # on; a later one whose patterns the page's time cut short comes first on the next
+            # page instead of being judged on half its patterns (SC-12).
             prepared = await prepare(
                 self._store,
                 self._matcher,
                 [rule, *following],
                 document,
                 max_text=self._max_text,
-                budget=budget,
+                budget=PatternBudget() if last is None else budget,
             )
+            if prepared.out_of_time and last is not None:
+                next_cursor = last
+                break
+            last = document.id
+            looked_at += 1
             item = await self._preview_one(user, rule, document.id, prepared)
             if item is not None:
                 items.append(item)
@@ -266,9 +300,12 @@ class RuleApplicationService:
             current = await uow.documents.find(id)
             if current is None or not await _candidate(uow, user, rule, current):
                 return None
+            edited = None if user.is_admin else await edited_spaces(uow, user.id)
             shown = copy.deepcopy(current)
             played = await self._play(uow, user, rule, current, prepared, accept=False)
-            outcome = Outcome(current.space_id, () if played is None else played.chain)
+            outcome = _as_seen(
+                Outcome(current.space_id, () if played is None else played.chain), edited
+            )
         if played is None:
             return None
         report = played.run.plan.reports[0]
@@ -282,7 +319,9 @@ class RuleApplicationService:
                 current = await uow.documents.find(id)
                 if current is not None:
                     other = await self._play(uow, user, rule, current, prepared, accept=True)
-                    accepted = Outcome(current.space_id, () if other is None else other.chain)
+                    accepted = _as_seen(
+                        Outcome(current.space_id, () if other is None else other.chain), edited
+                    )
         return PreviewItem(
             shown,
             tuple(report.applied),
@@ -297,9 +336,9 @@ class RuleApplicationService:
     async def hits(self, actor: UserId, id: RuleId, document: DocumentId) -> list[TextHit]:
         """Where the text conditions of the rule's current version (`contains`, `matches`)
         hit the document, on its pages, for those who apply the rule and read the document;
-        none without text or the words of its pages. A pattern runs as in the rules, on the
-        text with whitespace collapsed, at most `max_text` characters, with the time limit
-        (PatternTimeoutError)."""
+        none without text or the words of its pages. Each searches the text the rules read
+        (`text_hits`); a pattern runs as in the rules, on the text without markup, at most
+        `max_text` characters, with the time limit (PatternTimeoutError)."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             rule = await _applicable_rule(uow, user, id)
@@ -312,27 +351,28 @@ class RuleApplicationService:
         if not conditions:
             return []
         try:
-            text = (await load_text(self._store, document)).decode("utf-8", "replace")
+            text = await load_text(self._store, document)
         except NotFoundError:
             return []
         pages = await load_layout(self._store, document)
         if not pages:
             return []
         places = await asyncio.to_thread(TextPlaces, text, pages)
-        folded = collapsed(text[: self._max_text * 2])
+        # Long texts take a while: not in the event loop (SC-05).
+        searched = await asyncio.to_thread(pattern_text, text, self._max_text)
         hits = []
         for condition in conditions:
             value = str(condition.value)
             if condition.op is Operator.MATCHES:
                 found = await self._matcher.find(
                     value,
-                    folded.text[: self._max_text],
+                    searched.text,
                     case_sensitive=condition.case_sensitive,
                     limit=MAX_HITS,
                 )
-                spans = [folded.span(start, end) for start, end in found]
+                spans = [searched.span(start, end) for start, end in found if end > start]
             else:
-                spans = list(contained(text, value))
+                spans = list(await asyncio.to_thread(contained, text, value))
             occurrences = tuple(
                 Occurrence(located)
                 for start, end in spans
@@ -388,7 +428,7 @@ class RuleApplicationService:
 
     async def run_next_job(self) -> bool:
         """Claim and run a due application job. Returns False if none was due."""
-        return await self._jobs.run_next([APPLY_JOB], LEASE, self._attempt)
+        return await self._jobs.run_next(self.job_kinds, LEASE, self._attempt)
 
     async def _attempt(self, job: Job) -> None:
         try:
@@ -400,21 +440,18 @@ class RuleApplicationService:
             await self._abort(job, error)
 
     async def _abort(self, job: Job, error: Exception) -> None:
-        """An unexpected error: end the application, so it does not run again and again."""
-        try:
-            async with self._uow() as uow:
-                await uow.jobs.fail(
-                    job, now=self._clock.now(), error=f"{type(error).__name__}: {error}"
-                )
-                application = await uow.rule_applications.find(
-                    RuleApplicationId(UUID(str(job.payload.get("application_id"))))
-                )
-                if application is not None and application.finished_at is None:
-                    application.finish(self._clock.now(), error="stopped by an internal error")
-                    await uow.rule_applications.update(application)
-                await uow.commit()
-        except (ConcurrencyError, ValueError):
-            log.warning("could not end a failed rule application", extra={"job_id": str(job.id)})
+        """An unexpected error: end the application, so it does not run again and again, and
+        fail its job as every given up job fails, the admins told (`JobRunner.end`; SB-08). The
+        payload was read before (`_run` ends an unreadable one as invalid)."""
+        id = RuleApplicationId(UUID(str(job.payload.get("application_id"))))
+
+        async def stop(uow: UnitOfWork) -> None:
+            application = await uow.rule_applications.find(id)
+            if application is not None and application.finished_at is None:
+                application.finish(self._clock.now(), error="stopped by an internal error")
+                await uow.rule_applications.update(application)
+
+        await self._jobs.end(job, error=reason_of(error), also=stop)
 
     async def _run(self, job: Job) -> None:
         try:
@@ -445,7 +482,8 @@ class RuleApplicationService:
                 await uow.rule_applications.update(application)
                 await uow.commit()
                 return True
-            document = await uow.documents.find(application.remaining[0])
+            target = application.remaining[0]
+            document = await uow.documents.find(target)
             rule = await uow.rules.find(application.rule_id)
             user = await uow.users.find(application.user_id)
             if rule is None or rule.deleted_at is not None or user is None or not user.active:
@@ -462,22 +500,24 @@ class RuleApplicationService:
             prepared = await prepare(
                 self._store, self._matcher, [rule, *following], document, max_text=self._max_text
             )
+        # Another worker may have taken the application over and gone on meanwhile (its lease
+        # ran out): what was prepared for `target` is for no other document (SC-04).
         try:
             async with self._uow() as uow:
                 application = await uow.rule_applications.get(id)
-                await self._apply_one(uow, user, rule, prepared, application)
+                if application.remaining[:1] != (target,):
+                    return False
+                await self._apply_one(uow, user, rule, prepared, application, target)
                 await uow.rule_applications.update(application)
                 await uow.commit()
         except ConcurrencyError:
-            # The document changed meanwhile (or another worker took the application over;
-            # then this fails again and the claim is lost).
+            # The document changed meanwhile, or another worker went on.
             async with self._uow() as uow:
                 application = await uow.rule_applications.get(id)
-                application.record_skipped(
-                    application.remaining[0], because(ReasonCode.SKIP_CHANGED_MEANWHILE)
-                )
-                await uow.rule_applications.update(application)
-                await uow.commit()
+                if application.remaining[:1] == (target,):
+                    application.record_skipped(target, because(ReasonCode.SKIP_CHANGED_MEANWHILE))
+                    await uow.rule_applications.update(application)
+                    await uow.commit()
         return False
 
     async def _apply_one(
@@ -487,9 +527,10 @@ class RuleApplicationService:
         rule: Rule,
         prepared: Prepared,
         application: RuleApplication,
+        id: DocumentId,
     ) -> None:
-        """Apply the rule to the next document of `application` and record what it did."""
-        id = application.remaining[0]
+        """Apply the rule to `id`, the next document of `application`, and record what it
+        did."""
         document = await uow.documents.find(id)
         if document is None or not await _candidate(uow, user, rule, document):
             application.record_skipped(id, because(ReasonCode.SKIP_NOT_AVAILABLE))

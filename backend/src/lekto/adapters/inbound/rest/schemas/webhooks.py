@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.rest.schemas.common import following_offset
-from lekto.adapters.inbound.schemas import ReasonOut
+from lekto.adapters.inbound.schemas import DocumentRefOut, ReasonOut, RequestBody
 from lekto.core.domain.documents import UNSET, Unset
 from lekto.core.domain.tasks import DEFAULT_TIMEOUT, MAX_TIMEOUT, MIN_TIMEOUT
 from lekto.core.domain.validation import MAX_URL_LENGTH
@@ -14,6 +14,7 @@ from lekto.core.domain.webhooks import (
     ALL_EVENTS,
     DEFAULT_OPEN_TASKS,
     MAX_BODY_TEMPLATE,
+    MAX_HEADER_NAME,
     MAX_HEADER_VALUE,
     MAX_HEADERS,
     MAX_NAME_LENGTH,
@@ -33,6 +34,9 @@ from lekto.core.services.webhooks.management import (
     DeliverySummary,
     DeliveryView,
 )
+
+MAX_EVENT_TYPES = len(event_type_names()) + 1
+"""Event types a webhook can name: each of them once, and `*` for all."""
 
 EVENT_TYPES_HELP = (
     f"Event types: {', '.join(f'`{name}`' for name in event_type_names())}, or `{ALL_EVENTS}` "
@@ -105,7 +109,7 @@ class WebhookModelCallOut(BaseModel):
 class HeaderIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(min_length=1, max_length=100, examples=["Authorization"])
+    name: str = Field(min_length=1, max_length=MAX_HEADER_NAME, examples=["Authorization"])
     value: str = Field(
         min_length=1,
         max_length=MAX_HEADER_VALUE,
@@ -118,7 +122,7 @@ class HeaderIn(BaseModel):
 class HeaderPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(min_length=1, max_length=100, examples=["Authorization"])
+    name: str = Field(min_length=1, max_length=MAX_HEADER_NAME, examples=["Authorization"])
     value: str | None = Field(
         default=None,
         min_length=1,
@@ -128,9 +132,8 @@ class HeaderPatch(BaseModel):
     )
 
 
-class WebhookCreate(BaseModel):
+class WebhookCreate(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={
             "examples": [
                 {
@@ -151,7 +154,9 @@ class WebhookCreate(BaseModel):
         ),
     )
     event_types: list[str] = Field(
-        default=[], description=EVENT_TYPES_HELP + " None: the webhook serves rules only."
+        default=[],
+        max_length=MAX_EVENT_TYPES,
+        description=EVENT_TYPES_HELP + " None: the webhook serves rules only.",
     )
     active: bool = True
     signed: bool = Field(
@@ -173,15 +178,17 @@ class WebhookCreate(BaseModel):
     model_call: WebhookModelCallIn | None = Field(default=None, description=MODEL_CALL_HELP)
 
 
-class WebhookPatch(BaseModel):
+class WebhookPatch(RequestBody):
     """Fields left out stay as they are."""
 
-    model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [{"active": False}]})
+    model_config = ConfigDict(json_schema_extra={"examples": [{"active": False}]})
 
     name: str | None = Field(default=None, min_length=1, max_length=MAX_NAME_LENGTH)
     url: str | None = Field(default=None, max_length=MAX_URL_LENGTH)
     event_types: list[str] | None = Field(
-        default=None, description=EVENT_TYPES_HELP + " Empty: the webhook serves rules only."
+        default=None,
+        max_length=MAX_EVENT_TYPES,
+        description=EVENT_TYPES_HELP + " Empty: the webhook serves rules only.",
     )
     active: bool | None = Field(
         default=None, description="Switching on clears the failure count and the reason."
@@ -285,11 +292,6 @@ class WebhookCreated(WebhookOut):
         return cls(**WebhookOut.of(created.webhook).model_dump(), secret=created.secret)
 
 
-class DeliveryDocumentOut(BaseModel):
-    id: UUID
-    title: str
-
-
 class DeliveryOut(BaseModel):
     id: UUID
     webhook_id: UUID
@@ -317,7 +319,7 @@ class DeliveryOut(BaseModel):
         )
     )
     next_attempt_at: datetime | None
-    document: DeliveryDocumentOut | None = Field(
+    document: DocumentRefOut | None = Field(
         description="The document of the event, if the caller may read it."
     )
     document_hidden: bool = Field(
@@ -351,9 +353,7 @@ class DeliveryOut(BaseModel):
             reason=None if delivery.reason is None else ReasonOut.of(delivery.reason),
             next_attempt_at=delivery.next_attempt_at,
             document=(
-                None
-                if document is None
-                else DeliveryDocumentOut(id=document.id, title=document.title)
+                None if document is None else DocumentRefOut(id=document.id, title=document.title)
             ),
             document_hidden=hidden,
         )

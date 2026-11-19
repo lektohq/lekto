@@ -3,7 +3,7 @@
 import asyncio
 import json
 import logging
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 
 from lekto.core.domain.codes import Code, codes_from_json
 from lekto.core.domain.documents import Sha256
@@ -12,6 +12,7 @@ from lekto.core.domain.ids import ContactId, DocumentId
 from lekto.core.domain.labels import LaidWord, layout_words
 from lekto.core.domain.pipeline import Node
 from lekto.core.ports.object_store import ObjectStore
+from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +26,28 @@ LEGACY_EXCHANGES = {Node.SIGNAL_LLM: "classify", Node.FIELDS: "extract_fields"}
 def original_key(sha256: Sha256) -> str:
     """An original; identical content is stored once, for all owners."""
     return f"originals/{sha256.hex}"
+
+
+async def remove_unnamed(
+    uow: UnitOfWorkFactory, store: ObjectStore, originals: Iterable[Sha256]
+) -> list[Sha256]:
+    """Remove each of `originals` that no document and no version names, under the lock of its
+    key, which an upload of the same file takes too; the ones kept. After an error a caller
+    cannot tell whether its commit went through (a request cancelled while the database
+    answered it): the files it stored go only if nothing names them."""
+    kept: list[Sha256] = []
+    for sha256 in originals:
+        key = original_key(sha256)
+        async with uow() as work:
+            await work.lock(key)
+            if await work.documents.exists(sha256=sha256) or (
+                await work.document_versions.find_by_sha256(sha256) is not None
+            ):
+                kept.append(sha256)
+            else:
+                await store.delete(key)
+            await work.commit()
+    return kept
 
 
 def archive_key(document: DocumentId) -> str:
@@ -69,13 +92,15 @@ def reading_key(document: DocumentId) -> str:
     return f"documents/{document}/reading.json"
 
 
-async def load_text(store: ObjectStore, document: DocumentId) -> bytes:
+async def load_text(store: ObjectStore, document: DocumentId) -> str:
     """The document's text, or the Markdown of one parsed before 0.2. NotFoundError if it has
-    neither (it is not parsed yet)."""
+    neither (it is not parsed yet). A byte that is no UTF-8 reads as a replacement character
+    (SA-12): every reader of the text takes it so, none fails on it."""
     try:
-        return await store.get(text_key(document))
+        data = await store.get(text_key(document))
     except NotFoundError:
-        return await store.get(legacy_text_key(document))
+        data = await store.get(legacy_text_key(document))
+    return data.decode("utf-8", errors="replace")
 
 
 async def load_layout(

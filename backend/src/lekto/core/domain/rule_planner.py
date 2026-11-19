@@ -164,7 +164,7 @@ class Situation:
     document: Document
     definitions: Mapping[FieldId, FieldDefinition]
     render: Render
-    writing: Writing = field(default_factory=Writing)
+    writing: Writing
     in_personal_space: bool = False
     uploader_name: str | None = None
     spaces: Mapping[SpaceId, SpaceTarget] = field(default_factory=dict)
@@ -237,17 +237,15 @@ class RuleReport:
     applied: list[Effect] = field(default_factory=list)
     notes: list[Note] = field(default_factory=list)
 
-    def to_json(self, *, names: bool = True) -> JsonObject:
-        data: JsonObject = {
+    def to_json(self) -> JsonObject:
+        return {
             "rule_id": str(self.rule_id),
             "version": self.version,
             "scope": self.scope.value,
             "applied": [item.to_json() for item in self.applied],
             "notes": [item.to_json() for item in self.notes],
+            "name": self.name,
         }
-        if names:
-            data["name"] = self.name
-        return data
 
 
 @dataclass
@@ -269,10 +267,6 @@ class RulePlan:
     labels: Mapping[str, str] = field(default_factory=dict)
     distrusted: frozenset[str] = frozenset()
     distrusted_tags: frozenset[TagId] = frozenset()
-
-    @property
-    def uncertain(self) -> bool:
-        return bool(self.reviews) or any(not check.ok for check in self.checks)
 
     @property
     def reasons(self) -> list[Reason]:

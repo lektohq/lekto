@@ -1,12 +1,17 @@
 """The Liquid renderer passes the contract; its locale shapes dates and amounts."""
 
 import re
+import tracemalloc
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date
 from decimal import Decimal
 
 import pytest
 
 from lekto.adapters.outbound.liquid import LiquidTemplateRenderer, parse_locale
+from lekto.adapters.outbound.liquid.renderer import MAX_RESULT
+from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import Money, Writing
 from lekto.core.domain.periods import Period
 from lekto.core.domain.templates import TemplateValue
@@ -85,3 +90,78 @@ def test_an_unknown_locale_is_refused(text: str) -> None:
         parse_locale(text)
     with pytest.raises(ValueError, match=message):
         LiquidTemplateRenderer(locale=text, currency="EUR")
+
+
+@contextmanager
+def at_most(megabytes: float) -> Iterator[None]:
+    """The block allocates at most `megabytes` at once."""
+    tracemalloc.start()
+    try:
+        yield
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert peak < megabytes * 1024**2, f"{peak / 1024**2:.1f} MB"
+
+
+def test_a_chain_of_filters_stops_at_the_first_result_too_large() -> None:
+    """Liquid's limits look at what is assigned and written out: three `replace` made 1.6
+    billion characters of 200 before the output was refused (3 GB)."""
+    renderer = LiquidTemplateRenderer(locale="de", currency="EUR")
+    x = "a" * 200
+    bomb = '{% assign x = "' + x + '" %}{{ x | replace: "a", x | replace: "a", x }}'
+    with at_most(1), pytest.raises(ValidationError, match="the filter 'replace' has more than"):
+        renderer.render(bomb, {})
+
+
+@pytest.mark.parametrize(
+    ("template", "values", "message"),
+    [
+        (
+            '{{ "a" | append: big }}',
+            {"big": "b" * MAX_RESULT},
+            "'append' has more than 10000 characters",
+        ),
+        (
+            "{{ list | concat: list | size }}",
+            {"list": ["c"] * 6000},
+            "'concat' has more than 10000 entries",
+        ),
+        (
+            "{{ list | concat: list | size }}",
+            {"list": ["c" * 6000]},
+            "'concat' has more than 10000 characters",
+        ),
+        (
+            "{% assign n = 1" + "0" * 4000 + " %}{{ n | times: n | times: n }}",
+            {},
+            "'times' has more than 10000 digits",
+        ),
+    ],
+    ids=["text", "list entries", "list characters", "number"],
+)
+def test_every_filter_s_result_is_bounded(
+    template: str, values: dict[str, TemplateValue], message: str
+) -> None:
+    renderer = LiquidTemplateRenderer(locale="de", currency="EUR")
+    with pytest.raises(
+        ValidationError, match=re.escape(f"invalid template: the result of the filter {message}")
+    ):
+        renderer.render(template, values)
+
+
+def test_replace_and_join_are_refused_before_they_multiply() -> None:
+    """A single call of them writes 10 000 characters for each of 10 000: refused before."""
+    renderer = LiquidTemplateRenderer(locale="de", currency="EUR")
+    long = "x" * MAX_RESULT
+    values: dict[str, TemplateValue] = {"long": long, "many": ["a"] * 5000}
+    for template in ('{{ long | replace: "x", long }}', "{{ many | join: long }}"):
+        with at_most(1), pytest.raises(ValidationError, match="has more than 10000 characters"):
+            renderer.render(template, values)
+
+
+def test_a_result_at_the_limit_is_written() -> None:
+    renderer = LiquidTemplateRenderer(locale="de", currency="EUR")
+    half = "y" * (MAX_RESULT // 2)
+    assert renderer.render("{{ half | append: half }}", {"half": half}) == half * 2
+    assert renderer.render('{{ list | join: "-" }}', {"list": ["a", "b"]}) == "a-b"

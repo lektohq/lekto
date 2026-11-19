@@ -262,6 +262,32 @@ def test_an_amount_in_a_text_without_currency_is_in_the_default_one() -> None:
     assert read_amount("2,111.68", shown, default="EUR") == (Decimal("2111.68"), "USD")
 
 
+@pytest.mark.parametrize(
+    ("text", "shown"),
+    [
+        ("Sprechzeiten Mo. - Fr. 8-12 Uhr", set()),  # Friday
+        ("Top-Arbeitgeber, all inclusive, Sek. I", set()),  # words that are codes in capitals
+        ("Unsere All-Net-Flat für 84,20 €", {"EUR"}),
+        ("Preis: Fr. 12.50", {"CHF"}),
+        ("Summe 120,00 kr", {"SEK", "NOK", "DKK"}),
+        ("Betrag CHF 12.50", {"CHF"}),
+    ],
+)
+def test_a_text_shows_a_currency_by_its_code_in_capitals_or_beside_an_amount(
+    text: str, shown: set[str]
+) -> None:
+    """A word that is a code in lower case, or an abbreviation beside no amount, showed a
+    currency, and an amount without one was read in it, or not at all (DA-09)."""
+    assert DocumentText(text).currencies == shown
+    if not shown:
+        assert read_amount("84,20", DocumentText(text), default="EUR") == (Decimal("84.20"), "EUR")
+
+
+def test_a_word_that_is_a_code_in_lower_case_makes_no_amount() -> None:
+    assert DocumentText("Top 620 Angebote").amounts == set()
+    assert DocumentText("EUR 620 bezahlt").amounts == {Decimal(620)}
+
+
 # --- periods ------------------------------------------------------------------------------------
 
 DOCUMENT_DATE = date(2026, 10, 5)
@@ -332,8 +358,7 @@ def test_a_period_without_its_year_takes_that_of_the_document_date() -> None:
     ["September 2026 und Oktober 2026", "01.09.2026 und 05.09.2026", "30.09.2026 bis 01.09.2026"],
 )
 def test_two_periods_or_none_are_no_reading(raw: str) -> None:
-    found = read_period(raw, DOCUMENT_DATE)
-    assert found is None or found[0] != SEPTEMBER
+    assert read_period(raw, DOCUMENT_DATE) is None
 
 
 def test_a_text_shows_a_period_as_written_or_by_its_first_and_last_day() -> None:
@@ -365,3 +390,13 @@ def test_a_text_read_at_once_has_found_everything() -> None:
     text = DocumentText.read("Rechnung vom 31.03.2026 über 84,20 EUR")
     assert {"normalised", "dates", "periods", "numbers", "amounts", "currencies"} <= set(vars(text))
     assert text.has_date(date(2026, 3, 31)) and text.has_currency("EUR")
+
+
+def test_a_month_s_name_is_a_whole_word() -> None:
+    """ "Weimar 2025" was March 2025, "Mainz" May of the document's year (DA-10)."""
+    assert periods_in(normalise("Stadt Weimar 2025")) == {Period.year(2025)}
+    assert read_period("Weimar 2025") == (Period.year(2025), False)
+    assert read_period("März 2025") == (Period.month(2025, 3), False)
+    mainz = DocumentText("Stadtwerke Mainz, Marktplatz 1")
+    assert not mainz.has_period(Period.month(2026, 5), date(2026, 6, 15))
+    assert DocumentText("Abrechnung Mai").has_period(Period.month(2026, 5), date(2026, 6, 15))

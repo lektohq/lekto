@@ -11,8 +11,7 @@ from lekto.core.domain.pipeline import NodeResult, Outcome
 from lekto.core.services.classification.signals import FactsResult, FactsSignal
 from lekto.core.services.pipeline import MetadataResult
 from tests.builders import NOW
-from tests.unit.services.support import World
-from tests.unit.services.test_classification import (
+from tests.unit.services.classification_support import (
     checks,
     document_with,
     judge,
@@ -21,6 +20,7 @@ from tests.unit.services.test_classification import (
     proposal,
     signal_step,
 )
+from tests.unit.services.support import World
 
 
 def output_of(schema: JsonObject) -> Any:
@@ -105,7 +105,7 @@ async def test_the_facts_tell_the_topic_an_identifier_points_to(world: World) ->
     document = await document_with(world, PAY_SLIP)
     ran = await FactsSignal(world.uow, world.object_store).run(document)
     assert isinstance(ran, FactsResult)
-    assert ran.output["identifiers"] == [
+    assert ran.result.output["identifiers"] == [
         {
             "contact_id": str(nord.id),
             "kind": "personnel_number",

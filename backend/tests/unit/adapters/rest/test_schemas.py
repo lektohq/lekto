@@ -1,13 +1,23 @@
-"""JSON forms of field values."""
+"""JSON forms of field values; enums of the API."""
 
 from datetime import date
 from decimal import Decimal
+from typing import get_args
 
 import pytest
 
+from lekto.adapters.inbound.rest.documents import DocumentListSort, DocumentSort, order_of
+from lekto.adapters.inbound.rest.schemas.documents import ReprocessNode
+from lekto.adapters.inbound.rest.schemas.inbox import ResumeNode, Signal
+from lekto.adapters.inbound.rest.schemas.push import Locale, NoticeKind, PushPreferencesBody
 from lekto.adapters.inbound.schemas import MoneyValue, PeriodValue, field_json
+from lekto.core.domain.documents import REPROCESSABLE_NODES, RESUMABLE_NODES
 from lekto.core.domain.fields import Money, Url
+from lekto.core.domain.ids import UserId, new_id
+from lekto.core.domain.lenses import LensSort
 from lekto.core.domain.periods import Period
+from lekto.core.domain.pipeline import SIGNALS, Node
+from lekto.core.domain.push import DEFAULT_KINDS, LOCALES, PushPreferences
 
 
 @pytest.mark.parametrize(
@@ -42,3 +52,22 @@ def test_periods_are_their_start_and_end() -> None:
     assert field_json(Period.month(2026, 9)) == PeriodValue(
         start=date(2026, 9, 1), end=date(2026, 9, 30)
     )
+
+
+def test_the_enums_of_the_api_are_built_from_the_core() -> None:
+    """A value the core adds reaches the API, not a 500 (RA-06, RB-10)."""
+    assert [signal.value for signal in Signal] == [node.value for node in Node if node in SIGNALS]
+    assert [node.value for node in ReprocessNode] == [node.value for node in REPROCESSABLE_NODES]
+    assert [node.value for node in ResumeNode] == [node.value for node in RESUMABLE_NODES]
+    assert set(get_args(NoticeKind)) == {kind.value for kind in DEFAULT_KINDS}
+    assert get_args(Locale) == LOCALES
+    every = PushPreferencesBody.of(PushPreferences(id=UserId(new_id())))
+    assert set(every.kinds) == {kind.value for kind in DEFAULT_KINDS}
+
+
+def test_the_sorts_of_list_and_search_are_a_lens_s() -> None:
+    """Built from `LensSort`: a key the lenses gain reaches the list and the search (RA-08)."""
+    lens = [sort.value for sort in LensSort if sort is not LensSort.RELEVANCE]
+    assert [sort.value for sort in DocumentListSort] == lens
+    assert [sort.value for sort in DocumentSort] == [key for key in lens if "field" not in key]
+    assert order_of("-title").ascending is False

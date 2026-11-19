@@ -33,7 +33,7 @@ import math
 import re
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Literal, Self
@@ -74,6 +74,7 @@ from lekto.core.domain.ids import (
 from lekto.core.domain.json_value import JsonValue, require_date, require_uuid
 from lekto.core.domain.mail_traits import MAIL_OPERATORS, check_mail_value
 from lekto.core.domain.master_data import DocumentType, TagScope
+from lekto.core.domain.progress import Progress
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.tasks import DEFAULT_TIMEOUT, validate_timeout
 from lekto.core.domain.validation import require_name, require_utc
@@ -352,8 +353,10 @@ class Condition:
         return [] if self.value is None else [self.value]
 
 
-STEP_NAME = re.compile(r"[a-z][a-z0-9_]{0,49}")
-"""A step's name: what the steps after it write as `steps.<name>`."""
+MAX_STEP_NAME = 50
+STEP_NAME = re.compile(rf"[a-z][a-z0-9_]{{0,{MAX_STEP_NAME - 1}}}")
+"""A step's name: what the steps after it write as `steps.<name>`; at most `MAX_STEP_NAME`
+characters."""
 _STEP_KEY = re.compile(r"[A-Za-z0-9_-]{1,100}")
 MAX_STEP_PATH = 200
 
@@ -673,11 +676,6 @@ class RuleDefinition:
         )
 
     @property
-    def sends(self) -> tuple[SendWebhook, ...]:
-        """The webhooks the rule sends through, in order."""
-        return tuple(action for action in self.actions if isinstance(action, SendWebhook))
-
-    @property
     def asks(self) -> tuple[AskWebhook, ...]:
         """The steps that ask a webhook, in order."""
         return tuple(action for action in self.actions if isinstance(action, AskWebhook))
@@ -765,10 +763,11 @@ def title_rule(document_type: DocumentType) -> RuleDefinition:
 
 
 def check_fields(
-    definition: RuleDefinition, definitions: Mapping[FieldId, FieldDefinition]
+    definition: RuleDefinition, definitions: Mapping[FieldId, FieldDefinition], writing: Writing
 ) -> None:
     """Conditions and actions on fields fit the field's data type. ValidationError
-    otherwise, naming the place; a missing field is a ValidationError too."""
+    otherwise, naming the place; a missing field is a ValidationError too. `writing`: how the
+    templates write values (`TemplateRenderer.writing`), by which text without markup is read."""
     places = [
         *condition_places(definition.conditions),
         *(
@@ -803,7 +802,7 @@ def check_fields(
                     # Text without markup writes itself: it must be readable now. A template's
                     # syntax and values are checked where the rule is saved (a port renders it).
                     not TEMPLATE_MARKUP.search(str(action.value))
-                    and read_written(field, str(action.value), Writing()) is None
+                    and read_written(field, str(action.value), writing) is None
                 ):
                     raise field.refusal(action.value)
 
@@ -1013,47 +1012,27 @@ class Rule:
 # --- applying a rule to existing documents ----------------------------------------------------
 
 
-class ApplicationStatus(StrEnum):
-    QUEUED = "queued"
-    RUNNING = "running"
-    DONE = "done"
-    FAILED = "failed"
-
-
 @dataclass(kw_only=True)
-class RuleApplication:
+class RuleApplication(Progress):
     """A person applies one version of a rule to documents they selected (in the background).
 
     `accept_conflicts`: documents where the rule's value replaces a different value the
-    document has (a deliberate decision, no review). `position`: how many of `documents` are
-    done. `skipped`: document id and reason (with its code). `via`: the API token the person
-    started it through, kept in the log entry of each document."""
+    document has (a deliberate decision, no review). `applied`: documents the rule changed;
+    the rest as `Progress` counts them. `via`: the API token the person started it through,
+    kept in the log entry of each document."""
 
     id: RuleApplicationId
     rule_id: RuleId
     rule_version: int
     user_id: UserId
-    documents: tuple[DocumentId, ...]
     via: ViaToken | None = None
     accept_conflicts: frozenset[DocumentId] = frozenset()
-    status: ApplicationStatus = ApplicationStatus.QUEUED
-    position: int = 0
     applied: int = 0
-    unchanged: int = 0
-    skipped: list[tuple[DocumentId, Reason]] = field(default_factory=list)
-    error: str | None = None
-    created_at: datetime
-    finished_at: datetime | None = None
-    version: int = 1
 
     def __post_init__(self) -> None:
-        if not self.documents:
-            raise ValidationError("select at least one document")
-        if len(set(self.documents)) != len(self.documents):
-            raise ValidationError("a document is selected twice")
+        super().__post_init__()
         if not self.accept_conflicts <= set(self.documents):
             raise ValidationError("accepted conflicts must be among the selected documents")
-        self.created_at = require_utc(self.created_at, "created_at")
 
     @classmethod
     def create(
@@ -1078,33 +1057,10 @@ class RuleApplication:
             created_at=now,
         )
 
-    @property
-    def remaining(self) -> tuple[DocumentId, ...]:
-        return self.documents[self.position :]
-
     def record_applied(self) -> None:
         """One more document done: the rule changed it."""
         self.applied += 1
         self._next()
-
-    def record_unchanged(self) -> None:
-        """One more document done: the rule did not hold or changed nothing."""
-        self.unchanged += 1
-        self._next()
-
-    def record_skipped(self, document: DocumentId, reason: Reason) -> None:
-        """One more document done: left as it was, for `reason`."""
-        self.skipped.append((document, reason))
-        self._next()
-
-    def _next(self) -> None:
-        self.position += 1
-        self.status = ApplicationStatus.RUNNING
-
-    def finish(self, now: datetime, error: str | None = None) -> None:
-        self.status = ApplicationStatus.FAILED if error else ApplicationStatus.DONE
-        self.error = error
-        self.finished_at = require_utc(now, "finished_at")
 
 
 # --- helpers ----------------------------------------------------------------------------------

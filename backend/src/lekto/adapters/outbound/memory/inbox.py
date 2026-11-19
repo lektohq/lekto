@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 from lekto.adapters.outbound.memory.database import DOCUMENTS, SPACES, USERS, SeenMark
 from lekto.adapters.outbound.memory.rows import _copy
 from lekto.core.domain.documents import Document
-from lekto.core.domain.errors import ConflictError
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import DocumentId, UserId
 from lekto.core.domain.inbox import Confirmation, InboxState, InboxTab, inbox_state, open_tab
@@ -92,7 +91,7 @@ class MemoryInboxRepository:
         self._marks()  # the unit is open
         self._refer(document)
         if self._uow._row(USERS, viewer) is None:
-            raise ConflictError(f"seen mark of a user that does not exist: {viewer}")
+            raise self._uow._violated(f"seen mark of a user that does not exist: {viewer}")
         self._uow._seen[(viewer, document)] = SeenMark(require_utc(at, "seen_at"), silent, via)
 
     async def mark_all_seen(
@@ -176,7 +175,7 @@ class MemoryInboxRepository:
         """ConflictError for a mark of a document that does not exist, as the SQL schema's
         foreign key refuses it."""
         if not self._exists(document):
-            raise ConflictError(f"inbox mark of a document that does not exist: {document}")
+            raise self._uow._violated(f"inbox mark of a document that does not exist: {document}")
 
     def _marks(self) -> dict[SeenKey, SeenMark]:
         """The seen marks committed, with this unit's changes."""

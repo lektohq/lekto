@@ -326,6 +326,66 @@ async def test_a_rule_is_applied_to_existing_documents(api: Api) -> None:
     assert two["title"] == "Tax Other" and two["tag_ids"] == [tax["id"]]
 
 
+async def test_the_preview_hides_the_rules_of_a_space_the_caller_does_not_edit(api: Api) -> None:
+    """A rule hands documents over into another user's personal space; that space's rules file
+    them on into a space the caller does not see. Whoever does not edit a space does not learn
+    that its rules exist: the caller's preview ends where they hand it over."""
+    admin, owner, other = await api.admin(), await api.user("jane"), await api.user("john")
+    o, j = auth(owner), auth(other)
+    tag = await post(api, "/tags", {"name": "Muster"}, auth(admin))
+    users = (await api.client.get(f"{PREFIX}/users", headers=j)).json()
+    janes = next(user["personal_space_id"] for user in users if user["username"] == "jane")
+    hidden = await post(api, "/spaces", {"name": "Privat"}, o)
+    channel = {"all": [{"field": "channel", "op": "is", "value": "api"}]}
+    await post(
+        api,
+        "/rules",
+        {
+            "name": "Weiter",
+            "conditions": channel,
+            "actions": [
+                {"type": "add_tags", "tag_ids": [tag["id"]]},
+                {"type": "set_space", "space_id": hidden["id"]},
+            ],
+        },
+        o,
+    )
+    await upload(api, j)
+    rule = await post(
+        api,
+        "/rules",
+        {
+            "name": "Übergabe",
+            "enabled": False,
+            "conditions": channel,
+            "actions": [{"type": "set_space", "space_id": janes}],
+        },
+        j,
+    )
+
+    seen = await api.client.post(f"{PREFIX}/rules/{rule['id']}/apply/preview", json={}, headers=j)
+    full = await api.client.post(
+        f"{PREFIX}/rules/{rule['id']}/apply/preview", json={}, headers=auth(admin)
+    )
+
+    assert seen.status_code == 200, seen.text
+    (item,) = seen.json()["items"]
+    assert item["outcome"]["space_id"] == janes
+    assert item["outcome"]["chain"] == [
+        {
+            "space_id": janes,
+            "rules": [],
+            "moved_to": None,
+            "looped_to": None,
+            "problem": None,
+            "problem_reason": None,
+        }
+    ]
+    (item,) = full.json()["items"]
+    assert item["outcome"]["space_id"] == hidden["id"]
+    assert [report["name"] for report in item["outcome"]["chain"][0]["rules"]] == ["Weiter"]
+
+
 async def test_the_preview_shows_the_chain_of_the_spaces_a_rule_files_into(api: Api) -> None:
     admin, owner = await api.admin(), await api.user()
     a, o = auth(admin), auth(owner)

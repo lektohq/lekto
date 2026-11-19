@@ -213,10 +213,10 @@ describe('the space in the signals and the rules', () => {
 	afterEach(() => session.clear());
 
 	const ME = '0199a6c4-0000-7000-8000-000000000001';
-	const ANNA = '0199a6c4-0000-7000-8000-000000000002';
+	const ERIKA = '0199a6c4-0000-7000-8000-000000000002';
 	const MINE = '0199a6c4-0000-7000-8000-0000000000d1';
 	const HOUSE = '0199a6c4-0000-7000-8000-0000000000d2';
-	const ANNAS = '0199a6c4-0000-7000-8000-0000000000d3';
+	const ERIKAS = '0199a6c4-0000-7000-8000-0000000000d3';
 	const spaces = {
 		...lookup,
 		spaces: [
@@ -225,7 +225,7 @@ describe('the space in the signals and the rules', () => {
 		],
 		users: [
 			{ id: ME, username: 'tobi', role: 'user', personal_space_id: MINE },
-			{ id: ANNA, username: 'anna', role: 'user', personal_space_id: ANNAS }
+			{ id: ERIKA, username: 'erika', role: 'user', personal_space_id: ERIKAS }
 		]
 	} as unknown as Lookup;
 	const withInput = (node: string, input: Record<string, unknown>, output = {}) =>
@@ -234,10 +234,10 @@ describe('the space in the signals and the rules', () => {
 	it('names the spaces of the model, the classifier and the similar documents', () => {
 		const llm = texts(signalSummary(entry('signal_llm', { proposal: { space: HOUSE } }), spaces));
 		expect(llm).toContainEqual([m.field_space(), ['Haushalt']]);
-		const output = { contacts: [], document_types: [], spaces: [[ANNAS, 0.7]] };
+		const output = { contacts: [], document_types: [], spaces: [[ERIKAS, 0.7]] };
 		const classifier = texts(signalSummary(entry('signal_classifier', output), spaces));
-		// Anna's personal space, which the caller is no member of, by her name.
-		expect(classifier).toContainEqual([m.signal_spaces(), ['anna 70%']]);
+		// Erika's personal space, which the caller is no member of, by her name.
+		expect(classifier).toContainEqual([m.signal_spaces(), ['erika 70%']]);
 		const [similar] = signalSummary(
 			entry('signal_neighbours', {
 				neighbours: [{ document_id: 'd1', contact_id: UTILITY, space_id: HOUSE }]
@@ -270,23 +270,23 @@ describe('the space in the signals and the rules', () => {
 
 	it('names the persons the facts found and the judge weighed, and who would not see it', () => {
 		const facts = signalSummary(
-			entry('signal_facts', { persons: [{ user_id: ANNA, strength: 'hard' }] }),
+			entry('signal_facts', { persons: [{ user_id: ERIKA, strength: 'hard' }] }),
 			spaces
 		);
 		expect(texts(facts).at(-1)).toEqual([
 			m.facts_persons(),
-			[m.signal_person_hard({ name: 'anna' })]
+			[m.signal_person_hard({ name: 'erika' })]
 		]);
 		const judged = signalSummary(
 			entry('judge', {
-				fields: [{ field: 'space', outcome: 'ok', unseen_by: [ANNA, 'someone'] }],
-				persons: [{ user_id: ANNA, strength: 'medium' }]
+				fields: [{ field: 'space', outcome: 'ok', unseen_by: [ERIKA, 'someone'] }],
+				persons: [{ user_id: ERIKA, strength: 'medium' }]
 			}),
 			spaces
 		);
 		expect(texts(judged)).toEqual([
-			[m.facts_persons(), [m.signal_person_medium({ name: 'anna' })]],
-			[m.log_space_unseen(), ['anna', m.space_named_someone()]]
+			[m.facts_persons(), [m.signal_person_medium({ name: 'erika' })]],
+			[m.log_space_unseen(), ['erika', m.space_named_someone()]]
 		]);
 		// Without a space check the judge's entry has nothing of its own to show.
 		expect(signalSummary(entry('judge', { fields: [{ field: 'contact' }] }), spaces)).toEqual([]);

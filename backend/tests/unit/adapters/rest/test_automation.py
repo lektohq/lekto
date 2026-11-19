@@ -117,21 +117,24 @@ async def test_admins_see_the_holders_against_their_decisions(api: Api) -> None:
     assert response.status_code == 200, response.text
     body = response.json()
     zero = {"right": 0, "learned_rejected": 0, "refused_confirmed": 0, "unclear": 0, "unread": 0}
-    assert [item["kind"] for item in body["kinds"]] == ["email_domain", "iban"]
+    # The kinds a contact carries with a holder: no IBAN since #215 (DA-06).
+    assert [item["kind"] for item in body["kinds"]] == ["email_domain"]
     assert body["recommendation"] == zero  # nothing decided yet
     cases = f"{PREFIX}/automation/holders/cases"
     none = await api.client.get(
-        cases, params={"measure": "iban", "outcome": "learned_rejected"}, headers=auth(admin)
+        cases,
+        params={"measure": "email_domain", "outcome": "learned_rejected"},
+        headers=auth(admin),
     )
     assert none.json() == {"cases": []}
     recommended = await api.client.get(
         cases, params={"measure": "recommendation", "outcome": "unclear"}, headers=auth(admin)
     )
     assert recommended.status_code == 200
-    for params in ({"measure": "nonsense", "outcome": "right"}, {"measure": "iban"}):
+    for params in ({"measure": "nonsense", "outcome": "right"}, {"measure": "email_domain"}):
         assert (await api.client.get(cases, params=params, headers=auth(admin))).status_code == 422
     assert (
         await api.client.get(
-            cases, params={"measure": "iban", "outcome": "right"}, headers=auth(user)
+            cases, params={"measure": "email_domain", "outcome": "right"}, headers=auth(user)
         )
     ).status_code == 403

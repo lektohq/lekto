@@ -11,6 +11,7 @@ from lekto.adapters.outbound.imaging import image_dpi
 from lekto.adapters.outbound.ocrmypdf.engine import prepare_image
 from lekto.core.domain.errors import UnprocessableDocumentError
 from tests.builders import SAMPLES
+from tests.images import stated_png, too_large_on_page_two
 
 
 @pytest.mark.parametrize(
@@ -81,6 +82,21 @@ def test_a_page_over_the_limit_after_the_first_is_unprocessable(
 ) -> None:
     source = bomb_on_page_two(tmp_path / "bomb.tiff", monkeypatch)
     with pytest.raises(UnprocessableDocumentError, match="cannot be read"):
+        prepare_image(source, tmp_path / "prepared.tiff")
+
+
+@pytest.mark.filterwarnings("ignore::PIL.Image.DecompressionBombWarning")
+def test_an_image_over_the_limit_is_refused_before_it_is_decoded(tmp_path: Path) -> None:
+    source = stated_png(tmp_path / "large.png", 11_000, 11_000)
+    with pytest.raises(UnprocessableDocumentError, match="has 121 megapixels"):
+        prepare_image(source, tmp_path / "prepared.tiff")
+
+
+def test_a_later_page_over_the_limit_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = too_large_on_page_two(tmp_path / "large.tiff", monkeypatch)
+    with pytest.raises(UnprocessableDocumentError, match="has 2 megapixels"):
         prepare_image(source, tmp_path / "prepared.tiff")
 
 

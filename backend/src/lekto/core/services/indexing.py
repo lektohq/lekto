@@ -13,8 +13,8 @@ into the index. A job is idempotent and may be repeated.
 - A job that finds the document gone removes it from the index.
 - Two jobs for one document may run at the same time, and the older state may be written last.
   So a job checks after writing that the document and the names it carries are still as it read
-  them, and writes again if not (`_ROUNDS`). The state written last is then one that matched the
-  database after the write.
+  them, and writes again if not (`INDEX_ROUNDS`). The state written last is then one that matched
+  the database after the write.
 - Vectors are computed from sections of the text (`LEKTO_SEARCH_CHUNK_SIZE`, at most
   `LEKTO_SEARCH_MAX_CHUNKS`) and only for sections that differ from those of the indexed
   vectors: a change of lane, space or date costs no embedding, a new topic or title only the
@@ -86,7 +86,13 @@ from lekto.core.ports.repository import DocumentFilter
 from lekto.core.ports.search_index import IndexStats, SearchIndex
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import load_actor, require_admin
-from lekto.core.services._jobs import JobRunner, document_payload, lost, payload_document
+from lekto.core.services._jobs import (
+    JobRunner,
+    document_payload,
+    lost,
+    payload_document,
+    reason_of,
+)
 from lekto.core.services._kept import Kept
 from lekto.core.services._pages import document_pages
 from lekto.core.services._tags import tag_tree
@@ -127,7 +133,9 @@ def _index_key(document: DocumentId) -> str:
     return f"{INDEX_JOB}:{document}"
 
 
-_ROUNDS = 3
+INDEX_ROUNDS = 3
+"""How often an index job embeds and writes at most; how long a worker holds it follows from it
+(`IndexingPolicy.job_lease`, set by the composition)."""
 _RETRY = RetryPolicy(max_attempts=10, delay=timedelta(seconds=30), max_delay=timedelta(hours=1))
 _RETRIES = {INDEX_JOB: _RETRY, REFRESH_JOB: _RETRY, REBUILD_JOB: replace(_RETRY, max_attempts=3)}
 """How often a job is tried; the reconciliation runs again at its next interval instead."""
@@ -295,12 +303,9 @@ class _Snapshot:
 
 
 class IndexingService:
-    job_kinds = (
-        INDEX_JOB,
-        REFRESH_JOB,
-        RECONCILE_JOB,
-        REBUILD_JOB,
-    )
+    _LEASED = (INDEX_JOB, REFRESH_JOB, RECONCILE_JOB)
+    _REBUILDING = (REBUILD_JOB,)  # with a lease of its own, as long as a rebuild may take
+    job_kinds = (*_LEASED, *_REBUILDING)
     """The kinds of jobs `run_next_job` runs."""
 
     def __init__(
@@ -361,8 +366,10 @@ class IndexingService:
         """Claim and run a due job of this service. Returns False if none was due. The rebuild
         has a lease of its own, as long as a rebuild may take."""
         return await self._jobs.run_next(
-            [INDEX_JOB, REFRESH_JOB, RECONCILE_JOB], self._policy.job_lease, self._run_claimed
-        ) or await self._jobs.run_next([REBUILD_JOB], self._policy.rebuild_lease, self._run_claimed)
+            self._LEASED, self._policy.job_lease, self._run_claimed
+        ) or await self._jobs.run_next(
+            self._REBUILDING, self._policy.rebuild_lease, self._run_claimed
+        )
 
     async def _run_claimed(self, job: Job) -> None:
         try:
@@ -372,8 +379,13 @@ class IndexingService:
             return
         try:
             outcome = await work()
-        except ConcurrencyError:
-            lost(job)
+        except ConcurrencyError as error:
+            # A lost claim only if another worker owns the job now; else (a deadlock, a row
+            # changed meanwhile) it fails this attempt and runs again (SA-08).
+            if not await self._jobs.still_claimed(job):
+                lost(job)
+                return
+            await self._failed(job, error)
             return
         except Exception as error:
             await self._failed(job, error)
@@ -395,16 +407,15 @@ class IndexingService:
         return self.rebuild
 
     async def _failed(self, job: Job, error: Exception) -> None:
-        reason = f"{type(error).__name__}: {error}"
+        if job.kind != RECONCILE_JOB:
+            await self._jobs.failed(job, error, _RETRIES[job.kind], "search job failed")
+            return
+        # Again at the next interval, like the cleanup.
         log.warning(
             "search job failed", extra={"job_id": str(job.id), "kind": job.kind}, exc_info=True
         )
-        now = self._clock.now()
-        if job.kind == RECONCILE_JOB:  # again at the next interval, like the cleanup
-            run_at: datetime | None = now + self._policy.reconcile_interval
-        else:
-            run_at = _RETRIES[job.kind].next_run(job.tries, now)
-        await self._jobs.again(job, reason, run_at)
+        run_at = self._clock.now() + self._policy.reconcile_interval
+        await self._jobs.again(job, reason_of(error), run_at)
 
     async def _next_reconcile(self, uow: UnitOfWork) -> None:
         run_at = self._clock.now() + self._policy.reconcile_interval
@@ -420,7 +431,7 @@ class IndexingService:
         Returns how many sections it embedded (0 if the vectors it had stay) and whether the
         embedding failed."""
         embedded, failed = 0, False
-        for _ in range(_ROUNDS):
+        for _ in range(INDEX_ROUNDS):
             snapshot = await self._snapshot(id)
             if snapshot is None:
                 await self._index.remove(id)
@@ -461,10 +472,10 @@ class IndexingService:
 
     async def _read_text(self, id: DocumentId) -> str:
         try:
-            data = await load_text(self._store, id)
+            text = await load_text(self._store, id)
         except NotFoundError:
             return ""  # not parsed yet
-        return data.decode("utf-8", errors="replace")[: self._policy.max_text]
+        return text[: self._policy.max_text]
 
     async def _compose(
         self,

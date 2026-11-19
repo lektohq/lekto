@@ -10,7 +10,6 @@ import base64
 import os
 import tempfile
 from collections.abc import Awaitable, Callable, Mapping
-from datetime import UTC
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -21,7 +20,7 @@ from fastapi import Path as FastApiPath
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 from pydantic import ValidationError as PydanticValidationError
-from starlette.background import BackgroundTask
+from starlette.types import Receive, Scope, Send
 
 from lekto.adapters.inbound.rest.auth import (
     PROTECTED,
@@ -80,7 +79,7 @@ from lekto.adapters.inbound.rest.schemas.inbox import (
 from lekto.adapters.inbound.rest.schemas.open_identifiers import PlaceOut
 from lekto.adapters.inbound.rest.schemas.refs import MAX_REF, opened
 from lekto.adapters.inbound.rest.upload import read_upload, read_uploads, upload_body
-from lekto.adapters.inbound.schemas import RuleReportOut
+from lekto.adapters.inbound.schemas import MAX_POSITION, RuleReportOut
 from lekto.core.domain.classification import field_id_of
 from lekto.core.domain.documents import (
     UNSET,
@@ -89,8 +88,8 @@ from lekto.core.domain.documents import (
     Unset,
     changed_fields,
 )
-from lekto.core.domain.editing import MAX_ADDED, MAX_MERGED
-from lekto.core.domain.errors import ValidationError
+from lekto.core.domain.editing import MAX_ADDED, MAX_MERGED, MAX_PREVIEW_PAGES
+from lekto.core.domain.errors import PermissionDeniedError, ValidationError
 from lekto.core.domain.fields import FieldDefinition, field_from_json
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import (
@@ -104,7 +103,10 @@ from lekto.core.domain.ids import (
 )
 from lekto.core.domain.imports import ImportedMetadata, ImportedReview
 from lekto.core.domain.inbox import DONE_PERIOD, InboxTab
+from lekto.core.domain.lenses import LensSort
 from lekto.core.domain.pipeline import Node
+from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.validation import to_utc
 from lekto.core.ports.pages import PAGE_MEDIA_TYPE
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE, DocumentOrder, SortKey
 from lekto.core.services.documents import DocumentFile, DocumentView, FileInfo, MetadataChange
@@ -117,48 +119,34 @@ inbox = APIRouter(prefix="/inbox", tags=["inbox"], dependencies=PROTECTED)
 EDITORS = "Editors of the document's space and admins"
 
 
-class DocumentSort(StrEnum):
-    """A key to sort by, descending with a `-` before it. Documents without a date come last
-    either way."""
-
-    CREATED = "created_at"
-    CREATED_DESC = "-created_at"
-    DOCUMENT_DATE = "document_date"
-    DOCUMENT_DATE_DESC = "-document_date"
-    TITLE = "title"
-    TITLE_DESC = "-title"
-
-    @property
-    def order(self) -> DocumentOrder:
-        return DocumentOrder(SortKey(self.value.lstrip("-")), ascending=not self.startswith("-"))
-
-
-class DocumentListSort(StrEnum):
-    """The keys of `DocumentSort`, and `field`: by the value of the field `sort_field_id`.
-    Only the list sorts by a field; the search index holds no field values."""
-
-    CREATED = "created_at"
-    CREATED_DESC = "-created_at"
-    DOCUMENT_DATE = "document_date"
-    DOCUMENT_DATE_DESC = "-document_date"
-    TITLE = "title"
-    TITLE_DESC = "-title"
-    FIELD = "field"
-    FIELD_DESC = "-field"
-
-    def order(self, field: FieldId | None) -> DocumentOrder:
-        """ValidationError unless `field` is given exactly for `field` and `-field`."""
-        return DocumentOrder(
-            SortKey(self.value.lstrip("-")), ascending=not self.startswith("-"), field=field
-        )
+DocumentListSort = StrEnum(  # type: ignore[misc]
+    "DocumentListSort",
+    {sort.name: sort.value for sort in LensSort if sort is not LensSort.RELEVANCE},
+)
+DocumentListSort.__doc__ = (
+    "The keys of `DocumentSort`, and `field`: by the value of the field `sort_field_id`.\n"
+    "Only the list sorts by a field; the search index holds no field values."
+)
+DocumentSort = StrEnum(  # type: ignore[misc]
+    "DocumentSort",
+    {
+        sort.name: sort.value
+        for sort in LensSort
+        if sort is not LensSort.RELEVANCE and not sort.by_field
+    },
+)
+DocumentSort.__doc__ = (
+    "A key to sort by, descending with a `-` before it. Documents without a date come last\n"
+    "either way."
+)
+# Both are a lens's sorts (`LensSort`) without `relevance`, the search's without `field` too:
+# a key the lenses gain reaches the list and the search (RA-08).
 
 
-# The list's keys are the search's and `field`: one key more must reach both (fails at import).
-if {key.value for key in DocumentListSort} != {key.value for key in DocumentSort} | {
-    "field",
-    "-field",
-}:
-    raise RuntimeError("DocumentListSort must hold the keys of DocumentSort and field")
+def order_of(sort: str, field: FieldId | None = None) -> DocumentOrder:
+    """A key of `DocumentListSort` or `DocumentSort` as an order; ValidationError unless
+    `field` is given exactly for `field` and `-field`."""
+    return DocumentOrder(SortKey(sort.lstrip("-")), ascending=not sort.startswith("-"), field=field)
 
 
 _UPLOAD_BODY = upload_body(
@@ -217,6 +205,14 @@ async def upload(
             raise RequestValidationError(
                 [{**item, "loc": ("body", *item["loc"])} for item in error.errors()]
             ) from None
+        # An upload token (a shortcut on a phone) uploads for its own user, as a user does:
+        # an admin's, lost with the phone, would put documents in anyone's name (XA-07).
+        if principal.only_uploads:
+            given = [name for name in ("uploaded_by", "channel", "metadata") if getattr(form, name)]
+            if given:
+                raise PermissionDeniedError(
+                    because(ReasonCode.UPLOAD_ONLY_TOKEN_FIELDS, fields=given)
+                )
         # The intake channel: as the caller says (`migration` only), else by credentials.
         channel = Channel.API if principal.session is None else Channel.WEB
         if form.channel is not None:
@@ -237,7 +233,7 @@ async def upload(
             via=principal.via,
         )
     finally:
-        await asyncio.shield(asyncio.to_thread(received.file.path.unlink, missing_ok=True))
+        await received.remove()
     url = str(request.url_for("get_document", id=document.id).path)
     response.headers["Location"] = url
     return DocumentAccepted(id=document.id, status_url=url)
@@ -271,7 +267,7 @@ async def new_version(
             user, DocumentId(id), received.file, filename=received.filename
         )
     finally:
-        await asyncio.shield(asyncio.to_thread(received.file.path.unlink, missing_ok=True))
+        await received.remove()
     return _details(view)
 
 
@@ -285,7 +281,8 @@ _PREVIEW_BODY = upload_body("PDF, JPEG, PNG or TIFF; recognised by content.")
         EDITORS + ", before they add a file to an edit of the document's pages (`POST "
         "/documents/{id}/edit`): its pages as images, as large as a document's page images "
         "(`GET /documents/{id}/pages/{number}`). Nothing is stored. 415 for a file "
-        "that is no PDF or image; 422 for one whose pages cannot be read."
+        "that is no PDF or image; 422 for one whose pages cannot be read, or of more than "
+        f"{MAX_PREVIEW_PAGES} pages."
     ),
     response_model=PagePreviews,
     responses=problem_responses(400, 401, 403, 404, 413, 415, 422),
@@ -298,12 +295,13 @@ async def preview_pages(
     try:
         images = await context.editing.preview(user, DocumentId(id), received.file)
     finally:
-        await asyncio.shield(asyncio.to_thread(received.file.path.unlink, missing_ok=True))
-    return PagePreviews(
-        pages=[
-            f"data:{PAGE_MEDIA_TYPE};base64,{base64.b64encode(image).decode()}" for image in images
-        ]
-    )
+        await received.remove()
+    return PagePreviews(pages=await asyncio.to_thread(_data_urls, images))
+
+
+def _data_urls(images: list[bytes]) -> list[str]:
+    """Each WebP image as a data URL (blocking: some 75 KB each)."""
+    return [f"data:{PAGE_MEDIA_TYPE};base64,{base64.b64encode(image).decode()}" for image in images]
 
 
 _EDIT_BODY = {
@@ -463,7 +461,7 @@ async def list_documents(
     user: CurrentUser,
     context: Context,
     filter: Listed,
-    sort: DocumentListSort = DocumentListSort.CREATED_DESC,
+    sort: DocumentListSort = DocumentListSort.CREATED_DESC,  # type: ignore[attr-defined]
     sort_field_id: Annotated[
         UUID | None, Query(description="The field to sort by with `sort=field` or `-field`.")
     ] = None,
@@ -473,6 +471,7 @@ async def list_documents(
         int,
         Query(
             ge=0,
+            le=MAX_POSITION,
             description="Skip so many documents (pages by number); with `cursor`, after it.",
         ),
     ] = 0,
@@ -481,7 +480,7 @@ async def list_documents(
     views = await context.documents.query(
         user,
         filter,
-        order=sort.order(None if sort_field_id is None else FieldId(sort_field_id)),
+        order=order_of(sort, None if sort_field_id is None else FieldId(sort_field_id)),
         after=decode_cursor(cursor),
         offset=offset,
         limit=limit,
@@ -693,7 +692,10 @@ _file_route(DocumentFile.ORIGINAL, "The original file", "application/octet-strea
     },
 )
 async def version_original(
-    id: UUID, number: Annotated[int, FastApiPath(ge=1)], user: CurrentUser, context: Context
+    id: UUID,
+    number: Annotated[int, FastApiPath(ge=1, le=MAX_POSITION)],
+    user: CurrentUser,
+    context: Context,
 ) -> FileResponse:
     return await _sent(
         lambda target: context.documents.download_version(user, DocumentId(id), number, target),
@@ -751,7 +753,7 @@ async def _sent(write: Callable[[Path], Awaitable[FileInfo]], disposition: str) 
     except BaseException:
         await asyncio.shield(asyncio.to_thread(path.unlink, missing_ok=True))
         raise
-    return FileResponse(
+    return _CopyResponse(
         path,
         media_type=info.media_type,
         filename=info.filename,
@@ -760,8 +762,19 @@ async def _sent(write: Callable[[Path], Awaitable[FileInfo]], disposition: str) 
         # every answer. A file shown in the browser runs no scripts and reaches nothing of
         # this site.
         headers={"Content-Security-Policy": "sandbox; default-src 'none'"},
-        background=BackgroundTask(path.unlink, missing_ok=True),
     )
+
+
+class _CopyResponse(FileResponse):
+    """The temporary copy of a file, removed however the answer ends: Starlette answers a
+    broken or unsatisfiable `Range` with 400 or 416 and runs no background task then, so a
+    copy removed by one would stay on the disk with every such request."""
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            await asyncio.shield(asyncio.to_thread(Path(self.path).unlink, missing_ok=True))
 
 
 @router.get(
@@ -1198,7 +1211,7 @@ async def _changes(body: DocumentPatch, user: UserId, context: Context) -> Docum
         ),
         document_date=body.document_date if "document_date" in given else UNSET,
         fields=fields,
-        created_at=UNSET if body.created_at is None else body.created_at.astimezone(UTC),
+        created_at=UNSET if body.created_at is None else to_utc(body.created_at, "created_at"),
     )
 
 
@@ -1234,7 +1247,7 @@ async def _imported_metadata(
             tag_ids=frozenset(TagId(tag) for tag in body.tag_ids),
             document_date=body.document_date,
             fields={key: field_from_json(definitions[key], raw) for key, raw in fields.items()},
-            created_at=None if body.created_at is None else body.created_at.astimezone(UTC),
+            created_at=None if body.created_at is None else to_utc(body.created_at, "created_at"),
             review=tuple(_review(item, definitions) for item in body.review),
         )
     except ValidationError as error:

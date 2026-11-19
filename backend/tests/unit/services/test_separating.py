@@ -2,6 +2,7 @@
 split at its separator sheets; the stack stays version 1, the first part becomes version 2 and
 every other part a new document as the stack came in, each processed as any new one."""
 
+import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -10,13 +11,12 @@ import pytest
 
 from lekto.adapters.outbound.memory import FakeCodeReader, fake_pdf
 from lekto.core.domain.codes import Code
-from lekto.core.domain.documents import Channel, Document
+from lekto.core.domain.documents import MAX_DOCUMENT_PAGES, Channel, Document
 from lekto.core.domain.editing import EditPart, PagePick
 from lekto.core.domain.errors import InvalidTransitionError
-from lekto.core.domain.ids import DocumentId, MailboxId, MailRecordId, new_id
+from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.locations import Box
-from lekto.core.domain.mail_intake import MailOrigin, OriginRole
 from lekto.core.domain.pipeline import (
     PERSON_SPACE,
     Lane,
@@ -25,7 +25,7 @@ from lekto.core.domain.pipeline import (
     Outcome,
     ProcessingStatus,
 )
-from lekto.core.domain.reasons import ReasonCode
+from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.separating import MAX_STACK_PAGES, separated_parts, separator_pages
 from lekto.core.domain.users import Role, User
 from lekto.core.domain.versions import VersionKind
@@ -34,8 +34,10 @@ from lekto.core.services._intake import SPLIT_FROM
 from lekto.core.services.objects import original_key
 from lekto.core.services.pipeline import PipelineService
 from lekto.core.services.separating import NOT_LOOKED, SeparateNode, Separation
-from tests.builders import NOW, incoming
-from tests.unit.services.support import World
+from tests import builders
+from tests.builders import incoming
+from tests.unit.services.flows import mailed
+from tests.unit.services.support import CancelledCommit, World
 
 STACK = fake_pdf(8, "two payslips and a letter")
 BOX = Box.clamped(0.1, 0.1, 0.9, 0.3)
@@ -211,26 +213,7 @@ async def test_the_parts_of_a_mailed_stack_keep_its_mail(world: World) -> None:
     stack = await pipeline.receive(
         owner.id, incoming(STACK), filename="scans.pdf", channel=Channel.MAIL
     )
-    origin = MailOrigin(
-        document_id=stack.id,
-        record_id=MailRecordId(new_id()),
-        mailbox_id=MailboxId(new_id()),
-        mailbox="Post",
-        rule="Scans",
-        role=OriginRole.ATTACHMENT,
-        letter=1,
-        message_id="<scans@example.org>",
-        sender=(),
-        to=(),
-        cc=(),
-        subject="Scans",
-        sent_at=None,
-        arrived_at=NOW,
-        filename="scans.pdf",
-    )
-    async with world.uow() as uow:
-        await uow.mail_origins.add(origin)
-        await uow.commit()
+    origin = await mailed(world, stack, "scans.pdf")
     await world.drain(pipeline)
     _, part = await documents(world)
     assert part.channel is Channel.MAIL
@@ -239,7 +222,7 @@ async def test_the_parts_of_a_mailed_stack_keep_its_mail(world: World) -> None:
 
 
 async def test_a_stack_without_a_sheet_stays_as_it_is(world: World) -> None:
-    reader = sheets(3, text="K-20047718")
+    reader = sheets(3, text="K-12345678")
     _, stack = await received(world, reader)
     (document,) = await documents(world)
     assert document.sha256 == stack.sha256
@@ -288,6 +271,70 @@ async def test_a_file_longer_than_a_stack_is_not_looked_through(world: World) ->
         "pages": MAX_STACK_PAGES + 1,
         "max": MAX_STACK_PAGES,
     }
+
+
+async def test_a_file_of_more_pages_than_lekto_reads_fails_before_they_are_read(
+    world: World,
+) -> None:
+    """A file of 100 MB may hold 430 000 empty pages: OCR and the page images would read each."""
+    reader = sheets(3)
+    pages = MAX_DOCUMENT_PAGES + 1
+    for separators, channel in ((("PATCHT",), Channel.WEB), ((), Channel.MIGRATION)):
+        _, book = await received(
+            world,
+            reader,
+            fake_pdf(pages, f"a book {channel}"),
+            separators=separators,
+            channel=channel,
+        )
+        async with world.uow() as uow:
+            log = await uow.processing_log.list_for(book.id)
+        (run,) = [entry for entry in log if entry.node is Node.SEPARATE]
+        assert run.result.outcome is Outcome.FAILED
+        assert run.result.reasons == (
+            because(ReasonCode.DOCUMENT_TOO_MANY_PAGES, pages=pages, max=MAX_DOCUMENT_PAGES),
+        )
+    assert reader.calls == []
+    _, longest = await received(
+        world, reader, fake_pdf(MAX_DOCUMENT_PAGES, "the longest"), separators=()
+    )
+    assert await not_looked(world, longest.id) == "off"
+
+
+async def test_parts_stored_as_storing_was_cancelled_keep_their_files(world: World) -> None:
+    """Cancelled while the database answered the commit of the node's result: the parts are
+    stored, their files stay (`Separation.discard`)."""
+    cancelled = CancelledCommit(world.uow)
+    node = SeparateNode(
+        cancelled,
+        world.object_store,
+        sheets(3),
+        world.composer,
+        separators=("PATCHT",),
+        pipeline_version="test",
+    )
+
+    class ThenCancelled:
+        async def run(self, document: Document) -> NodeResult | Separation:
+            result = await node.run(document)
+            cancelled.armed = True  # the next commit stores the result
+            return result
+
+    pipeline = builders.pipeline_service(
+        cancelled,
+        world.clock,
+        world.object_store,
+        {**world.executors, Node.SEPARATE: ThenCancelled()},
+    )
+    owner = await world.user(role=Role.ADMIN)
+    await pipeline.receive(owner.id, incoming(STACK), filename="scan_2026-11-10.pdf")
+    with pytest.raises(asyncio.CancelledError):
+        await world.drain(pipeline)
+    async with world.uow() as uow:
+        documents = await uow.documents.list_all()
+    assert len(documents) == 2  # the stack's first part, and the second as a document
+    for item in documents:
+        assert await world.object_store.exists(original_key(item.sha256))
 
 
 async def test_a_new_version_is_not_split(world: World) -> None:

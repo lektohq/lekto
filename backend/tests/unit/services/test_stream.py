@@ -8,42 +8,19 @@ import pytest
 
 from lekto.core.domain.documents import Document, DocumentChanges
 from lekto.core.domain.ids import ContactId, DocumentTypeId
-from lekto.core.domain.master_data import Contact, DocumentType
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState
 from lekto.core.domain.series import SeriesState
-from lekto.core.domain.spaces import Space
-from lekto.core.domain.users import User
 from lekto.core.ports.repository import DocumentFilter
 from lekto.core.services import stream as module
 from lekto.core.services.stream import LaneKind, StreamService
 from tests import builders
-from tests.unit.services.support import World
+from tests.unit.services.support import StoredScene, World
 
 NOW = builders.NOW
 
 
-class Scene:
-    def __init__(self, world: World, owner: User, space: Space) -> None:
-        self.world, self.owner, self.space = world, owner, space
-
-    @classmethod
-    async def of(cls, world: World) -> "Scene":
-        owner = await world.user()
-        return cls(world, owner, await world.personal_space(owner))
-
-    async def contact(self, name: str) -> ContactId:
-        contact = Contact.create(name=name, now=NOW)
-        async with self.world.uow() as uow:
-            await uow.contacts.add(contact)
-            await uow.commit()
-        return contact.id
-
-    async def kind(self, name: str, *, target: bool = False) -> DocumentTypeId:
-        kind = DocumentType.create(name=name, now=NOW, relation_target=target)
-        async with self.world.uow() as uow:
-            await uow.document_types.add(kind)
-            await uow.commit()
-        return kind.id
+class Scene(StoredScene):
+    """A user's documents with contacts, types and dates, stored directly."""
 
     async def document(
         self,
@@ -86,9 +63,9 @@ async def test_a_contact_s_stream(world: World) -> None:
     s = await Scene.of(world)
     insurer = await s.contact("Nord Versicherung")
     contract, bill, complaint = (
-        await s.kind("Vertrag", target=True),
-        await s.kind("Beitragsrechnung"),
-        await s.kind("Reklamation"),
+        await s.document_type("Vertrag", target=True),
+        await s.document_type("Beitragsrechnung"),
+        await s.document_type("Reklamation"),
     )
     policy = await s.document(insurer, contract, date(2025, 12, 1))
     bills = [await s.document(insurer, bill, date(2026, month, 1)) for month in (7, 8, 9)]
@@ -133,9 +110,9 @@ async def test_a_document_that_refers_to_the_target_branches_off_the_series(worl
     s = await Scene.of(world)
     insurer = await s.contact("Nord Versicherung")
     contract, bill, notice = (
-        await s.kind("Vertrag", target=True),
-        await s.kind("Beitragsrechnung"),
-        await s.kind("Kündigung"),
+        await s.document_type("Vertrag", target=True),
+        await s.document_type("Beitragsrechnung"),
+        await s.document_type("Kündigung"),
     )
     policy = await s.document(insurer, contract, date(2025, 12, 1))
     bills = [await s.document(insurer, bill, date(2026, month, 1)) for month in (7, 8, 9)]
@@ -166,9 +143,9 @@ async def test_one_target_stands_at_the_start_of_several_series(world: World) ->
     s = await Scene.of(world)
     insurer = await s.contact("Nord Versicherung")
     contract, bill, statement = (
-        await s.kind("Vertrag", target=True),
-        await s.kind("Beitragsrechnung"),
-        await s.kind("Auszug"),
+        await s.document_type("Vertrag", target=True),
+        await s.document_type("Beitragsrechnung"),
+        await s.document_type("Auszug"),
     )
     policy = await s.document(insurer, contract, date(2023, 12, 1))
     for kind, days in (
@@ -191,7 +168,7 @@ async def test_lanes_beyond_the_limit_come_folded_with_their_branches(
     s = await Scene.of(world)
     shop = await s.contact("Versandhaus")
     for n in range(3):
-        kind = await s.kind(f"Typ {n}")
+        kind = await s.document_type(f"Typ {n}")
         docs = [
             await s.document(shop, kind, date(2026, month, 1)) for month in (4 + n, 5 + n, 6 + n)
         ]

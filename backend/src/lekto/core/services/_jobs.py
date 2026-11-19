@@ -18,7 +18,7 @@ from uuid import UUID
 from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import ConcurrencyError
 from lekto.core.domain.ids import DocumentId, JobId
-from lekto.core.domain.jobs import Job, JobStatus
+from lekto.core.domain.jobs import Job, JobStatus, RetryPolicy
 from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.push import PushKind
@@ -183,6 +183,18 @@ class JobRunner:
                 "could not release an interrupted job", extra={"job_id": str(job.id)}, exc_info=True
             )
 
+    async def failed(
+        self, job: Job, error: Exception, policy: RetryPolicy, message: str, **extra: str
+    ) -> None:
+        """An attempt of `job` raised `error`: logged (`message`, with `extra`), and the job runs
+        again as `policy` says, or is given up after its attempts (SA-16)."""
+        log.warning(
+            message,
+            extra={"job_id": str(job.id), "kind": job.kind, "attempt": job.tries, **extra},
+            exc_info=error,
+        )
+        await self.again(job, reason_of(error), policy.next_run(job.tries, self._clock.now()))
+
     async def still_claimed(self, job: Job) -> bool:
         async with self._uow() as uow:
             current = await uow.jobs.get(job.id)
@@ -202,6 +214,11 @@ class JobRunner:
                 if attempt == STORE_ATTEMPTS:
                     raise
                 await _backoff(attempt)
+
+
+def reason_of(error: BaseException) -> str:
+    """What an attempt that raised `error` failed of, as its job keeps it."""
+    return f"{type(error).__name__}: {error}"
 
 
 def lost(job: Job) -> None:

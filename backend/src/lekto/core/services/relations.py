@@ -17,7 +17,7 @@ from enum import StrEnum
 from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import ConflictError, NotFoundError
 from lekto.core.domain.events import DocumentUpdated
-from lekto.core.domain.first_runs import RELATIONS, Decision, FieldVerdict, Verdict
+from lekto.core.domain.first_runs import RELATIONS, Verdict
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import DocumentId, DocumentTypeId, UserId
 from lekto.core.domain.permissions import can_edit_document, can_read_document
@@ -28,6 +28,7 @@ from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import controllable_document, load_actor, readable_document
+from lekto.core.services._first_runs import keep_verdict
 
 RELATIONS_LOCK = "relations"
 """One change of relations at a time, Lekto's (`relating`) or a person's: two documents that
@@ -267,17 +268,4 @@ async def _verdict(
 ) -> None:
     """The first decision about the newer document's relations (through the API token `via`);
     before its first run stopped, early."""
-    if newer.processing.run == 1 and newer.first_lane is None:
-        verdict = Verdict.EARLY
-    await uow.processing_facts.add_verdicts(
-        [
-            FieldVerdict(
-                document_id=newer.id,
-                field=RELATIONS,
-                verdict=verdict,
-                decided_at=now,
-                decision=Decision.CHANGE,
-                via=via,
-            )
-        ]
-    )
+    await keep_verdict(uow, newer, RELATIONS, verdict, now, via)

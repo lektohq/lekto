@@ -4,11 +4,29 @@ input, the PDF pages of an edit)."""
 
 from PIL import Image
 
+from lekto.core.domain.errors import UnprocessableDocumentError
+from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.ports.images import MAX_DOCUMENT_PIXELS
+
 A4_LONG_EDGE = 11.69  # inches
 PLAUSIBLE_PAGE = (3.0, 17.0)  # long edge in inches: from a receipt to A3
 
 # Modes with an alpha channel, straight or premultiplied (`RGBa`, `La`).
 _ALPHA = ("RGBA", "LA", "PA", "RGBa", "La")
+
+
+def check_pixels(image: Image.Image) -> None:
+    """UnprocessableDocumentError unless `image` (a frame of it) has at most
+    `MAX_DOCUMENT_PIXELS`: on what Pillow read of its header, before anything is decoded."""
+    width, height = image.size
+    if width * height > MAX_DOCUMENT_PIXELS:
+        raise UnprocessableDocumentError(
+            because(
+                ReasonCode.IMAGE_TOO_LARGE,
+                pixels=-(-width * height // 1_000_000),  # rounded up: never "120 of 120"
+                max=MAX_DOCUMENT_PIXELS // 1_000_000,
+            )
+        )
 
 
 def flatten_on_white(image: Image.Image) -> Image.Image:
@@ -20,7 +38,7 @@ def flatten_on_white(image: Image.Image) -> Image.Image:
         return image
     if image.mode == "La":
         image = image.convert("LA")  # Pillow converts premultiplied grey to nothing else
-    rgba = image.convert("RGBA")
+    rgba = image if image.mode == "RGBA" else image.convert("RGBA")  # no copy of a large one
     white = Image.new("RGB", rgba.size, "white")
     white.paste(rgba, mask=rgba.getchannel("A"))
     return white

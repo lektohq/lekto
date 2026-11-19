@@ -12,22 +12,26 @@ parse node reads them (`layout`): the text layer of an OCR'd scan holds Tesserac
 after the other, so a line across two of them (`Entgeltbescheinigung` on the left, its date on
 the right) is not one run of characters there, though it is one line of the parsed text the
 quote comes from.
+
+The PDF is read in a child (`child`); a page PDFium cannot read has no places.
 """
 
-import asyncio
 import html
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 
 import pypdfium2
 
 from lekto.adapters.outbound.pdfium.chars import Char, Geometry, page_chars, page_fractions
+from lekto.adapters.outbound.pdfium.child import DEFAULT_TIMEOUT, run_child
 from lekto.adapters.outbound.pdfium.fixed_pitch import page_lines
 from lekto.adapters.outbound.pdfium.layout import WORD_GAP
-from lekto.adapters.outbound.pdfium.library import LOCK
-from lekto.core.domain.errors import UnprocessableDocumentError
+from lekto.adapters.outbound.pdfium.library import LOCK, MODULE
+from lekto.core.domain.errors import UnprocessableDocumentError, ValidationError
+from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.locations import Box, Location, line_boxes
 from lekto.core.domain.reasons import ReasonCode, because
 
@@ -43,13 +47,47 @@ _LINE_BREAKS = "\r\n"
 
 
 class PdfiumTextLocator:
+    """Reads the PDF in a child with `timeout` and `memory` (`child.run_child`)."""
+
+    def __init__(self, *, timeout: timedelta = DEFAULT_TIMEOUT, memory: int | None = None) -> None:
+        self._timeout = timeout
+        self._memory = memory
+
     async def locate(self, pdf: Path, texts: Sequence[str]) -> list[tuple[Location, ...]]:
         if not texts:
             return []
-        return await asyncio.to_thread(_locate, pdf, list(texts))
+        answer = await run_child(
+            MODULE,
+            "locate",
+            [str(pdf)],
+            timeout=self._timeout,
+            memory=self._memory,
+            input=list(texts),
+        )
+        found: list[tuple[Location, ...]] = []
+        try:
+            if not isinstance(answer, list) or len(answer) != len(texts):
+                raise ValidationError("not a list for each text")
+            for places in answer:
+                if not isinstance(places, list):
+                    raise ValidationError("not a list of places")
+                found.append(tuple(Location.from_json(place) for place in places))
+        except ValidationError:
+            raise RuntimeError("locate gave no usable answer") from None
+        return found
 
 
-def _locate(pdf: Path, texts: list[str]) -> list[tuple[Location, ...]]:
+def locate_task(args: Sequence[str], texts: JsonValue) -> JsonValue:
+    """The child's task `locate PDF`, the texts as a JSON list on its standard input."""
+    (pdf,) = args
+    if not isinstance(texts, list) or not all(isinstance(text, str) for text in texts):
+        raise ValueError("locate needs a list of texts")
+    found = locate(Path(pdf), [str(text) for text in texts])
+    return [[place.to_json() for place in places] for places in found]
+
+
+def locate(pdf: Path, texts: list[str]) -> list[tuple[Location, ...]]:
+    """The places of each of `texts` in `pdf`, in this process (blocking)."""
     found: list[list[Location]] = [[] for _ in texts]
     with LOCK:
         try:

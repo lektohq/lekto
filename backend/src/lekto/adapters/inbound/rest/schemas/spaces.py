@@ -8,11 +8,13 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.rest.schemas.common import Name, NameIn
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.ids import UserId
 from lekto.core.domain.master_data import MAX_DESCRIPTION
 from lekto.core.domain.permissions import space_role
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import User
+from lekto.core.domain.validation import MAX_REFERENCES
 
 SpaceDescription = Annotated[
     str,
@@ -27,9 +29,8 @@ SpaceDescription = Annotated[
 ]
 
 
-class MemberIn(BaseModel):
+class MemberIn(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"role": "read"}]},
     )
 
@@ -60,13 +61,13 @@ class MemberDetails(MemberOut):
 
 class SpaceCreate(NameIn):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"name": "Household"}]},
     )
 
     description: SpaceDescription | None = None
     members: list[SpaceMember] | None = Field(
         default=None,
+        max_length=MAX_REFERENCES,
         description=(
             "Who else is a member, with their role. The caller always edits a space they "
             "create; an admin may give the members alone (one of them must edit)."
@@ -74,11 +75,10 @@ class SpaceCreate(NameIn):
     )
 
 
-class SpacePatch(BaseModel):
+class SpacePatch(RequestBody):
     """Fields left out stay; a `description` of null or empty removes it."""
 
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"description": "Wohnung, Nebenkosten, Versorger"}]},
     )
 

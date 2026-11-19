@@ -1,24 +1,33 @@
 """Applying a rule to existing documents: the preview and the background job."""
 
+import threading
+from types import SimpleNamespace
+
 import pytest
 
+from lekto.core.domain import evidence, rule_conditions
 from lekto.core.domain.documents import DocumentChanges
 from lekto.core.domain.errors import NotFoundError, ValidationError
 from lekto.core.domain.ids import DocumentId, new_id
 from lekto.core.domain.pipeline import RULES_APPLY, Lane
+from lekto.core.domain.progress import ProgressStatus
+from lekto.core.domain.push import PushKind
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.rules import (
-    ApplicationStatus,
     Condition,
     ConditionField,
     ForceReview,
     Operator,
+    Rule,
     SetSpace,
     SetTitle,
 )
 from lekto.core.domain.spaces import SpaceRole
-from lekto.core.services.rules import retroactive
+from lekto.core.domain.users import User
+from lekto.core.services._push_queue import PUSH_JOB
+from lekto.core.services.rules import retroactive, running
 from lekto.core.services.rules.retroactive import BATCH
+from lekto.core.services.rules.running import Prepared, prepare
 from tests import builders
 from tests.unit.services.rules_support import (
     MAX_DOCUMENTS,
@@ -94,7 +103,7 @@ async def test_the_preview_lists_changes_and_the_job_applies_the_pinned_version(
 
     done = await r.applications.get(owner.id, application.id)
     assert (done.status, done.applied, done.unchanged, done.skipped) == (
-        ApplicationStatus.DONE,
+        ProgressStatus.DONE,
         3,
         0,
         [],
@@ -149,6 +158,25 @@ async def test_the_dry_run_looks_only_at_documents_the_conditions_leave(
     assert [item.document.id for item in unfiltered.items] == [arrived["a1"]]
 
 
+async def test_a_dry_run_counts_only_the_documents_the_caller_may_edit(world: World) -> None:
+    """A global rule, applied by someone who only reads a shared space: its documents are
+    neither listed nor counted (SC-10)."""
+    r = await rule_world(world)
+    owner, reader = await world.user(), await world.user()
+    tax = await r.tag("tax")
+    shared = await world.spaces.create(owner.id, "Haushalt")
+    await world.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
+    for _ in range(3):
+        await r.arrive(owner, space=shared.id)
+    mine = await r.arrive(reader)
+    rule = await r.global_rule(definition("Tax", channel_api(), add_tags(tax.id)))
+
+    preview = await r.applications.preview(reader.id, rule.id)
+
+    assert [item.document.id for item in preview.items] == [mine.id]
+    assert (preview.looked_at, preview.total) == (1, 1)
+
+
 async def test_a_dry_run_whose_conditions_no_document_meets_looks_at_none(world: World) -> None:
     r = await rule_world(world)
     owner = await world.user()
@@ -197,7 +225,7 @@ async def test_the_job_checks_the_rights_again_and_a_global_rule_moves_nothing(
     await run_jobs(r)
 
     done = await r.applications.get(editor.id, application.id)
-    assert (done.status, done.applied) == (ApplicationStatus.DONE, 1)
+    assert (done.status, done.applied) == (ProgressStatus.DONE, 1)
     assert done.skipped == [(in_shared.id, NOT_AVAILABLE), (private.id, NOT_AVAILABLE)]
     assert (await r.stored(in_shared)).tag_ids == set()
     assert (await r.stored(private)).tag_ids == set()
@@ -267,14 +295,14 @@ async def test_a_long_application_continues_in_a_new_job(world: World) -> None:
     assert await r.applications.run_next_job()
     progress = await r.applications.get(owner.id, application.id)
     assert (progress.status, progress.position, progress.finished_at) == (
-        ApplicationStatus.RUNNING,
+        ProgressStatus.RUNNING,
         BATCH,
         None,
     )
 
     assert await run_jobs(r) == 1
     done = await r.applications.get(owner.id, application.id)
-    assert (done.status, done.applied) == (ApplicationStatus.DONE, BATCH + 1)
+    assert (done.status, done.applied) == (ProgressStatus.DONE, BATCH + 1)
     for document in documents:
         assert (await r.stored(document)).tag_ids == {tax.id}
 
@@ -291,7 +319,7 @@ async def test_an_application_ends_when_its_rule_is_deleted(world: World) -> Non
     await run_jobs(r)
 
     done = await r.applications.get(owner.id, application.id)
-    assert (done.status, done.error) == (ApplicationStatus.FAILED, "the rule or its user is gone")
+    assert (done.status, done.error) == (ProgressStatus.FAILED, "the rule or its user is gone")
     assert (await r.stored(document)).tag_ids == set()
     with pytest.raises(NotFoundError):
         await r.applications.preview(owner.id, rule.id)
@@ -326,6 +354,140 @@ async def test_filing_on_an_unconfirmed_contact_is_a_conflict_until_accepted(
     assert (await r.stored(document)).space_id == shared.id
 
 
+async def test_a_worker_overtaken_applies_what_it_prepared_to_no_other_document(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Another worker took the application over (the lease ran out) and went on while the
+    first prepared a document: the first applies nothing to the next one (SC-04)."""
+    r = await rule_world(world)
+    owner = await world.user()
+    tax = await r.tag("tax")
+    invoice = await r.arrive(owner, text="# Rechnung")
+    others = [await r.arrive(owner, text="# Strom") for _ in range(2)]
+    rule = await r.personal_rule(owner, definition("Tax", text_matches("Rech"), add_tags(tax.id)))
+    application = await r.applications.start(
+        owner.id, rule.id, version=1, documents=[invoice.id, *(item.id for item in others)]
+    )
+    real, calls = prepare, 0
+
+    async def overtaken(*args: object, **kwargs: object) -> Prepared:
+        nonlocal calls
+        calls += 1
+        prepared = await real(*args, **kwargs)  # type: ignore[arg-type]
+        if calls == 1:
+            await r.applications._next_document(application.id)  # the other worker
+        return prepared
+
+    monkeypatch.setattr(retroactive, "prepare", overtaken)
+    await r.applications._next_document(application.id)
+    await run_jobs(r)
+
+    assert (await r.stored(invoice)).tag_ids == {tax.id}
+    for item in others:
+        assert (await r.stored(item)).tag_ids == set()
+    done = await r.applications.get(owner.id, application.id)
+    assert (done.status, done.applied) == (ProgressStatus.DONE, 1)
+
+
+async def test_the_text_is_read_for_the_rules_outside_the_event_loop(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Cutting and folding a long text take a while: done once per document in a worker
+    thread, not again for each condition in the event loop (SC-05)."""
+    folds: list[int] = []
+    cuts: list[int] = []
+    fold, cut = evidence.fold_umlauts, rule_conditions.pattern_text
+
+    def folding(text: str) -> str:
+        if len(text) > 100:  # the document's text, not a condition's value
+            folds.append(threading.get_ident())
+        return fold(text)
+
+    def cutting(markdown: str, limit: int) -> str:
+        cuts.append(threading.get_ident())
+        return cut(markdown, limit)
+
+    monkeypatch.setattr(evidence, "fold_umlauts", folding)
+    monkeypatch.setattr(running, "pattern_text", cutting)
+    r = await rule_world(world)
+    owner = await world.user()
+    tax = await r.tag("tax")
+    await r.arrive(owner, text="# Gebuehr\n" + "Zeile mit Inhalt\n" * 20)
+    contains = [
+        Condition(field=ConditionField.TEXT, op=Operator.CONTAINS, value=value)
+        for value in ("Gebühr", "Prüfung", "Übersicht")
+    ]
+    rule = await r.personal_rule(owner, definition("Fee", all_of(*contains), add_tags(tax.id)))
+    folds.clear()
+    cuts.clear()
+
+    preview = await r.applications.preview(owner.id, rule.id)
+
+    assert preview.looked_at == 1
+    assert len(folds) == 1 and len(cuts) == 1
+    assert threading.get_ident() not in folds + cuts
+
+
+def slow_patterns(r: RuleWorld, monkeypatch: pytest.MonkeyPatch, page: float) -> None:
+    """Each pattern takes 0.06 s of a clock of its own; a page of the dry run has `page`."""
+    now = [0.0]
+    search = r.matcher.search
+
+    async def slow(pattern: str, text: str, *, case_sensitive: bool) -> bool:
+        now[0] += 0.06
+        return await search(pattern, text, case_sensitive=case_sensitive)
+
+    r.matcher.search = slow  # type: ignore[method-assign]
+    monkeypatch.setattr(running, "time", SimpleNamespace(monotonic=lambda: now[0]))
+    monkeypatch.setattr(retroactive, "PREVIEW_BUDGET", page)
+
+
+async def pages(r: RuleWorld, owner: User, rule: Rule) -> list[list[DocumentId]]:
+    """The dry run page by page: the documents each shows."""
+    shown: list[list[DocumentId]] = []
+    before = None
+    while True:
+        preview = await r.applications.preview(owner.id, rule.id, before=before)
+        shown.append([item.document.id for item in preview.items])
+        if preview.next_cursor is None:
+            return shown
+        before = preview.next_cursor
+
+
+async def test_the_first_document_of_a_page_has_the_time_of_one(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Shorter than two patterns, the page's time judged each document on half of them: none
+    was shown (SC-12)."""
+    r = await rule_world(world)
+    owner = await world.user()
+    tax = await r.tag("tax")
+    documents = [await r.arrive(owner, text="# Strom Rechnung") for _ in range(3)]
+    rule = await r.personal_rule(
+        owner,
+        definition("Tax", all_of(text_matches("Strom"), text_matches("Rech")), add_tags(tax.id)),
+    )
+    slow_patterns(r, monkeypatch, page=0.05)
+    assert await pages(r, owner, rule) == [[item.id] for item in reversed(documents)]
+
+
+async def test_a_document_the_page_s_time_cuts_short_comes_first_on_the_next(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Not judged on half its patterns, and not left behind (SC-12)."""
+    r = await rule_world(world)
+    owner = await world.user()
+    tax = await r.tag("tax")
+    invoice = await r.arrive(owner, text="# Strom Rechnung")
+    await r.arrive(owner)  # no text: no patterns, no time
+    rule = await r.personal_rule(
+        owner,
+        definition("Tax", all_of(text_matches("Strom"), text_matches("Rech")), add_tags(tax.id)),
+    )
+    slow_patterns(r, monkeypatch, page=0.05)
+    assert await pages(r, owner, rule) == [[], [invoice.id]]
+
+
 async def test_an_unexpected_error_ends_the_application(world: World) -> None:
     r = await rule_world(world)
     owner = await world.user()
@@ -342,8 +504,19 @@ async def test_an_unexpected_error_ends_the_application(world: World) -> None:
     assert await r.applications.run_next_job()
     assert not await r.applications.run_next_job()
     done = await r.applications.get(owner.id, application.id)
-    assert (done.status, done.error) == (ApplicationStatus.FAILED, "stopped by an internal error")
+    assert (done.status, done.error) == (ProgressStatus.FAILED, "stopped by an internal error")
     assert (await r.stored(document)).tag_ids == set()
+    # Given up as every job is: the admins hear of it (SB-08).
+    assert failed_jobs_told(world) == [{"kind": retroactive.APPLY_JOB}]
+
+
+def failed_jobs_told(world: World) -> list[object]:
+    """What the admins are told of jobs given up."""
+    return [
+        job.payload.get("params")
+        for job in world.database.jobs.values()
+        if job.kind == PUSH_JOB and job.payload.get("kind") == PushKind.JOB_FAILED.value
+    ]
 
 
 async def test_applying_a_rule_moves_nothing_where_the_person_could_not_move_it(

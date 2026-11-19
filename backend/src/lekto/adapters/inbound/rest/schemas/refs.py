@@ -3,13 +3,15 @@ identifiers): an address names a value by its reference, never as written."""
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.errors import ValidationError
-from lekto.core.domain.identifiers import IdentifierKind
+from lekto.core.domain.identifiers import MAX_IDENTIFIER_VALUE, IdentifierKind
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.identity import DecryptionError, RefCipher
 
-MAX_REF = 400
-"""Characters of a reference at most (a value of 200 characters, sealed, in base64url)."""
+MAX_REF = 2 * MAX_IDENTIFIER_VALUE
+"""Characters of a reference at most (a value of `MAX_IDENTIFIER_VALUE` characters, sealed, in
+base64url)."""
 
 
 def seal(refs: RefCipher, kind: IdentifierKind, value: str) -> str:
@@ -25,14 +27,13 @@ def opened(refs: RefCipher, kind: IdentifierKind, ref: str) -> str:
         raise ValidationError(because(ReasonCode.REF_UNKNOWN)) from None
 
 
-class RefIn(BaseModel):
+class RefIn(RequestBody):
     model_config = ConfigDict(
-        extra="forbid",
         json_schema_extra={"examples": [{"kind": "invoice_number", "value": "R-2025-0471"}]},
     )
 
     kind: IdentifierKind
-    value: str = Field(min_length=1, max_length=200, description="As written.")
+    value: str = Field(min_length=1, max_length=MAX_IDENTIFIER_VALUE, description="As written.")
 
 
 class RefOut(BaseModel):

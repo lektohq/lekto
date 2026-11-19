@@ -27,6 +27,7 @@ from lekto_migration.masterdata import (
     PENDING,
     UPDATED,
     Action,
+    missing,
     needs,
     prepare,
 )
@@ -241,9 +242,9 @@ async def _plan(
     path, written = config.plan, False
     if path.exists():
         try:
-            document = plans.yaml().load(path.read_text(encoding="utf-8"))
-        except Exception as error:  # ruamel.yaml raises several of its own
-            raise MigrationError(f"{path} is no valid YAML: {error}") from None
+            document = plans.read_yaml(path)
+        except plans.PlanError as error:
+            raise MigrationError("; ".join(error.problems)) from None
         bound(document, config)
         changes = merge(document, snapshot, directory, today)
         if changes:
@@ -287,10 +288,7 @@ async def _plan(
         expected = [expect(d, context) for d in snapshot.documents]
         for action in needs(plan, directory, snapshot, expected, fields):
             if action.status == MISSING:
-                problems.append(
-                    f"{action.kind.replace('_', ' ')} '{action.name}' does not exist in Lekto "
-                    f"and the plan may not create it ({action.source})"
-                )
+                problems.append(missing(action))
     for problem in problems:
         progress(f"  problem: {problem}")
     report = {

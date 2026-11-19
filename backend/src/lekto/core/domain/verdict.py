@@ -89,7 +89,7 @@ LLM = Node.SIGNAL_LLM.value
 CLASSIFIER = Node.SIGNAL_CLASSIFIER.value
 NEIGHBOURS = Node.SIGNAL_NEIGHBOURS.value
 FACTS = Node.SIGNAL_FACTS.value
-_UNSURE = 0.89  # the confidence of an uncertain field stays below acceptance
+_BELOW = 0.01  # how far the confidence of an uncertain field stays below `Thresholds.accept`
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -101,6 +101,11 @@ class Thresholds:
     suggest: float  # this well: a weak match, a suggestion
     classifier: float  # the classifier this sure: it names the class
     ambiguity: float = 0.05  # two contacts this close: the model names neither
+
+    @property
+    def unsure(self) -> float:
+        """The highest confidence an uncertain value shows: just below `accept`."""
+        return max(0.0, self.accept - _BELOW)
 
 
 @dataclass(frozen=True)
@@ -171,6 +176,21 @@ class KnownLabels:
     tags: frozenset[TagId] = frozenset()
     topics: frozenset[TagId] = frozenset()
     spaces: frozenset[SpaceId] = frozenset()  # as candidates of the uploader
+
+
+def known_space(
+    space: SpaceId,
+    personal_of: UserId | None,
+    uploaded_by: UserId | None,
+    reader_space: SpaceId | None,
+) -> SpaceId:
+    """The decided space of a confirmed document as a candidate of the reader
+    (`KnownLabels.spaces`): one in its uploader's personal space (`personal_of`, the space's
+    person) counts as the reader's personal space (`reader_space`), if they have one; a shared
+    space, also of a document whose uploader is gone, as itself (PM-01)."""
+    if reader_space is not None and personal_of is not None and personal_of == uploaded_by:
+        return reader_space
+    return space
 
 
 @dataclass(frozen=True)
@@ -364,7 +384,7 @@ class _ContactView:
         """Whether the signals naming `other` speak against another contact: the model always;
         the classifier and the similar documents only with a proof of `other` in the text, its
         name, an alias or an identifier (Tobi, 22.10.2026: similar payslips name Tobi's
-        employer, the text shows Anna's; hard evidence rules the employer out)."""
+        employer, the text shows Erika's; hard evidence rules the employer out)."""
         return LLM in self.ranking.namers.get(other, ()) or self.hard(other)
 
     def green(self, id: ContactId) -> bool:
@@ -411,7 +431,7 @@ def judge_contact(
     return FieldCheck(
         field=CONTACT,
         outcome=Outcome.UNCERTAIN,
-        confidence=min(score, _UNSURE),
+        confidence=min(score, view.thresholds.unsure),
         reasons=(_contact_reason(view, top, signals.model is None),),
         proposed=view.sender,
         evidence=view.quote,
@@ -514,6 +534,10 @@ def _contact_reason(view: _ContactView, top: ContactId | None, no_model: bool) -
         return because(ReasonCode.ONLY_SUGGESTED, name=name)
     if not view.hard(top):
         return because(ReasonCode.CONTACT_NOT_IN_TEXT, contact=name)
+    other = next((id for id in view.facts.identifiers if id != top and id in names), None)
+    if other is not None:
+        # The one identifier in the text is another contact's (`contradicted`).
+        return because(ReasonCode.CONTACT_IDENTIFIER_OF_OTHER, other=names[other].name)
     return because(ReasonCode.ONE_SIGNAL_ONLY, name=name)
 
 
@@ -562,9 +586,7 @@ def judge_type(
         return any(other != id for other in namers)
 
     def green(id: DocumentTypeId) -> bool:
-        naming = namers.get(id, ())
-        sole = naming == (LLM,) and not covered_by_others(id)
-        return not contradicted(id) and (len(naming) >= 2 or sole)
+        return not contradicted(id) and _settled(namers.get(id, ()), covered_by_others(id))
 
     ranked = ranking.candidates()
     listed = ranking.listed(ranked, contradicted)
@@ -585,7 +607,7 @@ def judge_type(
     return FieldCheck(
         field=DOCUMENT_TYPE,
         outcome=Outcome.UNCERTAIN,
-        confidence=min(probabilities.get(top, 0.0) if top else 0.0, _UNSURE),
+        confidence=min(probabilities.get(top, 0.0) if top else 0.0, thresholds.unsure),
         reasons=(_type_reason(names, namers, top, new),),
         proposed=proposed,
         suggestion=None if top is None else str(top),
@@ -641,7 +663,7 @@ def judge_tags(
             found.append(LLM)
         if probabilities.get(id, 0.0) >= thresholds.classifier:
             found.append(CLASSIFIER)
-        if carried.get(id, 0) >= 2 and carried[id] > len(neighbours) / 2:
+        if _most(carried.get(id, 0), len(neighbours)):
             found.append(NEIGHBOURS)
         return tuple(found)
 
@@ -657,7 +679,7 @@ def judge_tags(
         naming = namers(id)
         if id not in names or not naming:
             continue
-        if len(naming) >= 2 or (naming == (LLM,) and not covered_by_others(id)):
+        if _settled(naming, covered_by_others(id)):
             applied.append(id)
         else:
             suggested.append(id)
@@ -869,7 +891,7 @@ def judge_space(
     names, with the strongest evidence (`named_persons`); `recipients`: those the model's
     recipient names by their display name (what anyone may know). The model proposing the
     personal space of a user its recipient names suggests handing it over to them, whatever
-    the other signals say (Tobi, 22.10.2026: a payslip for Anna among Tobi's payslips).
+    the other signals say (Tobi, 22.10.2026: a payslip for Erika among Tobi's payslips).
     Reasons and candidates name no space and no person (the editors of the document may not
     see them): the suggestion is the space's id, `unseen_by` the ids of those named (medium or
     hard) who would not see the document where the check leads."""
@@ -918,8 +940,7 @@ def judge_space(
         naming = namers.get(id, ())
         if any(other != id for other in namers):
             return False
-        sole = naming == (LLM,) and not covered_by_others(id)
-        return len(naming) >= 2 or sole or (id == backed and bool(naming))
+        return _settled(naming, covered_by_others(id)) or (id == backed and bool(naming))
 
     ranked = named.preferred(ranking.candidates(), names, namers, backed)
     listed = tuple(ranking.listed(ranked, contradicted))
@@ -940,7 +961,7 @@ def judge_space(
             FieldCheck(
                 field=SPACE,
                 outcome=Outcome.UNCERTAIN,
-                confidence=min(confidence, _UNSURE),
+                confidence=min(confidence, thresholds.unsure),
                 reasons=why,
                 suggestion=str(target) if target != current else None,
                 candidates=listed,
@@ -1121,15 +1142,28 @@ def _top[K](ranking: Sequence[tuple[K, float]], threshold: float) -> K | None:
     return ranking[0][0] if ranking and ranking[0][1] >= threshold else None
 
 
+def _settled(naming: Sequence[str], covered: bool) -> bool:
+    """Whether the signals `naming` a value settle it: two of them, or the language model alone
+    where no other signal could have named it (`covered`: one that knows the value had the
+    chance). A type, a tag and a space alike (DA-11)."""
+    return len(naming) >= 2 or (tuple(naming) == (LLM,) and not covered)
+
+
+def _most(count: int, found: int) -> bool:
+    """Whether `count` of the `found` neighbours are a majority: at least two and more than
+    half."""
+    return count >= 2 and count > found / 2
+
+
 def _majority[K](votes: Counter[K], found: int, *, undivided: bool = False) -> K | None:
-    """The value at least two and more than half of the `found` carry; `undivided`: and no
-    other value two of them carry."""
+    """The value a majority of the `found` carry (`_most`); `undivided`: and no other value two
+    of them carry."""
     if not votes:
         return None
     (value, count), *others = votes.most_common()
     if undivided and any(other >= 2 for _, other in others):
         return None
-    return value if count >= 2 and count > found / 2 else None
+    return value if _most(count, found) else None
 
 
 def _unique[K](items: Iterable[K]) -> list[K]:

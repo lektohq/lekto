@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
 from lekto.adapters.inbound.problems import (
+    MAX_INPUT_ERRORS,
     PROBLEM_JSON,
     PROBLEMS,
     InputErrorOut,
@@ -50,6 +51,7 @@ from lekto.core.domain.errors import (
 )
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.users import UserDeletionBlockedError
+from lekto.core.ports.mail_server import MailServerError
 
 __all__ = [
     "NOT_FROM_REQUESTS",
@@ -62,6 +64,16 @@ __all__ = [
 ]
 
 log = logging.getLogger(__name__)
+
+
+PRIVATE_HEADERS = {
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+}
+"""What `middleware.NoStore` sets on the API's answers; the answer to an unexpected error, which
+leaves the app past every middleware (Starlette's `ServerErrorMiddleware`), sets it itself
+(RB-03)."""
 
 
 def install(app: FastAPI) -> None:
@@ -96,8 +108,11 @@ def install(app: FastAPI) -> None:
 
     async def validation_error(request: Request, error: Exception) -> JSONResponse:
         assert isinstance(error, RequestValidationError)
-        errors = [_input_error(item) for item in error.errors()]
+        found = error.errors()
+        errors = [_input_error(item) for item in found[:MAX_INPUT_ERRORS]]
         details = "; ".join(f"{item.field}: {item.message}" for item in errors)
+        if len(found) > len(errors):
+            details += f" (the first {len(errors)} of {len(found)} errors)"
         return problem(422, details, errors=errors)
 
     async def http_error(request: Request, error: Exception) -> JSONResponse:
@@ -105,9 +120,10 @@ def install(app: FastAPI) -> None:
         return problem(error.status_code, str(error.detail), headers=error.headers)
 
     async def unexpected_error(request: Request, error: Exception) -> JSONResponse:
-        # Details stay in the server log; the client learns only that something broke.
+        # Details stay in the server log; the client learns only that something broke. The
+        # answer passes no middleware: it marks itself as `NoStore` would (RB-03).
         log.error("request failed", exc_info=error)
-        return problem(500, PROBLEMS[500][1])
+        return problem(500, PROBLEMS[500][1], headers=PRIVATE_HEADERS)
 
     for kind, _ in STATUSES:
         app.add_exception_handler(kind, domain_error)
@@ -143,6 +159,7 @@ NOT_FROM_REQUESTS: frozenset[type[DomainError]] = frozenset(
         LogoFetchError,  # fetching in the worker: the contact keeps no logo
         PatternTimeoutError,  # the rules skip the pattern and note it
         MissingValueError,  # a template's: the rules skip the action and note it
+        MailServerError,  # the mailbox test and the intake report it with its reason (TC-01)
     }
 )
 """Domain errors no request lets through: the services catch them, or they arise in the worker

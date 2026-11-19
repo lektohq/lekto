@@ -78,6 +78,8 @@ class MemoryRuleRepository(MemoryRepository[RuleId, Rule]):
         return row.item
 
     async def remove_for_space(self, space: SpaceId) -> int:
+        """The rules of a space that goes, with their versions and applications: what the SQL
+        schema's ON DELETE CASCADE does (`MemorySpaceRepository.remove`); no port method."""
         rules = [row for row in self._all() if row.space_id == space]
         ids = {row.id for row in rules}
         self._versions._remove_rows(

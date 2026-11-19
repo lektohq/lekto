@@ -2,17 +2,24 @@
 quiet, many in one; what a person switched off is not told; a job given up reaches the admins."""
 
 import itertools
+from typing import Any
+
+import pytest
 
 from lekto.adapters.outbound.memory import FakePushSender
 from lekto.adapters.outbound.memory.push import FAKE_PUBLIC_KEY
 from lekto.core.domain.documents import Document
 from lekto.core.domain.events import ReviewRequired
-from lekto.core.domain.jobs import Job
+from lekto.core.domain.jobs import Job, JobStatus
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.push import PushKind, PushMessage
 from lekto.core.domain.users import Role, User
+from lekto.core.ports.push import PushOutcome
+from lekto.core.services import _jobs
+from lekto.core.services import push as push_module
 from lekto.core.services._jobs import JobRunner
 from lekto.core.services._push_queue import PUSH_DELAY, PUSH_JOB
+from lekto.core.services.inbox import in_inbox
 from lekto.core.services.push import PushService
 from tests import builders
 from tests.builders import UNCERTAIN, Returns, incoming
@@ -107,6 +114,62 @@ async def test_a_document_confirmed_meanwhile_is_not_told(world: World) -> None:
     await world.inbox.mark_seen(owner.id, document.id)
     await world.documents.delete(owner.id, document.id)
     assert await told(world, service, sender) == []
+
+
+async def test_a_document_noted_while_the_notification_is_made_is_told_with_it(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Noting it changes the preferences the notification empties: read again, both are told;
+    the job ran into the worker's loop and stayed running for its lease (SC-09)."""
+    sender = FakePushSender()
+    service = push(world, sender)
+    owner = await world.user()
+    await with_device(world, service, owner)
+    await waiting(world, service, owner)
+    pipeline = world.pipeline({Node.JUDGE: Returns(UNCERTAIN)})
+    late = await pipeline.receive(owner.id, incoming(b"%PDF-1.7 late"), filename="b.pdf")
+    await world.drain(pipeline)
+    (event,) = [
+        item
+        for item in world.events()
+        if isinstance(item, ReviewRequired) and item.document_id == late.id
+    ]
+    pending = [event]
+    real = in_inbox
+
+    async def meanwhile(*args: Any, **kwargs: Any) -> Any:
+        while pending:
+            await service.on_event(pending.pop())
+        return await real(*args, **kwargs)
+
+    async def at_once(attempt: int) -> None:
+        return None
+
+    monkeypatch.setattr(push_module, "in_inbox", meanwhile)
+    monkeypatch.setattr(_jobs, "_backoff", at_once)
+    messages = await told(world, service, sender)
+    assert messages[0].params["new"] == 2
+
+
+async def test_a_notification_that_fails_runs_again_later(world: World) -> None:
+    """Not in the worker's loop, running until its lease ends (SC-09)."""
+
+    def broken(device: object, message: object) -> PushOutcome:
+        raise RuntimeError("broken")
+
+    sender = FakePushSender(broken)
+    service = push(world, sender)
+    owner = await world.user()
+    await with_device(world, service, owner)
+    await waiting(world, service, owner)
+    assert await told(world, service, sender) != []
+    (job,) = [
+        job
+        for job in world.database.jobs.values()
+        if job.kind == PUSH_JOB and job.payload.get("kind") == PushKind.WAITING.value
+    ]
+    assert job.status is JobStatus.QUEUED
+    assert job.last_error == "RuntimeError: broken"
 
 
 async def test_a_given_up_job_reaches_the_admins_but_not_a_notifications_own(

@@ -6,6 +6,7 @@ stores the result (`prepare`), so no transaction waits for a slow pattern. Patte
 values (short) run inside it, on the state that is stored.
 """
 
+import asyncio
 import logging
 import time
 from collections.abc import Collection, Iterable, Mapping, Sequence
@@ -41,8 +42,14 @@ from lekto.core.domain.ids import (
     UserId,
     WebhookId,
 )
-from lekto.core.domain.json_value import JsonObject, JsonValue, as_list, as_object, as_uuid
-from lekto.core.domain.permissions import in_reach
+from lekto.core.domain.json_value import (
+    JsonObject,
+    JsonValue,
+    as_list,
+    as_object,
+    as_uuid,
+    same_json,
+)
 from lekto.core.domain.pipeline import (
     ACCEPTED,
     ACTOR,
@@ -86,7 +93,7 @@ from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.patterns import PatternMatcher
 from lekto.core.ports.templates import TemplateRenderer
 from lekto.core.ports.unit_of_work import UnitOfWork
-from lekto.core.services._access import space_label
+from lekto.core.services._access import may_reach, space_label
 from lekto.core.services._tags import tag_tree
 from lekto.core.services.inbox import MODEL_NODES, arrived, field_checks, latest_entries
 from lekto.core.services.objects import load_codes, load_text
@@ -216,12 +223,14 @@ class PatternBudget:
 @dataclass(frozen=True)
 class Prepared:
     """The document text as conditions see it, and the results of the regular expressions on
-    it. `problems`: patterns that timed out or could not run (they do not match)."""
+    it. `problems`: patterns that timed out or could not run (they do not match);
+    `out_of_time`: some of them were skipped because the budget was used up."""
 
     text: DocumentText | None = None
     patterns: Mapping[PatternKey, bool] = field(default_factory=dict)
     problems: tuple[str, ...] = ()
     codes: tuple[Code, ...] = ()  # the codes on its pages, for templates (`facts.girocode`)
+    out_of_time: bool = False
 
 
 async def prepare(
@@ -243,13 +252,19 @@ async def prepare(
     if document.processing.outcome(Node.PARSE) not in (Outcome.OK, Outcome.UNCERTAIN):
         return Prepared(codes=codes)
     try:
-        markdown = (await load_text(store, document.id)).decode("utf-8")
+        markdown = await load_text(store, document.id)
     except NotFoundError:
         return Prepared(codes=codes)
-    text = pattern_text(markdown, max_text)
+    text = await asyncio.to_thread(_searchable, markdown, max_text)
     keys = {key for rule in rules for key in rule.definition.patterns() if key[0] == TEXT_TARGET}
-    results, problems = await _search(matcher, {key: text for key in keys}, budget)
-    return Prepared(DocumentText(text), results, problems, codes)
+    results, problems, out_of_time = await _search(matcher, {key: text.raw for key in keys}, budget)
+    return Prepared(text, results, problems, codes, out_of_time)
+
+
+def _searchable(markdown: str, max_text: int) -> DocumentText:
+    """The text the conditions read, with what `contains` searches: computed in a worker
+    thread, as the patterns run there, not in the transaction of the rules (SC-05)."""
+    return DocumentText.searchable(pattern_text(markdown, max_text))
 
 
 async def field_patterns(
@@ -259,20 +274,27 @@ async def field_patterns(
     kept_facts: Sequence[DocumentFact] = (),
 ) -> tuple[dict[PatternKey, bool], tuple[str, ...]]:
     """The rules' patterns on the document's field values and its facts."""
-    return await _search(matcher, pattern_subjects(rules, document, None, kept_facts), None)
+    results, problems, _ = await _search(
+        matcher, pattern_subjects(rules, document, None, kept_facts), None
+    )
+    return results, problems
 
 
 async def _search(
     matcher: PatternMatcher,
     subjects: Mapping[PatternKey, PatternSubject],
     budget: PatternBudget | None,
-) -> tuple[dict[PatternKey, bool], tuple[str, ...]]:
+) -> tuple[dict[PatternKey, bool], tuple[str, ...], bool]:
+    """The patterns' results, what could not run, and whether some were skipped because the
+    budget was used up."""
     budget = budget or PatternBudget()
     results: dict[PatternKey, bool] = {}
     problems: list[str] = []
+    out_of_time = False
     for key, subject in subjects.items():
         _, pattern, case_sensitive = key
         if budget.exhausted:
+            out_of_time = True
             problems.append(f"pattern {pattern!r} skipped: the time for patterns is used up")
             log.warning("rule pattern skipped", extra={"pattern": pattern, "error": "no time"})
             continue
@@ -287,7 +309,7 @@ async def _search(
         except (PatternTimeoutError, ValidationError) as error:
             problems.append(str(error))
             log.warning("rule pattern skipped", extra={"pattern": pattern, "error": str(error)})
-    return results, tuple(problems)
+    return results, tuple(problems), out_of_time
 
 
 # --- where values came from -------------------------------------------------------------------
@@ -358,7 +380,7 @@ def provenance(log: Sequence[NodeRun], document: Document) -> Provenance:
                 model_tags = frozenset(TagId(UUID(str(tag))) for tag in check.value) & frozenset(
                     document.tag_ids
                 )
-        elif name in current and repr(current[name]) == repr(check.value):
+        elif name in current and same_json(current[name], check.value):
             model_values[name] = check.value
     run = document.processing.run
     reviewed: set[RuleId] = set()
@@ -753,26 +775,39 @@ STEPS_REPORTED = "steps_reported"
 """Key of the answers that did not come after a person decided, only reported."""
 SENDS_REFUSED = "sends_refused"
 """Key of the requests it could not send, with why, in its log entry's output."""
+CHANGES_UNFIT = "changes_unfit"
+"""Key of why the change of the rules of a space did not apply (it does not fit), in the log
+entry's output of the node `apply_rules`."""
 
 
 async def deliverable(
     uow: UnitOfWork, sends: Iterable[Send], document: Document
 ) -> tuple[list[Send], list[Reason]]:
-    """Of `sends`, those whose webhook is there, still its rule author's, and whose owner may
-    read `document` where it lies now; and why the others are not."""
-    space = await uow.spaces.find(document.space_id)
+    """Of `sends`, those that may go (`refusal`); and why the others may not."""
     ok: list[Send] = []
     refused: list[Reason] = []
     for send in sends:
-        webhook = await uow.webhooks.find(send.webhook_id)
-        owner = None if webhook is None else await uow.users.find(webhook.owner_id)
-        if owner is None or not owner.active or owner.id != send.author:
-            refused.append(because(ReasonCode.RULE_WEBHOOK_GONE, rule=send.name))
-        elif space is None or not in_reach(owner, document, space):
-            refused.append(because(ReasonCode.RULE_WEBHOOK_UNREADABLE, rule=send.name))
-        else:
+        reason = await refusal(uow, send.webhook_id, send.author, send.name, document)
+        if reason is None:
             ok.append(send)
+        else:
+            refused.append(reason)
     return ok, refused
+
+
+async def refusal(
+    uow: UnitOfWork, webhook_id: WebhookId, author: UserId | None, rule: str, document: Document
+) -> Reason | None:
+    """Why the rule `rule` may not send or ask through the webhook now: it is gone, no longer
+    its rule's `author`'s, or its owner may not read `document` where it lies now; None if it
+    may. One check for sending and asking alike (SC-07)."""
+    webhook = await uow.webhooks.find(webhook_id)
+    owner = None if webhook is None else await uow.users.find(webhook.owner_id)
+    if owner is None or not owner.active or owner.id != author:
+        return because(ReasonCode.RULE_WEBHOOK_GONE, rule=rule)
+    if not await may_reach(uow, owner, document):
+        return because(ReasonCode.RULE_WEBHOOK_UNREADABLE, rule=rule)
+    return None
 
 
 async def queue_sends(

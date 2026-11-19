@@ -1,6 +1,7 @@
 """Identity repositories on SQL tables: credentials, sessions, API tokens, known devices, links
-to identity providers and failed sign-ins. Updates are optimistic as in `repositories`; `touch`
-and `renew` update only a timestamp and leave the version alone."""
+to identity providers and failed sign-ins. Credentials update optimistically as in
+`repositories`; the others are only added, touched (a timestamp) and removed, and carry no
+version (SQ-04)."""
 
 from collections.abc import Sequence
 from datetime import datetime, timedelta
@@ -120,7 +121,6 @@ class SqlSessionRepository:
                 created_at=session.created_at,
                 last_seen_at=session.last_seen_at,
                 expires_at=session.expires_at,
-                version=session.version,
             )
         )
 
@@ -164,7 +164,6 @@ def _session(row: Row[Any]) -> Session:
         created_at=row.created_at,
         last_seen_at=row.last_seen_at,
         expires_at=row.expires_at,
-        version=row.version,
     )
 
 
@@ -183,7 +182,6 @@ class SqlApiTokenRepository:
                 created_at=token.created_at,
                 expires_at=token.expires_at,
                 last_used_at=token.last_used_at,
-                version=token.version,
             )
         )
 
@@ -233,7 +231,6 @@ def _api_token(row: Row[Any]) -> ApiToken:
         created_at=row.created_at,
         expires_at=row.expires_at,
         last_used_at=row.last_used_at,
-        version=row.version,
     )
 
 
@@ -249,7 +246,6 @@ class SqlKnownDeviceRepository:
                 token_hash=device.token_hash,
                 created_at=device.created_at,
                 expires_at=device.expires_at,
-                version=device.version,
             )
         )
 
@@ -270,6 +266,18 @@ class SqlKnownDeviceRepository:
         table = t.known_devices
         return (await self._tx.write(delete(table).where(table.c.user_id == user))).rowcount
 
+    async def keep_newest(self, user: UserId, count: int) -> int:
+        table = t.known_devices
+        rows = await self._tx.read(
+            select(table.c.id)
+            .where(table.c.user_id == user)
+            .order_by(table.c.created_at.desc(), table.c.id.desc())
+        )
+        older = [row.id for row in rows][count:]
+        if not older:
+            return 0
+        return (await self._tx.write(delete(table).where(table.c.id.in_(older)))).rowcount
+
     async def purge(self, *, now: datetime) -> int:
         table = t.known_devices
         return (await self._tx.write(delete(table).where(table.c.expires_at <= now))).rowcount
@@ -282,7 +290,6 @@ def _known_device(row: Row[Any]) -> KnownDevice:
         token_hash=row.token_hash,
         created_at=row.created_at,
         expires_at=row.expires_at,
-        version=row.version,
     )
 
 
@@ -298,7 +305,6 @@ class SqlExternalIdentityRepository:
                 subject=identity.subject,
                 user_id=identity.user_id,
                 created_at=identity.created_at,
-                version=identity.version,
             )
         )
 
@@ -318,10 +324,6 @@ class SqlExternalIdentityRepository:
         )
         return [_external_identity(row) for row in rows]
 
-    async def remove(self, id: ExternalIdentityId) -> None:
-        table = t.external_identities
-        await self._tx.write(delete(table).where(table.c.id == id))
-
     async def remove_for_user(self, user: UserId) -> int:
         table = t.external_identities
         return (await self._tx.write(delete(table).where(table.c.user_id == user))).rowcount
@@ -334,7 +336,6 @@ def _external_identity(row: Row[Any]) -> ExternalIdentity:
         subject=row.subject,
         user_id=UserId(row.user_id),
         created_at=row.created_at,
-        version=row.version,
     )
 
 
@@ -352,7 +353,6 @@ class SqlLoginFailureRepository:
             failures=row.failures,
             first_failure_at=row.first_failure_at,
             blocked_until=row.blocked_until,
-            version=row.version,
         )
 
     async def reserve(self, key: str, rule: ThrottleRule, now: datetime) -> timedelta | None:
@@ -364,13 +364,12 @@ class SqlLoginFailureRepository:
         new_window = table.c.first_failure_at <= now - rule.window
         statement = (
             self._tx.database.insert(table)
-            .values(key=key, failures=1, first_failure_at=now, blocked_until=None, version=1)
+            .values(key=key, failures=1, first_failure_at=now, blocked_until=None)
             .on_conflict_do_update(
                 index_elements=[table.c.key],
                 set_={
                     "failures": case((new_window, 1), else_=table.c.failures + 1),
                     "first_failure_at": case((new_window, at), else_=table.c.first_failure_at),
-                    "version": table.c.version + 1,
                 },
                 where=or_(table.c.blocked_until.is_(None), table.c.blocked_until <= now),
             )
@@ -395,7 +394,7 @@ class SqlLoginFailureRepository:
             await self._tx.write(
                 update(table)
                 .where(table.c.key == key, table.c.failures > 0)
-                .values(failures=table.c.failures - 1, version=table.c.version + 1)
+                .values(failures=table.c.failures - 1)
                 .returning(table.c.failures)
             )
         ).first()

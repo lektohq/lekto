@@ -1,8 +1,6 @@
 """Whose an IBAN, a creditor ID or a VAT ID is where it stands, and whose an e-mail domain is by
 its name (`domain.holders`), on invented documents."""
 
-from dataclasses import replace
-
 import pytest
 
 from lekto.core.domain.document_facts import (
@@ -25,7 +23,6 @@ from lekto.core.domain.holders import (
     holder_at,
     holders,
     merged_holder,
-    unlearned,
 )
 from lekto.core.domain.identifiers import IdentifierKind, Key, identifiers_in
 from lekto.core.domain.reasons import Reason, ReasonCode
@@ -382,15 +379,3 @@ def test_whose_a_domain_is() -> None:
     # Another contact's domain on the utility's letter is a third party's.
     held = domain_holder("hausverwaltung-ost.de", "", DOMAIN_PARTIES)
     assert held_by(held, ["Stadtwerke Musterstadt GmbH"]) is HolderKind.THIRD_PARTY
-
-
-def test_an_unclear_domain_is_not_learned_an_unclear_iban_is() -> None:
-    unclear = Holder(HolderKind.UNCLEAR, HolderSource.RULE)
-    names = ["Stadtwerke Musterstadt GmbH"]
-    text = f"Zahlung über info@paypal.com auf {spaced(UTILITY)}"
-    facts = {fact.kind: fact for fact in found_facts(text, identifiers_in(text))}
-    domain, iban = facts[IdentifierKind.EMAIL_DOMAIN], facts[IBAN]
-    assert unlearned(replace(domain, holder=unclear), names)
-    assert not unlearned(replace(iban, holder=unclear), names)
-    # Read before 0.8, without a holder: learned as before.
-    assert not unlearned(domain, names)

@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from lekto.adapters.outbound.memory import FakeClassifier
+from lekto.adapters.outbound.memory.unit_of_work import MemoryDocumentFactRepository
 from lekto.core.domain.classifier import KEPT_MODELS
 from lekto.core.domain.document_facts import (
     DocumentFact,
@@ -152,9 +153,27 @@ async def test_a_number_counts_only_where_it_is_its_contact_s(world: World) -> N
         assert (await uow.contacts.get(bank.id)).identifiers == []
 
 
-async def test_training_follows_a_person_s_decisions_about_facts(world: World) -> None:
+async def test_training_follows_a_person_s_decisions_about_facts(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The utility's customer number rejected on its documents is not learned; one a person
-    added (the text writes it so no pattern reads it) is."""
+    added (the text writes it so no pattern reads it) is. The facts of all documents are read
+    at once, not one query each (SA-04)."""
+
+    inside: list[bool] = []
+    many, one = MemoryDocumentFactRepository.of_documents, MemoryDocumentFactRepository.of_document
+
+    async def at_once(self: Any, documents: Any) -> Any:
+        inside.append(True)  # the memory adapter reads them one by one itself
+        try:
+            return await many(self, documents)
+        finally:
+            inside.pop()
+
+    async def alone(self: Any, document: Any) -> Any:
+        assert inside, "the facts of one document read alone"
+        return await one(self, document)
+
     _, utility, _ = await corpus(world)
     their = (IdentifierKind.CUSTOMER_NUMBER, "K4711")
     async with world.uow() as uow:
@@ -183,6 +202,8 @@ async def test_training_follows_a_person_s_decisions_about_facts(world: World) -
                 ),
             )
         await uow.commit()
+    monkeypatch.setattr(MemoryDocumentFactRepository, "of_documents", at_once)
+    monkeypatch.setattr(MemoryDocumentFactRepository, "of_document", alone)
     await service(world).train()
     async with world.uow() as uow:
         learned = [item.key for item in (await uow.contacts.get(utility.id)).identifiers]
@@ -193,19 +214,19 @@ async def test_a_learned_number_knows_whose_it_is_and_where_it_was_learned(world
     """Issue #82: the pay slips in a user's personal space teach the employer her personnel
     number as hers, seen by the members of that space. A customer number in a shared space that
     names nobody surely is nobody's."""
-    anna, bob = await world.user(), await world.user()
+    erika, bob = await world.user(), await world.user()
     employer = Contact.create(name="Arbeitgeber", now=builders.NOW)
     utility = Contact.create(name="Stadtwerke", now=builders.NOW)
     async with world.uow() as uow:
         await uow.contacts.add(employer)
         await uow.contacts.add(utility)
         await uow.commit()
-    own = await world.personal_space(anna)
-    family = await world.spaces.create(anna.id, "Familie")
+    own = await world.personal_space(erika)
+    family = await world.spaces.create(erika.id, "Familie")
     for number in range(2):
         await confirmed(
             world,
-            anna,
+            erika,
             employer,
             f"Arbeitgeber Lohnabrechnung {number} Personalnummer 12345 IBAN {THEIR_IBAN}",
         )
@@ -220,7 +241,7 @@ async def test_a_learned_number_knows_whose_it_is_and_where_it_was_learned(world
             for item in contact.identifiers
         }
     personnel = learned[IdentifierKind.PERSONNEL_NUMBER]
-    assert (personnel.user_id, personnel.learned_in) == (anna.id, frozenset({own.id}))
+    assert (personnel.user_id, personnel.learned_in) == (erika.id, frozenset({own.id}))
     contract = learned[IdentifierKind.CUSTOMER_NUMBER]
     assert (contract.user_id, contract.learned_in) == (None, frozenset({family.id}))
 

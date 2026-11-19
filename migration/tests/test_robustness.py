@@ -1,14 +1,12 @@
 """Edge cases found in review: inactive uploaders, the executing admin among the members, spaces
-that cannot be made, lost answers, big values, documents moved in Lekto, old state files."""
+that cannot be made, lost answers, big values, documents moved in Lekto."""
 
+import asyncio
 import json
-from pathlib import Path
 from typing import Any
 
 from lekto_migration.config import public
 from lekto_migration.fake_paperless import pdf
-from lekto_migration.report import run_documents
-from lekto_migration.state import State
 from tests.conftest import PDF, Setup
 from tests.fake_lekto import ADMIN
 
@@ -39,7 +37,7 @@ def row(setup: Setup, command: str, id: int) -> dict[str, Any]:
 async def test_documents_of_an_inactive_user_are_taken_over_and_the_user_deactivated(
     setup: Setup,
 ) -> None:
-    # "gone" (id 4) is inactive in Paperless and owns a document that anna may read.
+    # "gone" (id 4) is inactive in Paperless and owns a document that erika may read.
     add_document(
         setup,
         30,
@@ -71,6 +69,21 @@ async def test_a_run_that_failed_for_an_inactive_uploader_wakes_the_user_for_the
     assert await setup.run("run") == 0
     assert titled(setup, "Extra 30")["uploaded_by"] == gone["id"]
     assert gone["active"] is False
+
+
+async def test_a_stopped_run_puts_the_users_it_woke_to_sleep_again(setup: Setup) -> None:
+    """Inactive in Lekto as in Paperless, not active until the next whole run (MI-05)."""
+    assert await setup.migrate() == 0
+    for id in (30, 31):
+        add_document(setup, id, 4)
+    stop = asyncio.Event()
+    setup.lekto.after_upload = lambda count: stop.set()
+    assert await setup.run("run", stop=stop, concurrency=1) == 130
+    gone = next(u for u in setup.lekto.users.values() if u["username"] == "gone")
+    assert gone["active"] is False
+    setup.lekto.after_upload = None
+    assert await setup.run("run") == 0
+    assert titled(setup, "Extra 31")["uploaded_by"] == gone["id"] and gone["active"] is False
 
 
 async def test_prepare_wakes_a_user_it_deactivated_to_make_them_a_member(setup: Setup) -> None:
@@ -140,10 +153,10 @@ async def test_a_space_that_cannot_be_made_holds_the_run_back(setup: Setup) -> N
 
 
 async def test_a_lost_answer_after_creating_a_user_is_not_an_error(setup: Setup) -> None:
-    setup.lekto.lose_answer = {"anna", "ACME Energy"}
+    setup.lekto.lose_answer = {"erika", "ACME Energy"}
     assert await setup.migrate() == 0
     names = [u["username"] for u in setup.lekto.users.values()]
-    assert names.count("anna") == 1
+    assert names.count("erika") == 1
     assert [c["name"] for c in setup.lekto.contacts.values()].count("ACME Energy") == 1
 
 
@@ -182,7 +195,7 @@ async def test_further_versions_of_a_file_are_reported(setup: Setup) -> None:
 
 async def test_a_document_a_person_moved_stays_where_it_is(setup: Setup) -> None:
     assert await setup.migrate() == 0
-    document = titled(setup, "Document 12")  # anna's, in her personal space
+    document = titled(setup, "Document 12")  # erika's, in her personal space
     document["space_id"] = f"personal:{ADMIN['id']}"  # a rule or a person filed it elsewhere
     assert await setup.run("check") == 0
     differences = row(setup, "check", 12)["differences"]
@@ -216,49 +229,3 @@ async def test_a_run_notes_that_a_document_was_repaired_since(setup: Setup) -> N
     report = setup.report("run")
     assert report["lanes"] == {"green": 8}
     assert row(setup, "run", 12)["reason"] is None
-
-
-def test_a_state_from_before_spaces_reads_its_drawers_as_spaces(tmp_path: Path) -> None:
-    path = tmp_path / "state.sqlite"
-    state = State(path)
-    state.put_object("drawer", "anna|bob", "Shared", "id-1", "new", [])
-    state.put_document(7, "done", detail={"title": "T", "drawer": "Shared", "owner": "anna"})
-    state.close()
-
-    state = State(path)
-    assert state.object("space", "anna|bob") == ("id-1", "new")
-    assert state.object("drawer", "anna|bob") is None
-    found = state.document(7)
-    assert found is not None
-    assert found.detail == {"title": "T", "space": "Shared", "owner": "anna"}
-    # Before 0.5 the state kept the Paperless owner, which uploaded the document.
-    assert run_documents(state, {7})[0]["uploaded_by"] == "anna"
-    state.close()
-
-
-def test_a_state_from_before_the_plan_learns_what_was_applied(tmp_path: Path) -> None:
-    import sqlite3
-
-    path = tmp_path / "state.sqlite"
-    old = sqlite3.connect(path)
-    old.executescript(
-        """
-        CREATE TABLE documents (
-            source_id INTEGER PRIMARY KEY, status TEXT NOT NULL, lekto_id TEXT, sha256 TEXT,
-            lane TEXT, reason TEXT, notes TEXT NOT NULL DEFAULT '[]',
-            detail TEXT NOT NULL DEFAULT '{}', upload_seconds REAL, pipeline_seconds REAL,
-            updated_at TEXT NOT NULL
-        );
-        INSERT INTO documents (source_id, status, lekto_id, updated_at)
-            VALUES (7, 'done', 'l7', '2026-10-10');
-        """
-    )
-    old.commit()
-    old.close()
-    state = State(path)
-    found = state.document(7)
-    assert found is not None and found.lekto_id == "l7" and found.applied is None
-    state.put_document(7, "done", applied={"title": "T"})
-    again = state.document(7)
-    assert again is not None and again.applied == {"title": "T"} and again.lekto_id == "l7"
-    state.close()

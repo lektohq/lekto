@@ -14,25 +14,17 @@ from lekto.adapters.inbound.rest import PREFIX
 from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.identity import TokenScope
-from lekto.core.domain.pipeline import SIGNALS, Node, NodeResult
+from lekto.core.domain.pipeline import Node, NodeResult
 from lekto.core.domain.users import User
-from lekto.core.services.imports import ImportedFieldsNode, ImportedJudgeNode, ImportedSignal
 from lekto.core.services.pipeline import DeferredResult, NodeExecutor
 from tests.api import auth, bearer
-from tests.builders import SAMPLES, PlaceholderNode
-from tests.unit.adapters.rest.support import DOCUMENTS, Api, post, sample_file
+from tests.builders import SAMPLES
+from tests.unit.adapters.rest.support import DOCUMENTS, Api, imported_nodes, post, sample_file
 
 
 @pytest.fixture(autouse=True)
 def imported_steps(api: Api) -> None:
-    """The signals, the judge and the fields node as the container builds them, around nodes
-    that do nothing (there is no language model)."""
-    uow = api.container.unit_of_work
-    pipeline = api.services.pipeline
-    for signal in SIGNALS:
-        pipeline.replace_executor(signal, ImportedSignal(uow, PlaceholderNode()))
-    pipeline.replace_executor(Node.JUDGE, ImportedJudgeNode(uow, PlaceholderNode()))
-    pipeline.replace_executor(Node.FIELDS, ImportedFieldsNode(uow, PlaceholderNode()))
+    imported_nodes(api)
 
 
 async def upload(
@@ -244,17 +236,36 @@ async def test_only_admins_upload_through_the_channel_migration(api: Api) -> Non
     """The channel tells where a document came from; a user's own upload is no migration, with
     a session, an API token or an upload token alike."""
     admin, user = await api.admin(), await api.user()
-    _, shortcut = await api.services.auth.create_api_token(user.id, "phone", TokenScope.UPLOAD)
-    for headers in (auth(user), bearer(shortcut)):
-        refused = await upload(api, headers, channel="migration")
-        assert refused.status_code == 403
-        reason = refused.json()["reason"]
-        assert (reason["code"], reason["params"]["action"]) == (
-            "admins_only",
-            "upload_as_migration",
-        )
+    refused = await upload(api, auth(user), channel="migration")
+    assert refused.status_code == 403
+    reason = refused.json()["reason"]
+    assert (reason["code"], reason["params"]["action"]) == ("admins_only", "upload_as_migration")
     taken = await upload(api, auth(admin), channel="migration")
     assert taken.status_code == 202, taken.text
+
+
+async def test_an_upload_token_uploads_for_its_own_user_alone(api: Api) -> None:
+    """An admin's upload token, lost with the phone, would put documents in anyone's name, as a
+    migration, in any space: it names no uploader, no channel and no metadata (XA-07), as an
+    upload token of a user does not either."""
+    admin, user, owner = await api.admin(), await api.user(), await api.user()
+    data = await master_data(api, admin)
+    for who in (admin, user):
+        _, shortcut = await api.services.auth.create_api_token(who.id, "phone", TokenScope.UPLOAD)
+        for fields, named in [
+            ({"uploaded_by": str(owner.id)}, ["uploaded_by"]),
+            ({"channel": "migration"}, ["channel"]),
+            ({"channel": "migration", "metadata": metadata(data)}, ["channel", "metadata"]),
+        ]:
+            refused = await upload(api, bearer(shortcut), **fields)
+            assert refused.status_code == 403, refused.text
+            reason = refused.json()["reason"]
+            assert reason == {"code": "upload_only_token_fields", "params": {"fields": named}}
+    _, shortcut = await api.services.auth.create_api_token(admin.id, "phone", TokenScope.UPLOAD)
+    taken = await upload(api, bearer(shortcut))
+    assert taken.status_code == 202, taken.text
+    document = (await api.client.get(taken.json()["status_url"], headers=auth(admin))).json()
+    assert document["uploaded_by"] == str(admin.id)
 
 
 async def test_an_uploader_who_is_gone_or_inactive_is_not_found(api: Api) -> None:
@@ -728,14 +739,9 @@ async def test_an_admin_token_creates_users_without_password(api: Api) -> None:
 
 
 async def test_rules_run_and_trust_the_imported_values(api: Api) -> None:
-    admin, owner, reader = await api.admin(), await api.user(), await api.user()
+    admin, owner = await api.admin(), await api.user()
     data = await master_data(api, admin)
     shared = await post(api, "/spaces", {"name": "Shared"}, auth(owner))
-    await api.client.put(
-        f"{PREFIX}/spaces/{shared['id']}/shares/{reader.id}",
-        json={"level": "read"},
-        headers=auth(owner),
-    )
     await post(
         api,
         "/rules",

@@ -39,7 +39,7 @@ from lekto.core.domain.addresses import is_public, literal
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.events import DOCUMENT_EVENT_TYPES
 from lekto.core.domain.ids import DeliveryId, DocumentId, EventId, UserId, WebhookId, new_id
-from lekto.core.domain.json_value import JsonObject
+from lekto.core.domain.json_value import JsonObject, loads
 from lekto.core.domain.reasons import Reason, ReasonCode, because
 from lekto.core.domain.tasks import DEFAULT_TIMEOUT, validate_timeout
 from lekto.core.domain.validation import (
@@ -108,8 +108,9 @@ class ModelCallRole:
 
 MAX_HEADERS = 20
 MAX_HEADER_VALUE = 4096
-_HEADER_NAME = re.compile(r"[!#$%&'*+\-.^_`|~0-9A-Za-z]{1,100}")
-"""A header name: a token of RFC 9110 (section 5.1), at most 100 characters."""
+MAX_HEADER_NAME = 100
+_HEADER_NAME = re.compile(rf"[!#$%&'*+\-.^_`|~0-9A-Za-z]{{1,{MAX_HEADER_NAME}}}")
+"""A header name: a token of RFC 9110 (section 5.1), at most `MAX_HEADER_NAME` characters."""
 RESERVED_HEADERS = frozenset(
     {"content-type", "content-length", "host", "connection", "transfer-encoding"}
 )
@@ -334,12 +335,14 @@ def rendered_body(text: str) -> bytes:
     """What a template made, as the body goes: the text in UTF-8, as it is. ValueError if it is
     not JSON."""
     try:
-        json.loads(text)
+        loads(text)
     except json.JSONDecodeError as error:
         raise ValueError(
             f"the template does not make JSON: {error.msg} at line {error.lineno}, "
             f"column {error.colno}"
         ) from None
+    except ValueError:
+        raise ValueError("the template does not make JSON: it is nested too deeply") from None
     return text.encode("utf-8")
 
 
@@ -528,10 +531,12 @@ class Webhook:
     def delivered(self) -> None:
         self.failed_streak = 0
 
-    def gave_up(self, *, disable_after: int, now: datetime) -> bool:
-        """A delivery was given up. Returns True if this switched the webhook off."""
+    def gave_up(self, *, disable_after: int, now: datetime, takes_tasks: bool = False) -> bool:
+        """A delivery was given up. Returns True if this switched the webhook off: after
+        `disable_after` in a row, unless it `takes_tasks` (a model call, a rule's step that
+        asks it), which is never switched off (Tobi, 25.10.2026)."""
         self.failed_streak += 1
-        if self.active and self.failed_streak >= disable_after:
+        if self.active and not takes_tasks and self.failed_streak >= disable_after:
             self.active = False
             self.disabled_reason = because(ReasonCode.WEBHOOK_FAILING)
             self.updated_at = now

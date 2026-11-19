@@ -25,8 +25,8 @@ class EmailAddress(IdentifierType):
         return value
 
     def find(self, text: str) -> Iterator[Candidate]:
-        # Without its place: only a person's numbers keep a customer or personnel number they
-        # overlap from counting (`identifiers_from`).
+        # Without its place: only a person's numbers keep a number that may name a user
+        # (`NAMING_KINDS`) they overlap from counting (`identifiers_from`).
         for match in EMAIL.finditer(text):
             yield Candidate(self.kind, match.group())
 

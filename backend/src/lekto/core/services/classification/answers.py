@@ -30,6 +30,7 @@ from lekto.core.domain.json_value import (
     as_text,
     as_texts,
     as_uuid,
+    loads,
 )
 from lekto.core.domain.master_data import one_line
 
@@ -408,7 +409,7 @@ def _load(content: str) -> JsonObject:
     fenced = _FENCE.match(content)
     text = fenced.group(1) if fenced else content
     try:
-        data = json.loads(text)
+        data = loads(text)
     except ValueError:
         raise AnswerError("the answer is not JSON") from None
     if not isinstance(data, dict):

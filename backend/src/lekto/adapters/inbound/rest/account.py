@@ -1,6 +1,5 @@
 """`/auth`: signing in and out, the caller's account, TOTP, API tokens, OpenID Connect."""
 
-from datetime import UTC
 from typing import Annotated
 from urllib.parse import urlencode
 from uuid import UUID
@@ -51,12 +50,13 @@ from lekto.adapters.inbound.rest.ui import UI_PREFIX
 from lekto.core.domain.errors import (
     AuthenticationError,
     ConflictError,
+    DomainError,
     IdentityProviderError,
     UnsupportedMediaTypeError,
 )
 from lekto.core.domain.identity import csrf_token
 from lekto.core.domain.ids import ApiTokenId
-from lekto.core.domain.validation import MAX_URL_LENGTH
+from lekto.core.domain.validation import MAX_URL_LENGTH, to_utc
 from lekto.core.services.auth import Principal, SignedIn
 
 public = APIRouter(prefix="/auth", tags=["auth"])
@@ -80,6 +80,11 @@ async def _json_body(request: Request) -> None:
 
 
 # --- password sign-in ---------------------------------------------------------------------------
+
+LOGIN_MAX_BODY = 8 * 1024
+"""Bytes of a sign-in's body: a username, a password and a code, each bounded, even with every
+character escaped. The route is public, so FastAPI must not read and validate more: a megabyte of
+unknown keys held the event loop for seconds."""
 
 
 @public.post(
@@ -200,13 +205,18 @@ async def change_own_profile(
     summary="Change the own password",
     description=(
         "Ends all sessions and starts a new one for the caller (new cookie and CSRF token). "
-        "API tokens stay unless `revoke_tokens`." + SESSION_ONLY_NOTE
+        "The caller's known devices are forgotten; this browser is known again by a new "
+        "device cookie. API tokens stay unless `revoke_tokens`." + SESSION_ONLY_NOTE
     ),
     response_model=SessionOut,
     responses=problem_responses(401, 403, 422, 429),
 )
 async def change_password(
-    body: PasswordChange, principal: SessionPrincipal, response: Response, context: Context
+    body: PasswordChange,
+    principal: SessionPrincipal,
+    request: Request,
+    response: Response,
+    context: Context,
 ) -> SessionOut:
     assert principal.session is not None
     signed_in = await context.auth.change_password(
@@ -215,9 +225,11 @@ async def change_password(
         body.new_password.get_secret_value(),
         session=principal.session.id,
         revoke_tokens=body.revoke_tokens,
+        devices=known_devices(request, context),
     )
     assert signed_in is not None
     set_session_cookie(response, context, signed_in)
+    set_device_cookie(response, context, signed_in)
     return _session_out(signed_in)
 
 
@@ -325,7 +337,7 @@ async def create_token(
         principal.id,
         body.name,
         body.scope,
-        expires_at=None if body.expires_at is None else body.expires_at.astimezone(UTC),
+        expires_at=None if body.expires_at is None else to_utc(body.expires_at, "expires_at"),
     )
     return TokenCreated(**TokenOut.of(token).model_dump(), token=value)
 
@@ -389,9 +401,9 @@ async def oidc_login(context: Context, oidc: Oidc, next: Next = None) -> Redirec
         "browser had ends) or completes a link, then redirects to the path given at the start. "
         "If that fails, the browser goes to the web UI instead: `/ui/login?error=<code>` (while "
         "linking: `/ui/settings?error=<code>`) with `denied` (the provider did not sign the "
-        "user in), `failed` (the flow expired or does not match, or no account is linked to "
-        "this sign-in), `conflict` (the provider's account is linked to another user) or "
-        "`provider` (the provider cannot be reached or answered wrongly)."
+        "user in), `failed` (the flow expired or does not match, no account is linked to this "
+        "sign-in, or none can be made of it), `conflict` (the provider's account is linked to "
+        "another user) or `provider` (the provider cannot be reached or answered wrongly)."
     ),
     response_class=RedirectResponse,
     responses={
@@ -427,6 +439,10 @@ async def oidc_callback(
         return _oidc_failure(failed, "conflict", context)
     except IdentityProviderError:
         return _oidc_failure(failed, "provider", context)
+    except DomainError:
+        # Any other refusal, such as a user name of the provider Lekto refuses for an account
+        # it creates: the browser goes back as well, not to a problem document (RB-07).
+        return _oidc_failure(failed, "failed", context)
     response = RedirectResponse(outcome.redirect_to, status_code=303)
     clear_flow_cookie(response, context)
     if outcome.signed_in is not None:

@@ -17,7 +17,7 @@ from synth.numbers import MONTHS, euro, german, plain, short
 from synth.printout import printout
 from synth.screen import confirmation
 
-STADTWERKE_CUSTOMER = "2004 7718"
+STADTWERKE_CUSTOMER = "1234 5678"
 STADTWERKE_CREDITOR = ids.creditor_id("00000471108")
 
 

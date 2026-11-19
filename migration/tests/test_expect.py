@@ -48,10 +48,10 @@ def test_skipped_files_and_shared_documents(world: World) -> None:
     assert "wordprocessingml" in (world.expect(17).skip or "")
     assert "trash" in (world.expect(18).skip or "")
     shared = world.expect(13)
-    assert shared.uploader == "anna"
+    assert shared.uploader == "erika"
     # One shared space for all of them: the uploader and the writers edit, the readers read.
-    assert shared.members == (("anna", "edit"), ("bob", "read"), ("tobias", "edit"))
-    assert shared.space == "Geteilt: anna (bearbeiten), bob (lesen), tobias (bearbeiten)"
+    assert shared.members == (("bob", "read"), ("erika", "edit"), ("tobias", "edit"))
+    assert shared.space == "Geteilt: bob (lesen), erika (bearbeiten), tobias (bearbeiten)"
     assert shared.sources["space"] == "the permissions in Paperless"
     # No owner, or one who is gone: the executing admin (None), or the fallback.
     assert world.expect(14).uploader is None
@@ -64,10 +64,10 @@ def test_users_are_mapped_and_dropped(world: World) -> None:
     world.set("users", "bob", "drop")
     assert world.expect(10).uploader == "tobi"
     shared = world.expect(13)
-    assert shared.members == (("anna", "edit"), ("tobi", "edit"))
-    assert shared.space == "Geteilt: anna (bearbeiten), tobi (bearbeiten)"
+    assert shared.members == (("erika", "edit"), ("tobi", "edit"))
+    assert shared.space == "Geteilt: erika (bearbeiten), tobi (bearbeiten)"
     assert "shared with bob, who is not taken over: not a member" in shared.notes
-    world.set("users", "anna", "drop")
+    world.set("users", "erika", "drop")
     assert world.expect(12).uploader is None
     world.inactive = frozenset({"tobi"})
     assert world.expect(10).uploader is None
@@ -77,7 +77,7 @@ def test_users_are_mapped_and_dropped(world: World) -> None:
 def test_a_user_can_bring_more_targets(world: World) -> None:
     world.set("users", "tobias", "[{to: user, name: tobi}, {to: tag, name: Tobi}]")
     assert world.expect(10).tags == {"tax", "tax/2024", "Tobi"}
-    assert "Tobi" not in world.expect(12).tags  # anna's
+    assert "Tobi" not in world.expect(12).tags  # erika's
 
 
 def test_a_reinterpretation_fills_only_what_is_empty(world: World) -> None:
@@ -271,7 +271,7 @@ def test_a_long_space_name_stays_in_bounds_and_apart(world: World) -> None:
     shorter = world.expect(13).space
     assert long is not None and shorter is not None
     assert len(long) <= 200 and len(shorter) <= 200 and long != shorter
-    assert long.startswith("Geteilt: anna (bearbeiten), user-000-")
+    assert long.startswith("Geteilt: erika (bearbeiten), user-000-")
 
 
 def test_a_mail_is_taken_over() -> None:
@@ -284,7 +284,7 @@ def test_a_mail_is_taken_over() -> None:
     ("head", "kind"),
     [
         (
-            b"Delivered-To: anna@example.test\r\nReceived: by 2002:a05 with SMTP id x;\r\n"
+            b"Delivered-To: erika@example.test\r\nReceived: by 2002:a05 with SMTP id x;\r\n"
             b"        Tue, 4 Nov 2026 01:00:00 -0800 (PST)\r\nFrom: a@example.test\r\n",
             "message/rfc822",
         ),

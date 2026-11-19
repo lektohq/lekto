@@ -15,6 +15,7 @@ from lekto.adapters.outbound.imap.names import quoted
 from lekto.core.domain.mail import MailLogin, MailSecurity
 from lekto.core.ports.mail_server import MailServer
 from tests import probes
+from tests.builders import DEFAULT_SETTINGS
 from tests.contracts.mail_server import MailServerContract, MailWorld
 
 _opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -84,7 +85,7 @@ class _GreenMail:
 class TestImapMailServer(MailServerContract):
     @pytest.fixture
     def server(self) -> MailServer:
-        return ImapMailServer()
+        return ImapMailServer(timeout=DEFAULT_SETTINGS.mail_timeout)
 
     @pytest.fixture
     def world(self, greenmail: tuple[str, int, str]) -> MailWorld:

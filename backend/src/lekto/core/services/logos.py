@@ -204,7 +204,7 @@ class LogoService:
         """Claim and run a due fetch; False if none was due. Without fetching (switched off
         since the job was queued) the job ends at once with a note, neither waiting nor
         tried again."""
-        return await self._jobs.run_next([LOGO_JOB], LEASE, self._run)
+        return await self._jobs.run_next(self.job_kinds, LEASE, self._run)
 
     async def fetch(self, id: ContactId, *, domain: str | None = None, asked: bool = False) -> bool:
         """Fetch the contact's logo and store it; whether one was stored. Queued for a new
@@ -282,9 +282,7 @@ class LogoService:
                 asked=bool(payload.get("asked")),
             )
         except Exception as error:
-            log.warning("logo job failed", extra={"job_id": str(job.id)}, exc_info=True)
-            reason = f"{type(error).__name__}: {error}"
-            await self._jobs.again(job, reason, _RETRY.next_run(job.tries, self._clock.now()))
+            await self._jobs.failed(job, error, _RETRY, "logo job failed")
             return
         await self._jobs.end(job)
 

@@ -35,11 +35,11 @@ from functools import lru_cache
 from lekto.core.domain.document_facts import (
     HOLDER_KINDS,
     MODEL_HOLDER_KINDS,
-    SURE_HOLDER_KINDS,
     DocumentFact,
     Holder,
     HolderKind,
     HolderSource,
+    quote_reason,
 )
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.evidence import contains, normalise
@@ -49,7 +49,6 @@ from lekto.core.domain.identifiers import (
     IdentifierKind,
     Key,
     normalise_identifier,
-    type_of,
 )
 from lekto.core.domain.names import match_key
 from lekto.core.domain.reasons import Reason, ReasonCode, because
@@ -97,12 +96,8 @@ _TARGET = re.compile(
     re.IGNORECASE,
 )
 # The label of the number just before it, left out of the name before it.
-_LABEL = re.compile(
-    r"(?i)(iban|gläubiger[-\s]*(id(entifikations(nummer)?)?|identifikationsnummer|nr\.?)"
-    r"|creditor[-\s]*(id|identifier)|ci"
-    r"|(ust|umsatzsteuer)[-.\s]*(id(\.|entifikations)?[-.\s]*(nr|nummer)?|identifikationsnummer)"
-    r"|vat[-\s]*(id|no|number|reg(istration)?[-\s]*(no|number)?)?)\s*[:=.]?\s*$"
-)
+_LABEL = re.compile(r"(?i)iban\s*[:=.]?\s*$")
+"""The label before a number `holder_at` places: since #215 it places IBANs alone (DA-07)."""
 _WORD = re.compile(r"[a-z]{3,}")
 _ANOTHER_NUMBER = re.compile(r"\b[A-Z]{2}\d{2}[ A-Z0-9]{12,}")
 # A column: words apart by one or two spaces; columns apart by three spaces or a table's `|`.
@@ -248,19 +243,6 @@ def foreign(holder: Holder | None, names: Iterable[str]) -> bool:
     """Whether a number belongs to someone other than the contact of `names`: a person or a
     third party (`held_by`). A number without a holder (read before 0.8) is not."""
     return held_by(holder, names) in (HolderKind.RECIPIENT, HolderKind.THIRD_PARTY)
-
-
-def unlearned(fact: DocumentFact, names: Iterable[str]) -> bool:
-    """Whether training leaves `fact` out for the contact of `names`: someone else's
-    (`foreign`), or of `SURE_HOLDER_KINDS` and not surely its (an e-mail domain whose name
-    names no one: offered in the open list, not learned)."""
-    if foreign(fact.holder, names):
-        return True
-    return (
-        fact.kind in SURE_HOLDER_KINDS
-        and fact.holder is not None
-        and fact.holder.kind is HolderKind.UNCLEAR
-    )
 
 
 # --- e-mail domains: whose by the name --------------------------------------------------------
@@ -498,11 +480,12 @@ class ReadHolder:
 
 
 def checked_holder(
-    text: str, read: ReadHolder, listed: Collection[Key]
+    text: str, read: ReadHolder, listed: Collection[Key], normalised: str | None = None
 ) -> tuple[Key, Holder] | Reason:
     """The holder `read` tells, checked: of one of the `listed` numbers, a holder Lekto knows,
     a passage of the text that shows the number (`QUOTE_*`), and a name that stands in the text
-    near one of the number's places (`NEAR`). Why not, otherwise."""
+    near one of the number's places (`NEAR`). Why not, otherwise. `normalised` is
+    `normalise(text)`, if known."""
     number = next((kind for kind in MODEL_HOLDER_KINDS if kind.value == read.kind), None)
     if number is None:
         return because(ReasonCode.HOLDER_NOT_LISTED, value=read.value)
@@ -516,13 +499,11 @@ def checked_holder(
         kind = HolderKind(read.holder)
     except ValueError:
         return because(ReasonCode.HOLDER_KIND_UNKNOWN, holder=read.holder)
-    evidence = (read.evidence or "").strip()
-    if not evidence:
-        return because(ReasonCode.QUOTE_MISSING)
-    if not contains(normalise(text), evidence):
-        return because(ReasonCode.QUOTE_NOT_IN_TEXT)
-    if re.search(type_of(key[0]).written(key[1]), evidence, re.IGNORECASE) is None:
-        return because(ReasonCode.QUOTE_WITHOUT_VALUE)
+    quoted = quote_reason(
+        normalise(text) if normalised is None else normalised, read.evidence, *key
+    )
+    if quoted is not None:
+        return quoted
     name = (read.name or "").strip() or None
     if name is not None:
         near = [

@@ -36,7 +36,7 @@ async def place_of(
 ) -> Place:
     """Where `fact` stands in `document`."""
     try:
-        text = (await load_text(store, document)).decode("utf-8", "replace")
+        text = await load_text(store, document)
     except NotFoundError:
         return Place(document, title, dated, fact.role, None)
     pages = await load_layout(store, document)

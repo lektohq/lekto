@@ -14,6 +14,7 @@ the new one takes its place: entered by hand, or, where the old one was learned,
 the same spaces and user (who saw the old one sees the new one, #82); as a person's choice it
 takes the value from another contact that only learned or rejected it."""
 
+import asyncio
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -37,7 +38,7 @@ from lekto.core.domain.errors import (
     ValidationError,
 )
 from lekto.core.domain.events import DocumentUpdated
-from lekto.core.domain.first_runs import FACTS, Decision, FieldVerdict, Verdict
+from lekto.core.domain.first_runs import FACTS, Verdict
 from lekto.core.domain.identifiers import (
     CONTACT_KINDS,
     Identifier,
@@ -54,6 +55,7 @@ from lekto.core.ports.clock import Clock
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import controllable_document, load_actor
+from lekto.core.services._first_runs import keep_verdict
 from lekto.core.services._identifiers import claim_identifiers
 from lekto.core.services.classification.kept_facts import TextFacts, facts_lock, refresh_facts
 from lekto.core.services.classification.signals import model_facts
@@ -108,9 +110,15 @@ async def decide_fact(
     value that is none of the kind, a decision without what it needs, and `at_contact` without
     a contact or for a kind that is no contact's."""
     try:
-        text = (await load_text(store, id)).decode("utf-8", errors="replace")
+        text = await load_text(store, id)
     except NotFoundError:
         text = None
+    # What the sources find in the text, for a withdrawal: read before the lock is taken.
+    sources = (
+        await TextFacts.read(text)
+        if text is not None and decision.action is FactAction.WITHDRAW
+        else None
+    )
     now = clock.now()
     async with uow_factory() as uow:
         # One store of the document's facts at a time: the signals' and a person's.
@@ -128,8 +136,13 @@ async def decide_fact(
             case FactAction.ADD:
                 if decision.role is None:
                     raise ValidationError(because(ReasonCode.FACT_ROLE_MISSING))
-                given = person_fact(
-                    text, decision.kind, decision.value, decision.role, FactState.ADDED
+                given = await asyncio.to_thread(
+                    person_fact,
+                    text,
+                    decision.kind,
+                    decision.value,
+                    decision.role,
+                    FactState.ADDED,
                 )
                 known = facts.get(given.key)
                 if known is not None and known.state is not FactState.REJECTED:
@@ -142,7 +155,8 @@ async def decide_fact(
                 fact = _fact(facts, key)
                 new = None
                 if decision.new_value is not None:
-                    new = person_fact(
+                    new = await asyncio.to_thread(
+                        person_fact,
                         text,
                         decision.kind,
                         decision.new_value,
@@ -163,13 +177,14 @@ async def decide_fact(
                 verdict = Verdict.CORRECTED
             case FactAction.WITHDRAW:
                 _fact(facts, key)
+                assert sources is not None  # read above: the document has its text
                 await uow.document_facts.withdraw(id, key)
                 # As the sources find it now: its role and origins, or nothing.
                 log = await uow.processing_log.list_for(id)
                 await refresh_facts(
                     uow,
                     id,
-                    await TextFacts.read(text),
+                    sources,
                     model_facts(ProcessingHistory(log).signals()),
                     in_codes={
                         fact.key for fact in facts.values() if FactOrigin.CODE in fact.origins
@@ -185,20 +200,7 @@ async def decide_fact(
             if after is not None:
                 await after(uow, user, document, tuple(facts.values()))
         if verdict is not None:
-            if document.processing.run == 1 and document.first_lane is None:
-                verdict = Verdict.EARLY  # before the first run stopped: nothing to judge
-            await uow.processing_facts.add_verdicts(
-                [
-                    FieldVerdict(
-                        document_id=id,
-                        field=FACTS,
-                        verdict=verdict,
-                        decided_at=now,
-                        decision=Decision.CHANGE,
-                        via=via,
-                    )
-                ]
-            )
+            await keep_verdict(uow, document, FACTS, verdict, now, via)
         await uow.commit()
 
 

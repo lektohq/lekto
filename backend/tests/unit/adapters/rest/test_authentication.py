@@ -5,20 +5,17 @@ import re
 from datetime import timedelta
 from uuid import UUID
 
-import httpx2
 import pytest
 from fastapi.routing import APIRoute, iter_route_contexts
 
 from lekto import __version__
 from lekto.adapters.inbound.rest import PREFIX
 from lekto.adapters.inbound.rest.auth import CSRF_HEADER, READS_KEY
-from lekto.adapters.outbound.memory import ManualClock
-from lekto.composition.container import build_memory_container, build_services
 from lekto.core.domain.errors import AuthenticationError
 from lekto.core.domain.identity import TokenScope
 from tests.api import auth, bearer
-from tests.builders import NOW, PASSWORD, SAMPLES
-from tests.unit.adapters.rest.support import Api, make_app
+from tests.builders import PASSWORD, SAMPLES
+from tests.unit.adapters.rest.support import Api, api_with
 
 PUBLIC = {
     ("POST", f"{PREFIX}/auth/login"),
@@ -100,12 +97,9 @@ async def test_login_sets_a_secure_cookie(api: Api) -> None:
 
 
 async def test_insecure_cookies_only_when_configured() -> None:
-    container = build_memory_container()
-    services = build_services(container)
-    await services.users.bootstrap_admin("alice", PASSWORD)
-    app = make_app(container, services, cookie_secure=False)
-    transport = httpx2.ASGITransport(app=app)
-    async with httpx2.AsyncClient(transport=transport, base_url="http://lekto") as client:
+    async with api_with(cookie_secure=False) as api:
+        await api.services.users.bootstrap_admin("alice", PASSWORD)
+        client = api.client
         response = await client.post(
             f"{PREFIX}/auth/login", json={"username": "alice", "password": PASSWORD}
         )
@@ -183,6 +177,8 @@ async def test_changes_with_a_session_need_the_csrf_token(api: Api) -> None:
         assert CSRF_HEADER in missing.json()["detail"]
         wrong = await client.post(url, json={"name": "A"}, headers={CSRF_HEADER: "x" * 64})
         assert wrong.status_code == 403
+        latin = await client.post(url, json={"name": "A"}, headers={CSRF_HEADER.encode(): b"\xe4"})
+        assert latin.status_code == 403  # not a 500 (RB-02)
         right = await client.post(url, json={"name": "A"}, headers=session.headers)
         assert right.status_code == 201
         # Another session's CSRF token does not fit.
@@ -263,6 +259,9 @@ async def test_password_change_over_http(api: Api) -> None:
         )
         assert response.status_code == 200
         assert "__Host-lekto_session=" in response.headers["set-cookie"]
+        # The known devices are forgotten; this browser is known again by a new cookie (XA-05).
+        devices = [c for c in response.headers.get_list("set-cookie") if "lekto_device" in c]
+        assert [c.split("=")[0] for c in devices] == ["__Secure-lekto_device"]
         new_csrf = response.json()["csrf_token"]
         assert new_csrf != session.csrf_token
         assert (await client.get(f"{PREFIX}/auth/me")).status_code == 200  # renewed
@@ -503,14 +502,8 @@ async def test_a_read_token_does_not_upload(api: Api) -> None:
 
 async def test_me_names_the_shortcut_the_server_offers() -> None:
     link = "https://www.icloud.com/shortcuts/8d752558e38f4f64bf9c61faa4694a75"
-    clock = ManualClock(NOW)
-    container = build_memory_container(clock)
-    services = build_services(container)
-    app = make_app(container, services, shortcut_url=link)
-    client = httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="https://lekto")
-    api = Api(container, services, app, client, clock)
-    user = await api.user()
-    async with api.client:
+    async with api_with(shortcut_url=link) as api:
+        user = await api.user()
         me = (await api.client.get(f"{PREFIX}/auth/me", headers=auth(user))).json()
     assert me["shortcut_url"] == link
 

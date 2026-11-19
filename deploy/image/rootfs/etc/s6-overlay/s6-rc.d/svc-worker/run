@@ -1,11 +1,11 @@
 #!/command/with-contenv sh
 # Pipeline jobs, outbox dispatch and webhook delivery. Only with LEKTO_ROLE all or worker: other
 # roles leave it out of the bundle (scripts/stage2-hook); this guard holds for a start by hand.
-role=$(printf %s "${LEKTO_ROLE:-all}" | tr '[:upper:]' '[:lower:]')
-case "$role" in
+# LEKTO_ROLE as init-lekto resolved it.
+case "$LEKTO_ROLE" in
   all | worker) ;;
   *)
-    echo "svc-worker: not started with LEKTO_ROLE=$role"
+    echo "svc-worker: not started with LEKTO_ROLE=$LEKTO_ROLE"
     exec s6-svc -Od .
     ;;
 esac
