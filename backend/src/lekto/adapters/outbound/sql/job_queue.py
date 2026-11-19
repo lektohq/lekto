@@ -29,9 +29,10 @@ from sqlalchemy import (
     delete,
     func,
     insert,
-    or_,
+    literal,
     select,
     text,
+    union_all,
     update,
 )
 
@@ -110,20 +111,25 @@ class SqlJobQueue:
     async def claim(
         self, *, now: datetime, lease: timedelta, kinds: Collection[str] | None = None
     ) -> Job | None:
-        due = or_(
-            and_(_jobs.c.status == JobStatus.QUEUED.value, _jobs.c.run_at <= now),
-            and_(_jobs.c.status == JobStatus.RUNNING.value, _jobs.c.locked_until <= now),
-        )
-        if kinds is not None:
-            due = and_(due, _jobs.c.kind.in_(list(kinds)))
-        candidate = (
-            select(_jobs.c.id)
-            .where(due)
+        """The due job first in line (by `run_at`), queued or with its lease run out. Looked for
+        kind by kind and status by status, each in the order of its index (`kind`, `status`,
+        `run_at`): with thousands of jobs of one kind waiting, a claim of another kind reads
+        none of them, and one of that kind reads one (SQ-07)."""
+        firsts = [
+            select(_jobs.c.id, _jobs.c.run_at)
+            .where(*where, due)
             .order_by(_jobs.c.run_at, _jobs.c.id)
             .limit(1)
             .with_for_update(skip_locked=True)
-            .scalar_subquery()
-        )
+            .subquery()
+            for where in _by_kind(kinds)
+            for due in (
+                and_(_jobs.c.status == JobStatus.QUEUED.value, _jobs.c.run_at <= now),
+                and_(_jobs.c.status == JobStatus.RUNNING.value, _jobs.c.locked_until <= now),
+            )
+        ]
+        each = union_all(*(select(first.c.id, first.c.run_at) for first in firsts)).subquery()
+        candidate = select(each.c.id).order_by(each.c.run_at, each.c.id).limit(1).scalar_subquery()
         result = await self._tx.write(
             update(_jobs)
             .where(_jobs.c.id == candidate)
@@ -140,14 +146,18 @@ class SqlJobQueue:
         return None if row is None else _job(row)
 
     async def next_due(self, *, kinds: Collection[str] | None = None) -> datetime | None:
-        queued = select(_jobs.c.run_at.label("at")).where(_jobs.c.status == JobStatus.QUEUED.value)
-        running = select(_jobs.c.locked_until.label("at")).where(
-            _jobs.c.status == JobStatus.RUNNING.value
-        )
-        if kinds is not None:
-            queued = queued.where(_jobs.c.kind.in_(list(kinds)))
-            running = running.where(_jobs.c.kind.in_(list(kinds)))
-        times = queued.union_all(running).subquery()
+        """The earliest `run_at` of a queued job and `locked_until` of a running one, kind by
+        kind, each in the order of an index (as `claim`)."""
+        times = union_all(
+            *(
+                select(func.min(column).label("at")).where(*where, _jobs.c.status == status)
+                for where in _by_kind(kinds)
+                for status, column in (
+                    (JobStatus.QUEUED.value, _jobs.c.run_at),
+                    (JobStatus.RUNNING.value, _jobs.c.locked_until),
+                )
+            )
+        ).subquery()
         at = (await self._tx.read(select(func.min(times.c.at)))).scalar_one()
         assert at is None or isinstance(at, datetime)
         return at
@@ -350,6 +360,16 @@ def _order(state: ColumnElement[str]) -> list[ColumnElement[Any]]:
 
 
 _FINISHED = [JobStatus.DONE.value, JobStatus.FAILED.value]
+
+
+def _by_kind(kinds: Collection[str] | None) -> list[tuple[ColumnElement[bool], ...]]:
+    """The conditions of one look-up each: kind by kind, or (None) one over every kind."""
+    if kinds is None:
+        return [()]
+    # Each kind written into the statement, not bound: a prepared statement's generic plan does
+    # not know how many jobs a kind has, and Postgres then took the index of status and due time
+    # for a kind with none, reading every waiting job of another.
+    return [(_jobs.c.kind == literal(kind, literal_execute=True),) for kind in dict.fromkeys(kinds)]
 
 
 def _job(row: Row[Any]) -> Job:

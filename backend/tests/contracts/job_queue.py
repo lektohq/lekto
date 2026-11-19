@@ -103,6 +103,21 @@ class JobQueueContract:
         assert await claim(uow_factory, at=timedelta(minutes=3)) is None
         assert future is not None
 
+    async def test_claim_takes_the_most_overdue_of_several_kinds(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """Looked for kind by kind and status by status, the first in line of all of them; one
+        whose lease ran out before one due after it (SQ-07)."""
+        late = await enqueue(uow_factory, "a", run_at=timedelta(minutes=2))
+        first = await enqueue(uow_factory, "b")
+        await enqueue(uow_factory, "c", run_at=-timedelta(hours=1))  # not asked for
+        claimed = await claim(uow_factory, at=timedelta(minutes=5), kinds=["a", "b", "b"])
+        assert claimed is not None and claimed.id == first
+        again = await claim(uow_factory, at=timedelta(hours=1), kinds=["b", "a"])
+        assert again is not None and again.id == first  # its lease ran out
+        third = await claim(uow_factory, at=timedelta(hours=1), kinds=["a", "b"])
+        assert third is not None and third.id == late
+
     async def test_claim_locks_and_counts_attempts(self, uow_factory: UnitOfWorkFactory) -> None:
         id = await enqueue(uow_factory)
         job = await claim(uow_factory)

@@ -687,6 +687,9 @@ jobs = Table(
     Column("finished_at", UtcDateTime, nullable=True),
     Column("result", json_type(), nullable=True),
     Index(None, "status", "run_at"),
+    # The jobs of a kind due first, in the order a claim takes them (`JobQueue.claim`,
+    # `next_due`; revision 0080).
+    Index(None, "kind", "status", "run_at", "id"),
     # The durations of the jobs done lately (`JobQueue.finished`).
     Index(None, "finished_at"),
     # Claims of running jobs whose lease ran out.
