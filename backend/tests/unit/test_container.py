@@ -41,7 +41,6 @@ from lekto.composition.container import (
     build_memory_container,
     build_services,
 )
-from lekto.composition.errors import AdapterNotAvailableError
 from lekto.composition.settings import Settings
 from lekto.composition.worker import build_worker
 from lekto.core.domain import media_types
@@ -176,15 +175,12 @@ def timeout_of(request: httpx2.Request) -> float:
     return timeout
 
 
-def test_missing_adapter_is_reported_with_port_and_name(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_a_missing_adapter_is_a_key_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Only a test takes one out of a table: the settings allow no other name (CO-07)."""
     monkeypatch.setitem(container.PERSISTENCE, "sqlite", fake_persistence)
     monkeypatch.delitem(container.OBJECT_STORES, "filesystem")
-    with pytest.raises(AdapterNotAvailableError) as info:
+    with pytest.raises(KeyError, match="filesystem"):
         build_container(settings())
-    assert str(info.value) == "object_store: adapter 'filesystem' is not implemented yet"
-    assert (info.value.port, info.value.adapter) == ("object_store", "filesystem")
 
 
 def test_the_database_type_selects_the_sql_adapter(tmp_path: Path) -> None:
@@ -220,10 +216,10 @@ def test_each_port_is_checked_in_turn(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(container.PERSISTENCE, "sqlite", fake_persistence)
     monkeypatch.delitem(container.OCR_ENGINES, "ocrmypdf")
     monkeypatch.delitem(container.PARSERS, "layout")
-    with pytest.raises(AdapterNotAvailableError, match="ocr: adapter 'ocrmypdf'"):
+    with pytest.raises(KeyError, match="ocrmypdf"):
         build_container(settings())
     monkeypatch.setitem(container.OCR_ENGINES, "ocrmypdf", lambda _: object())
-    with pytest.raises(AdapterNotAvailableError, match="parser: adapter 'layout'"):
+    with pytest.raises(KeyError, match="layout"):
         build_container(settings())
 
 
@@ -365,7 +361,7 @@ def test_optional_ports_are_only_selected_when_configured(
     monkeypatch.setitem(container.SEARCH_INDEXES, "meilisearch", lambda _: Opened(object()))
     assert build_container(settings(meilisearch_url="http://meilisearch:7700")).search_index
     monkeypatch.delitem(container.SEARCH_INDEXES, "meilisearch")
-    with pytest.raises(AdapterNotAvailableError, match="search_index: adapter 'meilisearch'"):
+    with pytest.raises(KeyError, match="meilisearch"):
         build_container(settings(meilisearch_url="http://meilisearch:7700"))
 
 

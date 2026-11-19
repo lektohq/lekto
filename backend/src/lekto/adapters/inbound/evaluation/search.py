@@ -102,7 +102,6 @@ class TimedEmbeddings:
         self._inner = inner
         self.seconds = 0.0
         self.texts = 0
-        self.calls = 0
 
     @property
     def model(self) -> str:
@@ -115,7 +114,6 @@ class TimedEmbeddings:
         finally:
             self.seconds += time.perf_counter() - started
             self.texts += len(texts)
-            self.calls += 1
 
 
 @dataclass(frozen=True)
@@ -245,14 +243,12 @@ class ModelResult:
     index_seconds: float  # the whole rebuild
     embed_seconds: float  # of it, the time spent in the embedding endpoint
     sections: int  # texts embedded for the documents
-    embed_calls: int
     ratios: list[RatioResult]
 
 
 @dataclass(frozen=True)
 class SearchRun:
     documents: int
-    sections_per_document: float
     models: list[ModelResult]
 
 
@@ -294,8 +290,7 @@ async def evaluate_search(
     models = []
     for backend in backends:
         models.append(await _measure(backend, queries, services, names, owner, ratios, say))
-    sections = [m.sections / len(names) for m in models if m.sections]
-    return SearchRun(len(names), sections[0] if sections else 0.0, models)
+    return SearchRun(len(names), models)
 
 
 async def _measure(
@@ -312,15 +307,13 @@ async def _measure(
     if timed is not None:
         probe = await timed.embed(["dimensions"])
         dimensions = len(probe.vectors[0])
-        timed.seconds, timed.texts, timed.calls = 0.0, 0, 0
+        timed.seconds, timed.texts = 0.0, 0
     async with backend.open_index(dimensions) as index:
         say(f"{backend.name}: indexing {len(names)} documents")
         started = time.perf_counter()
         await services.indexing(index, timed).rebuild()
         index_seconds = time.perf_counter() - started
-        embed_seconds, sections, calls = (
-            (0.0, 0, 0) if timed is None else (timed.seconds, timed.texts, timed.calls)
-        )
+        embed_seconds, sections = (0.0, 0) if timed is None else (timed.seconds, timed.texts)
         search = services.search(index, timed)
         results = []
         for ratio in ratios if timed is not None else [0.0]:
@@ -340,7 +333,6 @@ async def _measure(
         index_seconds=index_seconds,
         embed_seconds=embed_seconds,
         sections=sections,
-        embed_calls=calls,
         ratios=results,
     )
 

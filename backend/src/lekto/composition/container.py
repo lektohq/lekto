@@ -1,7 +1,7 @@
 """Composition root: choose the configured adapter for each port.
 
-Adapters register their factories in the tables below, keyed by the configured adapter name.
-A port whose configured adapter does not exist yet fails with AdapterNotAvailableError.
+Adapters register their factories in the tables below, keyed by the configured adapter name:
+a name the settings allow (their `Literal`s) or a fixed one.
 """
 
 import os
@@ -70,7 +70,6 @@ from lekto.adapters.outbound.webhooks import HttpWebhookSender
 from lekto.adapters.outbound.webpush.sender import WebPushSender
 from lekto.adapters.outbound.zxing import ZxingCodeReader
 from lekto.composition.database import open_database
-from lekto.composition.errors import AdapterNotAvailableError
 from lekto.composition.settings import Settings
 from lekto.core.domain.jobs import WORK_LEASE_MARGIN, RetryPolicy
 from lekto.core.domain.links import Links
@@ -446,31 +445,25 @@ class Container:
 
 
 def build_container(settings: Settings) -> Container:
-    """Create the adapter for every port. Raises AdapterNotAvailableError for a missing one."""
-    persistence = _select("persistence", settings.db_type, PERSISTENCE, settings)
+    """Create the adapter for every port."""
+    persistence = _select(settings.db_type, PERSISTENCE, settings)
     closers: list[Closer] = [persistence.close]
 
-    def opened[T](port: str, adapter: str, factories: Mapping[str, Factory[Opened[T]]]) -> T:
-        built = _select(port, adapter, factories, settings)
+    def opened[T](adapter: str, factories: Mapping[str, Factory[Opened[T]]]) -> T:
+        built = _select(adapter, factories, settings)
         if built.close is not None:
             closers.append(built.close)
         return built.adapter
 
-    object_store = opened("object_store", settings.storage_type, OBJECT_STORES)
+    object_store = opened(settings.storage_type, OBJECT_STORES)
     search_index = (
-        opened("search_index", "meilisearch", SEARCH_INDEXES)
-        if settings.meilisearch_url is not None
-        else None
+        opened("meilisearch", SEARCH_INDEXES) if settings.meilisearch_url is not None else None
     )
     language_model = (
-        opened("llm", "openai-compatible", LANGUAGE_MODELS)
-        if settings.llm_base_url is not None
-        else None
+        opened("openai-compatible", LANGUAGE_MODELS) if settings.llm_base_url is not None else None
     )
     embeddings = (
-        opened("embeddings", "openai-compatible", EMBEDDINGS)
-        if settings.embedding_base_url is not None
-        else None
+        opened("openai-compatible", EMBEDDINGS) if settings.embedding_base_url is not None else None
     )
     # The head of a mail set as a PDF speaks the language of the templates' locale (`de` of
     # `de_AT`), not the locale as written (AD-04).
@@ -483,14 +476,14 @@ def build_container(settings: Settings) -> Container:
         wakeup=persistence.wakeup,
         clock=SystemClock(),
         object_store=object_store,
-        ocr=_select("ocr", "ocrmypdf", OCR_ENGINES, settings),
-        parser=_select("parser", "layout", PARSERS, settings),
-        pages=_select("pages", "pdfium", PAGE_RENDERERS, settings),
-        locator=_select("locator", "pdfium", TEXT_LOCATORS, settings),
-        codes=_select("codes", "zxing", CODE_READERS, settings),
-        metadata=_select("metadata", "pikepdf", METADATA_READERS, settings),
-        composer=_select("composer", "pikepdf", PAGE_COMPOSERS, settings),
-        images=_select("images", "pillow", IMAGE_NORMALISERS, settings),
+        ocr=_select("ocrmypdf", OCR_ENGINES, settings),
+        parser=_select("layout", PARSERS, settings),
+        pages=_select("pdfium", PAGE_RENDERERS, settings),
+        locator=_select("pdfium", TEXT_LOCATORS, settings),
+        codes=_select("zxing", CODE_READERS, settings),
+        metadata=_select("pikepdf", METADATA_READERS, settings),
+        composer=_select("pikepdf", PAGE_COMPOSERS, settings),
+        images=_select("pillow", IMAGE_NORMALISERS, settings),
         password_hasher=Argon2PasswordHasher(),
         cipher=secret_cipher(settings),
         refs=ref_cipher(settings),
@@ -513,22 +506,16 @@ def build_container(settings: Settings) -> Container:
         totp=PyotpTotp(),
         patterns=RegexPatternMatcher(settings.rules_pattern_timeout.total_seconds()),
         templates=templates,
-        oidc=(
-            _select("oidc", "authlib", OIDC_PROVIDERS, settings) if settings.oidc_enabled else None
-        ),
+        oidc=(_select("authlib", OIDC_PROVIDERS, settings) if settings.oidc_enabled else None),
         search_index=search_index,
         language_model=language_model,
         embeddings=embeddings,
         classifier=(
             None
             if settings.classifier == "none"
-            else _select("classifier", settings.classifier, CLASSIFIERS, settings)
+            else _select(settings.classifier, CLASSIFIERS, settings)
         ),
-        logo_fetcher=(
-            _select("logo_fetcher", "httpx2", LOGO_FETCHERS, settings)
-            if settings.logo_fetch
-            else None
-        ),
+        logo_fetcher=(_select("httpx2", LOGO_FETCHERS, settings) if settings.logo_fetch else None),
         closers=tuple(closers),
     )
 
@@ -1012,11 +999,5 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
     )
 
 
-def _select[T](
-    port: str, adapter: str, factories: Mapping[str, Factory[T]], settings: Settings
-) -> T:
-    try:
-        factory = factories[adapter]
-    except KeyError:
-        raise AdapterNotAvailableError(port, adapter) from None
-    return factory(settings)
+def _select[T](adapter: str, factories: Mapping[str, Factory[T]], settings: Settings) -> T:
+    return factories[adapter](settings)
