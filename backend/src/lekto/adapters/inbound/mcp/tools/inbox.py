@@ -1,6 +1,6 @@
 """The tools of the domain `inbox`: what waits for the caller, confirming it, marking it seen (Tobi,
-01.11.2026, `.idea/decisions/2026-11-01-mcp.md`, PR 5). Where a document belongs is the person's to
-decide in the web UI: an assistant does not move documents (decision 3)."""
+01.11.2026, `.knowledge/decisions/2026-11-01-mcp.md`, PR 5). Where a document belongs is the
+person's to decide in the web UI: an assistant does not move documents (decision 3)."""
 
 from datetime import date, datetime
 from typing import Annotated, Any, Literal

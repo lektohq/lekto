@@ -101,7 +101,7 @@ when the pull brings a new revision (`git log --stat -- backend/src/lekto/adapte
 
 `dev.local.env.example` points at Open WebUI (in front of Ollama) with `qwen3:8b-ctx8k`
 (classification) and Qwen3-Embedding 4B (search vectors), the models evaluated in
-`.idea/measurements/` (`2026-10-07-local-llm-qwen3.md`, `2026-10-21-embedding-models.md`). On a CPU a document takes 3 to 10 minutes in the model
+`.knowledge/measurements/` (`2026-10-07-local-llm-qwen3.md`, `2026-10-21-embedding-models.md`). On a CPU a document takes 3 to 10 minutes in the model
 (`LEKTO_LLM_TIMEOUT=600`); embeddings take about 4 s per section of 1500 characters on Ollama
 with two vGPUs (21.10.2026), a query about 0.5 s. Single uploads are fine at any time. Mass runs (the migration with
 embeddings on, `reindex` after switching embeddings on, a reprocessing of many documents) load

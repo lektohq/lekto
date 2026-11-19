@@ -98,7 +98,7 @@ one of its ancestors, so filing is the last thing that happens to a document."""
 
 WAITS: Mapping[Node, frozenset[Node]] = {Node.SIGNAL_LLM: frozenset({Node.PAGES})}
 """Nodes a node waits for without needing their results: the page images are there when a model call
-goes to a webhook with links to them (`.idea/decisions/2026-10-25-webhooks-and-tasks.md`).
+goes to a webhook with links to them (`.knowledge/decisions/2026-10-25-webhooks-and-tasks.md`).
 Processing again from one of them leaves the node alone (the text, not the images, is what the model
 reads)."""
 

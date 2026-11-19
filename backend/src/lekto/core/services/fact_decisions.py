@@ -1,4 +1,5 @@
-"""A person's decisions about the facts of a document (`.idea/decisions/2026-10-25-facts.md`, issue
+"""A person's decisions about the facts of a document (`.knowledge/decisions/2026-10-25-facts.md`,
+issue
 #145 PR 6): adding one the sources did not find, correcting the value or the role of one, rejecting
 one (it is no fact of the document), and withdrawing a decision. Editors of the document's space and
 admins decide; the kinds that are a person's alone (tax ID, social security number, ...;

@@ -5,8 +5,8 @@ Revises: 0042
 Create Date: 2026-10-25 12:00:00.000000
 
 A webhook may set headers of its own (`Authorization`, ...) and may go without a secret, unsigned
-(Tobi, 25.10.2026, `.idea/decisions/2026-10-25-webhooks-and-tasks.md`): `webhooks.header_names` (a
-JSON list) and `webhooks.headers` (the values, encrypted; NULL without headers), and
+(Tobi, 25.10.2026, `.knowledge/decisions/2026-10-25-webhooks-and-tasks.md`): `webhooks.header_names`
+(a JSON list) and `webhooks.headers` (the values, encrypted; NULL without headers), and
 `webhooks.secret` may be NULL. Existing webhooks keep their secret and have no headers.
 
 Postgres changes the table in place; SQLite builds `webhooks` anew, keeping its rows (migrations

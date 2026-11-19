@@ -373,8 +373,8 @@ class DocumentType(MasterData):
     check. `group_ids`: the type groups it is in (tags of scope `document_type`). `icon`: the name
     of a Lucide icon (`appearance.checked_icon`). `relation_target`: documents refer to those of the
     type (a contract, a policy) by a contract or customer number they share
-    (`.idea/decisions/2026-10-25-relations.md`, decision 8); without it such a number connects no
-    documents (it would connect every invoice with every other)."""
+    (`.knowledge/decisions/2026-10-25-relations.md`, decision 8); without it such a number connects
+    no documents (it would connect every invoice with every other)."""
 
     id: DocumentTypeId
     description: str | None = None

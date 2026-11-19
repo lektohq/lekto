@@ -215,7 +215,7 @@ async def test_a_person_decides_about_a_fact(facts_api: Api) -> None:
 
 async def test_a_decision_through_a_token_carries_it(facts_api: Api) -> None:
     """The verdict on the facts names the token it came through
-    (`.idea/decisions/2026-11-01-mcp.md`, decision 11)."""
+    (`.knowledge/decisions/2026-11-01-mcp.md`, decision 11)."""
     api = facts_api
     owner = await api.user()
     document = await upload(api, auth(owner))

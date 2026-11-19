@@ -1,4 +1,5 @@
-"""Relations between documents (`domain.relations`, `.idea/decisions/2026-10-25-relations.md`, issue
+"""Relations between documents (`domain.relations`, `.knowledge/decisions/2026-10-25-relations.md`,
+issue
 #145 PR 9): which a person sees, sets, accepts and removes.
 
 Only who reads both documents sees a relation. Who edits the newer and reads the older sets one
