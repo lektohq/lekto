@@ -97,11 +97,6 @@ class SqlRuleRepository(SqlRepository[RuleId, Rule]):
             )
         return _version(row)
 
-    async def remove_for_space(self, space: SpaceId) -> int:
-        """Versions and applications go with their rule (ON DELETE CASCADE)."""
-        result = await self._tx.write(delete(t.rules).where(t.rules.c.space_id == space))
-        return int(result.rowcount)
-
     async def remove_applications_by(self, user: UserId) -> int:
         applications = t.rule_applications
         result = await self._tx.write(delete(applications).where(applications.c.user_id == user))

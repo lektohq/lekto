@@ -11,6 +11,7 @@ from lekto.core.domain.identifiers import Identifier, IdentifierKind
 from lekto.core.domain.master_data import TagScope
 from lekto.core.domain.pipeline import NODES, Lane, Node
 from lekto.core.domain.users import User
+from lekto.core.ports.repository import DocumentFilter
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from lekto.core.services.documents import DocumentService
 from lekto.core.services.master_data import MasterDataService
@@ -49,7 +50,8 @@ class ServicesOverPersistence:
         assert len([r for r in results if isinstance(r, Document)]) == 1, results
         assert all(isinstance(r, Document | DuplicateDocumentError) for r in results), results
         async with uow_factory() as uow:
-            assert len(await uow.documents.list_visible_to(owner.id)) == 1
+            found = await uow.documents.query_visible(owner.id, DocumentFilter(), limit=10)
+            assert len(found) == 1
 
     async def test_concurrent_tag_moves_make_no_cycle(self, uow_factory: UnitOfWorkFactory) -> None:
         """Moving A under B and B under A at once: one move waits for the other and sees it."""

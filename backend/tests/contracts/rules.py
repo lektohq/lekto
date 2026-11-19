@@ -490,9 +490,9 @@ class RuleRepositoriesContract:
             (found,) = await uow.rules.list_for(spaces=[at_bob.id], include_global=False)
         assert found == of_bob  # with the current version
 
-    async def test_remove_for_space(self, uow_factory: UnitOfWorkFactory) -> None:
-        """The space's rules with their versions and applications go for good; nothing else
-        does."""
+    async def test_a_space_that_goes_takes_its_rules(self, uow_factory: UnitOfWorkFactory) -> None:
+        """The space's rules with their versions and applications go with it, for good;
+        nothing else does (SQL: ON DELETE CASCADE)."""
         (admin,) = await users(uow_factory, 1)
         owner, owned = await owner_with_space(uow_factory)
         other, elsewhere = await owner_with_space(uow_factory)
@@ -506,7 +506,7 @@ class RuleRepositoriesContract:
         await store(uow_factory, applications=(*removed_applications, *kept_applications))
 
         async with uow_factory() as uow:
-            assert await uow.rules.remove_for_space(owned.id) == 2
+            await uow.spaces.remove(owned.id)
             await uow.commit()
 
         async with uow_factory() as uow:
@@ -524,7 +524,6 @@ class RuleRepositoriesContract:
             assert [v.number for v in await uow.rules.versions(everyone.id)] == [1, 2]
             remaining = await uow.rules.list_for(spaces=None, include_global=True)
             assert {rule.id for rule in remaining} == {others.id, everyone.id}
-            assert await uow.rules.remove_for_space(owned.id) == 0
 
     async def test_remove_applications_by(self, uow_factory: UnitOfWorkFactory) -> None:
         (admin,) = await users(uow_factory, 1)
@@ -608,7 +607,7 @@ class RuleRepositoriesContract:
                 raise LookupError
         async with uow_factory() as uow:
             await uow.rules.add(space_rule(owner, owned.id))
-            assert await uow.rules.remove_for_space(owned.id) == 2
+            await uow.spaces.remove(owned.id)
             await uow.rollback()
         async with uow_factory() as uow:
             assert await uow.rules.get(rule.id) == rule

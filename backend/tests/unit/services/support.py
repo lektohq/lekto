@@ -24,12 +24,14 @@ from lekto.adapters.outbound.memory import (
 )
 from lekto.core.domain.documents import Document
 from lekto.core.domain.events import DomainEvent
+from lekto.core.domain.ids import UserId
 from lekto.core.domain.links import Links
 from lekto.core.domain.pipeline import NODES, Node, NodeResult
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.logos import LogoFetcher
 from lekto.core.ports.ocr import VisionModel
+from lekto.core.ports.repository import PAGE_LIMIT, DocumentFilter
 from lekto.core.services.auth import AuthService
 from lekto.core.services.documents import DocumentService
 from lekto.core.services.editing import EditingService
@@ -279,6 +281,12 @@ class World:
     async def personal_space(self, user: User) -> Space:
         async with self.uow() as uow:
             return await uow.spaces.get_personal(user.id)
+
+    async def visible(self, user: UserId) -> list[Document]:
+        """The documents within `user`'s reach, oldest first (as the lists read them)."""
+        async with self.uow() as uow:
+            found = await uow.documents.query_visible(user, DocumentFilter(), limit=PAGE_LIMIT)
+        return found[::-1]
 
     async def drain(self, pipeline: PipelineService | None = None) -> int:
         """Run due jobs until none is left; returns how many ran."""

@@ -596,7 +596,8 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
     async def find_by_sha256(self, sha256: Sha256) -> Document | None:
         return next((_copy(row) for row in self._all() if row.sha256 == sha256), None)
 
-    async def list_visible_to(self, user: UserId) -> list[Document]:
+    async def _visible_to(self, user: UserId) -> list[Document]:
+        """The documents within the user's reach, as `query_visible` reads them."""
         reach = Reach.of(user, await self._uow.spaces.list_accessible(user))
         return [_copy(row) for row in self._all() if reach.allows(row)]
 
@@ -624,7 +625,7 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
         limit: int,
         offset: int = 0,
     ) -> list[Document]:
-        visible = await self.list_visible_to(user)
+        visible = await self._visible_to(user)
         return _query(
             visible, filter, self._groups(), order=order, after=after, limit=limit, offset=offset
         )
@@ -645,9 +646,7 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
 
     async def _matching(self, filter: DocumentFilter, user: UserId | None) -> list[Document]:
         documents = (
-            [_copy(row) for row in self._all()]
-            if user is None
-            else await self.list_visible_to(user)
+            [_copy(row) for row in self._all()] if user is None else await self._visible_to(user)
         )
         groups = self._groups()
         return [document for document in documents if filter.matches(groups.view(document))]
@@ -692,9 +691,7 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
 
     async def count_by(self, by: CountBy, user: UserId | None) -> dict[UUID, int]:
         documents = (
-            [_copy(row) for row in self._all()]
-            if user is None
-            else await self.list_visible_to(user)
+            [_copy(row) for row in self._all()] if user is None else await self._visible_to(user)
         )
         counts: dict[UUID, int] = {}
         for document in documents:
@@ -725,7 +722,7 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
         )
 
     async def confirmed_labels(self, reader: UserId) -> KnownLabels:
-        readable = await self.list_visible_to(reader)
+        readable = await self._visible_to(reader)
         confirmed = [row for row in readable if row.confirmed_at is not None]
         spaces = {space.id: space for space in self._uow._rows(SPACES)}
         own = next((space.id for space in spaces.values() if space.personal_of == reader), None)

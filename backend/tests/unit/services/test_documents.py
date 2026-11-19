@@ -84,10 +84,10 @@ async def scene(world: World) -> Scene:
 async def test_visibility(world: World, scene: Scene) -> None:
     for user in (scene.owner, scene.reader, scene.writer):
         assert (await world.documents.get(user.id, scene.document.id)).id == scene.document.id
-        assert [d.id for d in await world.documents.list_visible(user.id)] == [scene.document.id]
+        assert [d.id for d in await world.visible(user.id)] == [scene.document.id]
     with pytest.raises(NotFoundError):
         await world.documents.get(scene.stranger.id, scene.document.id)
-    assert await world.documents.list_visible(scene.stranger.id) == []
+    assert await world.visible(scene.stranger.id) == []
     with pytest.raises(NotFoundError):
         await world.documents.get(scene.owner.id, DocumentId(new_id()))
 
@@ -101,7 +101,7 @@ async def test_a_yellow_document_is_hidden_from_readers(world: World, scene: Sce
         assert (await world.documents.get(user.id, scene.document.id)).lane is Lane.YELLOW
     with pytest.raises(NotFoundError):
         await world.documents.get(scene.reader.id, scene.document.id)
-    assert await world.documents.list_visible(scene.reader.id) == []
+    assert await world.visible(scene.reader.id) == []
 
 
 async def test_writer_updates_metadata(world: World, scene: Scene) -> None:

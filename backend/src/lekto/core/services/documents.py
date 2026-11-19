@@ -1065,11 +1065,6 @@ class DocumentService:
             undated=days.get(None, 0),
         )
 
-    async def list_visible(self, actor: UserId) -> list[Document]:
-        async with self._uow() as uow:
-            await load_actor(uow, actor)
-            return await uow.documents.list_visible_to(actor)
-
     async def filter_readers(self, id: DocumentId, candidates: Collection[UserId]) -> set[UserId]:
         """Those of `candidates` who may read the document now (admins: always); none if it does
         not exist. For pushing events to users (SSE), so it reads the current state."""

@@ -422,12 +422,6 @@ class DocumentRepository(Repository[DocumentId, Document], Protocol):
         """The document with that original: every file exists once per installation."""
         ...
 
-    async def list_visible_to(self, user: UserId) -> list[Document]:
-        """Documents within the user's reach (`lekto.core.domain.permissions.within_reach`):
-        every document in the spaces they edit, the green ones in the spaces they read.
-        Whether the user is active the services check."""
-        ...
-
     async def field_in_use(
         self,
         field: FieldId,
@@ -450,8 +444,10 @@ class DocumentRepository(Repository[DocumentId, Document], Protocol):
         limit: int,
         offset: int = 0,
     ) -> list[Document]:
-        """Documents the user may read (as `list_visible_to`) that match `filter`, in `order`,
-        only those after `after` in it, skipping the first `offset` of them, at most `limit`."""
+        """Documents within the user's reach (`domain.permissions.within_reach`: every
+        document in the spaces they edit, the green ones in the spaces they read; whether the
+        user is active the services check) that match `filter`, in `order`, only those after
+        `after` in it, skipping the first `offset` of them, at most `limit`."""
         ...
 
     async def query(
@@ -467,7 +463,7 @@ class DocumentRepository(Repository[DocumentId, Document], Protocol):
         ...
 
     async def count(self, filter: DocumentFilter, user: UserId | None) -> int:
-        """How many documents match `filter` that the user may read (as `list_visible_to`;
+        """How many documents match `filter` that the user may read (as `query_visible`;
         None: every document)."""
         ...
 
@@ -480,7 +476,7 @@ class DocumentRepository(Repository[DocumentId, Document], Protocol):
         ...
 
     async def count_by(self, by: CountBy, user: UserId | None) -> dict[UUID, int]:
-        """How many documents the user may read (as `list_visible_to`; None: every document)
+        """How many documents the user may read (as `query_visible`; None: every document)
         have each contact, type, topic or tag, or a value for each field. Only ids with
         documents."""
         ...
@@ -807,10 +803,14 @@ class ProcessingFacts(Protocol):
         """Keep the verdicts; a field of a document that has a verdict keeps it."""
         ...
 
-    async def first_run(self, document: DocumentId) -> FirstRun | None: ...
+    async def first_run(self, document: DocumentId) -> FirstRun | None:
+        """The document's first run, for tests and diagnosis: the services read the counts
+        (Tobi, 19.11.2026; SQ-03)."""
+        ...
 
     async def verdicts(self, document: DocumentId) -> list[FieldVerdict]:
-        """The verdicts on the document's fields, by field."""
+        """The verdicts on the document's fields, by field, for tests and diagnosis (as
+        `first_run`)."""
         ...
 
     async def lane_counts(self, scope: FactsScope) -> list[LaneCount]:
@@ -870,11 +870,6 @@ class RuleRepository(Protocol):
 
     async def get_version(self, id: RuleId, number: int) -> RuleVersion:
         """NotFoundError if the rule or the version does not exist."""
-        ...
-
-    async def remove_for_space(self, space: SpaceId) -> int:
-        """Delete the rules of the space with their versions and applications, for good;
-        returns how many rules."""
         ...
 
     async def remove_applications_by(self, user: UserId) -> int:

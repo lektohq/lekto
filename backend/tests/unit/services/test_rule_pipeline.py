@@ -278,14 +278,14 @@ async def test_unconfirmed_model_values_do_not_file_into_a_space_others_see(
     assert [(check.field, check.suggestion) for check in open.fields] == [("contact", str(acme.id))]
     (entry,) = await r.rule_entries(document, RULES)
     assert notes(entry.result.output) == [("space", "refused")]
-    assert await world.documents.list_visible(reader.id) == []
+    assert await world.visible(reader.id) == []
 
     # Confirmed by the owner, the contact is trusted: the rule files.
     await r.pipeline().confirm(owner.id, document.id, DocumentChanges())
     await world.drain(r.pipeline())
     document = await r.stored(document)
     assert (document.lane, document.space_id) == (Lane.GREEN, shared.id)
-    assert [item.id for item in await world.documents.list_visible(reader.id)] == [document.id]
+    assert [item.id for item in await world.visible(reader.id)] == [document.id]
 
 
 async def test_unconfirmed_model_values_still_file_into_a_private_space(world: World) -> None:

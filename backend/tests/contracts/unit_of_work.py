@@ -1534,8 +1534,6 @@ class UnitOfWorkContract:
                     for document in documents
                     if can_read_document(user, document, spaces[document.space_id])
                 }
-                visible = {document.id for document in await uow.documents.list_visible_to(user.id)}
-                assert visible == expected, user.username
                 queried = await uow.documents.query_visible(user.id, DocumentFilter(), limit=100)
                 assert {document.id for document in queried} == expected, user.username
                 for lane in (Lane.YELLOW, Lane.RED, None):

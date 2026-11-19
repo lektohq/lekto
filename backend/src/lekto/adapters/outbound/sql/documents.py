@@ -79,9 +79,6 @@ class SqlDocumentRepository(SqlRepository[DocumentId, Document]):
         found = await self._load(t.documents.c.sha256 == sha256.hex)
         return found[0] if found else None
 
-    async def list_visible_to(self, user: UserId) -> list[Document]:
-        return await self._load(visible_to(user))
-
     async def field_in_use(
         self,
         field: FieldId,
