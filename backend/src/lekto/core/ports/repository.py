@@ -964,7 +964,7 @@ class MailboxRepository(Protocol):
         ...
 
     async def list_all(self) -> list[Mailbox]:
-        """All mailboxes by name."""
+        """All mailboxes, in no order: the service sorts them by name (`sort_key`)."""
         ...
 
 

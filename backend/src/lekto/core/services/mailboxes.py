@@ -23,6 +23,7 @@ from lekto.core.domain.mail import (
 from lekto.core.domain.mail_intake import MailOutcome, MailRecord
 from lekto.core.domain.mail_rules import MailRule, first_match, record_facts
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
+from lekto.core.domain.sorting import sort_key
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.identity import DecryptionError, SecretCipher
 from lekto.core.ports.mail_server import MailServer, MailServerError
@@ -87,9 +88,12 @@ class MailboxService:
         self._server = server
 
     async def list_mailboxes(self, actor: UserId) -> list[Mailbox]:
+        """By name, as every list sorts names (`sort_key`): `Ärzte` beside `Arzt`, in every
+        database alike (SQ-08)."""
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.MANAGE_MAILBOXES)
-            return await uow.mailboxes.list_all()
+            mailboxes = await uow.mailboxes.list_all()
+        return sorted(mailboxes, key=lambda mailbox: (sort_key(mailbox.name), str(mailbox.id)))
 
     async def get(self, actor: UserId, id: MailboxId) -> Mailbox:
         async with self._uow() as uow:

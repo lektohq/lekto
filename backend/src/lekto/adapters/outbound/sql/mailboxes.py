@@ -18,7 +18,7 @@ class SqlMailboxRepository(SqlRepository[MailboxId, Mailbox]):
     table = t.mailboxes
 
     async def list_all(self) -> list[Mailbox]:
-        rows = await self._tx.read(select(self.table).order_by(self.table.c.name_key))
+        rows = await self._tx.read(select(self.table))
         return [self._entity(row) for row in rows]
 
     def _entity(self, row: Row[Any]) -> Mailbox:

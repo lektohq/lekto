@@ -41,6 +41,15 @@ async def _create(world: World, admin: User, name: str = "Household", **changes:
     )
 
 
+async def test_mailboxes_are_listed_as_every_list_sorts_names(world: World) -> None:
+    """`Ärzte` beside `Arzt`, not behind `Zahnarzt`, in every database alike (SQ-08)."""
+    admin = await _admin(world)
+    for name in ("Zahnarzt", "Ärzte", "Bank"):
+        await _create(world, admin, name)
+    listed = [item.name for item in await world.mailboxes.list_mailboxes(admin.id)]
+    assert listed == ["Ärzte", "Bank", "Zahnarzt"]
+
+
 async def test_only_admins_see_and_change_mailboxes(world: World) -> None:
     admin, user = await _admin(world), await world.user()
     mailbox = await _create(world, admin)

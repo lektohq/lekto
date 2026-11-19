@@ -112,14 +112,15 @@ class MailboxRepositoryContract:
             with pytest.raises(ConcurrencyError):
                 await uow.mailboxes.update(replace(mailbox, name="Stale"))
 
-    async def test_lists_by_name_and_removes(self, uow_factory: UnitOfWorkFactory) -> None:
+    async def test_lists_all_and_removes(self, uow_factory: UnitOfWorkFactory) -> None:
         later, earlier = a_mailbox("zeta"), a_mailbox("Alpha")
         async with uow_factory() as uow:
             await uow.mailboxes.add(later)
             await uow.mailboxes.add(earlier)
             await uow.commit()
         async with uow_factory() as uow:
-            assert [item.name for item in await uow.mailboxes.list_all()] == ["Alpha", "zeta"]
+            listed = [item.name for item in await uow.mailboxes.list_all()]
+            assert sorted(listed) == ["Alpha", "zeta"]  # in no order: the service sorts
             await uow.mailboxes.remove(later.id)
             await uow.commit()
         async with uow_factory() as uow:
