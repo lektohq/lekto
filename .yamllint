@@ -3,7 +3,7 @@
 # `yaml`.
 extends: default
 
-# Whatever git ignores is not ours to lint (installed packages, builds, `.idea`, a local
+# Whatever git ignores is not ours to lint (installed packages, builds, `.knowledge`, a local
 # migration-plan.yaml with real data).
 ignore-from-file: [.gitignore, web/.gitignore]
 

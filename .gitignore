@@ -23,7 +23,9 @@ node_modules/
 # Local data
 data/
 
-# The design documents: the private repository lektohq/lekto-knowledge, checked out in .idea
+# The knowledge: the private repository lektohq/lekto-knowledge, checked out in .knowledge
+.knowledge/
+# JetBrains IDEs
 .idea/
 # VS Code: only the tasks
 .vscode/*
