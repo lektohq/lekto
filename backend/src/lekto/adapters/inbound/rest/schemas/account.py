@@ -133,6 +133,7 @@ class Me(BaseModel):
                     "totp_enabled": False,
                     "linked_accounts": [],
                     "lekto_version": "0.8.0",
+                    "api_version": "1.0",
                     "instance_id": "6f1c2a9e-3b4d-4e8f-9a1b-2c3d4e5f6a7b",
                     "shortcut_url": "https://www.icloud.com/shortcuts/8d752558e38f4f64bf9c61faa4694a75",
                 }
@@ -156,6 +157,10 @@ class Me(BaseModel):
     totp_enabled: bool
     linked_accounts: list[LinkOut]
     lekto_version: str = Field(description="The version of Lekto that answers (its release).")
+    api_version: str = Field(
+        description="The version of this API, `MAJOR.MINOR` (as `info.version` of the OpenAPI "
+        "document): MAJOR rises with a change that breaks a client, MINOR with one that adds."
+    )
     instance_id: UUID = Field(
         description="The id of this instance: random, made once, kept in the database (a restore "
         "keeps it). Tells instances apart, e.g. for Home Assistant."

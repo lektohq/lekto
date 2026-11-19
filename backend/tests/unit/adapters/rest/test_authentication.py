@@ -11,6 +11,7 @@ from fastapi.routing import APIRoute, iter_route_contexts
 from lekto import __version__
 from lekto.adapters.inbound.rest import PREFIX
 from lekto.adapters.inbound.rest.auth import CSRF_HEADER, READS_KEY
+from lekto.adapters.inbound.rest.version import API_VERSION
 from lekto.core.domain.errors import AuthenticationError
 from lekto.core.domain.identity import TokenScope
 from lekto.core.domain.rights import Actor
@@ -556,3 +557,10 @@ async def test_me_names_the_instance_alike_for_everyone(api: Api) -> None:
     }
     assert len(ids) == 1
     assert UUID(ids.pop()).version == 4
+
+
+async def test_me_names_the_version_of_the_api(api: Api) -> None:
+    user = await api.user()
+    me = (await api.client.get(f"{PREFIX}/auth/me", headers=auth(user))).json()
+    assert me["api_version"] == API_VERSION
+    assert me["lekto_version"] == __version__

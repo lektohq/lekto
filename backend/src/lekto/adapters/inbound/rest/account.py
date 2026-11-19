@@ -50,6 +50,7 @@ from lekto.adapters.inbound.rest.schemas.account import (
 )
 from lekto.adapters.inbound.rest.schemas.profiles import PERSON_NOTE, ProfileOut, ProfilePatch
 from lekto.adapters.inbound.rest.ui import UI_PREFIX
+from lekto.adapters.inbound.rest.version import API_VERSION
 from lekto.core.domain.errors import (
     AuthenticationError,
     ConflictError,
@@ -178,6 +179,7 @@ async def me(principal: Authenticated, request: Request, context: Context) -> Me
         totp_enabled=account.totp_enabled,
         linked_accounts=[LinkOut.of(link) for link in account.external_identities],
         lekto_version=__version__,
+        api_version=API_VERSION,
         instance_id=await context.users.instance_id(principal.actor),
         shortcut_url=context.shortcut_url,
     )
