@@ -9,7 +9,7 @@ from sqlalchemy import Row, delete, func, insert, select
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.repositories import SqlRepository, Values
 from lekto.core.domain.errors import NotFoundError, ValidationError
-from lekto.core.domain.ids import DeliveryId, DocumentId, EventId, UserId, WebhookId
+from lekto.core.domain.ids import ApiTokenId, DeliveryId, DocumentId, EventId, UserId, WebhookId
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.webhooks import (
     BodyFormat,
@@ -37,6 +37,14 @@ class SqlWebhookRepository(SqlRepository[WebhookId, Webhook]):
         rows = await self._tx.read(
             select(self.table)
             .where(self.table.c.owner_id == owner)
+            .order_by(self.table.c.created_at, self.table.c.id)
+        )
+        return [self._entity(row) for row in rows]
+
+    async def list_for_token(self, token: ApiTokenId) -> list[Webhook]:
+        rows = await self._tx.read(
+            select(self.table)
+            .where(self.table.c.api_token_id == token)
             .order_by(self.table.c.created_at, self.table.c.id)
         )
         return [self._entity(row) for row in rows]
@@ -163,6 +171,7 @@ class SqlWebhookRepository(SqlRepository[WebhookId, Webhook]):
             previous_valid_until=row.previous_valid_until,
             max_open_tasks=row.max_open_tasks,
             model_call=_model_call(row),
+            api_token_id=None if row.api_token_id is None else ApiTokenId(row.api_token_id),
             created_at=row.created_at,
             updated_at=row.updated_at,
             version=row.version,
@@ -194,6 +203,7 @@ class SqlWebhookRepository(SqlRepository[WebhookId, Webhook]):
                 None if entity.disabled_reason is None else entity.disabled_reason.to_json()
             ),
             "failed_streak": entity.failed_streak,
+            "api_token_id": entity.api_token_id,
             "created_at": entity.created_at,
             "updated_at": entity.updated_at,
             "version": entity.version,

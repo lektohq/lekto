@@ -304,7 +304,7 @@ export interface paths {
 		post?: never;
 		/**
 		 * Revoke an API token
-		 * @description Needs a session; API tokens are refused (403).
+		 * @description Also deletes the webhooks created through it. Needs a session; API tokens are refused (403).
 		 */
 		delete: operations['revoke_token_api_v1_auth_tokens__id__delete'];
 		options?: never;
@@ -2276,7 +2276,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * Create a webhook
-		 * @description Lekto sends a request to the URL for each event of the chosen types on documents within the reach of the webhook's owner: every document in the spaces they edit, the green ones in the spaces they read (an admin's webhooks too; the rights of an admin do not widen them). A signed webhook's answer holds the secret, shown only once. A user has at most as many webhooks as `LEKTO_WEBHOOKS_PER_USER` allows (409).
+		 * @description Lekto sends a request to the URL for each event of the chosen types on documents within the reach of the webhook's owner: every document in the spaces they edit, the green ones in the spaces they read (an admin's webhooks too; the rights of an admin do not widen them). A signed webhook's answer holds the secret, shown only once. A user has at most as many webhooks as `LEKTO_WEBHOOKS_PER_USER` allows (409). Created through an API token, it goes with the token: revoking the token deletes it. An address that is not public needs, through a token, `admin:private_webhooks`.
 		 */
 		post: operations['create_webhook_api_v1_webhooks_post'];
 		delete?: never;

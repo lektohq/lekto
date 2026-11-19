@@ -38,7 +38,15 @@ from uuid import UUID
 from lekto.core.domain.addresses import is_public, literal
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.events import DOCUMENT_EVENT_TYPES
-from lekto.core.domain.ids import DeliveryId, DocumentId, EventId, UserId, WebhookId, new_id
+from lekto.core.domain.ids import (
+    ApiTokenId,
+    DeliveryId,
+    DocumentId,
+    EventId,
+    UserId,
+    WebhookId,
+    new_id,
+)
 from lekto.core.domain.json_value import JsonObject, loads
 from lekto.core.domain.reasons import Reason, ReasonCode, because
 from lekto.core.domain.tasks import DEFAULT_TIMEOUT, validate_timeout
@@ -368,7 +376,8 @@ class Webhook:
     `previous_valid_until`. `header_names`: the webhook's own headers, in the order given;
     `encrypted_headers` their values (`headers_to_bytes`, encrypted), None without headers.
     `model_call`: the model call the webhook serves as, if any (an admin's webhook only; the
-    services check that)."""
+    services check that). `api_token_id`: the API token it was created through, if any; revoking
+    the token deletes the webhook (`.knowledge/plans/token-rights.md`)."""
 
     id: WebhookId
     owner_id: UserId
@@ -388,6 +397,7 @@ class Webhook:
     previous_valid_until: datetime | None = None
     max_open_tasks: int = DEFAULT_OPEN_TASKS
     model_call: ModelCallRole | None = None
+    api_token_id: ApiTokenId | None = None
     created_at: datetime
     updated_at: datetime
     version: int = 1
@@ -420,6 +430,7 @@ class Webhook:
         active: bool = True,
         id: WebhookId | None = None,
         max_open_tasks: int = DEFAULT_OPEN_TASKS,
+        api_token_id: ApiTokenId | None = None,
     ) -> "Webhook":
         """`id`: given when the secret or header values were encrypted for it beforehand."""
         return cls(
@@ -431,6 +442,7 @@ class Webhook:
             encrypted_secret=encrypted_secret,
             active=active,
             max_open_tasks=max_open_tasks,
+            api_token_id=api_token_id,
             created_at=now,
             updated_at=now,
         )

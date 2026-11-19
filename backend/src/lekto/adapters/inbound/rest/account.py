@@ -363,7 +363,7 @@ async def create_token(
     "/tokens/{id}",
     status_code=204,
     summary="Revoke an API token",
-    description=SESSION_ONLY_NOTE.strip(),
+    description="Also deletes the webhooks created through it." + SESSION_ONLY_NOTE,
     responses=problem_responses(401, 403, 404, 422),
 )
 async def revoke_token(id: UUID, principal: SessionPrincipal, context: Context) -> None:

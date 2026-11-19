@@ -22,7 +22,8 @@ from lekto.core.domain.errors import (
     PermissionDeniedError,
     ValidationError,
 )
-from lekto.core.domain.ids import UserId, WebhookId, new_id
+from lekto.core.domain.identity import ViaToken
+from lekto.core.domain.ids import ApiTokenId, UserId, WebhookId, new_id
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.templates import WEBHOOK_NAMES, unknown_values
@@ -136,11 +137,13 @@ class WebhookService:
         body_template: str | None = None,
         max_open_tasks: int = DEFAULT_OPEN_TASKS,
         model_call: ModelCallRole | None = None,
+        via: ViaToken | None = None,
     ) -> CreatedWebhook:
         """`signed`: with a secret (shown once in the answer); `headers`: the webhook's own,
         name to value; `body`, with its template for `template`; `max_open_tasks`: how many
         tasks it takes at the same time; `model_call`: the model call it serves as (admins
-        only). ValidationError for a bad URL, event type, header, template or number,
+        only); `via`: the API token it is created through, whose revoking deletes it.
+        ValidationError for a bad URL, event type, header, template or number,
         ConflictError at the user's limit or for a model call another webhook serves,
         PermissionDeniedError for a model call of a user who is not an admin."""
         async with self._uow() as uow:
@@ -162,6 +165,7 @@ class WebhookService:
                 now=now,
                 active=active,
                 max_open_tasks=max_open_tasks,
+                api_token_id=None if via is None else via.id,
             )
             given = header_values(headers or [])
             webhook.set_headers(given, self._encrypt_headers(id, given), now=now)
@@ -169,7 +173,7 @@ class WebhookService:
             if model_call is not None:
                 webhook.serve(model_call, now=now)
                 await _check_model_call(uow, user, webhook)
-            self._check_target(webhook, user)
+            self._check_target(webhook, user, user)
             await uow.webhooks.add(webhook)
             await uow.commit()
         return CreatedWebhook(webhook, secret)
@@ -255,19 +259,25 @@ class WebhookService:
                 owner = (
                     user if webhook.owner_id == user.id else await uow.users.find(webhook.owner_id)
                 )
-                self._check_target(webhook, owner)
+                self._check_target(webhook, owner, user)
             await uow.webhooks.update(webhook)
             if more_room:
                 await wake_queue(uow, webhook.id, now)
             await uow.commit()
             return webhook
 
-    def _check_target(self, webhook: Webhook, owner: User | None) -> None:
+    def _check_target(self, webhook: Webhook, owner: User | None, caller: User) -> None:
         """ValidationError if the URL names an address that is not public (`localhost`,
-        `192.168.…`) and the owner's webhooks may not reach one. A name is checked when the
-        request is sent, after resolving it."""
+        `192.168.…`) and the owner's webhooks may not reach one, or the caller saves it
+        through a token without `admin:private_webhooks`. A name is checked when the request is
+        sent, after resolving it, by the owner alone (the token's right cannot change: revoking
+        it deletes the webhook)."""
         targets = self._policy.private_targets
-        admin = owner is not None and owner.is_active_admin
+        admin = (
+            owner is not None
+            and owner.is_active_admin
+            and caller.may(TokenRight.ADMIN_PRIVATE_WEBHOOKS)
+        )
         if names_private_address(webhook.url) and not targets.allow(admin):
             raise ValidationError(because(targets.refusal()))
 
@@ -405,6 +415,20 @@ async def disable_sending_rules(
             because(ReasonCode.RULE_DISABLED_DELETED, kind="webhook", name=webhook.name),
             refers_to(lambda references: references.webhooks, webhook.id),
         )
+
+
+async def remove_webhooks_of(
+    uow: UnitOfWork, tokens: Collection[ApiTokenId], now: datetime
+) -> None:
+    """Delete the webhooks created through `tokens`, in `uow`, as `WebhookService.delete` does:
+    the rules that send through one are disabled, its queued tasks fail."""
+    webhooks = [webhook for token in tokens for webhook in await uow.webhooks.list_for_token(token)]
+    if not webhooks:
+        return
+    await disable_sending_rules(uow, webhooks, now)
+    for webhook in webhooks:
+        await drop_queued(uow, webhook, now)
+        await uow.webhooks.remove(webhook.id)
 
 
 async def serving_model_call(uow: UnitOfWork, kind: ModelCallKind) -> Webhook | None:
