@@ -70,7 +70,8 @@ class Transaction:
                 # line alone (Postgres details the values, which may be private: an alias).
                 message = str(error.orig).strip().splitlines()
                 log.info("constraint violated", extra={"error": message[0] if message else ""})
-                raise ConflictError("the change conflicts with existing data") from error
+                # Not chained: the error names the values too (Postgres in its DETAIL; SQ-05).
+                raise ConflictError("the change conflicts with existing data") from None
             if getattr(error.orig, "sqlstate", None) in _CONCURRENCY_SQLSTATES:
                 log.info("concurrent transaction", extra={"error": str(error.orig)})
                 raise ConcurrencyError("a concurrent change interfered; try again") from error

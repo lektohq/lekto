@@ -76,10 +76,12 @@ class Database:
             url = URL.create(
                 "sqlite+aiosqlite", database=f"file:{path}", query={"mode": "ro", "uri": "true"}
             )
-            engine = create_async_engine(url)
+            engine = create_async_engine(url, hide_parameters=True)
             event.listen(engine.sync_engine, "connect", _configure_sqlite_reader)
         else:
-            engine = create_async_engine(URL.create("sqlite+aiosqlite", database=str(path)))
+            engine = create_async_engine(
+                URL.create("sqlite+aiosqlite", database=str(path)), hide_parameters=True
+            )
             event.listen(engine.sync_engine, "connect", _configure_sqlite)
         return cls(engine, sqlite_path=path)
 
@@ -99,7 +101,7 @@ class Database:
             database=name,
         )
         arguments = {} if tls is None else {"connect_args": {"ssl": tls}}
-        return cls(create_async_engine(url, **arguments), tls=tls)
+        return cls(create_async_engine(url, hide_parameters=True, **arguments), tls=tls)
 
     @property
     def is_sqlite(self) -> bool:
