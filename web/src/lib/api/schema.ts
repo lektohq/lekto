@@ -9725,6 +9725,7 @@ export interface components {
 			| 'read_only_token'
 			| 'upload_only_token'
 			| 'upload_only_token_fields'
+			| 'token_lacks_right'
 			| 'push_off'
 			| 'push_endpoint_refused'
 			| 'push_keys_invalid'

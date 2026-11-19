@@ -2,7 +2,7 @@
 user; what is private about a person (aliases, birth date, e-mail, identifiers) to their
 profile (`profiles.py`)."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from typing import Self
@@ -10,6 +10,7 @@ from typing import Self
 from lekto.core.domain.errors import ConflictError, ValidationError
 from lekto.core.domain.ids import SpaceId, UserId, new_id
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import TokenRight, holds
 from lekto.core.domain.validation import require_name, require_utc
 
 MAX_USERNAME = 150
@@ -33,6 +34,9 @@ class User:
     # How others see them ("Jane Doe"); public, unique regardless of case. None: the username.
     display_name: str | None = None
     version: int = 1
+    # What the user may now as caller: the rights of the API token they act through; None for
+    # every right of their role. Never stored; set by `_access.load_actor` for the caller only.
+    rights: frozenset[TokenRight] | None = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         self.username = require_name(self.username, "username", max_length=MAX_USERNAME)
@@ -55,6 +59,14 @@ class User:
     @property
     def is_active_admin(self) -> bool:
         return self.active and self.is_admin
+
+    def may(self, right: TokenRight) -> bool:
+        """Whether the user may do what `right` stands for now: active, the right among the
+        rights they act with, and for an admin right an active admin. For a user who is not the
+        caller (no rights set) an admin right is the role alone."""
+        if not self.active or not holds(self.rights, right):
+            return False
+        return not right.for_admins or self.is_admin
 
 
 @dataclass(frozen=True, kw_only=True)
