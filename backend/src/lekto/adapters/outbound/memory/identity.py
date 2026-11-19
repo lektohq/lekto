@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from lekto.adapters.outbound.memory.database import Table
-from lekto.adapters.outbound.memory.rows import MemoryRepository, _copy
+from lekto.adapters.outbound.memory.rows import MemoryRepository, MemoryRows, _copy
 from lekto.core.domain.identity import (
     ApiToken,
     Credential,
@@ -33,7 +33,7 @@ class MemoryCredentialRepository(MemoryRepository[UserId, Credential]):
         self._remove_rows([row for row in self._all() if row.user_id == user])
 
 
-class MemorySessionRepository(MemoryRepository[SessionId, Session]):
+class MemorySessionRepository(MemoryRows[SessionId, Session]):
     async def find_by_token(self, token_hash: str) -> Session | None:
         return next((_copy(row) for row in self._all() if row.token_hash == token_hash), None)
 
@@ -54,7 +54,7 @@ class MemorySessionRepository(MemoryRepository[SessionId, Session]):
         )
 
 
-class MemoryApiTokenRepository(MemoryRepository[ApiTokenId, ApiToken]):
+class MemoryApiTokenRepository(MemoryRows[ApiTokenId, ApiToken]):
     async def find_by_token(self, token_hash: str) -> ApiToken | None:
         return next((_copy(row) for row in self._all() if row.token_hash == token_hash), None)
 
@@ -72,7 +72,7 @@ class MemoryApiTokenRepository(MemoryRepository[ApiTokenId, ApiToken]):
         return self._remove_rows([row for row in self._all() if row.user_id == user])
 
 
-class MemoryKnownDeviceRepository(MemoryRepository[KnownDeviceId, KnownDevice]):
+class MemoryKnownDeviceRepository(MemoryRows[KnownDeviceId, KnownDevice]):
     async def find_by_token(self, token_hash: str) -> KnownDevice | None:
         return next((_copy(row) for row in self._all() if row.token_hash == token_hash), None)
 
@@ -96,7 +96,7 @@ class MemoryKnownDeviceRepository(MemoryRepository[KnownDeviceId, KnownDevice]):
 
 class MemoryExternalIdentityRepository:
     def __init__(self, uow: "MemoryUnitOfWork", table: Table[ExternalIdentity]) -> None:
-        self._rows = MemoryRepository[ExternalIdentityId, ExternalIdentity](uow, table)
+        self._rows = MemoryRows[ExternalIdentityId, ExternalIdentity](uow, table)
 
     async def add(self, identity: ExternalIdentity) -> None:
         await self._rows.add(identity)
@@ -123,7 +123,7 @@ class MemoryLoginFailureRepository:
     """Atomic, since nothing in a call waits for anything else."""
 
     def __init__(self, uow: "MemoryUnitOfWork", table: Table[LoginFailures]) -> None:
-        self._rows = MemoryRepository[UUID, LoginFailures](uow, table)
+        self._rows = MemoryRows[UUID, LoginFailures](uow, table)
 
     async def find(self, key: str) -> LoginFailures | None:
         return await self._rows.find(failure_id(key))
@@ -142,7 +142,7 @@ class MemoryLoginFailureRepository:
         failures.failures += 1
         block = rule.block(failures.failures)
         failures.blocked_until = None if block is None else now + block
-        await (self._rows.add if new else self._rows.update)(failures)
+        await (self._rows.add if new else self._rows._replace)(failures)
         return None
 
     async def release(self, key: str, rule: ThrottleRule) -> None:
@@ -152,7 +152,7 @@ class MemoryLoginFailureRepository:
             failures.failures = max(0, failures.failures - 1)
             if rule.block(failures.failures) is None:
                 failures.blocked_until = None
-            await self._rows.update(failures)
+            await self._rows._replace(failures)
 
     async def remove(self, key: str) -> None:
         self._rows._remove_rows([row for row in self._rows._all() if row.key == key])

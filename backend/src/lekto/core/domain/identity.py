@@ -179,7 +179,6 @@ class Session:
     created_at: datetime
     last_seen_at: datetime
     expires_at: datetime
-    version: int = 1
 
     def __post_init__(self) -> None:
         self.created_at = require_utc(self.created_at, "created_at")
@@ -255,7 +254,6 @@ class ApiToken:
     created_at: datetime
     expires_at: datetime | None = None
     last_used_at: datetime | None = None
-    version: int = 1
 
     def __post_init__(self) -> None:
         self.name = require_name(self.name, "token name", max_length=MAX_TOKEN_NAME)
@@ -327,7 +325,6 @@ class ExternalIdentity:
     subject: str
     user_id: UserId
     created_at: datetime
-    version: int = 1
 
     @classmethod
     def link(cls, *, issuer: str, subject: str, user_id: UserId, now: datetime) -> Self:
@@ -436,7 +433,6 @@ class LoginFailures:
     failures: int
     first_failure_at: datetime
     blocked_until: datetime | None = None
-    version: int = 1
 
     @property
     def id(self) -> uuid.UUID:
@@ -464,7 +460,6 @@ class KnownDevice:
     token_hash: str
     created_at: datetime
     expires_at: datetime
-    version: int = 1
 
     def __post_init__(self) -> None:
         self.created_at = require_utc(self.created_at, "created_at")

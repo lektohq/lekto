@@ -67,6 +67,13 @@ class MemoryRows[K: UUID, E: Identified[UUID]]:
             self._uow._write(self._table, row.id, _REMOVED)
         return len(rows)
 
+    async def _replace(self, entity: E) -> None:
+        """Write the row anew, for rows without a version (`LoginFailures`): none to check."""
+        self._uow._check_open()
+        if self._uow._row(self._table, entity.id) is _REMOVED:
+            raise NotFoundError(self._table.name, entity.id)
+        self._uow._write(self._table, entity.id, _copy(entity))
+
     def _touch(self, id: K, field: str, value: datetime) -> None:
         """Move a usage timestamp forward without changing the version (`MemoryUnitOfWork._touch`):
         no change, so it conflicts with none."""

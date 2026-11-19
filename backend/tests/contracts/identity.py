@@ -116,7 +116,6 @@ class IdentityRepositoriesContract:
             found = await uow.sessions.find_by_token(session.token_hash)
             assert found is not None
             assert found.last_seen_at == NOW + HOUR
-            assert found.version == session.version  # touching is no change
 
     async def test_concurrent_touches_do_not_conflict(self, uow_factory: UnitOfWorkFactory) -> None:
         user = await a_user(uow_factory)
@@ -223,7 +222,6 @@ class IdentityRepositoriesContract:
             found = await uow.known_devices.find_by_token(device.token_hash)
             assert found is not None
             assert found.expires_at == device.expires_at + HOUR
-            assert found.version == device.version  # renewing is no change
 
     async def test_known_device_tokens_are_unique(self, uow_factory: UnitOfWorkFactory) -> None:
         user = await a_user(uow_factory)
@@ -314,7 +312,6 @@ class IdentityRepositoriesContract:
         async with uow_factory() as uow:
             [stored] = await uow.api_tokens.list_for(user.id)
             assert stored.last_used_at == NOW + HOUR
-            assert stored.version == first.version
             assert await uow.api_tokens.remove_for_user(other.id) == 1
             await uow.commit()
         async with uow_factory() as uow:

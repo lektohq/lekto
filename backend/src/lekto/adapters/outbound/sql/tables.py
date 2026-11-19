@@ -781,7 +781,6 @@ sessions = Table(
     Column("created_at", UtcDateTime, nullable=False),
     Column("last_seen_at", UtcDateTime, nullable=False, index=True),
     Column("expires_at", UtcDateTime, nullable=False, index=True),
-    Column("version", Integer, nullable=False),
 )
 
 # Browsers that signed in with the password (revision 0074): their failed sign-ins count under
@@ -794,7 +793,6 @@ known_devices = Table(
     Column("token_hash", String(64), nullable=False, unique=True),
     Column("created_at", UtcDateTime, nullable=False),
     Column("expires_at", UtcDateTime, nullable=False, index=True),
-    Column("version", Integer, nullable=False),
 )
 
 # The browsers a person receives notifications on (web push); a browser's address at its push
@@ -838,7 +836,6 @@ api_tokens = Table(
     Column("created_at", UtcDateTime, nullable=False),
     Column("expires_at", UtcDateTime, nullable=True),
     Column("last_used_at", UtcDateTime, nullable=True),
-    Column("version", Integer, nullable=False),
 )
 
 external_identities = Table(
@@ -849,7 +846,6 @@ external_identities = Table(
     Column("subject", Text, nullable=False),
     Column("user_id", Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True),
     Column("created_at", UtcDateTime, nullable=False),
-    Column("version", Integer, nullable=False),
     Index(None, "issuer", "subject", unique=True),
 )
 
@@ -861,7 +857,6 @@ login_failures = Table(
     Column("failures", Integer, nullable=False),
     Column("first_failure_at", UtcDateTime, nullable=False),
     Column("blocked_until", UtcDateTime, nullable=True),
-    Column("version", Integer, nullable=False),
 )
 
 # --- webhooks: rows go with their owner (ON DELETE CASCADE) ---------------------------------------

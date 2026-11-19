@@ -4011,6 +4011,39 @@ class MigrationSuite:
         async with empty_database.reading() as connection:
             assert await connection.run_sync(_schema) == schema
 
+    async def test_revision_0079_drops_versions_nobody_checked_and_back(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0079: sessions, API tokens, known devices, external identities and failed
+        sign-ins lose their `version`, keeping their rows; the downgrade gives it back at 1, on
+        SQLite by copying the table, as the earlier revisions made it (SQ-04)."""
+        await migrate(empty_database, "0078")
+        async with empty_database.reading() as connection:
+            schema = await connection.run_sync(_schema)
+        async with empty_database.writing() as connection:
+            await connection.exec_driver_sql(
+                "INSERT INTO login_failures (key, failures, first_failure_at, version) "
+                "VALUES ('account:jane', 2, '2026-11-19 08:00:00.000000', 7)"
+            )
+        await migrate(empty_database)
+        async with empty_database.reading() as connection:
+            columns = await connection.run_sync(
+                lambda sync: {
+                    table: {item["name"] for item in sa.inspect(sync).get_columns(table)}
+                    for table in ("sessions", "login_failures")
+                }
+            )
+            kept = await _read_all(connection, sa.text("SELECT key, failures FROM login_failures"))
+        assert "version" not in columns["sessions"] | columns["login_failures"]
+        assert kept == [("account:jane", 2)]
+        await downgrade(empty_database, "0078")
+        async with empty_database.reading() as connection:
+            assert await connection.run_sync(_schema) == schema
+            back = await _read_all(
+                connection, sa.text("SELECT key, failures, version FROM login_failures")
+            )
+        assert back == [("account:jane", 2, 1)]
+
     async def test_revision_0067_turns_the_json_null_into_null(
         self, empty_database: Database
     ) -> None:
@@ -4635,8 +4668,11 @@ def _schema(connection: Connection) -> set[tuple[Any, ...]]:
 
 
 def _table_clauses(sql: str) -> tuple[str, frozenset[str]]:
-    """CREATE TABLE as its head and its clauses (split at top-level commas), order ignored."""
+    """CREATE TABLE as its head and its clauses (split at top-level commas), order ignored;
+    the table's name without quotes, which SQLite writes for a table copied and renamed (a
+    downgrade that copies the table, revision 0079)."""
     head, body = " ".join(sql.split()).split("(", 1)
+    head = head.replace('"', "")
     clauses, depth, current = [], 0, ""
     for char in body.rsplit(")", 1)[0]:
         depth += {"(": 1, ")": -1}.get(char, 0)
