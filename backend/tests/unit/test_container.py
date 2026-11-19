@@ -52,6 +52,8 @@ from lekto.core.domain.pipeline import Lane, Node
 from lekto.core.domain.templates import TemplateValue
 from lekto.core.domain.users import Role
 from lekto.core.ports.ocr import VisionModel
+from lekto.core.services.classification.nodes import MOST_MODEL_CALLS
+from lekto.core.services.indexing import INDEX_ROUNDS
 from lekto.core.services.nodes import OcrNode, ParseNode
 from lekto.core.services.pipeline import PipelineService
 from lekto.core.services.rules.nodes import ApplyRulesNode
@@ -263,10 +265,11 @@ async def test_a_vision_model_reads_pages_when_configured(
     # longer, every other node as before.
     # The model's signal may ask four times (proposal and facts, each once more): 4 times 5 min,
     # and read the PDF once more (10 min).
-    assert container.node_lease(configured) == timedelta(minutes=30) + WORK_LEASE_MARGIN
+    longest = MOST_MODEL_CALLS * timedelta(minutes=5) + timedelta(minutes=10)
+    assert container.node_lease(configured) == longest + WORK_LEASE_MARGIN
     assert container.vision_lease(configured) is None  # no longer than the others
     slow = settings(vlm_base_url="https://chat.example/api", vlm_model="m", vlm_timeout="2400")
-    assert container.node_lease(slow) == timedelta(minutes=30) + WORK_LEASE_MARGIN
+    assert container.node_lease(slow) == longest + WORK_LEASE_MARGIN
     assert container.vision_lease(slow) == timedelta(minutes=40) + WORK_LEASE_MARGIN
     assert pipeline_made(monkeypatch, slow)["vision_lease"] == (
         timedelta(minutes=40) + WORK_LEASE_MARGIN
@@ -302,9 +305,13 @@ def test_services_take_their_tuning_from_the_settings(monkeypatch: pytest.Monkey
     assert made["retry"] == RetryPolicy(max_attempts=5, delay=timedelta(seconds=10))
     # The model's signal may ask four times: 4 times 100 s beyond the OCR's 300 s; a node may
     # read a PDF besides (60 s).
-    assert made["lease"] == timedelta(seconds=460) + WORK_LEASE_MARGIN
+    asking = MOST_MODEL_CALLS * timedelta(seconds=100)
+    assert asking > timedelta(seconds=300)
+    assert made["lease"] == asking + timedelta(seconds=60) + WORK_LEASE_MARGIN
     longer = pipeline_made(monkeypatch, settings(llm_timeout="400"))
-    assert longer["lease"] == timedelta(seconds=1600 + 600) + WORK_LEASE_MARGIN
+    assert longer["lease"] == (
+        MOST_MODEL_CALLS * timedelta(seconds=400) + timedelta(seconds=600) + WORK_LEASE_MARGIN
+    )
     services = build_services(build_memory_container(), configured)
     pipeline = services.pipeline
     assert isinstance(pipeline.executor(Node.OCR), OcrNode)
@@ -529,8 +536,8 @@ def test_the_services_are_tuned_by_the_settings() -> None:
     assert policy.document_prefix == "passage: "
     assert policy.reconcile_interval == timedelta(hours=2)
     assert policy.rebuild_lease == timedelta(hours=9)
-    # Three rounds of embedding and writing, and a margin.
-    assert policy.job_lease == 3 * timedelta(minutes=3) + WORK_LEASE_MARGIN
+    # The rounds of embedding and writing, and a margin.
+    assert policy.job_lease == INDEX_ROUNDS * timedelta(minutes=3) + WORK_LEASE_MARGIN
     assert container.indexing_policy_of(settings()).document_prefix == ""
 
 

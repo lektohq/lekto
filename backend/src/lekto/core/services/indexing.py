@@ -13,8 +13,8 @@ into the index. A job is idempotent and may be repeated.
 - A job that finds the document gone removes it from the index.
 - Two jobs for one document may run at the same time, and the older state may be written last.
   So a job checks after writing that the document and the names it carries are still as it read
-  them, and writes again if not (`_ROUNDS`). The state written last is then one that matched the
-  database after the write.
+  them, and writes again if not (`INDEX_ROUNDS`). The state written last is then one that matched
+  the database after the write.
 - Vectors are computed from sections of the text (`LEKTO_SEARCH_CHUNK_SIZE`, at most
   `LEKTO_SEARCH_MAX_CHUNKS`) and only for sections that differ from those of the indexed
   vectors: a change of lane, space or date costs no embedding, a new topic or title only the
@@ -133,7 +133,9 @@ def _index_key(document: DocumentId) -> str:
     return f"{INDEX_JOB}:{document}"
 
 
-_ROUNDS = 3
+INDEX_ROUNDS = 3
+"""How often an index job embeds and writes at most; how long a worker holds it follows from it
+(`IndexingPolicy.job_lease`, set by the composition)."""
 _RETRY = RetryPolicy(max_attempts=10, delay=timedelta(seconds=30), max_delay=timedelta(hours=1))
 _RETRIES = {INDEX_JOB: _RETRY, REFRESH_JOB: _RETRY, REBUILD_JOB: replace(_RETRY, max_attempts=3)}
 """How often a job is tried; the reconciliation runs again at its next interval instead."""
@@ -429,7 +431,7 @@ class IndexingService:
         Returns how many sections it embedded (0 if the vectors it had stay) and whether the
         embedding failed."""
         embedded, failed = 0, False
-        for _ in range(_ROUNDS):
+        for _ in range(INDEX_ROUNDS):
             snapshot = await self._snapshot(id)
             if snapshot is None:
                 await self._index.remove(id)

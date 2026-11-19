@@ -112,6 +112,7 @@ from lekto.core.services.auth import AuthService, SessionPolicy
 from lekto.core.services.automation import AutomationService
 from lekto.core.services.bulk import BulkService
 from lekto.core.services.classification.nodes import (
+    MOST_MODEL_CALLS,
     ClassificationPolicy,
     FieldsNode,
     JudgeNode,
@@ -129,7 +130,7 @@ from lekto.core.services.editing import EditingService
 from lekto.core.services.expected import ExpectedService
 from lekto.core.services.imports import ImportedFieldsNode, ImportedJudgeNode, ImportedSignal
 from lekto.core.services.inbox import InboxService
-from lekto.core.services.indexing import IndexingPolicy, IndexingService
+from lekto.core.services.indexing import INDEX_ROUNDS, IndexingPolicy, IndexingService
 from lekto.core.services.jobs import JobsService
 from lekto.core.services.lenses import LensService
 from lekto.core.services.logos import LogoService
@@ -615,11 +616,6 @@ VISION_REQUEST_TIMEOUT = timedelta(minutes=5)
 """How long the vision language model may take for one page."""
 
 
-MODEL_CALLS_PER_NODE = 4
-"""The most requests to the language model one node makes in a row: the proposal and the facts
-of `signal_llm` (#145), each once more after an unfit answer."""
-
-
 def node_lease(settings: Settings) -> timedelta:
     """How long a worker holds the job of a node: longer than any node may take, except the
     OCR of a document the vision model reads (`vision_lease`). A node may read a PDF with
@@ -628,7 +624,7 @@ def node_lease(settings: Settings) -> timedelta:
     longest = max(
         settings.ocr_timeout,
         settings.mail_render_timeout,
-        MODEL_CALLS_PER_NODE * settings.llm_timeout,
+        MOST_MODEL_CALLS * settings.llm_timeout,
     )
     return longest + settings.pdf_timeout + WORK_LEASE_MARGIN
 
@@ -732,8 +728,7 @@ def indexing_policy_of(settings: Settings) -> IndexingPolicy:
         document_prefix=_prefix(settings.embedding_document_prefix),
         dimensions=settings.embedding_dimensions,
         reconcile_interval=settings.search_reconcile_interval,
-        # An indexing job may embed and write up to three times (see `IndexingService`).
-        job_lease=3 * (settings.embedding_timeout + settings.meilisearch_task_timeout)
+        job_lease=INDEX_ROUNDS * (settings.embedding_timeout + settings.meilisearch_task_timeout)
         + WORK_LEASE_MARGIN,
         rebuild_lease=settings.search_rebuild_timeout,
         durations_window=settings.retention,

@@ -57,6 +57,7 @@ from lekto.core.domain.verdict import judge_contact
 from lekto.core.ports.llm import StructuredRequest
 from lekto.core.services.classification import nodes
 from lekto.core.services.classification.nodes import (
+    MOST_MODEL_CALLS,
     ClassificationPolicy,
     FieldsNode,
     JudgeNode,
@@ -424,6 +425,18 @@ async def test_two_unfit_answers_fail_the_signal(world: World) -> None:
     )
     assert output(result)["attempts"] == 2
     assert len(output(result)["answers"]) == 2
+
+
+async def test_the_signal_asks_the_model_at_most_as_often_as_a_node_lease_allows(
+    world: World,
+) -> None:
+    """The proposal and the facts, each once more after an unfit answer: `MOST_MODEL_CALLS`,
+    which the lease of a node's job counts (CO-06)."""
+    await seed(world)
+    fake = model("Sure! Here is the JSON.", proposal(), facts="not json")
+    result = await signal_step(world, fake).run(await document_with(world))
+    assert result.outcome is Outcome.OK
+    assert len(fake.requests) == MOST_MODEL_CALLS
 
 
 async def test_an_unreachable_model_raises_for_a_retry(world: World) -> None:

@@ -194,6 +194,14 @@ _LATEST_AHEAD = timedelta(days=366)
 JUDGE = "judge"
 """`model_version` of the judge's entry when the language model gave nothing."""
 
+ATTEMPTS = 2
+"""How often a node asks the language model the same question: once more after an unfit
+answer."""
+MOST_MODEL_CALLS = 2 * ATTEMPTS
+"""The most requests to the language model one node makes in a row: the proposal and the facts
+of `signal_llm` (#145), each `ATTEMPTS` times; how long a worker holds a node's job follows from
+it (`node_lease` of the composition)."""
+
 
 _NO_WORDS: Mapping[int, tuple[ReadWord, ...]] = MappingProxyType({})
 
@@ -303,7 +311,7 @@ class _ModelStep:
         text = document_message(sent)
         retry: str | None = None
         try:
-            for _ in range(2):
+            for _ in range(ATTEMPTS):
                 answer = await self._model.complete(
                     StructuredRequest(
                         system=SYSTEM,
