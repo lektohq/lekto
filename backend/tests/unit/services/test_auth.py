@@ -24,7 +24,7 @@ from lekto.core.domain.identity import (
     hash_token,
 )
 from lekto.core.domain.ids import ApiTokenId, new_id
-from lekto.core.domain.rights import Actor
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.identity import PasswordHasher
 from lekto.core.services.auth import AuthService
@@ -64,7 +64,7 @@ async def test_login_starts_a_session(world: World) -> None:
     assert signed_in.csrf_token == csrf_token(signed_in.token) != signed_in.token
     principal = await world.auth.authenticate_session(signed_in.token)
     assert principal.id == user.id
-    assert principal.can_write
+    assert principal.may(TokenRight.DOCUMENTS_WRITE)
     assert principal.session is not None and principal.session.id == signed_in.session.id
 
 
@@ -728,8 +728,8 @@ async def test_api_tokens(world: World) -> None:
     assert [t.id for t in await world.auth.list_api_tokens(Actor(user.id))] == [read.id, write.id]
 
     principal = await world.auth.authenticate_token(read_token)
-    assert principal.id == user.id and not principal.can_write
-    assert (await world.auth.authenticate_token(write_token)).can_write
+    assert principal.id == user.id and not principal.may(TokenRight.DOCUMENTS_WRITE)
+    assert (await world.auth.authenticate_token(write_token)).may(TokenRight.DOCUMENTS_WRITE)
     [stored, _] = await world.auth.list_api_tokens(Actor(user.id))
     assert stored.last_used_at == world.clock.now()
 

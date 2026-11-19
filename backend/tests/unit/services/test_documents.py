@@ -305,13 +305,13 @@ async def test_editors_read_the_processing_log(world: World, scene: Scene) -> No
 
 
 async def test_filter_readers_follows_the_visibility(world: World, scene: Scene) -> None:
-    everyone = {user.id for user in (scene.owner, scene.reader, scene.writer, scene.stranger)}
-    unknown = UserId(new_id())
+    everyone = {Actor(u.id) for u in (scene.owner, scene.reader, scene.writer, scene.stranger)}
+    unknown = Actor(UserId(new_id()))
     readers = await world.documents.filter_readers(scene.document.id, {*everyone, unknown})
-    assert readers == {scene.owner.id, scene.reader.id, scene.writer.id}
+    assert readers == {Actor(scene.owner.id), Actor(scene.reader.id), Actor(scene.writer.id)}
 
     await world.pipeline().reprocess_from(Actor(scene.owner.id), scene.document.id, Node.JUDGE)
-    editors = {scene.owner.id, scene.writer.id}
+    editors = {Actor(scene.owner.id), Actor(scene.writer.id)}
     assert await world.documents.filter_readers(scene.document.id, everyone) == editors
     assert await world.documents.filter_readers(DocumentId(new_id()), everyone) == set()
     assert await world.documents.filter_readers(scene.document.id, set()) == set()

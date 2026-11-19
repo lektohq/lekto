@@ -10,6 +10,7 @@ from lekto.adapters.inbound.context import ApiContext
 from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
 from lekto.core.domain.ids import short_id
+from lekto.core.domain.rights import TokenRight
 from lekto.core.domain.series import SeriesState
 
 
@@ -39,6 +40,7 @@ def add_expected_tools(tools: Tools, context: ApiContext) -> None:
         "and one contract or customer number where they show one, at least three at a steady "
         "interval) with the next date and state overdue, soon (30 days), later or ended; the "
         "overdue first. Nothing is stored.",
+        needs=TokenRight.DOCUMENTS_READ,
     )
     async def expected_list(
         ctx: Context,

@@ -4,6 +4,7 @@ documents they may read."""
 import asyncio
 from collections.abc import Sequence
 from datetime import timedelta
+from uuid import UUID
 
 import httpx2
 
@@ -13,7 +14,7 @@ from lekto.adapters.outbound.memory import FakeEmbeddings
 from lekto.composition.settings import Settings
 from lekto.core.domain.events import ClassifierTrained, DocumentUpdated, MailboxFetched
 from lekto.core.domain.ids import DocumentId, MailboxId, UserId, new_id
-from lekto.core.domain.rights import Actor
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import User
 from lekto.core.ports.embeddings import EmbeddingResult
@@ -208,10 +209,11 @@ class _Readers:
     def __init__(self, readers: dict[DocumentId, set[UserId]]) -> None:
         self._readers = readers
 
-    async def filter_readers(self, id: DocumentId, candidates: set[UserId]) -> set[UserId]:
-        return self._readers.get(id, set()) & set(candidates)
+    async def filter_readers(self, id: DocumentId, candidates: set[Actor]) -> set[Actor]:
+        readers = self._readers.get(id, set())
+        return {candidate for candidate in candidates if candidate.id in readers}
 
-    async def active_admins(self, candidates: set[UserId]) -> set[UserId]:
+    async def who_may(self, candidates: set[Actor], right: TokenRight) -> set[Actor]:
         return set()
 
 
@@ -224,7 +226,29 @@ async def test_a_relation_reaches_only_who_reads_both_documents() -> None:
     event = DocumentUpdated(
         document_id=invoice, occurred_at=NOW, fields=("relations",), related=reminder
     )
-    async with hub.listen(owner) as mine, hub.listen(friend) as theirs:
+    async with hub.listen(Actor(owner)) as mine, hub.listen(Actor(friend)) as theirs:
         await hub.handle(event)
         assert (mine.queue.qsize(), theirs.queue.qsize()) == (1, 0)
     assert "related" not in message(event)
+
+
+async def test_a_token_hears_what_its_rights_open(api: Api) -> None:
+    """A stream through a token hears of another user's documents only with
+    `admin:documents_all`, of a fetched mailbox only with `admin:mailboxes`, of a training only
+    with `system:read` (`.knowledge/plans/token-rights.md`)."""
+    admin, owner = await api.admin(), await api.user()
+    hub = EventHub(api.services.documents)
+    files = {"file": ("scan.pdf", (SAMPLES / "scan.pdf").read_bytes(), "application/pdf")}
+    uploaded = await api.client.post(f"{PREFIX}/documents", files=files, headers=auth(owner))
+    document = DocumentId(UUID(uploaded.json()["id"]))
+    reading = frozenset({TokenRight.DOCUMENTS_READ})
+    every = reading | {TokenRight.ADMIN_DOCUMENTS_ALL, TokenRight.ADMIN_MAILBOXES}
+    every |= {TokenRight.SYSTEM_READ}
+    async with (
+        hub.listen(Actor(admin.id, reading)) as narrow,
+        hub.listen(Actor(admin.id, every)) as wide,
+    ):
+        await hub.handle(DocumentUpdated(document_id=document, occurred_at=NOW, fields=("title",)))
+        await hub.handle(MailboxFetched(occurred_at=NOW, mailbox_id=MailboxId(new_id()), mails=1))
+        await hub.handle(ClassifierTrained(occurred_at=NOW, number=1, examples=2))
+        assert (narrow.queue.qsize(), wide.queue.qsize()) == (0, 3)

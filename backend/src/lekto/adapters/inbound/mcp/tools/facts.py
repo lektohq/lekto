@@ -15,6 +15,7 @@ from lekto.adapters.inbound.mcp.tools.documents import FactsOut, facts_out
 from lekto.core.domain.document_facts import FactRole
 from lekto.core.domain.identifiers import MAX_IDENTIFIER_VALUE
 from lekto.core.domain.ids import short_id
+from lekto.core.domain.rights import TokenRight
 from lekto.core.services.fact_decisions import FactAction, FactDecision
 
 type Action = Literal["add", "correct", "reject", "withdraw"]
@@ -27,6 +28,7 @@ def add_fact_tools(tools: Tools, context: ApiContext) -> None:
         "shows them): add one (with role), correct its value (new_value) or role, reject it, "
         "or withdraw your decision. Answers the facts after it.",
         idempotent=True,
+        needs=TokenRight.DOCUMENTS_WRITE,
     )
     async def facts_decide(
         ctx: Context,

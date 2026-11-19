@@ -6,8 +6,9 @@ classifier, and for a searcher that the meaning of their query is ready
 with `waiting.dispatch_events`)
 and hands each document event to the open streams of the users who may read the document at
 that moment, and `classifier.trained` to every stream that does not follow one document (every
-user sees the classifier on the page "System", Tobi 24.10.2026); `mailbox.fetched` to those
-streams of the active admins (only they see mailboxes, Tobi 06.11.2026). Events are pushed only
+user sees the classifier on the page "System", Tobi 24.10.2026; a token with `system:read`);
+`mailbox.fetched` to those streams of the active admins (only they see mailboxes, Tobi
+06.11.2026; a token with `admin:mailboxes`). Events are pushed only
 to connected clients; there is no replay, so a client that reconnects fetches the current
 state. One API instance is assumed: several instances would
 share the subscription and each would see only part of the events (a broker is the way out).
@@ -38,6 +39,7 @@ from lekto.core.domain.events import (
     SearchMeaningReady,
 )
 from lekto.core.domain.ids import DocumentId, UserId
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.ports.event_bus import EventBus
 from lekto.core.services.documents import DocumentService
 
@@ -51,11 +53,15 @@ _CLOSED = object()
 
 @dataclasses.dataclass(eq=False)
 class Listener:
-    user: UserId
+    actor: Actor  # who listens, with the rights of their token
     document: DocumentId | None
     queue: asyncio.Queue[object] = dataclasses.field(
         default_factory=lambda: asyncio.Queue(QUEUE_SIZE)
     )
+
+    @property
+    def user(self) -> UserId:
+        return self.actor.id
 
     async def events(
         self,
@@ -110,10 +116,10 @@ class EventHub:
 
     async def handle(self, event: DomainEvent) -> None:
         if isinstance(event, ClassifierTrained):
-            self._to_all(event)
+            self._to_all(event, TokenRight.SYSTEM_READ)
             return
         if isinstance(event, MailboxFetched):
-            await self._to_admins(event)
+            await self._to_admins(event, TokenRight.ADMIN_MAILBOXES)
             return
         if not isinstance(event, DocumentEvent):
             return
@@ -124,17 +130,17 @@ class EventHub:
         ]
         if not listeners:
             return
+        actors = {listener.actor for listener in listeners}
         if isinstance(event, DocumentDeleted):
-            users = {listener.user for listener in listeners}
-            readers = set(event.readers) | await self._documents.active_admins(users)
+            readers = {actor for actor in actors if actor.id in event.readers}
+            readers |= await self._documents.who_may(actors, TokenRight.ADMIN_DOCUMENTS_ALL)
         else:
-            users = {listener.user for listener in listeners}
-            readers = await self._documents.filter_readers(event.document_id, users)
+            readers = await self._documents.filter_readers(event.document_id, actors)
             if isinstance(event, DocumentUpdated) and event.related is not None:
                 # A relation: only who reads its other document too.
-                readers &= await self._documents.filter_readers(event.related, users)
+                readers &= await self._documents.filter_readers(event.related, actors)
         for listener in listeners:
-            if listener.user in readers:
+            if listener.actor in readers:
                 listener.offer(event)
 
     def deliver(self, event: SearchMeaningReady) -> None:
@@ -143,26 +149,27 @@ class EventHub:
             if listener.user == event.user_id and listener.document is None:
                 listener.offer(event)
 
-    async def _to_admins(self, event: DomainEvent) -> None:
-        """To the streams of the active admins that do not follow one document."""
+    async def _to_admins(self, event: DomainEvent, right: TokenRight) -> None:
+        """To the streams of the active admins with `right` that do not follow one document."""
         listeners = [listener for listener in self._listeners if listener.document is None]
         if not listeners:
             return
-        admins = await self._documents.active_admins({listener.user for listener in listeners})
+        admins = await self._documents.who_may({listener.actor for listener in listeners}, right)
         for listener in listeners:
-            if listener.user in admins:
+            if listener.actor in admins:
                 listener.offer(event)
 
-    def _to_all(self, event: DomainEvent) -> None:
+    def _to_all(self, event: DomainEvent, right: TokenRight) -> None:
+        """To the streams that do not follow one document, of those with `right`."""
         for listener in list(self._listeners):
-            if listener.document is None:
+            if listener.document is None and listener.actor.may(right):
                 listener.offer(event)
 
     @asynccontextmanager
     async def listen(
-        self, user: UserId, document: DocumentId | None = None
+        self, actor: Actor, document: DocumentId | None = None
     ) -> AsyncIterator[Listener]:
-        listener = Listener(user, document)
+        listener = Listener(actor, document)
         if self._closed:
             listener.offer(_CLOSED)
         self._listeners.add(listener)

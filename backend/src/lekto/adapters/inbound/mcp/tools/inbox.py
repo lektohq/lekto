@@ -26,6 +26,7 @@ from lekto.core.domain.classification import SPACE
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import short_id
 from lekto.core.domain.inbox import DONE_PERIOD, InboxTab
+from lekto.core.domain.rights import TokenRight
 
 INBOX_SIZE = 20
 """Documents one page of the inbox returns unless the client asks for more."""
@@ -64,6 +65,7 @@ def add_inbox_tools(tools: Tools, context: ApiContext) -> None:
         "What waits for you, newest first: review (yellow: a person should check), intervene "
         "(red: processing failed), new (green, not seen yet), processing; done: what left it "
         f"in {DONE_PERIOD.days} days. Each with what is open and why. counts: per tab.",
+        needs=TokenRight.DOCUMENTS_READ,
     )
     async def inbox_list(
         ctx: Context,
@@ -124,6 +126,7 @@ def add_inbox_tools(tools: Tools, context: ApiContext) -> None:
         "suggestions for the rest; a value it has is kept. Processing goes on to filing. "
         "Where it belongs (space) is the person's to decide in the web UI.",
         idempotent=False,
+        needs=TokenRight.DOCUMENTS_WRITE,
     )
     async def inbox_confirm(
         ctx: Context,
@@ -162,6 +165,7 @@ def add_inbox_tools(tools: Tools, context: ApiContext) -> None:
         "Mark a new document as seen, so it leaves your inbox (seen: false makes it new "
         "again). Seen changes nothing else.",
         idempotent=True,
+        needs=TokenRight.DOCUMENTS_WRITE,
     )
     async def inbox_mark_seen(ctx: Context, id: str, seen: bool = True) -> str:
         principal = principal_of(ctx)
