@@ -4038,6 +4038,215 @@ class MigrationSuite:
         async with empty_database.reading() as connection:
             assert await connection.run_sync(_schema) == schema
 
+    async def test_revision_0077_gives_every_document_its_first_version_and_back(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0077: every document gets its first version, its original as it came in,
+        by who uploaded it (none for a document without uploader); the downgrade forgets the
+        versions and keeps the documents (TA-02)."""
+        await migrate(empty_database, "0076")
+        ids = {name: new_id() for name in ("user", "space", "uploaded", "mailed")}
+        documents = _before_0077(t.documents)
+        document = {"space_id": ids["space"], "created_at": NOW}
+        await _insert(
+            empty_database,
+            [
+                (t.users, _user(ids["user"])),
+                (
+                    t.spaces,
+                    {
+                        "id": ids["space"],
+                        "name": "A",
+                        "name_key": "a",
+                        "personal_of": ids["user"],
+                    },
+                ),
+                (
+                    documents,
+                    document
+                    | {
+                        "id": ids["uploaded"],
+                        "sha256": "1" * 64,
+                        "original_filename": "scan.pdf",
+                        "media_type": "application/pdf",
+                        "uploaded_by": ids["user"],
+                    },
+                ),
+                (
+                    documents,
+                    document
+                    | {
+                        "id": ids["mailed"],
+                        "sha256": "2" * 64,
+                        "original_filename": "photo.jpg",
+                        "media_type": "image/jpeg",
+                        "uploaded_by": None,
+                    },
+                ),
+            ],
+        )
+        await migrate(empty_database, "0077")
+        versions = t.document_versions
+        async with empty_database.reading() as connection:
+            rows = await connection.execute(
+                select(
+                    versions.c.document_id,
+                    versions.c.number,
+                    versions.c.sha256,
+                    versions.c.original_filename,
+                    versions.c.media_type,
+                    versions.c.kind,
+                    versions.c.created_at,
+                    versions.c.created_by,
+                    versions.c.detail,
+                )
+            )
+            found = {row[0]: tuple(row[1:]) for row in rows.all()}
+        assert found == {
+            ids["uploaded"]: (
+                1,
+                "1" * 64,
+                "scan.pdf",
+                "application/pdf",
+                "received",
+                NOW,
+                ids["user"],
+                {},
+            ),
+            ids["mailed"]: (1, "2" * 64, "photo.jpg", "image/jpeg", "received", NOW, None, {}),
+        }
+        await downgrade(empty_database, "0076")
+        async with empty_database.reading() as connection:
+            kept = await connection.execute(select(documents.c.id, documents.c.sha256))
+            assert dict(kept.all()) == {ids["uploaded"]: "1" * 64, ids["mailed"]: "2" * 64}
+            tables = await connection.run_sync(lambda sync: set(inspect(sync).get_table_names()))
+        assert "document_versions" not in tables
+
+    async def test_revision_0078_adds_separate_skipped_and_takes_it_back(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0078: every document gets `separate` skipped. The downgrade drops the node
+        from the states, the log, the jobs and the undelivered events; a document whose
+        `separate` had not run gets jobs for OCR and the page images (not a second one it has);
+        a version of a stack's first part counts as edited (TA-02)."""
+        await migrate(empty_database, "0077")
+        ids = {name: new_id() for name in ("user", "space", "before", "stack", "queued", "event")}
+
+        def state(status: str, outcome: str | None = None) -> dict[str, Any]:
+            return {"status": status, "outcome": outcome, "started_at": None, "finished_at": None}
+
+        ok, waiting = state("done", "ok"), state("waiting")
+        later = ("ocr", "pages", "parse", *_SIGNALS, "judge", "fields", "relate", "apply_rules")
+        done = {"receive": ok, **dict.fromkeys(later, ok), "file": ok}
+        await _insert(
+            empty_database,
+            [
+                (t.users, _user(ids["user"])),
+                (
+                    t.spaces,
+                    {
+                        "id": ids["space"],
+                        "name": "A",
+                        "name_key": "a",
+                        "personal_of": ids["user"],
+                    },
+                ),
+                (
+                    t.documents,
+                    {"id": ids["before"], "space_id": ids["space"], "processing_nodes": done},
+                ),
+            ],
+        )
+
+        async def nodes() -> dict[Any, Any]:
+            async with empty_database.reading() as connection:
+                rows = await connection.execute(
+                    select(t.documents.c.id, t.documents.c.processing_nodes)
+                )
+                return {id: graph for id, graph in rows.all()}
+
+        await migrate(empty_database, "0078")
+        assert await nodes() == {ids["before"]: {**done, "separate": state("skipped")}}
+
+        # Two stacks whose `separate` waits, one of them with its OCR queued already; what the
+        # node left in the log, the jobs and the events; the versions of a split stack.
+        stacked = {"receive": ok, "separate": waiting, **dict.fromkeys(later, waiting)}
+        stacked["file"] = waiting
+        stack, queued = str(ids["stack"]), str(ids["queued"])
+
+        def job(document: str, node: str) -> dict[str, Any]:
+            return {
+                "id": new_id(),
+                "kind": "pipeline.node",
+                "payload": {"document_id": document, "node": node, "run": 1},
+                "dedup_key": f"{document}:1:{node}",
+            }
+
+        def event(node: str) -> dict[str, Any]:
+            payload = {"document_id": stack, "node": node, "run": 1}
+            return {"event_id": new_id(), "type": "document.node_started", "payload": payload}
+
+        version = {"document_id": ids["before"], "media_type": "application/pdf"}
+        await _insert(
+            empty_database,
+            [
+                *(
+                    (
+                        t.documents,
+                        {
+                            "id": ids[name],
+                            "space_id": ids["space"],
+                            "sha256": str(number) * 64,
+                            "processing_nodes": stacked,
+                        },
+                    )
+                    for number, name in enumerate(("stack", "queued"), start=1)
+                ),
+                (t.jobs, job(stack, "separate")),
+                (t.jobs, job(queued, "ocr")),
+                (t.outbox, event("separate")),
+                (t.outbox, event("receive")),
+                *(
+                    (
+                        t.processing_log,
+                        {"document_id": ids["before"], "node": node, "input": {}, "output": {}},
+                    )
+                    for node in ("receive", "separate")
+                ),
+                *(
+                    (
+                        t.document_versions,
+                        version
+                        | {"number": number, "sha256": name * 64, "original_filename": name}
+                        | {"kind": kind},
+                    )
+                    for number, name, kind in ((1, "a", "received"), (2, "b", "separated"))
+                ),
+            ],
+        )
+
+        await downgrade(empty_database, "0077")
+        assert await nodes() == {
+            ids["before"]: done,
+            ids["stack"]: {node: s for node, s in stacked.items() if node != "separate"},
+            ids["queued"]: {node: s for node, s in stacked.items() if node != "separate"},
+        }
+        async with empty_database.reading() as connection:
+            jobs = await _read_all(
+                connection, select(t.jobs.c.dedup_key).where(t.jobs.c.status == "queued")
+            )
+            events = await _read_all(connection, select(t.outbox.c.payload))
+            log = await _read_all(connection, select(t.processing_log.c.node))
+            kinds = await _read_all(
+                connection, select(t.document_versions.c.number, t.document_versions.c.kind)
+            )
+        assert sorted(key for (key,) in jobs) == sorted(
+            [f"{stack}:1:ocr", f"{stack}:1:pages", f"{queued}:1:ocr", f"{queued}:1:pages"]
+        )
+        assert [payload["node"] for (payload,) in events] == ["receive"]
+        assert [node for (node,) in log] == ["receive"]
+        assert sorted(kinds) == [(1, "received"), (2, "edited")]
+
     async def test_revision_0079_drops_versions_nobody_checked_and_back(
         self, empty_database: Database
     ) -> None:
@@ -4269,6 +4478,11 @@ def _json_null_before_0067(table: sa.Table) -> sa.TableClause:
             for column in table.c
         ),
     )
+
+
+def _user(id: UUID) -> dict[str, Any]:
+    """The row of a user `a`."""
+    return {"id": id, "username": "a", "username_key": "a", "role": "user"}
 
 
 async def _insert(
