@@ -14,6 +14,7 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp_types import ImageContent, Tool
 
 from lekto.adapters.inbound.limits import MAX_SELECTED
+from lekto.adapters.inbound.mcp.names import OTHER_SPACE
 from lekto.adapters.inbound.mcp.server import instructions
 from lekto.adapters.inbound.rest import PREFIX
 from lekto.adapters.inbound.schemas import MAX_POSITION
@@ -441,22 +442,70 @@ async def test_documents_update_refuses_a_moment_beyond_the_calendar(
 
 async def test_documents_update_names_a_space_a_rule_moves_it_to(api: Api, scene: Scene) -> None:
     """What changed is what REST reports (`changed_fields`, review 0.12.2 A-01): a rule's move
-    to another space the caller reads too, by its name."""
+    to another space the caller reads too, by its name; the rule's report names the spaces and
+    the tag, without ids (decision 7, CO-05)."""
     owner = scene.headers["owner"]
     household = await post(api, "/spaces", {"name": "Household"}, owner)
+    strom = await api.services.master_data.create_tag((await api.admin()).id, "Strom")
     await post(
         api,
         "/rules",
         {
             "name": "ACME",
             "conditions": {"all": [{"field": "contact", "op": "is", "value": scene.contact}]},
-            "actions": [{"type": "set_space", "space_id": household["id"]}],
+            "actions": [
+                {"type": "set_space", "space_id": household["id"]},
+                {"type": "add_tags", "tag_ids": [str(strom.id)]},
+            ],
         },
         owner,
     )
     id = await upload(api, owner)
     tried = data(await call(api, owner, "documents_update", id=id, contact="ACME", dry_run=True))
-    assert tried["set"] == {"contact": "ACME", "space": "Household"}
+    assert tried["set"] == {"contact": "ACME", "space": "Household", "tags": ["Strom"]}
+    (rule,) = tried["rules"]
+    assert set(rule) == {"name", "scope", "applied"}
+    assert sorted(rule["applied"], key=lambda effect: effect["field"]) == [
+        {"field": "space", "old": "owner", "new": "Household"},
+        {"field": "tags", "new": "Strom"},
+    ]
+
+
+async def test_a_suggested_space_is_named_as_the_caller_reads_it(api: Api) -> None:
+    """In the review of `documents_get` and in `inbox_list`: a space of the caller's by its name,
+    another person's personal space by that person's name, one the caller does not read as such
+    (CO-05)."""
+    owner, other = await api.user(), await api.user("Jane Doe")
+    household = await post(api, "/spaces", {"name": "Household"}, auth(owner))
+    handed = (await api.services.users.personal_spaces(owner.id))[other.id]
+    for target, named in (
+        (household["id"], "Household"),
+        (str(handed), "Jane Doe"),
+        (str(new_id()), OTHER_SPACE),
+    ):
+        check = FieldCheck(
+            field="space",
+            outcome=Outcome.UNCERTAIN,
+            confidence=0.5,
+            reasons=(written("two spaces fit"),),
+            suggestion=target,
+        )
+        api.services.pipeline.replace_executor(
+            Node.JUDGE,
+            builders.Returns(
+                NodeResult(
+                    outcome=Outcome.UNCERTAIN,
+                    reasons=(written("space"),),
+                    output={"fields": checks_to_json([check])},
+                )
+            ),
+        )
+        id = await upload(api, auth(owner), content=unique_pdf(named))
+        got = data(await call(api, auth(owner), "documents_get", id=id, include=["review"]))
+        assert got["open"][0]["fields"][0]["suggestion"] == named
+        listed = data(await call(api, auth(owner), "inbox_list", tab="review"))
+        (item,) = [item for item in listed["items"] if {item["id"]} == shorts(id)]
+        assert item["open"][0]["fields"][0]["suggestion"] == named
 
 
 async def test_inbox_list_tells_what_waits_and_why(api: Api, scene: Scene) -> None:

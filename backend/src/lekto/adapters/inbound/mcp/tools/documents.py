@@ -2,7 +2,7 @@
 
 import asyncio
 import tempfile
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import date, datetime
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -16,7 +16,7 @@ from lekto.adapters.inbound.mcp.names import FORMER_ACCOUNT, Names
 from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
 from lekto.adapters.inbound.mcp.tools.spaces import space_name
-from lekto.adapters.inbound.schemas import FieldJson, RuleReportOut, field_json
+from lekto.adapters.inbound.schemas import FieldJson, field_json
 from lekto.core.domain.classification import CheckField, field_id_of
 from lekto.core.domain.document_facts import FactState
 from lekto.core.domain.documents import (
@@ -30,13 +30,14 @@ from lekto.core.domain.documents import (
     changed_fields,
 )
 from lekto.core.domain.fields import FieldValue, field_from_json, field_to_json
-from lekto.core.domain.ids import DocumentId, FieldId, UserId, short_id
+from lekto.core.domain.ids import DocumentId, FieldId, SpaceId, UserId, short_id
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.lenses import MAX_FILTER_VALUES, MAX_QUERY_LENGTH
 from lekto.core.domain.mail_intake import OriginRole
 from lekto.core.domain.mail_message import address_line
 from lekto.core.domain.pipeline import ACTOR, CONFIRMED_BY, VIA_TOKEN, NodeRun
 from lekto.core.domain.relations import RelationState
+from lekto.core.domain.rule_planner import RuleReport
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.validation import to_utc
 from lekto.core.ports.repository import DocumentFilter
@@ -166,6 +167,28 @@ class LogOut(BaseModel):
     entries: list[LogEntryOut]
 
 
+class EffectOut(BaseModel):
+    field: str
+    old: JsonValue = None
+    new: JsonValue = None
+
+
+class NoteOut(BaseModel):
+    field: str
+    kind: str  # overruled, refused, conflict, skipped, review, yielded
+    reason: str
+
+
+class RuleRunOut(BaseModel):
+    """What one rule did, by names: what REST reports (`RuleReportOut`) without ids
+    (decision 7)."""
+
+    name: str
+    scope: str
+    applied: list[EffectOut] = []
+    notes: list[NoteOut] = []  # actions not applied, and why
+
+
 class UpdateOut(BaseModel):
     """What a change did: the values set and those removed, and what the rules did after it,
     not the whole document (decision 7)."""
@@ -176,7 +199,7 @@ class UpdateOut(BaseModel):
     access: SpaceRole | None = None
     set: dict[str, JsonValue] = {}
     removed: list[str] = []
-    rules: list[RuleReportOut] | None = None
+    rules: list[RuleRunOut] | None = None
 
 
 class RetryOut(BaseModel):
@@ -306,6 +329,8 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
             out.facts = facts_out(await context.documents.facts(user, document.id), names)
         if "review" in wanted and document.lane is not None:
             review = await context.documents.review(user, document.id)
+            if suggests_space(review.open):
+                names = await names.with_spaces(context, user)
             out.open = [open_out(item, names) for item in review.open]
         if "reading" in wanted:
             reading = await context.pipeline.reading(user, document.id)
@@ -436,8 +461,9 @@ def add_document_tools(tools: Tools, context: ApiContext) -> None:
         assert change.before is not None  # a change the caller still reads
         out = await update_out(context, user, change.before, change.document, change.access, names)
         out.dry_run = tried
-        if change.rules is not None:
-            out.rules = [RuleReportOut.of(report) for report in change.rules.plan.reports]
+        if change.rules is not None and change.rules.plan.reports:
+            names = await names.with_spaces(context, user)
+            out.rules = [rule_run_out(report, names) for report in change.rules.plan.reports]
         return compact(out)
 
 
@@ -549,6 +575,35 @@ def open_out(item: OpenNode, names: Names) -> OpenOut:
     )
 
 
+def suggests_space(open: Iterable[OpenNode]) -> bool:
+    """Whether an open check suggests a space: its name needs `Names.with_spaces`."""
+    return any(
+        check.field == CheckField.SPACE and check.suggestion is not None
+        for item in open
+        for check in item.fields
+    )
+
+
+def rule_run_out(report: RuleReport, names: Names) -> RuleRunOut:
+    """`report` by names; `names` with spaces (`Names.with_spaces`)."""
+    return RuleRunOut(
+        name=report.name,
+        scope=report.scope.value,
+        applied=[
+            EffectOut(
+                field=_field_label(effect.field, names),
+                old=_named(effect.field, effect.old, names),
+                new=_named(effect.field, effect.new, names),
+            )
+            for effect in report.applied
+        ],
+        notes=[
+            NoteOut(field=_field_label(note.field, names), kind=note.kind, reason=note.reason.text)
+            for note in report.notes
+        ],
+    )
+
+
 def log_out(entry: NodeRun, users: dict[UserId, str]) -> LogEntryOut:
     result = entry.result
     by = result.input.get(ACTOR) or result.output.get(CONFIRMED_BY)
@@ -571,17 +626,21 @@ def _field_label(field: str, names: Names) -> str:
 
 
 def _named(field: str, value: JsonValue, names: Names) -> JsonValue:
-    """A suggested value with names for ids."""
+    """A value of `field` with names for ids: a suggestion, or what a rule changed (one tag)."""
     if not isinstance(value, str | list):
         return value
     match field:
-        case "contact" if isinstance(value, str):
+        case CheckField.CONTACT if isinstance(value, str):
             return names.contact(UUID(value))
-        case "document_type" if isinstance(value, str):
+        case CheckField.DOCUMENT_TYPE if isinstance(value, str):
             return names.document_type(UUID(value))
-        case "topic" if isinstance(value, str):
+        case CheckField.TOPIC if isinstance(value, str):
             return names.topic(UUID(value))
-        case "tags" if isinstance(value, list):
+        case CheckField.SPACE if isinstance(value, str):
+            return names.space(SpaceId(UUID(value)))
+        case CheckField.TAGS if isinstance(value, str):
+            return names.tag_names([UUID(value)])[0]
+        case CheckField.TAGS if isinstance(value, list):
             return list[JsonValue](names.tag_names(UUID(str(item)) for item in value))
     return value
 

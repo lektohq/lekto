@@ -4,14 +4,14 @@ unknown one is an error that names similar ones, so the client need not list the
 
 import difflib
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from uuid import UUID
 
 from lekto.adapters.inbound.context import ApiContext
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldDefinition
 from lekto.core.domain.identifiers import IdentifierKind
-from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, TagId, UserId
+from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, SpaceId, TagId, UserId
 from lekto.core.domain.master_data import TagScope
 from lekto.core.domain.sorting import sort_key
 from lekto.core.domain.spaces import Space
@@ -22,13 +22,16 @@ SIMILAR = 3
 """Names an error suggests at most."""
 FORMER_ACCOUNT = "a former account"
 """How the tools name a person whose account is gone."""
+OTHER_SPACE = "a space you are no member of"
+"""How the tools name a space the caller does not read (a rule may file a document through it)."""
 _CONTAINED = 3
 """Characters a name has at least to be suggested for standing in the one asked for or it."""
 
 
 @dataclass(frozen=True)
 class Names:
-    """The names of contacts, document types, tags and fields (visible to every user)."""
+    """The names of contacts, document types, tags and fields (visible to every user); those of
+    spaces only where a tool needs them (`with_spaces`)."""
 
     contacts: dict[UUID, str]
     document_types: dict[UUID, str]
@@ -36,6 +39,7 @@ class Names:
     fields: dict[FieldId, FieldDefinition]
     topics: dict[UUID, str]
     groups: dict[UUID, str] = field(default_factory=dict)  # of contacts and of types
+    spaces: dict[UUID, str] = field(default_factory=dict)
 
     @classmethod
     async def load(cls, context: ApiContext, user: UserId) -> "Names":
@@ -54,6 +58,21 @@ class Names:
             groups=of(TagScope.CONTACT, TagScope.DOCUMENT_TYPE),
         )
 
+    async def with_spaces(self, context: ApiContext, user: UserId) -> "Names":
+        """These names, and how the caller reads the spaces a document may go to: theirs
+        (`space_label`), and every other person's personal space by that person's name (a
+        hand-over)."""
+        people = {person.id: person.label for person in await context.users.list_users(user)}
+        spaces: dict[UUID, str] = {
+            space: people[holder]
+            for holder, space in (await context.users.personal_spaces(user)).items()
+            if holder in people
+        }
+        theirs = await context.spaces.list_spaces(user)
+        labels = await member_labels(context, user, theirs)
+        spaces.update({space.id: space_label(space, labels) for space in theirs})
+        return replace(self, spaces=spaces)
+
     def contact(self, id: UUID | None) -> str | None:
         return None if id is None else self.contacts.get(id, str(id))
 
@@ -62,6 +81,10 @@ class Names:
 
     def topic(self, id: UUID | None) -> str | None:
         return None if id is None else self.topics.get(id, str(id))
+
+    def space(self, id: SpaceId) -> str:
+        """Needs `with_spaces`."""
+        return self.spaces.get(id, OTHER_SPACE)
 
     def tag_names(self, ids: Iterable[UUID]) -> list[str]:
         return sorted((self.tags.get(i, str(i)) for i in ids), key=sort_key)
