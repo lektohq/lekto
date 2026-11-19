@@ -481,6 +481,10 @@ async def test_a_run_that_failed_meanwhile_sends_nothing_and_frees_the_queue(
     for document in (second, third):  # another signal failed meanwhile
         async with world.uow() as uow:
             stored = await uow.documents.get(document.id)
+            # As the domain allows it: the run failed with a failed node (TD-05).
+            facts = stored.processing.nodes[Node.SIGNAL_FACTS]
+            assert facts.status is NodeStatus.DONE  # the other signals are done by now
+            facts.outcome = Outcome.FAILED
             stored.processing.status = ProcessingStatus.FAILED
             await uow.documents.update(stored)
             await uow.commit()
