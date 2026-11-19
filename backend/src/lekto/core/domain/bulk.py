@@ -1,5 +1,5 @@
-"""Changing many documents at once (`.idea/decisions/2026-10-28-bulk-actions.md`): one action on
-documents a person selected in the documents list, a page of them or all the hits of a search and
+"""Changing many documents at once (`.knowledge/decisions/2026-10-28-bulk-actions.md`): one action
+on documents a person selected in the documents list, a page of them or all the hits of a search and
 filters, worked through in the background.
 
 The selection is fixed when the person starts: the documents it names then, at most

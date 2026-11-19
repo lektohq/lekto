@@ -5,8 +5,8 @@ Revises: 0053
 Create Date: 2026-11-01 18:00:00.000000
 
 A decision through an API token carries the token (Tobi, 01.11.2026,
-`.idea/decisions/2026-11-01-mcp.md`, decision 11): a verdict through a script or an assistant stays
-apart from one in the web UI. Each table that keeps who decided gets `via_token_id` and
+`.knowledge/decisions/2026-11-01-mcp.md`, decision 11): a verdict through a script or an assistant
+stays apart from one in the web UI. Each table that keeps who decided gets `via_token_id` and
 `via_token_name` beside it, without a foreign key and the name as a copy, so both stay once the
 token is revoked. Rows from before have none: they were decided in the web UI or through a token
 nobody can name any more.

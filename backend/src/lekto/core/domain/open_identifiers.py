@@ -1,4 +1,4 @@
-"""The open identifiers (`.idea/architecture/open-identifiers.md`): the identifiers
+"""The open identifiers (`.knowledge/architecture/open-identifiers.md`): the identifiers
 no person has confirmed yet, across all contacts and documents. A learned one stands at a contact
 (training found it). A suggested one stands in confirmed documents and is open nowhere else: an
 IBAN whose holder a document names as its recipient, for that person's profile (`_suggested`);

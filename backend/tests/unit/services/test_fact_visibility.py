@@ -1,7 +1,7 @@
 """The contact a number of a document is a contact's by, as the reader may see it (XA-01): in
 the facts and in the processing log, another user's number, one learned in a space not theirs
 and one rejected show as unknown; admins see every one
-(`.idea/decisions/2026-10-24-private-identifiers.md`)."""
+(`.knowledge/decisions/2026-10-24-private-identifiers.md`)."""
 
 from datetime import timedelta
 from typing import Any

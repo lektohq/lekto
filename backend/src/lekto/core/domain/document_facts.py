@@ -1,4 +1,4 @@
-"""Facts as values of a document (`.idea/decisions/2026-10-25-facts.md`, issue #145): what a
+"""Facts as values of a document (`.knowledge/decisions/2026-10-25-facts.md`, issue #145): what a
 document shows that marks something or points to something, numbers and references, each with its
 kind, its value (normalised, as Lekto compares it), where it stands, where it comes from and its
 role.

@@ -5,7 +5,7 @@ Revises: 0046
 Create Date: 2026-10-26 02:00:00.000000
 
 The identifiers a document shows become its facts (issue #145,
-`.idea/decisions/2026-10-25-facts.md`): `document_facts` keeps kind and normalised value as
+`.knowledge/decisions/2026-10-25-facts.md`): `document_facts` keeps kind and normalised value as
 `document_identifiers` did, and adds the fact's role, where it comes from, as written, where it
 stands first in the text and whether a person decided it. The rows of `document_identifiers` are
 taken over with the role of their kind, as found by the patterns of the text (whether a code held

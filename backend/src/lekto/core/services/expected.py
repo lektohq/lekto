@@ -1,4 +1,5 @@
-"""The documents expected next (`.idea/decisions/2026-10-25-relations.md`, decisions 10 to 12; issue
+"""The documents expected next (`.knowledge/decisions/2026-10-25-relations.md`, decisions 10 to 12;
+issue
 #145 PR 12): the series among the documents a person may read, each with its next date. Derived on
 each call, nothing stored, no events."""
 

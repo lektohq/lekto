@@ -1,4 +1,4 @@
-"""Editing a document's pages (`.idea/decisions/2026-11-10-versions.md`; `services.editing`): a
+"""Editing a document's pages (`.knowledge/decisions/2026-11-10-versions.md`; `services.editing`): a
 person turns, reorders, removes and splits the pages of the document's original, and adds the pages
 of files from their device. The pages make parts, each a PDF of its own: at most one replaces the
 document as its next version (`VersionKind.EDITED`), every other becomes a new document in its space

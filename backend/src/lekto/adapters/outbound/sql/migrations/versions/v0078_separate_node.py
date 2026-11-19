@@ -5,7 +5,7 @@ Revises: 0077
 Create Date: 2026-11-11 12:00:00.000000
 
 A scanned stack is split at its separator sheets when it comes in (Tobi, 10.11.2026;
-`.idea/decisions/2026-11-10-separator-and-merge.md`), in a node before OCR and the page images.
+`.knowledge/decisions/2026-11-10-separator-and-merge.md`), in a node before OCR and the page images.
 Every document came in before it and gets it `skipped`, as revision 0050 did for `relate`: nothing
 waits on it, and nothing is split after the fact.
 

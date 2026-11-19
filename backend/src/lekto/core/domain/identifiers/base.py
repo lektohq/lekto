@@ -19,7 +19,7 @@ fact, a reference, an open identifier, in REST and MCP alike (Tobi, 17.11.2026; 
 
 class IdentifierKind(StrEnum):
     """The kinds of identifiers, which are the kinds of facts too (`domain.document_facts`;
-    `.idea/architecture/fact-roles.md`)."""
+    `.knowledge/architecture/fact-roles.md`)."""
 
     IBAN = "iban"
     VAT_ID = "vat_id"
