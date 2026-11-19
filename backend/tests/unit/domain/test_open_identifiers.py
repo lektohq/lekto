@@ -4,16 +4,13 @@ from dataclasses import replace
 from datetime import date
 
 from lekto.core.domain.document_facts import (
-    DocumentFact,
-    FactOrigin,
     FactRole,
     Holder,
     HolderKind,
     HolderSource,
-    role_of,
 )
 from lekto.core.domain.identifiers import Identifier, IdentifierKind, IdentifierSource
-from lekto.core.domain.ids import ContactId, DocumentId, UserId, new_id
+from lekto.core.domain.ids import DocumentId, UserId, new_id
 from lekto.core.domain.master_data import Contact
 from lekto.core.domain.open_identifiers import (
     OpenSource,
@@ -25,6 +22,7 @@ from lekto.core.domain.open_identifiers import (
 from lekto.core.domain.profiles import Person
 from lekto.core.domain.reasons import ReasonCode
 from tests.builders import NOW
+from tests.unit.domain.facts_support import fact, seen
 
 IBAN = (IdentifierKind.IBAN, "DE02120300000000202051")
 VAT = (IdentifierKind.VAT_ID, "DE312456789")
@@ -35,38 +33,10 @@ DOMAIN = (IdentifierKind.EMAIL_DOMAIN, "stadtwerke.example")
 INVOICE = (IdentifierKind.INVOICE_NUMBER, "R-4711")
 
 
-def fact(
-    key: tuple[IdentifierKind, str], written: str | None = None, holder: Holder | None = None
-) -> DocumentFact:
-    kind, value = key
-    return DocumentFact(
-        kind=kind,
-        value=value,
-        role=role_of(kind),
-        origins=frozenset({FactOrigin.PATTERN}),
-        written=written,
-        position=0,
-        holder=holder,
-    )
-
-
-def seen(
-    contact: ContactId,
-    key: tuple[IdentifierKind, str],
-    day: int,
-    written: str | None = None,
-    holder: Holder | None = None,
-    owner: UserId | None = None,
-) -> Sighting:
-    return Sighting(
-        DocumentId(new_id()), contact, date(2026, 10, day), fact(key, written, holder), owner
-    )
-
-
 def test_a_learned_one_is_open_with_the_documents_that_show_it() -> None:
     utility = Contact.create(name="Stadtwerke", now=NOW)
     utility.set_learned([Identifier(*CUSTOMER, IdentifierSource.LEARNED)])
-    sightings = [seen(utility.id, CUSTOMER, 1), seen(utility.id, CONTRACT, 9, "1234 5678")]
+    sightings = [seen(utility.id, CUSTOMER, 1), seen(utility.id, CONTRACT, 9, written="1234 5678")]
     (item,) = open_identifiers([utility], sightings)
     # A customer number stands for the contract number of its value.
     assert (item.key, item.source, item.contacts) == (CUSTOMER, OpenSource.LEARNED, (utility.id,))

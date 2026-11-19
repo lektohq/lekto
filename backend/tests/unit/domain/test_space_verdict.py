@@ -1,10 +1,7 @@
 """The judge's rule for the space (`verdict.judge_space`)."""
 
-from functools import partial
-
-from lekto.core.domain import verdict
 from lekto.core.domain.classification import SPACE
-from lekto.core.domain.ids import SpaceId, UserId, new_id
+from lekto.core.domain.ids import SpaceId, new_id
 from lekto.core.domain.pipeline import Outcome
 from lekto.core.domain.verdict import (
     ClassifierView,
@@ -15,27 +12,17 @@ from lekto.core.domain.verdict import (
     SpaceChoice,
     SpaceOption,
 )
-from tests import builders
-
-judge_space = partial(verdict.judge_space, thresholds=builders.THRESHOLDS)
-
-TOBI, ERIKA = UserId(new_id()), UserId(new_id())
-OWN, HOUSEHOLD, ERIKAS = SpaceId(new_id()), SpaceId(new_id()), SpaceId(new_id())
-SHARED_OWN = SpaceId(new_id())  # Tobi's personal space, shared with Erika
-OPTIONS = {
-    OWN: SpaceOption("the uploader's personal space", frozenset({TOBI}), personal_of=TOBI),
-    HOUSEHOLD: SpaceOption("a shared space", frozenset({TOBI, ERIKA})),
-    ERIKAS: SpaceOption("another user's personal space", frozenset({ERIKA}), personal_of=ERIKA),
-}
-
-
-def choice(current: SpaceId = OWN, *, locked: bool = False) -> SpaceChoice:
-    options = dict(OPTIONS)
-    if current == SHARED_OWN:
-        options[SHARED_OWN] = SpaceOption(
-            "the uploader's personal space", frozenset({TOBI, ERIKA}), personal_of=TOBI
-        )
-    return SpaceChoice(current=current, options=options, locked=locked, uploader=TOBI)
+from tests.unit.domain.verdict_support import (
+    ERIKA,
+    ERIKAS,
+    HOUSEHOLD,
+    OPTIONS,
+    OWN,
+    SHARED_OWN,
+    TOBI,
+    choice,
+    judge_space,
+)
 
 
 def neighbours(*spaces: SpaceId | None) -> tuple[Neighbour, ...]:

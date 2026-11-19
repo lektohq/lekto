@@ -60,6 +60,7 @@ from lekto.core.domain.rules_json import (
 )
 from lekto.core.domain.validation import MAX_NAME
 from tests.builders import NOW
+from tests.unit.domain.rules_support import field
 
 OWNER = UserId(new_id())
 ADMIN = UserId(new_id())
@@ -87,12 +88,6 @@ def definition(
         name=name,
         conditions=conditions or group(ALWAYS),
         actions=actions or (AddTags(frozenset({TAG})),),
-    )
-
-
-def field(data_type: FieldType, choices: tuple[str, ...] = ()) -> FieldDefinition:
-    return FieldDefinition.create(
-        name=data_type.value, data_type=data_type, now=NOW, choices=choices
     )
 
 
@@ -435,7 +430,7 @@ def test_field_condition_fits_data_type(
     data_type: FieldType, op: Operator, value: JsonValue
 ) -> None:
     choices = ("monthly", "yearly") if data_type is FieldType.CHOICE else ()
-    attr = field(data_type, choices)
+    attr = field(data_type, *choices)
 
     check_fields(field_rule(attr, op, value), {attr.id: attr}, WRITING)
 
@@ -462,7 +457,7 @@ def test_field_operator_must_fit_data_type(
     data_type: FieldType, op: Operator, value: JsonValue
 ) -> None:
     choices = ("monthly", "yearly") if data_type is FieldType.CHOICE else ()
-    attr = field(data_type, choices)
+    attr = field(data_type, *choices)
 
     with pytest.raises(ValidationError, match=f"operator '{op}' does not apply to field"):
         check_fields(field_rule(attr, op, value), {attr.id: attr}, WRITING)
@@ -488,7 +483,7 @@ def test_field_condition_value_must_fit(
     data_type: FieldType, op: Operator, value: JsonValue
 ) -> None:
     choices = ("monthly", "yearly") if data_type is FieldType.CHOICE else ()
-    attr = field(data_type, choices)
+    attr = field(data_type, *choices)
 
     with pytest.raises(ValidationError, match="does not accept"):
         check_fields(field_rule(attr, op, value), {attr.id: attr}, WRITING)
@@ -526,7 +521,7 @@ def test_set_field_value_must_fit(data_type: FieldType, value: JsonValue, fits: 
     """Text is a template for every type; without markup it writes itself and must be readable
     as the field's type has it (`fields.read_written`)."""
     choices = ("monthly", "yearly") if data_type is FieldType.CHOICE else ()
-    attr = field(data_type, choices)
+    attr = field(data_type, *choices)
     rule = definition(SetField(attr.id, value))
 
     if fits:

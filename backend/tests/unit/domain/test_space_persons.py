@@ -3,7 +3,6 @@ the model's recipient as a person (`verdict.recipient_persons`)."""
 
 from functools import partial
 
-from lekto.core.domain import verdict
 from lekto.core.domain.facts import Strength
 from lekto.core.domain.ids import SpaceId, UserId, new_id
 from lekto.core.domain.pipeline import Outcome
@@ -13,35 +12,22 @@ from lekto.core.domain.verdict import (
     ModelProposal,
     Neighbour,
     Signals,
-    SpaceChoice,
     SpaceOption,
     named_persons,
     recipient_persons,
 )
 from tests import builders
+from tests.unit.domain import verdict_support
+from tests.unit.domain.verdict_support import ERIKA, ERIKAS, HOUSEHOLD, OWN, TOBI, judge_space
 
-judge_space = partial(verdict.judge_space, thresholds=builders.THRESHOLDS)
-
-TOBI, ERIKA, BOB = UserId(new_id()), UserId(new_id()), UserId(new_id())
-OWN, HOUSEHOLD, ERIKAS, BOBS = (SpaceId(new_id()) for _ in range(4))
+BOB = UserId(new_id())
+BOBS = SpaceId(new_id())
 FAMILY = SpaceId(new_id())  # Tobi, Erika and their child Bob
 OPTIONS = {
-    OWN: SpaceOption("the uploader's personal space", frozenset({TOBI}), personal_of=TOBI),
-    HOUSEHOLD: SpaceOption("a shared space", frozenset({TOBI, ERIKA})),
-    ERIKAS: SpaceOption("another user's personal space", frozenset({ERIKA}), personal_of=ERIKA),
+    **verdict_support.OPTIONS,
     BOBS: SpaceOption("another user's personal space", frozenset({BOB}), personal_of=BOB),
 }
-
-
-def choice(
-    current: SpaceId = OWN,
-    *,
-    locked: bool = False,
-    options: dict[SpaceId, SpaceOption] | None = None,
-) -> SpaceChoice:
-    return SpaceChoice(
-        current=current, options=options or dict(OPTIONS), locked=locked, uploader=TOBI
-    )
+choice = partial(verdict_support.choice, options=OPTIONS)
 
 
 def sure_of(space: SpaceId) -> Signals:

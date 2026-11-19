@@ -17,8 +17,7 @@ from lekto.core.domain.fields import (
 )
 from lekto.core.domain.ids import DocumentTypeId, new_id
 from lekto.core.domain.periods import Period, PeriodKind
-
-NOW = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
+from tests.builders import NOW
 
 
 def definition(data_type: FieldType, choices: tuple[str, ...] = ()) -> FieldDefinition:

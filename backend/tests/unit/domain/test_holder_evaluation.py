@@ -1,21 +1,11 @@
 """The holders and the recommendations against a person's decisions at the contacts."""
 
-from datetime import date
-
-from lekto.core.domain.document_facts import (
-    DocumentFact,
-    FactOrigin,
-    Holder,
-    HolderKind,
-    HolderSource,
-    role_of,
-)
+from lekto.core.domain.document_facts import Holder, HolderKind, HolderSource
 from lekto.core.domain.holder_evaluation import HolderOutcome, Tally, evaluate
 from lekto.core.domain.identifiers import Identifier, IdentifierKind, IdentifierSource
-from lekto.core.domain.ids import ContactId, DocumentId, new_id
 from lekto.core.domain.master_data import Contact
-from lekto.core.domain.open_identifiers import Sighting
 from tests.builders import NOW
+from tests.unit.domain.facts_support import seen
 
 # Since #215 a contact carries no IBANs: its e-mail domains are the numbers with a holder.
 OWN = (IdentifierKind.EMAIL_DOMAIN, "stadtwerke.example")
@@ -27,22 +17,6 @@ SENDER = Holder(HolderKind.SENDER, HolderSource.RULE)
 THIRD = Holder(HolderKind.THIRD_PARTY, HolderSource.RULE)
 
 
-def seen(
-    contact: ContactId, key: tuple[IdentifierKind, str], day: int, holder: Holder | None = None
-) -> Sighting:
-    kind, value = key
-    fact = DocumentFact(
-        kind=kind,
-        value=value,
-        role=role_of(kind),
-        origins=frozenset({FactOrigin.PATTERN}),
-        written=value,
-        position=0,
-        holder=holder,
-    )
-    return Sighting(DocumentId(new_id()), contact, date(2026, 10, day), fact)
-
-
 def test_the_holders_and_the_recommendation_against_the_decisions() -> None:
     utility, bank = (Contact.create(name=name, now=NOW) for name in ("Stadtwerke", "Bank"))
     utility.set_identifiers(
@@ -52,10 +26,10 @@ def test_the_holders_and_the_recommendation_against_the_decisions() -> None:
     bank.set_identifiers([], [Identifier(*PORTAL, IdentifierSource.REJECTED)])
     sightings = [
         # The utility's domain, its own twice: right, and recommended to confirm.
-        seen(utility.id, OWN, 1, SENDER),
-        seen(utility.id, OWN, 2, SENDER),
+        seen(utility.id, OWN, 1, holder=SENDER),
+        seen(utility.id, OWN, 2, holder=SENDER),
         # Another party's at the bank, rejected there: right, and recommended to reject.
-        seen(bank.id, PORTAL, 3, THIRD),
+        seen(bank.id, PORTAL, 3, holder=THIRD),
         # One read before it had a holder, rejected: unread.
         seen(utility.id, OLD, 4),
         # A customer number of one document: no recommendation.
@@ -76,9 +50,9 @@ def test_the_ways_wrong_are_kept_apart() -> None:
     utility = Contact.create(name="Stadtwerke", now=NOW)
     utility.set_identifiers([Identifier(*PORTAL)], [Identifier(*OWN, IdentifierSource.REJECTED)])
     sightings = [
-        seen(utility.id, OWN, 1, SENDER),  # the rule's, rejected: training learned it
-        seen(utility.id, OWN, 2, SENDER),
-        seen(utility.id, PORTAL, 3, THIRD),  # foreign, confirmed
+        seen(utility.id, OWN, 1, holder=SENDER),  # the rule's, rejected: training learned it
+        seen(utility.id, OWN, 2, holder=SENDER),
+        seen(utility.id, PORTAL, 3, holder=THIRD),  # foreign, confirmed
     ]
     found = evaluate([utility], sightings)
     assert found.kinds[DOMAIN] == Tally(learned_rejected=1, refused_confirmed=1)

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
 import pytest
 
@@ -6,8 +6,7 @@ from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import UserId, new_id
 from lekto.core.domain.spaces import PERSONAL_SPACE_NAME, Space, SpaceRole
 from lekto.core.domain.users import Role, User
-
-NOW = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
+from tests.builders import NOW
 
 
 def test_user_has_a_role() -> None:
