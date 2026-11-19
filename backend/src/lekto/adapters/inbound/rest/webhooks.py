@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, area
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, Via, area
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.webhooks import (
@@ -65,13 +65,15 @@ async def list_webhooks(
         "within the reach of the webhook's owner: every document in the spaces they edit, the "
         "green ones in the spaces they read (an admin's webhooks too; the rights of an admin do "
         "not widen them). A signed webhook's answer holds the secret, shown only once. A user "
-        "has at most as many webhooks as `LEKTO_WEBHOOKS_PER_USER` allows (409)."
+        "has at most as many webhooks as `LEKTO_WEBHOOKS_PER_USER` allows (409). Created "
+        "through an API token, it goes with the token: revoking the token deletes it. An "
+        "address that is not public needs, through a token, `admin:private_webhooks`."
     ),
     response_model=WebhookCreated,
     responses=problem_responses(401, 403, 409, 422),
 )
 async def create_webhook(
-    body: WebhookCreate, user: CurrentUser, context: Context
+    body: WebhookCreate, user: CurrentUser, via: Via, context: Context
 ) -> WebhookCreated:
     created = await context.webhooks.create(
         user,
@@ -85,6 +87,7 @@ async def create_webhook(
         body_template=body.body_template,
         max_open_tasks=body.max_open_tasks,
         model_call=None if body.model_call is None else body.model_call.role(),
+        via=via,
     )
     return WebhookCreated.created(created)
 

@@ -12,9 +12,10 @@ from lekto.core.domain.errors import (
     PermissionDeniedError,
     ValidationError,
 )
+from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import DocumentId, EventId, WebhookId, new_id
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.domain.rights import Actor
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.users import Role
 from lekto.core.domain.webhooks import (
     BodyFormat,
@@ -572,3 +573,42 @@ async def test_the_log_names_documents_as_far_as_the_viewer_may_read_them(world:
     assert filed.counts == {DeliveryOutcome.DELIVERED: 1, DeliveryOutcome.GAVE_UP: 1}
     with pytest.raises(NotFoundError):
         await world.webhooks.delivery_summary(Actor(stranger.id), hook.id)
+
+
+async def test_a_webhook_created_through_a_token_goes_with_the_token(world: World) -> None:
+    """Revoking the token deletes the webhooks created through it, the others stay
+    (`.knowledge/plans/token-rights.md`)."""
+    admin = await world.user(role=Role.ADMIN)
+    rights = frozenset({TokenRight.WEBHOOKS_WRITE, TokenRight.ADMIN_PRIVATE_WEBHOOKS})
+    token, _ = await world.auth.create_api_token(Actor(admin.id), "Home Assistant", rights)
+    created = await world.webhooks.create(
+        Actor(admin.id, rights),
+        name="Home Assistant",
+        url="http://127.0.0.1:8123/api/webhook/lekto",
+        event_types=["*"],
+        via=ViaToken.of(token),
+    )
+    kept = await world.webhooks.create(Actor(admin.id), name="kept", url=URL, event_types=["*"])
+    assert created.webhook.api_token_id == token.id
+    assert kept.webhook.api_token_id is None
+
+    await world.auth.revoke_api_token(Actor(admin.id), token.id)
+    with pytest.raises(NotFoundError):
+        await world.webhooks.get(Actor(admin.id), created.webhook.id)
+    assert (await world.webhooks.get(Actor(admin.id), kept.webhook.id)).name == "kept"
+
+
+async def test_a_token_needs_its_right_for_an_address_in_the_own_network(world: World) -> None:
+    """An admin's token reaches an address that is not public only with
+    `admin:private_webhooks`, on creating and on changing the address."""
+    admin = await world.user(role=Role.ADMIN)
+    url = "http://127.0.0.1:8123/api/webhook/lekto"
+    writes = frozenset({TokenRight.WEBHOOKS_WRITE})
+    without = Actor(admin.id, writes)
+    with pytest.raises(ValidationError):
+        await world.webhooks.create(without, name="x", url=url, event_types=["*"])
+    public = await world.webhooks.create(without, name="x", url=URL, event_types=["*"])
+    with pytest.raises(ValidationError):
+        await world.webhooks.update(without, public.webhook.id, url=url)
+    allowed = Actor(admin.id, writes | {TokenRight.ADMIN_PRIVATE_WEBHOOKS})
+    await world.webhooks.update(allowed, public.webhook.id, url=url)

@@ -35,6 +35,7 @@ from lekto.core.domain.first_runs import FieldVerdict, FirstRun, Verdict
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import (
+    ApiTokenId,
     BulkOperationId,
     ContactId,
     DocumentId,
@@ -1097,6 +1098,10 @@ class WebhookRepository(Protocol):
 
     async def list_all(self) -> list[Webhook]:
         """Everybody's webhooks, oldest first."""
+        ...
+
+    async def list_for_token(self, token: ApiTokenId) -> list[Webhook]:
+        """The webhooks created through the API token, oldest first."""
         ...
 
     async def count_for_owner(self, owner: UserId) -> int: ...

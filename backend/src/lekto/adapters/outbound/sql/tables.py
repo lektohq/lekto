@@ -897,6 +897,14 @@ webhooks = Table(
     Column("active", Boolean, nullable=False),
     Column("disabled_reason", json_type(), nullable=True),
     Column("failed_streak", Integer, nullable=False),
+    # The API token it was created through; revoking the token deletes it (the service does).
+    Column(
+        "api_token_id",
+        Uuid,
+        ForeignKey("api_tokens.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    ),
     Column("created_at", UtcDateTime, nullable=False),
     Column("updated_at", UtcDateTime, nullable=False),
     Column("version", Integer, nullable=False),

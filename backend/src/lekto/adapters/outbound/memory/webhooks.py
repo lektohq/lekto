@@ -11,7 +11,7 @@ from uuid import UUID
 from lekto.adapters.outbound.memory.database import WEBHOOK_DELIVERIES, Table
 from lekto.adapters.outbound.memory.rows import _REMOVED, MemoryRepository, _copy
 from lekto.core.domain.errors import NotFoundError
-from lekto.core.domain.ids import UserId, WebhookId
+from lekto.core.domain.ids import ApiTokenId, UserId, WebhookId
 from lekto.core.domain.webhooks import DeliveryOutcome, Webhook, WebhookDelivery
 from lekto.core.ports.repository import PAGE_SIZE
 
@@ -53,6 +53,9 @@ class MemoryWebhookRepository(MemoryRepository[WebhookId, Webhook]):
 
     async def list_all(self) -> list[Webhook]:
         return self._oldest_first(self._all())
+
+    async def list_for_token(self, token: ApiTokenId) -> list[Webhook]:
+        return self._oldest_first(row for row in self._all() if row.api_token_id == token)
 
     async def count_for_owner(self, owner: UserId) -> int:
         return sum(1 for row in self._all() if row.owner_id == owner)

@@ -4344,6 +4344,24 @@ class MigrationSuite:
             back = dict(await _read_all(connection, sa.select(tokens.c.id, tokens.c.scope)))
         assert back == {id: scope.value for (_, scope), id in scopes.items()}
 
+    async def test_revision_0082_gives_webhooks_their_token_and_back(
+        self, empty_database: Database
+    ) -> None:
+        """Revision 0082: a webhook gets the API token it was created through (none for those
+        before); the downgrade drops it."""
+        await migrate(empty_database, "0081")
+        async with empty_database.reading() as connection:
+            schema = await connection.run_sync(_schema)
+        await migrate(empty_database)
+        async with empty_database.reading() as connection:
+            columns = await connection.run_sync(
+                lambda sync: {item["name"] for item in sa.inspect(sync).get_columns("webhooks")}
+            )
+        assert "api_token_id" in columns
+        await downgrade(empty_database, "0081")
+        async with empty_database.reading() as connection:
+            assert await connection.run_sync(_schema) == schema
+
     async def test_revision_0067_turns_the_json_null_into_null(
         self, empty_database: Database
     ) -> None:
@@ -4660,12 +4678,25 @@ def _drawer(table: sa.TableClause) -> sa.TableClause:
 _INBOX_COLUMNS = frozenset({"new_at", "processing_baseline", "processing_decided"})
 
 
+def _before_0082(table: sa.Table) -> sa.TableClause:
+    """`table` as the revisions before 0082 had it: no token a webhook was created through."""
+    added = {"webhooks": {"api_token_id"}}
+    return sa.table(
+        table.name,
+        *(sa.column(c.name, c.type) for c in table.c if c.name not in added.get(table.name, ())),
+    )
+
+
 def _before_0077(table: sa.Table) -> sa.TableClause:
     """`table` as the revisions before 0077 had it: no run that reads a new version."""
     added = {"documents": {"processing_new_version"}}
     return sa.table(
         table.name,
-        *(sa.column(c.name, c.type) for c in table.c if c.name not in added.get(table.name, ())),
+        *(
+            sa.column(c.name, c.type)
+            for c in _before_0082(table).c
+            if c.name not in added.get(table.name, ())
+        ),
     )
 
 

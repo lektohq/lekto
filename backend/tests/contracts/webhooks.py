@@ -6,7 +6,9 @@ from datetime import timedelta
 import pytest
 
 from lekto.core.domain.errors import ConcurrencyError, NotFoundError
+from lekto.core.domain.identity import ApiToken
 from lekto.core.domain.ids import DeliveryId, DocumentId, EventId, new_id
+from lekto.core.domain.rights import TokenRight
 from lekto.core.domain.users import User
 from lekto.core.domain.webhooks import (
     ALL_EVENTS,
@@ -148,6 +150,28 @@ class WebhookRepositoryContract:
             assert [w.name for w in await uow.webhooks.list_all()] == ["first", "second", "foreign"]
             assert await uow.webhooks.count_for_owner(owner.id) == 2
             assert await uow.webhooks.count_for_owner(other.id) == 1
+
+    async def test_webhooks_are_listed_by_the_token_they_came_through(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        owner = await a_user(uow_factory)
+        token, _ = ApiToken.issue(
+            user_id=owner.id,
+            name="Home Assistant",
+            rights=frozenset({TokenRight.WEBHOOKS_WRITE}),
+            now=NOW,
+        )
+        through = a_webhook(owner, name="through", api_token_id=token.id)
+        other = a_webhook(owner, name="other", at=HOUR)
+        async with uow_factory() as uow:
+            await uow.api_tokens.add(token)
+            for webhook in (through, other):
+                await uow.webhooks.add(webhook)
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert [w.name for w in await uow.webhooks.list_for_token(token.id)] == ["through"]
+            assert (await uow.webhooks.get(through.id)).api_token_id == token.id
+            assert (await uow.webhooks.get(other.id)).api_token_id is None
 
     async def test_active_for_an_event_type_lists_those_that_want_it(
         self, uow_factory: UnitOfWorkFactory
