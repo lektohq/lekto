@@ -44,6 +44,7 @@ class SqlWakeup:
         self._signals: list[InProcessSignal] = []
         self._listener: asyncio.Task[None] | None = None
         self._listening = False
+        self._failures = 0  # breaks of the connection in a row, since it last listened
         self._closed = False
         if database.is_sqlite:
             database.listeners.append(self._signal)
@@ -78,23 +79,25 @@ class SqlWakeup:
             signal.raise_for(channel, kind)
 
     async def _listen_forever(self) -> None:
-        failures = 0
         while True:
             try:
                 await self._listen()
             except asyncio.CancelledError:
                 raise
             except Exception:
-                failures += 1
-                delay = min(RECONNECT_DELAY * (1 << min(failures, 10)), RECONNECT_MAX_DELAY)
-                log.warning(
-                    "listening for notifications failed; connecting again",
-                    extra={"failures": failures, "delay": delay.total_seconds()},
-                    exc_info=True,
-                )
-                await asyncio.sleep(delay.total_seconds())
-            else:
-                failures = 0
+                await asyncio.sleep(self._failed().total_seconds())
+
+    def _failed(self) -> timedelta:
+        """One more break in a row: how long to wait before connecting again, longer after
+        each (`_listen` counts anew once it listens; SQ-02)."""
+        self._failures += 1
+        delay = min(RECONNECT_DELAY * (1 << min(self._failures, 10)), RECONNECT_MAX_DELAY)
+        log.warning(
+            "listening for notifications failed; connecting again",
+            extra={"failures": self._failures, "delay": delay.total_seconds()},
+            exc_info=True,
+        )
+        return delay
 
     async def _listen(self) -> None:
         """Listen on one connection until it ends; raises when it breaks."""
@@ -113,6 +116,7 @@ class SqlWakeup:
                 await connection.add_listener(name, on_notification)
             connection.add_termination_listener(on_termination)
             self._listening = True
+            self._failures = 0  # it listens: the next break is a first one again
             log.info("listening for notifications")
             # Connected: whatever was committed while not listening is looked at once.
             for signal in self._signals:
