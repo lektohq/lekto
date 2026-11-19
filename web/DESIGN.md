@@ -629,8 +629,7 @@ line (`border-t`), then one `button` the width of the card, at least 44 px: a `C
 font-medium`) and below it what they are (`text-xs text-muted-foreground`); `aria-expanded` and
 `aria-controls`. Closed at first; opened, it stays open while the page shows the same thing. The
 rows inside look as elsewhere in the card, indented to the text of the button (`pl-6`). A whole
-card that folds is `FilterSection`. Under one row of a list it folds what belongs to that row alone
-(an API token's rights, [Settings](#settings)).
+card that folds is `FilterSection`.
 
 **Grouped by contact** (`IdentifiersEditor` with `contacts`: the identifiers at contacts, Tobi
 02.11.2026): where the rows of a list belong to different contacts, one line per contact, a
@@ -732,7 +731,10 @@ list pages the same way (see [Lists](#lists)).
   as well, without asking (rejecting an open identifier beside taking it over): `outline` at the
   start of the footer; on the phone below the fields.
 - **Delete in an editor:** a `FormDialog` or `EditorShell` with `ondelete` shows "Löschen" at the
-  start of its footer, apart from the two actions, and asks with `ConfirmDialog`.
+  start of its footer, apart from the two actions, and asks with `ConfirmDialog`. Where deleting
+  has another word, `deleteLabel` gives it ("Widerrufen" of an API token). An `EditorShell`
+  without an action of its own but with `ondelete` (something nobody changes, only removes: an
+  API token) has a footer on desktop too: deleting at its start, "Fertig" (`default`) at its end.
 - **Dialog footer:** see [Patterns](#footers).
 - **Beam:** the one sheet from the right with content (see [Beam](#beam)).
 - A dialog title names its object: "„Stromrechnung Oktober“ löschen", never a bare "Löschen".
@@ -969,14 +971,18 @@ linking an account came back with an error the sign-in), the last with its count
 - **Anmeldung:** password, second factor, single sign-on, sessions.
 - **Benachrichtigungen:** this device, when, the locked screen, the devices ([App](#app)).
 - **API-Tokens:** on iPhone, iPad and Mac first the shortcut ([App](#app)), then the tokens.
-  A token's badge names its preset ("Lesen", "Lesen und Schreiben", "Nur hochladen") or "Eigene
-  Rechte: n"; under its row its rights fold away (`FoldedGroup`, "14 Rechte", one line per area
-  in words: "Dokumente: Lesen, Hochladen", then the admin rights). A new token takes a preset or
-  "Eigene Rechte" in its `Select`; with the latter one `fieldset` per area follows, its name as
-  the legend and a `Choice` per right beside each other ("Lesen", "Ändern"; the documents also
-  "Nur zählen" and "Hochladen"), and for an admin the admin rights apart, one `Choice` each, with
-  the line that they count only while the user is an admin (Tobi, 19.11.2026,
-  `.knowledge/plans/token-rights.md`).
+  A token's row: its name opens its dialog (the row's `after:absolute` link), below it last use
+  and expiry, the badge of its preset ("Lesen", "Lesen und Schreiben", "Nur hochladen") or "Eigene
+  Rechte: n", a `ChevronRight`; nothing else in the row. Its dialog (`EditorShell` without
+  `action`, `md`, the token's name as title, that a token does not change as description) shows
+  created, used and expiry, then its rights in the arrangement of choosing them, each a `Check`
+  (`primary`) or a `Minus` (muted) with its word, the admin rights apart for an admin;
+  "Widerrufen" deletes it (`ondelete`, `deleteLabel`). A new token takes a preset or "Eigene
+  Rechte" in its `Select`; with the latter one `fieldset` per area follows, its name as the legend
+  and a `Choice` per right beside each other ("Lesen", "Ändern"; the documents also "Nur zählen"
+  and "Hochladen"), and for an admin the admin rights apart, one `Choice` each, with the line
+  that they count only while the user is an admin (Tobi, 19.11.2026,
+  `.knowledge/plans/token-rights.md`, after a mock).
 - **Kennungen bei Kontakten:** the identifiers at contacts, grouped by contact ("Lists").
 
 A tab with a form saves only its own part, and guards it ("Saving and leaving").

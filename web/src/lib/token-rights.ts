@@ -80,22 +80,3 @@ export const ADMIN_RIGHTS = [
 ] as const satisfies readonly Right[];
 
 export type AdminRight = (typeof ADMIN_RIGHTS)[number];
-
-export function isAdminRight(right: Right): right is AdminRight {
-	return (ADMIN_RIGHTS as readonly Right[]).includes(right);
-}
-
-/** `rights` by area, in the dialog's order, with the verbs each holds; the admin rights apart. */
-export function grouped(rights: readonly Right[]): {
-	areas: { area: Area; verbs: Verb[] }[];
-	admin: AdminRight[];
-} {
-	const held = new Set(rights);
-	return {
-		areas: AREAS.map(({ area, rights: own }) => ({
-			area,
-			verbs: own.filter(([right]) => held.has(right)).map(([, verb]) => verb)
-		})).filter(({ verbs }) => verbs.length > 0),
-		admin: ADMIN_RIGHTS.filter((right) => held.has(right))
-	};
-}
