@@ -40,6 +40,11 @@ release and, while there is none, the newest beta. The image knows its version (
 set from the tag): the API description, the MCP server and the processing log name it. Building
 it yourself (above) is for development.
 
+Releases build one after the other, and GitHub keeps only one waiting: a release published while
+one builds and another waits replaces the waiting one, which ends as cancelled and leaves its
+release without an image. Run the workflow `Release` by hand (Actions, Run workflow) with that
+release's tag; an older release built again takes no channel tag from a newer one.
+
 Last, a published release whose image got `latest` tells the homelab its version: the job
 `homelab` checks the version (`0.7.0`, `1.2.0-beta.1`) and sends a `repository_dispatch`
 (`lekto-release`, `client_payload.version`), which must answer HTTP 204. The homelab then enters

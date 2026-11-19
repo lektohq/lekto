@@ -30,7 +30,10 @@ on:
 permissions:
   contents: read
 
-# One release at a time: the channel tags must not race.
+# One release at a time: the channel tags must not race. GitHub keeps one run waiting per group,
+# and a newer one replaces it: a release published while one builds and another waits cancels the
+# waiting one, whose release then has no image. Build it by hand (`workflow_dispatch` with its
+# tag); as the older release, it takes no channel tag from a newer one (`image_tags.py`).
 concurrency:
   group: release
   cancel-in-progress: false
