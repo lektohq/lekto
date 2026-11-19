@@ -14,6 +14,7 @@ from lekto.core.domain.ids import ContactId, DocumentTypeId, SpaceId, TagId
 from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.master_data import Contact, Tag
 from lekto.core.domain.pipeline import Node, NodeResult, NodeRun, Outcome
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rules import (
     Action,
     AddTags,
@@ -286,20 +287,20 @@ class RuleWorld:
     # --- seeding ---------------------------------------------------------------------------------
 
     async def contact(self, name: str) -> Contact:
-        return await self.world.master_data.create_contact(self.admin.id, name)
+        return await self.world.master_data.create_contact(Actor(self.admin.id), name)
 
     async def tag(self, name: str) -> Tag:
-        return await self.world.master_data.create_tag(self.admin.id, name)
+        return await self.world.master_data.create_tag(Actor(self.admin.id), name)
 
     async def personal_rule(self, owner: User, rule: RuleDefinition) -> Rule:
         """A rule of `owner`'s personal space, where their uploads land."""
-        return await self.rules.create(owner.id, RuleScope.SPACE, rule)
+        return await self.rules.create(Actor(owner.id), RuleScope.SPACE, rule)
 
     async def space_rule(self, author: User, space: SpaceId, rule: RuleDefinition) -> Rule:
-        return await self.rules.create(author.id, RuleScope.SPACE, rule, space=space)
+        return await self.rules.create(Actor(author.id), RuleScope.SPACE, rule, space=space)
 
     async def global_rule(self, rule: RuleDefinition) -> Rule:
-        return await self.rules.create(self.admin.id, RuleScope.GLOBAL, rule)
+        return await self.rules.create(Actor(self.admin.id), RuleScope.GLOBAL, rule)
 
     async def arrive(
         self,
@@ -315,7 +316,9 @@ class RuleWorld:
         """Upload a document, give it `text` as its parsed Markdown, process it; the stored
         document."""
         pipeline = self.pipeline(classify, fields, facts)
-        received = await pipeline.receive(owner.id, incoming_pdf(), filename=filename, space=space)
+        received = await pipeline.receive(
+            Actor(owner.id), incoming_pdf(), filename=filename, space=space
+        )
         if text is not None:
             await self.world.object_store.put(
                 text_key(received.id), text.encode(), content_type="text/markdown"
@@ -339,7 +342,7 @@ class RuleWorld:
         ]
 
     async def deactivate(self, user: User) -> None:
-        await self.world.users.update(self.admin.id, user.id, active=False)
+        await self.world.users.update(Actor(self.admin.id), user.id, active=False)
 
 
 def incoming_pdf() -> IncomingFile:

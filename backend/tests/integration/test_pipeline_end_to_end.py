@@ -16,6 +16,7 @@ from lekto.composition.container import build_memory_container, build_services
 from lekto.composition.settings import Settings
 from lekto.core.domain import media_types
 from lekto.core.domain.pipeline import Lane, Node
+from lekto.core.domain.rights import Actor
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.services.objects import archive_key, preview_key, structure_key, text_key
 from tests import builders, probes
@@ -59,12 +60,12 @@ async def test_scan_and_photo_are_processed(
     owner = await builders.seed_user(container.unit_of_work)
 
     document = await services.pipeline.receive(
-        owner.id, incoming((SAMPLES / sample).read_bytes()), filename=sample
+        Actor(owner.id), incoming((SAMPLES / sample).read_bytes()), filename=sample
     )
     await builders.drain(services.pipeline)
 
-    stored = await services.documents.get(owner.id, document.id)
-    log = await services.documents.processing_log(owner.id, document.id)
+    stored = await services.documents.get(Actor(owner.id), document.id)
+    log = await services.documents.processing_log(Actor(owner.id), document.id)
     assert stored.lane is Lane.GREEN, [entry.result for entry in log]
     assert (await object_store.get(archive_key(document.id))).startswith(b"%PDF-")
     assert (await object_store.get(preview_key(document.id)))[8:12] == b"WEBP"

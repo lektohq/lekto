@@ -29,6 +29,7 @@ from lekto.core.domain.pipeline import (
     ProcessingStatus,
 )
 from lekto.core.domain.reasons import ReasonCode
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.tasks import TaskKind, TaskStatus
 from lekto.core.domain.users import Role, User
 from lekto.core.domain.webhooks import ModelCallKind, ModelCallRole, Webhook
@@ -134,7 +135,7 @@ async def calls(world: World, *kinds: ModelCallKind) -> Calls:
     webhooks = {
         kind: (
             await world.webhooks.create(
-                admin.id,
+                Actor(admin.id),
                 name=f"Agent {kind}",
                 url=URL,
                 event_types=[],
@@ -283,7 +284,7 @@ async def test_the_links_give_the_files_until_the_deadline(world: World) -> None
         await fetch(sent["structure"], expires=expires)  # the end is signed too
     with pytest.raises(AuthenticationError):
         await fetch(sent["structure"].replace("content.json", "pages/1.webp"))
-    await world.documents.delete(f.admin.id, document.id)
+    await world.documents.delete(Actor(f.admin.id), document.id)
     with pytest.raises(ConflictError):
         await fetch(sent["page_images"][0])
     world.clock.advance(timedelta(minutes=10))
@@ -345,7 +346,7 @@ async def test_an_error_or_no_answer_makes_the_document_red(world: World, error:
 async def test_without_a_serving_webhook_the_signal_abstains_as_before(world: World) -> None:
     f = await calls(world, ModelCallKind.PROPOSE)
     webhook = f.webhooks[ModelCallKind.PROPOSE]
-    await world.webhooks.update(f.admin.id, webhook.id, active=False)
+    await world.webhooks.update(Actor(f.admin.id), webhook.id, active=False)
     document = await f.arrive()
     assert f.sent() == []
     result = await f.node(document, Node.SIGNAL_LLM)
@@ -394,7 +395,7 @@ async def test_the_pipeline_runs_a_node_anew_at_once_when_asked(world: World) ->
     owner = await world.user()
     again = Again()
     pipeline = builders.skip_classification(world.pipeline({Node.SIGNAL_LLM: again}))
-    received = await pipeline.receive(owner.id, incoming_pdf(), filename="a.pdf")
+    received = await pipeline.receive(Actor(owner.id), incoming_pdf(), filename="a.pdf")
     while await pipeline.run_next_job():
         pass
     async with world.uow() as uow:
@@ -407,13 +408,13 @@ async def test_the_pipeline_runs_a_node_anew_at_once_when_asked(world: World) ->
 async def test_a_queued_model_call_whose_webhook_went_asks_the_model_again(world: World) -> None:
     f = await calls(world, ModelCallKind.PROPOSE)
     webhook = f.webhooks[ModelCallKind.PROPOSE]
-    await world.webhooks.update(f.admin.id, webhook.id, max_open_tasks=1)
+    await world.webhooks.update(Actor(f.admin.id), webhook.id, max_open_tasks=1)
     first = await f.arrive()
     second = await f.arrive()
     async with world.uow() as uow:
         (queued,) = await uow.tasks.list_for_run(second.id, Node.SIGNAL_LLM, 1)
     assert queued.status is TaskStatus.QUEUED and len(f.sent()) == 1
-    await world.webhooks.delete(f.admin.id, webhook.id)
+    await world.webhooks.delete(Actor(f.admin.id), webhook.id)
     await f.run()
     # No webhook serves any more and there is no model: the signal abstains, as without both.
     result = await f.node(second, Node.SIGNAL_LLM)
@@ -440,7 +441,7 @@ async def test_a_role_that_moved_on_meanwhile_sends_nothing(world: World) -> Non
     f = await calls(world, ModelCallKind.PROPOSE)
     webhook = f.webhooks[ModelCallKind.PROPOSE]
     owner = await world.user()
-    received = await f.pipeline.receive(owner.id, incoming_pdf(), filename="a.pdf")
+    received = await f.pipeline.receive(Actor(owner.id), incoming_pdf(), filename="a.pdf")
     async with world.uow() as uow:
         document = await uow.documents.get(received.id)
     await world.object_store.put(text_key(document.id), INVOICE.encode(), content_type="text/plain")
@@ -449,7 +450,7 @@ async def test_a_role_that_moved_on_meanwhile_sends_nothing(world: World) -> Non
     )
     call = await signal.run(document)  # the node reads the role ...
     assert isinstance(call, ExternalCall) and call.context is not None
-    await world.webhooks.update(f.admin.id, webhook.id, model_call=None)  # ... it goes
+    await world.webhooks.update(Actor(f.admin.id), webhook.id, model_call=None)  # ... it goes
     async with world.uow() as uow:
         stored = await uow.documents.get(document.id)
         assert await call.apply(uow, stored, world.clock.now()) == Delegation(None, again=True)
@@ -461,7 +462,7 @@ async def test_a_run_that_failed_meanwhile_sends_nothing_and_frees_the_queue(
 ) -> None:
     f = await calls(world, ModelCallKind.PROPOSE)
     webhook = f.webhooks[ModelCallKind.PROPOSE]
-    await world.webhooks.update(f.admin.id, webhook.id, max_open_tasks=1)
+    await world.webhooks.update(Actor(f.admin.id), webhook.id, max_open_tasks=1)
     await f.arrive()
     second = await f.arrive()
     third = await f.arrive()

@@ -155,7 +155,7 @@ async def logout(principal: SessionPrincipal, response: Response, context: Conte
     responses=problem_responses(401),
 )
 async def me(principal: Authenticated, request: Request, context: Context) -> Me:
-    account = await context.users.own_account(principal.id)
+    account = await context.users.own_account(principal.actor)
     session, token = principal.session, principal.api_token
     cookie = request.cookies.get(session_cookie_name(context)) if session else None
     return Me(
@@ -180,7 +180,7 @@ async def me(principal: Authenticated, request: Request, context: Context) -> Me
     responses=problem_responses(401, 403),
 )
 async def own_profile(principal: SessionPrincipal, context: Context) -> ProfileOut:
-    return ProfileOut.of(await context.profiles.get(principal.id, principal.id))
+    return ProfileOut.of(await context.profiles.get(principal.actor, principal.id))
 
 
 @router.patch(
@@ -196,7 +196,7 @@ async def own_profile(principal: SessionPrincipal, context: Context) -> ProfileO
 async def change_own_profile(
     body: ProfilePatch, principal: SessionPrincipal, context: Context
 ) -> ProfileOut:
-    changed = await context.profiles.update(principal.id, principal.id, body.changes())
+    changed = await context.profiles.update(principal.actor, principal.id, body.changes())
     return ProfileOut.of(changed)
 
 
@@ -220,7 +220,7 @@ async def change_password(
 ) -> SessionOut:
     assert principal.session is not None
     signed_in = await context.auth.change_password(
-        principal.id,
+        principal.actor,
         body.current_password.get_secret_value(),
         body.new_password.get_secret_value(),
         session=principal.session.id,
@@ -242,7 +242,7 @@ async def change_password(
 )
 async def end_other_sessions(principal: SessionPrincipal, context: Context) -> SessionsEnded:
     assert principal.session is not None
-    ended = await context.auth.end_other_sessions(principal.id, keep=principal.session.id)
+    ended = await context.auth.end_other_sessions(principal.actor, keep=principal.session.id)
     return SessionsEnded(ended=ended)
 
 
@@ -261,7 +261,7 @@ async def end_other_sessions(principal: SessionPrincipal, context: Context) -> S
     responses=problem_responses(401, 403, 409),
 )
 async def begin_totp(principal: SessionPrincipal, context: Context) -> TotpSetupOut:
-    setup = await context.auth.begin_totp(principal.id)
+    setup = await context.auth.begin_totp(principal.actor)
     return TotpSetupOut(secret=setup.secret, otpauth_uri=setup.uri)
 
 
@@ -276,7 +276,7 @@ async def begin_totp(principal: SessionPrincipal, context: Context) -> TotpSetup
 async def confirm_totp(
     body: CodeIn, principal: SessionPrincipal, context: Context
 ) -> RecoveryCodes:
-    return RecoveryCodes(recovery_codes=await context.auth.confirm_totp(principal.id, body.code))
+    return RecoveryCodes(recovery_codes=await context.auth.confirm_totp(principal.actor, body.code))
 
 
 @router.post(
@@ -287,7 +287,7 @@ async def confirm_totp(
     responses=problem_responses(401, 403, 409, 422, 429),
 )
 async def disable_totp(body: CodeIn, principal: SessionPrincipal, context: Context) -> None:
-    await context.auth.disable_totp(principal.id, body.code)
+    await context.auth.disable_totp(principal.actor, body.code)
 
 
 @router.post(
@@ -301,7 +301,7 @@ async def disable_totp(body: CodeIn, principal: SessionPrincipal, context: Conte
 async def renew_recovery_codes(
     body: CodeIn, principal: SessionPrincipal, context: Context
 ) -> RecoveryCodes:
-    codes = await context.auth.renew_recovery_codes(principal.id, body.code)
+    codes = await context.auth.renew_recovery_codes(principal.actor, body.code)
     return RecoveryCodes(recovery_codes=codes)
 
 
@@ -316,7 +316,7 @@ async def renew_recovery_codes(
     responses=problem_responses(401, 403),
 )
 async def list_tokens(principal: SessionPrincipal, context: Context) -> list[TokenOut]:
-    return [TokenOut.of(token) for token in await context.auth.list_api_tokens(principal.id)]
+    return [TokenOut.of(token) for token in await context.auth.list_api_tokens(principal.actor)]
 
 
 @router.post(
@@ -334,7 +334,7 @@ async def create_token(
     body: TokenCreate, principal: SessionPrincipal, context: Context
 ) -> TokenCreated:
     token, value = await context.auth.create_api_token(
-        principal.id,
+        principal.actor,
         body.name,
         body.scope,
         expires_at=None if body.expires_at is None else to_utc(body.expires_at, "expires_at"),
@@ -350,7 +350,7 @@ async def create_token(
     responses=problem_responses(401, 403, 404, 422),
 )
 async def revoke_token(id: UUID, principal: SessionPrincipal, context: Context) -> None:
-    await context.auth.revoke_api_token(principal.id, ApiTokenId(id))
+    await context.auth.revoke_api_token(principal.actor, ApiTokenId(id))
 
 
 # --- OpenID Connect -----------------------------------------------------------------------------
@@ -475,7 +475,7 @@ async def oidc_link(
     oidc: Oidc,
     next: Next = None,
 ) -> AuthorizationUrl:
-    start = await oidc.begin_link(principal.id, next)
+    start = await oidc.begin_link(principal.actor, next)
     set_flow_cookie(response, context, start.flow)
     return AuthorizationUrl(authorization_url=start.url)
 
@@ -489,4 +489,4 @@ async def oidc_link(
     responses=problem_responses(401, 403, 404, 409),
 )
 async def oidc_unlink(principal: SessionPrincipal, oidc: Oidc) -> Removed:
-    return Removed(removed=await oidc.unlink(principal.id))
+    return Removed(removed=await oidc.unlink(principal.actor))

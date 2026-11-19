@@ -88,7 +88,7 @@ def add_master_data_tools(tools: Tools, context: ApiContext) -> None:
     async def contacts_list(
         ctx: Context, query: Annotated[str | None, Field(max_length=100)] = None
     ) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         names = await Names.load(context, user)
         counts = await context.documents.document_counts(user, CountBy.CONTACT)
         wanted = None if query is None else query.casefold()
@@ -109,7 +109,7 @@ def add_master_data_tools(tools: Tools, context: ApiContext) -> None:
         "entered by hand or learned by training, with their topic.",
     )
     async def contacts_get(ctx: Context, name: str) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         names = await Names.load(context, user)
         contact = await context.master_data.get_contact(user, names.find_contact(name))
         counts = await context.documents.document_counts(user, CountBy.CONTACT)
@@ -133,7 +133,7 @@ def add_master_data_tools(tools: Tools, context: ApiContext) -> None:
         "they have.",
     )
     async def document_types_list(ctx: Context) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         names = await Names.load(context, user)
         counts = await context.documents.document_counts(user, CountBy.DOCUMENT_TYPE)
         fields = list(names.fields.values())
@@ -159,7 +159,7 @@ def add_master_data_tools(tools: Tools, context: ApiContext) -> None:
         "choice, link, period), choices, the document types they apply to (none: every type).",
     )
     async def fields_list(ctx: Context) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         names = await Names.load(context, user)
         return compact(
             FieldsOut(
@@ -195,7 +195,7 @@ def add_master_data_tools(tools: Tools, context: ApiContext) -> None:
     async def tags_list(
         ctx: Context, scope: Annotated[Scope | None, Field(description="Default: all.")] = None
     ) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         tree = TagTree.of(await context.master_data.list_tags(user))
         scopes = list(TagScope) if scope is None else [TagScope(scope)]
         return compact(

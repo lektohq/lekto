@@ -21,9 +21,10 @@ from lekto.core.domain.documents import Channel
 from lekto.core.domain.first_runs import FACTS, JUDGED_FIELDS, RELATIONS, Verdict
 from lekto.core.domain.holder_evaluation import Case, HolderEvaluation, HolderOutcome, evaluate
 from lekto.core.domain.identifiers import CONTACT_KINDS, IdentifierKind
-from lekto.core.domain.ids import ContactId, UserId
+from lekto.core.domain.ids import ContactId
 from lekto.core.domain.pipeline import NODES, Lane, Node
 from lekto.core.domain.reasons import Action
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.statistics import percentiles
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.repository import FactsScope, LaneCount
@@ -152,7 +153,7 @@ class AutomationService:
 
     async def report(
         self,
-        actor: UserId,
+        actor: Actor,
         *,
         channels: Collection[Channel] = DEFAULT_CHANNELS,
         period: Period = Period.MONTHS_12,
@@ -198,7 +199,7 @@ class AutomationService:
 
     async def signals(
         self,
-        actor: UserId,
+        actor: Actor,
         *,
         channels: Collection[Channel] = DEFAULT_CHANNELS,
         period: Period = Period.MONTHS_12,
@@ -239,7 +240,7 @@ class AutomationService:
 
         return await self._kept.get(("signals", chosen, period, str(zone)), count)
 
-    async def holders(self, actor: UserId) -> HolderEvaluation:
+    async def holders(self, actor: Actor) -> HolderEvaluation:
         """The holders and the open list's recommendations against the decisions at the
         contacts (`domain.holder_evaluation`; admins: it reads the master data)."""
         async with self._uow() as uow:
@@ -254,7 +255,7 @@ class AutomationService:
         return await self._kept.get(("holders",), count)
 
     async def holder_cases(
-        self, actor: UserId, measure: IdentifierKind | None, outcome: HolderOutcome
+        self, actor: Actor, measure: IdentifierKind | None, outcome: HolderOutcome
     ) -> tuple[list[Case], dict[ContactId, str]]:
         """The decisions behind one number of `holders` (admins): measured by the holders of
         `measure` (None: the recommendation) with `outcome`, at most `MAX_CASES`, with the names
@@ -268,7 +269,7 @@ class AutomationService:
         wanted = {case.contact for case in cases}
         return cases, {contact.id: contact.name for contact in contacts if contact.id in wanted}
 
-    async def _actor(self, actor: UserId) -> None:
+    async def _actor(self, actor: Actor) -> None:
         async with self._uow() as uow:
             await load_actor(uow, actor)
 

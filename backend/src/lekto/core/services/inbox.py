@@ -69,6 +69,7 @@ from lekto.core.domain.pipeline import (
     via_entry,
 )
 from lekto.core.domain.reasons import Action, Reason, text_of
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
@@ -446,7 +447,7 @@ class InboxService:
 
     async def items(
         self,
-        actor: UserId,
+        actor: Actor,
         *,
         tab: InboxTab | None = None,
         after: DocumentId | None = None,
@@ -463,8 +464,8 @@ class InboxService:
             user = await load_lister(uow, actor, all_users, Action.SEE_ALL_INBOXES)
             since = self._clock.now() - DONE_PERIOD
             entries = await uow.inbox.query(
-                actor,
-                editor=None if all_users else actor,
+                actor.id,
+                editor=None if all_users else actor.id,
                 tab=tab,
                 since=since,
                 after=await _position(uow, user, tab, after, everyone=all_users),
@@ -476,7 +477,7 @@ class InboxService:
                 document = entry.document
                 state = inbox_state(
                     document,
-                    viewer=actor,
+                    viewer=actor.id,
                     seen_at=entry.seen_at,
                     confirmation=entry.confirmation,
                     since=since,
@@ -486,7 +487,7 @@ class InboxService:
                 if state is None:
                     log.error(
                         "the repository listed a document that is not in the inbox",
-                        extra={"document_id": str(document.id), "user_id": str(actor)},
+                        extra={"document_id": str(document.id), "user_id": str(actor.id)},
                     )
                     continue
                 if document.space_id not in spaces:
@@ -496,21 +497,21 @@ class InboxService:
                 items.append(InboxItem(document, access, await _open(uow, user, document), state))
         return items
 
-    async def summary(self, actor: UserId, *, all_users: bool = False) -> InboxSummary:
+    async def summary(self, actor: Actor, *, all_users: bool = False) -> InboxSummary:
         """How many documents stand under each tab of the caller's inbox (with `all_users`,
         admins only: every user's), and the worst lane among the open ones."""
         async with self._uow() as uow:
-            await load_lister(uow, actor, all_users, Action.SEE_ALL_INBOXES)
+            await load_lister(
+                uow, actor, all_users, Action.SEE_ALL_INBOXES, TokenRight.ADMIN_COUNT_ALL
+            )
             counts = await uow.inbox.count(
-                actor,
-                editor=None if all_users else actor,
+                actor.id,
+                editor=None if all_users else actor.id,
                 since=self._clock.now() - DONE_PERIOD,
             )
         return InboxSummary(counts, worst_lane(counts))
 
-    async def mark_seen(
-        self, actor: UserId, id: DocumentId, *, via: ViaToken | None = None
-    ) -> None:
+    async def mark_seen(self, actor: Actor, id: DocumentId, *, via: ViaToken | None = None) -> None:
         """The caller saw the document (through the API token `via`): the web UI reports it
         when the document view opens (reading a document through the API or MCP does not).
         NotFoundError if they cannot read it. Only a document that is new and unseen by the
@@ -522,29 +523,29 @@ class InboxService:
             document, space = await readable_document(uow, user, id)
             if document.new_at is None or not can_edit_document(user, document, space):
                 return
-            seen = await uow.inbox.seen(actor, [id])
+            seen = await uow.inbox.seen(actor.id, [id])
             if not is_unseen(document, seen.get(id)):
                 return
-            await uow.inbox.mark_seen(actor, id, self._clock.now(), via=via)
+            await uow.inbox.mark_seen(actor.id, id, self._clock.now(), via=via)
             await uow.commit()
 
-    async def mark_unseen(self, actor: UserId, id: DocumentId) -> None:
+    async def mark_unseen(self, actor: Actor, id: DocumentId) -> None:
         """Mark the document as new again: the caller's seen is forgotten, and it stands new in
         their inbox while it is new. NotFoundError if they cannot read it."""
         async with self._uow() as uow:
             await readable_document(uow, await load_actor(uow, actor), id)
-            await uow.inbox.unmark_seen(actor, id)
+            await uow.inbox.unmark_seen(actor.id, id)
             await uow.commit()
 
     async def mark_all_seen(
-        self, actor: UserId, *, all_users: bool = False, via: ViaToken | None = None
+        self, actor: Actor, *, all_users: bool = False, via: ViaToken | None = None
     ) -> int:
         """Mark everything new in the caller's inbox (with `all_users`, admins only: in every
         user's) as seen by them (through `via`); returns how many documents."""
         async with self._uow() as uow:
             await load_lister(uow, actor, all_users, Action.SEE_ALL_INBOXES)
             count = await uow.inbox.mark_all_seen(
-                actor, editor=None if all_users else actor, at=self._clock.now(), via=via
+                actor.id, editor=None if all_users else actor.id, at=self._clock.now(), via=via
             )
             await uow.commit()
         return count

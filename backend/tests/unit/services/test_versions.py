@@ -19,6 +19,7 @@ from lekto.core.domain.errors import (
 )
 from lekto.core.domain.pipeline import Lane, Node, Outcome, ProcessingStatus
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.versions import DocumentVersion, VersionKind
 from lekto.core.services.classification.nodes import _kept
 from lekto.core.services.objects import archive_key, derivative_keys, original_key, page_key
@@ -58,7 +59,9 @@ async def with_earlier_version(world: World, document: Document) -> DocumentVers
 
 async def test_a_document_comes_in_as_its_first_version(world: World) -> None:
     owner = await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(STACK), filename="stack.pdf"
+    )
     async with world.uow() as uow:
         assert await uow.document_versions.of_document(document.id) == [
             DocumentVersion(
@@ -78,14 +81,16 @@ async def test_the_file_of_any_version_is_a_duplicate(world: World) -> None:
     """Every file exists once, an earlier version's too (Tobi, 10.11.2026): the error names
     the document and the version to who may read it."""
     owner, stranger = await world.user(), await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(STACK), filename="stack.pdf"
+    )
     await with_earlier_version(world, document)
     with pytest.raises(DuplicateDocumentError) as info:
-        await world.pipeline().receive(owner.id, incoming(PART), filename="again.pdf")
+        await world.pipeline().receive(Actor(owner.id), incoming(PART), filename="again.pdf")
     assert (info.value.existing, info.value.version) == (document.id, 2)
     assert str(info.value) == f"duplicate of version 2 of document {document.id}"
     with pytest.raises(DuplicateDocumentError) as info:
-        await world.pipeline().receive(stranger.id, incoming(PART), filename="mine.pdf")
+        await world.pipeline().receive(Actor(stranger.id), incoming(PART), filename="mine.pdf")
     assert (info.value.existing, info.value.version) == (None, None)
 
 
@@ -93,17 +98,19 @@ async def test_deleting_a_document_removes_the_originals_of_all_its_versions(
     world: World,
 ) -> None:
     owner = await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(STACK), filename="stack.pdf"
+    )
     second = await with_earlier_version(world, document)
     await world.drain()
-    await world.documents.delete(owner.id, document.id)
+    await world.documents.delete(Actor(owner.id), document.id)
     service = world.maintenance()
     while await service.run_next_job():
         pass
     assert not await world.object_store.exists(original_key(document.sha256))
     assert not await world.object_store.exists(original_key(second.sha256))
     # Its files may come in again.
-    again = await world.pipeline().receive(owner.id, incoming(PART), filename="part.pdf")
+    again = await world.pipeline().receive(Actor(owner.id), incoming(PART), filename="part.pdf")
     async with world.uow() as uow:
         assert [item.number for item in await uow.document_versions.of_document(again.id)] == [1]
 
@@ -112,17 +119,19 @@ async def test_the_files_name_the_versions_and_give_an_earlier_one(
     world: World, tmp_path: Path
 ) -> None:
     owner, stranger = await world.user(), await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(STACK), filename="stack.pdf"
+    )
     second = await with_earlier_version(world, document)
-    files = await world.documents.files(owner.id, document.id)
+    files = await world.documents.files(Actor(owner.id), document.id)
     assert [version.number for version in files.versions] == [1, 2]
     target = tmp_path / "version"
-    info = await world.documents.download_version(owner.id, document.id, 2, target)
+    info = await world.documents.download_version(Actor(owner.id), document.id, 2, target)
     assert (info.media_type, info.filename) == (second.media_type, "november.pdf")
     assert target.read_bytes() == PART
     for actor, number in ((owner.id, 3), (stranger.id, 1)):
         with pytest.raises(NotFoundError):
-            await world.documents.download_version(actor, document.id, number, target)
+            await world.documents.download_version(Actor(actor), document.id, number, target)
 
 
 async def test_the_files_are_read_from_a_copy_not_held_in_memory(
@@ -131,7 +140,9 @@ async def test_the_files_are_read_from_a_copy_not_held_in_memory(
     """An original may be as large as an upload, and every reader may look: copied to a file,
     hashed and read from there (SB-09)."""
     owner = await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(STACK), filename="stack.pdf"
+    )
 
     copied: list[str] = []
     download = world.object_store.download
@@ -141,14 +152,16 @@ async def test_the_files_are_read_from_a_copy_not_held_in_memory(
         await download(key, target)
 
     monkeypatch.setattr(world.object_store, "download", copying)
-    files = await world.documents.files(owner.id, document.id)
+    files = await world.documents.files(Actor(owner.id), document.id)
     assert copied == [original_key(document.sha256)]
     assert (files.original.size, files.original.sha256) == (len(STACK), str(document.sha256))
 
 
 async def test_a_new_version_takes_the_original_s_place_and_runs_anew(world: World) -> None:
     owner = await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(STACK), filename="stack.pdf"
+    )
     await world.drain()
     for key in derivative_keys(document.id, 3):
         await world.object_store.put(key, b"x", content_type="x")
@@ -158,7 +171,7 @@ async def test_a_new_version_takes_the_original_s_place_and_runs_anew(world: Wor
         await uow.documents.update(stored)
         await uow.commit()
     view = await world.pipeline().new_version(
-        owner.id, document.id, incoming(PART), filename="november.pdf"
+        Actor(owner.id), document.id, incoming(PART), filename="november.pdf"
     )
     replaced = view.document
     assert (replaced.sha256, replaced.original_filename) == (Sha256.of(PART), "november.pdf")
@@ -184,7 +197,9 @@ async def test_a_new_version_that_is_not_stored_leaves_the_derivatives(
 ) -> None:
     """They go only when nothing but the commit is left to fail."""
     owner = await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(STACK), filename="stack.pdf"
+    )
     await world.drain()
     for key in derivative_keys(document.id, 1):
         await world.object_store.put(key, b"x", content_type="x")
@@ -195,11 +210,11 @@ async def test_a_new_version_that_is_not_stored_leaves_the_derivatives(
     monkeypatch.setattr(MemoryDocumentRepository, "update", changed_meanwhile)
     with pytest.raises(ConcurrencyError):
         await world.pipeline().new_version(
-            owner.id, document.id, incoming(PART), filename="november.pdf"
+            Actor(owner.id), document.id, incoming(PART), filename="november.pdf"
         )
     assert await world.object_store.exists(archive_key(document.id))
     assert await world.object_store.exists(page_key(document.id, 1))
-    assert (await world.documents.get(owner.id, document.id)).sha256 == document.sha256
+    assert (await world.documents.get(Actor(owner.id), document.id)).sha256 == document.sha256
     # No version names the new file: it goes again.
     assert not await world.object_store.exists(original_key(Sha256.of(PART)))
 
@@ -208,7 +223,9 @@ async def test_a_new_version_stored_as_it_was_cancelled_keeps_its_file(world: Wo
     """Cancelled while the database answered the commit: the version is stored, its file
     stays."""
     owner = await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(STACK), filename="stack.pdf"
+    )
     await world.drain()
     cancelled = CancelledCommit(world.uow)
     pipeline = builders.pipeline_service(
@@ -216,8 +233,10 @@ async def test_a_new_version_stored_as_it_was_cancelled_keeps_its_file(world: Wo
     )
     cancelled.armed = True
     with pytest.raises(asyncio.CancelledError):
-        await pipeline.new_version(owner.id, document.id, incoming(PART), filename="november.pdf")
-    stored = await world.documents.get(owner.id, document.id)
+        await pipeline.new_version(
+            Actor(owner.id), document.id, incoming(PART), filename="november.pdf"
+        )
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.sha256 == Sha256.of(PART)
     assert await world.object_store.get(original_key(stored.sha256)) == PART
 
@@ -225,25 +244,27 @@ async def test_a_new_version_stored_as_it_was_cancelled_keeps_its_file(world: Wo
 async def test_a_new_version_helps_a_document_that_failed(world: World) -> None:
     owner = await world.user()
     pipeline = world.pipeline({Node.PAGES: Returns(FAILED)})
-    document = await pipeline.receive(owner.id, incoming(STACK), filename="stack.pdf")
+    document = await pipeline.receive(Actor(owner.id), incoming(STACK), filename="stack.pdf")
     await world.drain(pipeline)
-    assert (await world.documents.get(owner.id, document.id)).lane is Lane.RED
+    assert (await world.documents.get(Actor(owner.id), document.id)).lane is Lane.RED
     view = await world.pipeline().new_version(
-        owner.id, document.id, incoming(PART), filename="november.pdf"
+        Actor(owner.id), document.id, incoming(PART), filename="november.pdf"
     )
     assert view.document.processing.due() == (Node.SEPARATE,)
     await world.drain()
-    after = await world.documents.get(owner.id, document.id)
+    after = await world.documents.get(Actor(owner.id), document.id)
     assert after.processing.status is ProcessingStatus.COMPLETED  # the rules of the world pass
 
 
 async def test_a_new_version_must_be_a_new_file_of_a_kind_a_document_has(world: World) -> None:
     owner, reader = await world.user(), await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
-    other = await world.pipeline().receive(owner.id, incoming(PART), filename="part.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(STACK), filename="stack.pdf"
+    )
+    other = await world.pipeline().receive(Actor(owner.id), incoming(PART), filename="part.pdf")
     with pytest.raises(InvalidTransitionError):  # still processed
         await world.pipeline().new_version(
-            owner.id, document.id, incoming(b"%PDF-1.7 new"), filename="new.pdf"
+            Actor(owner.id), document.id, incoming(b"%PDF-1.7 new"), filename="new.pdf"
         )
     # Asked before its file is stored: nothing is left behind.
     assert not await world.object_store.exists(original_key(Sha256.of(b"%PDF-1.7 new")))
@@ -251,14 +272,16 @@ async def test_a_new_version_must_be_a_new_file_of_a_kind_a_document_has(world: 
     for file in (STACK, PART):  # its own, another document's
         with pytest.raises(DuplicateDocumentError):
             await world.pipeline().new_version(
-                owner.id, document.id, incoming(file), filename="again.pdf"
+                Actor(owner.id), document.id, incoming(file), filename="again.pdf"
             )
     mail = b"From: a@example.org\r\nSubject: Hi\r\n\r\nHello\r\n"
     with pytest.raises(UnsupportedMediaTypeError):
-        await world.pipeline().new_version(owner.id, document.id, incoming(mail), filename="m.eml")
+        await world.pipeline().new_version(
+            Actor(owner.id), document.id, incoming(mail), filename="m.eml"
+        )
     with pytest.raises(NotFoundError):
         await world.pipeline().new_version(
-            reader.id, document.id, incoming(b"%PDF-1.7 mine"), filename="mine.pdf"
+            Actor(reader.id), document.id, incoming(b"%PDF-1.7 mine"), filename="mine.pdf"
         )
     assert other.id != document.id
 
@@ -268,16 +291,16 @@ async def test_a_new_version_keeps_what_a_person_confirmed_and_waits_in_the_inbo
 ) -> None:
     c = await confirmed(world)
     owner, document, pipeline = c.owner, c.document, c.pipeline
-    await pipeline.new_version(owner.id, document.id, incoming(PART), filename="nov.pdf")
+    await pipeline.new_version(Actor(owner.id), document.id, incoming(PART), filename="nov.pdf")
     await world.drain(pipeline)
-    after = await world.documents.get(owner.id, document.id)
+    after = await world.documents.get(Actor(owner.id), document.id)
     assert (after.contact_id, after.document_date) == (c.contact, CONFIRMED_ON)
     assert after.lane is Lane.YELLOW
     assert await held_as_a_new_version(world, owner, after)
     # Confirmed in the inbox, it is done: the rules ask no more.
-    await pipeline.confirm(owner.id, document.id, DocumentChanges())
+    await pipeline.confirm(Actor(owner.id), document.id, DocumentChanges())
     await world.drain(pipeline)
-    assert (await world.documents.get(owner.id, document.id)).lane is Lane.GREEN
+    assert (await world.documents.get(Actor(owner.id), document.id)).lane is Lane.GREEN
 
 
 def check_of(value: str | None, *, ok: bool = True, suggestion: str | None = None) -> FieldCheck:
@@ -295,7 +318,9 @@ async def test_a_new_version_s_run_keeps_confirmed_values_and_suggests_what_diff
     world: World,
 ) -> None:
     owner = await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(STACK), filename="stack.pdf"
+    )
     document.confirmed_at = world.clock.now()
     document.processing.new_version = True
     same, other = check_of("c-1"), check_of("c-2")

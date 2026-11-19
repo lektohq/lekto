@@ -25,6 +25,7 @@ from lekto.core.domain.pipeline import Lane, Node
 from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.push import PushKind
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rules import ForceReview
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.ports.repository import DocumentFilter
@@ -92,26 +93,26 @@ async def test_tags_are_added_where_missing_and_the_others_are_skipped_with_why(
     r = await rule_world(world)
     owner, other = await world.user(), await world.user()
     tax = await r.tag("tax")
-    readable = await world.spaces.create(other.id, "Readable")
-    await world.spaces.set_member(other.id, readable.id, owner.id, SpaceRole.READ)
+    readable = await world.spaces.create(Actor(other.id), "Readable")
+    await world.spaces.set_member(Actor(other.id), readable.id, owner.id, SpaceRole.READ)
     first, tagged = await r.arrive(owner), await r.arrive(owner)
     await r.documents.change_metadata(
-        owner.id, tagged.id, DocumentChanges(tag_ids=frozenset({tax.id}))
+        Actor(owner.id), tagged.id, DocumentChanges(tag_ids=frozenset({tax.id}))
     )
     read_only = await r.arrive(other, space=readable.id)
-    busy = await r.pipeline().receive(owner.id, incoming_pdf(), filename="Busy.pdf")
+    busy = await r.pipeline().receive(Actor(owner.id), incoming_pdf(), filename="Busy.pdf")
     gone = DocumentId(new_id())
     bulk_service = service(r)
 
     operation = await bulk_service.start(
-        owner.id,
+        Actor(owner.id),
         Selection(ids=(first.id, tagged.id, read_only.id, busy.id, gone)),
         BulkAction(BulkKind.CHANGE_TAGS, add=frozenset({tax.id})),
     )
     assert operation.status is ProgressStatus.QUEUED
     assert await builders.drain(bulk_service) == 1
 
-    done = await bulk_service.get(owner.id, operation.id)
+    done = await bulk_service.get(Actor(owner.id), operation.id)
     assert (done.status, done.position, done.changed, done.unchanged) == (
         ProgressStatus.DONE,
         5,
@@ -137,7 +138,7 @@ async def test_tags_are_removed_and_contact_type_and_topic_set_or_cleared(world:
     contact = await r.contact("ACME")
     document = await r.arrive(owner)
     await r.documents.change_metadata(
-        owner.id,
+        Actor(owner.id),
         document.id,
         DocumentChanges(tag_ids=frozenset({tax.id, keep.id}), contact_id=contact.id),
     )
@@ -147,16 +148,18 @@ async def test_tags_are_removed_and_contact_type_and_topic_set_or_cleared(world:
         BulkAction(BulkKind.CHANGE_TAGS, add=frozenset({keep.id}), remove=frozenset({tax.id})),
         BulkAction(BulkKind.SET_CONTACT, contact=None),
     ):
-        await bulk_service.start(owner.id, ids(document), action)
+        await bulk_service.start(Actor(owner.id), ids(document), action)
     await builders.drain(bulk_service)
 
     stored = await r.stored(document)
     assert (stored.tag_ids, stored.contact_id) == ({keep.id}, None)
     again = await bulk_service.start(
-        owner.id, ids(document), BulkAction(BulkKind.SET_DOCUMENT_TYPE, document_type=None)
+        Actor(owner.id), ids(document), BulkAction(BulkKind.SET_DOCUMENT_TYPE, document_type=None)
     )
     await builders.drain(bulk_service)
-    assert (await bulk_service.get(owner.id, again.id)).unchanged == 1  # no type before either
+    assert (
+        await bulk_service.get(Actor(owner.id), again.id)
+    ).unchanged == 1  # no type before either
 
 
 async def test_what_an_action_names_is_checked_once_when_it_starts(world: World) -> None:
@@ -174,7 +177,7 @@ async def test_what_an_action_names_is_checked_once_when_it_starts(world: World)
         BulkAction(BulkKind.MOVE, space=SpaceId(new_id())),
     ):
         with pytest.raises(NotFoundError):
-            await bulk_service.start(owner.id, ids(document), action)
+            await bulk_service.start(Actor(owner.id), ids(document), action)
     with pytest.raises(ValidationError, match="move takes no add"):
         BulkAction(BulkKind.MOVE, space=SpaceId(new_id()), add=frozenset({TagId(new_id())}))
     with pytest.raises(ValidationError, match="confirm takes no contact, node"):
@@ -189,23 +192,29 @@ async def test_a_selection_by_filter_takes_what_the_person_reaches(world: World)
     bulk_service = service(r)
 
     operation = await bulk_service.start(
-        owner.id, Selection(), BulkAction(BulkKind.SET_TOPIC, topic=None)
+        Actor(owner.id), Selection(), BulkAction(BulkKind.SET_TOPIC, topic=None)
     )
     assert set(operation.documents) == {document.id for document in mine}
 
     with pytest.raises(PermissionDeniedError):
-        await bulk_service.start(owner.id, Selection(all_users=True), BulkAction(BulkKind.CONFIRM))
+        await bulk_service.start(
+            Actor(owner.id), Selection(all_users=True), BulkAction(BulkKind.CONFIRM)
+        )
     everyone = await bulk_service.start(
-        r.admin.id, Selection(all_users=True), BulkAction(BulkKind.CONFIRM)
+        Actor(r.admin.id), Selection(all_users=True), BulkAction(BulkKind.CONFIRM)
     )
     assert len(everyone.documents) == 4
     # With ids too, every user's documents are an admin's to name (RA-09).
     with pytest.raises(PermissionDeniedError):
         await bulk_service.start(
-            owner.id, Selection(ids=(mine[0].id,), all_users=True), BulkAction(BulkKind.CONFIRM)
+            Actor(owner.id),
+            Selection(ids=(mine[0].id,), all_users=True),
+            BulkAction(BulkKind.CONFIRM),
         )
     named = await bulk_service.start(
-        r.admin.id, Selection(ids=(mine[0].id,), all_users=True), BulkAction(BulkKind.CONFIRM)
+        Actor(r.admin.id),
+        Selection(ids=(mine[0].id,), all_users=True),
+        BulkAction(BulkKind.CONFIRM),
     )
     assert named.documents == (mine[0].id,)
 
@@ -230,14 +239,16 @@ async def test_an_unexpected_error_ends_the_operation_and_tells_the_admins(
     owner = await world.user()
     document = await r.arrive(owner)
     bulk_service = service(r)
-    operation = await bulk_service.start(owner.id, ids(document), BulkAction(BulkKind.CONFIRM))
+    operation = await bulk_service.start(
+        Actor(owner.id), ids(document), BulkAction(BulkKind.CONFIRM)
+    )
 
     async def broken(id: object) -> bool:
         raise RuntimeError("broken")
 
     monkeypatch.setattr(bulk_service, "_next_document", broken)
     assert await bulk_service.run_next_job()
-    done = await bulk_service.get(owner.id, operation.id)
+    done = await bulk_service.get(Actor(owner.id), operation.id)
     assert (done.status, done.error) == (ProgressStatus.FAILED, "stopped by an internal error")
     told = [
         job.payload.get("params")
@@ -257,13 +268,13 @@ async def test_a_selection_is_bounded(world: World, monkeypatch: pytest.MonkeyPa
 
     too_many = tuple(DocumentId(new_id()) for _ in range(MAX_IDS + 1))
     with pytest.raises(ValidationError) as raised:
-        await bulk_service.start(owner.id, Selection(ids=too_many), confirm)
+        await bulk_service.start(Actor(owner.id), Selection(ids=too_many), confirm)
     assert raised.value.reason == because(ReasonCode.BULK_TOO_MANY, max=MAX_IDS)
     monkeypatch.setattr(bulk, "MAX_DOCUMENTS", 1)
     with pytest.raises(ValidationError):
-        await bulk_service.start(owner.id, Selection(), confirm)
+        await bulk_service.start(Actor(owner.id), Selection(), confirm)
     with pytest.raises(ValidationError):
-        await bulk_service.start(owner.id, Selection(ids=()), confirm)
+        await bulk_service.start(Actor(owner.id), Selection(ids=()), confirm)
 
 
 async def test_a_selection_by_words_takes_every_hit_the_search_reaches(world: World) -> None:
@@ -278,43 +289,51 @@ async def test_a_selection_by_words_takes_every_hit_the_search_reaches(world: Wo
     )
 
     operation = await service(r, hits).start(
-        owner.id, Selection(text="Rechnung"), BulkAction(BulkKind.CONFIRM)
+        Actor(owner.id), Selection(text="Rechnung"), BulkAction(BulkKind.CONFIRM)
     )
 
     assert operation.documents == tuple(document.id for document in found)
     assert hits.asked == [("Rechnung", 0), ("Rechnung", 2), ("Rechnung", 4)]
     with pytest.raises(SearchUnavailableError):
-        await service(r).start(owner.id, Selection(text="Rechnung"), BulkAction(BulkKind.CONFIRM))
+        await service(r).start(
+            Actor(owner.id), Selection(text="Rechnung"), BulkAction(BulkKind.CONFIRM)
+        )
 
 
 async def test_move_confirm_reprocess_and_delete_go_through_the_services(world: World) -> None:
     r = await rule_world(world)
     owner = await world.user()
-    archive = await world.spaces.create(owner.id, "Archive")
+    archive = await world.spaces.create(Actor(owner.id), "Archive")
     await r.personal_rule(owner, definition("Check", channel_api(), ForceReview("check")))
     waiting, filed = await r.arrive(owner), await r.arrive(owner)
     assert (waiting.lane, filed.lane) == (Lane.YELLOW, Lane.YELLOW)
     bulk_service = service(r)
 
-    await bulk_service.start(owner.id, ids(waiting, filed), BulkAction(BulkKind.CONFIRM))
+    await bulk_service.start(Actor(owner.id), ids(waiting, filed), BulkAction(BulkKind.CONFIRM))
     await builders.drain(bulk_service)
     assert (await r.stored(waiting)).lane is None  # processing goes on, as by hand
     await world.drain(r.pipeline())
     assert (await r.stored(waiting)).lane is Lane.GREEN
 
-    await bulk_service.start(owner.id, ids(filed), BulkAction(BulkKind.MOVE, space=archive.id))
+    await bulk_service.start(
+        Actor(owner.id), ids(filed), BulkAction(BulkKind.MOVE, space=archive.id)
+    )
     await builders.drain(bulk_service)
     assert (await r.stored(filed)).space_id == archive.id
 
     await bulk_service.start(
-        owner.id, ids(filed), BulkAction(BulkKind.REPROCESS, node=Node.APPLY_RULES)
+        Actor(owner.id), ids(filed), BulkAction(BulkKind.REPROCESS, node=Node.APPLY_RULES)
     )
     await builders.drain(bulk_service)
     assert (await r.stored(filed)).lane is None  # processing again
 
-    deleting = await bulk_service.start(owner.id, ids(waiting, filed), BulkAction(BulkKind.DELETE))
+    deleting = await bulk_service.start(
+        Actor(owner.id), ids(waiting, filed), BulkAction(BulkKind.DELETE)
+    )
     await builders.drain(bulk_service)
-    assert (await bulk_service.get(owner.id, deleting.id)).changed == 2  # also while processing
+    assert (
+        await bulk_service.get(Actor(owner.id), deleting.id)
+    ).changed == 2  # also while processing
     async with world.uow() as uow:
         assert await uow.documents.find(waiting.id) is None
 
@@ -330,11 +349,11 @@ async def test_the_job_hands_back_after_a_batch_and_continues(
     bulk_service = service(r)
 
     operation = await bulk_service.start(
-        owner.id, ids(*documents), BulkAction(BulkKind.CHANGE_TAGS, add=frozenset({tax.id}))
+        Actor(owner.id), ids(*documents), BulkAction(BulkKind.CHANGE_TAGS, add=frozenset({tax.id}))
     )
 
     assert await builders.drain(bulk_service) == 3
-    done = await bulk_service.get(owner.id, operation.id)
+    done = await bulk_service.get(Actor(owner.id), operation.id)
     assert (done.status, done.changed) == (ProgressStatus.DONE, 5)
 
 
@@ -343,12 +362,14 @@ async def test_a_deactivated_person_stops_the_operation(world: World) -> None:
     owner = await world.user()
     document = await r.arrive(owner)
     bulk_service = service(r)
-    operation = await bulk_service.start(owner.id, ids(document), BulkAction(BulkKind.CONFIRM))
+    operation = await bulk_service.start(
+        Actor(owner.id), ids(document), BulkAction(BulkKind.CONFIRM)
+    )
     await r.deactivate(owner)
 
     await builders.drain(bulk_service)
 
-    done = await bulk_service.get(r.admin.id, operation.id)
+    done = await bulk_service.get(Actor(r.admin.id), operation.id)
     assert (done.status, done.position, done.error) == (
         ProgressStatus.FAILED,
         0,
@@ -361,8 +382,10 @@ async def test_only_its_person_and_admins_follow_an_operation(world: World) -> N
     owner, other = await world.user(), await world.user()
     document = await r.arrive(owner)
     bulk_service = service(r)
-    operation = await bulk_service.start(owner.id, ids(document), BulkAction(BulkKind.CONFIRM))
+    operation = await bulk_service.start(
+        Actor(owner.id), ids(document), BulkAction(BulkKind.CONFIRM)
+    )
 
     with pytest.raises(NotFoundError):
-        await bulk_service.get(other.id, operation.id)
-    assert (await bulk_service.get(r.admin.id, operation.id)).id == operation.id
+        await bulk_service.get(Actor(other.id), operation.id)
+    assert (await bulk_service.get(Actor(r.admin.id), operation.id)).id == operation.id

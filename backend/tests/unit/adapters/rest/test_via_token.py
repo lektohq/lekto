@@ -23,6 +23,7 @@ from lekto.core.domain.pipeline import (
 )
 from lekto.core.domain.reasons import written
 from lekto.core.domain.relations import RelationOrigin, RelationState
+from lekto.core.domain.rights import Actor
 from tests import builders
 from tests.api import auth
 from tests.builders import NOW, Returns
@@ -103,7 +104,7 @@ async def test_a_change_through_a_token_carries_it(api: Api) -> None:
         for entry in await log_of(api, id, auth(owner))
         if entry["model_version"] == RULES_CHANGE
     ]
-    (token,) = await api.services.auth.list_api_tokens(owner.id)
+    (token,) = await api.services.auth.list_api_tokens(Actor(owner.id))
     assert entry["input"][VIA_TOKEN] == {"id": str(token.id), "name": TOKEN}
     assert await verdict_tokens(api, id) == {TOKEN}
 

@@ -70,6 +70,7 @@ from lekto.core.domain.identity import (
 )
 from lekto.core.domain.ids import ApiTokenId, SessionId, UserId
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.identity import PasswordHasher, SecretCipher, Totp
@@ -128,6 +129,11 @@ class Principal:
     @property
     def id(self) -> UserId:
         return self.user.id
+
+    @property
+    def actor(self) -> Actor:
+        """The caller as the services take them, with the rights they act with."""
+        return Actor(self.user.id)
 
     @property
     def can_write(self) -> bool:
@@ -343,7 +349,7 @@ class AuthService:
 
     async def change_password(
         self,
-        actor: UserId,
+        actor: Actor,
         current: str,
         new: str,
         *,
@@ -359,19 +365,19 @@ class AuthService:
         now = self._clock.now()
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
-            credential = await uow.credentials.find(actor)
+            credential = await uow.credentials.find(actor.id)
         new_password = check_new_password(new, user.username)  # before anything is counted
         reserved, _ = await self._reserve(_throttles(user.username, None), now)
         stored = None if credential is None else credential.password_hash
         if stored is None or not await self._hasher.verify(stored, normalize_password(current)):
-            _log_failure(actor, None)
+            _log_failure(actor.id, None)
             raise PermissionDeniedError(because(ReasonCode.WRONG_PASSWORD))
         new_hash = await self._hasher.hash(new_password)
         known = await self._known_devices(user.username, devices, now)
 
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
-            credential = await uow.credentials.get(actor)
+            credential = await uow.credentials.get(actor.id)
             if credential.password_hash != stored:
                 await _release(uow, reserved)  # the current password was right
                 await uow.commit()
@@ -380,50 +386,52 @@ class AuthService:
             credential.password_changed_at = now
             await uow.credentials.update(credential)
             await _release(uow, reserved)
-            await uow.sessions.remove_for_user(actor)
-            await uow.known_devices.remove_for_user(actor)
+            await uow.sessions.remove_for_user(actor.id)
+            await uow.known_devices.remove_for_user(actor.id)
             if revoke_tokens:
-                await uow.api_tokens.remove_for_user(actor)
+                await uow.api_tokens.remove_for_user(actor.id)
             signed_in = None
             if session is not None:
                 signed_in = await self._start_session(uow, user, LoginMethod.PASSWORD, now)
                 kept = await _keep_known(uow, user, replace(known, own=None), now)
                 signed_in = replace(signed_in, devices=kept)
             await uow.commit()
-        log.info("password changed", extra={"user_id": str(actor), "tokens_revoked": revoke_tokens})
+        log.info(
+            "password changed", extra={"user_id": str(actor.id), "tokens_revoked": revoke_tokens}
+        )
         return signed_in
 
-    async def end_other_sessions(self, actor: UserId, *, keep: SessionId | None) -> int:
+    async def end_other_sessions(self, actor: Actor, *, keep: SessionId | None) -> int:
         async with self._uow() as uow:
             await load_actor(uow, actor)
-            ended = await uow.sessions.remove_for_user(actor, keep=keep)
+            ended = await uow.sessions.remove_for_user(actor.id, keep=keep)
             await uow.commit()
         return ended
 
     # --- TOTP -----------------------------------------------------------------------------------
 
-    async def begin_totp(self, actor: UserId) -> TotpSetup:
+    async def begin_totp(self, actor: Actor) -> TotpSetup:
         """Start setting up TOTP with a new secret; it takes effect when a code confirms it.
         Replaces a setup that was not confirmed. ConflictError if TOTP is on already."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
-            credential = await _credential(uow, actor)
+            credential = await _credential(uow, actor.id)
             if credential.totp_enabled:
                 raise ConflictError(because(ReasonCode.TOTP_ALREADY_ON))
             secret = self._totp.new_secret()
-            credential.totp = TotpSetting(secret=self._encrypt(actor, secret))
+            credential.totp = TotpSetting(secret=self._encrypt(actor.id, secret))
             await uow.credentials.update(credential)
             await uow.commit()
         uri = self._totp.provisioning_uri(secret, account=user.username, issuer=TOTP_ISSUER)
         return TotpSetup(secret=secret, uri=uri)
 
-    async def confirm_totp(self, actor: UserId, code: str) -> list[str]:
+    async def confirm_totp(self, actor: Actor, code: str) -> list[str]:
         """Turn TOTP on with a code from the authenticator; returns new recovery codes, shown
         only now."""
         now = self._clock.now()
         async with self._uow() as uow:
             await load_actor(uow, actor)
-            credential = await _credential(uow, actor)
+            credential = await _credential(uow, actor.id)
             totp = credential.totp
             if totp is None or totp.confirmed:
                 raise ConflictError(because(ReasonCode.NO_TOTP_SETUP))
@@ -435,15 +443,15 @@ class AuthService:
             credential.recovery_codes = {hash_token(normalize_recovery_code(c)) for c in codes}
             await uow.credentials.update(credential)
             await uow.commit()
-        log.info("TOTP turned on", extra={"user_id": str(actor)})
+        log.info("TOTP turned on", extra={"user_id": str(actor.id)})
         return codes
 
-    async def disable_totp(self, actor: UserId, code: str) -> None:
+    async def disable_totp(self, actor: Actor, code: str) -> None:
         """Turn TOTP off; needs a current code or a recovery code."""
         await self._with_second_factor(actor, code, _turn_off_totp)
-        log.info("TOTP turned off", extra={"user_id": str(actor)})
+        log.info("TOTP turned off", extra={"user_id": str(actor.id)})
 
-    async def renew_recovery_codes(self, actor: UserId, code: str) -> list[str]:
+    async def renew_recovery_codes(self, actor: Actor, code: str) -> list[str]:
         """New recovery codes in place of the old ones; needs a current code or a recovery
         code."""
         codes = new_recovery_codes()
@@ -455,7 +463,7 @@ class AuthService:
         return codes
 
     async def _with_second_factor(
-        self, actor: UserId, code: str, change: Callable[[Credential], None]
+        self, actor: Actor, code: str, change: Callable[[Credential], None]
     ) -> None:
         now = self._clock.now()
         async with self._uow() as uow:
@@ -463,7 +471,7 @@ class AuthService:
         reserved, _ = await self._reserve(_throttles(user.username, None), now)
         async with self._uow() as uow:
             await load_actor(uow, actor)
-            credential = await _credential(uow, actor)
+            credential = await _credential(uow, actor.id)
             if not credential.totp_enabled:
                 await _release(uow, reserved)
                 await uow.commit()
@@ -475,14 +483,14 @@ class AuthService:
                 await _release(uow, reserved)
                 await uow.commit()
         if not valid:
-            _log_failure(actor, None)
+            _log_failure(actor.id, None)
             raise PermissionDeniedError(because(ReasonCode.CODE_INVALID))
 
     # --- API tokens -----------------------------------------------------------------------------
 
     async def create_api_token(
         self,
-        actor: UserId,
+        actor: Actor,
         name: str,
         scope: TokenScope,
         *,
@@ -493,30 +501,30 @@ class AuthService:
         async with self._uow() as uow:
             await load_actor(uow, actor)
             api_token, token = ApiToken.issue(
-                user_id=actor, name=name, scope=scope, now=now, expires_at=expires_at
+                user_id=actor.id, name=name, scope=scope, now=now, expires_at=expires_at
             )
             await uow.api_tokens.add(api_token)
             await uow.commit()
         log.info(
             "API token created",
-            extra={"user_id": str(actor), "token_id": str(api_token.id), "scope": scope.value},
+            extra={"user_id": str(actor.id), "token_id": str(api_token.id), "scope": scope.value},
         )
         return api_token, token
 
-    async def list_api_tokens(self, actor: UserId) -> list[ApiToken]:
+    async def list_api_tokens(self, actor: Actor) -> list[ApiToken]:
         async with self._uow() as uow:
             await load_actor(uow, actor)
-            return await uow.api_tokens.list_for(actor)
+            return await uow.api_tokens.list_for(actor.id)
 
-    async def revoke_api_token(self, actor: UserId, id: ApiTokenId) -> None:
+    async def revoke_api_token(self, actor: Actor, id: ApiTokenId) -> None:
         async with self._uow() as uow:
             await load_actor(uow, actor)
             api_token = await uow.api_tokens.find(id)
-            if api_token is None or api_token.user_id != actor:
+            if api_token is None or api_token.user_id != actor.id:
                 raise NotFoundError("API token", id)
             await uow.api_tokens.remove(id)
             await uow.commit()
-        log.info("API token revoked", extra={"user_id": str(actor), "token_id": str(id)})
+        log.info("API token revoked", extra={"user_id": str(actor.id), "token_id": str(id)})
 
     # --- helpers --------------------------------------------------------------------------------
 

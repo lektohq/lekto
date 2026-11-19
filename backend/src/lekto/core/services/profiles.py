@@ -40,6 +40,7 @@ from lekto.core.domain.ids import ContactId, UserId
 from lekto.core.domain.master_data import Contact
 from lekto.core.domain.profiles import Person, Profile
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.users import User, display_name_of
 from lekto.core.domain.validation import name_key
 from lekto.core.ports.clock import Clock
@@ -103,7 +104,7 @@ class ProfileService:
         self._uow = uow
         self._clock = clock
 
-    async def get(self, actor: UserId, id: UserId, *, session: bool = True) -> UserProfile:
+    async def get(self, actor: Actor, id: UserId, *, session: bool = True) -> UserProfile:
         """The user themself or an active admin (PermissionDeniedError otherwise), with a
         session; an admin with an API token gets the display name and e-mail address alone
         (the rest stays empty), a user with one nothing."""
@@ -119,7 +120,7 @@ class ProfileService:
         return UserProfile(user, profile, numbers)
 
     async def update(
-        self, actor: UserId, id: UserId, changes: ProfileChanges, *, session: bool = True
+        self, actor: Actor, id: UserId, changes: ProfileChanges, *, session: bool = True
     ) -> UserProfile:
         """Change the profile (`ProfileChanges`); the user themself or an active admin, with a
         session; an admin with an API token only the display name and e-mail address
@@ -165,7 +166,7 @@ class ProfileService:
             ):
                 contacts = await _set_numbers(uow, viewer, id, contacts, changes)
             await uow.commit()
-        log.info("profile changed", extra={"user_id": str(id), "by": str(actor)})
+        log.info("profile changed", extra={"user_id": str(id), "by": str(actor.id)})
         return UserProfile(user, profile, numbers_of(contacts, id))
 
 
@@ -232,16 +233,16 @@ async def _set_numbers(
     return await uow.contacts.list_all()
 
 
-async def _allowed(uow: UnitOfWork, actor: UserId, id: UserId, session: bool) -> tuple[User, bool]:
+async def _allowed(uow: UnitOfWork, actor: Actor, id: UserId, session: bool) -> tuple[User, bool]:
     """The caller, and whether they may see and change the profile of `id` only in part: an
     admin with an API token (True); the user themself and admins with a session wholly
     (False); PermissionDeniedError for anyone else, and for a user's own token."""
     user = await load_actor(uow, actor)
-    if user.id != id and not user.is_active_admin:
+    if user.id != id and not user.may(TokenRight.ADMIN_MANAGE):
         raise PermissionDeniedError(because(ReasonCode.PROFILE_OWN_ONLY))
     if session:
         return user, False
-    if user.id == id and not user.is_active_admin:
+    if user.id == id and not user.may(TokenRight.ADMIN_MANAGE):
         raise PermissionDeniedError(because(ReasonCode.SESSION_NEEDED))
     return user, True
 
@@ -295,7 +296,7 @@ async def check_person_identifiers(
     if not mine:
         return
     spaces = None
-    if viewer is not None and not viewer.is_active_admin:
+    if viewer is not None and not viewer.may(TokenRight.ADMIN_MANAGE):
         spaces = await member_spaces(uow, viewer)
     for contact in await uow.contacts.list_all():
         changed = False
@@ -326,7 +327,7 @@ async def matching_persons(uow: UnitOfWork, viewer: User | None = None) -> list[
     persons = [
         Person.of(user, profiles.get(user.id)) for user in await uow.users.list_all() if user.active
     ]
-    if viewer is None or viewer.is_active_admin:
+    if viewer is None or viewer.may(TokenRight.ADMIN_MANAGE):
         return persons
     return [person if person.user_id == viewer.id else person.public() for person in persons]
 

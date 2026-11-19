@@ -89,9 +89,9 @@ async def events(
     document: Annotated[DocumentId | None, Depends(_visible_document)],
 ) -> AsyncIterable[ServerSentEvent]:
     async def still_allowed() -> bool:
-        return await still_authenticated(request, context, user)
+        return await still_authenticated(request, context, user.id)
 
-    async with hub.listen(user, document) as listener:
+    async with hub.listen(user.id, document) as listener:
         yield ServerSentEvent(comment=READY)
         async for event in listener.events(still_allowed, context.stream_recheck_interval):
             yield ServerSentEvent(event=event.type, id=str(event.id), data=message(event))

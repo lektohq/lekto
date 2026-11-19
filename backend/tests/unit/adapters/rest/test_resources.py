@@ -10,6 +10,7 @@ from lekto.adapters.inbound.problems import MAX_INPUT_ERRORS
 from lekto.adapters.inbound.rest import PREFIX
 from lekto.adapters.inbound.rest.account import LOGIN_MAX_BODY
 from lekto.core.domain.ids import DocumentId, new_id
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role
 from lekto.core.domain.validation import MAX_REFERENCES
 from lekto.core.services.objects import archive_key
@@ -561,13 +562,13 @@ async def test_spaces_and_members(api: Api) -> None:
     # A deactivated member keeps their place, with their name for the others.
     await api.client.put(f"{url}/members/{friend.id}", json={"role": "read"}, headers=auth(owner))
     admin = await api.admin()
-    await api.services.users.update(admin.id, friend.id, active=False)
+    await api.services.users.update(Actor(admin.id), friend.id, active=False)
     listed = (await api.client.get(url, headers=auth(owner))).json()["members"]
     assert {(m["username"], m["active"]) for m in listed} == {
         (owner.username, True),
         ("friend", False),
     }
-    await api.services.users.update(admin.id, friend.id, active=True)
+    await api.services.users.update(Actor(admin.id), friend.id, active=True)
     # A reader leaves a space themselves.
     await api.client.put(f"{url}/members/{friend.id}", json={"role": "read"}, headers=auth(owner))
     left = await api.client.delete(f"{url}/members/{friend.id}", headers=auth(friend))

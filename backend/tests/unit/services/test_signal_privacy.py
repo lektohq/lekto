@@ -8,6 +8,7 @@ from lekto.core.domain.classification import Candidate, CandidateSource, FieldCh
 from lekto.core.domain.documents import Document
 from lekto.core.domain.pipeline import Node, NodeRun, Outcome
 from lekto.core.domain.reasons import written
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
 from tests import builders
@@ -20,8 +21,8 @@ async def _scene(world: World) -> tuple[User, User, Document, Document, Document
     """Tobi's private document, one in a space he shares with Erika, and the new one there,
     whose signals found both."""
     tobi, erika = await world.user(), await world.user()
-    shared = await world.spaces.create(tobi.id, "Shared")
-    await world.spaces.set_member(tobi.id, shared.id, erika.id, SpaceRole.EDIT)
+    shared = await world.spaces.create(Actor(tobi.id), "Shared")
+    await world.spaces.set_member(Actor(tobi.id), shared.id, erika.id, SpaceRole.EDIT)
     home = await world.personal_space(tobi)
     private = builders.processed(tobi, home, content="private")
     common = builders.processed(tobi, shared, content="common")
@@ -72,19 +73,19 @@ def _sources(log: list[NodeRun]) -> Any:
 
 async def test_a_co_editor_sees_only_the_similar_documents_they_may_read(world: World) -> None:
     tobi, erika, private, common, new = await _scene(world)
-    log = await world.documents.processing_log(erika.id, new.id)
+    log = await world.documents.processing_log(Actor(erika.id), new.id)
     assert _neighbours(log) == ([str(common.id)], False)
     assert _sources(log) == [str(common.id)]
-    review = await world.documents.review(erika.id, new.id)
+    review = await world.documents.review(Actor(erika.id), new.id)
     (judge,) = [node for node in review.nodes if node.node is Node.JUDGE]
     assert judge.fields[0].candidates[0].sources[0].documents == (str(common.id),)
     # The uploader reads both; what his documents carry stays with admins.
-    assert _neighbours(await world.documents.processing_log(tobi.id, new.id)) == (
+    assert _neighbours(await world.documents.processing_log(Actor(tobi.id), new.id)) == (
         [str(private.id), str(common.id)],
         False,
     )
     admin = await world.user(role=Role.ADMIN)
-    assert _neighbours(await world.documents.processing_log(admin.id, new.id))[1]
+    assert _neighbours(await world.documents.processing_log(Actor(admin.id), new.id))[1]
 
 
 async def test_who_received_a_document_sees_none_of_the_givers_similar_documents(
@@ -92,7 +93,7 @@ async def test_who_received_a_document_sees_none_of_the_givers_similar_documents
 ) -> None:
     tobi, _, _, _, new = await _scene(world)
     bob = await world.user()
-    await world.documents.move(tobi.id, new.id, (await world.personal_space(bob)).id)
-    log = await world.documents.processing_log(bob.id, new.id)
+    await world.documents.move(Actor(tobi.id), new.id, (await world.personal_space(bob)).id)
+    log = await world.documents.processing_log(Actor(bob.id), new.id)
     assert _neighbours(log) == ([], False)
     assert _sources(log) == []

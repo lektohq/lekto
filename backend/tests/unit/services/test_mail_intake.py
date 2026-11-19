@@ -44,6 +44,7 @@ from lekto.core.domain.mail_traits import FlagColor, Importance, MailMarks
 from lekto.core.domain.master_data import DocumentType
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.reasons import ReasonCode
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rules import Condition, ConditionField, Operator, RuleScope
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
@@ -83,7 +84,7 @@ async def _setup(
         **changes,  # type: ignore[arg-type]
     )
     mailbox = await world.mailboxes.create(
-        admin.id,
+        Actor(admin.id),
         name="Household",
         host=LOGIN.host,
         port=LOGIN.port,
@@ -214,7 +215,7 @@ async def test_nothing_without_a_rule(world: World) -> None:
 async def test_a_forward_is_unwrapped_and_a_known_attachment_related(world: World) -> None:
     _, person, mailbox = await _setup(world)
     pipeline = world.pipeline()
-    existing = await pipeline.receive(person.id, incoming(mails.PDF), filename="schon.pdf")
+    existing = await pipeline.receive(Actor(person.id), incoming(mails.PDF), filename="schon.pdf")
     inner = EmailMessage()
     inner["From"] = "Stadtwerke <rechnung@stadtwerke.example>"
     inner["Subject"] = "Rechnung"
@@ -288,7 +289,7 @@ async def test_a_mail_is_fetched_once_across_mailboxes(world: World) -> None:
     # one whose id happens to be smaller (TD-02).
     world.clock.advance(timedelta(seconds=1))
     second = await world.mailboxes.create(
-        admin.id,
+        Actor(admin.id),
         name="Other",
         host=other.host,
         port=other.port,
@@ -318,7 +319,7 @@ async def test_a_mail_no_rule_took_is_taken_where_one_does(world: World) -> None
         "INBOX", mails.plain_mail(), arrived_at=world.clock.now() + LATER
     )
     second = await world.mailboxes.create(
-        admin.id,
+        Actor(admin.id),
         name="Other",
         host=other.host,
         port=other.port,
@@ -332,7 +333,7 @@ async def test_a_mail_no_rule_took_is_taken_where_one_does(world: World) -> None
     assert [record.outcome for record in await _records(world, second)] == [MailOutcome.TAKEN]
     # The same mail again in the first mailbox (moved, its UID new), which takes it now.
     await world.mailboxes.change(
-        admin.id,
+        Actor(admin.id),
         first.id,
         MailboxChanges(fallback=Fallback.EVERYTHING, fallback_user_id=person.id),
     )
@@ -410,7 +411,7 @@ def test_a_mail_may_carry_an_attachment_as_large_as_an_upload() -> None:
 
 async def test_a_refused_login_shows_at_the_mailbox(world: World) -> None:
     admin, _, mailbox = await _setup(world)
-    await world.mailboxes.change(admin.id, mailbox.id, MailboxChanges(), password="wrong")
+    await world.mailboxes.change(Actor(admin.id), mailbox.id, MailboxChanges(), password="wrong")
     await _fetch(world, world.mail_intake())
     async with world.uow() as uow:
         stored = await uow.mailboxes.get(mailbox.id)
@@ -429,13 +430,13 @@ async def test_a_refused_login_shows_at_the_mailbox(world: World) -> None:
 
 async def test_a_paused_mailbox_is_not_fetched(world: World) -> None:
     admin, person, mailbox = await _setup(world)
-    await world.mailboxes.change(admin.id, mailbox.id, MailboxChanges(enabled=False))
+    await world.mailboxes.change(Actor(admin.id), mailbox.id, MailboxChanges(enabled=False))
     _deliver(world, mails.plain_mail())
     service = world.mail_intake()
     await _fetch(world, service)
     assert await world.visible(person.id) == []
     with pytest.raises(ValidationError):
-        await service.fetch_now(admin.id, mailbox.id)
+        await service.fetch_now(Actor(admin.id), mailbox.id)
 
 
 async def test_fetch_now_brings_the_next_fetch_forward(world: World) -> None:
@@ -445,7 +446,7 @@ async def test_fetch_now_brings_the_next_fetch_forward(world: World) -> None:
     _deliver(world, mails.plain_mail("Später"))
     world.clock.advance(2 * LATER)
     assert await drain(service) == 0
-    await service.fetch_now(admin.id, mailbox.id)
+    await service.fetch_now(Actor(admin.id), mailbox.id)
     assert await drain(service) == 1
     names = [document.original_filename for document in await world.visible(person.id)]
     assert names == ["Später.eml"]
@@ -587,7 +588,9 @@ async def test_the_documents_of_a_mail_relate_and_stay_related(world: World) -> 
 async def test_an_attachment_counts_its_sender_as_evidence(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     domain = Identifier.parse(IdentifierKind.EMAIL_DOMAIN, "stadtwerke.example")
-    utility = await world.master_data.create_contact(admin.id, "Stadtwerke", identifiers=[domain])
+    utility = await world.master_data.create_contact(
+        Actor(admin.id), "Stadtwerke", identifiers=[domain]
+    )
     _, _, mailbox = await _setup(world)
     _deliver(world, mails.rich_mail())
     await _fetch(world, world.mail_intake())
@@ -612,7 +615,7 @@ async def test_an_attachment_counts_its_sender_as_evidence(world: World) -> None
 async def _rule(world: World, admin: User, mailbox: Mailbox, **changes: Any) -> MailRule:
     values: dict[str, Any] = {"name": "Strom"}
     values.update(changes)
-    return await world.mail_rules.create(admin.id, mailbox.id, MailRuleChanges(**values))
+    return await world.mail_rules.create(Actor(admin.id), mailbox.id, MailRuleChanges(**values))
 
 
 async def test_a_rule_on_the_marks_and_importance_of_a_mail(world: World) -> None:
@@ -810,7 +813,7 @@ async def test_a_waiting_mail_a_rule_takes_keeps_its_outcome_and_steps_due(
         world, admin, mailbox, user_id=person.id, after=(MailStep(MailAction.READ),), enabled=False
     )
     world.clock.advance(LATER)
-    await world.mail_rules.change(admin.id, rule.id, MailRuleChanges(enabled=True))
+    await world.mail_rules.change(Actor(admin.id), rule.id, MailRuleChanges(enabled=True))
     _stops_once(monkeypatch, "mark")
     with pytest.raises(asyncio.CancelledError, match="stopped"):
         await drain(service)
@@ -855,7 +858,7 @@ async def test_a_rule_switched_on_later_takes_the_mails_no_rule_took(world: Worl
         enabled=False,
     )
     world.clock.advance(LATER)
-    await world.mail_rules.change(admin.id, rule.id, MailRuleChanges(enabled=True))
+    await world.mail_rules.change(Actor(admin.id), rule.id, MailRuleChanges(enabled=True))
     await drain(world.mail_intake())  # switching it on brought the fetch forward to now
     fetched = [event for event in world.events() if isinstance(event, MailboxFetched)]
     assert [(e.mailbox_id, e.mails, e.later) for e in fetched[-1:]] == [(mailbox.id, 0, 1)]
@@ -879,12 +882,12 @@ async def test_a_rule_switched_on_later_takes_the_mails_no_rule_took(world: Worl
     assert records["Unser Newsletter"].waiting
 
     await world.mailboxes.change(
-        admin.id,
+        Actor(admin.id),
         mailbox.id,
         MailboxChanges(fallback=Fallback.EVERYTHING, fallback_user_id=person.id),
     )
     intake = world.mail_intake()
-    await intake.fetch_now(admin.id, mailbox.id)
+    await intake.fetch_now(Actor(admin.id), mailbox.id)
     await drain(intake)
     assert len(await world.visible(person.id)) == 1  # not the fallback's
     async with world.uow() as uow:
@@ -905,13 +908,15 @@ async def test_the_dry_run_names_the_mails_waiting_for_a_rule(world: World) -> N
         ),
         user_id=person.id,
     )
-    (item,) = await world.mail_rules.dry_run(admin.id, mailbox.id, draft)
+    (item,) = await world.mail_rules.dry_run(Actor(admin.id), mailbox.id, draft)
     assert (item.waiting, item.decider, item.matches) == (True, Decider.RULE, True)
 
 
 async def test_the_first_matching_rule_takes_a_mail(world: World) -> None:
     admin, person, mailbox = await _setup(world, everything=False)
-    household = await world.spaces.create(admin.id, "Haushalt", members={person.id: SpaceRole.EDIT})
+    household = await world.spaces.create(
+        Actor(admin.id), "Haushalt", members={person.id: SpaceRole.EDIT}
+    )
     letter = DocumentType.create(name="E-Mail", now=world.clock.now())
     async with world.uow() as uow:
         await uow.document_types.add(letter)
@@ -967,7 +972,7 @@ async def test_a_rule_whose_person_is_gone_pauses_and_the_fallback_takes(world: 
     admin, person, mailbox = await _setup(world)
     other = await world.user()
     rule = await _rule(world, admin, mailbox, user_id=other.id)
-    await world.users.update(admin.id, other.id, active=False)
+    await world.users.update(Actor(admin.id), other.id, active=False)
     _deliver(world, mails.plain_mail())
     await _fetch(world, world.mail_intake())
     async with world.uow() as uow:
@@ -982,20 +987,20 @@ async def test_only_admins_set_up_mail_rules_that_fit(world: World) -> None:
     admin, person, mailbox = await _setup(world)
     user = await world.user()
     with pytest.raises(PermissionDeniedError):
-        await world.mail_rules.list_rules(user.id)
+        await world.mail_rules.list_rules(Actor(user.id))
     with pytest.raises(PermissionDeniedError):
         await _rule(world, user, mailbox, user_id=person.id)
-    stranger = await world.spaces.create(admin.id, "Fremd")
+    stranger = await world.spaces.create(Actor(admin.id), "Fremd")
     with pytest.raises(ValidationError):
         await _rule(world, admin, mailbox, user_id=person.id, space_id=stranger.id)
     with pytest.raises(ValidationError):
         await _rule(world, admin, mailbox, user_id=person.id, text_type_id=DocumentTypeId(new_id()))
     made = await _rule(world, admin, mailbox, user_id=person.id)
-    changed = await world.mail_rules.change(admin.id, made.id, MailRuleChanges(priority=7))
+    changed = await world.mail_rules.change(Actor(admin.id), made.id, MailRuleChanges(priority=7))
     assert changed.priority == 7
-    assert [item.id for item in await world.mail_rules.list_rules(admin.id)] == [made.id]
-    await world.mail_rules.delete(admin.id, made.id)
-    assert await world.mail_rules.list_rules(admin.id) == []
+    assert [item.id for item in await world.mail_rules.list_rules(Actor(admin.id))] == [made.id]
+    await world.mail_rules.delete(Actor(admin.id), made.id)
+    assert await world.mail_rules.list_rules(Actor(admin.id)) == []
 
 
 async def test_the_mail_text_gets_the_type_of_its_rule(world: World) -> None:
@@ -1043,7 +1048,7 @@ async def test_a_dry_run_over_the_latest_mails(world: World) -> None:
         ),
         user_id=person.id,
     )
-    found = await world.mail_rules.dry_run(admin.id, mailbox.id, draft)
+    found = await world.mail_rules.dry_run(Actor(admin.id), mailbox.id, draft)
     by_subject = {item.record.subject: item for item in found}
     assert len(found) == 3
     newsletter = by_subject["Unser Newsletter"]
@@ -1058,19 +1063,19 @@ async def test_a_dry_run_over_the_latest_mails(world: World) -> None:
     assert by_subject["Etwas anderes"].decider is Decider.NOTHING
     # Editing the stored rule: the draft stands in its place.
     edited = await world.mail_rules.dry_run(
-        admin.id, mailbox.id, replace(draft, priority=0), rule=other.id
+        Actor(admin.id), mailbox.id, replace(draft, priority=0), rule=other.id
     )
     assert {item.decider for item in edited} == {Decider.RULE, Decider.NOTHING}
     with pytest.raises(PermissionDeniedError):
-        await world.mail_rules.dry_run(person.id, mailbox.id, draft)
+        await world.mail_rules.dry_run(Actor(person.id), mailbox.id, draft)
 
 
 async def test_a_document_rule_looks_at_the_mail_a_document_came_with(world: World) -> None:
     admin, person, mailbox = await _setup(world)
-    tag = await world.master_data.create_tag(admin.id, "Strom")
+    tag = await world.master_data.create_tag(Actor(admin.id), "Strom")
     rules = RuleService(world.uow, world.clock, TEMPLATES, RegexPatternMatcher(0.2))
     await rules.create(
-        admin.id,
+        Actor(admin.id),
         RuleScope.GLOBAL,
         definition(
             "Strom per Mail",
@@ -1089,7 +1094,9 @@ async def test_a_document_rule_looks_at_the_mail_a_document_came_with(world: Wor
         world.uow, world.object_store, RegexPatternMatcher(0.2), TEMPLATES, max_text=200_000
     )
     pipeline = world.pipeline({Node.APPLY_RULES: step})
-    uploaded = await pipeline.receive(person.id, incoming(b"%PDF-1.7\n%%EOF\n"), filename="a.pdf")
+    uploaded = await pipeline.receive(
+        Actor(person.id), incoming(b"%PDF-1.7\n%%EOF\n"), filename="a.pdf"
+    )
     _deliver(world, mails.plain_mail())
     await _fetch(world, world.mail_intake(pipeline))
     await world.drain(pipeline)
@@ -1199,7 +1206,7 @@ async def test_a_mail_that_cannot_be_taken_is_recorded_as_failed_with_its_rule(
 async def test_a_rule_whose_space_or_type_is_gone_pauses_with_the_reason(world: World) -> None:
     admin, person, mailbox = await _setup(world)
     household = await world.spaces.create(
-        admin.id, "Haushalt", members={person.id: SpaceRole.EDIT, admin.id: SpaceRole.EDIT}
+        Actor(admin.id), "Haushalt", members={person.id: SpaceRole.EDIT, admin.id: SpaceRole.EDIT}
     )
     letter = DocumentType.create(name="E-Mail", now=world.clock.now())
     async with world.uow() as uow:
@@ -1211,8 +1218,8 @@ async def test_a_rule_whose_space_or_type_is_gone_pauses_with_the_reason(world: 
     typed = await _rule(
         world, admin, mailbox, name="Typ", priority=1, user_id=person.id, text_type_id=letter.id
     )
-    await world.spaces.remove_member(admin.id, household.id, person.id)
-    await world.master_data.delete_document_type(admin.id, letter.id)
+    await world.spaces.remove_member(Actor(admin.id), household.id, person.id)
+    await world.master_data.delete_document_type(Actor(admin.id), letter.id)
     _deliver(world, mails.plain_mail())
     await _fetch(world, world.mail_intake())
     async with world.uow() as uow:
@@ -1234,7 +1241,7 @@ async def test_deleting_what_a_rule_names_pauses_it_at_once(world: World) -> Non
     admin, person, mailbox = await _setup(world)
     leaving, gone = await world.user(), await world.user()
     household = await world.spaces.create(
-        admin.id, "Haushalt", members={person.id: SpaceRole.EDIT, admin.id: SpaceRole.EDIT}
+        Actor(admin.id), "Haushalt", members={person.id: SpaceRole.EDIT, admin.id: SpaceRole.EDIT}
     )
     letter = DocumentType.create(name="E-Mail", now=world.clock.now())
     async with world.uow() as uow:
@@ -1245,10 +1252,10 @@ async def test_deleting_what_a_rule_names_pauses_it_at_once(world: World) -> Non
     await _rule(world, admin, mailbox, name="Inaktiv", user_id=leaving.id)
     await _rule(world, admin, mailbox, name="Gelöscht", user_id=gone.id)
     await _rule(world, admin, mailbox, name="Bleibt", user_id=person.id)
-    await world.spaces.delete(admin.id, household.id)
-    await world.master_data.delete_document_type(admin.id, letter.id)
-    await world.users.update(admin.id, leaving.id, active=False)
-    await world.users.delete_user(admin.id, gone.id)
+    await world.spaces.delete(Actor(admin.id), household.id)
+    await world.master_data.delete_document_type(Actor(admin.id), letter.id)
+    await world.users.update(Actor(admin.id), leaving.id, active=False)
+    await world.users.delete_user(Actor(admin.id), gone.id)
     async with world.uow() as uow:
         reasons = {
             rule.name: (rule.enabled, rule.disabled_reason and rule.disabled_reason.code)
@@ -1265,7 +1272,7 @@ async def test_deleting_what_a_rule_names_pauses_it_at_once(world: World) -> Non
 
 async def test_a_deactivated_fallback_person_takes_nothing(world: World) -> None:
     admin, person, mailbox = await _setup(world)
-    await world.users.update(admin.id, person.id, active=False)
+    await world.users.update(Actor(admin.id), person.id, active=False)
     _deliver(world, mails.plain_mail())
     await _fetch(world, world.mail_intake())
     (record,) = await _records(world, mailbox)
@@ -1275,7 +1282,7 @@ async def test_a_deactivated_fallback_person_takes_nothing(world: World) -> None
 async def test_the_worker_start_queues_the_fetch_of_every_enabled_mailbox(world: World) -> None:
     admin, _, mailbox = await _setup(world)
     paused = await world.mailboxes.create(
-        admin.id,
+        Actor(admin.id),
         name="Pausiert",
         host=LOGIN.host,
         port=LOGIN.port,
@@ -1303,7 +1310,7 @@ async def test_the_worker_start_queues_the_fetch_of_every_enabled_mailbox(world:
 
 async def test_the_job_of_a_deleted_mailbox_ends(world: World) -> None:
     admin, _, mailbox = await _setup(world)
-    await world.mailboxes.delete(admin.id, mailbox.id)
+    await world.mailboxes.delete(Actor(admin.id), mailbox.id)
     service = world.mail_intake()
     world.clock.advance(2 * LATER)
     assert await service.run_next_job()  # ran and ended

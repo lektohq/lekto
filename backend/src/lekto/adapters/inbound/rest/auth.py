@@ -29,6 +29,7 @@ from lekto.core.domain.identity import (
 )
 from lekto.core.domain.ids import UserId
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.services.auth import Principal, SignedIn
 from lekto.core.services.oidc import FLOW_LIFETIME
 
@@ -156,9 +157,9 @@ async def still_authenticated(request: Request, context: ApiContext, user: UserI
         return False
 
 
-async def current_user(principal: Annotated[Principal, Depends(authenticate)]) -> UserId:
-    """The authenticated user."""
-    return principal.id
+async def current_user(principal: Annotated[Principal, Depends(authenticate)]) -> Actor:
+    """The authenticated user, with the rights they act with."""
+    return principal.actor
 
 
 async def via_token(principal: Annotated[Principal, Depends(authenticate)]) -> ViaToken | None:
@@ -175,7 +176,7 @@ async def session_principal(principal: Annotated[Principal, Depends(authenticate
 
 
 Authenticated = Annotated[Principal, Depends(authenticate)]
-CurrentUser = Annotated[UserId, Depends(current_user)]
+CurrentUser = Annotated[Actor, Depends(current_user)]
 Via = Annotated[ViaToken | None, Depends(via_token)]
 SessionPrincipal = Annotated[Principal, Depends(session_principal)]
 PROTECTED = [Depends(authenticate)]

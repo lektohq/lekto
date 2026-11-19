@@ -40,6 +40,7 @@ from lekto.core.domain.documents import UNSET, Unset
 from lekto.core.domain.identifiers import Identifier
 from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, TagId, UserId
 from lekto.core.domain.master_data import MasterData, TagScope
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.tag_tree import MAX_LEVELS, TagTree
 from lekto.core.ports.images import LOGO_SIZE
 from lekto.core.ports.repository import CountBy
@@ -65,11 +66,11 @@ class Kind[K: UUID, E: MasterData, C: BaseModel, P: BaseModel, O: MasterDataOut]
     name: str  # in route names: `create_document_type`
     plural: str  # in the list's route name: `list_document_types`
     id: Callable[[UUID], K]
-    list: Callable[[MasterDataService, UserId], Awaitable[list[E]]]
-    create: Callable[Concatenate[MasterDataService, UserId, ...], Awaitable[E]]
-    get: Callable[[MasterDataService, UserId, K], Awaitable[E]]
-    change: Callable[Concatenate[MasterDataService, UserId, K, ...], Awaitable[E]]
-    delete: Callable[[MasterDataService, UserId, K], Awaitable[None]]
+    list: Callable[[MasterDataService, Actor], Awaitable[list[E]]]
+    create: Callable[Concatenate[MasterDataService, Actor, ...], Awaitable[E]]
+    get: Callable[[MasterDataService, Actor, K], Awaitable[E]]
+    change: Callable[Concatenate[MasterDataService, Actor, K, ...], Awaitable[E]]
+    delete: Callable[[MasterDataService, Actor, K], Awaitable[None]]
     create_in: type[C]
     patch_in: type[P]
     out: type[O]
@@ -182,7 +183,7 @@ class _Counted(Protocol):
 
 
 async def _counts(
-    context: ApiContext, user: UserId, by: CountBy, document_counts: bool, all_users: bool
+    context: ApiContext, user: Actor, by: CountBy, document_counts: bool, all_users: bool
 ) -> Mapping[UUID, int] | None:
     """The document counts of a listing when asked for (`document_counts`), else None. With
     `all_users`, the service is asked either way: it refuses everyone but admins (403), whether
@@ -395,7 +396,7 @@ document_types = _simple(
 tags = APIRouter(prefix="/tags", tags=["master data"], dependencies=PROTECTED)
 
 
-async def _tree(context: ApiContext, user: UserId) -> TagTree:
+async def _tree(context: ApiContext, user: Actor) -> TagTree:
     return TagTree.of(await context.master_data.list_tags(user))
 
 

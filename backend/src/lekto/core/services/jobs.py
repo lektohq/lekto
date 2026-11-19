@@ -16,10 +16,11 @@ from enum import StrEnum
 from uuid import UUID
 
 from lekto.core.domain.errors import ConflictError
-from lekto.core.domain.ids import ContactId, DocumentId, JobId, UserId
+from lekto.core.domain.ids import ContactId, DocumentId, JobId
 from lekto.core.domain.jobs import FinishedJob, Job, JobState
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.reasons import Action, ReasonCode, because
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.statistics import median, percentile
 from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
@@ -136,7 +137,7 @@ class JobsService:
         self._sample = sample
         self._kept = Kept(clock)
 
-    async def summary(self, actor: UserId) -> JobsSummary:
+    async def summary(self, actor: Actor) -> JobsSummary:
         now = self._clock.now()
         async with self._uow() as uow:
             await load_actor(uow, actor)
@@ -149,7 +150,7 @@ class JobsService:
 
     async def list(
         self,
-        actor: UserId,
+        actor: Actor,
         *,
         states: Collection[JobState],
         kind: str | None = None,
@@ -173,7 +174,7 @@ class JobsService:
         )
         return JobsPage(tuple(views), total)
 
-    async def durations(self, actor: UserId) -> JobDurations:
+    async def durations(self, actor: Actor) -> JobDurations:
         """How long the jobs done within the retention period waited and ran, by kind: from
         the latest `sample` done jobs of each kind, counted at most once a minute."""
         async with self._uow() as uow:
@@ -198,7 +199,7 @@ class JobsService:
 
         return await self._kept.get("durations", count)
 
-    async def retry(self, actor: UserId, id: JobId) -> JobView:
+    async def retry(self, actor: Actor, id: JobId) -> JobView:
         """Admins only: queue the failed job again (`JobQueue.retry`). A failed processing step
         is tried again at its document instead (ConflictError)."""
         now = self._clock.now()
@@ -227,7 +228,7 @@ class _Viewer:
 
     async def _view(self, job: Job, now: datetime) -> JobView:
         state = job.state(now)
-        admin = self._user.is_active_admin
+        admin = self._user.may(TokenRight.ADMIN_MANAGE)
         document, hidden = None, False
         if (document_id := _uuid(job.payload.get("document_id"))) is not None:
             document = await self._documents.ref(DocumentId(document_id))

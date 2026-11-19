@@ -26,6 +26,7 @@ from lekto.core.domain.fields import FieldDefinition, FieldType, Money
 from lekto.core.domain.master_data import Contact, DocumentType
 from lekto.core.domain.pipeline import Lane, Node
 from lekto.core.domain.reading import VisionAdvice
+from lekto.core.domain.rights import Actor
 from lekto.core.ports.llm import StructuredRequest
 from lekto.core.services.objects import text_key
 from tests import builders, probes
@@ -163,19 +164,21 @@ async def test_the_vision_model_reads_what_tesseract_cannot(
         await builders.drain(services.pipeline)
 
     data = (SAMPLES / case.sample).read_bytes()
-    received = await services.pipeline.receive(owner.id, incoming(data), filename=case.sample)
+    received = await services.pipeline.receive(
+        Actor(owner.id), incoming(data), filename=case.sample
+    )
     await drain()
     # Tesseract finds no text; nothing went to the vision model.
-    read = await services.documents.get(owner.id, received.id)
+    read = await services.documents.get(Actor(owner.id), received.id)
     assert read.lane is Lane.RED
     assert stub.requests == []
-    reading = await services.pipeline.reading(owner.id, received.id)
+    reading = await services.pipeline.reading(Actor(owner.id), received.id)
     assert (reading.vision, reading.advice) == (False, VisionAdvice.NO_TEXT)
 
-    await services.pipeline.read_with_vision(owner.id, received.id)
+    await services.pipeline.read_with_vision(Actor(owner.id), received.id)
     await drain()
-    document = await services.documents.get(owner.id, received.id)
-    log = await services.documents.processing_log(owner.id, received.id)
+    document = await services.documents.get(Actor(owner.id), received.id)
+    log = await services.documents.processing_log(Actor(owner.id), received.id)
     assert document.lane is Lane.GREEN, [(entry.node, entry.result.reason) for entry in log]
     assert len(stub.requests) == 1
     assert (document.contact_id, document.document_type_id) == (contact.id, kind.id)
@@ -186,5 +189,5 @@ async def test_the_vision_model_reads_what_tesseract_cannot(
     ocr = [entry for entry in log if entry.node is Node.OCR][-1]
     vision = ocr.result.output["vision"]
     assert isinstance(vision, dict) and vision["model"] == "stub-vlm"
-    after = await services.pipeline.reading(owner.id, received.id)
+    after = await services.pipeline.reading(Actor(owner.id), received.id)
     assert (after.vision, after.advice) == (True, None)

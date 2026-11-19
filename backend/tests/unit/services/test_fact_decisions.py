@@ -24,6 +24,7 @@ from lekto.core.domain.first_runs import FACTS, Verdict
 from lekto.core.domain.identifiers import Identifier, IdentifierKind, IdentifierSource
 from lekto.core.domain.identifiers.visibility import seen_by
 from lekto.core.domain.master_data import Contact
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.services.classification.signals import FactsSignal
@@ -73,23 +74,23 @@ async def test_a_person_adds_corrects_rejects_and_withdraws(world: World) -> Non
 
     # The reminder's own number stands nowhere the patterns read it: added, where it stands.
     await service.decide_fact(
-        owner.id,
+        Actor(owner.id),
         document.id,
         decide(FactAction.ADD, K.ORDER_NUMBER, "A 77881", role=FactRole.OWN),
     )
     # The invoice it refers to: the role corrected; its own number: the value.
     await service.decide_fact(
-        owner.id,
+        Actor(owner.id),
         document.id,
         decide(FactAction.CORRECT, K.INVOICE_NUMBER, "M77", new_value="M-78"),
     )
     await service.decide_fact(
-        owner.id,
+        Actor(owner.id),
         document.id,
         decide(FactAction.CORRECT, K.INVOICE_NUMBER, "4711", role=FactRole.THREAD),
     )
     await service.decide_fact(
-        owner.id, document.id, decide(FactAction.REJECT, K.CUSTOMER_NUMBER, "12345678")
+        Actor(owner.id), document.id, decide(FactAction.REJECT, K.CUSTOMER_NUMBER, "12345678")
     )
     assert await kept(world, document) == {
         (K.INVOICE_NUMBER, "M77"): (FactRole.OWN, FactState.REJECTED, pattern | person),
@@ -103,7 +104,7 @@ async def test_a_person_adds_corrects_rejects_and_withdraws(world: World) -> Non
         (K.ORDER_NUMBER, "A77881"): (FactRole.OWN, FactState.ADDED, person),
     }
     # The report shows the identifier found as the fact kept for it tells (RA-10).
-    report = await service.facts(owner.id, document.id)
+    report = await service.facts(Actor(owner.id), document.id)
     (customer,) = [item for item in report.identifiers if item.found.kind is K.CUSTOMER_NUMBER]
     assert (customer.role, customer.state, customer.origins, customer.kept) == (
         FactRole.CONTACT,
@@ -124,14 +125,14 @@ async def test_a_person_adds_corrects_rejects_and_withdraws(world: World) -> Non
         (K.ORDER_NUMBER, "A77881"),
         (K.INVOICE_NUMBER, "4711"),
     ):
-        await service.decide_fact(owner.id, document.id, decide(FactAction.WITHDRAW, *key))
+        await service.decide_fact(Actor(owner.id), document.id, decide(FactAction.WITHDRAW, *key))
     after = await kept(world, document)
     assert after[(K.CUSTOMER_NUMBER, "12345678")] == (FactRole.CONTACT, FactState.FOUND, pattern)
     assert after[(K.INVOICE_NUMBER, "4711")] == (FactRole.REFERS, FactState.FOUND, pattern)
     assert (K.ORDER_NUMBER, "A77881") not in after
 
     # The report shows the rejected number and that the owner decides.
-    report = await service.facts(owner.id, document.id)
+    report = await service.facts(Actor(owner.id), document.id)
     assert report.editable
     states = {item.fact.value: item.fact.state for item in report.numbers}
     assert states["M77"] is FactState.REJECTED and states["M78"] is FactState.CORRECTED
@@ -187,13 +188,13 @@ async def test_what_a_decision_needs(world: World) -> None:
     ]
     for decision, error in cases:
         with pytest.raises(error):
-            await service.decide_fact(owner.id, document.id, decision)
+            await service.decide_fact(Actor(owner.id), document.id, decision)
 
 
 async def test_only_editors_and_admins_decide(world: World) -> None:
     owner, reader, admin = await world.user(), await world.user(), await world.user(role=Role.ADMIN)
-    shared = await world.spaces.create(owner.id, "Shared")
-    await world.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
+    shared = await world.spaces.create(Actor(owner.id), "Shared")
+    await world.spaces.set_member(Actor(owner.id), shared.id, reader.id, SpaceRole.READ)
     document = builders.processed(owner, shared, content="shared reminder")
     async with world.uow() as uow:
         await uow.documents.add(document)
@@ -202,19 +203,21 @@ async def test_only_editors_and_admins_decide(world: World) -> None:
     await run_facts(world, document)
     reject = decide(FactAction.REJECT, K.INVOICE_NUMBER, "M77")
     with pytest.raises(PermissionDeniedError):
-        await world.documents.decide_fact(reader.id, document.id, reject)
-    assert not (await world.documents.facts(reader.id, document.id)).editable
-    await world.documents.decide_fact(admin.id, document.id, reject)
+        await world.documents.decide_fact(Actor(reader.id), document.id, reject)
+    assert not (await world.documents.facts(Actor(reader.id), document.id)).editable
+    await world.documents.decide_fact(Actor(admin.id), document.id, reject)
 
 
 async def test_the_first_decision_about_the_facts_is_a_verdict(world: World) -> None:
     owner = await world.user()
     document = await with_facts(world, owner)
     await world.documents.decide_fact(
-        owner.id, document.id, decide(FactAction.REJECT, K.INVOICE_NUMBER, "M77")
+        Actor(owner.id), document.id, decide(FactAction.REJECT, K.INVOICE_NUMBER, "M77")
     )
     await world.documents.decide_fact(
-        owner.id, document.id, decide(FactAction.ADD, K.ORDER_NUMBER, "A 100", role=FactRole.OWN)
+        Actor(owner.id),
+        document.id,
+        decide(FactAction.ADD, K.ORDER_NUMBER, "A 100", role=FactRole.OWN),
     )
     async with world.uow() as uow:
         verdicts = await uow.processing_facts.verdicts(document.id)
@@ -228,7 +231,7 @@ async def test_a_rejected_fact_is_no_evidence_of_a_contact(world: World) -> None
     owner = await world.user()
     document = await with_facts(world, owner)
     await world.documents.decide_fact(
-        owner.id, document.id, decide(FactAction.REJECT, K.CUSTOMER_NUMBER, "12345678")
+        Actor(owner.id), document.id, decide(FactAction.REJECT, K.CUSTOMER_NUMBER, "12345678")
     )
     result = await FactsSignal(world.uow, world.object_store, FakeCodeReader([])).run(document)
     assert output(result)["identifiers"] == []
@@ -242,7 +245,7 @@ async def test_an_admin_corrects_a_number_at_the_contact_too(world: World) -> No
     admin = await world.user(role=Role.ADMIN)
     document = await with_facts(world, await world.user(), bank)
     await world.documents.decide_fact(
-        admin.id,
+        Actor(admin.id),
         document.id,
         decide(
             FactAction.CORRECT,
@@ -261,7 +264,7 @@ async def test_an_admin_corrects_a_number_at_the_contact_too(world: World) -> No
     # Only on a document with a contact and for a contact's kind.
     with pytest.raises(ValidationError):
         await world.documents.decide_fact(
-            admin.id,
+            Actor(admin.id),
             document.id,
             decide(FactAction.CORRECT, K.INVOICE_NUMBER, "M77", new_value="M-1", at_contact=True),
         )
@@ -291,7 +294,7 @@ async def test_a_learned_number_corrected_at_the_contact_stays_learned_where_it_
         await uow.commit()
     document = await with_facts(world, owner, bank)
     await world.documents.decide_fact(
-        admin.id,
+        Actor(admin.id),
         document.id,
         decide(
             FactAction.CORRECT,
@@ -325,7 +328,7 @@ async def test_a_decision_before_the_first_run_stopped_is_early(world: World) ->
         await uow.documents.update(current)
         await uow.commit()
     await world.documents.decide_fact(
-        owner.id, document.id, decide(FactAction.REJECT, K.INVOICE_NUMBER, "M77")
+        Actor(owner.id), document.id, decide(FactAction.REJECT, K.INVOICE_NUMBER, "M77")
     )
     async with world.uow() as uow:
         verdicts = await uow.processing_facts.verdicts(document.id)
@@ -339,9 +342,10 @@ async def test_admins_see_and_decide_the_found_facts_of_a_person(world: World) -
     document = await stored(world, owner, "Steuer-ID 86 095 742 001\nRechnungsnummer: M-77")
     await run_facts(world, document)
     tax = (K.TAX_ID, "86095742001")
-    seen = await world.documents.facts(admin.id, document.id)
+    seen = await world.documents.facts(Actor(admin.id), document.id)
     assert tax in {item.fact.key for item in seen.decided}
     assert tax not in {
-        item.fact.key for item in (await world.documents.facts(owner.id, document.id)).decided
+        item.fact.key
+        for item in (await world.documents.facts(Actor(owner.id), document.id)).decided
     }
-    await world.documents.decide_fact(admin.id, document.id, decide(FactAction.REJECT, *tax))
+    await world.documents.decide_fact(Actor(admin.id), document.id, decide(FactAction.REJECT, *tax))

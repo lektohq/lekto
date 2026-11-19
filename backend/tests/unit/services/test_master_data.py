@@ -15,6 +15,7 @@ from lekto.core.domain.fields import FieldType
 from lekto.core.domain.identifiers import Identifier, IdentifierKind, IdentifierSource
 from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, TagId, new_id
 from lekto.core.domain.master_data import Assignment, Contact, TagScope
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rules import (
     AddTags,
     Condition,
@@ -41,19 +42,21 @@ REJECTED = IdentifierSource.REJECTED
 async def test_admin_maintains_master_data(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
-    contact = await service.create_contact(admin.id, "Stadtwerke")
-    invoice = await service.create_document_type(admin.id, "Invoice")
-    tag = await service.create_tag(admin.id, "Tax")
+    contact = await service.create_contact(Actor(admin.id), "Stadtwerke")
+    invoice = await service.create_document_type(Actor(admin.id), "Invoice")
+    tag = await service.create_tag(Actor(admin.id), "Tax")
     total = await service.create_field(
-        admin.id, "Total", FieldType.AMOUNT, document_type_ids=[invoice.id]
+        Actor(admin.id), "Total", FieldType.AMOUNT, document_type_ids=[invoice.id]
     )
     period = await service.create_field(
-        admin.id, "Period", FieldType.CHOICE, choices=["monthly", "yearly"]
+        Actor(admin.id), "Period", FieldType.CHOICE, choices=["monthly", "yearly"]
     )
-    assert (await service.change_contact(admin.id, contact.id, name="SWK")).name == "SWK"
-    assert (await service.change_document_type(admin.id, invoice.id, name="Bill")).name == "Bill"
-    assert (await service.change_tag(admin.id, tag.id, name="Taxes")).name == "Taxes"
-    assert (await service.change_field(admin.id, total.id, name="Sum")).name == "Sum"
+    assert (await service.change_contact(Actor(admin.id), contact.id, name="SWK")).name == "SWK"
+    assert (
+        await service.change_document_type(Actor(admin.id), invoice.id, name="Bill")
+    ).name == "Bill"
+    assert (await service.change_tag(Actor(admin.id), tag.id, name="Taxes")).name == "Taxes"
+    assert (await service.change_field(Actor(admin.id), total.id, name="Sum")).name == "Sum"
     async with world.uow() as uow:
         assert (await uow.contacts.get(contact.id)).name == "SWK"
         assert (await uow.fields.get(total.id)).document_type_ids == frozenset({invoice.id})
@@ -63,64 +66,66 @@ async def test_admin_maintains_master_data(world: World) -> None:
 async def test_no_two_fields_share_a_key_in_templates(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
-    gross = await service.create_field(admin.id, "LA_Brutto", FieldType.AMOUNT)
+    gross = await service.create_field(Actor(admin.id), "LA_Brutto", FieldType.AMOUNT)
     assert gross.key == "la_brutto"
     with pytest.raises(ConflictError, match=r"field\.la_brutto"):
-        await service.create_field(admin.id, "LA Brutto", FieldType.AMOUNT)
-    net = await service.create_field(admin.id, "LA Netto", FieldType.AMOUNT)
+        await service.create_field(Actor(admin.id), "LA Brutto", FieldType.AMOUNT)
+    net = await service.create_field(Actor(admin.id), "LA Netto", FieldType.AMOUNT)
     with pytest.raises(ConflictError, match=r"field\.la_brutto"):
-        await service.change_field(admin.id, net.id, name="la-brutto")
+        await service.change_field(Actor(admin.id), net.id, name="la-brutto")
     # The field keeps its own key when only the case of its name changes.
-    assert (await service.change_field(admin.id, gross.id, name="LA_BRUTTO")).key == "la_brutto"
+    assert (
+        await service.change_field(Actor(admin.id), gross.id, name="LA_BRUTTO")
+    ).key == "la_brutto"
 
 
 async def test_only_admins_change_master_data(world: World) -> None:
     admin, user = await world.user(role=Role.ADMIN), await world.user()
     service = world.master_data
-    contact = await service.create_contact(admin.id, "Bank")
+    contact = await service.create_contact(Actor(admin.id), "Bank")
     with pytest.raises(PermissionDeniedError):
-        await service.create_contact(user.id, "Other bank")
+        await service.create_contact(Actor(user.id), "Other bank")
     with pytest.raises(PermissionDeniedError):
-        await service.change_contact(user.id, contact.id, name="Mine")
+        await service.change_contact(Actor(user.id), contact.id, name="Mine")
     with pytest.raises(PermissionDeniedError):
-        await service.create_document_type(user.id, "Letter")
+        await service.create_document_type(Actor(user.id), "Letter")
     with pytest.raises(PermissionDeniedError):
-        await service.create_tag(user.id, "x")
+        await service.create_tag(Actor(user.id), "x")
     with pytest.raises(PermissionDeniedError):
-        await service.create_field(user.id, "x", FieldType.TEXT)
+        await service.create_field(Actor(user.id), "x", FieldType.TEXT)
 
 
 async def test_contact_aliases_and_type_descriptions(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
-    example = await service.create_contact(admin.id, "Nord Versicherungsgruppe", ["Nord AG"])
-    other = await service.create_contact(admin.id, "Muster")
+    example = await service.create_contact(Actor(admin.id), "Nord Versicherungsgruppe", ["Nord AG"])
+    other = await service.create_contact(Actor(admin.id), "Muster")
     changed = await service.change_contact(
-        admin.id,
+        Actor(admin.id),
         example.id,
         aliases=["Nord Krankenversicherung AG", "nord krankenversicherung ag"],
     )
     assert changed.aliases == ["Nord Krankenversicherung AG"]
     assert (
-        await service.change_contact(admin.id, example.id, name="Nord")
+        await service.change_contact(Actor(admin.id), example.id, name="Nord")
     ).aliases == changed.aliases
     # A name or an alias of one contact is never a name or an alias of another.
     for change in (
-        service.change_contact(admin.id, other.id, aliases=["Nord"]),
-        service.change_contact(admin.id, other.id, name="nord krankenversicherung ag"),
-        service.create_contact(admin.id, "Other", ["Nord Krankenversicherung AG"]),
+        service.change_contact(Actor(admin.id), other.id, aliases=["Nord"]),
+        service.change_contact(Actor(admin.id), other.id, name="nord krankenversicherung ag"),
+        service.create_contact(Actor(admin.id), "Other", ["Nord Krankenversicherung AG"]),
         # As classification compares names: legal forms and punctuation do not count.
-        service.create_contact(admin.id, "Other", ["Nord Krankenversicherung"]),
-        service.create_contact(admin.id, "Nord Krankenversicherung GmbH"),
+        service.create_contact(Actor(admin.id), "Other", ["Nord Krankenversicherung"]),
+        service.create_contact(Actor(admin.id), "Nord Krankenversicherung GmbH"),
     ):
         with pytest.raises(ConflictError):
             await change
-    pay = await service.create_document_type(admin.id, "Pay slip", " Entgeltbescheinigung ")
+    pay = await service.create_document_type(Actor(admin.id), "Pay slip", " Entgeltbescheinigung ")
     assert pay.description == "Entgeltbescheinigung"
-    kept = await service.change_document_type(admin.id, pay.id, name="Payslip")
+    kept = await service.change_document_type(Actor(admin.id), pay.id, name="Payslip")
     assert kept.description == "Entgeltbescheinigung"
     assert (
-        await service.change_document_type(admin.id, pay.id, description="")
+        await service.change_document_type(Actor(admin.id), pay.id, description="")
     ).description is None
 
 
@@ -131,21 +136,23 @@ DOMAIN = Identifier.parse(IdentifierKind.EMAIL_DOMAIN, "stadtwerke.example")
 async def test_contact_identifiers(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
-    utility = await service.create_contact(admin.id, "Stadtwerke", identifiers=[NUMBER])
-    other = await service.create_contact(admin.id, "Bank")
+    utility = await service.create_contact(Actor(admin.id), "Stadtwerke", identifiers=[NUMBER])
+    other = await service.create_contact(Actor(admin.id), "Bank")
     assert utility.identifiers == [NUMBER]
     # A value another contact entered by hand is a conflict.
     with pytest.raises(ConflictError):
-        await service.change_contact(admin.id, other.id, identifiers=[NUMBER])
+        await service.change_contact(Actor(admin.id), other.id, identifiers=[NUMBER])
     with pytest.raises(ConflictError):
-        await service.create_contact(admin.id, "Other", identifiers=[NUMBER])
+        await service.create_contact(Actor(admin.id), "Other", identifiers=[NUMBER])
     # Rejected and entered ones are replaced on their own.
-    changed = await service.change_contact(admin.id, utility.id, rejected_identifiers=[DOMAIN])
+    changed = await service.change_contact(
+        Actor(admin.id), utility.id, rejected_identifiers=[DOMAIN]
+    )
     assert [item.source for item in changed.identifiers] == [MANUAL, REJECTED]
-    changed = await service.change_contact(admin.id, utility.id, identifiers=[])
+    changed = await service.change_contact(Actor(admin.id), utility.id, identifiers=[])
     assert changed.identifiers == [Identifier(DOMAIN.kind, DOMAIN.value, REJECTED)]
     # Entered by hand elsewhere, a rejected (or learned) value moves.
-    moved = await service.change_contact(admin.id, other.id, identifiers=[DOMAIN])
+    moved = await service.change_contact(Actor(admin.id), other.id, identifiers=[DOMAIN])
     assert moved.identifiers == [DOMAIN]
     async with world.uow() as uow:
         assert (await uow.contacts.get(utility.id)).identifiers == []
@@ -160,17 +167,17 @@ async def test_a_customer_number_from_before_145_is_the_same_as_a_contract_numbe
     service = world.master_data
     customer = Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "12345")
     contract = Identifier.parse(IdentifierKind.CONTRACT_NUMBER, "12345")
-    insurer = await service.create_contact(admin.id, "Versicherer", identifiers=[customer])
+    insurer = await service.create_contact(Actor(admin.id), "Versicherer", identifiers=[customer])
     with pytest.raises(ConflictError):
-        await service.create_contact(admin.id, "Other", identifiers=[contract])
+        await service.create_contact(Actor(admin.id), "Other", identifiers=[contract])
     learned = Identifier(contract.kind, contract.value, LEARNED)
-    bank = await service.create_contact(admin.id, "Bank")
+    bank = await service.create_contact(Actor(admin.id), "Bank")
     async with world.uow() as uow:
         await replace_learned_identifiers(uow, {bank.id: [learned]})
         await uow.commit()
     async with world.uow() as uow:
         assert (await uow.contacts.get(bank.id)).identifiers == [learned]
-    await service.change_contact(admin.id, insurer.id, identifiers=[customer])
+    await service.change_contact(Actor(admin.id), insurer.id, identifiers=[customer])
     async with world.uow() as uow:
         assert (await uow.contacts.get(bank.id)).identifiers == []
 
@@ -178,8 +185,8 @@ async def test_a_customer_number_from_before_145_is_the_same_as_a_contract_numbe
 async def test_training_replaces_the_learned_identifiers(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
-    utility = await service.create_contact(admin.id, "Stadtwerke")
-    bank = await service.create_contact(admin.id, "Bank", identifiers=[NUMBER])
+    utility = await service.create_contact(Actor(admin.id), "Stadtwerke")
+    bank = await service.create_contact(Actor(admin.id), "Bank", identifiers=[NUMBER])
     learned = [Identifier(DOMAIN.kind, DOMAIN.value, LEARNED)]
     taken = [Identifier(NUMBER.kind, NUMBER.value, LEARNED)]
     async with world.uow() as uow:
@@ -200,47 +207,53 @@ async def test_required_fields_and_title_patterns(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
     payslip = await service.create_document_type(
-        admin.id, "Lohnnachweis", title_pattern="Lohn {{ document_date | date: '%Y-%m' }}"
+        Actor(admin.id), "Lohnnachweis", title_pattern="Lohn {{ document_date | date: '%Y-%m' }}"
     )
-    other = await service.create_document_type(admin.id, "Brief")
+    other = await service.create_document_type(Actor(admin.id), "Brief")
     period = await service.create_field(
-        admin.id,
+        Actor(admin.id),
         "Zeitraum",
         FieldType.TEXT,
         document_type_ids=[payslip.id, other.id],
         required_document_type_ids=[payslip.id],
     )
     assert period.is_required_for(payslip.id) and not period.is_required_for(other.id)
-    note = await service.create_field(admin.id, "Notiz", FieldType.TEXT, required=True)
+    note = await service.create_field(Actor(admin.id), "Notiz", FieldType.TEXT, required=True)
     assert note.is_required_for(None)
     # A pattern names fields of the type only.
     changed = await service.change_document_type(
-        admin.id, payslip.id, title_pattern="Lohn {{ field.zeitraum }} {{ field.notiz }}"
+        Actor(admin.id), payslip.id, title_pattern="Lohn {{ field.zeitraum }} {{ field.notiz }}"
     )
     assert changed.title_pattern == "Lohn {{ field.zeitraum }} {{ field.notiz }}"
     with pytest.raises(ValidationError, match=r"field\.betrag"):
-        await service.change_document_type(admin.id, payslip.id, title_pattern="{{ field.betrag }}")
+        await service.change_document_type(
+            Actor(admin.id), payslip.id, title_pattern="{{ field.betrag }}"
+        )
     with pytest.raises(ValidationError, match="invalid template"):
-        await service.change_document_type(admin.id, payslip.id, title_pattern="{{ contact")
+        await service.change_document_type(Actor(admin.id), payslip.id, title_pattern="{{ contact")
     with pytest.raises(ValidationError):
-        await service.create_document_type(admin.id, "Neu", title_pattern="{{ field.zeitraum }}")
+        await service.create_document_type(
+            Actor(admin.id), "Neu", title_pattern="{{ field.zeitraum }}"
+        )
     # Renamed, the field is renamed in the patterns; narrowed, it stays required for the rest.
-    await service.change_field(admin.id, period.id, name="Abrechnungszeitraum")
+    await service.change_field(Actor(admin.id), period.id, name="Abrechnungszeitraum")
     async with world.uow() as uow:
         assert (await uow.document_types.get(payslip.id)).title_pattern == (
             "Lohn {{ field.abrechnungszeitraum }} {{ field.notiz }}"
         )
-    narrowed = await service.change_field(admin.id, period.id, document_type_ids=[payslip.id])
+    narrowed = await service.change_field(
+        Actor(admin.id), period.id, document_type_ids=[payslip.id]
+    )
     assert narrowed.required_types == frozenset({payslip.id})
     # Not narrowed past a type whose pattern uses it, not deleted while a pattern does.
     with pytest.raises(ConflictError, match="the title pattern of 'Lohnnachweis'"):
-        await service.change_field(admin.id, note.id, document_type_ids=[other.id])
+        await service.change_field(Actor(admin.id), note.id, document_type_ids=[other.id])
     with pytest.raises(ConflictError, match="title patterns of 'Lohnnachweis'"):
-        await service.delete_field(admin.id, note.id)
-    optional = await service.change_field(admin.id, period.id, required_document_type_ids=[])
+        await service.delete_field(Actor(admin.id), note.id)
+    optional = await service.change_field(Actor(admin.id), period.id, required_document_type_ids=[])
     assert not optional.is_required_for(payslip.id)
     with pytest.raises(ValidationError):
-        await service.change_field(admin.id, period.id, required=True)
+        await service.change_field(Actor(admin.id), period.id, required=True)
 
 
 async def test_names_are_compared_outside_the_event_loop_and_only_when_they_change(
@@ -257,27 +270,27 @@ async def test_names_are_compared_outside_the_event_loop_and_only_when_they_chan
 
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
-    nord = await service.create_contact(admin.id, "Nord Versicherungsgruppe")
-    await service.create_contact(admin.id, "Muster Bank", ["Muster"])
+    nord = await service.create_contact(Actor(admin.id), "Nord Versicherungsgruppe")
+    await service.create_contact(Actor(admin.id), "Muster Bank", ["Muster"])
     monkeypatch.setattr(master_data, "match_key", keyed)
-    renamed = await service.change_contact(admin.id, nord.id, aliases=["Nord Leben"])
+    renamed = await service.change_contact(Actor(admin.id), nord.id, aliases=["Nord Leben"])
     assert renamed.aliases == ["Nord Leben"] and threads
     with pytest.raises(ConflictError):
-        await service.change_contact(admin.id, nord.id, aliases=["Muster AG"])  # too close
+        await service.change_contact(Actor(admin.id), nord.id, aliases=["Muster AG"])  # too close
     async with world.uow() as uow:
         assert await learn_alias(uow, nord.id, "Nord Kranken", threshold=SUGGEST) is not None
     assert threading.get_ident() not in threads
     threads.clear()
     number = Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "12345")
-    await service.add_identifier(admin.id, nord.id, number)
+    await service.add_identifier(Actor(admin.id), nord.id, number)
     assert threads == []
 
 
 async def test_learn_alias(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
-    example = await service.create_contact(admin.id, "Nord Versicherungsgruppe")
-    other = await service.create_contact(admin.id, "Muster", ["Nord Kranken"])
+    example = await service.create_contact(Actor(admin.id), "Nord Versicherungsgruppe")
+    other = await service.create_contact(Actor(admin.id), "Muster", ["Nord Kranken"])
     async with world.uow() as uow:
 
         async def learn(alias: str) -> Contact | None:
@@ -303,57 +316,57 @@ async def test_learn_alias(world: World) -> None:
 async def test_names_are_unique_per_kind(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
-    await service.create_tag(admin.id, "Insurance")
-    await service.create_contact(admin.id, "Insurance")
+    await service.create_tag(Actor(admin.id), "Insurance")
+    await service.create_contact(Actor(admin.id), "Insurance")
     with pytest.raises(ConflictError):
-        await service.create_tag(admin.id, "insurance")
-    other = await service.create_tag(admin.id, "Car")
+        await service.create_tag(Actor(admin.id), "insurance")
+    other = await service.create_tag(Actor(admin.id), "Car")
     with pytest.raises(ConflictError):
-        await service.change_tag(admin.id, other.id, name="INSURANCE")
-    assert (await service.change_tag(admin.id, other.id, name="CAR")).name == "CAR"
+        await service.change_tag(Actor(admin.id), other.id, name="INSURANCE")
+    assert (await service.change_tag(Actor(admin.id), other.id, name="CAR")).name == "CAR"
 
 
 async def test_field_needs_existing_document_types(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     with pytest.raises(NotFoundError):
         await world.master_data.create_field(
-            admin.id, "Total", FieldType.NUMBER, document_type_ids=[DocumentTypeId(new_id())]
+            Actor(admin.id), "Total", FieldType.NUMBER, document_type_ids=[DocumentTypeId(new_id())]
         )
 
 
 async def test_everyone_reads_master_data_sorted(world: World) -> None:
     admin, user = await world.user(role=Role.ADMIN), await world.user()
     for name in ("b", "A", "c"):
-        await world.master_data.create_tag(admin.id, name)
-    tags = await world.master_data.list_tags(user.id)
+        await world.master_data.create_tag(Actor(admin.id), name)
+    tags = await world.master_data.list_tags(Actor(user.id))
     assert [tag.name for tag in tags] == ["A", "b", "c"]
-    assert (await world.master_data.get_tag(user.id, tags[0].id)).name == "A"
-    contact = await world.master_data.create_contact(admin.id, "ACME")
-    assert await world.master_data.list_contacts(user.id) == [contact]
-    invoice = await world.master_data.create_document_type(admin.id, "Invoice")
-    assert await world.master_data.get_document_type(user.id, invoice.id) == invoice
-    note = await world.master_data.create_field(admin.id, "Note", FieldType.TEXT)
-    assert await world.master_data.list_fields(user.id) == [note]
+    assert (await world.master_data.get_tag(Actor(user.id), tags[0].id)).name == "A"
+    contact = await world.master_data.create_contact(Actor(admin.id), "ACME")
+    assert await world.master_data.list_contacts(Actor(user.id)) == [contact]
+    invoice = await world.master_data.create_document_type(Actor(admin.id), "Invoice")
+    assert await world.master_data.get_document_type(Actor(user.id), invoice.id) == invoice
+    note = await world.master_data.create_field(Actor(admin.id), "Note", FieldType.TEXT)
+    assert await world.master_data.list_fields(Actor(user.id)) == [note]
     with pytest.raises(NotFoundError):
-        await world.master_data.get_contact(user.id, ContactId(new_id()))
+        await world.master_data.get_contact(Actor(user.id), ContactId(new_id()))
 
 
 async def test_fields_are_listed_by_position_then_by_name(world: World) -> None:
     admin, user = await world.user(role=Role.ADMIN), await world.user()
     service = world.master_data
     for name in ("net", "Gross"):
-        await service.create_field(admin.id, name, FieldType.AMOUNT)
-    period = await service.create_field(admin.id, "Period", FieldType.PERIOD, position=5)
-    payout = await service.create_field(admin.id, "Payout", FieldType.AMOUNT)
-    assert [f.name for f in await service.list_fields(user.id)] == [
+        await service.create_field(Actor(admin.id), name, FieldType.AMOUNT)
+    period = await service.create_field(Actor(admin.id), "Period", FieldType.PERIOD, position=5)
+    payout = await service.create_field(Actor(admin.id), "Payout", FieldType.AMOUNT)
+    assert [f.name for f in await service.list_fields(Actor(user.id))] == [
         "Gross",
         "net",
         "Payout",
         "Period",
     ]
-    await service.change_field(admin.id, payout.id, position=-1)
-    await service.change_field(admin.id, period.id, name="Service period")
-    assert [f.name for f in await service.list_fields(user.id)] == [
+    await service.change_field(Actor(admin.id), payout.id, position=-1)
+    await service.change_field(Actor(admin.id), period.id, name="Service period")
+    assert [f.name for f in await service.list_fields(Actor(user.id))] == [
         "Payout",
         "Gross",
         "net",
@@ -363,144 +376,152 @@ async def test_fields_are_listed_by_position_then_by_name(world: World) -> None:
 
 async def test_only_unused_master_data_is_deleted_by_admins(world: World) -> None:
     admin, owner = await world.user(role=Role.ADMIN), await world.user()
-    contact = await world.master_data.create_contact(admin.id, "ACME")
-    tag = await world.master_data.create_tag(admin.id, "tax")
-    invoice = await world.master_data.create_document_type(admin.id, "Invoice")
+    contact = await world.master_data.create_contact(Actor(admin.id), "ACME")
+    tag = await world.master_data.create_tag(Actor(admin.id), "tax")
+    invoice = await world.master_data.create_document_type(Actor(admin.id), "Invoice")
     bound = await world.master_data.create_field(
-        admin.id, "Amount", FieldType.AMOUNT, document_type_ids=[invoice.id]
+        Actor(admin.id), "Amount", FieldType.AMOUNT, document_type_ids=[invoice.id]
     )
-    unused = await world.master_data.create_tag(admin.id, "unused")
-    document = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 x"), filename="x.pdf")
+    unused = await world.master_data.create_tag(Actor(admin.id), "unused")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(b"%PDF-1.7 x"), filename="x.pdf"
+    )
     await world.drain()
     await world.documents.change_metadata(
-        owner.id,
+        Actor(owner.id),
         document.id,
         DocumentChanges(contact_id=contact.id, tag_ids=frozenset({tag.id})),
     )
     with pytest.raises(PermissionDeniedError):
-        await world.master_data.delete_tag(owner.id, unused.id)
+        await world.master_data.delete_tag(Actor(owner.id), unused.id)
     for delete in (
-        world.master_data.delete_contact(admin.id, contact.id),
-        world.master_data.delete_tag(admin.id, tag.id),
-        world.master_data.delete_document_type(admin.id, invoice.id),  # a field uses it
+        world.master_data.delete_contact(Actor(admin.id), contact.id),
+        world.master_data.delete_tag(Actor(admin.id), tag.id),
+        world.master_data.delete_document_type(Actor(admin.id), invoice.id),  # a field uses it
     ):
         with pytest.raises(ConflictError):
             await delete
-    await world.master_data.delete_tag(admin.id, unused.id)
-    await world.master_data.delete_field(admin.id, bound.id)
-    await world.master_data.delete_document_type(admin.id, invoice.id)
-    assert [t.name for t in await world.master_data.list_tags(admin.id)] == ["tax"]
+    await world.master_data.delete_tag(Actor(admin.id), unused.id)
+    await world.master_data.delete_field(Actor(admin.id), bound.id)
+    await world.master_data.delete_document_type(Actor(admin.id), invoice.id)
+    assert [t.name for t in await world.master_data.list_tags(Actor(admin.id))] == ["tax"]
     with pytest.raises(NotFoundError):
-        await world.master_data.delete_tag(admin.id, unused.id)
+        await world.master_data.delete_tag(Actor(admin.id), unused.id)
 
 
 async def test_field_definitions_change_without_breaking_values(world: World) -> None:
     admin, owner = await world.user(role=Role.ADMIN), await world.user()
-    invoice = await world.master_data.create_document_type(admin.id, "Invoice")
-    letter = await world.master_data.create_document_type(admin.id, "Letter")
+    invoice = await world.master_data.create_document_type(Actor(admin.id), "Invoice")
+    letter = await world.master_data.create_document_type(Actor(admin.id), "Letter")
     kind = await world.master_data.create_field(
-        admin.id, "Kind", FieldType.CHOICE, choices=["a", "b"]
+        Actor(admin.id), "Kind", FieldType.CHOICE, choices=["a", "b"]
     )
-    document = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 x"), filename="x.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(b"%PDF-1.7 x"), filename="x.pdf"
+    )
     await world.drain()
     await world.documents.change_metadata(
-        owner.id,
+        Actor(owner.id),
         document.id,
         DocumentChanges(document_type_id=invoice.id, fields={kind.id: "a"}),
     )
     change = world.master_data.change_field
 
     with pytest.raises(PermissionDeniedError):
-        await change(owner.id, kind.id, name="Sort")
-    changed = await change(admin.id, kind.id, name="Sort", choices=["a", "b", "c"])
+        await change(Actor(owner.id), kind.id, name="Sort")
+    changed = await change(Actor(admin.id), kind.id, name="Sort", choices=["a", "b", "c"])
     assert changed.name == "Sort" and changed.choices == ("a", "b", "c")
-    await change(admin.id, kind.id, choices=["c", "a"])  # b is unused
+    await change(Actor(admin.id), kind.id, choices=["c", "a"])  # b is unused
     with pytest.raises(ConflictError):
-        await change(admin.id, kind.id, choices=["c"])  # a is in use
+        await change(Actor(admin.id), kind.id, choices=["c"])  # a is in use
     with pytest.raises(ConflictError):
-        await change(admin.id, kind.id, document_type_ids=[letter.id])  # narrower
-    await change(admin.id, kind.id, document_type_ids=[invoice.id, letter.id])
-    await change(admin.id, kind.id, document_type_ids=[invoice.id])  # values all inside
-    await change(admin.id, kind.id, document_type_ids=None)
+        await change(Actor(admin.id), kind.id, document_type_ids=[letter.id])  # narrower
+    await change(Actor(admin.id), kind.id, document_type_ids=[invoice.id, letter.id])
+    await change(Actor(admin.id), kind.id, document_type_ids=[invoice.id])  # values all inside
+    await change(Actor(admin.id), kind.id, document_type_ids=None)
     with pytest.raises(NotFoundError):
-        await change(admin.id, kind.id, document_type_ids=[DocumentTypeId(new_id())])
-    stored = await world.master_data.get_field(owner.id, kind.id)
+        await change(Actor(admin.id), kind.id, document_type_ids=[DocumentTypeId(new_id())])
+    stored = await world.master_data.get_field(Actor(owner.id), kind.id)
     assert stored.choices == ("c", "a") and stored.document_type_ids is None
-    document_now = await world.documents.get(owner.id, document.id)
+    document_now = await world.documents.get(Actor(owner.id), document.id)
     assert document_now.fields == {kind.id: "a"}
 
 
 async def test_tags_nest_within_their_scope(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
-    insurance = await service.create_tag(admin.id, "Insurance")
-    health = await service.create_tag(admin.id, "Health", parent_id=insurance.id)
-    status = await service.create_tag(admin.id, "To pay", assignment=Assignment.MANUAL)
-    group = await service.create_tag(admin.id, "Insurance", scope=TagScope.CONTACT)
+    insurance = await service.create_tag(Actor(admin.id), "Insurance")
+    health = await service.create_tag(Actor(admin.id), "Health", parent_id=insurance.id)
+    status = await service.create_tag(Actor(admin.id), "To pay", assignment=Assignment.MANUAL)
+    group = await service.create_tag(Actor(admin.id), "Insurance", scope=TagScope.CONTACT)
     assert (group.assignment, group.shown) == (Assignment.MANUAL, False)
     assert (status.assignment, status.shown) == (Assignment.MANUAL, True)
     with pytest.raises(ConflictError):  # names are unique per scope
-        await service.create_tag(admin.id, "insurance", scope=TagScope.CONTACT)
+        await service.create_tag(Actor(admin.id), "insurance", scope=TagScope.CONTACT)
     with pytest.raises(ValidationError, match="another scope"):
-        await service.create_tag(admin.id, "Car", parent_id=group.id)
+        await service.create_tag(Actor(admin.id), "Car", parent_id=group.id)
     with pytest.raises(ValidationError, match="below it"):
-        await service.change_tag(admin.id, insurance.id, parent_id=health.id)
+        await service.change_tag(Actor(admin.id), insurance.id, parent_id=health.id)
     with pytest.raises(ValidationError, match="by hand"):
-        await service.change_tag(admin.id, group.id, assignment=Assignment.AUTO)
+        await service.change_tag(Actor(admin.id), group.id, assignment=Assignment.AUTO)
     with pytest.raises(NotFoundError):
-        await service.create_tag(admin.id, "Car", parent_id=TagId(new_id()))
-    moved = await service.change_tag(admin.id, status.id, parent_id=insurance.id, shown=False)
+        await service.create_tag(Actor(admin.id), "Car", parent_id=TagId(new_id()))
+    moved = await service.change_tag(
+        Actor(admin.id), status.id, parent_id=insurance.id, shown=False
+    )
     assert (moved.parent_id, moved.shown, moved.name) == (insurance.id, False, "To pay")
-    top = await service.change_tag(admin.id, moved.id, parent_id=None)
+    top = await service.change_tag(Actor(admin.id), moved.id, parent_id=None)
     assert top.parent_id is None and top.scope is TagScope.DOCUMENT
-    assert [tag.name for tag in await service.list_tags(admin.id, TagScope.CONTACT)] == [
+    assert [tag.name for tag in await service.list_tags(Actor(admin.id), TagScope.CONTACT)] == [
         "Insurance"
     ]
-    assert len(await service.list_tags(admin.id)) == 4
+    assert len(await service.list_tags(Actor(admin.id))) == 4
 
 
 async def test_contacts_and_types_are_in_groups_of_their_scope(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
-    insurer = await service.create_tag(admin.id, "Insurer", scope=TagScope.CONTACT)
+    insurer = await service.create_tag(Actor(admin.id), "Insurer", scope=TagScope.CONTACT)
     health = await service.create_tag(
-        admin.id, "Health insurer", scope=TagScope.CONTACT, parent_id=insurer.id
+        Actor(admin.id), "Health insurer", scope=TagScope.CONTACT, parent_id=insurer.id
     )
-    bills = await service.create_tag(admin.id, "Bills", scope=TagScope.DOCUMENT_TYPE)
-    tag = await service.create_tag(admin.id, "Tax")
-    contact = await service.create_contact(admin.id, "Nord", group_ids=[insurer.id, health.id])
+    bills = await service.create_tag(Actor(admin.id), "Bills", scope=TagScope.DOCUMENT_TYPE)
+    tag = await service.create_tag(Actor(admin.id), "Tax")
+    contact = await service.create_contact(
+        Actor(admin.id), "Nord", group_ids=[insurer.id, health.id]
+    )
     assert contact.group_ids == {health.id}  # a child and its parent leave the child
     with pytest.raises(ValidationError, match="contact group"):
-        await service.change_contact(admin.id, contact.id, group_ids=[bills.id])
+        await service.change_contact(Actor(admin.id), contact.id, group_ids=[bills.id])
     with pytest.raises(ValidationError):
-        await service.create_contact(admin.id, "Süd", group_ids=[tag.id])
+        await service.create_contact(Actor(admin.id), "Süd", group_ids=[tag.id])
     with pytest.raises(NotFoundError):
-        await service.create_contact(admin.id, "Süd", group_ids=[TagId(new_id())])
-    changed = await service.change_contact(admin.id, contact.id, group_ids=[insurer.id])
+        await service.create_contact(Actor(admin.id), "Süd", group_ids=[TagId(new_id())])
+    changed = await service.change_contact(Actor(admin.id), contact.id, group_ids=[insurer.id])
     assert changed.group_ids == {insurer.id}
-    assert (await service.change_contact(admin.id, contact.id, name="Nord AG")).group_ids == {
-        insurer.id
-    }
-    kind = await service.create_document_type(admin.id, "Invoice", group_ids=[bills.id])
+    assert (
+        await service.change_contact(Actor(admin.id), contact.id, name="Nord AG")
+    ).group_ids == {insurer.id}
+    kind = await service.create_document_type(Actor(admin.id), "Invoice", group_ids=[bills.id])
     assert kind.group_ids == {bills.id}
     with pytest.raises(ValidationError, match="not a document type group"):
-        await service.change_document_type(admin.id, kind.id, group_ids=[insurer.id])
-    assert (await service.change_document_type(admin.id, kind.id, group_ids=[])).group_ids == (
-        frozenset()
-    )
+        await service.change_document_type(Actor(admin.id), kind.id, group_ids=[insurer.id])
+    assert (
+        await service.change_document_type(Actor(admin.id), kind.id, group_ids=[])
+    ).group_ids == (frozenset())
 
 
 async def test_a_tag_is_deleted_only_without_tags_below_it_and_unused(world: World) -> None:
     admin, owner = await world.user(role=Role.ADMIN), await world.user()
     service = world.master_data
-    insurance = await service.create_tag(admin.id, "Insurance")
-    health = await service.create_tag(admin.id, "Health", parent_id=insurance.id)
-    insurer = await service.create_tag(admin.id, "Insurer", scope=TagScope.CONTACT)
-    bills = await service.create_tag(admin.id, "Bills", scope=TagScope.DOCUMENT_TYPE)
-    ruled = await service.create_tag(admin.id, "Ruled")
-    used = await service.create_tag(admin.id, "Used")
-    contact = await service.create_contact(admin.id, "Nord", group_ids=[insurer.id])
-    kind = await service.create_document_type(admin.id, "Invoice", group_ids=[bills.id])
+    insurance = await service.create_tag(Actor(admin.id), "Insurance")
+    health = await service.create_tag(Actor(admin.id), "Health", parent_id=insurance.id)
+    insurer = await service.create_tag(Actor(admin.id), "Insurer", scope=TagScope.CONTACT)
+    bills = await service.create_tag(Actor(admin.id), "Bills", scope=TagScope.DOCUMENT_TYPE)
+    ruled = await service.create_tag(Actor(admin.id), "Ruled")
+    used = await service.create_tag(Actor(admin.id), "Used")
+    contact = await service.create_contact(Actor(admin.id), "Nord", group_ids=[insurer.id])
+    kind = await service.create_document_type(Actor(admin.id), "Invoice", group_ids=[bills.id])
     condition = Condition(field=ConditionField.TAGS, op=Operator.CONTAINS, value=str(ruled.id))
     rule = Rule.create(
         scope=RuleScope.GLOBAL,
@@ -516,10 +537,12 @@ async def test_a_tag_is_deleted_only_without_tags_below_it_and_unused(world: Wor
     async with world.uow() as uow:
         await uow.rules.add(rule)
         await uow.commit()
-    document = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 x"), filename="x.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(b"%PDF-1.7 x"), filename="x.pdf"
+    )
     await world.drain()
     await world.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(tag_ids=frozenset({used.id}))
+        Actor(owner.id), document.id, DocumentChanges(tag_ids=frozenset({used.id}))
     )
     for tag, reason in (
         (insurance, "below it"),
@@ -530,17 +553,17 @@ async def test_a_tag_is_deleted_only_without_tags_below_it_and_unused(world: Wor
         (used, "in use"),
     ):
         with pytest.raises(ConflictError, match=reason):
-            await service.delete_tag(admin.id, tag.id)
-    await service.change_contact(admin.id, contact.id, group_ids=[])
-    await service.delete_document_type(admin.id, kind.id)
-    await service.delete_tag(admin.id, insurer.id)
-    await service.delete_tag(admin.id, bills.id)
+            await service.delete_tag(Actor(admin.id), tag.id)
+    await service.change_contact(Actor(admin.id), contact.id, group_ids=[])
+    await service.delete_document_type(Actor(admin.id), kind.id)
+    await service.delete_tag(Actor(admin.id), insurer.id)
+    await service.delete_tag(Actor(admin.id), bills.id)
     async with world.uow() as uow:
         await uow.rules.update(_deleted(await uow.rules.get(rule.id), world))
         await uow.commit()
-    await service.delete_tag(admin.id, health.id)
-    await service.delete_tag(admin.id, insurance.id)
-    assert {tag.name for tag in await service.list_tags(admin.id)} == {"Ruled", "Used"}
+    await service.delete_tag(Actor(admin.id), health.id)
+    await service.delete_tag(Actor(admin.id), insurance.id)
+    assert {tag.name for tag in await service.list_tags(Actor(admin.id))} == {"Ruled", "Used"}
 
 
 def _deleted(rule: Rule, world: World) -> Rule:
@@ -551,19 +574,21 @@ def _deleted(rule: Rule, world: World) -> Rule:
 async def test_documents_carry_document_tags_normalised(world: World) -> None:
     admin, owner = await world.user(role=Role.ADMIN), await world.user()
     service = world.master_data
-    insurance = await service.create_tag(admin.id, "Insurance")
-    health = await service.create_tag(admin.id, "Health", parent_id=insurance.id)
-    paid = await service.create_tag(admin.id, "Paid", assignment=Assignment.MANUAL)
-    group = await service.create_tag(admin.id, "Insurer", scope=TagScope.CONTACT)
-    document = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 x"), filename="x.pdf")
+    insurance = await service.create_tag(Actor(admin.id), "Insurance")
+    health = await service.create_tag(Actor(admin.id), "Health", parent_id=insurance.id)
+    paid = await service.create_tag(Actor(admin.id), "Paid", assignment=Assignment.MANUAL)
+    group = await service.create_tag(Actor(admin.id), "Insurer", scope=TagScope.CONTACT)
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(b"%PDF-1.7 x"), filename="x.pdf"
+    )
     await world.drain()
     with pytest.raises(ValidationError, match="not a document tag"):
         await world.documents.change_metadata(
-            owner.id, document.id, DocumentChanges(tag_ids=frozenset({group.id}))
+            Actor(owner.id), document.id, DocumentChanges(tag_ids=frozenset({group.id}))
         )
     changed = (
         await world.documents.change_metadata(
-            owner.id,
+            Actor(owner.id),
             document.id,
             DocumentChanges(tag_ids=frozenset({insurance.id, health.id, paid.id})),
         )
@@ -571,7 +596,7 @@ async def test_documents_carry_document_tags_normalised(world: World) -> None:
     assert changed.tag_ids == {health.id, paid.id}
     parent_only = (
         await world.documents.change_metadata(
-            owner.id, document.id, DocumentChanges(tag_ids=frozenset({insurance.id}))
+            Actor(owner.id), document.id, DocumentChanges(tag_ids=frozenset({insurance.id}))
         )
     ).document
     assert parent_only.tag_ids == {insurance.id}
@@ -582,8 +607,8 @@ async def test_a_tag_move_announces_each_document_it_changes(world: World) -> No
     here what the move tells: an update of each document whose tags changed."""
     admin, owner = await world.user(role=Role.ADMIN), await world.user()
     service = world.master_data
-    insurance = await service.create_tag(admin.id, "Insurance")
-    health = await service.create_tag(admin.id, "Health")
+    insurance = await service.create_tag(Actor(admin.id), "Insurance")
+    health = await service.create_tag(Actor(admin.id), "Health")
     space = await world.personal_space(owner)
     async with world.uow() as uow:
         for tags in ({insurance.id, health.id}, {insurance.id}, {health.id}):
@@ -592,7 +617,7 @@ async def test_a_tag_move_announces_each_document_it_changes(world: World) -> No
             await uow.documents.add(document)
         await uow.commit()
     world.database.outbox.clear()
-    await service.change_tag(admin.id, health.id, parent_id=insurance.id)
+    await service.change_tag(Actor(admin.id), health.id, parent_id=insurance.id)
     await builders.drain(service)
     assert world.event_types() == [DocumentUpdated.type]
 
@@ -600,15 +625,15 @@ async def test_a_tag_move_announces_each_document_it_changes(world: World) -> No
 async def test_only_a_new_parent_of_a_tag_or_group_normalises(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
-    insurance = await service.create_tag(admin.id, "Insurance")
-    health = await service.create_tag(admin.id, "Health", parent_id=insurance.id)
-    work = await service.create_tag(admin.id, "Work", scope=TagScope.TOPIC)
-    jobs = await service.create_tag(admin.id, "Jobs", scope=TagScope.TOPIC)
-    await service.change_tag(admin.id, health.id, parent_id=None, name="Gesundheit")
-    await service.change_tag(admin.id, jobs.id, parent_id=work.id)
-    await service.change_tag(admin.id, insurance.id, shown=False)
+    insurance = await service.create_tag(Actor(admin.id), "Insurance")
+    health = await service.create_tag(Actor(admin.id), "Health", parent_id=insurance.id)
+    work = await service.create_tag(Actor(admin.id), "Work", scope=TagScope.TOPIC)
+    jobs = await service.create_tag(Actor(admin.id), "Jobs", scope=TagScope.TOPIC)
+    await service.change_tag(Actor(admin.id), health.id, parent_id=None, name="Gesundheit")
+    await service.change_tag(Actor(admin.id), jobs.id, parent_id=work.id)
+    await service.change_tag(Actor(admin.id), insurance.id, shown=False)
     assert not await service.run_next_job()
-    await service.change_tag(admin.id, insurance.id, parent_id=health.id)
+    await service.change_tag(Actor(admin.id), insurance.id, parent_id=health.id)
     assert await service.run_next_job()
     # A tag gone meanwhile: the job ends without changing anything.
     async with world.uow() as uow:
@@ -625,8 +650,8 @@ async def test_each_step_of_the_normalising_sees_the_tree_as_it_is() -> None:
     world = World(normalise_batch=2)
     admin, owner = await world.user(role=Role.ADMIN), await world.user()
     service = world.master_data
-    insurance = await service.create_tag(admin.id, "Insurance")
-    health = await service.create_tag(admin.id, "Health")
+    insurance = await service.create_tag(Actor(admin.id), "Insurance")
+    health = await service.create_tag(Actor(admin.id), "Health")
     space = await world.personal_space(owner)
     documents = []
     async with world.uow() as uow:
@@ -636,9 +661,9 @@ async def test_each_step_of_the_normalising_sees_the_tree_as_it_is() -> None:
             await uow.documents.add(document)
             documents.append(document)
         await uow.commit()
-    await service.change_tag(admin.id, health.id, parent_id=insurance.id)
+    await service.change_tag(Actor(admin.id), health.id, parent_id=insurance.id)
     assert await service.run_next_job()  # the first two by id
-    await service.change_tag(admin.id, health.id, parent_id=None)
+    await service.change_tag(Actor(admin.id), health.id, parent_id=None)
     await builders.drain(service)
     async with world.uow() as uow:
         stored = {
@@ -651,42 +676,45 @@ async def test_each_step_of_the_normalising_sees_the_tree_as_it_is() -> None:
 async def test_tags_and_types_carry_icons_and_colours(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
-    tag = await service.create_tag(admin.id, "Health", icon="heart-pulse", color="#B45309")
+    tag = await service.create_tag(Actor(admin.id), "Health", icon="heart-pulse", color="#B45309")
     assert (tag.icon, tag.color) == ("heart-pulse", "#b45309")
     # Left out, they stay; None removes one.
-    renamed = await service.change_tag(admin.id, tag.id, name="Health care")
+    renamed = await service.change_tag(Actor(admin.id), tag.id, name="Health care")
     assert (renamed.icon, renamed.color) == ("heart-pulse", "#b45309")
-    changed = await service.change_tag(admin.id, tag.id, icon=None, color="pink")
+    changed = await service.change_tag(Actor(admin.id), tag.id, icon=None, color="pink")
     assert (changed.icon, changed.color) == (None, "pink")
     with pytest.raises(ValidationError):
-        await service.change_tag(admin.id, tag.id, color="purple")
+        await service.change_tag(Actor(admin.id), tag.id, color="purple")
     with pytest.raises(ValidationError):
-        await service.create_tag(admin.id, "X", icon="Heart Pulse")
+        await service.create_tag(Actor(admin.id), "X", icon="Heart Pulse")
 
-    kind = await service.create_document_type(admin.id, "Invoice", icon="receipt")
+    kind = await service.create_document_type(Actor(admin.id), "Invoice", icon="receipt")
     assert kind.icon == "receipt"
-    kept = await service.change_document_type(admin.id, kind.id, description="Bills")
+    kept = await service.change_document_type(Actor(admin.id), kind.id, description="Bills")
     assert kept.icon == "receipt"
-    gone = await service.change_document_type(admin.id, kind.id, icon=None)
+    gone = await service.change_document_type(Actor(admin.id), kind.id, icon=None)
     assert gone.icon is None
     async with world.uow() as uow:
         assert (await uow.tags.get(tag.id)).color == "pink"
         assert (await uow.document_types.get(kind.id)).icon is None
     user = await world.user()
     with pytest.raises(PermissionDeniedError):
-        await service.change_tag(user.id, tag.id, icon="house")
+        await service.change_tag(Actor(user.id), tag.id, icon="house")
 
 
 async def test_a_document_type_comes_with_its_fields_or_not_at_all(world: World) -> None:
     """Issue #73: a new type and its fields in one transaction; its pattern may name them."""
     admin = await world.user(role=Role.ADMIN)
     service = world.master_data
-    other = await service.create_document_type(admin.id, "Brief")
+    other = await service.create_document_type(Actor(admin.id), "Brief")
     amount = await service.create_field(
-        admin.id, "Betrag", FieldType.AMOUNT, document_type_ids=[other.id]
+        Actor(admin.id), "Betrag", FieldType.AMOUNT, document_type_ids=[other.id]
     )
     invoice = await service.create_document_type(
-        admin.id, "Rechnung", title_pattern="Rechnung {{ field.betrag }}", fields={amount.id: True}
+        Actor(admin.id),
+        "Rechnung",
+        title_pattern="Rechnung {{ field.betrag }}",
+        fields={amount.id: True},
     )
     async with world.uow() as uow:
         stored = await uow.fields.get(amount.id)
@@ -694,10 +722,12 @@ async def test_a_document_type_comes_with_its_fields_or_not_at_all(world: World)
     assert stored.is_required_for(invoice.id) and not stored.is_required_for(other.id)
     # A field that does not exist, or a pattern naming a field it does not get: nothing is made.
     with pytest.raises(NotFoundError):
-        await service.create_document_type(admin.id, "Mahnung", fields={FieldId(new_id()): False})
+        await service.create_document_type(
+            Actor(admin.id), "Mahnung", fields={FieldId(new_id()): False}
+        )
     with pytest.raises(ValidationError, match=r"field\.betrag"):
         await service.create_document_type(
-            admin.id, "Mahnung", title_pattern="{{ field.betrag }}", fields={}
+            Actor(admin.id), "Mahnung", title_pattern="{{ field.betrag }}", fields={}
         )
     async with world.uow() as uow:
         assert await uow.document_types.find_by_name("Mahnung") is None
@@ -711,8 +741,8 @@ async def test_holders_of_an_identifier_are_those_the_caller_sees(world: World) 
         await world.user("erika"),
         await world.user("bob"),
     )
-    utility = await world.master_data.create_contact(admin.id, "Stadtwerke")
-    employer = await world.master_data.create_contact(admin.id, "Arbeitgeber")
+    utility = await world.master_data.create_contact(Actor(admin.id), "Stadtwerke")
+    employer = await world.master_data.create_contact(Actor(admin.id), "Arbeitgeber")
     kind = IdentifierKind.CUSTOMER_NUMBER
     async with world.uow() as uow:
         for contact, number, user in ((utility, "KD12345678", None), (employer, "P4711", erika.id)):
@@ -723,7 +753,8 @@ async def test_holders_of_an_identifier_are_those_the_caller_sees(world: World) 
 
     async def holders(user: User, written: str) -> list[str]:
         return [
-            contact.name for contact in await world.master_data.holders_of(user.id, kind, written)
+            contact.name
+            for contact in await world.master_data.holders_of(Actor(user.id), kind, written)
         ]
 
     assert await holders(bob, " kd-12 345 678 ") == ["Stadtwerke"]

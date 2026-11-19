@@ -18,6 +18,7 @@ from lekto.core.domain.identifiers import Identifier, IdentifierKind, Identifier
 from lekto.core.domain.master_data import Contact
 from lekto.core.domain.open_identifiers import OpenSource
 from lekto.core.domain.reasons import ReasonCode
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role, User
 from lekto.core.services.objects import text_key
 from lekto.core.services.open_identifiers import OpenAction, OpenDecision
@@ -93,7 +94,7 @@ async def held(world: World, contact: Contact) -> dict[tuple[IdentifierKind, str
 
 async def test_an_admin_lists_the_open_identifiers(world: World) -> None:
     admin, utility, _ = await setting(world)
-    page = await world.open_identifiers.page(admin.id)
+    page = await world.open_identifiers.page(Actor(admin.id))
     assert [(item.key, item.source, len(item.seen)) for item in page.items] == [
         (CUSTOMER, OpenSource.LEARNED, 2),
         (SITE, OpenSource.SUGGESTED, 1),
@@ -102,26 +103,26 @@ async def test_an_admin_lists_the_open_identifiers(world: World) -> None:
     assert page.counts == {OpenSource.LEARNED: 1, OpenSource.SUGGESTED: 1}
     assert page.names == {utility.id: "Stadtwerke"}
 
-    learned = await world.open_identifiers.page(admin.id, source=OpenSource.LEARNED)
+    learned = await world.open_identifiers.page(Actor(admin.id), source=OpenSource.LEARNED)
     assert [item.key for item in learned.items] == [CUSTOMER]
     assert learned.counts == page.counts  # not narrowed by the source
-    words = await world.open_identifiers.page(admin.id, words="stadtwerke-nord")
+    words = await world.open_identifiers.page(Actor(admin.id), words="stadtwerke-nord")
     assert [item.key for item in words.items] == [SITE]
-    named = await world.open_identifiers.page(admin.id, words="stadtwerke")
+    named = await world.open_identifiers.page(Actor(admin.id), words="stadtwerke")
     assert [item.key for item in named.items] == [CUSTOMER, SITE]
-    assert (await world.open_identifiers.page(admin.id, words="5566 7788")).items == []
-    paged = await world.open_identifiers.page(admin.id, offset=1, limit=1)
+    assert (await world.open_identifiers.page(Actor(admin.id), words="5566 7788")).items == []
+    paged = await world.open_identifiers.page(Actor(admin.id), offset=1, limit=1)
     assert ([item.key for item in paged.items], paged.total) == ([SITE], 2)
-    assert await world.open_identifiers.summary(admin.id) == page.counts
+    assert await world.open_identifiers.summary(Actor(admin.id)) == page.counts
 
     user = await world.user()
     with pytest.raises(PermissionDeniedError):
-        await world.open_identifiers.page(user.id)
+        await world.open_identifiers.page(Actor(user.id))
 
 
 async def test_a_detail_shows_where_it_stands(world: World) -> None:
     admin, utility, _ = await setting(world)
-    detail = await world.open_identifiers.detail(admin.id, *CUSTOMER)
+    detail = await world.open_identifiers.detail(Actor(admin.id), *CUSTOMER)
     assert detail.names == {utility.id: "Stadtwerke"}
     assert len(detail.places) == 2
     place = detail.places[0]
@@ -132,13 +133,15 @@ async def test_a_detail_shows_where_it_stands(world: World) -> None:
         "1234 5678",
     )
     with pytest.raises(NotFoundError):
-        await world.open_identifiers.detail(admin.id, IdentifierKind.CUSTOMER_NUMBER, "99999999")
+        await world.open_identifiers.detail(
+            Actor(admin.id), IdentifierKind.CUSTOMER_NUMBER, "99999999"
+        )
 
 
 async def test_decisions_confirm_and_reject_one_by_one(world: World) -> None:
     admin, utility, bank = await setting(world)
     outcomes = await world.open_identifiers.decide(
-        admin.id,
+        Actor(admin.id),
         [
             OpenDecision(kind=CUSTOMER[0], value=CUSTOMER[1], action=OpenAction.CONFIRM),
             OpenDecision(kind=SITE[0], value=SITE[1], action=OpenAction.CONFIRM),
@@ -154,24 +157,24 @@ async def test_decisions_confirm_and_reject_one_by_one(world: World) -> None:
     assert outcomes[3].error.code is ReasonCode.IDENTIFIER_NOT_OPEN
     assert await held(world, utility) == {CUSTOMER: "manual", SITE: "manual"}
     assert await held(world, bank) == {}
-    assert (await world.open_identifiers.page(admin.id)).items == []
+    assert (await world.open_identifiers.page(Actor(admin.id))).items == []
 
 
 async def test_a_suggested_domain_rejected_is_not_suggested_again(world: World) -> None:
     admin, utility, _ = await setting(world)
     (rejected,) = await world.open_identifiers.decide(
-        admin.id, [OpenDecision(kind=SITE[0], value=SITE[1], action=OpenAction.REJECT)]
+        Actor(admin.id), [OpenDecision(kind=SITE[0], value=SITE[1], action=OpenAction.REJECT)]
     )
     assert rejected.error is None
     assert (await held(world, utility))[SITE] == "rejected"
-    page = await world.open_identifiers.page(admin.id)
+    page = await world.open_identifiers.page(Actor(admin.id))
     assert [item.key for item in page.items] == [CUSTOMER]
 
 
 async def test_a_learned_one_is_rejected_or_moved_by_its_contact(world: World) -> None:
     admin, utility, bank = await setting(world)
     await world.open_identifiers.decide(
-        admin.id,
+        Actor(admin.id),
         [
             OpenDecision(kind=CUSTOMER[0], value=CUSTOMER[1], action=OpenAction.REJECT),
             OpenDecision(kind=SITE[0], value=SITE[1], action=OpenAction.CONFIRM, contact=bank.id),
@@ -182,7 +185,7 @@ async def test_a_learned_one_is_rejected_or_moved_by_its_contact(world: World) -
     user = await world.user()
     with pytest.raises(PermissionDeniedError):
         await world.open_identifiers.decide(
-            user.id, [OpenDecision(kind=SITE[0], value=SITE[1], action=OpenAction.REJECT)]
+            Actor(user.id), [OpenDecision(kind=SITE[0], value=SITE[1], action=OpenAction.REJECT)]
         )
 
 
@@ -197,7 +200,7 @@ async def test_a_learned_one_moved_to_another_contact_leaves_its_user(world: Wor
         await uow.contacts.update(stored)
         await uow.commit()
     (outcome,) = await world.open_identifiers.decide(
-        admin.id,
+        Actor(admin.id),
         [
             OpenDecision(
                 kind=CUSTOMER[0], value=CUSTOMER[1], action=OpenAction.CONFIRM, contact=bank.id
@@ -214,10 +217,10 @@ async def test_a_learned_one_moved_to_another_contact_leaves_its_user(world: Wor
 async def test_an_identifier_entered_by_hand_is_not_rejected_at_its_contact(world: World) -> None:
     admin = await world.user(role=Role.ADMIN)
     contact = await world.master_data.create_contact(
-        admin.id, "Nord", identifiers=[Identifier(*SITE)]
+        Actor(admin.id), "Nord", identifiers=[Identifier(*SITE)]
     )
     with pytest.raises(ConflictError):
-        await world.master_data.reject_identifier(admin.id, contact.id, SITE)
+        await world.master_data.reject_identifier(Actor(admin.id), contact.id, SITE)
 
 
 async def test_a_suggestion_goes_into_a_profile_or_is_declined_there(world: World) -> None:
@@ -231,30 +234,30 @@ async def test_a_suggestion_goes_into_a_profile_or_is_declined_there(world: Worl
         await uow.commit()
     yours = Holder(HolderKind.RECIPIENT, HolderSource.RULE)
     await confirmed(world, admin, bank, [IBAN], yours)
-    (item,) = (await world.open_identifiers.page(admin.id)).items
+    (item,) = (await world.open_identifiers.page(Actor(admin.id))).items
     assert (item.source, item.person) == (OpenSource.SUGGESTED, admin.id)
     confirm = OpenDecision(kind=IBAN[0], value=IBAN[1], action=OpenAction.CONFIRM)
-    (outcome,) = await world.open_identifiers.decide(admin.id, [confirm], session=False)
+    (outcome,) = await world.open_identifiers.decide(Actor(admin.id), [confirm], session=False)
     assert outcome.error is not None
     assert outcome.error.code is ReasonCode.SESSION_NEEDED_PROFILE
-    (outcome,) = await world.open_identifiers.decide(admin.id, [confirm])
+    (outcome,) = await world.open_identifiers.decide(Actor(admin.id), [confirm])
     assert outcome.error is None
     async with world.uow() as uow:
         profile = await uow.profiles.get(admin.id)
     assert [item.key for item in profile.identifiers] == [IBAN]
-    assert (await world.open_identifiers.page(admin.id)).items == []
+    assert (await world.open_identifiers.page(Actor(admin.id))).items == []
 
     async with world.uow() as uow:
         profile.identifiers = []
         await uow.profiles.update(profile)
         await uow.commit()
     reject = OpenDecision(kind=IBAN[0], value=IBAN[1], action=OpenAction.REJECT)
-    (outcome,) = await world.open_identifiers.decide(admin.id, [reject])
+    (outcome,) = await world.open_identifiers.decide(Actor(admin.id), [reject])
     assert outcome.error is None
     async with world.uow() as uow:
         profile = await uow.profiles.get(admin.id)
     assert ([item.key for item in profile.declined], profile.identifiers) == ([IBAN], [])
-    assert (await world.open_identifiers.page(admin.id)).items == []
+    assert (await world.open_identifiers.page(Actor(admin.id))).items == []
 
 
 async def test_a_person_without_a_display_name_is_named_by_their_username(world: World) -> None:
@@ -267,8 +270,8 @@ async def test_a_person_without_a_display_name_is_named_by_their_username(world:
         await uow.contacts.add(bank)
         await uow.commit()
     await confirmed(world, admin, bank, [IBAN], Holder(HolderKind.RECIPIENT, HolderSource.RULE))
-    page = await world.open_identifiers.page(admin.id, words=admin.username)
+    page = await world.open_identifiers.page(Actor(admin.id), words=admin.username)
     assert [item.person for item in page.items] == [admin.id]
     assert page.persons == {admin.id: admin.username}
-    detail = await world.open_identifiers.detail(admin.id, *IBAN)
+    detail = await world.open_identifiers.detail(Actor(admin.id), *IBAN)
     assert detail.persons == {admin.id: admin.username}

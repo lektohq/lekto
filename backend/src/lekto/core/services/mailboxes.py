@@ -12,7 +12,7 @@ from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 
 from lekto.core.domain.errors import ValidationError
-from lekto.core.domain.ids import MailboxId, MailRuleId, UserId
+from lekto.core.domain.ids import MailboxId, MailRuleId
 from lekto.core.domain.mail import (
     Mailbox,
     MailboxChanges,
@@ -23,6 +23,7 @@ from lekto.core.domain.mail import (
 from lekto.core.domain.mail_intake import MailOutcome, MailRecord
 from lekto.core.domain.mail_rules import MailRule, first_match, record_facts
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.sorting import sort_key
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.identity import DecryptionError, SecretCipher
@@ -87,22 +88,22 @@ class MailboxService:
         self._cipher = cipher
         self._server = server
 
-    async def list_mailboxes(self, actor: UserId) -> list[Mailbox]:
+    async def list_mailboxes(self, actor: Actor) -> list[Mailbox]:
         """By name, as every list sorts names (`sort_key`): `Ärzte` beside `Arzt`, in every
         database alike (SQ-08)."""
         async with self._uow() as uow:
-            await require_admin(uow, actor, Action.MANAGE_MAILBOXES)
+            await require_admin(uow, actor, Action.MANAGE_MAILBOXES, TokenRight.ADMIN_MAILBOXES)
             mailboxes = await uow.mailboxes.list_all()
         return sorted(mailboxes, key=lambda mailbox: (sort_key(mailbox.name), str(mailbox.id)))
 
-    async def get(self, actor: UserId, id: MailboxId) -> Mailbox:
+    async def get(self, actor: Actor, id: MailboxId) -> Mailbox:
         async with self._uow() as uow:
-            await require_admin(uow, actor, Action.MANAGE_MAILBOXES)
+            await require_admin(uow, actor, Action.MANAGE_MAILBOXES, TokenRight.ADMIN_MAILBOXES)
             return await uow.mailboxes.get(id)
 
     async def create(
         self,
-        actor: UserId,
+        actor: Actor,
         *,
         name: str,
         host: str,
@@ -139,7 +140,7 @@ class MailboxService:
 
     async def change(
         self,
-        actor: UserId,
+        actor: Actor,
         id: MailboxId,
         changes: MailboxChanges,
         *,
@@ -166,7 +167,7 @@ class MailboxService:
             await uow.commit()
             return mailbox
 
-    async def delete(self, actor: UserId, id: MailboxId) -> None:
+    async def delete(self, actor: Actor, id: MailboxId) -> None:
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.MANAGE_MAILBOXES)
             await uow.mailboxes.remove(id)
@@ -174,7 +175,7 @@ class MailboxService:
 
     async def test_connection(
         self,
-        actor: UserId,
+        actor: Actor,
         *,
         host: str,
         port: int,
@@ -218,7 +219,7 @@ class MailboxService:
 
     async def mails(
         self,
-        actor: UserId,
+        actor: Actor,
         id: MailboxId,
         *,
         outcomes: Collection[MailOutcome] | None = None,
@@ -257,7 +258,7 @@ class MailboxService:
         return MailsPage(tuple(views), total)
 
     async def mail_summary(
-        self, actor: UserId, id: MailboxId, *, rule: MailRuleId | None = None
+        self, actor: Actor, id: MailboxId, *, rule: MailRuleId | None = None
     ) -> MailSummary:
         """How many of the mailbox's mails by outcome (of those `rule` took, if given), its
         rules, and how many waiting mails each active rule takes at the next fetch (admins)."""

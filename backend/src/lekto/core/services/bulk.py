@@ -36,11 +36,12 @@ from lekto.core.domain.errors import (
     ValidationError,
 )
 from lekto.core.domain.identity import ViaToken
-from lekto.core.domain.ids import BulkOperationId, DocumentId, UserId
+from lekto.core.domain.ids import BulkOperationId, DocumentId
 from lekto.core.domain.jobs import Job
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.repository import PAGE_LIMIT, DocumentFilter
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
@@ -94,7 +95,7 @@ class BulkService:
 
     async def start(
         self,
-        actor: UserId,
+        actor: Actor,
         selection: Selection,
         action: BulkAction,
         *,
@@ -120,16 +121,18 @@ class BulkService:
             await uow.commit()
         return operation
 
-    async def get(self, actor: UserId, id: BulkOperationId) -> BulkOperation:
+    async def get(self, actor: Actor, id: BulkOperationId) -> BulkOperation:
         """For the user who started it and for admins."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             operation = await uow.bulk_operations.find(id)
-        if operation is None or not (operation.user_id == actor or user.is_active_admin):
+        if operation is None or not (
+            operation.user_id == actor.id or user.may(TokenRight.ADMIN_DOCUMENTS_ALL)
+        ):
             raise NotFoundError("bulk operation", id)
         return operation
 
-    async def _resolve(self, actor: UserId, selection: Selection) -> tuple[DocumentId, ...]:
+    async def _resolve(self, actor: Actor, selection: Selection) -> tuple[DocumentId, ...]:
         if selection.ids is not None:
             if len(selection.ids) > MAX_IDS:
                 raise ValidationError(because(ReasonCode.BULK_TOO_MANY, max=MAX_IDS))
@@ -157,7 +160,7 @@ class BulkService:
                 return tuple(found)[:MAX_DOCUMENTS]
             after = page[-1].document.id
 
-    async def _hits(self, actor: UserId, selection: Selection) -> tuple[DocumentId, ...]:
+    async def _hits(self, actor: Actor, selection: Selection) -> tuple[DocumentId, ...]:
         """Every hit of the search, as far as the index reaches (`MAX_HITS`)."""
         if self._search is None:
             raise SearchUnavailableError("the installation has no search index")
@@ -244,7 +247,7 @@ class BulkService:
         """Do the operation's action to the document as its person would by hand: True if it
         changed, False if it was as the action wants it already, else the reason it was
         skipped. Raises the errors of the services."""
-        actor, action, via = operation.user_id, operation.action, operation.via
+        actor, action, via = Actor(operation.user_id), operation.action, operation.via
         try:
             view = await self._documents.view(actor, id)
         except NotFoundError:

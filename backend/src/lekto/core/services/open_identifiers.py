@@ -35,6 +35,7 @@ from lekto.core.domain.open_identifiers import (
 )
 from lekto.core.domain.profiles import Profile
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import require_admin
@@ -114,7 +115,7 @@ class OpenIdentifierService:
 
     async def page(
         self,
-        actor: UserId,
+        actor: Actor,
         *,
         source: OpenSource | None = None,
         kind: IdentifierKind | None = None,
@@ -161,12 +162,12 @@ class OpenIdentifierService:
             to_confirm=to_confirm,
         )
 
-    async def summary(self, actor: UserId) -> Mapping[OpenSource, int]:
+    async def summary(self, actor: Actor) -> Mapping[OpenSource, int]:
         """How many identifiers are open under each source (admins)."""
         page = await self.page(actor, limit=0)
         return page.counts
 
-    async def detail(self, actor: UserId, kind: IdentifierKind, value: str) -> OpenDetail:
+    async def detail(self, actor: Actor, kind: IdentifierKind, value: str) -> OpenDetail:
         """The open identifier of `kind` and `value` (admins) and where it stands in its newest
         documents; NotFoundError if it is not open."""
         async with self._uow() as uow:
@@ -195,7 +196,7 @@ class OpenIdentifierService:
         )
 
     async def decide(
-        self, actor: UserId, decisions: Sequence[OpenDecision], *, session: bool = True
+        self, actor: Actor, decisions: Sequence[OpenDecision], *, session: bool = True
     ) -> list[DecisionOutcome]:
         """Keep each of `decisions` (admins), each a change of its contact or profile on its
         own; one that cannot be done says why, and the others are done all the same. A
@@ -223,7 +224,7 @@ class OpenIdentifierService:
         return outcomes
 
     async def confirm_recommended(
-        self, actor: UserId, *, session: bool = True
+        self, actor: Actor, *, session: bool = True
     ) -> list[DecisionOutcome]:
         """Confirm every open identifier whose documents recommend it (admins, Tobi
         28.10.2026), each as `decide` confirms one: at its contact by hand, a suggested one at
@@ -243,7 +244,7 @@ class OpenIdentifierService:
 
     async def _decide(
         self,
-        actor: UserId,
+        actor: Actor,
         decision: OpenDecision,
         item: OpenIdentifier | None,
         learned: Mapping[Key, Identifier],
@@ -278,10 +279,10 @@ class OpenIdentifierService:
         )
         await self._master_data.add_identifier(actor, contact, entered)
 
-    async def _at_person(self, actor: UserId, user: UserId, decision: OpenDecision) -> None:
+    async def _at_person(self, actor: Actor, user: UserId, decision: OpenDecision) -> None:
         """Enter a suggested identifier in the profile of `user`, or note it declined there."""
         async with self._uow() as uow:
-            viewer = await uow.users.get(actor)
+            viewer = await uow.users.get(actor.id)
             stored = await uow.profiles.find(user)
             old = stored or Profile.empty(user)
             entered = Identifier(*decision.key)

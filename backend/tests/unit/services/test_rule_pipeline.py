@@ -25,6 +25,7 @@ from lekto.core.domain.pipeline import (
     Outcome,
     ProcessingStatus,
 )
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rule_planner import Mode
 from lekto.core.domain.rules import (
     AddTags,
@@ -76,11 +77,11 @@ async def test_rules_act_on_arrival_and_the_log_names_rule_and_version(world: Wo
     owner, stranger = await world.user(), await world.user()
     acme = await r.contact("ACME")
     tax, checked, foreign = await r.tag("tax"), await r.tag("checked"), await r.tag("foreign")
-    note = await world.master_data.create_field(r.admin.id, "Note", FieldType.TEXT)
-    household = await world.spaces.create(owner.id, "Household")
+    note = await world.master_data.create_field(Actor(r.admin.id), "Note", FieldType.TEXT)
+    household = await world.spaces.create(Actor(owner.id), "Household")
     rule = await r.personal_rule(owner, definition("Draft", channel_api(), SetTitle("Draft")))
     rule = await r.rules.change(
-        owner.id,
+        Actor(owner.id),
         rule.id,
         definition(
             "ACME",
@@ -134,7 +135,7 @@ async def test_conflicting_rules_wait_in_the_inbox_until_the_owner_decides(world
 
     assert document.lane is Lane.YELLOW
     assert document.contact_id is None  # priority orders, but never decides
-    (item,) = await world.inbox.items(owner.id)
+    (item,) = await world.inbox.items(Actor(owner.id))
     (open,) = item.open
     assert open.node is Node.APPLY_RULES
     (check,) = open.fields
@@ -143,7 +144,9 @@ async def test_conflicting_rules_wait_in_the_inbox_until_the_owner_decides(world
         (await r.rule_entries(document, RULES))[0].result.output
     )
 
-    await r.pipeline().confirm(owner.id, document.id, DocumentChanges(), accept_suggestions=True)
+    await r.pipeline().confirm(
+        Actor(owner.id), document.id, DocumentChanges(), accept_suggestions=True
+    )
     await world.drain(r.pipeline())
 
     document = await r.stored(document)
@@ -161,21 +164,23 @@ async def test_a_required_field_set_by_hand_waits_for_a_person(world: World) -> 
     r = await rule_world(world)
     owner = await world.user()
     asn = await world.master_data.create_field(
-        r.admin.id, "ASN", FieldType.NUMBER, required=True, assignment=Assignment.MANUAL
+        Actor(r.admin.id), "ASN", FieldType.NUMBER, required=True, assignment=Assignment.MANUAL
     )
 
     document = await r.arrive(owner)
 
     assert document.lane is Lane.YELLOW
-    (item,) = await world.inbox.items(owner.id)
+    (item,) = await world.inbox.items(Actor(owner.id))
     (open,) = item.open
     assert open.node is Node.APPLY_RULES
     (check,) = open.fields
     assert check.reason == "'ASN' is set by hand and has no value yet"
     with pytest.raises(OpenFieldsError, match="ASN"):
-        await r.pipeline().confirm(owner.id, document.id, DocumentChanges(fields={asn.id: None}))
+        await r.pipeline().confirm(
+            Actor(owner.id), document.id, DocumentChanges(fields={asn.id: None})
+        )
     await r.pipeline().confirm(
-        owner.id, document.id, DocumentChanges(fields={asn.id: Decimal(4711)})
+        Actor(owner.id), document.id, DocumentChanges(fields={asn.id: Decimal(4711)})
     )
     await world.drain(r.pipeline())
 
@@ -188,7 +193,7 @@ async def test_a_rule_gives_a_field_set_by_hand_its_value(world: World) -> None:
     r = await rule_world(world)
     owner = await world.user()
     asn = await world.master_data.create_field(
-        r.admin.id, "ASN", FieldType.TEXT, required=True, assignment=Assignment.MANUAL
+        Actor(r.admin.id), "ASN", FieldType.TEXT, required=True, assignment=Assignment.MANUAL
     )
     await r.personal_rule(owner, definition("ASN", channel_api(), SetField(asn.id, "A-1")))
 
@@ -220,13 +225,15 @@ async def test_a_rule_does_not_replace_the_models_value(world: World) -> None:
     document = await r.arrive(owner, classify=Classifies(contact=model.id))
 
     assert (document.lane, document.contact_id) == (Lane.YELLOW, model.id)
-    ((check,),) = [open.fields for open in (await r.documents.review(owner.id, document.id)).open]
+    ((check,),) = [
+        open.fields for open in (await r.documents.review(Actor(owner.id), document.id)).open
+    ]
     assert check.field == "contact"
     assert check.reason == "rules: the model set another value ('Model')"
     assert check.suggestion == str(rule.id)
 
     # The owner takes the rule's value; it is not yellow again.
-    await r.pipeline().confirm(owner.id, document.id, DocumentChanges(contact_id=rule.id))
+    await r.pipeline().confirm(Actor(owner.id), document.id, DocumentChanges(contact_id=rule.id))
     await world.drain(r.pipeline())
     document = await r.stored(document)
     assert (document.lane, document.contact_id) == (Lane.GREEN, rule.id)
@@ -249,7 +256,7 @@ async def test_a_forced_review_holds_the_document_once(world: World) -> None:
     assert "rule 'Mine': look at it" in entry.result.reason
     assert "rule 'Everyone's': audit" in entry.result.reason
 
-    await r.pipeline().confirm(owner.id, document.id, DocumentChanges())
+    await r.pipeline().confirm(Actor(owner.id), document.id, DocumentChanges())
     await world.drain(r.pipeline())
 
     document = await r.stored(document)
@@ -266,22 +273,22 @@ async def test_unconfirmed_model_values_do_not_file_into_a_space_others_see(
     r = await rule_world(world)
     owner, reader = await world.user(), await world.user()
     acme = await r.contact("ACME")
-    shared = await world.spaces.create(owner.id, "Shared")
-    await world.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
+    shared = await world.spaces.create(Actor(owner.id), "Shared")
+    await world.spaces.set_member(Actor(owner.id), shared.id, reader.id, SpaceRole.READ)
     await r.personal_rule(owner, definition("ACME", contact_is(acme.id), SetSpace(shared.id)))
 
     document = await r.arrive(owner, classify=Classifies(contact=acme.id))
 
     assert document.lane is Lane.YELLOW
     assert document.space_id == (await world.personal_space(owner)).id
-    (open,) = (await r.documents.review(owner.id, document.id)).open
+    (open,) = (await r.documents.review(Actor(owner.id), document.id)).open
     assert [(check.field, check.suggestion) for check in open.fields] == [("contact", str(acme.id))]
     (entry,) = await r.rule_entries(document, RULES)
     assert notes(entry.result.output) == [("space", "refused")]
     assert await world.visible(reader.id) == []
 
     # Confirmed by the owner, the contact is trusted: the rule files.
-    await r.pipeline().confirm(owner.id, document.id, DocumentChanges())
+    await r.pipeline().confirm(Actor(owner.id), document.id, DocumentChanges())
     await world.drain(r.pipeline())
     document = await r.stored(document)
     assert (document.lane, document.space_id) == (Lane.GREEN, shared.id)
@@ -292,7 +299,7 @@ async def test_unconfirmed_model_values_still_file_into_a_private_space(world: W
     r = await rule_world(world)
     owner = await world.user()
     acme = await r.contact("ACME")
-    private = await world.spaces.create(owner.id, "Private")
+    private = await world.spaces.create(Actor(owner.id), "Private")
     await r.personal_rule(owner, definition("ACME", contact_is(acme.id), SetSpace(private.id)))
 
     document = await r.arrive(owner, classify=Classifies(contact=acme.id))
@@ -306,37 +313,37 @@ async def test_unconfirmed_model_tags_do_not_file_into_another_users_space(
     r = await rule_world(world)
     owner, colleague = await world.user(), await world.user()
     tax = await r.tag("tax")
-    office = await world.spaces.create(colleague.id, "Office")
-    await world.spaces.set_member(colleague.id, office.id, owner.id, SpaceRole.EDIT)
+    office = await world.spaces.create(Actor(colleague.id), "Office")
+    await world.spaces.set_member(Actor(colleague.id), office.id, owner.id, SpaceRole.EDIT)
     await r.personal_rule(owner, definition("Tax", has_tag(tax.id), SetSpace(office.id)))
 
     document = await r.arrive(owner, classify=Classifies(tags=[tax.id]))
 
     assert document.lane is Lane.YELLOW
     assert document.space_id == (await world.personal_space(owner)).id
-    (open,) = (await r.documents.review(owner.id, document.id)).open
+    (open,) = (await r.documents.review(Actor(owner.id), document.id)).open
     assert [check.field for check in open.fields] == ["tags"]
 
 
 async def test_a_withdrawn_edit_right_stops_the_rule_from_filing(world: World) -> None:
     r = await rule_world(world)
     owner, colleague = await world.user(), await world.user()
-    office = await world.spaces.create(colleague.id, "Office")
-    await world.spaces.set_member(colleague.id, office.id, owner.id, SpaceRole.EDIT)
+    office = await world.spaces.create(Actor(colleague.id), "Office")
+    await world.spaces.set_member(Actor(colleague.id), office.id, owner.id, SpaceRole.EDIT)
     await r.personal_rule(owner, definition("Office", channel_api(), SetSpace(office.id)))
-    await world.spaces.set_member(colleague.id, office.id, owner.id, SpaceRole.READ)
+    await world.spaces.set_member(Actor(colleague.id), office.id, owner.id, SpaceRole.READ)
 
     document = await r.arrive(owner)
 
     default = await world.personal_space(owner)
     assert (document.lane, document.space_id) == (Lane.YELLOW, default.id)
-    (open,) = (await r.documents.review(owner.id, document.id)).open
+    (open,) = (await r.documents.review(Actor(owner.id), document.id)).open
     (check,) = open.fields
     assert check.field == "space"
     assert check.reason == "rule 'Office': no right to file into space 'Office' (any more)"
 
     # Keeping the space: the rule is refused again, but the document is filed.
-    await r.pipeline().confirm(owner.id, document.id, DocumentChanges())
+    await r.pipeline().confirm(Actor(owner.id), document.id, DocumentChanges())
     await world.drain(r.pipeline())
     document = await r.stored(document)
     assert (document.lane, document.space_id) == (Lane.GREEN, default.id)
@@ -347,11 +354,13 @@ async def test_filing_holds_after_the_uploader_lost_the_space(world: World) -> N
     them again."""
     r = await rule_world(world)
     owner, colleague = await world.user(), await world.user()
-    office = await world.spaces.create(colleague.id, "Office")
-    await world.spaces.set_member(colleague.id, office.id, owner.id, SpaceRole.EDIT)
+    office = await world.spaces.create(Actor(colleague.id), "Office")
+    await world.spaces.set_member(Actor(colleague.id), office.id, owner.id, SpaceRole.EDIT)
     pipeline = r.pipeline()
-    received = await pipeline.receive(owner.id, incoming_pdf(), filename="a.pdf", space=office.id)
-    await world.spaces.remove_member(colleague.id, office.id, owner.id)
+    received = await pipeline.receive(
+        Actor(owner.id), incoming_pdf(), filename="a.pdf", space=office.id
+    )
+    await world.spaces.remove_member(Actor(colleague.id), office.id, owner.id)
 
     await world.drain(pipeline)
 
@@ -359,7 +368,7 @@ async def test_filing_holds_after_the_uploader_lost_the_space(world: World) -> N
     assert (document.lane, document.space_id) == (Lane.GREEN, office.id)
     assert document.processing.outcomes[Node.FILE] is Outcome.OK
     assert DocumentFiled.type in world.event_types()
-    assert (await world.documents.get(colleague.id, document.id)).uploaded_by == owner.id
+    assert (await world.documents.get(Actor(colleague.id), document.id)).uploaded_by == owner.id
 
 
 async def test_the_rules_of_a_space_run_whoever_wrote_them(world: World) -> None:
@@ -371,7 +380,7 @@ async def test_the_rules_of_a_space_run_whoever_wrote_them(world: World) -> None
     personal = await r.personal_rule(owner, definition("Mine", channel_api(), add_tags(mine.id)))
     shared = await r.global_rule(definition("All", channel_api(), add_tags(everyone.id)))
     pipeline = r.pipeline()
-    received = await pipeline.receive(owner.id, incoming_pdf(), filename="a.pdf")
+    received = await pipeline.receive(Actor(owner.id), incoming_pdf(), filename="a.pdf")
     await r.deactivate(owner)
 
     await world.drain(pipeline)
@@ -388,8 +397,8 @@ async def test_the_rules_of_a_space_run_whoever_wrote_them(world: World) -> None
 async def test_a_global_rule_acts_on_every_document_but_never_moves_it(world: World) -> None:
     r = await rule_world(world)
     owner, colleague = await world.user(), await world.user()
-    office = await world.spaces.create(colleague.id, "Office")
-    await world.spaces.set_member(colleague.id, office.id, owner.id, SpaceRole.EDIT)
+    office = await world.spaces.create(Actor(colleague.id), "Office")
+    await world.spaces.set_member(Actor(colleague.id), office.id, owner.id, SpaceRole.EDIT)
     seen = await r.tag("seen")
     await r.global_rule(definition("Seen", channel_api(), add_tags(seen.id)))
 
@@ -492,7 +501,7 @@ async def test_a_rule_run_loads_contacts_types_and_tags_once(
     r = await rule_world(world)
     owner = await world.user()
     acme = await r.contact("ACME")
-    invoice = await world.master_data.create_document_type(r.admin.id, "Invoice")
+    invoice = await world.master_data.create_document_type(Actor(r.admin.id), "Invoice")
     tax = await r.tag("tax")
     document = await r.arrive(owner, classify=Classifies(tags=[tax.id]))
     await r.personal_rule(
@@ -538,7 +547,7 @@ async def test_a_rule_reads_the_facts_into_a_field(world: World) -> None:
     field; a document without one the rule leaves alone."""
     r = await rule_world(world)
     owner = await world.user()
-    note = await world.master_data.create_field(r.admin.id, "Bezug", FieldType.TEXT)
+    note = await world.master_data.create_field(Actor(r.admin.id), "Bezug", FieldType.TEXT)
     refers = Condition(
         field=ConditionField.FACT,
         op=Operator.PRESENT,
@@ -566,7 +575,7 @@ async def test_a_persons_fact_decision_runs_the_change_rules(world: World) -> No
     on the facts before and after the decision, so a field a rule fills follows it."""
     r = await rule_world(world)
     owner = await world.user()
-    note = await world.master_data.create_field(r.admin.id, "Bezug", FieldType.TEXT)
+    note = await world.master_data.create_field(Actor(r.admin.id), "Bezug", FieldType.TEXT)
     refers = Condition(
         field=ConditionField.FACT,
         op=Operator.MATCHES,
@@ -587,7 +596,7 @@ async def test_a_persons_fact_decision_runs_the_change_rules(world: World) -> No
     reminder = await r.arrive(owner, text="Ihre Rechnung Nr. 4711 ist noch offen.", facts=facts)
     assert note.id not in reminder.fields  # on arrival the change rule does not run
     await r.documents.decide_fact(
-        owner.id,
+        Actor(owner.id),
         reminder.id,
         FactDecision(
             action=FactAction.CORRECT,
@@ -603,8 +612,8 @@ async def test_only_admins_write_and_apply_rules_on_a_persons_facts(world: World
     """As only admins find documents by them (`_access.check_fact_filter`)."""
     r = await rule_world(world)
     editor = await world.user()
-    shared = await world.spaces.create(r.admin.id, "Haushalt")
-    await world.spaces.set_member(r.admin.id, shared.id, editor.id, SpaceRole.EDIT)
+    shared = await world.spaces.create(Actor(r.admin.id), "Haushalt")
+    await world.spaces.set_member(Actor(r.admin.id), shared.id, editor.id, SpaceRole.EDIT)
     tax_id = Condition(
         field=ConditionField.FACT,
         op=Operator.IS,
@@ -627,8 +636,8 @@ async def test_only_admins_write_and_apply_rules_on_a_persons_facts(world: World
         r.admin, shared.id, definition("Steuer", tax_id, AddTags(frozenset({paid.id})))
     )
     with pytest.raises(PermissionDeniedError):
-        await r.applications.preview(editor.id, rule.id)
-    await r.applications.preview(r.admin.id, rule.id)
+        await r.applications.preview(Actor(editor.id), rule.id)
+    await r.applications.preview(Actor(r.admin.id), rule.id)
 
 
 async def test_the_preview_sees_the_girocode(world: World) -> None:
@@ -652,7 +661,7 @@ async def test_the_preview_sees_the_girocode(world: World) -> None:
         (True, '{"iban": "{{ facts.girocode.iban }}"}', "DE89370400440532013000"),
     ):
         preview = await r.rules.preview_template(
-            owner.id, template, document=invoice.id, webhook=webhook
+            Actor(owner.id), template, document=invoice.id, webhook=webhook
         )
         assert preview.missing is None and preview.error is None, preview
         assert shown in (preview.rendered or "")

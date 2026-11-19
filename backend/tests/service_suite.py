@@ -10,6 +10,7 @@ from lekto.core.domain.errors import DuplicateDocumentError
 from lekto.core.domain.identifiers import Identifier, IdentifierKind
 from lekto.core.domain.master_data import TagScope
 from lekto.core.domain.pipeline import NODES, Lane, Node
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import User
 from lekto.core.ports.repository import DocumentFilter
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
@@ -44,7 +45,9 @@ class ServicesOverPersistence:
         )
 
         async def upload() -> Document:
-            return await pipeline.receive(owner.id, incoming(b"%PDF-1.7 same"), filename="a.pdf")
+            return await pipeline.receive(
+                Actor(owner.id), incoming(b"%PDF-1.7 same"), filename="a.pdf"
+            )
 
         results = await asyncio.gather(*(upload() for _ in range(3)), return_exceptions=True)
         assert len([r for r in results if isinstance(r, Document)]) == 1, results
@@ -57,11 +60,11 @@ class ServicesOverPersistence:
         """Moving A under B and B under A at once: one move waits for the other and sees it."""
         admin = await _admin(uow_factory)
         service = MasterDataService(uow_factory, ManualClock(NOW), builders.TEMPLATES)
-        a = await service.create_tag(admin.id, "A")
-        b = await service.create_tag(admin.id, "B")
+        a = await service.create_tag(Actor(admin.id), "A")
+        b = await service.create_tag(Actor(admin.id), "B")
         results = await asyncio.gather(
-            service.change_tag(admin.id, a.id, parent_id=b.id),
-            service.change_tag(admin.id, b.id, parent_id=a.id),
+            service.change_tag(Actor(admin.id), a.id, parent_id=b.id),
+            service.change_tag(Actor(admin.id), b.id, parent_id=a.id),
             return_exceptions=True,
         )
         assert sorted(type(result).__name__ for result in results) == ["Tag", "ValidationError"]
@@ -80,17 +83,19 @@ class ServicesOverPersistence:
         service = MasterDataService(
             uow_factory, ManualClock(NOW), builders.TEMPLATES, normalise_batch=2
         )
-        insurance = await service.create_tag(admin.id, "Insurance")
-        health = await service.create_tag(admin.id, "Health")
-        dental = await service.create_tag(admin.id, "Dental", parent_id=health.id)
-        other = await service.create_tag(admin.id, "Other")
-        insurer = await service.create_tag(admin.id, "Insurer", scope=TagScope.CONTACT)
-        kassen = await service.create_tag(admin.id, "Kassen", scope=TagScope.CONTACT)
-        bills = await service.create_tag(admin.id, "Bills", scope=TagScope.DOCUMENT_TYPE)
-        medical = await service.create_tag(admin.id, "Medical", scope=TagScope.DOCUMENT_TYPE)
-        nord = await service.create_contact(admin.id, "Nord", group_ids=[insurer.id, kassen.id])
+        insurance = await service.create_tag(Actor(admin.id), "Insurance")
+        health = await service.create_tag(Actor(admin.id), "Health")
+        dental = await service.create_tag(Actor(admin.id), "Dental", parent_id=health.id)
+        other = await service.create_tag(Actor(admin.id), "Other")
+        insurer = await service.create_tag(Actor(admin.id), "Insurer", scope=TagScope.CONTACT)
+        kassen = await service.create_tag(Actor(admin.id), "Kassen", scope=TagScope.CONTACT)
+        bills = await service.create_tag(Actor(admin.id), "Bills", scope=TagScope.DOCUMENT_TYPE)
+        medical = await service.create_tag(Actor(admin.id), "Medical", scope=TagScope.DOCUMENT_TYPE)
+        nord = await service.create_contact(
+            Actor(admin.id), "Nord", group_ids=[insurer.id, kassen.id]
+        )
         invoice = await service.create_document_type(
-            admin.id, "Invoice", group_ids=[bills.id, medical.id]
+            Actor(admin.id), "Invoice", group_ids=[bills.id, medical.id]
         )
         carried = [
             {insurance.id, health.id},
@@ -111,9 +116,9 @@ class ServicesOverPersistence:
                 await uow.documents.add(document)
                 documents.append(document)
             await uow.commit()
-        await service.change_tag(admin.id, health.id, parent_id=insurance.id)
-        await service.change_tag(admin.id, kassen.id, parent_id=insurer.id)
-        await service.change_tag(admin.id, medical.id, parent_id=bills.id)
+        await service.change_tag(Actor(admin.id), health.id, parent_id=insurance.id)
+        await service.change_tag(Actor(admin.id), kassen.id, parent_id=insurer.id)
+        await service.change_tag(Actor(admin.id), medical.id, parent_id=bills.id)
         # Health: four documents carry it or Dental, two per step, and a last step finds none.
         assert [await service.run_next_job() for _ in range(6)] == [True] * 5 + [False]
         async with uow_factory() as uow:
@@ -138,30 +143,32 @@ class ServicesOverPersistence:
         stored groups and topics of contacts and types."""
         admin = await _admin(uow_factory)
         service = MasterDataService(uow_factory, ManualClock(NOW), builders.TEMPLATES)
-        insurer = await service.create_tag(admin.id, "Insurer", scope=TagScope.CONTACT)
+        insurer = await service.create_tag(Actor(admin.id), "Insurer", scope=TagScope.CONTACT)
         health = await service.create_tag(
-            admin.id, "Health insurer", scope=TagScope.CONTACT, parent_id=insurer.id
+            Actor(admin.id), "Health insurer", scope=TagScope.CONTACT, parent_id=insurer.id
         )
-        bank = await service.create_tag(admin.id, "Bank", scope=TagScope.CONTACT)
-        insurance = await service.create_tag(admin.id, "Insurance", scope=TagScope.TOPIC)
+        bank = await service.create_tag(Actor(admin.id), "Bank", scope=TagScope.CONTACT)
+        insurance = await service.create_tag(Actor(admin.id), "Insurance", scope=TagScope.TOPIC)
         dental = await service.create_tag(
-            admin.id, "Dental", scope=TagScope.TOPIC, parent_id=insurance.id
+            Actor(admin.id), "Dental", scope=TagScope.TOPIC, parent_id=insurance.id
         )
-        bills = await service.create_tag(admin.id, "Bills", scope=TagScope.DOCUMENT_TYPE)
+        bills = await service.create_tag(Actor(admin.id), "Bills", scope=TagScope.DOCUMENT_TYPE)
         medical = await service.create_tag(
-            admin.id, "Medical", scope=TagScope.DOCUMENT_TYPE, parent_id=bills.id
+            Actor(admin.id), "Medical", scope=TagScope.DOCUMENT_TYPE, parent_id=bills.id
         )
         await service.create_contact(
-            admin.id,
+            Actor(admin.id),
             "Nord",
             group_ids=[insurer.id, health.id],
             topic_ids=[insurance.id, dental.id],
         )
-        await service.create_contact(admin.id, "Süd", group_ids=[health.id], topic_ids=[dental.id])
-        await service.create_contact(admin.id, "Plain")
-        await service.create_document_type(admin.id, "Invoice", group_ids=[medical.id])
-        await service.create_document_type(admin.id, "Receipt", group_ids=[bills.id])
-        members = await service.tag_members(admin.id)
+        await service.create_contact(
+            Actor(admin.id), "Süd", group_ids=[health.id], topic_ids=[dental.id]
+        )
+        await service.create_contact(Actor(admin.id), "Plain")
+        await service.create_document_type(Actor(admin.id), "Invoice", group_ids=[medical.id])
+        await service.create_document_type(Actor(admin.id), "Receipt", group_ids=[bills.id])
+        members = await service.tag_members(Actor(admin.id))
         assert members.contacts == {insurer.id: 2, health.id: 2, insurance.id: 2, dental.id: 2}
         assert bank.id not in members.contacts
         assert members.document_types == {bills.id: 2, medical.id: 1}
@@ -176,20 +183,22 @@ class ServicesOverPersistence:
         admin = await _admin(uow_factory)
         master = MasterDataService(uow_factory, ManualClock(NOW), builders.TEMPLATES)
         documents = DocumentService(uow_factory, ManualClock(NOW), MemoryObjectStore())
-        work = await master.create_tag(admin.id, "Work", scope=TagScope.TOPIC)
-        nord = await master.create_contact(admin.id, "Nord", topic_ids=[work.id])
+        work = await master.create_tag(Actor(admin.id), "Work", scope=TagScope.TOPIC)
+        nord = await master.create_contact(Actor(admin.id), "Nord", topic_ids=[work.id])
         document = builders.document(owner, space)
         async with uow_factory() as uow:
             await uow.documents.add(document)
             await uow.commit()
-        await documents.change_metadata(owner.id, document.id, DocumentChanges(contact_id=nord.id))
+        await documents.change_metadata(
+            Actor(owner.id), document.id, DocumentChanges(contact_id=nord.id)
+        )
 
         async def with_topic() -> Document:
             changes = DocumentChanges(topic_id=work.id)
-            return (await documents.change_metadata(owner.id, document.id, changes)).document
+            return (await documents.change_metadata(Actor(owner.id), document.id, changes)).document
 
         results = await asyncio.gather(
-            master.change_contact(admin.id, nord.id, topic_ids=[]),
+            master.change_contact(Actor(admin.id), nord.id, topic_ids=[]),
             with_topic(),
             return_exceptions=True,
         )
@@ -213,9 +222,9 @@ class ServicesOverPersistence:
         master = MasterDataService(uow_factory, ManualClock(NOW), builders.TEMPLATES)
         hers = Identifier.parse(IdentifierKind.CUSTOMER_NUMBER, "K4711", user_id=owner.id)
         # Stored first, the one that gets the number is listed and changed first.
-        second = await master.create_contact(admin.id, "Alpha")
-        first = await master.create_contact(admin.id, "Zulu", identifiers=[hers])
-        third = await master.create_contact(admin.id, "Yankee")
+        second = await master.create_contact(Actor(admin.id), "Alpha")
+        first = await master.create_contact(Actor(admin.id), "Zulu", identifiers=[hers])
+        third = await master.create_contact(Actor(admin.id), "Yankee")
         async with uow_factory() as uow:
             contact = await uow.contacts.get(third.id)
             contact.set_learned(
@@ -228,7 +237,7 @@ class ServicesOverPersistence:
             for value in ("K4711", "K0815")
         ]
         changed = await ProfileService(uow_factory, ManualClock(NOW)).update(
-            owner.id, owner.id, ProfileChanges(numbers=numbers)
+            Actor(owner.id), owner.id, ProfileChanges(numbers=numbers)
         )
         assert [(item.contact_id, item.identifier.value) for item in changed.numbers] == [
             (second.id, "K0815"),

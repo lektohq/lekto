@@ -24,6 +24,7 @@ from lekto.core.domain.ids import DocumentId, DocumentTypeId, UserId
 from lekto.core.domain.permissions import can_edit_document, can_read_document
 from lekto.core.domain.reasons import Action, ReasonCode, because
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState, ordered
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
@@ -70,7 +71,7 @@ class RelationService:
         self._uow = uow
         self._clock = clock
 
-    async def relations(self, actor: UserId, id: DocumentId) -> DocumentRelations:
+    async def relations(self, actor: Actor, id: DocumentId) -> DocumentRelations:
         """The relations of the document whose other end the caller reads, rejected ones aside.
         NotFoundError if they do not read the document."""
         async with self._uow() as uow:
@@ -88,7 +89,7 @@ class RelationService:
         )
 
     async def relate(
-        self, actor: UserId, id: DocumentId, other: DocumentId, *, via: ViaToken | None = None
+        self, actor: Actor, id: DocumentId, other: DocumentId, *, via: ViaToken | None = None
     ) -> None:
         """Set the relation between the two documents, from the newer to the older (by their
         document dates, else when they came in), or accept Lekto's suggestion of it (through the
@@ -133,7 +134,7 @@ class RelationService:
             await uow.commit()
 
     async def unrelate(
-        self, actor: UserId, id: DocumentId, other: DocumentId, *, via: ViaToken | None = None
+        self, actor: Actor, id: DocumentId, other: DocumentId, *, via: ViaToken | None = None
     ) -> None:
         """Remove the relation between the two documents, or reject Lekto's suggestion of it
         (through the API token `via`): one Lekto made is kept as rejected (it is not suggested

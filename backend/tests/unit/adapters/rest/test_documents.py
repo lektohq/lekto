@@ -16,6 +16,7 @@ from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.exchanges import ModelCall, RunExchange, exchanges_to_json
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.pipeline import Node
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.services.objects import exchanges_key, original_key
 from tests.api import auth
@@ -210,9 +211,9 @@ async def test_malformed_uploads(
 async def test_upload_into_a_space(api: Api) -> None:
     owner, writer, reader = await api.user(), await api.user(), await api.user()
     spaces = api.services  # space service lives in the services, not in the API (M4)
-    shared = await spaces.spaces.create(owner.id, "Household")
-    await spaces.spaces.set_member(owner.id, shared.id, writer.id, SpaceRole.EDIT)
-    await spaces.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
+    shared = await spaces.spaces.create(Actor(owner.id), "Household")
+    await spaces.spaces.set_member(Actor(owner.id), shared.id, writer.id, SpaceRole.EDIT)
+    await spaces.spaces.set_member(Actor(owner.id), shared.id, reader.id, SpaceRole.READ)
     data = {"space_id": str(shared.id)}
 
     accepted = await api.client.post(
@@ -300,8 +301,8 @@ async def test_the_original_is_stored_by_its_hash(api: Api) -> None:
 
 async def test_others_see_a_document_only_through_a_share_once_green(api: Api) -> None:
     owner, reader, stranger = await api.user(), await api.user(), await api.user()
-    shared = await api.services.spaces.create(owner.id, "Shared")
-    await api.services.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
+    shared = await api.services.spaces.create(Actor(owner.id), "Shared")
+    await api.services.spaces.set_member(Actor(owner.id), shared.id, reader.id, SpaceRole.READ)
     response = await api.client.post(
         DOCUMENTS, files=sample_file(), data={"space_id": str(shared.id)}, headers=auth(owner)
     )
@@ -494,8 +495,8 @@ async def test_reprocess_validates_the_step(api: Api) -> None:
 
 async def test_only_editors_control_processing(api: Api) -> None:
     owner, writer = await api.user(), await api.user()
-    shared = await api.services.spaces.create(owner.id, "Shared")
-    await api.services.spaces.set_member(owner.id, shared.id, writer.id, SpaceRole.READ)
+    shared = await api.services.spaces.create(Actor(owner.id), "Shared")
+    await api.services.spaces.set_member(Actor(owner.id), shared.id, writer.id, SpaceRole.READ)
     response = await api.client.post(
         DOCUMENTS, files=sample_file(), data={"space_id": str(shared.id)}, headers=auth(owner)
     )

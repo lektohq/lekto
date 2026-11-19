@@ -18,6 +18,7 @@ from lekto.core.domain.mail import (
 )
 from lekto.core.domain.master_data import DocumentType
 from lekto.core.domain.reasons import ReasonCode
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role, User
 from tests.builders import NOW
 from tests.mails import LOGIN
@@ -30,7 +31,7 @@ async def _admin(world: World) -> User:
 
 async def _create(world: World, admin: User, name: str = "Household", **changes: Any) -> Mailbox:
     return await world.mailboxes.create(
-        admin.id,
+        Actor(admin.id),
         name=name,
         host=LOGIN.host,
         port=LOGIN.port,
@@ -46,7 +47,7 @@ async def test_mailboxes_are_listed_as_every_list_sorts_names(world: World) -> N
     admin = await _admin(world)
     for name in ("Zahnarzt", "Ärzte", "Bank"):
         await _create(world, admin, name)
-    listed = [item.name for item in await world.mailboxes.list_mailboxes(admin.id)]
+    listed = [item.name for item in await world.mailboxes.list_mailboxes(Actor(admin.id))]
     assert listed == ["Ärzte", "Bank", "Zahnarzt"]
 
 
@@ -54,19 +55,21 @@ async def test_only_admins_see_and_change_mailboxes(world: World) -> None:
     admin, user = await _admin(world), await world.user()
     mailbox = await _create(world, admin)
     with pytest.raises(PermissionDeniedError) as caught:
-        await world.mailboxes.list_mailboxes(user.id)
+        await world.mailboxes.list_mailboxes(Actor(user.id))
     assert caught.value.reason.code is ReasonCode.ADMINS_ONLY
     for attempt in (
-        world.mailboxes.get(user.id, mailbox.id),
-        world.mailboxes.change(user.id, mailbox.id, MailboxChanges(name="mine")),
-        world.mailboxes.delete(user.id, mailbox.id),
+        world.mailboxes.get(Actor(user.id), mailbox.id),
+        world.mailboxes.change(Actor(user.id), mailbox.id, MailboxChanges(name="mine")),
+        world.mailboxes.delete(Actor(user.id), mailbox.id),
         world.mailboxes.test_connection(
-            user.id, host="h", port=1, security=MailSecurity.NONE, username="u", password="p"
+            Actor(user.id), host="h", port=1, security=MailSecurity.NONE, username="u", password="p"
         ),
     ):
         with pytest.raises(PermissionDeniedError):
             await attempt
-    assert [item.name for item in await world.mailboxes.list_mailboxes(admin.id)] == ["Household"]
+    assert [item.name for item in await world.mailboxes.list_mailboxes(Actor(admin.id))] == [
+        "Household"
+    ]
 
 
 async def test_the_password_is_encrypted_for_its_mailbox(world: World) -> None:
@@ -80,9 +83,13 @@ async def test_the_password_is_encrypted_for_its_mailbox(world: World) -> None:
 async def test_a_change_without_a_password_keeps_it(world: World) -> None:
     admin = await _admin(world)
     mailbox = await _create(world, admin)
-    changed = await world.mailboxes.change(admin.id, mailbox.id, MailboxChanges(name="Renamed"))
+    changed = await world.mailboxes.change(
+        Actor(admin.id), mailbox.id, MailboxChanges(name="Renamed")
+    )
     assert changed.encrypted_password == mailbox.encrypted_password
-    renewed = await world.mailboxes.change(admin.id, mailbox.id, MailboxChanges(), password="new")
+    renewed = await world.mailboxes.change(
+        Actor(admin.id), mailbox.id, MailboxChanges(), password="new"
+    )
     assert (
         world.cipher.decrypt(renewed.encrypted_password, context=password_context(mailbox.id))
         == b"new"
@@ -119,10 +126,10 @@ async def test_settings_are_checked(world: World) -> None:
         MailboxChanges(body_type_id=DocumentTypeId(new_id())),  # no such type
     ):
         with pytest.raises(ValidationError):
-            await world.mailboxes.change(admin.id, mailbox.id, bad)
+            await world.mailboxes.change(Actor(admin.id), mailbox.id, bad)
     with pytest.raises(ValidationError):
         await world.mailboxes.create(
-            admin.id,
+            Actor(admin.id),
             name="No password",
             host="h",
             port=143,
@@ -138,7 +145,7 @@ async def test_testing_a_connection_lists_the_folders_or_says_why_not(world: Wor
     admin = await _admin(world)
     world.mail_server.add_account(LOGIN).add_folders("Rechnungen")
     found = await world.mailboxes.test_connection(
-        admin.id,
+        Actor(admin.id),
         host=LOGIN.host,
         port=LOGIN.port,
         security=LOGIN.security,
@@ -147,7 +154,7 @@ async def test_testing_a_connection_lists_the_folders_or_says_why_not(world: Wor
     )
     assert (found.folders, found.error) == (("INBOX", "Rechnungen"), None)
     refused = await world.mailboxes.test_connection(
-        admin.id,
+        Actor(admin.id),
         host=LOGIN.host,
         port=LOGIN.port,
         security=LOGIN.security,
@@ -163,7 +170,7 @@ async def test_a_mailbox_is_tested_with_its_stored_password(world: World) -> Non
     world.mail_server.add_account(LOGIN)
     mailbox = await _create(world, admin)
     found = await world.mailboxes.test_connection(
-        admin.id,
+        Actor(admin.id),
         host=LOGIN.host,
         port=LOGIN.port,
         security=LOGIN.security,
@@ -173,7 +180,7 @@ async def test_a_mailbox_is_tested_with_its_stored_password(world: World) -> Non
     assert found.folders == ("INBOX",)
     with pytest.raises(ValidationError):
         await world.mailboxes.test_connection(
-            admin.id, host="h", port=1, security=MailSecurity.NONE, username="u"
+            Actor(admin.id), host="h", port=1, security=MailSecurity.NONE, username="u"
         )
 
 
@@ -200,19 +207,19 @@ async def test_the_stored_password_goes_only_where_it_was_given_for(
         "username": LOGIN.username,
     }
     world.mail_server.add_account(LOGIN)
-    found = await world.mailboxes.test_connection(admin.id, **login, mailbox_id=mailbox.id)
+    found = await world.mailboxes.test_connection(Actor(admin.id), **login, mailbox_id=mailbox.id)
     assert found.folders == ("INBOX",)
 
     with pytest.raises(ValidationError) as tested:
         await world.mailboxes.test_connection(
-            admin.id, **{**login, **target}, mailbox_id=mailbox.id
+            Actor(admin.id), **{**login, **target}, mailbox_id=mailbox.id
         )
     assert tested.value.reason.code is ReasonCode.MAIL_PASSWORD_AGAIN
     with pytest.raises(ValidationError) as changed:
-        await world.mailboxes.change(admin.id, mailbox.id, MailboxChanges(**target))
+        await world.mailboxes.change(Actor(admin.id), mailbox.id, MailboxChanges(**target))
     assert changed.value.reason.code is ReasonCode.MAIL_PASSWORD_AGAIN
     moved = await world.mailboxes.change(
-        admin.id, mailbox.id, MailboxChanges(**target), password="anew"
+        Actor(admin.id), mailbox.id, MailboxChanges(**target), password="anew"
     )
     assert world.cipher.decrypt(moved.encrypted_password, context=password_context(mailbox.id)) == (
         b"anew"
@@ -228,7 +235,7 @@ async def test_an_unreadable_password_says_so(world: World) -> None:
         await uow.mailboxes.update(stored)
         await uow.commit()
     found = await world.mailboxes.test_connection(
-        admin.id,
+        Actor(admin.id),
         host=LOGIN.host,
         port=LOGIN.port,
         security=LOGIN.security,

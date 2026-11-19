@@ -23,6 +23,7 @@ from lekto.core.domain.inbox import Confirmation
 from lekto.core.domain.master_data import Assignment, Contact
 from lekto.core.domain.pipeline import PERSON, Lane, Node, NodeResult, Outcome, ProcessingStatus
 from lekto.core.domain.reasons import written
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.services.inbox import OpenNode, decide, field_checks
@@ -102,9 +103,11 @@ async def scene(world: World) -> Scene:
             Node.FIELDS: Returns(extracted(amount)),
         }
     )
-    document = await pipeline.receive(owner.id, incoming(b"%PDF-1.7\n%%EOF\n"), filename="a.pdf")
+    document = await pipeline.receive(
+        Actor(owner.id), incoming(b"%PDF-1.7\n%%EOF\n"), filename="a.pdf"
+    )
     await world.drain(pipeline)
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     return Scene(owner, contact, amount, pipeline, stored)
 
 
@@ -117,7 +120,7 @@ async def test_confirming_into_another_users_personal_space_hands_it_over(
     receiver = await world.user()
     home = await world.personal_space(receiver)
     view = await s.pipeline.confirm(
-        s.owner.id,
+        Actor(s.owner.id),
         s.document.id,
         DocumentChanges(document_date=date(2026, 3, 31)),
         accept_suggestions=True,
@@ -131,11 +134,13 @@ async def test_confirming_into_another_users_personal_space_hands_it_over(
         (home.id, True, True)
     ]
     await world.drain(s.pipeline)
-    document = await world.documents.get(receiver.id, s.document.id)
+    document = await world.documents.get(Actor(receiver.id), s.document.id)
     assert (document.space_id, document.lane) == (home.id, Lane.GREEN)
-    assert [item.document.id for item in await world.inbox.items(receiver.id)] == [s.document.id]
+    assert [item.document.id for item in await world.inbox.items(Actor(receiver.id))] == [
+        s.document.id
+    ]
     with pytest.raises(NotFoundError):
-        await world.documents.get(s.owner.id, s.document.id)
+        await world.documents.get(Actor(s.owner.id), s.document.id)
 
 
 async def test_confirming_into_a_space_the_caller_only_reads(world: World) -> None:
@@ -144,9 +149,9 @@ async def test_confirming_into_a_space_the_caller_only_reads(world: World) -> No
     s = await scene(world)
     other = await world.user()
     home = await world.personal_space(other)
-    await world.spaces.set_member(other.id, home.id, s.owner.id, SpaceRole.READ)
+    await world.spaces.set_member(Actor(other.id), home.id, s.owner.id, SpaceRole.READ)
     view = await s.pipeline.confirm(
-        s.owner.id,
+        Actor(s.owner.id),
         s.document.id,
         DocumentChanges(document_date=date(2026, 3, 31)),
         accept_suggestions=True,
@@ -154,19 +159,21 @@ async def test_confirming_into_a_space_the_caller_only_reads(world: World) -> No
     )
     assert view is None
     await world.drain(s.pipeline)
-    document = await world.documents.get(s.owner.id, s.document.id)
+    document = await world.documents.get(Actor(s.owner.id), s.document.id)
     assert (document.space_id, document.lane) == (home.id, Lane.GREEN)
-    assert [item.document.id for item in await world.inbox.items(other.id)] == [s.document.id]
-    assert await world.inbox.items(s.owner.id) == []
+    assert [item.document.id for item in await world.inbox.items(Actor(other.id))] == [
+        s.document.id
+    ]
+    assert await world.inbox.items(Actor(s.owner.id)) == []
 
 
 async def test_confirming_into_a_space_of_the_same_editors_makes_nothing_new(
     world: World,
 ) -> None:
     s = await scene(world)
-    archive = await world.spaces.create(s.owner.id, "Archive")
+    archive = await world.spaces.create(Actor(s.owner.id), "Archive")
     view = await s.pipeline.confirm(
-        s.owner.id,
+        Actor(s.owner.id),
         s.document.id,
         DocumentChanges(document_date=date(2026, 3, 31)),
         accept_suggestions=True,
@@ -174,7 +181,7 @@ async def test_confirming_into_a_space_of_the_same_editors_makes_nothing_new(
     )
     assert view is not None and view.access is SpaceRole.EDIT
     await world.drain(s.pipeline)
-    document = await world.documents.get(s.owner.id, s.document.id)
+    document = await world.documents.get(Actor(s.owner.id), s.document.id)
     assert (document.space_id, document.new_at) == (archive.id, None)
 
 
@@ -184,22 +191,24 @@ async def test_a_person_confirms_the_metadata(world: World) -> None:
     s = await scene(world)
     assert s.document.confirmed_at is None
     await s.pipeline.confirm(
-        s.owner.id,
+        Actor(s.owner.id),
         s.document.id,
         DocumentChanges(document_date=date(2026, 3, 31)),
         accept_suggestions=True,
     )
     await world.drain(s.pipeline)
-    confirmed = await world.documents.get(s.owner.id, s.document.id)
+    confirmed = await world.documents.get(Actor(s.owner.id), s.document.id)
     assert confirmed.confirmed_at == world.clock.now()
     world.clock.advance(timedelta(hours=1))
-    await world.documents.change_metadata(s.owner.id, s.document.id, DocumentChanges(title="X"))
-    titled = await world.documents.get(s.owner.id, s.document.id)
+    await world.documents.change_metadata(
+        Actor(s.owner.id), s.document.id, DocumentChanges(title="X")
+    )
+    titled = await world.documents.get(Actor(s.owner.id), s.document.id)
     assert titled.confirmed_at == confirmed.confirmed_at
     await world.documents.change_metadata(
-        s.owner.id, s.document.id, DocumentChanges(document_date=date(2026, 4, 1))
+        Actor(s.owner.id), s.document.id, DocumentChanges(document_date=date(2026, 4, 1))
     )
-    assert (await world.documents.get(s.owner.id, s.document.id)).confirmed_at == (
+    assert (await world.documents.get(Actor(s.owner.id), s.document.id)).confirmed_at == (
         world.clock.now()
     )
 
@@ -209,27 +218,29 @@ async def test_tags_set_by_hand_alone_confirm_nothing(world: World) -> None:
     automatic tag or any other confirming value the change confirms."""
     s = await scene(world)
     admin = await world.user(role=Role.ADMIN)
-    paid = await world.master_data.create_tag(admin.id, "Paid", assignment=Assignment.MANUAL)
-    due = await world.master_data.create_tag(admin.id, "Due", assignment=Assignment.MANUAL)
-    bill = await world.master_data.create_tag(admin.id, "Bill")
+    paid = await world.master_data.create_tag(Actor(admin.id), "Paid", assignment=Assignment.MANUAL)
+    due = await world.master_data.create_tag(Actor(admin.id), "Due", assignment=Assignment.MANUAL)
+    bill = await world.master_data.create_tag(Actor(admin.id), "Bill")
     change = world.documents.change_metadata
-    await change(s.owner.id, s.document.id, DocumentChanges(tag_ids=frozenset({paid.id})))
-    await change(s.owner.id, s.document.id, DocumentChanges(tag_ids=frozenset({due.id})))
-    await change(s.owner.id, s.document.id, DocumentChanges(tag_ids=frozenset()))
-    assert (await world.documents.get(s.owner.id, s.document.id)).confirmed_at is None
-    await change(s.owner.id, s.document.id, DocumentChanges(tag_ids=frozenset({bill.id})))
+    await change(Actor(s.owner.id), s.document.id, DocumentChanges(tag_ids=frozenset({paid.id})))
+    await change(Actor(s.owner.id), s.document.id, DocumentChanges(tag_ids=frozenset({due.id})))
+    await change(Actor(s.owner.id), s.document.id, DocumentChanges(tag_ids=frozenset()))
+    assert (await world.documents.get(Actor(s.owner.id), s.document.id)).confirmed_at is None
+    await change(Actor(s.owner.id), s.document.id, DocumentChanges(tag_ids=frozenset({bill.id})))
     confirmed = world.clock.now()
-    assert (await world.documents.get(s.owner.id, s.document.id)).confirmed_at == confirmed
+    assert (await world.documents.get(Actor(s.owner.id), s.document.id)).confirmed_at == confirmed
     world.clock.advance(timedelta(hours=1))
-    await change(s.owner.id, s.document.id, DocumentChanges(tag_ids=frozenset({bill.id, paid.id})))
-    stored = await world.documents.get(s.owner.id, s.document.id)
+    await change(
+        Actor(s.owner.id), s.document.id, DocumentChanges(tag_ids=frozenset({bill.id, paid.id}))
+    )
+    stored = await world.documents.get(Actor(s.owner.id), s.document.id)
     assert (stored.tag_ids, stored.confirmed_at) == ({bill.id, paid.id}, confirmed)
     await change(
-        s.owner.id,
+        Actor(s.owner.id),
         s.document.id,
         DocumentChanges(tag_ids=frozenset({bill.id}), document_date=date(2026, 4, 1)),
     )
-    assert (await world.documents.get(s.owner.id, s.document.id)).confirmed_at == (
+    assert (await world.documents.get(Actor(s.owner.id), s.document.id)).confirmed_at == (
         world.clock.now()
     )
 
@@ -257,7 +268,7 @@ async def test_the_model_deriving_contact_type_or_tags_ends_the_confirmation(
 async def test_an_uncertain_document_is_in_the_inbox(world: World) -> None:
     s = await scene(world)
     assert s.document.processing.status is ProcessingStatus.REVIEW
-    (item,) = await world.inbox.items(s.owner.id)
+    (item,) = await world.inbox.items(Actor(s.owner.id))
     assert item.document.id == s.document.id
     assert [(node.node, node.outcome) for node in item.open] == [
         (Node.JUDGE, Outcome.UNCERTAIN),
@@ -265,12 +276,12 @@ async def test_an_uncertain_document_is_in_the_inbox(world: World) -> None:
     ]
     assert [check.field for check in item.open[0].fields] == ["contact", "document_date"]
     assert item.open[1].fields[0].field == field_key(s.amount.id)
-    assert await world.inbox.items((await world.user()).id) == []
+    assert await world.inbox.items(Actor((await world.user()).id)) == []
 
 
 async def test_the_review_shows_the_model_runs(world: World) -> None:
     s = await scene(world)
-    review = await world.documents.review(s.owner.id, s.document.id)
+    review = await world.documents.review(Actor(s.owner.id), s.document.id)
     classify, extract = review.nodes
     assert (classify.node, classify.truncated, classify.model_version) == (
         Node.JUDGE,
@@ -285,7 +296,7 @@ async def test_the_review_shows_the_model_runs(world: World) -> None:
 async def test_confirming_needs_a_decision_on_every_open_field(world: World) -> None:
     s = await scene(world)
     with pytest.raises(OpenFieldsError) as error:
-        await s.pipeline.confirm(s.owner.id, s.document.id, DocumentChanges())
+        await s.pipeline.confirm(Actor(s.owner.id), s.document.id, DocumentChanges())
     assert error.value.fields == (
         "contact",
         "document_date",
@@ -293,17 +304,17 @@ async def test_confirming_needs_a_decision_on_every_open_field(world: World) -> 
     )
     with pytest.raises(OpenFieldsError) as error:
         await s.pipeline.confirm(
-            s.owner.id, s.document.id, DocumentChanges(), accept_suggestions=True
+            Actor(s.owner.id), s.document.id, DocumentChanges(), accept_suggestions=True
         )
     assert error.value.fields == ("document_date",)
-    unchanged = await world.documents.get(s.owner.id, s.document.id)
+    unchanged = await world.documents.get(Actor(s.owner.id), s.document.id)
     assert unchanged.processing.status is ProcessingStatus.REVIEW
 
 
 async def test_a_confirmed_document_is_filed(world: World) -> None:
     s = await scene(world)
     view = await s.pipeline.confirm(
-        s.owner.id,
+        Actor(s.owner.id),
         s.document.id,
         DocumentChanges(document_date=date(2026, 3, 31)),
         accept_suggestions=True,
@@ -316,18 +327,18 @@ async def test_a_confirmed_document_is_filed(world: World) -> None:
     assert confirmed.lane is None
     await world.drain(s.pipeline)
 
-    document = await world.documents.get(s.owner.id, s.document.id)
+    document = await world.documents.get(Actor(s.owner.id), s.document.id)
     assert document.lane is Lane.GREEN
     assert document.contact_id == s.contact.id
     assert document.document_date == date(2026, 3, 31)
     assert document.fields[s.amount.id] == Money(Decimal("84.20"), "EUR")
     assert DocumentFiled.type in world.event_types()
-    assert await world.inbox.items(s.owner.id) == []
+    assert await world.inbox.items(Actor(s.owner.id)) == []
     # Who confirmed it, for the inbox's done; new it is for no one.
     assert world.database.confirmations == {s.document.id: Confirmation(s.owner.id, NOW)}
     assert document.new_at is None
 
-    log = await world.documents.processing_log(s.owner.id, s.document.id)
+    log = await world.documents.processing_log(Actor(s.owner.id), s.document.id)
     confirmations = [entry for entry in log if entry.result.model_version == PERSON]
     assert [(entry.node, entry.run) for entry in confirmations] == [
         (Node.JUDGE, 2),
@@ -357,13 +368,13 @@ async def contacts(world: World) -> dict[str, list[str]]:
 async def test_accepting_the_suggested_contact_learns_the_name_read(world: World) -> None:
     s = await scene(world)
     await s.pipeline.confirm(
-        s.owner.id,
+        Actor(s.owner.id),
         s.document.id,
         DocumentChanges(document_date=date(2026, 3, 31)),
         accept_suggestions=True,
     )
     assert await contacts(world) == {"Stadtwerke": ["Stadtwerk"]}
-    log = await world.documents.processing_log(s.owner.id, s.document.id)
+    log = await world.documents.processing_log(Actor(s.owner.id), s.document.id)
     rules = next(
         entry
         for entry in log
@@ -386,7 +397,7 @@ async def test_choosing_another_contact_learns_there_by_any_user(world: World) -
         await uow.contacts.update(suggested)
         await uow.commit()
     await s.pipeline.confirm(
-        s.owner.id,
+        Actor(s.owner.id),
         s.document.id,
         DocumentChanges(contact_id=chosen.id, document_date=date(2026, 3, 31)),
         accept_suggestions=True,
@@ -402,7 +413,7 @@ async def test_an_unrelated_name_is_not_learned(world: World) -> None:
         await uow.contacts.add(chosen)
         await uow.commit()
     await s.pipeline.confirm(
-        s.owner.id,
+        Actor(s.owner.id),
         s.document.id,
         DocumentChanges(contact_id=chosen.id, document_date=date(2026, 3, 31)),
         accept_suggestions=True,
@@ -413,13 +424,13 @@ async def test_an_unrelated_name_is_not_learned(world: World) -> None:
 async def test_nothing_is_learned_without_a_chosen_contact(world: World) -> None:
     s = await scene(world)
     await s.pipeline.confirm(
-        s.owner.id,
+        Actor(s.owner.id),
         s.document.id,
         DocumentChanges(contact_id=None, document_date=date(2026, 3, 31)),
         accept_suggestions=True,
     )
     assert await contacts(world) == {"Stadtwerke": []}
-    log = await world.documents.processing_log(s.owner.id, s.document.id)
+    log = await world.documents.processing_log(Actor(s.owner.id), s.document.id)
     assert all("learned_alias" not in entry.result.output for entry in log)
 
 
@@ -432,19 +443,19 @@ async def test_values_set_meanwhile_are_kept(world: World) -> None:
         await uow.contacts.add(chosen)
         await uow.commit()
     await world.documents.change_metadata(
-        s.owner.id, s.document.id, DocumentChanges(contact_id=chosen.id)
+        Actor(s.owner.id), s.document.id, DocumentChanges(contact_id=chosen.id)
     )
     await s.pipeline.confirm(
-        s.owner.id,
+        Actor(s.owner.id),
         s.document.id,
         DocumentChanges(document_date=date(2026, 3, 31)),
         accept_suggestions=True,
     )
     await world.drain(s.pipeline)
-    document = await world.documents.get(s.owner.id, s.document.id)
+    document = await world.documents.get(Actor(s.owner.id), s.document.id)
     assert document.contact_id == chosen.id
     assert document.fields[s.amount.id] == Money(Decimal("84.20"), "EUR")
-    log = await world.documents.processing_log(s.owner.id, s.document.id)
+    log = await world.documents.processing_log(Actor(s.owner.id), s.document.id)
     confirmed = next(entry for entry in log if entry.result.model_version == PERSON)
     assert confirmed.result.output["kept"] == ["contact"]
     assert confirmed.result.output["accepted"] == []
@@ -455,15 +466,15 @@ async def test_values_set_meanwhile_are_kept(world: World) -> None:
 async def test_after_a_type_correction_fields_are_extracted_again(world: World) -> None:
     s = await scene(world)
     await s.pipeline.confirm(
-        s.owner.id,
+        Actor(s.owner.id),
         s.document.id,
         DocumentChanges(contact_id=None, document_date=None),
         resume_at=Node.FIELDS,
     )
     await world.drain(s.pipeline)
-    document = await world.documents.get(s.owner.id, s.document.id)
+    document = await world.documents.get(Actor(s.owner.id), s.document.id)
     assert document.processing.status is ProcessingStatus.REVIEW  # extraction is uncertain again
-    log = await world.documents.processing_log(s.owner.id, s.document.id)
+    log = await world.documents.processing_log(Actor(s.owner.id), s.document.id)
     assert [entry.node for entry in log if entry.result.model_version == PERSON] == [
         Node.JUDGE,
         Node.APPLY_RULES,
@@ -473,20 +484,22 @@ async def test_after_a_type_correction_fields_are_extracted_again(world: World) 
 async def test_a_red_document_can_be_taken_over(world: World) -> None:
     owner = await world.user()
     pipeline = world.pipeline({Node.JUDGE: Returns(FAILED)})
-    document = await pipeline.receive(owner.id, incoming(b"%PDF-1.7\n%%EOF\n"), filename="a.pdf")
+    document = await pipeline.receive(
+        Actor(owner.id), incoming(b"%PDF-1.7\n%%EOF\n"), filename="a.pdf"
+    )
     await world.drain(pipeline)
-    (item,) = await world.inbox.items(owner.id)
+    (item,) = await world.inbox.items(Actor(owner.id))
     assert (item.open[0].node, item.open[0].outcome, item.open[0].fields) == (
         Node.JUDGE,
         Outcome.FAILED,
         (),
     )
     assert item.open[0].reason == FAILED.reason
-    await pipeline.confirm(owner.id, document.id, DocumentChanges())
+    await pipeline.confirm(Actor(owner.id), document.id, DocumentChanges())
     await world.drain(pipeline)
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.lane is Lane.GREEN
-    log = await world.documents.processing_log(owner.id, document.id)
+    log = await world.documents.processing_log(Actor(owner.id), document.id)
     taken = [entry for entry in log if entry.result.model_version == PERSON]
     assert [entry.node for entry in taken] == [
         Node.JUDGE,
@@ -501,49 +514,51 @@ async def test_a_red_document_can_be_taken_over(world: World) -> None:
 async def test_only_documents_in_the_inbox_can_be_confirmed(world: World) -> None:
     owner = await world.user()
     pipeline = world.pipeline()
-    document = await pipeline.receive(owner.id, incoming(b"%PDF-1.7\n%%EOF\n"), filename="a.pdf")
+    document = await pipeline.receive(
+        Actor(owner.id), incoming(b"%PDF-1.7\n%%EOF\n"), filename="a.pdf"
+    )
     with pytest.raises(InvalidTransitionError, match="not waiting for confirmation"):
-        await pipeline.confirm(owner.id, document.id, DocumentChanges())  # processing
+        await pipeline.confirm(Actor(owner.id), document.id, DocumentChanges())  # processing
     await world.drain(pipeline)
     with pytest.raises(InvalidTransitionError, match="not waiting for confirmation"):
-        await pipeline.confirm(owner.id, document.id, DocumentChanges())  # green
+        await pipeline.confirm(Actor(owner.id), document.id, DocumentChanges())  # green
 
 
 async def test_the_inbox_is_the_owners(world: World) -> None:
     s = await scene(world)
     stranger = await world.user()
     with pytest.raises(NotFoundError):
-        await world.documents.review(stranger.id, s.document.id)
+        await world.documents.review(Actor(stranger.id), s.document.id)
     with pytest.raises(NotFoundError):
-        await s.pipeline.confirm(stranger.id, s.document.id, DocumentChanges())
+        await s.pipeline.confirm(Actor(stranger.id), s.document.id, DocumentChanges())
 
     # A green document in a shared space: readable, but the review is its editors'.
     reader = await world.user()
-    space = await world.spaces.create(s.owner.id, "Shared")
-    await world.spaces.set_member(s.owner.id, space.id, reader.id, SpaceRole.READ)
+    space = await world.spaces.create(Actor(s.owner.id), "Shared")
+    await world.spaces.set_member(Actor(s.owner.id), space.id, reader.id, SpaceRole.READ)
     pipeline = world.pipeline()
     green = await pipeline.receive(
-        s.owner.id, incoming(b"%PDF-1.7 green\n"), filename="b.pdf", space=space.id
+        Actor(s.owner.id), incoming(b"%PDF-1.7 green\n"), filename="b.pdf", space=space.id
     )
     await world.drain(pipeline)
     with pytest.raises(PermissionDeniedError):
-        await world.documents.review(reader.id, green.id)
+        await world.documents.review(Actor(reader.id), green.id)
     with pytest.raises(PermissionDeniedError):
-        await pipeline.confirm(reader.id, green.id, DocumentChanges())
+        await pipeline.confirm(Actor(reader.id), green.id, DocumentChanges())
 
 
 async def test_a_confirmed_document_becomes_visible_to_the_spaces_readers(world: World) -> None:
     s = await scene(world)
     reader = await world.user()
-    space = await world.spaces.create(s.owner.id, "Shared")
-    await world.spaces.set_member(s.owner.id, space.id, reader.id, SpaceRole.READ)
+    space = await world.spaces.create(Actor(s.owner.id), "Shared")
+    await world.spaces.set_member(Actor(s.owner.id), space.id, reader.id, SpaceRole.READ)
     document = await s.pipeline.receive(
-        s.owner.id, incoming(b"%PDF-1.7 shared\n"), filename="b.pdf", space=space.id
+        Actor(s.owner.id), incoming(b"%PDF-1.7 shared\n"), filename="b.pdf", space=space.id
     )
     await world.drain(s.pipeline)
     assert await world.visible(reader.id) == []  # yellow: the editors' only
     await s.pipeline.confirm(
-        s.owner.id,
+        Actor(s.owner.id),
         document.id,
         DocumentChanges(document_date=date(2026, 3, 31)),
         accept_suggestions=True,

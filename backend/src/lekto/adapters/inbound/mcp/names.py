@@ -13,6 +13,7 @@ from lekto.core.domain.fields import FieldDefinition
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, SpaceId, TagId, UserId
 from lekto.core.domain.master_data import TagScope
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.sorting import sort_key
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.spaces import space_label as space_label
@@ -42,7 +43,7 @@ class Names:
     spaces: dict[UUID, str] = field(default_factory=dict)
 
     @classmethod
-    async def load(cls, context: ApiContext, user: UserId) -> "Names":
+    async def load(cls, context: ApiContext, user: Actor) -> "Names":
         master = context.master_data
         tags = await master.list_tags(user)
 
@@ -58,7 +59,7 @@ class Names:
             groups=of(TagScope.CONTACT, TagScope.DOCUMENT_TYPE),
         )
 
-    async def with_spaces(self, context: ApiContext, user: UserId) -> "Names":
+    async def with_spaces(self, context: ApiContext, user: Actor) -> "Names":
         """These names, and how the caller reads the spaces a document may go to: theirs
         (`space_label`), and every other person's personal space by that person's name (a
         hand-over)."""
@@ -152,7 +153,7 @@ def identifier_kind(name: str, what: str) -> IdentifierKind:
 
 
 async def member_labels(
-    context: ApiContext, user: UserId, spaces: Iterable[Space]
+    context: ApiContext, user: Actor, spaces: Iterable[Space]
 ) -> dict[UserId, str]:
     """How the caller reads the members of `spaces`, by their ids."""
     members = await context.spaces.members(user, list(spaces))

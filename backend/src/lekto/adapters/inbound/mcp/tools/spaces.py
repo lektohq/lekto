@@ -12,8 +12,9 @@ from lekto.adapters.inbound.context import ApiContext
 from lekto.adapters.inbound.mcp.names import FORMER_ACCOUNT, Names, member_labels, space_label
 from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
-from lekto.core.domain.ids import SpaceId, UserId
+from lekto.core.domain.ids import SpaceId
 from lekto.core.domain.lenses import Lens
+from lekto.core.domain.rights import Actor
 
 
 class MemberOut(BaseModel):
@@ -56,7 +57,7 @@ def add_space_tools(tools: Tools, context: ApiContext) -> None:
         "(read or edit) and who else sees its documents.",
     )
     async def spaces_list(ctx: Context) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         spaces = await context.spaces.list_spaces(user)
         people = await member_labels(context, user, spaces)
         return compact(
@@ -66,11 +67,11 @@ def add_space_tools(tools: Tools, context: ApiContext) -> None:
                         name=space_label(space, people),
                         personal=True if space.personal_of is not None else None,
                         description=space.description,
-                        role=None if (role := space.role_of(user)) is None else role.value,
+                        role=None if (role := space.role_of(user.id)) is None else role.value,
                         members=[
                             MemberOut(name=people.get(id, FORMER_ACCOUNT), role=role.value)
                             for id, role in space.members.items()
-                            if id != user
+                            if id != user.id
                         ],
                     )
                     for space in spaces
@@ -84,13 +85,13 @@ def add_space_tools(tools: Tools, context: ApiContext) -> None:
         "documents_list takes one by name.",
     )
     async def lenses_list(ctx: Context) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         names = await Names.load(context, user)
         lenses = await context.lenses.list_lenses(user)
         return compact(LensesOut(lenses=[_lens(lens, names) for lens in lenses]))
 
 
-async def space_name(context: ApiContext, user: UserId, id: SpaceId) -> str:
+async def space_name(context: ApiContext, user: Actor, id: SpaceId) -> str:
     """How the caller reads the space `id`: a personal one by its person's name."""
     space = await context.spaces.get(user, id)
     return space_label(space, await member_labels(context, user, [space]))

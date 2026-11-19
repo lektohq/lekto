@@ -20,6 +20,7 @@ from lekto.core.domain.errors import (
 from lekto.core.domain.identity import Credential, ExternalIdentity, check_new_password
 from lekto.core.domain.ids import DocumentId, SpaceId, UserId
 from lekto.core.domain.reasons import Action, ReasonCode, because
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.rules import Rule
 from lekto.core.domain.sorting import sort_key
 from lekto.core.domain.spaces import Space, SpaceRole
@@ -81,39 +82,40 @@ class UserService:
 
     # --- reading --------------------------------------------------------------------------------
 
-    async def list_users(self, actor: UserId) -> list[SeenUser]:
+    async def list_users(self, actor: Actor) -> list[SeenUser]:
         """Admins see all users, whole; others see the active ones by id and name (to share
         spaces with them, `SeenUser`)."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             users = await uow.users.list_all()
-        admin = user.is_active_admin
+        admin = user.may(TokenRight.ADMIN_MANAGE)
         visible = users if admin else [u for u in users if u.active]
         seen = [SeenUser.of(u, by_admin=admin) for u in visible]
         return sorted(seen, key=lambda u: sort_key(u.label))
 
-    async def get(self, actor: UserId, id: UserId) -> SeenUser:
+    async def get(self, actor: Actor, id: UserId) -> SeenUser:
         """Like `list_users`: a deactivated user is not found for others than admins."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             found = await uow.users.find(id)
-        if found is None or not (found.active or user.is_active_admin):
+        admin = user.may(TokenRight.ADMIN_MANAGE)
+        if found is None or not (found.active or admin):
             raise NotFoundError("user", id)
-        return SeenUser.of(found, by_admin=user.is_active_admin)
+        return SeenUser.of(found, by_admin=admin)
 
-    async def personal_spaces(self, actor: UserId) -> dict[UserId, SpaceId]:
+    async def personal_spaces(self, actor: Actor) -> dict[UserId, SpaceId]:
         """The personal space of every user, by user: where a document is handed over to them
         (`DocumentService.move`). Every signed-in user may know them."""
         async with self._uow() as uow:
             await load_actor(uow, actor)
             return await uow.spaces.personal_ids()
 
-    async def own_account(self, actor: UserId) -> Account:
+    async def own_account(self, actor: Actor) -> Account:
         """The caller's own account."""
         async with self._uow() as uow:
             return await _account(uow, await load_actor(uow, actor))
 
-    async def account(self, actor: UserId, id: UserId) -> Account:
+    async def account(self, actor: Actor, id: UserId) -> Account:
         """Admins only."""
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.MANAGE_USERS)
@@ -123,7 +125,7 @@ class UserService:
 
     async def create_user(
         self,
-        actor: UserId,
+        actor: Actor,
         username: str,
         role: Role,
         password: str | None = None,
@@ -162,7 +164,7 @@ class UserService:
 
     async def update(
         self,
-        actor: UserId,
+        actor: Actor,
         id: UserId,
         *,
         role: Role | None = None,
@@ -203,7 +205,7 @@ class UserService:
         return user
 
     async def reset_password(
-        self, actor: UserId, id: UserId, password: str, *, revoke_tokens: bool = False
+        self, actor: Actor, id: UserId, password: str, *, revoke_tokens: bool = False
     ) -> None:
         """Admins only, not for their own account (that is `AuthService.change_password`, which
         needs the current password). All sessions of the user end and no browser stays a known
@@ -233,7 +235,7 @@ class UserService:
             await uow.commit()
         log.info("password reset", extra={"user_id": str(id), "tokens_revoked": revoke_tokens})
 
-    async def disable_totp(self, actor: UserId, id: UserId) -> None:
+    async def disable_totp(self, actor: Actor, id: UserId) -> None:
         """Admins only, for a user who lost their authenticator and recovery codes; not for
         their own account (that is `AuthService.disable_totp`, which needs a code)."""
         _not_own(actor, id, Action.TURN_OFF_OWN_TOTP)
@@ -248,7 +250,7 @@ class UserService:
                 await uow.commit()
                 log.info("TOTP turned off by an admin", extra={"user_id": str(id)})
 
-    async def unlink_external_identities(self, actor: UserId, id: UserId) -> int:
+    async def unlink_external_identities(self, actor: Actor, id: UserId) -> int:
         """Admins only: remove the user's links to identity providers."""
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.MANAGE_USERS)
@@ -257,7 +259,7 @@ class UserService:
             await uow.commit()
         return removed
 
-    async def removal(self, actor: UserId, id: UserId) -> list[BlockingSpace]:
+    async def removal(self, actor: Actor, id: UserId) -> list[BlockingSpace]:
         """Admins: the spaces that stop deleting the user until the deletion settles them
         (`delete_user`); empty if nothing does."""
         async with self._uow() as uow:
@@ -267,7 +269,7 @@ class UserService:
 
     async def delete_user(
         self,
-        actor: UserId,
+        actor: Actor,
         id: UserId,
         settle: Mapping[SpaceId, Settlement] | None = None,
     ) -> None:
@@ -423,8 +425,8 @@ class UserService:
         return await self._hasher.hash(check_new_password(password, username))
 
 
-def _not_own(actor: UserId, id: UserId, what: Action) -> None:
-    if actor == id:
+def _not_own(actor: Actor, id: UserId, what: Action) -> None:
+    if actor.id == id:
         raise PermissionDeniedError(because(ReasonCode.ADMINS_CANNOT, action=what.value))
 
 

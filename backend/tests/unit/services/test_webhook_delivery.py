@@ -33,6 +33,7 @@ from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.master_data import Contact, DocumentType
 from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.rules import AskWebhook, Trigger
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import Role, User
@@ -61,7 +62,9 @@ URL = "http://n8n.lan:5678/webhook/lekto"
 
 
 async def hook(world: World, owner: User, *types: str, url: str = URL) -> tuple[Webhook, str]:
-    created = await world.webhooks.create(owner.id, name="n8n", url=url, event_types=types or ["*"])
+    created = await world.webhooks.create(
+        Actor(owner.id), name="n8n", url=url, event_types=types or ["*"]
+    )
     assert created.secret is not None
     return created.webhook, created.secret
 
@@ -107,7 +110,7 @@ async def test_an_event_is_queued_for_each_webhook_that_wants_its_type(world: Wo
     await hook(world, user)  # all types
     await hook(world, user, "document.updated")
     off, _ = await hook(world, user)
-    await world.webhooks.update(user.id, off.id, active=False)
+    await world.webhooks.update(Actor(user.id), off.id, active=False)
     await world.webhook_delivery().on_event(lane_changed(document))
     assert len(deliveries(world)) == 2
 
@@ -173,7 +176,7 @@ async def test_a_relation_is_told_only_to_who_reads_both_documents(world: World)
     letter = await seed(world, owner, other)
     await service.on_event(related(letter, invoice))
     assert len(deliveries(world)) == 4
-    await world.spaces.remove_member(owner.id, shared.id, friend.id)
+    await world.spaces.remove_member(Actor(owner.id), shared.id, friend.id)
     await run_all(service)
     (row,) = await log_of(world, friend)
     assert (row.outcome, row.document_id) == (DeliveryOutcome.DROPPED, letter.id)
@@ -211,7 +214,7 @@ async def test_an_admins_webhooks_report_their_reach_only(world: World) -> None:
 
     # The rights are checked again when sending: still the reach, although the admin may
     # read the document.
-    await world.spaces.remove_member(user.id, shared.id, admin.id)
+    await world.spaces.remove_member(Actor(user.id), shared.id, admin.id)
     assert await run_all(service) == 2
     rows = await log(world, webhook)
     dropped = [row.document_id for row in rows if row.outcome is DeliveryOutcome.DROPPED]
@@ -222,7 +225,7 @@ async def test_a_deactivated_owner_is_not_told(world: World) -> None:
     admin, user = await world.user(role=Role.ADMIN), await world.user()
     document = await seed(world, user)
     await hook(world, user)
-    await world.users.update(admin.id, user.id, active=False)
+    await world.users.update(Actor(admin.id), user.id, active=False)
     await world.webhook_delivery().on_event(lane_changed(document))
     assert deliveries(world) == []
 
@@ -360,7 +363,7 @@ async def test_a_renewed_secret_signs_next_to_the_new_one_during_the_grace_perio
     user = await world.user()
     document = await seed(world, user)
     webhook, old = await hook(world, user)
-    new = (await world.webhooks.renew_secret(user.id, webhook.id)).secret
+    new = (await world.webhooks.renew_secret(Actor(user.id), webhook.id)).secret
     assert new is not None
     service = world.webhook_delivery()
     await queue(world, document, service)
@@ -426,7 +429,7 @@ async def test_it_gives_up_after_the_last_attempt(world: World) -> None:
         DeliveryOutcome.GAVE_UP,
     ]
     assert len(world.sender.requests) == 3
-    assert (await world.webhooks.get(user.id, webhook.id)).failed_streak == 1
+    assert (await world.webhooks.get(Actor(user.id), webhook.id)).failed_streak == 1
 
 
 @pytest.mark.parametrize("status", [301, 302, 400, 401, 404, 410, 422])
@@ -461,12 +464,12 @@ async def test_a_webhook_is_switched_off_after_repeated_failures_and_success_res
     await deliver(404)
     await deliver(404)
     await deliver(200)  # resets the count
-    assert (await world.webhooks.get(user.id, webhook.id)).failed_streak == 0
+    assert (await world.webhooks.get(Actor(user.id), webhook.id)).failed_streak == 0
     await deliver(404)
     await deliver(404)
-    assert (await world.webhooks.get(user.id, webhook.id)).active
+    assert (await world.webhooks.get(Actor(user.id), webhook.id)).active
     await deliver(404)
-    off = await world.webhooks.get(user.id, webhook.id)
+    off = await world.webhooks.get(Actor(user.id), webhook.id)
     assert (off.active, off.disabled_reason, off.failed_streak) == (
         False,
         because(ReasonCode.WEBHOOK_FAILING),
@@ -498,7 +501,7 @@ async def test_a_webhook_that_takes_tasks_is_never_switched_off(world: World) ->
     )
     role = ModelCallRole(ModelCallKind.PROPOSE, timedelta(minutes=10))
     created = await world.webhooks.create(
-        admin.id, name="agent", url=URL, event_types=["*"], model_call=role
+        Actor(admin.id), name="agent", url=URL, event_types=["*"], model_call=role
     )
     model = created.webhook
     events_only, _ = await hook(world, admin)
@@ -525,7 +528,7 @@ async def test_own_headers_go_with_the_request_and_an_unsigned_one_has_no_signat
     user = await world.user()
     document = await seed(world, user)
     created = await world.webhooks.create(
-        user.id,
+        Actor(user.id),
         name="HA",
         url=URL,
         event_types=["*"],
@@ -550,7 +553,7 @@ async def test_header_values_that_cannot_be_decrypted_give_up_without_sending(
     user = await world.user()
     document = await seed(world, user)
     created = await world.webhooks.create(
-        user.id, name="HA", url=URL, event_types=["*"], headers=[("X-Token", "a")]
+        Actor(user.id), name="HA", url=URL, event_types=["*"], headers=[("X-Token", "a")]
     )
     async with world.uow() as uow:
         webhook = await uow.webhooks.get(created.webhook.id)
@@ -589,7 +592,7 @@ async def test_a_full_body_carries_the_document_as_it_is(world: World) -> None:
     user = await world.user()
     document = await described(world, user)
     await world.webhooks.create(
-        user.id, name="HA", url=URL, event_types=["*"], signed=False, body=BodyFormat.FULL
+        Actor(user.id), name="HA", url=URL, event_types=["*"], signed=False, body=BodyFormat.FULL
     )
     service = world.webhook_delivery()
     event = await queue(world, document, service)
@@ -615,7 +618,7 @@ async def test_a_template_body_is_what_the_template_makes(world: World) -> None:
         '"topic": {{ topic | default: nil | json }}, "open": {{ link | json }}}'
     )
     await world.webhooks.create(
-        user.id,
+        Actor(user.id),
         name="HA",
         url=URL,
         event_types=["*"],
@@ -647,7 +650,7 @@ async def test_a_field_renamed_is_renamed_in_the_template_and_not_deleted_while_
         (amount,) = await uow.fields.list_all()
     template = '{"amount": {{ field.betrag.amount | json }}, "betrag": {{ title | json }}}'
     created = await world.webhooks.create(
-        user.id,
+        Actor(user.id),
         name="HA",
         url=URL,
         event_types=["*"],
@@ -656,14 +659,14 @@ async def test_a_field_renamed_is_renamed_in_the_template_and_not_deleted_while_
         body_template=template,
     )
     other = await world.webhooks.create(
-        user.id,
+        Actor(user.id),
         name="Andere",
         url=URL,
         event_types=["*"],
         body=BodyFormat.TEMPLATE,
         body_template='{"title": {{ title | json }}}',
     )
-    await world.master_data.change_field(admin.id, amount.id, name="Summe")
+    await world.master_data.change_field(Actor(admin.id), amount.id, name="Summe")
     async with world.uow() as uow:
         renamed = await uow.webhooks.get(created.webhook.id)
         untouched = await uow.webhooks.get(other.webhook.id)
@@ -685,7 +688,7 @@ async def test_a_field_renamed_is_renamed_in_the_template_and_not_deleted_while_
     with pytest.raises(
         ConflictError, match=r"field\.summe is used by the templates of the webhooks 'HA'"
     ):
-        await world.master_data.delete_field(admin.id, amount.id)
+        await world.master_data.delete_field(Actor(admin.id), amount.id)
 
 
 @pytest.mark.parametrize(
@@ -701,7 +704,7 @@ async def test_a_template_that_makes_no_json_gives_up_without_sending(
     user = await world.user()
     document = await described(world, user)
     created = await world.webhooks.create(
-        user.id,
+        Actor(user.id),
         name="HA",
         url=URL,
         event_types=["*"],
@@ -720,10 +723,12 @@ async def test_a_template_that_makes_no_json_gives_up_without_sending(
 async def test_a_rule_s_request_names_the_rule(world: World) -> None:
     user = await world.user()
     document = await seed(world, user)
-    thin = (await world.webhooks.create(user.id, name="thin", url=URL, event_types=[])).webhook
+    thin = (
+        await world.webhooks.create(Actor(user.id), name="thin", url=URL, event_types=[])
+    ).webhook
     templated = (
         await world.webhooks.create(
-            user.id,
+            Actor(user.id),
             name="template",
             url=URL,
             event_types=[],
@@ -762,14 +767,14 @@ async def test_a_lost_right_drops_the_delivery_without_sending(world: World) -> 
     webhook, _ = await hook(world, friend)
     service = world.webhook_delivery()
     await queue(world, document, service)
-    await world.spaces.remove_member(owner.id, shared.id, friend.id)
+    await world.spaces.remove_member(Actor(owner.id), shared.id, friend.id)
 
     assert await service.run_next_job()
     assert world.sender.requests == []
     (row,) = await log(world, webhook)
     assert (row.outcome, row.status_code) == (DeliveryOutcome.DROPPED, None)
     assert row.error == "the document is not available to the owner"
-    assert (await world.webhooks.get(friend.id, webhook.id)).failed_streak == 0
+    assert (await world.webhooks.get(Actor(friend.id), webhook.id)).failed_streak == 0
     assert not await service.run_next_job()
 
 
@@ -785,8 +790,8 @@ async def test_a_switched_off_webhook_or_deactivated_owner_or_vanished_document_
         docs.append(document)
         hooks.append((await hook(world, owner))[0])
         await queue(world, document, service)
-    await world.webhooks.update(a.id, hooks[0].id, active=False)
-    await world.users.update(admin.id, b.id, active=False)
+    await world.webhooks.update(Actor(a.id), hooks[0].id, active=False)
+    await world.users.update(Actor(admin.id), b.id, active=False)
     async with world.uow() as uow:
         await uow.documents.remove(docs[2].id)
         await uow.commit()
@@ -813,7 +818,7 @@ async def test_a_deleted_webhook_ends_its_queued_deliveries(world: World) -> Non
     webhook, _ = await hook(world, user)
     service = world.webhook_delivery()
     await queue(world, document, service)
-    await world.webhooks.delete(user.id, webhook.id)
+    await world.webhooks.delete(Actor(user.id), webhook.id)
     assert await service.run_next_job()
     assert world.sender.requests == []
     assert [j.status for j in deliveries(world)] == [JobStatus.DONE]
@@ -894,8 +899,8 @@ async def test_a_target_in_the_own_network_is_dropped_once_its_owner_is_no_admin
     assert world.sender.requests == []
     assert all(job.status is JobStatus.DONE for job in deliveries(world))
     # Not a failure of the receiver: it does not count towards switching the webhook off.
-    assert (await world.webhooks.get(owner.id, webhook.id)).failed_streak == 0
-    test = await service.send_test(owner.id, webhook.id)
+    assert (await world.webhooks.get(Actor(owner.id), webhook.id)).failed_streak == 0
+    test = await service.send_test(Actor(owner.id), webhook.id)
     assert test.outcome is DeliveryOutcome.DROPPED
 
 
@@ -906,7 +911,7 @@ async def test_the_test_request_is_sent_once_and_logged(world: World) -> None:
     user = await world.user()
     webhook, secret = await hook(world, user, "document.filed")
     service = world.webhook_delivery()
-    row = await service.send_test(user.id, webhook.id)
+    row = await service.send_test(Actor(user.id), webhook.id)
     (request,) = world.sender.requests
     assert json.loads(request.body)["type"] == TEST_EVENT
     assert json.loads(request.body)["document_id"] is None
@@ -919,14 +924,14 @@ async def test_the_test_request_is_sent_once_and_logged(world: World) -> None:
     assert await log(world, webhook) == [row]
 
     world.sender.answers = [500]
-    failed = await service.send_test(user.id, webhook.id)
+    failed = await service.send_test(Actor(user.id), webhook.id)
     assert (failed.outcome, failed.status_code, failed.next_attempt_at) == (
         DeliveryOutcome.GAVE_UP,
         500,
         None,
     )
     assert len(world.sender.requests) == 2  # no repetition
-    assert (await world.webhooks.get(user.id, webhook.id)).failed_streak == 0
+    assert (await world.webhooks.get(Actor(user.id), webhook.id)).failed_streak == 0
 
 
 async def test_a_test_request_with_an_unusable_secret_is_logged_as_given_up(world: World) -> None:
@@ -938,7 +943,7 @@ async def test_a_test_request_with_an_unusable_secret_is_logged_as_given_up(worl
         stored.encrypted_secret = b"garbage" * 8
         await uow.webhooks.update(stored)
         await uow.commit()
-    row = await world.webhook_delivery().send_test(user.id, webhook.id)
+    row = await world.webhook_delivery().send_test(Actor(user.id), webhook.id)
     assert row.outcome is DeliveryOutcome.GAVE_UP and "secret" in (row.error or "")
     assert world.sender.requests == []
     assert await log(world, webhook) == [row]
@@ -949,11 +954,11 @@ async def test_the_owner_and_admins_test_a_webhook(world: World) -> None:
     webhook, _ = await hook(world, owner)
     service = world.webhook_delivery()
     with pytest.raises(NotFoundError):
-        await service.send_test(other.id, webhook.id)
+        await service.send_test(Actor(other.id), webhook.id)
     with pytest.raises(NotFoundError):
-        await service.send_test(owner.id, WebhookId(new_id()))
+        await service.send_test(Actor(owner.id), WebhookId(new_id()))
     assert world.sender.requests == []
-    await service.send_test(admin.id, webhook.id)
+    await service.send_test(Actor(admin.id), webhook.id)
     assert len(world.sender.requests) == 1
 
 
@@ -962,17 +967,17 @@ async def test_test_requests_are_limited_per_user_and_window(world: World) -> No
     webhook, _ = await hook(world, owner)
     policy = replace(builders.WEBHOOKS, test_requests=2, test_window=timedelta(minutes=1))
     service = world.webhook_delivery(policy)
-    await service.send_test(owner.id, webhook.id)
+    await service.send_test(Actor(owner.id), webhook.id)
     world.clock.advance(timedelta(seconds=20))
-    await service.send_test(owner.id, webhook.id)
+    await service.send_test(Actor(owner.id), webhook.id)
     with pytest.raises(TooManyAttemptsError) as refused:
-        await service.send_test(owner.id, webhook.id)
+        await service.send_test(Actor(owner.id), webhook.id)
     assert refused.value.retry_after == timedelta(seconds=40)
     assert len(world.sender.requests) == 2
     # Another user has a window of their own; an unknown webhook does not count.
-    await service.send_test(admin.id, webhook.id)
+    await service.send_test(Actor(admin.id), webhook.id)
     with pytest.raises(NotFoundError):
-        await service.send_test(owner.id, WebhookId(new_id()))
+        await service.send_test(Actor(owner.id), WebhookId(new_id()))
     world.clock.advance(timedelta(seconds=40))
-    await service.send_test(owner.id, webhook.id)
+    await service.send_test(Actor(owner.id), webhook.id)
     assert len(world.sender.requests) == 4

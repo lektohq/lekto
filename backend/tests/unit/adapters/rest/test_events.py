@@ -13,6 +13,7 @@ from lekto.adapters.outbound.memory import FakeEmbeddings
 from lekto.composition.settings import Settings
 from lekto.core.domain.events import ClassifierTrained, DocumentUpdated, MailboxFetched
 from lekto.core.domain.ids import DocumentId, MailboxId, UserId, new_id
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import User
 from lekto.core.ports.embeddings import EmbeddingResult
@@ -38,8 +39,8 @@ async def listening(
 async def test_events_reach_only_users_who_may_read_the_document(api: Api) -> None:
     owner, reader, stranger = await api.user(), await api.user(), await api.user()
     admin = await api.admin()
-    shared = await api.services.spaces.create(owner.id, "Shared")
-    await api.services.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
+    shared = await api.services.spaces.create(Actor(owner.id), "Shared")
+    await api.services.spaces.set_member(Actor(owner.id), shared.id, reader.id, SpaceRole.READ)
 
     async with serving(api.app) as url, httpx2.AsyncClient(base_url=url, timeout=10) as client:
         streams, tasks = await listening(client, (owner, reader, stranger, admin))
@@ -148,10 +149,10 @@ async def test_a_stream_for_one_document(api: Api) -> None:
 async def test_a_stream_ends_when_its_token_is_revoked() -> None:
     async with api_with(recheck=timedelta(milliseconds=200)) as api:
         user = await api.admin()
-        [token] = await api.services.auth.list_api_tokens(user.id)
+        [token] = await api.services.auth.list_api_tokens(Actor(user.id))
         async with serving(api.app) as url, httpx2.AsyncClient(base_url=url, timeout=10) as client:
             _, (task,) = await listening(client, (user,))
-            await api.services.auth.revoke_api_token(user.id, token.id)
+            await api.services.auth.revoke_api_token(Actor(user.id), token.id)
             await asyncio.wait_for(task, timeout=5)  # the server ended the stream
 
 

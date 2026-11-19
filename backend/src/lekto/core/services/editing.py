@@ -42,13 +42,14 @@ from lekto.core.domain.errors import (
     UnsupportedMediaTypeError,
     ValidationError,
 )
-from lekto.core.domain.ids import DocumentId, UserId
+from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.pipeline import (
     TRIGGER_EDIT,
 )
 from lekto.core.domain.reasons import Action, ReasonCode, because
 from lekto.core.domain.relations import Relation
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import User
 from lekto.core.domain.versions import VersionKind
 from lekto.core.ports.clock import Clock
@@ -117,7 +118,7 @@ class EditingService:
         self._pages = pages
         self._version = pipeline_version
 
-    async def preview(self, actor: UserId, id: DocumentId, file: IncomingFile) -> list[bytes]:
+    async def preview(self, actor: Actor, id: DocumentId, file: IncomingFile) -> list[bytes]:
         """Editors and admins, before they add `file` to an edit of the document: its pages as
         WebP images as large as a document's page images, in their order; nothing is stored.
         UnsupportedMediaTypeError unless a PDF or an image; ValidationError if its pages cannot
@@ -144,7 +145,7 @@ class EditingService:
 
     async def edit(
         self,
-        actor: UserId,
+        actor: Actor,
         id: DocumentId,
         parts: Sequence[EditPart],
         added: Sequence[AddedFile] = (),
@@ -232,7 +233,7 @@ class EditingService:
 
     async def _store_parts(
         self,
-        actor: UserId,
+        actor: Actor,
         files: dict[DocumentId, Sha256],
         goal: DocumentId,
         parts: Sequence[_Part],
@@ -345,7 +346,7 @@ class EditingService:
     async def _split_off(
         self,
         uow: UnitOfWork,
-        actor: UserId,
+        actor: Actor,
         source: Document,
         item: _Part,
         number: int,
@@ -372,8 +373,8 @@ class EditingService:
             item.file.size,
             number=number,
             detail=detail,
-            created_by=actor,
-            chooser=actor,
+            created_by=actor.id,
+            chooser=actor.id,
             trigger=TRIGGER_EDIT,
             edited=True,
             pipeline_version=self._version,
@@ -383,7 +384,7 @@ class EditingService:
     async def _replace(
         self,
         uow: UnitOfWork,
-        actor: UserId,
+        actor: Actor,
         document: Document,
         item: _Part,
         kind: VersionKind,
@@ -399,7 +400,7 @@ class EditingService:
             filename=f"{document.file_title}.pdf",
             media_type=media_types.PDF,
             kind=kind,
-            created_by=actor,
+            created_by=actor.id,
             detail=detail,
             now=now,
         )

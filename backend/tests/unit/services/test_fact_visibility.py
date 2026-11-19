@@ -10,6 +10,7 @@ from lekto.adapters.outbound.memory import FakeCodeReader
 from lekto.core.domain.identifiers import Identifier, IdentifierKind, IdentifierSource
 from lekto.core.domain.master_data import Contact
 from lekto.core.domain.pipeline import Node, NodeRun
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role
 from lekto.core.services.classification.signals import FactsSignal
@@ -28,8 +29,8 @@ async def _scene(world: World) -> tuple[Any, Any, Any, Any, Contact]:
     facts signal ran and is in the processing log."""
     tobi, bert, erika = await world.user(), await world.user(), await world.user()
     admin = await world.user(role=Role.ADMIN)
-    shared = await world.spaces.create(tobi.id, "Shared")
-    await world.spaces.set_member(tobi.id, shared.id, bert.id, SpaceRole.EDIT)
+    shared = await world.spaces.create(Actor(tobi.id), "Shared")
+    await world.spaces.set_member(Actor(tobi.id), shared.id, bert.id, SpaceRole.EDIT)
     erikas = await world.personal_space(erika)
     bank = Contact.create(name="Muster Bank", now=builders.NOW)
     bank.set_identifiers(
@@ -65,7 +66,7 @@ async def _scene(world: World) -> tuple[Any, Any, Any, Any, Contact]:
 
 
 async def _facts(world: World, user: Any, document: Any) -> dict[str, tuple[Any, Any]]:
-    facts = await world.documents.facts(user.id, document.id)
+    facts = await world.documents.facts(Actor(user.id), document.id)
     return {
         item.value: (item.contact_id, item.rejected_at)
         for item in facts.facts.identifiers
@@ -91,7 +92,7 @@ async def test_a_reader_sees_the_contact_of_the_numbers_they_may_see_alone(world
         REJECTED: (None, None),
     }
     # The signal leaves out a rejected one: no evidence of any contact.
-    assert _logged(await world.documents.processing_log(bert.id, document.id)) == (
+    assert _logged(await world.documents.processing_log(Actor(bert.id), document.id)) == (
         {PUBLIC},
         {ERIKAS, LEARNED},
     )
@@ -105,7 +106,7 @@ async def test_admins_see_every_contact_and_rejection(world: World) -> None:
         LEARNED: (bank.id, None),
         REJECTED: (None, bank.id),
     }
-    assert _logged(await world.documents.processing_log(admin.id, document.id)) == (
+    assert _logged(await world.documents.processing_log(Actor(admin.id), document.id)) == (
         {PUBLIC, ERIKAS, LEARNED},
         set(),
     )

@@ -14,6 +14,7 @@ from lekto.core.domain.ids import DocumentId, EventId, new_id
 from lekto.core.domain.inbox import DONE_PERIOD, Confirmation
 from lekto.core.domain.jobs import JobStatus
 from lekto.core.domain.mail_intake import KEPT_RECORDS
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.webhooks import DeliveryOutcome, WebhookDelivery
 from lekto.core.services.maintenance import CLEANUP_JOB, REMOVE_FILES_JOB
 from lekto.core.services.objects import derivative_keys, original_key
@@ -37,7 +38,7 @@ async def test_schedule_queues_one_cleanup(world: World) -> None:
 async def test_cleanup_runs_and_schedules_the_next_one(world: World) -> None:
     service = world.maintenance()
     owner = await world.user()
-    await world.pipeline().receive(owner.id, incoming(b"%PDF-1"), filename="a.pdf")
+    await world.pipeline().receive(Actor(owner.id), incoming(b"%PDF-1"), filename="a.pdf")
     await world.drain()
     step_jobs = len(world.database.jobs)
 
@@ -63,7 +64,7 @@ async def test_delivered_events_are_purged(world: World) -> None:
 
     bus.subscribe("test", handler)
     owner = await world.user()
-    await world.pipeline().receive(owner.id, incoming(b"%PDF-1"), filename="a.pdf")
+    await world.pipeline().receive(Actor(owner.id), incoming(b"%PDF-1"), filename="a.pdf")
     await bus.dispatch()
     service = world.maintenance(bus)
     await service.schedule()
@@ -119,8 +120,8 @@ async def test_deleting_a_document_removes_its_files(world: World) -> None:
     service = world.maintenance()
     alice, bob = await world.user(), await world.user()
     again_file, own_file = b"%PDF-1.7 same", b"%PDF-1.7 alice only"
-    first = await world.pipeline().receive(alice.id, incoming(again_file), filename="a.pdf")
-    gone = await world.pipeline().receive(alice.id, incoming(own_file), filename="b.pdf")
+    first = await world.pipeline().receive(Actor(alice.id), incoming(again_file), filename="a.pdf")
+    gone = await world.pipeline().receive(Actor(alice.id), incoming(own_file), filename="b.pdf")
     await world.drain()
     for document in (first, gone):
         for key in derivative_keys(document.id, 2):
@@ -132,9 +133,9 @@ async def test_deleting_a_document_removes_its_files(world: World) -> None:
             await uow.documents.update(stored)
         await uow.commit()
 
-    await world.documents.delete(alice.id, gone.id)
-    await world.documents.delete(alice.id, first.id)
-    other = await world.pipeline().receive(bob.id, incoming(again_file), filename="c.pdf")
+    await world.documents.delete(Actor(alice.id), gone.id)
+    await world.documents.delete(Actor(alice.id), first.id)
+    other = await world.pipeline().receive(Actor(bob.id), incoming(again_file), filename="c.pdf")
     assert await service.run_next_job() and await service.run_next_job()
     assert not await service.run_next_job()
 
@@ -152,9 +153,11 @@ async def test_deleting_a_document_removes_its_files(world: World) -> None:
 async def test_removing_files_is_retried(world: World, monkeypatch: pytest.MonkeyPatch) -> None:
     service = world.maintenance()
     owner = await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 x"), filename="x.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(b"%PDF-1.7 x"), filename="x.pdf"
+    )
     await world.drain()
-    await world.documents.delete(owner.id, document.id)
+    await world.documents.delete(Actor(owner.id), document.id)
 
     async def broken(key: str) -> None:
         raise OSError("storage unreachable")
@@ -173,7 +176,9 @@ async def test_cleanup_removes_old_webhook_deliveries(world: World) -> None:
     service = world.maintenance()
     user = await world.user()
     hook = (
-        await world.webhooks.create(user.id, name="x", url="http://x.lan/hook", event_types=["*"])
+        await world.webhooks.create(
+            Actor(user.id), name="x", url="http://x.lan/hook", event_types=["*"]
+        )
     ).webhook
 
     def delivery(at: timedelta) -> WebhookDelivery:
@@ -205,20 +210,24 @@ async def test_cleanup_drops_previous_webhook_secrets_after_the_grace_period(wor
     user = await world.user()
     grace = timedelta(hours=24)
     first = (
-        await world.webhooks.create(user.id, name="a", url="http://x.lan/a", event_types=["*"])
+        await world.webhooks.create(
+            Actor(user.id), name="a", url="http://x.lan/a", event_types=["*"]
+        )
     ).webhook
     second = (
-        await world.webhooks.create(user.id, name="b", url="http://x.lan/b", event_types=["*"])
+        await world.webhooks.create(
+            Actor(user.id), name="b", url="http://x.lan/b", event_types=["*"]
+        )
     ).webhook
-    await world.webhooks.renew_secret(user.id, first.id)
+    await world.webhooks.renew_secret(Actor(user.id), first.id)
     world.clock.advance(grace / 2)
-    await world.webhooks.renew_secret(user.id, second.id)
+    await world.webhooks.renew_secret(Actor(user.id), second.id)
     world.clock.advance(grace / 2)  # the first grace period is over, the second half-way
     await service.schedule()
     assert await service.run_next_job()
     first, second = (
-        await world.webhooks.get(user.id, first.id),
-        await world.webhooks.get(user.id, second.id),
+        await world.webhooks.get(Actor(user.id), first.id),
+        await world.webhooks.get(Actor(user.id), second.id),
     )
     assert first.previous_secret is None and first.previous_valid_until is None
     assert second.previous_secret is not None

@@ -42,6 +42,7 @@ from lekto.core.domain.permissions import (
 )
 from lekto.core.domain.pipeline import Node, NodeRun
 from lekto.core.domain.reasons import Action, ReasonCode, because
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.rules import ConditionField, RuleDefinition
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import User
@@ -84,13 +85,13 @@ class ReadableDocuments:
         return DocumentRef(document.id, document.title)
 
 
-async def load_actor(uow: UnitOfWork, actor: UserId) -> User:
-    """The caller; AuthenticationError if the account is gone or deactivated (it may have
-    changed since the request was authenticated)."""
-    user = await uow.users.find(actor)
+async def load_actor(uow: UnitOfWork, actor: Actor) -> User:
+    """The caller, with the rights they act with (`User.rights`); AuthenticationError if the
+    account is gone or deactivated (it may have changed since the request was authenticated)."""
+    user = await uow.users.find(actor.id)
     if user is None or not user.active:
         raise AuthenticationError(because(ReasonCode.AUTHENTICATION_REQUIRED))
-    return user
+    return user if actor.rights is None else replace(user, rights=actor.rights)
 
 
 async def field_definitions(uow: UnitOfWork) -> dict[FieldId, FieldDefinition]:
@@ -98,25 +99,38 @@ async def field_definitions(uow: UnitOfWork) -> dict[FieldId, FieldDefinition]:
     return {item.id: item for item in await uow.fields.list_all()}
 
 
-def admin_only(user: User, action: Action) -> None:
-    """PermissionDeniedError ("only admins <action>") unless `user` is an active admin."""
+def admin_only(user: User, action: Action, right: TokenRight = TokenRight.ADMIN_MANAGE) -> None:
+    """PermissionDeniedError unless `user` may `right`, an admin right: "only admins <action>"
+    for one who is no active admin, "this API token lacks the right" for an admin acting through
+    a token without it."""
     if not user.is_active_admin:
         raise PermissionDeniedError(because(ReasonCode.ADMINS_ONLY, action=action.value))
+    if not user.may(right):
+        raise PermissionDeniedError(because(ReasonCode.TOKEN_LACKS_RIGHT, right=right.value))
 
 
-async def require_admin(uow: UnitOfWork, actor: UserId, action: Action) -> User:
-    """The caller, if an active admin (`admin_only`)."""
+async def require_admin(
+    uow: UnitOfWork, actor: Actor, action: Action, right: TokenRight = TokenRight.ADMIN_MANAGE
+) -> User:
+    """The caller, if they may `right` (`admin_only`)."""
     user = await load_actor(uow, actor)
-    admin_only(user, action)
+    admin_only(user, action, right)
     return user
 
 
-async def load_lister(uow: UnitOfWork, actor: UserId, all_users: bool, action: Action) -> User:
+async def load_lister(
+    uow: UnitOfWork,
+    actor: Actor,
+    all_users: bool,
+    action: Action,
+    right: TokenRight = TokenRight.ADMIN_DOCUMENTS_ALL,
+) -> User:
     """The caller of a list; with `all_users` (every user's instead of their own or their
-    reach), only an active admin (`admin_only`, "only admins <action>")."""
+    reach), only who may `right` (`admin_only`): `admin:count_all` for numbers,
+    `admin:documents_all` for what shows documents."""
     user = await load_actor(uow, actor)
     if all_users:
-        admin_only(user, action)
+        admin_only(user, action, right)
     return user
 
 
@@ -275,7 +289,7 @@ async def _fitted_topic(
         return changes
     if not topic_given:
         return replace(changes, topic_id=None)  # the new contact does not enable it
-    if actor is not None and actor.is_active_admin:
+    if actor is not None and actor.may(TokenRight.ADMIN_MANAGE):
         contact.enable_topic(topic_id)
         await uow.contacts.update(contact)
         return changes
@@ -295,8 +309,10 @@ async def readable_log(uow: UnitOfWork, user: User, log: Sequence[NodeRun]) -> l
     see themselves, and another user only as far as the text names them by their display name
     (`_persons_seen`): what is private about a person found them for admins and that person
     alone. The relations `relate` made name only documents they may read. Admins see
-    everything; the stored log keeps everything for reprocessing."""
-    if user.is_active_admin:
+    everything (as caller: the documents with `admin:documents_all`, the persons with
+    `admin:manage`); the stored log keeps everything for reprocessing."""
+    persons_whole = user.may(TokenRight.ADMIN_MANAGE)
+    if persons_whole and user.may(TokenRight.ADMIN_DOCUMENTS_ALL):
         return list(log)
     readable: dict[str, bool] = {}
 
@@ -318,7 +334,7 @@ async def readable_log(uow: UnitOfWork, user: User, log: Sequence[NodeRun]) -> l
         neighbours = run.node is Node.SIGNAL_NEIGHBOURS
         output = await _readable(run.result.output, may_read, neighbours=neighbours)
         assert isinstance(output, dict)
-        if run.node in (Node.SIGNAL_FACTS, Node.JUDGE) and PERSONS in output:
+        if run.node in (Node.SIGNAL_FACTS, Node.JUDGE) and PERSONS in output and not persons_whole:
             output = _persons_seen(output, str(user.id))
         if run.node is Node.SIGNAL_FACTS:
             output = await _identifiers_seen(uow, user, output)
@@ -461,7 +477,7 @@ def check_fact_filter(user: User, filter: DocumentFilter) -> None:
     """Only admins find documents by a person's facts: of a kind a person's alone (a tax ID
     found on a document is that person's) or in the role `person`; PermissionDeniedError
     otherwise."""
-    if user.is_active_admin:
+    if user.may(TokenRight.ADMIN_MANAGE):
         return
     if any(of_a_person(item) for item in filter.facts):
         raise PermissionDeniedError(because(ReasonCode.FACT_FILTER_OF_PERSON))
@@ -471,7 +487,7 @@ def check_rule_facts(user: User, definition: RuleDefinition) -> None:
     """Only admins write and apply rules on a person's facts, as only they find documents by
     them (`check_fact_filter`): a condition on a kind a person's alone or in the role `person`;
     PermissionDeniedError otherwise."""
-    if user.is_active_admin:
+    if user.may(TokenRight.ADMIN_MANAGE):
         return
     for condition in definition.all_conditions():
         if condition.field is ConditionField.FACT and of_a_person(

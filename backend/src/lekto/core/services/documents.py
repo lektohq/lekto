@@ -75,6 +75,7 @@ from lekto.core.domain.permissions import (
 )
 from lekto.core.domain.pipeline import Node, NodeRun
 from lekto.core.domain.reasons import Action, ReasonCode, because
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.rule_planner import changed_fields
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.tag_tree import TagTree
@@ -322,7 +323,7 @@ def _other_fact_shown(user: User, fact: DocumentFact) -> bool:
     """Whether the facts report lists a kept fact the identifiers do not show: every one to an
     admin; to others one a person decided, of no person's kind alone and not a person's (an
     IBAN in the role `person`)."""
-    if user.is_active_admin:
+    if user.may(TokenRight.ADMIN_MANAGE):
         return True
     return (
         fact.state.by_person
@@ -334,7 +335,7 @@ def _other_fact_shown(user: User, fact: DocumentFact) -> bool:
 def _number_shown(user: User, fact: DocumentFact) -> bool:
     """Whether the facts report lists a fact among the document's numbers: an IBAN in the role
     `person` (a user's own account) only to admins."""
-    return user.is_active_admin or not (
+    return user.may(TokenRight.ADMIN_MANAGE) or not (
         TYPES[fact.kind].for_persons and fact.role is FactRole.PERSON
     )
 
@@ -502,12 +503,12 @@ class DocumentService:
         assert self._store is not None, "DocumentService needs an object store to read files"
         return self._store
 
-    async def get(self, actor: UserId, id: DocumentId) -> Document:
+    async def get(self, actor: Actor, id: DocumentId) -> Document:
         async with self._uow() as uow:
             document, _ = await readable_document(uow, await load_actor(uow, actor), id)
             return document
 
-    async def view(self, actor: UserId, id: DocumentId) -> DocumentView:
+    async def view(self, actor: Actor, id: DocumentId) -> DocumentView:
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             document, space = await readable_document(uow, user, id)
@@ -516,7 +517,7 @@ class DocumentService:
         return DocumentView(document, access)
 
     async def read_text(
-        self, actor: UserId, id: DocumentId, *, offset: int = 0, limit: int | None = None
+        self, actor: Actor, id: DocumentId, *, offset: int = 0, limit: int | None = None
     ) -> DocumentText:
         """`limit` characters of the document's text from `offset`; none or more than a piece
         holds (`text_max`) give a whole piece, the rest follows from `next_offset`, for REST and
@@ -541,7 +542,7 @@ class DocumentService:
             next_offset=end if end < len(text) else None,
         )
 
-    async def facts(self, actor: UserId, id: DocumentId) -> DocumentFacts:
+    async def facts(self, actor: Actor, id: DocumentId) -> DocumentFacts:
         """The facts of the document's text and codes, as the facts signal finds them now:
         a contact named or an identifier attached since counts at once; the persons it names
         only for the editors of its space and admins, and what is private about a person
@@ -612,7 +613,7 @@ class DocumentService:
         if codes is not None:
             views = _code_facts(codes, amounts)
         others = None
-        if user.is_active_admin:
+        if user.may(TokenRight.ADMIN_MANAGE):
             async with self._uow() as uow:
                 carrying = await uow.document_facts.contacts_of(
                     [item.key for item in facts.identifiers]
@@ -638,7 +639,7 @@ class DocumentService:
         )
 
     async def decide_fact(
-        self, actor: UserId, id: DocumentId, decision: FactDecision, *, via: ViaToken | None = None
+        self, actor: Actor, id: DocumentId, decision: FactDecision, *, via: ViaToken | None = None
     ) -> None:
         """Keep a person's decision about a fact of the document (`fact_decisions`; through the
         API token `via`); the change rules of its space and the global ones run on the facts
@@ -693,7 +694,7 @@ class DocumentService:
         version)."""
         return await load_codes(self._object_store, id)
 
-    async def read_structure(self, actor: UserId, id: DocumentId) -> bytes:
+    async def read_structure(self, actor: Actor, id: DocumentId) -> bytes:
         """The structure of the text as JSON: its pages, lines and words with their boxes
         (`structure_key`; a document parsed before 0.2 has Docling's until it is read again).
         NotFoundError if the caller may not read the document; ConflictError while it is not
@@ -706,7 +707,7 @@ class DocumentService:
         except NotFoundError:
             raise ConflictError(because(ReasonCode.NO_STRUCTURE_YET)) from None
 
-    async def check_referable(self, actor: UserId, kind: IdentifierKind) -> None:
+    async def check_referable(self, actor: Actor, kind: IdentifierKind) -> None:
         """Whether the caller may turn a value of `kind` into its reference or a reference back
         into its value (`/identifiers/refs`): a person's kinds only admins, as the `fact` filter
         and the places (PermissionDeniedError). A reference in an address must tell nobody the
@@ -716,7 +717,7 @@ class DocumentService:
         check_fact_filter(user, DocumentFilter(facts=(FactCriterion(kind=kind),)))
 
     async def identifier_place(
-        self, actor: UserId, id: DocumentId, kind: IdentifierKind, value: str
+        self, actor: Actor, id: DocumentId, kind: IdentifierKind, value: str
     ) -> Place:
         """Where the identifier of `kind` and `value` (normalised) stands in the document, as
         its fact (none a person rejected): the text around it and each place its pages show it.
@@ -736,7 +737,7 @@ class DocumentService:
         return await place_of(self._object_store, id, document.title, dated, fact)
 
     async def identifier_places(
-        self, actor: UserId, kind: IdentifierKind, value: str, *, limit: int = PLACES
+        self, actor: Actor, kind: IdentifierKind, value: str, *, limit: int = PLACES
     ) -> list[Place]:
         """Where the identifier of `kind` and `value` (normalised) stands in the newest
         documents within the caller's reach that have it as a fact (none a person rejected), by
@@ -767,7 +768,7 @@ class DocumentService:
 
     async def query(
         self,
-        actor: UserId,
+        actor: Actor,
         filter: DocumentFilter,
         *,
         order: DocumentOrder = NEWEST_FIRST,
@@ -796,7 +797,7 @@ class DocumentService:
                 )
             else:
                 documents = await uow.documents.query_visible(
-                    actor, filter, order=order, after=position, limit=limit, offset=offset
+                    actor.id, filter, order=order, after=position, limit=limit, offset=offset
                 )
             spaces: dict[SpaceId, Space] = {}
             readable = []
@@ -807,12 +808,12 @@ class DocumentService:
                 if access is None:
                     log.error(
                         "the repository listed a document the user may not read",
-                        extra={"document_id": str(document.id), "user_id": str(actor)},
+                        extra={"document_id": str(document.id), "user_id": str(actor.id)},
                     )
                     continue
                 readable.append((document, access))
             waiting = await in_inbox(
-                uow, actor, [document for document, _ in readable], all_users=all_users
+                uow, actor.id, [document for document, _ in readable], all_users=all_users
             )
         return [
             ListedDocument(document, access, document.id in waiting)
@@ -821,7 +822,7 @@ class DocumentService:
 
     async def aggregate(
         self,
-        actor: UserId,
+        actor: Actor,
         filter: DocumentFilter,
         *,
         by: GroupBy | None = None,
@@ -842,7 +843,7 @@ class DocumentService:
             filter = await expanded(uow, filter)
             if among is None:
                 documents = await uow.documents.query_visible(
-                    actor, filter, limit=AGGREGATE_MAX + 1
+                    actor.id, filter, limit=AGGREGATE_MAX + 1
                 )
             else:
                 ids = sorted({id.hex for id in among})
@@ -850,7 +851,7 @@ class DocumentService:
                 for start in range(0, len(ids), _AMONG_PER_QUERY):
                     chunk = replace(filter, ids=frozenset(ids[start : start + _AMONG_PER_QUERY]))
                     documents += await uow.documents.query_visible(
-                        actor, chunk, limit=_AMONG_PER_QUERY
+                        actor.id, chunk, limit=_AMONG_PER_QUERY
                     )
         if len(documents) > AGGREGATE_MAX:
             raise ValidationError(
@@ -858,7 +859,7 @@ class DocumentService:
             )
         return aggregate(documents, by, amount)
 
-    async def resolve(self, actor: UserId, reference: str) -> DocumentId:
+    async def resolve(self, actor: Actor, reference: str) -> DocumentId:
         """The document `reference` names: its whole id, or its end (`ids.short_id`, up to the
         last group), among the documents within the caller's reach. ValidationError for text
         that is neither, and for an end several of them share (naming each by a longer end and
@@ -882,7 +883,7 @@ class DocumentService:
         return found[0].document.id
 
     async def download(
-        self, actor: UserId, id: DocumentId, file: DocumentFile, target: Path, *, page: int = 1
+        self, actor: Actor, id: DocumentId, file: DocumentFile, target: Path, *, page: int = 1
     ) -> FileInfo:
         """Write a file of a readable document to the local path `target`. NotFoundError if
         the caller may not read the document or the file does not exist (yet); for a page,
@@ -912,7 +913,7 @@ class DocumentService:
         await store.download(key, target)
         return info
 
-    async def files(self, actor: UserId, id: DocumentId) -> DocumentFiles:
+    async def files(self, actor: Actor, id: DocumentId) -> DocumentFiles:
         """The files of a readable document as they are stored: size, SHA-256 and their
         metadata (a PDF's document information and XMP, an image's EXIF). NotFoundError if
         the caller may not read the document."""
@@ -935,7 +936,7 @@ class DocumentService:
         )
 
     async def download_version(
-        self, actor: UserId, id: DocumentId, number: int, target: Path
+        self, actor: Actor, id: DocumentId, number: int, target: Path
     ) -> FileInfo:
         """Write the original of version `number` of a readable document to `target`.
         NotFoundError if the caller may not read the document or it has no such version."""
@@ -971,31 +972,36 @@ class DocumentService:
         return StoredFile(size=size, sha256=digest, metadata=metadata)
 
     async def document_counts(
-        self, actor: UserId, by: CountBy, *, all_users: bool = False
+        self, actor: Actor, by: CountBy, *, all_users: bool = False
     ) -> dict[UUID, int]:
         """How many documents within the caller's reach (with `all_users`, admins only: every
         document) have each contact, type or tag, or a value for each field. A tag counts what
         its filter finds: the documents with it or a tag below it (each once), a group those
         whose contact or type is in it or a group below it (`_tags.tag_counts`)."""
         async with self._uow() as uow:
-            await load_lister(uow, actor, all_users, Action.COUNT_ALL_DOCUMENTS)
-            user = None if all_users else actor
+            await load_lister(
+                uow, actor, all_users, Action.COUNT_ALL_DOCUMENTS, TokenRight.ADMIN_COUNT_ALL
+            )
+            user = None if all_users else actor.id
             if by is CountBy.TAG:
                 return await tag_counts(uow, user)
             return await uow.documents.count_by(by, user)
 
-    async def count(self, actor: UserId, filter: DocumentFilter, *, all_users: bool = False) -> int:
+    async def count(self, actor: Actor, filter: DocumentFilter, *, all_users: bool = False) -> int:
         """How many documents within the caller's reach (with `all_users`, admins only: every
         document) match `filter`, counted as `facets` counts its total (a lens in the sidebar)."""
         async with self._uow() as uow:
             check_fact_filter(
-                await load_lister(uow, actor, all_users, Action.COUNT_ALL_DOCUMENTS), filter
+                await load_lister(
+                    uow, actor, all_users, Action.COUNT_ALL_DOCUMENTS, TokenRight.ADMIN_COUNT_ALL
+                ),
+                filter,
             )
             tree = await tag_tree(uow)
-            return await uow.documents.count(expand(filter, tree), None if all_users else actor)
+            return await uow.documents.count(expand(filter, tree), None if all_users else actor.id)
 
     async def facets(
-        self, actor: UserId, filter: DocumentFilter, *, all_users: bool = False
+        self, actor: Actor, filter: DocumentFilter, *, all_users: bool = False
     ) -> DocumentFacets:
         """How many documents within the caller's reach (with `all_users`, admins only: every
         document) that match `filter` have each contact, type, group of contacts and types,
@@ -1006,9 +1012,12 @@ class DocumentService:
         filter finds them."""
         async with self._uow() as uow:
             check_fact_filter(
-                await load_lister(uow, actor, all_users, Action.COUNT_ALL_DOCUMENTS), filter
+                await load_lister(
+                    uow, actor, all_users, Action.COUNT_ALL_DOCUMENTS, TokenRight.ADMIN_COUNT_ALL
+                ),
+                filter,
             )
-            user = None if all_users else actor
+            user = None if all_users else actor.id
             tree = await tag_tree(uow)
             documents = uow.documents
 
@@ -1096,7 +1105,7 @@ class DocumentService:
                     admins.add(candidate)
             return admins
 
-    async def processing_log(self, actor: UserId, id: DocumentId) -> list[NodeRun]:
+    async def processing_log(self, actor: Actor, id: DocumentId) -> list[NodeRun]:
         """Editors and admins: the log may hold technical details of failed runs. Similar
         documents the caller may not read are left out (`_access.readable_log`)."""
         async with self._uow() as uow:
@@ -1104,7 +1113,7 @@ class DocumentService:
             await controllable_document(uow, user, id, Action.READ_PROCESSING_LOG)
             return await readable_log(uow, user, await uow.processing_log.list_for(id))
 
-    async def exchanges(self, actor: UserId, id: DocumentId, node: Node) -> list[RunExchange]:
+    async def exchanges(self, actor: Actor, id: DocumentId, node: Node) -> list[RunExchange]:
         """Editors and admins, as the log: what `node` sent to the language model and got back,
         every run, oldest first; none if it never asked one. ValidationError for a node that
         does not ask the model."""
@@ -1124,7 +1133,7 @@ class DocumentService:
             return exchanges_from_json(json.loads(data))
         return []
 
-    async def review(self, actor: UserId, id: DocumentId) -> Review:
+    async def review(self, actor: Actor, id: DocumentId) -> Review:
         """Editors and admins: what is open, and what the model proposed and how it was
         checked."""
         async with self._uow() as uow:
@@ -1136,7 +1145,7 @@ class DocumentService:
 
     async def change_metadata(
         self,
-        actor: UserId,
+        actor: Actor,
         id: DocumentId,
         changes: DocumentChanges,
         *,
@@ -1230,7 +1239,7 @@ class DocumentService:
         return MetadataChange(document, access, space, run if report else None, before)
 
     async def move(
-        self, actor: UserId, id: DocumentId, space: SpaceId, *, via: ViaToken | None = None
+        self, actor: Actor, id: DocumentId, space: SpaceId, *, via: ViaToken | None = None
     ) -> None:
         """The editors of the document's space move it into a space they edit, or hand it over
         into another, active user's personal space; an admin moves any document into any space,
@@ -1282,7 +1291,7 @@ class DocumentService:
             )
             await uow.commit()
 
-    async def delete(self, actor: UserId, id: DocumentId) -> None:
+    async def delete(self, actor: Actor, id: DocumentId) -> None:
         """Editors and admins. Removes the metadata and queues the removal of its files
         (derivatives, and the originals of all its versions unless another document has the
         same file). Its tasks end (a late answer is refused)."""

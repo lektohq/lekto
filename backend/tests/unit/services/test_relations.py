@@ -11,6 +11,7 @@ from lekto.core.domain.events import DocumentUpdated
 from lekto.core.domain.first_runs import RELATIONS, Verdict
 from lekto.core.domain.ids import DocumentId, new_id
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState, ordered
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import User
 from lekto.core.services.relations import Direction, RelationService
@@ -65,7 +66,7 @@ async def test_relating_before_the_first_run_stopped_is_early(world: World) -> N
     async with world.uow() as uow:
         await uow.documents.add(arriving)
         await uow.commit()
-    await service(world).relate(owner.id, arriving.id, original.id)
+    await service(world).relate(Actor(owner.id), arriving.id, original.id)
     assert await verdicts(world, arriving.id) == [(RELATIONS, Verdict.EARLY)]
 
 
@@ -77,25 +78,25 @@ async def test_a_person_relates_two_documents_and_removes_the_relation(world: Wo
     relations = service(world)
 
     # From either end: the correction refers to the original.
-    await relations.relate(owner.id, original.id, correction.id)
-    seen = await relations.relations(owner.id, correction.id)
+    await relations.relate(Actor(owner.id), original.id, correction.id)
+    seen = await relations.relations(Actor(owner.id), correction.id)
     assert [(item.other.id, item.direction) for item in seen.refers_to] == [
         (original.id, Direction.REFERS_TO)
     ]
-    back = await relations.relations(owner.id, original.id)
+    back = await relations.relations(Actor(owner.id), original.id)
     assert [item.other.id for item in back.referred_by] == [correction.id]
     with pytest.raises(ConflictError):
-        await relations.relate(owner.id, correction.id, original.id)
+        await relations.relate(Actor(owner.id), correction.id, original.id)
     with pytest.raises(ConflictError):
-        await relations.relate(owner.id, original.id, original.id)
+        await relations.relate(Actor(owner.id), original.id, original.id)
     assert await verdicts(world, correction.id) == [(RELATIONS, Verdict.ADDED)]
 
     # A person's relation goes when removed.
-    await relations.unrelate(owner.id, correction.id, original.id)
+    await relations.unrelate(Actor(owner.id), correction.id, original.id)
     async with world.uow() as uow:
         assert await uow.document_relations.of_document(original.id) == []
     with pytest.raises(NotFoundError):
-        await relations.unrelate(owner.id, correction.id, original.id)
+        await relations.unrelate(Actor(owner.id), correction.id, original.id)
 
 
 async def test_a_suggestion_is_accepted_or_rejected_for_good(world: World) -> None:
@@ -118,10 +119,10 @@ async def test_a_suggestion_is_accepted_or_rejected_for_good(world: World) -> No
             )
         await uow.commit()
     relations = service(world)
-    assert len((await relations.relations(owner.id, invoice.id)).suggested) == 2
-    await relations.relate(owner.id, reminder.id, invoice.id)
-    await relations.unrelate(owner.id, credit.id, invoice.id)
-    seen = await relations.relations(owner.id, invoice.id)
+    assert len((await relations.relations(Actor(owner.id), invoice.id)).suggested) == 2
+    await relations.relate(Actor(owner.id), reminder.id, invoice.id)
+    await relations.unrelate(Actor(owner.id), credit.id, invoice.id)
+    seen = await relations.relations(Actor(owner.id), invoice.id)
     assert [item.other.id for item in seen.referred_by] == [reminder.id]
     assert seen.suggested == ()
     async with world.uow() as uow:
@@ -134,26 +135,26 @@ async def test_a_suggestion_is_accepted_or_rejected_for_good(world: World) -> No
 async def test_who_sees_and_who_sets_a_relation(world: World) -> None:
     """Only who reads both ends sees it; who edits the newer and reads the older sets it."""
     owner, reader, stranger = await world.user(), await world.user(), await world.user()
-    shared = await world.spaces.create(owner.id, "Haushalt")
-    await world.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
+    shared = await world.spaces.create(Actor(owner.id), "Haushalt")
+    await world.spaces.set_member(Actor(owner.id), shared.id, reader.id, SpaceRole.READ)
     contract = await stored(world, owner, shared, date(2025, 1, 1))
     private = await stored(world, owner, await world.personal_space(owner), date(2026, 3, 1))
     invoice = await stored(world, owner, shared, date(2026, 2, 1))
     relations = service(world)
-    await relations.relate(owner.id, invoice.id, contract.id)
-    await relations.relate(owner.id, private.id, contract.id)
-    seen = await relations.relations(reader.id, contract.id)
+    await relations.relate(Actor(owner.id), invoice.id, contract.id)
+    await relations.relate(Actor(owner.id), private.id, contract.id)
+    seen = await relations.relations(Actor(reader.id), contract.id)
     assert [item.other.id for item in seen.referred_by] == [invoice.id]  # not the private one
     assert not seen.editable and not seen.referred_by[0].changeable
     with pytest.raises(PermissionDeniedError):
-        await relations.unrelate(reader.id, invoice.id, contract.id)
+        await relations.unrelate(Actor(reader.id), invoice.id, contract.id)
     with pytest.raises(NotFoundError):
-        await relations.relations(stranger.id, contract.id)
+        await relations.relations(Actor(stranger.id), contract.id)
     # The newer is the one to edit: an editor of the shared space relates within it.
-    await world.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.EDIT)
+    await world.spaces.set_member(Actor(owner.id), shared.id, reader.id, SpaceRole.EDIT)
     newer = await stored(world, owner, shared, date(2026, 4, 1))
-    await relations.relate(reader.id, contract.id, newer.id)
-    seen = await relations.relations(reader.id, contract.id)
+    await relations.relate(Actor(reader.id), contract.id, newer.id)
+    seen = await relations.relations(Actor(reader.id), contract.id)
     assert {item.other.id: item.changeable for item in seen.referred_by} == {
         newer.id: True,
         invoice.id: True,
@@ -168,16 +169,16 @@ async def test_a_date_that_turns_the_pair_turns_the_relation(world: World) -> No
     first = await stored(world, owner, space, date(2026, 1, 31))
     second = await stored(world, owner, space, date(2026, 6, 20))
     relations = service(world)
-    await relations.relate(owner.id, second.id, first.id)
+    await relations.relate(Actor(owner.id), second.id, first.id)
     await world.documents.change_metadata(
-        owner.id, second.id, DocumentChanges(document_date=date(2025, 12, 1))
+        Actor(owner.id), second.id, DocumentChanges(document_date=date(2025, 12, 1))
     )
-    seen = await relations.relations(owner.id, first.id)
+    seen = await relations.relations(Actor(owner.id), first.id)
     assert [(item.other.id, item.changeable) for item in seen.refers_to] == [(second.id, True)]
     with pytest.raises(ConflictError):
-        await relations.relate(owner.id, first.id, second.id)
-    await relations.unrelate(owner.id, second.id, first.id)
-    assert (await relations.relations(owner.id, first.id)).refers_to == ()
+        await relations.relate(Actor(owner.id), first.id, second.id)
+    await relations.unrelate(Actor(owner.id), second.id, first.id)
+    assert (await relations.relations(Actor(owner.id), first.id)).refers_to == ()
 
 
 async def test_a_rejection_outlasts_setting_and_removing_by_hand(world: World) -> None:
@@ -197,9 +198,9 @@ async def test_a_rejection_outlasts_setting_and_removing_by_hand(world: World) -
         )
         await uow.commit()
     relations = service(world)
-    await relations.unrelate(owner.id, reminder.id, invoice.id)
-    await relations.relate(owner.id, reminder.id, invoice.id)
-    await relations.unrelate(owner.id, reminder.id, invoice.id)
+    await relations.unrelate(Actor(owner.id), reminder.id, invoice.id)
+    await relations.relate(Actor(owner.id), reminder.id, invoice.id)
+    await relations.unrelate(Actor(owner.id), reminder.id, invoice.id)
     async with world.uow() as uow:
         kept = await uow.document_relations.find(reminder.id, invoice.id)
     assert kept is not None and kept.state is RelationState.REJECTED
@@ -220,10 +221,10 @@ async def test_a_relation_set_or_removed_tells_both_documents(world: World) -> N
             if isinstance(event, DocumentUpdated) and event.fields == (RELATIONS,)
         }
 
-    await relations.relate(owner.id, original.id, correction.id)
+    await relations.relate(Actor(owner.id), original.id, correction.id)
     assert told() == {(correction.id, original.id), (original.id, correction.id)}
     before = len(world.events())
-    await relations.unrelate(owner.id, correction.id, original.id)
+    await relations.unrelate(Actor(owner.id), correction.id, original.id)
     removed = [event for event in world.events()[before:] if isinstance(event, DocumentUpdated)]
     assert {(event.document_id, event.related) for event in removed} == {
         (correction.id, original.id),

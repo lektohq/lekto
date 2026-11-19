@@ -23,8 +23,8 @@ from lekto.adapters.inbound.rest.schemas.open_identifiers import (
 from lekto.adapters.inbound.rest.schemas.refs import MAX_REF, RefIn, RefOut, opened, seal
 from lekto.adapters.inbound.schemas import MAX_POSITION
 from lekto.core.domain.identifiers import IdentifierKind, normalise_identifier
-from lekto.core.domain.ids import UserId
 from lekto.core.domain.open_identifiers import OpenSource
+from lekto.core.domain.rights import Actor
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE
 from lekto.core.services.places import PLACES
 
@@ -58,7 +58,7 @@ class _Listing:
         self.source, self.kind, self.recommended = source, kind, recommended
         self.offset, self.limit = offset, limit
 
-    async def page(self, user: UserId, context: ApiContext, words: str | None) -> OpenPageOut:
+    async def page(self, user: Actor, context: ApiContext, words: str | None) -> OpenPageOut:
         page = await context.open_identifiers.page(
             user,
             source=self.source,
@@ -153,7 +153,7 @@ async def decide_open(
     body: OpenDecisionsIn, principal: Authenticated, context: Context
 ) -> list[OutcomeOut]:
     outcomes = await context.open_identifiers.decide(
-        principal.id,
+        principal.actor,
         [item.decision() for item in body.decisions],
         session=principal.session is not None,
     )
@@ -174,7 +174,7 @@ async def decide_open(
 )
 async def confirm_recommended(principal: Authenticated, context: Context) -> list[OutcomeOut]:
     outcomes = await context.open_identifiers.confirm_recommended(
-        principal.id, session=principal.session is not None
+        principal.actor, session=principal.session is not None
     )
     return [OutcomeOut.of(outcome) for outcome in outcomes]
 

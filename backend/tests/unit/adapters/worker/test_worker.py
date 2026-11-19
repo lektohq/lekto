@@ -20,6 +20,7 @@ from lekto.core.domain.events import DocumentReceived, DomainEvent, LaneChanged
 from lekto.core.domain.ids import JobId
 from lekto.core.domain.jobs import Job, JobStatus
 from lekto.core.domain.pipeline import Lane, Node, NodeResult
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role, User
 from lekto.core.services._jobs import NODE_JOB
 from lekto.core.services.indexing import SUBSCRIBER
@@ -71,7 +72,7 @@ async def owner(container: Container) -> User:
 
 
 async def lane(services: Services, user: User, document: Document) -> Lane | None:
-    return (await services.documents.get(user.id, document.id)).lane
+    return (await services.documents.get(Actor(user.id), document.id)).lane
 
 
 class Slow:
@@ -111,7 +112,7 @@ async def test_documents_are_processed_and_events_delivered() -> None:
     user = await owner(container)
     async with running(worker(container, services)):
         document = await services.pipeline.receive(
-            user.id, incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
+            Actor(user.id), incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
         )
         await until(lambda: received and received[-1].type == LaneChanged.type)
     assert await lane(services, user, document) is Lane.GREEN
@@ -127,7 +128,7 @@ async def test_documents_reach_the_search_index() -> None:
     user = await owner(container)
     async with running(worker(container, services, indexing=services.indexing)):
         document = await services.pipeline.receive(
-            user.id, incoming((SAMPLES / "scan.pdf").read_bytes()), filename="invoice.pdf"
+            Actor(user.id), incoming((SAMPLES / "scan.pdf").read_bytes()), filename="invoice.pdf"
         )
         await until(lambda: index.documents.get(document.id) is not None)
         await until(lambda: index.documents[document.id].lane_value == "green")
@@ -192,8 +193,8 @@ async def test_a_moved_tag_is_normalised_at_its_documents() -> None:
     user = await owner(container)
     admin = await builders.seed_user(container.unit_of_work, role=Role.ADMIN)
     master = services.master_data
-    insurance = await master.create_tag(admin.id, "Insurance")
-    health = await master.create_tag(admin.id, "Health")
+    insurance = await master.create_tag(Actor(admin.id), "Insurance")
+    health = await master.create_tag(Actor(admin.id), "Health")
     async with container.unit_of_work() as uow:
         space = await uow.spaces.get_personal(user.id)
         document = builders.run_pipeline(builders.document(user, space))
@@ -201,10 +202,12 @@ async def test_a_moved_tag_is_normalised_at_its_documents() -> None:
         await uow.documents.add(document)
         await uow.commit()
     async with running(worker(container, services, master_data=master)):
-        await master.change_tag(admin.id, health.id, parent_id=insurance.id)
+        await master.change_tag(Actor(admin.id), health.id, parent_id=insurance.id)
 
         async def moved() -> bool:
-            return (await services.documents.get(user.id, document.id)).tag_ids == {health.id}
+            return (await services.documents.get(Actor(user.id), document.id)).tag_ids == {
+                health.id
+            }
 
         await until(moved, every=0.01, what="the tag of the document moved")
 
@@ -230,11 +233,11 @@ async def test_stop_lets_running_jobs_finish() -> None:
     services = with_ocr(build_services(container), node)
     user = await owner(container)
     document = await services.pipeline.receive(
-        user.id, incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
+        Actor(user.id), incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
     )
     async with running(worker(container, services)):
         await node.started.wait()
-    log = await services.documents.processing_log(user.id, document.id)
+    log = await services.documents.processing_log(Actor(user.id), document.id)
     nodes = [entry.node for entry in log]
     assert Node.OCR in nodes and Node.PARSE not in nodes  # nothing new after stop
     assert set(nodes) <= {Node.RECEIVE, Node.SEPARATE, Node.OCR, Node.PAGES}
@@ -246,7 +249,7 @@ async def test_jobs_still_running_after_the_timeout_are_released() -> None:
     services = with_ocr(build_services(container), node)
     user = await owner(container)
     await services.pipeline.receive(
-        user.id, incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
+        Actor(user.id), incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
     )
     async with running(worker(container, services, shutdown_timeout=FAST)):
         await node.started.wait()
@@ -266,16 +269,16 @@ async def test_a_long_job_holds_up_no_other_loop(loops: int) -> None:
     services = with_ocr(build_services(container), node)
     user = await owner(container)
     first = await services.pipeline.receive(
-        user.id, incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
+        Actor(user.id), incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
     )
     async with running(worker(container, services, shutdown_timeout=FAST, concurrency=loops)):
         await node.started.wait()  # the first document's OCR holds a loop
         second = await services.pipeline.receive(
-            user.id, incoming((SAMPLES / "text.pdf").read_bytes()), filename="b.pdf"
+            Actor(user.id), incoming((SAMPLES / "text.pdf").read_bytes()), filename="b.pdf"
         )
 
         async def separated() -> bool:
-            log = await services.documents.processing_log(user.id, second.id)
+            log = await services.documents.processing_log(Actor(user.id), second.id)
             return any(entry.node is Node.SEPARATE for entry in log)
 
         if loops == 1:
@@ -283,7 +286,7 @@ async def test_a_long_job_holds_up_no_other_loop(loops: int) -> None:
             assert not await separated()
             return
         await until(separated, timeout=2)
-        log = await services.documents.processing_log(user.id, first.id)
+        log = await services.documents.processing_log(Actor(user.id), first.id)
         assert Node.OCR not in {entry.node for entry in log}  # still at it
 
 
@@ -292,7 +295,7 @@ async def test_a_failing_loop_keeps_running(monkeypatch: pytest.MonkeyPatch) -> 
     services = build_services(container)
     user = await owner(container)
     await services.pipeline.receive(
-        user.id, incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
+        Actor(user.id), incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
     )
     container.event_bus.subscribe("test", _ignore)  # without a subscriber nothing is due
     calls = 0

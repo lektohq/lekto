@@ -19,9 +19,10 @@ from lekto.adapters.inbound.schemas import MAX_POSITION, FieldJson, field_json
 from lekto.core.domain.aggregates import Aggregate, GroupBy, GroupKey
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldType
-from lekto.core.domain.ids import FieldId, LensId, UserId, short_id
+from lekto.core.domain.ids import FieldId, LensId, short_id
 from lekto.core.domain.lenses import MAX_FILTER_VALUES, MAX_QUERY_LENGTH
 from lekto.core.domain.periods import Period
+from lekto.core.domain.rights import Actor
 from lekto.core.ports.repository import DocumentFilter, each_tag
 
 LIST_SIZE = 20
@@ -91,7 +92,7 @@ def add_listing_tools(tools: Tools, context: ApiContext) -> None:
         limit: Annotated[int, Field(ge=1, le=LIST_MAX)] = LIST_SIZE,
         offset: Annotated[int, Field(ge=0, le=MAX_POSITION)] = 0,
     ) -> str:
-        user = principal_of(ctx).id
+        user = principal_of(ctx).actor
         names = await Names.load(context, user)
         filter, words = await _lens(context, user, lens)
         if contact is not None:
@@ -159,7 +160,7 @@ def add_listing_tools(tools: Tools, context: ApiContext) -> None:
 
 
 async def _lens(
-    context: ApiContext, user: UserId, name: str | None
+    context: ApiContext, user: Actor, name: str | None
 ) -> tuple[DocumentFilter, str | None]:
     """The filter and the words of the caller's lens named `name`; none without a name."""
     if name is None:

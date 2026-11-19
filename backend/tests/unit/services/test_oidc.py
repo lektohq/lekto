@@ -4,6 +4,7 @@ import pytest
 
 from lekto.core.domain.errors import AuthenticationError, ConflictError
 from lekto.core.domain.identity import ExternalIdentity, LoginMethod, safe_redirect
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role, User
 from lekto.core.services.oidc import OidcOutcome, OidcService, OidcStart
 from tests.builders import NOW
@@ -144,22 +145,22 @@ async def test_linking_an_account(world: World) -> None:
     alice, bob = await world.account("alice"), await world.account("bob")
     service = world.oidc()
 
-    start = await service.begin_link(alice.id, "/settings")
+    start = await service.begin_link(Actor(alice.id), "/settings")
     with pytest.raises(AuthenticationError):  # signed in as someone else at the callback
         await round_trip(service, world, start, "sub-alice", caller=bob)
-    start = await service.begin_link(alice.id, "/settings")
+    start = await service.begin_link(Actor(alice.id), "/settings")
     with pytest.raises(AuthenticationError):  # not signed in at the callback
         await round_trip(service, world, start, "sub-alice")
 
-    start = await service.begin_link(alice.id, "/settings")
+    start = await service.begin_link(Actor(alice.id), "/settings")
     outcome = await round_trip(service, world, start, "sub-alice", caller=alice)
     assert outcome == OidcOutcome(signed_in=None, redirect_to="/settings")
-    assert [link.subject for link in await service.links(alice.id)] == ["sub-alice"]
+    assert [link.subject for link in await service.links(Actor(alice.id))] == ["sub-alice"]
 
     signed_in = await round_trip(service, world, await service.begin(), "sub-alice")
     assert signed_in.signed_in is not None and signed_in.signed_in.user.id == alice.id
 
-    start = await service.begin_link(bob.id)
+    start = await service.begin_link(Actor(bob.id))
     with pytest.raises(ConflictError):
         await round_trip(service, world, start, "sub-alice", caller=bob)
 
@@ -171,8 +172,8 @@ async def test_unlinking_needs_a_password(world: World) -> None:
     await link(world, nopass, "sub-nopass")
     service = world.oidc()
     with pytest.raises(ConflictError):
-        await service.unlink(nopass.id)
-    assert await service.unlink(alice.id) == 1
+        await service.unlink(Actor(nopass.id))
+    assert await service.unlink(Actor(alice.id)) == 1
     with pytest.raises(AuthenticationError):
         await round_trip(service, world, await service.begin(), "sub-alice")
 

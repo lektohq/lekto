@@ -52,8 +52,8 @@ def _account(account: Account, personal_space: SpaceId | None) -> AccountOut:
     responses=problem_responses(401),
 )
 async def list_users(principal: Authenticated, context: Context) -> list[UserOut]:
-    users = await context.users.list_users(principal.id)
-    personal = await context.users.personal_spaces(principal.id)
+    users = await context.users.list_users(principal.actor)
+    personal = await context.users.personal_spaces(principal.actor)
     return [UserOut.seen(user, personal.get(user.id)) for user in users]
 
 
@@ -72,7 +72,7 @@ async def list_users(principal: Authenticated, context: Context) -> list[UserOut
 async def create_user(body: UserCreate, admin: Authenticated, context: Context) -> UserOut:
     password = None if body.password is None else body.password.get_secret_value()
     created = await context.users.create_user(
-        admin.id,
+        admin.actor,
         body.username,
         body.role,
         password,
@@ -94,10 +94,10 @@ async def create_user(body: UserCreate, admin: Authenticated, context: Context) 
     responses=problem_responses(401, 404, 422),
 )
 async def get_user(id: UUID, principal: Authenticated, context: Context) -> AccountOut | UserOut:
-    personal = (await context.users.personal_spaces(principal.id)).get(UserId(id))
+    personal = (await context.users.personal_spaces(principal.actor)).get(UserId(id))
     if principal.user.is_admin:
-        return _account(await context.users.account(principal.id, UserId(id)), personal)
-    return UserOut.seen(await context.users.get(principal.id, UserId(id)), personal)
+        return _account(await context.users.account(principal.actor, UserId(id)), personal)
+    return UserOut.seen(await context.users.get(principal.actor, UserId(id)), personal)
 
 
 @router.get(
@@ -113,7 +113,7 @@ async def get_user(id: UUID, principal: Authenticated, context: Context) -> Acco
 )
 async def get_profile(id: UUID, principal: Authenticated, context: Context) -> ProfileOut:
     session = principal.session is not None
-    return ProfileOut.of(await context.profiles.get(principal.id, UserId(id), session=session))
+    return ProfileOut.of(await context.profiles.get(principal.actor, UserId(id), session=session))
 
 
 @router.patch(
@@ -131,7 +131,7 @@ async def change_profile(
     id: UUID, body: ProfilePatch, principal: Authenticated, context: Context
 ) -> ProfileOut:
     changed = await context.profiles.update(
-        principal.id, UserId(id), body.changes(), session=principal.session is not None
+        principal.actor, UserId(id), body.changes(), session=principal.session is not None
     )
     return ProfileOut.of(changed)
 
@@ -150,7 +150,11 @@ async def change_profile(
 )
 async def update_user(id: UUID, body: UserPatch, admin: Authenticated, context: Context) -> UserOut:
     changed = await context.users.update(
-        admin.id, UserId(id), role=body.role, active=body.active, session=admin.session is not None
+        admin.actor,
+        UserId(id),
+        role=body.role,
+        active=body.active,
+        session=admin.session is not None,
     )
     return UserOut.of(changed)
 
@@ -168,7 +172,7 @@ async def reset_password(
     id: UUID, body: PasswordReset, admin: SessionPrincipal, context: Context
 ) -> None:
     await context.users.reset_password(
-        admin.id, UserId(id), body.password.get_secret_value(), revoke_tokens=body.revoke_tokens
+        admin.actor, UserId(id), body.password.get_secret_value(), revoke_tokens=body.revoke_tokens
     )
 
 
@@ -182,7 +186,7 @@ async def reset_password(
     responses=problem_responses(401, 403, 404, 422),
 )
 async def disable_totp(id: UUID, admin: SessionPrincipal, context: Context) -> None:
-    await context.users.disable_totp(admin.id, UserId(id))
+    await context.users.disable_totp(admin.actor, UserId(id))
 
 
 @router.delete(
@@ -193,7 +197,7 @@ async def disable_totp(id: UUID, admin: SessionPrincipal, context: Context) -> N
     responses=problem_responses(401, 403, 404, 422),
 )
 async def unlink(id: UUID, admin: SessionPrincipal, context: Context) -> Removed:
-    return Removed(removed=await context.users.unlink_external_identities(admin.id, UserId(id)))
+    return Removed(removed=await context.users.unlink_external_identities(admin.actor, UserId(id)))
 
 
 @router.get(
@@ -234,4 +238,4 @@ async def delete_user(
     settle = (
         {} if body is None else {SpaceId(item.space_id): item.settlement() for item in body.spaces}
     )
-    await context.users.delete_user(admin.id, UserId(id), settle)
+    await context.users.delete_user(admin.actor, UserId(id), settle)

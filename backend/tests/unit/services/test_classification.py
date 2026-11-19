@@ -49,6 +49,7 @@ from lekto.core.domain.pipeline import (
 )
 from lekto.core.domain.reading import PageReading, PageWords, reading_to_json, readings_to_json
 from lekto.core.domain.reasons import ReasonCode, written
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role
 from lekto.core.domain.verdict import judge_contact
 from lekto.core.ports.llm import StructuredRequest
@@ -1164,11 +1165,11 @@ async def test_reprocessing_after_the_ocr_judges_the_kept_words_again(world: Wor
     )
     owner = await world.user()
     data = (SAMPLES / "scan.pdf").read_bytes()
-    document = await pipeline.receive(owner.id, incoming(data), filename="scan.pdf")
+    document = await pipeline.receive(Actor(owner.id), incoming(data), filename="scan.pdf")
     await world.drain(pipeline)
 
     async def date_check() -> FieldCheck:
-        log = await world.documents.processing_log(owner.id, document.id)
+        log = await world.documents.processing_log(Actor(owner.id), document.id)
         entry = ProcessingHistory(log).latest(Node.JUDGE)
         assert entry is not None
         return checks(entry.result)["document_date"]
@@ -1180,7 +1181,7 @@ async def test_reprocessing_after_the_ocr_judges_the_kept_words_again(world: Wor
     await store.put(
         reading_key(document.id), json.dumps(kept).encode(), content_type="application/json"
     )
-    await pipeline.reprocess_from(owner.id, document.id, Node.JUDGE)
+    await pipeline.reprocess_from(Actor(owner.id), document.id, Node.JUDGE)
     await world.drain(pipeline)
     assert (await date_check()).reason == AROUND_THE_DATE
     assert len(ocr.calls) == 1
@@ -1703,12 +1704,14 @@ async def run(world: World, fake: FakeLanguageModel, text: str = INVOICE) -> tup
         Node.FIELDS: fields_step(world, fake),
     }
     pipeline = world.pipeline(executors | {Node.APPLY_RULES: rules_step(world)})
-    document = await pipeline.receive(owner.id, incoming(b"%PDF-1.7\n%%EOF\n"), filename="a.pdf")
+    document = await pipeline.receive(
+        Actor(owner.id), incoming(b"%PDF-1.7\n%%EOF\n"), filename="a.pdf"
+    )
     await world.object_store.put(
         text_key(document.id), text.encode(), content_type="text/markdown; charset=utf-8"
     )
     await world.drain(pipeline)
-    return owner, await world.documents.get(owner.id, document.id)
+    return owner, await world.documents.get(Actor(owner.id), document.id)
 
 
 async def test_a_verified_document_is_filed_green(world: World) -> None:
@@ -1725,7 +1728,7 @@ async def test_a_verified_document_is_filed_green(world: World) -> None:
     assert DocumentFiled.type in world.event_types()
     # One request for the whole document, one for its facts on the same beginning.
     assert [request.schema_name for request in fake.requests] == ["proposal", FACTS_SCHEMA]
-    log = await world.documents.processing_log(owner.id, document.id)
+    log = await world.documents.processing_log(Actor(owner.id), document.id)
     proposed = next(entry for entry in log if entry.node is Node.SIGNAL_LLM)
     assert proposed.result.output["answer"] == proposal()
     judged = next(entry for entry in log if entry.node is Node.JUDGE)
@@ -1758,7 +1761,7 @@ async def test_confirming_renders_the_title_pattern_with_the_decided_values(
     admin = await world.user(role=Role.ADMIN)
     pattern = "{{ document_type }} {{ field.rechnungsnummer }}"
     await world.master_data.change_document_type(
-        admin.id, seeded.types["Rechnung"].id, title_pattern=pattern
+        Actor(admin.id), seeded.types["Rechnung"].id, title_pattern=pattern
     )
     answer = proposal(fields=FIELDS[:2])
     owner, document = await run(world, FakeLanguageModel(responder(answer, extraction())))
@@ -1767,9 +1770,11 @@ async def test_confirming_renders_the_title_pattern_with_the_decided_values(
 
     number = seeded.fields["Rechnungsnummer"].id
     pipeline = world.pipeline({Node.APPLY_RULES: rules_step(world), Node.FILE: PlaceholderNode()})
-    await pipeline.confirm(owner.id, document.id, DocumentChanges(fields={number: "R-2026-0815"}))
+    await pipeline.confirm(
+        Actor(owner.id), document.id, DocumentChanges(fields={number: "R-2026-0815"})
+    )
     await world.drain(pipeline)
-    document = await world.documents.get(owner.id, document.id)
+    document = await world.documents.get(Actor(owner.id), document.id)
     assert document.title == "Rechnung R-2026-0815"
 
 
@@ -1864,7 +1869,7 @@ async def test_the_facts_the_model_read_are_the_document_s_with_their_role(world
         frozenset({FactOrigin.PATTERN, FactOrigin.MODEL}),
     )
     assert all(fact.kind is not IdentifierKind.METER_NUMBER for fact in kept)
-    log = await world.documents.processing_log(owner.id, document.id)
+    log = await world.documents.processing_log(Actor(owner.id), document.id)
     # The facts signal ran first (the model's waits for the pages): the model's kept them.
     facts = next(entry for entry in log if entry.node is Node.SIGNAL_LLM)
     assert facts.result.output["read_facts"] == {
@@ -1944,7 +1949,7 @@ async def test_the_model_s_facts_join_the_patterns_whichever_signal_stores_first
     log = {
         entry.node: entry
         for entry in await world.documents.processing_log(
-            (await world.user(role=Role.ADMIN)).id, document.id
+            Actor((await world.user(role=Role.ADMIN)).id), document.id
         )
     }
     stored_last = Node.SIGNAL_FACTS if model_first else Node.SIGNAL_LLM

@@ -27,6 +27,7 @@ from lekto.core.domain.errors import AuthenticationError, ConflictError
 from lekto.core.domain.identity import ExternalIdentity, LoginMethod, safe_redirect, same_secret
 from lekto.core.domain.ids import SessionId, UserId
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.identity import DecryptionError, OidcProvider, SecretCipher
@@ -95,11 +96,11 @@ class OidcService:
         """Start signing in; afterwards the browser goes to `redirect_to` (a path here)."""
         return await self._begin(_new_flow(safe_redirect(redirect_to), None, self._clock.now()))
 
-    async def begin_link(self, actor: UserId, redirect_to: str | None = None) -> OidcStart:
+    async def begin_link(self, actor: Actor, redirect_to: str | None = None) -> OidcStart:
         """Start linking the caller's account to an account at the provider."""
         async with self._uow() as uow:
             await load_actor(uow, actor)
-        return await self._begin(_new_flow(safe_redirect(redirect_to), actor, self._clock.now()))
+        return await self._begin(_new_flow(safe_redirect(redirect_to), actor.id, self._clock.now()))
 
     async def complete(
         self,
@@ -129,7 +130,7 @@ class OidcService:
             if caller != flow.link_user:
                 raise AuthenticationError(because(ReasonCode.OIDC_RELINK))
             async with self._uow() as uow:
-                await load_actor(uow, caller)
+                await load_actor(uow, Actor(caller))
                 existing = await uow.external_identities.find(identity.issuer, identity.subject)
                 if existing is not None and existing.user_id != caller:
                     raise ConflictError(because(ReasonCode.OIDC_LINKED_ELSEWHERE))
@@ -168,22 +169,22 @@ class OidcService:
         signed_in = await self._auth.sign_in(user_id, LoginMethod.OIDC)
         return OidcOutcome(signed_in=signed_in, redirect_to=flow.redirect_to)
 
-    async def unlink(self, actor: UserId) -> int:
+    async def unlink(self, actor: Actor) -> int:
         """Remove the caller's links to the provider. ConflictError if the caller has no
         password: they could not sign in any more."""
         async with self._uow() as uow:
             await load_actor(uow, actor)
-            credential = await uow.credentials.find(actor)
+            credential = await uow.credentials.find(actor.id)
             if credential is None or credential.password_hash is None:
                 raise ConflictError(because(ReasonCode.OIDC_PASSWORD_FIRST))
-            removed = await uow.external_identities.remove_for_user(actor)
+            removed = await uow.external_identities.remove_for_user(actor.id)
             await uow.commit()
         return removed
 
-    async def links(self, actor: UserId) -> list[ExternalIdentity]:
+    async def links(self, actor: Actor) -> list[ExternalIdentity]:
         async with self._uow() as uow:
             await load_actor(uow, actor)
-            return await uow.external_identities.list_for(actor)
+            return await uow.external_identities.list_for(actor.id)
 
     async def _begin(self, flow: _Flow) -> OidcStart:
         url = await self._provider.authorization_url(

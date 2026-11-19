@@ -15,6 +15,7 @@ from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.identity import TokenScope
 from lekto.core.domain.pipeline import Node, NodeResult
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import User
 from lekto.core.services.pipeline import DeferredResult, NodeExecutor
 from tests.api import auth, bearer
@@ -251,7 +252,9 @@ async def test_an_upload_token_uploads_for_its_own_user_alone(api: Api) -> None:
     admin, user, owner = await api.admin(), await api.user(), await api.user()
     data = await master_data(api, admin)
     for who in (admin, user):
-        _, shortcut = await api.services.auth.create_api_token(who.id, "phone", TokenScope.UPLOAD)
+        _, shortcut = await api.services.auth.create_api_token(
+            Actor(who.id), "phone", TokenScope.UPLOAD
+        )
         for fields, named in [
             ({"uploaded_by": str(owner.id)}, ["uploaded_by"]),
             ({"channel": "migration"}, ["channel"]),
@@ -261,7 +264,9 @@ async def test_an_upload_token_uploads_for_its_own_user_alone(api: Api) -> None:
             assert refused.status_code == 403, refused.text
             reason = refused.json()["reason"]
             assert reason == {"code": "upload_only_token_fields", "params": {"fields": named}}
-    _, shortcut = await api.services.auth.create_api_token(admin.id, "phone", TokenScope.UPLOAD)
+    _, shortcut = await api.services.auth.create_api_token(
+        Actor(admin.id), "phone", TokenScope.UPLOAD
+    )
     taken = await upload(api, bearer(shortcut))
     assert taken.status_code == 202, taken.text
     document = (await api.client.get(taken.json()["status_url"], headers=auth(admin))).json()
@@ -272,7 +277,7 @@ async def test_an_uploader_who_is_gone_or_inactive_is_not_found(api: Api) -> Non
     admin, owner = await api.admin(), await api.user()
     unknown = await upload(api, auth(admin), uploaded_by=str(UUID(int=5)))
     assert unknown.status_code == 404
-    await api.services.users.update(admin.id, owner.id, active=False)
+    await api.services.users.update(Actor(admin.id), owner.id, active=False)
     inactive = await upload(api, auth(admin), uploaded_by=str(owner.id))
     assert inactive.status_code == 404
     assert (await upload(api, auth(admin), uploaded_by="not-a-uuid")).status_code == 422
@@ -280,10 +285,10 @@ async def test_an_uploader_who_is_gone_or_inactive_is_not_found(api: Api) -> Non
 
 async def test_a_deactivated_admin_and_a_read_token_can_neither(api: Api) -> None:
     admin, owner, boss = await api.admin(), await api.user(), await api.admin()
-    _, token = await api.services.auth.create_api_token(admin.id, "read", TokenScope.READ)
+    _, token = await api.services.auth.create_api_token(Actor(admin.id), "read", TokenScope.READ)
     response = await upload(api, bearer(token), uploaded_by=str(owner.id))
     assert response.status_code == 403
-    await api.services.users.update(boss.id, admin.id, active=False)
+    await api.services.users.update(Actor(boss.id), admin.id, active=False)
     response = await upload(api, auth(admin), uploaded_by=str(owner.id))
     assert response.status_code == 401
 
@@ -724,7 +729,7 @@ async def test_an_admin_token_creates_users_without_password(api: Api) -> None:
     assert (
         await api.client.post(f"{PREFIX}/users", json={"username": "x"}, headers=auth(user))
     ).status_code == 403
-    _, read = await api.services.auth.create_api_token(admin.id, "r", TokenScope.READ)
+    _, read = await api.services.auth.create_api_token(Actor(admin.id), "r", TokenScope.READ)
     assert (
         await api.client.post(f"{PREFIX}/users", json={"username": "y"}, headers=bearer(read))
     ).status_code == 403

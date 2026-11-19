@@ -14,6 +14,7 @@ from lekto.core.domain.identifiers import Identifier, IdentifierKind, iban_valid
 from lekto.core.domain.ids import ContactId
 from lekto.core.domain.master_data import Contact
 from lekto.core.domain.pipeline import Node
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role
 from lekto.core.ports.codes import CodeReading
 from lekto.core.services.classification.signals import FactsResult, FactsSignal
@@ -131,7 +132,7 @@ async def test_the_facts_keep_where_they_come_from_and_their_role(world: World) 
     assert own.position is not None and own.written is not None
     assert TEXT[own.position :].startswith(own.written)
     assert (giro.origins, giro.position) == (frozenset({FactOrigin.CODE}), None)
-    report = await world.documents.facts((await world.user(role=Role.ADMIN)).id, document.id)
+    report = await world.documents.facts(Actor((await world.user(role=Role.ADMIN)).id), document.id)
     assert report.stored[(IdentifierKind.IBAN, GIRO_IBAN)].origins == {FactOrigin.CODE}
 
 
@@ -142,12 +143,14 @@ async def test_admins_learn_which_other_contacts_show_an_identifier(world: World
     await confirmed(world, bank, [])
     document = await with_archive(world, await stored(world, await world.user(), TEXT, utility))
     admin = await world.user(role=Role.ADMIN)
-    report = await world.documents.facts(admin.id, document.id)
+    report = await world.documents.facts(Actor(admin.id), document.id)
     assert report.other_contacts is not None
     # The customer number stands on the bank's documents too, never counting the utility.
     assert report.other_contacts[CUSTOMER] == {bank.id}
     assert document.uploaded_by is not None
-    assert (await world.documents.facts(document.uploaded_by, document.id)).other_contacts is None
+    assert (
+        await world.documents.facts(Actor(document.uploaded_by), document.id)
+    ).other_contacts is None
 
 
 async def test_read_codes_reads_the_facts_of_documents_from_before(world: World) -> None:
@@ -185,7 +188,7 @@ async def test_the_report_lists_the_document_s_numbers(world: World) -> None:
     async with world.uow() as uow:
         await result.apply(uow, await uow.documents.get(document.id), builders.NOW)
         await uow.commit()
-    report = await world.documents.facts(owner.id, document.id)
+    report = await world.documents.facts(Actor(owner.id), document.id)
     numbers = [(item.fact.kind, item.fact.value, item.fact.role) for item in report.numbers]
     assert numbers == [
         (IdentifierKind.INVOICE_NUMBER, "M77", FactRole.OWN),
@@ -217,7 +220,7 @@ async def test_the_report_lists_every_identifier_of_a_long_statement(world: Worl
     async with world.uow() as uow:
         await result.apply(uow, await uow.documents.get(document.id), builders.NOW)
         await uow.commit()
-    report = await world.documents.facts(owner.id, document.id)
+    report = await world.documents.facts(Actor(owner.id), document.id)
     assert sorted(item.fact.value for item in report.numbers) == sorted(ibans)
     assert report.decided == ()
 
@@ -234,7 +237,7 @@ async def test_the_report_shows_an_identifier_rejected_at_a_contact(world: World
     async with world.uow() as uow:
         await result.apply(uow, await uow.documents.get(document.id), builders.NOW)
         await uow.commit()
-    report = await world.documents.facts(owner.id, document.id)
+    report = await world.documents.facts(Actor(owner.id), document.id)
     (customer,) = [item for item in report.facts.identifiers if item.key == CUSTOMER]
     assert (customer.contact_id, customer.rejected_at) == (None, bank.id)
     assert report.decided == ()

@@ -62,6 +62,7 @@ from lekto.core.domain.reading import (
     vision_advice,
 )
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.rule_planner import changed_fields
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
@@ -318,7 +319,7 @@ class PipelineService:
 
     async def receive(
         self,
-        actor: UserId,
+        actor: Actor,
         file: IncomingFile,
         *,
         filename: str,
@@ -369,8 +370,8 @@ class PipelineService:
             await self._store.upload(key, file.path, content_type=media_type)
 
         output: JsonObject = {"sha256": sha256.hex, "size": file.size, "media_type": media_type}
-        if uploader != actor:
-            output["uploaded_by"] = str(actor)
+        if uploader != actor.id:
+            output["uploaded_by"] = str(actor.id)
         if imported is not None:
             output[IMPORTED] = imported.to_json()
         result = NodeResult(outcome=Outcome.OK, output=output)
@@ -401,7 +402,7 @@ class PipelineService:
 
     async def _create(
         self,
-        actor: UserId,
+        actor: Actor,
         uploader: UserId,
         target: SpaceId,
         sha256: Sha256,
@@ -450,7 +451,7 @@ class PipelineService:
                 pipeline_version=self._version,
                 started=started,
                 now=now,
-                chooser=actor if chosen else None,
+                chooser=actor.id if chosen else None,
                 via=via,
             )
             if also is not None:
@@ -461,7 +462,7 @@ class PipelineService:
     async def _uploader(
         self,
         uow: UnitOfWork,
-        actor: UserId,
+        actor: Actor,
         uploaded_by: UserId | None,
         channel: Channel,
         imported: ImportedMetadata | None,
@@ -470,20 +471,20 @@ class PipelineService:
         name. Only an admin brings documents in through the channel `migration`: it tells where
         a document came from, and rules and statistics go by it."""
         caller = await load_actor(uow, actor)
-        if channel is Channel.MIGRATION and not caller.is_active_admin:
+        if channel is Channel.MIGRATION and not caller.may(TokenRight.ADMIN_MANAGE):
             raise PermissionDeniedError(
                 because(ReasonCode.ADMINS_ONLY, action=Action.UPLOAD_AS_MIGRATION.value)
             )
         if imported is not None:
             if channel is not Channel.MIGRATION:
                 raise ValidationError("metadata: only with the channel 'migration'")
-            if not caller.is_active_admin:
+            if not caller.may(TokenRight.ADMIN_MANAGE):
                 raise PermissionDeniedError(
                     because(ReasonCode.ADMINS_ONLY, action=Action.GIVE_UPLOAD_METADATA.value)
                 )
-        if uploaded_by is None or uploaded_by == actor:
-            return actor
-        if not caller.is_active_admin:
+        if uploaded_by is None or uploaded_by == actor.id:
+            return actor.id
+        if not caller.may(TokenRight.ADMIN_MANAGE):
             raise PermissionDeniedError(
                 because(ReasonCode.ADMINS_ONLY, action=Action.UPLOAD_FOR_OTHERS.value)
             )
@@ -495,7 +496,7 @@ class PipelineService:
     async def _target_space(
         self,
         uow: UnitOfWork,
-        actor: UserId,
+        actor: Actor,
         uploader: UserId,
         space: SpaceId | None,
         sha256: Sha256,
@@ -517,7 +518,7 @@ class PipelineService:
 
     # --- retry and reprocess --------------------------------------------------------------------
 
-    async def retry(self, actor: UserId, id: DocumentId) -> DocumentView:
+    async def retry(self, actor: Actor, id: DocumentId) -> DocumentView:
         """Editors and admins: repeat the failed nodes and continue from there."""
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
@@ -527,7 +528,7 @@ class PipelineService:
             await self._restart(uow, document)
         return DocumentView(document, access)
 
-    async def reprocess_from(self, actor: UserId, id: DocumentId, node: Node) -> DocumentView:
+    async def reprocess_from(self, actor: Actor, id: DocumentId, node: Node) -> DocumentView:
         """Editors and admins: discard the results of `node` and the nodes after it and process
         them again."""
         async with self._uow() as uow:
@@ -539,7 +540,7 @@ class PipelineService:
         return DocumentView(document, access)
 
     async def new_version(
-        self, actor: UserId, id: DocumentId, file: IncomingFile, *, filename: str
+        self, actor: Actor, id: DocumentId, file: IncomingFile, *, filename: str
     ) -> DocumentView:
         """Editors and admins: put `file` in the place of the document's original as its next
         version (`domain.versions`, kind `replaced`); the earlier ones stay. Processing runs
@@ -584,7 +585,7 @@ class PipelineService:
                     filename=filename,
                     media_type=media_type,
                     kind=VersionKind.REPLACED,
-                    created_by=actor,
+                    created_by=actor.id,
                     detail={},
                     now=now,
                 )
@@ -598,7 +599,7 @@ class PipelineService:
             raise
         return DocumentView(document, access)
 
-    async def read_with_vision(self, actor: UserId, id: DocumentId) -> DocumentView:
+    async def read_with_vision(self, actor: Actor, id: DocumentId) -> DocumentView:
         """Editors and admins: have the vision language model read every page, and process the
         document again from OCR (`Document.read_with_vision`). Sending the pages out is a
         person's decision; nothing else asks for it. InvalidTransitionError without a model,
@@ -613,7 +614,7 @@ class PipelineService:
             await self._restart(uow, document)
         return DocumentView(document, access)
 
-    async def reading(self, actor: UserId, id: DocumentId) -> DocumentReading:
+    async def reading(self, actor: Actor, id: DocumentId) -> DocumentReading:
         """Editors and admins, as the log: how the archive's text was read (its latest OCR that
         made one), and whether reading it with the vision language model is advised: the
         document waits for a person because no text was found, or with a poorly read page."""
@@ -648,7 +649,7 @@ class PipelineService:
 
     async def confirm(
         self,
-        actor: UserId,
+        actor: Actor,
         id: DocumentId,
         changes: DocumentChanges,
         *,
@@ -820,25 +821,25 @@ class PipelineService:
 
         return await self._queue_each(CATCH_UP_JOB, catch_up)
 
-    async def request_reparse(self, actor: UserId) -> int:
+    async def request_reparse(self, actor: Actor) -> int:
         """Admins only: `reparse`."""
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.REPARSE_ALL)
         return await self.reparse()
 
-    async def request_render_pages(self, actor: UserId) -> int:
+    async def request_render_pages(self, actor: Actor) -> int:
         """Admins only: `catch_up(Node.PAGES)` (the command `render-pages`)."""
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.RENDER_PAGES_ALL)
         return await self.catch_up(Node.PAGES)
 
-    async def request_read_facts(self, actor: UserId) -> int:
+    async def request_read_facts(self, actor: Actor) -> int:
         """Admins only: `request_facts` (the command `read-facts`)."""
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.READ_FACTS_ALL)
         return await self.request_facts()
 
-    async def request_relate(self, actor: UserId) -> int:
+    async def request_relate(self, actor: Actor) -> int:
         """Admins only: `request_relations` (the command `relate`)."""
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.RELATE_ALL)

@@ -9,6 +9,7 @@ import pytest
 from lekto.core.domain.documents import Document, DocumentChanges
 from lekto.core.domain.ids import ContactId, DocumentTypeId
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.series import SeriesState
 from lekto.core.ports.repository import DocumentFilter
 from lekto.core.services import stream as module
@@ -79,7 +80,7 @@ async def test_a_contact_s_stream(world: World) -> None:
     world.clock.set(datetime(2026, 10, 2, 12, tzinfo=NOW.tzinfo))
 
     stream = await StreamService(world.uow, world.clock).stream(
-        s.owner.id, DocumentFilter(contacts=frozenset({insurer}))
+        Actor(s.owner.id), DocumentFilter(contacts=frozenset({insurer}))
     )
 
     kinds = [lane.kind for lane in stream.lanes]
@@ -100,7 +101,7 @@ async def test_documents_related_among_themselves_make_a_chain(world: World) -> 
     invoice = await s.document(shop, None, date(2026, 5, 12))
     reminder = await s.document(shop, None, date(2026, 6, 10))
     await s.relate(reminder, invoice)
-    stream = await StreamService(world.uow, world.clock).stream(s.owner.id, DocumentFilter())
+    stream = await StreamService(world.uow, world.clock).stream(Actor(s.owner.id), DocumentFilter())
     (chain,) = stream.lanes
     assert chain.kind is LaneKind.CHAIN
     assert [item.id for item in chain.documents] == [invoice.id, reminder.id]
@@ -124,7 +125,7 @@ async def test_a_document_that_refers_to_the_target_branches_off_the_series(worl
     renewal = await s.document(insurer, contract, date(2026, 9, 20))
     await s.relate(renewal, bills[2])
 
-    stream = await StreamService(world.uow, world.clock).stream(s.owner.id, DocumentFilter())
+    stream = await StreamService(world.uow, world.clock).stream(Actor(s.owner.id), DocumentFilter())
 
     assert [lane.kind for lane in stream.lanes] == [
         LaneKind.SERIES,
@@ -155,7 +156,7 @@ async def test_one_target_stands_at_the_start_of_several_series(world: World) ->
         for day in days:
             await s.relate(await s.document(insurer, kind, day), policy)
 
-    stream = await StreamService(world.uow, world.clock).stream(s.owner.id, DocumentFilter())
+    stream = await StreamService(world.uow, world.clock).stream(Actor(s.owner.id), DocumentFilter())
 
     assert [lane.kind for lane in stream.lanes] == [LaneKind.SERIES, LaneKind.SERIES]
     assert [lane.target.id for lane in stream.lanes if lane.target] == [policy.id, policy.id]
@@ -177,7 +178,7 @@ async def test_lanes_beyond_the_limit_come_folded_with_their_branches(
     loose = await s.document(shop, None, date(2026, 1, 1))
     world.clock.set(datetime(2026, 9, 2, 12, tzinfo=NOW.tzinfo))
 
-    stream = await StreamService(world.uow, world.clock).stream(s.owner.id, DocumentFilter())
+    stream = await StreamService(world.uow, world.clock).stream(Actor(s.owner.id), DocumentFilter())
 
     assert [(lane.kind, lane.folded) for lane in stream.lanes] == [
         (LaneKind.SERIES, False),
@@ -202,7 +203,7 @@ async def test_the_newest_documents_within_the_limit_and_those_in_processing(
     newer = await s.document(shop, None, date(2026, 2, 1))
     arriving = await s.document(shop, None, None, processing=True)
 
-    stream = await StreamService(world.uow, world.clock).stream(s.owner.id, DocumentFilter())
+    stream = await StreamService(world.uow, world.clock).stream(Actor(s.owner.id), DocumentFilter())
 
     (single,) = stream.lanes
     assert {item.id for item in single.documents} == {newer.id, arriving.id}

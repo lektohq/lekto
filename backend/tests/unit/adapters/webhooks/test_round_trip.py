@@ -16,6 +16,7 @@ from lekto.adapters.inbound.worker import Worker
 from lekto.adapters.outbound.webhooks import HttpWebhookSender
 from lekto.composition.container import build_memory_container, build_services
 from lekto.composition.settings import Settings
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.webhooks import DeliveryOutcome
 from lekto.core.services.webhooks import SUBSCRIBER
 from tests import builders
@@ -61,7 +62,10 @@ async def test_a_green_document_reaches_the_receiver_signed_after_a_failed_try()
         container.event_bus.subscribe(SUBSCRIBER, services.webhook_delivery.on_event)
         user = await builders.seed_user(container.unit_of_work)
         created = await services.webhooks.create(
-            user.id, name="n8n", url=f"{receiver.url}/hook", event_types=["document.lane_changed"]
+            Actor(user.id),
+            name="n8n",
+            url=f"{receiver.url}/hook",
+            event_types=["document.lane_changed"],
         )
         worker = Worker(
             pipeline=services.pipeline,
@@ -80,7 +84,7 @@ async def test_a_green_document_reaches_the_receiver_signed_after_a_failed_try()
         task = asyncio.create_task(worker.run())
         try:
             document = await services.pipeline.receive(
-                user.id, incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
+                Actor(user.id), incoming((SAMPLES / "scan.pdf").read_bytes()), filename="a.pdf"
             )
             await until(lambda: len(receiver.received) >= 2, 10, every=0.01, what="two requests")
         finally:
@@ -99,7 +103,7 @@ async def test_a_green_document_reaches_the_receiver_signed_after_a_failed_try()
         assert first.headers["content-type"] == "application/json"
         assert first.headers["user-agent"].startswith("Lekto/")
 
-        deliveries = await services.webhooks.deliveries(user.id, created.webhook.id)
+        deliveries = await services.webhooks.deliveries(Actor(user.id), created.webhook.id)
         assert [
             (v.delivery.attempt, v.delivery.outcome, v.delivery.status_code)
             for v in reversed(deliveries.deliveries)

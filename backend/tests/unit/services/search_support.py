@@ -9,6 +9,7 @@ from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import EmbeddingsError
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.jobs import Job
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.search import IndexDocument
 from lekto.core.domain.users import User
 from lekto.core.ports.embeddings import EmbeddingResult
@@ -123,11 +124,11 @@ class Setup:
     async def document(self, owner: User, text: str = "Stromrechnung September") -> Document:
         """A document that went through the pipeline (green), with `text` as its parsed text."""
         received = await self.world.pipeline().receive(
-            owner.id, incoming(b"%PDF-1.7 " + text.encode()), filename="strom.pdf"
+            Actor(owner.id), incoming(b"%PDF-1.7 " + text.encode()), filename="strom.pdf"
         )
         await self.put_text(received.id, text)
         await self.settle()
-        return await self.world.documents.get(owner.id, received.id)
+        return await self.world.documents.get(Actor(owner.id), received.id)
 
     async def put_text(self, id: DocumentId, text: str) -> None:
         await self.world.object_store.put(text_key(id), text.encode(), content_type="text/plain")

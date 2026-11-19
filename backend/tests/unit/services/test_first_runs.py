@@ -23,6 +23,7 @@ from lekto.core.domain.master_data import Assignment, Contact, Tag
 from lekto.core.domain.pipeline import Lane, Node, NodeResult, Outcome
 from lekto.core.domain.reasons import written
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import User
 from lekto.core.services.pipeline import MetadataResult, PipelineService
 from tests.builders import NOW, Returns, incoming
@@ -111,7 +112,7 @@ async def scene(world: World, *, sure_date: bool, space_suggestion: SpaceId | No
 
 
 async def received(s: Scene, space: SpaceId | None = None) -> Document:
-    return await s.pipeline.receive(s.owner.id, incoming(PDF), filename="a.pdf", space=space)
+    return await s.pipeline.receive(Actor(s.owner.id), incoming(PDF), filename="a.pdf", space=space)
 
 
 async def verdicts(world: World, document: Document) -> dict[str, FieldVerdict]:
@@ -143,7 +144,7 @@ async def test_a_later_run_leaves_the_first_run(world: World) -> None:
     assert first is not None
 
     world.clock.advance(timedelta(hours=1))
-    await s.pipeline.confirm(s.owner.id, document.id, DocumentChanges(document_date=DATE))
+    await s.pipeline.confirm(Actor(s.owner.id), document.id, DocumentChanges(document_date=DATE))
     await world.drain(s.pipeline)
 
     async with world.uow() as uow:
@@ -157,7 +158,7 @@ async def test_confirming_in_the_inbox_judges_every_field(world: World) -> None:
     await world.drain(s.pipeline)
     world.clock.advance(timedelta(hours=1))
 
-    await s.pipeline.confirm(s.owner.id, document.id, DocumentChanges(document_date=DATE))
+    await s.pipeline.confirm(Actor(s.owner.id), document.id, DocumentChanges(document_date=DATE))
 
     found = await verdicts(world, document)
     assert {name: item.verdict for name, item in found.items()} == {
@@ -185,7 +186,7 @@ async def test_confirming_a_document_with_facts_takes_them(world: World) -> None
         await uow.document_facts.replace_found(document.id, [fact])
         await uow.commit()
 
-    await s.pipeline.confirm(s.owner.id, document.id, DocumentChanges(document_date=DATE))
+    await s.pipeline.confirm(Actor(s.owner.id), document.id, DocumentChanges(document_date=DATE))
 
     assert (await verdicts(world, document))[FACTS].verdict is Verdict.TAKEN
 
@@ -197,7 +198,7 @@ async def test_confirming_a_document_with_relations_takes_them(world: World) -> 
     document = await received(s)
     await world.drain(s.pipeline)
     other = await s.pipeline.receive(
-        s.owner.id, incoming(b"%PDF-1.7 older"), filename="b.pdf", space=None
+        Actor(s.owner.id), incoming(b"%PDF-1.7 older"), filename="b.pdf", space=None
     )
     async with world.uow() as uow:
         await uow.document_relations.put(
@@ -211,7 +212,7 @@ async def test_confirming_a_document_with_relations_takes_them(world: World) -> 
         )
         await uow.commit()
 
-    await s.pipeline.confirm(s.owner.id, document.id, DocumentChanges(document_date=DATE))
+    await s.pipeline.confirm(Actor(s.owner.id), document.id, DocumentChanges(document_date=DATE))
 
     assert (await verdicts(world, document))[RELATIONS].verdict is Verdict.TAKEN
 
@@ -222,11 +223,11 @@ async def test_a_change_judges_what_it_sets_and_what_the_automation_set(world: W
     await world.drain(s.pipeline)
 
     await world.documents.change_metadata(
-        s.owner.id, document.id, DocumentChanges(contact_id=s.other.id)
+        Actor(s.owner.id), document.id, DocumentChanges(contact_id=s.other.id)
     )
     world.clock.advance(timedelta(hours=1))
     await world.documents.change_metadata(
-        s.owner.id, document.id, DocumentChanges(contact_id=s.named.id, title="Strom")
+        Actor(s.owner.id), document.id, DocumentChanges(contact_id=s.named.id, title="Strom")
     )
 
     found = await verdicts(world, document)
@@ -245,11 +246,11 @@ async def test_a_change_before_the_first_run_stopped_leaves_nothing_to_judge(
     document = await received(s)
 
     await world.documents.change_metadata(
-        s.owner.id, document.id, DocumentChanges(document_date=date(2026, 9, 1))
+        Actor(s.owner.id), document.id, DocumentChanges(document_date=date(2026, 9, 1))
     )
     await world.drain(s.pipeline)
     await world.documents.change_metadata(
-        s.owner.id, document.id, DocumentChanges(document_date=date(2026, 9, 2))
+        Actor(s.owner.id), document.id, DocumentChanges(document_date=date(2026, 9, 2))
     )
 
     found = await verdicts(world, document)
@@ -267,7 +268,7 @@ async def test_tags_set_by_hand_alone_decide_nothing(world: World) -> None:
         await uow.commit()
 
     await world.documents.change_metadata(
-        s.owner.id, document.id, DocumentChanges(tag_ids=frozenset({status.id}))
+        Actor(s.owner.id), document.id, DocumentChanges(tag_ids=frozenset({status.id}))
     )
 
     assert await verdicts(world, document) == {}
@@ -277,9 +278,9 @@ async def test_a_move_judges_the_space(world: World) -> None:
     s = await scene(world, sure_date=True)
     document = await received(s)
     await world.drain(s.pipeline)
-    archive = await world.spaces.create(s.owner.id, "Archive")
+    archive = await world.spaces.create(Actor(s.owner.id), "Archive")
 
-    await world.documents.move(s.owner.id, document.id, archive.id)
+    await world.documents.move(Actor(s.owner.id), document.id, archive.id)
 
     found = await verdicts(world, document)
     assert {name: item.verdict for name, item in found.items()} == {SPACE: Verdict.CORRECTED}
@@ -288,13 +289,13 @@ async def test_a_move_judges_the_space(world: World) -> None:
 
 async def test_a_space_chosen_on_upload_is_not_judged(world: World) -> None:
     s = await scene(world, sure_date=False)
-    archive = await world.spaces.create(s.owner.id, "Archive")
+    archive = await world.spaces.create(Actor(s.owner.id), "Archive")
     document = await received(s, archive.id)
     await world.drain(s.pipeline)
 
-    await s.pipeline.confirm(s.owner.id, document.id, DocumentChanges(document_date=DATE))
+    await s.pipeline.confirm(Actor(s.owner.id), document.id, DocumentChanges(document_date=DATE))
     home = await world.personal_space(s.owner)
-    await world.documents.move(s.owner.id, document.id, home.id)
+    await world.documents.move(Actor(s.owner.id), document.id, home.id)
 
     assert SPACE not in await verdicts(world, document)
 
@@ -303,14 +304,16 @@ async def test_the_space_the_automation_asked_about_since_the_upload_is_judged(
     world: World,
 ) -> None:
     owner = await world.user()
-    archive = await world.spaces.create(owner.id, "Archive")
+    archive = await world.spaces.create(Actor(owner.id), "Archive")
     home = await world.personal_space(owner)
     s = await scene(world, sure_date=True, space_suggestion=home.id)
     s.owner = owner
     document = await received(s, archive.id)  # chosen on upload
     await world.drain(s.pipeline)
 
-    await s.pipeline.confirm(s.owner.id, document.id, DocumentChanges(), accept_suggestions=True)
+    await s.pipeline.confirm(
+        Actor(s.owner.id), document.id, DocumentChanges(), accept_suggestions=True
+    )
 
     found = await verdicts(world, document)
     assert (found[SPACE].verdict, found[SPACE].decision) == (Verdict.ACCEPTED, Decision.INBOX)

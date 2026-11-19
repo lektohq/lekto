@@ -39,6 +39,7 @@ from lekto.core.domain.pipeline import (
     ProcessingStatus,
 )
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
 from lekto.core.services._jobs import NODE_JOB
@@ -79,15 +80,17 @@ async def receive(world: World, pipeline: PipelineService | None = None) -> tupl
     are due."""
     owner = await world.user()
     pipeline = pipeline or world.pipeline()
-    document = await pipeline.receive(owner.id, incoming(PDF), filename="invoice.pdf")
+    document = await pipeline.receive(Actor(owner.id), incoming(PDF), filename="invoice.pdf")
     assert document.processing.due() == (Node.SEPARATE,)
     assert await pipeline.run_next_job()
-    return owner, await world.documents.get(owner.id, document.id)
+    return owner, await world.documents.get(Actor(owner.id), document.id)
 
 
 async def test_receive_stores_original_document_events_and_job(world: World) -> None:
     owner = await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(PDF), filename="invoice.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(PDF), filename="invoice.pdf"
+    )
     assert document.sha256 == Sha256.of(PDF)
     assert await world.object_store.get(original_key(document.sha256)) == PDF
     assert document.space_id == (await world.personal_space(owner)).id
@@ -114,9 +117,11 @@ async def test_receive_stores_original_document_events_and_job(world: World) -> 
 
 async def test_pipeline_runs_to_green(world: World) -> None:
     owner = await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(PDF), filename="invoice.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(PDF), filename="invoice.pdf"
+    )
     assert await world.drain() == len(NODES) - 1
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.processing.status is ProcessingStatus.COMPLETED
     assert stored.lane is Lane.GREEN
     assert all(state.status is NodeStatus.DONE for state in stored.processing.nodes.values())
@@ -129,7 +134,7 @@ async def test_pipeline_runs_to_green(world: World) -> None:
     assert in_graph_order(completed)
     assert isinstance(events[-2], DocumentFiled)
     assert isinstance(events[-1], LaneChanged) and events[-1].new is Lane.GREEN
-    log = await world.documents.processing_log(owner.id, document.id)
+    log = await world.documents.processing_log(Actor(owner.id), document.id)
     assert in_graph_order([entry.node for entry in log])
     assert len(world.database.jobs) == len(NODES) - 1
     assert all(job.status is JobStatus.DONE for job in world.database.jobs.values())
@@ -142,7 +147,7 @@ async def test_a_running_node_is_visible_until_its_result_is_stored(world: World
 
     class Looks:
         async def run(self, document: Document) -> NodeResult:
-            stored = await world.documents.get(owner.id, document.id)
+            stored = await world.documents.get(Actor(owner.id), document.id)
             seen.append(stored.processing.running())
             assert stored.processing.nodes[Node.OCR].started_at == NOW
             return builders.OK
@@ -151,7 +156,7 @@ async def test_a_running_node_is_visible_until_its_result_is_stored(world: World
     assert await pipeline.run_next_job()
     assert seen == [(Node.OCR,)]
     assert world.event_types()[-2:] == [NodeStarted.type, NodeCompleted.type]
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.processing.nodes[Node.OCR] == NodeState(
         status=NodeStatus.DONE, outcome=Outcome.OK, started_at=NOW, finished_at=NOW
     )
@@ -163,9 +168,9 @@ async def test_uncertain_step_ends_yellow(world: World) -> None:
     pipeline = world.pipeline({Node.JUDGE: Returns(UNCERTAIN)})
     owner, document = await receive(world, pipeline)
     await world.drain(pipeline)
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.lane is Lane.YELLOW
-    log = await world.documents.processing_log(owner.id, stored.id)
+    log = await world.documents.processing_log(Actor(owner.id), stored.id)
     classify = next(entry for entry in log if entry.node is Node.JUDGE)
     assert classify.result.reason == "new contact"
 
@@ -176,7 +181,7 @@ async def test_failed_result_stops_red(world: World) -> None:
     # The nodes after receiving, up to the one that fails.
     ran = Node.RECEIVE.successors | Node.PARSE.ancestors | {Node.PARSE}
     assert await world.drain(pipeline) == len(ran - {Node.RECEIVE})
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.lane is Lane.RED
     assert stored.processing.status is ProcessingStatus.FAILED
     assert stored.processing.failed() == (Node.PARSE,)
@@ -196,16 +201,16 @@ async def test_a_node_still_queued_after_a_failure_is_dropped_and_retried_later(
     world.clock.advance(timedelta(seconds=1))
     assert await pipeline.run_next_job()  # the pages job is stale now: nothing new starts
     assert pages.calls == 0
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.processing.nodes[Node.PAGES] == NodeState()
     assert all(job.status is not JobStatus.QUEUED for job in world.database.jobs.values())
 
     working = world.pipeline({Node.PAGES: pages})
-    retried = (await working.retry(owner.id, document.id)).document
+    retried = (await working.retry(Actor(owner.id), document.id)).document
     assert retried.processing.due() == (Node.OCR, Node.PAGES)
     await world.drain(working)
     assert pages.calls == 1
-    assert (await world.documents.get(owner.id, document.id)).lane is Lane.GREEN
+    assert (await world.documents.get(Actor(owner.id), document.id)).lane is Lane.GREEN
 
 
 async def test_exceptions_are_retried_with_backoff(world: World) -> None:
@@ -215,7 +220,7 @@ async def test_exceptions_are_retried_with_backoff(world: World) -> None:
     # The pages, and the first attempt of the OCR, which fails.
     assert await world.drain(pipeline) == len(Node.SEPARATE.successors)
     assert not await pipeline.run_next_job()  # waits 30 s
-    waiting = await world.documents.get(owner.id, document.id)
+    waiting = await world.documents.get(Actor(owner.id), document.id)
     assert waiting.processing.nodes[Node.OCR] == NodeState()  # not shown as running meanwhile
     assert NodeDeferred.type in world.event_types()
     world.clock.advance(timedelta(seconds=30))
@@ -225,7 +230,7 @@ async def test_exceptions_are_retried_with_backoff(world: World) -> None:
     world.clock.advance(timedelta(seconds=1))
     await world.drain(pipeline)  # attempt 3 succeeds, the rest follows
     assert flaky.calls == 3
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.lane is Lane.GREEN
     ocr_job = next(
         job for job in world.database.jobs.values() if job.payload["node"] == Node.OCR.value
@@ -242,9 +247,9 @@ async def test_exhausted_retries_end_red_and_retry_recovers(world: World) -> Non
         assert await world.drain(pipeline)
         world.clock.advance(timedelta(minutes=5))
     assert not await pipeline.run_next_job()
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.lane is Lane.RED
-    log = await world.documents.processing_log(owner.id, stored.id)
+    log = await world.documents.processing_log(Actor(owner.id), stored.id)
     assert log[-1].result.outcome is Outcome.FAILED
     assert log[-1].result.reason == "OSError: scanner glitch"
     ocr_job = next(
@@ -252,11 +257,11 @@ async def test_exhausted_retries_end_red_and_retry_recovers(world: World) -> Non
     )
     assert ocr_job.status is JobStatus.FAILED
 
-    retried = (await pipeline.retry(owner.id, stored.id)).document
+    retried = (await pipeline.retry(Actor(owner.id), stored.id)).document
     assert retried.processing.run == 2
     assert retried.lane is None
     await world.drain(pipeline)
-    stored = await world.documents.get(owner.id, stored.id)
+    stored = await world.documents.get(Actor(owner.id), stored.id)
     assert stored.lane is Lane.GREEN
     assert broken.calls == 4
 
@@ -265,10 +270,12 @@ async def test_skipped_pages_are_caught_up_on_without_a_new_run(world: World) ->
     owner, document = await receive(world)
     await world.drain()
     red = await world.pipeline({Node.PARSE: Returns(FAILED)}).receive(
-        owner.id, incoming(b"%PDF-1.7 red"), filename="red.pdf"
+        Actor(owner.id), incoming(b"%PDF-1.7 red"), filename="red.pdf"
     )
     await world.drain(world.pipeline({Node.PARSE: Returns(FAILED)}))
-    processing = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 p"), filename="p.pdf")
+    processing = await world.pipeline().receive(
+        Actor(owner.id), incoming(b"%PDF-1.7 p"), filename="p.pdf"
+    )
     async with world.uow() as uow:  # as revision 0010 leaves documents from before the node
         for id in (document.id, red.id, processing.id):
             stored = await uow.documents.get(id)
@@ -285,18 +292,18 @@ async def test_skipped_pages_are_caught_up_on_without_a_new_run(world: World) ->
     # were due.
     assert await world.drain(pipeline) == 3 + len(Node.RECEIVE.descendants) - 1
     assert pages.calls == 3
-    caught_up = await world.documents.get(owner.id, processing.id)
+    caught_up = await world.documents.get(Actor(owner.id), processing.id)
     assert caught_up.lane is Lane.GREEN
     assert caught_up.processing.nodes[Node.PAGES].status is NodeStatus.DONE
     for id, lane, status in ((document.id, Lane.GREEN, "completed"), (red.id, Lane.RED, "failed")):
-        stored = await world.documents.get(owner.id, id)
+        stored = await world.documents.get(Actor(owner.id), id)
         assert (stored.lane, stored.processing.status.value, stored.processing.run) == (
             lane,
             status,
             1,
         )
         assert stored.processing.nodes[Node.PAGES].status is NodeStatus.DONE
-        log = await world.documents.processing_log(owner.id, id)
+        log = await world.documents.processing_log(Actor(owner.id), id)
         assert log[-1].node is Node.PAGES and log[-1].run == 1
     kinds = [job.kind for job in world.database.jobs.values() if job.status is JobStatus.DONE]
     assert kinds.count(CATCH_UP_JOB) == 3
@@ -318,15 +325,15 @@ async def test_a_failed_catch_up_keeps_the_node_skipped_and_blocks_nothing(world
     pipeline = world.pipeline({Node.PAGES: Returns(FAILED)})
     assert await pipeline.catch_up(Node.PAGES) == 1
     await world.drain(pipeline)
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.processing.nodes[Node.PAGES] == NodeState(status=NodeStatus.SKIPPED)
     assert (stored.lane, stored.processing.status) == (Lane.GREEN, ProcessingStatus.COMPLETED)
-    log = await world.documents.processing_log(owner.id, document.id)
+    log = await world.documents.processing_log(Actor(owner.id), document.id)
     assert (log[-1].node, log[-1].result.outcome) == (Node.PAGES, Outcome.FAILED)
     (job,) = [job for job in world.database.jobs.values() if job.kind == CATCH_UP_JOB]
     assert job.status is JobStatus.FAILED
     assert await pipeline.catch_up(Node.PAGES) == 1  # tried again next time
-    await pipeline.reprocess_from(owner.id, document.id, Node.JUDGE)  # not blocked
+    await pipeline.reprocess_from(Actor(owner.id), document.id, Node.JUDGE)  # not blocked
 
 
 async def test_a_catch_up_job_is_stale_once_the_document_runs_again(world: World) -> None:
@@ -340,10 +347,10 @@ async def test_a_catch_up_job_is_stale_once_the_document_runs_again(world: World
     pages = Returns(builders.OK)
     pipeline = world.pipeline({Node.PAGES: pages})
     assert await pipeline.catch_up(Node.PAGES) == 1
-    await pipeline.reprocess_from(owner.id, document.id, Node.JUDGE)  # run 2
+    await pipeline.reprocess_from(Actor(owner.id), document.id, Node.JUDGE)  # run 2
     await world.drain(pipeline)
     assert pages.calls == 0
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.processing.nodes[Node.PAGES].status is NodeStatus.SKIPPED
     assert all(job.status is JobStatus.DONE for job in world.database.jobs.values())
 
@@ -354,10 +361,12 @@ async def test_the_text_is_read_again_beside_processing(world: World) -> None:
     owner, document = await receive(world)
     await world.drain()
     red = await world.pipeline({Node.OCR: Returns(FAILED)}).receive(
-        owner.id, incoming(b"%PDF-1.7 red"), filename="red.pdf"
+        Actor(owner.id), incoming(b"%PDF-1.7 red"), filename="red.pdf"
     )
     await world.drain(world.pipeline({Node.OCR: Returns(FAILED)}))
-    busy = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 busy"), filename="b.pdf")
+    busy = await world.pipeline().receive(
+        Actor(owner.id), incoming(b"%PDF-1.7 busy"), filename="b.pdf"
+    )
     world.database.outbox.clear()
 
     parse = Returns(builders.OK)
@@ -366,9 +375,9 @@ async def test_the_text_is_read_again_beside_processing(world: World) -> None:
     assert await pipeline.reparse() == 0  # queued already
     await world.drain(pipeline)
     assert parse.calls == 2  # the reading, and the busy document's own run
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert (stored.lane, stored.processing.run) == (Lane.GREEN, 1)
-    log = await world.documents.processing_log(owner.id, document.id)
+    log = await world.documents.processing_log(Actor(owner.id), document.id)
     assert (log[-1].node, log[-1].run, log[-1].result.input.get("reparse")) == (Node.PARSE, 1, True)
     kinds = [job.kind for job in world.database.jobs.values() if job.status is JobStatus.DONE]
     assert kinds.count(REPARSE_JOB) == 1
@@ -378,8 +387,8 @@ async def test_the_text_is_read_again_beside_processing(world: World) -> None:
         if isinstance(event, DocumentEvent) and event.document_id == document.id
     ]
     assert types == [NodeCompleted.type]
-    assert (await world.documents.get(owner.id, busy.id)).lane is Lane.GREEN
-    assert (await world.documents.get(owner.id, red.id)).lane is Lane.RED
+    assert (await world.documents.get(Actor(owner.id), busy.id)).lane is Lane.GREEN
+    assert (await world.documents.get(Actor(owner.id), red.id)).lane is Lane.RED
 
 
 async def test_a_reading_is_stale_once_the_document_runs_again(world: World) -> None:
@@ -388,10 +397,10 @@ async def test_a_reading_is_stale_once_the_document_runs_again(world: World) -> 
     parse = Returns(builders.OK)
     pipeline = world.pipeline({Node.PARSE: parse})
     assert await pipeline.reparse() == 1
-    await pipeline.reprocess_from(owner.id, document.id, Node.JUDGE)  # run 2
+    await pipeline.reprocess_from(Actor(owner.id), document.id, Node.JUDGE)  # run 2
     await world.drain(pipeline)
     assert parse.calls == 0
-    log = await world.documents.processing_log(owner.id, document.id)
+    log = await world.documents.processing_log(Actor(owner.id), document.id)
     assert not any(entry.result.input.get("reparse") for entry in log)
 
 
@@ -399,9 +408,9 @@ async def test_only_admins_have_every_text_read_again(world: World) -> None:
     owner, _ = await receive(world)
     await world.drain()
     with pytest.raises(PermissionDeniedError):
-        await world.pipeline().request_reparse(owner.id)
+        await world.pipeline().request_reparse(Actor(owner.id))
     admin = await world.user(role=Role.ADMIN)
-    assert await world.pipeline().request_reparse(admin.id) == 1
+    assert await world.pipeline().request_reparse(Actor(admin.id)) == 1
 
 
 async def test_only_admins_queue_the_maintenance_over_every_document(world: World) -> None:
@@ -422,11 +431,11 @@ async def test_only_admins_queue_the_maintenance_over_every_document(world: Worl
         pipeline.request_read_facts,
     ):
         with pytest.raises(PermissionDeniedError):
-            await request(owner.id)
-    assert await pipeline.request_relate(admin.id) == 1
-    assert await pipeline.request_relate(admin.id) == 0  # queued already
-    assert await pipeline.request_render_pages(admin.id) == 1
-    assert await pipeline.request_read_facts(admin.id) == 0  # no code reader in this world
+            await request(Actor(owner.id))
+    assert await pipeline.request_relate(Actor(admin.id)) == 1
+    assert await pipeline.request_relate(Actor(admin.id)) == 0  # queued already
+    assert await pipeline.request_render_pages(Actor(admin.id)) == 1
+    assert await pipeline.request_read_facts(Actor(admin.id)) == 0  # no code reader in this world
     kinds = sorted(
         job.kind for job in world.database.jobs.values() if job.status is JobStatus.QUEUED
     )
@@ -438,11 +447,11 @@ async def test_reprocess_from_a_step(world: World) -> None:
     await world.drain()
     world.database.outbox.clear()
     pipeline = world.pipeline({Node.FIELDS: Returns(UNCERTAIN)})
-    await pipeline.reprocess_from(owner.id, document.id, Node.JUDGE)
+    await pipeline.reprocess_from(Actor(owner.id), document.id, Node.JUDGE)
     # The signals without a model call, judge, fields, rules; it waits before filing.
     again = CURRENT_SIGNALS | {Node.JUDGE} | Node.JUDGE.descendants - {Node.FILE}
     assert await world.drain(pipeline) == len(again)
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.lane is Lane.YELLOW
     assert stored.processing.status is ProcessingStatus.REVIEW
     assert stored.processing.run == 2
@@ -452,22 +461,22 @@ async def test_reprocess_from_a_step(world: World) -> None:
 
 async def test_retry_and_reprocess_are_for_the_editors(world: World) -> None:
     owner, reader, editor = await world.user(), await world.user(), await world.user()
-    shared = await world.spaces.create(owner.id, "Shared")
-    await world.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
-    await world.spaces.set_member(owner.id, shared.id, editor.id, SpaceRole.EDIT)
+    shared = await world.spaces.create(Actor(owner.id), "Shared")
+    await world.spaces.set_member(Actor(owner.id), shared.id, reader.id, SpaceRole.READ)
+    await world.spaces.set_member(Actor(owner.id), shared.id, editor.id, SpaceRole.EDIT)
     document = await world.pipeline().receive(
-        owner.id, incoming(PDF), filename="a.pdf", space=shared.id
+        Actor(owner.id), incoming(PDF), filename="a.pdf", space=shared.id
     )
     await world.drain()
     with pytest.raises(PermissionDeniedError):
-        await world.pipeline().reprocess_from(reader.id, document.id, Node.OCR)
-    await world.pipeline().reprocess_from(editor.id, document.id, Node.OCR)
+        await world.pipeline().reprocess_from(Actor(reader.id), document.id, Node.OCR)
+    await world.pipeline().reprocess_from(Actor(editor.id), document.id, Node.OCR)
     await world.drain()
     stranger = await world.user()
     with pytest.raises(NotFoundError):
-        await world.pipeline().reprocess_from(stranger.id, document.id, Node.OCR)
+        await world.pipeline().reprocess_from(Actor(stranger.id), document.id, Node.OCR)
     with pytest.raises(InvalidTransitionError):
-        await world.pipeline().retry(owner.id, document.id)
+        await world.pipeline().retry(Actor(owner.id), document.id)
 
 
 async def test_a_file_exists_once_per_installation(world: World) -> None:
@@ -475,17 +484,17 @@ async def test_a_file_exists_once_per_installation(world: World) -> None:
     first lies; it names the document to who may read it, and to no one else."""
     owner, document = await receive(world)
     with pytest.raises(DuplicateDocumentError) as info:
-        await world.pipeline().receive(owner.id, incoming(PDF), filename="again.pdf")
+        await world.pipeline().receive(Actor(owner.id), incoming(PDF), filename="again.pdf")
     assert info.value.existing == document.id
     other = await world.user()
     with pytest.raises(DuplicateDocumentError) as info:
-        await world.pipeline().receive(other.id, incoming(PDF), filename="mine.pdf")
+        await world.pipeline().receive(Actor(other.id), incoming(PDF), filename="mine.pdf")
     assert info.value.existing is None
     assert str(info.value) == "the file lies in Lekto already, in a space you cannot see"
     personal = await world.personal_space(owner)
-    await world.spaces.set_member(owner.id, personal.id, other.id, SpaceRole.READ)
+    await world.spaces.set_member(Actor(owner.id), personal.id, other.id, SpaceRole.READ)
     with pytest.raises(DuplicateDocumentError) as info:
-        await world.pipeline().receive(other.id, incoming(PDF), filename="mine.pdf")
+        await world.pipeline().receive(Actor(other.id), incoming(PDF), filename="mine.pdf")
     assert info.value.existing is None  # not green yet: a reader does not see it
 
 
@@ -497,9 +506,11 @@ async def test_a_reader_learns_which_green_document_holds_the_file(world: World)
     async with world.uow() as uow:
         await uow.documents.add(green)
         await uow.commit()
-    await world.spaces.set_member(owner.id, personal.id, reader.id, SpaceRole.READ)
+    await world.spaces.set_member(Actor(owner.id), personal.id, reader.id, SpaceRole.READ)
     with pytest.raises(DuplicateDocumentError) as info:
-        await world.pipeline().receive(reader.id, incoming(b"%PDF-1.7 green"), filename="g.pdf")
+        await world.pipeline().receive(
+            Actor(reader.id), incoming(b"%PDF-1.7 green"), filename="g.pdf"
+        )
     assert info.value.existing == green.id
 
 
@@ -507,8 +518,8 @@ async def test_a_duplicate_in_the_target_is_named_only_to_who_reads_it(world: Wo
     """The target space holds a file once; the caller learns which document holds it only if
     they may read it."""
     owner, editor = await world.user(), await world.user()
-    shared = await world.spaces.create(owner.id, "Shared")
-    await world.spaces.set_member(owner.id, shared.id, editor.id, SpaceRole.EDIT)
+    shared = await world.spaces.create(Actor(owner.id), "Shared")
+    await world.spaces.set_member(Actor(owner.id), shared.id, editor.id, SpaceRole.EDIT)
     held = builders.document(owner, shared)
     held.sha256 = Sha256.of(PDF)
     async with world.uow() as uow:
@@ -517,35 +528,37 @@ async def test_a_duplicate_in_the_target_is_named_only_to_who_reads_it(world: Wo
     admin = await world.user(role=Role.ADMIN)
     with pytest.raises(DuplicateDocumentError) as info:
         await world.pipeline().receive(
-            admin.id, incoming(PDF), filename="a.pdf", space=shared.id, uploaded_by=editor.id
+            Actor(admin.id), incoming(PDF), filename="a.pdf", space=shared.id, uploaded_by=editor.id
         )
     assert info.value.existing == held.id
-    await world.spaces.set_member(owner.id, shared.id, editor.id, SpaceRole.READ)
+    await world.spaces.set_member(Actor(owner.id), shared.id, editor.id, SpaceRole.READ)
     with pytest.raises(DuplicateDocumentError) as info:
         await world.pipeline().receive(
-            admin.id, incoming(PDF), filename="a.pdf", space=shared.id, uploaded_by=editor.id
+            Actor(admin.id), incoming(PDF), filename="a.pdf", space=shared.id, uploaded_by=editor.id
         )
     assert info.value.existing == held.id  # the admin reads it
 
 
 async def test_receive_into_a_space_needs_edit_rights(world: World) -> None:
     owner, writer, reader = await world.user(), await world.user(), await world.user()
-    shared = await world.spaces.create(owner.id, "Shared")
-    await world.spaces.set_member(owner.id, shared.id, writer.id, SpaceRole.EDIT)
-    await world.spaces.set_member(owner.id, shared.id, reader.id, SpaceRole.READ)
+    shared = await world.spaces.create(Actor(owner.id), "Shared")
+    await world.spaces.set_member(Actor(owner.id), shared.id, writer.id, SpaceRole.EDIT)
+    await world.spaces.set_member(Actor(owner.id), shared.id, reader.id, SpaceRole.READ)
     document = await world.pipeline().receive(
-        writer.id, incoming(PDF), filename="a.pdf", space=shared.id
+        Actor(writer.id), incoming(PDF), filename="a.pdf", space=shared.id
     )
     assert (document.uploaded_by, document.space_id) == (writer.id, shared.id)
-    plain = await world.pipeline().receive(writer.id, incoming(b"%PDF-1.7 own"), filename="o.pdf")
+    plain = await world.pipeline().receive(
+        Actor(writer.id), incoming(b"%PDF-1.7 own"), filename="o.pdf"
+    )
     assert plain.space_id == (await world.personal_space(writer)).id
     with pytest.raises(PermissionDeniedError):
         await world.pipeline().receive(
-            reader.id, incoming(b"%PDF-1.7 other"), filename="b.pdf", space=shared.id
+            Actor(reader.id), incoming(b"%PDF-1.7 other"), filename="b.pdf", space=shared.id
         )
     with pytest.raises(NotFoundError):
         await world.pipeline().receive(
-            reader.id,
+            Actor(reader.id),
             incoming(b"%PDF-1.7 other"),
             filename="b.pdf",
             space=(await world.personal_space(owner)).id,
@@ -554,7 +567,7 @@ async def test_receive_into_a_space_needs_edit_rights(world: World) -> None:
 
 async def test_stale_jobs_are_skipped(world: World) -> None:
     owner, document = await receive(world)
-    await world.documents.delete(owner.id, document.id)
+    await world.documents.delete(Actor(owner.id), document.id)
     calls = Returns(FAILED)
     pipeline = world.pipeline({Node.OCR: calls})
     assert await world.drain(pipeline) == len(Node.SEPARATE.successors)  # both stale
@@ -580,9 +593,9 @@ async def test_a_step_that_keeps_killing_the_worker_ends_red(world: World) -> No
     pipeline = world.pipeline({Node.OCR: ocr})
     assert await pipeline.run_next_job()
     assert ocr.calls == 0
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.lane is Lane.RED
-    log = await world.documents.processing_log(owner.id, document.id)
+    log = await world.documents.processing_log(Actor(owner.id), document.id)
     assert log[-1].result.reason is not None and "ran out of time" in log[-1].result.reason
     assert not await pipeline.run_next_job()
 
@@ -602,7 +615,7 @@ async def test_a_worker_that_lost_its_claim_stores_nothing(world: World) -> None
 
     postpone(world, Node.PAGES, timedelta(hours=1))
     assert await world.pipeline({Node.OCR: Slow()}).run_next_job()
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.processing.nodes[Node.OCR].status is NodeStatus.RUNNING
     assert stored.processing.outcome(Node.OCR) is None
     assert stored.lane is None
@@ -668,10 +681,10 @@ async def test_an_unprocessable_document_fails_at_once(world: World) -> None:
     pipeline = world.pipeline({Node.OCR: ocr})
     owner, document = await receive(world, pipeline)
     await world.drain(pipeline)
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.lane is Lane.RED
     assert ocr.calls == 1  # no automatic retry
-    log = await world.documents.processing_log(owner.id, document.id)
+    log = await world.documents.processing_log(Actor(owner.id), document.id)
     assert (log[-1].node, log[-1].result.reason) == (Node.OCR, "the PDF is encrypted")
     assert log[-1].result.reasons == (because(ReasonCode.PDF_ENCRYPTED),)
     (job,) = [job for job in world.database.jobs.values() if job.payload["node"] == Node.OCR.value]
@@ -702,7 +715,7 @@ async def test_a_cancelled_step_releases_its_job_at_once(world: World) -> None:
     await world.drain()  # another worker takes it over without waiting for the lease
     world.clock.advance(timedelta(hours=1))
     await world.drain()  # the pages
-    assert (await world.documents.get(owner.id, document.id)).lane is Lane.GREEN
+    assert (await world.documents.get(Actor(owner.id), document.id)).lane is Lane.GREEN
 
 
 @pytest.mark.parametrize(
@@ -714,7 +727,7 @@ async def test_the_media_type_comes_from_the_content(
 ) -> None:
     owner = await world.user()
     document = await world.pipeline().receive(
-        owner.id, incoming((SAMPLES / sample).read_bytes()), filename="named-wrongly.txt"
+        Actor(owner.id), incoming((SAMPLES / sample).read_bytes()), filename="named-wrongly.txt"
     )
     assert document.media_type == media_type
     assert world.object_store.content_type(original_key(document.sha256)) == media_type
@@ -724,7 +737,7 @@ async def test_an_unsupported_file_is_rejected_and_not_stored(world: World) -> N
     owner = await world.user()
     file = incoming((SAMPLES / "unsupported.docx").read_bytes())
     with pytest.raises(UnsupportedMediaTypeError, match="unsupported file type"):
-        await world.pipeline().receive(owner.id, file, filename="letter.pdf")
+        await world.pipeline().receive(Actor(owner.id), file, filename="letter.pdf")
     assert not await world.object_store.exists(original_key(file.sha256))
     assert world.events() == []
 
@@ -735,7 +748,7 @@ async def test_a_stored_original_is_not_uploaded_again(world: World) -> None:
     owner = await world.user()
     key = original_key(Sha256.of(PDF))
     await world.object_store.put(key, b"%PDF-1.7 marker", content_type="application/pdf")
-    await world.pipeline().receive(owner.id, incoming(PDF), filename="b.pdf")
+    await world.pipeline().receive(Actor(owner.id), incoming(PDF), filename="b.pdf")
     assert await world.object_store.get(key) == b"%PDF-1.7 marker"
 
 
@@ -755,7 +768,9 @@ class VanishingStore(MemoryObjectStore):
 async def test_an_upload_stores_the_original_again_if_it_vanished(world: World) -> None:
     world.object_store = VanishingStore()
     owner = await world.user()
-    document = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 x"), filename="x.pdf")
+    document = await world.pipeline().receive(
+        Actor(owner.id), incoming(b"%PDF-1.7 x"), filename="x.pdf"
+    )
     assert await world.object_store.get(original_key(document.sha256)) == b"%PDF-1.7 x"
 
 
@@ -779,7 +794,7 @@ async def test_a_step_changes_metadata_with_its_result(world: World) -> None:
     pipeline = world.pipeline({Node.JUDGE: Changes(changes)})
     owner, document = await receive(world, pipeline)
     await world.drain(pipeline)
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.tag_ids == frozenset({tag.id})
     assert stored.lane is Lane.GREEN
 
@@ -793,10 +808,10 @@ async def test_classified_tags_are_added_to_the_documents_tags(world: World) -> 
     pipeline = world.pipeline({Node.JUDGE: Changes(DocumentChanges(), frozenset({strom.id}))})
     owner, document = await receive(world, pipeline)
     await world.documents.change_metadata(
-        owner.id, document.id, DocumentChanges(tag_ids=frozenset({mine.id}))
+        Actor(owner.id), document.id, DocumentChanges(tag_ids=frozenset({mine.id}))
     )
     await world.drain(pipeline)
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.tag_ids == frozenset({mine.id, strom.id})
     assert stored.lane is Lane.GREEN
 
@@ -808,10 +823,10 @@ async def test_changes_that_no_longer_fit_make_the_step_uncertain(world: World) 
     pipeline = world.pipeline({Node.JUDGE: Changes(changes)})
     owner, document = await receive(world, pipeline)
     await world.drain(pipeline)
-    stored = await world.documents.get(owner.id, document.id)
+    stored = await world.documents.get(Actor(owner.id), document.id)
     assert stored.lane is Lane.YELLOW
     assert stored.contact_id is None
-    log = await world.documents.processing_log(owner.id, document.id)
+    log = await world.documents.processing_log(Actor(owner.id), document.id)
     classified = next(entry for entry in log if entry.node is Node.JUDGE)
     assert classified.result.outcome is Outcome.UNCERTAIN
     assert (classified.result.reason or "").startswith("the master data changed during the node")

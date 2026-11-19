@@ -7,6 +7,7 @@ from uuid import UUID
 from lekto.core.domain.documents import Document
 from lekto.core.domain.ids import MailboxId, MailRecordId, TaskId, UserId, new_id
 from lekto.core.domain.mail_intake import MailOrigin, OriginRole
+from lekto.core.domain.rights import Actor
 from lekto.core.ports.webhook_sender import WebhookRequest
 from lekto.core.services.pipeline import PipelineService
 from lekto.core.services.tasks.service import AnswerReceipt
@@ -33,7 +34,7 @@ async def stored(world: World, document: Document) -> Document:
 
 async def arrive(world: World, pipeline: PipelineService, by: UserId) -> Document:
     """A PDF `by` uploads, once nothing is due any more."""
-    received = await pipeline.receive(by, incoming_pdf(), filename="a.pdf")
+    received = await pipeline.receive(Actor(by), incoming_pdf(), filename="a.pdf")
     await run_due(world, pipeline)
     return await stored(world, received)
 

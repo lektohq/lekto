@@ -40,6 +40,7 @@ from lekto.core.domain.push import (
     PushPreferences,
 )
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import Actor
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.push import PushOutcome, PushResult, PushSender
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
@@ -83,15 +84,15 @@ class PushService:
 
     # --- what a person wants ----------------------------------------------------------------
 
-    async def preferences(self, actor: UserId) -> PushPreferences:
+    async def preferences(self, actor: Actor) -> PushPreferences:
         async with self._uow() as uow:
-            return await uow.push_preferences.find(actor) or PushPreferences(id=actor)
+            return await uow.push_preferences.find(actor.id) or PushPreferences(id=actor.id)
 
     async def set_preferences(
-        self, actor: UserId, *, kinds: frozenset[PushKind], titles: bool
+        self, actor: Actor, *, kinds: frozenset[PushKind], titles: bool
     ) -> PushPreferences:
         async with self._uow() as uow:
-            preferences = await uow.push_preferences.find(actor) or PushPreferences(id=actor)
+            preferences = await uow.push_preferences.find(actor.id) or PushPreferences(id=actor.id)
             preferences = replace(preferences, kinds=kinds, titles=titles)
             await uow.push_preferences.save(preferences)
             await uow.commit()
@@ -179,7 +180,7 @@ class PushService:
             await uow.commit()
         if not still:
             return None
-        summary = await self._inbox.summary(user)
+        summary = await self._inbox.summary(Actor(user))
         count = summary.counts.get(InboxTab.REVIEW, 0) + summary.counts.get(InboxTab.INTERVENE, 0)
         one = still[0].id if len(still) == 1 else None
         return PushMessage(
@@ -206,7 +207,7 @@ class PushService:
 
     async def register(
         self,
-        actor: UserId,
+        actor: Actor,
         *,
         endpoint: str,
         p256dh: str,
@@ -219,7 +220,7 @@ class PushService:
         now = self._clock.now()
         device = PushDevice(
             id=PushDeviceId(new_id()),
-            user_id=actor,
+            user_id=actor.id,
             endpoint=endpoint,
             p256dh=p256dh,
             auth=auth,
@@ -238,24 +239,24 @@ class PushService:
                 )
                 await uow.push_devices.update(device)
             else:
-                if len(await uow.push_devices.list_for(actor)) >= MAX_DEVICES:
+                if len(await uow.push_devices.list_for(actor.id)) >= MAX_DEVICES:
                     raise ConflictError(because(ReasonCode.PUSH_DEVICES_LIMIT, max=MAX_DEVICES))
                 await uow.push_devices.add(device)
             await uow.commit()
-        log.info("push device registered", extra={"user_id": str(actor)})
+        log.info("push device registered", extra={"user_id": str(actor.id)})
         return device
 
-    async def devices(self, actor: UserId) -> list[PushDevice]:
+    async def devices(self, actor: Actor) -> list[PushDevice]:
         async with self._uow() as uow:
-            return await uow.push_devices.list_for(actor)
+            return await uow.push_devices.list_for(actor.id)
 
-    async def remove(self, actor: UserId, id: PushDeviceId) -> None:
+    async def remove(self, actor: Actor, id: PushDeviceId) -> None:
         async with self._uow() as uow:
             await self._own(uow, actor, id)
             await uow.push_devices.remove(id)
             await uow.commit()
 
-    async def test(self, actor: UserId, id: PushDeviceId) -> PushResult:
+    async def test(self, actor: Actor, id: PushDeviceId) -> PushResult:
         """Send the device a test notification now."""
         self._sender_or_off()
         async with self._uow() as uow:
@@ -307,9 +308,9 @@ class PushService:
         return self._sender
 
     @staticmethod
-    async def _own(uow: UnitOfWork, actor: UserId, id: PushDeviceId) -> PushDevice:
+    async def _own(uow: UnitOfWork, actor: Actor, id: PushDeviceId) -> PushDevice:
         device = await uow.push_devices.find(id)
-        if device is None or device.user_id != actor:
+        if device is None or device.user_id != actor.id:
             raise NotFoundError("push device", id)
         return device
 
