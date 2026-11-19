@@ -178,6 +178,7 @@ async def me(principal: Authenticated, request: Request, context: Context) -> Me
         totp_enabled=account.totp_enabled,
         linked_accounts=[LinkOut.of(link) for link in account.external_identities],
         lekto_version=__version__,
+        instance_id=await context.users.instance_id(principal.actor),
         shortcut_url=context.shortcut_url,
     )
 

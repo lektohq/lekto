@@ -544,3 +544,15 @@ async def test_a_read_token_may_call_a_post_that_only_reads(api: Api, path: str)
     answer = await api.client.post(url, json={}, headers=bearer(token))
     if answer.status_code == 403:
         assert answer.json()["reason"]["code"] != "read_only_token", path
+
+
+async def test_me_names_the_instance_alike_for_everyone(api: Api) -> None:
+    """One id of the instance, the same for every caller and every time
+    (`.knowledge/open/instance-id-fas.md`)."""
+    first, second = await api.user(), await api.user()
+    ids = {
+        (await api.client.get(f"{PREFIX}/auth/me", headers=auth(user))).json()["instance_id"]
+        for user in (first, second, first)
+    }
+    assert len(ids) == 1
+    assert UUID(ids.pop()).version == 4

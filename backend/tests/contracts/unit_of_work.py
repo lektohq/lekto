@@ -213,6 +213,22 @@ def _repository_of(item: object) -> str:
 class UnitOfWorkContract:
     # --- transactions ---------------------------------------------------------------------------
 
+    async def test_the_instance_has_one_id_that_stays(self, uow_factory: UnitOfWorkFactory) -> None:
+        """Made once (by revision 0083, else by the first unit that asks) and kept; units that
+        ask at the same time get the same (`.knowledge/open/instance-id-fas.md`)."""
+
+        async def ask() -> UUID:
+            async with uow_factory() as uow:
+                id = await uow.instance.id()
+                await uow.commit()
+                return id
+
+        first, second = await asyncio.gather(ask(), ask())
+        assert first == second
+        assert await ask() == first
+        async with uow_factory() as uow:
+            assert await uow.instance.id() == first  # also in a unit that is not committed
+
     async def test_committed_changes_are_stored(self, uow_factory: UnitOfWorkFactory) -> None:
         user = builders.user()
         async with uow_factory() as uow:

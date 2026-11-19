@@ -11,6 +11,7 @@ from lekto.core.ports.identity import (
     LoginFailureRepository,
     SessionRepository,
 )
+from lekto.core.ports.instance import InstanceRepository
 from lekto.core.ports.job_queue import JobQueue
 from lekto.core.ports.push import PushDeviceRepository, PushPreferencesRepository
 from lekto.core.ports.repository import (
@@ -129,6 +130,8 @@ class UnitOfWork(Protocol):
     def push_devices(self) -> PushDeviceRepository: ...
     @property
     def push_preferences(self) -> PushPreferencesRepository: ...
+    @property
+    def instance(self) -> InstanceRepository: ...
     @property
     def login_failures(self) -> LoginFailureRepository: ...
 

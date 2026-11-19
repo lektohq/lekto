@@ -34,6 +34,7 @@ from lekto.adapters.outbound.sql.identity import (
     SqlSessionRepository,
 )
 from lekto.adapters.outbound.sql.inbox import SqlInboxRepository
+from lekto.adapters.outbound.sql.instance import SqlInstanceRepository
 from lekto.adapters.outbound.sql.job_queue import SqlJobQueue
 from lekto.adapters.outbound.sql.lenses import SqlLensRepository
 from lekto.adapters.outbound.sql.mail_records import (
@@ -141,6 +142,7 @@ class SqlUnitOfWork:
         self.known_devices = SqlKnownDeviceRepository(self._tx)
         self.push_devices = SqlPushDeviceRepository(self._tx)
         self.push_preferences = SqlPushPreferencesRepository(self._tx)
+        self.instance = SqlInstanceRepository(self._tx)
         self.external_identities = SqlExternalIdentityRepository(self._tx)
         self.login_failures = SqlLoginFailureRepository(self._tx)
 
