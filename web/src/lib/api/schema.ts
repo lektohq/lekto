@@ -8286,6 +8286,7 @@ export interface components {
 		/**
 		 * Me
 		 * @example {
+		 *       "api_version": "0.1",
 		 *       "authenticated_with": "token",
 		 *       "has_password": true,
 		 *       "instance_id": "6f1c2a9e-3b4d-4e8f-9a1b-2c3d4e5f6a7b",
@@ -8339,6 +8340,11 @@ export interface components {
 			 * @description The version of Lekto that answers (its release).
 			 */
 			lekto_version: string;
+			/**
+			 * Api Version
+			 * @description The version of this API, `MAJOR.MINOR` (as `info.version` of the OpenAPI document). During the beta `0.MINOR`, raised with every change; from the first release without beta MAJOR rises with a change that breaks a client, MINOR with one that adds.
+			 */
+			api_version: string;
 			/**
 			 * Instance Id
 			 * Format: uuid

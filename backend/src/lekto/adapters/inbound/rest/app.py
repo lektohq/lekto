@@ -8,7 +8,7 @@ import hashlib
 import logging
 import re
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
-from typing import Protocol
+from typing import Protocol, cast
 
 from fastapi import FastAPI
 from fastapi.dependencies.models import Dependant
@@ -64,6 +64,7 @@ from lekto.adapters.inbound.rest.paths import HEALTH_PATH, LOGIN_PATH, MCP_PATH,
 from lekto.adapters.inbound.rest.schemas.events import EventMessage
 from lekto.adapters.inbound.rest.schemas.external import TaskAnswer
 from lekto.adapters.inbound.rest.ui import UI_PREFIX, ui_routes
+from lekto.adapters.inbound.rest.version import API_VERSION
 from lekto.adapters.inbound.waiting import dispatch_events
 from lekto.core.domain.document_facts import ROLES as FACT_ROLES
 from lekto.core.domain.identifiers import catalog as identifier_kinds
@@ -86,13 +87,14 @@ endpoint needs one of them (401 without), except health, the sign-in endpoints (
 /auth/login` and, below `/auth/oidc`, information, start and callback) and the answer to a task
 (`/external/tasks/{{id}}/result`, with the task's own token).
 
-An API token has a scope:
-
-- `read`: reading only, that is GET and the POSTs marked `x-reads` (a search with its words in
-  the body, a dry run, a preview, a check). Anything else answers 403.
-- `upload`: only the upload marked `x-uploads` (`POST /documents`). Anything else answers 403,
-  reading too.
-- `read_write`: everything except what needs a session.
+An API token carries rights: the read and write right of each area (`documents`,
+`master_data`, `rules`, `spaces`, `webhooks`, `lenses`, `push`, `system`), `documents:upload`,
+`documents:count` (the numbers alone), and for an admin's token the admin rights one by one
+(`admin:count_all`, `admin:documents_all`, `admin:mailboxes`, `admin:private_webhooks`,
+`admin:manage`), which count only while the user is an active admin. Each operation names the
+right it needs as `x-right` (`any`: every token; `session`: no token); without it a token gets
+403 (`token_lacks_right`). The presets `read`, `read_write` and `upload` give a token the rights
+it had as a scope (`POST /auth/tokens`).
 
 A session is needed, and a token gets 403, for the own account (profile, password, sessions,
 TOTP, API tokens, provider links) and, for admins, for creating a user with a password or the
@@ -101,9 +103,9 @@ not see are "not found" (404), the same as ones that do not exist.
 
 The same services are available to AI clients over MCP (Streamable HTTP, stateless) at
 `{MCP_PATH}`, with the same API tokens as bearer; it is not part of this OpenAPI document.
-Tools are named `<area>_<verb>` (such as `documents_search` or `inbox_confirm`) and come in two
-classes: `read`, and `write`, which needs a `read_write` token. Some are for admins only.
-`tools/list` names the tools the caller may use.
+Tools are named `<area>_<verb>` (such as `documents_search` or `inbox_confirm`); each needs the
+right of its area, a tool for admins also an admin right. `tools/list` names the tools the
+caller may use.
 """
 
 
@@ -181,7 +183,7 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
 
     app = FastAPI(
         title="Lekto DMS API",
-        version=__version__,
+        version=API_VERSION,
         description=DESCRIPTION,
         lifespan=lifespan,
         openapi_url=f"{PREFIX}/openapi.json",
@@ -263,6 +265,8 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
 
     def openapi() -> dict[str, object]:
         schema = original_openapi()
+        # The version of the API is `info.version`; Lekto's release stands beside it.
+        cast(dict[str, object], schema["info"])["x-lekto-version"] = __version__
         outgoing.delivered(schema)
         components = schema.setdefault("components", {}).setdefault("schemas", {})
         components.setdefault("EventMessage", EventMessage.model_json_schema())
