@@ -342,7 +342,7 @@ async def test_contacts_the_text_names_most_are_listed(world: World) -> None:
     await add_contact(world, "Südstädter Versicherung")
     await add_contact(world, "Nord Sport")
     fake = model(proposal())
-    text = EXAMPLE_LETTER + "\nINTER, Südstadt\n"
+    text = EXAMPLE_LETTER + "\nMuster Bäckerei, Südstadt\n"
     result = await signal_step(world, fake, max_contacts=3).run(await document_with(world, text))
     contacts = fake.requests[0].task.split("\n\nFields:")[0].split("\n\n", 1)[1]
     assert contacts == (
