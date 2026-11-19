@@ -32,8 +32,8 @@ from lekto.core.services.fact_decisions import FactAction, FactDecision
 from lekto.core.services.master_data import replace_learned_identifiers
 from lekto.core.services.objects import text_key
 from tests import builders
+from tests.unit.services.classification_support import contacts, output, stored
 from tests.unit.services.support import World
-from tests.unit.services.test_signals import contacts, output, stored
 
 K = IdentifierKind
 TEXT = "Mahnung\nRechnungsnummer: M-77\nIhre Rechnung Nr. 4711 ist offen.\nKundennummer 12345678\n"

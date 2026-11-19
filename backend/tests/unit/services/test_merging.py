@@ -25,9 +25,7 @@ from lekto.core.services import editing
 from lekto.core.services.editing import MOVED
 from lekto.core.services.objects import archive_key, derivative_keys, original_key, page_key
 from tests.builders import HOUR, NOW, incoming
-from tests.unit.services.support import World
-from tests.unit.services.test_editing import STACK, part, received
-from tests.unit.services.test_maintenance import maintenance
+from tests.unit.services.support import STACK, World, part, received
 
 SCAN = fake_pdf(2, "the forgotten page and its blank back")
 
@@ -84,7 +82,7 @@ async def test_merging_makes_one_document_of_two(world: World) -> None:
         {"document": str(scan.id), "title": "scan_0412", "version": 2},
     ]
     # The scan's derivatives go, its original stays: a version of the stack now.
-    service = maintenance(world)
+    service = world.maintenance()
     while await service.run_next_job():
         pass
     assert await world.object_store.exists(original_key(scan.sha256))

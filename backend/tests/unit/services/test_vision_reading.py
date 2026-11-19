@@ -23,8 +23,7 @@ from lekto.core.ports.ocr import OcrResult
 from lekto.core.services.nodes import OcrNode, PagesNode, ParseNode
 from lekto.core.services.objects import archive_key, exchanges_key, original_key
 from lekto.core.services.pipeline import PipelineService
-from tests.builders import SAMPLES, incoming
-from tests.unit.services.support import World
+from tests.unit.services.support import World, ingest
 
 
 def pipeline(world: World, ocr: FakeOcr, text: str = "Rechnung") -> PipelineService:
@@ -37,16 +36,6 @@ def pipeline(world: World, ocr: FakeOcr, text: str = "Rechnung") -> PipelineServ
         },
         vision=ocr.vision,
     )
-
-
-async def ingest(
-    world: World, service: PipelineService, sample: str = "scan.pdf"
-) -> tuple[User, Document]:
-    owner = await world.user()
-    data = (SAMPLES / sample).read_bytes()
-    document = await service.receive(owner.id, incoming(data), filename=sample)
-    await world.drain(service)
-    return owner, await world.documents.get(owner.id, document.id)
 
 
 async def ocr_runs(world: World, owner: User, document: Document) -> list[NodeRun]:

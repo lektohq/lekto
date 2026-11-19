@@ -19,8 +19,8 @@ from lekto.core.services.classification.prompts import (
 )
 from lekto.core.services.pipeline import MetadataResult
 from tests.builders import NOW
+from tests.unit.services.classification_support import checks, document_with, fields_step, model
 from tests.unit.services.support import World
-from tests.unit.services.test_classification import checks, document_with, fields_step, model
 
 TIMESHEET = """\
 Zeitnachweis

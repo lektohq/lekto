@@ -4,7 +4,6 @@ room of a webhook, and the end of a run."""
 import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from uuid import UUID
 
 import pytest
 
@@ -24,7 +23,15 @@ from lekto.core.services.pipeline import PipelineService
 from lekto.core.services.tasks.desk import Ask, TaskDesk, TaskRequest
 from lekto.core.services.tasks.settling import Delegation
 from tests import builders
-from tests.unit.services.rules_support import incoming_pdf
+from tests.unit.services.flows import (
+    answer_task,
+    arrive,
+    run_due,
+    sent_to,
+    stored,
+    task_of,
+    token_of,
+)
 from tests.unit.services.support import LINK_BASE, World
 
 URL = "http://flow.lan:1880/ask"
@@ -87,23 +94,13 @@ class Flow:
     pipeline: PipelineService
 
     async def arrive(self) -> Document:
-        received = await self.pipeline.receive(self.owner.id, incoming_pdf(), filename="a.pdf")
-        await self.run()
-        return await self.stored(received)
+        return await arrive(self.world, self.pipeline, self.owner.id)
 
     async def run(self) -> None:
-        """Run the due jobs: the nodes, the deliveries and the ends of tasks."""
-        delivery = self.world.webhook_delivery()
-        while (
-            await self.pipeline.run_next_job()
-            or await delivery.run_next_job()
-            or await self.world.tasks.run_next_job()
-        ):
-            pass
+        await run_due(self.world, self.pipeline)
 
     async def stored(self, document: Document) -> Document:
-        async with self.world.uow() as uow:
-            return await uow.documents.get(document.id)
+        return await stored(self.world, document)
 
     async def tasks(self, document: Document) -> list[Task]:
         async with self.world.uow() as uow:
@@ -114,7 +111,7 @@ class Flow:
             ]
 
     def asked(self) -> list[WebhookRequest]:
-        return [request for request in self.world.sender.requests if request.url == URL]
+        return sent_to(self.world, URL)
 
 
 async def flow(
@@ -141,14 +138,6 @@ async def flow(
     return Flow(world, owner, created.webhook, pipeline)
 
 
-def task_of(request: WebhookRequest) -> TaskId:
-    return TaskId(UUID(request.headers["lekto-task-id"]))
-
-
-def token_of(request: WebhookRequest) -> str:
-    return request.headers["lekto-task-token"]
-
-
 def body_of(request: WebhookRequest) -> dict[str, object]:
     data = json.loads(request.body)
     assert isinstance(data, dict)
@@ -158,9 +147,7 @@ def body_of(request: WebhookRequest) -> dict[str, object]:
 async def answer(
     f: Flow, request: WebhookRequest, data: object, *, token: str | None = None
 ) -> None:
-    body = json.dumps(data).encode()
-    task = task_of(request)
-    receipt = await f.world.tasks.answer(task, token or token_of(request), body)
+    receipt = await answer_task(f.world, request, json.dumps(data).encode(), token=token)
     assert receipt.problem is None
 
 

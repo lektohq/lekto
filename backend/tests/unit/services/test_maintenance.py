@@ -15,27 +15,12 @@ from lekto.core.domain.inbox import DONE_PERIOD, Confirmation
 from lekto.core.domain.jobs import JobStatus
 from lekto.core.domain.mail_intake import KEPT_RECORDS
 from lekto.core.domain.webhooks import DeliveryOutcome, WebhookDelivery
-from lekto.core.services.maintenance import CLEANUP_JOB, REMOVE_FILES_JOB, MaintenanceService
+from lekto.core.services.maintenance import CLEANUP_JOB, REMOVE_FILES_JOB
 from lekto.core.services.objects import derivative_keys, original_key
 from tests import builders
 from tests.builders import PASSWORD, incoming
 from tests.contracts.mail_records import a_mailbox, a_record
-from tests.unit.services.support import World
-
-INTERVAL = timedelta(hours=1)
-RETENTION = timedelta(days=7)
-
-
-def maintenance(world: World, bus: MemoryEventBus | None = None) -> MaintenanceService:
-    return MaintenanceService(
-        world.uow,
-        world.clock,
-        bus or MemoryEventBus(world.database, clock=world.clock, retry=builders.EVENT_RETRY),
-        interval=INTERVAL,
-        retention=RETENTION,
-        session_idle=builders.DEFAULT_SETTINGS.session_idle_timeout,
-        object_store=world.object_store,
-    )
+from tests.unit.services.support import MAINTENANCE_INTERVAL, RETENTION, World
 
 
 def cleanup_jobs(world: World) -> list[JobStatus]:
@@ -43,14 +28,14 @@ def cleanup_jobs(world: World) -> list[JobStatus]:
 
 
 async def test_schedule_queues_one_cleanup(world: World) -> None:
-    service = maintenance(world)
+    service = world.maintenance()
     await service.schedule()
     await service.schedule()
     assert cleanup_jobs(world) == [JobStatus.QUEUED]
 
 
 async def test_cleanup_runs_and_schedules_the_next_one(world: World) -> None:
-    service = maintenance(world)
+    service = world.maintenance()
     owner = await world.user()
     await world.pipeline().receive(owner.id, incoming(b"%PDF-1"), filename="a.pdf")
     await world.drain()
@@ -63,7 +48,7 @@ async def test_cleanup_runs_and_schedules_the_next_one(world: World) -> None:
     assert sorted(cleanup_jobs(world)) == [JobStatus.DONE, JobStatus.QUEUED]
     assert not await service.run_next_job()  # the next one is due in an hour
 
-    world.clock.advance(INTERVAL)
+    world.clock.advance(MAINTENANCE_INTERVAL)
     assert await service.run_next_job()
     assert sorted(cleanup_jobs(world)) == [JobStatus.DONE, JobStatus.QUEUED]  # old run removed
     assert len(world.database.jobs) == 2
@@ -80,7 +65,7 @@ async def test_delivered_events_are_purged(world: World) -> None:
     owner = await world.user()
     await world.pipeline().receive(owner.id, incoming(b"%PDF-1"), filename="a.pdf")
     await bus.dispatch()
-    service = maintenance(world, bus)
+    service = world.maintenance(bus)
     await service.schedule()
     world.clock.set(max(world.database.recorded_at.values()) + RETENTION + timedelta(seconds=1))
     assert await service.run_next_job()
@@ -92,19 +77,19 @@ async def test_a_failed_cleanup_is_tried_again_later(world: World) -> None:
         async def purge(self, *, before: datetime) -> int:
             raise OSError("disk full")
 
-    service = maintenance(world, BrokenBus(world.database, retry=builders.EVENT_RETRY))
+    service = world.maintenance(BrokenBus(world.database, retry=builders.EVENT_RETRY))
     await service.schedule()
     assert await service.run_next_job()
     (job,) = world.database.jobs.values()
     assert (job.status, job.run_at, job.last_error) == (
         JobStatus.QUEUED,
-        world.clock.now() + INTERVAL,
+        world.clock.now() + MAINTENANCE_INTERVAL,
         "OSError('disk full')",
     )
 
 
 async def test_cleanup_removes_ended_sessions_and_old_failures(world: World) -> None:
-    service = maintenance(world)
+    service = world.maintenance()
     await world.account("alice")
     signed_in = await world.auth.login("alice", PASSWORD)
     with pytest.raises(AuthenticationError):
@@ -118,7 +103,7 @@ async def test_cleanup_removes_ended_sessions_and_old_failures(world: World) -> 
 
 
 async def test_cleanup_removes_devices_known_no_longer(world: World) -> None:
-    service = maintenance(world)
+    service = world.maintenance()
     await world.account("alice")
     [device] = (await world.auth.login("alice", PASSWORD)).devices
     await service.schedule()
@@ -131,7 +116,7 @@ async def test_cleanup_removes_devices_known_no_longer(world: World) -> None:
 async def test_deleting_a_document_removes_its_files(world: World) -> None:
     """Its derivatives and its original, unless the same file came in again meanwhile (every
     file exists once, but a deleted one may be uploaded anew before its files are gone)."""
-    service = maintenance(world)
+    service = world.maintenance()
     alice, bob = await world.user(), await world.user()
     again_file, own_file = b"%PDF-1.7 same", b"%PDF-1.7 alice only"
     first = await world.pipeline().receive(alice.id, incoming(again_file), filename="a.pdf")
@@ -165,7 +150,7 @@ async def test_deleting_a_document_removes_its_files(world: World) -> None:
 
 
 async def test_removing_files_is_retried(world: World, monkeypatch: pytest.MonkeyPatch) -> None:
-    service = maintenance(world)
+    service = world.maintenance()
     owner = await world.user()
     document = await world.pipeline().receive(owner.id, incoming(b"%PDF-1.7 x"), filename="x.pdf")
     await world.drain()
@@ -185,7 +170,7 @@ async def test_removing_files_is_retried(world: World, monkeypatch: pytest.Monke
 
 
 async def test_cleanup_removes_old_webhook_deliveries(world: World) -> None:
-    service = maintenance(world)
+    service = world.maintenance()
     user = await world.user()
     hook = (
         await world.webhooks.create(user.id, name="x", url="http://x.lan/hook", event_types=["*"])
@@ -216,7 +201,7 @@ async def test_cleanup_removes_old_webhook_deliveries(world: World) -> None:
 
 
 async def test_cleanup_drops_previous_webhook_secrets_after_the_grace_period(world: World) -> None:
-    service = maintenance(world)
+    service = world.maintenance()
     user = await world.user()
     grace = timedelta(hours=24)
     first = (
@@ -243,7 +228,7 @@ async def test_cleanup_drops_previous_webhook_secrets_after_the_grace_period(wor
 async def test_cleanup_removes_what_only_done_needs_after_its_period(world: World) -> None:
     """Who confirmed a document is kept for the inbox's done, 14 days; a seen mark as long as
     it tells that the document is not new."""
-    service = maintenance(world)
+    service = world.maintenance()
     owner = await world.user()
     space = await world.personal_space(owner)
     confirmed, seen = builders.processed(owner, space), builders.processed(owner, space)
@@ -259,7 +244,7 @@ async def test_cleanup_removes_what_only_done_needs_after_its_period(world: Worl
     await service.schedule()
     assert await service.run_next_job()
     assert world.database.confirmations == {confirmed.id: Confirmation(owner.id, builders.NOW)}
-    world.clock.advance(INTERVAL)
+    world.clock.advance(MAINTENANCE_INTERVAL)
     assert await service.run_next_job()
     assert world.database.confirmations == {}
     assert world.database.seen == {(owner.id, seen.id): SeenMark(builders.NOW)}
@@ -274,7 +259,7 @@ async def test_a_cancelled_cleanup_gives_its_job_back_at_once(world: World) -> N
             await asyncio.Event().wait()  # until cancelled
             return 0
 
-    service = maintenance(world, SlowBus(world.database, retry=builders.EVENT_RETRY))
+    service = world.maintenance(SlowBus(world.database, retry=builders.EVENT_RETRY))
     await service.schedule()
     task = asyncio.create_task(service.run_next_job())
     await started.wait()
@@ -295,7 +280,7 @@ async def test_cleanup_lets_old_mail_records_go_of_what_the_mail_said(world: Wor
         for uid in range(1, KEPT_RECORDS + 3):
             await uow.mail_records.add(a_record(mailbox, uid))
         await uow.commit()
-    service = maintenance(world)
+    service = world.maintenance()
     await service.schedule()
     assert await service.run_next_job()
     async with world.uow() as uow:

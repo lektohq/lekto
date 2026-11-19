@@ -20,8 +20,8 @@ from lekto.core.services.classification.signals import FactsResult, FactsSignal
 from lekto.core.services.nodes import OcrNode
 from lekto.core.services.objects import archive_key, codes_key, original_key
 from tests import builders
+from tests.unit.services.classification_support import contacts, output, stored
 from tests.unit.services.support import World
-from tests.unit.services.test_signals import contacts, output, stored
 
 GIRO_IBAN = "DE89370400440532013000"
 OWN_IBAN = "DE02120300000000202051"

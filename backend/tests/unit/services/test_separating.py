@@ -14,10 +14,9 @@ from lekto.core.domain.codes import Code
 from lekto.core.domain.documents import MAX_DOCUMENT_PAGES, Channel, Document
 from lekto.core.domain.editing import EditPart, PagePick
 from lekto.core.domain.errors import InvalidTransitionError
-from lekto.core.domain.ids import DocumentId, MailboxId, MailRecordId, new_id
+from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.locations import Box
-from lekto.core.domain.mail_intake import MailOrigin, OriginRole
 from lekto.core.domain.pipeline import (
     PERSON_SPACE,
     Lane,
@@ -36,7 +35,8 @@ from lekto.core.services.objects import original_key
 from lekto.core.services.pipeline import PipelineService
 from lekto.core.services.separating import NOT_LOOKED, SeparateNode, Separation
 from tests import builders
-from tests.builders import NOW, incoming
+from tests.builders import incoming
+from tests.unit.services.flows import mailed
 from tests.unit.services.support import CancelledCommit, World
 
 STACK = fake_pdf(8, "two payslips and a letter")
@@ -213,26 +213,7 @@ async def test_the_parts_of_a_mailed_stack_keep_its_mail(world: World) -> None:
     stack = await pipeline.receive(
         owner.id, incoming(STACK), filename="scans.pdf", channel=Channel.MAIL
     )
-    origin = MailOrigin(
-        document_id=stack.id,
-        record_id=MailRecordId(new_id()),
-        mailbox_id=MailboxId(new_id()),
-        mailbox="Post",
-        rule="Scans",
-        role=OriginRole.ATTACHMENT,
-        letter=1,
-        message_id="<scans@example.org>",
-        sender=(),
-        to=(),
-        cc=(),
-        subject="Scans",
-        sent_at=None,
-        arrived_at=NOW,
-        filename="scans.pdf",
-    )
-    async with world.uow() as uow:
-        await uow.mail_origins.add(origin)
-        await uow.commit()
+    origin = await mailed(world, stack, "scans.pdf")
     await world.drain(pipeline)
     _, part = await documents(world)
     assert part.channel is Channel.MAIL

@@ -3,13 +3,11 @@ every version's file counts for duplicates, and all their originals go with the 
 
 import asyncio
 from dataclasses import replace
-from datetime import date
 from pathlib import Path
 
 import pytest
 
 from lekto.adapters.outbound.memory.unit_of_work import MemoryDocumentRepository
-from lekto.adapters.outbound.regex import RegexPatternMatcher
 from lekto.core.domain.classification import FieldCheck
 from lekto.core.domain.documents import Document, DocumentChanges, Sha256
 from lekto.core.domain.errors import (
@@ -19,17 +17,20 @@ from lekto.core.domain.errors import (
     NotFoundError,
     UnsupportedMediaTypeError,
 )
-from lekto.core.domain.pipeline import Lane, Node, Outcome, ProcessingHistory, ProcessingStatus
+from lekto.core.domain.pipeline import Lane, Node, Outcome, ProcessingStatus
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.domain.users import Role
 from lekto.core.domain.versions import DocumentVersion, VersionKind
 from lekto.core.services.classification.nodes import _kept
 from lekto.core.services.objects import archive_key, derivative_keys, original_key, page_key
-from lekto.core.services.rules.nodes import ApplyRulesNode
 from tests import builders
-from tests.builders import FAILED, TEMPLATES, Returns, incoming
-from tests.unit.services.support import CancelledCommit, World
-from tests.unit.services.test_maintenance import maintenance
+from tests.builders import FAILED, Returns, incoming
+from tests.unit.services.support import (
+    CONFIRMED_ON,
+    CancelledCommit,
+    World,
+    confirmed,
+    held_as_a_new_version,
+)
 
 STACK = b"%PDF-1.7 three payslips"
 PART = b"%PDF-1.7 november only"
@@ -96,7 +97,7 @@ async def test_deleting_a_document_removes_the_originals_of_all_its_versions(
     second = await with_earlier_version(world, document)
     await world.drain()
     await world.documents.delete(owner.id, document.id)
-    service = maintenance(world)
+    service = world.maintenance()
     while await service.run_next_job():
         pass
     assert not await world.object_store.exists(original_key(document.sha256))
@@ -265,29 +266,14 @@ async def test_a_new_version_must_be_a_new_file_of_a_kind_a_document_has(world: 
 async def test_a_new_version_keeps_what_a_person_confirmed_and_waits_in_the_inbox(
     world: World,
 ) -> None:
-    owner = await world.user()
-    admin = await world.user(role=Role.ADMIN)
-    contact = await world.master_data.create_contact(admin.id, "INTER")
-    document = await world.pipeline().receive(owner.id, incoming(STACK), filename="stack.pdf")
-    await world.drain()
-    await world.documents.change_metadata(
-        owner.id,
-        document.id,
-        DocumentChanges(contact_id=contact.id, document_date=date(2022, 11, 25)),
-    )
-    rules = ApplyRulesNode(
-        world.uow, world.object_store, RegexPatternMatcher(0.2), TEMPLATES, max_text=200_000
-    )
-    pipeline = world.pipeline({Node.APPLY_RULES: rules})
+    c = await confirmed(world)
+    owner, document, pipeline = c.owner, c.document, c.pipeline
     await pipeline.new_version(owner.id, document.id, incoming(PART), filename="nov.pdf")
     await world.drain(pipeline)
     after = await world.documents.get(owner.id, document.id)
-    assert (after.contact_id, after.document_date) == (contact.id, date(2022, 11, 25))
+    assert (after.contact_id, after.document_date) == (c.contact, CONFIRMED_ON)
     assert after.lane is Lane.YELLOW
-    log = await world.documents.processing_log(owner.id, document.id)
-    entry = ProcessingHistory(log).latest(Node.APPLY_RULES)
-    assert entry is not None
-    assert ReasonCode.NEW_VERSION in {reason.code for reason in entry.result.reasons}
+    assert await held_as_a_new_version(world, owner, after)
     # Confirmed in the inbox, it is done: the rules ask no more.
     await pipeline.confirm(owner.id, document.id, DocumentChanges())
     await world.drain(pipeline)

@@ -48,9 +48,10 @@ from lekto.core.services.tasks.files import file_link
 from lekto.core.services.tasks.settling import Delegation
 from tests import builders
 from tests.builders import OK
+from tests.unit.services.classification_support import FIELDS, INVOICE, Seeded, proposal, seed
+from tests.unit.services.flows import answer_task, arrive, run_due, sent_to, stored
 from tests.unit.services.rules_support import incoming_pdf
 from tests.unit.services.support import World
-from tests.unit.services.test_classification import FIELDS, INVOICE, Seeded, proposal, seed
 
 URL = "http://agent.lan:8080/lekto"
 STRUCTURE = b'{"pages": []}'
@@ -104,34 +105,20 @@ class Calls:
     pipeline: PipelineService
 
     async def arrive(self, by: User | None = None) -> Document:
-        uploader = (by or self.admin).id
-        received = await self.pipeline.receive(uploader, incoming_pdf(), filename="a.pdf")
-        await self.run()
-        return await self.stored(received)
+        return await arrive(self.world, self.pipeline, (by or self.admin).id)
 
     async def run(self) -> None:
-        delivery = self.world.webhook_delivery()
-        while (
-            await self.pipeline.run_next_job()
-            or await delivery.run_next_job()
-            or await self.world.tasks.run_next_job()
-        ):
-            pass
+        await run_due(self.world, self.pipeline)
 
     async def stored(self, document: Document) -> Document:
-        async with self.world.uow() as uow:
-            return await uow.documents.get(document.id)
+        return await stored(self.world, document)
 
     def sent(self) -> list[WebhookRequest]:
-        return [request for request in self.world.sender.requests if request.url == URL]
+        return sent_to(self.world, URL)
 
     async def answer(self, request: WebhookRequest, envelope: object) -> str | None:
         """Answer the request; why it was not taken, if it was not."""
-        receipt = await self.world.tasks.answer(
-            TaskId(UUID(request.headers["lekto-task-id"])),
-            request.headers["lekto-task-token"],
-            json.dumps(envelope).encode(),
-        )
+        receipt = await answer_task(self.world, request, json.dumps(envelope).encode())
         await self.run()
         return receipt.problem
 

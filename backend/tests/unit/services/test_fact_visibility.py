@@ -14,8 +14,8 @@ from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role
 from lekto.core.services.classification.signals import FactsSignal
 from tests import builders
+from tests.unit.services.classification_support import contacts, stored
 from tests.unit.services.support import World
-from tests.unit.services.test_signals import contacts, stored
 
 K = IdentifierKind.CUSTOMER_NUMBER
 PUBLIC, ERIKAS, LEARNED, REJECTED = "77770001", "77770002", "77770003", "77770004"

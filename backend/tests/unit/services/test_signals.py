@@ -1,8 +1,6 @@
 """The signals without a language model: facts in the text, the classifier, the neighbours."""
 
-import itertools
 from dataclasses import replace
-from typing import Any
 
 from lekto.adapters.outbound.memory import (
     BagOfWordsEmbeddings,
@@ -13,20 +11,21 @@ from lekto.core.domain.documents import Document, DocumentChanges
 from lekto.core.domain.errors import EmbeddingsError
 from lekto.core.domain.identifiers import Identifier, IdentifierKind
 from lekto.core.domain.master_data import Assignment, Contact, Tag
-from lekto.core.domain.pipeline import NodeResult
 from lekto.core.domain.search import EmbeddingStamp, IndexDocument
-from lekto.core.domain.users import User
 from lekto.core.ports.embeddings import EmbeddingResult
 from lekto.core.services.classification.signals import (
     ABSTAINED,
     ClassifierSignal,
-    FactsResult,
     FactsSignal,
     NeighboursSignal,
 )
 from lekto.core.services.classifier import ClassifierService
-from lekto.core.services.objects import text_key
 from tests import builders
+from tests.unit.services.classification_support import (
+    contacts,
+    output,
+    stored,
+)
 from tests.unit.services.support import World
 
 THEIR_IBAN = "DE89 3704 0044 0532 0130 00"
@@ -38,30 +37,6 @@ Bitte überweisen Sie auf IBAN {THEIR_IBAN}. Lastschrift von {OTHER_IBAN}.
 Kundennummer: 4711-0815
 """
 DIMENSIONS = 256
-_numbers = itertools.count()
-
-
-def output(result: NodeResult | FactsResult) -> Any:
-    return (result.result if isinstance(result, FactsResult) else result).output
-
-
-async def stored(world: World, owner: User, text: str, contact: Contact | None = None) -> Document:
-    space = await world.personal_space(owner)
-    document = builders.processed(owner, space, content=f"{text} {next(_numbers)}")
-    if contact is not None:
-        document.apply_changes(DocumentChanges(contact_id=contact.id), {}, builders.NOW)
-    async with world.uow() as uow:
-        await uow.documents.add(document)
-        await uow.commit()
-    await world.object_store.put(text_key(document.id), text.encode(), content_type="text/md")
-    return document
-
-
-async def contacts(world: World, *items: Contact) -> None:
-    async with world.uow() as uow:
-        for item in items:
-            await uow.contacts.add(item)
-        await uow.commit()
 
 
 # --- facts ------------------------------------------------------------------------------------

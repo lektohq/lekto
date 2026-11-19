@@ -32,9 +32,7 @@ from lekto.core.services.pipeline import MetadataResult, NodeExecutor
 from lekto.core.services.rules import RuleService
 from tests import builders, person_numbers
 from tests.builders import incoming
-from tests.unit.services.rules_support import FakeMatcher
-from tests.unit.services.support import World
-from tests.unit.services.test_classification import (
+from tests.unit.services.classification_support import (
     INVOICE,
     extraction,
     fields_step,
@@ -46,7 +44,8 @@ from tests.unit.services.test_classification import (
     seed,
     signal_step,
 )
-from tests.unit.services.test_space_rules import files_into
+from tests.unit.services.rules_support import FakeMatcher, files_into
+from tests.unit.services.support import World
 
 
 async def household(world: World, *, erika_reads_tobi: bool = False) -> tuple[User, User, Space]:

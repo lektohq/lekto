@@ -16,13 +16,10 @@ from lekto.core.domain.first_runs import RELATIONS
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import ContactId, DocumentId, DocumentTypeId
 from lekto.core.domain.jobs import JobStatus
-from lekto.core.domain.master_data import Contact, DocumentType
 from lekto.core.domain.periods import Period
 from lekto.core.domain.pipeline import Node, NodeResult, NodeRun, Outcome
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState
 from lekto.core.domain.rules import AddTags, Condition, ConditionField, Operator
-from lekto.core.domain.spaces import Space
-from lekto.core.domain.users import User
 from lekto.core.services import pipeline as pipeline_module
 from lekto.core.services import relating
 from lekto.core.services.classification.signals import FactsSignal
@@ -30,36 +27,14 @@ from lekto.core.services.relating import RELATE, RELATE_JOB, queue_relate, relat
 from lekto.core.services.relations import RELATIONS_LOCK, RelationService
 from tests import builders
 from tests.unit.services.rules_support import Classifies, definition, rule_world
-from tests.unit.services.support import World
+from tests.unit.services.support import StoredScene, World
 
 K = IdentifierKind
 NOW = builders.NOW
 
 
-class Scene:
+class Scene(StoredScene):
     """A user's documents with contacts, types, dates, fields and facts, stored directly."""
-
-    def __init__(self, world: World, owner: User, space: Space) -> None:
-        self.world, self.owner, self.space = world, owner, space
-
-    @classmethod
-    async def of(cls, world: World) -> "Scene":
-        owner = await world.user()
-        return cls(world, owner, await world.personal_space(owner))
-
-    async def contact(self, name: str) -> ContactId:
-        contact = Contact.create(name=name, now=NOW)
-        async with self.world.uow() as uow:
-            await uow.contacts.add(contact)
-            await uow.commit()
-        return contact.id
-
-    async def document_type(self, name: str, *, target: bool = False) -> DocumentTypeId:
-        kind = DocumentType.create(name=name, now=NOW, relation_target=target)
-        async with self.world.uow() as uow:
-            await uow.document_types.add(kind)
-            await uow.commit()
-        return kind.id
 
     async def document(
         self,

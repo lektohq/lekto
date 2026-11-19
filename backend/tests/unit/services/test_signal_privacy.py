@@ -1,34 +1,19 @@
 """The similar documents a signal found are searched from the uploader's reach: an editor of
 the document's space, or who received it, sees only those they may read themselves."""
 
-from datetime import timedelta
+from functools import partial
 from typing import Any
 
 from lekto.core.domain.classification import Candidate, CandidateSource, FieldCheck, checks_to_json
 from lekto.core.domain.documents import Document
-from lekto.core.domain.pipeline import Node, NodeResult, NodeRun, Outcome
+from lekto.core.domain.pipeline import Node, NodeRun, Outcome
 from lekto.core.domain.reasons import written
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role, User
 from tests import builders
-from tests.builders import NOW
-from tests.unit.services.support import World
+from tests.unit.services.support import World, node_run
 
-
-def _run(document: Document, node: Node, output: dict[str, object]) -> NodeRun:
-    return NodeRun(
-        document_id=document.id,
-        node=node,
-        run=1,
-        result=NodeResult(
-            outcome=Outcome.UNCERTAIN if node is Node.JUDGE else Outcome.OK,
-            reasons=(written("contact"),) if node is Node.JUDGE else (),
-            output=output,  # type: ignore[arg-type]
-        ),
-        pipeline_version="1",
-        started_at=NOW,
-        duration=timedelta(seconds=1),
-    )
+_run = partial(node_run, why="contact")
 
 
 async def _scene(world: World) -> tuple[User, User, Document, Document, Document]:

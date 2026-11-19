@@ -7,7 +7,6 @@ from lekto.core.domain.rules import (
     Condition,
     ConditionField,
     Operator,
-    RuleDefinition,
     SetDocumentType,
     SetSpace,
     Trigger,
@@ -26,6 +25,7 @@ from tests.unit.services.rules_support import (
     channel_api,
     contact_is,
     definition,
+    files_into,
     reports,
     rule_world,
 )
@@ -39,10 +39,6 @@ async def household(rules: RuleWorld) -> tuple[User, User, Space]:
     space = await world.spaces.create(tobi.id, "Haushalt")
     space = await world.spaces.set_member(tobi.id, space.id, erika.id, SpaceRole.EDIT)
     return tobi, erika, space
-
-
-def files_into(space: Space, name: str = "File") -> RuleDefinition:
-    return definition(name, channel_api(), SetSpace(space.id), triggers=(Trigger.INGEST,))
 
 
 async def test_the_rules_of_the_space_a_rule_files_into_run_next(world: World) -> None:

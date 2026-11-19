@@ -22,8 +22,8 @@ from lekto.core.services.classification.answers import read_fact_to_json
 from lekto.core.services.classification.kept_facts import TextFacts, keep_facts
 from lekto.core.services.classification.signals import MODEL_FACTS, FactsResult, FactsSignal
 from tests import builders
+from tests.unit.services.classification_support import stored
 from tests.unit.services.support import World
-from tests.unit.services.test_signals import stored
 
 TEXT = (
     "Muster Bank\nKontoauszug\nIBAN DE02 1203 0000 0000 2020 51\n"
