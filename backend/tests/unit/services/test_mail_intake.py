@@ -284,6 +284,9 @@ async def test_a_mail_is_fetched_once_across_mailboxes(world: World) -> None:
         "INBOX", mails.plain_mail(), arrived_at=world.clock.now() + LATER
     )
     _deliver(world, mails.plain_mail())
+    # The second mailbox's fetch is queued a second later: the first one's runs first, not the
+    # one whose id happens to be smaller (TD-02).
+    world.clock.advance(timedelta(seconds=1))
     second = await world.mailboxes.create(
         admin.id,
         name="Other",
