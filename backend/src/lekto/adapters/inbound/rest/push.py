@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Response
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, area
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.push import (
@@ -15,8 +15,10 @@ from lekto.adapters.inbound.rest.schemas.push import (
     PushTestOut,
 )
 from lekto.core.domain.ids import PushDeviceId
+from lekto.core.domain.rights import TokenRight
 
-router = APIRouter(prefix="/push", tags=["push"], dependencies=PROTECTED)
+PUSH_AREA = area(TokenRight.PUSH_READ, TokenRight.PUSH_WRITE)
+router = APIRouter(route_class=PUSH_AREA, prefix="/push", tags=["push"], dependencies=PROTECTED)
 
 WHO = "Only its owner sees a device; other users' devices are not found (404)."
 OFF = "409 `push_off`: the server sends no notifications (no VAPID key)."

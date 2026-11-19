@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, area
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.params import ADMINS_ONLY
 from lekto.adapters.inbound.rest.problems import problem_responses
@@ -18,10 +18,12 @@ from lekto.adapters.inbound.rest.schemas.jobs import (
 from lekto.adapters.inbound.schemas import MAX_POSITION
 from lekto.core.domain.ids import JobId
 from lekto.core.domain.jobs import OPEN_STATES, JobState
+from lekto.core.domain.rights import TokenRight
 from lekto.core.ports.repository import PAGE_SIZE
 from lekto.core.services.jobs import PAGE_LIMIT
 
-router = APIRouter(prefix="/jobs", tags=["jobs"], dependencies=PROTECTED)
+SYSTEM_AREA = area(TokenRight.SYSTEM_READ, TokenRight.SYSTEM_WRITE)
+router = APIRouter(route_class=SYSTEM_AREA, prefix="/jobs", tags=["jobs"], dependencies=PROTECTED)
 
 WHO = (
     "Every user sees the jobs; a job names a document only to those who may read it, and its "

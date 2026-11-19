@@ -9,7 +9,13 @@ from uuid import UUID
 from sqlalchemy import Row, and_, delete, insert, or_, select, tuple_
 
 from lekto.adapters.outbound.sql import tables as t
-from lekto.adapters.outbound.sql.repositories import SqlRepository, Values, via_columns
+from lekto.adapters.outbound.sql.repositories import (
+    SqlRepository,
+    Values,
+    rights_column,
+    stored_rights,
+    via_columns,
+)
 from lekto.core.domain.errors import NotFoundError
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import (
@@ -223,6 +229,7 @@ class SqlRuleApplicationRepository(SqlRepository[RuleApplicationId, RuleApplicat
             user_id=UserId(row.user_id),
             documents=tuple(DocumentId(UUID(item)) for item in row.documents),
             via=ViaToken.stored(row.via_token_id, row.via_token_name),
+            rights=stored_rights(row.rights),
             accept_conflicts=frozenset(DocumentId(UUID(item)) for item in row.accept_conflicts),
             status=ProgressStatus(row.status),
             position=row.position,
@@ -248,6 +255,7 @@ class SqlRuleApplicationRepository(SqlRepository[RuleApplicationId, RuleApplicat
             "status": entity.status.value,
             "documents": [str(id) for id in entity.documents],
             **via_columns(entity.via),
+            "rights": rights_column(entity.rights),
             "accept_conflicts": sorted(str(id) for id in entity.accept_conflicts),
             "position": entity.position,
             "applied": entity.applied,

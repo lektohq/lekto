@@ -29,6 +29,8 @@ from lekto.adapters.inbound.rest.auth import (
     Authenticated,
     CurrentUser,
     Via,
+    area,
+    right,
 )
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.cursors import Cursor, decode_cursor, encode_cursor
@@ -106,16 +108,21 @@ from lekto.core.domain.inbox import DONE_PERIOD, InboxTab
 from lekto.core.domain.lenses import LensSort
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.domain.rights import Actor
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.validation import to_utc
 from lekto.core.ports.pages import PAGE_MEDIA_TYPE
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE, DocumentOrder, SortKey
 from lekto.core.services.documents import DocumentFile, DocumentView, FileInfo, MetadataChange
 from lekto.core.services.editing import AddedFile
 
-router = APIRouter(prefix="/documents", tags=["documents"], dependencies=PROTECTED)
+DOCUMENTS_AREA = area(TokenRight.DOCUMENTS_READ, TokenRight.DOCUMENTS_WRITE)
+router = APIRouter(
+    route_class=DOCUMENTS_AREA, prefix="/documents", tags=["documents"], dependencies=PROTECTED
+)
 
-inbox = APIRouter(prefix="/inbox", tags=["inbox"], dependencies=PROTECTED)
+inbox = APIRouter(
+    route_class=DOCUMENTS_AREA, prefix="/inbox", tags=["inbox"], dependencies=PROTECTED
+)
 
 EDITORS = "Editors of the document's space and admins"
 
@@ -496,6 +503,7 @@ async def list_documents(
 
 @router.get(
     "/count",
+    openapi_extra=right(TokenRight.DOCUMENTS_COUNT),
     summary="How many documents match a filter",
     description=(
         "How many documents within the caller's reach match the filter (the parameters of "
@@ -1138,6 +1146,7 @@ async def list_inbox(
 
 @inbox.get(
     "/summary",
+    openapi_extra=right(TokenRight.DOCUMENTS_COUNT),
     summary="What the caller's inbox holds",
     description=(
         "How many documents stand under each tab of the caller's inbox (as `GET /inbox`), "

@@ -4,15 +4,19 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, area
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.lenses import LensCreate, LensOrder, LensOut, LensPatch
 from lekto.core.domain.changes import UNSET
 from lekto.core.domain.ids import FieldId, LensId
 from lekto.core.domain.lenses import LensChanges
+from lekto.core.domain.rights import TokenRight
 
-router = APIRouter(prefix="/lenses", tags=["lenses"], dependencies=PROTECTED)
+LENSES_AREA = area(TokenRight.LENSES_READ, TokenRight.LENSES_WRITE)
+router = APIRouter(
+    route_class=LENSES_AREA, prefix="/lenses", tags=["lenses"], dependencies=PROTECTED
+)
 
 WHO = "Only its owner sees and changes a lens; other users' lenses are not found (404)."
 GONE = (

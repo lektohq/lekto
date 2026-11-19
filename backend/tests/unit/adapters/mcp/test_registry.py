@@ -49,7 +49,9 @@ def principal(
     token = (
         None
         if scope is None
-        else ApiToken.issue(user_id=user.id, name="t", scope=scope, now=builders.NOW)[0]
+        else ApiToken.issue(
+            user_id=user.id, name="t", rights=scope.rights(admin=admin), now=builders.NOW
+        )[0]
     )
     return Principal(user=user, api_token=token)
 

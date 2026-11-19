@@ -458,6 +458,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -517,6 +518,7 @@
             }
           }
         },
+        "x-right": "any",
         "security": [
           {
             "session": []
@@ -595,6 +597,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -742,6 +745,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -875,6 +879,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -950,6 +955,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -1041,6 +1047,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -1174,6 +1181,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -1316,6 +1324,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -1465,6 +1474,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -1544,6 +1554,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -1555,7 +1566,7 @@
           "auth"
         ],
         "summary": "Create an API token",
-        "description": "`read` allows reading only; `read_write` everything the caller may do, except managing the own sign-in. The token is shown only now. Needs a session; API tokens are refused (403).",
+        "description": "With the rights of a preset (`scope`) or chosen one by one (`rights`); each operation names the right it needs (`x-right`). `read` allows reading only; `read_write` everything the caller may do, except managing the own sign-in; `upload` only uploading. An admin's `read` and `read_write` carry every admin right. 422 without rights, and for admin rights of a user who is no admin. The token is shown only now. Needs a session; API tokens are refused (403).",
         "operationId": "create_token_api_v1_auth_tokens_post",
         "requestBody": {
           "content": {
@@ -1659,6 +1670,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -1771,6 +1783,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -1915,6 +1928,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -2020,6 +2034,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -2083,6 +2098,7 @@
             }
           }
         },
+        "x-right": "spaces:read",
         "security": [
           {
             "session": []
@@ -2217,6 +2233,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -2331,6 +2348,7 @@
             }
           }
         },
+        "x-right": "spaces:read",
         "security": [
           {
             "session": []
@@ -2493,6 +2511,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -2655,6 +2674,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -2774,6 +2794,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -2936,6 +2957,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -3077,6 +3099,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -3189,6 +3212,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -3308,6 +3332,7 @@
             }
           }
         },
+        "x-right": "session",
         "security": [
           {
             "session": []
@@ -3427,6 +3452,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -3551,6 +3577,7 @@
             }
           }
         },
+        "x-right": "master_data:read",
         "security": [
           {
             "session": []
@@ -3701,6 +3728,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -3806,6 +3834,7 @@
             }
           }
         },
+        "x-right": "master_data:read",
         "security": [
           {
             "session": []
@@ -3968,6 +3997,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -4097,6 +4127,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -4191,6 +4222,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -4355,6 +4387,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -4545,6 +4578,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -4658,6 +4692,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -4763,6 +4798,7 @@
             }
           }
         },
+        "x-right": "master_data:read",
         "security": [
           {
             "session": []
@@ -4910,6 +4946,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -5034,6 +5071,7 @@
             }
           }
         },
+        "x-right": "master_data:read",
         "security": [
           {
             "session": []
@@ -5184,6 +5222,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -5289,6 +5328,7 @@
             }
           }
         },
+        "x-right": "master_data:read",
         "security": [
           {
             "session": []
@@ -5451,6 +5491,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -5580,6 +5621,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -5748,6 +5790,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -5888,6 +5931,7 @@
             }
           }
         },
+        "x-right": "master_data:read",
         "security": [
           {
             "session": []
@@ -6038,6 +6082,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -6143,6 +6188,7 @@
             }
           }
         },
+        "x-right": "master_data:read",
         "security": [
           {
             "session": []
@@ -6305,6 +6351,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -6434,6 +6481,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -6558,6 +6606,7 @@
             }
           }
         },
+        "x-right": "master_data:read",
         "security": [
           {
             "session": []
@@ -6708,6 +6757,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -6813,6 +6863,7 @@
             }
           }
         },
+        "x-right": "master_data:read",
         "security": [
           {
             "session": []
@@ -6975,6 +7026,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -7104,6 +7156,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -7266,6 +7319,7 @@
             }
           }
         },
+        "x-right": "master_data:read",
         "security": [
           {
             "session": []
@@ -7455,6 +7509,7 @@
           }
         },
         "x-reads": true,
+        "x-right": "master_data:read",
         "security": [
           {
             "session": []
@@ -7533,6 +7588,7 @@
             }
           }
         },
+        "x-right": "master_data:read",
         "security": [
           {
             "session": []
@@ -7663,6 +7719,7 @@
             }
           }
         },
+        "x-right": "master_data:read",
         "security": [
           {
             "session": []
@@ -7787,6 +7844,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -7869,6 +7927,7 @@
             }
           }
         },
+        "x-right": "master_data:write",
         "security": [
           {
             "session": []
@@ -7990,6 +8049,7 @@
           }
         },
         "x-reads": true,
+        "x-right": "master_data:read",
         "security": [
           {
             "session": []
@@ -8104,6 +8164,7 @@
             }
           }
         },
+        "x-right": "master_data:read",
         "security": [
           {
             "session": []
@@ -8218,6 +8279,7 @@
             }
           }
         },
+        "x-right": "master_data:read",
         "security": [
           {
             "session": []
@@ -8330,6 +8392,7 @@
             }
           }
         },
+        "x-right": "spaces:read",
         "security": [
           {
             "session": []
@@ -8480,6 +8543,7 @@
             }
           }
         },
+        "x-right": "spaces:write",
         "security": [
           {
             "session": []
@@ -8585,6 +8649,7 @@
             }
           }
         },
+        "x-right": "spaces:read",
         "security": [
           {
             "session": []
@@ -8747,6 +8812,7 @@
             }
           }
         },
+        "x-right": "spaces:write",
         "security": [
           {
             "session": []
@@ -8876,6 +8942,7 @@
             }
           }
         },
+        "x-right": "spaces:write",
         "security": [
           {
             "session": []
@@ -9034,6 +9101,7 @@
             }
           }
         },
+        "x-right": "spaces:write",
         "security": [
           {
             "session": []
@@ -9167,6 +9235,7 @@
             }
           }
         },
+        "x-right": "spaces:write",
         "security": [
           {
             "session": []
@@ -9322,6 +9391,7 @@
             }
           }
         },
+        "x-right": "rules:read",
         "security": [
           {
             "session": []
@@ -9456,6 +9526,7 @@
             }
           }
         },
+        "x-right": "rules:write",
         "security": [
           {
             "session": []
@@ -9562,6 +9633,7 @@
             }
           }
         },
+        "x-right": "rules:read",
         "security": [
           {
             "session": []
@@ -9724,6 +9796,7 @@
             }
           }
         },
+        "x-right": "rules:write",
         "security": [
           {
             "session": []
@@ -9886,6 +9959,7 @@
             }
           }
         },
+        "x-right": "rules:write",
         "security": [
           {
             "session": []
@@ -10015,6 +10089,7 @@
             }
           }
         },
+        "x-right": "rules:write",
         "security": [
           {
             "session": []
@@ -10125,6 +10200,7 @@
             }
           }
         },
+        "x-right": "rules:read",
         "security": [
           {
             "session": []
@@ -10242,6 +10318,7 @@
             }
           }
         },
+        "x-right": "rules:read",
         "security": [
           {
             "session": []
@@ -10391,6 +10468,7 @@
           }
         },
         "x-reads": true,
+        "x-right": "rules:read",
         "security": [
           {
             "session": []
@@ -10523,6 +10601,7 @@
             }
           }
         },
+        "x-right": "rules:read",
         "security": [
           {
             "session": []
@@ -10671,6 +10750,7 @@
             }
           }
         },
+        "x-right": "rules:write",
         "security": [
           {
             "session": []
@@ -10777,6 +10857,7 @@
             }
           }
         },
+        "x-right": "rules:read",
         "security": [
           {
             "session": []
@@ -10914,6 +10995,7 @@
           }
         },
         "x-reads": true,
+        "x-right": "rules:read",
         "security": [
           {
             "session": []
@@ -11369,6 +11451,7 @@
           }
         },
         "x-reads": true,
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -11534,6 +11617,7 @@
           }
         },
         "x-reads": true,
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -11621,6 +11705,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -11708,6 +11793,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -11786,6 +11872,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -11881,6 +11968,7 @@
           }
         },
         "x-reads": true,
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -12309,6 +12397,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -12415,6 +12504,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -12763,6 +12853,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -12841,6 +12932,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -12923,6 +13015,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -13026,6 +13119,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -13253,7 +13347,7 @@
             }
           }
         },
-        "x-uploads": true,
+        "x-right": "documents:upload",
         "security": [
           {
             "session": []
@@ -13695,6 +13789,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -13901,6 +13996,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -14091,6 +14187,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -14384,6 +14481,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -14754,6 +14852,7 @@
             }
           }
         },
+        "x-right": "documents:count",
         "security": [
           {
             "session": []
@@ -15124,6 +15223,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -15230,6 +15330,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -15412,6 +15513,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -15525,6 +15627,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -15702,6 +15805,7 @@
           }
         },
         "x-reads": true,
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -15859,6 +15963,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -15966,6 +16071,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -16084,6 +16190,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -16191,6 +16298,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -16298,6 +16406,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -16415,6 +16524,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -16569,6 +16679,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -16691,6 +16802,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -16825,6 +16937,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -16951,6 +17064,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -17089,6 +17203,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -17227,6 +17342,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -17349,6 +17465,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -17489,6 +17606,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -17653,6 +17771,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -17759,6 +17878,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -17881,6 +18001,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -18045,6 +18166,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -18160,6 +18282,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -18273,6 +18396,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -18395,6 +18519,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -18567,6 +18692,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -18724,6 +18850,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -18832,6 +18959,7 @@
             }
           }
         },
+        "x-right": "documents:count",
         "security": [
           {
             "session": []
@@ -18940,6 +19068,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -19002,6 +19131,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -19080,6 +19210,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -19158,6 +19289,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -19236,6 +19368,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -19314,6 +19447,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -19456,6 +19590,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -19559,6 +19694,7 @@
             }
           }
         },
+        "x-right": "webhooks:read",
         "security": [
           {
             "session": []
@@ -19693,6 +19829,7 @@
             }
           }
         },
+        "x-right": "webhooks:write",
         "security": [
           {
             "session": []
@@ -19799,6 +19936,7 @@
             }
           }
         },
+        "x-right": "webhooks:read",
         "security": [
           {
             "session": []
@@ -19961,6 +20099,7 @@
             }
           }
         },
+        "x-right": "webhooks:write",
         "security": [
           {
             "session": []
@@ -20074,6 +20213,7 @@
             }
           }
         },
+        "x-right": "webhooks:write",
         "security": [
           {
             "session": []
@@ -20196,6 +20336,7 @@
             }
           }
         },
+        "x-right": "webhooks:write",
         "security": [
           {
             "session": []
@@ -20316,6 +20457,7 @@
             }
           }
         },
+        "x-right": "webhooks:write",
         "security": [
           {
             "session": []
@@ -20484,6 +20626,7 @@
             }
           }
         },
+        "x-right": "webhooks:read",
         "security": [
           {
             "session": []
@@ -20607,6 +20750,7 @@
             }
           }
         },
+        "x-right": "webhooks:read",
         "security": [
           {
             "session": []
@@ -20745,6 +20889,7 @@
             }
           }
         },
+        "x-right": "webhooks:write",
         "security": [
           {
             "session": []
@@ -21095,6 +21240,7 @@
             }
           }
         },
+        "x-right": "lenses:read",
         "security": [
           {
             "session": []
@@ -21229,6 +21375,7 @@
             }
           }
         },
+        "x-right": "lenses:write",
         "security": [
           {
             "session": []
@@ -21369,6 +21516,7 @@
             }
           }
         },
+        "x-right": "lenses:write",
         "security": [
           {
             "session": []
@@ -21475,6 +21623,7 @@
             }
           }
         },
+        "x-right": "lenses:read",
         "security": [
           {
             "session": []
@@ -21637,6 +21786,7 @@
             }
           }
         },
+        "x-right": "lenses:write",
         "security": [
           {
             "session": []
@@ -21750,6 +21900,7 @@
             }
           }
         },
+        "x-right": "lenses:write",
         "security": [
           {
             "session": []
@@ -21812,6 +21963,7 @@
             }
           }
         },
+        "x-right": "push:read",
         "security": [
           {
             "session": []
@@ -21878,6 +22030,7 @@
             }
           }
         },
+        "x-right": "push:read",
         "security": [
           {
             "session": []
@@ -22012,6 +22165,7 @@
             }
           }
         },
+        "x-right": "push:write",
         "security": [
           {
             "session": []
@@ -22127,6 +22281,7 @@
             }
           }
         },
+        "x-right": "push:write",
         "security": [
           {
             "session": []
@@ -22265,6 +22420,7 @@
             }
           }
         },
+        "x-right": "push:write",
         "security": [
           {
             "session": []
@@ -22327,6 +22483,7 @@
             }
           }
         },
+        "x-right": "push:read",
         "security": [
           {
             "session": []
@@ -22461,6 +22618,7 @@
             }
           }
         },
+        "x-right": "push:write",
         "security": [
           {
             "session": []
@@ -22543,6 +22701,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -22677,6 +22836,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -22813,6 +22973,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -22933,6 +23094,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -23119,6 +23281,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -23260,6 +23423,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -23382,6 +23546,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -23544,6 +23709,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -23657,6 +23823,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -23739,6 +23906,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -23873,6 +24041,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -24014,6 +24183,7 @@
           }
         },
         "x-reads": true,
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -24136,6 +24306,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -24298,6 +24469,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -24411,6 +24583,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -24517,6 +24690,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -24623,6 +24797,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -24785,6 +24960,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -24933,6 +25109,7 @@
             }
           }
         },
+        "x-right": "documents:write",
         "security": [
           {
             "session": []
@@ -25061,6 +25238,7 @@
             }
           }
         },
+        "x-right": "documents:read",
         "security": [
           {
             "session": []
@@ -25123,6 +25301,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -25265,6 +25444,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -25327,6 +25507,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -25465,6 +25646,7 @@
             }
           }
         },
+        "x-right": "system:write",
         "security": [
           {
             "session": []
@@ -25591,6 +25773,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -25717,6 +25900,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -25795,6 +25979,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -25916,6 +26101,7 @@
             }
           }
         },
+        "x-right": "system:read",
         "security": [
           {
             "session": []
@@ -37087,7 +37273,15 @@
                 "type": "null"
               }
             ],
-            "description": "With an API token: its scope."
+            "description": "With an API token: the preset its rights match; null for rights chosen one by one."
+          },
+          "rights": {
+            "items": {
+              "$ref": "#/components/schemas/TokenRight"
+            },
+            "type": "array",
+            "title": "Rights",
+            "description": "What the caller may: with an API token its rights (an admin right only while the user is an active admin), with a session every right of the user."
           },
           "has_password": {
             "type": "boolean",
@@ -37129,6 +37323,7 @@
           "csrf_token",
           "session_expires_at",
           "token_scope",
+          "rights",
           "has_password",
           "totp_enabled",
           "linked_accounts",
@@ -37142,6 +37337,10 @@
             "has_password": true,
             "lekto_version": "0.8.0",
             "linked_accounts": [],
+            "rights": [
+              "documents:count",
+              "documents:read"
+            ],
             "shortcut_url": "https://www.icloud.com/shortcuts/8d752558e38f4f64bf9c61faa4694a75",
             "token_scope": "read",
             "totp_enabled": false,
@@ -39509,6 +39708,8 @@
           "upload_only_token",
           "upload_only_token_fields",
           "token_lacks_right",
+          "token_rights_empty",
+          "token_admin_rights",
           "push_off",
           "push_endpoint_refused",
           "push_keys_invalid",
@@ -43350,7 +43551,31 @@
             ]
           },
           "scope": {
-            "$ref": "#/components/schemas/TokenScope"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenScope"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A preset of rights: `read`, `read_write` (for an admin with every admin right) or `upload`. Either this or `rights`."
+          },
+          "rights": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TokenRight"
+                },
+                "type": "array",
+                "maxItems": 23
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rights",
+            "description": "The rights one by one; admin rights only for an admin. Either this or `scope`."
           },
           "expires_at": {
             "anyOf": [
@@ -43368,8 +43593,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "name",
-          "scope"
+          "name"
         ],
         "title": "TokenCreate",
         "examples": [
@@ -43377,6 +43601,13 @@
             "expires_at": "2027-01-01T00:00:00Z",
             "name": "scanner",
             "scope": "read_write"
+          },
+          {
+            "name": "Home Assistant",
+            "rights": [
+              "documents:read",
+              "admin:count_all"
+            ]
           }
         ]
       },
@@ -43392,7 +43623,22 @@
             "title": "Name"
           },
           "scope": {
-            "$ref": "#/components/schemas/TokenScope"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenScope"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The preset the rights match; null for rights chosen one by one."
+          },
+          "rights": {
+            "items": {
+              "$ref": "#/components/schemas/TokenRight"
+            },
+            "type": "array",
+            "title": "Rights"
           },
           "created_at": {
             "type": "string",
@@ -43437,6 +43683,7 @@
           "id",
           "name",
           "scope",
+          "rights",
           "created_at",
           "expires_at",
           "last_used_at",
@@ -43449,7 +43696,10 @@
             "expires_at": "2027-01-01T00:00:00Z",
             "id": "01999d5e-6666-7c1e-b6a3-2f4d5e6f7a8b",
             "name": "scanner",
-            "scope": "read_write",
+            "rights": [
+              "documents:upload"
+            ],
+            "scope": "upload",
             "token": "lekto_<token shown once>"
           }
         ]
@@ -43466,7 +43716,22 @@
             "title": "Name"
           },
           "scope": {
-            "$ref": "#/components/schemas/TokenScope"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenScope"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The preset the rights match; null for rights chosen one by one."
+          },
+          "rights": {
+            "items": {
+              "$ref": "#/components/schemas/TokenRight"
+            },
+            "type": "array",
+            "title": "Rights"
           },
           "created_at": {
             "type": "string",
@@ -43503,6 +43768,7 @@
           "id",
           "name",
           "scope",
+          "rights",
           "created_at",
           "expires_at",
           "last_used_at"
@@ -43515,9 +43781,41 @@
             "id": "01999d5e-6666-7c1e-b6a3-2f4d5e6f7a8b",
             "last_used_at": "2026-04-02T07:30:00Z",
             "name": "scanner",
-            "scope": "read_write"
+            "rights": [
+              "documents:upload"
+            ],
+            "scope": "upload"
           }
         ]
+      },
+      "TokenRight": {
+        "type": "string",
+        "enum": [
+          "documents:count",
+          "documents:read",
+          "documents:write",
+          "documents:upload",
+          "master_data:read",
+          "master_data:write",
+          "rules:read",
+          "rules:write",
+          "spaces:read",
+          "spaces:write",
+          "webhooks:read",
+          "webhooks:write",
+          "lenses:read",
+          "lenses:write",
+          "push:read",
+          "push:write",
+          "system:read",
+          "system:write",
+          "admin:count_all",
+          "admin:documents_all",
+          "admin:mailboxes",
+          "admin:private_webhooks",
+          "admin:manage"
+        ],
+        "title": "TokenRight"
       },
       "TokenScope": {
         "type": "string",
@@ -43527,7 +43825,7 @@
           "upload"
         ],
         "title": "TokenScope",
-        "description": "What an API token may do: read, read and write, or only upload documents (a shortcut\non a phone that sends shared files; it reads nothing, not even what it uploaded)."
+        "description": "A preset of rights for an API token (`rights`): read, read and write, or only upload\ndocuments (a shortcut on a phone that sends shared files; it reads nothing, not even what it\nuploaded). What a token may is its rights; the scope is how they were chosen, or the preset\nthey match."
       },
       "TotpSetupOut": {
         "properties": {
@@ -44812,7 +45110,7 @@
       "token": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Personal API token (`lekto_…`); scope `read` allows reading only: GET, and the POST operations marked `x-reads` (a search with its words in the body, a dry run, a preview, a check); scope `upload` allows only the operation marked `x-uploads` (`POST /documents`)."
+        "description": "Personal API token (`lekto_…`) with its rights: each operation names the right it needs as `x-right` (`session`: no token reaches it; `any`: every token). An admin right also needs an active admin; an admin token without one acts as a user with the same spaces."
       },
       "taskToken": {
         "type": "http",
@@ -45379,6 +45677,8 @@
     "token_lacks_right": {
       "right": "text"
     },
+    "token_rights_empty": {},
+    "token_admin_rights": {},
     "push_off": {},
     "push_endpoint_refused": {},
     "push_keys_invalid": {},

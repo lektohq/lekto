@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Path, Request, Response
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, READS, CurrentUser, Via
+from lekto.adapters.inbound.rest.auth import PROTECTED, READS, CurrentUser, Via, area
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.cursors import decode_cursor, encode_cursor
 from lekto.adapters.inbound.rest.params import AllRules
@@ -42,11 +42,15 @@ from lekto.core.domain.ids import (
     RuleId,
     SpaceId,
 )
+from lekto.core.domain.rights import TokenRight
 from lekto.core.domain.rules import RuleScope
 from lekto.core.domain.rules_json import definition_from_json
 
-router = APIRouter(prefix="/rules", tags=["rules"], dependencies=PROTECTED)
-templates = APIRouter(prefix="/templates", tags=["rules"], dependencies=PROTECTED)
+RULES_AREA = area(TokenRight.RULES_READ, TokenRight.RULES_WRITE)
+router = APIRouter(route_class=RULES_AREA, prefix="/rules", tags=["rules"], dependencies=PROTECTED)
+templates = APIRouter(
+    route_class=RULES_AREA, prefix="/templates", tags=["rules"], dependencies=PROTECTED
+)
 
 WHO_CHANGES = (
     "A space rule: the editors of its space and admins (its references are checked for the "
@@ -310,7 +314,9 @@ async def apply_rule(
     return RuleApplicationOut.of(application)
 
 
-applications = APIRouter(prefix="/rule-applications", tags=["rules"], dependencies=PROTECTED)
+applications = APIRouter(
+    route_class=RULES_AREA, prefix="/rule-applications", tags=["rules"], dependencies=PROTECTED
+)
 
 
 @applications.get(

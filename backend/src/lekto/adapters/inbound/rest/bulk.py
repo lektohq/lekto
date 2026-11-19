@@ -4,17 +4,21 @@ from uuid import UUID
 
 from fastapi import APIRouter, Request, Response
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, Via
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, Via, area
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.params import AllDocuments, Listed
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.bulk import BulkOperationOut, BulkRequest
 from lekto.core.domain.bulk import MAX_DOCUMENTS, MAX_IDS
 from lekto.core.domain.ids import BulkOperationId, DocumentId
+from lekto.core.domain.rights import TokenRight
 from lekto.core.ports.search_index import MAX_HITS
 from lekto.core.services.bulk import Selection
 
-router = APIRouter(prefix="/documents/bulk", tags=["documents"], dependencies=PROTECTED)
+DOCUMENTS_AREA = area(TokenRight.DOCUMENTS_READ, TokenRight.DOCUMENTS_WRITE)
+router = APIRouter(
+    route_class=DOCUMENTS_AREA, prefix="/documents/bulk", tags=["documents"], dependencies=PROTECTED
+)
 
 
 @router.post(

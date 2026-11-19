@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query
 from pydantic import SecretStr
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, area
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.mailboxes import (
@@ -21,9 +21,13 @@ from lekto.adapters.inbound.rest.schemas.mailboxes import (
 from lekto.adapters.inbound.schemas import MAX_POSITION
 from lekto.core.domain.ids import MailboxId, MailRuleId
 from lekto.core.domain.mail_intake import MailOutcome
+from lekto.core.domain.rights import TokenRight
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE
 
-router = APIRouter(prefix="/mailboxes", tags=["mailboxes"], dependencies=PROTECTED)
+SYSTEM_AREA = area(TokenRight.SYSTEM_READ, TokenRight.SYSTEM_WRITE)
+router = APIRouter(
+    route_class=SYSTEM_AREA, prefix="/mailboxes", tags=["mailboxes"], dependencies=PROTECTED
+)
 
 WHO = "Only admins (403)."
 CHECKS = (

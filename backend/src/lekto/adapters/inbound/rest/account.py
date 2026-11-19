@@ -9,8 +9,10 @@ from fastapi.responses import RedirectResponse
 
 from lekto import __version__
 from lekto.adapters.inbound.rest.auth import (
+    ANY,
     PROTECTED,
     Authenticated,
+    MarkedRoute,
     SessionPrincipal,
     clear_flow_cookie,
     clear_session_cookie,
@@ -18,6 +20,7 @@ from lekto.adapters.inbound.rest.auth import (
     flow_cookie_name,
     known_devices,
     optional_session,
+    right,
     session_cookie_name,
     set_device_cookie,
     set_flow_cookie,
@@ -54,13 +57,14 @@ from lekto.core.domain.errors import (
     IdentityProviderError,
     UnsupportedMediaTypeError,
 )
-from lekto.core.domain.identity import csrf_token
+from lekto.core.domain.identity import TokenScope, csrf_token
 from lekto.core.domain.ids import ApiTokenId
+from lekto.core.domain.rights import TokenRight
 from lekto.core.domain.validation import MAX_URL_LENGTH, to_utc
 from lekto.core.services.auth import Principal, SignedIn
 
-public = APIRouter(prefix="/auth", tags=["auth"])
-router = APIRouter(prefix="/auth", tags=["auth"], dependencies=PROTECTED)
+public = APIRouter(route_class=MarkedRoute, prefix="/auth", tags=["auth"])
+router = APIRouter(route_class=MarkedRoute, prefix="/auth", tags=["auth"], dependencies=PROTECTED)
 
 
 def _session_out(signed_in: SignedIn) -> SessionOut:
@@ -148,6 +152,7 @@ async def logout(principal: SessionPrincipal, response: Response, context: Conte
 
 @router.get(
     "/me",
+    openapi_extra=right(ANY),
     summary="The caller",
     description="Who is signed in and how; with a session also its CSRF token; the version of "
     "Lekto.",
@@ -163,7 +168,12 @@ async def me(principal: Authenticated, request: Request, context: Context) -> Me
         authenticated_with="session" if session else "token",
         csrf_token=csrf_token(cookie) if cookie else None,
         session_expires_at=session.expires_at if session else None,
-        token_scope=token.scope if token else None,
+        token_scope=(
+            TokenScope.matching(token.rights, admin=principal.user.is_active_admin)
+            if token
+            else None
+        ),
+        rights=sorted(right for right in TokenRight if principal.may(right)),
         has_password=account.has_password,
         totp_enabled=account.totp_enabled,
         linked_accounts=[LinkOut.of(link) for link in account.external_identities],
@@ -316,7 +326,9 @@ async def renew_recovery_codes(
     responses=problem_responses(401, 403),
 )
 async def list_tokens(principal: SessionPrincipal, context: Context) -> list[TokenOut]:
-    return [TokenOut.of(token) for token in await context.auth.list_api_tokens(principal.actor)]
+    admin = principal.user.is_active_admin
+    tokens = await context.auth.list_api_tokens(principal.actor)
+    return [TokenOut.of(token, admin=admin) for token in tokens]
 
 
 @router.post(
@@ -324,8 +336,12 @@ async def list_tokens(principal: SessionPrincipal, context: Context) -> list[Tok
     status_code=201,
     summary="Create an API token",
     description=(
-        "`read` allows reading only; `read_write` everything the caller may do, except "
-        "managing the own sign-in. The token is shown only now." + SESSION_ONLY_NOTE
+        "With the rights of a preset (`scope`) or chosen one by one (`rights`); each operation "
+        "names the right it needs (`x-right`). `read` allows reading only; `read_write` "
+        "everything the caller may do, except managing the own sign-in; `upload` only "
+        "uploading. An admin's `read` and `read_write` carry every admin right. 422 without "
+        "rights, and for admin rights of a user who is no admin. The token is shown only now."
+        + SESSION_ONLY_NOTE
     ),
     response_model=TokenCreated,
     responses=problem_responses(401, 403, 422),
@@ -336,10 +352,11 @@ async def create_token(
     token, value = await context.auth.create_api_token(
         principal.actor,
         body.name,
-        body.scope,
+        body.chosen(),
         expires_at=None if body.expires_at is None else to_utc(body.expires_at, "expires_at"),
     )
-    return TokenCreated(**TokenOut.of(token).model_dump(), token=value)
+    out = TokenOut.of(token, admin=principal.user.is_active_admin)
+    return TokenCreated(**out.model_dump(), token=value)
 
 
 @router.delete(

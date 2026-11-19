@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, area
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.webhooks import (
@@ -19,11 +19,15 @@ from lekto.adapters.inbound.rest.schemas.webhooks import (
 )
 from lekto.adapters.inbound.schemas import MAX_POSITION
 from lekto.core.domain.ids import UserId, WebhookId
+from lekto.core.domain.rights import TokenRight
 from lekto.core.domain.webhooks import DeliveryOutcome
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE
 from lekto.core.services.webhooks.policy import TEST_REQUESTS, TEST_WINDOW
 
-router = APIRouter(prefix="/webhooks", tags=["webhooks"], dependencies=PROTECTED)
+WEBHOOKS_AREA = area(TokenRight.WEBHOOKS_READ, TokenRight.WEBHOOKS_WRITE)
+router = APIRouter(
+    route_class=WEBHOOKS_AREA, prefix="/webhooks", tags=["webhooks"], dependencies=PROTECTED
+)
 
 WHO = (
     "Its owner, or an admin (who also changes, deletes and tests other users' webhooks and "

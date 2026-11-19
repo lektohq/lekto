@@ -60,6 +60,7 @@ from lekto.core.domain.identity import (
     ViaToken,
     account_key,
     check_new_password,
+    check_token_rights,
     csrf_token,
     device_key,
     hash_token,
@@ -70,7 +71,7 @@ from lekto.core.domain.identity import (
 )
 from lekto.core.domain.ids import ApiTokenId, SessionId, UserId
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.domain.rights import Actor
+from lekto.core.domain.rights import Actor, TokenRight, holds
 from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.identity import PasswordHasher, SecretCipher, Totp
@@ -131,18 +132,29 @@ class Principal:
         return self.user.id
 
     @property
+    def rights(self) -> frozenset[TokenRight] | None:
+        """The rights the caller acts with: their token's; None in a session (every right)."""
+        return None if self.api_token is None else self.api_token.rights
+
+    @property
     def actor(self) -> Actor:
         """The caller as the services take them, with the rights they act with."""
-        return Actor(self.user.id)
+        return Actor(self.user.id, self.rights)
+
+    def may(self, right: TokenRight) -> bool:
+        """Whether the caller's rights include `right` (an admin right also needs an active
+        admin, `User.may`)."""
+        return holds(self.rights, right) and (not right.for_admins or self.user.is_active_admin)
 
     @property
     def can_write(self) -> bool:
-        return self.api_token is None or self.api_token.scope.can_write
+        """Whether the caller may change documents (the MCP tools of the class `write`)."""
+        return self.may(TokenRight.DOCUMENTS_WRITE)
 
     @property
     def only_uploads(self) -> bool:
         """Whether the caller's token may do nothing but upload documents."""
-        return self.api_token is not None and self.api_token.scope.only_uploads
+        return self.rights is not None and self.rights <= {TokenRight.DOCUMENTS_UPLOAD}
 
     @property
     def via(self) -> ViaToken | None:
@@ -492,22 +504,34 @@ class AuthService:
         self,
         actor: Actor,
         name: str,
-        scope: TokenScope,
+        rights: TokenScope | frozenset[TokenRight],
         *,
         expires_at: datetime | None = None,
     ) -> tuple[ApiToken, str]:
-        """A new token; the second value is the token itself, shown only now."""
+        """A new token with `rights`, or the rights of a preset for the caller (an admin's with
+        the admin rights); the second value is the token itself, shown only now. ValidationError
+        for no rights, and for admin rights of a user who is no admin."""
         now = self._clock.now()
         async with self._uow() as uow:
-            await load_actor(uow, actor)
+            user = await load_actor(uow, actor)
+            admin = user.is_active_admin
+            chosen = rights.rights(admin=admin) if isinstance(rights, TokenScope) else rights
             api_token, token = ApiToken.issue(
-                user_id=actor.id, name=name, scope=scope, now=now, expires_at=expires_at
+                user_id=actor.id,
+                name=name,
+                rights=check_token_rights(chosen, admin=admin),
+                now=now,
+                expires_at=expires_at,
             )
             await uow.api_tokens.add(api_token)
             await uow.commit()
         log.info(
             "API token created",
-            extra={"user_id": str(actor.id), "token_id": str(api_token.id), "scope": scope.value},
+            extra={
+                "user_id": str(actor.id),
+                "token_id": str(api_token.id),
+                "rights": sorted(api_token.rights),
+            },
         )
         return api_token, token
 

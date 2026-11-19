@@ -6,7 +6,13 @@ from uuid import UUID
 from sqlalchemy import Row
 
 from lekto.adapters.outbound.sql import tables as t
-from lekto.adapters.outbound.sql.repositories import SqlRepository, Values, via_columns
+from lekto.adapters.outbound.sql.repositories import (
+    SqlRepository,
+    Values,
+    rights_column,
+    stored_rights,
+    via_columns,
+)
 from lekto.core.domain.bulk import BulkAction, BulkOperation
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import BulkOperationId, DocumentId, UserId
@@ -26,6 +32,7 @@ class SqlBulkOperationRepository(SqlRepository[BulkOperationId, BulkOperation]):
             action=BulkAction.from_json(row.action),
             documents=tuple(DocumentId(UUID(item)) for item in row.documents),
             via=ViaToken.stored(row.via_token_id, row.via_token_name),
+            rights=stored_rights(row.rights),
             status=ProgressStatus(row.status),
             position=row.position,
             changed=row.changed,
@@ -46,6 +53,7 @@ class SqlBulkOperationRepository(SqlRepository[BulkOperationId, BulkOperation]):
             "action": entity.action.to_json(),
             "documents": [str(id) for id in entity.documents],
             **via_columns(entity.via),
+            "rights": rights_column(entity.rights),
             "created_at": entity.created_at,
             "version": entity.version,
             **self._changed(entity),

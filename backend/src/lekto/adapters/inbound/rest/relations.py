@@ -4,13 +4,17 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, Via
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, Via, area
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.relations import RelateIn, RelationsOut
 from lekto.core.domain.ids import DocumentId
+from lekto.core.domain.rights import TokenRight
 
-router = APIRouter(prefix="/documents", tags=["relations"], dependencies=PROTECTED)
+DOCUMENTS_AREA = area(TokenRight.DOCUMENTS_READ, TokenRight.DOCUMENTS_WRITE)
+router = APIRouter(
+    route_class=DOCUMENTS_AREA, prefix="/documents", tags=["relations"], dependencies=PROTECTED
+)
 
 WHO = (
     "A relation points from the newer document to the older one (by their document dates, else "

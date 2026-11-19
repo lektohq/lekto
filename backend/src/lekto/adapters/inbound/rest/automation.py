@@ -7,7 +7,7 @@ from fastapi import APIRouter, Query
 from pydantic import AfterValidator
 
 from lekto.adapters.inbound.limits import in_words
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, area
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.params import ADMINS_ONLY
 from lekto.adapters.inbound.rest.problems import problem_responses
@@ -20,9 +20,13 @@ from lekto.adapters.inbound.rest.schemas.automation import (
 from lekto.core.domain.documents import Channel
 from lekto.core.domain.holder_evaluation import HolderOutcome
 from lekto.core.domain.identifiers import IdentifierKind
+from lekto.core.domain.rights import TokenRight
 from lekto.core.services.automation import ALL_MONTHS, DEFAULT_CHANNELS, Period
 
-router = APIRouter(prefix="/automation", tags=["automation"], dependencies=PROTECTED)
+SYSTEM_AREA = area(TokenRight.SYSTEM_READ, TokenRight.SYSTEM_WRITE)
+router = APIRouter(
+    route_class=SYSTEM_AREA, prefix="/automation", tags=["automation"], dependencies=PROTECTED
+)
 
 SCOPE = (
     "For the documents of the channels given (by default `web` and `api`: migrated documents "

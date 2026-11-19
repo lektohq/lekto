@@ -289,15 +289,19 @@ class IdentityRepositoriesContract:
 
     async def test_api_tokens(self, uow_factory: UnitOfWorkFactory) -> None:
         user, other = await a_user(uow_factory), await a_user(uow_factory)
-        first, _ = ApiToken.issue(user_id=user.id, name="cli", scope=TokenScope.READ, now=NOW)
+        first, _ = ApiToken.issue(
+            user_id=user.id, name="cli", rights=TokenScope.READ.rights(admin=False), now=NOW
+        )
         second, _ = ApiToken.issue(
             user_id=user.id,
             name="mcp",
-            scope=TokenScope.READ_WRITE,
+            rights=TokenScope.READ_WRITE.rights(admin=False),
             now=NOW + HOUR,
             expires_at=NOW + 48 * HOUR,
         )
-        foreign, _ = ApiToken.issue(user_id=other.id, name="x", scope=TokenScope.READ, now=NOW)
+        foreign, _ = ApiToken.issue(
+            user_id=other.id, name="x", rights=TokenScope.READ.rights(admin=False), now=NOW
+        )
         async with uow_factory() as uow:
             for token in (second, first, foreign):
                 await uow.api_tokens.add(token)

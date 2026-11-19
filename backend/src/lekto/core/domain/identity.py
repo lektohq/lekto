@@ -37,6 +37,7 @@ from lekto.core.domain.ids import (
 )
 from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import ADMIN_RIGHTS, AREA_RIGHTS, READ_RIGHTS, TokenRight
 from lekto.core.domain.validation import (
     MAX_URL_LENGTH,
     has_control_characters,
@@ -226,30 +227,52 @@ def same_secret(expected: str, given: str) -> bool:
 
 
 class TokenScope(StrEnum):
-    """What an API token may do: read, read and write, or only upload documents (a shortcut
-    on a phone that sends shared files; it reads nothing, not even what it uploaded)."""
+    """A preset of rights for an API token (`rights`): read, read and write, or only upload
+    documents (a shortcut on a phone that sends shared files; it reads nothing, not even what it
+    uploaded). What a token may is its rights; the scope is how they were chosen, or the preset
+    they match."""
 
     READ = "read"
     READ_WRITE = "read_write"
     UPLOAD = "upload"
 
-    @property
-    def can_write(self) -> bool:
-        return self is TokenScope.READ_WRITE
+    def rights(self, *, admin: bool) -> frozenset[TokenRight]:
+        """The rights of this preset; for an admin with every admin right but for uploading."""
+        match self:
+            case TokenScope.READ:
+                areas = READ_RIGHTS
+            case TokenScope.READ_WRITE:
+                areas = AREA_RIGHTS
+            case TokenScope.UPLOAD:
+                return frozenset({TokenRight.DOCUMENTS_UPLOAD})
+        return areas | ADMIN_RIGHTS if admin else areas
 
-    @property
-    def only_uploads(self) -> bool:
-        return self is TokenScope.UPLOAD
+    @classmethod
+    def matching(cls, rights: frozenset[TokenRight], *, admin: bool) -> "TokenScope | None":
+        """The preset whose rights `rights` are, for a user who is an admin or not; None for
+        rights chosen one by one."""
+        return next((scope for scope in cls if scope.rights(admin=admin) == rights), None)
+
+
+def check_token_rights(rights: frozenset[TokenRight], *, admin: bool) -> frozenset[TokenRight]:
+    """`rights` for a new token of a user who is an admin or not: ValidationError for none, and
+    for an admin right of a user who is no admin."""
+    if not rights:
+        raise ValidationError(because(ReasonCode.TOKEN_RIGHTS_EMPTY))
+    if not admin and rights & ADMIN_RIGHTS:
+        raise ValidationError(because(ReasonCode.TOKEN_ADMIN_RIGHTS))
+    return rights
 
 
 @dataclass(kw_only=True)
 class ApiToken:
-    """A personal API token. The token itself is shown once, at creation."""
+    """A personal API token with the rights it carries (Tobi, 19.11.2026,
+    `.knowledge/plans/token-rights.md`). The token itself is shown once, at creation."""
 
     id: ApiTokenId
     user_id: UserId
     name: str
-    scope: TokenScope
+    rights: frozenset[TokenRight]
     token_hash: str
     created_at: datetime
     expires_at: datetime | None = None
@@ -267,7 +290,7 @@ class ApiToken:
         *,
         user_id: UserId,
         name: str,
-        scope: TokenScope,
+        rights: frozenset[TokenRight],
         now: datetime,
         expires_at: datetime | None = None,
     ) -> tuple[Self, str]:
@@ -278,7 +301,7 @@ class ApiToken:
             id=ApiTokenId(new_id()),
             user_id=user_id,
             name=name,
-            scope=scope,
+            rights=rights,
             token_hash=hash_token(token),
             created_at=now,
             expires_at=expires_at,

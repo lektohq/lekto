@@ -32,6 +32,7 @@ from lekto.core.domain.json_value import JsonObject, JsonValue, as_list, as_text
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.progress import Progress
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.domain.rights import TokenRight
 
 MAX_DOCUMENTS = 10_000
 """Documents one action changes at most."""
@@ -138,12 +139,14 @@ class BulkAction:
 class BulkOperation(Progress):
     """A person's action on the documents they selected, worked through in the background.
     `changed`: documents it changed; the rest as `Progress` counts them. `via`: the API token
-    the person started it through, kept with each change as with one by hand."""
+    the person started it through, kept with each change as with one by hand; `rights`: the
+    rights it was started with, which it works with (None: every right of its person)."""
 
     id: BulkOperationId
     user_id: UserId
     action: BulkAction
     via: ViaToken | None = None
+    rights: frozenset[TokenRight] | None = None
     changed: int = 0
 
     def __post_init__(self) -> None:
@@ -160,6 +163,7 @@ class BulkOperation(Progress):
         documents: tuple[DocumentId, ...],
         now: datetime,
         via: ViaToken | None = None,
+        rights: frozenset[TokenRight] | None = None,
     ) -> Self:
         return cls(
             id=BulkOperationId(new_id()),
@@ -167,6 +171,7 @@ class BulkOperation(Progress):
             action=action,
             documents=documents,
             via=via,
+            rights=rights,
             created_at=now,
         )
 

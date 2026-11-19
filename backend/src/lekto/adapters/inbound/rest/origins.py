@@ -4,13 +4,17 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, area
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.origins import MailOriginOut, OriginOut
 from lekto.core.domain.ids import DocumentId
+from lekto.core.domain.rights import TokenRight
 
-router = APIRouter(prefix="/documents", tags=["documents"], dependencies=PROTECTED)
+DOCUMENTS_AREA = area(TokenRight.DOCUMENTS_READ, TokenRight.DOCUMENTS_WRITE)
+router = APIRouter(
+    route_class=DOCUMENTS_AREA, prefix="/documents", tags=["documents"], dependencies=PROTECTED
+)
 
 
 @router.get(

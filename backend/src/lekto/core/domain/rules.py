@@ -76,6 +76,7 @@ from lekto.core.domain.mail_traits import MAIL_OPERATORS, check_mail_value
 from lekto.core.domain.master_data import DocumentType, TagScope
 from lekto.core.domain.progress import Progress
 from lekto.core.domain.reasons import Reason
+from lekto.core.domain.rights import TokenRight
 from lekto.core.domain.tasks import DEFAULT_TIMEOUT, validate_timeout
 from lekto.core.domain.validation import require_name, require_utc
 
@@ -1026,6 +1027,7 @@ class RuleApplication(Progress):
     rule_version: int
     user_id: UserId
     via: ViaToken | None = None
+    rights: frozenset[TokenRight] | None = None  # what it was started with; None: every right
     accept_conflicts: frozenset[DocumentId] = frozenset()
     applied: int = 0
 
@@ -1045,6 +1047,7 @@ class RuleApplication(Progress):
         accept_conflicts: frozenset[DocumentId],
         now: datetime,
         via: ViaToken | None = None,
+        rights: frozenset[TokenRight] | None = None,
     ) -> Self:
         return cls(
             id=RuleApplicationId(new_id()),
@@ -1053,6 +1056,7 @@ class RuleApplication(Progress):
             user_id=user_id,
             documents=documents,
             via=via,
+            rights=rights,
             accept_conflicts=accept_conflicts,
             created_at=now,
         )
