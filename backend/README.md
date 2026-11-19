@@ -119,9 +119,12 @@ authenticate.
   changes or is reset (the caller's own session is renewed). Every sign-in starts a new session.
   Last use is written at most once a minute. The CSRF token of a session is derived from its
   token (HMAC), so nothing more is stored.
-- API tokens: `lekto_` plus 256 random bits, stored as SHA-256; scope `read`, `read_write` or
-  `upload` (only `POST /documents`: a shortcut that sends shared files from a phone),
-  a name, optional expiry, last use. Shown once. They survive a password change unless the
+- API tokens: `lekto_` plus 256 random bits, stored as SHA-256; their rights by area and the
+  admin rights one by one, chosen or from a preset `read`, `read_write` or `upload` (only
+  `POST /documents`: a shortcut that sends shared files from a phone); each operation names the
+  right it needs (`x-right`), `authenticate` checks it, the core the admin rights
+  ([docs/api-tokens.md](../docs/api-tokens.md)); a name, optional expiry, last use. Revoking one
+  deletes the webhooks created through it. Shown once. They survive a password change unless the
   caller (or the admin resetting it) asks to revoke them, and are refused while the account is
   deactivated.
 - Accounts: admins create users (optionally with a password), change roles, reset passwords,

@@ -329,4 +329,4 @@ prefix `LEKTO_MIGRATION_`; Lekto ignores them. See [migration/README.md](../migr
 | `LEKTO_MIGRATION_PAPERLESS_URL` | – | The source system's address; required (or `--paperless-url`) |
 | `LEKTO_MIGRATION_PAPERLESS_TOKEN` | – | *secret*; its API token, required |
 | `LEKTO_MIGRATION_LEKTO_URL` | – | Lekto's address (or `--lekto-url`) |
-| `LEKTO_MIGRATION_LEKTO_TOKEN` | – | *secret*; an admin's API token with scope `read_write` |
+| `LEKTO_MIGRATION_LEKTO_TOKEN` | – | *secret*; an admin's API token with the preset `read_write` ([API tokens](api-tokens.md)) |

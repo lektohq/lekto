@@ -154,7 +154,7 @@ cd migration && uv sync
 export LEKTO_MIGRATION_PAPERLESS_URL=http://paperless:8000
 export LEKTO_MIGRATION_PAPERLESS_TOKEN=...     # or ..._TOKEN_FILE=/path
 export LEKTO_MIGRATION_LEKTO_URL=http://lekto:8000
-export LEKTO_MIGRATION_LEKTO_TOKEN=...         # an admin's API token, scope read_write
+export LEKTO_MIGRATION_LEKTO_TOKEN=...         # an admin's API token, preset read_write
 
 uv run lekto-migration plan       # write migration-plan.yaml; edit it
 uv run lekto-migration check      # what would happen; nothing is written
