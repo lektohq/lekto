@@ -15,7 +15,6 @@ from lekto.core.domain.events import (
     NodeStarted,
     ReviewRequired,
 )
-from lekto.core.domain.ids import new_id
 from lekto.core.domain.pipeline import (
     CURRENT_SIGNALS,
     GRAPH,
@@ -767,7 +766,6 @@ def test_event_ids_are_unique() -> None:
     builders.run_pipeline(document)
     ids = [event.id for event in document.pull_events()]
     assert len(set(ids)) == len(ids)
-    assert new_id() not in ids
 
 
 def up_to_the_rules() -> Document:

@@ -358,8 +358,7 @@ def test_a_period_without_its_year_takes_that_of_the_document_date() -> None:
     ["September 2026 und Oktober 2026", "01.09.2026 und 05.09.2026", "30.09.2026 bis 01.09.2026"],
 )
 def test_two_periods_or_none_are_no_reading(raw: str) -> None:
-    found = read_period(raw, DOCUMENT_DATE)
-    assert found is None or found[0] != SEPTEMBER
+    assert read_period(raw, DOCUMENT_DATE) is None
 
 
 def test_a_text_shows_a_period_as_written_or_by_its_first_and_last_day() -> None:

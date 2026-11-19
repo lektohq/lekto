@@ -335,12 +335,13 @@ def test_repeatable_actions() -> None:
     "template",
     [
         "Invoice",
-        "{contact}",
-        "{contact} {document_type} {document_date} {filename}",
-        "{document_date} - {contact}",
+        "{{ contact }}",
+        "{{ contact }} {{ document_type }} {{ document_date }} {{ filename }}",
+        "{{ document_date | date: '%Y-%m' }} - {{ contact }}",
     ],
 )
-def test_title_template_with_known_placeholders(template: str) -> None:
+def test_a_title_template_is_kept_as_written(template: str) -> None:
+    """Its syntax and values are checked where the rule is saved (the renderer is a port)."""
     assert SetTitle(template).template == template
 
 

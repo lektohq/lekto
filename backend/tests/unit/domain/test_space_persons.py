@@ -259,13 +259,19 @@ def test_the_recipient_alone_moves_nothing() -> None:
     """The model proposes Haushalt, the recipient is Erika: no hand-over the model did not
     propose; and the model proposing Erika's space without her as recipient changes nothing."""
     household = judge_space(payslip_signals(HOUSEHOLD), choice(), recipients=frozenset({ERIKA}))
-    assert household.suggestion != str(ERIKAS)
+    assert (household.outcome, household.value) == (Outcome.OK, None)  # it stays
+    # The model's space beside it, as signals that disagree give one: no review.
+    assert household.suggestion == str(HOUSEHOLD)
+    assert [reason.text for reason in household.reasons] == ["the signals name different spaces"]
     unaddressed = judge_space(payslip_signals(), choice(), recipients=frozenset({BOB}))
     assert unaddressed.outcome is Outcome.OK
     assert unaddressed.value is None
 
 
-def test_already_in_erika_s_space_nothing_to_suggest() -> None:
+def test_already_in_erika_s_space_it_stays() -> None:
+    """The model names her space, the similar documents Tobi's: it stays where it lies, with
+    Tobi's space beside it, as signals that disagree give one (Tobi, 19.11.2026: wanted)."""
     check = judge_space(payslip_signals(), choice(ERIKAS), recipients=frozenset({ERIKA}))
-    assert check.suggestion != str(ERIKAS)
-    assert check.value is None
+    assert (check.outcome, check.value) == (Outcome.OK, None)
+    assert check.suggestion == str(OWN)
+    assert [reason.text for reason in check.reasons] == ["the signals name different spaces"]
