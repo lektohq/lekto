@@ -629,7 +629,8 @@ line (`border-t`), then one `button` the width of the card, at least 44 px: a `C
 font-medium`) and below it what they are (`text-xs text-muted-foreground`); `aria-expanded` and
 `aria-controls`. Closed at first; opened, it stays open while the page shows the same thing. The
 rows inside look as elsewhere in the card, indented to the text of the button (`pl-6`). A whole
-card that folds is `FilterSection`.
+card that folds is `FilterSection`. Under one row of a list it folds what belongs to that row alone
+(an API token's rights, [Settings](#settings)).
 
 **Grouped by contact** (`IdentifiersEditor` with `contacts`: the identifiers at contacts, Tobi
 02.11.2026): where the rows of a list belong to different contacts, one line per contact, a
@@ -968,6 +969,14 @@ linking an account came back with an error the sign-in), the last with its count
 - **Anmeldung:** password, second factor, single sign-on, sessions.
 - **Benachrichtigungen:** this device, when, the locked screen, the devices ([App](#app)).
 - **API-Tokens:** on iPhone, iPad and Mac first the shortcut ([App](#app)), then the tokens.
+  A token's badge names its preset ("Lesen", "Lesen und Schreiben", "Nur hochladen") or "Eigene
+  Rechte: n"; under its row its rights fold away (`FoldedGroup`, "14 Rechte", one line per area
+  in words: "Dokumente: Lesen, Hochladen", then the admin rights). A new token takes a preset or
+  "Eigene Rechte" in its `Select`; with the latter one `fieldset` per area follows, its name as
+  the legend and a `Choice` per right beside each other ("Lesen", "Ändern"; the documents also
+  "Nur zählen" and "Hochladen"), and for an admin the admin rights apart, one `Choice` each, with
+  the line that they count only while the user is an admin (Tobi, 19.11.2026,
+  `.knowledge/plans/token-rights.md`).
 - **Kennungen bei Kontakten:** the identifiers at contacts, grouped by contact ("Lists").
 
 A tab with a form saves only its own part, and guards it ("Saving and leaving").
