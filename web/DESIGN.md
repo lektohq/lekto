@@ -1004,6 +1004,12 @@ with the rows (the name with its `InfoTip`, how many jobs wait, "Einreihen", whi
 a `ConfirmDialog` over it), on a phone a `PhoneSheet` (`fit`). Others see no button: only
 admins queue, and the table of the jobs shows everyone what waits.
 
+While a newer Lekto is out (`GET /version`, `update_available`), an admin sees above the tabs an
+`Alert` `note` (`role="status"`): "Lekto 0.16.0 ist da", below it the running version, the day it
+was published and when Lekto last looked, and "Release Notes" (`outline`, `sm`, `ExternalLink`)
+that opens the release's page in a new tab. It cannot be closed: it goes once the new version
+runs. Other users see nothing of it (Tobi, 19.11.2026, after a mock).
+
 ### Intake channels
 
 The page "System" has a tab "Eingangskanäle" for admins only (Tobi, 04.11.2026); other users do

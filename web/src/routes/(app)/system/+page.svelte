@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import AutomationTab from '#lib/components/system/AutomationTab.svelte';
+	import UpdateNotice from '#lib/components/system/UpdateNotice.svelte';
 	import ClassifierTab from '#lib/components/system/ClassifierTab.svelte';
 	import IntakeTab from '#lib/components/system/IntakeTab.svelte';
 	import JobsTab from '#lib/components/system/JobsTab.svelte';
@@ -29,6 +30,7 @@
 
 <div class="flex flex-col gap-6">
 	<PageHeader title={m.nav_system()} />
+	<UpdateNotice />
 	<TabBar
 		label={m.system_tabs()}
 		tabs={systemTabs(session.isAdmin).map((value) => ({
