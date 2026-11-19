@@ -45,6 +45,7 @@
 		ondelete,
 		deleteTitle = '',
 		deleteDescription = '',
+		deleteLabel = m.delete_title(),
 		class: className,
 		size = 'lg',
 		fixed = false,
@@ -70,6 +71,8 @@
 		ondelete?: () => Promise<void>;
 		deleteTitle?: string;
 		deleteDescription?: string;
+		/** The word of deleting, where it is another ("Widerrufen" for an API token). */
+		deleteLabel?: string;
 		/** The height of the dialog with tabs. */
 		class?: string;
 		/** One height whatever part shows (web/DESIGN.md, "Dialogs": a dialog with parts keeps one height). */
@@ -168,7 +171,9 @@
 	{#if bottom}
 		<div class="shrink-0">{@render bottom()}</div>
 	{/if}
-	{#if !phone.current && action}
+	{#if !phone.current && (action || ondelete)}
+		<!-- Without an action of its own but with deleting (an API token, which nobody changes):
+		     deleting at the start, "Fertig" at the end (web/DESIGN.md, "Dialogs"). -->
 		<div class="flex shrink-0 flex-wrap items-center gap-2 border-t bg-muted/50 p-4">
 			{#if footNote}
 				<p class="min-w-0 flex-1 text-meta text-muted-foreground">{footNote}</p>
@@ -187,14 +192,18 @@
 					onclick={() => (confirming = true)}
 				>
 					<Trash2 aria-hidden="true" />
-					{m.delete_title()}
+					{deleteLabel}
 				</Button>
 			{/if}
 			<div class="ml-auto flex gap-2">
-				<Button type="button" variant="ghost" onclick={() => (open = false)}>
-					{m.cancel()}
-				</Button>
-				<Button type="submit" disabled={busy || disabled}>{submitLabel}</Button>
+				{#if action}
+					<Button type="button" variant="ghost" onclick={() => (open = false)}>
+						{m.cancel()}
+					</Button>
+					<Button type="submit" disabled={busy || disabled}>{submitLabel}</Button>
+				{:else}
+					<Button type="button" onclick={() => (open = false)}>{m.picker_done()}</Button>
+				{/if}
 			</div>
 		</div>
 	{/if}
@@ -234,7 +243,7 @@
 		bind:open={confirming}
 		title={deleteTitle}
 		description={deleteDescription}
-		confirmLabel={m.delete_title()}
+		confirmLabel={deleteLabel}
 		onconfirm={ondelete}
 	/>
 {/if}

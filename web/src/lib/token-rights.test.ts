@@ -1,0 +1,41 @@
+import { describe, expect, it } from 'vitest';
+import type { components } from '#lib/api/schema.ts';
+import { ADMIN_RIGHTS, AREAS } from '#lib/token-rights.ts';
+
+type Right = components['schemas']['TokenRight'];
+
+describe('token rights', () => {
+	it('name every right of the API once', () => {
+		const shown = [
+			...AREAS.flatMap(({ rights }) => rights.map(([right]) => right)),
+			...ADMIN_RIGHTS
+		];
+		const every: Record<Right, true> = {
+			'documents:count': true,
+			'documents:read': true,
+			'documents:write': true,
+			'documents:upload': true,
+			'master_data:read': true,
+			'master_data:write': true,
+			'rules:read': true,
+			'rules:write': true,
+			'spaces:read': true,
+			'spaces:write': true,
+			'webhooks:read': true,
+			'webhooks:write': true,
+			'lenses:read': true,
+			'lenses:write': true,
+			'push:read': true,
+			'push:write': true,
+			'system:read': true,
+			'system:write': true,
+			'admin:count_all': true,
+			'admin:documents_all': true,
+			'admin:mailboxes': true,
+			'admin:private_webhooks': true,
+			'admin:manage': true
+		};
+		expect([...shown].sort()).toEqual(Object.keys(every).sort());
+		expect(new Set(shown).size).toBe(shown.length);
+	});
+});
