@@ -203,6 +203,8 @@ ARG LEKTO_VERSION=0.0.0.dev0
 # Shutdown on `docker stop`: the worker gets LEKTO_WORKER_SHUTDOWN_TIMEOUT (30 s) to finish
 # its jobs, so s6 waits 40 s for the services; Compose `stop_grace_period` is 60 s. s6 sits out the
 # whole S6_KILL_GRACETIME before it ends, so that stays short (1 s). Raise the first two together.
+# Before the services start, `stage2-hook` writes the bundle `user` for LEKTO_ROLE to
+# S6_RUNTIME_BUNDLEDIR: the service a role does not run is never started.
 # The database and the objects live on the volume /data (the defaults of settings.py are
 # relative paths). The API serves the web UI below /ui. PUID and PGID are not Lekto settings:
 # the user of the Lekto processes.
@@ -210,6 +212,8 @@ ENV PATH="/command:/opt/lekto/venv/bin:$PATH" \
     S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
     S6_SERVICES_GRACETIME=40000 \
     S6_KILL_GRACETIME=1000 \
+    S6_STAGE2_HOOK=/etc/s6-overlay/scripts/stage2-hook \
+    S6_RUNTIME_BUNDLEDIR=/run/lekto/user-bundles.d \
     LEKTO_DB_SQLITE_PATH=/data/lekto.db \
     LEKTO_STORAGE_PATH=/data/objects \
     LEKTO_UI_DIR=/opt/lekto/ui \

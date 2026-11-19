@@ -1,5 +1,6 @@
 #!/command/with-contenv sh
-# Uvicorn with the REST API, MCP and the event streams. Only with LEKTO_ROLE all or api.
+# Uvicorn with the REST API, MCP and the event streams. Only with LEKTO_ROLE all or api: other
+# roles leave it out of the bundle (scripts/stage2-hook); this guard holds for a start by hand.
 # LEKTO_ROLE as init-lekto resolved it.
 case "$LEKTO_ROLE" in
   all | api) ;;

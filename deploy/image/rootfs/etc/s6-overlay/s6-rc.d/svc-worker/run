@@ -1,5 +1,6 @@
 #!/command/with-contenv sh
-# Pipeline jobs, outbox dispatch and webhook delivery. Only with LEKTO_ROLE all or worker.
+# Pipeline jobs, outbox dispatch and webhook delivery. Only with LEKTO_ROLE all or worker: other
+# roles leave it out of the bundle (scripts/stage2-hook); this guard holds for a start by hand.
 # LEKTO_ROLE as init-lekto resolved it.
 case "$LEKTO_ROLE" in
   all | worker) ;;
