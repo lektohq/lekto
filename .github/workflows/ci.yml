@@ -81,8 +81,9 @@ jobs:
           read='^web/(src/routes/|src/lib/jobs\.ts$|package\.json$)|^examples/documents/(manifest\.json$|search/)'
           backend_tests="$code|^migration/|$read"
           web="^web/|^\.github/workflows/ci\.yml$"
-          # The Compose examples, the release's tag script and the workflows.
-          release="^docker/|^\.github/(scripts|workflows)/"
+          # The Compose examples, the scripts and their tests, the workflows, and the Dockerfile
+          # (test_ocr_packages compares its packages with ocr-packages.sh).
+          release="^docker/|^\.github/(scripts|workflows)/|^Dockerfile$"
           # The YAML files, yamllint's config and what tells it which files are ours.
           yaml='\.ya?ml$|^\.yamllint$|(^|/)\.gitignore$|^backend/(pyproject\.toml|uv\.lock)$'
           image="^(Dockerfile|\.dockerignore)$|^\.devcontainer/|$ci"
@@ -189,8 +190,9 @@ jobs:
       - run: docker run --rm lekto-migration:ci --help
 
   # What the release uses besides the images (pull requests only): the Compose examples in
-  # docker/ with every extension (`docker compose config`, a .env with every value set), the tag
-  # script's tests, and the workflows (actionlint).
+  # docker/ with every extension (`docker compose config`, a .env with every value set), the tests
+  # in .github/scripts (tag script, pinned actions, the image's packages for the integration
+  # tests), and the workflows (actionlint).
   release:
     needs: changes
     if: needs.changes.outputs.release == 'true'
@@ -198,7 +200,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-      - name: Tag script
+      - name: Scripts' tests
         run: python3 -m unittest discover -s .github/scripts
       - name: Compose examples
         working-directory: docker
