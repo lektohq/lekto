@@ -96,3 +96,33 @@ describe('a stale CSRF token', () => {
 		expect(events.replaced).toHaveBeenCalledOnce();
 	});
 });
+
+describe('another user in the same tab', () => {
+	const signedIn = (id: string) =>
+		({
+			user: { id, username: id, role: 'user' },
+			method: 'password',
+			expires_at: '2026-10-09T12:00:00Z',
+			csrf_token: 'token'
+		}) as never;
+
+	it('is told apart from the one the tab knew before, also after the session ended', async () => {
+		// Each test file starts with a tab that knew no one.
+		fetchMock.mockResolvedValueOnce(me('jane', 'one'));
+		await session.load();
+		expect(session.another).toBe(false);
+
+		session.clear();
+		session.start(signedIn('jane'));
+		expect(session.another).toBe(false);
+
+		session.clear();
+		session.start(signedIn('erika'));
+		expect(session.another).toBe(true);
+
+		// Signing in again as the same person is no change.
+		session.clear();
+		session.start(signedIn('erika'));
+		expect(session.another).toBe(false);
+	});
+});

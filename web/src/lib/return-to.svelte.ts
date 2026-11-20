@@ -5,7 +5,7 @@
  * after a reload the way back is the bare list.
  */
 import { BASE } from '#lib/base.ts';
-import { gotoSearching } from '#lib/words.ts';
+import { gotoSearching, wordsState } from '#lib/words.ts';
 
 let documents = $state<string | null>(null);
 let words = $state('');
@@ -22,7 +22,7 @@ export const returnTo = {
 	},
 	/** The history entry of the way back: the words the list searched for. */
 	get state(): App.PageState {
-		return { words };
+		return wordsState(words);
 	},
 	/** The list remembers its URL and words whenever they change. */
 	rememberDocuments(url: { pathname: string; search: string }, searched: string): void {

@@ -585,7 +585,7 @@
 		// Opened without filters, words or a lens: the filters this browser last set apply, in
 		// the URL as if the link had brought them. A link's own filters, its words and a lens go
 		// first; within the page (a chip removed, "All documents" from a lens) nothing applies.
-		const remembered = rememberedFilters();
+		const remembered = rememberedFilters(session.user?.id);
 		const plain = !isFiltered(filters) && !searching && selected.length === 0;
 		if (remembered && plain && !params.has('lens')) {
 			const next = writeFilters(new URLSearchParams(page.url.search), remembered);
@@ -628,11 +628,11 @@
 	// a link set it; within a lens the filters are the lens's. None (a reset, the last chip
 	// removed) forgets them, in `change`.
 	$effect(() => {
-		if (isFiltered(filters) && !params.has('lens')) rememberFilters(filters);
+		if (isFiltered(filters) && !params.has('lens')) rememberFilters(filters, session.user?.id);
 	});
 
 	function change(next: Filters) {
-		if (!params.has('lens')) rememberFilters(next);
+		if (!params.has('lens')) rememberFilters(next, session.user?.id);
 		go(writeFilters(new URLSearchParams(page.url.search), next));
 	}
 

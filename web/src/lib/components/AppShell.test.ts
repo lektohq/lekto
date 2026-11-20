@@ -2,7 +2,9 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { createRawSnippet, tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LANGUAGE_NAMES, locales } from '#lib/i18n.ts';
+import { NO_FILTERS } from '#lib/filters.ts';
 import { inbox } from '#lib/inbox.svelte.ts';
+import { rememberedFilters, rememberFilters } from '#lib/listing.ts';
 import { offerPageSearch } from '#lib/page-search.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
@@ -210,6 +212,22 @@ describe('AppShell', () => {
 		);
 		expect(screen.getByRole('button', { name: m.account_menu({ username: 'john' }) })).toBeTruthy();
 		expect(screen.getByText('content')).toBeTruthy();
+	});
+
+	it('forgets the remembered filters on signing out: nothing of them stays on the device', async () => {
+		phone.override(false);
+		signIn('user');
+		const id = session.user!.id;
+		rememberFilters({ ...NO_FILTERS, contacts: ['c1'] }, id);
+		const logout = vi.spyOn(session, 'logout').mockResolvedValue();
+		render(AppShell, { children });
+
+		const menu = await openAccountMenu();
+		await fireEvent.click(within(menu).getByRole('menuitem', { name: m.sign_out() }));
+
+		await vi.waitFor(() => expect(logout).toHaveBeenCalled());
+		expect(rememberedFilters(id)).toBeNull();
+		expect(localStorage.getItem('lekto.documents.filters')).toBeNull();
 	});
 
 	it('keeps language and theme in the account menu (web/DESIGN.md, "Navigation")', async () => {

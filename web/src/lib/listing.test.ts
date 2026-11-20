@@ -4,6 +4,7 @@ import {
 	byMonth,
 	filtersCollapsed,
 	monthOf,
+	forgetFilters,
 	rememberFilters,
 	rememberFiltersCollapsed,
 	rememberSort,
@@ -56,21 +57,57 @@ describe('the sort of the document view', () => {
 
 describe('the filters the document view remembers', () => {
 	it('keeps the filters as set, and forgets them once none is left', () => {
-		expect(rememberedFilters()).toBeNull();
-		rememberFilters({ ...NO_FILTERS, contacts: ['c1', 'c2'], dateFrom: '2026-01-01' });
-		expect(rememberedFilters()).toEqual({
+		expect(rememberedFilters('u1')).toBeNull();
+		rememberFilters({ ...NO_FILTERS, contacts: ['c1', 'c2'], dateFrom: '2026-01-01' }, 'u1');
+		expect(rememberedFilters('u1')).toEqual({
 			...NO_FILTERS,
 			contacts: ['c1', 'c2'],
 			dateFrom: '2026-01-01'
 		});
-		rememberFilters(NO_FILTERS);
-		expect(rememberedFilters()).toBeNull();
+		rememberFilters(NO_FILTERS, 'u1');
+		expect(rememberedFilters('u1')).toBeNull();
 		expect(localStorage.getItem('lekto.documents.filters')).toBeNull();
 	});
 
 	it('counts what was stored but narrows nothing as none', () => {
-		localStorage.setItem('lekto.documents.filters', 'contact=&date_from=yesterday');
-		expect(rememberedFilters()).toBeNull();
+		localStorage.setItem(
+			'lekto.documents.filters',
+			JSON.stringify({ user: 'u1', filters: 'contact=&date_from=yesterday' })
+		);
+		expect(rememberedFilters('u1')).toBeNull();
+	});
+
+	it('keeps them for the user who set them: another user gets none', () => {
+		rememberFilters({ ...NO_FILTERS, contacts: ['c1'] }, 'u1');
+		expect(rememberedFilters('u2')).toBeNull();
+		expect(rememberedFilters(undefined)).toBeNull();
+		// Still there for their owner.
+		expect(rememberedFilters('u1')).toEqual({ ...NO_FILTERS, contacts: ['c1'] });
+		// Whoever sets filters next takes the place.
+		rememberFilters({ ...NO_FILTERS, tags: ['t1'] }, 'u2');
+		expect(rememberedFilters('u1')).toBeNull();
+	});
+
+	it('remembers none without a user', () => {
+		rememberFilters({ ...NO_FILTERS, contacts: ['c1'] }, undefined);
+		expect(localStorage.getItem('lekto.documents.filters')).toBeNull();
+	});
+
+	it("takes filters kept without their user as no one's", () => {
+		// As this browser kept them before they named their user.
+		localStorage.setItem('lekto.documents.filters', 'contact=c1');
+		expect(rememberedFilters('u1')).toBeNull();
+		localStorage.setItem('lekto.documents.filters', JSON.stringify({ filters: 'contact=c1' }));
+		expect(rememberedFilters('u1')).toBeNull();
+		localStorage.setItem('lekto.documents.filters', 'null');
+		expect(rememberedFilters('u1')).toBeNull();
+	});
+
+	it('forgets them on demand', () => {
+		rememberFilters({ ...NO_FILTERS, contacts: ['c1'] }, 'u1');
+		forgetFilters();
+		expect(rememberedFilters('u1')).toBeNull();
+		expect(localStorage.getItem('lekto.documents.filters')).toBeNull();
 	});
 
 	it('remembers the panel collapsed, open at first', () => {
@@ -91,8 +128,8 @@ describe('the filters the document view remembers', () => {
 			}
 		});
 		try {
-			expect(() => rememberFilters({ ...NO_FILTERS, contacts: ['c1'] })).not.toThrow();
-			expect(rememberedFilters()).toBeNull();
+			expect(() => rememberFilters({ ...NO_FILTERS, contacts: ['c1'] }, 'u1')).not.toThrow();
+			expect(rememberedFilters('u1')).toBeNull();
 			expect(() => rememberFiltersCollapsed(true)).not.toThrow();
 			expect(filtersCollapsed()).toBe(false);
 		} finally {

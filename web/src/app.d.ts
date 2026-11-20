@@ -11,6 +11,8 @@ declare global {
 		interface PageState {
 			/** The words of the documents' search (`lib/words.ts`), never in the address. */
 			words?: string;
+			/** The user whose words these are: they count for no one else (`lib/words.ts`). */
+			by?: string;
 			/** The open Beam (`lib/beam.svelte.ts`). */
 			beam?: import('#lib/beam.svelte.ts').BeamState;
 			/** The place a jump came from (`lib/way-back.ts`). */

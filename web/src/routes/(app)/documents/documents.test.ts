@@ -59,7 +59,7 @@ vi.mock('$app/state', () => ({
 /** The options of a navigation of the list that searches for `words`. */
 const searching = (words: string, options: object = { reset: false }) => ({
 	...options,
-	state: { words },
+	state: { words, by: OWNER },
 	persistState: true
 });
 
@@ -115,7 +115,7 @@ describe('the archive page', () => {
 	});
 
 	it('opens a document in the Beam, paging through the documents of the page', async () => {
-		state.entry = { words: '' };
+		state.entry = { words: '', by: OWNER };
 		vi.stubGlobal(
 			'fetch',
 			fakeApi({
@@ -137,6 +137,7 @@ describe('the archive page', () => {
 			shallow: true,
 			state: {
 				words: '',
+				by: OWNER,
 				beam: { ids: ['d1', 'd2'], index: 1, list: true, from: m.nav_documents() }
 			},
 			persistState: true
@@ -144,7 +145,7 @@ describe('the archive page', () => {
 	});
 
 	it('opens a hit of a search in the Beam with where its words stand', async () => {
-		state.entry = { words: 'Strom' };
+		state.entry = { words: 'Strom', by: OWNER };
 		const hit = (id: string, title: string) => ({
 			document: listedOf({ id, title }),
 			score: 0.5,
@@ -171,6 +172,7 @@ describe('the archive page', () => {
 			shallow: true,
 			state: {
 				words: 'Strom',
+				by: OWNER,
 				beam: { ids: ['d1', 'd2'], index: 1, list: true, from: m.nav_documents(), source }
 			},
 			persistState: true
@@ -660,7 +662,7 @@ describe('the archive page', () => {
 
 	it('shows the words of a search in its field, no chip beside it, their count by the title', async () => {
 		state.url = new URL('http://lekto/ui/documents?tag=t1');
-		state.entry = { words: 'Strom' };
+		state.entry = { words: 'Strom', by: OWNER };
 		const bodies: unknown[] = [];
 		const api = fakeApi({
 			'POST /api/v1/documents/search': async (request) => {
@@ -689,7 +691,7 @@ describe('the archive page', () => {
 		[0, 1724, () => m.search_meaning_only()],
 		[1, 1, () => m.search_total({ count: '1' })] // the floor left nothing beside the words
 	])('counts what %i words found among %i', async (words, total, text) => {
-		state.entry = { words: 'Urlaubsgeld' };
+		state.entry = { words: 'Urlaubsgeld', by: OWNER };
 		vi.stubGlobal(
 			'fetch',
 			fakeApi({
@@ -709,7 +711,7 @@ describe('the archive page', () => {
 	});
 
 	it('says when a search went by words alone, and offers the meaning once it is ready', async () => {
-		state.entry = { words: 'Weihnachten' };
+		state.entry = { words: 'Weihnachten', by: OWNER };
 		let first = true;
 		const api = fakeApi({
 			'GET /api/v1/pipeline': () => ({
@@ -766,7 +768,7 @@ describe('the archive page', () => {
 	});
 
 	it('shows nothing of the meaning where the installation has no search by it', async () => {
-		state.entry = { words: 'Strom' };
+		state.entry = { words: 'Strom', by: OWNER };
 		const api = fakeApi({
 			'GET /api/v1/pipeline': () => ({
 				nodes: [],
@@ -796,7 +798,7 @@ describe('the archive page', () => {
 	});
 
 	it('applies the filters this browser last set when opened without any', async () => {
-		rememberFilters({ ...NO_FILTERS, contacts: ['c1'], tags: ['t1'] });
+		rememberFilters({ ...NO_FILTERS, contacts: ['c1'], tags: ['t1'] }, OWNER);
 		vi.stubGlobal('fetch', fakeApi());
 		render(Page);
 		expect(vi.mocked(goto)).toHaveBeenCalledWith(
@@ -805,15 +807,33 @@ describe('the archive page', () => {
 		);
 	});
 
+	it('applies none of the filters another user set in this browser', async () => {
+		rememberFilters({ ...NO_FILTERS, contacts: ['c1'], tags: ['t1'] }, 'the-one-before');
+		vi.stubGlobal('fetch', fakeApi());
+		render(Page);
+		await screen.findByRole('heading', { level: 1 });
+		expect(vi.mocked(goto)).not.toHaveBeenCalled();
+	});
+
+	it('shows none of the words another user searched for in this browser', async () => {
+		state.entry = { words: 'Strom', by: 'the-one-before' };
+		const fetchMock = fakeApi();
+		vi.stubGlobal('fetch', fetchMock);
+		render(Page);
+		await screen.findByRole('heading', { level: 1 });
+		await vi.waitFor(() => expect(calls(fetchMock).length).toBeGreaterThan(0));
+		expect(calls(fetchMock).some((call) => call.includes('/documents/search'))).toBe(false);
+	});
+
 	it.each([
 		// A link's filters show, and are remembered in turn; words and a lens leave the memory.
 		['?tag=t2', {}, { ...NO_FILTERS, tags: ['t2'] }],
 		['?contact=c2&layout=stream', {}, { ...NO_FILTERS, contacts: ['c2'] }],
-		['', { words: 'Strom' }, { ...NO_FILTERS, contacts: ['c1'] }],
+		['', { words: 'Strom', by: OWNER }, { ...NO_FILTERS, contacts: ['c1'] }],
 		['?lens=l1', {}, { ...NO_FILTERS, contacts: ['c1'] }],
 		['?lens=l1&tag=t2', {}, { ...NO_FILTERS, contacts: ['c1'] }]
 	])('leaves what a link brings alone (%s %o)', async (search, entry, remembered) => {
-		rememberFilters({ ...NO_FILTERS, contacts: ['c1'] });
+		rememberFilters({ ...NO_FILTERS, contacts: ['c1'] }, OWNER);
 		state.url = new URL(`http://lekto/ui/documents${search}`);
 		state.entry = entry;
 		vi.stubGlobal(
@@ -823,7 +843,7 @@ describe('the archive page', () => {
 		render(Page);
 		await screen.findByRole('heading', { level: 1 });
 		expect(vi.mocked(goto)).not.toHaveBeenCalled();
-		expect(rememberedFilters()).toEqual(remembered);
+		expect(rememberedFilters(OWNER)).toEqual(remembered);
 	});
 
 	it('remembers the filters as they change, and forgets them with a reset', async () => {
@@ -834,10 +854,10 @@ describe('the archive page', () => {
 		await user.click(
 			await screen.findByRole('button', { name: m.filter_tag_remove({ name: 't1' }) })
 		);
-		expect(rememberedFilters()).toEqual({ ...NO_FILTERS, contacts: ['c1'] });
+		expect(rememberedFilters(OWNER)).toEqual({ ...NO_FILTERS, contacts: ['c1'] });
 		expect(vi.mocked(goto)).toHaveBeenLastCalledWith('?contact=c1', searching(''));
 		await user.click(screen.getByRole('button', { name: m.filter_reset() }));
-		expect(rememberedFilters()).toBeNull();
+		expect(rememberedFilters(OWNER)).toBeNull();
 		expect(vi.mocked(goto)).toHaveBeenLastCalledWith('/ui/documents', searching(''));
 	});
 
@@ -850,7 +870,7 @@ describe('the archive page', () => {
 			await screen.findByRole('button', { name: m.filter_tag_remove({ name: 't1' }) })
 		);
 		expect(vi.mocked(goto)).toHaveBeenLastCalledWith('?lens=l1', searching(''));
-		expect(rememberedFilters()).toBeNull();
+		expect(rememberedFilters(OWNER)).toBeNull();
 	});
 
 	it('collapses the filters beside the list, counts the active ones, and remembers it', async () => {
@@ -929,7 +949,7 @@ describe('a selection by link', () => {
 	});
 
 	it('leaves the remembered filters as they are', async () => {
-		rememberFilters({ ...NO_FILTERS, contacts: ['c1'] });
+		rememberFilters({ ...NO_FILTERS, contacts: ['c1'] }, OWNER);
 		state.url = new URL('http://lekto/ui/documents?ids=9b653410');
 		vi.mocked(goto).mockClear();
 		vi.stubGlobal(

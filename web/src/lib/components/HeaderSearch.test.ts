@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
 import { m } from '#lib/paraglide/messages.js';
 import { openLens } from '#lib/open-lens.svelte.ts';
+import { session } from '#lib/session.svelte.ts';
 import HeaderSearch from './HeaderSearch.svelte';
 
 const state = vi.hoisted(() => ({
@@ -22,14 +23,24 @@ vi.mock('$app/state', () => ({
 	}
 }));
 
-/** The words go into the history entry, never into the address. */
-const searching = (words: string) => ({ state: { words }, persistState: true });
+const USER = 'u1';
+
+/** The words go into the history entry, never into the address, with whose they are. */
+const searching = (words: string) => ({ state: { words, by: USER }, persistState: true });
 
 beforeEach(() => {
 	vi.mocked(goto).mockClear();
 	state.url = new URL('http://lekto/ui/inbox');
 	state.entry = {};
+	session.start({
+		user: { id: USER, username: 'john', role: 'user' },
+		method: 'password',
+		expires_at: '2026-10-18T12:00:00Z',
+		csrf_token: 'token'
+	} as never);
 });
+
+afterEach(() => session.clear());
 
 describe('HeaderSearch', () => {
 	it('searches the documents with the words', async () => {
@@ -55,13 +66,24 @@ describe('HeaderSearch', () => {
 
 	it('keeps the filters of the document view, the sort goes with the search', async () => {
 		state.url = new URL('http://lekto/ui/documents?tag=7&sort=title');
-		state.entry = { words: 'alt' };
+		state.entry = { words: 'alt', by: USER };
 		render(HeaderSearch);
 		const field = screen.getByRole('searchbox', { name: m.header_search_label() });
 		expect((field as HTMLInputElement).value).toBe('alt');
 		await userEvent.clear(field);
 		await userEvent.type(field, 'neu{Enter}');
 		expect(goto).toHaveBeenCalledWith('/ui/documents?tag=7', searching('neu'));
+	});
+
+	it.each([
+		['another user', { words: 'alt', by: 'u2' }],
+		['no one', { words: 'alt' }]
+	])('shows none of the words %s searched for in this browser', (_, entry) => {
+		state.url = new URL('http://lekto/ui/documents');
+		state.entry = entry;
+		render(HeaderSearch);
+		const field = screen.getByRole('searchbox', { name: m.header_search_label() });
+		expect((field as HTMLInputElement).value).toBe('');
 	});
 
 	it('shows the words of a lens a plain link opened', () => {

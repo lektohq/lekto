@@ -60,7 +60,10 @@
 			if (signedIn) {
 				session.start(signedIn);
 				password = '';
-				await goto(data.next, { replaceState: true });
+				// Another person than this tab knew before: the app starts afresh, so that nothing
+				// it holds in memory of the one before stays.
+				if (session.another) window.location.replace(data.next);
+				else await goto(data.next, { replaceState: true });
 			} else if (response.status === 401 && error?.second_factor_required) {
 				await showStep('totp');
 			} else if (response.status === 401) {

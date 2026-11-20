@@ -140,7 +140,7 @@ describe('the frame of the page', () => {
 		emit?.('document.deleted', { document_id: 'doc-1' });
 		await waitFor(() => expect(goto).toHaveBeenCalled());
 		expect(vi.mocked(goto).mock.calls).toEqual([
-			['/ui/documents', { state: { words: '' }, persistState: true }]
+			['/ui/documents', { state: { words: '', by: OWNER }, persistState: true }]
 		]);
 	});
 

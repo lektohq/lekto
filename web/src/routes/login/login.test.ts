@@ -63,6 +63,36 @@ describe('sign-in page', () => {
 		expect(session.csrfToken).toBe('token');
 	});
 
+	it('starts the app afresh when another user signs in than this tab knew before', async () => {
+		// Someone was signed in here; their session ended, the page was never reloaded.
+		session.start({ ...signedIn, user: { ...signedIn.user, id: 'the-one-before' } } as never);
+		session.clear();
+		const replace = vi.fn();
+		vi.stubGlobal('location', { ...window.location, replace });
+		fetchMock.mockResolvedValueOnce(json(signedIn));
+		render(Page, { data: { next: '/ui/inbox', oidc: null, error: null } });
+
+		await enterPassword();
+
+		// A full load, so that nothing the tab holds in memory of the one before stays.
+		expect(replace).toHaveBeenCalledWith('/ui/inbox');
+		expect(goto).not.toHaveBeenCalled();
+	});
+
+	it('goes on within the app when the same user signs in again', async () => {
+		session.start(signedIn as never);
+		session.clear();
+		const replace = vi.fn();
+		vi.stubGlobal('location', { ...window.location, replace });
+		fetchMock.mockResolvedValueOnce(json(signedIn));
+		render(Page, { data: { next: '/ui/inbox', oidc: null, error: null } });
+
+		await enterPassword();
+
+		expect(goto).toHaveBeenCalledWith('/ui/inbox', { replaceState: true });
+		expect(replace).not.toHaveBeenCalled();
+	});
+
 	it('says when the password is wrong', async () => {
 		fetchMock.mockResolvedValueOnce(refused());
 		render(Page, { data: { next: '/ui/', oidc: null, error: null } });

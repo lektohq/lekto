@@ -39,6 +39,7 @@
 	import { phone } from '#lib/phone.svelte.ts';
 	import { scope } from '#lib/scope.svelte.ts';
 	import { href, isCurrent, SETTINGS, visibleSections, type Section } from '#lib/sections.ts';
+	import { forgetFilters } from '#lib/listing.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import { cn } from '#lib/utils.ts';
 	import { onChange } from '#lib/watch.svelte.ts';
@@ -66,6 +67,8 @@
 
 	async function signOut() {
 		menuOpen = false;
+		// Nothing of the filters stays on the device for the next person.
+		forgetFilters();
 		try {
 			await session.logout();
 		} catch (error) {

@@ -19,6 +19,17 @@ class Session {
 	 * offers none, and the web UI shows nothing of it. */
 	shortcutUrl = $state<string | null>(null);
 	#csrf: string | null = null;
+	/** The user this tab last knew; kept when the session ends, since another person may sign in
+	 * next. */
+	#known: string | null = null;
+	#another = false;
+
+	/** Whether the user who signed in is another one than this tab knew before. What the tab
+	 * still holds in memory (the way back to a list, values it looked up) is not theirs: the
+	 * sign-in page then starts the app afresh. */
+	get another(): boolean {
+		return this.#another;
+	}
 
 	get isAdmin(): boolean {
 		return this.user?.role === 'admin';
@@ -37,6 +48,7 @@ class Session {
 		const { data, error, response } = await api.GET('/api/v1/auth/me');
 		if (data) {
 			if (JSON.stringify(this.user) !== JSON.stringify(data.user)) this.user = data.user;
+			this.#known = data.user.id;
 			this.#csrf = data.csrf_token;
 			this.version = data.lekto_version;
 			this.shortcutUrl = data.shortcut_url;
@@ -49,6 +61,8 @@ class Session {
 
 	/** Take over a new session (sign-in answer). */
 	start(signedIn: SessionOut): void {
+		this.#another = this.#known !== null && this.#known !== signedIn.user.id;
+		this.#known = signedIn.user.id;
 		this.user = signedIn.user;
 		this.#csrf = signedIn.csrf_token;
 	}

@@ -270,7 +270,7 @@ describe('DocumentHeader', () => {
 			await user.click(within(dialog).getByRole('button', { name: m.move_title() }));
 			await waitFor(() =>
 				expect(goto).toHaveBeenCalledWith('/ui/documents', {
-					state: { words: '' },
+					state: { words: '', by: OWNER },
 					persistState: true
 				})
 			);
@@ -292,7 +292,7 @@ describe('DocumentHeader', () => {
 			await user.click(within(dialog).getByRole('button', { name: m.move_title() }));
 			await waitFor(() =>
 				expect(goto).toHaveBeenCalledWith('/ui/documents', {
-					state: { words: '' },
+					state: { words: '', by: OWNER },
 					persistState: true
 				})
 			);

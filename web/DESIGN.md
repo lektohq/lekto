@@ -1229,6 +1229,12 @@ true })`, read from `page.state` (`lib/words.ts` for the words of the documents)
   button and F5 bring it back; a plain link opens without it.
 - Words go to the API in a body (`POST /documents/search`); never put them into a query.
 - Not in `localStorage` either: that is per browser and outlives the tab.
+- **What the browser keeps belongs to its user.** A history entry and the remembered filters
+  outlive the session, and another person may sign in next. So the words of an entry name their
+  user (`by`) and count for that user only; the remembered filters of the documents are kept with
+  their user, apply for that user only and are removed on signing out. When another user signs in
+  than the tab knew before, the app starts afresh (a full load), so that nothing it holds in
+  memory stays. Preferences without content (sort, layout, a table's size) stay per browser.
 
 ### Selection by link
 
