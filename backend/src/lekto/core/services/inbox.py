@@ -73,7 +73,13 @@ from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
-from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE, InboxPosition
+from lekto.core.ports.repository import (
+    PAGE_LIMIT,
+    PAGE_SIZE,
+    DocumentFilter,
+    InboxCriterion,
+    InboxPosition,
+)
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import (
     edited_spaces,
@@ -562,6 +568,18 @@ async def in_inbox(
     new = [item.id for item in theirs if item.lane is Lane.GREEN and item.new_at is not None]
     seen = await uow.inbox.seen(viewer, new) if new else {}
     return {item.id for item in theirs if open_tab(item, seen.get(item.id)) is not None}
+
+
+def inbox_filter(
+    filter: DocumentFilter, viewer: UserId, in_inbox: bool | None, *, all_users: bool
+) -> DocumentFilter:
+    """`filter` with the documents that stand open in `viewer`'s inbox (`in_inbox` true) or do
+    not (false), as `in_inbox` marks them: without `all_users` in the spaces `viewer` edits,
+    with it in every user's inbox, new by `viewer`'s own seen marks; None leaves it as it is
+    (.knowledge/plans/inbox-filter.md)."""
+    if in_inbox is None:
+        return filter
+    return replace(filter, inbox=InboxCriterion(viewer, everyone=all_users, open=in_inbox))
 
 
 async def arrived(

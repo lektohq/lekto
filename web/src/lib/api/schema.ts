@@ -1494,7 +1494,7 @@ export interface paths {
 		};
 		/**
 		 * List documents
-		 * @description The documents within the caller's reach, newest first: every document in the spaces they edit, the green ones in the spaces they read. Admins may read every document and list them all with `all_users` (others: 403). Filters combine; `contact_id`, `document_type_id`, `space_id`, `tag_id`, `contact_group_id`, `document_type_group_id`, `topic_id` and `lane` may repeat (any contact, type, space, group, topic or lane, all tags; `processing`: no lane yet). A tag matches the documents with it or a tag below it; a group those whose contact (type) is in it or a group below it; a topic the documents with it or one below it. `field_id`: a value for the field is set. `document_date_from` and `document_date_to`: the document date lies between them, both days included, either end open (a document without a date does not match). `sort` orders by arrival (the default, newest first), document date, title, or (`field` with `sort_field_id`) the value of a field of type date, period (by its first day), number or amount (by its value); documents without a date or value come last. Each document says whether it stands in the caller's inbox (`in_inbox`). To search by words and meaning use `POST /documents/search`.
+		 * @description The documents within the caller's reach, newest first: every document in the spaces they edit, the green ones in the spaces they read. Admins may read every document and list them all with `all_users` (others: 403). Filters combine; `contact_id`, `document_type_id`, `space_id`, `tag_id`, `contact_group_id`, `document_type_group_id`, `topic_id` and `lane` may repeat (any contact, type, space, group, topic or lane, all tags; `processing`: no lane yet). A tag matches the documents with it or a tag below it; a group those whose contact (type) is in it or a group below it; a topic the documents with it or one below it. `field_id`: a value for the field is set. `document_date_from` and `document_date_to`: the document date lies between them, both days included, either end open (a document without a date does not match). `sort` orders by arrival (the default, newest first), document date, title, or (`field` with `sort_field_id`) the value of a field of type date, period (by its first day), number or amount (by its value); documents without a date or value come last. Each document says whether it stands in the caller's inbox (`in_inbox`); the parameter `in_inbox` keeps those that do (true) or do not (false). To search by words and meaning use `POST /documents/search`.
 		 */
 		get: operations['list_documents_api_v1_documents_get'];
 		put?: never;
@@ -23356,6 +23356,8 @@ export interface operations {
 				offset?: number;
 				/** @description Every user's documents instead of the caller's reach (admins). */
 				all_users?: boolean;
+				/** @description Only the documents that stand open in the caller's inbox (true) or those that do not (false), as `in_inbox` marks them and `GET /inbox/summary` counts them: in processing, to review, to intervene, or new and not seen by the caller since; in the spaces the caller edits, with `all_users` in every user's inbox (with the caller's own seen). */
+				in_inbox?: boolean | null;
 				/** @description Documents by id: the whole id, or its end of at least 8 characters (a short id, as MCP names documents; an end several documents share finds each). Several: any of them. The list, its count, its facets and an action on many take it; the search does not (the search index knows no ids). */
 				ids?: string[] | null;
 				contact_id?: string[] | null;
@@ -24214,6 +24216,8 @@ export interface operations {
 			query?: {
 				/** @description Every user's documents instead of the caller's reach (admins). */
 				all_users?: boolean;
+				/** @description Only the documents that stand open in the caller's inbox (true) or those that do not (false), as `in_inbox` marks them and `GET /inbox/summary` counts them: in processing, to review, to intervene, or new and not seen by the caller since; in the spaces the caller edits, with `all_users` in every user's inbox (with the caller's own seen). */
+				in_inbox?: boolean | null;
 				/** @description Documents by id: the whole id, or its end of at least 8 characters (a short id, as MCP names documents; an end several documents share finds each). Several: any of them. The list, its count, its facets and an action on many take it; the search does not (the search index knows no ids). */
 				ids?: string[] | null;
 				contact_id?: string[] | null;
@@ -24320,6 +24324,8 @@ export interface operations {
 			query?: {
 				/** @description Every user's documents instead of the caller's reach (admins). */
 				all_users?: boolean;
+				/** @description Only the documents that stand open in the caller's inbox (true) or those that do not (false), as `in_inbox` marks them and `GET /inbox/summary` counts them: in processing, to review, to intervene, or new and not seen by the caller since; in the spaces the caller edits, with `all_users` in every user's inbox (with the caller's own seen). */
+				in_inbox?: boolean | null;
 				/** @description Documents by id: the whole id, or its end of at least 8 characters (a short id, as MCP names documents; an end several documents share finds each). Several: any of them. The list, its count, its facets and an action on many take it; the search does not (the search index knows no ids). */
 				ids?: string[] | null;
 				contact_id?: string[] | null;
