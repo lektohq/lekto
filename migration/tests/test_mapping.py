@@ -129,7 +129,7 @@ def test_the_date_added_is_taken_over_with_its_time_zone_and_never_ahead() -> No
 
 
 USERS = {
-    1: {"id": 1, "username": "tobias", "is_active": True, "groups": [1]},
+    1: {"id": 1, "username": "johndoe", "is_active": True, "groups": [1]},
     2: {"id": 2, "username": "erika", "is_active": True, "groups": [1]},
     3: {"id": 3, "username": "bob", "is_active": True, "groups": []},
     4: {"id": 4, "username": "gone", "is_active": False, "groups": []},
@@ -150,7 +150,7 @@ def permissions(
 
 def test_no_permissions_means_no_shares() -> None:
     access = access_of({"owner": 1, "permissions": permissions()}, USERS)
-    assert (access.owner, access.shares, access.notes) == ("tobias", (), ())
+    assert (access.owner, access.shares, access.notes) == ("johndoe", (), ())
 
 
 def test_groups_are_resolved_and_writers_win_over_readers() -> None:
@@ -158,11 +158,11 @@ def test_groups_are_resolved_and_writers_win_over_readers() -> None:
         {"owner": 1, "permissions": permissions([3], [1], [2], [])},
         USERS,
     )
-    # tobias (the owner) is left out; erika reads via the group and writes directly (edits); bob
+    # johndoe (the owner) is left out; erika reads via the group and writes directly (edits); bob
     # reads.
     assert access.shares == (("bob", "read"), ("erika", "edit"))
     access = access_of({"owner": 3, "permissions": permissions([], [], [], [1])}, USERS)
-    assert access.shares == (("erika", "edit"), ("tobias", "edit"))
+    assert access.shares == (("erika", "edit"), ("johndoe", "edit"))
 
 
 def test_no_owner_unknown_owner_and_users_that_are_gone_are_noted() -> None:

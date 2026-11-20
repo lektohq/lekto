@@ -19,7 +19,7 @@ def world() -> World:
 
 def test_the_first_plan_takes_a_document_over_as_it_is(world: World) -> None:
     ten = world.expect(10)
-    assert (ten.uploader, ten.owner_source, ten.skip) == ("tobias", "tobias", None)
+    assert (ten.uploader, ten.owner_source, ten.skip) == ("johndoe", "johndoe", None)
     assert (ten.contact, ten.document_type, ten.topic) == ("ACME Energy", "Invoice", None)
     assert ten.tags == {"tax", "tax/2024"}
     assert (ten.document_date, ten.created_at) == ("2024-05-01", "2024-04-02T09:30:00+02:00")
@@ -50,34 +50,34 @@ def test_skipped_files_and_shared_documents(world: World) -> None:
     shared = world.expect(13)
     assert shared.uploader == "erika"
     # One shared space for all of them: the uploader and the writers edit, the readers read.
-    assert shared.members == (("bob", "read"), ("erika", "edit"), ("tobias", "edit"))
-    assert shared.space == "Geteilt: bob (lesen), erika (bearbeiten), tobias (bearbeiten)"
+    assert shared.members == (("bob", "read"), ("erika", "edit"), ("johndoe", "edit"))
+    assert shared.space == "Geteilt: bob (lesen), erika (bearbeiten), johndoe (bearbeiten)"
     assert shared.sources["space"] == "the permissions in Paperless"
     # No owner, or one who is gone: the executing admin (None), or the fallback.
     assert world.expect(14).uploader is None
-    world.settings["fallback_owner"] = "tobi"
-    assert world.expect(15).uploader == "tobi"
+    world.settings["fallback_owner"] = "john"
+    assert world.expect(15).uploader == "john"
 
 
 def test_users_are_mapped_and_dropped(world: World) -> None:
-    world.set("users", "tobias", "{to: user, name: tobi}")
+    world.set("users", "johndoe", "{to: user, name: john}")
     world.set("users", "bob", "drop")
-    assert world.expect(10).uploader == "tobi"
+    assert world.expect(10).uploader == "john"
     shared = world.expect(13)
-    assert shared.members == (("erika", "edit"), ("tobi", "edit"))
-    assert shared.space == "Geteilt: erika (bearbeiten), tobi (bearbeiten)"
+    assert shared.members == (("erika", "edit"), ("john", "edit"))
+    assert shared.space == "Geteilt: erika (bearbeiten), john (bearbeiten)"
     assert "shared with bob, who is not taken over: not a member" in shared.notes
     world.set("users", "erika", "drop")
     assert world.expect(12).uploader is None
-    world.inactive = frozenset({"tobi"})
+    world.inactive = frozenset({"john"})
     assert world.expect(10).uploader is None
     assert any("not an active user in Lekto" in note for note in world.expect(10).notes)
 
 
 def test_a_user_can_bring_more_targets(world: World) -> None:
-    world.set("users", "tobias", "[{to: user, name: tobi}, {to: tag, name: Tobi}]")
-    assert world.expect(10).tags == {"tax", "tax/2024", "Tobi"}
-    assert "Tobi" not in world.expect(12).tags  # erika's
+    world.set("users", "johndoe", "[{to: user, name: john}, {to: tag, name: John}]")
+    assert world.expect(10).tags == {"tax", "tax/2024", "John"}
+    assert "John" not in world.expect(12).tags  # erika's
 
 
 def test_a_reinterpretation_fills_only_what_is_empty(world: World) -> None:
@@ -110,12 +110,12 @@ def test_a_drop_with_a_review_opens_the_field_in_the_inbox(world: World) -> None
     ten = world.expect(10)
     assert ten.contact is None
     assert ten.review == ((Review("Resolve the contact"), "contact"),)
-    world.set("users", "tobias", "{to: user, name: tobias, review: true}")
-    tobias = Review(
-        "Paperless user 'tobias': to be checked in Lekto", "paperless_user_review", "tobias"
+    world.set("users", "johndoe", "{to: user, name: johndoe, review: true}")
+    johndoe = Review(
+        "Paperless user 'johndoe': to be checked in Lekto", "paperless_user_review", "johndoe"
     )
-    assert (tobias, None) in world.expect(10).review
-    assert world.expect(14).review == ()  # no owner: not tobias' document
+    assert (johndoe, None) in world.expect(10).review
+    assert world.expect(14).review == ()  # no owner: not johndoe's document
 
 
 def test_storage_paths_and_tags_can_become_anything(world: World) -> None:
