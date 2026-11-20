@@ -25,7 +25,7 @@ from tests.builders import NOW
 from tests.unit.domain.facts_support import fact, seen
 
 IBAN = (IdentifierKind.IBAN, "DE02120300000000202051")
-VAT = (IdentifierKind.VAT_ID, "DE312456789")
+VAT = (IdentifierKind.VAT_ID, "DE987654321")
 CUSTOMER = (IdentifierKind.CUSTOMER_NUMBER, "12345678")
 CONTRACT = (IdentifierKind.CONTRACT_NUMBER, "12345678")
 OTHER = (IdentifierKind.CUSTOMER_NUMBER, "55667788")
@@ -170,10 +170,10 @@ def test_an_excerpt_shows_the_text_around_on_one_line() -> None:
     assert cut.before == "Rechnung Bitte überweise an IBAN "
     assert cut.match == "DE02 1203 0000 0000 2020 51"
     assert cut.after == " bis Monatsende."
-    long = "Wort " * 60 + "DE312456789" + " Wort" * 60
-    short = excerpt(long, long.index("DE3"), 11, reach=20)
+    long = "Wort " * 60 + "DE987654321" + " Wort" * 60
+    short = excerpt(long, long.index("DE9"), 11, reach=20)
     assert short.before.startswith("…") and short.after.endswith("…")
-    assert short.match == "DE312456789"
+    assert short.match == "DE987654321"
     assert len(short.before) <= 21 and len(short.after) <= 21
 
 

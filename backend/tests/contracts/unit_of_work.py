@@ -1165,7 +1165,7 @@ class UnitOfWorkContract:
         utility, bank = (Contact.create(name=name, now=NOW) for name in ("Stadtwerke", "Bank"))
         own = (IdentifierKind.IBAN, "DE02120300000000202051")
         customer = (IdentifierKind.CUSTOMER_NUMBER, "12345678")
-        other = (IdentifierKind.VAT_ID, "DE312456789")
+        other = (IdentifierKind.VAT_ID, "DE987654321")
         documents = [builders.processed(owner, space) for _ in range(4)]
         shows = [{own, customer}, {own}, {other}, {own}]
         for document, contact in zip(documents, [utility, bank, utility, None], strict=True):
@@ -1204,7 +1204,7 @@ class UnitOfWorkContract:
         utility = Contact.create(name="Stadtwerke", now=NOW)
         iban = (IdentifierKind.IBAN, "DE02120300000000202051")
         invoice = (IdentifierKind.INVOICE_NUMBER, "R-4711")
-        vat = (IdentifierKind.VAT_ID, "DE312456789")
+        vat = (IdentifierKind.VAT_ID, "DE987654321")
         documents = [builders.processed(owner, space) for _ in range(4)]
         for document in documents:
             document.contact_id = utility.id
@@ -1252,7 +1252,7 @@ class UnitOfWorkContract:
             position=120,
             holder=Holder(HolderKind.THIRD_PARTY, HolderSource.RULE, "Stadtwerke Musterstadt"),
         )
-        vat = found(IdentifierKind.VAT_ID, "DE312456789", position=40)
+        vat = found(IdentifierKind.VAT_ID, "DE987654321", position=40)
         coded = found(IdentifierKind.CUSTOMER_NUMBER, "777", position=None)
         async with uow_factory() as uow:
             await uow.documents.add(document)
@@ -1277,7 +1277,7 @@ class UnitOfWorkContract:
             with pytest.raises(ValidationError):
                 await uow.document_facts.replace_found(document.id, [vat, vat])
             await uow.commit()
-        again = replace(vat, written="DE 312 456 789")
+        again = replace(vat, written="DE 987 654 321")
         async with uow_factory() as uow:
             await uow.document_facts.replace_found(document.id, [again, coded])
             await uow.commit()
@@ -1295,7 +1295,7 @@ class UnitOfWorkContract:
         found stays as it is."""
         owner, space = await owner_with_space(uow_factory)
         document = builders.processed(owner, space)
-        vat = found(IdentifierKind.VAT_ID, "DE312456789", position=40)
+        vat = found(IdentifierKind.VAT_ID, "DE987654321", position=40)
         iban = found(IdentifierKind.IBAN, "DE02120300000000202051", position=10)
         given = DocumentFact(
             kind=IdentifierKind.INVOICE_NUMBER,

@@ -25,8 +25,8 @@ from lekto.core.domain.identifiers import IdentifierKind, identifiers_in, places
 from lekto.core.domain.reasons import Reason, ReasonCode
 
 IBAN = (IdentifierKind.IBAN, "DE02120300000000202051")
-VAT = (IdentifierKind.VAT_ID, "DE312456789")
-TEXT = "USt-IdNr. DE 312 456 789\nBitte überweisen Sie auf DE02 1203 0000 0000 2020 51."
+VAT = (IdentifierKind.VAT_ID, "DE987654321")
+TEXT = "USt-IdNr. DE 987 654 321\nBitte überweisen Sie auf DE02 1203 0000 0000 2020 51."
 
 
 def test_every_kind_has_a_role() -> None:
@@ -45,7 +45,7 @@ def test_facts_are_found_as_the_text_reads_with_where_they_come_from() -> None:
         FactRole.CONTACT,
         frozenset({FactOrigin.PATTERN}),
     )
-    assert (vat.written, vat.position) == ("DE 312 456 789", TEXT.index("DE 312"))
+    assert (vat.written, vat.position) == ("DE 987 654 321", TEXT.index("DE 987"))
     assert iban.origins == {FactOrigin.PATTERN, FactOrigin.CODE}
     assert iban.written == "DE02 1203 0000 0000 2020 51"
     # Only in a code: no place in the text, last.
@@ -157,7 +157,7 @@ def test_a_fact_the_model_read_is_checked_as_a_field_s_value() -> None:
         # What it was not asked for: a person's kind, its role, a kind the patterns read surely.
         (read("tax_id", "86095742001", "person", "86095742001"), ReasonCode.FACT_NOT_ASKED),
         (read("invoice_number", "4711", "person", "Nr. 4711"), ReasonCode.FACT_NOT_ASKED),
-        (read("vat_id", "DE312456789", "contact", "DE312456789"), ReasonCode.FACT_NOT_ASKED),
+        (read("vat_id", "DE987654321", "contact", "DE987654321"), ReasonCode.FACT_NOT_ASKED),
         (read("creditor_id", "DE00ZZZ09999999999", "contact", "x"), ReasonCode.NOT_OF_KIND),
         (read("invoice_number", "4712", "refers", "Nr. 4712"), ReasonCode.FACT_NOT_IN_TEXT),
         (read("invoice_number", "4711", "refers"), ReasonCode.QUOTE_MISSING),

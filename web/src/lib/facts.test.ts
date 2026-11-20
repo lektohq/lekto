@@ -53,7 +53,7 @@ const FACTS: Facts = {
 		},
 		{
 			kind: 'vat_id',
-			value: 'DE312456789',
+			value: 'DE987654321',
 			contact_id: 'contact-2',
 			in_text: true,
 			in_code: false,
@@ -137,7 +137,7 @@ describe('facts', () => {
 			'DE89370400440532013000'
 		]);
 		expect(groups.others.map((item) => ('value' in item ? item.value : ''))).toEqual([
-			'DE312456789'
+			'DE987654321'
 		]);
 		expect(groups.unknown.map((item) => item.value)).toEqual(['12345678']);
 		expect(factCounts(FACTS)).toEqual({ evidence: 2, unknown: 1, codes: 1 });
