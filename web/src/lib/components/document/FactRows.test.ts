@@ -18,14 +18,14 @@ describe('FactRows', () => {
 	it('tells what the text names: contacts as chips, identifiers with their contact, persons in brackets', () => {
 		render(FactRows, {
 			output: {
-				named: [{ name: 'N26' }, { name: 'Muster Bäckerei' }],
+				named: [{ name: 'Muster Bank' }, { name: 'Muster Bäckerei' }],
 				identifiers: [{ kind: 'personnel_number', value: '12345', contact_id: BAKERY }],
 				unknown_identifiers: [],
 				persons: [{ user_id: ERIKA, strength: 'hard' }]
 			},
 			lookup
 		});
-		expect(screen.getByText('N26')).toBeTruthy();
+		expect(screen.getByText('Muster Bank')).toBeTruthy();
 		expect(screen.getByText(/12345 → Muster Bäckerei$/)).toBeTruthy();
 		expect(screen.queryByText(m.signal_unknown_identifiers())).toBeNull();
 		expect(screen.getByText(m.signal_person_hard({ name: 'Jane Doe' }))).toBeTruthy();

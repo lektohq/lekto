@@ -210,7 +210,7 @@ describe('DocumentFiles', () => {
 	});
 
 	it('lists the versions of the original, the current one first and marked', async () => {
-		const lookup = { users: [{ id: 'u-1', username: 'tobi', display_name: 'Tobias Schulz' }] };
+		const lookup = { users: [{ id: 'u-1', username: 'john', display_name: 'John Doe' }] };
 		files = {
 			...FILES,
 			versions: [
@@ -236,7 +236,7 @@ describe('DocumentFiles', () => {
 		]);
 		expect(within(rows[0]).getByText(m.version_current())).toBeTruthy();
 		expect(rows[0].textContent).toContain(m.version_edited({ from: '1' }));
-		expect(rows[0].textContent).toContain('Tobias Schulz');
+		expect(rows[0].textContent).toContain('John Doe');
 		expect(within(rows[1]).queryByText(m.version_current())).toBeNull();
 		expect(rows[1].textContent).toContain(m.version_received());
 	});

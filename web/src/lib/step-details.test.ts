@@ -150,7 +150,7 @@ describe('step details', () => {
 	it('tells what the text names: contacts, identifiers with their contact, persons in brackets', () => {
 		const facts = factsOf(
 			{
-				named: [{ name: 'Muster Bäckerei' }, { name: 'N26' }],
+				named: [{ name: 'Muster Bäckerei' }, { name: 'Muster Bank' }],
 				identifiers: [{ kind: 'personnel_number', value: '12345', contact_id: BAKERY }],
 				// As the API keeps it; shown as printed.
 				unknown_identifiers: [{ kind: 'iban', value: 'DE89370400440532013000' }],
@@ -158,7 +158,7 @@ describe('step details', () => {
 			},
 			lookup
 		);
-		expect(facts.named).toEqual(['Muster Bäckerei', 'N26']);
+		expect(facts.named).toEqual(['Muster Bäckerei', 'Muster Bank']);
 		expect(facts.identifiers).toHaveLength(1);
 		expect(facts.identifiers[0]).toMatch(/12345 → Muster Bäckerei$/);
 		expect(facts.unknown[0]).toMatch(/DE89 3704 0044 0532 0130 00$/);
