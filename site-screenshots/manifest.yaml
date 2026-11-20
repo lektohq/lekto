@@ -1,0 +1,85 @@
+---
+# Screenshots of the web UI for lekto.dev, one entry per view: <file>-<variant>.png.
+# og.png (1200x630) is the social preview, cut from document-done-desktop-light.png.
+# All names, numbers and documents are made up.
+- file: inbox
+  title: Inbox
+  alt: >-
+    The Lekto inbox with seven documents: one still being processed, a handwritten letter
+    from Unicorn Pharmacy to review, a scan that needs action, and four new documents that
+    Lekto filed on its own.
+  caption: >-
+    Every document lands in the inbox with its lane, so you only look at what Lekto was
+    unsure about.
+  variants: [desktop-light, desktop-dark, mobile-light, mobile-dark]
+- file: document-review
+  title: Review
+  alt: >-
+    The text of a handwritten letter from Unicorn Pharmacy, read by the vision language
+    model; the letter waits in the yellow lane with three details to check, and the document
+    date has no source in the text.
+  caption: >-
+    When Lekto is unsure, it says why and shows where each value comes from, or that the
+    text holds none.
+  variants: [desktop-light, desktop-dark, mobile-light, mobile-dark]
+- file: document-done
+  title: Facts
+  alt: >-
+    The annual electricity bill from Sampleford Power & Water, filed automatically: its
+    customer number is marked in the document and points to the contact, next to the meter
+    number and the IBAN.
+  caption: >-
+    Each value is tied to its place in the text, and known identifiers assign the contact
+    without asking.
+  variants: [desktop-light, desktop-dark]
+- file: processing
+  title: Processing
+  alt: >-
+    The processing of the electricity bill: text recognition, the language model and the
+    other signals, the judgement, fields and filing, each with its duration and result.
+  caption: >-
+    Every step is visible, from text recognition to filing, with its duration and result.
+  variants: [desktop-light, desktop-dark]
+- file: search
+  title: Search
+  alt: >-
+    A search for "car insurance after the accident" finds the workshop invoice, the claim
+    settlement and the car insurance policy; saved lenses and filters stand beside the hits.
+  caption: >-
+    Hybrid search finds documents by their words and by their meaning; lenses keep the views
+    you need often.
+  variants: [desktop-light, desktop-dark, mobile-light, mobile-dark]
+- file: contact
+  title: Contact
+  alt: >-
+    The contact Sampleford Power & Water with its identifiers: the customer number 47110815
+    and the domain power.example.
+  caption: >-
+    Identifiers such as a customer number let Lekto recognise a sender by itself.
+  variants: [desktop-light, desktop-dark]
+- file: expected
+  title: Expected
+  alt: >-
+    The overview with the open inbox, identifiers and system status, and a yearly series of
+    electricity bills from Sampleford Power & Water: three documents, the next one expected on
+    12 November 2027.
+  caption: >-
+    Lekto notices documents that come at a steady interval and tells you when the next one
+    is due.
+  variants: [desktop-light, desktop-dark]
+- file: rules
+  title: Rules
+  alt: >-
+    The rule editor: three conditions on contact, document type and text, and two actions
+    that add a tag and set the title with a Liquid template.
+  caption: >-
+    Rules combine conditions and actions; a Liquid template writes the title from the
+    document's values.
+  variants: [desktop-light, desktop-dark]
+- file: rules-dry-run
+  title: Dry run
+  alt: >-
+    The dry run of the rule: one document would get the title "Electricity 2026 – €412.37".
+  caption: >-
+    A dry run shows what a rule would change before anything is stored.
+  variants: [desktop-light, desktop-dark]
