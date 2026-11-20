@@ -1326,9 +1326,15 @@ worker, and Lekto works as a website.
   from the network; without one the kept page starts the app.
 - **Sharing to Lekto (Android):** the installed app stands in the share sheet (`share_target`:
   PDF, images, mails, what "Hochladen" takes). The worker keeps the shared files under a random
-  id, at most an hour; the page `/share` hands them to the upload (into the personal space, as
-  "Hochladen" does) and goes on to the inbox, which shows what came of them. Taken files are gone
-  from the device; a share opened again says that nothing waits any more.
+  id, at most an hour. The page `/share` uploads nothing by itself, since any website can post
+  files to the share target: it lists the files (name, size) in a card and asks, "Verwerfen"
+  (`ghost`) then "Hochladen" (`default`). "Hochladen" hands them to the upload (into the personal
+  space, as "Hochladen" does) and goes on to the inbox, which shows what came of them;
+  "Verwerfen" goes there without. "Hochladen" counts only once the page has been in front for a
+  second (`aria-disabled` and dimmed until then, again whenever the window comes to the front): a
+  website that asks for a double click must not get the second one here. Files stay on the device
+  until the person has decided, then they are gone; a share opened after that says that nothing
+  waits any more.
 - **Installing from the upload:** in the dialog "Hochladen", under the drop area and set off by a
   line, one hint (`text-sm`, muted, with its icon): on Android in the browser, while the browser
   offers the install, "Schneller aus dem Teilen-Menü: App installieren" (a link button that opens
