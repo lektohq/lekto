@@ -233,7 +233,7 @@ over MCP) carries the token beside the person (`ViaToken`: its id and a copy of 
 in the web UI (`.knowledge/decisions/2026-11-01-mcp.md`, decision 11): the verdicts, the confirmation and seen marks of
 the inbox (`GET /inbox` names it under done, `via_token`), relations, bulk operations and rule
 applications (which pass it on to each document), and the log entries of a person (`via_token`
-beside `actor` or `confirmed_by`). The web UI writes "Tobi über Token „Claude“" there. The statistics over both are counted live. `GET /automation`
+beside `actor` or `confirmed_by`). The web UI writes "John über Token „Claude“" there. The statistics over both are counted live. `GET /automation`
 shows them on the page "System" to every user (`AutomationService`): the documents by the lane of
 their first run, what became of them, the history by month, the times (median and 90th
 percentile, per step too) and the verdicts per field; `GET /automation/signals` the hits of each
@@ -1101,7 +1101,7 @@ where it is and edits where it goes (global: admins); every version names its sp
 - **Entering a space.** If rules file a document into another space, that space's own rules
   (trigger `ingest`) run next, and so on. Each space at most once in such a chain: rules that
   would file it back into a space it was in stop the chain, the move is not made and the
-  document waits in the inbox ("rules move it back and forth: tobi → Haushalt → tobi"; the
+  document waits in the inbox ("rules move it back and forth: john → Haushalt → john"; the
   node's output lists the `spaces`). The chain goes on across a person's click: after a
   confirmation the spaces of the runs that waited for it count (the input's `chain`). A value
   a rule set only through unconfirmed model values stays unconfirmed for the next space's

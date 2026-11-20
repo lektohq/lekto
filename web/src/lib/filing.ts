@@ -107,7 +107,7 @@ function lostReaders(target: string, current: string, lookup: Lookup): string[] 
 		.map((member) => userLabel(member));
 }
 
-/** What a choice reads as: "Übergeben an Jane Doe", "Nach Haushalt", "In Tobi lassen". */
+/** What a choice reads as: "Übergeben an Jane Doe", "Nach Haushalt", "In John lassen". */
 export function choiceTitle(
 	kind: FilingKind,
 	target: string,

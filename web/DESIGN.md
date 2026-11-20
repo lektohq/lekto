@@ -1508,10 +1508,10 @@ has the user, and a `name` the API sends for a user follows the same rule (`User
 choice among users adds the username where it differs (`userChoice`: "Jane Doe (erika)").
 
 A decision a person made through an API token (a script, an assistant over MCP) names the token
-after them, as it was named then: "Tobi über Token „Claude“", "Bestätigt von Dir über Token
+after them, as it was named then: "John über Token „Claude“", "Bestätigt von Dir über Token
 „Claude“" (`viaToken`). It stands wherever the person stands: under done in the inbox and in the
 log of a document; an entry outside processing (a change, a move, a rule applied) names who set
-it off ("von Tobi über Token „Claude“"). Guard: `src/lib/via-token.test.ts`.
+it off ("von John über Token „Claude“"). Guard: `src/lib/via-token.test.ts`.
 
 ## Exceptions
 
