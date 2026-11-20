@@ -34,7 +34,7 @@ from lekto.adapters.inbound.rest.auth import (
 )
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.cursors import Cursor, decode_cursor, encode_cursor
-from lekto.adapters.inbound.rest.params import AllDocuments, AllInboxes, Listed
+from lekto.adapters.inbound.rest.params import AllDocuments, AllInboxes, InInbox, Listed
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.documents import (
     DocumentAccepted,
@@ -459,7 +459,8 @@ def _form_field[T](fields: Mapping[str, str], name: str, read: Callable[[str], T
         "`sort_field_id`) the value of a field of type date, period (by its first day), number "
         "or amount (by its value); documents without a date or value come last. Each document "
         "says whether "
-        "it stands in the caller's inbox (`in_inbox`). To search by words and meaning use "
+        "it stands in the caller's inbox (`in_inbox`); the parameter `in_inbox` keeps those that "
+        "do (true) or do not (false). To search by words and meaning use "
         "`POST /documents/search`."
     ),
     response_model=DocumentPage,
@@ -484,6 +485,7 @@ async def list_documents(
         ),
     ] = 0,
     all_users: AllDocuments = False,
+    in_inbox: InInbox = None,
 ) -> DocumentPage:
     views = await context.documents.query(
         user,
@@ -493,6 +495,7 @@ async def list_documents(
         offset=offset,
         limit=limit,
         all_users=all_users,
+        in_inbox=in_inbox,
     )
     next_cursor = encode_cursor(views[-1].document.id) if len(views) == limit else None
     return DocumentPage(
@@ -514,9 +517,14 @@ async def list_documents(
     responses=problem_responses(401, 403, 422),
 )
 async def count_documents(
-    user: CurrentUser, context: Context, filter: Listed, all_users: AllDocuments = False
+    user: CurrentUser,
+    context: Context,
+    filter: Listed,
+    all_users: AllDocuments = False,
+    in_inbox: InInbox = None,
 ) -> DocumentCountOut:
-    return DocumentCountOut(total=await context.documents.count(user, filter, all_users=all_users))
+    total = await context.documents.count(user, filter, all_users=all_users, in_inbox=in_inbox)
+    return DocumentCountOut(total=total)
 
 
 @router.get(
@@ -535,9 +543,13 @@ async def count_documents(
     responses=problem_responses(401, 403, 422),
 )
 async def document_facets(
-    user: CurrentUser, context: Context, filter: Listed, all_users: AllDocuments = False
+    user: CurrentUser,
+    context: Context,
+    filter: Listed,
+    all_users: AllDocuments = False,
+    in_inbox: InInbox = None,
 ) -> DocumentFacetsOut:
-    facets = await context.documents.facets(user, filter, all_users=all_users)
+    facets = await context.documents.facets(user, filter, all_users=all_users, in_inbox=in_inbox)
     return DocumentFacetsOut.of(facets)
 
 

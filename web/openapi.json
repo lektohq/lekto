@@ -3,7 +3,7 @@
   "info": {
     "title": "Lekto DMS API",
     "description": "Lekto is a headless document management system; this API is the only way in.\n\nErrors are problem details (RFC 9457, `application/problem+json`).\n\nAuthentication: a session cookie from `POST /auth/login` (web UI; changing requests also send\nthe header `X-CSRF-Token`) or a personal API token as `Authorization: Bearer lekto_…`. Every\nendpoint needs one of them (401 without), except health, the sign-in endpoints (`POST\n/auth/login` and, below `/auth/oidc`, information, start and callback) and the answer to a task\n(`/external/tasks/{id}/result`, with the task's own token).\n\nAn API token carries rights: the read and write right of each area (`documents`,\n`master_data`, `rules`, `spaces`, `webhooks`, `lenses`, `push`, `system`), `documents:upload`,\n`documents:count` (the numbers alone), and for an admin's token the admin rights one by one\n(`admin:count_all`, `admin:documents_all`, `admin:mailboxes`, `admin:private_webhooks`,\n`admin:manage`), which count only while the user is an active admin. Each operation names the\nright it needs as `x-right` (`any`: every token; `session`: no token); without it a token gets\n403 (`token_lacks_right`). The presets `read`, `read_write` and `upload` give a token the rights\nit had as a scope (`POST /auth/tokens`).\n\nA session is needed, and a token gets 403, for the own account (profile, password, sessions,\nTOTP, API tokens, provider links) and, for admins, for creating a user with a password or the\nrole admin, resetting a user's sign-in and deleting a user. Documents and spaces the caller may\nnot see are \"not found\" (404), the same as ones that do not exist.\n\nThe same services are available to AI clients over MCP (Streamable HTTP, stateless) at\n`/api/v1/mcp`, with the same API tokens as bearer; it is not part of this OpenAPI document.\nTools are named `<area>_<verb>` (such as `documents_search` or `inbox_confirm`); each needs the\nright of its area, a tool for admins also an admin right. `tools/list` names the tools the\ncaller may use.\n",
-    "version": "0.2",
+    "version": "0.3",
     "x-lekto-version": "0.0.0.dev0"
   },
   "paths": {
@@ -11986,7 +11986,7 @@
           "documents"
         ],
         "summary": "Change many documents at once",
-        "description": "Does one action to the selected documents in the background; follow it at `GET /documents/bulk/{id}`. The selection: `document_ids` (at most 500), or every document the query parameters find, as `GET /documents` (at most 10000, more: 422) or with `q` in the body as `POST /documents/search` (the hits it reaches, at most 1000); it is fixed now. Each document goes through the same change as one by hand, rights included: one the caller may not edit, one being processed (except to delete it) or one that changed meanwhile is skipped with the reason, one that is as the action wants it already stays as it is. A tag, contact, type, topic or space the action names that does not exist: 404. Admins act on every user's documents with `all_users` (others: 403).",
+        "description": "Does one action to the selected documents in the background; follow it at `GET /documents/bulk/{id}`. The selection: `document_ids` (at most 500), or every document the query parameters find, as `GET /documents` (without `in_inbox`; at most 10000, more: 422) or with `q` in the body as `POST /documents/search` (the hits it reaches, at most 1000); it is fixed now. Each document goes through the same change as one by hand, rights included: one the caller may not edit, one being processed (except to delete it) or one that changed meanwhile is skipped with the reason, one that is as the action wants it already stays as it is. A tag, contact, type, topic or space the action names that does not exist: 404. Admins act on every user's documents with `all_users` (others: 403).",
         "operationId": "start_bulk_api_v1_documents_bulk_post",
         "parameters": [
           {
@@ -13363,7 +13363,7 @@
           "documents"
         ],
         "summary": "List documents",
-        "description": "The documents within the caller's reach, newest first: every document in the spaces they edit, the green ones in the spaces they read. Admins may read every document and list them all with `all_users` (others: 403). Filters combine; `contact_id`, `document_type_id`, `space_id`, `tag_id`, `contact_group_id`, `document_type_group_id`, `topic_id` and `lane` may repeat (any contact, type, space, group, topic or lane, all tags; `processing`: no lane yet). A tag matches the documents with it or a tag below it; a group those whose contact (type) is in it or a group below it; a topic the documents with it or one below it. `field_id`: a value for the field is set. `document_date_from` and `document_date_to`: the document date lies between them, both days included, either end open (a document without a date does not match). `sort` orders by arrival (the default, newest first), document date, title, or (`field` with `sort_field_id`) the value of a field of type date, period (by its first day), number or amount (by its value); documents without a date or value come last. Each document says whether it stands in the caller's inbox (`in_inbox`). To search by words and meaning use `POST /documents/search`.",
+        "description": "The documents within the caller's reach, newest first: every document in the spaces they edit, the green ones in the spaces they read. Admins may read every document and list them all with `all_users` (others: 403). Filters combine; `contact_id`, `document_type_id`, `space_id`, `tag_id`, `contact_group_id`, `document_type_group_id`, `topic_id` and `lane` may repeat (any contact, type, space, group, topic or lane, all tags; `processing`: no lane yet). A tag matches the documents with it or a tag below it; a group those whose contact (type) is in it or a group below it; a topic the documents with it or one below it. `field_id`: a value for the field is set. `document_date_from` and `document_date_to`: the document date lies between them, both days included, either end open (a document without a date does not match). `sort` orders by arrival (the default, newest first), document date, title, or (`field` with `sort_field_id`) the value of a field of type date, period (by its first day), number or amount (by its value); documents without a date or value come last. Each document says whether it stands in the caller's inbox (`in_inbox`); the parameter `in_inbox` keeps those that do (true) or do not (false). To search by words and meaning use `POST /documents/search`.",
         "operationId": "list_documents_api_v1_documents_get",
         "parameters": [
           {
@@ -13450,6 +13450,24 @@
               "title": "All Users"
             },
             "description": "Every user's documents instead of the caller's reach (admins)."
+          },
+          {
+            "name": "in_inbox",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only the documents that stand open in the caller's inbox (true) or those that do not (false), as `in_inbox` marks them and `GET /inbox/summary` counts them: in processing, to review, to intervene, or new and not seen by the caller since; in the spaces the caller edits, with `all_users` in every user's inbox (with the caller's own seen). The list, its count and its facets take it; an action on many and the search do not.",
+              "title": "In Inbox"
+            },
+            "description": "Only the documents that stand open in the caller's inbox (true) or those that do not (false), as `in_inbox` marks them and `GET /inbox/summary` counts them: in processing, to review, to intervene, or new and not seen by the caller since; in the spaces the caller edits, with `all_users` in every user's inbox (with the caller's own seen). The list, its count and its facets take it; an action on many and the search do not."
           },
           {
             "name": "ids",
@@ -14515,6 +14533,24 @@
             "description": "Every user's documents instead of the caller's reach (admins)."
           },
           {
+            "name": "in_inbox",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only the documents that stand open in the caller's inbox (true) or those that do not (false), as `in_inbox` marks them and `GET /inbox/summary` counts them: in processing, to review, to intervene, or new and not seen by the caller since; in the spaces the caller edits, with `all_users` in every user's inbox (with the caller's own seen). The list, its count and its facets take it; an action on many and the search do not.",
+              "title": "In Inbox"
+            },
+            "description": "Only the documents that stand open in the caller's inbox (true) or those that do not (false), as `in_inbox` marks them and `GET /inbox/summary` counts them: in processing, to review, to intervene, or new and not seen by the caller since; in the spaces the caller edits, with `all_users` in every user's inbox (with the caller's own seen). The list, its count and its facets take it; an action on many and the search do not."
+          },
+          {
             "name": "ids",
             "in": "query",
             "required": false,
@@ -14884,6 +14920,24 @@
               "title": "All Users"
             },
             "description": "Every user's documents instead of the caller's reach (admins)."
+          },
+          {
+            "name": "in_inbox",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only the documents that stand open in the caller's inbox (true) or those that do not (false), as `in_inbox` marks them and `GET /inbox/summary` counts them: in processing, to review, to intervene, or new and not seen by the caller since; in the spaces the caller edits, with `all_users` in every user's inbox (with the caller's own seen). The list, its count and its facets take it; an action on many and the search do not.",
+              "title": "In Inbox"
+            },
+            "description": "Only the documents that stand open in the caller's inbox (true) or those that do not (false), as `in_inbox` marks them and `GET /inbox/summary` counts them: in processing, to review, to intervene, or new and not seen by the caller since; in the spaces the caller edits, with `all_users` in every user's inbox (with the caller's own seen). The list, its count and its facets take it; an action on many and the search do not."
           },
           {
             "name": "ids",

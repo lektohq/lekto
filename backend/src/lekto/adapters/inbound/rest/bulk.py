@@ -28,9 +28,10 @@ router = APIRouter(
     description=(
         "Does one action to the selected documents in the background; follow it at "
         f"`GET /documents/bulk/{{id}}`. The selection: `document_ids` (at most {MAX_IDS}), or "
-        "every document the query parameters find, as `GET /documents` (at most "
-        f"{MAX_DOCUMENTS}, more: 422) or with `q` in the body as `POST /documents/search` (the "
-        f"hits it reaches, at most {MAX_HITS}); it is fixed now. Each document goes through the "
+        "every document the query parameters find, as `GET /documents` (without `in_inbox`; "
+        f"at most {MAX_DOCUMENTS}, more: 422) or with `q` in the body as "
+        f"`POST /documents/search` (the hits it reaches, at most {MAX_HITS}); it is fixed now. "
+        "Each document goes through the "
         "same change as one by hand, rights included: one the caller may not edit, one being "
         "processed (except to delete it) or one that changed meanwhile is skipped with the "
         "reason, one that is as the action wants it already stays as it is. A tag, contact, "

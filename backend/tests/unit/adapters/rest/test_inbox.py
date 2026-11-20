@@ -1,6 +1,7 @@
 """Inbox, review and confirmation over HTTP."""
 
 from datetime import datetime, timedelta
+from typing import Any
 from uuid import UUID
 
 from lekto.adapters.inbound.rest import PREFIX
@@ -16,6 +17,7 @@ from lekto.core.domain.labels import LabelCheck, LabelOutcome
 from lekto.core.domain.master_data import Contact
 from lekto.core.domain.pipeline import Node, NodeResult, Outcome
 from lekto.core.domain.reasons import written
+from lekto.core.domain.users import User
 from tests.api import auth
 from tests.builders import NOW, Returns
 from tests.unit.adapters.rest.support import DOCUMENTS, Api, sample_file, unique_pdf, upload
@@ -256,4 +258,49 @@ async def test_the_inbox_refuses_what_it_does_not_know(api: Api) -> None:
         assert response.status_code == 404
         assert response.headers["content-type"] == PROBLEM
     invalid = await api.client.get(f"{PREFIX}/inbox", params={"tab": "all"}, headers=auth(owner))
+    assert invalid.status_code == 422
+
+
+async def test_the_document_list_filters_by_the_inbox(api: Api) -> None:
+    """`in_inbox` keeps what `GET /inbox/summary` counts as open, with and without `all_users`
+    (.knowledge/plans/inbox-filter.md)."""
+    owner, other, admin = await api.user(), await api.user(), await api.admin()
+    first = await upload(api, auth(owner), content=unique_pdf("first"))
+    second = await upload(api, auth(owner), content=unique_pdf("second"))
+    theirs = await upload(api, auth(other), content=unique_pdf("theirs"))
+    api.clock.advance(timedelta(minutes=1))
+    for user, document in ((owner, first), (admin, second)):
+        seen = await api.client.put(f"{DOCUMENTS}/{document}/seen", headers=auth(user))
+        assert seen.status_code == 204
+
+    async def get(path: str, user: User, **params: str) -> dict[str, Any]:
+        response = await api.client.get(f"{DOCUMENTS}{path}", params=params, headers=auth(user))
+        assert response.status_code == 200, response.text
+        result: dict[str, Any] = response.json()
+        return result
+
+    for user, everyone, open in (
+        (owner, {}, {second}),
+        (admin, {}, set()),
+        (admin, {"all_users": "true"}, {first, theirs}),
+    ):
+        summary = await api.client.get(
+            f"{PREFIX}/inbox/summary", params=everyone, headers=auth(user)
+        )
+        assert summary.json()["open"] == len(open)
+        for wanted, expected in (("true", open), ("false", None)):
+            listed = await get("", user, in_inbox=wanted, **everyone)
+            ids = {item["id"] for item in listed["items"]}
+            assert all(item["in_inbox"] is (wanted == "true") for item in listed["items"])
+            if expected is not None:
+                assert ids == expected
+            count = await get("/count", user, in_inbox=wanted, **everyone)
+            facets = await get("/facets", user, in_inbox=wanted, **everyone)
+            assert count["total"] == facets["total"] == len(ids)
+        every = await get("/count", user, **everyone)
+        assert (
+            every["total"]
+            == len(open) + (await get("/count", user, in_inbox="false", **everyone))["total"]
+        )
+    invalid = await api.client.get(DOCUMENTS, params={"in_inbox": "maybe"}, headers=auth(owner))
     assert invalid.status_code == 422

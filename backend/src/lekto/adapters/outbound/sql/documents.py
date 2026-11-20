@@ -28,7 +28,7 @@ from sqlalchemy import (
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.repositories import KEYS_PER_QUERY, SqlRepository, Values
-from lekto.adapters.outbound.sql.spaces import visible_to
+from lekto.adapters.outbound.sql.spaces import member_space_ids, visible_to
 from lekto.adapters.outbound.sql.transaction import Transaction
 from lekto.core.domain.document_facts import FactState
 from lekto.core.domain.documents import Channel, Document, Sha256
@@ -56,6 +56,7 @@ from lekto.core.domain.pipeline import (
 )
 from lekto.core.domain.reasons import reasons_from_json, reasons_to_json
 from lekto.core.domain.sorting import sort_key
+from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.verdict import KnownLabels, known_space
 from lekto.core.ports.repository import (
     NEWEST_FIRST,
@@ -64,6 +65,7 @@ from lekto.core.ports.repository import (
     DocumentOrder,
     DocumentPosition,
     FacetBy,
+    InboxCriterion,
     SortKey,
 )
 
@@ -667,6 +669,9 @@ def _matching(filter: DocumentFilter) -> list[ColumnElement[bool]]:
         if None in filter.lanes:
             lane_criteria.append(documents.c.lane.is_(None))
         criteria.append(or_(*lane_criteria))
+    if filter.inbox is not None:
+        in_inbox = _open_in_inbox(filter.inbox)
+        criteria.append(in_inbox if filter.inbox.open else not_(in_inbox))
     if filter.field is not None:
         fields = t.document_fields
         criteria.append(
@@ -675,6 +680,34 @@ def _matching(filter: DocumentFilter) -> list[ColumnElement[bool]]:
             )
         )
     return criteria
+
+
+def _open_in_inbox(criterion: InboxCriterion) -> ColumnElement[bool]:
+    """Whether the document stands open in the criterion's inbox, on the documents table
+    (`domain.inbox.open_tab`, as `inbox._conditions` has the open tabs on its join): no lane
+    yet, yellow, red, or green, new and without a seen mark of the viewer since it became new;
+    without `everyone` only in the spaces the viewer edits. Never NULL, so that its negation
+    holds for every other document."""
+    documents, seen = t.documents, t.inbox_seen
+    lane, new_at = documents.c.lane, documents.c.new_at
+    seen_since_new = (
+        select(seen.c.document_id)
+        .where(
+            seen.c.document_id == documents.c.id,
+            seen.c.user_id == criterion.viewer,
+            seen.c.seen_at >= new_at,
+        )
+        .exists()
+    )
+    in_inbox = or_(
+        lane.is_(None),
+        lane.in_([Lane.YELLOW.value, Lane.RED.value]),
+        and_(lane == Lane.GREEN.value, new_at.is_not(None), not_(seen_since_new)),
+    )
+    if criterion.everyone:
+        return in_inbox
+    edited = member_space_ids(criterion.viewer, SpaceRole.EDIT)
+    return and_(in_inbox, documents.c.space_id.in_(edited))
 
 
 def _sorting(

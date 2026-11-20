@@ -629,7 +629,13 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
     ) -> list[Document]:
         visible = await self._visible_to(user)
         return _query(
-            visible, filter, self._groups(), order=order, after=after, limit=limit, offset=offset
+            visible,
+            filter,
+            self._groups(filter),
+            order=order,
+            after=after,
+            limit=limit,
+            offset=offset,
         )
 
     async def query(
@@ -643,14 +649,20 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
     ) -> list[Document]:
         every = [_copy(row) for row in self._all()]
         return _query(
-            every, filter, self._groups(), order=order, after=after, limit=limit, offset=offset
+            every,
+            filter,
+            self._groups(filter),
+            order=order,
+            after=after,
+            limit=limit,
+            offset=offset,
         )
 
     async def _matching(self, filter: DocumentFilter, user: UserId | None) -> list[Document]:
         documents = (
             [_copy(row) for row in self._all()] if user is None else await self._visible_to(user)
         )
-        groups = self._groups()
+        groups = self._groups(filter)
         return [document for document in documents if filter.matches(groups.view(document))]
 
     async def count(self, filter: DocumentFilter, user: UserId | None) -> int:
@@ -671,11 +683,12 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
             counts[key] = counts.get(key, 0) + 1
         return counts
 
-    def _groups(self) -> "_Groups":
+    def _groups(self, filter: DocumentFilter) -> "_Groups":
         return _Groups(
             {row.id: row.group_ids for row in self._uow._rows(CONTACTS)},
             {row.id: row.group_ids for row in self._uow._rows(DOCUMENT_TYPES)},
             {row.id: fact_tokens(row.facts) for row in self._uow._rows(DOCUMENT_FACTS)},
+            None if filter.inbox is None else self._uow.inbox.open_for(filter.inbox),
         )
 
     async def count_tagged(
@@ -1242,6 +1255,7 @@ class _Groups:
     contacts: Mapping[UUID, frozenset[TagId]]
     document_types: Mapping[UUID, frozenset[TagId]]
     facts: Mapping[UUID, frozenset[str]] = field(default_factory=dict)  # `fact_tokens`
+    in_inbox: Collection[DocumentId] | None = None  # open in the filter's inbox (if it asks)
 
     def view(self, document: Document) -> FilterView:
         return FilterView.of(
@@ -1251,6 +1265,7 @@ class _Groups:
                 document.document_type_id or UUID(int=0), frozenset()
             ),
             facts=self.facts.get(document.id, frozenset()),
+            in_inbox=None if self.in_inbox is None else document.id in self.in_inbox,
         )
 
 

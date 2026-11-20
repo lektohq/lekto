@@ -160,6 +160,19 @@ def listed_filter(
 
 
 Listed = Annotated[DocumentFilter, Depends(listed_filter)]
+InInbox = Annotated[
+    bool | None,
+    Query(
+        description=(
+            "Only the documents that stand open in the caller's inbox (true) or those that do "
+            "not (false), as `in_inbox` marks them and `GET /inbox/summary` counts them: in "
+            "processing, to review, to intervene, or new and not seen by the caller since; in "
+            "the spaces the caller edits, with `all_users` in every user's inbox (with the "
+            "caller's own seen). The list, its count and its facets take it; an action on many "
+            "and the search do not."
+        )
+    ),
+]
 AllDocuments = Annotated[
     bool, Query(description="Every user's documents instead of the caller's reach (admins).")
 ]

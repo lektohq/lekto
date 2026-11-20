@@ -115,7 +115,8 @@ from lekto.core.services._identifiers import as_seen, member_spaces
 from lekto.core.services._moves import move_by_person, move_target
 from lekto.core.services._tags import expand, expanded, tag_counts, tag_tree
 from lekto.core.services.fact_decisions import FactDecision, decide_fact
-from lekto.core.services.inbox import Review, in_inbox, node_reviews, open_nodes
+from lekto.core.services.inbox import Review, inbox_filter, node_reviews, open_nodes
+from lekto.core.services.inbox import in_inbox as open_in_inbox
 from lekto.core.services.maintenance import REMOVE_FILES_JOB, RemoveFiles
 from lekto.core.services.objects import (
     EXCHANGE_NODES,
@@ -776,12 +777,14 @@ class DocumentService:
         offset: int = 0,
         limit: int = PAGE_SIZE,
         all_users: bool = False,
+        in_inbox: bool | None = None,
     ) -> list[ListedDocument]:
         """Documents within the caller's reach matching `filter`, in `order` (newest first),
         after the page ending at the document `after` or from the `offset`-th on (pages by
         number); with `all_users` (admins only), every
         document. Each is checked against the permission rules once more, and says whether it
-        stands open in the caller's inbox (with `all_users`, in every user's). ValidationError
+        stands open in the caller's inbox (with `all_users`, in every user's); `in_inbox` keeps
+        those that do (true) or do not (false), see `inbox_filter`. ValidationError
         if `after` is gone or out of reach while the list sorts by another key than the order of
         arrival, or if the order is by a field that is missing or of a type no list sorts by."""
         limit = max(1, min(limit, PAGE_LIMIT))
@@ -790,7 +793,9 @@ class DocumentService:
             check_fact_filter(user, filter)
             await _check_sortable(uow, order)
             position = await _position(uow, user, order, after, everyone=all_users)
-            filter = await expanded(uow, filter)
+            filter = await expanded(
+                uow, inbox_filter(filter, actor.id, in_inbox, all_users=all_users)
+            )
             if all_users:
                 documents = await uow.documents.query(
                     filter, order=order, after=position, limit=limit, offset=offset
@@ -812,7 +817,7 @@ class DocumentService:
                     )
                     continue
                 readable.append((document, access))
-            waiting = await in_inbox(
+            waiting = await open_in_inbox(
                 uow, actor.id, [document for document, _ in readable], all_users=all_users
             )
         return [
@@ -987,9 +992,17 @@ class DocumentService:
                 return await tag_counts(uow, user)
             return await uow.documents.count_by(by, user)
 
-    async def count(self, actor: Actor, filter: DocumentFilter, *, all_users: bool = False) -> int:
+    async def count(
+        self,
+        actor: Actor,
+        filter: DocumentFilter,
+        *,
+        all_users: bool = False,
+        in_inbox: bool | None = None,
+    ) -> int:
         """How many documents within the caller's reach (with `all_users`, admins only: every
-        document) match `filter`, counted as `facets` counts its total (a lens in the sidebar)."""
+        document) match `filter` and `in_inbox` (`inbox_filter`), counted as `facets` counts
+        its total (a lens in the sidebar)."""
         async with self._uow() as uow:
             check_fact_filter(
                 await load_lister(
@@ -998,18 +1011,24 @@ class DocumentService:
                 filter,
             )
             tree = await tag_tree(uow)
+            filter = inbox_filter(filter, actor.id, in_inbox, all_users=all_users)
             return await uow.documents.count(expand(filter, tree), None if all_users else actor.id)
 
     async def facets(
-        self, actor: Actor, filter: DocumentFilter, *, all_users: bool = False
+        self,
+        actor: Actor,
+        filter: DocumentFilter,
+        *,
+        all_users: bool = False,
+        in_inbox: bool | None = None,
     ) -> DocumentFacets:
         """How many documents within the caller's reach (with `all_users`, admins only: every
-        document) that match `filter` have each contact, type, group of contacts and types,
-        topic, tag and month of their document date. What combines as either-or (contacts,
-        types, groups, topics, the period) counts without its own choice, so that it tells
-        what one more would add; tags combine as all-of and count with the whole filter. A
-        tag, topic or group counts the documents with it or one below it, each once, as its
-        filter finds them."""
+        document) that match `filter` and `in_inbox` (`inbox_filter`) have each contact, type,
+        group of contacts and types, topic, tag and month of their document date. What combines
+        as either-or (contacts, types, groups, topics, the period) counts without its own
+        choice, so that it tells what one more would add; tags combine as all-of and count with
+        the whole filter. A tag, topic or group counts the documents with it or one below it,
+        each once, as its filter finds them."""
         async with self._uow() as uow:
             check_fact_filter(
                 await load_lister(
@@ -1020,6 +1039,7 @@ class DocumentService:
             user = None if all_users else actor.id
             tree = await tag_tree(uow)
             documents = uow.documents
+            filter = inbox_filter(filter, actor.id, in_inbox, all_users=all_users)
 
             # Counted by the database, never row by row (review 0.12.2, A-11): each either-or
             # part without its own choice, so that it tells what one more would add.
