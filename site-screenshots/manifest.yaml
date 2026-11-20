@@ -15,8 +15,9 @@
 - file: document-review
   title: Review
   alt: >-
-    A handwritten letter from Unicorn Pharmacy, read by the vision language model, in the
-    yellow lane with three details to check; the document date has no source in the text.
+    The text of a handwritten letter from Unicorn Pharmacy, read by the vision language
+    model; the letter waits in the yellow lane with three details to check, and the document
+    date has no source in the text.
   caption: >-
     When Lekto is unsure, it says why and shows where each value comes from, or that the
     text holds none.
@@ -37,7 +38,7 @@
     The processing of the electricity bill: text recognition, the language model and the
     other signals, the judgement, fields and filing, each with its duration and result.
   caption: >-
-    Every step is visible, from text recognition to the lane and the reason for it.
+    Every step is visible, from text recognition to filing, with its duration and result.
   variants: [desktop-light, desktop-dark]
 - file: search
   title: Search
@@ -59,8 +60,9 @@
 - file: expected
   title: Expected
   alt: >-
-    The overview with the open inbox and a yearly series of electricity bills from
-    Sampleford Power & Water: three documents, the next one expected on 12 November 2027.
+    The overview with the open inbox, identifiers and system status, and a yearly series of
+    electricity bills from Sampleford Power & Water: three documents, the next one expected on
+    12 November 2027.
   caption: >-
     Lekto notices documents that come at a steady interval and tells you when the next one
     is due.
