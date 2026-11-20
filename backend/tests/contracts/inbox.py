@@ -2,16 +2,18 @@
 tabs of an inbox, and the cleanup. The rule itself is `domain.inbox.inbox_state`; the suite
 checks that an adapter selects by it."""
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Collection
 from dataclasses import dataclass
 from datetime import timedelta
+from uuid import UUID
 
 import pytest
 
 from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import ConflictError
-from lekto.core.domain.ids import DocumentId, UserId, new_id
+from lekto.core.domain.ids import DocumentId, TagId, UserId, new_id
 from lekto.core.domain.inbox import DONE_PERIOD, Confirmation, InboxTab, left_at
+from lekto.core.domain.master_data import Tag
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
@@ -330,6 +332,68 @@ class InboxRepositoryContract:
                 assert await documents.count(criteria, None) == len(expected)
                 grouped = await documents.count_grouped(criteria, None, FacetBy.CONTACT)
                 assert sum(grouped.values()) == len(expected)
+
+    async def test_the_document_filter_goes_by_the_role_the_marks_and_their_time(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """Only spaces the viewer edits count without `everyone`; a mark at `new_at` is seen;
+        every viewer goes by their own marks, those of the unit not yet committed included;
+        the counts by tag and group take the criterion as the list does."""
+        owner, space = await owner_with_space(uow_factory)
+        editor = await builders.seed_user(uow_factory)
+        admin = (await builders.seed_user(uow_factory)).id
+        shared = builders.space(editor, readers=[owner])
+        paid = Tag.create(name="paid", now=NOW)
+        async with uow_factory() as uow:
+            await uow.spaces.add(shared)
+            await uow.tags.add(paid)
+            await uow.commit()
+        new, at_new, admin_seen = (green(owner, space) for _ in range(3))
+        read_only = green(editor, shared)
+        for document in (new, at_new, admin_seen):
+            document.tag_ids = {paid.id}
+        await store(uow_factory, new, at_new, admin_seen, read_only)
+        async with uow_factory() as uow:
+            await uow.inbox.mark_seen(owner.id, at_new.id, NOW)  # exactly when it became new
+            await uow.inbox.mark_seen(admin, admin_seen.id, LATER)
+            await uow.commit()
+        tagged: dict[UUID, Collection[TagId]] = {paid.id: {paid.id}}
+
+        def wanted(viewer: UserId, *, everyone: bool, open: bool = True) -> DocumentFilter:
+            return DocumentFilter(inbox=InboxCriterion(viewer, everyone=everyone, open=open))
+
+        async def ids(found: list[Document]) -> set[DocumentId]:
+            return {document.id for document in found}
+
+        async with uow_factory() as uow:
+            documents = uow.documents
+            mine, not_mine = (
+                wanted(owner.id, everyone=False),
+                wanted(owner.id, everyone=False, open=False),
+            )
+            assert await ids(await documents.query_visible(owner.id, mine, limit=9)) == {
+                new.id,
+                admin_seen.id,
+            }
+            assert await ids(await documents.query_visible(owner.id, not_mine, limit=9)) == {
+                at_new.id,
+                read_only.id,
+            }
+            assert await documents.count_tagged(tagged, owner.id, mine) == {paid.id: 2}
+            assert await documents.count_tagged(tagged, owner.id, not_mine) == {paid.id: 1}
+            grouped = await documents.count_grouped(not_mine, owner.id, FacetBy.DOCUMENT_TYPE)
+            assert sum(grouped.values()) == 2
+            every = wanted(admin, everyone=True)
+            assert await ids(await documents.query(every, limit=9)) == {
+                new.id,
+                at_new.id,
+                read_only.id,
+            }
+            assert await documents.count_tagged(tagged, None, every) == {paid.id: 2}
+            rest = wanted(admin, everyone=True, open=False)
+            assert await ids(await documents.query(rest, limit=9)) == {admin_seen.id}
+            await uow.inbox.mark_seen(owner.id, new.id, LATER)  # not committed
+            assert await documents.count(mine, owner.id) == 1
 
     async def test_pages_newest_first(self, uow_factory: UnitOfWorkFactory) -> None:
         scene = await inbox(uow_factory)
