@@ -24,7 +24,7 @@ describe('flipped', () => {
 describe('searchWords and matchesWords', () => {
 	it('match regardless of case and surrounding space', () => {
 		const words = searchWords('  Nord ');
-		expect(matchesWords('Nord Versicherung', words)).toBe(true);
+		expect(matchesWords('Nord Muster Versicherung', words)).toBe(true);
 		expect(matchesWords('nordsee', words)).toBe(true);
 		expect(matchesWords('Süd', words)).toBe(false);
 	});

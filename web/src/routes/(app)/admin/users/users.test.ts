@@ -15,7 +15,7 @@ const USERS = [
 		active: true,
 		created_at: '2026-10-01T08:00:00Z'
 	},
-	{ id: 'u2', username: 'bob', display_name: null, role: 'user', active: false, created_at: null }
+	{ id: 'u2', username: 'john', display_name: null, role: 'user', active: false, created_at: null }
 ];
 
 beforeEach(() => {
@@ -64,7 +64,7 @@ describe('the users', () => {
 		expect(rows[0].textContent).toContain('erika');
 		expect(rows[0].textContent).toContain(m.role_admin());
 		// Without a display name the username is the name.
-		await userEvent.click(within(rows[1]).getByRole('button', { name: 'bob' }));
+		await userEvent.click(within(rows[1]).getByRole('button', { name: 'john' }));
 		expect(await screen.findByRole('dialog')).toBeTruthy();
 	});
 });

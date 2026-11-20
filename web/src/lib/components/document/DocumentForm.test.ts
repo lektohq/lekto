@@ -31,7 +31,7 @@ const NOTE = '0199a6c4-0000-7000-8000-0000000000f2';
 const named = (id: string, name: string) => ({ id, name }) as Lookup['contacts'][number];
 
 const lookup = {
-	contacts: [named(CONTACT, 'Stadtwerke Musterstadt'), named(BANK, 'Beispielbank')],
+	contacts: [named(CONTACT, 'Stadtwerke Musterstadt'), named(BANK, 'Muster Bank')],
 	documentTypes: [named(INVOICE, 'Rechnung')],
 	tags: [],
 	fields: [
@@ -297,7 +297,7 @@ describe('DocumentForm', () => {
 								},
 								{
 									value: BANK,
-									label: 'Beispielbank',
+									label: 'Muster Bank',
 									contradicted: true,
 									sources: [
 										{
@@ -343,7 +343,7 @@ describe('DocumentForm', () => {
 		const select = screen.getByRole('combobox', { name: m.field_contact() });
 		expect(selectedValue(select)).toBe(CONTACT);
 		await userEvent.click(
-			within(card).getByRole('button', { name: m.candidate_pick({ name: 'Beispielbank' }) })
+			within(card).getByRole('button', { name: m.candidate_pick({ name: 'Muster Bank' }) })
 		);
 		expect(selectedValue(select)).toBe(BANK);
 	});
@@ -944,7 +944,7 @@ describe('the topic', () => {
 		...lookup,
 		contacts: [
 			{ ...named(CONTACT, 'Stadtwerke Musterstadt'), topic_ids: [WORK, HEALTH] },
-			{ ...named(BANK, 'Beispielbank'), topic_ids: [WORK] }
+			{ ...named(BANK, 'Muster Bank'), topic_ids: [WORK] }
 		],
 		tags: [topic(WORK, 'Arbeit'), topic(HEALTH, 'Krankenversicherung')]
 	} as unknown as Lookup;
@@ -1172,7 +1172,7 @@ describe('the topic', () => {
 		const bank = { ...filed, contact_id: BANK, topic_id: null } as Document;
 		render(DocumentForm, props({ document: bank, lookup: topics, review: null }));
 		for (const [label, kind, name, id] of [
-			[m.field_contact(), 'contacts', 'Bäckerei Korn', BAKERY],
+			[m.field_contact(), 'contacts', 'Bäckerei Muster', BAKERY],
 			[m.field_document_type(), 'document-types', 'Mahnung', REMINDER]
 		] as const) {
 			// The popover of the field before closes as the dialog takes over: it must be gone.

@@ -8,7 +8,7 @@ import SearchSelect from './SearchSelect.svelte';
 
 const OPTIONS = [
 	{ value: 'c1', label: 'Stadtwerke', keywords: 'SWM Energie' },
-	{ value: 'c2', label: 'Nord Versicherung' }
+	{ value: 'c2', label: 'Nord Muster Versicherung' }
 ];
 
 function field(props: Record<string, unknown> = {}) {
@@ -45,7 +45,7 @@ describe('SearchSelect', () => {
 	it('shows the chosen one, finds one by what it is also called, and clears', async () => {
 		const user = userEvent.setup();
 		const { onchange, trigger } = field();
-		expect(trigger.textContent).toContain('Nord Versicherung');
+		expect(trigger.textContent).toContain('Nord Muster Versicherung');
 		await fireEvent.click(trigger);
 		await user.type(await screen.findByLabelText(m.assignment_search()), 'swm');
 		// The popover is placed by measuring, which jsdom does not: it counts as hidden.
@@ -81,8 +81,8 @@ describe('SearchSelect', () => {
 		const create = vi.fn(async (name: string) => ({ value: 'c3', label: name }));
 		const { onchange, trigger } = field({ create });
 		await fireEvent.click(trigger);
-		await user.type(await screen.findByLabelText(m.assignment_search()), 'Bäckerei Korn');
-		const wanted = m.create_named({ name: 'Bäckerei Korn' });
+		await user.type(await screen.findByLabelText(m.assignment_search()), 'Bäckerei Muster');
+		const wanted = m.create_named({ name: 'Bäckerei Muster' });
 		const offer = (await screen.findAllByRole('option', { hidden: true })).find(
 			(option) => option.textContent?.trim() === wanted
 		)!;
@@ -90,8 +90,8 @@ describe('SearchSelect', () => {
 		await fireEvent.click(offer);
 		await waitFor(() => expect(onchange).toHaveBeenLastCalledWith('c3'));
 		expect(create).toHaveBeenCalledTimes(1);
-		expect(create).toHaveBeenCalledWith('Bäckerei Korn');
-		expect(trigger.textContent).toContain('Bäckerei Korn');
+		expect(create).toHaveBeenCalledWith('Bäckerei Muster');
+		expect(trigger.textContent).toContain('Bäckerei Muster');
 	});
 
 	it('keeps the value when what was to be made was not', async () => {
@@ -99,8 +99,8 @@ describe('SearchSelect', () => {
 		const create = vi.fn(async () => null);
 		const { onchange, trigger } = field({ create });
 		await fireEvent.click(trigger);
-		await user.type(await screen.findByLabelText(m.assignment_search()), 'Bäckerei Korn');
-		await user.click(await screen.findByText(m.create_named({ name: 'Bäckerei Korn' })));
+		await user.type(await screen.findByLabelText(m.assignment_search()), 'Bäckerei Muster');
+		await user.click(await screen.findByText(m.create_named({ name: 'Bäckerei Muster' })));
 		await waitFor(() => expect(create).toHaveBeenCalledOnce());
 		expect(onchange).not.toHaveBeenCalled();
 		expect(selectedValue(trigger)).toBe('c2');

@@ -19,7 +19,7 @@ const attachment: Origin = {
 		cc: [{ name: '', address: 'carl@example.test' }],
 		sent_at: '2026-11-04T09:00:00Z',
 		arrived_at: '2026-11-04T09:01:00Z',
-		forwarded_by: [{ name: 'Ben', address: 'ben@example.test' }],
+		forwarded_by: [{ name: 'Ben', address: 'john@example.test' }],
 		message_id: 'r-4711@stadtwerke.example',
 		importance: 'high',
 		keywords: ['Lekto', '$label1'],
@@ -52,7 +52,7 @@ describe('OriginCard', () => {
 		expect(screen.getByText(m.origin_fallback())).toBeTruthy();
 		expect(screen.getByText('Stadtwerke <rechnung@stadtwerke.example>')).toBeTruthy();
 		expect(screen.getByText('erika@example.test')).toBeTruthy();
-		expect(screen.getByText('Ben <ben@example.test>')).toBeTruthy();
+		expect(screen.getByText('Ben <john@example.test>')).toBeTruthy();
 		expect(screen.getByText('Rechnung 4711.pdf')).toBeTruthy();
 		expect(screen.queryByText(m.origin_forwarded())).toBeTruthy();
 		expect(screen.getByText('carl@example.test')).toBeTruthy();

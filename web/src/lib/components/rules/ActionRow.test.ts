@@ -75,7 +75,7 @@ describe('sending through a webhook', () => {
 	}
 
 	it('offers only the webhooks of whoever saves the rule', () => {
-		send([{ id: 'w1', name: 'Node-RED', owner_id: 'ben' }]);
+		send([{ id: 'w1', name: 'Node-RED', owner_id: 'john' }]);
 		expect(screen.getByText(m.rule_send_webhook_none())).toBeTruthy();
 	});
 

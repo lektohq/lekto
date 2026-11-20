@@ -229,7 +229,7 @@ describe('spaces', () => {
 			...HOUSE,
 			members: [
 				{ user_id: 'u1', role: 'edit' as const, username: 'john', active: true },
-				{ user_id: 'u9', role: 'read' as const, username: 'otto', active: false }
+				{ user_id: 'u9', role: 'read' as const, username: 'jane', active: false }
 			]
 		};
 		start([gone, JOHN]);
@@ -238,9 +238,9 @@ describe('spaces', () => {
 		);
 		const dialog = await screen.findByRole('dialog');
 		expect(within(dialog).getByText(m.user_inactive())).toBeTruthy();
-		expect(within(dialog).queryByLabelText(m.members_role_of({ name: 'otto' }))).toBeNull();
+		expect(within(dialog).queryByLabelText(m.members_role_of({ name: 'jane' }))).toBeNull();
 		expect(
-			within(dialog).getByRole('button', { name: m.members_remove({ name: 'otto' }) })
+			within(dialog).getByRole('button', { name: m.members_remove({ name: 'jane' }) })
 		).toBeTruthy();
 	});
 

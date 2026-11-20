@@ -16,7 +16,7 @@ const lookup = {
 
 describe('a condition on the mail', () => {
 	it('names "Mail" as its subject and the part of the mail in a second choice', () => {
-		const condition = $state({ ...newCondition('mail_cc'), value: 'ben@example.test' });
+		const condition = $state({ ...newCondition('mail_cc'), value: 'john@example.test' });
 		render(ConditionRow, { condition, lookup, onremove: vi.fn() });
 		expect(screen.getByLabelText(m.rule_condition_subject()).textContent).toContain(
 			m.rule_field_mail()

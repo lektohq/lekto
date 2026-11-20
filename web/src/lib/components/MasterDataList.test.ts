@@ -50,8 +50,8 @@ const contact = (id: string, name: string, extra: object = {}) => ({
 });
 
 const CONTACTS = [
-	contact('c1', 'Nord Versicherungsgruppe', {
-		aliases: ['Nord Krankenversicherung AG', 'Nord Leben AG'],
+	contact('c1', 'Nord Muster Versicherungsgruppe', {
+		aliases: ['Nord Muster Krankenversicherung AG', 'Nord Muster Leben AG'],
 		group_ids: ['g2'],
 		topic_ids: ['p1', 'p2', 'p3'],
 		document_count: 104
@@ -95,11 +95,11 @@ afterEach(() => {
 describe('MasterDataList', () => {
 	it('tells under a contact’s name its groups, aliases, identifiers and topics', async () => {
 		render(MasterDataList, { kind: 'contacts' });
-		const nord = (await screen.findByText('Nord Versicherungsgruppe')).closest('li')!;
+		const nord = (await screen.findByText('Nord Muster Versicherungsgruppe')).closest('li')!;
 		expect(within(nord).getByText('Health insurer')).toBeTruthy();
 		expect(
 			within(nord).getByText(
-				m.master_alias_more({ alias: 'Nord Krankenversicherung AG', count: 1 })
+				m.master_alias_more({ alias: 'Nord Muster Krankenversicherung AG', count: 1 })
 			)
 		).toBeTruthy();
 		expect(within(nord).getByText(m.master_topics_many({ count: 3 }))).toBeTruthy();
@@ -122,7 +122,7 @@ describe('MasterDataList', () => {
 	it('lists the contacts of a group or one below it, as a link from the Tags tab asks', async () => {
 		nav.url = new URL('http://lekto/ui/admin/master-data?tab=contacts&group=g1');
 		render(MasterDataList, { kind: 'contacts' });
-		expect(await screen.findByText('Nord Versicherungsgruppe')).toBeTruthy();
+		expect(await screen.findByText('Nord Muster Versicherungsgruppe')).toBeTruthy();
 		expect(screen.queryByText('Sparkasse Musterstadt')).toBeNull();
 		const label = m.master_filter_group({ name: 'Insurer' });
 		await fireEvent.click(
@@ -134,7 +134,7 @@ describe('MasterDataList', () => {
 	it('ignores a filter that names no tag of its kind, and takes it out of the URL', async () => {
 		nav.url = new URL('http://lekto/ui/admin/master-data?tab=contacts&group=gone');
 		render(MasterDataList, { kind: 'contacts' });
-		expect(await screen.findByText('Nord Versicherungsgruppe')).toBeTruthy();
+		expect(await screen.findByText('Nord Muster Versicherungsgruppe')).toBeTruthy();
 		expect(screen.getByText('Sparkasse Musterstadt')).toBeTruthy();
 		expect(screen.queryByRole('button', { name: /gone/ })).toBeNull();
 		await waitFor(() =>
@@ -164,9 +164,11 @@ describe('MasterDataList', () => {
 	it('on a phone opens a contact with a tap on its row', async () => {
 		phone.override(true);
 		render(MasterDataList, { kind: 'contacts' });
-		const name = await screen.findByText('Nord Versicherungsgruppe');
+		const name = await screen.findByText('Nord Muster Versicherungsgruppe');
 		expect(
-			screen.queryByRole('button', { name: m.master_edit({ name: 'Nord Versicherungsgruppe' }) })
+			screen.queryByRole('button', {
+				name: m.master_edit({ name: 'Nord Muster Versicherungsgruppe' })
+			})
 		).toBeNull();
 		expect(screen.queryByRole('link')).toBeNull();
 		await fireEvent.click(name.closest('button')!);

@@ -39,7 +39,7 @@ const lookup = {
 			name: 'Haushalt',
 			personal_of: null,
 			role: 'edit',
-			members: [member('u1', 'john'), member('u2', 'erika', 'read'), member('u3', 'bob')]
+			members: [member('u1', 'john'), member('u2', 'erika', 'read'), member('u3', 'jane')]
 		}
 	],
 	users: [
@@ -87,7 +87,7 @@ describe('the suggested space', () => {
 	});
 
 	it('names who sees the document there anew', () => {
-		expect(newReaders('house', 'mine', lookup)).toEqual(['erika', 'bob']);
+		expect(newReaders('house', 'mine', lookup)).toEqual(['erika', 'jane']);
 		// Another user's personal space the caller is no member of: that user.
 		expect(newReaders('erikas', 'mine', lookup)).toEqual(['erika']);
 		expect(newReaders('elsewhere', 'mine', lookup)).toEqual([]);
@@ -96,7 +96,7 @@ describe('the suggested space', () => {
 
 	it('reads as a suggestion with the new readers', () => {
 		expect(suggestionText('house', 'mine', lookup)).toBe(
-			m.space_suggestion_for({ space: 'Haushalt', names: 'erika, bob' })
+			m.space_suggestion_for({ space: 'Haushalt', names: 'erika, jane' })
 		);
 		expect(suggestionText('mine', 'house', lookup)).toBe(
 			m.space_suggestion({ space: m.space_personal() })

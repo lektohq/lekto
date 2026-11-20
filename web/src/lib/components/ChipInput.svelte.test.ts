@@ -19,18 +19,18 @@ function field(values: string[], { maxlength = 200, max = 100 } = {}) {
 describe('ChipInput', () => {
 	it('adds with Enter, once in any case, and removes with the cross', async () => {
 		const user = userEvent.setup();
-		const props = field(['Nord AG']);
+		const props = field(['Muster AG']);
 		await user.click(screen.getByRole('button', { name: 'Schreibweise' }));
 		const input = screen.getByLabelText('Neue Schreibweise');
 		expect(document.activeElement).toBe(input);
-		await user.type(input, 'Nord KV{Enter}');
-		expect(props.values).toEqual(['Nord AG', 'Nord KV']);
+		await user.type(input, 'Muster KV{Enter}');
+		expect(props.values).toEqual(['Muster AG', 'Muster KV']);
 		// The input stays for the next one.
 		expect((input as HTMLInputElement).value).toBe('');
-		await user.type(input, 'nord kv{Enter}');
-		expect(props.values).toEqual(['Nord AG', 'Nord KV']);
-		await user.click(screen.getByRole('button', { name: m.alias_remove({ name: 'Nord AG' }) }));
-		expect(props.values).toEqual(['Nord KV']);
+		await user.type(input, 'muster kv{Enter}');
+		expect(props.values).toEqual(['Muster AG', 'Muster KV']);
+		await user.click(screen.getByRole('button', { name: m.alias_remove({ name: 'Muster AG' }) }));
+		expect(props.values).toEqual(['Muster KV']);
 	});
 
 	it('adds what was typed on leaving, each pasted line apart, and leaves on Escape alone', async () => {
@@ -42,12 +42,12 @@ describe('ChipInput', () => {
 		await user.click(screen.getByRole('button', { name: 'Schreibweise' }));
 		const input = screen.getByLabelText('Neue Schreibweise');
 		await fireEvent.paste(input, {
-			clipboardData: { getData: () => 'Nord Leben AG\nNord KV\n\n' }
+			clipboardData: { getData: () => 'Muster Leben AG\nMuster KV\n\n' }
 		});
-		expect(props.values).toEqual(['Nord Leben AG', 'Nord KV']);
-		await user.type(input, 'Nord Bank');
+		expect(props.values).toEqual(['Muster Leben AG', 'Muster KV']);
+		await user.type(input, 'Muster SE');
 		await user.tab();
-		expect(props.values).toEqual(['Nord Leben AG', 'Nord KV', 'Nord Bank']);
+		expect(props.values).toEqual(['Muster Leben AG', 'Muster KV', 'Muster SE']);
 		await user.click(screen.getByRole('button', { name: 'Schreibweise' }));
 		await user.keyboard('{Escape}');
 		expect(screen.queryByLabelText('Neue Schreibweise')).toBeNull();
@@ -57,22 +57,24 @@ describe('ChipInput', () => {
 
 	it('takes values as long and as many as the API does; what does not fit stays typed', async () => {
 		const user = userEvent.setup();
-		const props = field(['Nord AG'], { maxlength: 10, max: 3 });
+		const props = field(['Muster AG'], { maxlength: 10, max: 3 });
 		await user.click(screen.getByRole('button', { name: 'Schreibweise' }));
 		const input = screen.getByLabelText('Neue Schreibweise') as HTMLInputElement;
 		expect(input.maxLength).toBe(10);
 		await fireEvent.paste(input, {
-			clipboardData: { getData: () => 'Nord Lebensversicherung\nNord KV\nNord Bank\nNord Rente' }
+			clipboardData: {
+				getData: () => 'Muster Lebensversicherung\nMuster KV\nMuster SE\nMuster OHG'
+			}
 		});
 		// Too long, and beyond three: not added, but left in the input to see and shorten.
-		expect(props.values).toEqual(['Nord AG', 'Nord KV', 'Nord Bank']);
+		expect(props.values).toEqual(['Muster AG', 'Muster KV', 'Muster SE']);
 		// At the limit the field takes no more: no input, no dashed chip.
 		expect(screen.queryByLabelText('Neue Schreibweise')).toBeNull();
 		expect(screen.queryByRole('button', { name: 'Schreibweise' })).toBeNull();
-		await user.click(screen.getByRole('button', { name: m.alias_remove({ name: 'Nord KV' }) }));
+		await user.click(screen.getByRole('button', { name: m.alias_remove({ name: 'Muster KV' }) }));
 		await user.click(screen.getByRole('button', { name: 'Schreibweise' }));
 		expect((screen.getByLabelText('Neue Schreibweise') as HTMLInputElement).value).toBe(
-			'Nord Lebensversicherung Nord Rente'
+			'Muster Lebensversicherung Muster OHG'
 		);
 	});
 });

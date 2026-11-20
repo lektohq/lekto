@@ -129,10 +129,10 @@ describe('ProfileForm', () => {
 	});
 
 	it('edits another user’s profile for an admin', async () => {
-		render(ProfileForm, { data, userId: 'bob' });
+		render(ProfileForm, { data, userId: 'john' });
 		await screen.findByLabelText(m.profile_display_name());
 		await userEvent.click(screen.getByRole('button', { name: m.save() }));
-		expect(sent.map((item) => item.path)).toEqual(['/api/v1/users/bob/profile']);
+		expect(sent.map((item) => item.path)).toEqual(['/api/v1/users/john/profile']);
 	});
 
 	it('saves only the part it shows', async () => {

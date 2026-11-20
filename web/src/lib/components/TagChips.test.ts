@@ -118,7 +118,7 @@ describe('NamesLine', () => {
 	it('shows the contact with its initials and the type with its icon', async () => {
 		const { container } = render(NamesLine, {
 			parts: [
-				{ name: 'Nord', avatar: { name: 'Nord Versicherung', logo: null } },
+				{ name: 'Nord', avatar: { name: 'Nord Muster Versicherung', logo: null } },
 				{ name: 'Invoice', icon: 'receipt' }
 			],
 			tags: []

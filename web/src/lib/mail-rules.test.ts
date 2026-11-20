@@ -48,7 +48,7 @@ const RULE: MailRule = {
 	updated_at: '2026-11-04T10:00:00Z'
 };
 
-const names = { user: () => 'Max', space: () => 'Haushalt', type: () => 'E-Mail' };
+const names = { user: () => 'John', space: () => 'Haushalt', type: () => 'E-Mail' };
 
 describe('the form of a mail rule', () => {
 	it('starts for a mailbox with its type of the mail text', () => {
@@ -105,8 +105,8 @@ describe('the form of a mail rule', () => {
 		expect(conditionText({ field: 'keyword', op: 'contains', value: 'Lekto' })).toBe(
 			`${m.mail_rule_field_keyword()} ${m.rule_op_tags_contains()} Lekto`
 		);
-		expect(conditionText({ field: 'cc', op: 'is', value: 'ben@example.test' })).toBe(
-			`${m.mail_rule_field_cc()} ${m.rule_op_is()} ben@example.test`
+		expect(conditionText({ field: 'cc', op: 'is', value: 'john@example.test' })).toBe(
+			`${m.mail_rule_field_cc()} ${m.rule_op_is()} john@example.test`
 		);
 		const form = formOf(RULE);
 		const keyword = newCondition('keyword');
@@ -221,7 +221,7 @@ describe('the form of a mail rule', () => {
 
 	it('says a rule in one line', () => {
 		expect(summaryOf(RULE, names)).toBe(
-			`${m.rule_priority_short({ priority: 1 })} · ${m.mail_rule_field_sender()} ${m.rule_op_ends_with()} @stadtwerke.example${m.rule_or()}${m.mail_rule_field_attachments()} ${m.mail_rule_attachments_present()} → ${m.mail_rule_parts_all()}, ${m.mail_rule_summary_for({ name: 'Max' })}, ${m.mail_rule_summary_space({ name: 'Haushalt' })}, ${m.mail_rule_after_add_keyword({ keyword: 'Lekto' })}, ${m.mail_rule_summary_move({ folder: 'Lekto/Erledigt' })}`
+			`${m.rule_priority_short({ priority: 1 })} · ${m.mail_rule_field_sender()} ${m.rule_op_ends_with()} @stadtwerke.example${m.rule_or()}${m.mail_rule_field_attachments()} ${m.mail_rule_attachments_present()} → ${m.mail_rule_parts_all()}, ${m.mail_rule_summary_for({ name: 'John' })}, ${m.mail_rule_summary_space({ name: 'Haushalt' })}, ${m.mail_rule_after_add_keyword({ keyword: 'Lekto' })}, ${m.mail_rule_summary_move({ folder: 'Lekto/Erledigt' })}`
 		);
 		expect(
 			summaryOf(

@@ -81,15 +81,13 @@ describe('spaces by name', () => {
 
 describe('the names of users', () => {
 	it('shows the display name, else the username', () => {
-		const named = { id: 'u4', username: 'carla', display_name: 'Carla Example' };
-		expect(userLabel(named)).toBe('Carla Example');
-		expect(userLabel({ username: 'carla', display_name: null })).toBe('carla');
-		expect(userName([...users, named], 'u4')).toBe('Carla Example');
+		const named = { id: 'u4', username: 'jane', display_name: 'Jane Doe' };
+		expect(userLabel(named)).toBe('Jane Doe');
+		expect(userLabel({ username: 'jane', display_name: null })).toBe('jane');
+		expect(userName([...users, named], 'u4')).toBe('Jane Doe');
 		expect(userName(users, 'nobody')).toBe(m.user_unknown());
 		expect(userName(users, null)).toBe(m.user_unknown());
-		expect(spaceLabel({ name: 'Personal', personal_of: 'u4' }, [named], 'u1')).toBe(
-			'Carla Example'
-		);
+		expect(spaceLabel({ name: 'Personal', personal_of: 'u4' }, [named], 'u1')).toBe('Jane Doe');
 	});
 });
 

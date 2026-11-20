@@ -47,7 +47,7 @@ describe('the archive', () => {
 
 	it('shows the contact in the head, the chips on the first page, then title, type and date', () => {
 		const lookup = {
-			contacts: [{ id: 'c1', name: 'Stadtwerke Süd', group_ids: ['g1'] }],
+			contacts: [{ id: 'c1', name: 'Stadtwerke Muster', group_ids: ['g1'] }],
 			documentTypes: [{ id: 'k1', name: 'Rechnung', group_ids: [], icon: 'receipt' }],
 			tags: [
 				{ id: 't1', name: 'zu bezahlen', path: ['zu bezahlen'], scope: 'document', shown: true },
@@ -69,8 +69,8 @@ describe('the archive', () => {
 		});
 		const link = screen.getByRole('link', { name: /Stromrechnung/ });
 		const [head, page, text] = [...link.children];
-		expect(within(head as HTMLElement).getByText('Stadtwerke Süd')).toBeTruthy();
-		expect(head.getAttribute('title')).toBe('Stadtwerke Süd');
+		expect(within(head as HTMLElement).getByText('Stadtwerke Muster')).toBeTruthy();
+		expect(head.getAttribute('title')).toBe('Stadtwerke Muster');
 		// Only the page count stands on the page, as glass; the tag and the contact's group stand
 		// below the title (web/DESIGN.md, "Document card").
 		const count = within(page as HTMLElement).getByText(m.doc_pages_short({ count: 2 }));

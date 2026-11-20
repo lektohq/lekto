@@ -68,7 +68,7 @@ describe('signalSummary', () => {
 
 	it('shows the language model’s proposal', () => {
 		const proposal = {
-			sender: { value: 'Stadtwerke GmbH', evidence: null },
+			sender: { value: 'Muster Stadtwerke GmbH', evidence: null },
 			recipient: null,
 			document_type: null,
 			new_document_type: 'Abschlag',
@@ -78,7 +78,7 @@ describe('signalSummary', () => {
 		};
 		const rows = texts(signalSummary(entry('signal_llm', { proposal }), lookup));
 		expect(rows).toEqual([
-			[m.signal_sender(), ['Stadtwerke GmbH']],
+			[m.signal_sender(), ['Muster Stadtwerke GmbH']],
 			[m.signal_recipient(), [m.signal_none()]],
 			[m.field_document_type(), [`Abschlag (${m.candidate_new()})`]],
 			[m.field_date(), ['31.03.2026']],

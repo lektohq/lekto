@@ -30,7 +30,7 @@ const FACTS: Facts = {
 	named: [
 		{
 			contact_id: CONTACT,
-			name: 'Lekto Test GmbH',
+			name: 'Muster GmbH',
 			alias: false,
 			in_text: true,
 			in_code: true,
@@ -84,7 +84,7 @@ const FACTS: Facts = {
 			text: 'BCD',
 			places: [{ page: 1, boxes: [{ x: 0.7, y: 0.8, width: 0.1, height: 0.1 }] }],
 			giro: {
-				name: 'Lekto Test GmbH',
+				name: 'Muster GmbH',
 				iban: 'DE89370400440532013000',
 				bic: null,
 				amount: { amount: '123.45', currency: 'EUR' },
@@ -133,7 +133,7 @@ describe('facts', () => {
 	it('groups them by the document contact, others and none', () => {
 		const groups = grouped(FACTS);
 		expect(groups.own.map((item) => ('name' in item ? item.name : item.value))).toEqual([
-			'Lekto Test GmbH',
+			'Muster GmbH',
 			'DE89370400440532013000'
 		]);
 		expect(groups.others.map((item) => ('value' in item ? item.value : ''))).toEqual([

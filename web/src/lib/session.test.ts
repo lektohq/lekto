@@ -47,20 +47,20 @@ afterEach(() => {
 
 describe('loading the session', () => {
 	it('keeps the user object while nothing about the user changed', async () => {
-		fetchMock.mockResolvedValueOnce(me('alice', 'one')).mockResolvedValueOnce(me('alice', 'two'));
+		fetchMock.mockResolvedValueOnce(me('jane', 'one')).mockResolvedValueOnce(me('jane', 'two'));
 		await session.load();
 		const first = session.user;
 		await session.load();
 		expect(session.user).toBe(first); // effects on `session.user` do not run again
 		expect(session.csrfToken).toBe('two');
-		fetchMock.mockResolvedValueOnce(me('bob', 'three'));
+		fetchMock.mockResolvedValueOnce(me('john', 'three'));
 		await session.load();
 		expect(session.user).not.toBe(first);
-		expect(session.user?.username).toBe('bob');
+		expect(session.user?.username).toBe('john');
 	});
 
 	it('keeps the version of Lekto until the session ends', async () => {
-		fetchMock.mockResolvedValueOnce(me('alice', 'one'));
+		fetchMock.mockResolvedValueOnce(me('jane', 'one'));
 		await session.load();
 		expect(session.version).toBe('0.8.0');
 		session.clear();
@@ -70,11 +70,11 @@ describe('loading the session', () => {
 
 describe('a stale CSRF token', () => {
 	it('is fetched anew for the same user, and the change is repeated', async () => {
-		fetchMock.mockResolvedValueOnce(me('alice', 'old'));
+		fetchMock.mockResolvedValueOnce(me('jane', 'old'));
 		await session.load();
 		fetchMock
 			.mockResolvedValueOnce(stale())
-			.mockResolvedValueOnce(me('alice', 'new'))
+			.mockResolvedValueOnce(me('jane', 'new'))
 			.mockResolvedValueOnce(new Response('{}', { status: 201 }));
 
 		const { response } = await api.POST('/api/v1/spaces', { body: { name: 'Bills' } });
@@ -85,9 +85,9 @@ describe('a stale CSRF token', () => {
 	});
 
 	it('never repeats a change as someone who signed in in another tab', async () => {
-		fetchMock.mockResolvedValueOnce(me('alice', 'old'));
+		fetchMock.mockResolvedValueOnce(me('jane', 'old'));
 		await session.load();
-		fetchMock.mockResolvedValueOnce(stale()).mockResolvedValueOnce(me('mallory', 'theirs'));
+		fetchMock.mockResolvedValueOnce(stale()).mockResolvedValueOnce(me('erika', 'theirs'));
 
 		const { response } = await api.POST('/api/v1/spaces', { body: { name: 'Bills' } });
 

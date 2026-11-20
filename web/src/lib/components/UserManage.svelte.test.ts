@@ -12,8 +12,8 @@ vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
 let fetchMock = fakeApi();
 
 const account = {
-	id: 'bob',
-	username: 'bob',
+	id: 'john',
+	username: 'john',
 	role: 'user',
 	active: true,
 	created_at: '2026-10-01T12:00:00Z',
@@ -23,8 +23,8 @@ const account = {
 };
 
 const profile = {
-	user_id: 'bob',
-	display_name: 'Bob',
+	user_id: 'john',
+	display_name: 'John',
 	aliases: [],
 	birth_date: null,
 	email: null,
@@ -47,7 +47,7 @@ beforeEach(() => {
 		if (request.method === 'PATCH') {
 			return json({ ...profile, ...(await request.json()) });
 		}
-		if (path.endsWith('/users/bob')) return json(account);
+		if (path.endsWith('/users/john')) return json(account);
 		if (path.endsWith('/profile')) return json(profile);
 		if (path.endsWith('/contacts')) return json([{ id: 'c1', name: 'Insurer', topic_ids: [] }]);
 		return json([]);
@@ -64,8 +64,8 @@ afterEach(() => {
 describe('UserManage', () => {
 	it('shows the account in parts, each keeping what was typed', async () => {
 		const user = userEvent.setup();
-		render(UserManage, { open: true, userId: 'bob', onchanged: vi.fn() });
-		await screen.findByRole('group', { name: 'bob' });
+		render(UserManage, { open: true, userId: 'john', onchanged: vi.fn() });
+		await screen.findByRole('group', { name: 'john' });
 		expect(screen.getByLabelText(m.user_role())).toBeTruthy();
 		const count = await screen.findByRole('button', { name: new RegExp(m.profile_numbers()) });
 		expect(count.textContent).toContain('1');
@@ -73,21 +73,21 @@ describe('UserManage', () => {
 		await user.click(screen.getByRole('button', { name: new RegExp(`^${m.profile_title()}`) }));
 		const name = screen.getByLabelText(m.profile_display_name()) as HTMLInputElement;
 		await user.clear(name);
-		await user.type(name, 'Bob Example');
+		await user.type(name, 'John Example');
 		await user.click(count);
 		// Hidden, not gone: back on the profile, the name typed is still there.
 		expect(name.closest('.hidden')).not.toBeNull();
 		await user.click(screen.getByRole('button', { name: new RegExp(`^${m.profile_title()}`) }));
 		expect(name.closest('.hidden')).toBeNull();
-		expect(name.value).toBe('Bob Example');
+		expect(name.value).toBe('John Example');
 	});
 
 	it('is a whole screen on a phone, as every editor, closed with "Fertig"', async () => {
 		phone.override(true);
 		const user = userEvent.setup();
-		const props = $state({ open: true, userId: 'bob', onchanged: vi.fn() });
+		const props = $state({ open: true, userId: 'john', onchanged: vi.fn() });
 		render(UserManage, props);
-		await screen.findByRole('group', { name: 'bob' });
+		await screen.findByRole('group', { name: 'john' });
 		const dialog = screen.getByRole('dialog');
 		expect(dialog.className).toContain('h-dvh');
 		// Each part saves itself: no form around them, no "Speichern" in the bar.

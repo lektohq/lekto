@@ -24,12 +24,12 @@ const lookup = {
 		space('s-erika', 'Erika', [{ user_id: 'u-erika', role: 'edit' }]),
 		space('s-family', 'Familie', [
 			{ user_id: 'u-erika', role: 'edit' },
-			{ user_id: 'u-max', role: 'read' }
+			{ user_id: 'u-john', role: 'read' }
 		])
 	],
 	users: [
 		{ id: 'u-erika', username: 'erika', display_name: 'Jane Doe' },
-		{ id: 'u-max', username: 'max', display_name: 'Max Muster' }
+		{ id: 'u-john', username: 'john', display_name: 'John Doe' }
 	]
 } as unknown as Lookup;
 
@@ -88,7 +88,7 @@ describe('ChangePreview', () => {
 					space_id: 's-family',
 					members: [
 						{ user_id: 'u-erika', role: 'edit' },
-						{ user_id: 'u-max', role: 'read' }
+						{ user_id: 'u-john', role: 'read' }
 					]
 				}
 			})
@@ -96,7 +96,7 @@ describe('ChangePreview', () => {
 		expect(screen.getByText(m.dryrun_rules_one())).toBeTruthy();
 		expect(screen.getByText(m.dryrun_visible())).toBeTruthy();
 		expect(screen.getByText('Familie')).toBeTruthy();
-		const max = screen.getByText(m.space_member_reads({ name: 'Max Muster' }));
-		expect(max.parentElement?.textContent).toContain(m.dryrun_new());
+		const john = screen.getByText(m.space_member_reads({ name: 'John Doe' }));
+		expect(john.parentElement?.textContent).toContain(m.dryrun_new());
 	});
 });

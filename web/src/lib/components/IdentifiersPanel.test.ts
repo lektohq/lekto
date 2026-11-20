@@ -53,7 +53,7 @@ const SUGGESTION = {
 	written: 'DE89 3704 0044 0532 0130 00',
 	source: 'suggested',
 	contacts: [],
-	person: { id: '0199a6c4-0000-7000-8000-0000000000a1', name: 'Max Nord' },
+	person: { id: '0199a6c4-0000-7000-8000-0000000000a1', name: 'John Doe' },
 	documents: 6,
 	last: '2026-10-31'
 };
@@ -385,7 +385,7 @@ describe('IdentifiersPanel', () => {
 		await user.click(screen.getByRole('button', { name: new RegExp(`^${m.open_suggestions()}`) }));
 		await vi.waitFor(() => expect(screen.getByText(m.open_column_target())).toBeTruthy());
 		const [row] = await rows();
-		expect(row.textContent).toContain('Max Nord');
+		expect(row.textContent).toContain('John Doe');
 		expect(row.textContent).toContain(m.open_target_profile());
 		expect(row.textContent).toContain(m.open_suggested());
 		await user.click(
@@ -393,7 +393,7 @@ describe('IdentifiersPanel', () => {
 		);
 		const dialog = await screen.findByRole('dialog');
 		await user.click(
-			within(dialog).getByRole('button', { name: m.open_confirm_profile({ person: 'Max Nord' }) })
+			within(dialog).getByRole('button', { name: m.open_confirm_profile({ person: 'John Doe' }) })
 		);
 		await vi.waitFor(() =>
 			expect(decisions).toEqual([
@@ -415,12 +415,12 @@ describe('IdentifiersPanel', () => {
 		const dialog = await screen.findByRole('dialog');
 		// The text names whose profile takes it.
 		expect(
-			within(dialog).getByText(m.open_suggested_person({ person: 'Max Nord', count: '6' }))
+			within(dialog).getByText(m.open_suggested_person({ person: 'John Doe', count: '6' }))
 		).toBeTruthy();
 		expect(within(dialog).getByRole('button', { name: m.open_confirm() })).toBeTruthy();
 		expect(
 			within(dialog).queryByRole('button', {
-				name: m.open_confirm_profile({ person: 'Max Nord' })
+				name: m.open_confirm_profile({ person: 'John Doe' })
 			})
 		).toBeNull();
 	});

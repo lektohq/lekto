@@ -161,7 +161,7 @@ describe('IdentifiersEditor', () => {
 
 describe('IdentifiersEditor, a user’s identifiers at contacts', () => {
 	const contacts = [
-		{ id: 'insurer', name: 'Hanse Versicherung', topic_ids: [] },
+		{ id: 'insurer', name: 'Muster Versicherung', topic_ids: [] },
 		{ id: 'utility', name: 'Stadtwerke', topic_ids: [] }
 	];
 	const numbers = () => [
@@ -175,7 +175,7 @@ describe('IdentifiersEditor, a user’s identifiers at contacts', () => {
 	it('groups them by contact, closed, with the kinds each holds', async () => {
 		const user = userEvent.setup();
 		editor(numbers(), { contacts, kinds: ['customer_number', 'contract_number', 'meter_number'] });
-		const insurer = group('Hanse Versicherung');
+		const insurer = group('Muster Versicherung');
 		const utility = group('Stadtwerke');
 		// By name; each names its kinds in their order and how many there are.
 		expect(
@@ -203,7 +203,7 @@ describe('IdentifiersEditor, a user’s identifiers at contacts', () => {
 		const user = userEvent.setup();
 		editor(numbers(), { contacts, kinds: ['customer_number', 'contract_number', 'meter_number'] });
 		await user.type(screen.getByLabelText(m.identifier_search()), 'P3');
-		expect(group('Hanse Versicherung').getAttribute('aria-expanded')).toBe('true');
+		expect(group('Muster Versicherung').getAttribute('aria-expanded')).toBe('true');
 		expect(line(/P3/)).toBeTruthy();
 		expect(screen.queryByRole('button', { name: /^Stadtwerke/ })).toBeNull();
 	});
@@ -215,7 +215,7 @@ describe('IdentifiersEditor, a user’s identifiers at contacts', () => {
 		const learned = within(sources).getByRole('button', { name: new RegExp(m.numbers_learned()) });
 		expect(learned.textContent).toContain('2');
 		await user.click(learned);
-		await user.click(group('Hanse Versicherung'));
+		await user.click(group('Muster Versicherung'));
 		expect(line(/P3/)).toBeTruthy();
 		expect(screen.queryByRole('button', { name: /K4/ })).toBeNull();
 	});

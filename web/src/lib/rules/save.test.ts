@@ -4,13 +4,13 @@ import type { ApiDefinition } from '#lib/rules/model.ts';
 import { changeSwitchedOff, createSwitchedOff, GLOBAL } from './save.ts';
 
 const definition = {
-	name: 'Telekom',
+	name: 'Muster Telefon',
 	priority: 100,
 	triggers: ['document_processed'],
 	conditions: { all: [] },
 	actions: []
 } as unknown as ApiDefinition;
-const rule = { id: 'r1', enabled: true, name: 'Telekom' };
+const rule = { id: 'r1', enabled: true, name: 'Muster Telefon' };
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -36,7 +36,7 @@ describe('saving a rule switched off', () => {
 		const [only, ...more] = await sent(fetch);
 		expect(more).toEqual([]);
 		expect(only.call).toBe('POST /api/v1/rules');
-		expect(only.body).toMatchObject({ scope: 'global', name: 'Telekom', enabled: false });
+		expect(only.body).toMatchObject({ scope: 'global', name: 'Muster Telefon', enabled: false });
 	});
 
 	it('saves a change switched off in one request', async () => {
