@@ -15,7 +15,13 @@ from lekto.core.domain.inbox import DONE_PERIOD, Confirmation, InboxTab, left_at
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
-from lekto.core.ports.repository import InboxEntry, InboxPosition
+from lekto.core.ports.repository import (
+    DocumentFilter,
+    FacetBy,
+    InboxCriterion,
+    InboxEntry,
+    InboxPosition,
+)
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from tests import builders
 from tests.builders import FAILED, NOW, UNCERTAIN, VIA
@@ -281,6 +287,49 @@ class InboxRepositoryContract:
             # Another user's inbox is theirs: nothing of the owner's.
             theirs = await uow.inbox.count(scene.other.id, editor=scene.other.id, since=SINCE)
         assert theirs == {**dict.fromkeys(InboxTab, 0), InboxTab.NEW: 1}
+
+    async def test_the_document_filter_holds_what_stands_open_in_an_inbox(
+        self, uow_factory: UnitOfWorkFactory
+    ) -> None:
+        """`DocumentFilter.inbox` selects as the open tabs do (.knowledge/plans/inbox-filter.md):
+        a user's own inbox in the spaces they edit, every user's with `everyone`, new by the
+        viewer's seen; its negation the rest."""
+        scene = await inbox(uow_factory)
+        owner, other = scene.owner.id, scene.other.id
+        admin = (await builders.seed_user(uow_factory)).id
+        mine = scene.ids("processing", "yellow", "red", "new", "new_again")
+        everyones = scene.ids(
+            "processing", "yellow", "red", "new", "seen", "seen_long_ago", "new_again", "other"
+        )
+        every = {document.id for document in scene.documents.values()}
+
+        def wanted(viewer: UserId, *, everyone: bool, open: bool = True) -> DocumentFilter:
+            return DocumentFilter(inbox=InboxCriterion(viewer, everyone=everyone, open=open))
+
+        async with uow_factory() as uow:
+            documents = uow.documents
+            found = await documents.query_visible(owner, wanted(owner, everyone=False), limit=50)
+            assert {document.id for document in found} == set(mine)
+            rest = await documents.query_visible(
+                owner, wanted(owner, everyone=False, open=False), limit=50
+            )
+            assert {document.id for document in rest} == every - set(mine) - {
+                scene.documents["other"].id
+            }
+            found = await documents.query(wanted(admin, everyone=True), limit=50)
+            assert {document.id for document in found} == set(everyones)
+            rest = await documents.query(wanted(admin, everyone=True, open=False), limit=50)
+            assert {document.id for document in rest} == every - set(everyones)
+            # Without `everyone` only the spaces the viewer edits: the other owner's one.
+            assert await documents.count(wanted(other, everyone=False), None) == 1
+            for viewer, everyone, expected in ((owner, False, mine), (admin, True, everyones)):
+                editor = None if everyone else viewer
+                counts = await uow.inbox.count(viewer, editor=editor, since=SINCE)
+                assert sum(counts.values()) - counts[InboxTab.DONE] == len(expected)
+                criteria = wanted(viewer, everyone=everyone)
+                assert await documents.count(criteria, None) == len(expected)
+                grouped = await documents.count_grouped(criteria, None, FacetBy.CONTACT)
+                assert sum(grouped.values()) == len(expected)
 
     async def test_pages_newest_first(self, uow_factory: UnitOfWorkFactory) -> None:
         scene = await inbox(uow_factory)

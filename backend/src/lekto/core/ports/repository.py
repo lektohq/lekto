@@ -173,6 +173,19 @@ def any_group(groups: Iterable[TagId]) -> TagSets:
     return (chosen,) if chosen else ()
 
 
+@dataclass(frozen=True)
+class InboxCriterion:
+    """Whether a document stands open in an inbox (`open`) or not: in `viewer`'s inbox, as
+    `GET /inbox` lists it (`domain.inbox.open_tab`: in processing, review, intervene, or new and
+    not seen by `viewer` since), in the spaces `viewer` edits; with `everyone`, in every user's
+    inbox, new by `viewer`'s own seen marks (as `services.inbox.in_inbox` marks the lists). The
+    service sets it from the caller (.knowledge/plans/inbox-filter.md)."""
+
+    viewer: UserId
+    everyone: bool
+    open: bool
+
+
 @dataclass(frozen=True, kw_only=True)
 class DocumentFilter:
     """Criteria for listing documents; all given ones must match.
@@ -190,7 +203,8 @@ class DocumentFilter:
     `field`: a value for it is set. `document_dates`: the document date lies in the period (a
     document without one does not match). `facts`: the document has a fact that matches each
     (`FactCriterion`; none a person rejected). `ids`: the document's id ends with one of them
-    (`ids.id_reference`: a short id or the whole one; not in the search index)."""
+    (`ids.id_reference`: a short id or the whole one; not in the search index). `inbox`:
+    whether it stands open in an inbox (`InboxCriterion`; not in the search index)."""
 
     contacts: frozenset[ContactId] | None = None
     document_types: frozenset[DocumentTypeId] | None = None
@@ -207,6 +221,7 @@ class DocumentFilter:
     document_dates: Period | None = None
     facts: tuple[FactCriterion, ...] = ()
     ids: frozenset[str] | None = None
+    inbox: InboxCriterion | None = None
 
     @classmethod
     def chosen(
@@ -278,6 +293,7 @@ class DocumentFilter:
             and (self.field is None or self.field in view.fields)
             and all(criterion.token in view.facts for criterion in self.facts)
             and (self.ids is None or (view.id is not None and ends_with(view.id, self.ids)))
+            and (self.inbox is None or view.in_inbox is self.inbox.open)
             and (
                 self.document_dates is None
                 or (
@@ -307,6 +323,9 @@ class FilterView:
     labelled: bool = False  # not in the search index
     facts: frozenset[str] = frozenset()  # `document_facts.fact_tokens`
     id: DocumentId | None = None  # not in the search index
+    # Whether it stands open in the inbox of the filter's `InboxCriterion` (None: unknown, as
+    # to the search index; matches neither way).
+    in_inbox: bool | None = None
 
     @classmethod
     def of(
@@ -316,6 +335,7 @@ class FilterView:
         contact_groups: frozenset[TagId] = frozenset(),
         document_type_groups: frozenset[TagId] = frozenset(),
         facts: frozenset[str] = frozenset(),
+        in_inbox: bool | None = None,
     ) -> "FilterView":
         return cls(
             contact=document.contact_id,
@@ -332,6 +352,7 @@ class FilterView:
             labelled=document.confirmed_at is not None or document.space_confirmed_at is not None,
             facts=facts,
             id=document.id,
+            in_inbox=in_inbox,
         )
 
 

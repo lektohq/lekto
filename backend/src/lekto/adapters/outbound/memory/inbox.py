@@ -15,7 +15,7 @@ from lekto.core.domain.ids import DocumentId, UserId
 from lekto.core.domain.inbox import Confirmation, InboxState, InboxTab, inbox_state, open_tab
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.validation import require_utc
-from lekto.core.ports.repository import InboxEntry, InboxPosition
+from lekto.core.ports.repository import InboxCriterion, InboxEntry, InboxPosition
 
 if TYPE_CHECKING:
     from lekto.adapters.outbound.memory.unit_of_work import MemoryUnitOfWork
@@ -156,6 +156,17 @@ class MemoryInboxRepository:
             )
             if state is not None:
                 yield document, state, mark, confirmation
+
+    def open_for(self, criterion: InboxCriterion) -> set[DocumentId]:
+        """The documents that stand open in the criterion's inbox (`domain.inbox.open_tab`),
+        for the document filter (`DocumentFilter.inbox`)."""
+        marks = self._marks()
+        viewer = criterion.viewer
+        return {
+            document.id
+            for document in self._documents(None if criterion.everyone else viewer)
+            if open_tab(document, _at(marks.get((viewer, document.id)))) is not None
+        }
 
     def _documents(self, editor: UserId | None) -> list[Document]:
         """The documents in the spaces `editor` edits (None: every one), as the unit sees them
