@@ -28,9 +28,9 @@ describe('via token', () => {
 	});
 
 	it('puts the token after the name', () => {
-		expect(viaToken('Tobi', 'Claude')).toBe(m.by_token({ name: 'Tobi', token: 'Claude' }));
-		expect(viaToken('Tobi', null)).toBe('Tobi');
-		expect(viaToken('Tobi', undefined)).toBe('Tobi');
+		expect(viaToken('John', 'Claude')).toBe(m.by_token({ name: 'John', token: 'Claude' }));
+		expect(viaToken('John', null)).toBe('John');
+		expect(viaToken('John', undefined)).toBe('John');
 	});
 
 	it('is named through viaToken wherever it is read', () => {

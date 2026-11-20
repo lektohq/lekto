@@ -23,7 +23,7 @@ vi.mock('$app/state', () => ({
 }));
 
 const USERS = [
-	{ id: OWNER, username: 'tobi', role: 'user', active: true },
+	{ id: OWNER, username: 'john', role: 'user', active: true },
 	{ id: 'admin-1', username: 'admin', role: 'admin', active: true }
 ];
 const SPACES = [
@@ -47,7 +47,7 @@ const SPACES = [
 		personal_of: null,
 		role: 'edit',
 		members: [
-			{ user_id: OWNER, role: 'edit', username: 'tobi', active: true },
+			{ user_id: OWNER, role: 'edit', username: 'john', active: true },
 			{ user_id: 'erika-1', role: 'read', username: 'erika', active: true }
 		]
 	}
@@ -78,7 +78,7 @@ function signIn(role: User['role'] = 'user') {
 		user:
 			role === 'admin'
 				? { id: 'admin-1', username: 'admin', role }
-				: { id: OWNER, username: 'tobi', role },
+				: { id: OWNER, username: 'john', role },
 		method: 'password',
 		expires_at: '2026-10-18T12:00:00Z',
 		csrf_token: 'token'

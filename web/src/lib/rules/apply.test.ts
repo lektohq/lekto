@@ -139,7 +139,7 @@ const lookup = {
 		{ id: 'house', name: 'Haushalt', personal_of: null, role: 'edit', members: [] }
 	],
 	users: [
-		{ id: 'u1', username: 'tobi', role: 'user', personal_space_id: 'mine' },
+		{ id: 'u1', username: 'john', role: 'user', personal_space_id: 'mine' },
 		{ id: 'u2', username: 'erika', role: 'user', personal_space_id: 'erikas' }
 	]
 } as unknown as Lookup;

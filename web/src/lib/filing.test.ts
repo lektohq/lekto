@@ -17,7 +17,7 @@ import { m } from '#lib/paraglide/messages.js';
 type Check = components['schemas']['FieldCheckOut'];
 type Member = components['schemas']['SpaceOut']['members'][number];
 
-const TOBI = 'u-tobi';
+const JOHN = 'u-john';
 const ERIKA = 'u-erika';
 const MINE = 's-mine';
 const ERIKAS = 's-erika';
@@ -28,9 +28,9 @@ const lookup = {
 		{
 			id: MINE,
 			name: 'Personal',
-			personal_of: TOBI,
+			personal_of: JOHN,
 			role: 'edit',
-			members: [{ user_id: TOBI, role: 'edit', username: 'tobi' }]
+			members: [{ user_id: JOHN, role: 'edit', username: 'john' }]
 		},
 		{
 			id: HOME,
@@ -38,13 +38,13 @@ const lookup = {
 			personal_of: null,
 			role: 'edit',
 			members: [
-				{ user_id: TOBI, role: 'edit', username: 'tobi' },
+				{ user_id: JOHN, role: 'edit', username: 'john' },
 				{ user_id: ERIKA, role: 'read', username: 'erika', display_name: 'Jane Doe' }
 			]
 		}
 	],
 	users: [
-		{ id: TOBI, username: 'tobi', role: 'user', personal_space_id: MINE },
+		{ id: JOHN, username: 'john', role: 'user', personal_space_id: MINE },
 		{
 			id: ERIKA,
 			username: 'erika',
@@ -55,7 +55,7 @@ const lookup = {
 	]
 } as unknown as Lookup;
 
-const tobi = { id: TOBI, admin: false };
+const john = { id: JOHN, admin: false };
 const choices = [{ value: HOME }, { value: ERIKAS }];
 
 function spaceCheck(fields: Partial<Check>): Check {
@@ -83,9 +83,9 @@ describe('filing', () => {
 	});
 
 	it('tells staying, moving and handing over apart', () => {
-		expect(filingKind(MINE, MINE, lookup, tobi)).toBe('stay');
-		expect(filingKind(HOME, MINE, lookup, tobi)).toBe('move');
-		expect(filingKind(ERIKAS, MINE, lookup, tobi)).toBe('hand_over');
+		expect(filingKind(MINE, MINE, lookup, john)).toBe('stay');
+		expect(filingKind(HOME, MINE, lookup, john)).toBe('move');
+		expect(filingKind(ERIKAS, MINE, lookup, john)).toBe('hand_over');
 	});
 
 	it('offers the suggestion first, the other spaces named, and staying, each once', () => {
@@ -109,7 +109,7 @@ describe('filing', () => {
 			}),
 			MINE,
 			lookup,
-			tobi,
+			john,
 			choices
 		);
 		expect(filing.options.map((option) => [option.value, option.kind])).toEqual([
@@ -135,30 +135,30 @@ describe('filing', () => {
 			}),
 			MINE,
 			lookup,
-			tobi,
+			john,
 			choices
 		);
 		expect(disagreeing.disagree).toBe(true);
 		expect(initialChoice(disagreeing)).toBe('');
-		const unavailable = openFiling(spaceCheck({ suggestion: HOME }), MINE, lookup, tobi, []);
+		const unavailable = openFiling(spaceCheck({ suggestion: HOME }), MINE, lookup, john, []);
 		expect(unavailable.options[0].choosable).toBe(false);
 		expect(initialChoice(unavailable)).toBe('');
 	});
 
 	it('says what each choice does above "Confirm"', () => {
-		expect(confirmHint('', MINE, lookup, tobi)).toEqual({
+		expect(confirmHint('', MINE, lookup, john)).toEqual({
 			text: m.filing_choose_first(),
 			tone: 'hint'
 		});
-		expect(confirmHint(MINE, MINE, lookup, tobi)).toBeNull();
-		expect(confirmHint(ERIKAS, MINE, lookup, tobi)).toEqual({
+		expect(confirmHint(MINE, MINE, lookup, john)).toBeNull();
+		expect(confirmHint(ERIKAS, MINE, lookup, john)).toEqual({
 			text: m.filing_hint_hand_over({ name: 'Jane Doe' }),
 			tone: 'warning'
 		});
-		expect(confirmHint(ERIKAS, MINE, lookup, { id: TOBI, admin: true })?.text).toBe(
+		expect(confirmHint(ERIKAS, MINE, lookup, { id: JOHN, admin: true })?.text).toBe(
 			m.filing_hint_hand_over_admin({ name: 'Jane Doe' })
 		);
-		expect(confirmHint(HOME, MINE, lookup, tobi)).toEqual({
+		expect(confirmHint(HOME, MINE, lookup, john)).toEqual({
 			text: m.filing_hint_move_readers({ space: 'Haushalt', names: 'Jane Doe' }),
 			tone: 'hint'
 		});
@@ -167,35 +167,35 @@ describe('filing', () => {
 	it('reads another person’s space as theirs', () => {
 		const admin = { id: 'u-admin', admin: true };
 		const filing = openFiling(spaceCheck({}), MINE, lookup, admin, []);
-		expect(filing.options[0].title).toBe(m.filing_stay_with({ name: 'tobi' }));
+		expect(filing.options[0].title).toBe(m.filing_stay_with({ name: 'john' }));
 		expect(whereText(MINE, lookup, admin, true)).toBe(
-			m.filing_where_person({ name: 'tobi', visible: m.visible_to({ names: 'tobi' }) })
+			m.filing_where_person({ name: 'john', visible: m.visible_to({ names: 'john' }) })
 		);
-		expect(confirmHint(ERIKAS, HOME, lookup, { id: TOBI, admin: false })?.tone).toBe('warning');
+		expect(confirmHint(ERIKAS, HOME, lookup, { id: JOHN, admin: false })?.tone).toBe('warning');
 	});
 
 	it('lists the members, the caller first, readers once the document is green', () => {
 		const home = lookup.spaces[1].members;
-		expect(memberChips(home, tobi, true)).toEqual([
-			{ key: TOBI, text: m.filing_you_edit() },
+		expect(memberChips(home, john, true)).toEqual([
+			{ key: JOHN, text: m.filing_you_edit() },
 			{ key: ERIKA, text: m.filing_member_read({ name: 'Jane Doe' }) }
 		]);
-		expect(memberChips(home, tobi, false)).toEqual([
-			{ key: TOBI, text: m.filing_you_edit() },
+		expect(memberChips(home, john, false)).toEqual([
+			{ key: JOHN, text: m.filing_you_edit() },
 			{ key: ERIKA, text: m.filing_member_read_later({ name: 'Jane Doe' }) }
 		]);
-		expect(whereText(MINE, lookup, tobi, true)).toBe(
+		expect(whereText(MINE, lookup, john, true)).toBe(
 			m.filing_where({ space: m.space_personal(), visible: m.visible_to_you() })
 		);
 	});
 
 	it('keeps two members of one display name apart', () => {
 		const twins = [
-			{ user_id: TOBI, role: 'edit', username: 'tobi' },
+			{ user_id: JOHN, role: 'edit', username: 'john' },
 			{ user_id: 'u-erika-1', role: 'read', username: 'erika1', display_name: 'Erika' },
 			{ user_id: 'u-erika-2', role: 'read', username: 'erika2', display_name: 'Erika' }
 		] as unknown as Member[];
-		const chips = memberChips(twins, tobi, true);
+		const chips = memberChips(twins, john, true);
 		expect(chips.map((chip) => chip.text)).toEqual([
 			m.filing_you_edit(),
 			m.filing_member_read({ name: 'Erika' }),
@@ -206,11 +206,11 @@ describe('filing', () => {
 
 	it('says who sees the document now and who once it is green', () => {
 		const home = lookup.spaces[1].members;
-		expect(visibleText(home, tobi, true)).toBe(m.visible_to({ names: 'Jane Doe' }));
-		expect(visibleText(home, tobi, false)).toBe(m.visible_to_you());
-		expect(readersLaterText(home, tobi, false)).toBe(
+		expect(visibleText(home, john, true)).toBe(m.visible_to({ names: 'Jane Doe' }));
+		expect(visibleText(home, john, false)).toBe(m.visible_to_you());
+		expect(readersLaterText(home, john, false)).toBe(
 			m.visible_to_readers_later({ names: 'Jane Doe' })
 		);
-		expect(readersLaterText(home, tobi, true)).toBeNull();
+		expect(readersLaterText(home, john, true)).toBeNull();
 	});
 });

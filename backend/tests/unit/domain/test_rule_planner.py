@@ -679,10 +679,10 @@ def test_the_title_sees_fields_tags_space_and_uploader() -> None:
     names = {**NAMES, PAID: "paid", URGENT: "urgent", DEFAULT: "Inbox"}
     result = run(
         [rule(AddTags(frozenset({URGENT})), SetTitle(template))],
-        situation(document, definitions=DEFINITIONS, names=names, uploader_name="tobi"),
+        situation(document, definitions=DEFINITIONS, names=names, uploader_name="john"),
     )
 
-    assert result.changes.title == "99,90 EUR paid+urgent Inbox tobi"
+    assert result.changes.title == "99,90 EUR paid+urgent Inbox john"
 
 
 def test_a_text_field_from_a_template() -> None:

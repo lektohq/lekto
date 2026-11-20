@@ -49,7 +49,7 @@ afterEach(() => {
 
 function signIn(role: 'admin' | 'user') {
 	session.start({
-		user: { id: 'u1', username: 'tobi', role },
+		user: { id: 'u1', username: 'john', role },
 		method: 'password',
 		expires_at: '2026-10-17T23:00:00Z',
 		csrf_token: 'token'

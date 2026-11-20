@@ -12,7 +12,7 @@ vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
 
 const signedIn = {
-	user: { id: '0199a6c4-0000-7000-8000-000000000001', username: 'tobi', role: 'admin' },
+	user: { id: '0199a6c4-0000-7000-8000-000000000001', username: 'john', role: 'admin' },
 	method: 'password',
 	expires_at: '2026-10-09T12:00:00Z',
 	csrf_token: 'token'
@@ -44,7 +44,7 @@ afterEach(() => {
 
 async function enterPassword() {
 	const user = userEvent.setup();
-	await user.type(screen.getByLabelText(m.login_username()), 'tobi');
+	await user.type(screen.getByLabelText(m.login_username()), 'john');
 	await user.type(screen.getByLabelText(m.login_password()), 'secret');
 	await user.click(screen.getByRole('button', { name: m.login_submit() }));
 	return user;
@@ -57,9 +57,9 @@ describe('sign-in page', () => {
 
 		await enterPassword();
 
-		expect(await bodyOf(0)).toMatchObject({ username: 'tobi', password: 'secret', code: null });
+		expect(await bodyOf(0)).toMatchObject({ username: 'john', password: 'secret', code: null });
 		expect(goto).toHaveBeenCalledWith('/ui/inbox', { replaceState: true });
-		expect(session.user?.username).toBe('tobi');
+		expect(session.user?.username).toBe('john');
 		expect(session.csrfToken).toBe('token');
 	});
 
@@ -87,7 +87,7 @@ describe('sign-in page', () => {
 		await user.click(screen.getByRole('button', { name: m.login_submit() }));
 
 		expect(await bodyOf(1)).toMatchObject({
-			username: 'tobi',
+			username: 'john',
 			password: 'secret',
 			code: '123456',
 			recovery_code: null

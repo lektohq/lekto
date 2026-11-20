@@ -32,18 +32,18 @@ const lookup = {
 			name: 'Personal',
 			personal_of: 'u1',
 			role: 'edit',
-			members: [member('u1', 'tobi')]
+			members: [member('u1', 'john')]
 		},
 		{
 			id: 'house',
 			name: 'Haushalt',
 			personal_of: null,
 			role: 'edit',
-			members: [member('u1', 'tobi'), member('u2', 'erika', 'read'), member('u3', 'bob')]
+			members: [member('u1', 'john'), member('u2', 'erika', 'read'), member('u3', 'bob')]
 		}
 	],
 	users: [
-		{ id: 'u1', username: 'tobi', role: 'user', personal_space_id: 'mine' },
+		{ id: 'u1', username: 'john', role: 'user', personal_space_id: 'mine' },
 		{ id: 'u2', username: 'erika', role: 'user', personal_space_id: 'erikas' }
 	]
 } as unknown as Lookup;
@@ -54,7 +54,7 @@ const node = (fields: { field: string; suggestion?: unknown; unseen_by?: string[
 describe('the suggested space', () => {
 	beforeEach(() =>
 		session.start({
-			user: { id: 'u1', username: 'tobi', role: 'user' },
+			user: { id: 'u1', username: 'john', role: 'user' },
 			method: 'password',
 			expires_at: '2026-10-22T12:00:00Z',
 			csrf_token: 'token'

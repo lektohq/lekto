@@ -94,9 +94,9 @@ describe('a reason in the user language', () => {
 		);
 		const field = { code: 'contact_none', params: {}, field: 'contact' } as Reason;
 		expect(reasonText(field, { field: () => 'Kontakt' })).toBe('Kontakt: kein Kontakt erkannt');
-		const back = { code: 'rules_back_and_forth', params: { spaces: ['tobi', 'Haushalt', 'tobi'] } };
+		const back = { code: 'rules_back_and_forth', params: { spaces: ['john', 'Haushalt', 'john'] } };
 		expect(outputReasonText(back, 'English')).toBe(
-			'Regeln verschieben es hin und her: tobi → Haushalt → tobi'
+			'Regeln verschieben es hin und her: john → Haushalt → john'
 		);
 		expect(outputReasonText(undefined, 'English')).toBe('English');
 		expect(outputReasonText(undefined, undefined)).toBeNull();

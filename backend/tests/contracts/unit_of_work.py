@@ -1666,7 +1666,7 @@ class UnitOfWorkContract:
             assert [item.id for item in unlabelled] == [plain.id]
             assert await uow.documents.count_confirmed() == 4
             assert await uow.documents.count_confirmed(after=NOW - timedelta(minutes=1)) == 3
-            # The other user reads the shared space (green documents) and their own: Tobi's
+            # The other user reads the shared space (green documents) and their own: John's
             # document in his personal space is not theirs to read; theirs has a decided space
             # but no confirmed metadata, so it votes nowhere and is not known.
             known = await uow.documents.confirmed_labels(other.id)

@@ -18,11 +18,11 @@ from lekto.core.domain.verdict import (
 )
 from tests import builders
 from tests.unit.domain import verdict_support
-from tests.unit.domain.verdict_support import ERIKA, ERIKAS, HOUSEHOLD, OWN, TOBI, judge_space
+from tests.unit.domain.verdict_support import ERIKA, ERIKAS, HOUSEHOLD, JOHN, OWN, judge_space
 
 BOB = UserId(new_id())
 BOBS = SpaceId(new_id())
-FAMILY = SpaceId(new_id())  # Tobi, Erika and their child Bob
+FAMILY = SpaceId(new_id())  # John, Erika and their child Bob
 OPTIONS = {
     **verdict_support.OPTIONS,
     BOBS: SpaceOption("another user's personal space", frozenset({BOB}), personal_of=BOB),
@@ -39,7 +39,7 @@ def sure_of(space: SpaceId) -> Signals:
 
 
 def test_erika_s_identifier_alone_suggests_handing_it_over() -> None:
-    """Tobi uploads Erika's tax assessment: no signal names a space, her tax ID stands in it."""
+    """John uploads Erika's tax assessment: no signal names a space, her tax ID stands in it."""
     check = judge_space(Signals(), choice(), persons={ERIKA: Strength.HARD})
     assert check.outcome is Outcome.UNCERTAIN
     assert check.suggestion == str(ERIKAS)
@@ -52,7 +52,7 @@ def test_erika_s_identifier_alone_suggests_handing_it_over() -> None:
 
 
 def test_hard_evidence_against_a_sure_choice_makes_it_uncertain() -> None:
-    """The signals are sure it stays with Tobi; Erika's identifier says otherwise."""
+    """The signals are sure it stays with John; Erika's identifier says otherwise."""
     check = judge_space(sure_of(OWN), choice(), persons={ERIKA: Strength.HARD})
     assert check.outcome is Outcome.UNCERTAIN
     assert check.suggestion == str(ERIKAS)
@@ -67,24 +67,24 @@ def test_hard_evidence_backs_a_space_a_signal_names() -> None:
     without = judge_space(signals, choice())
     assert without.outcome is Outcome.OK  # the model alone, and the classifier knows Haushalt
     assert without.value is None
-    backed = judge_space(signals, choice(), persons={TOBI: Strength.HARD, ERIKA: Strength.HARD})
+    backed = judge_space(signals, choice(), persons={JOHN: Strength.HARD, ERIKA: Strength.HARD})
     assert backed.outcome is Outcome.UNCERTAIN
     assert backed.suggestion == str(HOUSEHOLD)
     assert backed.reason == "suggests another space, which shows it to more people"
 
 
 def test_hard_evidence_of_two_backs_the_smallest_space_of_both() -> None:
-    options = {**OPTIONS, FAMILY: SpaceOption("a shared space", frozenset({TOBI, ERIKA, BOB}))}
+    options = {**OPTIONS, FAMILY: SpaceOption("a shared space", frozenset({JOHN, ERIKA, BOB}))}
     del options[HOUSEHOLD]
     check = judge_space(
-        Signals(), choice(options=options), persons={TOBI: Strength.HARD, ERIKA: Strength.HARD}
+        Signals(), choice(options=options), persons={JOHN: Strength.HARD, ERIKA: Strength.HARD}
     )
     assert check.outcome is Outcome.UNCERTAIN
     assert check.suggestion == str(FAMILY)
 
 
 def test_the_uploader_s_own_evidence_only_confirms_staying() -> None:
-    check = judge_space(Signals(), choice(), persons={TOBI: Strength.HARD})
+    check = judge_space(Signals(), choice(), persons={JOHN: Strength.HARD})
     assert check.outcome is Outcome.OK
     assert check.value is None
     assert check.suggestion is None
@@ -125,7 +125,7 @@ def test_weak_evidence_only_breaks_ties() -> None:
     tied = judge_space(
         Signals(classifier=ClassifierView(spaces=[(BOBS, 0.5), (HOUSEHOLD, 0.45)])),
         choice(),
-        persons={ERIKA: Strength.WEAK, TOBI: Strength.WEAK},
+        persons={ERIKA: Strength.WEAK, JOHN: Strength.WEAK},
     )
     assert tied.outcome is Outcome.OK
     assert tied.suggestion == str(HOUSEHOLD)
@@ -148,14 +148,14 @@ def test_two_others_without_a_space_of_their_own_warn_but_stay() -> None:
 
 
 def test_the_recipient_names_every_user_it_contains() -> None:
-    people = [(TOBI, ("John Doe", "Tobi")), (ERIKA, ("Jane Doe",)), (BOB, ("Bob",))]
+    people = [(JOHN, ("John Doe", "Johnny")), (ERIKA, ("Jane Doe",)), (BOB, ("Bob",))]
     found = recipient_persons("John und Jane Doe", people, builders.THRESHOLDS)
     assert found == {ERIKA: Strength.MEDIUM}  # "John Doe" does not stand whole in it
     assert recipient_persons("Frau Jane Doe", people, builders.THRESHOLDS) == {
         ERIKA: Strength.MEDIUM
     }
     assert recipient_persons("Herrn John Doe", people, builders.THRESHOLDS) == {
-        TOBI: Strength.MEDIUM
+        JOHN: Strength.MEDIUM
     }
     assert recipient_persons("Jane Do", people, builders.THRESHOLDS) == {
         ERIKA: Strength.MEDIUM
@@ -178,7 +178,7 @@ def test_facts_view_persons_reach_the_judge_through_signals() -> None:
 
 
 def test_it_stays_where_everyone_named_sees_it() -> None:
-    """In Haushalt, the signals sure of Tobi's own space, Erika's number in it: staying keeps it
+    """In Haushalt, the signals sure of John's own space, Erika's number in it: staying keeps it
     with both, no hand-over, no narrowing that leaves her out."""
     check = judge_space(sure_of(OWN), choice(current=HOUSEHOLD), persons={ERIKA: Strength.HARD})
     assert check.outcome is Outcome.OK
@@ -187,7 +187,7 @@ def test_it_stays_where_everyone_named_sees_it() -> None:
 
 
 def test_the_joint_account_in_the_household_stays() -> None:
-    both = {ERIKA: Strength.HARD, TOBI: Strength.HARD}
+    both = {ERIKA: Strength.HARD, JOHN: Strength.HARD}
     check = judge_space(sure_of(OWN), choice(current=HOUSEHOLD), persons=both)
     assert (check.outcome, check.value, check.suggestion) == (Outcome.OK, None, None)
 
@@ -198,7 +198,7 @@ def test_a_recipient_two_users_match_alike_names_neither() -> None:
 
 
 def payslip_signals(proposed: SpaceId = ERIKAS) -> Signals:
-    """Erika's payslip uploaded by Tobi: the model proposes `proposed`; Tobi's five payslips,
+    """Erika's payslip uploaded by John: the model proposes `proposed`; John's five payslips,
     the most similar documents, all lie in his personal space (there was no one else); the
     classifier knows no spaces yet."""
     neighbours = tuple(
@@ -210,7 +210,7 @@ def payslip_signals(proposed: SpaceId = ERIKAS) -> Signals:
 
 def test_the_model_and_its_recipient_suggest_handing_it_over() -> None:
     """Tobi, 22.10.2026: the model proposes Erika's personal space and reads Erika as the
-    recipient; the similar documents stay with Tobi. Without the recipient the signals only
+    recipient; the similar documents stay with John. Without the recipient the signals only
     disagree; with it Lekto suggests the hand-over (a click, never automatic)."""
     persons = {ERIKA: Strength.MEDIUM}
     without = judge_space(payslip_signals(), choice(), persons=persons)
@@ -229,12 +229,12 @@ def test_the_model_and_its_recipient_suggest_handing_it_over() -> None:
 
 
 def test_a_letter_to_both_is_no_hand_over() -> None:
-    """The recipient names Tobi and Erika: handing it over would leave Tobi without it."""
+    """The recipient names John and Erika: handing it over would leave John without it."""
     check = judge_space(
         payslip_signals(),
         choice(),
-        persons={ERIKA: Strength.MEDIUM, TOBI: Strength.MEDIUM},
-        recipients=frozenset({ERIKA, TOBI}),
+        persons={ERIKA: Strength.MEDIUM, JOHN: Strength.MEDIUM},
+        recipients=frozenset({ERIKA, JOHN}),
     )
     assert check.outcome is Outcome.OK  # stays, with a warning that Erika does not see it
     assert check.value is None
@@ -255,7 +255,7 @@ def test_the_recipient_alone_moves_nothing() -> None:
 
 
 def test_already_in_erika_s_space_it_stays() -> None:
-    """The model names her space, the similar documents Tobi's: it stays where it lies, with
+    """The model names her space, the similar documents John's: it stays where it lies, with
     Tobi's space beside it, as signals that disagree give one (Tobi, 19.11.2026: wanted)."""
     check = judge_space(payslip_signals(), choice(ERIKAS), recipients=frozenset({ERIKA}))
     assert (check.outcome, check.value) == (Outcome.OK, None)

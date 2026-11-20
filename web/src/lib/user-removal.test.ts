@@ -12,11 +12,11 @@ import {
 type Space = components['schemas']['SpaceOut'];
 
 const ERIKA = 'erika-id';
-const TOBI = 'tobi-id';
+const JOHN = 'john-id';
 const GONE = 'gone-id';
 const users = [
 	{ id: ERIKA, username: 'erika', active: true },
-	{ id: TOBI, username: 'tobi', display_name: 'John Doe', active: true },
+	{ id: JOHN, username: 'john', display_name: 'John Doe', active: true },
 	{ id: GONE, username: 'gone', active: false }
 ];
 
@@ -65,13 +65,13 @@ describe('deleting a user who leaves spaces behind', () => {
 			empty: { how: 'remove', target: '' }
 		});
 		expect(settled(spaces, decisions)).toBe(false);
-		decisions.erikas.target = 'tobis';
-		decisions.household = { how: 'editor', target: TOBI };
+		decisions.erikas.target = 'johns';
+		decisions.household = { how: 'editor', target: JOHN };
 		expect(settled(spaces, decisions)).toBe(true);
 		expect(removalBody(spaces, decisions)).toEqual({
 			spaces: [
-				{ space_id: 'erikas', remove: false, move_to: 'tobis' },
-				{ space_id: 'household', remove: false, editor: TOBI },
+				{ space_id: 'erikas', remove: false, move_to: 'johns' },
+				{ space_id: 'household', remove: false, editor: JOHN },
 				{ space_id: 'empty', remove: true }
 			]
 		});
@@ -82,12 +82,12 @@ describe('deleting a user who leaves spaces behind', () => {
 		const spaces = [
 			space('erikas', 'Personal', ERIKA),
 			space('household', 'Household'),
-			space('tobis', 'Personal', TOBI),
+			space('johns', 'Personal', JOHN),
 			space('gones', 'Personal', GONE),
 			space('archive', 'Archive')
 		];
 		const targets = moveTargets(spaces, users, ERIKA, [personal, household], 'admin-id');
-		expect(targets.map((target) => target.value)).toEqual(['archive', 'tobis']);
-		expect(editorOptions(users, ERIKA)).toEqual([{ value: TOBI, label: 'John Doe (tobi)' }]);
+		expect(targets.map((target) => target.value)).toEqual(['archive', 'johns']);
+		expect(editorOptions(users, ERIKA)).toEqual([{ value: JOHN, label: 'John Doe (john)' }]);
 	});
 });

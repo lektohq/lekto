@@ -20,7 +20,7 @@ const lookup = {
 	documentTypes: [{ id: PAYSLIP, name: 'Lohnabrechnung' }],
 	tags: [],
 	fields: [],
-	spaces: [{ id: HOME, name: 'Tobi', personal_of: null, members: [] }],
+	spaces: [{ id: HOME, name: 'John', personal_of: null, members: [] }],
 	users: [{ id: ERIKA, username: 'erika', display_name: 'Jane Doe', personal_space_id: null }]
 } as unknown as Lookup;
 
@@ -243,7 +243,7 @@ describe('stepSummary', () => {
 			)
 		).toBe(
 			[
-				m.summary_rules_arrived({ space: 'Tobi' }),
+				m.summary_rules_arrived({ space: 'John' }),
 				m.summary_rules_matched_one({ count: '3' })
 			].join(' · ')
 		);

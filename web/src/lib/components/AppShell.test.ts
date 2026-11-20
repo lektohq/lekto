@@ -18,7 +18,7 @@ const children = createRawSnippet(() => ({ render: () => '<p>content</p>' }));
 
 function signIn(role: User['role']) {
 	session.start({
-		user: { id: '0199a6c4-0000-7000-8000-000000000001', username: 'tobi', role },
+		user: { id: '0199a6c4-0000-7000-8000-000000000001', username: 'john', role },
 		method: 'password',
 		expires_at: '2026-10-09T12:00:00Z',
 		csrf_token: 'token'
@@ -43,7 +43,7 @@ function mainNavigation() {
 /** The account menu; bits-ui opens it on a pointer press. */
 async function openAccountMenu(): Promise<HTMLElement> {
 	await fireEvent.pointerDown(
-		screen.getByRole('button', { name: m.account_menu({ username: 'tobi' }) }),
+		screen.getByRole('button', { name: m.account_menu({ username: 'john' }) }),
 		{
 			button: 0,
 			pointerType: 'mouse'
@@ -208,7 +208,7 @@ describe('AppShell', () => {
 		expect(screen.getByRole('link', { name: m.skip_to_content() }).getAttribute('href')).toBe(
 			'#main'
 		);
-		expect(screen.getByRole('button', { name: m.account_menu({ username: 'tobi' }) })).toBeTruthy();
+		expect(screen.getByRole('button', { name: m.account_menu({ username: 'john' }) })).toBeTruthy();
 		expect(screen.getByText('content')).toBeTruthy();
 	});
 
@@ -229,10 +229,10 @@ describe('AppShell', () => {
 		render(AppShell, { children });
 		expect(screen.queryByRole('button', { name: m.theme_label() })).toBeNull();
 		expect(screen.queryByRole('button', { name: /^Sprache|^Language/ })).toBeNull();
-		expect(screen.queryByRole('button', { name: m.account_menu({ username: 'tobi' }) })).toBeNull();
+		expect(screen.queryByRole('button', { name: m.account_menu({ username: 'john' }) })).toBeNull();
 		await fireEvent.click(screen.getByRole('button', { name: m.nav_open() }));
 		const sheet = await screen.findByRole('dialog');
-		expect(within(sheet).getByText('tobi')).toBeTruthy();
+		expect(within(sheet).getByText('john')).toBeTruthy();
 		expect(within(sheet).getByText(m.role_admin())).toBeTruthy();
 		expect(within(sheet).getByRole('switch', { name: new RegExp(m.all_users()) })).toBeTruthy();
 		const links = within(sheet).getAllByRole('link');
@@ -267,10 +267,10 @@ describe('AppShell', () => {
 		phone.override(false);
 		signIn('user');
 		render(AppShell, { children });
-		expect(screen.getByRole('button', { name: m.account_menu({ username: 'tobi' }) })).toBeTruthy();
+		expect(screen.getByRole('button', { name: m.account_menu({ username: 'john' }) })).toBeTruthy();
 		await fireEvent.click(screen.getByRole('button', { name: m.nav_open() }));
 		const sheet = await screen.findByRole('dialog');
-		expect(within(sheet).queryByText('tobi')).toBeNull();
+		expect(within(sheet).queryByText('john')).toBeNull();
 		expect(within(sheet).queryByRole('button', { name: m.sign_out() })).toBeNull();
 		expect(within(sheet).getAllByRole('link')).toHaveLength(6);
 	});

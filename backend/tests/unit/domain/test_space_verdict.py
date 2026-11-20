@@ -16,10 +16,10 @@ from tests.unit.domain.verdict_support import (
     ERIKA,
     ERIKAS,
     HOUSEHOLD,
+    JOHN,
     OPTIONS,
     OWN,
     SHARED_OWN,
-    TOBI,
     choice,
     judge_space,
 )
@@ -49,7 +49,7 @@ def test_two_signals_that_name_a_wider_space_suggest_it_without_naming_anyone() 
 
 
 def test_a_space_that_shows_it_to_no_one_new_is_moved_to() -> None:
-    """From Tobi's shared personal space into Haushalt: Erika sees it in both."""
+    """From John's shared personal space into Haushalt: Erika sees it in both."""
     signals = Signals(
         model=ModelProposal(space=HOUSEHOLD),
         neighbours=neighbours(HOUSEHOLD, HOUSEHOLD, None),
@@ -152,8 +152,8 @@ def test_handing_over_is_a_wider_space_too() -> None:
 
 
 def test_a_hand_over_that_narrows_is_still_only_suggested() -> None:
-    """Tobi's personal space, which Erika reads; the model alone names Erika's personal space:
-    no one new sees it, but Tobi would lose his upload. Lekto suggests the hand-over, it
+    """John's personal space, which Erika reads; the model alone names Erika's personal space:
+    no one new sees it, but John would lose his upload. Lekto suggests the hand-over, it
     never hands over by itself."""
     check = judge_space(Signals(model=ModelProposal(space=ERIKAS)), choice(SHARED_OWN))
     assert check.outcome is Outcome.UNCERTAIN
@@ -163,7 +163,7 @@ def test_a_hand_over_that_narrows_is_still_only_suggested() -> None:
 
 
 def test_a_space_without_the_uploader_is_only_suggested() -> None:
-    """From Haushalt into a space only Erika edits (not her personal one): Tobi, the uploader,
+    """From Haushalt into a space only Erika edits (not her personal one): John, the uploader,
     would not see his document there."""
     erikas_archive = SpaceId(new_id())
     options = {
@@ -171,7 +171,7 @@ def test_a_space_without_the_uploader_is_only_suggested() -> None:
         erikas_archive: SpaceOption("a shared space", frozenset({ERIKA})),
     }
     signals = Signals(model=ModelProposal(space=erikas_archive))
-    check = judge_space(signals, SpaceChoice(current=HOUSEHOLD, options=options, uploader=TOBI))
+    check = judge_space(signals, SpaceChoice(current=HOUSEHOLD, options=options, uploader=JOHN))
     assert check.outcome is Outcome.UNCERTAIN
     assert check.suggestion == str(erikas_archive)
     assert check.reason == "suggests a space its uploader does not see"

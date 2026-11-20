@@ -24,13 +24,13 @@ TEXT = "".join(f"Kundennummer {number}\n" for number in (PUBLIC, ERIKAS, LEARNED
 
 
 async def _scene(world: World) -> tuple[Any, Any, Any, Any, Contact]:
-    """Tobi's letter in a space he shares with Bert, who edits it; the bank has a number entered
+    """John's letter in a space he shares with Bert, who edits it; the bank has a number entered
     by hand, one that names Erika, one learned in Erika's personal space and one rejected. The
     facts signal ran and is in the processing log."""
-    tobi, bert, erika = await world.user(), await world.user(), await world.user()
+    john, bert, erika = await world.user(), await world.user(), await world.user()
     admin = await world.user(role=Role.ADMIN)
-    shared = await world.spaces.create(Actor(tobi.id), "Shared")
-    await world.spaces.set_member(Actor(tobi.id), shared.id, bert.id, SpaceRole.EDIT)
+    shared = await world.spaces.create(Actor(john.id), "Shared")
+    await world.spaces.set_member(Actor(john.id), shared.id, bert.id, SpaceRole.EDIT)
     erikas = await world.personal_space(erika)
     bank = Contact.create(name="Muster Bank", now=builders.NOW)
     bank.set_identifiers(
@@ -41,7 +41,7 @@ async def _scene(world: World) -> tuple[Any, Any, Any, Any, Contact]:
         [Identifier(K, LEARNED, IdentifierSource.LEARNED, learned_in=frozenset({erikas.id}))]
     )
     await contacts(world, bank)
-    document = await stored(world, tobi, TEXT)
+    document = await stored(world, john, TEXT)
     async with world.uow() as uow:
         moved = await uow.documents.get(document.id)
         moved.space_id = shared.id

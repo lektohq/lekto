@@ -76,7 +76,7 @@ function props(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
 	session.start({
-		user: { id: OWNER, username: 'tobi', role: 'user' },
+		user: { id: OWNER, username: 'john', role: 'user' },
 		method: 'password',
 		expires_at: '2026-10-15T12:00:00Z',
 		csrf_token: 'token'
@@ -195,7 +195,7 @@ describe('DocumentHeader', () => {
 	describe('space', () => {
 		const lookup = {
 			users: [
-				{ id: OWNER, username: 'tobi', role: 'user', personal_space_id: 'space-2' },
+				{ id: OWNER, username: 'john', role: 'user', personal_space_id: 'space-2' },
 				{ id: 'user-2', username: 'erika', role: 'user', personal_space_id: 'space-3' }
 			],
 			spaces: [
@@ -205,7 +205,7 @@ describe('DocumentHeader', () => {
 					personal_of: null,
 					role: 'edit',
 					members: [
-						{ user_id: OWNER, role: 'edit', username: 'tobi', active: true },
+						{ user_id: OWNER, role: 'edit', username: 'john', active: true },
 						{ user_id: 'user-2', role: 'read', username: 'erika', active: true }
 					]
 				},
@@ -214,7 +214,7 @@ describe('DocumentHeader', () => {
 					name: 'Personal',
 					personal_of: OWNER,
 					role: 'edit',
-					members: [{ user_id: OWNER, role: 'edit', username: 'tobi', active: true }]
+					members: [{ user_id: OWNER, role: 'edit', username: 'john', active: true }]
 				},
 				{
 					id: 'space-3',
@@ -223,7 +223,7 @@ describe('DocumentHeader', () => {
 					role: 'read',
 					members: [
 						{ user_id: 'user-2', role: 'edit', username: 'erika', active: true },
-						{ user_id: OWNER, role: 'read', username: 'tobi', active: true }
+						{ user_id: OWNER, role: 'read', username: 'john', active: true }
 					]
 				}
 			]

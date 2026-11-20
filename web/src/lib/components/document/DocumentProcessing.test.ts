@@ -389,7 +389,7 @@ describe('DocumentProcessing', () => {
 			reason: null,
 			model_version: 'person',
 			output: {
-				confirmed_by: 'u-tobi',
+				confirmed_by: 'u-john',
 				outcome_before: 'uncertain',
 				accepted: [],
 				entered: ['contact'],

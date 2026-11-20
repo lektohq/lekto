@@ -204,7 +204,7 @@ describe('the labels in the fields node', () => {
 describe('the space in the signals and the rules', () => {
 	beforeEach(() =>
 		session.start({
-			user: { id: '0199a6c4-0000-7000-8000-000000000001', username: 'tobi', role: 'user' },
+			user: { id: '0199a6c4-0000-7000-8000-000000000001', username: 'john', role: 'user' },
 			method: 'password',
 			expires_at: '2026-10-22T12:00:00Z',
 			csrf_token: 'token'
@@ -224,7 +224,7 @@ describe('the space in the signals and the rules', () => {
 			{ id: HOUSE, name: 'Haushalt', personal_of: null, role: 'edit', members: [] }
 		],
 		users: [
-			{ id: ME, username: 'tobi', role: 'user', personal_space_id: MINE },
+			{ id: ME, username: 'john', role: 'user', personal_space_id: MINE },
 			{ id: ERIKA, username: 'erika', role: 'user', personal_space_id: ERIKAS }
 		]
 	} as unknown as Lookup;

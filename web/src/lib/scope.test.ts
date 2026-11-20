@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { scope } from './scope.svelte.ts';
 import { session, type User } from './session.svelte.ts';
 
-const user = (role: 'admin' | 'user') => ({ id: 'u1', username: 'tobi', role }) as unknown as User;
+const user = (role: 'admin' | 'user') => ({ id: 'u1', username: 'john', role }) as unknown as User;
 
 afterEach(() => {
 	scope.set(false);

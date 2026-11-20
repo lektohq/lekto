@@ -180,7 +180,7 @@ function props(overrides: Record<string, unknown> = {}) {
 beforeEach(async () => {
 	await waitFor(() => expect(popovers()).toHaveLength(0));
 	session.start({
-		user: { id: OWNER, username: 'tobi', role: 'user' },
+		user: { id: OWNER, username: 'john', role: 'user' },
 		method: 'password',
 		expires_at: '2026-10-09T12:00:00Z',
 		csrf_token: 'token'
@@ -516,7 +516,7 @@ describe('DocumentForm', () => {
 					name: 'Personal',
 					personal_of: OWNER,
 					role: 'edit',
-					members: [{ user_id: OWNER, role: 'edit', username: 'tobi', active: true }]
+					members: [{ user_id: OWNER, role: 'edit', username: 'john', active: true }]
 				},
 				{
 					id: SPACE,
@@ -524,13 +524,13 @@ describe('DocumentForm', () => {
 					personal_of: null,
 					role: 'edit',
 					members: [
-						{ user_id: OWNER, role: 'edit', username: 'tobi', active: true },
+						{ user_id: OWNER, role: 'edit', username: 'john', active: true },
 						{ user_id: ERIKA, role: 'read', username: 'erika', active: true }
 					]
 				}
 			],
 			users: [
-				{ id: OWNER, username: 'tobi', role: 'user', personal_space_id: MINE },
+				{ id: OWNER, username: 'john', role: 'user', personal_space_id: MINE },
 				{ id: ERIKA, username: 'erika', role: 'user', personal_space_id: ERIKAS }
 			]
 		} as unknown as Lookup;
@@ -775,7 +775,7 @@ describe('DocumentForm', () => {
 			expect(within(calm).getByText('Haushalt')).toBeTruthy();
 			expect(within(calm).getByText(m.filing_you_edit())).toBeTruthy();
 			expect(within(calm).getByText(m.filing_member_read({ name: 'erika' }))).toBeTruthy();
-			expect(within(calm).getByText(m.filing_uploader_you({ name: 'tobi' }))).toBeTruthy();
+			expect(within(calm).getByText(m.filing_uploader_you({ name: 'john' }))).toBeTruthy();
 			expect(within(calm).queryByText(m.filing_decided_lekto())).toBeNull();
 			await userEvent.click(within(calm).getByRole('button', { name: m.filing_move_action() }));
 			expect(onmove).toHaveBeenCalled();

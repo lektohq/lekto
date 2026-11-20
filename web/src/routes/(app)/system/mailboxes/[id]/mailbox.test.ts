@@ -77,7 +77,7 @@ const tip = () => screen.queryByRole('button', { name: m.hint_about({ name: m.ma
 describe('the page of a mailbox', () => {
 	beforeEach(() => {
 		session.start({
-			user: { id: 'u1', username: 'tobi', role: 'admin' },
+			user: { id: 'u1', username: 'john', role: 'admin' },
 			method: 'password',
 			expires_at: '2026-11-08T12:00:00Z',
 			csrf_token: 'token'

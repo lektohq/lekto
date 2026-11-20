@@ -33,7 +33,7 @@ function held() {
 
 beforeEach(() => {
 	session.start({
-		user: { id: 'user-1', username: 'tobi', role: 'user' },
+		user: { id: 'user-1', username: 'john', role: 'user' },
 		method: 'password',
 		expires_at: '2026-10-18T12:00:00Z',
 		csrf_token: 'token'

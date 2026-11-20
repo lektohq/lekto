@@ -9,7 +9,7 @@ import { stepsOf } from './steps.ts';
 type LogEntry = components['schemas']['LogEntry'];
 type ProcessingStatus = components['schemas']['ProcessingStatus'];
 
-const TOBI = 'u-tobi';
+const JOHN = 'u-john';
 const ERIKA = 'u-erika';
 const MINE = 's-mine';
 const ERIKAS = 's-erika';
@@ -28,13 +28,13 @@ const lookup = {
 		{
 			id: MINE,
 			name: 'Personal',
-			personal_of: TOBI,
+			personal_of: JOHN,
 			role: 'edit',
-			members: [{ user_id: TOBI, role: 'edit', username: 'tobi' }]
+			members: [{ user_id: JOHN, role: 'edit', username: 'john' }]
 		}
 	],
 	users: [
-		{ id: TOBI, username: 'tobi', role: 'user', personal_space_id: MINE },
+		{ id: JOHN, username: 'john', role: 'user', personal_space_id: MINE },
 		{
 			id: ERIKA,
 			username: 'erika',
@@ -45,7 +45,7 @@ const lookup = {
 	]
 } as unknown as Lookup;
 
-const tobi = { id: TOBI, admin: false };
+const john = { id: JOHN, admin: false };
 
 const graph: GraphNode[] = [
 	{ node: 'receive', requires: [], waits_for: [] },
@@ -127,7 +127,7 @@ describe('headlineOf', () => {
 			shown,
 			MINE,
 			lookup,
-			tobi
+			john
 		);
 		expect(headline).toMatchObject({ tone: 'running', action: null });
 		expect(headline.title).toBe(m.run_running_at({ run: 1, steps: m.node_ocr() }));
@@ -146,7 +146,7 @@ describe('headlineOf', () => {
 			shown,
 			MINE,
 			lookup,
-			tobi
+			john
 		);
 		expect(headline.title).toBe(m.run_review({ run: 3 }));
 		expect(headline.action).toBe('filing');
@@ -162,7 +162,7 @@ describe('headlineOf', () => {
 			shown,
 			MINE,
 			lookup,
-			tobi
+			john
 		);
 		expect(past.title).toBe(m.run_review_past({ run: 3 }));
 		expect(past.action).toBeNull();
@@ -181,7 +181,7 @@ describe('headlineOf', () => {
 			shown,
 			MINE,
 			lookup,
-			tobi
+			john
 		);
 		expect(headline.detail).toBe(m.run_why_fields({ fields: m.field_date() }));
 		expect(headline.action).toBe('review');
@@ -202,7 +202,7 @@ describe('headlineOf', () => {
 			shown,
 			MINE,
 			lookup,
-			tobi
+			john
 		);
 		expect(headline.detail).toBe(m.run_why_rule_review());
 	});
@@ -215,7 +215,7 @@ describe('headlineOf', () => {
 			shown,
 			MINE,
 			lookup,
-			tobi
+			john
 		);
 		expect(headline).toEqual({
 			tone: 'red',
@@ -233,16 +233,16 @@ describe('headlineOf', () => {
 			'completed'
 		);
 		const run = { number: 1, current: true, status: 'completed' as const };
-		expect(headlineOf(run, clean, MINE, lookup, tobi).title).toBe(m.run_through({ run: 1 }));
-		const confirmed = entry('judge', 2, 'ok', { confirmed_by: TOBI, outcome_before: 'uncertain' });
+		expect(headlineOf(run, clean, MINE, lookup, john).title).toBe(m.run_through({ run: 1 }));
+		const confirmed = entry('judge', 2, 'ok', { confirmed_by: JOHN, outcome_before: 'uncertain' });
 		const after = steps(
 			NODES.map((node) => state(node, 'ok')),
 			[entry('judge', 1, 'uncertain'), { ...confirmed, model_version: 'person' }],
 			2,
 			'completed'
 		);
-		expect(headlineOf({ ...run, number: 2 }, after, MINE, lookup, tobi).title).toBe(
-			m.run_through_confirmed({ run: 2, name: 'tobi' })
+		expect(headlineOf({ ...run, number: 2 }, after, MINE, lookup, john).title).toBe(
+			m.run_through_confirmed({ run: 2, name: 'john' })
 		);
 	});
 });

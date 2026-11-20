@@ -99,7 +99,7 @@ function routes() {
 describe('the page of a webhook', () => {
 	beforeEach(() => {
 		session.start({
-			user: { id: 'u1', username: 'tobi', role: 'user' },
+			user: { id: 'u1', username: 'john', role: 'user' },
 			method: 'password',
 			expires_at: '2026-10-28T12:00:00Z',
 			csrf_token: 'token'

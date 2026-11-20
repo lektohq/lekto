@@ -6,7 +6,7 @@ import { decidedBy, matrixOf, verdictOf } from './signal-matrix.ts';
 
 type LogEntry = components['schemas']['LogEntry'];
 
-const TOBI = 'u-tobi';
+const JOHN = 'u-john';
 const ERIKA = 'u-erika';
 const MINE = 's-mine';
 const ERIKAS = 's-erika';
@@ -26,13 +26,13 @@ const lookup = {
 		{
 			id: MINE,
 			name: 'Personal',
-			personal_of: TOBI,
+			personal_of: JOHN,
 			role: 'edit',
-			members: [{ user_id: TOBI, role: 'edit', username: 'tobi' }]
+			members: [{ user_id: JOHN, role: 'edit', username: 'john' }]
 		}
 	],
 	users: [
-		{ id: TOBI, username: 'tobi', role: 'user', personal_space_id: MINE },
+		{ id: JOHN, username: 'john', role: 'user', personal_space_id: MINE },
 		{
 			id: ERIKA,
 			username: 'erika',
@@ -43,7 +43,7 @@ const lookup = {
 	]
 } as unknown as Lookup;
 
-const tobi = { id: TOBI, admin: false };
+const john = { id: JOHN, admin: false };
 
 function verdict(fields: unknown[]): LogEntry {
 	return {
@@ -132,7 +132,7 @@ const kinds = (row: { cells: { kind: string }[] }) => row.cells.map((cell) => ce
 
 describe('matrixOf', () => {
 	it('tells per property what each signal said about its value', () => {
-		const rows = matrixOf(verdict([contact, type, space]), true, MINE, lookup, tobi);
+		const rows = matrixOf(verdict([contact, type, space]), true, MINE, lookup, john);
 		expect(rows.map((row) => [row.label, row.value, row.open])).toEqual([
 			[m.field_contact(), 'Muster Bäckerei', false],
 			[m.field_document_type(), 'Lohnabrechnung', false],
@@ -152,10 +152,10 @@ describe('matrixOf', () => {
 
 	it('leaves out what has no candidates, and asks no one in a past run', () => {
 		const date = { field: 'document_date', outcome: 'ok', value: '2025-05-08' };
-		const rows = matrixOf(verdict([date, space]), false, MINE, lookup, tobi);
+		const rows = matrixOf(verdict([date, space]), false, MINE, lookup, john);
 		expect(rows.map((row) => row.field)).toEqual(['space']);
 		expect(rows[0].chip).toBe(m.matrix_chip_unsure());
-		expect(matrixOf(undefined, false, MINE, lookup, tobi)).toEqual([]);
+		expect(matrixOf(undefined, false, MINE, lookup, john)).toEqual([]);
 	});
 
 	it('counts text evidence for another value, and what speaks against a contact by its rule', () => {
@@ -186,7 +186,7 @@ describe('matrixOf', () => {
 				}
 			]
 		};
-		const [row] = matrixOf(verdict([proven]), true, MINE, lookup, tobi);
+		const [row] = matrixOf(verdict([proven]), true, MINE, lookup, john);
 		// The classifier names the bakery, which the text proves: against MUSTERVEREIN; the identifier
 		// itself too.
 		expect(kinds(row)).toEqual(['names', 'contradicts', 'names', 'contradicts']);
@@ -196,7 +196,7 @@ describe('matrixOf', () => {
 		unproven.candidates[1].sources = [
 			{ signal: 'signal_classifier', names: true, score: 0.9, threshold: 0.8 }
 		];
-		const [other] = matrixOf(verdict([unproven]), true, MINE, lookup, tobi);
+		const [other] = matrixOf(verdict([unproven]), true, MINE, lookup, john);
 		expect(kinds(other)).toEqual(['names', 'other', 'names', 'silent']);
 	});
 
@@ -211,7 +211,7 @@ describe('matrixOf', () => {
 			{ contact: BAKERY, space: MINE }
 		);
 		expect([...decided]).toEqual([['space', MINE]]);
-		const rows = matrixOf(verdict([space]), false, MINE, lookup, tobi, decided);
+		const rows = matrixOf(verdict([space]), false, MINE, lookup, john, decided);
 		expect(rows[0]).toMatchObject({ open: false, chip: m.matrix_chip_by_hand() });
 		expect(rows[0].value).not.toContain('Erika');
 	});

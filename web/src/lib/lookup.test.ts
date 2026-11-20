@@ -4,7 +4,7 @@ import { PageLookup } from './lookup.svelte.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 
-const USERS = [{ id: 'u1', username: 'tobi', role: 'user', active: true }];
+const USERS = [{ id: 'u1', username: 'john', role: 'user', active: true }];
 
 describe('the master data of a page', () => {
 	it('keeps the newest answer, not the slowest', async () => {

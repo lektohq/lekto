@@ -136,7 +136,7 @@ def test_a_field_check_stores_its_reasons_beside_the_english_text() -> None:
             "'ABC' is no personnel number (3 to 30 letters and digits, one a digit)",
         ),
         (
-            lambda: check_new_password("short", "tobi"),
+            lambda: check_new_password("short", "john"),
             ReasonCode.PASSWORD_TOO_SHORT,
             {"min": PASSWORD_MIN_LENGTH},
             f"the password must have at least {PASSWORD_MIN_LENGTH} characters",

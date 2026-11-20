@@ -68,7 +68,7 @@ beforeEach(() => {
 	state.url = new URL('http://lekto/ui/documents');
 	state.entry = {};
 	session.start({
-		user: { id: OWNER, username: 'tobi', role: 'user' },
+		user: { id: OWNER, username: 'john', role: 'user' },
 		method: 'password',
 		expires_at: '2026-10-18T12:00:00Z',
 		csrf_token: 'token'
