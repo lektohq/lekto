@@ -13,6 +13,7 @@
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 	import Segmented, { type Segment } from '#lib/components/Segmented.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import { CloseGuard } from '#lib/close-guard.svelte.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { phone } from '#lib/phone.svelte.ts';
@@ -33,7 +34,10 @@
 	// footer, on a phone instead of "Abbrechen" in the bar. An editor whose body is a field of
 	// things to work on (the pages of "PDF bearbeiten") keeps its tools in place: `top` stands
 	// fixed under the title, `bottom` fixed under the body, and only the body scrolls;
-	// `footNote` says at the start of the footer how it is worked (the keyboard).
+	// `footNote` says at the start of the footer how it is worked (the keyboard). Closing over
+	// what was typed by Escape, a click beside it or the X asks first
+	// (`lib/close-guard.svelte.ts`); "Abbrechen" does not. An editor whose parts save themselves
+	// says itself whether one of them holds something unsaved (`dirty`).
 	let {
 		open = $bindable(false),
 		title,
@@ -57,6 +61,7 @@
 		top,
 		bottom,
 		footNote,
+		dirty,
 		children: body
 	}: {
 		open?: boolean;
@@ -93,12 +98,19 @@
 		bottom?: Snippet;
 		/** At the start of the desktop footer, muted: how the body is worked. */
 		footNote?: string;
+		/** Whether the editor holds something unsaved; without it, whether something was typed. */
+		dirty?: boolean;
 		children: Snippet;
 	} = $props();
 
 	let confirming = $state(false);
 	let staying = false;
 	let scroller = $state<HTMLElement | null>(null);
+	const guard = new CloseGuard();
+
+	$effect(() => {
+		if (open) guard.start();
+	});
 
 	$effect(() => {
 		void tab;
@@ -209,7 +221,7 @@
 	{/if}
 {/snippet}
 
-<Dialog.Root bind:open>
+<Dialog.Root bind:open={() => open, (next) => (next || guard.wants(dirty)) && (open = next)}>
 	<Dialog.Content
 		{size}
 		showCloseButton={!phone.current}
@@ -221,6 +233,7 @@
 		{#if action}
 			<AsyncForm
 				class="flex min-h-0 flex-1 flex-col"
+				onchanged={guard.changed}
 				action={async () => {
 					// As it was when the step was submitted: the step may change meanwhile.
 					staying = stay;
@@ -237,6 +250,16 @@
 		{/if}
 	</Dialog.Content>
 </Dialog.Root>
+
+<ConfirmDialog
+	bind:open={guard.asking}
+	title={m.unsaved_title()}
+	description={m.unsaved_hint()}
+	confirmLabel={m.unsaved_discard()}
+	onconfirm={async () => {
+		open = false;
+	}}
+/>
 
 {#if ondelete}
 	<ConfirmDialog

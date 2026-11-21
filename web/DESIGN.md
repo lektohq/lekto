@@ -949,6 +949,13 @@ the phone a full-screen editor carries the same two actions in its top bar.
   a tab, the back button, closing the dialog or closing the browser (`beforeNavigate`,
   `beforeunload`). The question is a `ConfirmDialog` with "Verwerfen" and "Weiter bearbeiten":
   `UnsavedGuard`, or `AsyncForm` with `onchanged`.
+- **A dialog with a form** (`FormDialog`, `EditorShell`, the template editor) asks the same
+  question before Escape, a click beside it or its X close it over what was typed
+  (`lib/close-guard.svelte.ts`). Typing counts, in a text field or an area: a tick or a choice is
+  set again in a tap, a search only narrows. "Abbrechen" and the phone's bar close at once: the
+  person said what they want, as "Abbrechen" of a page form does. An editor whose parts save
+  themselves says whether one holds something unsaved (`dirty`); a dialog whose text is nothing
+  to lose (a code) is `guarded={false}`.
 - **A change is the person's own:** what they changed since the form started. What a form
   starts with (the model's suggestions in the inbox) is no change, even where it differs from
   the stored document; leaving loses nothing then.

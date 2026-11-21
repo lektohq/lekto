@@ -39,6 +39,14 @@
 	let problem = $state<string | null>(null);
 	let busy = $state(false);
 	let password = $state('');
+	// What a part of the profile holds unsaved: the dialog asks before it closes over it.
+	const unsaved = $state({ person: false, numbers: false });
+	$effect(() => {
+		if (open) {
+			unsaved.person = false;
+			unsaved.numbers = false;
+		}
+	});
 	let revoke = $state(false);
 	let resetError = $state<string | null>(null);
 	let confirm = $state<'totp' | 'oidc' | null>(null);
@@ -174,6 +182,7 @@
 	shortTitle={m.user_tab_account()}
 	tabs={account && !problem ? parts : undefined}
 	class={TALL}
+	dirty={unsaved.person || unsaved.numbers}
 >
 	{#if problem}
 		<LoadProblem {problem} onretry={() => load()} />
@@ -252,10 +261,22 @@
 			{/if}
 		{:else if profile}
 			<div class={[part !== 'profile' && 'hidden']}>
-				<ProfileForm data={profile} userId={account.id} part="person" onsaved={profileSaved} />
+				<ProfileForm
+					data={profile}
+					userId={account.id}
+					part="person"
+					onsaved={profileSaved}
+					ondirty={(dirty) => (unsaved.person = dirty)}
+				/>
 			</div>
 			<div class={[part !== 'identifiers' && 'hidden']}>
-				<ProfileForm data={profile} userId={account.id} part="numbers" onsaved={profileSaved} />
+				<ProfileForm
+					data={profile}
+					userId={account.id}
+					part="numbers"
+					onsaved={profileSaved}
+					ondirty={(dirty) => (unsaved.numbers = dirty)}
+				/>
 			</div>
 		{:else if part !== 'account'}
 			<Loading class="text-sm" />

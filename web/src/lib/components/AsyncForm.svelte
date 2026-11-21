@@ -17,7 +17,7 @@
 		ondone: () => void;
 		class?: string;
 		/** Something in the form was typed or chosen (for a question before leaving). */
-		onchanged?: () => void;
+		onchanged?: (event: Event) => void;
 		children: Snippet<[{ busy: boolean; error: string | null }]>;
 	} = $props();
 

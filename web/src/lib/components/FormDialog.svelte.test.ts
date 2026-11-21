@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/svelte';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { createRawSnippet } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -63,6 +63,89 @@ describe('FormDialog', () => {
 		);
 		await user.click(screen.getByRole('button', { name: m.cancel() }));
 		await waitFor(() => expect(props.open).toBe(false));
+	});
+
+	describe('closing over what was typed', () => {
+		const question = () => screen.queryByRole('alertdialog', { name: m.unsaved_title() });
+
+		it('asks before Escape drops it, and stays open on "Abbrechen" of the question', async () => {
+			const user = userEvent.setup();
+			const props = dialog(vi.fn());
+			await user.type(await screen.findByLabelText('Name'), 'Haushalt');
+			await user.keyboard('{Escape}');
+			const asked = await screen.findByRole('alertdialog', { name: m.unsaved_title() });
+			expect(props.open).toBe(true);
+			await user.click(within(asked).getByRole('button', { name: m.cancel() }));
+			await waitFor(() => expect(question()).toBeNull());
+			expect(props.open).toBe(true);
+			expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Haushalt');
+		});
+
+		it('closes once the person discards', async () => {
+			const user = userEvent.setup();
+			const props = dialog(vi.fn());
+			await user.type(await screen.findByLabelText('Name'), 'Haushalt');
+			await user.keyboard('{Escape}');
+			const asked = await screen.findByRole('alertdialog', { name: m.unsaved_title() });
+			await user.click(within(asked).getByRole('button', { name: m.unsaved_discard() }));
+			await waitFor(() => expect(props.open).toBe(false));
+		});
+
+		it('asks before the X drops it', async () => {
+			const user = userEvent.setup();
+			const props = dialog(vi.fn());
+			await user.type(await screen.findByLabelText('Name'), 'Haushalt');
+			await user.click(screen.getByRole('button', { name: m.close() }));
+			expect(await screen.findByRole('alertdialog', { name: m.unsaved_title() })).toBeTruthy();
+			expect(props.open).toBe(true);
+		});
+
+		it('closes at once with nothing typed, and on "Abbrechen" with something typed', async () => {
+			const user = userEvent.setup();
+			const untouched = dialog(vi.fn());
+			await screen.findByLabelText('Name');
+			await user.keyboard('{Escape}');
+			await waitFor(() => expect(untouched.open).toBe(false));
+			expect(question()).toBeNull();
+			cleanup();
+
+			// "Abbrechen" says what the person wants: no question.
+			const typed = dialog(vi.fn());
+			await user.type(await screen.findByLabelText('Name'), 'Haushalt');
+			await user.click(screen.getByRole('button', { name: m.cancel() }));
+			await waitFor(() => expect(typed.open).toBe(false));
+			expect(question()).toBeNull();
+		});
+
+		it('asks again in a dialog opened anew only once something is typed again', async () => {
+			const user = userEvent.setup();
+			const props = dialog(vi.fn());
+			await user.type(await screen.findByLabelText('Name'), 'Haushalt');
+			await user.click(screen.getByRole('button', { name: m.cancel() }));
+			await waitFor(() => expect(props.open).toBe(false));
+			props.open = true;
+			await screen.findByLabelText('Name');
+			await user.keyboard('{Escape}');
+			await waitFor(() => expect(props.open).toBe(false));
+			expect(question()).toBeNull();
+		});
+
+		it('does not ask where what is typed is nothing to lose (`guarded={false}`)', async () => {
+			const user = userEvent.setup();
+			const props = $state({
+				open: true,
+				title: 'Code',
+				submitLabel: 'Save',
+				action: vi.fn(),
+				guarded: false,
+				children
+			});
+			render(FormDialog, props);
+			await user.type(await screen.findByLabelText('Name'), '123456');
+			await user.keyboard('{Escape}');
+			await waitFor(() => expect(props.open).toBe(false));
+			expect(question()).toBeNull();
+		});
 	});
 
 	describe('on a phone', () => {

@@ -34,12 +34,16 @@
 		data,
 		userId = null,
 		part = 'all',
-		onsaved
+		onsaved,
+		ondirty
 	}: {
 		data: ProfileData;
 		userId?: string | null;
 		part?: 'person' | 'numbers' | 'all';
 		onsaved?: (profile: Profile) => void;
+		/** Whether the form holds something unsaved, whenever that changes: a dialog around it
+		 * asks before it closes. */
+		ondirty?: (dirty: boolean) => void;
 	} = $props();
 
 	const uid = $props.id();
@@ -92,6 +96,7 @@
 	}
 
 	const dirty = $derived(JSON.stringify(body()) !== saved);
+	$effect(() => ondirty?.(dirty));
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();

@@ -249,6 +249,37 @@ describe('TemplateInput', () => {
 		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 		expect((screen.getByLabelText('Reason') as HTMLTextAreaElement).value).toBe('Check');
 	});
+
+	it('asks before Escape drops a changed draft, and keeps it on "Abbrechen" of the question', async () => {
+		const user = userEvent.setup();
+		render(TemplateInput, { id: 'reason', maxlength: 500, label: 'Reason', value: 'Check' });
+		await user.click(await screen.findByRole('button', { name: m.template_editor_open() }));
+		const sheet = await screen.findByRole('dialog');
+		const draft = (await within(sheet).findByLabelText(m.template_editor())) as HTMLTextAreaElement;
+		await user.type(draft, ' it');
+		await user.keyboard('{Escape}');
+		const asked = await screen.findByRole('alertdialog', { name: m.unsaved_title() });
+		await user.click(within(asked).getByRole('button', { name: m.cancel() }));
+		await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+		// The editor is still there, with the draft.
+		expect(draft.value).toBe('Check it');
+
+		await user.keyboard('{Escape}');
+		const again = await screen.findByRole('alertdialog', { name: m.unsaved_title() });
+		await user.click(within(again).getByRole('button', { name: m.unsaved_discard() }));
+		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+		expect((screen.getByLabelText('Reason') as HTMLTextAreaElement).value).toBe('Check');
+	});
+
+	it('closes the editor at once on Escape while the draft is as it was', async () => {
+		const user = userEvent.setup();
+		render(TemplateInput, { id: 'reason', maxlength: 500, label: 'Reason', value: 'Check' });
+		await user.click(await screen.findByRole('button', { name: m.template_editor_open() }));
+		await screen.findByRole('dialog');
+		await user.keyboard('{Escape}');
+		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+		expect(screen.queryByRole('alertdialog')).toBeNull();
+	});
 });
 
 describe('a template that sets a field', () => {

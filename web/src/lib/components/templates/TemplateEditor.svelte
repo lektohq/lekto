@@ -9,6 +9,8 @@
 	} from '#lib/components/templates/ReferencePicker.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
+	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
+	import { CloseGuard } from '#lib/close-guard.svelte.ts';
 	import { latest } from '#lib/latest.ts';
 	import { fieldText } from '#lib/card-fields.ts';
 	import { fieldTypeLabel } from '#lib/fields.ts';
@@ -71,8 +73,15 @@
 	let reference = $state<Reference | null>(null);
 	let preview = $state<Preview | null>(null);
 
+	// Escape, a click beside the sheet and its X ask before a changed draft is dropped
+	// (`lib/close-guard.svelte.ts`); "Abbrechen" drops it at once.
+	const guard = new CloseGuard();
+
 	$effect(() => {
-		if (open) draft = untrack(() => value);
+		if (open) {
+			draft = untrack(() => value);
+			guard.start();
+		}
 	});
 
 	// The template with the reference document, a moment after typing stops; the answer to an
@@ -132,7 +141,9 @@
 	}
 </script>
 
-<Sheet.Root bind:open>
+<Sheet.Root
+	bind:open={() => open, (next) => (next || guard.wants(draft !== value)) && (open = next)}
+>
 	<Sheet.Content
 		side="right"
 		class="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-2xl"
@@ -278,6 +289,16 @@
 		</Sheet.Footer>
 	</Sheet.Content>
 </Sheet.Root>
+
+<ConfirmDialog
+	bind:open={guard.asking}
+	title={m.unsaved_title()}
+	description={m.unsaved_hint()}
+	confirmLabel={m.unsaved_discard()}
+	onconfirm={async () => {
+		open = false;
+	}}
+/>
 
 {#snippet row(path: string, name: string, unknown = false)}
 	{@const shown = preview?.values && !unknown ? (preview.values[path] ?? null) : undefined}

@@ -36,6 +36,7 @@
 
 <FormDialog
 	bind:open
+	guarded={false}
 	{title}
 	{description}
 	{submitLabel}
