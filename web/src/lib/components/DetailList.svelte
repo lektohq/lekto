@@ -16,7 +16,8 @@
 </script>
 
 <dl class={cn('grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm', className)}>
-	{#each rows as row (row[0])}
+	<!-- By place: two rows may carry one label (a field named like a built-in one). -->
+	{#each rows as row, index (index)}
 		<dt class="text-muted-foreground">{row[0]}</dt>
 		<dd class="break-words">
 			{#if row.length === 3}{@render row[1](

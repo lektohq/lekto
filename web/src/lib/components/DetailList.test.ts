@@ -22,4 +22,24 @@ describe('a detail list', () => {
 			'Ihre Rechnung'
 		]);
 	});
+
+	it('shows two rows of one label: a field may be named like a built-in one', () => {
+		const { container } = render(DetailList, {
+			rows: [
+				['Titel', 'Rechnung 12345'],
+				['Titel', 'aus dem Feld'],
+				['Kontakt', 'Muster Bäckerei']
+			]
+		});
+		expect([...container.querySelectorAll('dt')].map((node) => node.textContent)).toEqual([
+			'Titel',
+			'Titel',
+			'Kontakt'
+		]);
+		expect([...container.querySelectorAll('dd')].map((node) => node.textContent)).toEqual([
+			'Rechnung 12345',
+			'aus dem Feld',
+			'Muster Bäckerei'
+		]);
+	});
 });
