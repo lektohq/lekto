@@ -9,7 +9,8 @@
  *   `_app/immutable/` carry a hash in their name and never change; the others (`shell`) belong
  *   to one version of the app, whose cache goes with it.
  * - `page`: a page of the app, from the network, so that a reload always gets the newest app;
- *   without a connection the app's page from the cache, which then says it is offline.
+ *   without a connection the app's page from the cache, which then says it is offline. The same
+ *   when a proxy answers for a Lekto that is not there (`unreachable`).
  * - `share`: files another app shares with the installed one (the manifest's `share_target`,
  *   `POST <base>/share`): kept until the page `<base>/share` hands them to the upload.
  */
@@ -43,6 +44,14 @@ export function strategy(
 	if (path.startsWith(`${base}/_app/immutable/`)) return 'file';
 	if (shell.has(path)) return 'file';
 	return 'network';
+}
+
+/** Whether a status is a proxy's answer for a server that is not there: Caddy, nginx and Traefik
+ * answer 502, 503 or 504 while Lekto restarts after an update. For a page of the app that is
+ * the same as no connection: the proxy's error page has no way back in the installed app (no
+ * reload button, no address bar), the app's own page says so and offers to try again. */
+export function unreachable(status: number): boolean {
+	return status === 502 || status === 503 || status === 504;
 }
 
 /** The addresses of the files of `static/` the worker keeps (`$app/manifest`'s `assets`, given

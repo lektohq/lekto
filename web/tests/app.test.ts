@@ -15,7 +15,8 @@ import {
 	sharedKey,
 	sharePath,
 	shellPaths,
-	strategy
+	strategy,
+	unreachable
 } from '#lib/app-cache.ts';
 import { BASE } from '#lib/base.ts';
 import { ACCEPT, skipReason } from '#lib/intake.ts';
@@ -133,6 +134,18 @@ function pngSize(dataUrl: string): [number, number] {
 	const view = new DataView(bytes.buffer);
 	return [view.getUint32(16), view.getUint32(20)];
 }
+
+describe('a page while Lekto restarts behind a proxy', () => {
+	// WM-01: the proxy's error page has no way back in the installed app; the worker serves the
+	// app's own page instead, as it does without a connection.
+	it('takes the answers of a proxy for a server that is not there', () => {
+		expect([502, 503, 504].map(unreachable)).toEqual([true, true, true]);
+	});
+
+	it('passes every other answer on', () => {
+		expect([200, 304, 401, 403, 404, 500].map(unreachable)).toEqual(Array(6).fill(false));
+	});
+});
 
 describe('the manifest', () => {
 	const manifest = JSON.parse(manifestText) as {

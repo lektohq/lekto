@@ -69,6 +69,72 @@ describe('loading the session', () => {
 	});
 });
 
+describe('a proxy answering for a Lekto that is not there', () => {
+	// WH-01: Caddy, nginx and Traefik answer 502 while the API restarts. That is no sign-out.
+	const gateway = () => new Response('Bad Gateway', { status: 502 });
+
+	it('keeps user and token when the session cannot be read', async () => {
+		fetchMock.mockResolvedValueOnce(me('jane', 'one'));
+		await session.load();
+		const user = session.user;
+		fetchMock.mockResolvedValueOnce(gateway());
+
+		await expect(session.load()).rejects.toMatchObject({ status: 502 });
+
+		expect(session.user).toBe(user);
+		expect(session.csrfToken).toBe('one');
+		expect(session.version).toBe('0.8.0');
+	});
+
+	it('ends the session only on the word of the API', async () => {
+		fetchMock.mockResolvedValueOnce(me('jane', 'one'));
+		await session.load();
+		fetchMock.mockResolvedValueOnce(json({ type: 'about:blank', title: 'x', status: 401 }, 401));
+
+		expect(await session.load()).toBe(false);
+
+		expect(session.user).toBeNull();
+		expect(session.csrfToken).toBeNull();
+	});
+
+	it('leaves the app as it is when the stream asks who is signed in', async () => {
+		fetchMock.mockResolvedValueOnce(me('jane', 'one'));
+		await session.load();
+		fetchMock.mockResolvedValueOnce(gateway());
+
+		await recheckSession();
+
+		expect(session.user?.id).toBe('jane');
+		expect(events.unauthorized).not.toHaveBeenCalled();
+		expect(events.replaced).not.toHaveBeenCalled();
+	});
+
+	it('stays signed in while the server did not sign out', async () => {
+		fetchMock.mockResolvedValueOnce(me('jane', 'one'));
+		await session.load();
+		fetchMock.mockResolvedValueOnce(gateway());
+
+		await expect(session.logout()).rejects.toMatchObject({ status: 502 });
+
+		expect(session.user?.id).toBe('jane');
+		expect(session.csrfToken).toBe('one');
+	});
+
+	it('forgets the session once the server signed out, or says it has gone', async () => {
+		for (const answer of [
+			() => new Response(null, { status: 204 }),
+			() => json({ type: 'about:blank', title: 'x', status: 401 }, 401)
+		]) {
+			fetchMock.mockResolvedValueOnce(me('jane', 'one'));
+			await session.load();
+			fetchMock.mockResolvedValueOnce(answer());
+			await session.logout();
+			expect(session.user).toBeNull();
+			expect(session.csrfToken).toBeNull();
+		}
+	});
+});
+
 describe('a stale CSRF token', () => {
 	it('is fetched anew for the same user, and the change is repeated', async () => {
 		fetchMock.mockResolvedValueOnce(me('jane', 'old'));

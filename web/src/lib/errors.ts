@@ -1,5 +1,6 @@
 import { toast } from 'svelte-sonner';
 import { ApiError } from '#lib/api/problem.ts';
+import { unreachable } from '#lib/app-cache.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { type Reason, reasonsText } from '#lib/reasons.ts';
 
@@ -19,6 +20,7 @@ export function describeError(error: unknown): string {
 				? m.error_too_many({ seconds: error.retryAfter })
 				: m.error_too_many_later();
 		}
+		if (isGatewayError(error)) return m.error_network();
 		const problem = error.problem;
 		const detail = problem?.reason
 			? reasonsText([problem.reason], problem.detail)
@@ -39,6 +41,14 @@ export function describeError(error: unknown): string {
  * `fetch` rejects with a TypeError then, worded by each browser its own way. */
 export function isNetworkError(error: unknown): boolean {
 	return error instanceof TypeError && /fetch|network|load failed/i.test(error.message);
+}
+
+/** Whether the answer came from a proxy in front of a Lekto that is not there (it restarts
+ * after an update): 502, 503 or 504 without the API's problem details. To the person that is
+ * the same as no answer: the server cannot be reached. Lekto's own 503 (no search, no
+ * classifier) carries its problem and says what is missing. */
+export function isGatewayError(error: unknown): boolean {
+	return error instanceof ApiError && unreachable(error.status) && error.problem === null;
 }
 
 /** Show a failed call as a toast. */

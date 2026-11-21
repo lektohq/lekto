@@ -58,7 +58,20 @@ describe('describeError', () => {
 	});
 
 	it('falls back to the status', () => {
-		expect(describeError(new ApiError(502, null, null))).toBe(m.error_unexpected({ status: 502 }));
+		expect(describeError(new ApiError(500, null, null))).toBe(m.error_unexpected({ status: 500 }));
+	});
+
+	it('names an unreachable server when a proxy answers for it', () => {
+		// WM-01: 502, 503 and 504 without problem details come from the proxy in front.
+		for (const status of [502, 503, 504]) {
+			expect(describeError(new ApiError(status, null, null))).toBe(m.error_network());
+		}
+	});
+
+	it('keeps what the API itself says with a 503', () => {
+		expect(describeError(new ApiError(503, problem(503, 'No search configured.'), null))).toBe(
+			'No search configured.'
+		);
 	});
 });
 

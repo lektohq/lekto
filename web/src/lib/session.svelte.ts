@@ -43,7 +43,9 @@ class Session {
 	 * Who is signed in, from the server; false without a session. Called when the app starts and
 	 * whenever it asks anew (`recheckSession`): the user object is replaced only when something
 	 * about the user changed, so that effects reading `session.user` (the event stream, the
-	 * uploads) do not run again for nothing.
+	 * uploads) do not run again for nothing. Only the API's own "no session" (401) ends the
+	 * session here: any other failure (a proxy answering 502 while Lekto restarts) leaves user and
+	 * token as they are and is thrown, like no answer at all.
 	 */
 	async load(): Promise<boolean> {
 		const { data, error, response } = await api.GET('/api/v1/auth/me');
@@ -55,9 +57,9 @@ class Session {
 			this.shortcutUrl = data.shortcut_url;
 			return true;
 		}
+		if (response.status !== 401) throw await apiError(response, error);
 		this.clear();
-		if (response.status === 401) return false;
-		throw await apiError(response, error);
+		return false;
 	}
 
 	/** Take over a new session (sign-in answer). */
@@ -75,11 +77,13 @@ class Session {
 		this.#csrf = null;
 	}
 
-	/** Sign out on the server, then forget the session; also when the server says it has gone. */
+	/** Sign out on the server, then forget the session; also when the server says it has gone.
+	 * While the server did not sign out (no answer, a 502 of a proxy) the session stays: the
+	 * cookie still holds, and the app must not look signed out. */
 	async logout(): Promise<void> {
 		const { error, response } = await api.POST('/api/v1/auth/logout');
-		this.clear();
 		if (!response.ok && response.status !== 401) throw await apiError(response, error);
+		this.clear();
 	}
 }
 

@@ -15,7 +15,8 @@ import {
 	sharedKey,
 	sharePath,
 	shellPaths,
-	strategy
+	strategy,
+	unreachable
 } from '#lib/app-cache.ts';
 import { BASE as base } from '#lib/base.ts';
 import { type PushPayload, pushText } from '#lib/push-text.ts';
@@ -112,13 +113,18 @@ async function file(request: Request): Promise<Response> {
 }
 
 async function page(request: Request): Promise<Response> {
+	const kept = async () => (await caches.open(CACHE)).match(PAGE);
+	let response: Response;
 	try {
-		return await fetch(request);
+		response = await fetch(request);
 	} catch (error) {
-		const kept = await (await caches.open(CACHE)).match(PAGE);
-		if (kept) return kept;
+		const page = await kept();
+		if (page) return page;
 		throw error;
 	}
+	// A proxy answering for a Lekto that is not there: the app's page, as without a connection.
+	if (unreachable(response.status)) return (await kept()) ?? response;
+	return response;
 }
 
 /** Files another app shared (Android's share sheet, the manifest's `share_target`): kept under a
