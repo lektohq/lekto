@@ -4,7 +4,7 @@ version = "0.0.0.dev0"
 description = "Self-hosted, headless document management system"
 readme = "README.md"
 license = "GPL-3.0-only"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "aioboto3==15.5.0",
     "aiosqlite==0.22.1",
@@ -67,7 +67,7 @@ build-backend = "uv_build"
 
 [tool.ruff]
 line-length = 100
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "N"]

@@ -14,7 +14,7 @@ Outside the Lekto container: Postgres (if used), Garage (if S3 is used), Meilise
 language model, an identity provider. With SQLite and the file system, the database and the files
 live on one volume of the Lekto container.
 
-Image: Debian slim, Python 3.13, OCRmyPDF with Tesseract (German, English), s6-overlay 3.2.3.2,
+Image: Debian slim, Python 3.14, OCRmyPDF with Tesseract (German, English), s6-overlay 3.2.3.2,
 the built web UI in `/opt/lekto/ui` (static files; no Node.js in the image). For `amd64` and
 `arm64`. About 1.4 GB (`docker image inspect`; with Docling, before 0.2, it was 4.6 GB). Nothing secret is part of the image.
 
