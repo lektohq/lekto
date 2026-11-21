@@ -370,6 +370,31 @@ describe('Beam', () => {
 		expect(sheet.querySelectorAll('.ring-primary')).toHaveLength(0);
 	});
 
+	it('marks the same document anew for another source (WB-02)', async () => {
+		// The Beam lives across all pages: the document seen for one search showed the places
+		// of those words when another search, a rule or the inbox opened it again.
+		goTo(LIST, {}, { beam: { ...beam(0), source: { kind: 'search', words: 'Strom Rechnung' } } });
+		render(Beam);
+		const sheet = await screen.findByRole('dialog', { name: 'Stromrechnung März' });
+		await waitFor(() => expect(sheet.querySelectorAll('.ring-primary')).toHaveLength(2));
+
+		goTo(LIST, {}, { beam: { ...beam(0), source: { kind: 'search', words: 'Zahnarzt' } } });
+		expect(await screen.findByText(m.beam_meaning_only())).toBeTruthy();
+		await waitFor(() =>
+			expect(
+				screen.getByRole('dialog', { name: 'Stromrechnung März' }).querySelectorAll('.ring-primary')
+			).toHaveLength(0)
+		);
+
+		goTo('/ui/rules/r1/apply', {}, { beam: { ...beam(0), source: { kind: 'rule', rule: 'r1' } } });
+		await waitFor(() =>
+			expect(
+				screen.getByRole('dialog', { name: 'Stromrechnung März' }).querySelectorAll('.ring-primary')
+			).toHaveLength(3)
+		);
+		expect(screen.queryByText(m.beam_meaning_only())).toBeNull();
+	});
+
 	it('marks where the text conditions of a rule hit, each labelled once', async () => {
 		goTo('/ui/rules/r1/apply', {}, { beam: { ...beam(0), source: { kind: 'rule', rule: 'r1' } } });
 		render(Beam);

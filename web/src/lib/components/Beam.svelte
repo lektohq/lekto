@@ -88,9 +88,12 @@
 			: null
 	);
 	// What the document shown has to mark, where its source tells it for each document: the place
-	// of a value, the open fields of the inbox; the names of the fields.
+	// of a value, the open fields of the inbox; the names of the fields. Kept for one document
+	// of one source: the Beam lives across all pages, and the same document opened from another
+	// search, another rule or the inbox has other places to mark.
 	let ownMarks = $state<{
 		id: string;
+		source: string;
 		place: PlaceOut | null;
 		checks: Check[];
 		hits: TextHit[];
@@ -185,6 +188,7 @@
 	 * (its open fields with the places of their quotes). */
 	async function loadOwn(source: BeamSource, wanted: string) {
 		const current = beginOwn();
+		const from = JSON.stringify(source);
 		try {
 			if (source.kind === 'fact') {
 				const place = await unwrap(
@@ -192,7 +196,7 @@
 						params: { path: { id: wanted, kind: source.identifier, ref: source.ref } }
 					})
 				);
-				if (current()) ownMarks = { id: wanted, place, checks: [], hits: [] };
+				if (current()) ownMarks = { id: wanted, source: from, place, checks: [], hits: [] };
 				return;
 			}
 			if (source.kind === 'search') {
@@ -202,7 +206,9 @@
 						body: { q: source.words }
 					})
 				);
-				if (current()) ownMarks = { id: wanted, place: null, checks: [], hits: [], search };
+				if (current()) {
+					ownMarks = { id: wanted, source: from, place: null, checks: [], hits: [], search };
+				}
 				return;
 			}
 			if (source.kind === 'rule') {
@@ -211,7 +217,9 @@
 						params: { path: { id: source.rule, document_id: wanted } }
 					})
 				);
-				if (current()) ownMarks = { id: wanted, place: null, checks: [], hits: found.hits };
+				if (current()) {
+					ownMarks = { id: wanted, source: from, place: null, checks: [], hits: found.hits };
+				}
 				return;
 			}
 			const found = await unwrap(
@@ -221,17 +229,29 @@
 			if (checks.some((check) => check.field.startsWith('field:')) && fields === null) {
 				fields = await unwrap(api.GET('/api/v1/fields'));
 			}
-			if (current()) ownMarks = { id: wanted, place: null, checks, hits: [] };
+			if (current()) ownMarks = { id: wanted, source: from, place: null, checks, hits: [] };
 		} catch {
 			// The pages show all the same, unmarked.
 		}
 	}
 
+	const ownKey = $derived(beam?.source ? JSON.stringify(beam.source) : null);
+	/** The marks of the document shown, as its source of now names them. */
+	const own = $derived(
+		ownMarks && ownMarks.id === id && ownMarks.source === ownKey ? ownMarks : null
+	);
+
 	$effect(() => {
 		const source = beam?.source;
 		if (!source || source.kind === 'open' || source.kind === 'places') return;
-		if (!id || ownMarks?.id === id) return;
+		if (!id || own) return;
 		void loadOwn(source, id);
+	});
+
+	// Closed: what was marked is over; opened again, the document is asked anew (the fields
+	// that kept it in the inbox may be decided meanwhile).
+	$effect(() => {
+		if (!beam) ownMarks = null;
 	});
 
 	/** A condition's text as a mark's label: one short line. */
@@ -249,21 +269,21 @@
 
 	const place = $derived.by(() => {
 		if (!id) return null;
-		if (ownMarks?.id === id && ownMarks.place) return ownMarks.place;
+		if (own?.place) return own.place;
 		return places && places.key === sourceKey ? (places.byDocument.get(id) ?? null) : null;
 	});
 	// Each place on each of its pages; the fact's own one with its kind and a halo. From the
 	// inbox, each open field's quote with its name, the first with a halo.
 	const marks = $derived.by<Mark[]>(() => {
 		if (beam?.source?.kind === 'review') {
-			if (!ownMarks || ownMarks.id !== id) return [];
-			return ownMarks.checks.flatMap((check, index) =>
+			if (!own) return [];
+			return own.checks.flatMap((check, index) =>
 				marksOf(check.field, fieldName(check.field), check, { pinned: index === 0 })
 			);
 		}
 		if (beam?.source?.kind === 'rule') {
-			if (!ownMarks || ownMarks.id !== id) return [];
-			return ownMarks.hits.flatMap((hit, index) =>
+			if (!own) return [];
+			return own.hits.flatMap((hit, index) =>
 				hit.occurrences.flatMap((occurrence, place) =>
 					occurrence.locations.map((location) => ({
 						key: `hit-${index}-${place}`,
@@ -277,8 +297,8 @@
 			);
 		}
 		if (beam?.source?.kind === 'search') {
-			if (!ownMarks?.search || ownMarks.id !== id) return [];
-			return ownMarks.search.occurrences.flatMap((occurrence, index) =>
+			if (!own?.search) return [];
+			return own.search.occurrences.flatMap((occurrence, index) =>
 				occurrence.locations.map((location) => ({
 					key: `word-${index}`,
 					label: '',
@@ -444,7 +464,7 @@
 			{:else if !document}
 				<Loading class="py-16 text-center" />
 			{:else}
-				{#if ownMarks?.id === id && ownMarks.search?.matched === 0}
+				{#if own?.search?.matched === 0}
 					<p class="pb-2 text-sm text-muted-foreground">{m.beam_meaning_only()}</p>
 				{/if}
 				<DocumentPages
