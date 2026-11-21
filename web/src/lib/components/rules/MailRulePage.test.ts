@@ -8,14 +8,8 @@ import { calls, fakeApi, json } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import MailRulePage from './MailRulePage.svelte';
 
-vi.mock('$app/navigation', () => ({
-	afterNavigate: vi.fn(),
-	beforeNavigate: vi.fn(),
-	goto: vi.fn()
-}));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const RULE = {
 	id: 'r1',
@@ -52,7 +46,6 @@ function serve(patch: () => unknown) {
 }
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	vi.clearAllMocks();
 });
 

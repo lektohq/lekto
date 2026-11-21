@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FieldDefinition } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { TEMPLATES_GUIDE } from '#lib/templates/guide.ts';
@@ -78,12 +78,6 @@ beforeEach(() => {
 		return json({}, 404);
 	});
 	vi.stubGlobal('fetch', fetchMock);
-});
-
-afterEach(() => {
-	vi.unstubAllGlobals();
-	// bits-ui frees the page a moment after a dialog closed; the next test must not wait for it.
-	window.document.body.style.pointerEvents = '';
 });
 
 describe('TemplateInput', () => {

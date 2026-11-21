@@ -2,7 +2,7 @@
 // history by month and the hit rate per field, for the channels and the period chosen.
 import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { formatDuration } from '#lib/duration.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { calls, fakeApi, json } from '#lib/testing/api.ts';
@@ -51,8 +51,6 @@ const report = {
 		{ field: 'field:a4', name: 'Vertrag', verdicts: verdicts(0, 0, 0, 2), early: 0 }
 	]
 };
-
-afterEach(() => vi.unstubAllGlobals());
 
 function serve(body: unknown = report) {
 	const api = fakeApi({ 'GET /api/v1/automation': () => body });

@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { formatDate } from '#lib/i18n.ts';
 import { inbox } from '#lib/inbox.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -36,15 +37,6 @@ const JOBS = {
 	kept_since: '2026-10-20T12:00:00Z'
 };
 
-function signIn(role: 'admin' | 'user') {
-	session.start({
-		user: { id: 'u1', username: 'john', role },
-		method: 'password',
-		expires_at: '2026-10-28T12:00:00Z',
-		csrf_token: 'token'
-	} as never);
-}
-
 function routes(expected: Expected[] = [], suggested = 2) {
 	return fakeApi({
 		'GET /api/v1/expected': () => expected,
@@ -56,7 +48,6 @@ function routes(expected: Expected[] = [], suggested = 2) {
 afterEach(() => {
 	inbox.summary = null;
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 describe('Übersicht', () => {

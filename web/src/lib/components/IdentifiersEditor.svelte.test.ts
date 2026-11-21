@@ -16,13 +16,8 @@ import { calls, fakeApi } from '#lib/testing/api.ts';
 import { goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import IdentifiersEditor from './IdentifiersEditor.svelte';
 
-vi.mock('$app/navigation', async () => ({
-	beforeNavigate: vi.fn(),
-	goto: (await import('#lib/testing/page-state.svelte.ts')).fakeGoto
-}));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/app-navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const WORK = {
 	id: 'p1',
@@ -232,7 +227,6 @@ describe('IdentifiersEditor, a user’s identifiers at contacts', () => {
 
 describe('IdentifiersEditor, where a learned one stands', () => {
 	afterEach(() => {
-		vi.unstubAllGlobals();
 		goTo('/ui/inbox');
 	});
 

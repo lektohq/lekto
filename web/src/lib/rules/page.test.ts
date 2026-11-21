@@ -1,9 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { calls, fakeApi, json } from '#lib/testing/api.ts';
 import { RuleLoader } from './page.svelte.ts';
-
-afterEach(() => vi.unstubAllGlobals());
 
 const lookups = (api: ReturnType<typeof fakeApi>) =>
 	calls(api).filter((call) => call === 'GET /api/v1/users').length;

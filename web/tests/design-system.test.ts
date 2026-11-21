@@ -955,6 +955,32 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('takes what every test needs from lib/testing and the setup, never from a copy', () => {
+		// The sign-in, the stand-ins for `$app`, the globals a test replaced and the pointer a
+		// dialog took stood in every file anew and had drifted apart (`web/README.md`, "Layout").
+		const tests = import.meta.glob<string>('/src/**/*.test.ts', {
+			query: '?raw',
+			import: 'default',
+			eager: true
+		});
+		const COPIES: Record<string, RegExp> = {
+			'signIn (lib/testing/session.ts)': /session\.start\(\{\s*user:/,
+			'navigation.ts (lib/testing)':
+				/vi\.mock\('\$app\/navigation', \(\) => \(\{\s*(?:(?:goto|beforeNavigate|afterNavigate): vi\.fn\(\),?\s*)+\}\)\)/,
+			'app-state.ts, app-navigation.ts (lib/testing)':
+				/import\('#lib\/testing\/page-state\.svelte\.ts'\)\)\.(?:testPage|fakeGoto)/,
+			'unstubGlobals (vite.config.ts)': /(?:after|before)Each\([^;]*?vi\.unstubAllGlobals\(\)/,
+			'the pointer (tests/setup.ts)': /pointerEventsCheck|body\.style\.pointerEvents = /
+		};
+		expect(
+			Object.entries(tests).flatMap(([path, source]) =>
+				Object.entries(COPIES)
+					.filter(([, copy]) => copy.test(source))
+					.map(([shared]) => `${path}: ${shared}`)
+			)
+		).toEqual([]);
+	});
+
 	it('writes the API prefix once, beside the typed calls that need it as their type', () => {
 		// `BASE_API` in `lib/api/base.ts`; `api.GET('/api/v1/…')` keeps the literal, which
 		// openapi-fetch reads as the path's type.

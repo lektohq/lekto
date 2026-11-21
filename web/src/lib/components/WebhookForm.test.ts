@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { choose, selectedValue } from '#lib/testing/select.ts';
 import { session } from '#lib/session.svelte.ts';
@@ -59,12 +60,7 @@ const stored: Webhook = {
 };
 
 beforeEach(() => {
-	session.start({
-		user: { id: 'erika', username: 'erika', role: 'user' },
-		method: 'password',
-		expires_at: '2026-10-26T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('user', { id: 'erika', username: 'erika' });
 	sent.length = 0;
 	fetchMock = fakeApi();
 	fetchMock.mockImplementation(async (request) => {
@@ -80,7 +76,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 describe('WebhookForm', () => {
@@ -191,12 +186,7 @@ describe('WebhookForm', () => {
 	});
 
 	it('lets an admin make a webhook serve as a model call, with its time to answer', async () => {
-		session.start({
-			user: { id: 'erika', username: 'erika', role: 'admin' },
-			method: 'password',
-			expires_at: '2026-10-26T12:00:00Z',
-			csrf_token: 'token'
-		});
+		signIn('admin', { id: 'erika', username: 'erika' });
 		render(WebhookForm, { webhook: stored, cancelHref: '/ui/webhooks/hook', ondone: () => {} });
 		const user = userEvent.setup();
 		await choose(
@@ -215,12 +205,7 @@ describe('WebhookForm', () => {
 	});
 
 	it('lets an admin take the model call away', async () => {
-		session.start({
-			user: { id: 'boss', username: 'boss', role: 'admin' },
-			method: 'password',
-			expires_at: '2026-10-26T12:00:00Z',
-			csrf_token: 'token'
-		});
+		signIn('admin', { id: 'boss', username: 'boss' });
 		const serving = { ...stored, model_call: { kind: 'extract' as const, timeout_seconds: 300 } };
 		render(WebhookForm, { webhook: serving, cancelHref: '/ui/webhooks/hook', ondone: () => {} });
 		const user = userEvent.setup();
@@ -327,12 +312,7 @@ describe('WebhookForm', () => {
 		});
 
 		it('asks after only the model call was chosen', async () => {
-			session.start({
-				user: { id: 'erika', username: 'erika', role: 'admin' },
-				method: 'password',
-				expires_at: '2026-10-26T12:00:00Z',
-				csrf_token: 'token'
-			});
+			signIn('admin', { id: 'erika', username: 'erika' });
 			open();
 			await choose(
 				userEvent.setup(),

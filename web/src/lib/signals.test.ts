@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
+import { signIn } from '#lib/testing/session.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
@@ -202,14 +203,7 @@ describe('the labels in the fields node', () => {
 });
 
 describe('the space in the signals and the rules', () => {
-	beforeEach(() =>
-		session.start({
-			user: { id: '0199a6c4-0000-7000-8000-000000000001', username: 'john', role: 'user' },
-			method: 'password',
-			expires_at: '2026-10-22T12:00:00Z',
-			csrf_token: 'token'
-		} as never)
-	);
+	beforeEach(() => signIn('user', { id: '0199a6c4-0000-7000-8000-000000000001' }));
 	afterEach(() => session.clear());
 
 	const ME = '0199a6c4-0000-7000-8000-000000000001';

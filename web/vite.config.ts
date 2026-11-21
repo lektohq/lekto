@@ -64,6 +64,8 @@ export default defineConfig({
 		// (`vi.stubEnv('TZ', …)`), and gets this one back.
 		env: { TZ: 'Europe/Berlin' },
 		unstubEnvs: true,
+		// What a test puts in the place of a global (`fetch`, `EventSource`) is gone before the next.
+		unstubGlobals: true,
 		// The colour tests read the palette's tokens from it (`?raw`).
 		css: { include: [/app\.css/] },
 		// Room for several waits of `asyncUtilTimeout` (tests/setup.ts) in one test on a busy runner.

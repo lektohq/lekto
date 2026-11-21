@@ -43,7 +43,6 @@ beforeEach(() => {
 afterEach(() => {
 	session.clear();
 	setSessionHooks(null);
-	vi.unstubAllGlobals();
 });
 
 describe('loading the session', () => {

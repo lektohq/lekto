@@ -9,6 +9,7 @@ import type { GraphNode } from '#lib/pipeline.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import DocumentProcessing from './DocumentProcessing.svelte';
 import { fakeApi, json } from '#lib/testing/api.ts';
+import { documentOf } from '#lib/testing/documents.ts';
 
 type Document = components['schemas']['DocumentDetails'];
 
@@ -18,9 +19,7 @@ vi.mock('$app/navigation', () => ({
 		(await import('#lib/testing/page-state.svelte.ts')).goTo(href, { id: 'doc-1' })
 	)
 }));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 let fetchMock = fakeApi();
 
@@ -34,7 +33,13 @@ const graph: GraphNode[] = [
 	{ node: 'file', requires: ['judge'], waits_for: [] }
 ];
 
-function state(node: string, outcome: string | null, status = 'done') {
+type NodeState = Document['processing']['nodes'][number];
+
+function state(
+	node: NodeState['node'],
+	outcome: NodeState['outcome'],
+	status: NodeState['status'] = 'done'
+): NodeState {
 	return {
 		node,
 		status,
@@ -44,12 +49,12 @@ function state(node: string, outcome: string | null, status = 'done') {
 	};
 }
 
-function documentAt(run: number, status: string, nodes: unknown[]): Document {
-	return {
-		id: 'doc-1',
-		space_id: 's-mine',
-		processing: { status, run, nodes }
-	} as unknown as Document;
+function documentAt(
+	run: number,
+	status: Document['processing']['status'],
+	nodes: Document['processing']['nodes']
+): Document {
+	return documentOf({ space_id: 's-mine', processing: { status, run, vision: false, nodes } });
 }
 
 const document = documentAt(1, 'review', [
@@ -174,10 +179,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	desktop.override(null);
-	// A dialog makes the page unclickable until it has closed; the next test must not wait.
-	window.document.body.style.pointerEvents = '';
 });
 
 describe('DocumentProcessing', () => {
@@ -361,12 +363,11 @@ describe('DocumentProcessing', () => {
 		// The log of run 1 stopped for review; the document keeps that its first run failed.
 		const again = { ...judged, run: 2, outcome: 'ok', reason: null };
 		serve([proposed, judged, again], { signal_llm: [exchange] });
-		const runs = (first_lane: Document['first_lane']) =>
-			({
-				...document,
-				first_lane,
-				processing: { ...document.processing, run: 2 }
-			}) as unknown as Document;
+		const runs = (first_lane: Document['first_lane']) => ({
+			...document,
+			first_lane,
+			processing: { ...document.processing, run: 2 }
+		});
 		const first = () =>
 			within(screen.getByRole('region', { name: m.log_runs() })).getByRole('button', {
 				name: new RegExp(m.log_run({ run: 1 }))

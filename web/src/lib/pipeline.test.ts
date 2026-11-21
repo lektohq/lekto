@@ -162,7 +162,6 @@ describe('hasText', () => {
 
 describe('the pipeline of the installation', () => {
 	afterEach(() => {
-		vi.unstubAllGlobals();
 		forgetPipeline();
 	});
 

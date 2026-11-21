@@ -92,7 +92,6 @@ function editor(initial: Lens | null = null) {
 
 afterEach(() => {
 	requests.length = 0;
-	vi.unstubAllGlobals();
 });
 
 describe('the lens editor', () => {

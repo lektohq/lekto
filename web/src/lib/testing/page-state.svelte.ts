@@ -1,7 +1,7 @@
 /**
  * A stand-in for SvelteKit's `page` from `$app/state` that pages react to, for tests that move
- * from one address to another: `vi.mock('$app/state', async () => ({ page: (await
- * import('#lib/testing/page-state.svelte.ts')).testPage }))`, then `goTo(…)`.
+ * from one address to another: `vi.mock('$app/state', () => import('#lib/testing/app-state.ts'))`,
+ * then `goTo(…)`.
  */
 export const testPage = $state<{
 	url: URL;
@@ -32,7 +32,7 @@ export function goTo(
 }
 
 /** A stand-in for `goto` of `$app/navigation` that keeps the states of the history entries:
- * `vi.mock('$app/navigation', async () => ({ goto: (await import(…)).fakeGoto }))`, with
+ * `vi.mock('$app/navigation', () => import('#lib/testing/app-navigation.ts'))`, with
  * `history.back` spied on by `fakeBack`. */
 export async function fakeGoto(
 	url: string | URL,

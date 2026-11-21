@@ -7,11 +7,7 @@ import { session } from '#lib/session.svelte.ts';
 import Page from './+page.svelte';
 import { json } from '#lib/testing/api.ts';
 
-vi.mock('$app/navigation', () => ({
-	afterNavigate: vi.fn(),
-	beforeNavigate: vi.fn(),
-	goto: vi.fn()
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
 
@@ -43,7 +39,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 async function enterPassword() {

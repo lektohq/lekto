@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/svelte';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { json } from '#lib/testing/api.ts';
 import type { Mailbox } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -43,10 +43,6 @@ describe('IntakeTab', () => {
 			'fetch',
 			vi.fn(async () => json([MAILBOX]))
 		);
-	});
-
-	afterEach(() => {
-		vi.unstubAllGlobals();
 	});
 
 	it('shows a mail left out because it was too large', async () => {

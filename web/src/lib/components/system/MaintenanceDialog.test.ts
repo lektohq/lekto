@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { toast } from 'svelte-sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import { signIn } from '#lib/testing/session.ts';
 import { session } from '#lib/session.svelte.ts';
 import { calls, fakeApi } from '#lib/testing/api.ts';
 import { phone } from '#lib/phone.svelte.ts';
@@ -34,15 +35,6 @@ function routes(logoFetch = true) {
 	});
 }
 
-function signIn(role: 'admin' | 'user') {
-	session.start({
-		user: { id: role, username: role, role },
-		method: 'password',
-		expires_at: '2026-10-25T12:00:00Z',
-		csrf_token: 'token'
-	});
-}
-
 const onqueued = vi.fn();
 
 beforeEach(() => signIn('admin'));
@@ -50,7 +42,6 @@ beforeEach(() => signIn('admin'));
 afterEach(() => {
 	phone.override(null);
 	session.clear();
-	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 });
 
@@ -91,7 +82,7 @@ describe('the maintenance dialog', () => {
 		await waitFor(() => expect(success).toHaveBeenCalledWith(m.maintenance_queued_none()));
 		await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
 		// The closed dialog still holds the page's pointer events for a moment.
-		const user = userEvent.setup({ pointerEventsCheck: 0 });
+		const user = userEvent.setup();
 		const pages = screen.getByText(m.maintenance_pages_name()).closest('li') as HTMLElement;
 		await user.click(within(pages).getByRole('button', { name: m.maintenance_run() }));
 		await user.click(

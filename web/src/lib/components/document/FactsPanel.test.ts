@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { calls, fakeApi } from '#lib/testing/api.ts';
 import type { Facts } from '#lib/facts.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
@@ -128,10 +128,6 @@ beforeEach(() => {
 	// Every change succeeds; the panel reloads through `onchanged`.
 	fetchMock = fakeApi();
 	vi.stubGlobal('fetch', fetchMock);
-});
-
-afterEach(() => {
-	vi.unstubAllGlobals();
 });
 
 describe('FactsPanel', () => {

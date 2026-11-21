@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { json } from '#lib/testing/api.ts';
 import type { FieldDefinition, Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -18,8 +18,6 @@ const lookup = {
 	spaces: [],
 	users: []
 } as unknown as Lookup;
-
-afterEach(() => vi.unstubAllGlobals());
 
 describe('the switch between a fixed value and a template', () => {
 	it('stays where it is while the person types', async () => {

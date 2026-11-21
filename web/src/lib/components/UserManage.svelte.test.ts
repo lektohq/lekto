@@ -2,17 +2,14 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import { signIn } from '#lib/testing/session.ts';
 import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import UserManage from './UserManage.svelte';
 import { fakeApi, json } from '#lib/testing/api.ts';
 import { choose, selectedValue } from '#lib/testing/select.ts';
 
-vi.mock('$app/navigation', () => ({
-	afterNavigate: vi.fn(),
-	beforeNavigate: vi.fn(),
-	goto: vi.fn()
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 
 let fetchMock = fakeApi();
 
@@ -40,12 +37,7 @@ const profile = {
 };
 
 beforeEach(() => {
-	session.start({
-		user: { id: 'erika', username: 'erika', role: 'admin' },
-		method: 'password',
-		expires_at: '2026-10-14T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('admin', { id: 'erika', username: 'erika' });
 	fetchMock = fakeApi();
 	fetchMock.mockImplementation(async (request) => {
 		const path = new URL(request.url).pathname;
@@ -63,7 +55,6 @@ beforeEach(() => {
 afterEach(() => {
 	phone.override(null);
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 describe('UserManage', () => {

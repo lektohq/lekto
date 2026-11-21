@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import { signIn } from '#lib/testing/session.ts';
 import { session } from '#lib/session.svelte.ts';
 import { calls, fakeApi } from '#lib/testing/api.ts';
 import Page from './+page.svelte';
@@ -30,17 +31,11 @@ const webhook = {
 
 describe('the list of webhooks', () => {
 	beforeEach(() => {
-		session.start({
-			user: { id: 'u1', username: 'john', role: 'user' },
-			method: 'password',
-			expires_at: '2026-10-28T12:00:00Z',
-			csrf_token: 'token'
-		} as never);
+		signIn();
 	});
 
 	afterEach(() => {
 		session.clear();
-		vi.unstubAllGlobals();
 	});
 
 	it('pauses a webhook from its row with a switch, not a badge', async () => {

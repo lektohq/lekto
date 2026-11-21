@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SHARED_CACHE, sharedKey } from '#lib/app-cache.ts';
 import { BASE } from '#lib/base.ts';
 import { forgetShared, readShared } from '#lib/shared-files.ts';
@@ -36,8 +36,6 @@ describe('the files of a share', () => {
 		kept = fake.kept;
 		vi.stubGlobal('caches', fake.caches);
 	});
-
-	afterEach(() => vi.unstubAllGlobals());
 
 	it('are read in the order they came, with their names and kinds', async () => {
 		keep(ID, 10, 'elf.pdf');

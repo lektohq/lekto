@@ -1,5 +1,5 @@
 import { render } from '@testing-library/svelte';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PdfViewer from './PdfViewer.svelte';
 
 // pdf.js needs a worker and a canvas; the test watches only how a document is opened and
@@ -31,10 +31,6 @@ const SOURCES = ['/api/v1/documents/d1/archive'];
 
 beforeEach(() => {
 	pdfjs.getDocument.mockReset();
-});
-
-afterEach(() => {
-	vi.unstubAllGlobals();
 });
 
 describe('PdfViewer', () => {

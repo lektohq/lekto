@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { createRawSnippet, tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LANGUAGE_NAMES, locales } from '#lib/i18n.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { NO_FILTERS } from '#lib/filters.ts';
 import { inbox } from '#lib/inbox.svelte.ts';
 import { rememberedFilters, rememberFilters } from '#lib/listing.ts';
@@ -11,14 +12,10 @@ import { phone } from '#lib/phone.svelte.ts';
 import { leaveDevice } from '#lib/push-device.ts';
 import { scope } from '#lib/scope.svelte.ts';
 import { SETTINGS } from '#lib/sections.ts';
-import { session, type User } from '#lib/session.svelte.ts';
+import { session } from '#lib/session.svelte.ts';
 import AppShell from './AppShell.svelte';
 
-vi.mock('$app/navigation', () => ({
-	afterNavigate: vi.fn(),
-	beforeNavigate: vi.fn(),
-	goto: vi.fn()
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 vi.mock('#lib/push-device.ts', async (original) => ({
 	...(await original<typeof import('#lib/push-device.ts')>()),
 	leaveDevice: vi.fn(async () => {})
@@ -26,15 +23,6 @@ vi.mock('#lib/push-device.ts', async (original) => ({
 vi.mock('$app/state', () => ({ page: { url: new URL('http://lekto/ui/inbox'), state: {} } }));
 
 const children = createRawSnippet(() => ({ render: () => '<p>content</p>' }));
-
-function signIn(role: User['role']) {
-	session.start({
-		user: { id: '0199a6c4-0000-7000-8000-000000000001', username: 'john', role },
-		method: 'password',
-		expires_at: '2026-10-09T12:00:00Z',
-		csrf_token: 'token'
-	});
-}
 
 afterEach(async () => {
 	session.clear();

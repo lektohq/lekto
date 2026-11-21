@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { events } from '#lib/events.svelte.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import Page from './ClassifierTab.svelte';
@@ -62,19 +63,13 @@ function answer(status: unknown = trained) {
 }
 
 beforeEach(() => {
-	session.start({
-		user: { id: 'admin', username: 'admin', role: 'admin' },
-		method: 'password',
-		expires_at: '2026-10-14T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('admin', { id: 'admin', username: 'admin' });
 	fetchMock = fakeApi();
 	vi.stubGlobal('fetch', fetchMock);
 });
 
 afterEach(() => {
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 describe('the classifier tab', () => {
@@ -94,12 +89,7 @@ describe('the classifier tab', () => {
 	});
 
 	it('shows a user the model without the training', async () => {
-		session.start({
-			user: { id: 'user', username: 'erika', role: 'user' },
-			method: 'password',
-			expires_at: '2026-10-14T12:00:00Z',
-			csrf_token: 'token'
-		});
+		signIn('user', { id: 'user', username: 'erika' });
 		fetchMock.mockImplementation(answer());
 		render(Page);
 		expect(

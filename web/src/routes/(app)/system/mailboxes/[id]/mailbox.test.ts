@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MailItem } from '#lib/mail-log.ts';
+import { signIn } from '#lib/testing/session.ts';
 import type { Mailbox } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
@@ -11,10 +12,8 @@ import { calls, fakeApi, json } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const MAILBOX: Mailbox = {
 	id: 'm1',
@@ -76,18 +75,12 @@ const tip = () => screen.queryByRole('button', { name: m.hint_about({ name: m.ma
 
 describe('the page of a mailbox', () => {
 	beforeEach(() => {
-		session.start({
-			user: { id: 'u1', username: 'john', role: 'admin' },
-			method: 'password',
-			expires_at: '2026-11-08T12:00:00Z',
-			csrf_token: 'token'
-		} as never);
+		signIn('admin');
 		goTo('/ui/system/mailboxes/m1', { id: 'm1' });
 	});
 
 	afterEach(() => {
 		session.clear();
-		vi.unstubAllGlobals();
 		localStorage.clear();
 	});
 

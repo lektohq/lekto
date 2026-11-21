@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fakeApi, json } from '#lib/testing/api.ts';
+import { signIn } from '#lib/testing/session.ts';
 import type { FieldDefinition, Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { newAction, newModel } from '#lib/rules/model.ts';
@@ -23,7 +24,6 @@ const targets = [{ value: 'house', label: 'Haushalt' }];
 
 afterEach(() => {
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 function fileInto(space: string) {
@@ -60,12 +60,7 @@ describe('a template of an action', () => {
 
 describe('sending through a webhook', () => {
 	function send(webhooks: Lookup['webhooks']) {
-		session.start({
-			user: { id: 'erika', username: 'erika', role: 'admin' },
-			method: 'password',
-			expires_at: '2026-10-26T12:00:00Z',
-			csrf_token: 'token'
-		});
+		signIn('admin', { id: 'erika', username: 'erika' });
 		render(ActionRow, {
 			action: newAction('send_webhook'),
 			lookup: { ...lookup, webhooks },

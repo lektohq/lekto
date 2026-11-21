@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeApi, json } from '#lib/testing/api.ts';
+import { documentOf as documentWith } from '#lib/testing/documents.ts';
+import { signIn } from '#lib/testing/session.ts';
 import type { components } from '#lib/api/schema.ts';
 import type { Mark, Review } from '#lib/document-view.ts';
 import type { Item } from '#lib/masterdata-api.ts';
@@ -17,11 +19,7 @@ import DocumentForm from './DocumentForm.svelte';
 
 type Document = components['schemas']['DocumentDetails'];
 
-vi.mock('$app/navigation', () => ({
-	afterNavigate: vi.fn(),
-	beforeNavigate: vi.fn(),
-	goto: vi.fn()
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 
 const OWNER = '0199a6c4-0000-7000-8000-000000000001';
 const SPACE = '0199a6c4-0000-7000-8000-0000000000d1';
@@ -71,21 +69,20 @@ const lookup = {
 	users: []
 } as unknown as Lookup;
 
-function documentOf(status: string, lane: string | null = 'yellow'): Document {
-	return {
+function documentOf(
+	status: Document['processing']['status'],
+	lane: Document['lane'] = 'yellow'
+): Document {
+	return documentWith({
 		lane,
-		id: 'doc-1',
 		title: 'Stromrechnung März 2026',
 		uploaded_by: OWNER,
 		space_id: SPACE,
-		access: 'edit',
-		contact_id: null,
 		document_type_id: INVOICE,
-		tag_ids: [],
 		document_date: '2026-03-12',
 		fields: { [NUMBER]: 'R-2026-03-1182' },
-		processing: { status, run: 1, nodes: [] }
-	} as unknown as Document;
+		processing: { status, run: 1, vision: false, nodes: [] }
+	});
 }
 
 const place = { page: 1, boxes: [{ x: 0.1, y: 0.2, width: 0.3, height: 0.02 }] };
@@ -183,12 +180,7 @@ function props(overrides: Record<string, unknown> = {}) {
 
 beforeEach(async () => {
 	await waitFor(() => expect(popovers()).toHaveLength(0));
-	session.start({
-		user: { id: OWNER, username: 'john', role: 'user' },
-		method: 'password',
-		expires_at: '2026-10-09T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('user', { id: OWNER });
 	fetchMock = fakeApi();
 	vi.stubGlobal('fetch', fetchMock);
 });
@@ -196,9 +188,6 @@ beforeEach(async () => {
 afterEach(() => {
 	session.clear();
 	masterDataDialogs.finishAll();
-	vi.unstubAllGlobals();
-	// A dialog makes the page unclickable until it has closed; the next test must not wait.
-	globalThis.document.body.style.pointerEvents = '';
 });
 
 describe('DocumentForm', () => {
@@ -602,8 +591,10 @@ describe('DocumentForm', () => {
 				}
 			]
 		});
-		const mine = (lane: string | null = 'yellow') =>
-			({ ...documentOf('review', lane), space_id: MINE }) as unknown as Document;
+		const mine = (lane: Document['lane'] = 'yellow') => ({
+			...documentOf('review', lane),
+			space_id: MINE
+		});
 		const ok = () =>
 			fetchMock.mockResolvedValue(
 				new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })
@@ -753,7 +744,7 @@ describe('DocumentForm', () => {
 				props({ document: mine(), review: suggesting, lookup: household, next: null, onconfirmed })
 			);
 			await choose(
-				userEvent.setup({ pointerEventsCheck: 0 }),
+				userEvent.setup(),
 				screen.getByRole('combobox', { name: m.filing_other() }),
 				ERIKAS
 			);
@@ -773,7 +764,7 @@ describe('DocumentForm', () => {
 				...documentOf('completed', 'green'),
 				space_id: SPACE,
 				space_confirmed_at: '2026-10-22T09:50:00Z'
-			} as unknown as Document;
+			};
 			render(DocumentForm, props({ document: decided, review: null, lookup: household, onmove }));
 			const calm = screen.getByTestId('filing-calm');
 			expect(within(calm).getByText('Haushalt')).toBeTruthy();
@@ -806,7 +797,7 @@ describe('DocumentForm', () => {
 			render(
 				DocumentForm,
 				props({
-					document: { ...documentOf('processing', null), space_id: SPACE } as unknown as Document,
+					document: { ...documentOf('processing', null), space_id: SPACE },
 					review: null,
 					lookup: household
 				})
@@ -1046,12 +1037,7 @@ describe('the topic', () => {
 	});
 
 	it('offers an admin, too, only the topics of the chosen contact', async () => {
-		session.start({
-			user: { id: OWNER, username: 'admin', role: 'admin' },
-			method: 'password',
-			expires_at: '2026-10-09T12:00:00Z',
-			csrf_token: 'token'
-		});
+		signIn('admin', { id: OWNER, username: 'admin' });
 		const bank = { ...filed, contact_id: BANK, topic_id: null } as Document;
 		const view = render(DocumentForm, props({ document: bank, lookup: topics, review: null }));
 		expect(await topicChoices()).toEqual(['Arbeit']);
@@ -1135,12 +1121,7 @@ describe('the topic', () => {
 	});
 
 	it('lets an admin create a topic named as searched in its dialog; saving enables it at the contact', async () => {
-		session.start({
-			user: { id: OWNER, username: 'admin', role: 'admin' },
-			method: 'password',
-			expires_at: '2026-10-09T12:00:00Z',
-			csrf_token: 'token'
-		});
+		signIn('admin', { id: OWNER, username: 'admin' });
 		const DENTAL = '0199a6c4-0000-7000-8000-0000000000b9';
 		const bank = { ...filed, contact_id: BANK, topic_id: null } as Document;
 		fetchMock.mockImplementation(async (request) =>
@@ -1164,12 +1145,7 @@ describe('the topic', () => {
 	});
 
 	it('lets an admin create a contact or type named as searched in its dialog, chosen after', async () => {
-		session.start({
-			user: { id: OWNER, username: 'admin', role: 'admin' },
-			method: 'password',
-			expires_at: '2026-10-09T12:00:00Z',
-			csrf_token: 'token'
-		});
+		signIn('admin', { id: OWNER, username: 'admin' });
 		const BAKERY = '0199a6c4-0000-7000-8000-0000000000c9';
 		const REMINDER = '0199a6c4-0000-7000-8000-0000000000e9';
 		fetchMock.mockImplementation(async () => json(PREVIEW));

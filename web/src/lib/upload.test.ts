@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { intakeOf } from '#lib/intake.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { session } from '#lib/session.svelte.ts';
 import { json } from '#lib/testing/api.ts';
 import { PARALLEL, Uploads } from './upload.svelte.ts';
@@ -32,17 +33,11 @@ function held() {
 }
 
 beforeEach(() => {
-	session.start({
-		user: { id: 'user-1', username: 'john', role: 'user' },
-		method: 'password',
-		expires_at: '2026-10-18T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('user', { id: 'user-1' });
 });
 
 afterEach(() => {
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 describe('uploads', () => {

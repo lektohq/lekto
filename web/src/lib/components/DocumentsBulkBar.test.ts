@@ -23,7 +23,6 @@ const GRAPH = [
 
 afterEach(() => {
 	forgetPipeline();
-	vi.unstubAllGlobals();
 });
 
 function renderBar(

@@ -1,10 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ListPlace } from './list-place.svelte.ts';
 import { returnTo } from './return-to.svelte.ts';
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
-
-afterEach(() => vi.unstubAllGlobals());
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 
 describe('the place in a list', () => {
 	it('is gone to once, when the list says it stands', async () => {

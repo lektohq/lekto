@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import { signIn } from '#lib/testing/session.ts';
 import { session } from '#lib/session.svelte.ts';
 import { fakeApi } from '#lib/testing/api.ts';
 import Page from './+page.svelte';
@@ -19,12 +20,7 @@ const USERS = [
 ];
 
 beforeEach(() => {
-	session.start({
-		user: { id: 'u1', username: 'erika', role: 'admin' },
-		method: 'password',
-		expires_at: '2026-10-21T12:00:00Z',
-		csrf_token: 'token'
-	} as never);
+	signIn('admin', { username: 'erika' });
 	vi.stubGlobal(
 		'fetch',
 		fakeApi({
@@ -50,7 +46,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	session.clear();
 });
 

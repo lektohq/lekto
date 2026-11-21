@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConnectionTest, Mailbox } from '#lib/mailboxes.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import MailboxDialog from './MailboxDialog.svelte';
@@ -53,12 +54,7 @@ const FOUND: ConnectionTest = {
 };
 
 beforeEach(() => {
-	session.start({
-		user: { id: 'erika', username: 'erika', role: 'admin' },
-		method: 'password',
-		expires_at: '2026-11-06T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('admin', { id: 'erika', username: 'erika' });
 	sent.length = 0;
 	failing.clear();
 	fetchMock = fakeApi();
@@ -79,9 +75,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	session.clear();
-	vi.unstubAllGlobals();
-	// bits-ui frees the page a moment after a dialog closed; the next test must not wait for it.
-	window.document.body.style.pointerEvents = '';
 });
 
 const testButton = () => screen.getByRole('button', { name: m.mail_test() }) as HTMLButtonElement;

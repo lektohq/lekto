@@ -30,7 +30,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.useRealTimers();
 	vi.restoreAllMocks();
-	vi.unstubAllGlobals();
 });
 
 describe('the error page', () => {

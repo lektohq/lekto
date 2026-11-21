@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Item } from '#lib/masterdata-api.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
@@ -61,12 +62,7 @@ const CONTACT = {
 };
 
 beforeEach(() => {
-	session.start({
-		user: { id: 'admin', username: 'admin', role: 'admin' },
-		method: 'password',
-		expires_at: '2026-10-15T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('admin', { id: 'admin', username: 'admin' });
 	fetchMock = fakeApi();
 	fetchMock.mockImplementation(async (request) => {
 		const path = new URL(request.url).pathname;
@@ -101,8 +97,6 @@ afterEach(() => {
 	masterDataDialogs.close();
 	phone.override(null);
 	session.clear();
-	vi.unstubAllGlobals();
-	window.document.body.style.pointerEvents = '';
 });
 
 // The icon picker's panel is loaded when it opens; under a full parallel run that can take a

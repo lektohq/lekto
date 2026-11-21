@@ -3,6 +3,7 @@ import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
 import { POLL } from '#lib/bulk.svelte.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { usageLabel } from '#lib/components/UsageCount.svelte';
 import { events } from '#lib/events.svelte.ts';
 import { formatDate } from '#lib/i18n.ts';
@@ -44,11 +45,7 @@ const state = vi.hoisted(() => ({
 	// The history entry: the words of a search stand here, never in the URL.
 	entry: {} as App.PageState
 }));
-vi.mock('$app/navigation', () => ({
-	afterNavigate: vi.fn(),
-	beforeNavigate: vi.fn(),
-	goto: vi.fn()
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 vi.mock('$app/state', () => ({
 	page: {
 		get url() {
@@ -71,12 +68,7 @@ beforeEach(() => {
 	forgetMeaningSearch();
 	state.url = new URL('http://lekto/ui/documents');
 	state.entry = {};
-	session.start({
-		user: { id: OWNER, username: 'john', role: 'user' },
-		method: 'password',
-		expires_at: '2026-10-18T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('user', { id: OWNER });
 	// Rows: their mark stands beside their link (the grid's is tested with the card).
 	rememberLayout('list');
 });
@@ -84,10 +76,8 @@ beforeEach(() => {
 afterEach(() => {
 	localStorage.clear();
 	session.clear();
-	vi.unstubAllGlobals();
 	vi.useRealTimers();
 	// A menu open while the clock was faked leaves this behind.
-	window.document.body.style.pointerEvents = '';
 });
 
 describe('the archive page', () => {

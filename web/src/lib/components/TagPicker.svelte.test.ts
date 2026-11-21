@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeApi } from '#lib/testing/api.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 import type { Tag } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -43,18 +44,7 @@ afterEach(() => {
 	phone.override(null);
 	session.clear();
 	masterDataDialogs.finishAll();
-	vi.unstubAllGlobals();
-	document.body.style.pointerEvents = '';
 });
-
-function signIn(role: 'admin' | 'user') {
-	session.start({
-		user: { id: 'u1', username: 'john', role },
-		method: 'password',
-		expires_at: '2026-10-17T23:00:00Z',
-		csrf_token: 'token'
-	});
-}
 
 function picker(selected: string[] = ['g1']) {
 	const made: Tag[] = [];

@@ -1,9 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { listedOf } from '#lib/testing/documents.ts';
 import { calls, fakeApi } from '#lib/testing/api.ts';
 import { listPlaces, SEARCH_PAGE_MAX } from './list-places.ts';
-
-afterEach(() => vi.unstubAllGlobals());
 
 describe('the documents of the list a document was opened from', () => {
 	it('reads the list page by page, with its filters, sort and selection', async () => {

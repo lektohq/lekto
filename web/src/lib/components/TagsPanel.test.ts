@@ -76,7 +76,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	phone.override(null);
 	masterDataDialogs.close();
 });

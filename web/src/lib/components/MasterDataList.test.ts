@@ -89,7 +89,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	phone.override(null);
 	desktop.override(null);
 	localStorage.clear();

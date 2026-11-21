@@ -4,6 +4,7 @@ import { toast } from 'svelte-sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
 import type { components } from '#lib/api/schema.ts';
+import { signIn } from '#lib/testing/session.ts';
 import type { Facts } from '#lib/facts.ts';
 import { events } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -17,14 +18,8 @@ import Page from './+page.svelte';
 
 type Document = components['schemas']['DocumentDetails'];
 
-vi.mock('$app/navigation', () => ({
-	afterNavigate: vi.fn(),
-	beforeNavigate: vi.fn(),
-	goto: vi.fn()
-}));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 let emit: ((type: string, data: object) => void) | null = null;
 
@@ -81,12 +76,7 @@ const seen = (api: ReturnType<typeof fakeApi>) =>
 beforeEach(() => {
 	goTo('/ui/documents/doc-1?tab=properties', { id: 'doc-1' });
 	vi.mocked(goto).mockClear();
-	session.start({
-		user: { id: OWNER, username: 'john', role: 'user' },
-		method: 'password',
-		expires_at: '2026-10-18T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('user', { id: OWNER });
 	streamEvents();
 });
 
@@ -94,7 +84,6 @@ afterEach(() => {
 	phone.override(null);
 	events.stop();
 	session.clear();
-	vi.unstubAllGlobals();
 	localStorage.clear();
 });
 

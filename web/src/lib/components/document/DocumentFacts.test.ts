@@ -1,18 +1,11 @@
 import { render, screen } from '@testing-library/svelte';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { calls, fakeApi } from '#lib/testing/api.ts';
 import DocumentFacts from './DocumentFacts.svelte';
 
-vi.mock('$app/navigation', async () => ({
-	beforeNavigate: vi.fn(),
-	goto: (await import('#lib/testing/page-state.svelte.ts')).fakeGoto
-}));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
-
-afterEach(() => vi.unstubAllGlobals());
+vi.mock('$app/navigation', () => import('#lib/testing/app-navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 describe('DocumentFacts', () => {
 	it('shows origin and relations of a document without text (WA-03)', async () => {

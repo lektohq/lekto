@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeApi } from '#lib/testing/api.ts';
 import { formatDate, formatNumber } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -54,8 +54,6 @@ beforeEach(() => {
 	});
 	vi.stubGlobal('fetch', fetchMock);
 });
-
-afterEach(() => vi.unstubAllGlobals());
 
 describe('DocumentFiles', () => {
 	it('tells the life of the file and shows the original’s passport, without an archive yet', async () => {

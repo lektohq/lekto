@@ -9,7 +9,6 @@ import { m } from '#lib/paraglide/messages.js';
 import { switchMailbox, switchMailRule, switchRule } from './switch.ts';
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	vi.clearAllMocks();
 });
 

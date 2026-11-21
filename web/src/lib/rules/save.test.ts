@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fakeApi } from '#lib/testing/api.ts';
 import type { ApiDefinition } from '#lib/rules/model.ts';
 import { changeSwitchedOff, createSwitchedOff, GLOBAL } from './save.ts';
@@ -11,8 +11,6 @@ const definition = {
 	actions: []
 } as unknown as ApiDefinition;
 const rule = { id: 'r1', enabled: true, name: 'Muster Telefon' };
-
-afterEach(() => vi.unstubAllGlobals());
 
 function stub() {
 	const fetch = fakeApi({}, () => ({ ...rule, enabled: false }));

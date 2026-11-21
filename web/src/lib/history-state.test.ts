@@ -2,10 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import { entryOf } from './history-state.ts';
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 afterEach(() => goTo('/ui/admin/master-data'));
 

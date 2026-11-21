@@ -7,9 +7,7 @@ import Page from './+page.svelte';
 
 const goto = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock('$app/navigation', () => ({ goto }));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 const shared = vi.hoisted(() => ({
 	readShared: vi.fn(async (): Promise<File[]> => []),
 	forgetShared: vi.fn(async () => {})

@@ -1,5 +1,5 @@
 import { render, screen, waitFor, within } from '@testing-library/svelte';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -70,8 +70,6 @@ beforeEach(() => {
 	});
 	vi.stubGlobal('fetch', fetchMock);
 });
-
-afterEach(() => vi.unstubAllGlobals());
 
 describe('StepDetails', () => {
 	it('shows the text recognition: the files, its notes and how well each page was read', () => {

@@ -80,7 +80,6 @@ const clearedBadge = () =>
 
 describe('giving this device up on signing out', () => {
 	afterEach(() => {
-		vi.unstubAllGlobals();
 		vi.useRealTimers();
 	});
 
@@ -154,8 +153,6 @@ describe('giving this device up on signing out', () => {
 });
 
 describe('a subscription this browser still has from someone else', () => {
-	afterEach(() => vi.unstubAllGlobals());
-
 	it("ends when it is none of the signed-in user's devices", async () => {
 		const { subscription, notifications } = browserWith(ENDPOINT, 1);
 		const api = fakeApi({

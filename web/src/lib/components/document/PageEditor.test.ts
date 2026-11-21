@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
 import { showPages } from '#lib/beam.svelte.ts';
 import { quoted } from '#lib/i18n.ts';
@@ -36,8 +36,6 @@ beforeEach(() => {
 	});
 	vi.stubGlobal('fetch', fetchMock);
 });
-
-afterEach(() => vi.unstubAllGlobals());
 
 function open(onedited = vi.fn()) {
 	render(PageEditor, { open: true, document: DOCUMENT, onedited });

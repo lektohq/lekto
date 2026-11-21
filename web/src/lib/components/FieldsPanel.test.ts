@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { scope } from '#lib/scope.svelte.ts';
@@ -16,12 +17,7 @@ const REMINDER = '0199a6c4-0000-7000-8000-0000000000e2';
 let fetchMock = fakeApi();
 
 beforeEach(() => {
-	session.start({
-		user: { id: 'admin', username: 'admin', role: 'admin' },
-		method: 'password',
-		expires_at: '2026-10-14T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('admin', { id: 'admin', username: 'admin' });
 	fetchMock = fakeApi();
 	fetchMock.mockImplementation(async (request) => {
 		const path = new URL(request.url).pathname;
@@ -71,9 +67,6 @@ afterEach(() => {
 	phone.override(null);
 	scope.set(false);
 	session.clear();
-	vi.unstubAllGlobals();
-	// A dialog makes the page unclickable until it has closed; the next test must not wait.
-	window.document.body.style.pointerEvents = '';
 });
 
 describe('FieldsPanel', () => {

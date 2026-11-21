@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { usageLabel } from '#lib/components/UsageCount.svelte';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
@@ -9,13 +10,8 @@ import { fakeBack, goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import IdentifiersPanel from './IdentifiersPanel.svelte';
 import { fakeApi, json } from '#lib/testing/api.ts';
 
-vi.mock('$app/navigation', async () => ({
-	beforeNavigate: vi.fn(),
-	goto: (await import('#lib/testing/page-state.svelte.ts')).fakeGoto
-}));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/app-navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const UTILITY = { id: '0199a6c4-0000-7000-8000-0000000000c1', name: 'Stadtwerke Nord' };
 const LOGO = `/api/v1/contacts/${UTILITY.id}/logo`;
@@ -65,12 +61,7 @@ let confirmedRecommended = 0;
 beforeEach(() => {
 	goTo('/ui/admin/master-data?tab=identifiers');
 	vi.spyOn(history, 'back').mockImplementation(fakeBack);
-	session.start({
-		user: { id: 'admin', username: 'admin', role: 'admin' },
-		method: 'password',
-		expires_at: '2026-10-14T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('admin', { id: 'admin', username: 'admin' });
 	decisions = [];
 	confirmedRecommended = 0;
 	fetchMock = fakeApi();
@@ -150,9 +141,7 @@ beforeEach(() => {
 afterEach(() => {
 	phone.override(null);
 	session.clear();
-	vi.unstubAllGlobals();
 	vi.useRealTimers();
-	window.document.body.style.pointerEvents = '';
 });
 
 /** The rows of the table (wider than a phone), its head left out. */

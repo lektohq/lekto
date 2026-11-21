@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/svelte';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { calls, fakeApi, json } from '#lib/testing/api.ts';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -38,10 +38,6 @@ describe('OriginCard', () => {
 			)
 		);
 		vi.stubGlobal('fetch', api);
-	});
-
-	afterEach(() => {
-		vi.unstubAllGlobals();
 	});
 
 	it('names the mail a document came with', async () => {

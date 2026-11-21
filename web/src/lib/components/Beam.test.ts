@@ -12,11 +12,7 @@ import { leaveBeam, openBeam, showPages } from '#lib/beam.svelte.ts';
 import { goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import Beam from './Beam.svelte';
 
-vi.mock('$app/navigation', () => ({
-	afterNavigate: vi.fn(),
-	beforeNavigate: vi.fn(),
-	goto: vi.fn()
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 // pdf.js needs a worker and a canvas: the archive opens as two A4 pages that are never drawn.
 vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
 	getDocument: () => ({
@@ -29,9 +25,7 @@ vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
 	GlobalWorkerOptions: { workerSrc: '' }
 }));
 vi.mock('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url', () => ({ default: 'worker.js' }));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const LIST = '/ui/documents?tag=t1';
 const BOX = { x: 0.1, y: 0.2, width: 0.3, height: 0.02 };
@@ -139,7 +133,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 	processing = processingOf();
 	goTo('/ui/inbox');

@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { scope } from '#lib/scope.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
@@ -51,15 +52,6 @@ const ERIKA = space('erika', {
 	]
 });
 
-function signIn(id: string, role: User['role'] = 'user') {
-	session.start({
-		user: { id, username: USERS.find((user) => user.id === id)?.username ?? id, role },
-		method: 'password',
-		expires_at: '2026-10-21T12:00:00Z',
-		csrf_token: 'token'
-	} as never);
-}
-
 function start(spaces: Space[]) {
 	const api = fakeApi({
 		'GET /api/v1/spaces': () => spaces,
@@ -75,11 +67,10 @@ function start(spaces: Space[]) {
 	return api;
 }
 
-beforeEach(() => signIn('u1'));
+beforeEach(() => signIn('user', { id: 'u1', username: 'john' }));
 afterEach(() => {
 	phone.override(null);
 	scope.set(false);
-	vi.unstubAllGlobals();
 	session.clear();
 });
 
@@ -104,7 +95,7 @@ describe('spaces', () => {
 	});
 
 	it('shows an admin the spaces they are no member of apart, with all users included', async () => {
-		signIn('u3', 'admin');
+		signIn('admin', { id: 'u3', username: 'admin' });
 		scope.set(true);
 		const admins = space('admins', {
 			personal_of: 'u3',
@@ -122,7 +113,7 @@ describe('spaces', () => {
 	});
 
 	it('shows an admin only their own spaces without all users, like everyone', async () => {
-		signIn('u3', 'admin');
+		signIn('admin', { id: 'u3', username: 'admin' });
 		const admins = space('admins', {
 			personal_of: 'u3',
 			members: [{ user_id: 'u3', role: 'edit', username: 'admin', active: true }]
@@ -135,7 +126,7 @@ describe('spaces', () => {
 	});
 
 	it('adds and removes members; the last editor stays', async () => {
-		signIn('u1');
+		signIn('user', { id: 'u1', username: 'john' });
 		const user = userEvent.setup();
 		const api = start([HOUSE, JOHN]);
 		await user.click(
@@ -190,7 +181,7 @@ describe('spaces', () => {
 	});
 
 	it('shows what belongs in a space, and creates one with its description', async () => {
-		const user = userEvent.setup({ pointerEventsCheck: 0 });
+		const user = userEvent.setup();
 		const api = start([{ ...HOUSE, description: 'Wohnung, Nebenkosten' }, JOHN]);
 		expect(await screen.findByText('Wohnung, Nebenkosten')).toBeTruthy();
 		await user.click(screen.getByRole('button', { name: m.space_new() }));
@@ -207,7 +198,7 @@ describe('spaces', () => {
 	});
 
 	it('describes the personal space without renaming it', async () => {
-		const user = userEvent.setup({ pointerEventsCheck: 0 });
+		const user = userEvent.setup();
 		const api = start([HOUSE, JOHN]);
 		await user.click(
 			await screen.findByRole('button', { name: m.space_edit({ name: m.space_personal() }) })
@@ -222,7 +213,7 @@ describe('spaces', () => {
 	});
 
 	it('renames a shared space with its description, and removes an emptied one', async () => {
-		const user = userEvent.setup({ pointerEventsCheck: 0 });
+		const user = userEvent.setup();
 		const api = start([{ ...HOUSE, description: 'alt' }, JOHN]);
 		await user.click(
 			await screen.findByRole('button', { name: m.space_edit({ name: 'Haushalt' }) })
@@ -239,9 +230,9 @@ describe('spaces', () => {
 	});
 
 	it('lets a reader leave a space, after asking', async () => {
-		signIn('u2');
+		signIn('user', { id: 'u2', username: 'erika' });
 		// A dialog of an earlier test may still leave the body without pointer events.
-		const user = userEvent.setup({ pointerEventsCheck: 0 });
+		const user = userEvent.setup();
 		const api = start([{ ...HOUSE, role: 'read' }, ERIKA]);
 		// Not their own personal space.
 		expect(
@@ -256,7 +247,7 @@ describe('spaces', () => {
 	});
 
 	it('keeps a deactivated member without a role to change, for removing', async () => {
-		const user = userEvent.setup({ pointerEventsCheck: 0 });
+		const user = userEvent.setup();
 		const gone = {
 			...HOUSE,
 			members: [

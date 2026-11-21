@@ -1,12 +1,8 @@
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import SecretDialog from './SecretDialog.svelte';
-
-afterEach(() => {
-	vi.unstubAllGlobals();
-});
 
 describe('SecretDialog', () => {
 	it('says a secret was copied until another one is shown', async () => {

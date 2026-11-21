@@ -1,16 +1,12 @@
 // The styleguide renders every part it shows, each section with its title.
 import { render, screen } from '@testing-library/svelte';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { fakeApi } from '#lib/testing/api.ts';
 import Page from './+page.svelte';
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn(), beforeNavigate: vi.fn() }));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
-
-afterEach(() => vi.unstubAllGlobals());
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 describe('the styleguide', () => {
 	it('shows each section', () => {

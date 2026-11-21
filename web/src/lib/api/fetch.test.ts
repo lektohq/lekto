@@ -27,7 +27,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	setSessionHooks(null);
-	vi.unstubAllGlobals();
 });
 
 describe('apiFetch', () => {

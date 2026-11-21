@@ -3,7 +3,6 @@ import { calls, fakeApi } from '#lib/testing/api.ts';
 import { forgetMeaningSearch, warmSearch } from './meaning-search.ts';
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	forgetMeaningSearch();
 });
 

@@ -6,10 +6,8 @@ import { m } from '#lib/paraglide/messages.js';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import DocumentBackLink from './DocumentBackLink.svelte';
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 afterEach(() => {
 	vi.mocked(goto).mockClear();

@@ -30,7 +30,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 	if (clientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', clientWidth);
 });

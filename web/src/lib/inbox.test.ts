@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import { signIn } from '#lib/testing/session.ts';
 import { scope } from '#lib/scope.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import { summaryOf } from '#lib/testing/documents.ts';
@@ -49,12 +50,7 @@ describe('inbox summary', () => {
 	let api = fakeApi();
 
 	beforeEach(() => {
-		session.start({
-			user: { id: 'admin', username: 'admin', role: 'admin' },
-			method: 'password',
-			expires_at: '2026-10-18T12:00:00Z',
-			csrf_token: 'token'
-		});
+		signIn('admin', { id: 'admin', username: 'admin' });
 		api = fakeApi({ 'GET /api/v1/inbox/summary': () => summary({ review: 1 }) });
 		vi.stubGlobal('fetch', api);
 	});
@@ -63,7 +59,6 @@ describe('inbox summary', () => {
 		inbox.stop();
 		scope.set(false);
 		session.clear();
-		vi.unstubAllGlobals();
 	});
 
 	it('is fetched for the scope chosen', async () => {

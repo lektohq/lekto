@@ -1,11 +1,19 @@
 import { configure } from '@testing-library/svelte';
-import { vi } from 'vitest';
+import { afterEach, vi } from 'vitest';
 
 // How long `waitFor` and `find*` wait for what a test expects: a busy runner (a CI shard, a full
 // run beside the dev instance) takes longer than the default second for a dialog to close or a
 // reload after a burst of events (300 ms) to land. A test that passes does not wait longer; the
 // deadline counts only for one that would fail. Not per test (Tobi, 10.11.2026).
 configure({ asyncUtilTimeout: 10_000 });
+
+// A dialog or menu of bits-ui takes the pointer from the page while it is open. One that a test
+// leaves open would take it from the next test of the file too: every test starts with it. No
+// test switches the check of the pointer off for that (`pointerEventsCheck`): it is what finds a
+// dialog that does not give the pointer back.
+afterEach(() => {
+	document.body.style.pointerEvents = '';
+});
 
 // jsdom lacks a few browser APIs the components use.
 

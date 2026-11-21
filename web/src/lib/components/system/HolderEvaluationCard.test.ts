@@ -7,15 +7,10 @@ import { fakeApi } from '#lib/testing/api.ts';
 import { goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import HolderEvaluationCard from './HolderEvaluationCard.svelte';
 
-vi.mock('$app/navigation', async () => ({
-	goto: (await import('#lib/testing/page-state.svelte.ts')).fakeGoto
-}));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/app-navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	goTo('/ui/system?tab=automation');
 });
 

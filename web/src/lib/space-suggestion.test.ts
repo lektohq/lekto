@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
+import { signIn } from '#lib/testing/session.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
@@ -52,14 +53,7 @@ const node = (fields: { field: string; suggestion?: unknown; unseen_by?: string[
 	({ node: 'judge', outcome: 'uncertain', reason: null, fields }) as unknown as OpenNode;
 
 describe('the suggested space', () => {
-	beforeEach(() =>
-		session.start({
-			user: { id: 'u1', username: 'john', role: 'user' },
-			method: 'password',
-			expires_at: '2026-10-22T12:00:00Z',
-			csrf_token: 'token'
-		} as never)
-	);
+	beforeEach(() => signIn());
 	afterEach(() => session.clear());
 
 	it('is the first open space check with a suggestion', () => {

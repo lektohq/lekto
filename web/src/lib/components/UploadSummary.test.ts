@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import { signIn } from '#lib/testing/session.ts';
 import { session } from '#lib/session.svelte.ts';
 import { json } from '#lib/testing/api.ts';
 import { uploads } from '#lib/upload.svelte.ts';
@@ -13,18 +14,12 @@ const pdf = (name: string) => ({
 });
 
 beforeEach(() => {
-	session.start({
-		user: { id: 'user-1', username: 'john', role: 'user' },
-		method: 'password',
-		expires_at: '2026-10-18T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('user', { id: 'user-1' });
 });
 
 afterEach(() => {
 	uploads.reset();
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 describe('UploadSummary', () => {

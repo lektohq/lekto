@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeApi, json } from '#lib/testing/api.ts';
+import { documentOf } from '#lib/testing/documents.ts';
+import { signIn } from '#lib/testing/session.ts';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import type { GraphNode } from '#lib/pipeline.ts';
@@ -12,11 +14,7 @@ import type { Reading } from '#lib/vision.ts';
 import { goto } from '$app/navigation';
 import DocumentHeader from './DocumentHeader.svelte';
 
-vi.mock('$app/navigation', () => ({
-	afterNavigate: vi.fn(),
-	beforeNavigate: vi.fn(),
-	goto: vi.fn()
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 
 type Document = components['schemas']['DocumentDetails'];
 
@@ -33,15 +31,10 @@ const graph: GraphNode[] = [
 ];
 
 function document(outcome: 'ok' | 'failed' = 'ok'): Document {
-	return {
-		id: 'doc-1',
+	return documentOf({
 		title: 'Scan',
-		original_filename: 'scan.pdf',
 		uploaded_by: OWNER,
-		space_id: 'space-1',
-		access: 'edit',
 		lane: outcome === 'failed' ? 'red' : 'yellow',
-		page_count: 1,
 		created_at: '2026-10-15T08:00:00Z',
 		processing: {
 			status: outcome === 'failed' ? 'failed' : 'review',
@@ -55,7 +48,7 @@ function document(outcome: 'ok' | 'failed' = 'ok'): Document {
 				finished_at: null
 			}))
 		}
-	} as unknown as Document;
+	});
 }
 
 const NO_TEXT: Reading = {
@@ -79,12 +72,7 @@ function props(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
-	session.start({
-		user: { id: OWNER, username: 'john', role: 'user' },
-		method: 'password',
-		expires_at: '2026-10-15T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('user', { id: OWNER });
 	fetchMock = fakeApi();
 	fetchMock.mockImplementation(async () => json({}, 202));
 	vi.stubGlobal('fetch', fetchMock);
@@ -92,7 +80,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 /** The menu of further actions; bits-ui opens it on a pointer press. */
@@ -249,7 +236,7 @@ describe('DocumentHeader', () => {
 			const onchanged = vi.fn();
 			render(DocumentHeader, props({ lookup, onchanged }));
 			// A dialog of an earlier test may still leave the body without pointer events.
-			const user = userEvent.setup({ pointerEventsCheck: 0 });
+			const user = userEvent.setup();
 			await user.click(screen.getByRole('button', { name: m.move_title() }));
 			const dialog = await screen.findByRole('dialog');
 			const field = within(dialog).getByLabelText(m.field_space());
@@ -267,7 +254,7 @@ describe('DocumentHeader', () => {
 		it('goes back to the documents after handing the document over', async () => {
 			const onchanged = vi.fn();
 			render(DocumentHeader, props({ lookup, onchanged }));
-			const user = userEvent.setup({ pointerEventsCheck: 0 });
+			const user = userEvent.setup();
 			await user.click(screen.getByRole('button', { name: m.move_title() }));
 			const dialog = await screen.findByRole('dialog');
 			await choose(user, within(dialog).getByLabelText(m.field_space()), 'space-3');
@@ -289,7 +276,7 @@ describe('DocumentHeader', () => {
 			} as Lookup;
 			const onchanged = vi.fn();
 			render(DocumentHeader, props({ lookup: strangers, onchanged }));
-			const user = userEvent.setup({ pointerEventsCheck: 0 });
+			const user = userEvent.setup();
 			await user.click(screen.getByRole('button', { name: m.move_title() }));
 			const dialog = await screen.findByRole('dialog');
 			await choose(user, within(dialog).getByLabelText(m.field_space()), 'space-3');

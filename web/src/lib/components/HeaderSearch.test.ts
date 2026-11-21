@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
 import { m } from '#lib/paraglide/messages.js';
+import { signIn } from '#lib/testing/session.ts';
 import { openLens } from '#lib/open-lens.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import HeaderSearch from './HeaderSearch.svelte';
@@ -11,11 +12,7 @@ const state = vi.hoisted(() => ({
 	url: new URL('http://lekto/ui/inbox'),
 	entry: {} as App.PageState
 }));
-vi.mock('$app/navigation', () => ({
-	afterNavigate: vi.fn(),
-	beforeNavigate: vi.fn(),
-	goto: vi.fn()
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 vi.mock('$app/state', () => ({
 	page: {
 		get url() {
@@ -36,12 +33,7 @@ beforeEach(() => {
 	vi.mocked(goto).mockClear();
 	state.url = new URL('http://lekto/ui/inbox');
 	state.entry = {};
-	session.start({
-		user: { id: USER, username: 'john', role: 'user' },
-		method: 'password',
-		expires_at: '2026-10-18T12:00:00Z',
-		csrf_token: 'token'
-	} as never);
+	signIn('user', { id: USER });
 });
 
 afterEach(() => session.clear());

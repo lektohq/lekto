@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import { calls, fakeApi, json } from '#lib/testing/api.ts';
@@ -12,10 +13,8 @@ import Page from './+page.svelte';
 
 type Delivery = components['schemas']['DeliveryOut'];
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const webhook = {
 	id: 'hook',
@@ -98,18 +97,12 @@ function routes() {
 
 describe('the page of a webhook', () => {
 	beforeEach(() => {
-		session.start({
-			user: { id: 'u1', username: 'john', role: 'user' },
-			method: 'password',
-			expires_at: '2026-10-28T12:00:00Z',
-			csrf_token: 'token'
-		} as never);
+		signIn();
 		goTo('/ui/webhooks/hook', { id: 'hook' });
 	});
 
 	afterEach(() => {
 		session.clear();
-		vi.unstubAllGlobals();
 		localStorage.clear();
 	});
 

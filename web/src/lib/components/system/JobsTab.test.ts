@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Job } from '#lib/jobs.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import { calls, fakeApi, json } from '#lib/testing/api.ts';
@@ -86,20 +87,10 @@ function routes() {
 	});
 }
 
-function signIn(role: 'admin' | 'user') {
-	session.start({
-		user: { id: role, username: role, role },
-		method: 'password',
-		expires_at: '2026-10-25T12:00:00Z',
-		csrf_token: 'token'
-	});
-}
-
 beforeEach(() => signIn('admin'));
 
 afterEach(() => {
 	session.clear();
-	vi.unstubAllGlobals();
 	localStorage.clear();
 });
 

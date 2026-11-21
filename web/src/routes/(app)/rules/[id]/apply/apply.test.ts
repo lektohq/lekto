@@ -14,14 +14,8 @@ import Page from './+page.svelte';
 type Preview = components['schemas']['ApplyPreviewOut'];
 type Application = components['schemas']['RuleApplicationOut'];
 
-vi.mock('$app/navigation', () => ({
-	afterNavigate: vi.fn(),
-	beforeNavigate: vi.fn(),
-	goto: vi.fn()
-}));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const rule = {
 	id: 'r1',
@@ -105,7 +99,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	session.user = null;
-	vi.unstubAllGlobals();
 	vi.clearAllMocks();
 });
 

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { goto } from '$app/navigation';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { inbox } from '#lib/inbox.svelte.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { session, type User } from '#lib/session.svelte.ts';
@@ -12,11 +13,7 @@ import { uploads } from '#lib/upload.svelte.ts';
 import Page from './+page.svelte';
 
 const state = vi.hoisted(() => ({ url: new URL('http://lekto/ui/inbox') }));
-vi.mock('$app/navigation', () => ({
-	afterNavigate: vi.fn(),
-	beforeNavigate: vi.fn(),
-	goto: vi.fn()
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 vi.mock('$app/state', () => ({
 	page: {
 		get url() {
@@ -77,22 +74,14 @@ function start(items: Items | ((tab: string | null) => Items), summary = summary
 	return api;
 }
 
-function signIn(role: User['role'] = 'user') {
-	session.start({
-		user:
-			role === 'admin'
-				? { id: 'admin-1', username: 'admin', role }
-				: { id: OWNER, username: 'john', role },
-		method: 'password',
-		expires_at: '2026-10-18T12:00:00Z',
-		csrf_token: 'token'
-	});
+function signedIn(role: User['role'] = 'user') {
+	signIn(role, role === 'admin' ? { id: 'admin-1', username: 'admin' } : { id: OWNER });
 }
 
 beforeEach(() => {
 	state.url = new URL('http://lekto/ui/inbox');
 	phone.override(false);
-	signIn();
+	signedIn();
 });
 
 afterEach(() => {
@@ -100,7 +89,6 @@ afterEach(() => {
 	uploads.reset();
 	phone.override(null);
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 function tabs() {
@@ -486,7 +474,7 @@ describe('uploading in the inbox', () => {
 	});
 
 	it('uploads with the dialog into the personal space, without asking for a space or owner', async () => {
-		signIn('admin');
+		signedIn('admin');
 		const user = userEvent.setup();
 		const append = vi.spyOn(FormData.prototype, 'append');
 		try {

@@ -8,14 +8,8 @@ import { fakeApi, json } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
 
-vi.mock('$app/navigation', () => ({
-	afterNavigate: vi.fn(),
-	beforeNavigate: vi.fn(),
-	goto: vi.fn()
-}));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const USER = { id: 'u1', username: 'jane', display_name: 'Jane Doe', role: 'user' };
 const ME = {
@@ -47,7 +41,6 @@ describe('the settings', () => {
 
 	afterEach(() => {
 		session.clear();
-		vi.unstubAllGlobals();
 	});
 
 	it('shows the page once trying again succeeded (WF-02)', async () => {

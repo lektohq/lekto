@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { fakeApi } from '#lib/testing/api.ts';
 import DocumentChoice from './DocumentChoice.svelte';
@@ -16,8 +16,6 @@ const listed = (id: string, title: string, changes: Record<string, unknown> = {}
 	created_at: '2026-11-10T22:41:00Z',
 	...changes
 });
-
-afterEach(() => vi.unstubAllGlobals());
 
 describe('DocumentChoice', () => {
 	it('offers the newest documents, those that cannot join disabled with why', async () => {

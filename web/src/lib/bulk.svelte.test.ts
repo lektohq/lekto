@@ -18,7 +18,6 @@ const operation = (status: string, done = 0) => ({
 });
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	vi.useRealTimers();
 });
 

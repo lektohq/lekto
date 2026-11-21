@@ -9,13 +9,8 @@ import { kindLabel } from '#lib/identifiers.ts';
 import { goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import RelationsCard from './RelationsCard.svelte';
 
-vi.mock('$app/navigation', async () => ({
-	beforeNavigate: vi.fn(),
-	goto: (await import('#lib/testing/page-state.svelte.ts')).fakeGoto
-}));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/app-navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 type Relations = components['schemas']['RelationsOut'];
 
@@ -63,7 +58,6 @@ describe('RelationsCard', () => {
 
 	afterEach(() => {
 		events.stop();
-		vi.unstubAllGlobals();
 	});
 
 	/** The event stream of the app; the function sends an event of a document. */
