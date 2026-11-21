@@ -124,7 +124,7 @@
 		<PhoneEditorBar
 			title={shortTitle}
 			submitLabel={action ? (shortSubmitLabel ?? m.editor_save_short()) : undefined}
-			disabled={busy || disabled}
+			{disabled}
 			{busy}
 			cancelLabel={back ? m.editor_back() : undefined}
 			oncancel={back ?? (() => (open = false))}
@@ -193,7 +193,7 @@
 				<p class="min-w-0 flex-1 text-meta text-muted-foreground">{footNote}</p>
 			{/if}
 			{#if back}
-				<Button type="button" variant="ghost" disabled={busy} onclick={back}>
+				<Button type="button" variant="ghost" {busy} onclick={back}>
 					{m.editor_back()}
 				</Button>
 			{/if}
@@ -211,10 +211,10 @@
 			{/if}
 			<div class="ml-auto flex gap-2">
 				{#if action}
-					<Button type="button" variant="ghost" disabled={busy} onclick={() => (open = false)}>
+					<Button type="button" variant="ghost" {busy} onclick={() => (open = false)}>
 						{m.cancel()}
 					</Button>
-					<Button type="submit" disabled={busy || disabled}>{submitLabel}</Button>
+					<Button type="submit" {busy} {disabled}>{submitLabel}</Button>
 				{:else}
 					<Button type="button" onclick={() => (open = false)}>{m.picker_done()}</Button>
 				{/if}

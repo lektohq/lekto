@@ -80,6 +80,6 @@
 	</label>
 	<div class="flex justify-end gap-2">
 		<Button type="button" variant="ghost" size="sm" onclick={oncancel}>{m.cancel()}</Button>
-		<Button type="submit" size="sm" disabled={busy || !value.trim()}>{m.facts_add_save()}</Button>
+		<Button type="submit" size="sm" {busy} disabled={!value.trim()}>{m.facts_add_save()}</Button>
 	</div>
 </form>

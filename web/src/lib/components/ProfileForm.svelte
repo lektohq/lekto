@@ -194,7 +194,7 @@
 		<p class="text-sm text-destructive" role="alert">{problem}</p>
 	{/if}
 	<div>
-		<Button type="submit" disabled={busy}>{m.save()}</Button>
+		<Button type="submit" {busy}>{m.save()}</Button>
 	</div>
 </form>
 <UnsavedGuard dirty={dirty && !busy} />

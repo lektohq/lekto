@@ -213,7 +213,8 @@
 		<Button
 			variant={offerSwitchOn ? 'outline' : 'default'}
 			size="sm"
-			disabled={busy || loading || chosen === 0 || over}
+			{busy}
+			disabled={loading || chosen === 0 || over}
 			onclick={() => onapply(false)}
 		>
 			<Play aria-hidden="true" />
@@ -222,7 +223,8 @@
 		{#if offerSwitchOn}
 			<Button
 				size="sm"
-				disabled={busy || loading || chosen === 0 || over}
+				{busy}
+				disabled={loading || chosen === 0 || over}
 				onclick={() => onapply(true)}
 			>
 				<Power aria-hidden="true" />

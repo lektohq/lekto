@@ -5,7 +5,7 @@
 	import type { HTMLAnchorAttributes, HTMLButtonAttributes } from 'svelte/elements';
 
 	export const buttonVariants = tv({
-		base: "focus-visible:border-ring aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-xl border border-transparent bg-clip-padding text-sm font-medium aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+		base: "focus-visible:border-ring aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-xl border border-transparent bg-clip-padding text-sm font-medium aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all select-none disabled:pointer-events-none disabled:opacity-50 aria-disabled:cursor-default aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
 		variants: {
 			variant: {
 				default: 'bg-primary text-primary-foreground hover:bg-primary/80',
@@ -51,6 +51,9 @@
 		WithElementRef<HTMLAnchorAttributes> & {
 			variant?: ButtonVariant;
 			size?: ButtonSize;
+			/** Its action runs: it is held and looks so, but keeps the focus (web/DESIGN.md,
+			 * "Footers"). */
+			busy?: boolean;
 		};
 </script>
 
@@ -63,9 +66,23 @@
 		href = undefined,
 		type = 'button',
 		disabled,
+		busy = false,
+		onclick,
 		children,
 		...restProps
 	}: ButtonProps = $props();
+
+	// While its action runs a button is held with `aria-disabled`, not `disabled`: a disabled
+	// button loses the focus to the page, and after a dialog that follows the keyboard starts at
+	// the top again (WCAG 2.4.3). So the click is swallowed here, the submit of a form with it.
+	function click(event: MouseEvent & { currentTarget: EventTarget & HTMLButtonElement }) {
+		if (busy) {
+			event.preventDefault();
+			event.stopPropagation();
+			return;
+		}
+		(onclick as ((event: MouseEvent) => void) | null | undefined)?.(event);
+	}
 </script>
 
 {#if href}
@@ -74,10 +91,11 @@
 		data-slot="button"
 		data-inline={size === 'inline' || undefined}
 		class={cn(buttonVariants({ variant, size }), className)}
-		href={disabled ? undefined : href}
-		aria-disabled={disabled}
-		role={disabled ? 'link' : undefined}
+		href={disabled || busy ? undefined : href}
+		aria-disabled={disabled || busy}
+		role={disabled || busy ? 'link' : undefined}
 		tabindex={disabled ? -1 : undefined}
+		onclick={onclick as HTMLAnchorAttributes['onclick']}
 		{...restProps}
 	>
 		{@render children?.()}
@@ -90,6 +108,8 @@
 		class={cn(buttonVariants({ variant, size }), className)}
 		{type}
 		{disabled}
+		aria-disabled={busy || undefined}
+		onclick={click}
 		{...restProps}
 	>
 		{@render children?.()}

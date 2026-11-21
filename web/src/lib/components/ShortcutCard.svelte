@@ -94,12 +94,7 @@
 				{/each}
 			</ul>
 		{/if}
-		<Button
-			variant={ready ? 'outline' : 'default'}
-			class="self-start"
-			aria-disabled={busy}
-			onclick={setUp}
-		>
+		<Button variant={ready ? 'outline' : 'default'} class="self-start" {busy} onclick={setUp}>
 			{ready ? m.shortcut_another() : m.shortcut_set_up()}
 		</Button>
 	</Card.Content>

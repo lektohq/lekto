@@ -78,7 +78,7 @@
 			<Choice bind:checked={revoke} class="font-medium">{m.password_revoke_tokens()}</Choice>
 			{#if problem}<p role="alert" class="text-sm text-destructive">{problem}</p>{/if}
 			<div>
-				<Button type="submit" disabled={busy || current === '' || next === ''}>
+				<Button type="submit" {busy} disabled={current === '' || next === ''}>
 					{m.password_change()}
 				</Button>
 			</div>

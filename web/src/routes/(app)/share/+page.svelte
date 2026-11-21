@@ -121,7 +121,7 @@
 			</ul>
 			<div class="flex justify-end gap-2">
 				<Button variant="ghost" onclick={discard}>{m.share_discard()}</Button>
-				<Button aria-disabled={held} class="aria-disabled:opacity-50" onclick={upload}>
+				<Button aria-disabled={held} onclick={upload}>
 					{m.upload_title()}
 				</Button>
 			</div>

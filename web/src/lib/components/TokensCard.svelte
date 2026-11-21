@@ -41,6 +41,9 @@
 	let tokens = $state<Token[] | null>(null);
 	let problem = $state<string | null>(null);
 	let creating = $state(false);
+	// Where the focus goes once a token's secret was seen, or its row is gone with it: the
+	// dialogs before have closed, and the keyboard would start at the top of the page.
+	let newToken = $state<HTMLElement | null>(null);
 	let name = $state('');
 	// A preset, or the rights one by one (`own`; `.knowledge/plans/token-rights.md`).
 	let scope = $state<Scope | 'own'>('read');
@@ -94,6 +97,8 @@
 		shown = null;
 		toast.success(m.token_revoked());
 		tokensChanged();
+		// After the dialog has given the focus back to a row that is gone.
+		setTimeout(() => newToken?.focus(), 0);
 	}
 
 	// The scope `upload` is for a shortcut that sends shared files (web/DESIGN.md, "App").
@@ -150,7 +155,9 @@
 	<Card.Header>
 		<Card.Title>{m.token_title()}</Card.Title>
 		<Card.Description>{m.token_hint()}</Card.Description>
-		<Card.Action><Button onclick={openCreate}>{m.token_new()}</Button></Card.Action>
+		<Card.Action>
+			<Button bind:ref={newToken} onclick={openCreate}>{m.token_new()}</Button>
+		</Card.Action>
 	</Card.Header>
 	<Card.Content>
 		{#if problem}
@@ -248,6 +255,7 @@
 	title={m.token_created_title()}
 	description={m.token_created_hint()}
 	onclose={() => (created = null)}
+	returnTo={newToken}
 />
 
 {#if shown}

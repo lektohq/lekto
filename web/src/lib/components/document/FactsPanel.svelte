@@ -517,7 +517,8 @@
 					<Button
 						type="submit"
 						size="sm"
-						disabled={busy || (target === 'other' ? !other : !facts.contact_id)}
+						{busy}
+						disabled={target === 'other' ? !other : !facts.contact_id}
 					>
 						{m.facts_attach()}
 					</Button>

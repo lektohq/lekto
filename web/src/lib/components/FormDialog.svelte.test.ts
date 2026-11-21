@@ -48,7 +48,10 @@ describe('FormDialog', () => {
 		await user.click(save);
 		await user.click(save);
 		expect(action).toHaveBeenCalledOnce();
-		expect((save as HTMLButtonElement).disabled).toBe(true);
+		// Held, but not disabled: a disabled button would lose the focus to the page (WZ-01).
+		expect(save.getAttribute('aria-disabled')).toBe('true');
+		expect((save as HTMLButtonElement).disabled).toBe(false);
+		expect(document.activeElement).toBe(save);
 		finish();
 		await waitFor(() => expect(props.open).toBe(false));
 	});
@@ -210,7 +213,7 @@ describe('a dialog while its action runs (WB-03)', () => {
 			expect(action).toHaveBeenCalledOnce();
 
 			const cancel = screen.getByRole('button', { name: m.cancel() });
-			expect((cancel as HTMLButtonElement).disabled).toBe(true);
+			expect(cancel.getAttribute('aria-disabled')).toBe('true');
 			await user.click(cancel);
 			await user.keyboard('{Escape}');
 			const close = screen.queryByRole('button', { name: m.close() });

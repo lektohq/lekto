@@ -113,7 +113,7 @@ the request goes on and takes effect all the same. -->
 						{title}
 						{submitLabel}
 						{destructive}
-						disabled={busy || disabled}
+						{disabled}
 						{busy}
 						oncancel={() => (open = false)}
 					/>
@@ -126,7 +126,8 @@ the request goes on and takes effect all the same. -->
 								type="button"
 								variant="outline"
 								class="mt-2"
-								disabled={busy || altBusy}
+								{busy}
+								disabled={altBusy}
 								onclick={runAlternative}
 							>
 								{alternative.label}
@@ -162,7 +163,8 @@ the request goes on and takes effect all the same. -->
 								type="button"
 								variant="outline"
 								class="sm:mr-auto"
-								disabled={busy || altBusy}
+								{busy}
+								disabled={altBusy}
 								onclick={runAlternative}
 							>
 								{alternative.label}
@@ -180,13 +182,14 @@ the request goes on and takes effect all the same. -->
 								{m.delete_title()}
 							</Button>
 						{/if}
-						<Button type="button" variant="ghost" disabled={busy} onclick={() => (open = false)}>
+						<Button type="button" variant="ghost" {busy} onclick={() => (open = false)}>
 							{m.cancel()}
 						</Button>
 						<Button
 							type="submit"
 							variant={destructive ? 'destructive' : 'default'}
-							disabled={busy || altBusy || disabled}
+							{busy}
+							disabled={altBusy || disabled}
 						>
 							{submitLabel}
 						</Button>

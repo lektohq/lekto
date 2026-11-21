@@ -203,7 +203,7 @@
 				<p class="text-muted-foreground">{m.notifications_unsupported()}</p>
 			{:else if here}
 				<div class="flex flex-wrap gap-2">
-					<Button variant="outline" aria-disabled={busy} onclick={test}>
+					<Button variant="outline" {busy} onclick={test}>
 						{m.notifications_test()}
 					</Button>
 					<Button variant="ghost" onclick={switchOff}>{m.notifications_switch_off()}</Button>
@@ -219,7 +219,7 @@
 					</Alert.Description>
 				</Alert.Root>
 			{:else}
-				<Button class="self-start" aria-disabled={busy} onclick={switchOn}>
+				<Button class="self-start" {busy} onclick={switchOn}>
 					{m.notifications_switch_on()}
 				</Button>
 			{/if}

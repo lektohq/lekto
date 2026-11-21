@@ -946,7 +946,10 @@ Two empty notes carry the owl ([Logo and owl](#logo-and-owl)).
 
 The same order everywhere, dialogs and page forms alike: right-aligned, **"Abbrechen"** (`ghost`)
 then **the primary action** (`default`). A destructive confirmation puts the destructive button in
-the primary place. While the action runs, both buttons are held (`ConfirmFooter`, `AsyncForm`), and
+the primary place. While the action runs, both buttons are held (`ConfirmFooter`, `AsyncForm`): a
+`Button` with `busy`, which holds it with `aria-disabled` and swallows the click, never `disabled`,
+so that it keeps the focus (a disabled button loses it to the page, and after a dialog that follows
+the keyboard would start at the top again). And
 nothing else closes the dialog either (the X, Escape, a click beside it): the request goes on and
 takes effect all the same. On
 the phone a full-screen editor carries the same two actions in its top bar.

@@ -234,7 +234,7 @@
 					<Pencil aria-hidden="true" />
 					{m.edit_do()}
 				</a>
-				<Button variant="outline" disabled={busy} onclick={test}>
+				<Button variant="outline" {busy} onclick={test}>
 					<Send aria-hidden="true" />
 					{m.webhook_test()}
 				</Button>

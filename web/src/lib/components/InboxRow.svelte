@@ -95,24 +95,12 @@
 	{/if}
 	{#snippet aside()}
 		{#if item.tab === 'new'}
-			<Button
-				variant="outline"
-				size="sm"
-				class={action}
-				disabled={busy}
-				onclick={() => onseen(document.id)}
-			>
+			<Button variant="outline" size="sm" class={action} {busy} onclick={() => onseen(document.id)}>
 				<Check aria-hidden="true" />
 				<span class="max-sm:sr-only">{m.inbox_seen()}</span>
 			</Button>
 		{:else if done?.how === 'seen'}
-			<Button
-				variant="ghost"
-				size="sm"
-				class={action}
-				disabled={busy}
-				onclick={() => onunseen(document.id)}
-			>
+			<Button variant="ghost" size="sm" class={action} {busy} onclick={() => onunseen(document.id)}>
 				<Undo2 aria-hidden="true" />
 				<span class="max-sm:sr-only">{m.inbox_unseen()}</span>
 			</Button>

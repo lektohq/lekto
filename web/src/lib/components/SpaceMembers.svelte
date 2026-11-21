@@ -189,7 +189,7 @@
 					/>
 				</Field.Field>
 				<div>
-					<Button disabled={busy || !userId} onclick={() => set(userId, role)}>
+					<Button {busy} disabled={!userId} onclick={() => set(userId, role)}>
 						{m.members_grant()}
 					</Button>
 				</div>

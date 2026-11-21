@@ -48,10 +48,10 @@
 				<div class="max-h-[60vh] overflow-auto">{@render body()}</div>
 				{#if error}<Field.Error>{error}</Field.Error>{/if}
 				<Dialog.Footer>
-					<Button type="button" variant="ghost" disabled={busy} onclick={() => (open = false)}>
+					<Button type="button" variant="ghost" {busy} onclick={() => (open = false)}>
 						{m.cancel()}
 					</Button>
-					<Button type="submit" variant={destructive ? 'destructive' : 'default'} disabled={busy}>
+					<Button type="submit" variant={destructive ? 'destructive' : 'default'} {busy}>
 						{submitLabel}
 					</Button>
 				</Dialog.Footer>

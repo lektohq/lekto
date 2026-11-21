@@ -374,7 +374,7 @@
 												<Button
 													size="sm"
 													variant="outline"
-													disabled={busy !== null}
+													busy={busy !== null}
 													onclick={() => retry(job)}
 												>
 													<RotateCw aria-hidden="true" />{m.jobs_retry()}

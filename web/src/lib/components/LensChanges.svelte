@@ -23,13 +23,13 @@
 <Alert.Root variant="warning" role="status" class="flex flex-wrap items-center gap-x-3 gap-y-2">
 	<Alert.Description class="min-w-0 flex-1">{m.lens_changed()}</Alert.Description>
 	<div class="flex flex-wrap gap-2">
-		<Button variant="ghost" size="sm" disabled={busy} onclick={ondiscard}>
+		<Button variant="ghost" size="sm" {busy} onclick={ondiscard}>
 			{m.lens_discard()}
 		</Button>
-		<Button variant="outline" size="sm" disabled={busy} onclick={onsaveas}>
+		<Button variant="outline" size="sm" {busy} onclick={onsaveas}>
 			{m.lens_save_as()}
 		</Button>
-		<Button size="sm" disabled={busy} onclick={onsave}>
+		<Button size="sm" {busy} onclick={onsave}>
 			{m.lens_save_into({ name })}
 		</Button>
 	</div>

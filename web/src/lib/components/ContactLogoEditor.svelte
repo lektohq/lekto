@@ -120,7 +120,7 @@
 			tabindex="-1"
 			aria-hidden="true"
 		/>
-		<Button variant="outline" size="sm" disabled={busy} onclick={() => input?.click()}>
+		<Button variant="outline" size="sm" {busy} onclick={() => input?.click()}>
 			{#if !beside}<Upload aria-hidden="true" />{/if}
 			{m.logo_upload()}
 		</Button>
@@ -130,7 +130,7 @@
 				variant={beside ? 'outline' : 'ghost'}
 				size="sm"
 				aria-label={beside ? m.logo_fetch() : undefined}
-				disabled={busy}
+				{busy}
 				onclick={() =>
 					run(async () => {
 						await fetchLogo(contact.id);
@@ -145,7 +145,7 @@
 			<Button
 				variant="ghost"
 				size="sm"
-				disabled={busy}
+				{busy}
 				onclick={() =>
 					run(async () => {
 						await removeLogo(contact.id);

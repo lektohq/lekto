@@ -290,17 +290,17 @@
 {#snippet bar()}
 	<SelectionBar count={m.selection_selected({ count: formatNumber(selection.length) })} {busy}>
 		{#snippet trail()}
-			<Button variant="ghost" size="sm" disabled={busy} onclick={() => (chosen = {})}>
+			<Button variant="ghost" size="sm" {busy} onclick={() => (chosen = {})}>
 				<X aria-hidden="true" />
 				{m.open_selection_clear()}
 			</Button>
 		{/snippet}
 		{#snippet actions()}
-			<Button variant="outline" size="sm" disabled={busy} onclick={() => decideChosen('reject')}>
+			<Button variant="outline" size="sm" {busy} onclick={() => decideChosen('reject')}>
 				<Ban aria-hidden="true" />
 				{m.open_reject()}
 			</Button>
-			<Button size="sm" disabled={busy} onclick={() => decideChosen('confirm')}>
+			<Button size="sm" {busy} onclick={() => decideChosen('confirm')}>
 				<Check aria-hidden="true" />
 				{m.open_confirm()}
 			</Button>

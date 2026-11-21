@@ -442,7 +442,7 @@
 					class={cn(buttonVariants({ variant: 'ghost' }))}
 					onclick={() => (leaving = true)}>{m.cancel()}</a
 				>
-				<Button type="submit" disabled={busy || incomplete}>
+				<Button type="submit" {busy} disabled={incomplete}>
 					{webhook ? m.save() : m.create()}
 				</Button>
 			</div>

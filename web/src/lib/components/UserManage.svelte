@@ -206,7 +206,7 @@
 			</Field.Field>
 			<div class="flex items-center justify-between gap-3">
 				<span>{account.active ? m.user_active() : m.user_inactive()}</span>
-				<Button variant="outline" disabled={busy} onclick={() => setActive(!account!.active)}>
+				<Button variant="outline" {busy} onclick={() => setActive(!account!.active)}>
 					{account.active ? m.user_deactivate() : m.user_activate()}
 				</Button>
 			</div>
@@ -227,7 +227,7 @@
 					</Field.Field>
 					<Choice bind:checked={revoke}>{m.user_revoke_tokens()}</Choice>
 					<div>
-						<Button type="submit" disabled={busy || password === ''}
+						<Button type="submit" {busy} disabled={password === ''}
 							>{m.user_password_reset()}</Button
 						>
 					</div>
@@ -241,17 +241,17 @@
 				</p>
 				<div class="flex flex-wrap gap-2">
 					{#if account.totp_enabled && !own}
-						<Button variant="outline" disabled={busy} onclick={() => (confirm = 'totp')}>
+						<Button variant="outline" {busy} onclick={() => (confirm = 'totp')}>
 							{m.user_totp_remove()}
 						</Button>
 					{/if}
 					{#if account.linked_accounts.length > 0}
-						<Button variant="outline" disabled={busy} onclick={() => (confirm = 'oidc')}>
+						<Button variant="outline" {busy} onclick={() => (confirm = 'oidc')}>
 							{m.user_oidc_remove()}
 						</Button>
 					{/if}
 					{#if !own}
-						<Button variant="destructive" disabled={busy} onclick={() => (deleting = true)}>
+						<Button variant="destructive" {busy} onclick={() => (deleting = true)}>
 							{m.user_delete()}
 						</Button>
 					{/if}

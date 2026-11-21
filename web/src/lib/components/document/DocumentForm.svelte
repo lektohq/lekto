@@ -674,7 +674,7 @@
 						<p>{reasonsText(failedNode.reasons, failedNode.reason, labelled(lookup))}</p>
 					{/if}
 					{#if editable}
-						<Button type="button" variant="outline" disabled={busy} onclick={retry}>
+						<Button type="button" variant="outline" {busy} onclick={retry}>
 							<RotateCcw aria-hidden="true" />
 							{m.retry_node()}
 						</Button>
@@ -1016,10 +1016,10 @@
 				</p>
 			{/if}
 			<div class="flex justify-end gap-2">
-				<Button type="button" variant="ghost" disabled={busy} onclick={reset}>
+				<Button type="button" variant="ghost" {busy} onclick={reset}>
 					{m.review_reset()}
 				</Button>
-				<Button type="submit" disabled={busy || blocked || (filing !== null && spaceTarget === '')}
+				<Button type="submit" {busy} disabled={blocked || (filing !== null && spaceTarget === '')}
 					>{m.review_confirm()}</Button
 				>
 			</div>

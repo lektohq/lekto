@@ -195,7 +195,7 @@
 					{/if}
 
 					<!-- Not disabled while busy: the focus stays on the button. -->
-					<Button type="submit" size="lg" aria-disabled={busy}>{m.login_submit()}</Button>
+					<Button type="submit" size="lg" {busy}>{m.login_submit()}</Button>
 
 					{#if step === 'password'}
 						{#if data.oidc}

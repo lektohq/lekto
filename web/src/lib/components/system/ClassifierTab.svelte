@@ -215,7 +215,7 @@
 						{/if}
 					</div>
 					{#if session.isAdmin}
-						<Button onclick={train} disabled={busy}>
+						<Button onclick={train} {busy}>
 							<RefreshCw aria-hidden="true" />{m.classifier_train()}
 						</Button>
 					{/if}

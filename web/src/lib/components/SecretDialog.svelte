@@ -15,12 +15,16 @@
 		title,
 		description,
 		onclose,
+		returnTo = null,
 		extra
 	}: {
 		secret: string | null;
 		title: string;
 		description: string;
 		onclose: () => void;
+		/** Where the focus goes when the dialog closes. It opens after another dialog (the one
+		 * that made the secret), so nothing it could return to by itself is left. */
+		returnTo?: HTMLElement | null;
 		extra?: Snippet;
 	} = $props();
 
@@ -41,7 +45,15 @@
 <Dialog.Root bind:open={() => secret !== null, (open) => !open && onclose()}>
 	<!-- Shown once: a click beside the dialog does not close it, only "Ist gesichert", the X or
 	     Escape do. -->
-	<Dialog.Content size="md" interactOutsideBehavior="ignore">
+	<Dialog.Content
+		size="md"
+		interactOutsideBehavior="ignore"
+		onCloseAutoFocus={(event) => {
+			if (!returnTo) return;
+			event.preventDefault();
+			returnTo.focus();
+		}}
+	>
 		<Dialog.Header>
 			<Dialog.Title>{title}</Dialog.Title>
 			<Dialog.Description>{description}</Dialog.Description>

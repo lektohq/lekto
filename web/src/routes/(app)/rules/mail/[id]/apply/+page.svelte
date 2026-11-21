@@ -133,7 +133,7 @@
 		{/snippet}
 		{#snippet actions()}
 			{#if rule && !rule.enabled}
-				<Button size="sm" disabled={busy} onclick={() => void switchOne(true)}>
+				<Button size="sm" {busy} onclick={() => void switchOne(true)}>
 					<Power aria-hidden="true" />
 					{m.mail_rule_switch_on()}
 				</Button>
