@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getLocale, setLocale } from '#lib/paraglide/runtime.js';
 import {
 	browserZone,
@@ -28,20 +28,14 @@ describe('regionalLocale', () => {
 });
 
 describe('formatDate', () => {
-	const zone = process.env.TZ;
-	afterEach(() => {
-		process.env.TZ = zone;
-	});
-
 	it('keeps a day the same calendar day west of Greenwich', () => {
-		process.env.TZ = 'America/New_York';
+		vi.stubEnv('TZ', 'America/New_York');
 		expect(formatDate('2026-10-01', { day: 'numeric', month: 'numeric', year: 'numeric' })).toBe(
 			'10/1/2026'
 		);
 	});
 
 	it('shows a moment in the browser time', () => {
-		process.env.TZ = 'Europe/Berlin';
 		expect(formatDate('2026-10-01T23:30:00Z', { dateStyle: 'short', timeStyle: 'short' })).toBe(
 			'10/2/26, 1:30 AM'
 		);
@@ -64,14 +58,11 @@ describe('formatMoney', () => {
 
 describe('one way to format', () => {
 	const before = getLocale();
-	const zone = process.env.TZ;
 	afterEach(() => {
 		setLocale(before, { reload: false });
-		process.env.TZ = zone;
 	});
 
 	it('writes a moment medium or short', () => {
-		process.env.TZ = 'Europe/Berlin';
 		setLocale('de', { reload: false });
 		expect(formatMoment('2026-11-05T13:03:00Z')).toBe(
 			formatDate('2026-11-05T13:03:00Z', { dateStyle: 'medium', timeStyle: 'short' })

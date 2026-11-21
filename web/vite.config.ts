@@ -59,6 +59,11 @@ export default defineConfig({
 		environment: 'jsdom',
 		include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
 		setupFiles: ['./tests/setup.ts'],
+		// One zone on every machine, and not UTC: east of it and with summer time, a test that
+		// takes the local time for UTC fails everywhere. A test that needs another one stubs it
+		// (`vi.stubEnv('TZ', …)`), and gets this one back.
+		env: { TZ: 'Europe/Berlin' },
+		unstubEnvs: true,
 		// The colour tests read the palette's tokens from it (`?raw`).
 		css: { include: [/app\.css/] },
 		// Room for several waits of `asyncUtilTimeout` (tests/setup.ts) in one test on a busy runner.

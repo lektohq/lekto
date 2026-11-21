@@ -163,6 +163,8 @@ describe('the months of the document view', () => {
 		expect(monthOf('-document_date', doc('2026-09-30'))).toBe('2026-09');
 		expect(monthOf('document_date', doc(null))).toBe('');
 		expect(monthOf('-created_at', doc('2026-09-30', '2026-10-01T09:00:00'))).toBe('2026-10');
+		// Half past one at night here, the day before in UTC: the month the date shows.
+		expect(monthOf('-created_at', doc('2026-09-30', '2026-09-30T23:30:00Z'))).toBe('2026-10');
 		expect(monthOf('title', doc('2026-09-30'))).toBeNull();
 		expect(monthOf('relevance', doc('2026-09-30'))).toBeNull();
 	});
