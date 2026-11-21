@@ -12,7 +12,7 @@ from lekto_migration import plan as plans
 from lekto_migration.config import Config, public
 from lekto_migration.directory import Directory
 from lekto_migration.expect import Context, Expected, FieldInfo, expect, field_infos
-from lekto_migration.lekto import ApiError, Lekto
+from lekto_migration.lekto import ApiError, Lekto, unfit
 from lekto_migration.masterdata import Action, needs
 from lekto_migration.paperless import Paperless, PaperlessError, Snapshot
 from lekto_migration.plan import Plan, PlanError
@@ -48,11 +48,16 @@ class Loaded:
 
 
 async def admin(target: Lekto, *, write: bool) -> dict[str, Any]:
-    """The executing admin; the key must be an admin's, and one that writes to write."""
+    """The executing admin; the key must be an admin's, and one that writes to write. Lekto
+    must speak the API this client does: a migration writes too much to guess."""
     try:
         me = await target.me()
     except ApiError as error:
-        raise MigrationError(f"Lekto refused the API key: {error}") from None
+        if error.status in (401, 403):
+            raise MigrationError(f"Lekto refused the API key: {error}") from None
+        raise MigrationError(f"cannot read Lekto: {error}") from None
+    if problem := unfit(me.get("api_version")):
+        raise MigrationError(problem)
     if me["user"].get("role") != "admin":
         raise MigrationError("the Lekto API key must belong to an admin")
     if write and me.get("token_scope") != "read_write":

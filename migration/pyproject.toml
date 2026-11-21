@@ -6,7 +6,8 @@ readme = "README.md"
 license = "GPL-3.0-only"
 requires-python = ">=3.14"
 dependencies = [
-    "httpx2==2.13.1",
+    "httpx2==2.16.0",
+    "pylekto==0.4.0",
     "ruamel-yaml==0.19.1",
 ]
 

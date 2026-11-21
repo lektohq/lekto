@@ -3,22 +3,13 @@ document types and fields by name, tags by scope and name (names are unique per 
 spaces by name (unique among them) and personal spaces by their user. Names are compared
 without case, as Lekto does."""
 
-from collections.abc import Collection
 from dataclasses import dataclass, field
 from typing import Any
 
 from lekto_migration.lekto import Lekto
-from lekto_migration.plan import REVIEW_CODES, TAG_SCOPES, norm
+from lekto_migration.plan import TAG_SCOPES, norm
 
 SCOPES = ("document", "topic", "contact", "document_type")
-
-
-def takes_review_codes(known: Collection[str]) -> bool:
-    """Whether a Lekto that knows the reasons' codes `known` (`Lekto.reason_codes`) takes the
-    codes of the default reasons of reviews with an upload (`ImportedReviewIn.code`, issue
-    #83): both came in 0.6.3, and an older Lekto refuses them. The upload's metadata are a
-    form field, so their schema is no component of Lekto's OpenAPI document."""
-    return set(REVIEW_CODES.values()) <= set(known)
 
 
 @dataclass
@@ -33,28 +24,24 @@ class Directory:
     fields: dict[str, dict[str, Any]] = field(default_factory=dict)
     spaces: list[dict[str, Any]] = field(default_factory=list)
     read: bool = False  # False: no Lekto was read (a plan without a Lekto key); all is new
-    review_codes: bool = False  # Lekto takes the codes of reviews' reasons (issue #83)
 
     @classmethod
     async def of(cls, lekto: Lekto | None, admin: dict[str, Any] | None = None) -> Directory:
         if lekto is None:
             return cls(admin or {"id": "admin", "username": "admin"})
         directory = cls(admin or (await lekto.me())["user"], read=True)
-        for user in await lekto.items("/users"):
+        for user in await lekto.users():
             directory.users[norm(user["username"])] = user
-        for contact in await lekto.items("/contacts"):
+        for contact in await lekto.contacts():
             directory.contacts[norm(contact["name"])] = contact
-        for document_type in await lekto.items("/document-types"):
+        for document_type in await lekto.document_types():
             directory.document_types[norm(document_type["name"])] = document_type
-        for tag in await lekto.items("/tags"):
-            scope = tag.get("scope", "document")
-            directory.tags.setdefault(scope, {})[norm(tag["name"])] = tag
-        for item in await lekto.items("/fields"):
+        for tag in await lekto.tags():
+            directory.tags.setdefault(tag["scope"], {})[norm(tag["name"])] = tag
+        for item in await lekto.fields():
             directory.fields[norm(item["name"])] = item
-        # Every space: the list follows the reach an admin asks for (`all_users`).
-        directory.spaces = await lekto.items("/spaces", params={"all_users": "true"})
+        directory.spaces = await lekto.spaces()
         directory.users.setdefault(norm(directory.admin["username"]), directory.admin)
-        directory.review_codes = takes_review_codes(await lekto.reason_codes())
         return directory
 
     def _store(self, to: str) -> dict[str, dict[str, Any]] | None:

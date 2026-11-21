@@ -1188,6 +1188,7 @@ dependencies = [
 dev = [
     { name = "import-linter" },
     { name = "mypy" },
+    { name = "pylekto" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-xdist" },
@@ -1237,6 +1238,7 @@ requires-dist = [
 dev = [
     { name = "import-linter", specifier = "==2.15" },
     { name = "mypy", specifier = "==2.4.0" },
+    { name = "pylekto", specifier = "==0.4.0" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-asyncio", specifier = "==1.4.0" },
     { name = "pytest-xdist", specifier = "==3.8.0" },
@@ -2126,6 +2128,19 @@ wheels = [
 [package.optional-dependencies]
 crypto = [
     { name = "cryptography" },
+]
+
+[[package]]
+name = "pylekto"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx2" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1e/93/2dad8e61a7b26afbac8f37f2f95a57fd076c3111ecea7c00ef282e52276c/pylekto-0.4.0.tar.gz", hash = "sha256:c0465175dc64024fab19baf96662005642611c5a5e03819ee7c70d4d4c9f41af", size = 102496, upload-time = "2026-11-20T14:51:17.512Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/23/f8/6fd9ccfc2b47745f328924ea1af9d92673083ba8627d4051fabb0da6034e/pylekto-0.4.0-py3-none-any.whl", hash = "sha256:4dee6e80d8cf7b3a6270a4ac46b53594ba7b0d933491f5aece60339f8217be0a", size = 113265, upload-time = "2026-11-20T14:51:16.323Z" },
 ]
 
 [[package]]

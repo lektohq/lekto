@@ -9,7 +9,6 @@ it. A migrated document is aligned from three states (`align`); one deleted in L
 reported, or uploaded again with `--reupload`."""
 
 import asyncio
-import json
 import tempfile
 import time
 from collections.abc import Awaitable, Callable
@@ -269,13 +268,6 @@ class Run:
     ) -> tuple[str, str, bool] | None:
         """Download the original and upload it with uploader, space and metadata: the Lekto id,
         the file's SHA-256 and whether Lekto had the file already. None: not taken over."""
-        fields = {
-            "channel": "migration",
-            "uploaded_by": resolved.uploader_id,
-            "metadata": json.dumps(resolved.metadata()),
-        }
-        if resolved.space_id is not None:
-            fields["space_id"] = resolved.space_id
         with tempfile.TemporaryDirectory(prefix="lekto-migration-") as directory:
             path = Path(directory) / "original"
             try:
@@ -287,7 +279,13 @@ class Run:
                 )
                 return None
             try:
-                accepted = await self._target.upload(path, item.filename, fields)
+                accepted = await self._target.upload(
+                    path,
+                    item.filename,
+                    uploaded_by=resolved.uploader_id,
+                    space_id=resolved.space_id,
+                    metadata=resolved.metadata(),
+                )
             except ApiError as error:
                 if error.status == 409 and error.existing:
                     self.totals.duplicates += 1

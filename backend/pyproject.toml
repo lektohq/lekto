@@ -56,7 +56,9 @@ dev = [
     "pytest-asyncio==1.4.0",
     "pytest-xdist==3.8.0",
     "ruff==0.16.10",
-    # The migration client's own dependency (its plan), for the flow tests that run it.
+    # The migration client's own dependencies (its way to Lekto, its plan), for the flow tests
+    # that run it.
+    "pylekto==0.4.0",
     "ruamel.yaml==0.19.1",
     "yamllint==1.38.0",
 ]
@@ -76,7 +78,7 @@ select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "N"]
 strict = true
 files = ["src", "tests"]
 # The migration client's package, which the flow tests in tests/unit/adapters/rest run against
-# the API (it needs httpx2 and ruamel.yaml).
+# the API (it needs pylekto and ruamel.yaml).
 mypy_path = "../migration/src"
 
 [tool.pytest.ini_options]
