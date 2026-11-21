@@ -557,7 +557,7 @@ def coerce(value: Any, source: str, data_type: str, currency: str) -> tuple[Any,
         return value, None
     try:
         return _coerced(value, data_type, currency), None
-    except (ValueError, InvalidOperation, TypeError):
+    except ValueError, InvalidOperation, TypeError:
         return None, f"{_show(value)} does not fit a field of type {data_type}: not taken over"
 
 

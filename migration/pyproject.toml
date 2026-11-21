@@ -4,9 +4,10 @@ version = "0.0.0.dev0"
 description = "Takes over a Paperless-ngx archive into Lekto through the two REST APIs"
 readme = "README.md"
 license = "GPL-3.0-only"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
-    "httpx2==2.13.1",
+    "httpx2==2.16.0",
+    "pylekto==0.4.0",
     "ruamel-yaml==0.19.1",
 ]
 
@@ -27,7 +28,7 @@ build-backend = "uv_build"
 
 [tool.ruff]
 line-length = 100
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "N"]

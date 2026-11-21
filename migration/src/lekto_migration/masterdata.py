@@ -3,7 +3,7 @@ their hierarchy, groups, fields and spaces the plan and the selected documents n
 works it out (`check` shows it, `run` refuses while anything is open); `prepare` creates it.
 A missing object the plan may not create (no `create: true`) is an error of the plan."""
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -19,7 +19,6 @@ FILL = "fill"  # an existing user's profile gets a name or e-mail; `run` does no
 CREATED, UPDATED, FAILED = "created", "updated", "failed"
 OPEN = (CREATE, UPDATE, MISSING)
 PENDING = (CREATE, UPDATE, FILL)  # what `prepare` does
-PATHS = {"contact": "/contacts", "document_type": "/document-types"}
 TITLES = {
     "user": "Users",
     "contact": "Contacts",
@@ -597,15 +596,21 @@ async def _do(action: Action, lekto: Lekto, directory: Directory) -> str | None:
             await _fill_profile(lekto, str(action.data["id"]), action)
             return str(action.data["id"])
         found = await _created(
-            lambda: lekto.create_user(name), lambda: _relist(lekto, "/users", "username", name)
+            lambda: lekto.create_user(name), lambda: _relist(lekto.users, "username", name)
         )
         directory.add("user", found)
         await _fill_profile(lekto, str(found["id"]), action)
         return str(found["id"])
-    if kind in PATHS:
-        path = PATHS[kind]
+    if kind == "contact":
         found = await _created(
-            lambda: lekto.create_named(path, name), lambda: _relist(lekto, path, "name", name)
+            lambda: lekto.create_contact(name), lambda: _relist(lekto.contacts, "name", name)
+        )
+        directory.add(kind, found)
+        return str(found["id"])
+    if kind == "document_type":
+        found = await _created(
+            lambda: lekto.create_document_type(name),
+            lambda: _relist(lekto.document_types, "name", name),
         )
         directory.add(kind, found)
         return str(found["id"])
@@ -616,7 +621,7 @@ async def _do(action: Action, lekto: Lekto, directory: Directory) -> str | None:
             raise ApiError(0, f"the tag above, {parent}, does not exist")
         found = await _created(
             lambda: lekto.create_tag(name, scope, above["id"] if above else None),
-            lambda: _relist(lekto, "/tags", "name", name, {"scope": scope}),
+            lambda: _relist_tag(lekto, name, scope),
         )
         directory.add(kind, found)
         return str(found["id"])
@@ -624,7 +629,7 @@ async def _do(action: Action, lekto: Lekto, directory: Directory) -> str | None:
         data_type, choices = action.data["data_type"], tuple(action.data.get("choices", ()))
         found = await _created(
             lambda: lekto.create_field(name, data_type, choices),
-            lambda: _relist(lekto, "/fields", "name", name),
+            lambda: _relist(lekto.fields, "name", name),
         )
         directory.add("field", found)
         return str(found["id"])
@@ -640,7 +645,10 @@ async def _do(action: Action, lekto: Lekto, directory: Directory) -> str | None:
         if member is None or group is None:
             raise ApiError(0, "the member or the group does not exist")
         groups = [*(member.get("group_ids") or []), group["id"]]
-        found = await lekto.set_groups(PATHS[member_kind], member["id"], groups)
+        set_groups = (
+            lekto.set_contact_groups if member_kind == "contact" else lekto.set_document_type_groups
+        )
+        found = await set_groups(member["id"], groups)
         directory.add(member_kind, found)
         return None
     if kind == "space":
@@ -682,9 +690,17 @@ async def _created(create: Any, again: Any) -> dict[str, Any]:
 
 
 async def _relist(
-    lekto: Lekto, path: str, key: str, name: str, params: dict[str, Any] | None = None
+    listed: Callable[[], Awaitable[list[dict[str, Any]]]], key: str, name: str
 ) -> dict[str, Any] | None:
-    return next((i for i in await lekto.items(path, params) if norm(i[key]) == norm(name)), None)
+    return next((i for i in await listed() if norm(i[key]) == norm(name)), None)
+
+
+async def _relist_tag(lekto: Lekto, name: str, scope: str) -> dict[str, Any] | None:
+    """The tag of this name in `scope` (names are unique per scope)."""
+    return next(
+        (t for t in await lekto.tags() if t["scope"] == scope and norm(t["name"]) == norm(name)),
+        None,
+    )
 
 
 async def _relist_space(lekto: Lekto, name: str) -> dict[str, Any] | None:
@@ -692,7 +708,7 @@ async def _relist_space(lekto: Lekto, name: str) -> dict[str, Any] | None:
     return next(
         (
             s
-            for s in await lekto.items("/spaces", params={"all_users": "true"})
+            for s in await lekto.spaces()
             if s.get("personal_of") is None and norm(s["name"]) == norm(name)
         ),
         None,

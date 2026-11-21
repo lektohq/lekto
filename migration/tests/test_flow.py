@@ -6,15 +6,15 @@ import sqlite3
 from collections import Counter
 from collections.abc import Callable
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import httpx2
 import pytest
+from pylekto import API_VERSION
 
 from lekto_migration import plan as plans
 from lekto_migration.basis import Basis
-from lekto_migration.directory import takes_review_codes
 from tests import fake_lekto
 from tests.conftest import Setup
 
@@ -37,7 +37,8 @@ def row(report: dict[str, Any], id: int) -> dict[str, Any]:
 
 
 async def test_the_first_plan_is_written_from_what_both_sides_hold(setup: Setup) -> None:
-    setup.lekto.contacts["c1"] = {"id": "c1", "name": "ACME ENERGY", "group_ids": []}
+    id = str(uuid4())
+    setup.lekto.contacts[id] = {"id": id, "name": "ACME ENERGY", "group_ids": []}
     assert await setup.run("plan") == 0
     assert setup.lekto.writes() == []
     assert all(method == "GET" for method, _ in setup.paperless.requests)
@@ -234,21 +235,8 @@ async def test_profiles_are_filled_once_and_never_hold_the_run_back(setup: Setup
     address Lekto refuses are left out. None of it is an open need for `run`, and a second
     `prepare` does not ask Lekto again."""
     lekto = setup.lekto
-    lekto.users["u-tobias"] = {
-        "id": "u-tobias",
-        "username": "tobias",
-        "role": "user",
-        "active": True,
-    }
-    lekto.spaces["personal:u-tobias"] = fake_lekto._personal("u-tobias")
-    lekto.users["u-carla"] = {
-        "id": "u-carla",
-        "username": "carla",
-        "display_name": "Bob",
-        "role": "user",
-        "active": True,
-    }
-    lekto.spaces["personal:u-carla"] = fake_lekto._personal("u-carla")
+    tobias = lekto.add_user("tobias")
+    lekto.add_user("carla", display_name="Bob")
     for user in setup.archive.users:
         if user["username"] == "tobias":
             user["email"] = "tobias@mail.example"
@@ -256,7 +244,7 @@ async def test_profiles_are_filled_once_and_never_hold_the_run_back(setup: Setup
             user["email"] = "erika@localhost"
     assert await setup.run("plan") == 0
     assert await setup.run("prepare") == 0
-    assert lekto.profiles["u-tobias"]["email"] == "tobias@mail.example"
+    assert lekto.profiles[tobias]["email"] == "tobias@mail.example"
     erika = named(lekto.users, "erika")
     assert erika["display_name"] == "Erika Mustermann"
     assert not lekto.profiles[erika["id"]]["email"]
@@ -284,7 +272,7 @@ async def test_the_migration_takes_everything_over(setup: Setup) -> None:
     first = by_title(setup, "Document 10")
     assert first["channel"] == "migration"
     assert first["uploaded_by"] == named(lekto.users, "tobias")["id"]
-    assert first["space_id"] == f"personal:{first['uploaded_by']}"
+    assert first["space_id"] == fake_lekto.personal_id(first["uploaded_by"])
     assert first["document_date"] == "2024-05-01"
     assert datetime.fromisoformat(first["created_at"]) == datetime(2024, 4, 2, 7, 30, tzinfo=UTC)
     assert first["contact_id"] == named(lekto.contacts, "ACME Energy")["id"]
@@ -307,7 +295,7 @@ async def test_the_migration_takes_everything_over(setup: Setup) -> None:
     assert by_title(setup, "Document 11")["fields"] == {}  # an invalid URL is left out
     assert by_title(setup, "Document 14")["uploaded_by"] == fake_lekto.ADMIN["id"]
     assert by_title(setup, "Document 15")["uploaded_by"] == fake_lekto.ADMIN["id"]
-    assert by_title(setup, "Document 12")["space_id"].startswith("personal:")
+    assert lekto.spaces[by_title(setup, "Document 12")["space_id"]]["personal_of"] is not None
     shared = by_title(setup, "Document 13")
     space = lekto.spaces[shared["space_id"]]
     assert space["name"] == "Geteilt: bob (lesen), erika (bearbeiten), tobias (bearbeiten)"
@@ -432,13 +420,13 @@ async def test_a_topic_without_a_contact_is_not_taken_over(setup: Setup) -> None
 async def test_a_value_changed_in_lekto_stays(setup: Setup) -> None:
     assert await setup.migrate() == 0
     first = by_title(setup, "Document 10")
-    first["contact_id"] = "chosen-by-a-person"
+    chosen = first["contact_id"] = str(uuid4())  # by a person
     setup.edit("correspondents", "ACME Energy", "{to: contact, name: Unused}")
     assert await setup.run("check") == 0
     differences = row(setup.report("check"), 10)["differences"]
     assert [(d["what"], d["action"]) for d in differences] == [("contact_id", "kept")]
     assert await setup.run("run") == 0
-    assert first["contact_id"] == "chosen-by-a-person"
+    assert first["contact_id"] == chosen
     assert "kept: contact_id" in (row(setup.report("run"), 10)["reason"] or "")
 
 
@@ -547,6 +535,39 @@ async def test_a_wrong_or_read_only_key_cannot_write(setup: Setup) -> None:
     setup.lekto.scope = "read_write"
     setup.lekto.role = "user"
     assert await setup.run("run") == 2
+
+
+@pytest.mark.parametrize(
+    ("api_version", "said"),
+    [
+        ("0.1", "update Lekto"),
+        # Before 0.16 Lekto named none: its answer is no `Me` of pylekto's, `GET /version` is 404.
+        (None, f"Lekto names no API version, this client speaks the API {API_VERSION}"),
+    ],
+)
+async def test_an_older_lekto_stops_every_command(
+    setup: Setup, capsys: pytest.CaptureFixture[str], api_version: str | None, said: str
+) -> None:
+    """A migration writes too much to guess what an older API lacks."""
+    assert await setup.run("plan") == 0
+    setup.lekto.api_version = api_version
+    for command in ("plan", "check", "prepare", "run"):
+        assert await setup.run(command) == 2
+        assert said in capsys.readouterr().err
+    assert setup.lekto.writes() == []
+
+
+@pytest.mark.parametrize("api_version", ["0.99", "1.0"])
+async def test_a_newer_lekto_is_warned_about_and_migrated(setup: Setup, api_version: str) -> None:
+    """pylekto follows a Lekto release: until then the newer Lekto's own tests and its migration
+    image run this client against it."""
+    setup.lekto.api_version = api_version
+    for command in ("plan", "prepare", "run", "check"):
+        assert await setup.run(command) == 0
+    warning = f"warning: Lekto speaks the API {api_version}, this client speaks the API"
+    said = [m for m in setup.messages if m.startswith(warning)]
+    assert len(said) == 4 and said[0].endswith(": use the client of that Lekto; going on")
+    assert len(setup.lekto.documents) == 8
 
 
 # --- interruption and failures ----------------------------------------------------------------
@@ -719,37 +740,22 @@ async def test_only_the_first_selected_documents_with_a_limit(setup: Setup) -> N
 async def test_a_group_of_the_same_name_is_no_tag(setup: Setup) -> None:
     """Lekto's names are unique per scope: a contact group named like a Paperless tag stays a
     group, and the tag becomes a document tag of its own."""
-    setup.lekto.tags["group"] = {"id": "group", "name": "tax", "scope": "contact"}
+    id = str(uuid4())
+    setup.lekto.tags[id] = {"id": id, "name": "tax", "scope": "contact"}
     assert await setup.migrate() == 0
     tags = [t for t in setup.lekto.tags.values() if t["name"] == "tax"]
     assert sorted(t.get("scope", "document") for t in tags) == ["contact", "document"]
 
 
-@pytest.mark.parametrize("takes", [True, False])
-async def test_reviews_go_with_their_codes_where_lekto_takes_them(
-    setup: Setup, takes: bool
-) -> None:
+async def test_reviews_go_with_their_codes(setup: Setup) -> None:
     assert await setup.run("plan") == 0
     setup.edit("tags", "tax", "{to: tag, name: tax, create: true, review: true}")
-    setup.lekto.review_codes = takes  # a Lekto from before the codes refuses them
     assert await setup.migrate() == 0, setup.messages
     reviews = [
         review
         for upload in setup.lekto.uploads
         for review in json.loads(upload.get("metadata", "{}")).get("review", [])
     ]
-    assert reviews
-    if takes:
-        assert {(review["code"], review["params"]["name"]) for review in reviews} == {
-            ("paperless_tag_review", "tax")
-        }
-    else:
-        assert all("code" not in review for review in reviews)
-
-
-def test_lekto_takes_the_codes_of_reviews_by_its_openapi_document() -> None:
-    """By the document Lekto serves (`web/openapi.json`, written from it): the upload's
-    metadata are a form field, so the reasons it knows tell, not a schema (MI-01)."""
-    document = json.loads((Path(__file__).parents[2] / "web" / "openapi.json").read_text())
-    assert takes_review_codes(document["x-reasons"])
-    assert not takes_review_codes({"text": {}, "error": {}})
+    assert {(review["code"], review["params"]["name"]) for review in reviews} == {
+        ("paperless_tag_review", "tax")
+    }

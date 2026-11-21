@@ -12,7 +12,7 @@
 FROM ghcr.io/astral-sh/uv:0.11.33 AS uv
 
 # --- build: the locked dependencies, then the client, into one environment -----------------------
-FROM python:3.13.18-slim-trixie AS build
+FROM python:3.14.10-slim-trixie AS build
 
 COPY --from=uv /uv /usr/local/bin/
 ENV UV_PYTHON_DOWNLOADS=never \
@@ -28,7 +28,7 @@ COPY src ./src
 RUN uv sync --frozen --no-dev --no-editable
 
 # --- runtime ---------------------------------------------------------------------------------------
-FROM python:3.13.18-slim-trixie
+FROM python:3.14.10-slim-trixie
 
 COPY --from=build /opt/lekto-migration/venv /opt/lekto-migration/venv
 
