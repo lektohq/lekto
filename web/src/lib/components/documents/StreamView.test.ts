@@ -129,6 +129,47 @@ describe('StreamView', () => {
 		expect(within(table).getByRole('button', { name: m.stream_fewer() })).toBeTruthy();
 	});
 
+	it('stays where one looks when the stream is read again (WA-02)', async () => {
+		// Every event of any document reads the stream anew: the lanes folded again and the
+		// months jumped back to the newest.
+		const lanes = [
+			series([doc('a', '2026-07-15'), doc('b', '2026-08-15')]),
+			series([doc('c', '2026-07-16'), doc('d', '2026-08-16')], { folded: true })
+		];
+		const api = fakeApi({
+			'GET /api/v1/documents/stream': () => ({ lanes, truncated: false })
+		});
+		vi.stubGlobal('fetch', api);
+		const query = apiQuery(NO_FILTERS);
+		const { rerender } = render(StreamView, { props: { query, lookup: null, version: 0 } });
+		const table = () => screen.getByRole('table', { name: m.stream_lanes() });
+		await screen.findByRole('table', { name: m.stream_lanes() });
+		await fireEvent.click(
+			within(table()).getByRole('button', { name: m.stream_more({ count: formatNumber(1) }) })
+		);
+		const scroller = table().closest('.overflow-x-auto')!;
+		scroller.scrollLeft = 120;
+
+		await rerender({ query, lookup: null, version: 1 });
+		await vi.waitFor(() => expect(calls(api)).toHaveLength(2));
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(within(table()).getByRole('link', { name: /Abschlag c/ })).toBeTruthy();
+		expect(within(table()).getByRole('button', { name: m.stream_fewer() })).toBeTruthy();
+		expect(scroller.scrollLeft).toBe(120);
+
+		// Other filters: a new stream, opened at its newest month, the lanes folded.
+		await rerender({
+			query: apiQuery({ ...NO_FILTERS, contacts: ['c1'] }),
+			lookup: null,
+			version: 1
+		});
+		await vi.waitFor(() => expect(calls(api)).toHaveLength(3));
+		await vi.waitFor(() =>
+			expect(within(table()).queryByRole('link', { name: /Abschlag c/ })).toBeNull()
+		);
+		expect(scroller.scrollLeft).toBe(0);
+	});
+
 	it('shows a chip in the Beam, paging through its lane: a chip is a small card', async () => {
 		vi.stubGlobal(
 			'fetch',

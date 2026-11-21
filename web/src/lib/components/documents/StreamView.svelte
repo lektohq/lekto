@@ -4,7 +4,7 @@
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import ChevronUp from '@lucide/svelte/icons/chevron-up';
 	import CornerDownRight from '@lucide/svelte/icons/corner-down-right';
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import { openBeam } from '#lib/beam.svelte.ts';
@@ -38,7 +38,8 @@
 	// start and its expected document at the end, branches off it, chains, and the rest. On the
 	// desktop the months run from left to right, opened at the newest end; on a phone each lane
 	// runs down, newest first. Lanes beyond the limit come folded and open on demand. `version`
-	// changes when documents change: the stream loads again.
+	// changes when documents change: the stream loads again, and stays where the person looks
+	// (the month scrolled to, the lanes unfolded). Only the stream of other filters opens anew.
 	let {
 		query,
 		lookup,
@@ -50,9 +51,14 @@
 	let attempt = $state(0);
 	let expanded = $state(false);
 	let scroller = $state<HTMLDivElement | null>(null);
+	// Grows with the stream of another query than the one shown; the same one read again
+	// (an event, a retry) does not count.
+	let opened = $state(0);
+	let openedFor: string | null = null;
 
 	$effect(() => {
 		const asked = query;
+		const key = JSON.stringify(asked);
 		void attempt;
 		void version;
 		let current = true;
@@ -61,6 +67,10 @@
 				if (!current) return;
 				stream = found;
 				problem = null;
+				if (key !== openedFor) {
+					openedFor = key;
+					opened++;
+				}
 			},
 			(error) => {
 				if (current) problem = describeError(error);
@@ -76,7 +86,10 @@
 	// A new stream opens with the newest document's month (or today's) at the right edge, not
 	// an expected date far ahead; folded lanes closed.
 	$effect(() => {
-		const month = stream ? openingMonth(stream, axis, isoDayLocal(new Date())) : null;
+		if (opened === 0) return;
+		const month = untrack(() =>
+			stream ? openingMonth(stream, axis, isoDayLocal(new Date())) : null
+		);
 		expanded = false;
 		void tick().then(() => {
 			if (!scroller) return;
