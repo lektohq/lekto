@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'svelte-sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
 import type { components } from '#lib/api/schema.ts';
@@ -134,6 +135,21 @@ describe('the frame of the page', () => {
 		expect(screen.getByRole('heading', { level: 1, name: m.document_generic() })).toBeTruthy();
 		expect(await screen.findByText(m.document_not_found())).toBeTruthy();
 		expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+	});
+
+	it('says so when the open document is gone on reading it anew', async () => {
+		let gone = false;
+		serve(() => documentOf({ lane: 'green' }), {
+			'GET /api/v1/documents/doc-1': () =>
+				gone
+					? json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+					: documentOf({ lane: 'green' })
+		});
+		render(Page);
+		await screen.findByRole('heading', { level: 1, name: documentOf().title });
+		gone = true;
+		emit?.('document.updated', { document_id: 'doc-1', fields: ['tags'] });
+		expect(await screen.findByText(m.document_not_found())).toBeTruthy();
 	});
 
 	it('leaves a document deleted elsewhere the way the person came, once', async () => {
@@ -509,6 +525,34 @@ describe('the document tab', () => {
 		goTo('/ui/documents/doc-1?left=text&right=form', { id: 'doc-1' });
 		await waitFor(() => expect(screen.getByRole('form', { name: m.edit_title() })).toBeTruthy());
 		expect(titleField()?.value).toBe('Neu');
+	});
+
+	it('keeps the document and what is typed when reading it anew fails', async () => {
+		// WF-01: every event of the open document reads it anew; one failed attempt took the
+		// page away, with the form and what was typed into it.
+		const failed = vi.spyOn(toast, 'error').mockImplementation(() => '');
+		let down = false;
+		goTo('/ui/documents/doc-1?left=text&right=form', { id: 'doc-1' });
+		const api = serve(parsed, {
+			...readable,
+			'GET /api/v1/documents/doc-1': () =>
+				down
+					? json({ type: 'about:blank', title: 'Service Unavailable', status: 503 }, 503)
+					: parsed()
+		});
+		render(Page);
+		await waitFor(() => expect(titleField()).not.toBeNull());
+		await userEvent.clear(titleField()!);
+		await userEvent.type(titleField()!, 'Neu');
+		const loads = () => calls(api).filter((call) => call === 'GET /api/v1/documents/doc-1');
+		const before = loads().length;
+		down = true;
+		emit?.('document.updated', { document_id: 'doc-1', fields: ['tags'] });
+		await waitFor(() => expect(failed).toHaveBeenCalledTimes(1));
+		expect(loads()).toHaveLength(before + 1);
+		expect(titleField()?.value).toBe('Neu');
+		expect(screen.getByRole('form', { name: m.edit_title() })).toBeTruthy();
+		failed.mockRestore();
 	});
 
 	it('shows a pane chosen deep down the one before from its start, on a phone', async () => {

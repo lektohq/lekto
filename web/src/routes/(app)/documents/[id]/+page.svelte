@@ -205,7 +205,15 @@
 				reportSeen(loaded);
 			}
 		} catch (error) {
-			if (wanted === id && request === latest) problem = error;
+			if (wanted === id && request === latest) {
+				// The document is on the screen and was only read anew (an event, a reconnect of
+				// the stream): one failed attempt must not take it away, with what is typed into
+				// its form. It stays, the failure is said, and the next event reads it again.
+				// Gone or out of reach is another matter: then the page says so.
+				const lost = error instanceof ApiError && (error.status === 404 || error.status === 403);
+				if (document?.id === wanted && !lost) reportError(error);
+				else problem = error;
+			}
 			// Gone, though the list held it: left out once one steps on from it.
 			if (error instanceof ApiError && error.status === 404) gone.add(wanted);
 		}
