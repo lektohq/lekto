@@ -9,7 +9,7 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from functools import partial
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, NamedTuple, Protocol
 
 import httpx2
 from pylekto import (
@@ -75,19 +75,29 @@ class _Request[M](Protocol):
     def model_validate(self, obj: Any, /) -> M: ...
 
 
-def unfit(api_version: str | None) -> str | None:
-    """Why this client does not work with a Lekto that speaks the API `api_version`; None if it
-    fits (`pylekto.api_fit`)."""
+class Unfit(NamedTuple):
+    """Why this client may not work with a Lekto, and whether that stops it."""
+
+    reason: str
+    stops: bool
+
+
+def unfit(api_version: str | None) -> Unfit | None:
+    """Why this client may not work with a Lekto that speaks the API `api_version`; None if it
+    fits (`pylekto.api_fit`). Only an older Lekto, or one that names no version, stops it: a
+    newer one comes before a pylekto that speaks its API (pylekto follows a release), and its
+    own tests and its migration image run this client against it."""
     ours = f"this client speaks the API {API_VERSION} of Lekto {LEKTO_VERSION}"
     match api_fit(api_version):
         case "fits":
             return None
         case "newer":
-            return f"Lekto speaks the API {api_version}, {ours}: use the client of that Lekto"
+            theirs = f"Lekto speaks the API {api_version}, {ours}"
+            return Unfit(f"{theirs}: use the client of that Lekto", stops=False)
         case "older":
-            return f"Lekto speaks the API {api_version}, {ours}: update Lekto"
+            return Unfit(f"Lekto speaks the API {api_version}, {ours}: update Lekto", stops=True)
         case _:
-            return f"Lekto names no API version, {ours}: update Lekto"
+            return Unfit(f"Lekto names no API version, {ours}: update Lekto", stops=True)
 
 
 class Lekto:
@@ -158,7 +168,7 @@ class Lekto:
                 problem = unfit(version.api_version)
             if problem is None:
                 raise
-            raise ApiError(0, problem) from None
+            raise ApiError(0, problem.reason) from None
 
     async def users(self) -> list[dict[str, Any]]:
         return await self._all(self._lekto.users.list)

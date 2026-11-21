@@ -47,9 +47,10 @@ class Loaded:
         return id in self.expected
 
 
-async def admin(target: Lekto, *, write: bool) -> dict[str, Any]:
-    """The executing admin; the key must be an admin's, and one that writes to write. Lekto
-    must speak the API this client does: a migration writes too much to guess."""
+async def admin(target: Lekto, *, write: bool, progress: Progress) -> dict[str, Any]:
+    """The executing admin; the key must be an admin's, and one that writes to write. An older
+    Lekto, or one without an API version, stops the command; a newer one gets a warning, and
+    what it refuses is reported as always."""
     try:
         me = await target.me()
     except ApiError as error:
@@ -57,7 +58,9 @@ async def admin(target: Lekto, *, write: bool) -> dict[str, Any]:
             raise MigrationError(f"Lekto refused the API key: {error}") from None
         raise MigrationError(f"cannot read Lekto: {error}") from None
     if problem := unfit(me.get("api_version")):
-        raise MigrationError(problem)
+        if problem.stops:
+            raise MigrationError(problem.reason)
+        progress(f"warning: {problem.reason}; going on")
     if me["user"].get("role") != "admin":
         raise MigrationError("the Lekto API key must belong to an admin")
     if write and me.get("token_scope") != "read_write":
@@ -76,7 +79,7 @@ async def read(
         f"Paperless {snapshot.version}: {len(snapshot.documents)} documents, "
         f"{len(snapshot.users)} users"
     )
-    me = await admin(target, write=write) if target is not None else None
+    me = await admin(target, write=write, progress=progress) if target is not None else None
     try:
         directory = await Directory.of(target, me)
     except ApiError as error:

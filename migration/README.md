@@ -7,8 +7,11 @@ so a complete migration also proves the API is complete. It is a separate uv pro
 (`lekto_migration`, Python 3.14; dependencies `pylekto`, `httpx2` and `ruamel.yaml`) and not
 part of the Lekto image.
 
-Lekto must speak the version of its API that pylekto speaks (`api_version` of `GET /auth/me`);
-otherwise every command stops before it reads or writes anything and says which side to update.
+Lekto must speak at least the version of its API that pylekto speaks (`api_version` of
+`GET /auth/me`): with an older Lekto, or one that names no version, every command stops before it
+reads or writes anything and says to update Lekto. A newer Lekto gets a warning and the command
+goes on (pylekto follows a Lekto release); what that Lekto refuses is reported as usual, and the
+client of its release is the safer choice.
 
 A migration is an ingest: Lekto reads every original itself (OCR as always: a page's own text
 layer stays, another program's invisible one is replaced, images are read), the migration plan
@@ -191,7 +194,7 @@ the state file, too). The state maps every document to its Lekto document and re
 migration set; an interrupted run continues where it stopped and a second run creates nothing
 twice. Reports (`plan`, `check`, `prepare`, `run`, each as `.md` and `.json`) list every object
 and document with what became of it, or why not. Exit codes: 0 fine, 1 problems or failures or
-nothing written, 2 cannot go on (wrong key, unreachable server, another API version of Lekto,
+nothing written, 2 cannot go on (wrong key, unreachable server, an older Lekto,
 a plan that cannot be used, a phase missing), 130 stopped.
 
 ## Checks

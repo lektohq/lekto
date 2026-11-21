@@ -541,22 +541,33 @@ async def test_a_wrong_or_read_only_key_cannot_write(setup: Setup) -> None:
     ("api_version", "said"),
     [
         ("0.1", "update Lekto"),
-        ("0.99", "use the client of that Lekto"),
-        ("1.0", "use the client of that Lekto"),
         # Before 0.16 Lekto named none: its answer is no `Me` of pylekto's, `GET /version` is 404.
         (None, f"Lekto names no API version, this client speaks the API {API_VERSION}"),
     ],
 )
-async def test_a_lekto_of_another_api_stops_every_command(
+async def test_an_older_lekto_stops_every_command(
     setup: Setup, capsys: pytest.CaptureFixture[str], api_version: str | None, said: str
 ) -> None:
-    """A migration writes too much to guess what another API means."""
+    """A migration writes too much to guess what an older API lacks."""
     assert await setup.run("plan") == 0
     setup.lekto.api_version = api_version
     for command in ("plan", "check", "prepare", "run"):
         assert await setup.run(command) == 2
         assert said in capsys.readouterr().err
     assert setup.lekto.writes() == []
+
+
+@pytest.mark.parametrize("api_version", ["0.99", "1.0"])
+async def test_a_newer_lekto_is_warned_about_and_migrated(setup: Setup, api_version: str) -> None:
+    """pylekto follows a Lekto release: until then the newer Lekto's own tests and its migration
+    image run this client against it."""
+    setup.lekto.api_version = api_version
+    for command in ("plan", "prepare", "run", "check"):
+        assert await setup.run(command) == 0
+    warning = f"warning: Lekto speaks the API {api_version}, this client speaks the API"
+    said = [m for m in setup.messages if m.startswith(warning)]
+    assert len(said) == 4 and said[0].endswith(": use the client of that Lekto; going on")
+    assert len(setup.lekto.documents) == 8
 
 
 # --- interruption and failures ----------------------------------------------------------------
