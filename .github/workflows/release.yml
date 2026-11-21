@@ -11,9 +11,9 @@ name: Release
 # dependencies, its Dockerfile) changed since the previous published release; otherwise that
 # release's image gets this release's tags, without a new image.
 # By hand (`workflow_dispatch`) the images of a published release are built again, both.
-# Last, a published release whose `lekto` image got `latest` tells the homelab
-# its version by `repository_dispatch` (repository in the secret `HOMELAB_DISPATCH_REPO`); the
-# homelab enters and deploys it.
+# Last, a published release whose `lekto` image got `latest` tells the homelab its version: it
+# starts the homelab's workflow `lekto-release.yml` (`workflow_dispatch`, repository in the secret
+# `HOMELAB_DISPATCH_REPO`); the homelab enters and deploys it.
 # Only in lektohq/lekto itself: a fork never tells the homelab anything.
 
 # yamllint disable-line rule:truthy
@@ -272,30 +272,18 @@ jobs:
             exit 1
           fi
       - name: 📣 Tell the homelab
-        # The homelab's workflow is active only once it is on its default branch; until then a
-        # failed dispatch must not mark the release red.
+        # A `workflow_dispatch` of the homelab's `lekto-release.yml` on `main`: its token needs only
+        # Actions (read and write) there, not Contents: write, which would let it push code. The
+        # homelab's workflow is active only once it is on its default branch; until then a failed
+        # call must not mark the release red.
         continue-on-error: true
         env:
           REPO: ${{ secrets.HOMELAB_DISPATCH_REPO }}
-          TOKEN: ${{ secrets.HOMELAB_DISPATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.HOMELAB_DISPATCH_TOKEN }}
         run: |
           if ! [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
             echo "::error::The secret HOMELAB_DISPATCH_REPO holds no repository (owner/name)"
             exit 1
           fi
-          body=$(jq -nc --arg version "$VERSION" \
-            '{event_type: "lekto-release", client_payload: {version: $version}}')
-          # The token goes to curl on stdin, never on a command line.
-          status=$(printf 'Authorization: Bearer %s\n' "$TOKEN" | curl -sS -X POST \
-            -H @- \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            --data "$body" \
-            -o /tmp/response -w '%{http_code}' \
-            "https://api.github.com/repos/$REPO/dispatches")
-          if [ "$status" != "204" ]; then
-            echo "::error::The homelab answered HTTP $status"
-            cat /tmp/response
-            exit 1
-          fi
+          gh workflow run lekto-release.yml -R "$REPO" --ref main -f version="$VERSION"
           echo "The homelab deploys $VERSION" >> "$GITHUB_STEP_SUMMARY"
