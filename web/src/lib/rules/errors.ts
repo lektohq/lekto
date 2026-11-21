@@ -1,7 +1,9 @@
 /**
  * Errors of saving a rule, next to the block they concern. The API names the place in a 422
  * (`conditions.all[1].any[0]: …`, `actions[2]: …`; request validation also names schema parts
- * in between), the missing id in a 404 (`tag <id> not found`) and the space in a 403.
+ * in between), the missing id in a 404 (`tag <id> not found`) and the space in a 403. A 422
+ * that names no place gives its reason with a code (an invalid pattern, a tag of the wrong
+ * kind): it stands in the user's language, an invalid pattern at the conditions that hold it.
  */
 import { ApiError } from '#lib/api/problem.ts';
 import { describeError } from '#lib/errors.ts';
@@ -51,6 +53,17 @@ export function saveErrors(error: unknown, model: RuleModel): SaveErrors {
 			if (match) errors.push({ path: match[1], message: match[2] });
 			else if (last) last.message += `; ${part}`;
 			else errors.push({ path: null, message: part });
+		}
+		// No place, but a reason with a code: in the user's language, and a pattern's at the
+		// conditions that match by it.
+		const reason = error.problem?.reason;
+		if (reason && errors.every((part) => part.path === null)) {
+			const message = describeError(error);
+			const pattern = PATTERN_CODES.has(reason.code) ? reason.params.pattern : undefined;
+			const blocks = typeof pattern === 'string' ? conditionsMatching(model, pattern) : [];
+			for (const key of blocks) result.byKey[key] = message;
+			if (blocks.length === 0) result.general = message;
+			return result;
 		}
 		// Request validation tries every kind of a condition or group; drop the kinds that are not
 		// the block's, unless nothing else is left.
@@ -107,6 +120,22 @@ function fits(path: string, model: RuleModel): boolean {
 		}
 	}
 	return true;
+}
+
+/** The reasons about a pattern (`params.pattern`). */
+const PATTERN_CODES: ReadonlySet<string> = new Set(['pattern_invalid', 'pattern_too_large']);
+
+/** The conditions that match by `pattern`. */
+function conditionsMatching(model: RuleModel, pattern: string): string[] {
+	const keys: string[] = [];
+	const visit = (group: GroupNode) => {
+		for (const item of group.items) {
+			if (item.kind === 'group') visit(item);
+			else if (item.op === 'matches' && item.value === pattern) keys.push(item.key);
+		}
+	};
+	visit(model.conditions);
+	return keys;
 }
 
 function blocksUsing(model: RuleModel, id: string): string[] {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { m } from '#lib/paraglide/messages.js';
 import { ApiError } from '#lib/api/problem.ts';
 import { keyAt, saveErrors } from './errors.ts';
 import {
@@ -519,6 +520,46 @@ describe('errors of saving', () => {
 		expect(Object.keys(saveErrors(type, typed).byKey)).toEqual([typed.actions[0].key]);
 		const other = failed(409, 'changed meanwhile');
 		expect(saveErrors(other, model)).toEqual({ byKey: {}, general: 'changed meanwhile' });
+	});
+
+	it("says an invalid pattern in the user's language, at the conditions that hold it (WD-01)", () => {
+		// The API names no place, but its reason with a code: the English text stood as a
+		// general line, and no condition was marked.
+		const refused = (code: string, params: Record<string, unknown>, detail: string) => {
+			const error = failed(422, detail);
+			return new ApiError(
+				422,
+				{ ...error.problem!, reason: { code, params, subject: null } as never },
+				null
+			);
+		};
+		const patterned = fromApi(
+			definition(
+				{
+					all: [
+						cond('text', 'matches', '(a'),
+						cond('text', 'contains', '(a'),
+						{ any: [cond('text', 'matches', '(a'), cond('text', 'matches', 'b+')], not: false }
+					],
+					not: false
+				},
+				[]
+			)
+		);
+		const inner = patterned.conditions.items[2] as GroupNode;
+		const invalid = refused(
+			'pattern_invalid',
+			{ pattern: '(a', detail: 'missing ) at position 2' },
+			"invalid pattern '(a': missing ) at position 2"
+		);
+		const message = m.reason_pattern_invalid({ pattern: '(a', detail: 'missing ) at position 2' });
+		expect(saveErrors(invalid, patterned)).toEqual({
+			byKey: { [patterned.conditions.items[0].key]: message, [inner.items[0].key]: message },
+			general: null
+		});
+		// A pattern no condition holds (changed meanwhile), and any other reason without a
+		// place: said in general, in the user's language all the same.
+		expect(saveErrors(invalid, model)).toEqual({ byKey: {}, general: message });
 	});
 });
 
