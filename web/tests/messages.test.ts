@@ -137,6 +137,11 @@ const NO_SINGULAR: ReadonlySet<string> = new Set([
 	'webhook_volume_total_exact'
 ]);
 
+// Help opens beside a label and is read in passing (DESIGN.md, "Help and tooltips"): about 200
+// characters, and none above this. The one text that is longer describes a dialog.
+const HELP_LIMIT = 220;
+const NO_HELP: ReadonlySet<string> = new Set(['open_confirm_recommended_hint']);
+
 describe('messages', () => {
 	it('have a singular beside every text that counts something', () => {
 		const counting = keys(de).filter(
@@ -157,6 +162,14 @@ describe('messages', () => {
 		const catalogue = catalogues[locale];
 		const empty = keys(catalogue).filter((key) => !catalogue[key].trim());
 		expect(empty).toEqual([]);
+	});
+
+	it.each(Object.keys(catalogues))('keep a help text short in %s', (locale) => {
+		const catalogue = catalogues[locale];
+		const long = keys(catalogue).filter(
+			(key) => /_(info|hint)$/.test(key) && !NO_HELP.has(key) && catalogue[key].length > HELP_LIMIT
+		);
+		expect(long).toEqual([]);
 	});
 
 	it('use the same placeholders in every language', () => {

@@ -252,8 +252,8 @@ Chips and badges are pills; a pill is never a button that starts an action.
 On the phone every button is at least 44 px tall (see [Touch targets](#touch-targets)). The
 component handles this. Pages and components do not give a `Button` or `IconButton` a height of
 their own (`h-*`, `size-*`, also through a class constant); a size from the table does it, and
-`design-system.test.ts` refuses one. A button in a row of small things (the inbox's "Gesehen") is
-`sm`.
+`design-system.test.ts` refuses one. A button in a row of small things (the inbox's "Als gesehen
+markieren") is `sm`.
 
 **Icon buttons:** `IconButton` only. It takes a `label` (its tooltip and `aria-label`), a variant
 and a size (`default` 40 px, `sm` 32 px), optionally a shorter `hint` as tooltip. Spread a menu
@@ -777,6 +777,9 @@ modal, over a dialog too.
   "Teil 2 von 3" to page through the parts, and nothing to open. The history entry names the
   parts by a key only; their images stay in memory, so a reload closes it, as the edit is gone
   then too.
+- **No shadow** (Tobi, 05.11.2026): Safari paints the shadow of the sheet solid black beside it
+  once its pages are drawn anew at another zoom, and keeps it so. Its left border and the
+  backdrop set it off. `design-system.test.ts` keeps the shadow away.
 - **Opening it: one way everywhere** (Tobi, 31.10.2026). Wherever Lekto names a document, its
   title opens it in the Beam: the eye (`scan-eye`) before the title, both one button in the
   brand colour, medium weight, one line, cut (`BeamTitle`); a value that stands for documents
@@ -860,12 +863,10 @@ a tap on it is none on the page behind, so the layer stays open (`lib/toasts.ts`
 
 ### Help and tooltips
 
-- **No shadow** (Tobi, 05.11.2026): Safari paints the shadow of the sheet solid black beside it
-  once its pages are drawn anew at another zoom, and keeps it so. Its left border and the
-  backdrop set it off. `design-system.test.ts` keeps the shadow away.
 - **Help of a field or section:** `InfoTip` or `HintLabel`, an info button beside the label that
-  opens the text; the title of a section or card with help is `SectionTitle` with `tip`. The visible text stays what one needs to read the view. Help text holds at most
-  about 200 characters. Longer explanations belong in the documentation.
+  opens the text; the title of a section or card with help is `SectionTitle` with `tip`. The visible text stays what one needs to read the view. Help text holds
+  about 200 characters; `messages.test.ts` refuses one above 220 (a key ending in `_info` or
+  `_hint`). Longer explanations belong in the documentation.
 - **Tooltip** (`ui/tooltip`): the name of an icon button (through `IconButton`), the names of the
   options of `Segmented`, the inbox mark of a card. A native `title=` attribute is used only for
   text that is cut off (a truncated name, "+3" for the rest of the tags, a type's title pattern
@@ -1479,20 +1480,22 @@ Every text a user reads is in `messages/en.json` and `messages/de.json` (`no-raw
 - Short sentences, active voice, no jargon a user does not know. Technical reasons from the API
   are translated (`x-reasons`).
 - Buttons are verbs or verb phrases ("Als gesehen markieren", not "Gesehen").
+  A button that opens the menu or the dialog of a thing bears the thing's name: "Tags", "Kontakt",
+  "Typ", "Mehr", "Details", "Wartung", "Release Notes", "Prompt".
   The one form of a noun: the action that creates in the head of a page or list is "Neue/r/s X"
   ("Neue Regel", "Neuer Webhook", "Neues Postfach"; Tobi, 09.11.2026); elsewhere "Anlegen".
 
 ### Words
 
-| Concept                              | German              | English              |
-| ------------------------------------ | ------------------- | -------------------- |
-| Save a form                          | Speichern           | Save                 |
-| Leave without saving                 | Abbrechen           | Cancel               |
-| Discard unsaved changes              | Verwerfen           | Discard              |
-| Enabled / disabled (rules, webhooks) | Aktiv / Pausiert    | Active / Paused      |
-| Enabled / disabled (users)           | Aktiv / Deaktiviert | Active / Deactivated |
-| Create                               | Anlegen             | Create               |
-| Delete                               | Löschen             | Delete               |
+| Concept                                         | German              | English              |
+| ----------------------------------------------- | ------------------- | -------------------- |
+| Save a form                                     | Speichern           | Save                 |
+| Leave without saving                            | Abbrechen           | Cancel               |
+| Discard unsaved changes                         | Verwerfen           | Discard              |
+| Enabled / disabled (rules, webhooks, mailboxes) | Aktiv / Pausiert    | Active / Paused      |
+| Enabled / disabled (users)                      | Aktiv / Deaktiviert | Active / Deactivated |
+| Create                                          | Anlegen             | Create               |
+| Delete                                          | Löschen             | Delete               |
 
 One thing has one name (Tobi, 21.11.2026; `messages-tone.test.ts` keeps the other words out):
 

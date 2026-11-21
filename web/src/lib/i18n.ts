@@ -51,7 +51,7 @@ export function quoted(text: string): string {
 	return m.rule_quoted({ text });
 }
 
-/** A moment with its time: `medium` "5. Nov. 2026, 14:03", as the lists of fetches and origins
+/** A moment with its time: `medium` "05.11.2026, 14:03", as the lists of fetches and origins
  * show it; `short` "05.11.26, 14:03", for the rows of tables. */
 export function formatMoment(value: Date | string, style: 'medium' | 'short' = 'medium'): string {
 	return formatDate(value, { dateStyle: style, timeStyle: 'short' });
