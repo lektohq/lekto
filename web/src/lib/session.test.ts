@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '#lib/api/client.ts';
 import { CSRF_HEADER, setSessionHooks } from '#lib/api/fetch.ts';
-import { connectSession, session } from './session.svelte.ts';
+import { json } from '#lib/testing/api.ts';
+import { connectSession, recheckSession, session } from './session.svelte.ts';
 
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
 
@@ -124,5 +125,97 @@ describe('another user in the same tab', () => {
 		session.clear();
 		session.start(signedIn('erika'));
 		expect(session.another).toBe(false);
+	});
+});
+
+describe('asking anew who is signed in', () => {
+	const gone = () => json({ type: 'about:blank', title: 'Unauthorized', status: 401 }, 401);
+
+	async function signedInAs(id: string) {
+		fetchMock.mockResolvedValueOnce(me(id, 'one'));
+		await session.load();
+	}
+
+	it('changes nothing while the same user is signed in', async () => {
+		await signedInAs('jane');
+		const user = session.user;
+		fetchMock.mockResolvedValueOnce(me('jane', 'two'));
+
+		await recheckSession();
+
+		expect(session.user).toBe(user);
+		expect(session.csrfToken).toBe('two');
+		expect(events.replaced).not.toHaveBeenCalled();
+		expect(events.unauthorized).not.toHaveBeenCalled();
+	});
+
+	it('follows the same user whose role changed, without starting afresh', async () => {
+		await signedInAs('jane');
+		fetchMock.mockResolvedValueOnce(
+			json({
+				user: { id: 'jane', username: 'jane', role: 'admin' },
+				method: 'password',
+				expires_at: '2026-10-09T12:00:00Z',
+				csrf_token: 'two',
+				lekto_version: '0.8.0'
+			})
+		);
+
+		await recheckSession();
+
+		expect(session.isAdmin).toBe(true);
+		expect(events.replaced).not.toHaveBeenCalled();
+	});
+
+	it('starts afresh when another user holds the session now', async () => {
+		await signedInAs('jane');
+		fetchMock.mockResolvedValueOnce(me('erika', 'theirs'));
+
+		await recheckSession();
+
+		expect(events.replaced).toHaveBeenCalledTimes(1);
+		expect(events.unauthorized).not.toHaveBeenCalled();
+	});
+
+	it('leads to signing in when the session is gone', async () => {
+		await signedInAs('jane');
+		fetchMock.mockResolvedValueOnce(gone());
+
+		await recheckSession();
+
+		expect(session.user).toBeNull();
+		expect(events.unauthorized).toHaveBeenCalledTimes(1);
+		expect(events.replaced).not.toHaveBeenCalled();
+	});
+
+	it('keeps the user while the API is not reachable', async () => {
+		await signedInAs('jane');
+		fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+		await expect(recheckSession()).resolves.toBeUndefined();
+
+		expect(session.user?.id).toBe('jane');
+		expect(events.replaced).not.toHaveBeenCalled();
+		expect(events.unauthorized).not.toHaveBeenCalled();
+	});
+
+	it('asks once when two occasions come together', async () => {
+		await signedInAs('jane');
+		fetchMock.mockResolvedValue(me('erika', 'theirs'));
+
+		await Promise.all([recheckSession(), recheckSession()]);
+
+		// One request beside the one that signed in, one fresh start.
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(events.replaced).toHaveBeenCalledTimes(1);
+	});
+
+	it('tells no one when nobody was signed in before', async () => {
+		fetchMock.mockResolvedValueOnce(me('jane', 'one'));
+
+		await recheckSession();
+
+		expect(session.user?.id).toBe('jane');
+		expect(events.replaced).not.toHaveBeenCalled();
 	});
 });

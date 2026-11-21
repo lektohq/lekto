@@ -40,9 +40,10 @@ class Session {
 	}
 
 	/**
-	 * Who is signed in, from the server; false without a session. Every navigation calls this:
-	 * the user object is replaced only when something about the user changed, so that effects
-	 * reading `session.user` (the event stream, the uploads) do not run again for nothing.
+	 * Who is signed in, from the server; false without a session. Called when the app starts and
+	 * whenever it asks anew (`recheckSession`): the user object is replaced only when something
+	 * about the user changed, so that effects reading `session.user` (the event stream, the
+	 * uploads) do not run again for nothing.
 	 */
 	async load(): Promise<boolean> {
 		const { data, error, response } = await api.GET('/api/v1/auth/me');
@@ -91,8 +92,37 @@ export interface SessionEvents {
 	replaced(): void;
 }
 
+let connected: SessionEvents | null = null;
+let rechecking: Promise<void> | null = null;
+
+/**
+ * Ask the server anew who is signed in. All tabs of a browser share the session cookie: someone
+ * may have signed out in another tab, and another person signed in. The app asks when the tab
+ * comes to the front again and when the event stream reconnects (the API closes a stream whose
+ * session ended). Another user than before: start afresh (`replaced`); no session any more: sign
+ * in again (`unauthorized`); the same user with another role or name: the app follows. Without
+ * an answer nothing changes; the next occasion asks again.
+ */
+export function recheckSession(): Promise<void> {
+	rechecking ??= (async () => {
+		const before = session.user?.id ?? null;
+		try {
+			const signedIn = await session.load();
+			if (before === null) return;
+			if (!signedIn) connected?.unauthorized();
+			else if (session.user?.id !== before) connected?.replaced();
+		} catch {
+			// The API is not reachable right now.
+		} finally {
+			rechecking = null;
+		}
+	})();
+	return rechecking;
+}
+
 /** Connect the API client to the session. */
 export function connectSession({ unauthorized, replaced }: SessionEvents): void {
+	connected = { unauthorized, replaced };
 	setSessionHooks({
 		csrfToken: () => session.csrfToken,
 		refreshCsrfToken: async () => {
