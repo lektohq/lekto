@@ -39,7 +39,9 @@
 </script>
 
 <Dialog.Root bind:open={() => secret !== null, (open) => !open && onclose()}>
-	<Dialog.Content size="md">
+	<!-- Shown once: a click beside the dialog does not close it, only "Ist gesichert", the X or
+	     Escape do. -->
+	<Dialog.Content size="md" interactOutsideBehavior="ignore">
 		<Dialog.Header>
 			<Dialog.Title>{title}</Dialog.Title>
 			<Dialog.Description>{description}</Dialog.Description>

@@ -106,7 +106,8 @@
 </Card.Root>
 
 <Dialog.Root bind:open={() => token !== null, (open) => !open && (token = null)}>
-	<Dialog.Content size="md">
+	<!-- The token is shown once: a click beside the dialog does not close it. -->
+	<Dialog.Content size="md" interactOutsideBehavior="ignore">
 		<Dialog.Header>
 			<Dialog.Title>{m.shortcut_dialog_title()}</Dialog.Title>
 			<Dialog.Description>{m.shortcut_dialog_text({ name: SHORTCUT_NAME })}</Dialog.Description>
