@@ -873,7 +873,8 @@
 {#snippet deleted()}
 	<!-- Struck through in red, as a removed tag in the question before saving a document. -->
 	<span class="flex flex-wrap gap-x-2">
-		{#each gone?.titles ?? [] as title (title)}
+		<!-- By place: documents made by one title pattern share their title. -->
+		{#each gone?.titles ?? [] as title, index (index)}
 			<span class="text-destructive line-through">{quoted(title)}</span>
 		{/each}
 	</span>

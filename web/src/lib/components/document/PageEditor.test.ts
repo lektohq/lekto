@@ -312,6 +312,26 @@ describe('PageEditor', () => {
 		expect(onedited).toHaveBeenCalledWith(expect.anything(), 'doc-1');
 	});
 
+	it('merges documents of one title: the question names each of them', async () => {
+		const user = userEvent.setup();
+		// A title pattern gives the same title to every statement of a month.
+		const same = (id: string) => ({ id, title: 'Kontoauszug 2026-03', page_count: 1 });
+		render(PageEditor, {
+			open: true,
+			document: DOCUMENT,
+			mergeWith: [same('doc-2'), same('doc-3')],
+			onedited: vi.fn()
+		});
+		await user.click(screen.getByRole('button', { name: m.page_edit_next() }));
+		await user.click(screen.getByRole('button', { name: m.page_edit_apply() }));
+
+		const title = quoted('Kontoauszug 2026-03');
+		expect(rows().at(-1)).toEqual([
+			m.page_edit_deleted(),
+			`${title}${title} ${m.merge_moved({ target: '2022/11' })}`
+		]);
+	});
+
 	it('merges no document whose pages all left the stack', async () => {
 		const user = userEvent.setup();
 		const scan = { id: 'doc-2', title: 'scan_0412', page_count: 2 };
