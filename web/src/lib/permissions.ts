@@ -56,9 +56,11 @@ export function canManageSpace(space: SpaceLike, user: Actor): boolean {
 	return user !== null && space.personal_of === null && space.role === 'edit';
 }
 
-/** Describe a space for the language model: its editors and admins, of a personal space too. */
+/** Describe a space for the language model: who chooses its members (the core's rule, 403
+ * `personal_space_describe`). The editors of a shared space and admins; a personal space only
+ * its user and admins, not someone who edits it along. */
 export function canDescribeSpace(space: SpaceLike, user: Actor): boolean {
-	return user !== null && space.role === 'edit';
+	return canChooseMembers(space, user);
 }
 
 /** Add, change and remove members: the editors of a space and admins; the members of a personal

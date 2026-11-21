@@ -251,4 +251,21 @@ describe('spaces', () => {
 		expect(await screen.findByRole('dialog')).toBeTruthy();
 		expect(within(own).queryByRole('button', { name: 'erika' })).toBeNull();
 	});
+
+	it('offers no editor for the personal space of another one edits along (WH-02)', async () => {
+		// The API lets only its user and admins describe it; "edit" there means the documents.
+		const lent = space('erika', {
+			...ERIKA,
+			role: 'edit',
+			members: [
+				{ user_id: 'u2', role: 'edit', username: 'erika', active: true },
+				{ user_id: 'u1', role: 'edit', username: 'john', active: true }
+			]
+		});
+		start([HOUSE, lent, JOHN]);
+		const own = await screen.findByRole('region', { name: m.spaces_own() });
+		expect(within(own).getByText('erika')).toBeTruthy();
+		expect(within(own).queryByRole('button', { name: 'erika' })).toBeNull();
+		expect(within(own).getByRole('button', { name: 'Haushalt' })).toBeTruthy();
+	});
 });
