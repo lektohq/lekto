@@ -210,7 +210,8 @@ describe('FilterPanel', () => {
 		await user.click(within(period).getByRole('button', { name: m.facet_this_year() }));
 		expect(onchange).toHaveBeenLastCalledWith({
 			...NO_FILTERS,
-			...yearPeriod(new Date().getFullYear())
+			...yearPeriod(new Date().getFullYear()),
+			period: 'this_year'
 		});
 		expect(within(period).getByText(m.facet_undated({ count: '2' }))).toBeTruthy();
 		// No months until a year is chosen.
@@ -252,13 +253,40 @@ describe('FilterPanel', () => {
 });
 
 describe('PeriodFacet', () => {
+	const years = [{ year: new Date().getFullYear() - 1, count: 3, months: [] }];
+	const last = new Date().getFullYear() - 1;
+
+	it('tells a quick pick from the tile of the same days (WG-03)', async () => {
+		const user = userEvent.setup();
+		const onchange = vi.fn();
+		const props = { years, undated: 0, showCounts: true, onchange };
+		// The quick pick: the chip is pressed, the tile of that year is not.
+		const { unmount } = render(PeriodFacet, {
+			...props,
+			period: { ...yearPeriod(last), period: 'last_year' as const }
+		});
+		const chip = () => screen.getByRole('button', { name: m.facet_last_year() });
+		const tile = () => screen.getByRole('button', { name: new RegExp(`^${last}`) });
+		expect(chip().getAttribute('aria-pressed')).toBe('true');
+		expect(tile().getAttribute('aria-pressed')).toBe('false');
+		await user.click(tile());
+		expect(onchange).toHaveBeenLastCalledWith({ ...yearPeriod(last), period: null });
+		unmount();
+		// The tile: the other way round.
+		render(PeriodFacet, { ...props, period: { ...yearPeriod(last), period: null } });
+		expect(chip().getAttribute('aria-pressed')).toBe('false');
+		expect(tile().getAttribute('aria-pressed')).toBe('true');
+		await user.click(chip());
+		expect(onchange).toHaveBeenLastCalledWith({ ...yearPeriod(last), period: 'last_year' });
+	});
+
 	it('keeps the older years behind one tile, but not a single one', async () => {
 		const user = userEvent.setup();
 		const years = (count: number) =>
 			Array.from({ length: count }, (_, index) => ({ year: 2026 - index, count: 1, months: [] }));
 		const props = {
 			undated: 0,
-			period: { dateFrom: null, dateTo: null },
+			period: { dateFrom: null, dateTo: null, period: null },
 			showCounts: true,
 			onchange: vi.fn()
 		};

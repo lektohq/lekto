@@ -184,7 +184,7 @@
 	let editorOpen = $state(false);
 	let editing = $state<Lens | null>(null);
 	const draft = $derived<LensDraft>({
-		filter: lensFilter(filters, today),
+		filter: lensFilter(filters),
 		query: query || null,
 		sort: params.has('sort') ? (sort as LensSort) : null,
 		sortField,

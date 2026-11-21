@@ -54,7 +54,7 @@
 				name: period,
 				label: m.filter_remove({ name: period }),
 				shape: 'round',
-				without: { dateFrom: null, dateTo: null }
+				without: { dateFrom: null, dateTo: null, period: null }
 			});
 		}
 		const lists = [

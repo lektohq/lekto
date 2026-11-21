@@ -1,9 +1,10 @@
 /**
  * Lenses: a user's saved looks at the documents. Opening one writes its filters and sort into
  * the URL of the documents (with `lens=<id>`), a fact's value by its reference; a relative
- * period becomes the days it means today. Its words go into the history entry, never into the
- * URL (`lib/words.ts`). Saving takes them from there again: a period that is one of the quick
- * picks today stays relative.
+ * period by its name (`period=last_year`). Its words go into the history entry, never into the
+ * URL (`lib/words.ts`). Saving takes them from there again: a period chosen as a quick pick
+ * stays relative, days chosen as such (the tile of a year) stay those days, also when they are
+ * the days of a quick pick today.
  */
 
 import { api } from '#lib/api/client.ts';
@@ -11,14 +12,7 @@ import { unwrap } from '#lib/api/call.ts';
 import type { components } from '#lib/api/schema.ts';
 import { rememberRef } from '#lib/fact-refs.svelte.ts';
 import { factFilter, parseFactFilter } from '#lib/facts.ts';
-import {
-	apiQuery,
-	relativeOf,
-	relativePeriod,
-	writeFilters,
-	type Filters,
-	type RelativePeriod
-} from '#lib/filters.ts';
+import { apiQuery, quickPick, writeFilters, type Filters } from '#lib/filters.ts';
 
 /** What the API takes of a lens (`tests/api-limits.test.ts`): its name, the fields its cards show. */
 export const LENS_LIMITS = { name: 100, cardFields: 3 } as const;
@@ -33,8 +27,12 @@ export type Grouping = components['schemas']['Grouping'];
 /** The filters a lens keeps, as of `today` (a moving period as its days). */
 export function filtersOf(filter: AnyLensFilter, today: Date): Filters {
 	const period = filter.document_period
-		? relativePeriod(filter.document_period, today)
-		: { dateFrom: filter.document_date_from ?? null, dateTo: filter.document_date_to ?? null };
+		? quickPick(filter.document_period, today)
+		: {
+				dateFrom: filter.document_date_from ?? null,
+				dateTo: filter.document_date_to ?? null,
+				period: null
+			};
 	return {
 		contacts: filter.contact_ids ?? [],
 		types: filter.document_type_ids ?? [],
@@ -72,9 +70,9 @@ export function lensParams(lens: Lens, today: Date): URLSearchParams {
 	return params;
 }
 
-/** `filters` as a lens keeps them: a quick pick of today as that, other periods as days. */
-export function lensFilter(filters: Filters, today: Date): LensFilter {
-	const relative: RelativePeriod | null = relativeOf(filters, today);
+/** `filters` as a lens keeps them: a quick pick as that, other periods as days. */
+export function lensFilter(filters: Filters): LensFilter {
+	const relative = filters.period;
 	return {
 		contact_ids: filters.contacts,
 		document_type_ids: filters.types,

@@ -1,18 +1,27 @@
 <script lang="ts">
 	import type { components } from '#lib/api/schema.ts';
-	import { monthPeriod, periodOf, relativePeriod, yearPeriod, type Filters } from '#lib/filters.ts';
+	import {
+		monthPeriod,
+		periodOf,
+		quickPick,
+		RELATIVE_PERIODS,
+		yearPeriod,
+		type Filters
+	} from '#lib/filters.ts';
 	import { formatDate, formatNumber } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import Chip from '#lib/components/Chip.svelte';
+	import { QUICK_PICKS } from '#lib/period-label.ts';
 
-	type Period = Pick<Filters, 'dateFrom' | 'dateTo'>;
+	type Period = Pick<Filters, 'dateFrom' | 'dateTo' | 'period'>;
 	type Year = components['schemas']['YearCount'];
 
 	// The period of the document date, compact however many years there are: quick picks, the
 	// newest years as tiles (three to a row, year and count on one line, a bar for how many
 	// documents each holds), the older ones behind one tile (a single one stays a tile); a chosen year (or the year of a chosen month) shows its
 	// months as bars to choose from. A second tap lets a choice go. `showCounts`: not while
-	// searching, the counts know no words.
+	// searching, the counts know no words. A quick pick moves with the day, a tile means its
+	// year: "Letztes Jahr" and the tile of that year are two choices, though the same days today.
 	let {
 		years,
 		undated,
@@ -29,28 +38,27 @@
 		shown?: number;
 	} = $props();
 
-	const NONE: Period = { dateFrom: null, dateTo: null };
-	const chosen = $derived(periodOf(period));
+	const NONE: Period = { dateFrom: null, dateTo: null, period: null };
+	const days = $derived(periodOf(period));
+	// The days chosen as such; none while a quick pick stands.
+	const chosen = $derived(period.period ? null : days);
 	let older = $state(false);
 
 	const today = new Date();
-	const QUICK: { label: () => string; period: Period }[] = [
-		{ label: m.facet_this_year, period: relativePeriod('this_year', today) },
-		{ label: m.facet_last_12_months, period: relativePeriod('last_12_months', today) },
-		{ label: m.facet_last_year, period: relativePeriod('last_year', today) }
-	];
+	const fixed = (days: Pick<Filters, 'dateFrom' | 'dateTo'>): Period => ({ ...days, period: null });
 
 	const most = $derived(Math.max(1, ...years.map((year) => year.count)));
 	const cut = $derived(years.length > shown + 1 ? shown : years.length);
 	const newest = $derived(years.slice(0, cut));
 	const rest = $derived(years.slice(cut));
 	const tiles = $derived(older ? years : newest);
-	// The year whose months show: the chosen one, or that of the chosen month.
+	// The year whose months show: the chosen one, that of the chosen month, or the year a quick
+	// pick covers.
 	const focus = $derived(
-		chosen?.kind === 'year'
-			? chosen.year
-			: chosen?.kind === 'month'
-				? Number(chosen.month.slice(0, 4))
+		days?.kind === 'year'
+			? days.year
+			: days?.kind === 'month'
+				? Number(days.month.slice(0, 4))
 				: null
 	);
 	const months = $derived.by(() => {
@@ -73,18 +81,18 @@
 		});
 	});
 	const monthMost = $derived(Math.max(1, ...months.map((month) => month.count)));
-
-	function same(a: Period, b: Period): boolean {
-		return a.dateFrom === b.dateFrom && a.dateTo === b.dateTo;
-	}
 </script>
 
 <div class="flex flex-col gap-2.5">
 	<div class="flex flex-wrap gap-1.5">
-		{#each QUICK as quick (quick.label())}
-			{@const active = same(quick.period, period)}
-			<Chip size="sm" pressed={active} onclick={() => onchange(active ? NONE : quick.period)}>
-				{quick.label()}
+		{#each RELATIVE_PERIODS as quick (quick)}
+			{@const active = period.period === quick}
+			<Chip
+				size="sm"
+				pressed={active}
+				onclick={() => onchange(active ? NONE : quickPick(quick, today))}
+			>
+				{QUICK_PICKS[quick]()}
 			</Chip>
 		{/each}
 	</div>
@@ -101,7 +109,7 @@
 							? 'border-primary/30 bg-panel font-medium text-brand'
 							: 'bg-card hover:bg-secondary'
 					]}
-					onclick={() => onchange(active ? NONE : yearPeriod(year.year))}
+					onclick={() => onchange(active ? NONE : fixed(yearPeriod(year.year)))}
 				>
 					{#if showCounts}
 						<span
@@ -159,7 +167,8 @@
 						title={m.facet_month_count({ month: month.name, count: formatNumber(month.count) })}
 						disabled={month.count === 0 && !active}
 						class="flex h-full flex-col items-center justify-end gap-0.5 text-nano text-muted-foreground disabled:opacity-40"
-						onclick={() => onchange(active ? yearPeriod(focus ?? 0) : monthPeriod(month.month))}
+						onclick={() =>
+							onchange(fixed(active ? yearPeriod(focus ?? 0) : monthPeriod(month.month)))}
 					>
 						<span
 							aria-hidden="true"

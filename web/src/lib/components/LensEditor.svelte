@@ -37,6 +37,7 @@
 	import { LIST_SORTS, sortLabel } from '#lib/listing.ts';
 	import type { Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
+	import { QUICK_PICKS } from '#lib/period-label.ts';
 	import IconButton from '#lib/components/IconButton.svelte';
 
 	type Listed = components['schemas']['ListedDocument'];
@@ -72,11 +73,6 @@
 		{ value: 'document_type', label: m.lens_grouping_document_type },
 		{ value: 'contact', label: m.lens_grouping_contact }
 	];
-	const PERIODS = {
-		this_year: m.facet_this_year,
-		last_12_months: m.facet_last_12_months,
-		last_year: m.facet_last_year
-	};
 
 	let name = $state('');
 	// '' as the list sorts; a sort by a field as `field:<id>` or `-field:<id>`.
@@ -104,7 +100,7 @@
 	// The filters as chips; a moving period stands as such above them.
 	const shown = $derived({
 		...filtersOf(filter, today),
-		...(filter.document_period ? { dateFrom: null, dateTo: null } : {})
+		...(filter.document_period ? { dateFrom: null, dateTo: null, period: null } : {})
 	});
 	const empty = $derived(!query && !filter.document_period && !isFiltered(shown));
 	const fields = $derived(lookup.fields);
@@ -218,7 +214,7 @@
 				<div class="flex flex-wrap gap-2">
 					{#if filter.document_period}
 						<Chip variant="selected">
-							{m.lens_period_moving({ period: PERIODS[filter.document_period]() })}
+							{m.lens_period_moving({ period: QUICK_PICKS[filter.document_period]() })}
 						</Chip>
 					{/if}
 					{#if query}
