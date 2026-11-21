@@ -49,6 +49,7 @@
 	import { coalesced } from '#lib/coalesce.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { events } from '#lib/events.svelte.ts';
+	import { listRefresh } from '#lib/list-events.ts';
 	import {
 		NO_FILTERS,
 		apiQuery,
@@ -613,14 +614,25 @@
 		// from it on another page, the field takes the focus at once.
 		const withdrawSearch = offerPageSearch(showSearch);
 		if (location.hash === '#search') void tick().then(showSearch);
-		// Events are thin: fetch the list again, at most once in a while.
+		// Events are thin: fetch the list again, at most once in a while. Its numbers (the
+		// count, the facets, the lenses, the stream) only for an event that may change them; a
+		// step of a document being processed reads the rows alone, and only if the page shows
+		// that document (`lib/list-events.ts`).
+		let numbers = false;
 		const refresh = coalesced(() => {
 			void list.refresh();
+			if (!numbers) return;
+			numbers = false;
 			void loadFacets();
 			void loadLensCounts();
 			streamVersion += 1;
 		}, 400);
-		const stop = events.subscribe(refresh);
+		const stop = events.subscribe((event) => {
+			const wanted = listRefresh(event, (id) => list.items.some((item) => item.document.id === id));
+			if (wanted === 'none') return;
+			if (wanted === 'all') numbers = true;
+			refresh();
+		});
 		const stopMeaning = events.on('search.meaning_ready', (event) =>
 			searchNote.meaningReady(String(event.query ?? ''))
 		);

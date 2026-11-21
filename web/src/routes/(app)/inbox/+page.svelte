@@ -19,6 +19,7 @@
 	import { coalesced } from '#lib/coalesce.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
 	import { events } from '#lib/events.svelte.ts';
+	import { listRefresh } from '#lib/list-events.ts';
 	import { inbox, type InboxSummary } from '#lib/inbox.svelte.ts';
 	import { inboxTabHref, inboxTabOf, type InboxItem, type InboxTab } from '#lib/inbox-view.ts';
 	import { readDrop } from '#lib/intake.ts';
@@ -125,9 +126,13 @@
 	onMount(() => {
 		place.want(page.state.place);
 		void lookup.load();
-		// Events are thin: fetch the list again, at most once in a while.
+		// Events are thin: fetch the list again, at most once in a while; for a step of a
+		// document being processed only if the inbox shows that document (`lib/list-events.ts`).
 		const refresh = coalesced(() => void list.refresh(), 400);
-		const stop = events.subscribe(refresh);
+		const stop = events.subscribe((event) => {
+			const wanted = listRefresh(event, (id) => list.items.some((item) => item.document.id === id));
+			if (wanted !== 'none') refresh();
+		});
 		return () => {
 			refresh.cancel();
 			stop();

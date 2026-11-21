@@ -91,6 +91,58 @@ afterEach(() => {
 });
 
 describe('the archive page', () => {
+	it('asks for its numbers only when an event may change them (WP-03)', async () => {
+		// Every event of any document read the page, its count, the facets and a count for
+		// each lens anew: a dozen times while one document was processed.
+		const api = fakeApi({
+			'GET /api/v1/documents': () => ({
+				items: [listedOf({ id: 'd1', title: 'Eins' })],
+				next_cursor: null
+			})
+		});
+		vi.stubGlobal('fetch', api);
+		events.useFactory((url) => new FakeSource(url) as unknown as EventSource);
+		events.start(() => {});
+		render(Page);
+		await screen.findByText('Eins');
+		const send = (type: string, id: string) =>
+			FakeSource.last.listeners.get(type)?.({
+				data: JSON.stringify({ type, id: crypto.randomUUID(), occurred_at: '', document_id: id })
+			});
+		const settled = () => new Promise((resolve) => setTimeout(resolve, 550));
+		const since = (from: number) =>
+			calls(api)
+				.slice(from)
+				.map((call) => call.split('?')[0]);
+
+		// A step of a document the page does not show: nothing.
+		let from = calls(api).length;
+		send('document.node_started', 'elsewhere');
+		send('document.node_completed', 'elsewhere');
+		await settled();
+		expect(since(from)).toEqual([]);
+
+		// A step of one it shows: its rows with their own count, no facets, no lens numbers.
+		from = calls(api).length;
+		send('document.node_completed', 'd1');
+		await settled();
+		expect(since(from).toSorted()).toEqual([
+			'GET /api/v1/documents',
+			'GET /api/v1/documents/count'
+		]);
+
+		// What may change the hits: the numbers too.
+		from = calls(api).length;
+		send('document.lane_changed', 'elsewhere');
+		await settled();
+		const all = since(from);
+		expect(all).toContain('GET /api/v1/documents');
+		expect(all).toContain('GET /api/v1/documents/facets');
+		// The list's own count and that of "all documents" beside the lenses.
+		expect(all.filter((call) => call === 'GET /api/v1/documents/count').length).toBeGreaterThan(1);
+		events.stop();
+	});
+
 	describe('comes back to the place it was left at (WF-03)', () => {
 		// SvelteKit restores the scroll position while the list is still empty and lands at
 		// its top: the page goes to its place itself, once the list stands.
