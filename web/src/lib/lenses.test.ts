@@ -168,6 +168,10 @@ describe('a page and its lens', () => {
 		]) {
 			expect(lensDiffers(open, new URLSearchParams(other), '', TODAY)).toBe(true);
 		}
+		// WG-02: a further page of the list is the same lens.
+		expect(
+			lensDiffers(open, new URLSearchParams('lens=l1&sort=title&tag=t2&tag=t1&page=2'), '', TODAY)
+		).toBe(false);
 		const moving = lens({ filter: { document_period: 'this_year' } });
 		expect(lensDiffers(moving, new URLSearchParams('lens=l1&period=this_year'), '', TODAY)).toBe(
 			false

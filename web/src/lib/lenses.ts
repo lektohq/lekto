@@ -93,7 +93,8 @@ export function lensFilter(filters: Filters): LensFilter {
 }
 
 /** Whether the page (`params`, `words`) shows other filters, words or another sort than `lens`
- * as of `today`; the order of repeated values does not count. */
+ * as of `today`; the order of repeated values does not count, nor does the page of the list one
+ * has turned to (`page`): it is the same lens further down. */
 export function lensDiffers(
 	lens: Lens,
 	params: URLSearchParams,
@@ -104,6 +105,7 @@ export function lensDiffers(
 	const wanted = lensParams(lens, today);
 	const keys = new Set([...wanted.keys(), ...params.keys()]);
 	keys.delete('lens');
+	keys.delete('page');
 	const values = (from: URLSearchParams, key: string) => from.getAll(key).toSorted().join('\n');
 	return [...keys].some((key) => values(wanted, key) !== values(params, key));
 }
