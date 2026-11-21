@@ -88,6 +88,21 @@ describe('the filters the document view remembers', () => {
 		expect(rememberedFilters('u1')).toBeNull();
 	});
 
+	it('reads a value kept twice once: such a filter once broke the list for good', () => {
+		localStorage.setItem(
+			'lekto.documents.filters',
+			JSON.stringify({
+				user: 'u1',
+				filters: 'contact=c1&contact=c1&fact=iban%3Ar%3A&fact=iban%3Ar%3A'
+			})
+		);
+		expect(rememberedFilters('u1')).toEqual({
+			...NO_FILTERS,
+			contacts: ['c1'],
+			facts: ['iban:r:']
+		});
+	});
+
 	it('remembers none without a user', () => {
 		rememberFilters({ ...NO_FILTERS, contacts: ['c1'] }, undefined);
 		expect(localStorage.getItem('lekto.documents.filters')).toBeNull();

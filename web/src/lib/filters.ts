@@ -50,10 +50,11 @@ const LISTS = {
 	spaces: 'space'
 } as const;
 
-/** The filters in `params`; empty values (`?contact=`) count as none. Whom the list covers is no
- * filter but a setting (`scope`). */
+/** The filters in `params`; empty values (`?contact=`) count as none, a value given twice
+ * (`?contact=c1&contact=c1`, in a link written by hand) once: each value is one chip, and a list
+ * names it once. Whom the list covers is no filter but a setting (`scope`). */
 export function parseFilters(params: URLSearchParams): Filters {
-	const all = (key: string) => params.getAll(key).filter((value) => value !== '');
+	const all = (key: string) => [...new Set(params.getAll(key).filter((value) => value !== ''))];
 	return {
 		contacts: all(LISTS.contacts),
 		types: all(LISTS.types),

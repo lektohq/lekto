@@ -59,6 +59,25 @@ describe('filters in the URL', () => {
 		expect(apiQuery(filters).all_users).toBeUndefined();
 	});
 
+	it('takes a value given twice once, in the order it first came', () => {
+		const params = new URLSearchParams(
+			'contact=c1&contact=c2&contact=c1&tag=t1&tag=t1&type=y1&type=y1&space=s1&space=s1' +
+				'&contact_group=g1&contact_group=g1&type_group=h1&type_group=h1&topic=o1&topic=o1' +
+				'&fact=iban%3Ar1%3A&fact=iban%3Ar1%3A'
+		);
+		expect(parseFilters(params)).toEqual({
+			...NO_FILTERS,
+			contacts: ['c1', 'c2'],
+			tags: ['t1'],
+			types: ['y1'],
+			spaces: ['s1'],
+			contactGroups: ['g1'],
+			typeGroups: ['h1'],
+			topics: ['o1'],
+			facts: ['iban:r1:']
+		});
+	});
+
 	it('leaves out what is not set, and a day that is none', () => {
 		expect(writeFilters(new URLSearchParams(), NO_FILTERS).toString()).toBe('');
 		expect(apiQuery(NO_FILTERS)).toEqual({

@@ -807,6 +807,16 @@ describe('the archive page', () => {
 		);
 	});
 
+	it('opens with a filter value a link names twice, and shows and remembers it once', async () => {
+		state.url = new URL('http://lekto/ui/documents?contact=c1&contact=c1&tag=t1&tag=t1');
+		vi.stubGlobal('fetch', fakeApi());
+		render(Page);
+		await screen.findByRole('heading', { level: 1 });
+		await vi.waitFor(() =>
+			expect(rememberedFilters(OWNER)).toEqual({ ...NO_FILTERS, contacts: ['c1'], tags: ['t1'] })
+		);
+	});
+
 	it('applies none of the filters another user set in this browser', async () => {
 		rememberFilters({ ...NO_FILTERS, contacts: ['c1'], tags: ['t1'] }, 'the-one-before');
 		vi.stubGlobal('fetch', fakeApi());
