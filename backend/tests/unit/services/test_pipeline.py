@@ -35,6 +35,7 @@ from lekto.core.domain.pipeline import (
     NodeResult,
     NodeState,
     NodeStatus,
+    NodeUnavailableError,
     Outcome,
     ProcessingStatus,
 )
@@ -264,6 +265,62 @@ async def test_exhausted_retries_end_red_and_retry_recovers(world: World) -> Non
     stored = await world.documents.get(Actor(owner.id), stored.id)
     assert stored.lane is Lane.GREEN
     assert broken.calls == 4
+
+
+class Unavailable:
+    """A signal whose service does not answer `times` times, then answers."""
+
+    FALLBACK = NodeResult(outcome=Outcome.OK, output={"abstained": "the index is down"})
+
+    def __init__(self, times: int) -> None:
+        self.times = times
+        self.calls = 0
+
+    async def run(self, document: Document) -> NodeResult:
+        self.calls += 1
+        if self.calls <= self.times:
+            raise NodeUnavailableError(self.FALLBACK)
+        return builders.OK
+
+
+async def drain_with_waits(world: World, pipeline: PipelineService) -> None:
+    """Every job, the deferred ones once they are due."""
+    for _ in range(5):
+        await world.drain(pipeline)
+        world.clock.advance(timedelta(minutes=5))
+
+
+async def test_a_signal_whose_service_is_back_runs_again(world: World) -> None:
+    neighbours = Unavailable(times=2)
+    pipeline = world.pipeline({Node.SIGNAL_NEIGHBOURS: neighbours})
+    owner, document = await receive(world, pipeline)
+    await drain_with_waits(world, pipeline)
+    assert neighbours.calls == 3
+    assert NodeDeferred.type in world.event_types()
+    log = await world.documents.processing_log(Actor(owner.id), document.id)
+    (entry,) = [item for item in log if item.node is Node.SIGNAL_NEIGHBOURS]
+    assert entry.result == builders.OK
+    assert (await world.documents.get(Actor(owner.id), document.id)).lane is Lane.GREEN
+
+
+async def test_a_signal_whose_service_stays_away_abstains_after_the_last_attempt(
+    world: World,
+) -> None:
+    neighbours = Unavailable(times=10)
+    pipeline = world.pipeline({Node.SIGNAL_NEIGHBOURS: neighbours})
+    owner, document = await receive(world, pipeline)
+    await drain_with_waits(world, pipeline)
+    assert neighbours.calls == 3  # the retry policy's attempts
+    log = await world.documents.processing_log(Actor(owner.id), document.id)
+    (entry,) = [item for item in log if item.node is Node.SIGNAL_NEIGHBOURS]
+    assert entry.result == Unavailable.FALLBACK  # it abstains instead of failing
+    assert (await world.documents.get(Actor(owner.id), document.id)).lane is Lane.GREEN
+    (job,) = [
+        job
+        for job in world.database.jobs.values()
+        if job.payload.get("node") == Node.SIGNAL_NEIGHBOURS.value
+    ]
+    assert job.status is JobStatus.DONE
 
 
 async def test_skipped_pages_are_caught_up_on_without_a_new_run(world: World) -> None:
