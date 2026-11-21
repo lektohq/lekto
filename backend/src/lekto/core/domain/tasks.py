@@ -85,7 +85,7 @@ class TaskStep:
         }
 
     @classmethod
-    def from_json(cls, data: JsonValue) -> "TaskStep":
+    def from_json(cls, data: JsonValue) -> TaskStep:
         item = as_object(data) or {}
         rule_id, version = as_uuid(item.get("rule_id")), item.get("version")
         rule, step = item.get("rule"), item.get("step")
@@ -176,7 +176,7 @@ class Task:
         step: TaskStep | None,
         timeout: timedelta,
         now: datetime,
-    ) -> "Task":
+    ) -> Task:
         """A task that waits to be sent."""
         return cls(
             id=TaskId(new_id()),

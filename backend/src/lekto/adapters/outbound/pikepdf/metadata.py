@@ -132,7 +132,7 @@ def _image(source: Path) -> FileMetadata:
                 dpi=round(float(dpi[0]), 1) if dpi else None,
                 entries=tuple(entries),
             )
-    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
+    except UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError:
         raise UnprocessableDocumentError(because(ReasonCode.IMAGE_UNREADABLE)) from None
 
 
@@ -162,7 +162,7 @@ def _mail(handle: BinaryIO) -> FileMetadata:
             continue
         try:
             text = _text(str(value))
-        except (LookupError, UnicodeError, ValueError):
+        except LookupError, UnicodeError, ValueError:
             text = None
         if text is not None:
             entries.append(MetadataEntry(MetadataSource.MAIL, name, text))

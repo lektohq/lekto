@@ -39,7 +39,7 @@ class RelatedOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, item: Related) -> "RelatedOut":
+    def of(cls, item: Related) -> RelatedOut:
         other, relation = item.other, item.relation
         return cls(
             document=RelatedDocumentOut(
@@ -77,7 +77,7 @@ class RelationsOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, relations: DocumentRelations) -> "RelationsOut":
+    def of(cls, relations: DocumentRelations) -> RelationsOut:
         return cls(
             refers_to=[RelatedOut.of(item) for item in relations.refers_to],
             referred_by=[RelatedOut.of(item) for item in relations.referred_by],

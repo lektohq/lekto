@@ -45,7 +45,7 @@ class Identifier:
         source: IdentifierSource = IdentifierSource.MANUAL,
         topic_id: TagId | None = None,
         user_id: UserId | None = None,
-    ) -> "Identifier":
+    ) -> Identifier:
         return cls(kind, normalise_identifier(kind, raw), source, topic_id, user_id)
 
     @property

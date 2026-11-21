@@ -154,7 +154,7 @@ class WebPushSender:
                 ) as client:
                     response = await client.post(device.endpoint, content=body, headers=headers)
                     status = response.status_code
-        except (TimeoutError, httpx2.TimeoutException):
+        except TimeoutError, httpx2.TimeoutException:
             error = f"no answer within {TIMEOUT:g} seconds"
         except httpx2.HTTPError as failure:
             error = describe_failure(failure)

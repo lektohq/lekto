@@ -805,7 +805,7 @@ class _Planner:
         try:
             rendered = self._s.render(template, self._with_steps(report, values))
             return " ".join(rendered.split()) or template
-        except (MissingValueError, ValidationError):
+        except MissingValueError, ValidationError:
             return template
 
     def _render(

@@ -98,7 +98,7 @@ class ContactNumberOut(BaseModel):
     topic_id: UUID | None
 
     @classmethod
-    def of(cls, number: ContactNumber) -> "ContactNumberOut":
+    def of(cls, number: ContactNumber) -> ContactNumberOut:
         item = number.identifier
         return cls(
             contact_id=number.contact_id,
@@ -126,7 +126,7 @@ class ProfileOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, found: UserProfile) -> "ProfileOut":
+    def of(cls, found: UserProfile) -> ProfileOut:
         profile = found.profile
         return cls(
             user_id=found.user.id,

@@ -171,6 +171,6 @@ async def load_codes(store: ObjectStore, document: DocumentId) -> tuple[Code, ..
         return codes_from_json(json.loads(await store.get(codes_key(document))))
     except NotFoundError:
         return None
-    except (ValueError, ValidationError):
+    except ValueError, ValidationError:
         log.warning("an unreadable file of codes", extra={"document_id": str(document)})
         return None

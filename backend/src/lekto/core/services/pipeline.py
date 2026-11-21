@@ -246,7 +246,7 @@ class IncomingFile:
     size: int
 
     @classmethod
-    def of(cls, path: Path) -> "IncomingFile":
+    def of(cls, path: Path) -> IncomingFile:
         """Hash an existing file (blocking; for tools and tests)."""
         digest = hashlib.sha256()
         size = 0
@@ -785,7 +785,7 @@ class PipelineService:
         it."""
         try:
             await self._move_target(uow, user, source, id)
-        except (NotFoundError, SpaceWriteDeniedError):
+        except NotFoundError, SpaceWriteDeniedError:
             return False
         return True
 

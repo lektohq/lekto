@@ -14,7 +14,7 @@ class AddressOut(BaseModel):
     address: str
 
     @classmethod
-    def of(cls, address: Address) -> "AddressOut":
+    def of(cls, address: Address) -> AddressOut:
         return cls(name=address.name, address=address.address)
 
 
@@ -49,7 +49,7 @@ class MailOriginOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, origin: MailOrigin) -> "MailOriginOut":
+    def of(cls, origin: MailOrigin) -> MailOriginOut:
         return cls(
             mailbox=origin.mailbox,
             rule=origin.rule,

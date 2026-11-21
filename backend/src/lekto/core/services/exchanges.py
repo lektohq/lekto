@@ -67,7 +67,7 @@ async def _runs(store: ObjectStore, document: Document, node: Node) -> list[RunE
         return exchanges_from_json(json.loads(await store.get(exchanges_key(document.id, node))))
     except NotFoundError:
         return []
-    except (ValueError, ValidationError):
+    except ValueError, ValidationError:
         log.warning(
             "replacing an unreadable file of model exchanges",
             extra={"document_id": str(document.id), "node": node.value},

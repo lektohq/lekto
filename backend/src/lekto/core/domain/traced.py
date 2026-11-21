@@ -17,7 +17,7 @@ class Traced:
     end: tuple[int, ...]
 
     @classmethod
-    def of(cls, text: str) -> "Traced":
+    def of(cls, text: str) -> Traced:
         """`text` as it is, each character its own."""
         return cls(text, tuple(range(len(text))), tuple(range(1, len(text) + 1)))
 
@@ -28,7 +28,7 @@ class Traced:
 
     def sub(
         self, pattern: re.Pattern[str], replacement: str | Callable[[re.Match[str]], str]
-    ) -> "Traced":
+    ) -> Traced:
         """As `pattern.sub(replacement, text)`: what replaces a match comes from what it
         matched."""
         text: list[str] = []
@@ -51,7 +51,7 @@ class Traced:
         end.extend(self.end[last:])
         return Traced("".join(text), tuple(start), tuple(end))
 
-    def each(self, change: Callable[[str], str]) -> "Traced":
+    def each(self, change: Callable[[str], str]) -> Traced:
         """Each character changed by `change`, into none, one or more."""
         text: list[str] = []
         start: list[int] = []
@@ -63,7 +63,7 @@ class Traced:
             end.extend([self.end[index]] * len(new))
         return Traced("".join(text), tuple(start), tuple(end))
 
-    def grouped(self, starts: Callable[[str], bool], change: Callable[[str], str]) -> "Traced":
+    def grouped(self, starts: Callable[[str], bool], change: Callable[[str], str]) -> Traced:
         """Each group of characters changed by `change`: a group begins with a character
         `starts` holds for and takes the ones after it it does not."""
         text: list[str] = []
@@ -80,16 +80,16 @@ class Traced:
             first = index
         return Traced("".join(text), tuple(start), tuple(end))
 
-    def strip(self) -> "Traced":
+    def strip(self) -> Traced:
         """Without whitespace at either end (as `str.strip`)."""
         left = len(self.text) - len(self.text.lstrip())
         right = len(self.text.rstrip())
         return self.head(right).tail(left) if right > left else Traced("", (), ())
 
-    def head(self, count: int) -> "Traced":
+    def head(self, count: int) -> Traced:
         """The first `count` characters."""
         return Traced(self.text[:count], self.start[:count], self.end[:count])
 
-    def tail(self, skip: int) -> "Traced":
+    def tail(self, skip: int) -> Traced:
         """Without the first `skip` characters."""
         return Traced(self.text[skip:], self.start[skip:], self.end[skip:])

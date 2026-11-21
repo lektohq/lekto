@@ -62,7 +62,7 @@ class Times:
     p90: timedelta | None
 
     @classmethod
-    def of(cls, micros: Sequence[int]) -> "Times":
+    def of(cls, micros: Sequence[int]) -> Times:
         median, p90 = percentiles(micros, (0.5, 0.9))
         return cls(len(micros), _time(median), _time(p90))
 

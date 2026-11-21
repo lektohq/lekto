@@ -229,7 +229,7 @@ class RelateNode:
     """The node `relate`: recognises the document's relations when its run stores the result,
     on the documents as they are then."""
 
-    async def run(self, document: Document) -> "RelateResult":
+    async def run(self, document: Document) -> RelateResult:
         return RelateResult()
 
 

@@ -190,7 +190,7 @@ class PagesNode:
         self._renderer = renderer
         self._mail = mail
 
-    async def run(self, document: Document) -> "PagesResult":
+    async def run(self, document: Document) -> PagesResult:
         async with work_directory() as work:
             original, pages = work / ORIGINAL_FILE, work / "pages"
             pages.mkdir()

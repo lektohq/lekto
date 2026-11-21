@@ -221,7 +221,7 @@ class WebhookDeliveryService:
             private = await self._private(uow, webhook)
         try:
             secrets, own = self._decrypt(webhook, now)
-        except (DecryptionError, ValueError):
+        except DecryptionError, ValueError:
             response = _unusable_secret(id)
         else:
             response = (
@@ -327,7 +327,7 @@ class WebhookDeliveryService:
         assert body is not None
         try:
             secrets, own = self._decrypt(webhook, now)
-        except (DecryptionError, ValueError):
+        except DecryptionError, ValueError:
             response = _unusable_secret(webhook_id)
             outcome = DeliveryOutcome.GAVE_UP
         else:
@@ -374,7 +374,7 @@ class WebhookDeliveryService:
             try:
                 secrets, own = self._decrypt(webhook, now)
                 request = TaskRequestText.decrypt(self._cipher, task)
-            except (DecryptionError, ValueError):
+            except DecryptionError, ValueError:
                 response, outcome = _unusable_secret(webhook_id), DeliveryOutcome.GAVE_UP
             else:
                 response = await self._send(
@@ -725,7 +725,7 @@ class TaskRequestText:
         return cipher.encrypt(json.dumps(plain).encode("utf-8"), context=_task_context(task))
 
     @classmethod
-    def decrypt(cls, cipher: SecretCipher, task: Task) -> "TaskRequestText":
+    def decrypt(cls, cipher: SecretCipher, task: Task) -> TaskRequestText:
         """DecryptionError or ValueError if it cannot be read."""
         assert task.encrypted_request is not None
         data = json.loads(cipher.decrypt(task.encrypted_request, context=_task_context(task)))

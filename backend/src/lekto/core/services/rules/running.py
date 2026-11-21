@@ -744,7 +744,7 @@ class Send:
         }
 
     @classmethod
-    def from_json(cls, data: JsonValue) -> "Send | None":
+    def from_json(cls, data: JsonValue) -> Send | None:
         """The send of a log entry's output; None if it is not one."""
         item = as_object(data) or {}
         rule, webhook = as_uuid(item.get("rule_id")), as_uuid(item.get("webhook_id"))

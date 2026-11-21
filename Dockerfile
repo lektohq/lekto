@@ -26,7 +26,7 @@ FROM ghcr.io/astral-sh/uv:0.11.33 AS uv
 ARG TARGETARCH
 
 # --- base: Python and the system packages OCRmyPDF and WeasyPrint need ----------------------------
-FROM python:3.13.18-slim-trixie AS base
+FROM python:3.14.10-slim-trixie AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1

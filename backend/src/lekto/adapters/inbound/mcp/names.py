@@ -43,7 +43,7 @@ class Names:
     spaces: dict[UUID, str] = field(default_factory=dict)
 
     @classmethod
-    async def load(cls, context: ApiContext, user: Actor) -> "Names":
+    async def load(cls, context: ApiContext, user: Actor) -> Names:
         master = context.master_data
         tags = await master.list_tags(user)
 
@@ -59,7 +59,7 @@ class Names:
             groups=of(TagScope.CONTACT, TagScope.DOCUMENT_TYPE),
         )
 
-    async def with_spaces(self, context: ApiContext, user: Actor) -> "Names":
+    async def with_spaces(self, context: ApiContext, user: Actor) -> Names:
         """These names, and how the caller reads the spaces a document may go to: theirs
         (`space_label`), and every other person's personal space by that person's name (a
         hand-over)."""

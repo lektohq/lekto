@@ -86,7 +86,7 @@ ENDING = frozenset({MailAction.MOVE, MailAction.TRASH})
 MAX_STEPS = 10
 
 
-def step_flags(step: "MailStep") -> tuple[tuple[str, ...], tuple[str, ...]]:
+def step_flags(step: MailStep) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """The IMAP flags a step adds and removes (none for a move or the trash): a flag's colour
     as Apple Mail's bits, the other bits taken away."""
     match step.action:
@@ -239,7 +239,7 @@ class Mailbox:
         enabled: bool = True,
         now: datetime,
         id: MailboxId | None = None,
-    ) -> "Mailbox":
+    ) -> Mailbox:
         require_utc(now, "now")
         mailbox = cls(
             id=id or MailboxId(new_id()),

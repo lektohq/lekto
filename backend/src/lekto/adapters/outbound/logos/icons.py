@@ -63,7 +63,7 @@ def page_icons(html: str, page_url: str) -> tuple[list[Candidate], str | None]:
     try:
         parser.feed(html)
         parser.close()
-    except (ValueError, AssertionError):  # what a broken page may make the parser raise
+    except ValueError, AssertionError:  # what a broken page may make the parser raise
         pass
     base = urljoin(page_url, parser.base) if parser.base else page_url
     icons: list[Candidate] = []

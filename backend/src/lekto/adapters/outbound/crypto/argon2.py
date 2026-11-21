@@ -43,5 +43,5 @@ class Argon2PasswordHasher:
     def _verify(self, hash: str, password: str) -> bool:
         try:
             return self._hasher.verify(hash, password)
-        except (VerificationError, InvalidHashError):
+        except VerificationError, InvalidHashError:
             return False

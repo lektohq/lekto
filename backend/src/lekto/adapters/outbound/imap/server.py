@@ -104,7 +104,7 @@ def _learn_capabilities(imap: imaplib.IMAP4) -> None:
     only afterwards. Without an answer the greeting's stay."""
     try:
         status, answer = imap.capability()
-    except (imaplib.IMAP4.error, OSError):
+    except imaplib.IMAP4.error, OSError:
         return
     line = answer[-1] if status == "OK" and answer else None
     if isinstance(line, bytes) and line.strip():

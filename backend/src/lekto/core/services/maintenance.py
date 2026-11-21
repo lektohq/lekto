@@ -58,7 +58,7 @@ class RemoveFiles:
         }
 
     @classmethod
-    def from_json(cls, payload: JsonObject) -> "RemoveFiles":
+    def from_json(cls, payload: JsonObject) -> RemoveFiles:
         """KeyError, ValueError or ValidationError for a payload that is none."""
         pages = payload.get("page_count")
         if pages is not None and as_int(pages) is None:

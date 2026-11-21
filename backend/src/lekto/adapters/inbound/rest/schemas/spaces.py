@@ -104,7 +104,7 @@ class SpaceOut(BaseModel):
     version: int
 
     @classmethod
-    def of(cls, space: Space, viewer: User, people: Mapping[UserId, User]) -> "SpaceOut":
+    def of(cls, space: Space, viewer: User, people: Mapping[UserId, User]) -> SpaceOut:
         """As `viewer` sees it, who is a member or an admin; `people`: its members."""
         role = space_role(viewer, space)
         assert role is not None  # the service returns visible spaces only

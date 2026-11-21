@@ -47,7 +47,7 @@ class ClassifierModelOut(BaseModel):
     method: str | None = Field(examples=["scikit-learn 1.9.1 lekto-tfidf-logreg/1"])
 
     @classmethod
-    def of(cls, model: ClassifierModel) -> "ClassifierModelOut":
+    def of(cls, model: ClassifierModel) -> ClassifierModelOut:
         summary = model.summary
         classes = summary.get("classes")
         accuracy = summary.get("accuracy")
@@ -74,7 +74,7 @@ class ClassifierStatusOut(BaseModel):
     threshold: float = Field(description="How sure a prediction must be to name its class.")
 
     @classmethod
-    def of(cls, status: ClassifierStatus) -> "ClassifierStatusOut":
+    def of(cls, status: ClassifierStatus) -> ClassifierStatusOut:
         return cls(
             model=None if status.model is None else ClassifierModelOut.of(status.model),
             confirmed=status.confirmed,

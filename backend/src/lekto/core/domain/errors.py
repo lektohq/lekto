@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from lekto.core.domain.reasons import Reason
 
 
-def _because(code: str, **params: object) -> "Reason":
+def _because(code: str, **params: object) -> Reason:
     """The reason `code` (a `ReasonCode` by its name), for errors defined before the reasons
     can be imported here."""
     from lekto.core.domain.reasons import ReasonCode, because
@@ -21,7 +21,7 @@ class DomainError(Exception):
     the reason's English text and `reason` keeps the code; raised with a text, `reason` is that
     text with the code `error`."""
 
-    def __init__(self, message: "str | Reason" = "", *args: object) -> None:
+    def __init__(self, message: str | Reason = "", *args: object) -> None:
         if isinstance(message, str):
             super().__init__(message, *args)
             self._reason: Reason | None = None
@@ -30,7 +30,7 @@ class DomainError(Exception):
             self._reason = message
 
     @property
-    def reason(self) -> "Reason":
+    def reason(self) -> Reason:
         from lekto.core.domain.reasons import ReasonCode, because
 
         return self._reason or because(ReasonCode.ERROR, detail=str(self))
@@ -39,7 +39,7 @@ class DomainError(Exception):
 class NotFoundError(DomainError):
     """The entity does not exist, or the caller may not know that it exists."""
 
-    def __init__(self, kind: str, id: UUID | str, reason: "Reason | None" = None) -> None:
+    def __init__(self, kind: str, id: UUID | str, reason: Reason | None = None) -> None:
         super().__init__(reason or _because("NOT_FOUND", kind=kind, id=str(id)))
         self.kind = kind
         self.id = id

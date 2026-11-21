@@ -18,7 +18,7 @@ class AllGroup[C: BaseModel](BaseModel):
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    all: "GroupItems[C]"
+    all: GroupItems[C]
     negate: bool = Field(default=False, alias="not")
 
 
@@ -27,7 +27,7 @@ class AnyGroup[C: BaseModel](BaseModel):
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    any: "GroupItems[C]"
+    any: GroupItems[C]
     negate: bool = Field(default=False, alias="not")
 
 

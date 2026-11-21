@@ -51,7 +51,7 @@ class Database:
         self,
         engine: AsyncEngine,
         sqlite_path: Path | None = None,
-        tls: "Tls" = None,
+        tls: Tls = None,
     ) -> None:
         self.engine = engine
         self.sqlite_path = sqlite_path  # the file of a SQLite database
@@ -63,7 +63,7 @@ class Database:
         self.listeners: list[Callable[[Channel, str | None], None]] = []
 
     @classmethod
-    def sqlite(cls, path: Path, *, read_only: bool = False) -> "Database":
+    def sqlite(cls, path: Path, *, read_only: bool = False) -> Database:
         """A SQLite database file (created by `migrate`). Only on a local volume: WAL mode
         does not work on network file systems.
 
@@ -87,8 +87,8 @@ class Database:
 
     @classmethod
     def postgres(
-        cls, *, host: str, port: int, name: str, user: str, password: str, tls: "Tls" = None
-    ) -> "Database":
+        cls, *, host: str, port: int, name: str, user: str, password: str, tls: Tls = None
+    ) -> Database:
         """`tls` is asyncpg's `ssl`: a mode (`prefer`, …), False, or a context that requires TLS
         and checks the server as it says; None leaves asyncpg's default (`PGSSLMODE`, else
         `prefer`)."""

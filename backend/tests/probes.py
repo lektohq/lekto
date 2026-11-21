@@ -51,7 +51,7 @@ def meilisearch_health(url: str) -> str | None:
     try:
         with _opener.open(url.rstrip("/") + "/health", timeout=TIMEOUT) as response:
             status = json.load(response).get("status")
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return None
     return status if isinstance(status, str) else None
 

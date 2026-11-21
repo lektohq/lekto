@@ -75,7 +75,7 @@ class Profile:
             raise ValidationError(f"at most {MAX_DECLINED} declined identifiers")
 
     @classmethod
-    def empty(cls, user: UserId) -> "Profile":
+    def empty(cls, user: UserId) -> Profile:
         return cls(id=user)
 
     def evidence(self) -> list[Identifier]:
@@ -103,7 +103,7 @@ class Person:
     private: bool = True
 
     @classmethod
-    def of(cls, user: User, profile: Profile | None) -> "Person":
+    def of(cls, user: User, profile: Profile | None) -> Person:
         if profile is None:
             return cls(user.id, user.display_name)
         return cls(
@@ -119,7 +119,7 @@ class Person:
         """The display name, then the aliases."""
         return (*((self.display_name,) if self.display_name else ()), *self.aliases)
 
-    def public(self) -> "Person":
+    def public(self) -> Person:
         """The person as anyone may find them: by their display name, nothing private."""
         return Person(self.user_id, self.display_name, private=False)
 

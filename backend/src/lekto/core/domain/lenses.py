@@ -218,7 +218,7 @@ class Lens:
         if self.grouping is Grouping.DUE and self.due_field_id is None:
             raise ValidationError("grouping: by when it is due only with a due_field_id")
 
-    def change(self, changes: "LensChanges", *, now: datetime) -> None:
+    def change(self, changes: LensChanges, *, now: datetime) -> None:
         """Apply what `changes` sets, normalised as a new lens is (`apply_changes`, DB-07);
         ValidationError (and nothing changed) if the result does not fit together, or a filter
         it sets names too many values (`check_values`)."""

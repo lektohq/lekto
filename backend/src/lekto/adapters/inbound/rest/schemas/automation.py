@@ -55,7 +55,7 @@ class TimesOut(BaseModel):
     p90_ms: float | None = Field(description="90th percentile, by nearest rank.")
 
     @classmethod
-    def of(cls, times: Times) -> "TimesOut":
+    def of(cls, times: Times) -> TimesOut:
         return cls(count=times.count, median_ms=_ms(times.median), p90_ms=_ms(times.p90))
 
 
@@ -79,7 +79,7 @@ class FieldVerdictsOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, item: FieldVerdicts) -> "FieldVerdictsOut":
+    def of(cls, item: FieldVerdicts) -> FieldVerdictsOut:
         return cls(
             field=item.field,
             name=item.name,
@@ -118,7 +118,7 @@ class AutomationOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, report: AutomationReport) -> "AutomationOut":
+    def of(cls, report: AutomationReport) -> AutomationOut:
         return cls(
             channels=sorted(report.channels),
             period=report.period,
@@ -151,7 +151,7 @@ class SignalHitsOut(BaseModel):
     decided: int = Field(description="Decisions on the field, whether the signal named one or not.")
 
     @classmethod
-    def of(cls, item: SignalHits) -> "SignalHitsOut":
+    def of(cls, item: SignalHits) -> SignalHitsOut:
         return cls(
             field=item.field,
             signal=item.signal,
@@ -172,7 +172,7 @@ class SignalsOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, report: SignalReport) -> "SignalsOut":
+    def of(cls, report: SignalReport) -> SignalsOut:
         return cls(
             channels=sorted(report.channels),
             period=report.period,
@@ -203,7 +203,7 @@ class TallyOut(BaseModel):
     unread: int = Field(description="Read before its kind had a holder (`read-facts` sets it).")
 
     @classmethod
-    def of(cls, tally: Tally) -> "TallyOut":
+    def of(cls, tally: Tally) -> TallyOut:
         return cls(
             right=tally.right,
             learned_rejected=tally.learned_rejected,
@@ -217,7 +217,7 @@ class HolderKindOut(TallyOut):
     kind: IdentifierKind
 
     @classmethod
-    def of_kind(cls, kind: IdentifierKind, tally: Tally) -> "HolderKindOut":
+    def of_kind(cls, kind: IdentifierKind, tally: Tally) -> HolderKindOut:
         return cls(kind=kind, **TallyOut.of(tally).model_dump())
 
 
@@ -226,7 +226,7 @@ class HoldersOut(BaseModel):
     recommendation: TallyOut = Field(description="The open list's recommendation, every kind.")
 
     @classmethod
-    def of(cls, evaluation: HolderEvaluation) -> "HoldersOut":
+    def of(cls, evaluation: HolderEvaluation) -> HoldersOut:
         return cls(
             kinds=[HolderKindOut.of_kind(kind, tally) for kind, tally in evaluation.kinds.items()],
             recommendation=TallyOut.of(evaluation.recommendation),
@@ -253,7 +253,7 @@ class HolderCasesOut(BaseModel):
     @classmethod
     def of(
         cls, cases: Sequence[Case], names: Mapping[ContactId, str], refs: RefCipher
-    ) -> "HolderCasesOut":
+    ) -> HolderCasesOut:
         return cls(
             cases=[
                 HolderCaseOut(

@@ -91,7 +91,7 @@ class TaskBook:
     def find(self, key: str) -> Task | None:
         return self.current.get(key) or self.earlier.get(key)
 
-    def open_deadline(self) -> "datetime | None":
+    def open_deadline(self) -> datetime | None:
         """When the last open task of the run ends at the latest."""
         deadlines = [
             task.deadline
@@ -183,7 +183,7 @@ class Walk:
         return self.ask is not None or self.waiting
 
     @classmethod
-    def plain(cls, match: Match) -> "Walk":
+    def plain(cls, match: Match) -> Walk:
         """A rule without steps between its actions: all of them count."""
         return cls(match, tuple(match.rule.definition.actions))
 

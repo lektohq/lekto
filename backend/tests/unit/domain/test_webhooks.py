@@ -366,6 +366,6 @@ def test_a_rendered_body_must_be_json_and_goes_as_it_is() -> None:
     assert rendered_body(text) == text.encode("utf-8")
     with pytest.raises(ValueError, match="does not make JSON"):
         rendered_body('{"title": Rechnung}')
-    # Ten thousand brackets of a loop: no delivery would make it JSON, it is given up at once.
+    # Half a million brackets of a loop: no delivery would make it JSON, it is given up at once.
     with pytest.raises(ValueError, match="nested too deeply"):
-        rendered_body("[" * 10_000)
+        rendered_body("[" * 500_000)

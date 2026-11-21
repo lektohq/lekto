@@ -57,7 +57,7 @@ class Code:
         }
 
     @classmethod
-    def from_json(cls, data: JsonValue) -> "Code":
+    def from_json(cls, data: JsonValue) -> Code:
         if not isinstance(data, dict):
             raise ValidationError(f"invalid code {data!r:.100}")
         page, format, text = as_int(data.get("page")), data.get("format"), data.get("text")

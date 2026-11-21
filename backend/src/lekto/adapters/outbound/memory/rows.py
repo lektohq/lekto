@@ -26,7 +26,7 @@ def _copy[E](entity: E) -> E:
 class MemoryRows[K: UUID, E: Identified[UUID]]:
     """Rows that are added, found, listed and removed; what only inserts builds on this."""
 
-    def __init__(self, uow: "MemoryUnitOfWork", table: Table[E]) -> None:
+    def __init__(self, uow: MemoryUnitOfWork, table: Table[E]) -> None:
         self._uow = uow
         self._table = table
 

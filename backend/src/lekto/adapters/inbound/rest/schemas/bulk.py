@@ -104,7 +104,7 @@ class BulkOperationOut(BaseModel):
     finished_at: datetime | None
 
     @classmethod
-    def of(cls, operation: BulkOperation) -> "BulkOperationOut":
+    def of(cls, operation: BulkOperation) -> BulkOperationOut:
         return cls(
             id=operation.id,
             kind=operation.action.kind,

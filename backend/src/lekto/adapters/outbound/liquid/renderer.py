@@ -42,7 +42,7 @@ def parse_locale(text: str) -> str:
     names none."""
     try:
         return str(Locale.parse(text.replace("-", "_")))
-    except (ValueError, UnknownLocaleError):
+    except ValueError, UnknownLocaleError:
         raise ValueError(f"unknown locale {text!r}") from None
 
 
@@ -68,7 +68,7 @@ class _Bounded:
     filter's own."""
 
     def __init__(
-        self, name: str, inner: Callable[..., object], before: "_Before | None" = None
+        self, name: str, inner: Callable[..., object], before: _Before | None = None
     ) -> None:
         self._name = name
         self._inner = inner
@@ -251,7 +251,7 @@ class _Number(float):
 
     _text: str
 
-    def __new__(cls, value: Decimal) -> "_Number":
+    def __new__(cls, value: Decimal) -> _Number:
         number = super().__new__(cls, value)
         number._text = format(value, "f")
         return number

@@ -391,7 +391,7 @@ class WebhookService:
                         webhook.encrypted_headers, context=headers_context(webhook.id)
                     )
                 )
-            except (DecryptionError, ValueError):
+            except DecryptionError, ValueError:
                 stored = {}  # unreadable (another secret key): every value must be given anew
             known = {name.lower(): value for name, value in stored.items()}
         resolved: list[tuple[str, str]] = []

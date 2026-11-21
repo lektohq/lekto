@@ -40,7 +40,7 @@ class SearchPlacesOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, places: SearchPlaces) -> "SearchPlacesOut":
+    def of(cls, places: SearchPlaces) -> SearchPlacesOut:
         return cls(
             matched=places.matched,
             occurrences=[OccurrenceOut.of(item) for item in places.occurrences],
@@ -116,7 +116,7 @@ class JobTimesOut(BaseModel):
     p90_ms: float
 
     @classmethod
-    def of(cls, times: JobTimes | None) -> "JobTimesOut | None":
+    def of(cls, times: JobTimes | None) -> JobTimesOut | None:
         if times is None:
             return None
         return cls(count=times.count, median_ms=ms(times.median), p90_ms=ms(times.p90))
@@ -145,7 +145,7 @@ class SearchStatusOut(BaseModel):
     since: datetime = Field(description="The durations count the jobs done from then on.")
 
     @classmethod
-    def of(cls, status: IndexStatus) -> "SearchStatusOut":
+    def of(cls, status: IndexStatus) -> SearchStatusOut:
         stats = status.stats
         return cls(
             documents=status.documents,
@@ -177,7 +177,7 @@ class IndexCheckOut(BaseModel):
     took_ms: float
 
     @classmethod
-    def of(cls, check: IndexCheck) -> "IndexCheckOut":
+    def of(cls, check: IndexCheck) -> IndexCheckOut:
         found = check.comparison
         return cls(
             current=found.current,

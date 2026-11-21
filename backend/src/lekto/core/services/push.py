@@ -298,7 +298,7 @@ class PushService:
                     current.failures += 1
                     await uow.push_devices.update(current)
                 await uow.commit()
-        except (ConcurrencyError, NotFoundError):
+        except ConcurrencyError, NotFoundError:
             pass  # Changed or removed meanwhile: the next delivery records again.
         return result
 

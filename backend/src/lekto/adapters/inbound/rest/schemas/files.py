@@ -36,7 +36,7 @@ class FileMetadataOut(BaseModel):
     entries: list[MetadataEntryOut] = Field(description="In the file's order.")
 
     @classmethod
-    def of(cls, metadata: FileMetadata) -> "FileMetadataOut":
+    def of(cls, metadata: FileMetadata) -> FileMetadataOut:
         return cls(
             format=metadata.format,
             pdf_version=metadata.pdf_version,
@@ -60,7 +60,7 @@ class StoredFileOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, stored: StoredFile) -> "StoredFileOut":
+    def of(cls, stored: StoredFile) -> StoredFileOut:
         return cls(
             size=stored.size,
             sha256=stored.sha256,
@@ -114,7 +114,7 @@ class DocumentVersionOut(BaseModel):
     @classmethod
     def of(
         cls, version: DocumentVersion, *, current: bool, origins: Mapping[DocumentId, str]
-    ) -> "DocumentVersionOut":
+    ) -> DocumentVersionOut:
         named = version.detail.get("document")
         origin = None
         if version.kind is VersionKind.SPLIT and isinstance(named, str):
@@ -192,7 +192,7 @@ class DocumentFilesOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, files: DocumentFiles) -> "DocumentFilesOut":
+    def of(cls, files: DocumentFiles) -> DocumentFilesOut:
         document = files.document
         return cls(
             added=document.created_at,

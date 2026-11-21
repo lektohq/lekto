@@ -163,7 +163,7 @@ class OpenAiCompatEmbeddings:
         try:
             items = sorted(data["data"], key=lambda item: int(item["index"]))
             vectors = [tuple(float(value) for value in item["embedding"]) for item in items]
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             raise EmbeddingsError("the embedding model sent an unusable response") from None
         if [int(item["index"]) for item in items] != list(range(len(texts))):
             raise EmbeddingsError(f"expected {len(texts)} vectors, got {len(vectors)}")
@@ -198,7 +198,7 @@ class _Client:
         try:
             async with asyncio.timeout(self._timeout):
                 response = await self._client.post(self._url, json=body)
-        except (TimeoutError, httpx2.TimeoutException):
+        except TimeoutError, httpx2.TimeoutException:
             raise self._error(f"no answer within {self._timeout:g} seconds") from None
         except httpx2.HTTPError as failure:
             endpoint = endpoint_of(self._url)

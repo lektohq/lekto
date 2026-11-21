@@ -683,7 +683,7 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
             counts[key] = counts.get(key, 0) + 1
         return counts
 
-    def _groups(self, filter: DocumentFilter) -> "_Groups":
+    def _groups(self, filter: DocumentFilter) -> _Groups:
         return _Groups(
             {row.id: row.group_ids for row in self._uow._rows(CONTACTS)},
             {row.id: row.group_ids for row in self._uow._rows(DOCUMENT_TYPES)},

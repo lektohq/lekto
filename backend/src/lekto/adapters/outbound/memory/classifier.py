@@ -58,7 +58,7 @@ class FakeClassifier:
             topics = _ranked(data.get("topic", {}), words)
             spaces = _ranked(data.get("space", {}), words)
             tags = {TagId(UUID(tag)): _share(set(own), words) for tag, own in data["tags"].items()}
-        except (ValueError, KeyError, TypeError, AttributeError):
+        except ValueError, KeyError, TypeError, AttributeError:
             raise ClassifierError("the model cannot be read") from None
         return Prediction(
             contacts=[(ContactId(UUID(key)), share) for key, share in contacts],

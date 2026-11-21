@@ -150,8 +150,8 @@ class Period:
             if found["start"]:
                 return cls(date.fromisoformat(found["start"]), date.fromisoformat(found["end"]))
             return cls.year(year)
-        except (ValueError, ValidationError):
+        except ValueError, ValidationError:
             raise ValidationError(f"{text.strip()!r} names no period") from None
 
-    def overlaps(self, other: "Period") -> bool:
+    def overlaps(self, other: Period) -> bool:
         return self.start <= other.end and other.start <= self.end

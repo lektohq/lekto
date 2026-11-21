@@ -659,5 +659,5 @@ async def _commit_quietly(uow: UnitOfWork) -> None:
     """Commit a usage timestamp; losing it to a concurrent change does no harm."""
     try:
         await uow.commit()
-    except (ConcurrencyError, ConflictError):
+    except ConcurrencyError, ConflictError:
         log.debug("usage timestamp not stored")

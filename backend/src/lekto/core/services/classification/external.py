@@ -479,7 +479,7 @@ async def by_webhook[T](
     text: str,
     context: Callable[[], Awaitable[ModelCallContext]],
     read: Callable[[Task], T],
-) -> "Answered[T] | NodeResult | ExternalCall":
+) -> Answered[T] | NodeResult | ExternalCall:
     """A model call a webhook takes over, as the model's signal and the fields node make it
     (SA-15): its answer as `read` reads it (kept beside what was sent), why it brought none
     (failed; unfit when `read` raises AnswerError), the call while it waits, or the call that
