@@ -81,7 +81,7 @@ class PushDeviceOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, device: PushDevice) -> "PushDeviceOut":
+    def of(cls, device: PushDevice) -> PushDeviceOut:
         return cls(
             id=device.id,
             name=device.name,
@@ -101,7 +101,7 @@ class PushTestOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, result: PushResult) -> "PushTestOut":
+    def of(cls, result: PushResult) -> PushTestOut:
         return cls(outcome=result.outcome)
 
 
@@ -131,7 +131,7 @@ class PushPreferencesBody(RequestBody):
     )
 
     @classmethod
-    def of(cls, preferences: PushPreferences) -> "PushPreferencesBody":
+    def of(cls, preferences: PushPreferences) -> PushPreferencesBody:
         return cls(
             kinds=sorted(kind.value for kind in preferences.kinds),
             titles=preferences.titles,

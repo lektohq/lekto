@@ -138,7 +138,7 @@ class PageRecord:
         }
 
     @classmethod
-    def from_json(cls, data: Any) -> "PageRecord":
+    def from_json(cls, data: Any) -> PageRecord:
         return cls(
             page=int(data["page"]),
             words=int(data["words"]),

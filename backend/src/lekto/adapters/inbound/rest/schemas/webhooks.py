@@ -100,7 +100,7 @@ class WebhookModelCallOut(BaseModel):
     timeout_seconds: int
 
     @classmethod
-    def of(cls, role: ModelCallRole | None) -> "WebhookModelCallOut | None":
+    def of(cls, role: ModelCallRole | None) -> WebhookModelCallOut | None:
         if role is None:
             return None
         return cls(kind=role.kind, timeout_seconds=int(role.timeout.total_seconds()))
@@ -253,7 +253,7 @@ class WebhookOut(BaseModel):
     updated_at: datetime
 
     @classmethod
-    def of(cls, webhook: Webhook) -> "WebhookOut":
+    def of(cls, webhook: Webhook) -> WebhookOut:
         reason = webhook.disabled_reason
         return cls(
             id=webhook.id,
@@ -288,7 +288,7 @@ class WebhookCreated(WebhookOut):
     )
 
     @classmethod
-    def created(cls, created: CreatedWebhook) -> "WebhookCreated":
+    def created(cls, created: CreatedWebhook) -> WebhookCreated:
         return cls(**WebhookOut.of(created.webhook).model_dump(), secret=created.secret)
 
 
@@ -327,7 +327,7 @@ class DeliveryOut(BaseModel):
     )
 
     @classmethod
-    def of_view(cls, view: DeliveryView) -> "DeliveryOut":
+    def of_view(cls, view: DeliveryView) -> DeliveryOut:
         return cls.of(view.delivery, view.document, hidden=view.document_hidden)
 
     @classmethod
@@ -337,7 +337,7 @@ class DeliveryOut(BaseModel):
         document: DocumentRef | None = None,
         *,
         hidden: bool = False,
-    ) -> "DeliveryOut":
+    ) -> DeliveryOut:
         return cls(
             id=delivery.id,
             webhook_id=delivery.webhook_id,
@@ -367,7 +367,7 @@ class DeliveryPageOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, page: DeliveriesPage, offset: int) -> "DeliveryPageOut":
+    def of(cls, page: DeliveriesPage, offset: int) -> DeliveryPageOut:
         return cls(
             items=[DeliveryOut.of_view(view) for view in page.deliveries],
             total=page.total,
@@ -384,7 +384,7 @@ class DeliverySummaryOut(BaseModel):
     kept_since: datetime = Field(description="Older entries are removed (the retention period).")
 
     @classmethod
-    def of(cls, summary: DeliverySummary) -> "DeliverySummaryOut":
+    def of(cls, summary: DeliverySummary) -> DeliverySummaryOut:
         def count(outcome: DeliveryOutcome) -> int:
             return summary.counts.get(outcome, 0)
 

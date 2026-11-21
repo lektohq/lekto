@@ -75,7 +75,7 @@ class MailStepBody(BaseModel):
         return MailStep(self.action, self.value)
 
     @classmethod
-    def of(cls, step: MailStep) -> "MailStepBody":
+    def of(cls, step: MailStep) -> MailStepBody:
         return cls(action=step.action, value=step.value)
 
 
@@ -231,7 +231,7 @@ class DryRunMailOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, item: DryRunMail) -> "DryRunMailOut":
+    def of(cls, item: DryRunMail) -> DryRunMailOut:
         record = item.record
         return cls(
             id=record.id,
@@ -267,7 +267,7 @@ class MailRuleOut(BaseModel):
     updated_at: datetime
 
     @classmethod
-    def of(cls, rule: MailRule) -> "MailRuleOut":
+    def of(cls, rule: MailRule) -> MailRuleOut:
         return cls(
             id=rule.id,
             mailbox_id=rule.mailbox_id,

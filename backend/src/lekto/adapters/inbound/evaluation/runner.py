@@ -182,7 +182,7 @@ async def evaluate(
 
 
 async def _relations(
-    environment: Environment, owner: User, result: "CaseResult", names: dict[DocumentId, str]
+    environment: Environment, owner: User, result: CaseResult, names: dict[DocumentId, str]
 ) -> frozenset[tuple[str, str]]:
     """The documents `relate` related the case with, by name, and how sure."""
     if environment.relations is None:

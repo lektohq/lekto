@@ -42,38 +42,38 @@ class Node(StrEnum):
     FILE = "file"
 
     @property
-    def requires(self) -> frozenset["Node"]:
+    def requires(self) -> frozenset[Node]:
         """The nodes whose results this node needs."""
         return GRAPH[self]
 
     @property
-    def waits_for(self) -> frozenset["Node"]:
+    def waits_for(self) -> frozenset[Node]:
         """The nodes that must be done before this node runs: those it needs, and those it
         only waits for (`WAITS`)."""
         return GRAPH[self] | WAITS.get(self, frozenset())
 
     @property
-    def successors(self) -> frozenset["Node"]:
+    def successors(self) -> frozenset[Node]:
         """The nodes that need this node's result."""
         return frozenset(node for node, needed in GRAPH.items() if self in needed)
 
     @property
-    def ancestors(self) -> frozenset["Node"]:
+    def ancestors(self) -> frozenset[Node]:
         """Every node this node depends on, directly or through others."""
         return _closure(self, lambda node: node.requires)
 
     @property
-    def descendants(self) -> frozenset["Node"]:
+    def descendants(self) -> frozenset[Node]:
         """Every node that depends on this node, directly or through others."""
         return _closure(self, lambda node: node.successors)
 
 
-SIGNALS: frozenset["Node"] = frozenset(
+SIGNALS: frozenset[Node] = frozenset(
     {Node.SIGNAL_LLM, Node.SIGNAL_CLASSIFIER, Node.SIGNAL_NEIGHBOURS, Node.SIGNAL_FACTS}
 )
 """The nodes that propose metadata for the judge; they never decide the lane themselves."""
 
-CURRENT_SIGNALS: frozenset["Node"] = frozenset(
+CURRENT_SIGNALS: frozenset[Node] = frozenset(
     {Node.SIGNAL_CLASSIFIER, Node.SIGNAL_NEIGHBOURS, Node.SIGNAL_FACTS}
 )
 """The signals that read the current master data, model and index without asking a language
@@ -129,7 +129,7 @@ class Lane(StrEnum):
     RED = "red"
 
     @classmethod
-    def from_outcomes(cls, outcomes: Iterable[Outcome]) -> "Lane":
+    def from_outcomes(cls, outcomes: Iterable[Outcome]) -> Lane:
         """The worst outcome decides: any failure is red, any uncertainty yellow."""
         found = set(outcomes)
         if Outcome.FAILED in found:
@@ -409,7 +409,7 @@ class Processing:
             raise ValidationError("processing in review has filing open")
 
     @classmethod
-    def new(cls) -> "Processing":
+    def new(cls) -> Processing:
         """The state of a document that just arrived: every node waiting; it was not green."""
         return cls(
             status=ProcessingStatus.PROCESSING,

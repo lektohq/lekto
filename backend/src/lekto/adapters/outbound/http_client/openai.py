@@ -47,7 +47,7 @@ def provider_message(response: httpx2.Response) -> str:
         data = response.json()
         detail = data["error"]["message"] if isinstance(data["error"], dict) else data["error"]
         text = str(detail)
-    except (ValueError, KeyError, TypeError):
+    except ValueError, KeyError, TypeError:
         text = response.text
     return excerpt(text) or response.reason_phrase
 
@@ -57,6 +57,6 @@ def answer_content(data: dict[str, Any]) -> str:
     the answer has no choice with a message."""
     try:
         content = data["choices"][0]["message"].get("content")
-    except (KeyError, IndexError, TypeError, AttributeError):
+    except KeyError, IndexError, TypeError, AttributeError:
         raise ProtocolError("unusable response") from None
     return content if isinstance(content, str) else ""

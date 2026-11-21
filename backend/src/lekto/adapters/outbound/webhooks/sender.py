@@ -83,7 +83,7 @@ class HttpWebhookSender:
                     status = response.status_code
         except _RefusedError:
             error = REFUSED
-        except (TimeoutError, httpx2.TimeoutException):
+        except TimeoutError, httpx2.TimeoutException:
             error = f"no answer within {limit:g} seconds"
         except httpx2.HTTPError as failure:
             error = describe_failure(failure)

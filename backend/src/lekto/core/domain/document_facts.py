@@ -518,7 +518,7 @@ class FactCriterion:
     @classmethod
     def written(
         cls, kind: IdentifierKind | None, value: str | None, role: FactRole | None
-    ) -> "FactCriterion":
+    ) -> FactCriterion:
         """A criterion with the value as a person writes it (ValidationError, with the kind's
         reason, if it is none of the kind)."""
         normalised = None

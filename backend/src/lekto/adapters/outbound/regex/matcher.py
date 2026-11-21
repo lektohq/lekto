@@ -14,7 +14,7 @@ from lekto.core.domain.reasons import ReasonCode, because
 
 
 @lru_cache(maxsize=512)
-def _compile(pattern: str, case_sensitive: bool) -> "regex.Pattern[str]":
+def _compile(pattern: str, case_sensitive: bool) -> regex.Pattern[str]:
     if spelled_out(pattern) > MAX_SPELLED_OUT:
         raise ValidationError(
             because(ReasonCode.PATTERN_TOO_LARGE, pattern=pattern, max=MAX_SPELLED_OUT)
@@ -53,7 +53,7 @@ class RegexPatternMatcher:
         return await asyncio.to_thread(self._find, compiled, text, limit)
 
     def _find(
-        self, compiled: "regex.Pattern[str]", text: str, limit: int
+        self, compiled: regex.Pattern[str], text: str, limit: int
     ) -> tuple[tuple[int, int], ...]:
         found: list[tuple[int, int]] = []
         try:
@@ -68,7 +68,7 @@ class RegexPatternMatcher:
             ) from None
         return tuple(found)
 
-    def _search(self, compiled: "regex.Pattern[str]", text: str) -> bool:
+    def _search(self, compiled: regex.Pattern[str], text: str) -> bool:
         try:
             return compiled.search(text, concurrent=True, timeout=self._timeout) is not None
         except TimeoutError:

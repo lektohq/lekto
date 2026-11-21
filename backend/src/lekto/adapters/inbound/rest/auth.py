@@ -207,7 +207,7 @@ async def still_authenticated(request: Request, context: ApiContext, user: UserI
     request.state.principal = None
     try:
         return (await authenticate(request, context)).id == user
-    except (AuthenticationError, PermissionDeniedError):
+    except AuthenticationError, PermissionDeniedError:
         return False
 
 

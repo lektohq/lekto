@@ -24,7 +24,7 @@ MICROSECOND = timedelta(microseconds=1)
 
 
 class MemoryProcessingFacts:
-    def __init__(self, uow: "MemoryUnitOfWork") -> None:
+    def __init__(self, uow: MemoryUnitOfWork) -> None:
         self._uow = uow
 
     async def add_first_run(self, run: FirstRun) -> None:

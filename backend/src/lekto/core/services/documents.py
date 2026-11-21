@@ -234,16 +234,16 @@ class DocumentFacts:
     # The document's numbers that are no contact's or person's identifier (its own, a strand's,
     # another document's it refers to), as the text reads, with where they stand; those a
     # person rejected too.
-    numbers: tuple["DocumentNumber", ...] = ()
+    numbers: tuple[DocumentNumber, ...] = ()
     # The kept facts of the other kinds the identifiers found in the text do not show: for
     # admins all of them (a person's numbers, those only the model read), for others those a
     # person decided, none of a person's (`_other_fact_shown`).
-    decided: tuple["DocumentNumber", ...] = ()
+    decided: tuple[DocumentNumber, ...] = ()
     # Whether the caller decides about the facts: an editor of the space or an admin.
     editable: bool = False
 
     @property
-    def identifiers(self) -> tuple["IdentifierFact", ...]:
+    def identifiers(self) -> tuple[IdentifierFact, ...]:
         """The identifiers found (`facts.identifiers`), each with the fact kept for it: what REST
         and MCP show alike (RA-10)."""
         return tuple(
@@ -265,7 +265,7 @@ class IdentifierFact:
     kept: bool
 
     @classmethod
-    def of(cls, found: FoundIdentifier, kept: DocumentFact | None) -> "IdentifierFact":
+    def of(cls, found: FoundIdentifier, kept: DocumentFact | None) -> IdentifierFact:
         """The text's patterns and a code as the facts are found now (a row taken over by
         revision 0047 does not know whether a code held it), other sources as kept."""
         origins = {
@@ -299,7 +299,7 @@ class DocumentNumber:
     fact: DocumentFact
     spans: tuple[Span, ...]
 
-    def on(self, places: TextPlaces) -> "DocumentNumber":
+    def on(self, places: TextPlaces) -> DocumentNumber:
         placed = tuple(
             replace(span, locations=places.locations(span.start, span.end)) for span in self.spans
         )

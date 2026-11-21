@@ -142,7 +142,7 @@ def series_of(key: SeriesKey, documents: Sequence[Dated]) -> Series | None:
     step lies beyond the calendar (year 9999; DB-10)."""
     try:
         return _series_of(key, documents)
-    except (ValueError, OverflowError):
+    except ValueError, OverflowError:
         return None
 
 

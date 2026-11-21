@@ -48,7 +48,7 @@ class Asking:
     desk: TaskDesk
     webhook: WebhookId
 
-    async def run(self, document: Document) -> "AskingResult":
+    async def run(self, document: Document) -> AskingResult:
         return AskingResult(self)
 
 

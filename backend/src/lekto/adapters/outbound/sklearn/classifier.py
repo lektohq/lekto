@@ -247,7 +247,7 @@ class _Model:
     tag_intercept: _Array
 
     @classmethod
-    def load(cls, data: bytes) -> "_Model":
+    def load(cls, data: bytes) -> _Model:
         try:
             with np.load(io.BytesIO(data), allow_pickle=False) as archive:
                 if str(archive["format"]) != FORMAT:

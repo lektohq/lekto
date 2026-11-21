@@ -111,7 +111,7 @@ class BulkAction:
         }
 
     @classmethod
-    def from_json(cls, data: JsonValue) -> "BulkAction":
+    def from_json(cls, data: JsonValue) -> BulkAction:
         if not isinstance(data, dict):
             raise ValidationError("an action is an object")
 

@@ -59,7 +59,7 @@ class Reach:
     reads: frozenset[SpaceId]
 
     @classmethod
-    def of(cls, user: UserId, spaces: Iterable[Space]) -> "Reach":
+    def of(cls, user: UserId, spaces: Iterable[Space]) -> Reach:
         edits: set[SpaceId] = set()
         reads: set[SpaceId] = set()
         for space in spaces:

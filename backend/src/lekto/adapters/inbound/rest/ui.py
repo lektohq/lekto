@@ -109,7 +109,7 @@ def _not_modified(request: Request, response: Response) -> bool:
         return False
     try:
         return parsedate_to_datetime(modified) <= parsedate_to_datetime(since)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return False
 
 

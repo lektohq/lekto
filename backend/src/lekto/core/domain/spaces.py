@@ -110,7 +110,7 @@ class Space:
         self._check_members(members)
         self.members = members
 
-    def widens(self, target: "Space") -> bool:
+    def widens(self, target: Space) -> bool:
         """Whether moving a document from this space into `target` shows it to someone who
         cannot read it here: `target` has a member this space lacks."""
         return any(user not in self.members for user in target.members)

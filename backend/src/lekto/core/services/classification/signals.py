@@ -170,7 +170,7 @@ class FactsSignal:
         self._store = store
         self._codes = codes
 
-    async def run(self, document: Document) -> "NodeResult | FactsResult":
+    async def run(self, document: Document) -> NodeResult | FactsResult:
         text = await _text(self._store, document)
         if text is None:
             return abstained(because(ReasonCode.NO_DOCUMENT_TEXT), model_version=FACTS)
@@ -231,7 +231,7 @@ class FactsSignal:
             kept = codes_from_json(json.loads(await self._store.get(key)))
         except NotFoundError:
             kept = None
-        except (ValueError, ValidationError):
+        except ValueError, ValidationError:
             log.warning("reading an unreadable file of codes again", extra={"key": key})
             kept = None
         if kept is not None:

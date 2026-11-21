@@ -36,7 +36,7 @@ class Box:
             raise ValidationError("a box must lie on the page")
 
     @classmethod
-    def clamped(cls, left: float, top: float, right: float, bottom: float) -> "Box":
+    def clamped(cls, left: float, top: float, right: float, bottom: float) -> Box:
         """The box between two corners, cut to the page and rounded."""
         left, right = sorted((_clamp(left), _clamp(right)))
         top, bottom = sorted((_clamp(top), _clamp(bottom)))
@@ -49,7 +49,7 @@ class Box:
         return {"x": self.x, "y": self.y, "width": self.width, "height": self.height}
 
     @classmethod
-    def from_json(cls, data: JsonValue) -> "Box":
+    def from_json(cls, data: JsonValue) -> Box:
         if not isinstance(data, dict):
             raise ValidationError(f"invalid box {data!r}")
         values = [data.get(name) for name in ("x", "y", "width", "height")]
@@ -74,7 +74,7 @@ class Location:
         return {"page": self.page, "boxes": [box.to_json() for box in self.boxes]}
 
     @classmethod
-    def from_json(cls, data: JsonValue) -> "Location":
+    def from_json(cls, data: JsonValue) -> Location:
         if not isinstance(data, dict):
             raise ValidationError(f"invalid location {data!r}")
         page, boxes = as_int(data.get("page")), data.get("boxes")

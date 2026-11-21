@@ -109,7 +109,7 @@ class SeparateNode:
         self._separators = frozenset(separators)
         self._version = pipeline_version
 
-    async def run(self, document: Document) -> "NodeResult | Separation":
+    async def run(self, document: Document) -> NodeResult | Separation:
         not_looked = await self._not_looked(document)
         if not_looked is not None and document.media_type not in VERSION_MEDIA_TYPES:
             return NodeResult(outcome=Outcome.OK, output=not_looked)  # a mail

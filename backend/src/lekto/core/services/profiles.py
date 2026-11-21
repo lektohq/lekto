@@ -343,7 +343,7 @@ async def new_profile_hints(
         name = display_name_of(display_name)
         if name is not None:
             await check_display_name(uow, user.id, name)
-    except (ValidationError, ConflictError):
+    except ValidationError, ConflictError:
         name = None
     if name is not None:
         user.display_name = name
@@ -353,6 +353,6 @@ async def new_profile_hints(
     try:
         profile = Profile(id=user.id, email=email, version=1)
         await check_person_identifiers(uow, profile.evidence())
-    except (ValidationError, ConflictError):
+    except ValidationError, ConflictError:
         return
     await uow.profiles.add(profile)

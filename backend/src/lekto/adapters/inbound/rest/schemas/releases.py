@@ -13,7 +13,7 @@ class ReleaseOut(BaseModel):
     url: str = Field(description="The release's page on GitHub, with its notes.")
 
     @classmethod
-    def of(cls, release: Release) -> "ReleaseOut":
+    def of(cls, release: Release) -> ReleaseOut:
         return cls(version=release.version, published_at=release.published_at, url=release.url)
 
 

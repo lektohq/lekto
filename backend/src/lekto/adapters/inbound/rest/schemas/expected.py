@@ -42,7 +42,7 @@ class ExpectedOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, item: Expected) -> "ExpectedOut":
+    def of(cls, item: Expected) -> ExpectedOut:
         series = item.series
         key = series.key
         number = (

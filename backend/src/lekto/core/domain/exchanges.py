@@ -54,7 +54,7 @@ class ModelCall:
         }
 
     @classmethod
-    def from_json(cls, data: JsonValue) -> "ModelCall":
+    def from_json(cls, data: JsonValue) -> ModelCall:
         if not isinstance(data, dict):
             raise ValidationError(f"invalid model call {data!r}")
         retry = data.get("retry")
@@ -87,7 +87,7 @@ class RunExchange:
         return {"run": self.run, "calls": [call.to_json() for call in self.calls]}
 
     @classmethod
-    def from_json(cls, data: JsonValue) -> "RunExchange":
+    def from_json(cls, data: JsonValue) -> RunExchange:
         if not isinstance(data, dict):
             raise ValidationError(f"invalid run exchange {data!r}")
         run, calls = as_int(data.get("run")), data.get("calls")

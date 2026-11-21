@@ -238,7 +238,7 @@ class MemoryDatabase:
     subscriptions: dict[str, SubscriptionState] = field(default_factory=dict)
     locks: dict[str, asyncio.Lock] = field(default_factory=dict)  # see MemoryUnitOfWork.lock
     # What the inbox keeps: when each user saw a document last, who confirmed it last.
-    seen: dict[tuple[UserId, DocumentId], "SeenMark"] = field(default_factory=dict)
+    seen: dict[tuple[UserId, DocumentId], SeenMark] = field(default_factory=dict)
     confirmations: dict[DocumentId, Confirmation] = field(default_factory=dict)
     # What processing facts keep: the first runs, the verdicts by document and field.
     first_runs: dict[DocumentId, FirstRun] = field(default_factory=dict)

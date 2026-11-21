@@ -44,7 +44,7 @@ def signed(cipher: SecretCipher, task: Task, name: str, expires: int, signature:
     """Whether `signature` is Lekto's for the file `name` of `task` until `expires`."""
     try:
         cipher.decrypt(from_base64url(signature), context=_context(task, name, expires))
-    except (DecryptionError, ValueError):
+    except DecryptionError, ValueError:
         return False
     return True
 

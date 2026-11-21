@@ -351,7 +351,7 @@ def field_from_json(definition: FieldDefinition, data: object) -> FieldValue:
                 start, end = data["start"], data["end"]
                 if isinstance(start, str) and isinstance(end, str):
                     value = Period(date.fromisoformat(start), date.fromisoformat(end))
-    except (InvalidOperation, ValueError, ValidationError):
+    except InvalidOperation, ValueError, ValidationError:
         raise definition.refusal(data) from None
     return definition.validate(value)
 
@@ -434,7 +434,7 @@ def read_written(
             case FieldType.LINK:
                 value = Url(text.strip())
         return None if value is None else definition.validate(value)
-    except (InvalidOperation, ValueError, ValidationError):
+    except InvalidOperation, ValueError, ValidationError:
         return None
 
 

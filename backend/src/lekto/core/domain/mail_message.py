@@ -104,7 +104,7 @@ class MailMessage:
     Apple Mail sends a PDF); attached mails aside (`messages`)."""
     pictures: tuple[MailPart, ...]
     """Parts the HTML can show by `cid:`."""
-    messages: tuple["MailMessage", ...]
+    messages: tuple[MailMessage, ...]
     """Mails attached to this one (a forward as attachment), `MAX_FORWARDS` deep."""
     source: bytes | Callable[[], bytes] = field(repr=False, compare=False, default=b"")
     """The mail as a file, or how to write it (`raw`)."""
@@ -199,7 +199,7 @@ def _read(message: EmailMessage, source: bytes | Callable[[], bytes], depth: int
 def _bytes(message: EmailMessage) -> bytes:
     try:
         return message.as_bytes(policy=_SMTP)
-    except (LookupError, UnicodeError, ValueError):
+    except LookupError, UnicodeError, ValueError:
         return message.as_bytes(policy=email.policy.compat32)
 
 
@@ -255,7 +255,7 @@ def _is_body(part: Message, *bodies: tuple[Message, str] | None) -> bool:
 def _text(part: Message) -> str | None:
     try:
         content = part.get_content()  # type: ignore[attr-defined]
-    except (LookupError, UnicodeError, ValueError):
+    except LookupError, UnicodeError, ValueError:
         raw = part.get_payload(decode=True)
         if not isinstance(raw, bytes):
             return None
@@ -277,7 +277,7 @@ def _attached(part: Message) -> EmailMessage | None:
 def _filename(part: Message) -> str | None:
     try:
         name = part.get_filename()
-    except (LookupError, UnicodeError, ValueError):
+    except LookupError, UnicodeError, ValueError:
         return None
     return clean_filename(_SPACE.sub(" ", name)) or None if name else None
 
@@ -311,7 +311,7 @@ def _parsed(message: Message, name: str, *, listed: bool = False) -> str:
         return ""
     try:
         return str(email.policy.default.header_fetch_parse(name, raw))
-    except (LookupError, UnicodeError, ValueError):
+    except LookupError, UnicodeError, ValueError:
         return ""
 
 
@@ -339,6 +339,6 @@ def _date(message: EmailMessage) -> datetime | None:
         if moment.tzinfo is None:
             moment = moment.replace(tzinfo=UTC)
         return moment.astimezone(UTC)
-    except (TypeError, ValueError, IndexError, OverflowError):
+    except TypeError, ValueError, IndexError, OverflowError:
         # A date at the edge of the calendar (`31 Dec 9999 … -0100`) leaves it in UTC.
         return None

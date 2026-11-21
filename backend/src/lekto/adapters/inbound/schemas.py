@@ -96,7 +96,7 @@ class DocumentRefOut(BaseModel):
     title: str
 
     @classmethod
-    def of(cls, ref: DocumentRef) -> "DocumentRefOut":
+    def of(cls, ref: DocumentRef) -> DocumentRefOut:
         return cls(id=ref.id, title=ref.title)
 
 
@@ -124,7 +124,7 @@ class ReasonOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, reason: Reason) -> "ReasonOut":
+    def of(cls, reason: Reason) -> ReasonOut:
         return cls(
             code=reason.code,
             params=dict(reason.params),
@@ -142,7 +142,7 @@ class RuleEffectOut(BaseModel):
     new: Any
 
     @classmethod
-    def of(cls, effect: Effect) -> "RuleEffectOut":
+    def of(cls, effect: Effect) -> RuleEffectOut:
         return cls.model_validate(effect.to_json())
 
 
@@ -161,7 +161,7 @@ class RuleNoteOut(BaseModel):
     reasons: list[ReasonOut] = Field(description="Why, with its code (one reason).")
 
     @classmethod
-    def of(cls, note: Note) -> "RuleNoteOut":
+    def of(cls, note: Note) -> RuleNoteOut:
         return cls(
             field=note.field,
             kind=note.kind,
@@ -188,7 +188,7 @@ class RuleReportOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, report: RuleReport, sends: Iterable[Send] = ()) -> "RuleReportOut":
+    def of(cls, report: RuleReport, sends: Iterable[Send] = ()) -> RuleReportOut:
         """`sends`: those of the run; the report's rule's are shown."""
         data = report.to_json()
         data["sends"] = [str(send.webhook_id) for send in sends if send.rule_id == report.rule_id]

@@ -261,7 +261,7 @@ class SqlEventBus:
         for row in rows:
             try:
                 event = events.decode(row.type, row.event_id, row.occurred_at, row.payload)
-            except (KeyError, TypeError, ValueError):
+            except KeyError, TypeError, ValueError:
                 log.exception(
                     "undecodable event skipped",
                     extra={"subscriber": name, "event_id": str(row.event_id), "type": row.type},

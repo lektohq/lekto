@@ -248,7 +248,7 @@ class TokenScope(StrEnum):
         return areas | ADMIN_RIGHTS if admin else areas
 
     @classmethod
-    def matching(cls, rights: frozenset[TokenRight], *, admin: bool) -> "TokenScope | None":
+    def matching(cls, rights: frozenset[TokenRight], *, admin: bool) -> TokenScope | None:
         """The preset whose rights `rights` are, for a user who is an admin or not; None for
         rights chosen one by one."""
         return next((scope for scope in cls if scope.rights(admin=admin) == rights), None)

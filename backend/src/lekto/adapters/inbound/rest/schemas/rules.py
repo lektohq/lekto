@@ -326,7 +326,7 @@ class AskWebhookAction(BaseModel):
 class ConditionStepAction(BaseModel):
     model_config = ConfigDict(extra="forbid")
     type: Literal["condition"]
-    conditions: "AllGroup | AnyGroup" = Field(
+    conditions: AllGroup | AnyGroup = Field(
         description=(
             "On the document as the rule's steps before left it, and on `step` (what a step "
             "that asks brought). If they do not hold, the rule ends here; its steps before "
@@ -492,7 +492,7 @@ class RuleVersionOut(_RuleDefinitionOut):
     created_by: UUID | None
 
     @classmethod
-    def of(cls, version: RuleVersion) -> "RuleVersionOut":
+    def of(cls, version: RuleVersion) -> RuleVersionOut:
         return cls.model_validate(
             {
                 **definition_to_json(version.definition),
@@ -531,7 +531,7 @@ class RuleOut(_RuleDefinitionOut):
     updated_at: datetime
 
     @classmethod
-    def of(cls, rule: Rule) -> "RuleOut":
+    def of(cls, rule: Rule) -> RuleOut:
         reason = rule.disabled_reason
         return cls.model_validate(
             {
@@ -646,7 +646,7 @@ class ArrivalStepOut(BaseModel):
     problem_reason: ReasonOut | None = Field(default=None, description="The same with its code.")
 
     @classmethod
-    def of(cls, step: ArrivalStep) -> "ArrivalStepOut":
+    def of(cls, step: ArrivalStep) -> ArrivalStepOut:
         problem = step.problem
         return cls(
             space_id=step.space_id,
@@ -670,7 +670,7 @@ class ApplyOutcomeOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, outcome: Outcome) -> "ApplyOutcomeOut":
+    def of(cls, outcome: Outcome) -> ApplyOutcomeOut:
         return cls(
             space_id=outcome.space_id, chain=[ArrivalStepOut.of(step) for step in outcome.chain]
         )
@@ -683,7 +683,7 @@ class TextHitOut(BaseModel):
     occurrences: list[OccurrenceOut] = Field(description="Each place its pages show a hit.")
 
     @classmethod
-    def of(cls, hit: TextHit) -> "TextHitOut":
+    def of(cls, hit: TextHit) -> TextHitOut:
         return cls(
             value=hit.value, occurrences=[OccurrenceOut.of(item) for item in hit.occurrences]
         )
@@ -776,7 +776,7 @@ class SkippedOut(BaseModel):
     reasons: list[ReasonOut] = Field(default_factory=list, description="The same with its code.")
 
     @classmethod
-    def of(cls, id: UUID, reason: Reason) -> "SkippedOut":
+    def of(cls, id: UUID, reason: Reason) -> SkippedOut:
         return cls(document_id=id, reason=reason.text, reasons=[ReasonOut.of(reason)])
 
 
@@ -797,7 +797,7 @@ class RuleApplicationOut(BaseModel):
     finished_at: datetime | None
 
     @classmethod
-    def of(cls, application: RuleApplication) -> "RuleApplicationOut":
+    def of(cls, application: RuleApplication) -> RuleApplicationOut:
         return cls(
             id=application.id,
             rule_id=application.rule_id,

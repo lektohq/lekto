@@ -23,7 +23,7 @@ class StreamDocumentOut(BaseModel):
     lane: DocumentLane | None
 
     @classmethod
-    def of(cls, document: Document) -> "StreamDocumentOut":
+    def of(cls, document: Document) -> StreamDocumentOut:
         return cls(
             id=document.id,
             title=document.title,
@@ -73,7 +73,7 @@ class StreamLaneOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, lane: Lane) -> "StreamLaneOut":
+    def of(cls, lane: Lane) -> StreamLaneOut:
         series = lane.series
         expected = None
         if series is not None and lane.state is not SeriesState.ENDED:
@@ -108,7 +108,7 @@ class StreamOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, stream: Stream) -> "StreamOut":
+    def of(cls, stream: Stream) -> StreamOut:
         return cls(
             lanes=[StreamLaneOut.of(lane) for lane in stream.lanes],
             truncated=stream.truncated,

@@ -195,7 +195,7 @@ class AuthlibOidcProvider:
                 document = await self._get_json(metadata["jwks_uri"])
                 try:
                     self._keys = KeySet.import_key_set(document)  # type: ignore[arg-type]
-                except (JoseError, ValueError, KeyError, TypeError):
+                except JoseError, ValueError, KeyError, TypeError:
                     raise IdentityProviderError(
                         "the identity provider's keys are invalid"
                     ) from None

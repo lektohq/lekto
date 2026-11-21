@@ -237,7 +237,7 @@ class DocumentFilter:
         field: FieldId | None = None,
         document_dates: Period | None = None,
         facts: Iterable[FactCriterion] = (),
-    ) -> "DocumentFilter":
+    ) -> DocumentFilter:
         """The filter of what a person chose in a list of documents (a lens, the REST list,
         MCP): several contacts, types, topics, spaces or groups of a kind, one of them; each
         tag a set of its own, all of them; a kind none of which is chosen, any (SB-12)."""
@@ -268,7 +268,7 @@ class DocumentFilter:
             if chosen is not None and not chosen:
                 raise ValueError(f"a set of {name} in a filter is never empty")
 
-    def matches(self, view: "FilterView") -> bool:
+    def matches(self, view: FilterView) -> bool:
         """Whether a document (as `view` shows it) matches; for the core and the in-memory
         adapters, where SQL and the search index have their query languages."""
         return (
@@ -336,7 +336,7 @@ class FilterView:
         document_type_groups: frozenset[TagId] = frozenset(),
         facts: frozenset[str] = frozenset(),
         in_inbox: bool | None = None,
-    ) -> "FilterView":
+    ) -> FilterView:
         return cls(
             contact=document.contact_id,
             document_type=document.document_type_id,
@@ -418,13 +418,13 @@ class DocumentPosition:
     value: datetime | date | str | Decimal | None = None
 
     @classmethod
-    def after(cls, id: DocumentId | None) -> "DocumentPosition | None":
+    def after(cls, id: DocumentId | None) -> DocumentPosition | None:
         """The position after the document `id` in a list sorted by `ARRIVAL`; None: from the
         start."""
         return None if id is None else cls(id)
 
     @classmethod
-    def of(cls, document: Document, order: DocumentOrder) -> "DocumentPosition":
+    def of(cls, document: Document, order: DocumentOrder) -> DocumentPosition:
         match order.key:
             case SortKey.ARRIVAL:
                 return cls(document.id)

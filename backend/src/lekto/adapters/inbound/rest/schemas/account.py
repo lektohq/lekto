@@ -63,7 +63,7 @@ class UserOut(BaseModel):
     created_at: datetime | None = None
 
     @classmethod
-    def seen(cls, user: SeenUser, personal_space: SpaceId | None) -> "UserOut":
+    def seen(cls, user: SeenUser, personal_space: SpaceId | None) -> UserOut:
         """As the service lets the caller see them (`SeenUser`)."""
         return cls(
             id=user.id,
@@ -76,7 +76,7 @@ class UserOut(BaseModel):
         )
 
     @classmethod
-    def of(cls, user: User, *, personal_space: SpaceId | None = None) -> "UserOut":
+    def of(cls, user: User, *, personal_space: SpaceId | None = None) -> UserOut:
         return cls(
             id=user.id,
             username=user.username,
@@ -96,7 +96,7 @@ class LinkOut(BaseModel):
     created_at: datetime
 
     @classmethod
-    def of(cls, link: ExternalIdentity) -> "LinkOut":
+    def of(cls, link: ExternalIdentity) -> LinkOut:
         return cls(issuer=link.issuer, subject=link.subject, created_at=link.created_at)
 
 
@@ -278,7 +278,7 @@ class TokenOut(BaseModel):
     last_used_at: datetime | None
 
     @classmethod
-    def of(cls, token: ApiToken, *, admin: bool) -> "TokenOut":
+    def of(cls, token: ApiToken, *, admin: bool) -> TokenOut:
         """`token` of a user who is an admin or not (whose presets carry the admin rights)."""
         return cls(
             id=token.id,
