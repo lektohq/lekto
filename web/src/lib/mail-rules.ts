@@ -16,7 +16,9 @@ import {
 import { quoted } from '#lib/i18n.ts';
 import { folderLabel } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
+import { own } from '#lib/utils.ts';
 import { mailOperatorLabel } from '#lib/rules/describe.ts';
+import { keyInTree, partsOf, type Places } from '#lib/rules/errors.ts';
 import { DEFAULT_PRIORITY, LIMITS } from '#lib/rules/model.ts';
 import {
 	conditionsOf,
@@ -305,6 +307,28 @@ export function validate(form: MailRuleForm, spaces?: readonly Space[]): Record<
 		if (problem) problems[step.key] = problem;
 	}
 	return problems;
+}
+
+/** Where the places the API names for a mail rule lie in its form, for the errors of a save
+ * (`rules/errors.ts`): the key of the field, the condition, the group or the step. */
+export function mailRulePlaces(form: MailRuleForm): Places {
+	const fields: Record<string, string> = {
+		name: 'name',
+		priority: 'priority',
+		mailbox_id: 'mailbox',
+		user_id: 'user',
+		space_id: 'space'
+	};
+	return {
+		heads: [...Object.keys(fields), 'text_type_id', 'conditions', 'after'],
+		keyAt(path) {
+			const [head, ...rest] = partsOf(path);
+			const field = own(fields, head);
+			if (field) return field;
+			if (head === 'after') return form.steps[Number(rest[0])]?.key ?? null;
+			return head === 'conditions' ? keyInTree(rest, form.conditions) : null;
+		}
+	};
 }
 
 /** Whether the form can be saved. */

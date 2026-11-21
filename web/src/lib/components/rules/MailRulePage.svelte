@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api } from '#lib/api/client.ts';
@@ -16,17 +15,22 @@
 	import {
 		createBody,
 		formOf,
+		mailRulePlaces,
 		patchBody,
 		validate,
 		type MailRule,
 		type MailRuleForm as Form
 	} from '#lib/mail-rules.ts';
 	import { m } from '#lib/paraglide/messages.js';
+	import { saveErrorsAt } from '#lib/rules/errors.ts';
+	import { RuleForm } from '#lib/rules/form.svelte.ts';
 
 	// The editor of a mail rule (Tobi, 04./05.11.2026; mock E), as the document rules': a new
 	// one (`id` null; the mailbox from `?mailbox=`, its type of the mail text proposed) or a
 	// stored one. It is saved switched off, in one request, and the dry run follows: the person
-	// sees what it would do before switching it on (as `rules/save.ts` does).
+	// sees what it would do before switching it on (as `rules/save.ts` does). Checking and
+	// saving go the way of every rule (`RuleForm`): a refused save stands next to the field,
+	// the condition or the step the API names.
 	let { id }: { id: string | null } = $props();
 
 	let rule = $state<MailRule | null>(null);
@@ -34,9 +38,7 @@
 	let initial = '';
 	let lookup = $state<MailRuleLookup | null>(null);
 	let problem = $state<string | null>(null);
-	let errors = $state<Record<string, string>>({});
-	let error = $state<string | null>(null);
-	let busy = $state(false);
+	const saving = new RuleForm();
 	let leaving = $state(false);
 
 	const changed = $derived(form !== null && JSON.stringify(form) !== initial);
@@ -62,33 +64,25 @@
 	onMount(load);
 
 	async function save() {
-		if (!form) return;
-		errors = validate(form, lookup?.spaces ?? []);
-		if (Object.keys(errors).length > 0) {
-			error = m.rule_form_invalid();
-			return;
-		}
-		busy = true;
-		error = null;
-		try {
-			const saved = id
-				? await unwrap(
-						api.PATCH('/api/v1/mail-rules/{id}', {
-							params: { path: { id } },
-							body: { ...patchBody(form), enabled: false }
-						})
-					)
-				: await unwrap(
-						api.POST('/api/v1/mail-rules', { body: { ...createBody(form), enabled: false } })
-					);
-			toast.success(m.rule_saved());
-			leaving = true;
-			await goto(`${BASE}/rules/mail/${saved.id}/apply?saved=1`);
-		} catch (failure) {
-			error = describeError(failure);
-		} finally {
-			busy = false;
-		}
+		const held = form;
+		if (!held || !saving.show(validate(held, lookup?.spaces ?? []))) return;
+		const saved = await saving.saveAt(
+			() =>
+				id
+					? unwrap(
+							api.PATCH('/api/v1/mail-rules/{id}', {
+								params: { path: { id } },
+								body: { ...patchBody(held), enabled: false }
+							})
+						)
+					: unwrap(
+							api.POST('/api/v1/mail-rules', { body: { ...createBody(held), enabled: false } })
+						),
+			(error) => saveErrorsAt(error, mailRulePlaces(held))
+		);
+		if (!saved) return;
+		leaving = true;
+		await goto(`${BASE}/rules/mail/${saved.id}/apply?saved=1`);
 	}
 
 	const title = $derived(
@@ -117,9 +111,9 @@
 			users={lookup.users}
 			spaces={lookup.spaces}
 			types={lookup.types}
-			{errors}
-			{busy}
-			{error}
+			errors={saving.errors}
+			busy={saving.busy}
+			error={saving.general}
 			cancelHref={back}
 			oncancel={() => (leaving = true)}
 			onsubmit={save}
