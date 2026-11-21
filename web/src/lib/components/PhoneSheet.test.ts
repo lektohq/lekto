@@ -34,6 +34,22 @@ beforeEach(() => vi.useFakeTimers({ toFake: ['Date', 'performance'] }));
 afterEach(() => vi.useRealTimers());
 
 describe('PhoneSheet', () => {
+	it('takes the focus itself when it opens: no field, and not left behind it (WZ-02)', async () => {
+		// The focus stayed on the button behind the modal sheet: Tab went over covered buttons
+		// of the page first, and a screen reader did not start in the dialog.
+		const field = createRawSnippet(() => ({ render: () => '<input aria-label="Suche" />' }));
+		const opener = document.createElement('button');
+		document.body.append(opener);
+		opener.focus();
+		render(PhoneSheet, { open: true, title: 'Kontakt wählen', close, children: field });
+		const dialog = screen.getByRole('dialog', { name: 'Kontakt wählen' });
+		await waitFor(() => expect(document.activeElement).toBe(dialog));
+		// Not the field: the keyboard of a phone waits for a tap.
+		expect(document.activeElement).not.toBe(screen.getByLabelText('Suche'));
+		expect(dialog.getAttribute('tabindex')).toBe('-1');
+		opener.remove();
+	});
+
 	it('closes when its head is pulled down far enough', async () => {
 		const { onOpenChange, dialog, head } = sheet();
 		pull(head, 160);

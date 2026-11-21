@@ -715,7 +715,8 @@ list pages the same way (see [Lists](#lists)).
 - **Sheet from the bottom:** `PhoneSheet`, on `ui/sheet` with `side="bottom"`: a grab handle,
   the title and its close button (an X, "Fertig") fixed on top, 85 % of the screen high (the
   filters as high as they need, up to that: `fit`), what stays at the bottom in `footer`;
-  `text-base`; nothing takes the focus when it opens. Pulled down by the handle or the title it
+  `text-base`; no field takes the focus when it opens (the sheet itself does, so that the
+  keyboard starts inside it and the on-screen keyboard stays away). Pulled down by the handle or the title it
   follows the finger and closes past 96 px or when flicked, else it springs back; the close
   button stays the way for everyone (Tobi, 11.11.2026). The pickers (`PickerShell`,
   `TagPickerDialog`) and the filters use it; its classes are written nowhere else.
