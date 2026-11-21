@@ -214,6 +214,22 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(offenders((source) => line(source, /\brounded-(?:3xl|4xl|\[)/))).toEqual([]);
 	});
 
+	it('uses only the radii DESIGN.md gives a role (WY-04)', async () => {
+		// `rounded-lg` stood fifty times and had no row: the most used radius after `full`.
+		const design = (await import('../DESIGN.md?raw')).default;
+		const table = design.slice(
+			design.indexOf('## Radius, borders, shadows'),
+			design.indexOf('All radii come from')
+		);
+		const named = new Set([...table.matchAll(/`rounded-([a-z0-9]+)`/g)].map((match) => match[1]));
+		expect([...named].toSorted()).toEqual(['2xl', 'full', 'lg', 'md', 'sm', 'xl', 'xs']);
+		const without = ['xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl', 'full'].filter(
+			(step) => !named.has(step)
+		);
+		const outside = new RegExp(`\\brounded(?:-[trblse]{1,2})?-(?:${without.join('|')})\\b`);
+		expect(offenders((source) => line(source, outside))).toEqual([]);
+	});
+
 	it('takes shadows from the tokens only, and the few DESIGN.md names', () => {
 		expect(offenders((source) => line(source, /\bshadow-\[/))).toEqual([]);
 		expect(

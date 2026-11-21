@@ -99,14 +99,21 @@ The scale is defined in `@theme`. Use these steps only:
 
 | Role                                                     | Class                       | Token                         |
 | -------------------------------------------------------- | --------------------------- | ----------------------------- |
-| Buttons, inputs, selects, text areas, menus, popovers    | `rounded-xl`                | `--radius-xl`                 |
+| Buttons, inputs, selects, text areas                     | `rounded-xl`                | `--radius-xl`                 |
 | Alerts (`ui/alert`)                                      | `rounded-xl`                | `--radius-xl`                 |
+| Small controls and rows, up to 36 px high (see below)    | `rounded-lg`                | `--radius-lg`                 |
 | Cards, dialogs, sheets, panes, empty notes               | `rounded-2xl`               | `--radius-2xl`                |
 | Chips, badges, `Segmented`, switches, avatars            | `rounded-full`              |                               |
 | Small marks inside a component (code thumb, bar segment) | `rounded-md` / `rounded-sm` | `--radius-md` / `--radius-sm` |
 | The checkbox, swatches of a legend                       | `rounded-xs`                | `--radius-xs`                 |
 
-All radii come from `--radius`. `rounded-3xl`, `rounded-4xl` and arbitrary radii are not used.
+`rounded-lg` is the radius of what is small and stands in a row or a grid of its kind (Tobi,
+21.11.2026): a small button (`sm`), a row of a menu, a picker or a list, a small tile (a year
+of the period, a colour, a file, a page of the stream), a day of the calendar; and the surface
+such rows stand on: a menu, a popover, a tooltip, the list of a `Select`.
+
+All radii come from `--radius`. `rounded-3xl`, `rounded-4xl` and arbitrary radii are not used, nor
+any step without a row above (`design-system.test.ts`).
 
 **Borders:** one hairline, `border` in `border-border`. Cards use `border`, not `ring`. Dashed
 borders mean "empty" or "add": `EmptyNote` and the dashed "+ …" chip.
