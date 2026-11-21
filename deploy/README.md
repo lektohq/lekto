@@ -269,6 +269,11 @@ service worker (`/ui/service-worker.js`, revalidated like every other file) keep
 the web UI for a start without a connection, never an answer of the API. Over plain HTTP the
 browser offers no install and Lekto works as a website.
 
+Serve Lekto over HTTP/2, as the three extensions do (nginx: `http2 on;` beside
+`listen 443 ssl;`). Over HTTP/1.1 a browser opens at most six connections to a host, and every
+tab of Lekto that is in front holds one for its events; a tab that is hidden lets go of it
+after a few seconds and takes it up again when it is shown.
+
 Two paths must not be buffered or cut short by the proxy:
 
 - `/api/v1/events`: server-sent events, minutes to hours.

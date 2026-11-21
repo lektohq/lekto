@@ -136,6 +136,12 @@ class EventStream {
 		}
 	}
 
+	/** Close the stream for a while (the tab is hidden, `lib/visible.ts`): the next `start` is a
+	 * reconnect, so that the pages read anew what they missed meanwhile. */
+	pause(): void {
+		this.#close();
+	}
+
 	/** Close the stream for good (sign-out): the next `start` opens a first stream again. */
 	stop(): void {
 		this.#close();

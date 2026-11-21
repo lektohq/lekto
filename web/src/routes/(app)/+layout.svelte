@@ -8,6 +8,7 @@
 	import { endForeignSubscription } from '#lib/push-device.ts';
 	import { recheckSession, session } from '#lib/session.svelte.ts';
 	import { uploads } from '#lib/upload.svelte.ts';
+	import { whileVisible } from '#lib/visible.ts';
 
 	let { children } = $props();
 
@@ -52,23 +53,34 @@
 	});
 
 	// One event stream while someone is signed in; it closes with the session (sign-out, 401).
+	// A tab that is hidden for a while lets go of it and opens it again when it is shown, as a
+	// reconnect (the pages read anew): over HTTP/1.1 a browser opens at most six connections to
+	// a host, and six tabs each holding one left none for any request (`lib/visible.ts`).
 	$effect(() => {
 		if (!userId) return;
 		let retry: ReturnType<typeof setTimeout> | undefined;
 		let ended = false;
+		let paused = false;
 		failures = 0;
-		const open = () =>
+		const open = () => {
+			paused = false;
 			events.start(async () => {
 				if (ended) return;
 				// Without a session it leads to the sign-in page, as another user it starts
 				// afresh; while the API is not reachable the user stays and the stream tries again.
 				await recheckSession();
-				if (!ended && session.user) retry = setTimeout(open, retryDelay(++failures));
+				if (!ended && !paused && session.user) retry = setTimeout(open, retryDelay(++failures));
 			});
-		open();
+		};
+		const unwatch = whileVisible(open, () => {
+			paused = true;
+			clearTimeout(retry);
+			events.pause();
+		});
 		inbox.start();
 		return () => {
 			ended = true;
+			unwatch();
 			clearTimeout(retry);
 			inbox.stop();
 			events.stop();

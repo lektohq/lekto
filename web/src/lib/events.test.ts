@@ -99,4 +99,22 @@ describe('event stream', () => {
 		expect(events.generation).toBe(before + 1);
 		events.stop();
 	});
+
+	it('lets go of the stream of a hidden tab and counts its return as a reconnect (WP-02)', () => {
+		const closed = vi.fn();
+		events.start(closed);
+		const first = FakeSource.last;
+		first.onopen?.();
+		const before = events.generation;
+		events.pause();
+		expect(first.readyState).toBe(2); // the connection is free for another tab
+		expect(events.connected).toBe(false);
+		expect(closed).not.toHaveBeenCalled(); // no failure: nothing asks the session
+		events.start(closed);
+		expect(FakeSource.last).not.toBe(first);
+		FakeSource.last.onopen?.();
+		// Shown again: the pages read anew what they missed.
+		expect(events.generation).toBe(before + 1);
+		events.stop();
+	});
 });
