@@ -66,6 +66,8 @@
 				unwrap(api.GET('/api/v1/auth/oidc')),
 				loadProfile(null)
 			]);
+			// Loaded: a problem of an attempt before is over ("Erneut versuchen", back online).
+			problem = null;
 		} catch (error) {
 			problem = describeError(error);
 		}

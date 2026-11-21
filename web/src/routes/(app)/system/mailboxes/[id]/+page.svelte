@@ -133,10 +133,16 @@
 			rule = '';
 			log.summary = null;
 		});
+		open(wanted);
+	});
+
+	/** The mailbox, then its log: when the page opens and when one tries again after a problem
+	 * (the log was never asked for then). */
+	function open(wanted: string) {
 		void load(wanted).then((found) => {
 			if (found) untrack(() => void log.reset());
 		});
-	});
+	}
 
 	// Live (Tobi, 06.11.2026): the end of a fetch of this mailbox shows what became of its mails
 	// at once; after a break of the stream the page loads anew, an end may have been missed.
@@ -238,7 +244,7 @@
 	</PageHeader>
 
 	{#if problem}
-		<LoadProblem {problem} onretry={() => void load(id)} />
+		<LoadProblem {problem} onretry={() => open(id)} />
 	{:else if !mailbox}
 		<Loading />
 	{/if}

@@ -161,10 +161,16 @@
 			eventType = '';
 			log.summary = null;
 		});
+		open(wanted);
+	});
+
+	/** The webhook, then its log: when the page opens and when one tries again after a problem
+	 * (the log was never asked for then). */
+	function open(wanted: string) {
 		void load(wanted).then((found) => {
 			if (found) untrack(() => void log.reset());
 		});
-	});
+	}
 
 	async function test() {
 		busy = true;
@@ -275,7 +281,7 @@
 	</PageHeader>
 
 	{#if problem}
-		<LoadProblem {problem} onretry={() => void load(id)} />
+		<LoadProblem {problem} onretry={() => open(id)} />
 	{:else if !webhook}
 		<Loading />
 	{/if}

@@ -147,6 +147,31 @@ describe('the page of a mailbox', () => {
 		expect(within(table).getByText('stadtwerke@example.test')).toBeTruthy();
 	});
 
+	it('loads the log too when trying again brought the mailbox (WF-02)', async () => {
+		// The retry read only the mailbox: its log stood at "loading" and asked for nothing.
+		let down = true;
+		const api = fakeApi({
+			'GET /api/v1/mailboxes/m1': () =>
+				down ? json({ type: 'about:blank', title: 'Unavailable', status: 503 }, 503) : MAILBOX,
+			'GET /api/v1/mailboxes/m1/mails': () => ({ items: [MAIL], total: 1, next_offset: null }),
+			'GET /api/v1/mailboxes/m1/mails/summary': () => ({
+				counts: { taken: 1 },
+				rules: [],
+				waiting: [],
+				kept: 500
+			})
+		});
+		vi.stubGlobal('fetch', api);
+		render(Page);
+		await screen.findByRole('alert');
+		expect(calls(api).filter((call) => call.includes('/mails'))).toEqual([]);
+		down = false;
+		await userEvent.setup().click(screen.getByRole('button', { name: m.retry() }));
+		const table = await screen.findByRole('table');
+		expect(within(table).getByText('Rechnung Oktober')).toBeTruthy();
+		expect(screen.queryByRole('alert')).toBeNull();
+	});
+
 	it('shows one problem for a mailbox that is not there, and asks for no log', async () => {
 		const api = fakeApi({
 			'GET /api/v1/mailboxes/m1': () =>

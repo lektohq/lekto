@@ -157,6 +157,26 @@ describe('the page of a webhook', () => {
 		expect(calls(api).filter((call) => call.includes('/deliveries'))).toEqual([]);
 	});
 
+	it('loads the deliveries too when trying again brought the webhook (WF-02)', async () => {
+		// The retry read only the webhook: its log stood at "loading" and asked for nothing.
+		const all = routes();
+		let down = true;
+		const api = fakeApi({}, (request, url) =>
+			down && url.pathname === '/api/v1/webhooks/hook'
+				? json({ type: 'about:blank', title: 'Unavailable', status: 503 }, 503)
+				: all(request)
+		);
+		vi.stubGlobal('fetch', api);
+		render(Page);
+		await screen.findByRole('alert');
+		expect(calls(api).filter((call) => call.includes('/deliveries'))).toEqual([]);
+		down = false;
+		await userEvent.click(screen.getByRole('button', { name: m.retry() }));
+		const table = await screen.findByRole('table');
+		expect(within(table).getByText('Stadtwerke – Abschlag')).toBeTruthy();
+		expect(screen.queryByRole('alert')).toBeNull();
+	});
+
 	it('shows the deliveries with their documents, counted by outcome', async () => {
 		const api = routes();
 		vi.stubGlobal('fetch', api);
