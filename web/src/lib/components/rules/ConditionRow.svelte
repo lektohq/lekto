@@ -4,12 +4,7 @@
 	import X from '@lucide/svelte/icons/x';
 	import MultiPicker from '#lib/components/MultiPicker.svelte';
 	import SearchSelect from '#lib/components/SearchSelect.svelte';
-	import {
-		flagOptions,
-		importanceOptions,
-		keywordOptions,
-		typedKeyword
-	} from '#lib/mail-traits.ts';
+	import MailValueInput from '#lib/components/rules/MailValueInput.svelte';
 	import DateInput from '#lib/components/DateInput.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import { namedOptions, withChoice } from '#lib/components/rules/options.ts';
@@ -21,6 +16,7 @@
 	import { IDENTIFIER_KINDS, NUMBER_KINDS, PERSON_KINDS, labelOfKind } from '#lib/identifiers.ts';
 	import type { Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
+	import { own } from '#lib/utils.ts';
 	import { CHANNEL_LABELS, fieldLabel, mailPartLabel, operatorLabel } from '#lib/rules/describe.ts';
 	import { tagOptions } from '#lib/tags.ts';
 	import { Choice } from '#lib/components/ui/choice/index.ts';
@@ -143,6 +139,12 @@
 	function stepInput(text: string) {
 		condition.value = kind === 'number' ? Number(text.replace(',', '.')) : text;
 	}
+	/** The fields of a mail's marks, and which mark each is. */
+	const MAIL_TRAITS: Record<string, 'importance' | 'flag' | 'keyword'> = {
+		mail_importance: 'importance',
+		mail_flag: 'flag',
+		mail_keyword: 'keyword'
+	};
 	const operatorOptions = $derived(
 		operators.map((op) => ({
 			value: op,
@@ -157,9 +159,13 @@
 			? m.picker_title_contact()
 			: condition.field === 'document_type' || condition.field === 'relation'
 				? m.picker_title_type()
-				: condition.field === 'mail_keyword'
-					? m.mail_keyword_title()
-					: null
+				: null
+	);
+	/** What a mail was marked with has its own input, the one a mail rule has too. */
+	const trait = $derived(own(MAIL_TRAITS, condition.field) ?? null);
+	/** A document rule has no mailbox: the keywords of every mailbox. */
+	const keywords = $derived(
+		[...new Set((lookup.mailboxes ?? []).flatMap((entry) => entry.keywords))].sort()
 	);
 	/** The choices of an id field or the channel. */
 	const choices = $derived.by(() => {
@@ -179,15 +185,6 @@
 				return CHANNELS.map((channel) => ({ value: channel, label: CHANNEL_LABELS[channel]() }));
 			case 'mail_mailbox':
 				return (lookup.mailboxes ?? []).map((entry) => ({ value: entry.id, label: entry.name }));
-			case 'mail_importance':
-				return importanceOptions();
-			case 'mail_flag':
-				return flagOptions();
-			case 'mail_keyword':
-				return keywordOptions(
-					[...new Set((lookup.mailboxes ?? []).flatMap((entry) => entry.keywords))].sort(),
-					single
-				);
 			case 'field':
 				return field?.data_type === 'choice'
 					? field.choices.map((choice) => ({ value: choice, label: choice }))
@@ -310,6 +307,15 @@
 					{m.rule_add_value()}
 				</Button>
 			</div>
+		{:else if trait}
+			<MailValueInput
+				{trait}
+				label={valueLabel}
+				{invalid}
+				value={single}
+				{keywords}
+				onchange={(next) => (condition.value = next)}
+			/>
 		{:else if choices && searched}
 			<!-- One of many by searching, as everywhere a contact or document type is chosen. -->
 			<SearchSelect
@@ -319,8 +325,6 @@
 				value={single}
 				options={choices}
 				placeholder={m.rule_choose()}
-				create={condition.field === 'mail_keyword' ? typedKeyword : undefined}
-				createLabel={condition.field === 'mail_keyword' ? m.mail_keyword_use : undefined}
 				onchange={(next) => (condition.value = next)}
 			/>
 		{:else if choices && condition.field !== 'field'}

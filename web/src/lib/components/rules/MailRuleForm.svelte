@@ -1,6 +1,7 @@
 <script lang="ts">
 	import AddActionMenu from '#lib/components/rules/AddActionMenu.svelte';
 	import RuleFormFoot from '#lib/components/rules/RuleFormFoot.svelte';
+	import MailValueInput from '#lib/components/rules/MailValueInput.svelte';
 	import RuleFormHead from '#lib/components/rules/RuleFormHead.svelte';
 	import ConditionGroup, { type RowMoves } from '#lib/components/rules/ConditionGroup.svelte';
 	import RuleRow from '#lib/components/rules/RuleRow.svelte';
@@ -31,13 +32,6 @@
 		type MailRuleForm,
 		type Optional
 	} from '#lib/mail-rules.ts';
-	import { withChoice } from '#lib/components/rules/options.ts';
-	import {
-		flagOptions,
-		importanceOptions,
-		keywordOptions,
-		typedKeyword
-	} from '#lib/mail-traits.ts';
 	import { folderLabel, LIMITS as MAILBOX_LIMITS, type Mailbox } from '#lib/mailboxes.ts';
 	import {
 		userChoice,
@@ -196,30 +190,14 @@
 							bind:value={condition.value}
 							options={folders}
 						/>
-					{:else if condition.field === 'importance'}
-						<Select
-							aria-label={m.rule_condition_value()}
-							aria-invalid={invalid || undefined}
-							bind:value={condition.value}
-							options={importanceOptions()}
-						/>
-					{:else if condition.field === 'flag'}
-						<Select
-							aria-label={m.rule_condition_value()}
-							aria-invalid={invalid || undefined}
-							bind:value={condition.value}
-							options={withChoice(flagOptions(), condition.value)}
-						/>
-					{:else if condition.field === 'keyword'}
-						<SearchSelect
-							aria-label={m.rule_condition_value()}
-							aria-invalid={invalid || undefined}
-							title={m.mail_keyword_title()}
-							bind:value={condition.value}
-							options={keywordOptions(mailbox?.status.keywords ?? [], condition.value)}
-							placeholder={m.rule_choose()}
-							create={typedKeyword}
-							createLabel={m.mail_keyword_use}
+					{:else if condition.field === 'importance' || condition.field === 'flag' || condition.field === 'keyword'}
+						<MailValueInput
+							trait={condition.field}
+							label={m.rule_condition_value()}
+							{invalid}
+							value={condition.value}
+							keywords={mailbox?.status.keywords ?? []}
+							onchange={(next) => (condition.value = next)}
 						/>
 					{:else}
 						<Input
@@ -324,23 +302,14 @@
 				onremove={() => form.steps.splice(index, 1)}
 			>
 				<div class="flex min-w-0 flex-1 basis-64 flex-col gap-2">
-					{#if step.action === 'flag'}
-						<Select
-							aria-label={STEP_LABELS[step.action]()}
-							aria-invalid={invalid || undefined}
-							bind:value={step.value}
-							options={flagOptions()}
-						/>
-					{:else if step.action === 'add_keyword' || step.action === 'remove_keyword'}
-						<SearchSelect
-							aria-label={STEP_LABELS[step.action]()}
-							aria-invalid={invalid || undefined}
-							title={m.mail_keyword_title()}
-							bind:value={step.value}
-							options={keywordOptions(mailbox?.status.keywords ?? [], step.value)}
-							placeholder={m.rule_choose()}
-							create={typedKeyword}
-							createLabel={m.mail_keyword_use}
+					{#if step.action === 'flag' || step.action === 'add_keyword' || step.action === 'remove_keyword'}
+						<MailValueInput
+							trait={step.action === 'flag' ? 'flag' : 'keyword'}
+							label={STEP_LABELS[step.action]()}
+							{invalid}
+							value={step.value}
+							keywords={mailbox?.status.keywords ?? []}
+							onchange={(next) => (step.value = next)}
 						/>
 					{:else if step.action === 'move'}
 						<Input
