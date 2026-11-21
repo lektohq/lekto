@@ -22,3 +22,31 @@ export function searchWords(query: string): string {
 export function matchesWords(text: string, words: string): boolean {
 	return text.toLocaleLowerCase().includes(words);
 }
+
+/**
+ * `items` by name under their first letter, as `locale` sorts them. Letters the language files
+ * as one (A, a and Ä in German; not Ä in Swedish, which comes after Z) share a group under the
+ * plain one, so that no letter comes twice: sorting and grouping follow the same rule.
+ */
+export function byLetter<T extends { label: string }>(
+	items: readonly T[],
+	locale: string
+): { letter: string; items: T[] }[] {
+	const collator = new Intl.Collator(locale, { sensitivity: 'base' });
+	// Space around a name counts for neither, or the two would disagree.
+	const name = (item: T) => item.label.trim();
+	const first = (item: T) => (Array.from(name(item))[0] ?? '').toLocaleUpperCase(locale);
+	const groups: { letter: string; items: T[] }[] = [];
+	for (const item of items.toSorted((a, b) => collator.compare(name(a), name(b)))) {
+		const letter = first(item);
+		const last = groups.at(-1);
+		if (last && collator.compare(last.letter, letter) === 0) {
+			last.items.push(item);
+			// "A" before "Ä": the group is named by the plain letter.
+			if (letter < last.letter) last.letter = letter;
+		} else {
+			groups.push({ letter, items: [item] });
+		}
+	}
+	return groups;
+}

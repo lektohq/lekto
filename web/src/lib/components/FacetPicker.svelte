@@ -4,9 +4,9 @@
 	import TypeIcon from '#lib/components/TypeIcon.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
-	import { formatNumber } from '#lib/i18n.ts';
+	import { formatNumber, listLocale } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { matchesWords, searchWords, toggled } from '#lib/picking.ts';
+	import { byLetter, matchesWords, searchWords, toggled } from '#lib/picking.ts';
 	import { ChoiceBox } from '#lib/components/ui/choice/index.ts';
 
 	// Every value of a group of the filters, to search and choose from: by name, under their
@@ -30,17 +30,10 @@
 	let query = $state('');
 	const sections = $derived.by(() => {
 		const words = searchWords(query);
-		const found = items
-			.filter((item) => matchesWords(item.label, words))
-			.toSorted((a, b) => a.label.localeCompare(b.label));
-		const byLetter: { letter: string; items: FacetItem[] }[] = [];
-		for (const item of found) {
-			const letter = item.label.charAt(0).toLocaleUpperCase();
-			const last = byLetter.at(-1);
-			if (last?.letter === letter) last.items.push(item);
-			else byLetter.push({ letter, items: [item] });
-		}
-		return byLetter;
+		return byLetter(
+			items.filter((item) => matchesWords(item.label, words)),
+			listLocale()
+		);
 	});
 
 	function toggle(id: string, checked: boolean) {
@@ -55,7 +48,7 @@
 		</Dialog.Header>
 		<SearchField bind:value={query} label={searchLabel} />
 		<div class="-mx-2 min-h-0 flex-1 overflow-y-auto px-2">
-			{#each sections as section (section.letter)}
+			{#each sections as section, index (index)}
 				<div class="px-2 pt-2 pb-0.5 text-xs font-semibold text-muted-foreground">
 					{section.letter}
 				</div>
