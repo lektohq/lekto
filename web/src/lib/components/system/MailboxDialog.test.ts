@@ -204,4 +204,35 @@ describe('MailboxDialog', () => {
 		await vi.waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
 		expect(sent.filter((call) => call.path === '/api/v1/users')).toHaveLength(2);
 	});
+
+	it('keeps what is typed when the page reads the same mailbox anew', async () => {
+		const user = userEvent.setup();
+		const { rerender } = render(MailboxDialog, { open: true, mailbox: STORED, onsaved: vi.fn() });
+		const name = (await screen.findByLabelText(m.field_name())) as HTMLInputElement;
+		await user.clear(name);
+		await user.type(name, 'Neuer Name');
+		await user.type(screen.getByLabelText(m.mail_password()), 'new-secret');
+		const loads = () => sent.filter((call) => call.path === '/api/v1/users').length;
+		const before = loads();
+
+		// After a fetch or a reconnect of the event stream: the same mailbox, a new object.
+		await rerender({ mailbox: { ...STORED } });
+
+		expect((screen.getByLabelText(m.field_name()) as HTMLInputElement).value).toBe('Neuer Name');
+		expect((screen.getByLabelText(m.mail_password()) as HTMLInputElement).value).toBe('new-secret');
+		// And its choices are not loaded once more.
+		expect(loads()).toBe(before);
+	});
+
+	it('starts anew for another mailbox', async () => {
+		const { rerender } = render(MailboxDialog, { open: true, mailbox: STORED, onsaved: vi.fn() });
+		const name = (await screen.findByLabelText(m.field_name())) as HTMLInputElement;
+		expect(name.value).toBe(STORED.name);
+		await rerender({ mailbox: { ...STORED, id: 'another', name: 'Zweites Postfach' } });
+		await vi.waitFor(() =>
+			expect((screen.getByLabelText(m.field_name()) as HTMLInputElement).value).toBe(
+				'Zweites Postfach'
+			)
+		);
+	});
 });

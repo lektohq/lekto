@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import PlugZap from '@lucide/svelte/icons/plug-zap';
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 	import { toast } from 'svelte-sonner';
@@ -73,13 +74,20 @@
 		mailbox ? m.mailbox_edit_title({ name: mailbox.name }) : m.mailbox_new_title()
 	);
 
+	// The form starts when the dialog opens, and for another mailbox. The page behind it reads
+	// its mailbox anew after every fetch and every reconnect of the event stream: that is the
+	// same mailbox as a new object, and must not empty what is being typed.
+	const mailboxId = $derived(mailbox?.id ?? null);
 	$effect(() => {
+		void mailboxId;
 		if (!open) return;
-		form = formOf(mailbox);
-		part = 'connection';
-		tested = null;
-		testProblem = null;
-		void loadChoices();
+		untrack(() => {
+			form = formOf(mailbox);
+			part = 'connection';
+			tested = null;
+			testProblem = null;
+			void loadChoices();
+		});
 	});
 
 	/** The people and types the part "Abruf" chooses from; a failure shows there. */
