@@ -27,11 +27,19 @@
 		action: () => Promise<void>;
 		children: Snippet;
 	} = $props();
+
+	let saving = $state(false);
 </script>
 
-<Dialog.Root bind:open>
+<!-- While the action runs nothing closes the dialog: the request goes on all the same. -->
+<Dialog.Root bind:open={() => open, (next) => (next || !saving) && (open = next)}>
 	<Dialog.Content size="md">
-		<AsyncForm class="flex min-h-0 flex-col gap-4" {action} ondone={() => (open = false)}>
+		<AsyncForm
+			class="flex min-h-0 flex-col gap-4"
+			{action}
+			bind:busy={saving}
+			ondone={() => (open = false)}
+		>
 			{#snippet children({ busy, error })}
 				<Dialog.Header>
 					<Dialog.Title>{m.dryrun_title()}</Dialog.Title>

@@ -107,6 +107,7 @@
 	let staying = false;
 	let scroller = $state<HTMLElement | null>(null);
 	const guard = new CloseGuard();
+	let saving = $state(false);
 
 	$effect(() => {
 		if (open) guard.start();
@@ -124,6 +125,7 @@
 			title={shortTitle}
 			submitLabel={action ? (shortSubmitLabel ?? m.editor_save_short()) : undefined}
 			disabled={busy || disabled}
+			{busy}
 			cancelLabel={back ? m.editor_back() : undefined}
 			oncancel={back ?? (() => (open = false))}
 		/>
@@ -209,7 +211,7 @@
 			{/if}
 			<div class="ml-auto flex gap-2">
 				{#if action}
-					<Button type="button" variant="ghost" onclick={() => (open = false)}>
+					<Button type="button" variant="ghost" disabled={busy} onclick={() => (open = false)}>
 						{m.cancel()}
 					</Button>
 					<Button type="submit" disabled={busy || disabled}>{submitLabel}</Button>
@@ -221,7 +223,10 @@
 	{/if}
 {/snippet}
 
-<Dialog.Root bind:open={() => open, (next) => (next || guard.wants(dirty)) && (open = next)}>
+<!-- While the action runs nothing closes the editor: the request goes on all the same. -->
+<Dialog.Root
+	bind:open={() => open, (next) => (next || (!saving && guard.wants(dirty))) && (open = next)}
+>
 	<Dialog.Content
 		{size}
 		showCloseButton={!phone.current}
@@ -233,6 +238,7 @@
 		{#if action}
 			<AsyncForm
 				class="flex min-h-0 flex-1 flex-col"
+				bind:busy={saving}
 				onchanged={guard.changed}
 				action={async () => {
 					// As it was when the step was submitted: the step may change meanwhile.

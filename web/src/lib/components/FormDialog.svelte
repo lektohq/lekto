@@ -63,6 +63,7 @@
 	let altError = $state<string | null>(null);
 
 	const guard = new CloseGuard();
+	let saving = $state(false);
 
 	$effect(() => {
 		if (open) {
@@ -86,7 +87,13 @@
 	}
 </script>
 
-<Dialog.Root bind:open={() => open, (next) => (next || !guarded || guard.wants()) && (open = next)}>
+<!-- While the action runs nothing closes the dialog (X, Escape, a click beside it, "Abbrechen"):
+the request goes on and takes effect all the same. -->
+<Dialog.Root
+	bind:open={
+		() => open, (next) => (next || (!saving && (!guarded || guard.wants()))) && (open = next)
+	}
+>
 	<Dialog.Content
 		{size}
 		showCloseButton={!phone.current}
@@ -95,6 +102,7 @@
 		<AsyncForm
 			class={cn('flex min-h-0 flex-col gap-4', phone.current && 'flex-1 gap-0')}
 			{action}
+			bind:busy={saving}
 			onchanged={guard.changed}
 			ondone={() => (open = false)}
 		>
@@ -106,6 +114,7 @@
 						{submitLabel}
 						{destructive}
 						disabled={busy || disabled}
+						{busy}
 						oncancel={() => (open = false)}
 					/>
 					<div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4">
@@ -171,9 +180,9 @@
 								{m.delete_title()}
 							</Button>
 						{/if}
-						<Button type="button" variant="ghost" onclick={() => (open = false)}
-							>{m.cancel()}</Button
-						>
+						<Button type="button" variant="ghost" disabled={busy} onclick={() => (open = false)}>
+							{m.cancel()}
+						</Button>
 						<Button
 							type="submit"
 							variant={destructive ? 'destructive' : 'default'}

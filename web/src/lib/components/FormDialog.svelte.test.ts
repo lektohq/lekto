@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type Problem } from '#lib/api/problem.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
+import ChangeDialog from './ChangeDialog.svelte';
+import EditorShell from './EditorShell.svelte';
 import FormDialog from './FormDialog.svelte';
 
 // A field that is told the error, as the dialogs' inputs are for `aria-invalid`.
@@ -173,4 +175,51 @@ describe('FormDialog', () => {
 			expect(action).toHaveBeenCalledOnce();
 		});
 	});
+});
+
+describe('a dialog while its action runs (WB-03)', () => {
+	// "Abbrechen", the X and Escape closed the dialog while "Speichern" ran: the request went
+	// on and took effect all the same (a lens was saved, an action on many documents began).
+	const body = createRawSnippet(() => ({ render: () => `<p>What it is about</p>` }));
+	const FRAMES = [
+		['FormDialog', FormDialog, { title: 'Space', children }],
+		['EditorShell', EditorShell, { title: 'Space', children: body }],
+		['ChangeDialog', ChangeDialog, { description: 'Nothing is stored yet.', children: body }]
+	] as const;
+
+	afterEach(() => phone.override(null));
+
+	it.each(
+		FRAMES.flatMap(([name, frame, given]) =>
+			[false, true].map(
+				(small) => [name, small ? 'on a phone' : 'wider', frame, given, small] as const
+			)
+		)
+	)(
+		'%s, %s: nothing closes it until the action ends',
+		async (_name, _where, frame, given, small) => {
+			phone.override(small);
+			const user = userEvent.setup();
+			let finish!: () => void;
+			const action = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+			const props = $state({ open: true, submitLabel: 'Save', action, ...given });
+			render(frame as never, props as never);
+			// A phone's bar names the submit of an editor by a short verb.
+			const save = await screen.findByRole('button', { name: /^(Save|Speichern)$/ });
+			await user.click(save);
+			expect(action).toHaveBeenCalledOnce();
+
+			const cancel = screen.getByRole('button', { name: m.cancel() });
+			expect((cancel as HTMLButtonElement).disabled).toBe(true);
+			await user.click(cancel);
+			await user.keyboard('{Escape}');
+			const close = screen.queryByRole('button', { name: m.close() });
+			if (close) await user.click(close);
+			expect(props.open).toBe(true);
+			expect(screen.getByRole('dialog')).toBeTruthy();
+
+			finish();
+			await waitFor(() => expect(props.open).toBe(false));
+		}
+	);
 });

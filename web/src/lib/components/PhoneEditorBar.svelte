@@ -22,6 +22,7 @@
 		title,
 		submitLabel,
 		disabled = false,
+		busy = false,
 		destructive = false,
 		cancelLabel,
 		oncancel
@@ -29,6 +30,8 @@
 		title: string;
 		submitLabel?: string;
 		disabled?: boolean;
+		/** The submit runs: "Abbrechen" is held too. */
+		busy?: boolean;
 		destructive?: boolean;
 		/** Instead of "Abbrechen": "Zurück" in a later step. */
 		cancelLabel?: string;
@@ -44,6 +47,7 @@
 			type="button"
 			variant="ghost"
 			class={cn(BAR_ACTION, 'justify-self-start font-normal')}
+			disabled={busy}
 			onclick={oncancel}
 		>
 			{cancelLabel ?? m.cancel()}
