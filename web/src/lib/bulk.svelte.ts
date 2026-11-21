@@ -10,6 +10,7 @@ import { unwrap } from '#lib/api/call.ts';
 import type { components } from '#lib/api/schema.ts';
 import type { apiQuery } from '#lib/filters.ts';
 import { bulkResult } from '#lib/bulk.ts';
+import { isPassing, reportError } from '#lib/errors.ts';
 import { formatNumber } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 
@@ -79,8 +80,17 @@ export class BulkRun {
 					this.#finish(operation);
 					return;
 				}
-			} catch {
-				// A hiccup of the connection: ask again.
+			} catch (error) {
+				// A hiccup of the connection or the server restarting: ask again. What the API
+				// refuses (the operation is gone, the session another's) it refuses every time:
+				// say so and end, the list shows what became of the documents.
+				if (!isPassing(error)) {
+					if (this.#stopped) return;
+					this.operation = null;
+					reportError(error);
+					this.#ondone();
+					return;
+				}
 			}
 			if (!this.#stopped) this.#follow(id);
 		}, POLL);

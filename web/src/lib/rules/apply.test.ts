@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ApiError } from '#lib/api/problem.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import {
@@ -77,6 +78,47 @@ describe('applying a rule', () => {
 			async (ms) => void waits.push(ms)
 		);
 		expect([last.status, seen, waits]).toEqual(['done', [1, 2, 3], [1000, 1000, 1000]]);
+	});
+
+	it('asks on after a failure that passes, and stops at a refusal (WD-04)', async () => {
+		// One failed answer (the connection, a 502 while the server restarts) ended the
+		// following: the bar stood at "running" for good.
+		const answers: (() => Application)[] = [
+			() => application('running', 1),
+			() => {
+				throw new TypeError('Failed to fetch');
+			},
+			() => {
+				throw new ApiError(502, null, null);
+			},
+			() => application('done', 3)
+		];
+		const seen: number[] = [];
+		const waits: number[] = [];
+		const last = await follow(
+			application('queued', 0),
+			async () => answers.shift()!(),
+			(current) => seen.push(current.done),
+			new AbortController().signal,
+			async (ms) => void waits.push(ms)
+		);
+		expect([last.status, seen, waits.length]).toEqual(['done', [1, 3], 4]);
+
+		// Gone, or no longer the caller's: asked once, not for ever.
+		let asked = 0;
+		await expect(
+			follow(
+				application('running', 1),
+				async () => {
+					asked += 1;
+					throw new ApiError(404, null, null);
+				},
+				() => undefined,
+				new AbortController().signal,
+				async () => undefined
+			)
+		).rejects.toMatchObject({ status: 404 });
+		expect(asked).toBe(1);
 	});
 
 	it('stops following when the page goes', async () => {

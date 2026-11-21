@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fakeApi } from '#lib/testing/api.ts';
+import { toast } from 'svelte-sonner';
+import { fakeApi, json } from '#lib/testing/api.ts';
 import { BulkRun, POLL } from './bulk.svelte.ts';
 
 const operation = (status: string, done = 0) => ({
@@ -49,6 +50,42 @@ describe('an action on many documents, as the page follows it', () => {
 		expect(run.busy).toBe(false);
 		expect(ondone).toHaveBeenCalledOnce();
 		run.stop();
+	});
+
+	it('asks on after a failure that passes, and ends at a refusal (WD-04)', async () => {
+		vi.useFakeTimers();
+		const failed = vi.spyOn(toast, 'error').mockImplementation(() => '');
+		const answers: (() => unknown)[] = [
+			() => json({ type: 'about:blank', title: 'Bad Gateway', status: 502 }, 502),
+			() => operation('running', 1),
+			// Gone: the API says so every time it is asked.
+			() => json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+		];
+		let polls = 0;
+		vi.stubGlobal(
+			'fetch',
+			fakeApi({
+				'POST /api/v1/documents/bulk': () => operation('queued'),
+				'GET /api/v1/documents/bulk/op-1': () => {
+					polls += 1;
+					return (answers.shift() ?? answers[0])!();
+				}
+			})
+		);
+		const ondone = vi.fn();
+		const run = new BulkRun(ondone);
+		await run.start({ ids: ['d1', 'd2'], query: {} }, { kind: 'confirm' });
+		await vi.advanceTimersByTimeAsync(POLL);
+		expect(run.busy).toBe(true); // the 502 passes
+		await vi.advanceTimersByTimeAsync(POLL);
+		expect(run.operation?.done).toBe(1);
+		await vi.advanceTimersByTimeAsync(POLL);
+		expect(run.busy).toBe(false);
+		expect(failed).toHaveBeenCalledOnce();
+		expect(ondone).toHaveBeenCalledOnce();
+		await vi.advanceTimersByTimeAsync(POLL * 5);
+		expect(polls).toBe(3); // not asked for ever
+		failed.mockRestore();
 	});
 
 	it('changes nothing after it is stopped, even by a poll that was in flight', async () => {
