@@ -6,6 +6,7 @@
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
@@ -425,7 +426,7 @@
 					</span>
 				</div>
 				{#if done.length === 0}
-					<p class="mt-3 text-muted-foreground">{m.jobs_none_done({ date: keptSince })}</p>
+					<EmptyNote size="line">{m.jobs_none_done({ date: keptSince })}</EmptyNote>
 				{:else}
 					<div class="mt-3">
 						<Table.Root class="min-w-[560px] text-meta">

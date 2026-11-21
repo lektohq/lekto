@@ -7,6 +7,7 @@
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
 	import { openBeam, type BeamSource } from '#lib/beam.svelte.ts';
 	import { refOf } from '#lib/fact-refs.svelte.ts';
@@ -222,7 +223,7 @@
 		</div>
 	{/if}
 	{#if relations && groups.length === 0}
-		<p class="px-1 py-2 text-sm text-muted-foreground">{m.relations_none()}</p>
+		<EmptyNote size="line" class="px-1">{m.relations_none()}</EmptyNote>
 	{/if}
 	{#each groups as group (group.key)}
 		<Eyebrow as="h3" class="mt-2 px-1">{group.title}</Eyebrow>

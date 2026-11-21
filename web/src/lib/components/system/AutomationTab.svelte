@@ -7,6 +7,7 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import { fieldLabel } from '#lib/describe.ts';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import { formatDuration } from '#lib/duration.ts';
@@ -306,7 +307,7 @@
 					<span class="text-meta text-muted-foreground">{scope}</span>
 				</div>
 				{#if total === 0}
-					<p class="text-muted-foreground">{m.automation_none()}</p>
+					<EmptyNote size="line">{m.automation_none()}</EmptyNote>
 				{:else}
 					<div
 						role="img"
@@ -479,7 +480,7 @@
 				{/if}
 			</p>
 			{#if !fixed.length && !custom.length}
-				<p class="mt-3 text-muted-foreground">{m.automation_hits_none()}</p>
+				<EmptyNote size="line">{m.automation_hits_none()}</EmptyNote>
 			{:else}
 				<div class="mt-3.5 flex flex-wrap gap-x-[18px] gap-y-2 text-meta text-muted-foreground">
 					{@render swatch('bg-chart-1', m.automation_verdict_taken())}

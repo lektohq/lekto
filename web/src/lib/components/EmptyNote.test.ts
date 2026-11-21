@@ -24,4 +24,16 @@ describe('EmptyNote', () => {
 		expect(box.classList).not.toContain('py-16');
 		expect(box.getAttribute('role')).toBe('presentation');
 	});
+
+	it('is a line of muted words inside a dense card, without the box', () => {
+		const { container } = render(EmptyNote, { children: words, size: 'line', class: 'px-1' });
+		const line = container.firstElementChild!;
+		expect([...line.classList].sort()).toEqual([
+			'px-1',
+			'py-2',
+			'text-muted-foreground',
+			'text-sm'
+		]);
+		expect(line.querySelector('p')?.textContent).toBe('Nothing here');
+	});
 });

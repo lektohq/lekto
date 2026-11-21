@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Globe from '@lucide/svelte/icons/globe';
@@ -985,7 +986,7 @@
 		{/if}
 
 		{#if reviewing && decisions.length === 0 && !failedNode && ruleNotes.length === 0 && nodeNotes.length === 0 && !hasSpace}
-			<p class="px-1 text-sm text-muted-foreground">{m.review_nothing_open()}</p>
+			<EmptyNote size="line" class="px-1">{m.review_nothing_open()}</EmptyNote>
 		{/if}
 	</div>
 

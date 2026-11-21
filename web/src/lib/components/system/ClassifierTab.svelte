@@ -8,6 +8,7 @@
 	import { ApiError } from '#lib/api/problem.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import { fieldLabel } from '#lib/describe.ts';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -323,7 +324,7 @@
 				<span class="text-meta text-muted-foreground">{m.classifier_history_hint()}</span>
 			</div>
 			{#if measured.length < 2}
-				<p class="mt-3 text-muted-foreground">{m.classifier_history_none()}</p>
+				<EmptyNote size="line">{m.classifier_history_none()}</EmptyNote>
 			{:else}
 				<div class="mt-3 flex flex-wrap gap-x-[18px] gap-y-2 text-meta text-muted-foreground">
 					<span class="inline-flex items-center gap-1.5">
@@ -404,7 +405,7 @@
 				<span class="text-meta text-muted-foreground">{m.classifier_signals_hint()}</span>
 			</div>
 			{#if !anySignal}
-				<p class="mt-3 text-muted-foreground">{m.classifier_signals_none()}</p>
+				<EmptyNote size="line">{m.classifier_signals_none()}</EmptyNote>
 			{:else}
 				<div class="mt-4 overflow-x-auto">
 					<Table.Root class="w-full min-w-[720px] border-collapse tabular-nums">

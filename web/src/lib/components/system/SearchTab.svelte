@@ -8,6 +8,7 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import { ApiError } from '#lib/api/problem.ts';
 	import type { components } from '#lib/api/schema.ts';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -250,7 +251,7 @@
 				</span>
 			</div>
 			{#if !status.embedded_jobs && !status.plain_jobs}
-				<p class="mt-3 text-muted-foreground">{m.search_durations_none({ date: since })}</p>
+				<EmptyNote size="line">{m.search_durations_none({ date: since })}</EmptyNote>
 			{:else}
 				<div class="mt-4 grid grid-cols-[repeat(auto-fit,minmax(min(280px,100%),1fr))] gap-4">
 					{#each [[m.search_with_embedding(), status.embedded_jobs, true], [m.search_without_embedding(), status.plain_jobs, false]] as const as [label, times, embedding] (label)}

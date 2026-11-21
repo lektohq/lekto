@@ -6,6 +6,7 @@
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import Loading from '#lib/components/Loading.svelte';
@@ -265,7 +266,7 @@
 		<Card.Header><Card.Title>{m.notifications_devices()}</Card.Title></Card.Header>
 		<Card.Content>
 			{#if devices.length === 0}
-				<p class="text-muted-foreground">{m.notifications_none()}</p>
+				<EmptyNote size="line">{m.notifications_none()}</EmptyNote>
 			{:else}
 				<ul class="divide-y">
 					{#each devices as device (device.id)}

@@ -7,6 +7,7 @@
 	import { TOKEN_NAME_MAX, tokenChanges, tokensChanged } from '#lib/tokens.svelte.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import EditorShell from '#lib/components/EditorShell.svelte';
 	import FormDialog from '#lib/components/FormDialog.svelte';
 	import Select from '#lib/components/Select.svelte';
@@ -165,7 +166,7 @@
 		{:else if tokens === null}
 			<Loading />
 		{:else if tokens.length === 0}
-			<p class="text-muted-foreground">{m.token_none()}</p>
+			<EmptyNote size="line">{m.token_none()}</EmptyNote>
 		{:else}
 			<ul class="divide-y">
 				{#each tokens as token (token.id)}

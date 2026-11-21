@@ -643,6 +643,32 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('says that a card or list holds nothing only with EmptyNote', () => {
+		// A paragraph of muted words with its own measure and grade at every place (DESIGN.md,
+		// "States"): in a dense card it is `EmptyNote size="line"`. What stands here is no empty
+		// card: a search inside a picker that found nothing, and a value that reads "none". This
+		// list may only shrink.
+		const OTHER: ReadonlySet<string> = new Set([
+			'assignment_none_found',
+			'icon_search_none',
+			'pick_document_empty',
+			'lens_filter_none',
+			'signal_none',
+			'summary_neighbours_none'
+		]);
+		const paragraph =
+			/<p\b[^>]*\bclass="[^"]*\btext-muted-foreground\b[^"]*"[^>]*>\s*\{m\.(\w+)\([^<]*\)\}\s*<\/p>/g;
+		const nothing = /(?:^|_)(?:none|empty|nothing)(?:_|$)/;
+		expect(
+			offenders(
+				(source) =>
+					[...source.matchAll(paragraph)].find(
+						([, key]) => nothing.test(key) && !OTHER.has(key)
+					)?.[0] ?? null
+			)
+		).toEqual([]);
+	});
+
 	it('draws a card of a choice only as ChoiceCard', () => {
 		// A radio alone is the start of a card (DESIGN.md, "Checkboxes, radios, switches"): one
 		// look for chosen, a border and the panel, no ring.

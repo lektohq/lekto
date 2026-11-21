@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Check from '@lucide/svelte/icons/check';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import FoldedGroup from '#lib/components/FoldedGroup.svelte';
 	import Copy from '@lucide/svelte/icons/copy';
 	import Pencil from '@lucide/svelte/icons/pencil';
@@ -537,7 +538,7 @@
 			>
 		</div>
 		{#if groups.own.length + groups.others.length + groups.unknown.length + groups.third.length === 0}
-			<p class="px-1 py-2 text-sm text-muted-foreground">{m.facts_none()}</p>
+			<EmptyNote size="line" class="px-1">{m.facts_none()}</EmptyNote>
 		{/if}
 		{#if groups.own.length > 0}
 			<Eyebrow as="h3" class="mt-2 flex items-center gap-1.5 px-1 text-lane-green-foreground">
@@ -668,7 +669,7 @@
 		{#if facts.codes === null}
 			<p class="px-1 py-2 text-sm text-muted-foreground">{m.codes_unread()}</p>
 		{:else if facts.codes.length === 0}
-			<p class="px-1 py-2 text-sm text-muted-foreground">{m.codes_none()}</p>
+			<EmptyNote size="line" class="px-1">{m.codes_none()}</EmptyNote>
 		{:else}
 			{#each facts.codes as code, index (index)}
 				{@const id = codeId(index)}

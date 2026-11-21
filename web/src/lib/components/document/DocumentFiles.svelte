@@ -13,6 +13,7 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import { copyText } from '#lib/clipboard.ts';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import DetailList from '#lib/components/DetailList.svelte';
 	import DocumentVersions from '#lib/components/document/DocumentVersions.svelte';
 	import type { Lookup } from '#lib/masterdata.svelte.ts';
@@ -538,7 +539,7 @@
 					{#if !shown?.metadata}
 						<p class="text-sm text-muted-foreground">{m.files_unreadable()}</p>
 					{:else if all.length === 0}
-						<p class="text-sm text-muted-foreground">{m.files_metadata_none()}</p>
+						<EmptyNote size="line">{m.files_metadata_none()}</EmptyNote>
 					{:else}
 						<div class="overflow-x-auto">
 							<Table.Root class="w-full min-w-[34rem] table-fixed border-collapse text-sm">

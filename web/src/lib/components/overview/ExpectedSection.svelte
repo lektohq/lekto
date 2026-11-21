@@ -102,7 +102,7 @@
 		<EmptyNote compact>{m.expected_none()}</EmptyNote>
 	{:else}
 		{#if sections.length === 0}
-			<p class="text-muted-foreground">{m.overview_expected_nothing_soon()}</p>
+			<EmptyNote size="line">{m.overview_expected_nothing_soon()}</EmptyNote>
 		{/if}
 		{#each sections as section (section.state)}
 			<section class="flex flex-col gap-2" aria-labelledby="expected-{section.state}">
