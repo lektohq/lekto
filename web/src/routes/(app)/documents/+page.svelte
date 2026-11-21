@@ -16,6 +16,7 @@
 	import { beforeNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api } from '#lib/api/client.ts';
+	import { keepClear } from '#lib/clear-room.svelte.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import { ApiError } from '#lib/api/problem.ts';
 	import type { components } from '#lib/api/schema.ts';
@@ -767,6 +768,10 @@
 					? HEADER
 					: HEADER + toolRowHeight
 	);
+	// What the keyboard reaches is scrolled clear of all that sticks at the top: the header,
+	// the tools or the selection bar, and the title of a group (`lib/clear-room.svelte.ts`).
+	const GROUP_TITLE = 40;
+	$effect(() => keepClear('top', groupTop + GROUP_TITLE));
 
 	function scrolled() {
 		// The band once the head of the page (title, count, lenses) has gone below the header:

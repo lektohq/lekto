@@ -212,6 +212,11 @@
 	html {
 		@apply bg-background font-sans text-foreground antialiased;
 		scrollbar-gutter: stable;
+		/* What the keyboard reaches is scrolled clear of the bars that stick to the top and the
+		   bottom, not just into view under them (WCAG 2.4.11): the header by default, more
+		   where a page says so (`lib/clear-room.svelte.ts`). */
+		scroll-padding-top: calc(var(--clear-top, 4rem) + 0.75rem);
+		scroll-padding-bottom: calc(var(--clear-bottom, 0px) + 0.75rem);
 	}
 	/* A visible focus everywhere the keyboard lands. */
 	:focus-visible {

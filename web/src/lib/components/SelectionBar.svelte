@@ -6,6 +6,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { cardVariants } from '#lib/components/ui/card/index.ts';
+	import { keepClear } from '#lib/clear-room.svelte.ts';
 	import { phone } from '#lib/phone.svelte.ts';
 	import { cn } from '#lib/utils.ts';
 
@@ -41,6 +42,13 @@
 		/** Its height as it stands, for what sticks below it (web/DESIGN.md, "Sticky heads"). */
 		height?: number;
 	} = $props();
+
+	// The bar sticks to the bottom on a phone, below the header elsewhere: what the keyboard
+	// reaches is scrolled clear of it (`lib/clear-room.svelte.ts`). In a dialog it does not stick.
+	$effect(() => {
+		if (inDialog || height === 0) return;
+		return phone.current ? keepClear('bottom', height) : keepClear('top', SELECTION_TOP + height);
+	});
 </script>
 
 <div
