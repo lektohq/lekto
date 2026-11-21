@@ -60,7 +60,7 @@ from lekto.adapters.inbound.rest.auth import (
 )
 from lekto.adapters.inbound.rest.context import ApiContext
 from lekto.adapters.inbound.rest.events import EventHub
-from lekto.adapters.inbound.rest.middleware import LimitRequestBody, NoStore
+from lekto.adapters.inbound.rest.middleware import Compress, LimitRequestBody, NoStore
 from lekto.adapters.inbound.rest.paths import HEALTH_PATH, LOGIN_PATH, MCP_PATH, PREFIX
 from lekto.adapters.inbound.rest.schemas.events import EventMessage
 from lekto.adapters.inbound.rest.schemas.external import TaskAnswer
@@ -218,6 +218,8 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
         # A logo is master data every user sees; its URL changes with it.
         cacheable=(master_data.LOGO_PATH,),
     )
+    # Outermost: it sees every answer as it leaves, the web UI's files too.
+    app.add_middleware(Compress, plain=(f"{PREFIX}/auth/",))
     for router in (
         account.public,
         account.router,
