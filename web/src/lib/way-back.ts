@@ -8,7 +8,6 @@
  */
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
-import { BASE } from '#lib/base.ts';
 import { returnTo } from '#lib/return-to.svelte.ts';
 
 /** Go to `href`, so that its way back leads here, named `label`; with `replace`, in place of the
@@ -25,5 +24,5 @@ export function jumpTo(href: string, label: string, replace = false): Promise<vo
  * inbox or the document list as it was left. */
 export async function leaveDocument(inbox: boolean): Promise<void> {
 	if (page.state.from) history.back();
-	else await (inbox ? goto(`${BASE}/inbox`) : returnTo.goDocuments());
+	else await (inbox ? returnTo.goInbox() : returnTo.goDocuments());
 }

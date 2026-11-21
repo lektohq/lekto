@@ -1162,7 +1162,13 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Neu
 - Detail pages of the same kind offer the same actions in the same place: header actions (edit,
   primary action). A single destructive action stands there as an `IconButton` (rule, webhook);
   where there are more actions, a "…" menu holds the rest (delete last, in `destructive`).
-- `return-to.svelte.ts` keeps the list's URL and words for the way back.
+- `return-to.svelte.ts` keeps the list's URL and words for the way back, and where one stood.
+- **Back at the place** (`lib/list-place.svelte.ts`): from a document, the back button and the
+  link of the way back both lead to the documents list or the inbox where one stood in it, the
+  inbox with as many documents as "Mehr laden" had brought. The lists load after the page
+  shows, so the page goes to its place itself, once the list stands (the back button: the
+  page's `snapshot`; the link: `page.state.place`). Opened any other way a list starts at its
+  top.
 - **After a jump** (the Beam's "Dokument öffnen", later a dialog's link): the new history entry
   names where it came from (`way-back.ts`, `page.state.from`). The document's `BackLink` then
   reads "Zurück zu {place}" and goes back in the history, one step, as the back button does: to

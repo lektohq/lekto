@@ -172,7 +172,10 @@ describe('the frame of the page', () => {
 		render(Page);
 		await screen.findByRole('heading', { level: 1, name: documentOf().title });
 		emit?.('document.deleted', { document_id: 'doc-1' });
-		await waitFor(() => expect(goto).toHaveBeenCalledWith('/ui/inbox'));
+		// With the place one stood at in the inbox, where it is known (none here).
+		await waitFor(() =>
+			expect(goto).toHaveBeenCalledWith('/ui/inbox', { state: {}, persistState: true })
+		);
 	});
 });
 

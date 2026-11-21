@@ -13,6 +13,7 @@
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
 	import { MediaQuery, SvelteMap } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
+	import { beforeNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
@@ -94,6 +95,7 @@
 	} from '#lib/listing.ts';
 	import { PageLookup } from '#lib/lookup.svelte.ts';
 	import { openLens } from '#lib/open-lens.svelte.ts';
+	import { ListPlace, type Place } from '#lib/list-place.svelte.ts';
 	import { Pager } from '#lib/paging.svelte.ts';
 	import { rememberedPageSize } from '#lib/page-size.ts';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -572,6 +574,18 @@
 		});
 	});
 
+	// Back from a document one stands where one stood (`lib/list-place.svelte.ts`): the back
+	// button brings the place in the snapshot, the document's way back in its history entry.
+	const place = new ListPlace();
+	export const snapshot = {
+		capture: (): Place => ({ y: window.scrollY }),
+		restore: (kept: Place) => place.want(kept)
+	};
+	beforeNavigate(() => returnTo.rememberPlace('documents', { y: window.scrollY }));
+	$effect(() => {
+		if (place.wanted && list.loaded && !list.loading) void place.reach();
+	});
+
 	// Again when an admin switches the reach: the spaces of the filter follow it.
 	onChange(
 		() => scope.allUsers,
@@ -582,6 +596,7 @@
 	);
 
 	onMount(() => {
+		place.want(page.state.place);
 		// Opened without filters, words or a lens: the filters this browser last set apply, in
 		// the URL as if the link had brought them. A link's own filters, its words and a lens go
 		// first; within the page (a chip removed, "All documents" from a lens) nothing applies.

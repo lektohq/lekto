@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
@@ -91,6 +91,64 @@ afterEach(() => {
 });
 
 describe('the archive page', () => {
+	describe('comes back to the place it was left at (WF-03)', () => {
+		// SvelteKit restores the scroll position while the list is still empty and lands at
+		// its top: the page goes to its place itself, once the list stands.
+		const listed = () => ({
+			items: [listedOf({ id: 'd1', title: 'Eins' }), listedOf({ id: 'd2', title: 'Zwei' })],
+			next_cursor: null
+		});
+
+		function serve() {
+			let answer: (() => void) | null = null;
+			const scrolled: { y: number; rows: number }[] = [];
+			vi.stubGlobal('scrollTo', (_x: number, y: number) =>
+				scrolled.push({ y, rows: screen.queryAllByText(/^(Eins|Zwei)$/).length })
+			);
+			vi.stubGlobal(
+				'fetch',
+				fakeApi({
+					'GET /api/v1/documents': () =>
+						new Promise((resolve) => (answer = () => resolve(listed())))
+				})
+			);
+			return { scrolled, answer: () => answer?.() };
+		}
+
+		it('by the way back of a document: the place in its history entry', async () => {
+			const { scrolled, answer } = serve();
+			state.entry = { place: { y: 1500 } };
+			render(Page);
+			await new Promise((resolve) => setTimeout(resolve, 20));
+			expect(scrolled).toEqual([]); // not while the list is empty
+			answer();
+			await screen.findByText('Eins');
+			await waitFor(() => expect(scrolled).toEqual([{ y: 1500, rows: 2 }]));
+		});
+
+		it('by the back button: the place in the snapshot', async () => {
+			const { scrolled, answer } = serve();
+			vi.stubGlobal('scrollY', 1200);
+			const { component } = render(Page);
+			const { snapshot } = component as unknown as {
+				snapshot: { capture: () => unknown; restore: (kept: unknown) => void };
+			};
+			expect(snapshot.capture()).toEqual({ y: 1200 });
+			snapshot.restore({ y: 1200 });
+			answer();
+			await waitFor(() => expect(scrolled).toEqual([{ y: 1200, rows: 2 }]));
+		});
+
+		it('stays at the top when opened otherwise', async () => {
+			const { scrolled, answer } = serve();
+			render(Page);
+			answer();
+			await screen.findByText('Eins');
+			await new Promise((resolve) => setTimeout(resolve, 20));
+			expect(scrolled).toEqual([]);
+		});
+	});
+
 	it('lists without lanes and upload, and marks what stands in the inbox', async () => {
 		const api = fakeApi({
 			'GET /api/v1/documents': () => ({

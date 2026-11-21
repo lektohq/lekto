@@ -107,6 +107,41 @@ function tabs() {
 	return within(screen.getByRole('navigation', { name: m.inbox_tabs_label() }));
 }
 
+describe('the inbox comes back to the place it was left at (WF-03)', () => {
+	it('loads as many documents as it showed, then goes to the place', async () => {
+		// The back button landed at the top, and what "Mehr laden" had brought was gone.
+		const pages: Record<string, { items: Items; next_cursor: string | null }> = {
+			'': { items: [inboxItem('new', { id: 'd1', title: 'Eins' })], next_cursor: 'c1' },
+			c1: { items: [inboxItem('new', { id: 'd2', title: 'Zwei' })], next_cursor: 'c2' },
+			c2: { items: [inboxItem('new', { id: 'd3', title: 'Drei' })], next_cursor: 'c3' }
+		};
+		const api = fakeApi({
+			'GET /api/v1/inbox': (_, url) => pages[url.searchParams.get('cursor') ?? ''],
+			'GET /api/v1/inbox/summary': () => summaryOf({ new: 1 }),
+			'GET /api/v1/users': () => USERS,
+			'GET /api/v1/spaces': () => SPACES
+		});
+		vi.stubGlobal('fetch', api);
+		const scrolled: { y: number; rows: number }[] = [];
+		vi.stubGlobal('scrollTo', (_x: number, y: number) =>
+			scrolled.push({ y, rows: screen.queryAllByText(/^(Eins|Zwei|Drei)$/).length })
+		);
+		vi.stubGlobal('scrollY', 900);
+		const { component } = render(Page);
+		const { snapshot } = component as unknown as {
+			snapshot: { capture: () => unknown; restore: (kept: unknown) => void };
+		};
+		await screen.findByText('Eins');
+		expect(snapshot.capture()).toEqual({ y: 900, loaded: 1 });
+		expect(scrolled).toEqual([]);
+
+		snapshot.restore({ y: 900, loaded: 3 });
+		await waitFor(() => expect(scrolled).toEqual([{ y: 900, rows: 3 }]));
+		// Three were shown: no fourth page is asked for.
+		expect(calls(api).filter((call) => call.startsWith('GET /api/v1/inbox?'))).toHaveLength(2);
+	});
+});
+
 describe('inbox tabs', () => {
 	it('lists everything open without a tab, and links each tab', async () => {
 		const api = start([inboxItem('review')], summaryOf({ review: 1, new: 2, done: 4 }));

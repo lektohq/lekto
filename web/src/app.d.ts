@@ -15,6 +15,8 @@ declare global {
 			by?: string;
 			/** The open Beam (`lib/beam.svelte.ts`). */
 			beam?: import('#lib/beam.svelte.ts').BeamState;
+			/** Where one stood in the list this entry comes back to (`lib/list-place.svelte.ts`). */
+			place?: import('#lib/list-place.svelte.ts').Place;
 			/** The place a jump came from (`lib/way-back.ts`). */
 			from?: { label: string };
 			/** The open identifier whose dialog is open (`IdentifiersPanel`). */
