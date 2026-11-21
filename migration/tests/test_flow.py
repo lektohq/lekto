@@ -543,8 +543,8 @@ async def test_a_wrong_or_read_only_key_cannot_write(setup: Setup) -> None:
         ("0.1", "update Lekto"),
         ("0.99", "use the client of that Lekto"),
         ("1.0", "use the client of that Lekto"),
-        # Before 0.16 Lekto named none, and its answer is no `Me` of pylekto's.
-        (None, f"is no Me ({API_VERSION} is the API this client speaks)"),
+        # Before 0.16 Lekto named none: its answer is no `Me` of pylekto's, `GET /version` is 404.
+        (None, f"Lekto names no API version, this client speaks the API {API_VERSION}"),
     ],
 )
 async def test_a_lekto_of_another_api_stops_every_command(

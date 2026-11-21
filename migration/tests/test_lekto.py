@@ -79,6 +79,15 @@ async def test_what_is_still_failing_after_the_repeats_is_an_api_error() -> None
     await lekto.close()
 
 
+async def test_a_server_error_that_will_not_pass_is_not_repeated() -> None:
+    transport, sent = answering(status(501))
+    lekto = calling(transport)
+    with pytest.raises(ApiError, match="HTTP 501"):
+        await lekto.users()
+    assert len(sent) == 1
+    await lekto.close()
+
+
 async def test_a_refusal_is_not_repeated_and_names_a_duplicate() -> None:
     existing = "00000000-0000-0000-0000-000000000042"
 
@@ -89,7 +98,7 @@ async def test_a_refusal_is_not_repeated_and_names_a_duplicate() -> None:
     transport, sent = answering(conflict)
     lekto = calling(transport)
     with pytest.raises(ApiError) as raised:
-        await lekto.create_contact("ACME Energy")
+        await lekto.create_contact("Muster Energie")
     assert (raised.value.status, raised.value.detail, raised.value.existing) == (
         409,
         "Conflict",

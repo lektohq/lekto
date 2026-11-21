@@ -59,6 +59,10 @@ class ApiError(Exception):
         self.existing = existing
 
 
+class UnreadableAnswerError(ApiError):
+    """An answer pylekto's models do not describe: most likely Lekto speaks another API."""
+
+
 class _Model(Protocol):
     """What the client reads of pylekto's models: their JSON."""
 
@@ -121,7 +125,8 @@ class Lekto:
                     raise _error(error) from None
                 await self._sleep(_wait(error.retry_after))
             except (LektoServerError, LektoConnectionError) as error:
-                if last:
+                hopeless = isinstance(error, LektoServerError) and error.status not in RETRY_STATUS
+                if last or hopeless:
                     raise _error(error) from None
                 await self._sleep(self._delays[attempt])
             except LektoError as error:
@@ -137,7 +142,23 @@ class Lekto:
     # --- reading -----------------------------------------------------------------------------
 
     async def me(self) -> dict[str, Any]:
-        return await self._one(self._lekto.auth.me)
+        """Who calls. An answer pylekto cannot read may come from a Lekto of another API: then
+        why, by the version `GET /version` names (an address Lekto has from 0.16 on, when it
+        began to name the version of its API)."""
+        try:
+            return await self._one(self._lekto.auth.me)
+        except UnreadableAnswerError as error:
+            try:
+                version = await self._call(self._lekto.version.get)
+            except ApiError as other:
+                if other.status != 404:
+                    raise error from None
+                problem = unfit(None)
+            else:
+                problem = unfit(version.api_version)
+            if problem is None:
+                raise
+            raise ApiError(0, problem) from None
 
     async def users(self) -> list[dict[str, Any]]:
         return await self._all(self._lekto.users.list)
@@ -314,5 +335,5 @@ def _error(error: LektoError) -> ApiError:
         detail = error.problem.detail or error.problem.title
         return ApiError(error.status, detail, None if existing is None else str(existing))
     if isinstance(error, LektoResponseError):
-        return ApiError(0, f"{error} ({API_VERSION} is the API this client speaks)")
+        return UnreadableAnswerError(0, f"{error} ({API_VERSION} is the API this client speaks)")
     return ApiError(0, str(error))
