@@ -163,6 +163,17 @@ class NodeResult:
         return text_of(self.reasons)
 
 
+class NodeUnavailableError(Exception):
+    """A service the node needs did not answer (the embedding model, the search index). The
+    attempt counts as failed and runs again like one that raised; after the last attempt the
+    node ends with `fallback` instead of failing (a signal abstains), so a short outage does
+    not decide the document with a signal less."""
+
+    def __init__(self, fallback: NodeResult) -> None:
+        super().__init__(fallback.reason or "a service is unavailable")
+        self.fallback = fallback
+
+
 @dataclass(frozen=True, kw_only=True)
 class NodeRun:
     """Processing log entry: one execution of one node for one document."""

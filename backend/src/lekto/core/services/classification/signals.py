@@ -11,7 +11,9 @@ model's signal fails, when its answers do not fit or it cannot be reached after 
 - `signal_classifier`: the trained classifier's probabilities for contact, type, topic, tags
   and the space (among the spaces the uploader may file into, `SpaceCandidates`).
 - `signal_neighbours`: the most similar confirmed documents the uploader may read, by vector,
-  with their contact, type, topic, tags and decided space.
+  with their contact, type, topic, tags and decided space. If the embedding model or the index
+  does not answer, the attempt runs again like a failed node, and the signal abstains only
+  after the last one (`NodeUnavailableError`).
 """
 
 import asyncio
@@ -63,7 +65,14 @@ from lekto.core.domain.mail_intake import MailOrigin, OriginRole
 from lekto.core.domain.mail_message import address_line
 from lekto.core.domain.master_data import Contact
 from lekto.core.domain.permissions import Reach, reach_access
-from lekto.core.domain.pipeline import Node, NodeResult, NodeRun, Outcome, ProcessingHistory
+from lekto.core.domain.pipeline import (
+    Node,
+    NodeResult,
+    NodeRun,
+    NodeUnavailableError,
+    Outcome,
+    ProcessingHistory,
+)
 from lekto.core.domain.profiles import Person
 from lekto.core.domain.reasons import Reason, ReasonCode, because, written
 from lekto.core.domain.search import Visibility
@@ -503,7 +512,8 @@ class NeighboursSignal:
         try:
             embedded = await self._embeddings.embed([self._policy.document_prefix + sections[0]])
         except EmbeddingsError as error:
-            return abstained(because(ReasonCode.TEXT_NOT_EMBEDDED, detail=str(error)))
+            fallback = abstained(because(ReasonCode.TEXT_NOT_EMBEDDED, detail=str(error)))
+            raise NodeUnavailableError(fallback) from error
         vector = tuple(embedded.vectors[0]) if embedded.vectors else ()
         wanted = self._policy.dimensions
         if not vector or (wanted is not None and len(vector) != wanted):
@@ -528,7 +538,8 @@ class NeighboursSignal:
                 )
             )
         except SearchError as error:
-            return abstained(because(ReasonCode.INDEX_UNAVAILABLE, detail=str(error)))
+            fallback = abstained(because(ReasonCode.INDEX_UNAVAILABLE, detail=str(error)))
+            raise NodeUnavailableError(fallback) from error
         neighbours: list[Neighbour] = []
         async with self._uow() as uow:
             known = await uow.documents.confirmed_labels(owner.id)
