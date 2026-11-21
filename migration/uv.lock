@@ -187,7 +187,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "httpx2", specifier = "==2.16.0" },
-    { name = "pylekto", specifier = "==0.4.0" },
+    { name = "pylekto", specifier = "==0.3.1" },
     { name = "ruamel-yaml", specifier = "==0.19.1" },
 ]
 
@@ -445,15 +445,15 @@ wheels = [
 
 [[package]]
 name = "pylekto"
-version = "0.4.0"
+version = "0.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx2" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1e/93/2dad8e61a7b26afbac8f37f2f95a57fd076c3111ecea7c00ef282e52276c/pylekto-0.4.0.tar.gz", hash = "sha256:c0465175dc64024fab19baf96662005642611c5a5e03819ee7c70d4d4c9f41af", size = 102496, upload-time = "2026-11-20T14:51:17.512Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a6/41/25a015a6dbbb9b74982d14927ea39c2f311673bf80def892fabf4b009b49/pylekto-0.3.1.tar.gz", hash = "sha256:6bb37fe80ee038c47dd412b4cf82953cbdbb993adb7e68a105a27e855c4b88ba", size = 102594, upload-time = "2026-11-21T14:17:59.612Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/23/f8/6fd9ccfc2b47745f328924ea1af9d92673083ba8627d4051fabb0da6034e/pylekto-0.4.0-py3-none-any.whl", hash = "sha256:4dee6e80d8cf7b3a6270a4ac46b53594ba7b0d933491f5aece60339f8217be0a", size = 113265, upload-time = "2026-11-20T14:51:16.323Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/9d/62778c9776aea86564cd1ebf00fba2217286116b622c2a588159f1c4b457/pylekto-0.3.1-py3-none-any.whl", hash = "sha256:c7789f61a106e02dcfa939e2933f6cd33ebdf91613ae441cb066f66f9ec29591", size = 113359, upload-time = "2026-11-21T14:17:58.276Z" },
 ]
 
 [[package]]
