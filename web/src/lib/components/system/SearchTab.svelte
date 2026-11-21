@@ -264,10 +264,12 @@
 									<span class="text-meta text-muted-foreground">{m.search_median()}</span>
 								</div>
 								<span class="text-meta text-muted-foreground">
-									{m.search_jobs_line({
-										p90: seconds(times.p90_ms),
-										count: formatNumber(times.count)
-									})}
+									{times.count === 1
+										? m.search_jobs_line_one({ p90: seconds(times.p90_ms) })
+										: m.search_jobs_line({
+												p90: seconds(times.p90_ms),
+												count: formatNumber(times.count)
+											})}
 									{#if embedding && status.per_section_ms != null}
 										· {m.search_per_section({ duration: seconds(status.per_section_ms) })}
 									{/if}

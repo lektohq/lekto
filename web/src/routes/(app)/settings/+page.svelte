@@ -112,7 +112,7 @@
 
 	async function endOthers() {
 		const { ended } = await unwrap(api.DELETE('/api/v1/auth/sessions'));
-		toast.success(m.sessions_ended({ count: ended }));
+		toast.success(ended === 1 ? m.sessions_ended_one() : m.sessions_ended({ count: ended }));
 	}
 	let ending = $state(false);
 </script>

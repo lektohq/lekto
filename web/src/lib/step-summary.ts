@@ -324,7 +324,9 @@ function ruled(entry: LogEntry, lookup: Lookup | null): string {
 		looked === 0
 			? m.summary_rules_absent()
 			: matched === 0
-				? m.summary_rules_none({ count: String(looked) })
+				? looked === 1
+					? m.summary_rules_none_one()
+					: m.summary_rules_none({ count: String(looked) })
 				: matched === 1
 					? m.summary_rules_matched_one({ count: String(looked) })
 					: m.summary_rules_matched({ matched: String(matched), count: String(looked) });

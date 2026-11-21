@@ -247,6 +247,23 @@ describe('stepSummary', () => {
 				m.summary_rules_matched_one({ count: '3' })
 			].join(' · ')
 		);
+		// WY-02: one rule looked at is named in the singular, never "keine von 1 Regeln".
+		expect(
+			summary(
+				'apply_rules',
+				{ rules: [] },
+				{ input: { trigger: 'ingest', space_id: HOME, rules: [{}] } }
+			)
+		).toBe([m.summary_rules_arrived({ space: 'John' }), m.summary_rules_none_one()].join(' · '));
+		expect(
+			summary(
+				'apply_rules',
+				{ rules: [] },
+				{ input: { trigger: 'ingest', space_id: HOME, rules: [{}, {}] } }
+			)
+		).toBe(
+			[m.summary_rules_arrived({ space: 'John' }), m.summary_rules_none({ count: '2' })].join(' · ')
+		);
 		expect(summary('apply_rules', { problem: 'rules move it back and forth' })).toBe(
 			'rules move it back and forth'
 		);

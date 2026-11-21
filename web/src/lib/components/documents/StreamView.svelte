@@ -196,7 +196,7 @@
 			{m.stream_fewer()}
 		{:else}
 			<ChevronDown class="size-4" aria-hidden="true" />
-			{m.stream_more({ count: formatNumber(folded) })}
+			{folded === 1 ? m.stream_more_one() : m.stream_more({ count: formatNumber(folded) })}
 		{/if}
 	</button>
 {/snippet}

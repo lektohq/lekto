@@ -141,6 +141,22 @@ describe('the automation tab', () => {
 		expect(calls(api)).toHaveLength(3);
 	});
 
+	it('names one document in the singular (WY-02)', async () => {
+		serve({
+			...report,
+			lanes: lanes(1, 0, 0),
+			fields: [
+				{ field: 'contact', name: null, verdicts: verdicts(0, 0, 1, 0), early: 0 },
+				{ field: 'field:a1', name: 'Betrag', verdicts: verdicts(0, 0, 3, 0), early: 0 }
+			]
+		});
+		render(AutomationTab);
+		expect(await screen.findByText(/^1 (Dokument|document) · /)).toBeTruthy();
+		expect(screen.getByText(m.automation_field_decided_one())).toBeTruthy();
+		// One custom field with several decisions: "in 1 Feld".
+		expect(screen.getByText(m.automation_custom_decided_one_field({ count: '3' }))).toBeTruthy();
+	});
+
 	it('tells the hit rate per field and groups the custom fields', async () => {
 		serve();
 		render(AutomationTab);
@@ -149,7 +165,8 @@ describe('the automation tab', () => {
 				m.automation_field_counts({ taken: '28', accepted: '2', corrected: '6', added: '4' })
 			)
 		).toBeTruthy();
-		expect(screen.getByText(m.automation_hits_early({ count: '1' }))).toBeTruthy();
+		// WY-02: one is named in the singular, never "1 Felder".
+		expect(screen.getByText(m.automation_hits_early_one())).toBeTruthy();
 		const group = screen.getByRole('button', { name: new RegExp(m.automation_custom_fields()) });
 		expect(group.getAttribute('aria-expanded')).toBe('true');
 		expect(screen.getByText('Betrag')).toBeTruthy();

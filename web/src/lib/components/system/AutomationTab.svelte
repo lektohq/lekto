@@ -136,19 +136,16 @@
 		new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(items);
 
 	const total = $derived(report ? report.lanes.green + report.lanes.yellow + report.lanes.red : 0);
-	const scope = $derived(
-		report
-			? m.automation_first_scope({
-					count: formatNumber(total),
-					channels: list(
-						CHANNELS.filter((item) => report?.channels.includes(item.value)).map((item) =>
-							item.label()
-						)
-					),
-					period: PERIODS.find((item) => item.value === report?.period)?.label() ?? ''
-				})
-			: ''
-	);
+	const scope = $derived.by(() => {
+		if (!report) return '';
+		const channels = list(
+			CHANNELS.filter((item) => report?.channels.includes(item.value)).map((item) => item.label())
+		);
+		const period = PERIODS.find((item) => item.value === report?.period)?.label() ?? '';
+		return total === 1
+			? m.automation_first_scope_one({ channels, period })
+			: m.automation_first_scope({ count: formatNumber(total), channels, period });
+	});
 
 	// What became of the documents of each first lane: their lanes now.
 	const flows = $derived(
@@ -474,7 +471,11 @@
 					untouched: formatNumber(report.untouched)
 				})}
 				{#if early}
-					<span>{m.automation_hits_early({ count: formatNumber(early) })}</span>
+					<span>
+						{early === 1
+							? m.automation_hits_early_one()
+							: m.automation_hits_early({ count: formatNumber(early) })}
+					</span>
 				{/if}
 			</p>
 			{#if !fixed.length && !custom.length}
@@ -501,7 +502,9 @@
 								<span class="font-medium">
 									{fieldLabel(field.field, null)}
 									<span class="text-xs font-normal text-muted-foreground">
-										{m.automation_field_decided({ count: formatNumber(decided(field)) })}
+										{decided(field) === 1
+											? m.automation_field_decided_one()
+											: m.automation_field_decided({ count: formatNumber(decided(field)) })}
 									</span>
 								</span>
 								<span class="font-semibold tabular-nums">
@@ -535,10 +538,16 @@
 									/>
 									{m.automation_custom_fields()}
 									<span class="text-xs font-normal text-muted-foreground">
-										{m.automation_custom_decided({
-											count: formatNumber(decided(customTotal)),
-											fields: formatNumber(custom.length)
-										})}
+										{decided(customTotal) === 1
+											? m.automation_custom_decided_one()
+											: custom.length === 1
+												? m.automation_custom_decided_one_field({
+														count: formatNumber(decided(customTotal))
+													})
+												: m.automation_custom_decided({
+														count: formatNumber(decided(customTotal)),
+														fields: formatNumber(custom.length)
+													})}
 									</span>
 								</button>
 								<span class="font-semibold tabular-nums">

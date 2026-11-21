@@ -146,7 +146,7 @@
 		<button
 			type="button"
 			onclick={() => (expandedFor = placesKey)}
-			aria-label={m.source_more({ count: hiddenPlaces })}
+			aria-label={hiddenPlaces === 1 ? m.source_more_one() : m.source_more({ count: hiddenPlaces })}
 			class="shrink-0 rounded-full bg-panel px-2 font-mono text-micro leading-5 text-brand hover:underline"
 		>
 			+{hiddenPlaces}

@@ -303,7 +303,9 @@
 				</span>
 				<Separator class="my-1" />
 				<span class="text-meta text-muted-foreground">
-					{m.classifier_confirmed_total({ count: formatNumber(status.confirmed) })}
+					{status.confirmed === 1
+						? m.classifier_confirmed_total_one()
+						: m.classifier_confirmed_total({ count: formatNumber(status.confirmed) })}
 				</span>
 				<span class="text-meta text-muted-foreground">
 					{m.classifier_threshold({ threshold: percent(status.threshold) })}

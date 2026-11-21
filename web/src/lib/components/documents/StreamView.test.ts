@@ -144,9 +144,7 @@ describe('StreamView', () => {
 		const { rerender } = render(StreamView, { props: { query, lookup: null, version: 0 } });
 		const table = () => screen.getByRole('table', { name: m.stream_lanes() });
 		await screen.findByRole('table', { name: m.stream_lanes() });
-		await fireEvent.click(
-			within(table()).getByRole('button', { name: m.stream_more({ count: formatNumber(1) }) })
-		);
+		await fireEvent.click(within(table()).getByRole('button', { name: m.stream_more_one() }));
 		const scroller = table().closest('.overflow-x-auto')!;
 		scroller.scrollLeft = 120;
 
