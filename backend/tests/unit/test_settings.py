@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from datetime import timedelta
 from pathlib import Path
 from types import UnionType
-from typing import Annotated, Literal, Union, get_args, get_origin
+from typing import Annotated, Any, Literal, Union, get_args, get_origin
 
 import annotated_types
 import pytest
@@ -866,7 +866,10 @@ def test_the_default_column_names_the_default(name: str) -> None:
         return
     written = re.match(r"`([^`]*)`", cell)
     assert written is not None, f"{variable}: no default in {cell!r}"
-    kind = Annotated[field.annotation, *field.metadata] if field.metadata else field.annotation
+    annotation = field.annotation
+    assert annotation is not None, f"{variable}: no type"
+    # A form typed at run time: what TypeAdapter takes (pydantic 2.14 types it as TypeForm).
+    kind: Any = Annotated[annotation, *field.metadata] if field.metadata else annotation
     value: object = TypeAdapter(kind).validate_strings(written[1])
     assert value == default, f"{variable}: {cell!r} is not the default {default!r}"
 
