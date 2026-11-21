@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { byLetter, flipped, matchesWords, searchWords, toggled } from './picking.ts';
+import {
+	byLetter,
+	flipped,
+	matchesAllWords,
+	matchesWords,
+	searchWords,
+	toggled
+} from './picking.ts';
 
 describe('toggled', () => {
 	it('adds a value once and removes every copy of it', () => {
@@ -32,6 +39,19 @@ describe('searchWords and matchesWords', () => {
 	it('match everything without words', () => {
 		expect(searchWords('   ')).toBe('');
 		expect(matchesWords('anything', '')).toBe(true);
+	});
+
+	it('finds every word wherever it stands, in any order (WH-04)', () => {
+		// The pickers held the query as one piece: "Bäckerei Muster" did not find "Muster
+		// Bäckerei", and an admin was offered to create the contact a second time.
+		const words = searchWords('Bäckerei  muster');
+		expect(matchesWords('Muster Bäckerei', words)).toBe(true);
+		expect(matchesWords('Muster Bäckerei GmbH', words)).toBe(true);
+		expect(matchesWords('Muster Versicherung', words)).toBe(false);
+		// A name with its aliases is one text: a word of each may be typed.
+		expect(matchesAllWords('doe bäck', ['Muster Bäckerei', null, 'Jane Doe'])).toBe(true);
+		expect(matchesAllWords('doe süd', ['Muster Bäckerei', 'Jane Doe'])).toBe(false);
+		expect(matchesAllWords('  ', ['anything'])).toBe(true);
 	});
 });
 

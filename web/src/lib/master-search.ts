@@ -5,25 +5,7 @@
  * by its name and description, a field by its name, key and description.
  */
 import type { Contact, DocumentType, FieldDefinition } from '#lib/masterdata.svelte.ts';
-
-function words(query: string): string[] {
-	return query
-		.toLocaleLowerCase()
-		.split(/\s+/)
-		.filter((word) => word !== '');
-}
-
-/** Whether every word of `query` stands in one of `texts`, regardless of case. */
-export function matchesAllWords(
-	query: string,
-	texts: readonly (string | null | undefined)[]
-): boolean {
-	const haystack = texts
-		.filter((text): text is string => !!text)
-		.join('\n')
-		.toLocaleLowerCase();
-	return words(query).every((word) => haystack.includes(word));
-}
+import { matchesAllWords } from '#lib/picking.ts';
 
 export function contactMatches(
 	contact: Pick<Contact, 'name'> & Partial<Pick<Contact, 'aliases' | 'identifiers'>>,

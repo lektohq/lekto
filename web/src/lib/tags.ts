@@ -3,7 +3,7 @@
  * with its path): the tags of a scope, their paths, the tree of a master data tab, and what a
  * search matches. Documents show the leaf; the path says where it stands.
  */
-import { matchesAllWords } from '#lib/master-search.ts';
+import { matchesAllWords } from '#lib/picking.ts';
 import type { Tag, TagScope } from '#lib/masterdata.svelte.ts';
 
 export const SEPARATOR = ' › ';

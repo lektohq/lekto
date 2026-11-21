@@ -42,6 +42,21 @@ describe('SearchSelect', () => {
 		expect(trigger.textContent).toContain('Stadtwerke');
 	});
 
+	it('finds an option by its words in any order, a word of its other names among them (WH-04)', async () => {
+		phone.override(true);
+		const user = userEvent.setup();
+		const { trigger } = field();
+		await user.click(trigger);
+		const sheet = await screen.findByRole('dialog', { name: 'Choose a contact' });
+		const search = within(sheet).getByLabelText(m.assignment_search());
+		await user.type(search, 'Versicherung nord');
+		expect(within(sheet).getByRole('option', { name: 'Nord Muster Versicherung' })).toBeTruthy();
+		await user.clear(search);
+		await user.type(search, 'energie stadt');
+		expect(within(sheet).getByRole('option', { name: 'Stadtwerke' })).toBeTruthy();
+		expect(within(sheet).queryByRole('option', { name: 'Nord Muster Versicherung' })).toBeNull();
+	});
+
 	it('shows the chosen one, finds one by what it is also called, and clears', async () => {
 		const user = userEvent.setup();
 		const { onchange, trigger } = field();

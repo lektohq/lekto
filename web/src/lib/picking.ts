@@ -1,6 +1,9 @@
 /**
  * What the pickers share: a choice of several values turned on or off, and a typed query held
- * against the labels of the options.
+ * against the labels of the options. One rule for every search in this browser, the pickers,
+ * the tags and the master data lists alike: every word of the query stands somewhere in what
+ * an option is about, regardless of case and of the order of the words ("Bäckerei Muster"
+ * finds "Muster Bäckerei").
  */
 
 /** `selected` with `value` in it (`on`) or without it. */
@@ -18,9 +21,21 @@ export function searchWords(query: string): string {
 	return query.trim().toLocaleLowerCase();
 }
 
-/** Whether `text` holds `words` (from `searchWords`); no words match everything. */
+/** Whether `text` holds every word of `words` (from `searchWords`); no words match everything. */
 export function matchesWords(text: string, words: string): boolean {
-	return text.toLocaleLowerCase().includes(words);
+	const held = text.toLocaleLowerCase();
+	return words.split(/\s+/).every((word) => held.includes(word));
+}
+
+/** Whether every word of `query` stands in one of `texts`, regardless of case. */
+export function matchesAllWords(
+	query: string,
+	texts: readonly (string | null | undefined)[]
+): boolean {
+	return matchesWords(
+		texts.filter((text): text is string => !!text).join('\n'),
+		searchWords(query)
+	);
 }
 
 /**
