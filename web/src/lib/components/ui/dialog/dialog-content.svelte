@@ -3,6 +3,7 @@
 	import { Dialog as DialogPrimitive } from 'bits-ui';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import { inToast } from '#lib/toasts.ts';
 	import { cn, type WithoutChildrenOrChild } from '#lib/utils.ts';
 	import * as Dialog from './index.js';
 	import DialogPortal from './dialog-portal.svelte';
@@ -14,6 +15,7 @@
 		class: className,
 		portalProps,
 		children,
+		onInteractOutside,
 		showCloseButton = true,
 		size = 'sm',
 		...restProps
@@ -44,6 +46,11 @@
 			className
 		)}
 		{...restProps}
+		onInteractOutside={(event) => {
+			// A tap on a toast above is none on the page behind: the layer stays.
+			if (inToast(event.target)) event.preventDefault();
+			else onInteractOutside?.(event);
+		}}
 	>
 		{@render children?.()}
 		{#if showCloseButton}

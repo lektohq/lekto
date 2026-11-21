@@ -839,7 +839,9 @@ figures of the search check, tiles in the tones of the lanes.
 
 Toasts (`svelte-sonner`) confirm an action that has finished ("Gespeichert", "3 Dokumente
 eingereiht") or report an error of an action. One toast waits for the person instead: a new
-version of the app ([App](#app)). **A toast never replaces a load error on the page.**
+version of the app ([App](#app)). **A toast never replaces a load error on the page.** A toast
+stays within reach above a dialog or a sheet: it takes the tap (to answer it, to close it), and
+a tap on it is none on the page behind, so the layer stays open (`lib/toasts.ts`).
 
 ### Help and tooltips
 

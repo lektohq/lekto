@@ -7,6 +7,7 @@
 	import { Dialog as SheetPrimitive } from 'bits-ui';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import { inToast } from '#lib/toasts.ts';
 	import { cn, type WithoutChildrenOrChild } from '#lib/utils.ts';
 	import SheetOverlay from './sheet-overlay.svelte';
 	import SheetPortal from './sheet-portal.svelte';
@@ -21,6 +22,7 @@
 		overlayClass,
 		portalProps,
 		children,
+		onInteractOutside,
 		...restProps
 	}: WithoutChildrenOrChild<SheetPrimitive.ContentProps> & {
 		portalProps?: WithoutChildrenOrChild<ComponentProps<typeof SheetPortal>>;
@@ -43,6 +45,11 @@
 			className
 		)}
 		{...restProps}
+		onInteractOutside={(event) => {
+			// A tap on a toast above is none on the page behind: the layer stays.
+			if (inToast(event.target)) event.preventDefault();
+			else onInteractOutside?.(event);
+		}}
 	>
 		{@render children?.()}
 		{#if showCloseButton}
