@@ -88,6 +88,41 @@ describe('an action on many documents, as the page follows it', () => {
 		failed.mockRestore();
 	});
 
+	it('keeps the action that skipped documents until the next one starts (WZ-06)', async () => {
+		// "Details" stood only in a toast that is gone after four seconds.
+		vi.useFakeTimers();
+		vi.spyOn(toast, 'warning').mockImplementation(() => '');
+		vi.spyOn(toast, 'success').mockImplementation(() => '');
+		const skipped = {
+			...operation('done', 1),
+			skipped: [{ document_id: 'd2', reason: 'in processing', reasons: [] }]
+		};
+		const answers = [skipped, operation('done', 2)];
+		vi.stubGlobal(
+			'fetch',
+			fakeApi({
+				'POST /api/v1/documents/bulk': () => operation('queued'),
+				'GET /api/v1/documents/bulk/op-1': () => answers.shift()
+			})
+		);
+		const run = new BulkRun(vi.fn());
+		await run.start({ ids: ['d1', 'd2'], query: {} }, { kind: 'confirm' });
+		expect(run.last).toBeNull();
+		await vi.advanceTimersByTimeAsync(POLL);
+		expect(run.busy).toBe(false);
+		expect(run.last?.skipped).toHaveLength(1);
+		// Still there long after the toast went.
+		await vi.advanceTimersByTimeAsync(60_000);
+		expect(run.last?.skipped).toHaveLength(1);
+		// The next action: its own outcome counts.
+		await run.start({ ids: ['d1'], query: {} }, { kind: 'confirm' });
+		expect(run.last).toBeNull();
+		await vi.advanceTimersByTimeAsync(POLL);
+		expect(run.last).toBeNull();
+		run.stop();
+		vi.restoreAllMocks();
+	});
+
 	it('changes nothing after it is stopped, even by a poll that was in flight', async () => {
 		vi.useFakeTimers();
 		let answer: (value: unknown) => void = () => {};

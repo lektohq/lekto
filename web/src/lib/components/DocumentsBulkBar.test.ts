@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { formatNumber } from '#lib/i18n.ts';
@@ -50,6 +50,33 @@ function renderBar(
 }
 
 describe('the selection bar of the documents', () => {
+	it('keeps "Details" of what the last action skipped, until the next one (WZ-06)', async () => {
+		const { run } = renderBar(0);
+		expect(screen.queryByRole('button', { name: m.bulk_details() })).toBeNull();
+		const last = {
+			id: 'op-1',
+			kind: 'confirm',
+			status: 'done',
+			total: 2,
+			done: 2,
+			changed: 1,
+			unchanged: 0,
+			skipped: [{ document_id: 'd2', reason: 'in processing', reasons: [] }],
+			error: null,
+			created_at: '2026-10-28T12:00:00Z',
+			finished_at: '2026-10-28T12:00:05Z'
+		} as NonNullable<typeof run.last>;
+		run.last = last;
+		const details = await screen.findByRole('button', { name: m.bulk_details() });
+		expect(screen.getByText(new RegExp(m.bulk_skipped({ count: '1' })))).toBeTruthy();
+		await userEvent.click(details);
+		expect(run.skipped).toStrictEqual(last);
+		run.last = null;
+		await waitFor(() =>
+			expect(screen.queryByRole('button', { name: m.bulk_details() })).toBeNull()
+		);
+	});
+
 	it('reprocesses from a chosen step, and says what the model costs for many', async () => {
 		const sent: unknown[] = [];
 		vi.stubGlobal(

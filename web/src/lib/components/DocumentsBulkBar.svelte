@@ -28,7 +28,7 @@
 	import { phone } from '#lib/phone.svelte.ts';
 	import { descendants, isReprocessNode, pipeline, type GraphNode } from '#lib/pipeline.ts';
 	import { session } from '#lib/session.svelte.ts';
-	import { bulkDocuments, MODEL_CALLS, WARN_ABOVE } from '#lib/bulk.ts';
+	import { bulkDocuments, bulkResult, MODEL_CALLS, WARN_ABOVE } from '#lib/bulk.ts';
 	import {
 		type BulkAction,
 		type BulkOperation,
@@ -200,6 +200,23 @@
 	{/if}
 {/snippet}
 
+<!-- What the last action skipped stays within reach until the next one: its toast is gone
+after a few seconds, with the only way to the details (web/DESIGN.md, "Choosing many"). -->
+{#snippet idle()}
+	{#if run.last}
+		{@const last = run.last}
+		<span class="flex min-w-0 flex-wrap items-baseline gap-x-2">
+			<span>
+				{bulkResult(last)} · {m.bulk_skipped({ count: formatNumber(last.skipped.length) })}
+			</span>
+			<Button variant="link" size="inline" onclick={() => (run.skipped = last)}>
+				{m.bulk_details()}
+			</Button>
+		</span>
+	{/if}
+	{#if !run.last || count > 0}{@render reach()}{/if}
+{/snippet}
+
 {#snippet actions()}
 	<Button variant="outline" size="sm" disabled={count === 0} onclick={open('tags')}>
 		<Tag aria-hidden="true" />
@@ -257,7 +274,11 @@
 	busy={run.busy}
 	{lead}
 	trail={phone.current && !running ? chooser : undefined}
-	hint={running ? progressHint : all || count === 0 || limit !== null ? reach : undefined}
+	hint={running
+		? progressHint
+		: run.last || all || count === 0 || limit !== null
+			? idle
+			: undefined}
 	actions={running ? undefined : actions}
 	bind:height
 />

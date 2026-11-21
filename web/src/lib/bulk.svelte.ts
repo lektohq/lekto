@@ -31,8 +31,11 @@ export const POLL = 1000;
 export class BulkRun {
 	/** The operation while it runs; null between actions. */
 	operation = $state<BulkOperation | null>(null);
-	/** The finished operation whose skipped documents are shown ("Details" of its toast). */
+	/** The finished operation whose skipped documents are shown ("Details"). */
 	skipped = $state<BulkOperation | null>(null);
+	/** The last action that skipped documents, until the next one starts: the bar keeps its
+	 * "Details", since the toast that offers them is gone after a few seconds. */
+	last = $state<BulkOperation | null>(null);
 	#stopped = false;
 	#timer: ReturnType<typeof setTimeout> | undefined;
 	#ondone: () => void;
@@ -57,6 +60,7 @@ export class BulkRun {
 			})
 		);
 		if (this.#stopped) return;
+		this.last = null;
 		this.operation = operation;
 		this.#follow(operation.id);
 	}
@@ -98,6 +102,7 @@ export class BulkRun {
 
 	#finish(operation: BulkOperation): void {
 		this.operation = null;
+		this.last = operation.skipped.length > 0 ? operation : null;
 		const result = bulkResult(operation);
 		if (operation.status === 'failed') {
 			toast.error(m.bulk_failed(), { description: result });

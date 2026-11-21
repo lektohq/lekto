@@ -568,7 +568,9 @@ and filters, not ids, and the bar says so (with words, how far the search reache
 but "Bestätigen" opens a `FormDialog` (deleting: a `ConfirmDialog` naming the count). The
 action runs in the background, owned by the page (`BulkRun`), not by the bar: the bar shows a
 `Progress` with "412 von 1.234 …" in place of its actions; at the end a toast says what it did,
-and where documents were skipped, "Details" opens them with their reasons. The mode stays after
+and where documents were skipped, "Details" opens them with their reasons: in the toast, and in the
+bar (the result and "Details" as a text button in its hint) until the next action starts, since the
+toast goes after a few seconds. The mode stays after
 an action and when the filters change (the choice is let go) until the person ends it.
 
 **A rule's dry run** (`/rules/{id}/apply`, Tobi 02.11.2026): what the rule's current version would
