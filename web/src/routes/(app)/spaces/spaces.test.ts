@@ -5,8 +5,9 @@ import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { scope } from '#lib/scope.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi } from '#lib/testing/api.ts';
-import { choose } from '#lib/testing/select.ts';
+import { phone } from '#lib/phone.svelte.ts';
+import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { choose, selectedValue } from '#lib/testing/select.ts';
 import Page from './+page.svelte';
 
 type Space = components['schemas']['SpaceOut'];
@@ -76,6 +77,7 @@ function start(spaces: Space[]) {
 
 beforeEach(() => signIn('u1'));
 afterEach(() => {
+	phone.override(null);
 	scope.set(false);
 	vi.unstubAllGlobals();
 	session.clear();
@@ -157,6 +159,36 @@ describe('spaces', () => {
 		const put = api.mock.calls.find(([request]) => request.method === 'PUT')![0];
 		expect(await put.json()).toEqual({ role: 'read' });
 	});
+	it.each([
+		['wider than a phone', false],
+		['on a phone', true]
+	])('shows the stored role again when the API refuses another, %s (WC-06)', async (_, small) => {
+		// The field kept the refused choice, and the same choice again asked for nothing.
+		phone.override(small);
+		const user = userEvent.setup();
+		const api = fakeApi({
+			'GET /api/v1/spaces': () => [HOUSE, JOHN],
+			'GET /api/v1/users': () => USERS,
+			'PUT /api/v1/spaces/house/members/u2': () =>
+				json({ type: 'about:blank', title: 'Unprocessable', status: 422, detail: 'no' }, 422)
+		});
+		vi.stubGlobal('fetch', api);
+		render(Page);
+		await user.click(
+			await screen.findByRole('button', { name: m.space_members({ name: 'Haushalt' }) })
+		);
+		const dialog = await screen.findByRole('dialog');
+		const role = () => within(dialog).getByLabelText(m.members_role_of({ name: 'erika' }));
+		const puts = () => calls(api).filter((call) => call.startsWith('PUT '));
+		expect(selectedValue(role())).toBe('read');
+		await choose(user, role(), 'edit');
+		await waitFor(() => expect(puts()).toHaveLength(1));
+		await waitFor(() => expect(selectedValue(role())).toBe('read'));
+		await waitFor(() => expect((role() as HTMLButtonElement).disabled).toBe(false));
+		await choose(user, role(), 'edit');
+		await waitFor(() => expect(puts()).toHaveLength(2));
+	});
+
 	it('shows what belongs in a space, and creates one with its description', async () => {
 		const user = userEvent.setup({ pointerEventsCheck: 0 });
 		const api = start([{ ...HOUSE, description: 'Wohnung, Nebenkosten' }, JOHN]);

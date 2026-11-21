@@ -9,6 +9,7 @@
 	import Check from '@lucide/svelte/icons/check';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import { Select as SelectPrimitive } from 'bits-ui';
+	import { tick } from 'svelte';
 	import { phone } from '#lib/phone.svelte.ts';
 	import { cn } from '#lib/utils.ts';
 	import { FIELD as FIELD_LOOK, FIELD_HEIGHT } from '#lib/components/ui/field-look.ts';
@@ -16,6 +17,10 @@
 	// A choice from a short, fixed list, styled like the inputs. On a phone the system's own
 	// picker (the most comfortable with a thumb, Tobi 20.10.2026); wider, a list in the look of
 	// the other pickers, by keyboard too (arrows, typing the first letters, Enter).
+	//
+	// The field shows `value`, never a choice of its own: a caller that saves a choice at once
+	// (`bind:value` with a getter and a setter) may refuse it, and the field then stands at
+	// what is stored, ready for the same choice again.
 	let {
 		value = $bindable(''),
 		options,
@@ -38,17 +43,27 @@
 	} = $props();
 
 	const FIELD = cn(FIELD_LOOK, FIELD_HEIGHT);
+	let system = $state<HTMLSelectElement | null>(null);
+
+	function picked(next: string) {
+		value = next;
+		onchange?.(next);
+		// The system's select keeps what was picked; where the caller did not take it, back.
+		void tick().then(() => {
+			if (system && system.value !== value) system.value = value;
+		});
+	}
 	const shown = $derived(options.find((option) => option.value === value)?.label ?? '');
 </script>
 
 {#if phone.current}
 	<select
 		{id}
-		bind:value
+		bind:this={system}
+		bind:value={() => value, picked}
 		{disabled}
 		aria-label={ariaLabel}
 		aria-invalid={ariaInvalid}
-		onchange={(event) => onchange?.(event.currentTarget.value)}
 		class={cn(FIELD, className, 'max-sm:h-11')}
 	>
 		{#each options as option (option.value)}
@@ -58,13 +73,9 @@
 {:else}
 	<SelectPrimitive.Root
 		type="single"
-		{value}
+		bind:value={() => value, picked}
 		{disabled}
 		items={[...options]}
-		onValueChange={(next) => {
-			value = next;
-			onchange?.(next);
-		}}
 	>
 		<!-- A combobox as the native select is one: named by its label, its value read out. -->
 		<SelectPrimitive.Trigger

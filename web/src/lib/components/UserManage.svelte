@@ -121,8 +121,11 @@
 		}
 	}
 
-	const setRole = (role: string) =>
-		run(
+	// The role as chosen while it is being saved; refused, the field shows the stored one again.
+	let roleChoice = $state<string | null>(null);
+	const setRole = (role: string) => {
+		roleChoice = role;
+		return run(
 			() =>
 				unwrap(
 					api.PATCH('/api/v1/users/{id}', {
@@ -131,7 +134,8 @@
 					})
 				),
 			m.user_saved()
-		);
+		).finally(() => (roleChoice = null));
+	};
 
 	const setActive = (active: boolean) =>
 		run(
@@ -192,13 +196,12 @@
 				<Field.Label for="user-role">{m.user_role()}</Field.Label>
 				<Select
 					id="user-role"
-					value={account.role ?? 'user'}
+					bind:value={() => roleChoice ?? account?.role ?? 'user', (next) => void setRole(next)}
 					disabled={busy}
 					options={[
 						{ value: 'user', label: m.role_user() },
 						{ value: 'admin', label: m.role_admin() }
 					]}
-					onchange={setRole}
 				/>
 			</Field.Field>
 			<div class="flex items-center justify-between gap-3">

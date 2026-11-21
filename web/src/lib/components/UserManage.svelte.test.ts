@@ -6,6 +6,7 @@ import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import UserManage from './UserManage.svelte';
 import { fakeApi, json } from '#lib/testing/api.ts';
+import { choose, selectedValue } from '#lib/testing/select.ts';
 
 vi.mock('$app/navigation', () => ({
 	afterNavigate: vi.fn(),
@@ -66,6 +67,30 @@ afterEach(() => {
 });
 
 describe('UserManage', () => {
+	it('shows the stored role again when the API refuses another (WC-06)', async () => {
+		const user = userEvent.setup();
+		const patches: unknown[] = [];
+		fetchMock.mockImplementation(async (request) => {
+			const path = new URL(request.url).pathname;
+			if (request.method === 'PATCH') {
+				patches.push(await request.json());
+				return json(
+					{ type: 'about:blank', title: 'Unprocessable', status: 422, detail: 'no' },
+					422
+				);
+			}
+			if (path.endsWith('/users/john')) return json(account);
+			if (path.endsWith('/profile')) return json(profile);
+			return json([]);
+		});
+		render(UserManage, { open: true, userId: 'john', onchanged: vi.fn() });
+		const role = async () => (await screen.findByLabelText(m.user_role())) as HTMLElement;
+		expect(selectedValue(await role())).toBe('user');
+		await choose(user, await role(), 'admin');
+		await vi.waitFor(() => expect(patches).toEqual([{ role: 'admin' }]));
+		await vi.waitFor(async () => expect(selectedValue(await role())).toBe('user'));
+	});
+
 	it('shows the account in parts, each keeping what was typed', async () => {
 		const user = userEvent.setup();
 		render(UserManage, { open: true, userId: 'john', onchanged: vi.fn() });
