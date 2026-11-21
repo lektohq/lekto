@@ -1,6 +1,6 @@
 <script lang="ts">
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
-	import { goto } from '$app/navigation';
+	import { gotoWithState } from '#lib/held-state.ts';
 
 	// The way back to the place a page came from. With `back`, that (the history after a jump,
 	// `lib/way-back.ts`); with `state`, `href` with the history entry it had (the words of a
@@ -17,7 +17,7 @@
 		if (event.shiftKey) return;
 		event.preventDefault();
 		if (back) back();
-		else void goto(href, { state, persistState: true });
+		else void gotoWithState(href, state ?? {});
 	}
 </script>
 

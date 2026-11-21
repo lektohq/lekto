@@ -14,7 +14,11 @@ import { SETTINGS } from '#lib/sections.ts';
 import { session, type User } from '#lib/session.svelte.ts';
 import AppShell from './AppShell.svelte';
 
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
+vi.mock('$app/navigation', () => ({
+	afterNavigate: vi.fn(),
+	beforeNavigate: vi.fn(),
+	goto: vi.fn()
+}));
 vi.mock('#lib/push-device.ts', async (original) => ({
 	...(await original<typeof import('#lib/push-device.ts')>()),
 	leaveDevice: vi.fn(async () => {})

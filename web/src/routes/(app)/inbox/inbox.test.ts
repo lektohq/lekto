@@ -12,7 +12,11 @@ import { uploads } from '#lib/upload.svelte.ts';
 import Page from './+page.svelte';
 
 const state = vi.hoisted(() => ({ url: new URL('http://lekto/ui/inbox') }));
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
+vi.mock('$app/navigation', () => ({
+	afterNavigate: vi.fn(),
+	beforeNavigate: vi.fn(),
+	goto: vi.fn()
+}));
 vi.mock('$app/state', () => ({
 	page: {
 		get url() {

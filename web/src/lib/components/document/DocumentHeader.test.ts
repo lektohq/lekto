@@ -12,7 +12,11 @@ import type { Reading } from '#lib/vision.ts';
 import { goto } from '$app/navigation';
 import DocumentHeader from './DocumentHeader.svelte';
 
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
+vi.mock('$app/navigation', () => ({
+	afterNavigate: vi.fn(),
+	beforeNavigate: vi.fn(),
+	goto: vi.fn()
+}));
 
 type Document = components['schemas']['DocumentDetails'];
 

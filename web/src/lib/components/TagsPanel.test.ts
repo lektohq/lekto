@@ -17,7 +17,11 @@ vi.mock('$app/state', () => ({
 		}
 	}
 }));
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: nav.goto }));
+vi.mock('$app/navigation', () => ({
+	afterNavigate: vi.fn(),
+	beforeNavigate: vi.fn(),
+	goto: nav.goto
+}));
 
 let fetchMock = fakeApi();
 

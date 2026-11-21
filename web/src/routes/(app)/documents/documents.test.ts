@@ -44,7 +44,11 @@ const state = vi.hoisted(() => ({
 	// The history entry: the words of a search stand here, never in the URL.
 	entry: {} as App.PageState
 }));
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
+vi.mock('$app/navigation', () => ({
+	afterNavigate: vi.fn(),
+	beforeNavigate: vi.fn(),
+	goto: vi.fn()
+}));
 vi.mock('$app/state', () => ({
 	page: {
 		get url() {

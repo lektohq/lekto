@@ -8,7 +8,7 @@
  * A history entry outlives the session: the next person to sign in in this browser can go back to
  * it. So the entry says whose words it holds (`by`), and they count for that user only.
  */
-import { goto } from '$app/navigation';
+import { gotoWithState } from '#lib/held-state.ts';
 import { session } from '#lib/session.svelte.ts';
 
 /** The history entry of a search for `words`, of the signed-in user. */
@@ -29,5 +29,5 @@ export function gotoSearching(
 	words: string,
 	options: { replace?: boolean; reset?: boolean } = {}
 ): Promise<void> {
-	return goto(url, { ...options, state: wordsState(words), persistState: true });
+	return gotoWithState(url, wordsState(words), options);
 }

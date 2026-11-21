@@ -7,7 +7,11 @@ import { session } from '#lib/session.svelte.ts';
 import ProfileForm from './ProfileForm.svelte';
 import { fakeApi, json } from '#lib/testing/api.ts';
 
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
+vi.mock('$app/navigation', () => ({
+	afterNavigate: vi.fn(),
+	beforeNavigate: vi.fn(),
+	goto: vi.fn()
+}));
 
 let fetchMock = fakeApi();
 const sent: { path: string; body: unknown }[] = [];

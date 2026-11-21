@@ -12,7 +12,11 @@ import { leaveBeam, openBeam, showPages } from '#lib/beam.svelte.ts';
 import { goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import Beam from './Beam.svelte';
 
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
+vi.mock('$app/navigation', () => ({
+	afterNavigate: vi.fn(),
+	beforeNavigate: vi.fn(),
+	goto: vi.fn()
+}));
 // pdf.js needs a worker and a canvas: the archive opens as two A4 pages that are never drawn.
 vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
 	getDocument: () => ({

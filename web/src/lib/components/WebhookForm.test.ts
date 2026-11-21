@@ -13,6 +13,7 @@ type Webhook = components['schemas']['WebhookOut'];
 // What the form's guard asks before a navigation (`UnsavedGuard`), to try leaving.
 const guards = vi.hoisted(() => [] as ((navigation: unknown) => void)[]);
 vi.mock('$app/navigation', () => ({
+	afterNavigate: vi.fn(),
 	beforeNavigate: (guard: (navigation: unknown) => void) => guards.push(guard),
 	goto: vi.fn()
 }));

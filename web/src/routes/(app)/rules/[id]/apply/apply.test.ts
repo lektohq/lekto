@@ -13,7 +13,11 @@ import Page from './+page.svelte';
 type Preview = components['schemas']['ApplyPreviewOut'];
 type Application = components['schemas']['RuleApplicationOut'];
 
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
+vi.mock('$app/navigation', () => ({
+	afterNavigate: vi.fn(),
+	beforeNavigate: vi.fn(),
+	goto: vi.fn()
+}));
 vi.mock('$app/state', async () => ({
 	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
 }));
