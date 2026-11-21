@@ -88,7 +88,7 @@ def test_the_same_json_is_the_same_whatever_the_order_of_its_keys() -> None:
 def test_json_nested_deeper_than_the_parser_goes_is_none() -> None:
     """A RecursionError otherwise, which no caller of foreign JSON expects (XB-08)."""
     assert loads('{"a": [1]}') == {"a": [1]}
-    for deep in ("[" * 10_000, b"[" * 100_000):
+    for deep in ("[" * 500_000, b"[" * 500_000):
         with pytest.raises(ValueError, match="nested too deeply"):
             loads(deep)
 
