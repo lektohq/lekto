@@ -23,6 +23,17 @@ const FORMAL_ALLOWED = new Set([
 	'identifier_kind_letter_date'
 ]);
 
+// One thing has one name (DESIGN.md, "Words"; Tobi, 21.11.2026): the words that were used
+// beside it stay out.
+const OTHER_WORDS: Record<string, RegExp> = {
+	'a paused webhook is "pausiert"': /Webhook[^.]*\b(aus|ab)geschaltet\b/,
+	'the model that reads page images is the "VLM"': /\bBildmodell/,
+	'what a rule or a webhook fills in is a "Template"': /\bVorlagen?\b/,
+	'it is "das Token"': /\b([Dd]er|[Dd]ieser|[Dd]iesen|[Dd]en|[Ee]inen|[Kk]einen) (API-)?Token\b/,
+	'the second step of a sign-in is the "zweite Faktor"': /Zwei-Faktor/,
+	'the channel is "Web"': /Web-Oberfläche/
+};
+
 // "Nummer" alone, not in a compound ("Kundennummer"): only for the numbers that mark the
 // document itself. This list may only shrink.
 const NUMBER = /\bNummer(n)?\b/;
@@ -51,6 +62,17 @@ describe('German texts', () => {
 
 	it('say "Anlegen", not "erstellen"', () => {
 		expect(matching(ERSTELLEN, ERSTELLEN_ALLOWED)).toEqual([]);
+	});
+
+	it.each(Object.entries(OTHER_WORDS))('give one thing one name: %s', (_rule, other) => {
+		expect(matching(other)).toEqual([]);
+	});
+
+	it('name a channel the same wherever it stands', () => {
+		for (const channel of ['web', 'api', 'migration', 'mail']) {
+			expect(catalogue[`automation_channel_${channel}`]).toBe(catalogue[`rule_channel_${channel}`]);
+		}
+		expect(catalogue.origin_channel_mail).toBe(catalogue.rule_channel_mail);
 	});
 
 	it('keep allowlisted keys that still need it', () => {

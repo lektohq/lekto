@@ -34,7 +34,7 @@ describe('the words of a notification', () => {
 
 	it('words the other notices and a test', () => {
 		expect(pushText(payload('webhook_disabled', { name: 'HA' })).title).toBe(
-			'Webhook „HA“ wurde abgeschaltet'
+			'Webhook „HA“ wurde pausiert'
 		);
 		expect(pushText(payload('job_failed', {})).title).toBe('Ein Job hat aufgegeben');
 		expect(pushText(payload('test', {})).title).toBe('Benachrichtigungen funktionieren');

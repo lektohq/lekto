@@ -792,7 +792,7 @@ modal, over a dialog too.
   document in the Beam, paging through them all, and the document checked stays where it is. An
   action that shows documents rather than naming one ("Woher gelernt?") has the eye before its
   text.
-- **The eye means only this:** no other action uses `scan-eye` ("Mit dem Bildmodell lesen" has
+- **The eye means only this:** no other action uses `scan-eye` ("Mit dem VLM lesen" has
   `scan-text`). The mark "Im Eingang" is navigation (the inbox's view of the document), not
   viewing. `tests/design-system.test.ts` keeps both: the eye only in `BeamTitle`, before
   "Woher gelernt?" and at the end of a part of "PDF bearbeiten", a link to one document only where
@@ -1486,6 +1486,17 @@ Every text a user reads is in `messages/en.json` and `messages/de.json` (`no-raw
 | Enabled / disabled (users)           | Aktiv / Deaktiviert | Active / Deactivated |
 | Create                               | Anlegen             | Create               |
 | Delete                               | Löschen             | Delete               |
+
+One thing has one name (Tobi, 21.11.2026; `messages-tone.test.ts` keeps the other words out):
+
+| Thing                                | German                      | Not                         |
+| ------------------------------------ | --------------------------- | --------------------------- |
+| A webhook that does not deliver      | pausiert                    | ausgeschaltet, abgeschaltet |
+| The model that reads the page images | VLM                         | Bildmodell                  |
+| What a rule or a webhook fills in    | Template                    | Vorlage                     |
+| An API token                         | das Token                   | der Token                   |
+| The second step of a sign-in         | zweiter Faktor              | Zwei-Faktor-Anmeldung       |
+| The channels a document comes in by  | Web, API, Migration, E-Mail | Web-Oberfläche, Mail        |
 
 ### Glossary
 
