@@ -7,27 +7,24 @@ import { connectSession, recheckSession, session } from './session.svelte.ts';
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
 
 function me(id: string, token: string): Response {
-	return new Response(
-		JSON.stringify({
-			user: { id, username: id, role: 'user' },
-			method: 'password',
-			expires_at: '2026-10-09T12:00:00Z',
-			csrf_token: token,
-			lekto_version: '0.8.0'
-		}),
-		{ status: 200, headers: { 'content-type': 'application/json' } }
-	);
+	return json({
+		user: { id, username: id, role: 'user' },
+		method: 'password',
+		expires_at: '2026-10-09T12:00:00Z',
+		csrf_token: token,
+		lekto_version: '0.8.0'
+	});
 }
 
 const stale = () =>
-	new Response(
-		JSON.stringify({
+	json(
+		{
 			type: 'about:blank',
 			title: 'Forbidden',
 			status: 403,
 			detail: `the header ${CSRF_HEADER} is missing or wrong`
-		}),
-		{ status: 403, headers: { 'content-type': 'application/problem+json' } }
+		},
+		403
 	);
 
 const events = { unauthorized: vi.fn(), replaced: vi.fn() };

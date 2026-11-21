@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
-import { fakeApi } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 import { choose } from '#lib/testing/select.ts';
 import FactFilter from './FactFilter.svelte';
 
@@ -16,10 +16,7 @@ describe('FactFilter', () => {
 					const body = await request.json();
 					asked.push(body);
 					if (body.value === 'kaputt') {
-						return new Response(
-							JSON.stringify({ title: 'Unprocessable', status: 422, detail: 'not one' }),
-							{ status: 422, headers: { 'content-type': 'application/problem+json' } }
-						);
+						return json({ title: 'Unprocessable', status: 422, detail: 'not one' }, 422);
 					}
 					return { kind: body.kind, value: 'R1001', ref: 'UjEwMDE' };
 				}

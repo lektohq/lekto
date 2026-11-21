@@ -40,6 +40,34 @@ const EXCEPTIONS = {
 		'/src/lib/components/Lenses.svelte',
 		'/src/lib/components/SelectionBar.svelte'
 	]),
+	// A size or a place that comes from data or is measured (zoom, durations, bars, columns),
+	// and a value from data that a class reads as a custom property (`--depth`, `--steps`).
+	inlineStyle: new Set([
+		'/src/lib/components/ColorPicker.svelte',
+		'/src/lib/components/PageViewer.svelte',
+		'/src/lib/components/PeriodFacet.svelte',
+		'/src/lib/components/TagPickerList.svelte',
+		'/src/lib/components/TagsPanel.svelte',
+		'/src/lib/components/document/CodeThumb.svelte',
+		'/src/lib/components/document/DocumentFiles.svelte',
+		'/src/lib/components/document/PageImages.svelte',
+		'/src/lib/components/document/ProcessingBand.svelte',
+		'/src/lib/components/document/ProcessingGraph.svelte',
+		'/src/lib/components/document/StepDetails.svelte',
+		'/src/lib/components/documents/StreamView.svelte',
+		'/src/lib/components/system/AutomationTab.svelte',
+		'/src/lib/components/system/ClassifierTab.svelte',
+		'/src/lib/components/system/SearchTab.svelte',
+		'/src/routes/(app)/documents/+page.svelte'
+	]),
+	// A colour as a value: the fingerprint of a file from its hash, the start of a tag's own
+	// colour and the themes' grounds its contrast is computed against, the browser's bars.
+	colourValue: new Set([
+		'/src/lib/components/ColorPicker.svelte',
+		'/src/lib/components/document/DocumentFiles.svelte',
+		'/src/lib/colors.ts',
+		'/src/lib/theme-color.ts'
+	]),
 	// Paper, logos and the QR code are drawn for white; the overlays of shadcn's dialogs.
 	palette: new Set([
 		'/src/lib/components/document/CodeThumb.svelte',
@@ -627,6 +655,48 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	// An inline style in markup: `style="…"`, `style={…}` and Svelte's `style:width={…}`.
+	const INLINE_STYLE = /\sstyle(?:=["{]|:[-\w]+)/;
+	// A colour as a value: hex (three digits only as a whole string or in a class), or a function.
+	const COLOUR_VALUE =
+		/#(?:[0-9a-f]{8}|[0-9a-f]{6})\b|['"[]#[0-9a-f]{3}['"\]]|\b(?:rgba?|hsla?|oklch|oklab)\(/i;
+
+	it('sets an inline style only where DESIGN.md names the file', () => {
+		// Classes carry the look; a style of its own is for a size or a place that comes from
+		// data (DESIGN.md, "Exceptions").
+		expect(
+			offenders((source, path) =>
+				path.includes('/components/ui/') || EXCEPTIONS.inlineStyle.has(path)
+					? null
+					: line(source, INLINE_STYLE)
+			)
+		).toEqual([]);
+	});
+
+	it('writes a colour as a value only where DESIGN.md names the file', () => {
+		const all = { ...sources, ...scripts };
+		expect(
+			Object.entries(all)
+				.filter(([path, source]) => !EXCEPTIONS.colourValue.has(path) && COLOUR_VALUE.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
+	it('notices an inline style and a colour as a value', () => {
+		expect(INLINE_STYLE.test('<div style="width: 3px">')).toBe(true);
+		expect(INLINE_STYLE.test('<div style={crop}>')).toBe(true);
+		expect(INLINE_STYLE.test('<div class="bar" style:width="{share}%">')).toBe(true);
+		expect(INLINE_STYLE.test("formatNumber(value, { style: 'percent' })")).toBe(false);
+		expect(INLINE_STYLE.test('const style = shown ? a : b;')).toBe(false);
+		expect(COLOUR_VALUE.test('class="bg-[#b45309]"')).toBe(true);
+		expect(COLOUR_VALUE.test("const ground = '#fff';")).toBe(true);
+		expect(COLOUR_VALUE.test('fill="hsl({hue} 55% 42%)"')).toBe(true);
+		expect(COLOUR_VALUE.test('// The facts the documents have (#145)')).toBe(false);
+		expect(
+			COLOUR_VALUE.test('hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)]')
+		).toBe(false);
+	});
+
 	it('says that nothing is there only with EmptyNote', () => {
 		// A dashed box of muted words (DESIGN.md, "States"); `size="sm"` inside a dialog.
 		const classes = /\sclass=(?:"[^"]*"|\{[^}]*\})/g;
@@ -949,7 +1019,7 @@ describe('the design system (web/DESIGN.md)', () => {
 				.filter(
 					([, source]) =>
 						/\bfunction json\(/.test(source) ||
-						/Response\.json\(|new Response\(JSON\.stringify\(/.test(source)
+						/Response\.json\(|new Response\(\s*JSON\.stringify\(/.test(source)
 				)
 				.map(([path]) => path)
 		).toEqual([]);
@@ -969,7 +1039,8 @@ describe('the design system (web/DESIGN.md)', () => {
 				/vi\.mock\('\$app\/navigation', \(\) => \(\{\s*(?:(?:goto|beforeNavigate|afterNavigate): vi\.fn\(\),?\s*)+\}\)\)/,
 			'app-state.ts, app-navigation.ts (lib/testing)':
 				/import\('#lib\/testing\/page-state\.svelte\.ts'\)\)\.(?:testPage|fakeGoto)/,
-			'unstubGlobals (vite.config.ts)': /(?:after|before)Each\([^;]*?vi\.unstubAllGlobals\(\)/,
+			'unstubGlobals (vite.config.ts)':
+				/(?:after|before)Each\((?:async )?\(\) => (?:\{[^}]*)?vi\.unstubAllGlobals\(\)/,
 			'the pointer (tests/setup.ts)': /pointerEventsCheck|body\.style\.pointerEvents = /
 		};
 		expect(

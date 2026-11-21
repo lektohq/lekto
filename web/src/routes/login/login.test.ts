@@ -139,13 +139,9 @@ describe('sign-in page', () => {
 
 	it('shows how long to wait after too many attempts', async () => {
 		fetchMock.mockResolvedValueOnce(
-			new Response(
-				JSON.stringify({ type: 'about:blank', title: 'Too Many Requests', status: 429 }),
-				{
-					status: 429,
-					headers: { 'content-type': 'application/problem+json', 'retry-after': '30' }
-				}
-			)
+			json({ type: 'about:blank', title: 'Too Many Requests', status: 429 }, 429, {
+				'retry-after': '30'
+			})
 		);
 		render(Page, { data: { next: '/ui/', oidc: null, error: null } });
 
