@@ -1,13 +1,12 @@
 <script lang="ts">
-	import Plus from '@lucide/svelte/icons/plus';
-	import HintLabel from '#lib/components/HintLabel.svelte';
+	import AddActionMenu from '#lib/components/rules/AddActionMenu.svelte';
+	import RuleFormFoot from '#lib/components/rules/RuleFormFoot.svelte';
+	import RuleFormHead from '#lib/components/rules/RuleFormHead.svelte';
 	import ConditionGroup, { type RowMoves } from '#lib/components/rules/ConditionGroup.svelte';
 	import RuleRow from '#lib/components/rules/RuleRow.svelte';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import SearchSelect from '#lib/components/SearchSelect.svelte';
 	import Select from '#lib/components/Select.svelte';
-	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
-	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import {
@@ -49,7 +48,6 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { LIMITS } from '#lib/rules/model.ts';
 	import { move } from '#lib/rules/tree.ts';
-	import { cn } from '#lib/utils.ts';
 
 	// The editor of a mail rule (Tobi, 04.11.2026; mock E), in the frame of the document rule's:
 	// name and priority, the mailbox it belongs to, the conditions on the mail in the tree every
@@ -148,36 +146,13 @@
 		if (!busy) onsubmit();
 	}}
 >
-	<div class="grid gap-4 sm:grid-cols-[1fr_12rem]">
-		<Field.Field>
-			<Field.Label for="mail-rule-name">{m.field_name()}</Field.Label>
-			<Input
-				id="mail-rule-name"
-				bind:value={form.name}
-				maxlength={LIMITS.name}
-				aria-invalid={errors.name ? true : undefined}
-			/>
-			{#if errors.name}<Field.Error>{errors.name}</Field.Error>{/if}
-		</Field.Field>
-		<Field.Field>
-			<HintLabel
-				for="mail-rule-priority"
-				label={m.rule_priority()}
-				hint={m.mail_rule_priority_info()}
-			/>
-			<Input
-				id="mail-rule-priority"
-				type="number"
-				min={LIMITS.priorityMin}
-				max={LIMITS.priorityMax}
-				step={1}
-				bind:value={form.priority}
-				aria-invalid={errors.priority ? true : undefined}
-			/>
-			{#if errors.priority}<Field.Error>{errors.priority}</Field.Error>{/if}
-			<Field.Description>{m.rule_priority_hint()}</Field.Description>
-		</Field.Field>
-	</div>
+	<RuleFormHead
+		bind:name={form.name}
+		bind:priority={form.priority}
+		{errors}
+		prefix="mail-rule"
+		priorityInfo={m.mail_rule_priority_info()}
+	/>
 
 	<Field.Field>
 		<Field.Label for="mail-rule-mailbox">{m.mail_rule_mailbox()}</Field.Label>
@@ -386,41 +361,27 @@
 		{/if}
 
 		{#if addable.length > 0 || steps.length > 0}
-			<div>
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger class={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
-						<Plus aria-hidden="true" />
-						{m.rule_add_action()}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="start" class="w-64">
-						{#each addable as item (item)}
-							<DropdownMenu.Item onSelect={() => (form.shown = [...form.shown, item])}
-								>{OPTIONAL_LABELS[item]()}</DropdownMenu.Item
-							>
-						{/each}
-						{#if steps.length > 0}
-							{#if addable.length > 0}<DropdownMenu.Separator />{/if}
-							<DropdownMenu.Label>{m.mail_rule_action_after()}</DropdownMenu.Label>
-							{#each steps as action (action)}
-								<DropdownMenu.Item onSelect={() => (form.steps = withStep(form.steps, action))}
-									>{STEP_LABELS[action]()}</DropdownMenu.Item
-								>
-							{/each}
-						{/if}
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
-			</div>
+			<AddActionMenu
+				groups={[
+					{
+						items: addable.map((item) => ({
+							key: item,
+							label: OPTIONAL_LABELS[item](),
+							onselect: () => (form.shown = [...form.shown, item])
+						}))
+					},
+					{
+						label: m.mail_rule_action_after(),
+						items: steps.map((action) => ({
+							key: action,
+							label: STEP_LABELS[action](),
+							onselect: () => (form.steps = withStep(form.steps, action))
+						}))
+					}
+				]}
+			/>
 		{/if}
 	</section>
 
-	<div class="flex flex-col gap-3 border-t pt-4">
-		{#if error}<Field.Error>{error}</Field.Error>{/if}
-		<p class="text-sm text-muted-foreground">{m.rule_save_hint()}</p>
-		<div class="flex flex-wrap justify-end gap-2">
-			<a href={cancelHref} class={cn(buttonVariants({ variant: 'ghost' }))} onclick={oncancel}
-				>{m.cancel()}</a
-			>
-			<Button type="submit" disabled={busy}>{m.rule_save()}</Button>
-		</div>
-	</div>
+	<RuleFormFoot {error} held={busy} {cancelHref} {oncancel} />
 </form>
