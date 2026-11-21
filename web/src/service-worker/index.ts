@@ -123,7 +123,9 @@ async function page(request: Request): Promise<Response> {
 		throw error;
 	}
 	// A proxy answering for a Lekto that is not there: the app's page, as without a connection.
-	if (unreachable(response.status)) return (await kept()) ?? response;
+	if (unreachable(response.status, response.headers.get('content-type'))) {
+		return (await kept()) ?? response;
+	}
 	return response;
 }
 

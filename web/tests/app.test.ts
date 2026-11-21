@@ -139,11 +139,21 @@ describe('a page while Lekto restarts behind a proxy', () => {
 	// WM-01: the proxy's error page has no way back in the installed app; the worker serves the
 	// app's own page instead, as it does without a connection.
 	it('takes the answers of a proxy for a server that is not there', () => {
-		expect([502, 503, 504].map(unreachable)).toEqual([true, true, true]);
+		expect([502, 503, 504].map((status) => unreachable(status))).toEqual([true, true, true]);
 	});
 
 	it('passes every other answer on', () => {
-		expect([200, 304, 401, 403, 404, 500].map(unreachable)).toEqual(Array(6).fill(false));
+		expect([200, 304, 401, 403, 404].map((status) => unreachable(status))).toEqual(
+			Array(5).fill(false)
+		);
+	});
+
+	it("takes any other 5xx that is no JSON for the proxy, Lekto's own for Lekto's", () => {
+		// Traefik answers a plain "Internal Server Error" while its service is empty.
+		expect(unreachable(500, 'text/plain; charset=utf-8')).toBe(true);
+		expect(unreachable(500, null)).toBe(true);
+		expect(unreachable(500, 'application/problem+json')).toBe(false);
+		expect(unreachable(404, 'text/plain')).toBe(false);
 	});
 });
 

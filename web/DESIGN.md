@@ -1421,7 +1421,8 @@ worker, and Lekto works as a website.
   connection ends on the error page with "Keine Verbindung", which loads again by itself.
   Nothing is written offline: an action fails as it does without the server ("Der Server ist
   nicht erreichbar.").
-- **The server behind a proxy:** while Lekto restarts, a proxy in front answers 502, 503 or 504.
+- **The server behind a proxy:** while Lekto restarts, a proxy in front answers 502, 503 or 504,
+  or a plain 500 (Traefik, while its service is empty): any 5xx without Lekto's problem details.
   That is the same as no answer: a page of the app comes from the device then, never the
   proxy's error page (the installed app has no way back from it), and a call says "Der Server
   ist nicht erreichbar." The person stays signed in; only the API's 401 ends a session.

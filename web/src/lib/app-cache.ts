@@ -46,12 +46,15 @@ export function strategy(
 	return 'network';
 }
 
-/** Whether a status is a proxy's answer for a server that is not there: Caddy, nginx and Traefik
- * answer 502, 503 or 504 while Lekto restarts after an update. For a page of the app that is
- * the same as no connection: the proxy's error page has no way back in the installed app (no
- * reload button, no address bar), the app's own page says so and offers to try again. */
-export function unreachable(status: number): boolean {
-	return status === 502 || status === 503 || status === 504;
+/** Whether an answer comes from a proxy in front of a Lekto that is not there (it restarts
+ * after an update), not from Lekto: 502, 503 or 504 (Caddy, nginx), and any other 5xx that is
+ * no JSON (Traefik answers a plain 500 while its service is empty). Lekto's own failure always
+ * carries its problem details as JSON (`rest/problems.py`). For a page of the app that is the
+ * same as no connection: the proxy's error page has no way back in the installed app (no
+ * reload button, no address bar), the app's own page says so and tries again. */
+export function unreachable(status: number, contentType: string | null = null): boolean {
+	if (status === 502 || status === 503 || status === 504) return true;
+	return status >= 500 && !(contentType ?? '').includes('json');
 }
 
 /** The addresses of the files of `static/` the worker keeps (`$app/manifest`'s `assets`, given

@@ -58,14 +58,21 @@ describe('describeError', () => {
 	});
 
 	it('falls back to the status', () => {
-		expect(describeError(new ApiError(500, null, null))).toBe(m.error_unexpected({ status: 500 }));
+		expect(describeError(new ApiError(418, null, null))).toBe(m.error_unexpected({ status: 418 }));
 	});
 
 	it('names an unreachable server when a proxy answers for it', () => {
 		// WM-01: 502, 503 and 504 without problem details come from the proxy in front.
-		for (const status of [502, 503, 504]) {
+		// Traefik answers a plain 500 while its service is empty: any 5xx without them.
+		for (const status of [500, 502, 503, 504]) {
 			expect(describeError(new ApiError(status, null, null))).toBe(m.error_network());
 		}
+	});
+
+	it('keeps what Lekto itself says with a 500', () => {
+		expect(describeError(new ApiError(500, problem(500, 'Something broke.'), null))).toBe(
+			'Something broke.'
+		);
 	});
 
 	it('keeps what the API itself says with a 503', () => {

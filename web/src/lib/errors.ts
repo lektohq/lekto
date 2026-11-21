@@ -1,6 +1,5 @@
 import { toast } from 'svelte-sonner';
 import { ApiError } from '#lib/api/problem.ts';
-import { unreachable } from '#lib/app-cache.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { type Reason, reasonsText } from '#lib/reasons.ts';
 
@@ -44,11 +43,12 @@ export function isNetworkError(error: unknown): boolean {
 }
 
 /** Whether the answer came from a proxy in front of a Lekto that is not there (it restarts
- * after an update): 502, 503 or 504 without the API's problem details. To the person that is
- * the same as no answer: the server cannot be reached. Lekto's own 503 (no search, no
- * classifier) carries its problem and says what is missing. */
+ * after an update), not from Lekto: a 5xx without the API's problem details. Lekto's own
+ * failure always carries them (a 500 as much as a 503 for a search that is missing), a proxy's
+ * is text or nothing (502, 503, 504, and Traefik's plain 500 while its service is empty). To
+ * the person that is the same as no answer: the server cannot be reached. */
 export function isGatewayError(error: unknown): boolean {
-	return error instanceof ApiError && unreachable(error.status) && error.problem === null;
+	return error instanceof ApiError && error.status >= 500 && error.problem === null;
 }
 
 /** Whether a failed call may succeed when asked again: no answer at all, or a failure of the
