@@ -279,6 +279,14 @@ and its time to read a request must allow the slowest upload. Traefik v3 stops r
 after 60 seconds, the body included (`respondingTimeouts.readTimeout`); `compose.traefik.yml`
 sets 15 minutes, which takes 100 MiB from 1 Mbit/s on.
 
+While Lekto restarts (an update) the proxy answers for it. The web UI takes a 5xx without
+Lekto's own JSON error body (502, 503, 504, a plain 500) for "the server cannot be reached": it
+keeps the person signed in, shows its own page and asks again by itself until Lekto is back. A
+404 it cannot tell from a page that does not exist, so the proxy must not answer that then.
+Traefik does by default: it drops the router of a container that is not healthy.
+`providers.docker.allowEmptyServices=true` keeps the router, and Traefik answers 5xx;
+`compose.traefik.yml` sets it.
+
 For nginx:
 
 ```nginx
