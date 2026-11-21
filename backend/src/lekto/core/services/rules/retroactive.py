@@ -222,6 +222,12 @@ class RuleApplicationService:
             store, matcher, templates, max_text=max_text, pipeline_version=pipeline_version
         )
 
+    @property
+    def max_documents(self) -> int:
+        """Documents one application takes at most (`LEKTO_RULES_APPLY_MAX_DOCUMENTS`); the
+        preview names it, so that a client selects no more."""
+        return self._max_documents
+
     # --- preview ---------------------------------------------------------------------------------
 
     async def preview(
@@ -401,7 +407,7 @@ class RuleApplicationService:
         """Apply `version` of the rule to the selected documents in the background (through
         the API token `via`, kept in each log entry)."""
         if len(documents) > self._max_documents:
-            raise ValidationError(f"select at most {self._max_documents} documents")
+            raise ValidationError(because(ReasonCode.RULE_APPLY_TOO_MANY, max=self._max_documents))
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             rule = await _applicable_rule(uow, user, id)

@@ -309,6 +309,8 @@ async def test_a_rule_is_applied_to_existing_documents(api: Api) -> None:
     }
     assert items[first]["page_count"] == 1 and items[first]["created_at"]
     assert preview["total"] == 2
+    # How many documents one application takes: a client selects no more.
+    assert preview["max_documents"] == api.services.rule_applications.max_documents > 0
 
     response = await api.client.post(
         f"{PREFIX}/rules/{rule['id']}/apply",

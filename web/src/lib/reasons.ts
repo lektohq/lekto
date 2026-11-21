@@ -346,6 +346,7 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	space_members_personal: entry(m.reason_space_members_personal),
 	space_members: entry(m.reason_space_members),
 	space_rule_apply: entry(m.reason_space_rule_apply),
+	rule_apply_too_many: entry(m.reason_rule_apply_too_many, { max: 'number' }),
 	rule_disabled_deleted: entry(m.reason_rule_disabled_deleted, { kind: 'thing' }),
 	rule_disabled_personal_space: entry(m.reason_rule_disabled_personal_space),
 	rule_disabled_choice: entry(m.reason_rule_disabled_choice),

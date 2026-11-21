@@ -24,9 +24,13 @@ export function hasConflict(item: PreviewItem): boolean {
 	return item.conflicts.length > 0;
 }
 
-/** The documents chosen when they show up: those without a conflict. */
-export function preselected(items: readonly PreviewItem[]): string[] {
-	return items.filter((item) => !hasConflict(item)).map((item) => item.document_id);
+/** The documents chosen when they show up: those without a conflict, at most `room` of them
+ * (what one application still takes, `max_documents` of the preview). */
+export function preselected(items: readonly PreviewItem[], room = Infinity): string[] {
+	return items
+		.filter((item) => !hasConflict(item))
+		.map((item) => item.document_id)
+		.slice(0, Math.max(0, room));
 }
 
 /** The request for the chosen documents, in the order of the preview. A conflict counts only

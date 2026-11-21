@@ -594,7 +594,12 @@ box that chooses every document without a conflict, how many are chosen, how far
 betroffen", out of the documents the rule's conditions leave, "Anhalten" in `ghost`; stopped:
 "Weiter laden"; at the end the count and those with a conflict), and "Anwenden" (`default`), or,
 while the rule is paused and the reader may switch it on, "Anwenden" (`outline`) and "Aktivieren
-und anwenden" (`default`), held while the dry run loads. Once applied, the bar follows the
+und anwenden" (`default`), held while the dry run loads. One application takes at most as many
+documents as the server allows (`max_documents` of the preview): no more are chosen by
+themselves, the box "all" chooses as many, and with more hits the bar says "Eine Anwendung
+nimmt höchstens 1.000 Dokumente: Wende die übrigen danach in einem weiteren Lauf an."; with
+more chosen by hand it says so in `destructive` and holds both buttons. "Aktivieren und
+anwenden" switches the rule on only once applying is taken. Once applied, the bar follows the
 application in place of all that, and the list stays pale and inert: waiting for the worker with
 a turning `LoaderCircle`, what comes before it (the pipeline's jobs and the other applications,
 from `GET /jobs/summary`) and "Jobs ansehen", or the yellow mark of the page "System" with "Kein

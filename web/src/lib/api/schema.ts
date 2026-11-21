@@ -3470,6 +3470,11 @@ export interface components {
 			 * @description Documents the whole dry run looks at: those the rule's conditions on contact, document type, their groups, topic, tags and fields do not rule out; the `looked_at` of all pages add up to it.
 			 */
 			total: number;
+			/**
+			 * Max Documents
+			 * @description Documents one application takes at most (`LEKTO_RULES_APPLY_MAX_DOCUMENTS`): applying more answers 422 `rule_apply_too_many`; apply the rest in a further run.
+			 */
+			max_documents: number;
 		};
 		/**
 		 * ApplyPreviewRequest
@@ -9801,6 +9806,7 @@ export interface components {
 			| 'space_members_personal'
 			| 'space_members'
 			| 'space_rule_apply'
+			| 'rule_apply_too_many'
 			| 'rule_disabled_deleted'
 			| 'rule_disabled_personal_space'
 			| 'rule_disabled_choice'

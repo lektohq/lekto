@@ -744,6 +744,12 @@ class ApplyPreviewOut(BaseModel):
             "`looked_at` of all pages add up to it."
         )
     )
+    max_documents: int = Field(
+        description=(
+            "Documents one application takes at most (`LEKTO_RULES_APPLY_MAX_DOCUMENTS`): "
+            "applying more answers 422 `rule_apply_too_many`; apply the rest in a further run."
+        )
+    )
 
 
 class ApplyRequest(RequestBody):

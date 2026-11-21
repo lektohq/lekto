@@ -316,6 +316,7 @@ class ReasonCode(StrEnum):
     SPACE_MEMBERS_PERSONAL = "space_members_personal"
     SPACE_MEMBERS = "space_members"
     SPACE_RULE_APPLY = "space_rule_apply"
+    RULE_APPLY_TOO_MANY = "rule_apply_too_many"
     RULE_DISABLED_DELETED = "rule_disabled_deleted"
     RULE_DISABLED_PERSONAL_SPACE = "rule_disabled_personal_space"
     RULE_DISABLED_CHOICE = "rule_disabled_choice"
@@ -843,6 +844,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.SPACE_MEMBERS_PERSONAL: "only its user and admins choose the members of space {id}",
     ReasonCode.SPACE_MEMBERS: "only editors and admins choose the members of space {id}",
     ReasonCode.SPACE_RULE_APPLY: "only the space's editors and admins apply a space rule",
+    ReasonCode.RULE_APPLY_TOO_MANY: "select at most {max:number} documents",
     ReasonCode.RULE_DISABLED_DELETED: "{kind:thing} '{name}' was deleted",
     ReasonCode.RULE_DISABLED_PERSONAL_SPACE: "the personal space of '{user}' was deleted",
     ReasonCode.RULE_DISABLED_CHOICE: "field '{field}' no longer allows a value the rule uses",

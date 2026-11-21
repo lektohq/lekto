@@ -257,6 +257,7 @@ async def preview_apply(
         next_cursor=None if preview.next_cursor is None else encode_cursor(preview.next_cursor),
         looked_at=preview.looked_at,
         total=preview.total,
+        max_documents=context.rule_applications.max_documents,
     )
 
 
