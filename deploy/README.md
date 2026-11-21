@@ -46,12 +46,13 @@ release without an image. Run the workflow `Release` by hand (Actions, Run workf
 release's tag; an older release built again takes no channel tag from a newer one.
 
 Last, a published release whose image got `latest` tells the homelab its version: the job
-`homelab` checks the version (`0.7.0`, `1.2.0-beta.1`) and sends a `repository_dispatch`
-(`lekto-release`, `client_payload.version`), which must answer HTTP 204. The homelab then enters
-the version and deploys it. A release of an older line, a release built again by hand and a
-release in a fork send nothing. The job needs two secrets: `HOMELAB_DISPATCH_REPO`, the homelab
-repository as `owner/name`, and `HOMELAB_DISPATCH_TOKEN` (fine-grained, only that repository,
-Contents: write); a failed dispatch does not mark the release red.
+`homelab` checks the version (`0.7.0`, `1.2.0-beta.1`, no leading `v`) and starts the homelab's
+workflow `lekto-release.yml` on `main` (`workflow_dispatch` with the input `version`). The homelab
+then enters the version and deploys it. A release of an older line, a release built again by hand
+and a release in a fork send nothing. The job needs two secrets: `HOMELAB_DISPATCH_REPO`, the
+homelab repository as `owner/name`, and `HOMELAB_DISPATCH_TOKEN` (fine-grained, only that
+repository, Actions: Read and write and nothing else; not Contents: write, which would let it push
+code there); a failed call does not mark the release red.
 
 ## Start an example stack
 
