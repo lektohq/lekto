@@ -137,6 +137,39 @@ describe('the classifier tab', () => {
 		events.stop();
 	});
 
+	it('says so when the model could not be read anew: the one shown is the old one (WE-02)', async () => {
+		let emit: ((message: { data: string }) => void) | undefined;
+		events.useFactory(
+			() =>
+				({
+					addEventListener(type: string, handler: (message: { data: string }) => void) {
+						if (type === 'classifier.trained') emit = handler;
+					},
+					close() {}
+				}) as unknown as EventSource
+		);
+		events.start(() => {});
+		let down = false;
+		fetchMock.mockImplementation((request) =>
+			down
+				? Promise.resolve(
+						json({ type: 'about:blank', title: 'Error', status: 500, detail: 'boom' }, 500)
+					)
+				: answer(trained)(request)
+		);
+		render(Page);
+		const model = () =>
+			screen.getByRole('heading', { name: m.classifier_model_title({ number: 2 }) });
+		await screen.findByRole('heading', { name: m.classifier_model_title({ number: 2 }) });
+		down = true;
+		emit?.({
+			data: JSON.stringify({ type: 'classifier.trained', id: 'e1', occurred_at: '', number: 3 })
+		});
+		expect((await screen.findByRole('alert')).textContent).toContain('boom');
+		expect(model()).toBeTruthy();
+		events.stop();
+	});
+
 	it('draws the accuracy over the models', async () => {
 		fetchMock.mockImplementation(answer());
 		render(Page);

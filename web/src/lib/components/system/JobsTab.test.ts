@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Job } from '#lib/jobs.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi } from '#lib/testing/api.ts';
+import { calls, fakeApi, json } from '#lib/testing/api.ts';
 import { choose } from '#lib/testing/select.ts';
 import JobsTab from './JobsTab.svelte';
 
@@ -163,6 +163,30 @@ describe('the jobs tab', () => {
 		expect(calls(api)).toContain(
 			'GET /api/v1/jobs?state=running&state=due&state=planned&kind=contacts.logo&offset=25&limit=25'
 		);
+	});
+
+	it('says so when another page could not be read: the rows are the old ones (WE-02)', async () => {
+		let down = false;
+		const api = fakeApi({
+			'GET /api/v1/jobs/summary': () => summary,
+			'GET /api/v1/jobs': (_request, url) =>
+				down
+					? json({ type: 'about:blank', title: 'Error', status: 500, detail: 'boom' }, 500)
+					: {
+							items: [job({ id: `p${url.searchParams.get('offset')}` })],
+							total: 120,
+							next_offset: null
+						}
+		});
+		vi.stubGlobal('fetch', api);
+		render(JobsTab);
+		await screen.findByRole('table');
+		down = true;
+		await userEvent.click(
+			await screen.findByRole('button', { name: m.pagination_page({ page: '2' }) })
+		);
+		expect((await screen.findByRole('alert')).textContent).toContain('boom');
+		expect(screen.getByRole('table')).toBeTruthy();
 	});
 
 	it('lets an admin try a failed job again, a failed step at its document', async () => {

@@ -920,15 +920,16 @@ switch of the scope (Tobi, 28.10.2026). The chips show none.
 
 Every view that loads has these four states. Each looks the same everywhere:
 
-| State        | Component                                                              | Notes                                                                                            |
-| ------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Loading      | `Skeleton` in the shape of the content, or `Loading` (`role="status"`) | The page header stays                                                                            |
-| Empty        | `EmptyNote` (dashed box, `action` for the way)                         | Says what would be here and how it gets here; a link or button to that action where there is one |
-| Empty, small | `EmptyNote size="sm"`                                                  | Inside a dialog or beside a field: no identifiers yet, nothing assigned                          |
-| Drop files   | `EmptyNote compact` with `icon` and `action`                           | The upload dialog's drop zone; `border-primary` while files are over it                          |
-| Drop here    | `EmptyNote` with `icon`, `border-primary`                              | The inbox while files are dragged over it: where they go (Tobi, 09.11.2026)                      |
-| Error        | `LoadProblem` (`role="alert"`, "Erneut versuchen")                     | On the page, not as a toast. A detail page keeps its header and back link                        |
-| Not found    | `LoadProblem` with the way back                                        | Never a dead end                                                                                 |
+| State        | Component                                                              | Notes                                                                                                                             |
+| ------------ | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Loading      | `Skeleton` in the shape of the content, or `Loading` (`role="status"`) | The page header stays                                                                                                             |
+| Empty        | `EmptyNote` (dashed box, `action` for the way)                         | Says what would be here and how it gets here; a link or button to that action where there is one                                  |
+| Empty, small | `EmptyNote size="sm"`                                                  | Inside a dialog or beside a field: no identifiers yet, nothing assigned                                                           |
+| Drop files   | `EmptyNote compact` with `icon` and `action`                           | The upload dialog's drop zone; `border-primary` while files are over it                                                           |
+| Drop here    | `EmptyNote` with `icon`, `border-primary`                              | The inbox while files are dragged over it: where they go (Tobi, 09.11.2026)                                                       |
+| Error        | `LoadProblem` (`role="alert"`, "Erneut versuchen")                     | On the page, not as a toast. A detail page keeps its header and back link                                                         |
+| Error, later | `LoadProblem` above what was read before                               | A reload that fails (another choice, the interval of a tab that refreshes): the old values stay and the problem says they are old |
+| Not found    | `LoadProblem` with the way back                                        | Never a dead end                                                                                                                  |
 
 Two empty notes carry the owl ([Logo and owl](#logo-and-owl)).
 

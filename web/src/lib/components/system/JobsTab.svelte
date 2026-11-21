@@ -208,6 +208,10 @@
 </script>
 
 <div class="flex flex-col gap-6">
+	<!-- A failed reload: said above what was read before, which stays (web/DESIGN.md, "States"). -->
+	{#if problem && summary}
+		<LoadProblem {problem} onretry={loadSummary} />
+	{/if}
 	{#if problem && !summary}
 		<LoadProblem {problem} onretry={loadSummary} />
 	{:else if !summary || !all}
@@ -296,11 +300,13 @@
 					</span>
 				{/if}
 			</div>
-			{#if jobs.error && !jobs.loaded}
+			<!-- Also above a page read before: another page that failed leaves its rows. -->
+			{#if jobs.error}
 				<div class="mt-3">
 					<LoadProblem problem={describeError(jobs.error)} onretry={() => jobs.reload()} />
 				</div>
-			{:else if jobs.empty}
+			{/if}
+			{#if jobs.empty}
 				<p class="mt-3 text-muted-foreground">{none}</p>
 			{:else if jobs.items.length}
 				<div class="mt-3">

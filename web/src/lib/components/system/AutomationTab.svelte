@@ -289,6 +289,10 @@
 		</div>
 	</div>
 
+	<!-- A failed reload: said above what was read before, which stays (web/DESIGN.md, "States"). -->
+	{#if problem && report}
+		<LoadProblem {problem} onretry={load} />
+	{/if}
 	{#if problem && !report}
 		<LoadProblem {problem} onretry={load} />
 	{:else if !report}

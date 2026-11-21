@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { formatDuration } from '#lib/duration.ts';
 import { m } from '#lib/paraglide/messages.js';
-import { calls, fakeApi } from '#lib/testing/api.ts';
+import { calls, fakeApi, json } from '#lib/testing/api.ts';
 import AutomationTab from './AutomationTab.svelte';
 
 const lanes = (green: number, yellow: number, red: number) => ({ green, yellow, red });
@@ -116,6 +116,29 @@ describe('the automation tab', () => {
 		const pressed = screen.getByRole('button', { name: m.automation_channel_migration() });
 		expect(pressed.getAttribute('aria-pressed')).toBe('true'); // the last one stays
 		expect(calls(api)).toHaveLength(6);
+	});
+
+	it('says so when another choice could not be read: the figures are the old ones (WE-02)', async () => {
+		// The chip stood at the new choice above the old figures, without a word.
+		let down = false;
+		const api = fakeApi({
+			'GET /api/v1/automation': () =>
+				down
+					? json({ type: 'about:blank', title: 'Error', status: 500, detail: 'boom' }, 500)
+					: report
+		});
+		vi.stubGlobal('fetch', api);
+		render(AutomationTab);
+		await screen.findByText(m.automation_first_green({ count: '70' }));
+		expect(screen.queryByRole('alert')).toBeNull();
+		down = true;
+		await userEvent.click(screen.getByRole('button', { name: m.automation_channel_migration() }));
+		expect((await screen.findByRole('alert')).textContent).toContain('boom');
+		expect(screen.getByText(m.automation_first_green({ count: '70' }))).toBeTruthy();
+		down = false;
+		await userEvent.click(screen.getByRole('button', { name: m.retry() }));
+		await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+		expect(calls(api)).toHaveLength(3);
 	});
 
 	it('tells the hit rate per field and groups the custom fields', async () => {

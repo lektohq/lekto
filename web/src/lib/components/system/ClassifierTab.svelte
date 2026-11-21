@@ -165,6 +165,10 @@
 </script>
 
 <div class="flex flex-col gap-6">
+	<!-- A failed reload: said above what was read before, which stays (web/DESIGN.md, "States"). -->
+	{#if problem && status && !unavailable}
+		<LoadProblem {problem} onretry={load} />
+	{/if}
 	{#if unavailable}
 		<p class="text-muted-foreground">{m.classifier_not_configured()}</p>
 	{:else if problem && !status}
