@@ -817,6 +817,14 @@ describe('the archive page', () => {
 		);
 	});
 
+	it('opens with a fact of a link whose kind and role are what every object has', async () => {
+		state.url = new URL('http://lekto/ui/documents?fact=__proto__%3A%3AvalueOf');
+		vi.stubGlobal('fetch', fakeApi());
+		render(Page);
+		await screen.findByRole('heading', { level: 1 });
+		expect((await screen.findAllByText(/__proto__ · valueOf/)).length).toBeGreaterThan(0);
+	});
+
 	it('applies none of the filters another user set in this browser', async () => {
 		rememberFilters({ ...NO_FILTERS, contacts: ['c1'], tags: ['t1'] }, 'the-one-before');
 		vi.stubGlobal('fetch', fakeApi());

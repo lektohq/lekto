@@ -357,13 +357,14 @@ export function parseFactFilter(fact: string): {
 
 /** A fact of the filter in words: "Rechnungsnummer R1001 · verweist auf ein Dokument", the value
  * as the API names its reference ("…" until it has); a kind or role this UI does not know (an
- * old link) as written, without a value. */
+ * old link, one written by hand) as written, without a value. Known is what the tables
+ * themselves hold: `valueOf` or `__proto__` from a link must not reach the prototype's members. */
 export function factFilterLabel(fact: string): string {
 	const { kind, ref, role } = parseFactFilter(fact);
-	const known = kind !== null && kind in KIND_ROLES;
+	const known = kind !== null && Object.hasOwn(KIND_ROLES, kind);
 	const kindText = kind ? (known ? kindLabel(kind) : kind) : m.filter_fact_any_kind();
 	const stored = ref && known ? refValue(kind, ref) : null;
 	const value = ref && known ? (stored === null ? '…' : printed(kind, stored)) : null;
-	const roleText = role ? (role in ROLE_LABELS ? roleLabel(role) : role) : null;
+	const roleText = role ? (Object.hasOwn(ROLE_LABELS, role) ? roleLabel(role) : role) : null;
 	return [[kindText, value].filter(Boolean).join(' '), roleText].filter(Boolean).join(' · ');
 }

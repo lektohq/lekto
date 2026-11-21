@@ -284,4 +284,19 @@ describe('a fact of the filter', () => {
 		rememberRef('iban', 'DeF', 'DE89370400440532013000');
 		expect(factFilterLabel('iban:DeF:')).toBe(`${kindLabel('iban')} DE89 3704 0044 0532 0130 00`);
 	});
+
+	// What every object has is no kind and no role: such a name in a link once broke the list.
+	it.each([
+		'__proto__',
+		'__defineGetter__',
+		'valueOf',
+		'toString',
+		'constructor',
+		'hasOwnProperty'
+	])('names %s as written, as any kind or role it does not know', (name) => {
+		expect(factFilterLabel(`${name}::`)).toBe(name);
+		expect(factFilterLabel(`${name}:AbC:`)).toBe(name);
+		expect(factFilterLabel(`::${name}`)).toBe(`${m.filter_fact_any_kind()} · ${name}`);
+		expect(factFilterLabel(`iban::${name}`)).toBe(`${kindLabel('iban')} · ${name}`);
+	});
 });
