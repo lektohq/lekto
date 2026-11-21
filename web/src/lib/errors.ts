@@ -51,6 +51,13 @@ export function isGatewayError(error: unknown): boolean {
 	return error instanceof ApiError && error.status >= 500 && error.problem === null;
 }
 
+/** Whether `problem` (the text of `describeError`) says that the server cannot be reached: what
+ * shows it then asks again by itself (`LoadProblem`). The text is the sign, since a load
+ * problem travels through the pages as its text. */
+export function saysUnreachable(problem: string): boolean {
+	return problem === m.error_network();
+}
+
 /** Whether a failed call may succeed when asked again: no answer at all, or a failure of the
  * server itself (5xx: it restarts, a proxy answers for it). What the API refuses (403, 404,
  * 422) it refuses again. Who follows something that runs asks on after the first, and stops

@@ -5,6 +5,8 @@ declare global {
 			message: string;
 			/** The page could not load because no answer came (`hooks.client.ts`). */
 			offline?: boolean;
+			/** No answer of Lekto came: the server may be restarting (`hooks.client.ts`). */
+			unreachable?: boolean;
 		}
 		// interface Locals {}
 		// interface PageData {}

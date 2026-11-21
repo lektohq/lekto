@@ -1426,6 +1426,11 @@ worker, and Lekto works as a website.
   That is the same as no answer: a page of the app comes from the device then, never the
   proxy's error page (the installed app has no way back from it), and a call says "Der Server
   ist nicht erreichbar." The person stays signed in; only the API's 401 ends a session.
+  What could not load then asks again by itself, with the waits of the event stream (5 s,
+  doubled up to a minute, one count for the tab): `LoadProblem` its retry, the error page of a
+  start by loading again, each with "Lekto versucht es von selbst erneut." below the problem.
+  It does not say "restarting": the app cannot know why no answer comes. Any other problem
+  waits for the person.
 
 ## Touch targets
 

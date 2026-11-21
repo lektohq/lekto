@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { online } from 'svelte/reactivity/window';
 	import { page } from '$app/state';
+	import { nextRetry } from '#lib/backoff.ts';
 	import Logo from '#lib/components/Logo.svelte';
 	import Mascot from '#lib/components/Mascot.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -16,6 +17,14 @@
 	$effect(() => {
 		if (offline) wasOffline = true;
 		else if (wasOffline && page.error?.offline) location.reload();
+	});
+	// The server cannot be reached, the device online (it restarts after an update): the page
+	// loads again by itself, with the growing waits of the event stream, and says so.
+	const retrying = $derived(page.error?.unreachable === true && !offline && !notFound);
+	$effect(() => {
+		if (!retrying) return;
+		const timer = setTimeout(() => location.reload(), nextRetry());
+		return () => clearTimeout(timer);
 	});
 	const title = $derived(
 		offline ? m.offline_title() : notFound ? m.error_not_found() : m.error_title()
@@ -37,6 +46,7 @@
 		<p class="text-muted-foreground">{m.offline_hint()}</p>
 	{:else if !notFound && page.error?.message}
 		<p class="text-muted-foreground">{page.error.message}</p>
+		{#if retrying}<p class="text-sm text-muted-foreground">{m.error_retrying()}</p>{/if}
 	{/if}
 	<div class="flex gap-3">
 		<Button href={home()}>{m.error_home()}</Button>
