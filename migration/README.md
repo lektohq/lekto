@@ -3,7 +3,7 @@
 Command-line client that takes a Paperless-ngx archive over into Lekto. It reads Paperless
 through its REST API and writes into Lekto through the Lekto API, with an admin's API token. It
 uses no back doors, so a complete migration also proves the API is complete. It is a separate
-uv project (`lekto_migration`, Python 3.13; dependencies `httpx2` and `ruamel.yaml`) and not
+uv project (`lekto_migration`, Python 3.14; dependencies `httpx2` and `ruamel.yaml`) and not
 part of the Lekto image.
 
 A migration is an ingest: Lekto reads every original itself (OCR as always: a page's own text

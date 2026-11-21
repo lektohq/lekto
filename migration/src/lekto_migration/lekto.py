@@ -226,6 +226,6 @@ def _error(response: httpx2.Response) -> ApiError:
         body = response.json()
         detail = str(body.get("detail") or body.get("title") or detail)
         existing = body.get("existing_document_id")
-    except (ValueError, AttributeError):
+    except ValueError, AttributeError:
         pass
     return ApiError(response.status_code, detail, existing)

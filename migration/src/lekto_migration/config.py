@@ -127,7 +127,7 @@ class Config:
         yes: bool = False,
         reupload: bool = False,
         env: Mapping[str, str] | None = None,
-    ) -> "Config":
+    ) -> Config:
         env = os.environ if env is None else env
         paperless = paperless_url or env.get(PREFIX + "PAPERLESS_URL")
         lekto = lekto_url or env.get(PREFIX + "LEKTO_URL")

@@ -36,7 +36,7 @@ class Directory:
     review_codes: bool = False  # Lekto takes the codes of reviews' reasons (issue #83)
 
     @classmethod
-    async def of(cls, lekto: Lekto | None, admin: dict[str, Any] | None = None) -> "Directory":
+    async def of(cls, lekto: Lekto | None, admin: dict[str, Any] | None = None) -> Directory:
         if lekto is None:
             return cls(admin or {"id": "admin", "username": "admin"})
         directory = cls(admin or (await lekto.me())["user"], read=True)

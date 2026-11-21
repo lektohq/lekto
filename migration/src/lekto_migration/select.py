@@ -219,7 +219,7 @@ def _field(name: str, names: Names) -> dict[str, Any] | None:
 def _is_day(value: Any) -> bool:
     try:
         _day(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return False
     return not isinstance(value, datetime)
 
