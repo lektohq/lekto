@@ -2,7 +2,8 @@
 	import { setAppBadge } from '#lib/app-badge.ts';
 	import { retryDelay } from '#lib/backoff.ts';
 	import AppShell from '#lib/components/AppShell.svelte';
-	import MasterDataDialogHost from '#lib/components/MasterDataDialogHost.svelte';
+	import OnDemand from '#lib/components/OnDemand.svelte';
+	import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 	import { events } from '#lib/events.svelte.ts';
 	import { inbox } from '#lib/inbox.svelte.ts';
 	import { endForeignSubscription } from '#lib/push-device.ts';
@@ -92,4 +93,10 @@
 <AppShell>
 	{@render children()}
 </AppShell>
-{#if userId}<MasterDataDialogHost />{/if}
+<!-- The dialogs of the master data open from any page, but most never open one (`OnDemand`). -->
+{#if userId}
+	<OnDemand
+		load={() => import('#lib/components/MasterDataDialogHost.svelte')}
+		wanted={masterDataDialogs.request !== null || masterDataDialogs.nested.length > 0}
+	/>
+{/if}

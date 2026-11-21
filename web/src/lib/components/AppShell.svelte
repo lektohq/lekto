@@ -16,7 +16,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { API_DOCS, BASE } from '#lib/base.ts';
-	import Beam from '#lib/components/Beam.svelte';
+	import OnDemand from '#lib/components/OnDemand.svelte';
 	import HeaderSearch from '#lib/components/HeaderSearch.svelte';
 	import Logo from '#lib/components/Logo.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
@@ -461,4 +461,8 @@
 		</div>
 	</main>
 </div>
-<Beam />
+<!-- The Beam opens over any page, but most never open it (`OnDemand`). -->
+<OnDemand
+	load={() => import('#lib/components/Beam.svelte')}
+	wanted={page.state.beam !== undefined}
+/>

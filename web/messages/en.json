@@ -536,6 +536,7 @@
 	"error_too_many_later": "Too many attempts. Please try again later.",
 	"error_network": "The server cannot be reached.",
 	"error_retrying": "Lekto tries again by itself.",
+	"part_load_failed": "This could not be loaded. Reload the page.",
 	"offline": "Offline",
 	"offline_title": "No connection",
 	"offline_hint": "Lekto cannot be reached right now. As soon as your device is back online, the page loads by itself.",
