@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { events } from '#lib/events.svelte.ts';
 import { fakeApi, json } from '#lib/testing/api.ts';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -61,7 +62,59 @@ describe('RelationsCard', () => {
 	});
 
 	afterEach(() => {
+		events.stop();
 		vi.unstubAllGlobals();
+	});
+
+	/** The event stream of the app; the function sends an event of a document. */
+	function stream() {
+		const listeners = new Map<string, (message: { data: string }) => void>();
+		events.useFactory(
+			() =>
+				({
+					addEventListener(type: string, handler: (message: { data: string }) => void) {
+						listeners.set(type, handler);
+					},
+					close() {}
+				}) as unknown as EventSource
+		);
+		events.start(() => {});
+		return (type: string, data: object) =>
+			listeners.get(type)?.({
+				data: JSON.stringify({ type, id: crypto.randomUUID(), occurred_at: '', ...data })
+			});
+	}
+
+	it('reads the relations anew when they changed elsewhere (WA-04)', async () => {
+		const emit = stream();
+		let current = suggested;
+		fetchMock.mockImplementation(async () => json(current));
+		render(RelationsCard, { props: { documentId: 'reminder', lookup: null } });
+		expect(await screen.findByText(m.relations_suggested())).toBeTruthy();
+		current = accepted;
+		// Another document's relations, and another field of this one: nothing to read.
+		emit('document.updated', { document_id: 'other', fields: ['relations'] });
+		emit('document.updated', { document_id: 'reminder', fields: ['title'] });
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		emit('document.updated', { document_id: 'reminder', fields: ['relations'] });
+		expect(await screen.findByText(m.relations_refers_to())).toBeTruthy();
+		expect(screen.queryByText(m.relations_suggested())).toBeNull();
+	});
+
+	it('says on the card that it could not load, and tries again (WA-04)', async () => {
+		let down = true;
+		fetchMock.mockImplementation(async () =>
+			down
+				? json({ type: 'about:blank', title: 'Error', status: 500, detail: 'boom' }, 500)
+				: json(suggested)
+		);
+		render(RelationsCard, { props: { documentId: 'reminder', lookup: null } });
+		expect((await screen.findByRole('alert')).textContent).toContain('boom');
+		down = false;
+		await userEvent.click(screen.getByRole('button', { name: m.retry() }));
+		expect(await screen.findByText('Rechnung 4711')).toBeTruthy();
+		expect(screen.queryByRole('alert')).toBeNull();
 	});
 
 	it('shows a suggestion with its evidence and accepts it', async () => {

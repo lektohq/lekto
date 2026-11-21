@@ -22,7 +22,10 @@
 	} from '#lib/identifiers.ts';
 	import type { Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { reportError } from '#lib/errors.ts';
+	import { describeError, reportError } from '#lib/errors.ts';
+	import { events } from '#lib/events.svelte.ts';
+	import LoadProblem from '#lib/components/LoadProblem.svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import Eyebrow from '#lib/components/page/Eyebrow.svelte';
@@ -38,7 +41,10 @@
 	// the document relates it with another (the newer refers to the older), accepts or rejects a
 	// suggestion, removes a relation, where they edit the newer of the two. A related document's
 	// title opens both in the Beam, the newer first, the shared number marked in each (the eye
-	// before the title says so); into the other document from there.
+	// before the title says so); into the other document from there. The card loads as the
+	// other cards do (a skeleton, then its rows; a load error on the card, web/DESIGN.md
+	// "States") and reads the relations anew when they change elsewhere (`document.updated`
+	// with `relations`, which both ends get) and after a break of the event stream.
 	let {
 		documentId,
 		documentTitle = '',
@@ -46,23 +52,46 @@
 	}: { documentId: string; documentTitle?: string; lookup: Lookup | null } = $props();
 
 	let relations = $state<Relations | null>(null);
+	let problem = $state<string | null>(null);
 	let busy = $state(false);
 	let adding = $state<Reference | null>(null);
 
-	async function load() {
+	/** Read the relations of `id`. What is shown stays until the answer; a failure stands on
+	 * the card, above what was read before. */
+	async function load(id: string = documentId) {
 		try {
-			relations = await unwrap(
-				api.GET('/api/v1/documents/{id}/relations', { params: { path: { id: documentId } } })
+			const found = await unwrap(
+				api.GET('/api/v1/documents/{id}/relations', { params: { path: { id } } })
 			);
+			if (id !== documentId) return;
+			relations = found;
+			problem = null;
 		} catch (error) {
-			reportError(error);
+			if (id === documentId) problem = describeError(error);
 		}
 	}
 
 	$effect(() => {
-		void documentId;
+		const id = documentId;
 		relations = null;
-		void load();
+		problem = null;
+		void load(id);
+		return events.subscribe((event) => {
+			if (
+				event.document_id === id &&
+				event.type === 'document.updated' &&
+				Array.isArray(event.fields) &&
+				event.fields.includes('relations')
+			) {
+				void load(id);
+			}
+		});
+	});
+
+	// After a break of the stream a change may have been missed.
+	$effect(() => {
+		if (events.generation === 0) return;
+		untrack(() => void load());
 	});
 
 	async function act(call: () => Promise<Relations>, done: string) {
@@ -184,6 +213,14 @@
 		<SectionTitle size="card" id="relations-title">{m.relations_title()}</SectionTitle>
 		<span class="text-xs text-muted-foreground">{m.relations_hint()}</span>
 	</div>
+	{#if problem}
+		<div class="px-1 py-2"><LoadProblem {problem} onretry={() => void load()} /></div>
+	{:else if !relations}
+		<div class="flex flex-col gap-2 px-1 py-2" aria-hidden="true">
+			<Skeleton class="h-4 w-2/3" />
+			<Skeleton class="h-4 w-1/2" />
+		</div>
+	{/if}
 	{#if relations && groups.length === 0}
 		<p class="px-1 py-2 text-sm text-muted-foreground">{m.relations_none()}</p>
 	{/if}
