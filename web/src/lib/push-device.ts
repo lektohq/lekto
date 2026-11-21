@@ -1,3 +1,6 @@
+import { unwrap } from '#lib/api/call.ts';
+import { api } from '#lib/api/client.ts';
+import { setAppBadge } from '#lib/app-badge.ts';
 import { BASE } from '#lib/base.ts';
 import { appleDevice, isAndroid } from '#lib/install.svelte.ts';
 
@@ -55,6 +58,74 @@ export async function subscribe(
 		userVisibleOnly: true,
 		applicationServerKey: keyBytes(publicKey)
 	});
+}
+
+/** How long signing out waits for the device to be given up; the push service may not answer. */
+const LEAVE_WITHIN_MS = 3000;
+
+/** End this browser's subscription and close the notifications it still shows. */
+async function silence(found: ServiceWorkerRegistration, subscription: PushSubscription | null) {
+	await subscription?.unsubscribe().catch(() => false);
+	const shown = await found.getNotifications().catch(() => []);
+	for (const notification of shown) notification.close();
+}
+
+async function leave(): Promise<void> {
+	const found = await registration();
+	if (!found) return;
+	const subscription = await found.pushManager.getSubscription();
+	if (subscription) {
+		// The server forgets the device; if it cannot be told, the ended subscription tells it
+		// with the next message it tries to send.
+		try {
+			const devices = await unwrap(api.GET('/api/v1/push/devices'));
+			const own = devices.find((device) => device.endpoint === subscription.endpoint);
+			if (own) {
+				await unwrap(api.DELETE('/api/v1/push/devices/{id}', { params: { path: { id: own.id } } }));
+			}
+		} catch {
+			// Offline, or the session is gone already.
+		}
+	}
+	await silence(found, subscription);
+}
+
+/**
+ * Give this device up, before the person signs out (the session must still hold): it gets no
+ * more notifications of theirs, shows none any more, and the app's icon loses its number. On a
+ * device others use too, the next person would read the titles of this one's documents
+ * otherwise. Never throws and never holds signing out up for long.
+ */
+export async function leaveDevice(): Promise<void> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const late = new Promise<void>((resolve) => (timer = setTimeout(resolve, LEAVE_WITHIN_MS)));
+	try {
+		await Promise.race([leave(), late]);
+	} catch {
+		// Signing out goes on.
+	} finally {
+		clearTimeout(timer);
+		setAppBadge(null);
+	}
+}
+
+/**
+ * End a subscription of this browser that is none of the signed-in user's devices: someone else
+ * switched notifications on here and never signed out (their session ran out), or the server
+ * has forgotten the device. Called once the app starts for a user. Never throws; without an
+ * answer of the API the subscription stays.
+ */
+export async function endForeignSubscription(): Promise<void> {
+	try {
+		const found = await registration();
+		const subscription = await found?.pushManager.getSubscription();
+		if (!found || !subscription) return;
+		const devices = await unwrap(api.GET('/api/v1/push/devices'));
+		if (devices.some((device) => device.endpoint === subscription.endpoint)) return;
+		await silence(found, subscription);
+	} catch {
+		// Not now: the next start tries again.
+	}
 }
 
 function browserName(agent: string): string {

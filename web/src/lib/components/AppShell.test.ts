@@ -8,12 +8,17 @@ import { rememberedFilters, rememberFilters } from '#lib/listing.ts';
 import { offerPageSearch } from '#lib/page-search.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
+import { leaveDevice } from '#lib/push-device.ts';
 import { scope } from '#lib/scope.svelte.ts';
 import { SETTINGS } from '#lib/sections.ts';
 import { session, type User } from '#lib/session.svelte.ts';
 import AppShell from './AppShell.svelte';
 
 vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
+vi.mock('#lib/push-device.ts', async (original) => ({
+	...(await original<typeof import('#lib/push-device.ts')>()),
+	leaveDevice: vi.fn(async () => {})
+}));
 vi.mock('$app/state', () => ({ page: { url: new URL('http://lekto/ui/inbox'), state: {} } }));
 
 const children = createRawSnippet(() => ({ render: () => '<p>content</p>' }));
@@ -228,6 +233,21 @@ describe('AppShell', () => {
 		await vi.waitFor(() => expect(logout).toHaveBeenCalled());
 		expect(rememberedFilters(id)).toBeNull();
 		expect(localStorage.getItem('lekto.documents.filters')).toBeNull();
+	});
+
+	it('gives the device up before the session ends: no more notifications of this person', async () => {
+		phone.override(false);
+		signIn('user');
+		const order: string[] = [];
+		vi.mocked(leaveDevice).mockImplementation(async () => void order.push('device'));
+		vi.spyOn(session, 'logout').mockImplementation(async () => void order.push('session'));
+		render(AppShell, { children });
+
+		const menu = await openAccountMenu();
+		await fireEvent.click(within(menu).getByRole('menuitem', { name: m.sign_out() }));
+
+		// The device first: the server only takes it back from someone signed in.
+		await vi.waitFor(() => expect(order).toEqual(['device', 'session']));
 	});
 
 	it('keeps language and theme in the account menu (web/DESIGN.md, "Navigation")', async () => {

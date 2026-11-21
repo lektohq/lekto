@@ -8,6 +8,7 @@
 	import { events } from '#lib/events.svelte.ts';
 	import { inbox } from '#lib/inbox.svelte.ts';
 	import { loginHref } from '#lib/navigation.ts';
+	import { endForeignSubscription } from '#lib/push-device.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import { uploads } from '#lib/upload.svelte.ts';
 
@@ -20,6 +21,12 @@
 	// The installed app's icon shows what the inbox counter shows (web/DESIGN.md, "App").
 	$effect(() => {
 		if (userId) setAppBadge(inbox.summary?.open);
+	});
+
+	// A push subscription this browser still has from someone else (their session ran out, they
+	// never signed out) ends when another user starts the app.
+	$effect(() => {
+		if (userId) void endForeignSubscription();
 	});
 
 	// After a reconnect the counter may be stale.

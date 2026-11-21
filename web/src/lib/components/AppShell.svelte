@@ -37,6 +37,7 @@
 	import { THEME_OPTIONS } from '#lib/theme.ts';
 	import { canListAllUsers } from '#lib/permissions.ts';
 	import { phone } from '#lib/phone.svelte.ts';
+	import { leaveDevice } from '#lib/push-device.ts';
 	import { scope } from '#lib/scope.svelte.ts';
 	import { href, isCurrent, SETTINGS, visibleSections, type Section } from '#lib/sections.ts';
 	import { forgetFilters } from '#lib/listing.ts';
@@ -67,8 +68,10 @@
 
 	async function signOut() {
 		menuOpen = false;
-		// Nothing of the filters stays on the device for the next person.
+		// Nothing of the filters stays on the device for the next person, and it shows no more
+		// notifications of this one (while the session still holds).
 		forgetFilters();
+		await leaveDevice();
 		try {
 			await session.logout();
 		} catch (error) {

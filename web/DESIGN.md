@@ -1377,6 +1377,12 @@ worker, and Lekto works as a website.
   mailbox or webhook. A tap opens the document if it is one, else the inbox or the page of what
   it names, in an open window of the app if there is one. The app's icon carries the inbox's
   count, set by a notification and kept by the open app.
+- **Signing out gives the device up:** before the session ends, the app removes this browser's
+  device at the server, ends its subscription, closes the notifications it still shows and
+  clears the icon's number (`leaveDevice`), so that a device others use shows nothing of this
+  person any more; whoever signs in again switches notifications on again. A session that only
+  runs out keeps the device. A subscription that is none of the signed-in user's devices (someone
+  else's, who never signed out) ends when the app starts (`endForeignSubscription`).
 - **A new version:** a toast that stays until it is answered, "Neue Version bereit" with the
   action "Neu laden"; its ✕ puts it off until the app starts again. It is the one toast that
   waits for the person ("Alerts"). A page that already runs the new version (it was reloaded)
