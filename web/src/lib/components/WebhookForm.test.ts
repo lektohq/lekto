@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
@@ -9,6 +9,29 @@ import WebhookForm from './WebhookForm.svelte';
 import { fakeApi, json } from '#lib/testing/api.ts';
 
 type Webhook = components['schemas']['WebhookOut'];
+
+// What the form's guard asks before a navigation (`UnsavedGuard`), to try leaving.
+const guards = vi.hoisted(() => [] as ((navigation: unknown) => void)[]);
+vi.mock('$app/navigation', () => ({
+	beforeNavigate: (guard: (navigation: unknown) => void) => guards.push(guard),
+	goto: vi.fn()
+}));
+
+/** Whether leaving by a link is held back with the question, which is then answered "stay". */
+async function heldBack(): Promise<boolean> {
+	const cancel = vi.fn();
+	guards.at(-1)?.({
+		type: 'link',
+		from: { url: new URL('http://lekto/ui/webhooks/hook/edit') },
+		to: { url: new URL('http://lekto/ui/documents') },
+		cancel
+	});
+	if (cancel.mock.calls.length === 0) return false;
+	const question = await screen.findByRole('alertdialog', { name: m.unsaved_title() });
+	await userEvent.click(within(question).getByRole('button', { name: m.cancel() }));
+	await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+	return true;
+}
 
 let fetchMock = fakeApi();
 const sent: { method: string; path: string; body: unknown }[] = [];
@@ -251,5 +274,79 @@ describe('WebhookForm', () => {
 		await userEvent.click(screen.getByLabelText(m.event_filed()));
 		const line = screen.getByText(m.webhook_volume_total_exact({ count: 1 }));
 		expect(line.textContent).not.toContain(m.webhook_volume_steps({ least: 26, most: 54 }));
+	});
+
+	describe('leaving with something changed', () => {
+		const open = () =>
+			render(WebhookForm, {
+				webhook: { ...stored, model_call: null },
+				cancelHref: '/ui/webhooks/hook',
+				ondone: () => {}
+			});
+
+		it('asks nothing while the form is as it opened', async () => {
+			open();
+			expect(await heldBack()).toBe(false);
+		});
+
+		it('asks after a name was typed', async () => {
+			open();
+			await userEvent.type(screen.getByLabelText(m.field_name()), 'x');
+			expect(await heldBack()).toBe(true);
+		});
+
+		it('asks nothing once what was typed is typed back', async () => {
+			const user = userEvent.setup();
+			open();
+			const name = screen.getByLabelText(m.field_name());
+			await user.type(name, 'x');
+			await user.type(name, '{Backspace}');
+			expect(await heldBack()).toBe(false);
+		});
+
+		// None of these sends an event of a form: the guard heard nothing of them once.
+		it('asks after only the trigger was switched', async () => {
+			open();
+			await userEvent.click(screen.getByRole('button', { name: m.webhook_trigger_rules() }));
+			expect(await heldBack()).toBe(true);
+		});
+
+		it('asks after only the kind of body was chosen', async () => {
+			open();
+			await userEvent.click(screen.getByRole('button', { name: m.webhook_body_full() }));
+			expect(await heldBack()).toBe(true);
+		});
+
+		it('asks after only a header was removed', async () => {
+			open();
+			await userEvent.click(
+				screen.getByRole('button', { name: m.webhook_header_remove({ name: 'Authorization' }) })
+			);
+			expect(await heldBack()).toBe(true);
+		});
+
+		it('asks after only the model call was chosen', async () => {
+			session.start({
+				user: { id: 'erika', username: 'erika', role: 'admin' },
+				method: 'password',
+				expires_at: '2026-10-26T12:00:00Z',
+				csrf_token: 'token'
+			});
+			open();
+			await choose(
+				userEvent.setup(),
+				await screen.findByRole('combobox', { name: m.webhook_model_call() }),
+				'propose'
+			);
+			expect(await heldBack()).toBe(true);
+		});
+
+		it('asks nothing once saved', async () => {
+			open();
+			await userEvent.click(screen.getByRole('button', { name: m.webhook_trigger_rules() }));
+			await userEvent.click(screen.getByRole('button', { name: m.save() }));
+			await waitFor(() => expect(sent.length).toBeGreaterThan(0));
+			expect(await heldBack()).toBe(false);
+		});
 	});
 });

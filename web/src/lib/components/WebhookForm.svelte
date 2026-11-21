@@ -153,9 +153,27 @@
 		);
 	}
 
-	// Something typed or chosen since the form opened, to ask before it is lost; cleared once
-	// saved or cancelled.
-	let touched = $state(false);
+	// Whether the form differs from how it opened, to ask before that is lost. Held against
+	// what it holds, not against events: a trigger, a kind of body or a model call chosen and a
+	// header removed send no event of a form, and what is typed back is no change. Not asked
+	// once saved or cancelled (`leaving`).
+	const held = () =>
+		JSON.stringify([
+			name,
+			url,
+			trigger,
+			all,
+			types,
+			signed,
+			headers,
+			body,
+			template,
+			openTasks,
+			modelCall,
+			callMinutes
+		]);
+	const opened = untrack(held);
+	const changed = $derived(held() !== opened);
 	let leaving = $state(false);
 
 	/** Saved: on to the webhook's page, once a new secret was seen. */
@@ -218,14 +236,9 @@
 	}
 </script>
 
-<UnsavedGuard dirty={touched && !leaving} />
+<UnsavedGuard dirty={changed && !leaving} />
 
-<AsyncForm
-	class="flex max-w-3xl flex-col gap-6"
-	action={save}
-	ondone={() => {}}
-	onchanged={() => (touched = true)}
->
+<AsyncForm class="flex max-w-3xl flex-col gap-6" action={save} ondone={() => {}}>
 	{#snippet children({ busy, error })}
 		<Field.Field>
 			<Field.Label for="wh-name">{m.field_name()}</Field.Label>
