@@ -50,6 +50,7 @@
 		page,
 		end,
 		onshow,
+		onhide,
 		onsettle,
 		onpage
 	}: {
@@ -67,6 +68,8 @@
 		/** At the end of the toolbar (the switch of a pane). */
 		end?: Snippet;
 		onshow?: (number: number, node: HTMLElement) => void;
+		/** A page left the view (and its margin). */
+		onhide?: (number: number) => void;
 		onsettle?: (pages: { number: number; node: HTMLElement }[]) => void;
 		onpage?: (current: number, total: number) => void;
 	} = $props();
@@ -274,7 +277,10 @@
 			const node = entry.target as HTMLElement;
 			const number = Number(node.dataset.page);
 			if (!entry.isIntersecting) {
+				// Also for a page a new observer finds outside at once: whoever keeps count of
+				// the pages near the view must not keep one that never came.
 				inView.delete(number);
+				onhide?.(number);
 				continue;
 			}
 			inView.add(number);
