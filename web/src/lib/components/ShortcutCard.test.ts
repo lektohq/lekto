@@ -1,9 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { SHORTCUT_NAME } from '#lib/shortcut.ts';
 import { fakeApi, json } from '#lib/testing/api.ts';
+import { tokensChanged } from '#lib/tokens.svelte.ts';
 import ShortcutCard from './ShortcutCard.svelte';
 
 function token(scope: 'read' | 'read_write' | 'upload', name = 't') {
@@ -18,6 +19,9 @@ function token(scope: 'read' | 'read_write' | 'upload', name = 't') {
 }
 
 const LINK = 'https://www.icloud.com/shortcuts/abc';
+
+// The tokens are read once for all that show them (`lib/tokens.svelte.ts`): each test has its own.
+beforeEach(() => tokensChanged());
 
 describe('ShortcutCard', () => {
 	it('sets the shortcut up: a token that may only upload, then the token, the address and the link', async () => {

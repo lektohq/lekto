@@ -4,7 +4,7 @@
 	import Minus from '@lucide/svelte/icons/minus';
 	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
-	import { TOKEN_NAME_MAX, tokenChanges, tokensChanged } from '#lib/tokens.svelte.ts';
+	import { TOKEN_NAME_MAX, tokens as store, tokensChanged } from '#lib/tokens.svelte.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import EmptyNote from '#lib/components/EmptyNote.svelte';
@@ -39,8 +39,9 @@
 	type Scope = components['schemas']['TokenScope'];
 
 	// API tokens: for scripts and tools, never for this UI. The token itself is shown once.
-	let tokens = $state<Token[] | null>(null);
-	let problem = $state<string | null>(null);
+	// The list is the one the shortcut's card beside it reads too (`lib/tokens.svelte.ts`).
+	const tokens = $derived(store.list);
+	const problem = $derived(store.failure === null ? null : describeError(store.failure));
 	let creating = $state(false);
 	// Where the focus goes once a token's secret was seen, or its row is gone with it: the
 	// dialogs before have closed, and the keyboard would start at the top of the page.
@@ -54,20 +55,8 @@
 	// The token whose dialog is open (web/DESIGN.md, "Settings").
 	let shown = $state<Token | null>(null);
 
-	async function load() {
-		problem = null;
-		try {
-			tokens = await unwrap(api.GET('/api/v1/auth/tokens'));
-		} catch (failure) {
-			problem = describeError(failure);
-		}
-	}
-
 	// Again whenever a token is created or revoked here or on the shortcut's card.
-	$effect(() => {
-		void tokenChanges.version;
-		void load();
-	});
+	$effect(() => void store.load());
 
 	function openCreate() {
 		name = '';
@@ -162,7 +151,7 @@
 	</Card.Header>
 	<Card.Content>
 		{#if problem}
-			<LoadProblem {problem} onretry={load} />
+			<LoadProblem {problem} onretry={() => void store.load(true)} />
 		{:else if tokens === null}
 			<Loading />
 		{:else if tokens.length === 0}
