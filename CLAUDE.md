@@ -128,7 +128,8 @@ them. Renovate (`renovate.json`, the hosted app) labels its own: `dependencies`,
 its release at the earliest, a fix of a known vulnerability (OSV, `[SECURITY]`) at once. The
 non-major updates come as one collective pull request per label ("runtime dependencies",
 "development dependencies", "GitHub Actions"), so each still carries one label; a major update
-and a security fix come on their own.
+and a security fix come on their own. The branches of `dev-deps` and `ci` carry the prefix `dev-`
+and `ci-`, so a package in files of two labels (Postgres, Node) gets one pull request per label.
 The version bump follows the labels (`breaking-change` or `major`: major; `new-feature` or
 `minor`: minor; else patch). Tobi publishes and tags the release from the draft.
 A pull request a user notices fills the section `## Release notes` of its description with one
