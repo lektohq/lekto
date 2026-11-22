@@ -291,9 +291,11 @@
 
 <ConfirmDialog
 	bind:open={() => confirm !== null, (value) => !value && (confirm = null)}
-	title={confirm === 'totp' ? m.user_totp_remove() : m.user_oidc_remove()}
+	title={confirm === 'totp'
+		? m.user_totp_remove_of({ name: account ? userLabel(account) : '' })
+		: m.user_oidc_remove_of({ name: account ? userLabel(account) : '' })}
 	description={confirm === 'totp' ? m.user_totp_remove_confirm() : m.user_oidc_remove_confirm()}
-	confirmLabel={m.confirm_yes()}
+	confirmLabel={confirm === 'totp' ? m.user_totp_remove_do() : m.user_oidc_remove_do()}
 	onconfirm={confirmed}
 />
 

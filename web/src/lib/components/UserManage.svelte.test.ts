@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
@@ -117,5 +117,37 @@ describe('UserManage', () => {
 		expect(bar.querySelector('button[type="submit"]')).toBeNull();
 		await user.click(screen.getByRole('button', { name: m.picker_done() }));
 		expect(props.open).toBe(false);
+	});
+
+	it('names the user in each question, and answers with the verb (WC-10)', async () => {
+		const user = userEvent.setup();
+		fetchMock.mockImplementation(async (request) => {
+			const path = new URL(request.url).pathname;
+			if (path.endsWith('/users/john'))
+				return json({ ...account, totp_enabled: true, linked_accounts: [{ issuer: 'i' }] });
+			if (path.endsWith('/profile')) return json(profile);
+			if (path.endsWith('/removal')) return json({ blocking_spaces: [] });
+			return json([]);
+		});
+		render(UserManage, { open: true, userId: 'john', onchanged: vi.fn() });
+		await user.click(await screen.findByRole('button', { name: m.user_totp_remove() }));
+		const factor = await screen.findByRole('alertdialog', {
+			name: m.user_totp_remove_of({ name: 'john' })
+		});
+		expect(within(factor).getByRole('button', { name: m.user_totp_remove_do() })).toBeTruthy();
+		await user.click(within(factor).getByRole('button', { name: m.cancel() }));
+		await user.click(screen.getByRole('button', { name: m.user_oidc_remove() }));
+		const link = await screen.findByRole('alertdialog', {
+			name: m.user_oidc_remove_of({ name: 'john' })
+		});
+		expect(within(link).getByRole('button', { name: m.user_oidc_remove_do() })).toBeTruthy();
+		await user.click(within(link).getByRole('button', { name: m.cancel() }));
+		await user.click(screen.getByRole('button', { name: m.user_delete() }));
+		const gone = await screen.findByRole('alertdialog', {
+			name: m.user_delete_named({ name: 'john' })
+		});
+		expect(
+			within(gone).getByRole('button', { name: m.user_delete_named({ name: 'john' }) })
+		).toBeTruthy();
 	});
 });
