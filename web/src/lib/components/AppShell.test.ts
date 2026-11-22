@@ -258,7 +258,7 @@ describe('AppShell', () => {
 		signIn('admin');
 		render(AppShell, { children });
 		expect(screen.queryByRole('button', { name: m.theme_label() })).toBeNull();
-		expect(screen.queryByRole('button', { name: /^Sprache|^Language/ })).toBeNull();
+		expect(screen.queryByRole('button', { name: /Sprache:|Language:/ })).toBeNull();
 		expect(screen.queryByRole('button', { name: m.account_menu({ username: 'john' }) })).toBeNull();
 		await fireEvent.click(screen.getByRole('button', { name: m.nav_open() }));
 		const sheet = await screen.findByRole('dialog');

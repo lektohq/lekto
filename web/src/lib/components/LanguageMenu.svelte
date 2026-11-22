@@ -8,6 +8,9 @@
 	import { cn } from '#lib/utils.ts';
 
 	const current = getLocale();
+	// What is read on the button comes first in its name: who steers by voice says "DE"
+	// (WCAG 2.5.3).
+	const shown = current.toUpperCase();
 </script>
 
 <DropdownMenu.Root>
@@ -16,10 +19,10 @@
 			buttonVariants({ variant: 'secondary', size: 'default' }),
 			'max-[380px]:gap-1 max-[380px]:px-2.5'
 		)}
-		aria-label={`${m.language_label()}: ${LANGUAGE_NAMES[current]}`}
+		aria-label={`${shown}, ${m.language_label()}: ${LANGUAGE_NAMES[current]}`}
 	>
 		<Languages aria-hidden="true" />
-		<span class="uppercase">{current}</span>
+		<span>{shown}</span>
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end" class="w-44">
 		<LanguageChoices />
