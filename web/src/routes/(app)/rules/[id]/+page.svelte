@@ -148,12 +148,14 @@
 
 		<section class="flex flex-col gap-3" aria-labelledby="rule-versions">
 			<SectionTitle id="rule-versions">{m.rule_versions()}</SectionTitle>
-			<ul class="flex flex-col gap-1">
+			<!-- A version's link is a line of text: its hit area is 24 px tall with a mouse and 44 px
+			     on a phone, where the rows stand that far apart. -->
+			<ul class="flex flex-col gap-1 max-sm:gap-6">
 				{#each versions as version (version.version)}
 					<li class="flex flex-wrap items-center gap-2 text-sm">
 						<a
 							href="{BASE}/rules/{rule.id}/versions/{version.version}"
-							class="font-medium hover:underline"
+							class="relative font-medium after:absolute after:inset-x-0 after:-inset-y-0.5 hover:underline max-sm:after:-inset-y-3"
 						>
 							{m.rule_version_n({ number: version.version })}
 						</a>

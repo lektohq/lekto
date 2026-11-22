@@ -33,7 +33,9 @@ user through the admin of the environment, signs in with password and TOTP, navi
 signs out. `areas.spec.ts` signs in as that admin (without a second factor), opens every area
 without a console error (a CSP violation is one) and creates and removes a contact, a space, a
 webhook and an API token; `webhooks.spec.ts` creates a webhook on its page, tests, changes and
-deletes it; `rules.spec.ts` does the same with a rule:
+deletes it; `rules.spec.ts` does the same with a rule; `layout.spec.ts` measures every area and
+every frame at three widths against the layout rules of `DESIGN.md` ("Enforcement"), with data
+of its own; a worker beside the API takes its document out of processing:
 
 ```sh
 pnpm build

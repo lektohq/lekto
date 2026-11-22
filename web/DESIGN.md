@@ -1665,7 +1665,11 @@ LayerChart stand here without one: no rule reaches into a shadow root or `app.cs
 
 - **Layout spec** (Playwright, `tests/e2e/layout.spec.ts`): every area at 390, 1024 and 1440 px.
   No horizontal overflow, 44 px targets on the phone and 24 px wider (a larger invisible hit area
-  counts), no console error.
+  counts), no console error. It creates what the pages show (a contact, a type with a title
+  pattern, a tag, a rule, a webhook, a paused mailbox, a document) and deletes it again, visits
+  their pages too, and opens one of each frame: the navigation sheet and the filter sheet of the
+  phone, a dialog, a form dialog, an editor, a question, a menu. A new frame gets its entry in
+  `FRAMES`, a new page in `PATHS`.
 - **Living style guide:** `/dev/components` (development builds) shows every component in every
   variant and size, in light and dark. A new component or variant is added there first.
 - **Review:** every pull request that touches `web/` confirms it follows this document (the

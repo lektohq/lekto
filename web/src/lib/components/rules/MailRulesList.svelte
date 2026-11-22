@@ -26,6 +26,12 @@
 	const mailboxes = $derived(lookup.mailboxes);
 	const names = $derived(namesOf(lookup));
 	const textLink = cn(buttonVariants({ variant: 'link', size: 'inline' }));
+	// A text link that stands alone in a row of controls: its line is 22 px tall, its hit area
+	// 24 px with a mouse and a finger's 44 px on a phone (web/DESIGN.md, "Touch targets").
+	const ownLink = cn(
+		textLink,
+		'relative after:absolute after:inset-x-0 after:-inset-y-0.5 max-sm:after:-inset-y-3'
+	);
 
 	const fallback = (mailbox: Mailbox) =>
 		mailbox.fallback === 'everything'
@@ -62,7 +68,7 @@
 						>{m.mail_rules_mailbox({ name: mailbox.name })}</SectionTitle
 					>
 					<span class="flex flex-wrap items-center gap-3">
-						<a href={mailboxHref(mailbox)} class={textLink}>{m.mail_rules_to_mailbox()}</a>
+						<a href={mailboxHref(mailbox)} class={ownLink}>{m.mail_rules_to_mailbox()}</a>
 						<a
 							href="{BASE}/rules/mail/new?mailbox={mailbox.id}"
 							class={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
