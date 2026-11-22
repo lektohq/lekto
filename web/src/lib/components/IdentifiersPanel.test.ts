@@ -367,6 +367,38 @@ describe('IdentifiersPanel', () => {
 		await vi.waitFor(async () => expect(await rows()).toHaveLength(1));
 	});
 
+	it('keeps the numbers of the newest request when an older answer comes late (WB-11)', async () => {
+		const usual = fetchMock.getMockImplementation()!;
+		let late: (() => void) | null = null;
+		fetchMock.mockImplementation(async (request) => {
+			const url = new URL(request.url);
+			if (url.searchParams.get('source') !== 'learned') return usual(request);
+			// The learned ones answer late, with numbers of their own.
+			await new Promise<void>((resolve) => (late = resolve));
+			return json({
+				items: [CUSTOMER],
+				total: 1,
+				counts: { learned: 100, suggested: 200 },
+				kinds: { customer_number: 90 },
+				recommended: 50,
+				to_confirm: 50
+			});
+		});
+		const user = userEvent.setup();
+		render(IdentifiersPanel);
+		await rows();
+		const learned = () => screen.getByRole('button', { name: new RegExp(`^${m.open_learned()}`) });
+		await user.click(learned());
+		await vi.waitFor(() => expect(late).not.toBeNull());
+		await user.click(screen.getByRole('button', { name: new RegExp(`^${m.open_suggested()}`) }));
+		await vi.waitFor(async () => expect(await rows()).toHaveLength(1));
+		late!();
+		await new Promise((resolve) => setTimeout(resolve, 30));
+		// The late answer's 100 would stand beside the list of the suggestions.
+		expect(learned().textContent).not.toContain('100');
+		expect(learned().textContent).toContain('1');
+	});
+
 	it('shows a suggestion for a profile and takes it over there', async () => {
 		const user = userEvent.setup();
 		render(IdentifiersPanel);
