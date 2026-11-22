@@ -28,6 +28,23 @@ beforeEach(({ onTestFinished }) => {
 	});
 });
 
+// A component that binds to a plain object, not to `$state`, shows none of the object's changes:
+// Svelte warns `binding_property_non_reactive`. A test that hands one over (a rule's model
+// without `$state`) tests a view that cannot follow; it fails (WT2-07).
+const unreactive: string[] = [];
+const warn = console.warn;
+console.warn = (...args: unknown[]) => {
+	if (String(args[0]).includes('binding_property_non_reactive')) unreactive.push(String(args[0]));
+	warn(...args);
+};
+beforeEach(({ onTestFinished }) => {
+	unreactive.length = 0;
+	onTestFinished(() => {
+		const found = unreactive.splice(0);
+		if (found.length > 0) throw new Error(`bound to a plain object: ${found[0]}`);
+	});
+});
+
 // jsdom lacks a few browser APIs the components use.
 
 if (!window.matchMedia) {

@@ -1168,8 +1168,9 @@ describe('the design system (web/DESIGN.md)', () => {
 		// The client's own tests: one call each, its answer in order.
 		const inOrder = new Set(['/src/lib/api/fetch.test.ts', '/src/lib/session.test.ts']);
 		const EVERYTHING =
-			/\bfetchMock\.mock(?:Implementation|ResolvedValue)\(|vi\.fn\(async \(\) => json\(/;
+			/\bfetchMock\.mock(?:Implementation|ResolvedValue)\(|vi\.fn\(async \(\) =>\s*json\(/;
 		expect(EVERYTHING.test('fetchMock.mockImplementation(async () => json({}));')).toBe(true);
+		expect(EVERYTHING.test('vi.fn(async () =>\n\tjson({}))')).toBe(true);
 		expect(EVERYTHING.test('fetchMock.mockResolvedValueOnce(json({}));')).toBe(false);
 		expect(
 			Object.entries(tests)

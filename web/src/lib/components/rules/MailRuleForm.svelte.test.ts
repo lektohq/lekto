@@ -16,7 +16,9 @@ const spaces = [
 ] as unknown as Space[];
 const types = [{ id: 't1', name: 'E-Mail' }] as DocumentType[];
 
-function show(errors: Record<string, string> = {}, form = formOf(null, 'm1', '')) {
+/** The form of a new mail rule, held in `$state` as the page holds it. */
+function show(errors: Record<string, string> = {}, given = formOf(null, 'm1', '')) {
+	const form = $state(given);
 	render(MailRuleForm, {
 		form,
 		mailboxes,
