@@ -61,4 +61,24 @@ describe('a condition on a date', () => {
 		await fireEvent.input(field, { target: { value: '2026-12-24' } });
 		expect(condition.value).toBe('2026-12-24');
 	});
+
+	it('keeps a number of a step as it is typed, and none where the field is empty (WD-13)', async () => {
+		const condition = $state({
+			...newCondition('step'),
+			path: 'answer.total',
+			op: 'is' as const,
+			value: 12 as number | string | boolean
+		});
+		render(ConditionRow, { condition, lookup, onremove: vi.fn() });
+		const field = screen.getByLabelText(m.rule_condition_value()) as HTMLInputElement;
+		expect(field.value).toBe('12');
+		// Emptied: it stays empty and is no 0, which nobody typed.
+		await fireEvent.input(field, { target: { value: '' } });
+		expect(field.value).toBe('');
+		expect(Number.isNaN(condition.value)).toBe(true);
+		await fireEvent.input(field, { target: { value: '-5' } });
+		expect(condition.value).toBe(-5);
+		await fireEvent.input(field, { target: { value: '0.5' } });
+		expect(condition.value).toBe(0.5);
+	});
 });

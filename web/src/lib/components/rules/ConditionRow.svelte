@@ -131,14 +131,30 @@
 		if (typeof value === 'number') return 'number';
 		return ordered ? 'date' : 'text';
 	});
+	// What stands in the number field, as typed: the value is its number, or none while the
+	// field is empty or holds only a sign (which the check refuses), never a 0 nobody typed.
+	let typed = $state<string | null>(null);
 	function setKind(next: string) {
+		typed = null;
 		if (next === 'true' || next === 'false') condition.value = next === 'true';
 		else if (next === 'number') condition.value = 0;
 		else condition.value = '';
 	}
 	function stepInput(text: string) {
-		condition.value = kind === 'number' ? Number(text.replace(',', '.')) : text;
+		if (kind !== 'number') {
+			condition.value = text;
+			return;
+		}
+		typed = text;
+		const number = text.trim().replace(',', '.');
+		condition.value = number === '' ? NaN : Number(number);
 	}
+	const shownNumber = $derived(
+		typed ??
+			(typeof condition.value === 'number' && Number.isFinite(condition.value)
+				? String(condition.value)
+				: '')
+	);
 	/** The fields of a mail's marks, and which mark each is. */
 	const MAIL_TRAITS: Record<string, 'importance' | 'flag' | 'keyword'> = {
 		mail_importance: 'importance',
@@ -359,7 +375,7 @@
 						type={kind === 'number' ? 'number' : 'text'}
 						aria-label={valueLabel}
 						aria-invalid={invalid || undefined}
-						value={typeof condition.value === 'number' ? String(condition.value) : single}
+						value={kind === 'number' ? shownNumber : single}
 						oninput={(event) => stepInput(event.currentTarget.value)}
 					/>
 				{/if}

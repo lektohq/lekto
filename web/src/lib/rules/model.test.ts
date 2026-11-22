@@ -639,6 +639,20 @@ describe('steps of a rule', () => {
 		expect(validate(model, FIELDS)[second.key]).toEqual({ code: 'path' });
 	});
 
+	it('wants a number where a step condition compares with one, not an emptied field (WD-13)', () => {
+		const model = fromApi(stepsDefinition);
+		const [ask, condition] = model.actions;
+		if (ask.type !== 'ask_webhook' || condition.type !== 'condition') throw new Error('steps');
+		const [first] = conditionsOf(condition.conditions);
+		first.path = `${ask.name}.total`;
+		first.op = 'is';
+		first.value = 7;
+		expect(validate(model, FIELDS)[first.key]).toBeUndefined();
+		// The emptied number field: still a number by its kind, and none.
+		first.value = NaN;
+		expect(validate(model, FIELDS)[first.key]).toEqual({ code: 'number' });
+	});
+
 	it('wants an action besides conditions, and a step name once', () => {
 		const model = newModel();
 		model.name = 'x';

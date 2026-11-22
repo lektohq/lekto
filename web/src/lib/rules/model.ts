@@ -756,6 +756,8 @@ function checkValue(
 /** What a step condition compares with: a text, a number or true/false; `gt` and `lt` a
  * number or a date; `contains` a text. */
 function checkStepValue(op: Operator, value: Value): Problem | null {
+	// A number field that holds none (empty, or only a sign) keeps its kind and has no number.
+	if (typeof value === 'number' && !Number.isFinite(value)) return { code: 'number' };
 	if (op === 'gt' || op === 'lt') {
 		return typeof value === 'number' || isDate(value) ? null : { code: 'number' };
 	}
