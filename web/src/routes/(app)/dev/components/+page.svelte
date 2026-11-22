@@ -763,7 +763,7 @@
 			<span>{formatMoney('1234.50', 'EUR')}</span>
 		</div>
 		<Card.Root size="flush">
-			<Table.Root>
+			<Table.Root label={m.dev_section_data()}>
 				<Table.Header>
 					<Table.Row>
 						<Table.Head>{m.dev_sample_table_title()}</Table.Head>

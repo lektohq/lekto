@@ -130,7 +130,7 @@
 		<Loading />
 	{:else}
 		<div class="overflow-x-auto">
-			<Table.Root>
+			<Table.Root label={m.holders_title()}>
 				<Table.Header>
 					<Table.Row>
 						<Table.Head>{m.holders_kind()}</Table.Head>

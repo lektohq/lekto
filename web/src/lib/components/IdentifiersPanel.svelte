@@ -435,7 +435,11 @@
 			</Card.Root>
 		{:else}
 			<Card.Root size="flush" class="overflow-hidden">
-				<Table.Root class="table-fixed" aria-label={m.master_identifiers()}>
+				<Table.Root
+					class="table-fixed"
+					label={m.master_identifiers()}
+					aria-label={m.master_identifiers()}
+				>
 					<Table.Header>
 						<Table.Row>
 							<Table.Head class="w-12 pl-4">

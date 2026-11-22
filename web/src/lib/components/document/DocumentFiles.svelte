@@ -542,7 +542,10 @@
 						<EmptyNote size="line">{m.files_metadata_none()}</EmptyNote>
 					{:else}
 						<div class="overflow-x-auto">
-							<Table.Root class="w-full min-w-[34rem] table-fixed border-collapse text-sm">
+							<Table.Root
+								label={m.files_metadata()}
+								class="w-full min-w-[34rem] table-fixed border-collapse text-sm"
+							>
 								<colgroup><col class="w-[30%]" /><col /><col class="w-28" /></colgroup>
 								<Table.Header>
 									<Table.Row>

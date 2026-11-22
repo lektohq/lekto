@@ -67,7 +67,7 @@
 		<SectionTitle size="card" id="matrix-heading">{m.matrix_title()}</SectionTitle>
 		<p class="mt-0.5 text-sm text-muted-foreground">{m.matrix_hint()}</p>
 	</div>
-	<Table.Root class="w-full table-fixed border-collapse text-sm">
+	<Table.Root label={m.matrix_title()} class="w-full table-fixed border-collapse text-sm">
 		<colgroup>
 			<col />
 			{#each SIGNAL_NODES as signal (signal)}

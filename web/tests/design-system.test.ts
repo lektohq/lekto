@@ -846,6 +846,14 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('names every table, for the region it is while it scrolls sideways', () => {
+		// "Tables": a table wider than its room scrolls in a region the keyboard reaches, which
+		// needs a name (`label` of `Table.Root`).
+		expect(
+			offenders((source) => tags(source, 'Table.Root').find((tag) => !/\slabel=/.test(tag)) ?? null)
+		).toEqual([]);
+	});
+
 	it('names its error at every field it marks as invalid', () => {
 		// "Fields": the error below a field is tied to it with `aria-describedby` (`describedby`
 		// at `DateInput` and `PeriodInput`), so that who lands on the field hears it. Not yet

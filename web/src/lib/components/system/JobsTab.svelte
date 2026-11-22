@@ -311,7 +311,7 @@
 				<p class="mt-3 text-muted-foreground">{none}</p>
 			{:else if jobs.items.length}
 				<div class="mt-3">
-					<Table.Root class="min-w-[760px] text-meta">
+					<Table.Root label={m.system_tab_jobs()} class="min-w-[760px] text-meta">
 						<Table.Header>
 							<Table.Row class="text-xs text-muted-foreground">
 								<Table.Head class="pl-0">{m.jobs_col_kind()}</Table.Head>
@@ -429,7 +429,7 @@
 					<EmptyNote size="line">{m.jobs_none_done({ date: keptSince })}</EmptyNote>
 				{:else}
 					<div class="mt-3">
-						<Table.Root class="min-w-[560px] text-meta">
+						<Table.Root label={m.jobs_durations_title()} class="min-w-[560px] text-meta">
 							<Table.Header>
 								<Table.Row class="text-xs text-muted-foreground">
 									<Table.Head class="pl-0">{m.jobs_col_kind()}</Table.Head>

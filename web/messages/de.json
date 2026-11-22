@@ -1940,6 +1940,7 @@
 	"files_copy_hash": "Prüfsumme kopieren",
 	"files_pixels_value": "{width} × {height}",
 	"files_dpi_value": "{dpi} dpi",
+	"files_metadata": "Metadaten der Datei",
 	"files_metadata_none": "Die Datei nennt keine Metadaten.",
 	"files_unreadable": "Die Metadaten der Datei lassen sich nicht lesen (beschädigt oder verschlüsselt).",
 	"files_source_info": "PDF-Info",

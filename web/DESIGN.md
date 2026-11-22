@@ -691,7 +691,8 @@ struck through with `Badge` `muted` "sieht es nicht mehr".
 `tabular-nums`. A count of mistakes is `text-lane-red-foreground` above nought, `muted` at nought;
 a count of what went right may name its whole (`29 von 29`, the whole in `muted`) and has no
 colour of its own: lane colours mean state. On the phone a table keeps to the columns that fit;
-where it is wider, it scrolls inside its card, never the page. A list a person reads item by
+where it is wider, it scrolls inside its card, never the page, in a region with the table's
+name (`label` of `Table.Root`) that the keyboard reaches. A list a person reads item by
 item is a list of rows, not a table. Pagination is `Pagination`, 50 to a page unless the table
 offers other sizes in a small menu beside the count (`outline`, `sm`): the jobs and the
 deliveries of a webhook, the mails of a mailbox and the lists of the master data 25, 50 and 100, 25 at first; the choice is remembered per table in the

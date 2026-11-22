@@ -408,7 +408,10 @@
 				<EmptyNote size="line">{m.classifier_signals_none()}</EmptyNote>
 			{:else}
 				<div class="mt-4 overflow-x-auto">
-					<Table.Root class="w-full min-w-[720px] border-collapse tabular-nums">
+					<Table.Root
+						label={m.classifier_signals_title()}
+						class="w-full min-w-[720px] border-collapse tabular-nums"
+					>
 						<Table.Header>
 							<Table.Row>
 								<Table.Head

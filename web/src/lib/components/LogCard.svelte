@@ -64,7 +64,7 @@
 		<p class="mt-3 text-muted-foreground">{filtered ? noneChosen : none}</p>
 	{:else if pager.items.length}
 		<div class="mt-3">
-			<Table.Root class={tableClass}>
+			<Table.Root label={title} class={tableClass}>
 				<Table.Header>
 					<Table.Row class="text-xs text-muted-foreground">
 						{@render head()}
