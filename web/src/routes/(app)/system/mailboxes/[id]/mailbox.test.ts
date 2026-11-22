@@ -8,7 +8,7 @@ import { signIn } from '#lib/testing/session.ts';
 import type { Mailbox } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, notFound, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
 
@@ -144,8 +144,7 @@ describe('the page of a mailbox', () => {
 		// The retry read only the mailbox: its log stood at "loading" and asked for nothing.
 		let down = true;
 		const api = fakeApi({
-			'GET /api/v1/mailboxes/m1': () =>
-				down ? json({ type: 'about:blank', title: 'Unavailable', status: 503 }, 503) : MAILBOX,
+			'GET /api/v1/mailboxes/m1': () => (down ? problem(503) : MAILBOX),
 			'GET /api/v1/mailboxes/m1/mails': () => ({ items: [MAIL], total: 1, next_offset: null }),
 			'GET /api/v1/mailboxes/m1/mails/summary': () => ({
 				counts: { taken: 1 },
@@ -167,8 +166,7 @@ describe('the page of a mailbox', () => {
 
 	it('shows one problem for a mailbox that is not there, and asks for no log', async () => {
 		const api = fakeApi({
-			'GET /api/v1/mailboxes/m1': () =>
-				json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+			'GET /api/v1/mailboxes/m1': () => notFound('mailbox', 'm1')
 		});
 		vi.stubGlobal('fetch', api);
 		render(Page);

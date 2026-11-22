@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
 import { m } from '#lib/paraglide/messages.js';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import MailRulePage from './MailRulePage.svelte';
 
@@ -53,15 +53,7 @@ describe('the editor of a mail rule, as a page', () => {
 	it('shows what the API refuses at the condition it names (WD-05)', async () => {
 		goTo('/ui/rules/mail/r1/edit', { id: 'r1' });
 		serve(() =>
-			json(
-				{
-					type: 'about:blank',
-					title: 'Unprocessable',
-					status: 422,
-					detail: "conditions.all[0]: operator 'ends_with' does not apply to folder"
-				},
-				422
-			)
+			problem(422, { detail: "conditions.all[0]: operator 'ends_with' does not apply to folder" })
 		);
 		render(MailRulePage, { id: 'r1' });
 		await userEvent.click(await screen.findByRole('button', { name: m.rule_save() }));

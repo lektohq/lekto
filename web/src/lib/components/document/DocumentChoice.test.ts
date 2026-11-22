@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, problem } from '#lib/testing/api.ts';
 import DocumentChoice from './DocumentChoice.svelte';
 
 const listed = (id: string, title: string, changes: Record<string, unknown> = {}) => ({
@@ -54,8 +54,7 @@ describe('DocumentChoice', () => {
 					next_cursor: null
 				}),
 				// The search does not answer: the newest ones are filtered by their title.
-				'POST /api/v1/documents/search': () =>
-					json({ type: 'about:blank', title: 'Service Unavailable', status: 503 }, 503)
+				'POST /api/v1/documents/search': () => problem(503)
 			})
 		);
 		const onpick = vi.fn();

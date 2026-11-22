@@ -6,7 +6,7 @@ import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import MailboxDialog from './MailboxDialog.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, json, problem } from '#lib/testing/api.ts';
 
 let fetchMock = fakeApi();
 const sent: { method: string; path: string; body: unknown }[] = [];
@@ -62,7 +62,7 @@ beforeEach(() => {
 		const path = new URL(request.url).pathname;
 		const body = request.method === 'GET' ? null : await request.json().catch(() => null);
 		sent.push({ method: request.method, path, body });
-		if (failing.has(path)) return json({ detail: 'down' }, 500);
+		if (failing.has(path)) return problem(500, { detail: 'an unexpected error occurred' });
 		if (path === '/api/v1/users')
 			return json([{ id: 'erika', username: 'erika', display_name: 'Erika', active: true }]);
 		if (path === '/api/v1/document-types') return json([]);

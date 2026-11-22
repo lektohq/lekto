@@ -5,7 +5,7 @@ import type { components } from '#lib/api/schema.ts';
 import { showPages } from '#lib/beam.svelte.ts';
 import { quoted } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, problem } from '#lib/testing/api.ts';
 import PageEditor from './PageEditor.svelte';
 
 // The Beam is the app's: here only what the editor hands it.
@@ -208,8 +208,7 @@ describe('PageEditor', () => {
 		// Still the parts, as they were.
 		expect(screen.getAllByRole('button', { name: m.page_edit_version() })).toHaveLength(2);
 		fetchMock = fakeApi({
-			'POST /api/v1/documents/doc-1/edit': () =>
-				json({ title: 'Conflict', status: 409, detail: 'Being processed.' }, 409)
+			'POST /api/v1/documents/doc-1/edit': () => problem(409, { detail: 'Being processed.' })
 		});
 		vi.stubGlobal('fetch', fetchMock);
 		await apply(user);

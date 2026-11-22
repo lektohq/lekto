@@ -1132,6 +1132,28 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('builds a problem in tests as the API does, through lib/testing/api.ts (WT2-02)', () => {
+		// By hand they lacked what the API sends: the reason with its code, the parts of a 422;
+		// so no test saw the words a person reads.
+		const tests = import.meta.glob<string>('/src/**/*.test.ts', {
+			query: '?raw',
+			import: 'default',
+			eager: true
+		});
+		// The fakes of a stale CSRF token, which WG-08 gives their reason.
+		const byHand = new Set(['/src/lib/session.test.ts', '/src/lib/api/fetch.test.ts']);
+		const PROBLEM =
+			/type: 'about:blank'|\btitle: '[^']*',\s*status: [45]\d\d|\bdetail: [^,}]+,\s*status: [45]\d\d|json\(\{\s*detail: [^}]*\},\s*[45]\d\d\)/;
+		expect(PROBLEM.test("json({\n\ttitle: 'Conflict',\n\tstatus: 409\n}, 409)")).toBe(true);
+		expect(PROBLEM.test("json({ detail: 'down' }, 500)")).toBe(true);
+		expect(PROBLEM.test("problem(409, { detail: 'taken' })")).toBe(false);
+		expect(
+			Object.entries(tests)
+				.filter(([path, source]) => !byHand.has(path) && PROBLEM.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
 	it('takes what every test needs from lib/testing and the setup, never from a copy', () => {
 		// The sign-in, the stand-ins for `$app`, the globals a test replaced and the pointer a
 		// dialog took stood in every file anew and had drifted apart (`web/README.md`, "Layout").

@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { events } from '#lib/events.svelte.ts';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, json, problem } from '#lib/testing/api.ts';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { kindLabel } from '#lib/identifiers.ts';
@@ -99,9 +99,7 @@ describe('RelationsCard', () => {
 	it('says on the card that it could not load, and tries again (WA-04)', async () => {
 		let down = true;
 		fetchMock.mockImplementation(async () =>
-			down
-				? json({ type: 'about:blank', title: 'Error', status: 500, detail: 'boom' }, 500)
-				: json(suggested)
+			down ? problem(500, { detail: 'boom' }) : json(suggested)
 		);
 		render(RelationsCard, { props: { documentId: 'reminder', lookup: null } });
 		expect((await screen.findByRole('alert')).textContent).toContain('boom');

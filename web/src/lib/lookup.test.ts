@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, json, problem } from '#lib/testing/api.ts';
 import { PageLookup } from './lookup.svelte.ts';
 
 const USERS = [{ id: 'u1', username: 'john', role: 'user', active: true }];
@@ -25,7 +25,7 @@ describe('the master data of a page', () => {
 		const onerror = vi.fn();
 		vi.stubGlobal(
 			'fetch',
-			fakeApi({ 'GET /api/v1/users': () => json({ detail: 'Down', status: 503 }, 503) })
+			fakeApi({ 'GET /api/v1/users': () => problem(503, { detail: 'Down' }) })
 		);
 		const lookup = new PageLookup(onerror);
 		await lookup.load();

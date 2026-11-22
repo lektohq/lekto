@@ -8,7 +8,7 @@ import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import Page from './ClassifierTab.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, json, problem } from '#lib/testing/api.ts';
 
 let fetchMock = fakeApi();
 
@@ -141,11 +141,7 @@ describe('the classifier tab', () => {
 		events.start(() => {});
 		let down = false;
 		fetchMock.mockImplementation((request) =>
-			down
-				? Promise.resolve(
-						json({ type: 'about:blank', title: 'Error', status: 500, detail: 'boom' }, 500)
-					)
-				: answer(trained)(request)
+			down ? Promise.resolve(problem(500, { detail: 'boom' })) : answer(trained)(request)
 		);
 		render(Page);
 		const model = () =>
@@ -182,7 +178,7 @@ describe('the classifier tab', () => {
 
 	it('says so when there is no classifier', async () => {
 		fetchMock.mockImplementation(async () =>
-			json({ type: 'about:blank', title: 'Unavailable', status: 503 }, 503)
+			problem(503, { detail: 'no classifier is configured' })
 		);
 		render(Page);
 		expect(await screen.findByText(m.classifier_not_configured())).toBeTruthy();

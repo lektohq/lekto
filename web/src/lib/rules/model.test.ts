@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { ApiError } from '#lib/api/problem.ts';
+import { problemOf, type ProblemParts } from '#lib/testing/api.ts';
+import type { ReasonCode } from '#lib/reasons.ts';
 import { keyAt, saveErrors } from './errors.ts';
 import {
 	FIELD_TYPE_OPERATORS,
@@ -32,24 +34,9 @@ import {
 	type RuleModel
 } from './model.ts';
 
-const failed = (status: number, detail: string, spaceId: string | null = null) =>
-	new ApiError(
-		status,
-		{
-			type: 'about:blank',
-			title: 'Failed',
-			status,
-			detail,
-			existing_document_id: null,
-			space_id: spaceId,
-			open_fields: null,
-			blocking_spaces: null,
-			second_factor_required: null,
-			reason: null,
-			errors: null
-		},
-		null
-	);
+/** A refused save as the API sends it: the English `detail`, a reason where the core gives one. */
+const failed = (status: number, detail: string, parts: ProblemParts = {}) =>
+	new ApiError(status, problemOf(status, { detail, ...parts }), null);
 
 const ID = (n: number) => `01999d5e-${String(n).padStart(4, '0')}-7c1e-b6a3-2f4d5e6f7a8b`;
 
@@ -502,21 +489,40 @@ describe('errors of saving', () => {
 			byKey: { [group.items[1].key]: "operator 'contains' does not apply" },
 			general: null
 		});
-		const missing = failed(404, `tag ${ID(4)} not found`);
-		expect(Object.keys(saveErrors(missing, model).byKey)).toEqual([
-			group.items[0].key,
-			model.actions[0].key
-		]);
-		const forbidden = failed(403, "no write access to space 'Office'", ID(8));
-		expect(Object.keys(saveErrors(forbidden, model).byKey)).toEqual([model.actions[1].key]);
-		const elsewhere = failed(403, 'only admins change global rules');
-		expect(saveErrors(elsewhere, model).byKey).toEqual({});
+		const missing = failed(404, `tag ${ID(4)} not found`, {
+			code: 'not_found',
+			params: { kind: 'tag', id: ID(4) }
+		});
+		expect(saveErrors(missing, model).byKey).toEqual({
+			[group.items[0].key]: m.rule_error_missing(),
+			[model.actions[0].key]: m.rule_error_missing()
+		});
+		const forbidden = failed(403, "no write access to space 'Office'", {
+			code: 'no_write_access_to_space',
+			params: { space: 'Office' },
+			space_id: ID(8)
+		});
+		expect(saveErrors(forbidden, model).byKey).toEqual({
+			[model.actions[1].key]:
+				`${m.error_forbidden()} ${m.reason_no_write_access_to_space({ space: 'Office' })}`
+		});
+		const elsewhere = failed(403, 'only admins change global rules', {
+			code: 'admins_only',
+			params: { action: 'change_global_rules' }
+		});
+		expect(saveErrors(elsewhere, model)).toEqual({
+			byKey: {},
+			general: `${m.error_forbidden()} ${m.reason_admins_only({ action: m.action_change_global_rules() })}`
+		});
 		const typed = fromApi(
 			definition({ all: [cond('channel', 'is', 'web')], not: false }, [
 				{ type: 'set_document_type', document_type_id: ID(9) }
 			])
 		);
-		const type = failed(404, `document type ${ID(9)} not found`);
+		const type = failed(404, `document type ${ID(9)} not found`, {
+			code: 'not_found',
+			params: { kind: 'document type', id: ID(9) }
+		});
 		expect(Object.keys(saveErrors(type, typed).byKey)).toEqual([typed.actions[0].key]);
 		const other = failed(409, 'changed meanwhile');
 		expect(saveErrors(other, model)).toEqual({ byKey: {}, general: 'changed meanwhile' });
@@ -525,14 +531,8 @@ describe('errors of saving', () => {
 	it("says an invalid pattern in the user's language, at the conditions that hold it (WD-01)", () => {
 		// The API names no place, but its reason with a code: the English text stood as a
 		// general line, and no condition was marked.
-		const refused = (code: string, params: Record<string, unknown>, detail: string) => {
-			const error = failed(422, detail);
-			return new ApiError(
-				422,
-				{ ...error.problem!, reason: { code, params, subject: null } as never },
-				null
-			);
-		};
+		const refused = (code: ReasonCode, params: Record<string, unknown>, detail: string) =>
+			failed(422, detail, { code, params });
 		const patterned = fromApi(
 			definition(
 				{
@@ -567,15 +567,7 @@ describe('errors of saving', () => {
 		// at the block.
 		const params = { at: 'actions[0]', value: 'contct', known: ['contact', 'title'] };
 		const detail = "actions[0]: unknown value contct; templates know 'contact', 'title'";
-		const error = failed(422, detail);
-		const refused = new ApiError(
-			422,
-			{
-				...error.problem!,
-				reason: { code: 'template_unknown_value_at', params, subject: null } as never
-			},
-			null
-		);
+		const refused = failed(422, detail, { code: 'template_unknown_value_at', params });
 		const said = saveErrors(refused, model);
 		expect(said.general).toBeNull();
 		expect(Object.keys(said.byKey)).toEqual([model.actions[0].key]);

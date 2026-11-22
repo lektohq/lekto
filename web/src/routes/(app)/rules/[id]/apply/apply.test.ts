@@ -7,7 +7,7 @@ import { bulkDocuments } from '#lib/bulk.ts';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, json, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
 
@@ -247,16 +247,11 @@ describe("a rule's dry run", () => {
 		// with nothing applied.
 		const { api, release } = held([preview(['a'], null)], {
 			'POST /api/v1/rules/r1/apply': () =>
-				json(
-					{
-						type: 'about:blank',
-						title: 'Unprocessable',
-						status: 422,
-						detail: 'select at most 2 documents',
-						reason: { code: 'rule_apply_too_many', params: { max: 2 }, subject: null }
-					},
-					422
-				)
+				problem(422, {
+					detail: 'select at most 2 documents',
+					code: 'rule_apply_too_many',
+					params: { max: 2 }
+				})
 		});
 		const failed = vi.spyOn(toast, 'error').mockImplementation(() => '');
 		render(Page);

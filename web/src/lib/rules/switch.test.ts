@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, json, problem } from '#lib/testing/api.ts';
 
 const { success, reportError } = vi.hoisted(() => ({ success: vi.fn(), reportError: vi.fn() }));
 vi.mock('svelte-sonner', () => ({ toast: { success } }));
@@ -14,7 +14,7 @@ afterEach(() => {
 
 function stub(status = 200) {
 	const fetch = fakeApi({}, () =>
-		json(status === 200 ? { id: 'x', enabled: false } : { title: 'no', status }, status)
+		status === 200 ? json({ id: 'x', enabled: false }) : problem(status)
 	);
 	vi.stubGlobal('fetch', fetch);
 	return fetch;

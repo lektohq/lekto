@@ -8,7 +8,7 @@ import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { session, type User } from '#lib/session.svelte.ts';
 import { inboxItem, OWNER, summaryOf } from '#lib/testing/documents.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, json, problem } from '#lib/testing/api.ts';
 import { uploads } from '#lib/upload.svelte.ts';
 import Page from './+page.svelte';
 
@@ -354,7 +354,9 @@ describe('inbox rows', () => {
 		const api = fakeApi({
 			'GET /api/v1/inbox': (_, url) => {
 				if (url.searchParams.get('cursor')) {
-					return json({ type: 'about:blank', title: 'Unprocessable', status: 422 }, 422);
+					return problem(422, {
+						detail: 'cursor: its document is no longer done; start from the first page'
+					});
 				}
 				pages++;
 				return pages === 1

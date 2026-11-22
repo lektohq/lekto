@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, problem } from '#lib/testing/api.ts';
 import { searchTyped, TYPING_PAUSE_MS } from './document-search.ts';
 
 const doc = (id: string, title: string) => ({ id, title });
@@ -42,8 +42,7 @@ describe('the documents a picker finds for what was typed (WA-14)', () => {
 		vi.stubGlobal(
 			'fetch',
 			fakeApi({
-				'POST /api/v1/documents/search': () =>
-					json({ type: 'about:blank', title: 'Service Unavailable', status: 503 }, 503)
+				'POST /api/v1/documents/search': () => problem(503)
 			})
 		);
 		const { shown, to } = picker();

@@ -6,7 +6,7 @@ import {
 	leaveDevice,
 	unblockSteps
 } from '#lib/push-device.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, problem } from '#lib/testing/api.ts';
 
 function agent(value: string, touchPoints = 0) {
 	vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(value);
@@ -186,7 +186,7 @@ describe('a subscription this browser still has from someone else', () => {
 		vi.stubGlobal(
 			'fetch',
 			fakeApi({
-				'GET /api/v1/push/devices': () => json({ title: 'Unavailable', status: 503 }, 503)
+				'GET /api/v1/push/devices': () => problem(503)
 			})
 		);
 

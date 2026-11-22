@@ -2,14 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { intakeOf } from '#lib/intake.ts';
 import { signIn } from '#lib/testing/session.ts';
 import { session } from '#lib/session.svelte.ts';
-import { json } from '#lib/testing/api.ts';
+import { json, problem } from '#lib/testing/api.ts';
 import { PARALLEL, Uploads } from './upload.svelte.ts';
 
 const pdf = (name: string) => new File(['%PDF-1.7'], name, { type: 'application/pdf' });
-
-function problem(status: number, extra: Record<string, unknown> = {}): Response {
-	return json({ type: 'about:blank', title: 'Problem', status, detail: 'no', ...extra }, status);
-}
 
 /** A fetch whose answers to the uploads wait until `answer` is called, in order. */
 function held() {
@@ -70,7 +66,7 @@ describe('uploads', () => {
 			problem(409),
 			problem(413),
 			problem(415),
-			problem(500)
+			problem(500, { detail: 'an unexpected error occurred' })
 		];
 		vi.stubGlobal(
 			'fetch',
@@ -93,7 +89,10 @@ describe('uploads', () => {
 		expect(byName['unseen.pdf']).toMatchObject({ state: 'duplicate', documentId: null });
 		expect(byName['huge.pdf']).toMatchObject({ state: 'skipped', reason: 'too_large' });
 		expect(byName['fake.pdf']).toMatchObject({ state: 'skipped', reason: 'type' });
-		expect(byName['broken.pdf']).toMatchObject({ state: 'failed', message: 'no' });
+		expect(byName['broken.pdf']).toMatchObject({
+			state: 'failed',
+			message: 'an unexpected error occurred'
+		});
 		expect(uploads.counts).toMatchObject({ uploaded: 1, duplicates: 2, skipped: 3, failed: 1 });
 	});
 

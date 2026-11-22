@@ -9,7 +9,7 @@ import { phone } from '#lib/phone.svelte.ts';
 import { choose, optionsOf, selectedValue } from '#lib/testing/select.ts';
 import { session } from '#lib/session.svelte.ts';
 import WithDialogs from '#lib/testing/WithDialogs.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, json, problem } from '#lib/testing/api.ts';
 
 const PAYSLIP = '0199a6c4-0000-7000-8000-0000000000e1';
 const RULE = '0199a6c4-0000-7000-8000-0000000000f1';
@@ -253,10 +253,7 @@ describe('tabs', () => {
 		const before = fetchMock.getMockImplementation()!;
 		fetchMock.mockImplementation(async (request) =>
 			request.method === 'PATCH'
-				? json(
-						{ title: 'Unprocessable', status: 422, detail: "'DE00 1234' is not a valid IBAN" },
-						422
-					)
+				? problem(422, { detail: "'DE00 1234' is not a valid IBAN" })
 				: before(request)
 		);
 		render(WithDialogs);
@@ -680,7 +677,7 @@ describe('the editor', () => {
 		fetchMock.mockImplementation(async (request) => {
 			if (request.method === 'DELETE') {
 				return refuse
-					? json({ title: 'Conflict', status: 409, detail: 'the tag is in use' }, 409)
+					? problem(409, { detail: 'the tag is in use' })
 					: new Response(null, { status: 204 });
 			}
 			return before(request);

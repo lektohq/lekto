@@ -5,7 +5,7 @@ import { goto } from '$app/navigation';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import Page from './+page.svelte';
-import { json } from '#lib/testing/api.ts';
+import { json, problem } from '#lib/testing/api.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 
@@ -20,12 +20,13 @@ const signedIn = {
 
 // Fresh each time: a response body can be read once.
 const secondFactor = () =>
-	json(
-		{ type: 'about:blank', title: 'Unauthorized', status: 401, second_factor_required: true },
-		401
-	);
+	problem(401, {
+		detail: 'a one-time code is required',
+		code: 'second_factor_required',
+		second_factor_required: true
+	});
 const refused = () =>
-	json({ type: 'about:blank', title: 'Unauthorized', status: 401, detail: 'Wrong.' }, 401);
+	problem(401, { detail: 'invalid username or password', code: 'invalid_credentials' });
 
 async function bodyOf(call: number): Promise<Record<string, unknown>> {
 	return JSON.parse(await fetchMock.mock.calls[call][0].clone().text());
@@ -139,9 +140,7 @@ describe('sign-in page', () => {
 
 	it('shows how long to wait after too many attempts', async () => {
 		fetchMock.mockResolvedValueOnce(
-			json({ type: 'about:blank', title: 'Too Many Requests', status: 429 }, 429, {
-				'retry-after': '30'
-			})
+			problem(429, { detail: 'too many failed attempts; try again later' }, { 'retry-after': '30' })
 		);
 		render(Page, { data: { next: '/ui/', oidc: null, error: null } });
 
@@ -153,17 +152,7 @@ describe('sign-in page', () => {
 	});
 
 	it('shows the detail of other refusals', async () => {
-		fetchMock.mockResolvedValueOnce(
-			json(
-				{
-					type: 'about:blank',
-					title: 'Service Unavailable',
-					status: 503,
-					detail: 'database: down'
-				},
-				503
-			)
-		);
+		fetchMock.mockResolvedValueOnce(problem(503, { detail: 'database: down' }));
 		render(Page, { data: { next: '/ui/', oidc: null, error: null } });
 
 		await enterPassword();

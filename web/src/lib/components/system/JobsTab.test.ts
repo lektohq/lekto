@@ -6,7 +6,7 @@ import type { Job } from '#lib/jobs.ts';
 import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, problem } from '#lib/testing/api.ts';
 import { choose } from '#lib/testing/select.ts';
 import JobsTab from './JobsTab.svelte';
 
@@ -162,7 +162,7 @@ describe('the jobs tab', () => {
 			'GET /api/v1/jobs/summary': () => summary,
 			'GET /api/v1/jobs': (_request, url) =>
 				down
-					? json({ type: 'about:blank', title: 'Error', status: 500, detail: 'boom' }, 500)
+					? problem(500, { detail: 'boom' })
 					: {
 							items: [job({ id: `p${url.searchParams.get('offset')}` })],
 							total: 120,

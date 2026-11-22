@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, problem } from '#lib/testing/api.ts';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import OriginCard from './OriginCard.svelte';
@@ -85,8 +85,7 @@ describe('OriginCard', () => {
 		vi.stubGlobal(
 			'fetch',
 			fakeApi({
-				'GET /api/v1/documents/d4/origin': () =>
-					json({ type: 'about:blank', title: 'Unavailable', status: 503 }, 503)
+				'GET /api/v1/documents/d4/origin': () => problem(503)
 			})
 		);
 		render(OriginCard, { props: { documentId: 'd4' } });

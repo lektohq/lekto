@@ -2,7 +2,8 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/svelt
 import userEvent from '@testing-library/user-event';
 import { createRawSnippet } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, type Problem } from '#lib/api/problem.ts';
+import { ApiError } from '#lib/api/problem.ts';
+import { problemOf } from '#lib/testing/api.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import ChangeDialog from './ChangeDialog.svelte';
@@ -17,19 +18,7 @@ const children = createRawSnippet((error: () => string | null) => ({
 	}
 }));
 
-const TAKEN: Problem = {
-	type: 'about:blank',
-	title: 'Conflict',
-	status: 409,
-	detail: 'taken',
-	existing_document_id: null,
-	space_id: null,
-	open_fields: null,
-	blocking_spaces: null,
-	second_factor_required: null,
-	reason: null,
-	errors: null
-};
+const TAKEN = problemOf(409, { detail: 'taken' });
 const taken = () => Promise.reject(new ApiError(409, TAKEN, null));
 
 function dialog(action: () => Promise<void>) {

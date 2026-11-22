@@ -11,7 +11,7 @@ import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import { documentOf, inboxItem, listedOf, OWNER, summaryOf } from '#lib/testing/documents.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, notFound, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import { returnTo } from '#lib/return-to.svelte.ts';
 import Page from './+page.svelte';
@@ -54,8 +54,7 @@ function documentRoutes(id: string, current: () => Document): Parameters<typeof 
 			editable: true
 		}),
 		// The properties tab says so; the test looks at seen.
-		[`GET /api/v1/documents/${id}/files`]: () =>
-			json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+		[`GET /api/v1/documents/${id}/files`]: () => notFound('document', id)
 	};
 }
 
@@ -117,8 +116,7 @@ describe('a short id', () => {
 describe('the frame of the page', () => {
 	it('keeps one title while the document loads and when it cannot be found', async () => {
 		serve(() => documentOf(), {
-			'GET /api/v1/documents/doc-1': () =>
-				json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+			'GET /api/v1/documents/doc-1': () => notFound('document', 'doc-1')
 		});
 		render(Page);
 		expect(screen.getByRole('heading', { level: 1, name: m.document_generic() })).toBeTruthy();
@@ -130,9 +128,7 @@ describe('the frame of the page', () => {
 		let gone = false;
 		serve(() => documentOf({ lane: 'green' }), {
 			'GET /api/v1/documents/doc-1': () =>
-				gone
-					? json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
-					: documentOf({ lane: 'green' })
+				gone ? notFound('document', 'doc-1') : documentOf({ lane: 'green' })
 		});
 		render(Page);
 		await screen.findByRole('heading', { level: 1, name: documentOf().title });
@@ -527,10 +523,7 @@ describe('the document tab', () => {
 		goTo('/ui/documents/doc-1?left=text&right=form', { id: 'doc-1' });
 		const api = serve(parsed, {
 			...readable,
-			'GET /api/v1/documents/doc-1': () =>
-				down
-					? json({ type: 'about:blank', title: 'Service Unavailable', status: 503 }, 503)
-					: parsed()
+			'GET /api/v1/documents/doc-1': () => (down ? problem(503) : parsed())
 		});
 		render(Page);
 		await waitFor(() => expect(titleField()).not.toBeNull());
@@ -699,8 +692,7 @@ describe('opened from the document list', () => {
 		returnTo.rememberDocuments({ pathname: '/ui/documents', search: '?tag=t3' }, '');
 		goTo('/ui/documents/doc-1?from=list', { id: 'doc-1' });
 		serve(() => documentOf({ lane: 'green' }), {
-			'GET /api/v1/documents/doc-2': () =>
-				json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404),
+			'GET /api/v1/documents/doc-2': () => notFound('document', 'doc-2'),
 			'GET /api/v1/documents': () => ({
 				items: ['doc-1', 'doc-2', 'doc-3'].map((id) => listedOf({ id })),
 				next_cursor: null

@@ -7,7 +7,7 @@ import { formatDuration } from '#lib/duration.ts';
 import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, problem } from '#lib/testing/api.ts';
 import SearchTab from './SearchTab.svelte';
 
 const status = {
@@ -110,16 +110,7 @@ describe('the search index tab', () => {
 			'fetch',
 			fakeApi({
 				'GET /api/v1/search/status': () =>
-					json(
-						{
-							type: 'about:blank',
-							title: 'Unavailable',
-							status: 503,
-							detail: 'no search',
-							reason: { code: 'search_not_configured', params: {} }
-						},
-						503
-					)
+					problem(503, { detail: 'no search', code: 'search_not_configured' })
 			})
 		);
 		render(SearchTab);

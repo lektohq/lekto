@@ -6,7 +6,7 @@ import { signIn } from '#lib/testing/session.ts';
 import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import UserManage from './UserManage.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, json, problem } from '#lib/testing/api.ts';
 import { choose, selectedValue } from '#lib/testing/select.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
@@ -65,10 +65,7 @@ describe('UserManage', () => {
 			const path = new URL(request.url).pathname;
 			if (request.method === 'PATCH') {
 				patches.push(await request.json());
-				return json(
-					{ type: 'about:blank', title: 'Unprocessable', status: 422, detail: 'no' },
-					422
-				);
+				return problem(422, { detail: 'no' });
 			}
 			if (path.endsWith('/users/john')) return json(account);
 			if (path.endsWith('/profile')) return json(profile);

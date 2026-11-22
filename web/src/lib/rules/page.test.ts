@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, problem } from '#lib/testing/api.ts';
 import { RuleLoader } from './page.svelte.ts';
 
 const lookups = (api: ReturnType<typeof fakeApi>) =>
@@ -42,13 +42,22 @@ describe('the loader of a rule page', () => {
 	it('says what went wrong, and clears it with the next load that works', async () => {
 		vi.stubGlobal(
 			'fetch',
-			fakeApi({ 'GET /api/v1/users': () => json({ detail: 'Not allowed.', status: 403 }, 403) })
+			fakeApi({
+				'GET /api/v1/users': () =>
+					problem(403, {
+						detail: 'only editors and admins make space rules',
+						code: 'editors_only',
+						params: { action: 'make_space_rules' }
+					})
+			})
 		);
 		const loader = new RuleLoader();
 		const then = vi.fn();
 		await loader.load(() => Promise.resolve('data'), then);
 		expect(then).not.toHaveBeenCalled();
-		expect(loader.problem).toContain(m.error_forbidden());
+		expect(loader.problem).toBe(
+			`${m.error_forbidden()} ${m.reason_editors_only({ action: m.action_make_space_rules() })}`
+		);
 		expect(loader.lookup).toBeNull();
 
 		vi.stubGlobal('fetch', fakeApi());

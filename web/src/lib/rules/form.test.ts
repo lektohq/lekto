@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '#lib/api/problem.ts';
+import { problemOf } from '#lib/testing/api.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { RuleForm } from './form.svelte.ts';
 import { newModel } from './model.ts';
@@ -29,21 +30,14 @@ describe('the form of a rule', () => {
 		expect(form.busy).toBe(false);
 
 		const refused = vi.fn(async () => {
+			// Request validation: each part with its reason, `detail` joins their English texts.
 			throw new ApiError(
 				422,
-				{
-					type: 'about:blank',
-					title: 'Unprocessable',
-					status: 422,
-					detail: 'name: too long',
-					existing_document_id: null,
-					space_id: null,
-					open_fields: null,
-					blocking_spaces: null,
-					second_factor_required: null,
-					reason: null,
-					errors: null
-				},
+				problemOf(422, {
+					errors: [
+						{ field: 'name', code: 'input_too_long', params: { max: 200 }, message: 'too long' }
+					]
+				}),
 				null
 			);
 		});

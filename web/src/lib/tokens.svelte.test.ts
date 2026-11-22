@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { session } from '#lib/session.svelte.ts';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, problem } from '#lib/testing/api.ts';
 import { signIn } from '#lib/testing/session.ts';
 import { tokens, tokensChanged } from './tokens.svelte.ts';
 
@@ -45,7 +45,7 @@ describe('the tokens, read once for all that show them (WC-11)', () => {
 
 	it('does not know whether one uploads when the read failed, and reads again on request', async () => {
 		signIn('user', { id: 'failing' });
-		api(() => json({ type: 'about:blank', title: 'Service Unavailable', status: 503 }, 503));
+		api(() => problem(503));
 		await tokens.load();
 		// One answer for the card and the upload dialog: not known, each says what that means.
 		expect(tokens.hasUploadToken).toBeNull();
