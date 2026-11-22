@@ -1385,8 +1385,11 @@ worker, and Lekto works as a website.
   the owl inside the safe circle, and the favicon itself.
 - **The colour of the bars** (`theme-color`) is the header's ground, `--card`, light or dark as
   the app shows itself: `static/theme.js` before the first paint, `lib/theme-color.ts` after.
-- **What the device keeps:** the service worker (`src/service-worker/`) keeps the files of one
-  version of the app and nothing else. Every request to the API goes to the network; documents,
+- **What the device keeps:** the service worker (`src/service-worker/`) keeps, of one version
+  of the app, what the device has loaded and nothing else: the start page with the files it
+  preloads and `static/` when it installs, the files of a page once that page was opened. It
+  does not fetch every page ahead (thousands of files for each version, and one that fails
+  would fail them all; Tobi, 22.11.2026). Every request to the API goes to the network; documents,
   pages, PDFs, thumbnails and lists never lie on the device (`lib/app-cache.ts`). A page comes
   from the network; without one the kept page starts the app.
 - **Sharing to Lekto (Android):** the installed app stands in the share sheet (`share_target`:
@@ -1454,7 +1457,8 @@ worker, and Lekto works as a website.
 - **Offline:** while the device has no connection, the header shows the badge "Offline" beside
   the logo (`Badge`, `muted`, `md`, `wifi-off`). `LoadProblem` says "Keine Verbindung …" in place
   of its problem and tries again by itself once the device is back online. A start without a
-  connection ends on the error page with "Keine Verbindung", which loads again by itself.
+  connection ends on the error page with "Keine Verbindung", which loads again by itself; so
+  does the way to a page this device never opened, whose files it does not have.
   Nothing is written offline: an action fails as it does without the server ("Der Server ist
   nicht erreichbar.").
 - **The server behind a proxy:** while Lekto restarts, a proxy in front answers 502, 503 or 504,
