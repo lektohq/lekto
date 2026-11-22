@@ -4,6 +4,7 @@
 	import X from '@lucide/svelte/icons/x';
 	import MultiPicker from '#lib/components/MultiPicker.svelte';
 	import SearchSelect from '#lib/components/SearchSelect.svelte';
+	import TagPicker from '#lib/components/TagPicker.svelte';
 	import MailValueInput from '#lib/components/rules/MailValueInput.svelte';
 	import DateInput from '#lib/components/DateInput.svelte';
 	import Select from '#lib/components/Select.svelte';
@@ -18,7 +19,6 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { own } from '#lib/utils.ts';
 	import { CHANNEL_LABELS, fieldLabel, mailPartLabel, operatorLabel } from '#lib/rules/describe.ts';
-	import { tagOptions } from '#lib/tags.ts';
 	import { Choice } from '#lib/components/ui/choice/index.ts';
 	import {
 		CHANNELS,
@@ -28,6 +28,7 @@
 		MAIL_SUBJECT,
 		STEP_CONDITION_FIELDS,
 		TAG_FIELDS,
+		isTagField,
 		changeField,
 		changeConditionField,
 		changeOperator,
@@ -194,12 +195,6 @@
 			case 'document_type':
 			case 'relation':
 				return lookup.documentTypes.map((entry) => ({ value: entry.id, label: entry.name }));
-			case 'tags':
-			case 'contact_group':
-			case 'document_type_group':
-				return tagOptions(lookup.tags, TAG_FIELDS[condition.field]);
-			case 'topic':
-				return tagOptions(lookup.tags, 'topic');
 			case 'channel':
 				return CHANNELS.map((channel) => ({ value: channel, label: CHANNEL_LABELS[channel]() }));
 			case 'mail_mailbox':
@@ -213,6 +208,20 @@
 		}
 	});
 	const single = $derived(typeof condition.value === 'string' ? condition.value : '');
+	/** The scope of the tags a condition on tags, groups or the topic chooses from. */
+	const tagScope = $derived(
+		condition.field === 'topic'
+			? ('topic' as const)
+			: isTagField(condition.field)
+				? TAG_FIELDS[condition.field]
+				: null
+	);
+	const TAG_TITLES = {
+		document: m.field_tags,
+		contact: m.master_contact_groups,
+		document_type: m.master_type_groups,
+		topic: m.picker_title_topic
+	};
 	const list = $derived(Array.isArray(condition.value) ? condition.value.map(String) : []);
 	const textual = $derived(
 		condition.field === 'text' || condition.op === 'contains' || condition.op === 'matches'
@@ -288,6 +297,20 @@
 	<div class="min-w-0 flex-1 basis-56">
 		{#if takesNoValue(condition.op)}
 			<span class="sr-only">{m.rule_no_value()}</span>
+		{:else if tagScope}
+			<!-- Tags of every kind and a topic are chosen in the tag picker, as in the actions
+			     (web/DESIGN.md, "Fields"): one, or several for "ist eines von". -->
+			<TagPicker
+				id="condition-{condition.key}"
+				label={valueLabel}
+				title={TAG_TITLES[tagScope]()}
+				scope={tagScope}
+				tags={lookup.tags}
+				selected={condition.op === 'in' ? list : single ? [single] : []}
+				onchange={(next) => (condition.value = condition.op === 'in' ? next : (next[0] ?? ''))}
+				single={condition.op !== 'in'}
+				creating={false}
+			/>
 		{:else if condition.op === 'in' && choices}
 			<MultiPicker
 				label={valueLabel}

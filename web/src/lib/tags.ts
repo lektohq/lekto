@@ -21,14 +21,6 @@ export function ofScope<T extends TagLike>(tags: readonly T[], scope: TagScope):
 	return tags.filter((tag) => tag.scope === scope);
 }
 
-/** Options of a picker: the tags of `scope` labelled with their path. */
-export function tagOptions(
-	tags: readonly TagLike[],
-	scope: TagScope
-): { value: string; label: string }[] {
-	return ofScope(tags, scope).map((tag) => ({ value: tag.id, label: pathLabel(tag) }));
-}
-
 /** Whether every word of `query` stands in the tag's path: a search for a parent's name finds
  * the tags below it. */
 export function matchesQuery(tag: Pick<Tag, 'name' | 'path'>, query: string): boolean {

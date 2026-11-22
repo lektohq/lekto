@@ -82,3 +82,46 @@ describe('a condition on a date', () => {
 		expect(condition.value).toBe(0.5);
 	});
 });
+
+describe('a condition on tags, groups or the topic (WD-09)', () => {
+	const tag = (id: string, name: string, scope: string) => ({
+		id,
+		name,
+		scope,
+		path: [name],
+		parent_id: null,
+		color: null,
+		icon: null
+	});
+	const tagged = {
+		...lookup,
+		tags: [
+			tag('t1', 'Steuer', 'document'),
+			tag('t2', 'Miete', 'document'),
+			tag('o1', 'Wohnen', 'topic')
+		]
+	} as unknown as Lookup;
+
+	it.each([
+		['tags', 'contains', 't1', 'Steuer'],
+		['topic', 'is', 'o1', 'Wohnen']
+	] as const)(
+		'chooses the one of %s in the tag picker, not in a select',
+		(field, op, value, name) => {
+			const condition = $state({ ...newCondition(field), op, value });
+			render(ConditionRow, { condition, lookup: tagged, onremove: vi.fn() });
+			// The chosen one stands as its chip in the picker's group; no combobox lists the tags.
+			const picker = screen.getByRole('group', { name: m.rule_condition_value() });
+			expect(picker.textContent).toContain(name);
+			expect(screen.queryByRole('combobox', { name: m.rule_condition_value() })).toBeNull();
+		}
+	);
+
+	it('chooses several for "is one of" in the tag picker too', () => {
+		const condition = $state({ ...newCondition('tags'), op: 'in' as const, value: ['t1', 't2'] });
+		render(ConditionRow, { condition, lookup: tagged, onremove: vi.fn() });
+		const picker = screen.getByRole('group', { name: m.rule_condition_value() });
+		expect(picker.textContent).toContain('Steuer');
+		expect(picker.textContent).toContain('Miete');
+	});
+});
