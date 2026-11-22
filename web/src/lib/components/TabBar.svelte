@@ -15,6 +15,7 @@
 	import AlertDot from '#lib/components/AlertDot.svelte';
 	import SteadyText from '#lib/components/SteadyText.svelte';
 	import { slidingPill } from '#lib/sliding-pill.ts';
+	import { centre, sideways, SIDEWAYS_FADE } from '#lib/sideways.ts';
 	import { cn } from '#lib/utils.ts';
 
 	// The tabs of a page (inbox, document, master data, system), web/DESIGN.md "Tabs and
@@ -38,45 +39,21 @@
 	} = $props();
 
 	let bar = $state<HTMLElement | null>(null);
-	/** Which edges have more behind them. */
-	let more = $state<{ start: boolean; end: boolean }>({ start: false, end: false });
-
-	function measure() {
-		if (!bar) return;
-		const end = bar.scrollWidth - bar.clientWidth - bar.scrollLeft;
-		more = { start: bar.scrollLeft > 1, end: end > 1 };
-	}
-
 	$effect(() => {
 		void current;
 		void tabs;
-		const chosen = bar?.querySelector<HTMLElement>('[aria-current="page"]');
-		if (!bar || !chosen) return;
-		const left = chosen.offsetLeft - (bar.clientWidth - chosen.offsetWidth) / 2;
-		bar.scrollLeft = Math.max(0, left);
-		measure();
-	});
-
-	$effect(() => {
-		if (!bar) return;
-		const sizes = new ResizeObserver(measure);
-		sizes.observe(bar);
-		return () => sizes.disconnect();
+		centre(bar, '[aria-current="page"]');
 	});
 </script>
 
 <nav
 	bind:this={bar}
 	{@attach slidingPill}
+	{@attach sideways}
 	aria-label={label}
-	onscroll={measure}
-	data-more-start={more.start || undefined}
-	data-more-end={more.end || undefined}
 	class={cn(
 		'relative flex w-full max-w-full [scrollbar-width:none] gap-1 overflow-x-auto border-b',
-		'data-more-end:[mask-image:linear-gradient(to_right,black_85%,transparent)]',
-		'data-more-start:[mask-image:linear-gradient(to_left,black_85%,transparent)]',
-		'data-more-start:data-more-end:[mask-image:linear-gradient(to_right,transparent,black_15%,black_85%,transparent)]',
+		SIDEWAYS_FADE,
 		fill && 'max-sm:grid max-sm:auto-cols-fr max-sm:grid-flow-col',
 		className
 	)}

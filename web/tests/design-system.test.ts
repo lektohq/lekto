@@ -846,6 +846,16 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('scrolls a row sideways with its fade only through lib/sideways.ts', () => {
+		// "Tabs and switches": measured, marked and faded in one place, not once per component.
+		const own = /mask-image:linear-gradient|data-more-(?:start|end)=/;
+		expect(
+			Object.entries({ ...sources, ...scripts })
+				.filter(([path, source]) => !path.endsWith('/lib/sideways.ts') && own.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
 	it('draws no action on the colour of a lane', () => {
 		// "Lane colours mean state, nothing else" (DESIGN.md, "Principles"): what one presses
 		// takes a variant of `Button`. A hover on a lane's ground is the mark of such an action.
