@@ -1445,8 +1445,11 @@ worker, and Lekto works as a website.
   it names, in an open window of the app if there is one: the worker asks the app, which goes
   there through its router (`lib/app-open.ts`), so nothing loads anew, uploads go on and unsaved
   changes ask as on every way out; only a window that does not answer is loaded at the address.
-  The app's icon carries the inbox's
-  count, set by a notification and kept by the open app.
+  The app's icon carries the count
+  of the person's own inbox, set by a notification and kept by the open app, also for an admin
+  whose counter counts everyone's. Only the open app can lower it: a push has to show something,
+  so none says that nothing waits any more. The app that finds nothing waiting closes the
+  notification that still says so.
 - **Signing out gives the device up:** before the session ends, the app removes this browser's
   device at the server, ends its subscription, closes the notifications it still shows and
   clears the icon's number (`leaveDevice`), so that a device others use shows nothing of this

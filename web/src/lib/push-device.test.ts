@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+	closeWaiting,
 	deviceName,
 	endForeignSubscription,
 	currentSubscription,
@@ -137,6 +138,32 @@ describe('a subscription of an earlier server key (WH-05)', () => {
 		expect((await currentSubscription(OLD))?.endpoint).toBe(ENDPOINT);
 		// Without a key to compare with, the subscription as it is.
 		expect((await currentSubscription())?.endpoint).toBe(ENDPOINT);
+	});
+});
+
+describe('the notification of what waits, once nothing waits (WM-05)', () => {
+	it('is closed by the open app, and only that one', async () => {
+		const asked: unknown[] = [];
+		const waiting = [{ close: vi.fn() }];
+		vi.stubGlobal('navigator', {
+			userAgent: 'test',
+			serviceWorker: {
+				getRegistration: async () => ({
+					getNotifications: async (filter: unknown) => {
+						asked.push(filter);
+						return waiting;
+					}
+				})
+			}
+		});
+		await closeWaiting();
+		expect(asked).toEqual([{ tag: 'lekto-waiting' }]);
+		expect(waiting[0].close).toHaveBeenCalledOnce();
+	});
+
+	it('does nothing in a browser without a service worker', async () => {
+		vi.stubGlobal('navigator', { userAgent: 'test' });
+		await expect(closeWaiting()).resolves.toBeUndefined();
 	});
 });
 

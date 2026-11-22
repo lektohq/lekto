@@ -132,6 +132,24 @@ export async function leaveDevice(): Promise<void> {
 	}
 }
 
+/** The tag of the notification that says what waits (`push.py` of the core). */
+const WAITING_TAG = 'lekto-waiting';
+
+/**
+ * Close the notification "… wait for you" this device still shows: the app is open and nothing
+ * waits any more. The server cannot take it back (a push must show something), so it would
+ * stand until someone taps it. Never throws.
+ */
+export async function closeWaiting(): Promise<void> {
+	try {
+		const found = await registration();
+		const shown = (await found?.getNotifications({ tag: WAITING_TAG })) ?? [];
+		for (const notification of shown) notification.close();
+	} catch {
+		// A browser without notifications: nothing to close.
+	}
+}
+
 /**
  * End a subscription of this browser that is none of the signed-in user's devices: someone else
  * switched notifications on here and never signed out (their session ran out), or the server

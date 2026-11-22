@@ -278,6 +278,15 @@ describe('the safe areas beside the notch, a phone held sideways (WM-07)', () =>
 	});
 });
 
+describe('the number on the app’s icon (WM-05)', () => {
+	it('is the caller’s own inbox, and the stale notification goes with it', () => {
+		const layout = sources['/src/routes/(app)/+layout.svelte'];
+		expect(layout).toContain('setAppBadge(inbox.own)');
+		expect(layout).not.toMatch(/setAppBadge\(inbox\.summary/);
+		expect(layout).toMatch(/inbox\.own === 0\) void closeWaiting\(\)/);
+	});
+});
+
 describe('a tap on a notification (WM-04)', () => {
 	it('asks the open app to go there before any address is loaded', () => {
 		// `navigate()` starts the app anew: only for a window that did not answer.

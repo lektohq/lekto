@@ -53,6 +53,9 @@ class Inbox {
 	/** Why the last fetch failed; null after one that did not. The counter says nothing of it
 	 * and keeps what it showed; the overview's tile shows it where it has nothing to show. */
 	failure = $state<unknown>(null);
+	/** Everything open in the caller's own inbox, whatever the counter's scope: the number on
+	 * the app's icon, the one a notification sets (web/DESIGN.md, "App"); null until read. */
+	own = $state<number | null>(null);
 	#timer: ReturnType<typeof setTimeout> | undefined;
 	#stop: (() => void) | null = null;
 	// An answer overtaken by a later request (the scope changed meanwhile) is dropped.
@@ -67,10 +70,13 @@ class Inbox {
 	async refresh(): Promise<void> {
 		const request = ++this.#request;
 		try {
-			const data = await unwrap(
-				api.GET('/api/v1/inbox/summary', { params: { query: { all_users: scope.query } } })
-			);
-			if (request === this.#request) [this.summary, this.failure] = [data, null];
+			// With "all users" the counter counts everyone's; the icon still counts the caller's.
+			const [data, mine] = await Promise.all([
+				unwrap(api.GET('/api/v1/inbox/summary', { params: { query: { all_users: scope.query } } })),
+				scope.query ? unwrap(api.GET('/api/v1/inbox/summary')) : null
+			]);
+			if (request === this.#request)
+				[this.summary, this.own, this.failure] = [data, (mine ?? data).open, null];
 		} catch (failure) {
 			// Offline or refused: the counter keeps what it showed until the next refresh.
 			if (request === this.#request) this.failure = failure;

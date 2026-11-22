@@ -6,7 +6,7 @@
 	import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 	import { events } from '#lib/events.svelte.ts';
 	import { inbox } from '#lib/inbox.svelte.ts';
-	import { endForeignSubscription } from '#lib/push-device.ts';
+	import { closeWaiting, endForeignSubscription } from '#lib/push-device.ts';
 	import { recheckSession, session } from '#lib/session.svelte.ts';
 	import { uploads } from '#lib/upload.svelte.ts';
 	import { whileVisible } from '#lib/visible.ts';
@@ -17,9 +17,13 @@
 	// who is signed in (`recheckSession`) must not restart the stream or drop the uploads.
 	const userId = $derived(session.user?.id ?? null);
 
-	// The installed app's icon shows what the inbox counter shows (web/DESIGN.md, "App").
+	// The installed app's icon shows the caller's own inbox, as a notification sets it, also
+	// while the counter counts everyone's (web/DESIGN.md, "App"). Nothing waits any more: the
+	// notification that said so goes, since no message can take it back while the app is closed.
 	$effect(() => {
-		if (userId) setAppBadge(inbox.summary?.open);
+		if (!userId) return;
+		setAppBadge(inbox.own);
+		if (inbox.own === 0) void closeWaiting();
 	});
 
 	// A push subscription this browser still has from someone else (their session ran out, they

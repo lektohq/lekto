@@ -6,7 +6,7 @@ import { scope } from '#lib/scope.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import { summaryOf } from '#lib/testing/documents.ts';
 import { badgeLabel, badgeText, badgeTone, inbox } from './inbox.svelte.ts';
-import { calls, fakeApi } from '#lib/testing/api.ts';
+import { calls, fakeApi, json } from '#lib/testing/api.ts';
 
 const summary = summaryOf;
 
@@ -78,6 +78,31 @@ describe('inbox summary', () => {
 		expect(calls(api)[0]).toBe('GET /api/v1/inbox/summary?all_users=true');
 		expect(inbox.open).toBe(1);
 		expect(inbox.summary?.worst_lane).toBe('yellow');
+	});
+
+	it('counts the caller’s own inbox for the app’s icon, whatever the scope (WM-05)', async () => {
+		// The counter may count everyone's; the icon carries what a notification sets.
+		api = fakeApi({}, (_, url) =>
+			url.pathname === '/api/v1/inbox/summary'
+				? json(summary(url.searchParams.has('all_users') ? { review: 7 } : { review: 2 }))
+				: json({})
+		);
+		vi.stubGlobal('fetch', api);
+		scope.set(true);
+		await inbox.refresh();
+		expect(inbox.open).toBe(7);
+		expect(inbox.own).toBe(2);
+		expect(calls(api)).toEqual([
+			'GET /api/v1/inbox/summary?all_users=true',
+			'GET /api/v1/inbox/summary'
+		]);
+
+		// The caller's own scope: one request, the same number.
+		scope.set(false);
+		api.mockClear();
+		await inbox.refresh();
+		expect(inbox.own).toBe(2);
+		expect(calls(api)).toEqual(['GET /api/v1/inbox/summary']);
 	});
 
 	it('keeps the last summary while the server cannot be reached', async () => {
