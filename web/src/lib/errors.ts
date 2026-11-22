@@ -1,4 +1,5 @@
 import { toast } from 'svelte-sonner';
+import { formatNumber } from '#lib/i18n.ts';
 import { ApiError } from '#lib/api/problem.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { type Reason, reasonsText } from '#lib/reasons.ts';
@@ -16,7 +17,7 @@ export function describeError(error: unknown): string {
 	if (error instanceof ApiError) {
 		if (error.status === 429) {
 			return error.retryAfter !== null
-				? m.error_too_many({ seconds: error.retryAfter })
+				? m.error_too_many({ seconds: formatNumber(error.retryAfter) })
 				: m.error_too_many_later();
 		}
 		if (isGatewayError(error)) return m.error_network();

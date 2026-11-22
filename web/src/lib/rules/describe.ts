@@ -1,4 +1,5 @@
 /** Texts of the rule builder: fields, operators, actions, problems; a rule as sentences. */
+import { formatNumber } from '#lib/i18n.ts';
 import { describeValue } from '#lib/describe.ts';
 import { roleLabel, type FactRole } from '#lib/facts.ts';
 import { kindLabel, type IdentifierKind } from '#lib/identifiers.ts';
@@ -171,14 +172,14 @@ export function mailOperatorLabel(field: MailField, op: MailOperator): string {
 
 const PROBLEMS: Record<Problem['code'], (params: Record<string, string | number>) => string> = {
 	name: () => m.rule_error_name(),
-	name_long: (params) => m.rule_error_text_long({ max: params.max }),
+	name_long: (params) => m.rule_error_text_long({ max: formatNumber(Number(params.max)) }),
 	priority: () => m.rule_error_priority(),
 	triggers: () => m.rule_error_triggers(),
 	value: () => m.rule_error_value(),
 	choose: () => m.rule_error_choose(),
 	list: () => m.rule_error_list(),
-	list_long: (params) => m.rule_error_list_long({ max: params.max }),
-	text_long: (params) => m.rule_error_text_long({ max: params.max }),
+	list_long: (params) => m.rule_error_list_long({ max: formatNumber(Number(params.max)) }),
+	text_long: (params) => m.rule_error_text_long({ max: formatNumber(Number(params.max)) }),
 	date: () => m.rule_error_date(),
 	number: () => m.rule_error_number(),
 	amount: () => m.rule_error_amount(),
@@ -186,14 +187,15 @@ const PROBLEMS: Record<Problem['code'], (params: Record<string, string | number>
 	field: () => m.rule_error_field(),
 	operator: () => m.rule_error_operator(),
 	group_empty: () => m.rule_error_group_empty(),
-	conditions_many: (params) => m.rule_error_conditions_many({ max: params.max }),
-	depth: (params) => m.rule_error_depth({ max: params.max }),
+	conditions_many: (params) =>
+		m.rule_error_conditions_many({ max: formatNumber(Number(params.max)) }),
+	depth: (params) => m.rule_error_depth({ max: formatNumber(Number(params.max)) }),
 	actions_none: () => m.rule_error_actions_none(),
-	actions_many: (params) => m.rule_error_actions_many({ max: params.max }),
+	actions_many: (params) => m.rule_error_actions_many({ max: formatNumber(Number(params.max)) }),
 	twice: () => m.rule_error_twice(),
 	triggers_ask: () => m.rule_error_triggers_ask(),
 	step_name: () => m.rule_error_step_name(),
-	timeout: (params) => m.rule_error_timeout({ max: params.max }),
+	timeout: (params) => m.rule_error_timeout({ max: formatNumber(Number(params.max)) }),
 	path: () => m.rule_error_path(),
 	step_unknown: () => m.rule_error_step_unknown()
 };

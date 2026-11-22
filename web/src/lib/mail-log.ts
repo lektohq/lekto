@@ -4,7 +4,7 @@
  * page's views: "Übernommen" holds a mail a rule took with nothing in it to take as well.
  */
 import type { components } from '#lib/api/schema.ts';
-import { formatDate } from '#lib/i18n.ts';
+import { formatDate, formatNumber } from '#lib/i18n.ts';
 import { stepText } from '#lib/mail-rules.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { reasonText } from '#lib/reasons.ts';
@@ -102,9 +102,11 @@ export function waitingText(summary: MailSummary): string {
 	const count = summary.waiting.reduce((sum, item) => sum + item.mails, 0);
 	if (count === 0) return '';
 	const rules = summary.waiting
-		.map((item) => m.mailbox_waiting_rule({ name: item.rule.name, count: item.mails }))
+		.map((item) =>
+			m.mailbox_waiting_rule({ name: item.rule.name, count: formatNumber(item.mails) })
+		)
 		.join(', ');
 	return count === 1
 		? m.mailbox_waiting_note_one({ rules })
-		: m.mailbox_waiting_note({ count, rules });
+		: m.mailbox_waiting_note({ count: formatNumber(count), rules });
 }

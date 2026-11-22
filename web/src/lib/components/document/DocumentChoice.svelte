@@ -6,7 +6,7 @@
 	import SearchField from '#lib/components/SearchField.svelte';
 	import { Choice } from '#lib/components/ui/choice/index.ts';
 	import { searchTyped } from '#lib/document-search.ts';
-	import { formatDate } from '#lib/i18n.ts';
+	import { formatDate, formatNumber } from '#lib/i18n.ts';
 	import { mergeBlock, type Candidate } from '#lib/merge.ts';
 	import { m } from '#lib/paraglide/messages.js';
 
@@ -60,7 +60,7 @@
 	);
 
 	const pages = (count: number | null) =>
-		count === 1 ? m.page_edit_pages_one() : m.page_edit_pages({ count: String(count ?? 0) });
+		count === 1 ? m.page_edit_pages_one() : m.page_edit_pages({ count: formatNumber(count ?? 0) });
 
 	// The choice counts only while its row stands there: a search may have taken it away (WA-07).
 	const choice = $derived(

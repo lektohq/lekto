@@ -28,7 +28,7 @@
 	import { documentApi, tabHref, type Neighbours } from '#lib/document-view.ts';
 	import { reportError } from '#lib/errors.ts';
 	import { readersLaterText, visibleText, type Viewer } from '#lib/filing.ts';
-	import { formatDate } from '#lib/i18n.ts';
+	import { formatDate, formatNumber } from '#lib/i18n.ts';
 	import { spaceLabel, userLabel, userName, type Lookup } from '#lib/masterdata.svelte.ts';
 	import { NODE_LABELS } from '#lib/node-labels.ts';
 	import { canEdit } from '#lib/permissions.ts';
@@ -284,12 +284,15 @@
 					{#if readersLater}· {readersLater}{/if}
 				{/if}
 				{#if uploader}· {m.uploaded_by({ name: uploader })}{/if}
-				{#if document.page_count}· {m.doc_pages({ count: document.page_count })}{/if}
+				{#if document.page_count}· {m.doc_pages({ count: formatNumber(document.page_count) })}{/if}
 			</p>
 			{#if status === 'processing'}
 				{#if visionRunning}
 					<p class="text-sm text-muted-foreground" role="status">
-						{m.doc_processing_vision({ done: running.done, total: running.total })}
+						{m.doc_processing_vision({
+							done: formatNumber(running.done),
+							total: formatNumber(running.total)
+						})}
 					</p>
 				{/if}
 				<ProcessingProgress

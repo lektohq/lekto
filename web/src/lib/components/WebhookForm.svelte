@@ -3,6 +3,7 @@
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import { formatNumber } from '#lib/i18n.ts';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
@@ -300,10 +301,16 @@
 				{:else}
 					<p class="text-sm text-muted-foreground">
 						{volume.least === volume.most
-							? m.webhook_volume_total_exact({ count: volume.least })
-							: m.webhook_volume_total_range({ least: volume.least, most: volume.most })}
+							? m.webhook_volume_total_exact({ count: formatNumber(volume.least) })
+							: m.webhook_volume_total_range({
+									least: formatNumber(volume.least),
+									most: formatNumber(volume.most)
+								})}
 						{#if volume.steps.most > 0}
-							{m.webhook_volume_steps({ least: volume.steps.least, most: volume.steps.most })}
+							{m.webhook_volume_steps({
+								least: formatNumber(volume.steps.least),
+								most: formatNumber(volume.steps.most)
+							})}
 						{/if}
 					</p>
 				{/if}
@@ -391,8 +398,8 @@
 			/>
 			<Field.Description id="wh-open-tasks-rule"
 				>{m.webhook_open_tasks_rule({
-					min: WEBHOOK_LIMITS.openTasks.min,
-					max: WEBHOOK_LIMITS.openTasks.max
+					min: formatNumber(WEBHOOK_LIMITS.openTasks.min),
+					max: formatNumber(WEBHOOK_LIMITS.openTasks.max)
 				})}</Field.Description
 			>
 		</Field.Field>

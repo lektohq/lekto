@@ -19,7 +19,7 @@
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { isoDayLocal } from '#lib/dates.ts';
-	import { formatDate } from '#lib/i18n.ts';
+	import { formatDate, formatNumber } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import Loading from '#lib/components/Loading.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
@@ -178,7 +178,7 @@
 						<Badge variant="note">
 							{token.scope
 								? SCOPE_LABELS[token.scope]()
-								: m.token_scope_custom({ count: token.rights.length })}
+								: m.token_scope_custom({ count: formatNumber(token.rights.length) })}
 						</Badge>
 						<ChevronRight class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
 					</li>

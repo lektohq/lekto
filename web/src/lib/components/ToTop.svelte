@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
+	import { formatNumber } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { cn } from '#lib/utils.ts';
 
@@ -29,10 +30,15 @@
 			'fixed right-7 bottom-[max(1.75rem,calc(env(safe-area-inset-bottom)+0.75rem))] z-30 inline-flex h-11 animate-in items-center gap-1.5 rounded-xl border bg-card/90 text-sm font-medium tabular-nums shadow-lg backdrop-blur duration-150 fade-in-0 motion-reduce:animate-none',
 			counted ? 'px-4' : 'w-11 justify-center'
 		)}
-		aria-label={counted ? m.to_top_page({ current, total }) : m.to_top()}
+		aria-label={counted
+			? m.to_top_page({ current: formatNumber(current), total: formatNumber(total) })
+			: m.to_top()}
 		onclick={up}
 	>
 		<ArrowUp class="size-4 shrink-0" aria-hidden="true" />
-		{#if counted}{m.to_top_count({ current, total })}{/if}
+		{#if counted}{m.to_top_count({
+				current: formatNumber(current),
+				total: formatNumber(total)
+			})}{/if}
 	</button>
 {/if}

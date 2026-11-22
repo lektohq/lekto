@@ -17,7 +17,7 @@
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
 	import { isoDayLocal } from '#lib/dates.ts';
-	import { formatDate } from '#lib/i18n.ts';
+	import { formatDate, formatNumber } from '#lib/i18n.ts';
 	import {
 		complete,
 		createBody,
@@ -319,7 +319,7 @@
 					<span class="text-destructive">{reasonText(tested.error)}</span>
 				{:else if tested}
 					<span class="text-lane-green-foreground"
-						>{m.mail_test_ok({ count: tested.folders.length })}</span
+						>{m.mail_test_ok({ count: formatNumber(tested.folders.length) })}</span
 					>
 					{#if !tested.own_keywords}
 						<span class="text-muted-foreground">{m.mail_test_no_own_keywords()}</span>

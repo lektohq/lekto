@@ -772,6 +772,66 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(inside.test('<Badge>a</Badge> <button type="button">x</button>')).toBe(false);
 	});
 
+	it('hands a message the number it counts with through formatNumber', () => {
+		// "Formats": numbers follow the language ("12.345 Mails"). Paraglide puts in what it
+		// gets, so the call formats: `count: formatNumber(n)`, never the number, a shorthand or
+		// `String(n)`. A quoted text is a sample.
+		const counted = new Set([
+			'count',
+			'total',
+			'done',
+			'least',
+			'most',
+			'min',
+			'max',
+			'seconds',
+			'mails'
+		]);
+		/** The end of the bracket that opens before `from`, and the commas at its top level. */
+		const walk = (source: string, from: number) => {
+			const commas: number[] = [];
+			let depth = 1;
+			let quote = '';
+			let at = from;
+			for (; at < source.length && depth > 0; at++) {
+				const char = source[at];
+				if (quote) {
+					if (char === '\\') at++;
+					else if (char === quote) quote = '';
+				} else if (char === "'" || char === '"' || char === '`') quote = char;
+				else if ('([{'.includes(char)) depth++;
+				else if (')]}'.includes(char)) depth--;
+				else if (char === ',' && depth === 1) commas.push(at);
+			}
+			return { end: at - 1, commas };
+		};
+		const raw = (source: string): string | null => {
+			for (const call of source.matchAll(/\bm\.(\w+)\(\s*\{/g)) {
+				const start = call.index + call[0].length;
+				const { end, commas } = walk(source, start);
+				const cuts = [start - 1, ...commas, end];
+				for (let index = 0; index < cuts.length - 1; index++) {
+					const part = source.slice(cuts[index] + 1, cuts[index + 1]);
+					const [, key, colon, value = ''] = /^\s*(\w+)(\s*:\s*)?([\s\S]*)$/.exec(part) ?? [];
+					if (!counted.has(key)) continue;
+					if (!colon || !/^(?:formatNumber\(|['"`])/.test(value.trim()))
+						return `m.${call[1]}: ${part.trim()}`;
+				}
+			}
+			return null;
+		};
+		expect(raw('m.mails({ count: mails.length })')).toBe('m.mails: count: mails.length');
+		expect(raw('m.mails({ name, count })')).toBe('m.mails: count');
+		expect(raw('m.mails({ count: String(found) })')).toBe('m.mails: count: String(found)');
+		expect(raw('m.mails({ count: formatNumber(pick(a, b)), name: a })')).toBeNull();
+		expect(
+			[...Object.entries(sources), ...Object.entries(scripts)]
+				.filter(([path]) => path !== '/src/routes/(app)/dev/components/+page.svelte')
+				.map(([path, source]) => [path, raw(source)])
+				.filter(([, found]) => found !== null)
+		).toEqual([]);
+	});
+
 	it('writes a list through formatList', () => {
 		// "Formats": one way each. A list of names is "A, B und C" in the user's language.
 		const own = /new Intl\.ListFormat\(/;

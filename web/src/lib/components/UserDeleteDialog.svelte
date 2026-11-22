@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
+	import { formatNumber } from '#lib/i18n.ts';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import ConfirmFooter from '#lib/components/ConfirmFooter.svelte';
@@ -72,7 +73,7 @@
 
 	function title(space: BlockingSpace): string {
 		const name = space.personal ? m.user_delete_personal({ name: username }) : space.name;
-		return m.user_delete_space({ name, count: space.documents });
+		return m.user_delete_space({ name, count: formatNumber(space.documents) });
 	}
 
 	async function confirm(event: Event) {

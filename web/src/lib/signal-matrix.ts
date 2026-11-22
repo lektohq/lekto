@@ -5,6 +5,7 @@
  * it by the text, suggests it (while it is open), names another value (against it, or without
  * evidence that would count), or is silent.
  */
+import { formatNumber } from '#lib/i18n.ts';
 import type { components } from '#lib/api/schema.ts';
 import { sourceChips, type CandidateSource } from '#lib/candidates.ts';
 import { describeValue, fieldLabel } from '#lib/describe.ts';
@@ -254,5 +255,5 @@ function chipOf(
 	const naming = cells.filter((cell) => cell.kind === 'names' || cell.kind === 'evidence').length;
 	return naming === 1
 		? m.matrix_chip_signal_one()
-		: m.matrix_chip_signals({ count: String(naming) });
+		: m.matrix_chip_signals({ count: formatNumber(naming) });
 }

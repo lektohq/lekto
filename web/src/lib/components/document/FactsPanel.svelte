@@ -442,7 +442,7 @@
 				{:else}
 					{identifier.other_contacts === 1
 						? m.facts_other_contacts_one()
-						: m.facts_other_contacts({ count: identifier.other_contacts })}
+						: m.facts_other_contacts({ count: formatNumber(identifier.other_contacts) })}
 				{/if}
 			</div>
 		{/if}

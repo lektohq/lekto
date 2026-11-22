@@ -3,6 +3,7 @@
 	import SearchX from '@lucide/svelte/icons/search-x';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import { tick, type Snippet } from 'svelte';
+	import { formatNumber } from '#lib/i18n.ts';
 	import { chosen } from '#lib/candidates.ts';
 	import type { Candidate } from '#lib/candidates.ts';
 	import ContactAvatar from '#lib/components/ContactAvatar.svelte';
@@ -146,7 +147,9 @@
 		<button
 			type="button"
 			onclick={() => (expandedFor = placesKey)}
-			aria-label={hiddenPlaces === 1 ? m.source_more_one() : m.source_more({ count: hiddenPlaces })}
+			aria-label={hiddenPlaces === 1
+				? m.source_more_one()
+				: m.source_more({ count: formatNumber(hiddenPlaces) })}
 			class="shrink-0 rounded-full bg-panel px-2 font-mono text-micro leading-5 text-brand hover:underline"
 		>
 			+{hiddenPlaces}

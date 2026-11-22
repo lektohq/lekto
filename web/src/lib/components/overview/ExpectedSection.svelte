@@ -7,7 +7,7 @@
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { describeError } from '#lib/errors.ts';
-	import { browserZone, formatDate } from '#lib/i18n.ts';
+	import { browserZone, formatDate, formatNumber } from '#lib/i18n.ts';
 	import { labelOfKind } from '#lib/identifiers.ts';
 	import { openBeam } from '#lib/beam.svelte.ts';
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
@@ -73,9 +73,9 @@
 	function rhythm(item: Expected): string {
 		const every =
 			item.cadence === 'days'
-				? m.expected_every_days({ count: String(item.interval_days) })
+				? m.expected_every_days({ count: formatNumber(item.interval_days) })
 				: CADENCES[item.cadence]();
-		return `${every} · ${m.expected_spread({ count: String(item.spread_days) })}`;
+		return `${every} · ${m.expected_spread({ count: formatNumber(item.spread_days) })}`;
 	}
 
 	const SOON: readonly State[] = ['overdue', 'soon'];
@@ -128,7 +128,7 @@
 									{/if}
 								</span>
 								<span class="text-sm text-muted-foreground">
-									{rhythm(item)} · {m.expected_documents({ count: String(item.documents) })}
+									{rhythm(item)} · {m.expected_documents({ count: formatNumber(item.documents) })}
 								</span>
 								<span class="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
 									{m.expected_last()}
@@ -165,7 +165,9 @@
 		{#if hidden > 0}
 			<div>
 				<Button variant="link" size="inline" onclick={() => (all = !all)}>
-					{all ? m.overview_expected_less() : m.overview_expected_more({ count: String(hidden) })}
+					{all
+						? m.overview_expected_less()
+						: m.overview_expected_more({ count: formatNumber(hidden) })}
 				</Button>
 			</div>
 		{/if}

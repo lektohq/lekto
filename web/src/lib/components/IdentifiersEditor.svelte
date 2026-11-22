@@ -517,7 +517,7 @@
 							<span class="sr-only"
 								>{group.rows.length === 1
 									? m.master_identifier_one()
-									: m.master_identifiers_many({ count: group.rows.length })}</span
+									: m.master_identifiers_many({ count: formatNumber(group.rows.length) })}</span
 							>
 						</button>
 						{#if open}

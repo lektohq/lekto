@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import { getLocale, setLocale } from '#lib/paraglide/runtime.js';
 import { signIn } from '#lib/testing/session.ts';
 import { scope } from '#lib/scope.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
@@ -37,6 +38,16 @@ describe('inbox badge', () => {
 		expect(badgeLabel(summary({ new: 3 }))).toBe(
 			`${m.inbox_badge_total({ count: 3 })}, ${m.inbox_badge_new({ count: 3 })}`
 		);
+	});
+
+	it('writes its numbers as the language does (WG-06)', () => {
+		const before = getLocale();
+		setLocale('de', { reload: false });
+		try {
+			expect(badgeLabel(summary({ new: 12345 }))).toBe('12.345 im Posteingang, 12.345 neu');
+		} finally {
+			setLocale(before, { reload: false });
+		}
 	});
 
 	it('cuts a long number short', () => {

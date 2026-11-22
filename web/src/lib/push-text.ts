@@ -1,3 +1,4 @@
+import { formatNumber } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 
 /**
@@ -40,11 +41,11 @@ export function pushText(payload: PushPayload): PushText {
 			const title =
 				waiting === 1
 					? m.push_waiting_one({}, options)
-					: m.push_waiting_many({ count: waiting }, options);
+					: m.push_waiting_many({ count: formatNumber(waiting) }, options);
 			const body = titles.length
 				? titles.join(' · ')
 				: fresh > 1
-					? m.push_waiting_new({ count: fresh }, options)
+					? m.push_waiting_new({ count: formatNumber(fresh) }, options)
 					: '';
 			return { title, body };
 		}

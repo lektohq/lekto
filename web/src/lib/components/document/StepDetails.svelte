@@ -233,7 +233,7 @@
 				</ol>
 			</figure>
 		{:else if pages > 0}
-			<p class="text-sm">{m.summary_page_images({ count: pages })}</p>
+			<p class="text-sm">{m.summary_page_images({ count: formatNumber(pages) })}</p>
 		{/if}
 	{:else if entry.node === 'parse'}
 		{#if total !== null}

@@ -273,7 +273,7 @@
 				<span class="font-mono text-sm break-all text-muted-foreground">{webhook.url}</span>
 				{#if switchedOffFailing(webhook)}
 					<span class="text-sm text-destructive">
-						{m.webhook_failing({ count: webhook.failed_streak })}
+						{m.webhook_failing({ count: formatNumber(webhook.failed_streak) })}
 					</span>
 				{/if}
 			{/if}

@@ -331,7 +331,7 @@
 										{/each}
 										{#if !phone.current && hasChildren}
 											<span class="text-sm text-muted-foreground">
-												{m.tag_below({ count: childCount.get(tag.id) ?? 0 })}
+												{m.tag_below({ count: formatNumber(childCount.get(tag.id) ?? 0) })}
 											</span>
 										{/if}
 										{#if !phone.current && kind === 'type-groups'}

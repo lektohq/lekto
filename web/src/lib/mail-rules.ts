@@ -13,7 +13,7 @@ import {
 	type MailField,
 	type MailOperator
 } from '#lib/mail-traits.ts';
-import { quoted } from '#lib/i18n.ts';
+import { quoted, formatNumber } from '#lib/i18n.ts';
 import { folderLabel } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { own } from '#lib/utils.ts';
@@ -267,7 +267,7 @@ export function validate(form: MailRuleForm, spaces?: readonly Space[]): Record<
 	const name = form.name.trim();
 	if (name === '') problems.name = m.rule_error_name();
 	else if (name.length > LIMITS.name) {
-		problems.name = m.rule_error_text_long({ max: LIMITS.name });
+		problems.name = m.rule_error_text_long({ max: formatNumber(LIMITS.name) });
 	}
 	const priority = Number(form.priority);
 	if (
@@ -299,7 +299,7 @@ export function validate(form: MailRuleForm, spaces?: readonly Space[]): Record<
 		} else if (value === '') {
 			problems[item.key] = m.rule_error_value();
 		} else if (item.field !== 'folder' && value.length > LIMITS.text) {
-			problems[item.key] = m.rule_error_text_long({ max: LIMITS.text });
+			problems[item.key] = m.rule_error_text_long({ max: formatNumber(LIMITS.text) });
 		}
 	}
 	for (const step of form.steps) {
@@ -355,7 +355,7 @@ function body(form: MailRuleForm) {
 
 /** "1 Mail", "12 Mails". */
 export const mailsCount = (count: number): string =>
-	count === 1 ? m.mail_rule_mails_one() : m.mail_rule_mails({ count });
+	count === 1 ? m.mail_rule_mails_one() : m.mail_rule_mails({ count: formatNumber(count) });
 
 /** A stored rule as the dry run takes it, in place of itself (`rule_id`). */
 export function dryRunBody(rule: MailRule): MailRuleDryRun {

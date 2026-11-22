@@ -357,7 +357,7 @@
 						{/if}
 						{#if item.documents_hidden}
 							<span class="block text-xs text-muted-foreground">
-								{m.mailbox_hidden_documents({ count: item.documents_hidden })}
+								{m.mailbox_hidden_documents({ count: formatNumber(item.documents_hidden) })}
 							</span>
 						{/if}
 					</Table.Cell>

@@ -8,7 +8,7 @@
 	import ProcessingProgress from '#lib/components/ProcessingProgress.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { inboxDocument } from '#lib/document-view.ts';
-	import { formatDate } from '#lib/i18n.ts';
+	import { formatDate, formatNumber } from '#lib/i18n.ts';
 	import type { InboxItem } from '#lib/inbox-view.ts';
 	import { byId, userLabel, type Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -74,7 +74,7 @@
 				{suggestion
 					? suggestionText(suggestion, document.space_id, lookup)
 					: (reasonsText(item.open[0]?.reasons, item.open[0]?.reason, labelled(lookup)) ??
-						m.inbox_open_fields({ count: item.open.length }))}
+						m.inbox_open_fields({ count: formatNumber(item.open.length) }))}
 			</span>
 		</span>
 	{:else if item.tab === 'new'}

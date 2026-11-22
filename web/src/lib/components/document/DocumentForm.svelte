@@ -66,7 +66,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { labelled, reasonsText } from '#lib/reasons.ts';
 	import { phone } from '#lib/phone.svelte.ts';
-	import { quoted } from '#lib/i18n.ts';
+	import { quoted, formatNumber } from '#lib/i18n.ts';
 	import { fieldId, initialValue, isRuleField, readAnew, type ReviewValue } from '#lib/review.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import { suggestedSpace, unseenBy, unseenHere } from '#lib/space-suggestion.ts';
@@ -653,7 +653,9 @@
 			{#if reviewing && undecided > 0}
 				<Badge variant="yellow">
 					<TriangleAlert aria-hidden="true" strokeWidth={2.2} />
-					{undecided === 1 ? m.review_undecided_one() : m.review_undecided({ count: undecided })}
+					{undecided === 1
+						? m.review_undecided_one()
+						: m.review_undecided({ count: formatNumber(undecided) })}
 				</Badge>
 			{/if}
 		</PaneHead>

@@ -29,7 +29,7 @@
 	import { fieldLabel } from '#lib/describe.ts';
 	import { inboxDocument, listDocument, marksOf, type Mark } from '#lib/document-view.ts';
 	import { describeError } from '#lib/errors.ts';
-	import { formatDate } from '#lib/i18n.ts';
+	import { formatDate, formatNumber } from '#lib/i18n.ts';
 	import { kindLabel } from '#lib/identifiers.ts';
 	import { fieldId } from '#lib/review.ts';
 	import { latest } from '#lib/latest.ts';
@@ -438,10 +438,19 @@
 				side="start"
 				label={parts ? m.beam_parts() : m.beam_documents()}
 				text={parts
-					? m.beam_part_position({ current: beam.index + 1, total })
+					? m.beam_part_position({
+							current: formatNumber(beam.index + 1),
+							total: formatNumber(total)
+						})
 					: beam.source?.kind === 'open' || beam.source?.kind === 'places'
-						? m.beam_place_position({ current: beam.index + 1, total })
-						: m.beam_position({ current: beam.index + 1, total })}
+						? m.beam_place_position({
+								current: formatNumber(beam.index + 1),
+								total: formatNumber(total)
+							})
+						: m.beam_position({
+								current: formatNumber(beam.index + 1),
+								total: formatNumber(total)
+							})}
 				previous={beam.index > 0 ? () => beamTo(beam!.index - 1) : null}
 				next={beam.index < total - 1 ? () => beamTo(beam!.index + 1) : null}
 				previousLabel={m.doc_previous()}

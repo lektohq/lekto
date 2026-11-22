@@ -1,6 +1,7 @@
 // What the webhook pages share: sending a test delivery and telling how it went, and the names
 // of the events a webhook reports or logs.
 import { toast } from 'svelte-sonner';
+import { formatNumber } from '#lib/i18n.ts';
 import { api } from '#lib/api/client.ts';
 import { unwrap } from '#lib/api/call.ts';
 import { reportError } from '#lib/errors.ts';
@@ -96,11 +97,11 @@ export const EVENT_VOLUME: Record<WebhookEventType, Volume> = {
 /** How often an event comes for one document, in words: "1×", "2–7×", "≈ 13× per run". */
 export function volumeText(type: WebhookEventType): string {
 	const { least, most, run } = EVENT_VOLUME[type];
-	if (run) return m.webhook_volume_run({ count: least });
-	if (least === most) return m.webhook_volume_times({ count: least });
+	if (run) return m.webhook_volume_run({ count: formatNumber(least) });
+	if (least === most) return m.webhook_volume_times({ count: formatNumber(least) });
 	if (most <= 1)
 		return type === 'document.deleted' ? m.webhook_volume_at_most_once() : m.webhook_volume_rare();
-	return m.webhook_volume_range({ least, most });
+	return m.webhook_volume_range({ least: formatNumber(least), most: formatNumber(most) });
 }
 
 /** How loud an event is for one document, for `VolumeMeter`: 1 at most once, 2 a few times,

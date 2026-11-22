@@ -169,12 +169,12 @@
 	);
 
 	function flowText(first: Lane, now: Lane | null, count: number): string {
-		const n = formatNumber(count);
-		if (now === null) return m.automation_flow_running({ count: n });
-		if (now === first && first !== 'green') return m.automation_flow_open({ count: n });
-		if (now === 'green') return m.automation_flow_done({ count: n });
-		if (now === 'yellow') return m.automation_flow_review({ count: n });
-		return m.automation_flow_failed({ count: n });
+		if (now === null) return m.automation_flow_running({ count: formatNumber(count) });
+		if (now === first && first !== 'green')
+			return m.automation_flow_open({ count: formatNumber(count) });
+		if (now === 'green') return m.automation_flow_done({ count: formatNumber(count) });
+		if (now === 'yellow') return m.automation_flow_review({ count: formatNumber(count) });
+		return m.automation_flow_failed({ count: formatNumber(count) });
 	}
 
 	// The months by their first day (unique: a month name alone names two in twenty months),

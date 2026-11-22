@@ -17,7 +17,7 @@
 	import SelectionBar from '#lib/components/SelectionBar.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
-	import { formatMoment } from '#lib/i18n.ts';
+	import { formatMoment, formatNumber } from '#lib/i18n.ts';
 	import { loadMailRuleLookup, namesOf, type MailRuleLookup } from '#lib/mail-rule-lookup.ts';
 	import {
 		actionTexts,
@@ -76,7 +76,7 @@
 			: next.length === 1
 				? m.mail_rule_switched_on_fetch_one()
 				: next.length > 1
-					? m.mail_rule_switched_on_fetch({ count: next.length })
+					? m.mail_rule_switched_on_fetch({ count: formatNumber(next.length) })
 					: undefined;
 		rule = (await switchMailRule(rule.id, enabled, said)) ?? rule;
 		busy = false;
@@ -120,13 +120,16 @@
 
 {#snippet bar()}
 	<SelectionBar
-		count={m.mail_rule_preview_count({ taken: taken.length, total: mails?.length ?? 0 })}
+		count={m.mail_rule_preview_count({
+			taken: taken.length,
+			total: formatNumber(mails?.length ?? 0)
+		})}
 		{busy}
 	>
 		{#snippet hint()}
 			{[
-				next.length > 0 ? m.mail_rule_preview_waiting({ count: next.length }) : '',
-				conflicts > 0 ? m.mail_rule_preview_before({ count: conflicts }) : ''
+				next.length > 0 ? m.mail_rule_preview_waiting({ count: formatNumber(next.length) }) : '',
+				conflicts > 0 ? m.mail_rule_preview_before({ count: formatNumber(conflicts) }) : ''
 			]
 				.filter(Boolean)
 				.join(' · ')}
@@ -152,7 +155,7 @@
 					formatMoment(item.arrived_at),
 					folderLabel(item.folder),
 					item.attachments.length
-						? m.mail_rule_dry_run_attachments({ count: item.attachments.length })
+						? m.mail_rule_dry_run_attachments({ count: formatNumber(item.attachments.length) })
 						: ''
 				]
 					.filter(Boolean)
@@ -182,7 +185,7 @@
 	{:else}
 		{#if !phone.current}{@render bar()}{/if}
 		{#if taken.length === 0 && conflicts === 0}
-			<EmptyNote>{m.mail_rule_preview_nothing({ count: mails.length })}</EmptyNote>
+			<EmptyNote>{m.mail_rule_preview_nothing({ count: formatNumber(mails.length) })}</EmptyNote>
 		{:else}
 			<div class="flex flex-col gap-4">
 				{#each [{ key: 'next', items: next, note: m.mail_rule_group_waiting() }, { key: 'rule', items: done, note: m.mail_rule_group_done() }] as group (group.key)}

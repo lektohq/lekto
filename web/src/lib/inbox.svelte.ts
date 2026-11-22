@@ -4,6 +4,7 @@
  * events and when the window comes back into view (seen in another tab or on another device
  * sends no event).
  */
+import { formatNumber } from '#lib/i18n.ts';
 import { unwrap } from '#lib/api/call.ts';
 import { api } from '#lib/api/client.ts';
 import type { components } from '#lib/api/schema.ts';
@@ -33,11 +34,11 @@ export function badgeTone(summary: InboxSummary | null): BadgeTone | null {
 /** What a screen reader says of the counter: everything open, then each kind in it. */
 export function badgeLabel(summary: InboxSummary): string {
 	const parts = [
-		m.inbox_badge_total({ count: summary.open }),
-		summary.intervene > 0 && m.inbox_badge_red({ count: summary.intervene }),
-		summary.review > 0 && m.inbox_badge_yellow({ count: summary.review }),
-		summary.new > 0 && m.inbox_badge_new({ count: summary.new }),
-		summary.processing > 0 && m.inbox_badge_processing({ count: summary.processing })
+		m.inbox_badge_total({ count: formatNumber(summary.open) }),
+		summary.intervene > 0 && m.inbox_badge_red({ count: formatNumber(summary.intervene) }),
+		summary.review > 0 && m.inbox_badge_yellow({ count: formatNumber(summary.review) }),
+		summary.new > 0 && m.inbox_badge_new({ count: formatNumber(summary.new) }),
+		summary.processing > 0 && m.inbox_badge_processing({ count: formatNumber(summary.processing) })
 	];
 	return parts.filter(Boolean).join(', ');
 }

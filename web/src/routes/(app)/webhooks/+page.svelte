@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/i18n.ts';
 	import { switchedOffFailing } from '#lib/webhooks.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { onMount } from 'svelte';
@@ -107,7 +108,7 @@
 						<span class="truncate font-mono text-sm text-muted-foreground">{hook.url}</span>
 						{#if switchedOffFailing(hook)}
 							<span class="text-sm text-destructive"
-								>{m.webhook_failing({ count: hook.failed_streak })}</span
+								>{m.webhook_failing({ count: formatNumber(hook.failed_streak) })}</span
 							>
 						{/if}
 					</div>

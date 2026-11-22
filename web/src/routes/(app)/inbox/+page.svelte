@@ -5,6 +5,7 @@
 	import { toast } from 'svelte-sonner';
 	import { beforeNavigate } from '$app/navigation';
 	import { page } from '$app/state';
+	import { formatNumber } from '#lib/i18n.ts';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import { ApiError } from '#lib/api/problem.ts';
@@ -172,7 +173,7 @@
 		const { marked } = await unwrap(
 			api.POST('/api/v1/inbox/seen', { params: { query: { all_users: scope.query } } })
 		);
-		toast.success(m.inbox_all_seen_done({ count: marked }));
+		toast.success(m.inbox_all_seen_done({ count: formatNumber(marked) }));
 		await changed();
 	}
 
@@ -274,7 +275,9 @@
 <ConfirmDialog
 	bind:open={askAll}
 	title={m.inbox_all_seen_title()}
-	description={fresh === 1 ? m.inbox_all_seen_text_one() : m.inbox_all_seen_text({ count: fresh })}
+	description={fresh === 1
+		? m.inbox_all_seen_text_one()
+		: m.inbox_all_seen_text({ count: formatNumber(fresh) })}
 	confirmLabel={m.inbox_all_seen_confirm()}
 	destructive={false}
 	onconfirm={markAll}

@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { page } from '$app/state';
+	import { formatNumber } from '#lib/i18n.ts';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
@@ -112,7 +113,9 @@
 
 	async function endOthers() {
 		const { ended } = await unwrap(api.DELETE('/api/v1/auth/sessions'));
-		toast.success(ended === 1 ? m.sessions_ended_one() : m.sessions_ended({ count: ended }));
+		toast.success(
+			ended === 1 ? m.sessions_ended_one() : m.sessions_ended({ count: formatNumber(ended) })
+		);
 	}
 	let ending = $state(false);
 </script>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/i18n.ts';
 	import Stepper from '#lib/components/Stepper.svelte';
 	import { inboxDocument, listDocument, type Neighbours } from '#lib/document-view.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -18,8 +19,14 @@
 		side="end"
 		label={m.doc_inbox_nav()}
 		text={phone.current
-			? m.doc_position_short({ position: inbox.position, total: inbox.total })
-			: m.doc_inbox_position({ position: inbox.position, total: inbox.total })}
+			? m.doc_position_short({
+					position: formatNumber(inbox.position),
+					total: formatNumber(inbox.total)
+				})
+			: m.doc_inbox_position({
+					position: formatNumber(inbox.position),
+					total: formatNumber(inbox.total)
+				})}
 		previous={inbox.previous ? inboxDocument(inbox.previous) : null}
 		next={inbox.next ? inboxDocument(inbox.next) : null}
 		previousLabel={m.doc_previous()}
@@ -31,8 +38,14 @@
 		side="end"
 		label={m.doc_list_nav()}
 		text={phone.current
-			? m.doc_position_short({ position: list.position, total: list.total })
-			: m.doc_list_position({ position: list.position, total: list.total })}
+			? m.doc_position_short({
+					position: formatNumber(list.position),
+					total: formatNumber(list.total)
+				})
+			: m.doc_list_position({
+					position: formatNumber(list.position),
+					total: formatNumber(list.total)
+				})}
 		previous={list.previous ? listDocument(list.previous) : null}
 		next={list.next ? listDocument(list.next) : null}
 		previousLabel={m.doc_previous()}

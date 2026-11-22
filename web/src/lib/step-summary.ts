@@ -217,7 +217,7 @@ function alike(output: Json, lookup: Lookup | null): string {
 	}
 	const [contact, share] = [...tally].sort((a, b) => b[1] - a[1])[0] ?? [null, 0];
 	const documents =
-		total === 1 ? m.summary_neighbours_one() : m.summary_neighbours({ count: String(total) });
+		total === 1 ? m.summary_neighbours_one() : m.summary_neighbours({ count: formatNumber(total) });
 	if (contact === null || share < 2) return documents;
 	const name = named(contact, lookup);
 	return share === total
@@ -286,9 +286,9 @@ function read(output: Json): string {
 	if (found === checks.length) {
 		return found === 1
 			? m.summary_fields_read_one()
-			: m.summary_fields_read({ count: String(found) });
+			: m.summary_fields_read({ count: formatNumber(found) });
 	}
-	return m.summary_fields_partly({ read: String(found), count: String(checks.length) });
+	return m.summary_fields_partly({ read: String(found), count: formatNumber(checks.length) });
 }
 
 /** How many relations the step set and suggested (#145). */
@@ -324,9 +324,9 @@ function ruled(entry: LogEntry, lookup: Lookup | null): string {
 			: matched === 0
 				? looked === 1
 					? m.summary_rules_none_one()
-					: m.summary_rules_none({ count: String(looked) })
+					: m.summary_rules_none({ count: formatNumber(looked) })
 				: matched === 1
-					? m.summary_rules_matched_one({ count: String(looked) })
-					: m.summary_rules_matched({ matched: String(matched), count: String(looked) });
+					? m.summary_rules_matched_one({ count: formatNumber(looked) })
+					: m.summary_rules_matched({ matched: String(matched), count: formatNumber(looked) });
 	return [where, took].filter(Boolean).join(SEPARATOR);
 }

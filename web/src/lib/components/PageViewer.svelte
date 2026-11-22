@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/i18n.ts';
 	import { cardVariants } from '#lib/components/ui/card/index.ts';
 	import Columns2 from '@lucide/svelte/icons/columns-2';
 	import File from '@lucide/svelte/icons/file';
@@ -405,8 +406,12 @@
 		<span class="ml-auto text-sm text-muted-foreground">
 			{#if note}{note} ·{/if}
 			{last > current
-				? m.pdf_pages({ first: current, last, total: sizes.length })
-				: m.pdf_page({ current, total: sizes.length })}
+				? m.pdf_pages({
+						first: formatNumber(current),
+						last: formatNumber(last),
+						total: formatNumber(sizes.length)
+					})
+				: m.pdf_page({ current: formatNumber(current), total: formatNumber(sizes.length) })}
 		</span>
 		{@render end?.()}
 	</div>
