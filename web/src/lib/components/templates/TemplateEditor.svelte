@@ -168,7 +168,8 @@
 					large
 					autofocus
 				/>
-				<div class="flex flex-wrap items-center gap-1">
+				<!-- Wrapped rows stand apart on a phone, where each button's hit area is taller than it. -->
+				<div class="flex flex-wrap items-center gap-1 max-sm:gap-y-3">
 					<span class="mr-1 text-xs text-muted-foreground">{m.template_filters()}</span>
 					{#each chips as chip (chip.name)}
 						<!-- What it inserts, on hover. -->
@@ -178,7 +179,7 @@
 									<Button
 										{...mergeProps(props, { onclick: () => filter(chip.insert) })}
 										variant="outline"
-										size="xs"
+										size="sm"
 										class="font-mono"
 									>
 										{chip.name}
@@ -305,7 +306,7 @@
 	<li>
 		<button
 			type="button"
-			class="grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 px-3 py-1.5 text-left text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-none sm:grid-cols-[9rem_minmax(0,11rem)_minmax(0,1fr)]"
+			class="grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 px-3 py-1.5 text-left text-sm hover:bg-accent focus-visible:bg-accent focus-visible:-outline-offset-2 max-sm:min-h-11 max-sm:content-center sm:grid-cols-[9rem_minmax(0,11rem)_minmax(0,1fr)]"
 			aria-label={m.template_insert({ name })}
 			onclick={() => insert(path)}
 		>

@@ -142,9 +142,16 @@ describe('TemplateInput', () => {
 		});
 		await user.click(await screen.findByRole('button', { name: m.template_editor_open() }));
 		const sheet = await screen.findByRole('dialog');
-		expect(
-			await within(sheet).findByRole('button', { name: m.template_insert({ name: 'Netto' }) })
-		).toBeTruthy();
+		const row = await within(sheet).findByRole('button', {
+			name: m.template_insert({ name: 'Netto' })
+		});
+		// The focus shows as the ring every target has, and a finger hits a row and a filter on a
+		// phone (WD-07): the row 44 px tall, the filter with the hit area of a small button.
+		expect(row.className).not.toContain('outline-none');
+		expect(row.className.split(' ')).toContain('max-sm:min-h-11');
+		expect(within(sheet).getByRole('button', { name: 'upcase' }).className).toContain(
+			'max-sm:after:-inset-y-1.5'
+		);
 		const asked = fetchMock.mock.calls.map(([request]) => new URL(request.url).pathname);
 		expect(asked).not.toContain('/api/v1/fields');
 	});
