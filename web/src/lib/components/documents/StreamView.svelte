@@ -12,6 +12,7 @@
 	import DocumentLink from '#lib/components/DocumentLink.svelte';
 	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import { describeError } from '#lib/errors.ts';
 	import type { apiQuery } from '#lib/filters.ts';
 	import { formatDate, formatNumber } from '#lib/i18n.ts';
@@ -185,20 +186,21 @@
 {/snippet}
 
 {#snippet toggle()}
-	<button
-		type="button"
-		class="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+	<Button
+		variant="ghost"
+		size="sm"
+		class="text-muted-foreground"
 		aria-expanded={expanded}
 		onclick={() => (expanded = !expanded)}
 	>
 		{#if expanded}
-			<ChevronUp class="size-4" aria-hidden="true" />
+			<ChevronUp aria-hidden="true" />
 			{m.stream_fewer()}
 		{:else}
-			<ChevronDown class="size-4" aria-hidden="true" />
+			<ChevronDown aria-hidden="true" />
 			{folded === 1 ? m.stream_more_one() : m.stream_more({ count: formatNumber(folded) })}
 		{/if}
-	</button>
+	</Button>
 {/snippet}
 
 {#if problem}
@@ -298,7 +300,7 @@
 								<div
 									role="rowheader"
 									class="sticky left-0 z-10 flex flex-col justify-center border-r border-b bg-card px-3 py-2"
-									title={joined(lane) ?? laneTitle(lane, lookup)}
+									title={laneTitle(lane, lookup)}
 								>
 									<span
 										class={[
@@ -314,7 +316,12 @@
 										{/if}
 										<span class="line-clamp-2">{laneTitle(lane, lookup)}</span>
 									</span>
-									{#if lane.number}
+									<!-- What a branch refers to stands there, as on a phone: not only on hover. -->
+									{#if joined(lane)}
+										<span class="line-clamp-2 pl-3 text-xs text-muted-foreground"
+											>{joined(lane)}</span
+										>
+									{:else if lane.number}
 										<span class="truncate font-mono text-xs text-muted-foreground"
 											>{lane.number}</span
 										>

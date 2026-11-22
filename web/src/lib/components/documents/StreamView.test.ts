@@ -119,9 +119,18 @@ describe('StreamView', () => {
 			name: m.stream_more({ count: formatNumber(2) })
 		});
 		expect(more.getAttribute('aria-expanded')).toBe('false');
+		// A `Button` of the row's size, with its hit area on a phone (WA-12).
+		expect(more.getAttribute('data-slot')).toBe('button');
+		expect(more.className.split(' ')).toContain('h-8');
 		await fireEvent.click(more);
 		expect(within(table).getByRole('link', { name: /Abschlag c/ })).toBeTruthy();
 		expect(within(table).getByRole('link', { name: /Abschlag e/ })).toBeTruthy();
+		// What the branch refers to is read in its row, not only on hover.
+		const branch = within(table)
+			.getAllByRole('rowheader')
+			.find((head) => head.textContent?.includes(m.stream_joins({ title: 'Abschlag d' })));
+		expect(branch).toBeTruthy();
+		expect(branch?.getAttribute('title')).not.toContain(m.stream_joins({ title: 'Abschlag d' }));
 		expect(within(table).getByRole('button', { name: m.stream_fewer() })).toBeTruthy();
 	});
 
