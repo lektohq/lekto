@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SHARED_CACHE, sharedKey } from '#lib/app-cache.ts';
 import { BASE } from '#lib/base.ts';
-import { forgetShared, readShared } from '#lib/shared-files.ts';
+import { forgetShared, forgetSharedFile, readShared } from '#lib/shared-files.ts';
 
 const ID = '0b0e7c1e-2f2a-4d67-9a43-6f1f0c2d9e11';
 const OTHER = '1c1f8d2f-3a3b-4e78-8b54-7a2a1d3e0f22';
@@ -55,6 +55,20 @@ describe('the files of a share', () => {
 		await readShared(ID);
 
 		expect(await readShared(ID)).toHaveLength(1);
+		expect(kept.size).toBe(1);
+	});
+
+	it('leave the device one by one, each when its upload has a result (WM-06)', async () => {
+		keep(ID, 0, 'eins.pdf');
+		keep(ID, 1, 'zwei.pdf');
+		const [first] = await readShared(ID);
+
+		await forgetSharedFile(first);
+
+		// The other one, which failed perhaps, is still there to be tried again.
+		expect((await readShared(ID)).map((file) => file.name)).toEqual(['zwei.pdf']);
+		// A file that was not read from a share: nothing happens.
+		await forgetSharedFile(new File(['x'], 'other.pdf'));
 		expect(kept.size).toBe(1);
 	});
 

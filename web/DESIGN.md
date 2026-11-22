@@ -1405,9 +1405,11 @@ worker, and Lekto works as a website.
   space, as "Hochladen" does) and goes on to the inbox, which shows what came of them;
   "Verwerfen" goes there without. "Hochladen" counts only once the page has been in front for a
   second (`aria-disabled` and dimmed until then, again whenever the window comes to the front): a
-  website that asks for a double click must not get the second one here. Files stay on the device
-  until the person has decided, then they are gone; a share opened after that says that nothing
-  waits any more.
+  website that asks for a double click must not get the second one here. A discarded share is
+  gone at once. An uploaded file leaves the device when its upload has a result (uploaded, a
+  duplicate, skipped); one that failed stays until the share's hour is over, and its row in the
+  inbox's summary leads back to the share with "Erneut versuchen". A share with nothing left
+  says that nothing waits any more.
 - **Installing from the upload:** in the dialog "Hochladen", under the drop area and set off by a
   line, one hint (`text-sm`, muted, with its icon): on Android in the browser, while the browser
   offers the install, "Schneller aus dem Teilen-Menü: App installieren" (a link button that opens

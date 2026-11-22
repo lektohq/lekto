@@ -97,6 +97,40 @@ describe('uploads', () => {
 		expect(uploads.counts).toMatchObject({ uploaded: 1, duplicates: 2, skipped: 3, failed: 1 });
 	});
 
+	it('tells of every file sent what came of it, and where a failed one can be tried again (WM-06)', async () => {
+		const answers = [json({ id: 'doc-new' }, 202), problem(503), problem(409)];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => answers.shift()!)
+		);
+		const uploads = new Uploads();
+		const files = ['new', 'broken', 'twin'].map((name) => pdf(`${name}.pdf`));
+		const settled: [string, string][] = [];
+		uploads.add(intakeOf(files), {
+			settled: (file, state) => settled.push([file.name, state]),
+			again: '/ui/share?id=12345'
+		});
+		await vi.waitFor(() => expect(uploads.active).toBe(false));
+		expect(settled.sort()).toEqual([
+			['broken.pdf', 'failed'],
+			['new.pdf', 'uploaded'],
+			['twin.pdf', 'duplicate']
+		]);
+		const byName = Object.fromEntries(uploads.items.map((item) => [item.name, item]));
+		expect(byName['broken.pdf'].again).toBe('/ui/share?id=12345');
+		expect(byName['new.pdf'].again).toBeNull();
+
+		// Handed over again: what failed before is told anew, not twice.
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => json({ id: 'doc-late' }, 202))
+		);
+		uploads.add(intakeOf([files[1]]), { again: '/ui/share?id=12345' });
+		await vi.waitFor(() => expect(uploads.active).toBe(false));
+		expect(uploads.items.filter((item) => item.name === 'broken.pdf')).toHaveLength(1);
+		expect(uploads.counts).toMatchObject({ uploaded: 2, duplicates: 1, failed: 0 });
+	});
+
 	it('sends only the file: the document lands in the personal space', async () => {
 		const api = held();
 		vi.stubGlobal('fetch', api.fetchMock);

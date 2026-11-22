@@ -23,6 +23,17 @@ export interface Upload {
 	reason: SkipReason | null;
 	/** Why it failed. */
 	message: string | null;
+	/** Where a file that failed can be handed to the upload again: a shared file still lies on
+	 * the device, at the page of its share. */
+	again: string | null;
+}
+
+/** What `add` may be told about the files it takes. */
+export interface UploadOptions {
+	/** Hears of every file sent, once it has come to something. */
+	settled?: (file: File, state: UploadState) => void;
+	/** Where the files can be handed over again while they failed (`Upload.again`). */
+	again?: string;
 }
 
 /** Requests at the same time. */
@@ -32,7 +43,7 @@ const PENDING: readonly UploadState[] = ['waiting', 'uploading'];
 
 export class Uploads {
 	items = $state<Upload[]>([]);
-	#queue: { upload: Upload; file: File }[] = [];
+	#queue: { upload: Upload; file: File; options: UploadOptions }[] = [];
 	#running = 0;
 	#next = 1;
 
@@ -54,14 +65,19 @@ export class Uploads {
 		};
 	}
 
-	add(intake: Intake): void {
+	add(intake: Intake, options: UploadOptions = {}): void {
+		// Handed over again: what failed of them before is told anew by this attempt.
+		if (options.again)
+			this.items = this.items.filter(
+				(item) => !(item.state === 'failed' && item.again === options.again)
+			);
 		for (const skipped of intake.skipped) {
 			this.#push({ name: skipped.name, state: 'skipped', reason: skipped.reason });
 		}
 		for (const { file, name } of intake.files) {
 			// The pushed item is a proxy; keep working on that one so the page sees the changes.
 			const upload = this.#push({ name, state: 'waiting' });
-			this.#queue.push({ upload, file });
+			this.#queue.push({ upload, file, options });
 		}
 		this.#pump();
 	}
@@ -83,6 +99,7 @@ export class Uploads {
 			documentId: null,
 			reason: null,
 			message: null,
+			again: null,
 			...fields
 		});
 		return this.items[this.items.length - 1];
@@ -93,6 +110,8 @@ export class Uploads {
 			const job = this.#queue.shift()!;
 			this.#running++;
 			void this.#send(job.upload, job.file).finally(() => {
+				if (job.upload.state === 'failed') job.upload.again = job.options.again ?? null;
+				job.options.settled?.(job.file, job.upload.state);
 				this.#running--;
 				this.#pump();
 			});

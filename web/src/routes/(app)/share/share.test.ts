@@ -10,7 +10,8 @@ vi.mock('$app/navigation', () => ({ goto }));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 const shared = vi.hoisted(() => ({
 	readShared: vi.fn(async (): Promise<File[]> => []),
-	forgetShared: vi.fn(async () => {})
+	forgetShared: vi.fn(async () => {}),
+	forgetSharedFile: vi.fn(async () => {})
 }));
 vi.mock('#lib/shared-files.ts', () => shared);
 
@@ -37,6 +38,7 @@ describe('the page of a share', () => {
 		goto.mockClear();
 		shared.readShared.mockReset();
 		shared.forgetShared.mockClear();
+		shared.forgetSharedFile.mockClear();
 	});
 
 	it('shows the shared files and uploads nothing by itself', async () => {
@@ -52,19 +54,31 @@ describe('the page of a share', () => {
 		expect(testPage.url.searchParams.get('id')).toBe(ID);
 	});
 
-	it('uploads on "Hochladen", then forgets the share and goes to the inbox', async () => {
+	it('uploads on "Hochladen" and goes to the inbox; a file leaves the device with its result (WM-06)', async () => {
+		const note = new File(['x'], 'notes.txt', { type: 'text/plain' });
+		const [good, broken] = [pdf('Rechnung.pdf'), pdf('Mahnung.pdf')];
+		shared.readShared.mockResolvedValue([good, broken, note]);
 		render(Page);
 		await pass(1000);
 		await fireEvent.click(uploadButton());
 		await pass();
 
 		expect(add).toHaveBeenCalledTimes(1);
-		expect(add.mock.calls[0][0].files.map((entry: { name: string }) => entry.name)).toEqual([
+		const [intake, options] = add.mock.calls[0];
+		expect(intake.files.map((entry: { name: string }) => entry.name)).toEqual([
 			'Rechnung.pdf',
-			'Rechnung.pdf'
+			'Mahnung.pdf'
 		]);
-		expect(shared.forgetShared).toHaveBeenCalledWith(ID);
 		expect(goto).toHaveBeenCalledWith('/ui/inbox', { replaceState: true });
+		// Nothing is gone yet but what the upload does not take: its result is known.
+		expect(shared.forgetShared).not.toHaveBeenCalled();
+		expect(shared.forgetSharedFile.mock.calls).toEqual([[note]]);
+
+		// Uploaded: gone. Failed: it stays, and the inbox's list leads back to this share.
+		options.settled(good, 'uploaded');
+		options.settled(broken, 'failed');
+		expect(shared.forgetSharedFile.mock.calls).toEqual([[note], [good]]);
+		expect(options.again).toBe(`/ui/share?id=${ID}`);
 	});
 
 	it('discards without an upload', async () => {

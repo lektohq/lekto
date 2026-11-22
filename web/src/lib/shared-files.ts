@@ -5,8 +5,13 @@ import { BASE } from '#lib/base.ts';
  * The files another app shared with the installed one (web/DESIGN.md, "App"), as the service
  * worker keeps them under the share's id. Reading leaves them where they are: any website can
  * post files to the share target, so the page `/share` shows them and asks before anything is
- * uploaded (`forgetShared` once the person has decided).
+ * uploaded. A file leaves the device once its upload has a result (`forgetSharedFile`), a
+ * share the person discards at once (`forgetShared`); what failed stays to be tried again,
+ * until the worker removes the share after its hour.
  */
+
+/** Where a file read from a share lies on the device, to remove that one alone. */
+const PLACES = new WeakMap<File, { cache: Cache; request: Request }>();
 
 async function kept(id: string): Promise<{ cache: Cache; requests: Request[] } | null> {
 	if (!('caches' in window)) return null;
@@ -29,12 +34,21 @@ export async function readShared(id: string): Promise<File[]> {
 		if (!response) continue;
 		const blob = await response.blob();
 		const name = decodeURIComponent(response.headers.get('x-lekto-name') ?? 'file');
-		files.push(new File([blob], name, { type: blob.type }));
+		const file = new File([blob], name, { type: blob.type });
+		PLACES.set(file, { cache: found.cache, request });
+		files.push(file);
 	}
 	return files;
 }
 
-/** Remove a share from the device: its files are with the upload, or the person discarded them. */
+/** Remove one file of a share from the device: its upload has a result. Nothing for a file
+ * that was not read from a share. */
+export async function forgetSharedFile(file: File): Promise<void> {
+	const place = PLACES.get(file);
+	if (place) await place.cache.delete(place.request);
+}
+
+/** Remove a share from the device: the person discarded it. */
 export async function forgetShared(id: string): Promise<void> {
 	const found = await kept(id);
 	if (!found) return;

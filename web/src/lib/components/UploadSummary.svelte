@@ -12,6 +12,7 @@
 	import { uploads } from '#lib/upload.svelte.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import IconButton from '#lib/components/IconButton.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
 
 	// What came of the uploads, until dismissed (in this browser only): "12 uploaded,
 	// 1 duplicate, 3 skipped", the progress while files are on their way, and each duplicate
@@ -101,6 +102,10 @@
 								<CircleAlert class="size-3.5 shrink-0" aria-hidden="true" />
 								{item.message}
 							</span>
+							{#if item.again}
+								<!-- A shared file still lies on the device: back to its share. -->
+								<Button variant="link" size="inline" href={item.again}>{m.retry()}</Button>
+							{/if}
 						{/if}
 					</li>
 				{/each}

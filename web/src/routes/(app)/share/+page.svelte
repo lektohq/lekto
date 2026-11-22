@@ -13,14 +13,15 @@
 	import { fileSize } from '#lib/file-passport.ts';
 	import { intakeOf } from '#lib/intake.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { forgetShared, readShared } from '#lib/shared-files.ts';
+	import { forgetShared, forgetSharedFile, readShared } from '#lib/shared-files.ts';
 	import { uploads } from '#lib/upload.svelte.ts';
 
 	// Files another app shared with the installed one (web/DESIGN.md, "App"). Any website can post
 	// files to the share target, with no click of the person, so nothing is uploaded here by
 	// itself: the page shows the files, and only "Hochladen" hands them to the upload (into the
 	// personal space; the inbox shows what came of them). The share's id stands in the address
-	// until the person has decided; until then the files stay on the device.
+	// until the person has decided. A file stays on the device until its upload has a result;
+	// one that failed stays, and the inbox's list leads back here to try again.
 
 	/** How long the page must have been in front before "Hochladen" counts: a website that asks
 	 * for a double click and brings this page up between the two must not get the second one. */
@@ -72,8 +73,7 @@
 		}
 	}
 
-	/** The share leaves the device, and the inbox is next: after the upload took the files, or
-	 * without it. */
+	/** The share leaves the device, and the inbox is next: the person discarded it. */
 	async function leave() {
 		try {
 			if (id) await forgetShared(id);
@@ -83,11 +83,23 @@
 		await goto(`${BASE}/inbox`, { replaceState: true });
 	}
 
+	/** A file's upload has a result: it leaves the device. */
+	const drop = (file: File) => void forgetSharedFile(file).catch(reportError);
+
 	async function upload() {
-		if (held || decided || !files) return;
+		if (held || decided || !files || !id) return;
 		decided = true;
-		uploads.add(intakeOf(files));
-		await leave();
+		const taken = intakeOf(files);
+		// What the upload does not take (another type, hidden) has its result already.
+		const sent = new Set(taken.files.map((entry) => entry.file));
+		for (const file of files) if (!sent.has(file)) drop(file);
+		uploads.add(taken, {
+			settled: (file, state) => {
+				if (state !== 'failed') drop(file);
+			},
+			again: `${BASE}/share?id=${id}`
+		});
+		await goto(`${BASE}/inbox`, { replaceState: true });
 	}
 
 	async function discard() {
