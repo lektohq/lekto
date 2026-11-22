@@ -453,8 +453,10 @@ chosen a line there says how to choose, move and cut. The description under the 
 
 ### Badges
 
-`Badge` (`ui/badge`) shows a state or a short fact. It is never a button. Its tones come from
-`tones.ts`, shared with every lane mark:
+`Badge` (`ui/badge`) shows a state or a short fact. It is never a button. The one exception
+(Tobi, 22.11.2026): "Titelmuster von …" at a rule (`TitlePatternBadge`) opens the dialog of its
+type for an admin, with a hit area of 44 px on a phone. Its tones come from `tones.ts`, shared
+with every lane mark:
 
 | Tone                                | Use                                                                                              |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------ |

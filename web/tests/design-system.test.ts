@@ -661,6 +661,20 @@ describe('the design system (web/DESIGN.md)', () => {
 	const COLOUR_VALUE =
 		/#(?:[0-9a-f]{8}|[0-9a-f]{6})\b|['"[]#[0-9a-f]{3}['"\]]|\b(?:rgba?|hsla?|oklch|oklab)\(/i;
 
+	it('makes a badge a button only for the title pattern of a rule', () => {
+		// "Badges": a badge shows a state and is never a button, with this one exception.
+		const inside = /<Badge\b[^>]*>(?:(?!<\/Badge\b)[\s\S])*?<(?:button|a)\b/;
+		expect(
+			offenders((source, path) =>
+				path.endsWith('/rules/TitlePatternBadge.svelte') ? null : (inside.exec(source)?.[0] ?? null)
+			)
+		).toEqual([]);
+		expect(inside.test('<Badge variant="note"><button type="button">x</button></Badge>')).toBe(
+			true
+		);
+		expect(inside.test('<Badge>a</Badge> <button type="button">x</button>')).toBe(false);
+	});
+
 	it('marks a target as small only where DESIGN.md names the exception', () => {
 		// "Touch targets": the layout spec skips what carries the mark. This list may only shrink.
 		const SMALL = new Set([
