@@ -15,11 +15,9 @@
 	import { separationOf } from '#lib/separation.ts';
 	import { object, person } from '#lib/signals.ts';
 	import { drawsDetails, drawsFacts } from '#lib/step-details.ts';
-	import { YELLOW_ACTION } from '#lib/step-look.ts';
 	import { actorOf, confirmationOf } from '#lib/step-summary.ts';
 	import type { Step } from '#lib/steps.ts';
 	import { usageOf } from '#lib/usage.ts';
-	import { cn } from '#lib/utils.ts';
 	import { viaToken } from '#lib/via-token.ts';
 
 	type LogEntry = components['schemas']['LogEntry'];
@@ -146,7 +144,7 @@
 			</div>
 		{/each}
 		{#if filingHref && step.node === 'judge'}
-			<Button href={filingHref} size="sm" class={cn('self-start', YELLOW_ACTION)}>
+			<Button href={filingHref} size="sm" class="self-start">
 				{m.processing_filing_link()}
 			</Button>
 		{/if}

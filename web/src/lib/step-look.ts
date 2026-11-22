@@ -91,7 +91,3 @@ export const LIT_RING: Record<Tone, string> = {
 	running: 'ring-lane-running-foreground',
 	muted: 'ring-muted-foreground'
 };
-
-/** An action in the yellow lane (to the filing question), drawn like the chip. */
-export const YELLOW_ACTION =
-	'bg-lane-yellow text-lane-yellow-foreground ring-1 ring-inset ring-lane-yellow-foreground/35 hover:bg-lane-yellow/70';

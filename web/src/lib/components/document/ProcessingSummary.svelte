@@ -9,7 +9,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { Changes, Headline, HeadlineTone } from '#lib/run-summary.ts';
-	import { DOT, YELLOW_ACTION } from '#lib/step-look.ts';
+	import { DOT } from '#lib/step-look.ts';
 	import type { Counts } from '#lib/steps.ts';
 	import { cn } from '#lib/utils.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
@@ -101,7 +101,7 @@
 			{/if}
 		</div>
 		{#if headline.action === 'filing' || headline.action === 'review'}
-			<Button href={reviewHref} class={cn('shrink-0', YELLOW_ACTION)}>
+			<Button href={reviewHref} class="shrink-0">
 				{headline.action === 'filing' ? m.processing_filing_link() : m.run_to_review()}
 			</Button>
 		{:else if headline.action === 'reprocess' && canReprocess}

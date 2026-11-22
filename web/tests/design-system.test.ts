@@ -840,6 +840,19 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('draws no action on the colour of a lane', () => {
+		// "Lane colours mean state, nothing else" (DESIGN.md, "Principles"): what one presses
+		// takes a variant of `Button`. A hover on a lane's ground is the mark of such an action.
+		const action = /\bhover:bg-lane-/;
+		expect(
+			Object.entries({ ...sources, ...scripts })
+				.filter(([, source]) => action.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+		expect(action.test('bg-lane-yellow ring-1 hover:bg-lane-yellow/70')).toBe(true);
+		expect(action.test('bg-lane-yellow text-lane-yellow-foreground')).toBe(false);
+	});
+
 	it('keeps the buttons in an alert in their variant, never in its tone', () => {
 		// DESIGN.md, "Alerts": a button in an alert is a Button of its variants.
 		const tone =
