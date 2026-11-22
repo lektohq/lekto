@@ -48,6 +48,12 @@ describe('the documents of the list a document was opened from', () => {
 		const ids = await listPlaces('/ui/documents?tag=t1', 'Strom', false);
 		expect(ids).toHaveLength(200);
 		expect(ids[150]).toBe('d150');
-		expect(calls(api)).toHaveLength(2);
+		// The filters and the sort of the list, page by page (WT3-06: the request was not read).
+		expect(calls(api)).toEqual([
+			'POST /api/v1/documents/search?tag_id=t1&sort=relevance&offset=0&limit=100',
+			'POST /api/v1/documents/search?tag_id=t1&sort=relevance&offset=100&limit=100'
+		]);
+		const sent = await Promise.all(api.mock.calls.map(([request]) => request.clone().json()));
+		expect(sent).toEqual([{ q: 'Strom' }, { q: 'Strom' }]);
 	});
 });

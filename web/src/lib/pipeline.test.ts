@@ -181,7 +181,7 @@ describe('the pipeline of the installation', () => {
 						} satisfies components['schemas']['PipelineOut'])
 		});
 		vi.stubGlobal('fetch', fetch);
-		await expect(pipeline()).rejects.toBeTruthy();
+		await expect(pipeline()).rejects.toMatchObject({ status: 503 });
 		fail = false;
 		const [first, second] = await Promise.all([pipeline(), pipeline()]);
 		expect(first).toBe(second);

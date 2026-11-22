@@ -209,7 +209,7 @@ describe('matrixOf', () => {
 		expect([...decided]).toEqual([['space', MINE]]);
 		const rows = matrixOf(verdict([space]), false, MINE, lookup, john, decided);
 		expect(rows[0]).toMatchObject({ open: false, chip: m.matrix_chip_by_hand() });
-		expect(rows[0].value).not.toContain('Erika');
+		expect(rows[0].value).not.toContain('Jane Doe');
 	});
 });
 

@@ -48,8 +48,13 @@ describe('the log of a mailbox', () => {
 		expect(takenText(ITEM)).toBe(m.mailbox_by_rule({ name: 'Strom' }));
 		expect(takenText({ ...ITEM, rule: null, rule_id: null })).toBe(m.mailbox_by_fallback());
 		const later = takenText({ ...ITEM, outcome: 'nothing', later: true });
-		expect(later).toContain(m.mailbox_nothing_taken());
-		expect(later).toContain(m.mailbox_later({ date: '' }).trim().split(' ')[0]);
+		expect(later).toBe(
+			[
+				m.mailbox_by_rule({ name: 'Strom' }),
+				m.mailbox_nothing_taken(),
+				m.mailbox_later({ date: '11/4/26' })
+			].join(' · ')
+		);
 		expect(takenText({ ...ITEM, outcome: 'no_rule' })).toBe('');
 	});
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { m } from '#lib/paraglide/messages.js';
 import { describeValue, fieldLabel } from './describe.ts';
 import { lookupOf } from '#lib/testing/master-data.ts';
 
@@ -25,9 +26,10 @@ describe('describing changes', () => {
 	});
 
 	it('shows plain values', () => {
-		expect(describeValue(true, lookup)).not.toBe('');
+		expect(describeValue(true, lookup)).toBe(m.value_yes());
+		expect(describeValue(false, lookup)).toBe(m.value_no());
 		expect(describeValue('hello', lookup)).toBe('hello');
-		expect(describeValue({ amount: '1.5', currency: 'EUR' }, lookup)).toContain('1');
+		expect(describeValue({ amount: '1.5', currency: 'EUR' }, lookup)).toBe('€1.50');
 	});
 
 	it('names fields', () => {

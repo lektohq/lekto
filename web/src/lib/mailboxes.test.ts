@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { formatMoment } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import type { Reason } from '#lib/reasons.ts';
 import {
@@ -134,6 +135,13 @@ describe('what a mailbox left out or could not do', () => {
 			}
 		};
 		expect(cautions(mailbox).map((item) => item.key)).toEqual(['step', 'skipped']);
-		expect(cautions(mailbox)[0].text).toContain('2026');
+		const [step, skipped] = cautions(mailbox).map((item) => item.text);
+		const said = m.reason_mail_server_error({ detail: 'no' });
+		expect(step).toBe(
+			m.mail_step_failed({ when: formatMoment('2026-11-05T10:00:00Z'), reason: said })
+		);
+		expect(skipped).toBe(
+			m.mail_skipped({ when: formatMoment('2026-11-04T10:00:00Z'), reason: said })
+		);
 	});
 });
