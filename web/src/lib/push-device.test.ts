@@ -6,8 +6,10 @@ import {
 	currentSubscription,
 	keyBytes,
 	leaveDevice,
+	notificationsBlocked,
 	subscribe,
-	unblockSteps
+	unblockSteps,
+	watchPermission
 } from '#lib/push-device.ts';
 import { calls, fakeApi, json } from '#lib/testing/api.ts';
 
@@ -53,6 +55,41 @@ describe('this device', () => {
 			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Safari/537.36'
 		);
 		expect(unblockSteps()).toEqual(['address-bar']);
+	});
+
+	it('names the settings of a phone, not a Mac’s menu bar or a click (WM-03)', () => {
+		const standalone = (matches: boolean) =>
+			vi.spyOn(window, 'matchMedia').mockReturnValue({ matches } as MediaQueryList);
+		// The installed app on an iPhone and an iPad (their web apps send no "Safari/").
+		standalone(true);
+		agent(
+			'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148'
+		);
+		expect(unblockSteps()).toEqual(['ios-app']);
+		agent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Mobile/15E148', 5);
+		expect(unblockSteps()).toEqual(['ios-app']);
+		// Android: the installed app has no address bar; the browser's is tapped.
+		const android =
+			'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Chrome/140.0 Mobile Safari/537.36';
+		agent(android);
+		expect(unblockSteps()).toEqual(['android-app']);
+		standalone(false);
+		expect(unblockSteps()).toEqual(['address-bar-tap']);
+	});
+
+	it('reads the permission again when the person comes back from the settings', () => {
+		vi.stubGlobal('Notification', { permission: 'denied' });
+		expect(notificationsBlocked()).toBe(true);
+		const changed = vi.fn();
+		const stop = watchPermission(changed);
+		window.dispatchEvent(new Event('focus'));
+		document.dispatchEvent(new Event('visibilitychange'));
+		expect(changed).toHaveBeenCalledTimes(2);
+		vi.stubGlobal('Notification', { permission: 'granted' });
+		expect(notificationsBlocked()).toBe(false);
+		stop();
+		window.dispatchEvent(new Event('focus'));
+		expect(changed).toHaveBeenCalledTimes(2);
 	});
 });
 

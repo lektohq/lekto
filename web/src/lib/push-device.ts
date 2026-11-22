@@ -193,17 +193,43 @@ export function deviceName(): string {
 	return [system, browserName(agent)].filter(Boolean).join(' · ');
 }
 
-/** Where the person allows notifications again after blocking them, for this browser: the app
- * in the Dock has settings of its own, apart from Safari's; macOS asks once more for the app. */
-export type UnblockStep = 'dock-app' | 'safari' | 'address-bar' | 'macos';
+/** Where the person allows notifications again after blocking them, for this device: on an
+ * iPhone or iPad the system's settings of the app (push is only in the app there), on Android
+ * those of the installed app or the browser's address bar, tapped; on a Mac the app in the Dock
+ * has settings of its own, apart from Safari's, and macOS asks once more for the app. */
+export type UnblockStep =
+	'ios-app' | 'android-app' | 'address-bar-tap' | 'dock-app' | 'safari' | 'address-bar' | 'macos';
 
 export function unblockSteps(): UnblockStep[] {
-	const agent = navigator.userAgent;
-	const browser = browserName(agent);
-	const mac = appleDevice() === 'Mac';
+	const apple = appleDevice();
+	if (apple === 'iPhone' || apple === 'iPad') return ['ios-app'];
+	if (isAndroid()) return [installed() ? 'android-app' : 'address-bar-tap'];
 	const steps: UnblockStep[] = [];
-	if (browser === 'Safari') steps.push(installed() ? 'dock-app' : 'safari');
+	if (browserName(navigator.userAgent) === 'Safari')
+		steps.push(installed() ? 'dock-app' : 'safari');
 	else steps.push('address-bar');
-	if (mac) steps.push('macos');
+	if (apple === 'Mac') steps.push('macos');
 	return steps;
+}
+
+/** Whether the person has blocked notifications for this app. */
+export function notificationsBlocked(): boolean {
+	return 'Notification' in window && Notification.permission === 'denied';
+}
+
+/**
+ * Tell `changed` whenever the person may have changed that outside the app: they come back
+ * from the settings (the tab or the app shows again, the window gets the focus). No reload is
+ * needed then, which the installed app has no button for. Returns what ends the watching.
+ */
+export function watchPermission(changed: () => void): () => void {
+	const back = () => {
+		if (document.visibilityState === 'visible') changed();
+	};
+	document.addEventListener('visibilitychange', back);
+	window.addEventListener('focus', back);
+	return () => {
+		document.removeEventListener('visibilitychange', back);
+		window.removeEventListener('focus', back);
+	};
 }

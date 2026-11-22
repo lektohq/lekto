@@ -18,13 +18,16 @@
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
 	import { formatDate, getLocale } from '#lib/i18n.ts';
+	import { appleDevice } from '#lib/install.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import {
 		currentSubscription,
 		deviceName,
+		notificationsBlocked,
 		pushSupport,
 		subscribe,
 		unblockSteps,
+		watchPermission,
 		type UnblockStep
 	} from '#lib/push-device.ts';
 	import { session } from '#lib/session.svelte.ts';
@@ -44,7 +47,7 @@
 	let endpoint = $state<string | null>(null);
 	let problem = $state<string | null>(null);
 	let busy = $state(false);
-	let blocked = $state(support === 'ready' && Notification.permission === 'denied');
+	let blocked = $state(support === 'ready' && notificationsBlocked());
 	let removing = $state<Device | null>(null);
 
 	const here = $derived(devices?.find((device) => device.endpoint === endpoint) ?? null);
@@ -57,12 +60,17 @@
 	const shown = $derived(KINDS.filter((item) => !item.admin || session.isAdmin));
 	// Where to allow them again, for this browser (a Dock app has settings of its own).
 	const UNBLOCK: Record<UnblockStep, () => string> = {
+		'ios-app': m.notifications_unblock_ios_app,
+		'android-app': m.notifications_unblock_android_app,
+		'address-bar-tap': m.notifications_unblock_address_bar_tap,
 		'dock-app': m.notifications_unblock_dock_app,
 		safari: m.notifications_unblock_safari,
 		'address-bar': m.notifications_unblock_address_bar,
 		macos: m.notifications_unblock_macos
 	};
 	const unblock = support === 'ready' ? unblockSteps() : [];
+	// The device the hint to install the app first names (only an iPhone or iPad gets it).
+	const device = appleDevice() === 'iPad' ? 'iPad' : 'iPhone';
 
 	async function load() {
 		problem = null;
@@ -84,7 +92,11 @@
 		}
 	}
 
-	onMount(load);
+	onMount(() => {
+		void load();
+		// Allowed again in the settings: the card knows once the person is back, without a reload.
+		return watchPermission(() => (blocked = support === 'ready' && notificationsBlocked()));
+	});
 
 	async function switchOn() {
 		if (busy || !publicKey) return;
@@ -192,10 +204,15 @@
 				<p class="text-muted-foreground">{m.notifications_off_server()}</p>
 			{:else if support === 'install-first'}
 				<Alert.Root variant="tip">
-					<Alert.Title>{m.notifications_install_title()}</Alert.Title>
+					<Alert.Title>{m.notifications_install_title({ device })}</Alert.Title>
 					<Alert.Description>
 						<ol class="list-decimal pl-5">
-							<li>{m.notifications_step_share()}</li>
+							<!-- Safari's "Share" stands at the bottom on an iPhone, at the top on an iPad. -->
+							<li>
+								{device === 'iPad'
+									? m.notifications_step_share_top()
+									: m.notifications_step_share()}
+							</li>
 							<li>{m.notifications_step_home()}</li>
 							<li>{m.notifications_step_open()}</li>
 						</ol>
@@ -216,7 +233,7 @@
 					<Alert.Description>
 						<ol class="list-decimal pl-5">
 							{#each unblock as step (step)}<li>{UNBLOCK[step]()}</li>{/each}
-							<li>{m.notifications_unblock_reload()}</li>
+							<li>{m.notifications_unblock_return()}</li>
 						</ol>
 					</Alert.Description>
 				</Alert.Root>
