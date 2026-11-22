@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	deviceName,
 	endForeignSubscription,
+	currentSubscription,
 	keyBytes,
 	leaveDevice,
+	subscribe,
 	unblockSteps
 } from '#lib/push-device.ts';
 import { calls, fakeApi, json } from '#lib/testing/api.ts';
@@ -77,6 +79,66 @@ function browserWith(endpoint: string | null, shown = 0) {
 
 const clearedBadge = () =>
 	vi.mocked((navigator as Navigator & { clearAppBadge: () => Promise<void> }).clearAppBadge);
+
+describe('a subscription of an earlier server key (WH-05)', () => {
+	// Two keys of the server, as bytes and as the base64url text the API gives.
+	const OLD = 'AQID';
+	const NEW = 'BAUG';
+
+	/** A browser that holds a subscription made with `key` and refuses a second with another. */
+	function browserSubscribed(key: string) {
+		const held = {
+			endpoint: ENDPOINT,
+			options: { applicationServerKey: keyBytes(key).buffer },
+			unsubscribe: vi.fn<() => Promise<boolean>>(async () => true)
+		};
+		let current: typeof held | null = held;
+		held.unsubscribe.mockImplementation(async () => {
+			current = null;
+			return true;
+		});
+		const made = { endpoint: 'https://push.example/new' };
+		const subscribing = vi.fn(async () => {
+			if (current) throw new DOMException('another key', 'InvalidStateError');
+			return made;
+		});
+		vi.stubGlobal('Notification', { requestPermission: async () => 'granted' });
+		vi.stubGlobal('navigator', {
+			userAgent: 'test',
+			serviceWorker: {
+				getRegistration: async () => ({
+					pushManager: { getSubscription: async () => current, subscribe: subscribing }
+				})
+			}
+		});
+		return { held, made, subscribing };
+	}
+
+	it('ends it and has the server forget its device before subscribing anew', async () => {
+		const { held, made } = browserSubscribed(OLD);
+		const api = fakeApi({ 'GET /api/v1/push/devices': () => [device('d-own', ENDPOINT)] });
+		vi.stubGlobal('fetch', api);
+		expect(await subscribe(NEW)).toBe(made);
+		expect(held.unsubscribe).toHaveBeenCalledOnce();
+		expect(calls(api)).toContain('DELETE /api/v1/push/devices/d-own');
+	});
+
+	it('keeps a subscription made with the key the server has', async () => {
+		const { held, subscribing } = browserSubscribed(NEW);
+		vi.stubGlobal('fetch', fakeApi());
+		await expect(subscribe(NEW)).rejects.toThrow();
+		expect(held.unsubscribe).not.toHaveBeenCalled();
+		expect(subscribing).toHaveBeenCalledOnce();
+	});
+
+	it('counts the device as off while its subscription is of another key', async () => {
+		browserSubscribed(OLD);
+		expect(await currentSubscription(NEW)).toBeNull();
+		expect((await currentSubscription(OLD))?.endpoint).toBe(ENDPOINT);
+		// Without a key to compare with, the subscription as it is.
+		expect((await currentSubscription())?.endpoint).toBe(ENDPOINT);
+	});
+});
 
 describe('giving this device up on signing out', () => {
 	afterEach(() => {

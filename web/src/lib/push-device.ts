@@ -33,10 +33,15 @@ async function registration(): Promise<ServiceWorkerRegistration | null> {
 	return (await navigator.serviceWorker.getRegistration(`${BASE}/`)) ?? null;
 }
 
-/** This browser's subscription, if it has one. */
-export async function currentSubscription(): Promise<PushSubscription | null> {
+/** This browser's subscription, if it has one. With `publicKey` (the server's key now): only
+ * one made with that key. A subscription of an earlier key gets nothing from this server any
+ * more, so the device counts as off (docs/configuration.md, `LEKTO_PUSH_VAPID_PRIVATE_KEY`). */
+export async function currentSubscription(
+	publicKey: string | null = null
+): Promise<PushSubscription | null> {
 	const found = await registration();
-	return found ? await found.pushManager.getSubscription() : null;
+	const held = found ? await found.pushManager.getSubscription() : null;
+	return held && publicKey !== null && !madeWith(held, publicKey) ? null : held;
 }
 
 /** A base64url key as the bytes `applicationServerKey` takes. */
@@ -44,6 +49,15 @@ export function keyBytes(base64url: string): Uint8Array<ArrayBuffer> {
 	const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
 	const raw = atob(base64 + '='.repeat((4 - (base64.length % 4)) % 4));
 	return Uint8Array.from(raw, (char) => char.charCodeAt(0));
+}
+
+/** Whether `subscription` was made with the server key `publicKey`; a browser that does not
+ * tell the key of a subscription is taken at its word. */
+export function madeWith(subscription: PushSubscription, publicKey: string): boolean {
+	const held = subscription.options?.applicationServerKey;
+	if (!held) return true;
+	const [own, wanted] = [new Uint8Array(held), keyBytes(publicKey)];
+	return own.length === wanted.length && own.every((byte, index) => byte === wanted[index]);
 }
 
 /** Ask the person (from a tap: browsers allow it only then) and subscribe; `denied` if they
@@ -54,6 +68,13 @@ export async function subscribe(
 	if ((await Notification.requestPermission()) !== 'granted') return 'denied';
 	const found = await registration();
 	if (!found) return 'unavailable';
+	// The browser refuses a second subscription with another key (`InvalidStateError`): one of
+	// an earlier server key ends first, and the server forgets its device.
+	const held = await found.pushManager.getSubscription();
+	if (held && !madeWith(held, publicKey)) {
+		await forget(held);
+		await held.unsubscribe();
+	}
 	return found.pushManager.subscribe({
 		userVisibleOnly: true,
 		applicationServerKey: keyBytes(publicKey)
@@ -70,23 +91,25 @@ async function silence(found: ServiceWorkerRegistration, subscription: PushSubsc
 	for (const notification of shown) notification.close();
 }
 
+/** The server forgets the device of `subscription`; if it cannot be told, the ended
+ * subscription tells it with the next message it tries to send. Never throws. */
+async function forget(subscription: PushSubscription): Promise<void> {
+	try {
+		const devices = await unwrap(api.GET('/api/v1/push/devices'));
+		const own = devices.find((device) => device.endpoint === subscription.endpoint);
+		if (own) {
+			await unwrap(api.DELETE('/api/v1/push/devices/{id}', { params: { path: { id: own.id } } }));
+		}
+	} catch {
+		// Offline, or the session is gone already.
+	}
+}
+
 async function leave(): Promise<void> {
 	const found = await registration();
 	if (!found) return;
 	const subscription = await found.pushManager.getSubscription();
-	if (subscription) {
-		// The server forgets the device; if it cannot be told, the ended subscription tells it
-		// with the next message it tries to send.
-		try {
-			const devices = await unwrap(api.GET('/api/v1/push/devices'));
-			const own = devices.find((device) => device.endpoint === subscription.endpoint);
-			if (own) {
-				await unwrap(api.DELETE('/api/v1/push/devices/{id}', { params: { path: { id: own.id } } }));
-			}
-		} catch {
-			// Offline, or the session is gone already.
-		}
-	}
+	if (subscription) await forget(subscription);
 	await silence(found, subscription);
 }
 

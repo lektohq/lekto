@@ -77,7 +77,8 @@
 			devices = list;
 			kinds = preferences.kinds;
 			titles = preferences.titles;
-			endpoint = support === 'ready' ? ((await currentSubscription())?.endpoint ?? null) : null;
+			endpoint =
+				support === 'ready' ? ((await currentSubscription(publicKey))?.endpoint ?? null) : null;
 		} catch (failure) {
 			problem = describeError(failure);
 		}
