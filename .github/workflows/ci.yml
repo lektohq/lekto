@@ -151,7 +151,7 @@ jobs:
       # mypy's cache: most of its work are the dependencies, so one entry per lock file.
       - id: mypy-cache
         if: matrix.part == 'checks'
-        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: backend/.mypy_cache
           key: mypy-${{ hashFiles('backend/uv.lock', 'backend/pyproject.toml') }}
@@ -159,7 +159,7 @@ jobs:
       - if: >-
           matrix.part == 'checks' && env.WRITE_CACHE == 'true'
           && steps.mypy-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: backend/.mypy_cache
           key: ${{ steps.mypy-cache.outputs.cache-primary-key }}
@@ -289,7 +289,7 @@ jobs:
       - id: store
         run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
       - id: pnpm-cache
-        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.store.outputs.path }}
           key: pnpm-${{ hashFiles('web/pnpm-lock.yaml') }}
@@ -297,7 +297,7 @@ jobs:
       - if: >-
           matrix.part == 'lint' && env.WRITE_CACHE == 'true'
           && steps.pnpm-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.store.outputs.path }}
           key: ${{ steps.pnpm-cache.outputs.cache-primary-key }}
@@ -331,7 +331,7 @@ jobs:
             >> "$GITHUB_ENV"
       - id: ocr
         run: echo "key=$(.github/scripts/ocr-packages.sh key)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/ocr-debs
           key: ${{ steps.ocr.outputs.key }}
@@ -378,7 +378,7 @@ jobs:
       - id: ocr
         run: echo "key=$(.github/scripts/ocr-packages.sh key)" >> "$GITHUB_OUTPUT"
       - id: cache
-        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/ocr-debs
           key: ${{ steps.ocr.outputs.key }}
@@ -386,7 +386,7 @@ jobs:
       - if: steps.cache.outputs.cache-hit != 'true'
         run: .github/scripts/ocr-packages.sh download "$RUNNER_TEMP/ocr-debs"
       - if: steps.cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/ocr-debs
           key: ${{ steps.ocr.outputs.key }}
