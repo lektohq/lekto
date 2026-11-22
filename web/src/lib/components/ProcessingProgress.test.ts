@@ -38,6 +38,10 @@ describe('ProcessingProgress', () => {
 		expect(bar.getAttribute('aria-valuetext')).toBeTruthy();
 		expect(screen.getByRole('status').textContent).toContain('3');
 		expect(screen.getByRole('link').getAttribute('href')).toBe('/ui/documents/d?tab=processing');
+		// The bar is a few pixels tall; the link's hit area is a target's (WC-07).
+		expect(screen.getByRole('link').className.split(' ')).toEqual(
+			expect.arrayContaining(['after:absolute', 'after:-inset-y-1.5', 'max-sm:after:-inset-y-4'])
+		);
 	});
 
 	it('is a thin bar alone where it is small', () => {

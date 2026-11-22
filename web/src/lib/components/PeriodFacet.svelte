@@ -10,6 +10,7 @@
 	} from '#lib/filters.ts';
 	import { formatDate, formatNumber } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
+	import { phone } from '#lib/phone.svelte.ts';
 	import Chip from '#lib/components/Chip.svelte';
 	import { QUICK_PICKS } from '#lib/period-label.ts';
 
@@ -88,7 +89,7 @@
 		{#each RELATIVE_PERIODS as quick (quick)}
 			{@const active = period.period === quick}
 			<Chip
-				size="sm"
+				size={phone.current ? 'md' : 'sm'}
 				pressed={active}
 				onclick={() => onchange(active ? NONE : quickPick(quick, today))}
 			>
@@ -104,7 +105,7 @@
 					type="button"
 					aria-pressed={active}
 					class={[
-						'relative flex h-9 items-center justify-between gap-1 overflow-hidden rounded-lg border px-2 text-left transition-colors',
+						'relative flex h-9 items-center justify-between gap-1 overflow-hidden rounded-lg border px-2 text-left transition-colors max-sm:h-11',
 						active
 							? 'border-primary/30 bg-panel font-medium text-brand'
 							: 'bg-card hover:bg-secondary'
@@ -136,7 +137,7 @@
 			<button
 				type="button"
 				aria-expanded={older}
-				class="flex h-8 items-center justify-between rounded-lg border border-dashed px-2.5 text-xs text-muted-foreground hover:bg-secondary"
+				class="flex h-8 items-center justify-between rounded-lg border border-dashed px-2.5 text-xs text-muted-foreground hover:bg-secondary max-sm:h-11"
 				onclick={() => (older = !older)}
 			>
 				<span>

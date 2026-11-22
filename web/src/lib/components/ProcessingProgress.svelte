@@ -69,7 +69,12 @@
 
 <span class={cn('flex min-w-0 flex-col gap-1', className)}>
 	{#if href}
-		<a {href} class="block rounded-full py-1 hover:opacity-80" aria-label={now}>
+		<!-- The bar is 6 px tall: its hit area reaches 24 px with a mouse and 44 px on a phone. -->
+		<a
+			{href}
+			class="relative block rounded-full py-1 after:absolute after:inset-x-0 after:-inset-y-1.5 hover:opacity-80 max-sm:after:-inset-y-4"
+			aria-label={now}
+		>
 			{@render bar()}
 		</a>
 	{:else}
