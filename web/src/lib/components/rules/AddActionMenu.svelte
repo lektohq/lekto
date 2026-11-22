@@ -27,7 +27,11 @@
 
 <div>
 	<DropdownMenu.Root>
-		<DropdownMenu.Trigger class={cn(buttonVariants({ variant: 'outline', size: 'sm' }))} {disabled}>
+		<DropdownMenu.Trigger
+			data-row="add"
+			class={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+			{disabled}
+		>
 			<Plus aria-hidden="true" />
 			{m.rule_add_action()}
 		</DropdownMenu.Trigger>

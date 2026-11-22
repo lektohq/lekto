@@ -158,6 +158,7 @@
 				{model}
 				{errors}
 				steps={asksBefore(model, index)}
+				number={index + 1}
 				error={errors[action.key]}
 				onunreadable={(unreadable) => mark(action.key, unreadable)}
 				onconditionunreadable={mark}

@@ -48,6 +48,7 @@
 		lookup,
 		error,
 		steps = null,
+		name,
 		onremove,
 		onup,
 		ondown,
@@ -58,6 +59,8 @@
 		error?: string;
 		steps?: readonly string[] | null;
 		onunreadable?: (unreadable: boolean) => void;
+		/** Which condition of its group it is ("Bedingung 2"). */
+		name?: string;
 		onremove: () => void;
 		onup?: () => void;
 		ondown?: () => void;
@@ -218,7 +221,7 @@
 	const invalid = $derived(Boolean(error));
 </script>
 
-<RuleRow key={condition.key} {error} moves {onup} {ondown} {onremove}>
+<RuleRow key={condition.key} {name} {error} moves {onup} {ondown} {onremove}>
 	<Select
 		aria-label={m.rule_condition_subject()}
 		value={mail ? MAIL_SUBJECT : condition.field}

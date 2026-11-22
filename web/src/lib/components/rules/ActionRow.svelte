@@ -44,6 +44,7 @@
 		model = null,
 		errors = {},
 		steps = [],
+		number,
 		onremove,
 		onup,
 		ondown,
@@ -59,6 +60,8 @@
 		steps?: readonly string[];
 		onunreadable?: (unreadable: boolean) => void;
 		onconditionunreadable?: (key: string, unreadable: boolean) => void;
+		/** Its place among the actions, from 1: for the names of its buttons. */
+		number?: number;
 		onremove: () => void;
 		onup?: () => void;
 		ondown?: () => void;
@@ -116,7 +119,16 @@
 	const missingOptions = MISSING.map((value) => ({ value, label: MISSING_LABELS[value]() }));
 </script>
 
-<RuleRow key={action.key} {label} {error} moves {onup} {ondown} {onremove}>
+<RuleRow
+	key={action.key}
+	{label}
+	name={number ? m.rule_row_action({ number, kind: label }) : undefined}
+	{error}
+	moves
+	{onup}
+	{ondown}
+	{onremove}
+>
 	<div class="flex min-w-0 flex-1 basis-64 flex-col gap-2">
 		{#if action.type === 'set_space'}
 			<Select
