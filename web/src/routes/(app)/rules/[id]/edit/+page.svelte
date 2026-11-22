@@ -7,7 +7,10 @@
 	import type { components } from '#lib/api/schema.ts';
 	import { BASE } from '#lib/base.ts';
 	import RuleBuilder from '#lib/components/rules/RuleBuilder.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import { spaceOptions } from '#lib/masterdata.svelte.ts';
+	import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
+	import { canChangeRule } from '#lib/permissions.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { RuleForm } from '#lib/rules/form.svelte.ts';
 	import { fromApi, toApi, type RuleModel } from '#lib/rules/model.ts';
@@ -59,13 +62,28 @@
 		untrack(() =>
 			loader.load(
 				() => unwrap(api.GET('/api/v1/rules/{id}', { params: { path: { id: wanted } } })),
-				(found) => {
+				(found, loaded) => {
 					rule = found;
+					// Only who may change the rule gets its editor (the API refuses the others when
+					// they save); the page of the rule offers "Edit" by the same rule.
+					if (!canChangeRule(found, session.user, loaded.spaces)) {
+						model = null;
+						loader.refuse(whyNot(found));
+						return;
+					}
 					model = fromApi(found);
 				}
 			)
 		);
 	});
+
+	/** Why the caller may not change `found`, as the API says it when one saves. */
+	function whyNot(found: Rule): string {
+		if (found.managed_by_document_type_id) return m.reason_rule_follows_type({ type: found.name });
+		return found.scope === 'global'
+			? `${m.error_forbidden()} ${m.reason_admins_only({ action: m.action_change_global_rules() })}`
+			: m.error_forbidden();
+	}
 
 	async function save() {
 		if (!rule || !model || !lookup || !form.check(model, lookup.fields)) return;
@@ -105,7 +123,18 @@
 	/>
 
 	{#if problem}
-		<LoadProblem {problem} onretry={loader.onretry} />
+		<LoadProblem {problem} onretry={loader.onretry}>
+			{#if rule?.managed_by_document_type_id && session.isAdmin}
+				{@const type = rule.managed_by_document_type_id}
+				<!-- The pattern is changed at its type: the way there. -->
+				<Button
+					variant="outline"
+					onclick={() => masterDataDialogs.open('document-types', type, { fromRule: id })}
+				>
+					{m.rule_title_pattern_of({ type: rule.name })}
+				</Button>
+			{/if}
+		</LoadProblem>
 	{:else if !rule || !model || !lookup}
 		<Loading />
 	{:else}
