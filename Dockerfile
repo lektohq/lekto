@@ -19,7 +19,7 @@
 # processes run as PUID:PGID (default 1000:1000), never as root. No secret is part of the
 # image or of its build arguments: configuration is read from the environment at run time.
 
-FROM node:24.21.0-trixie-slim AS node
+FROM node:26.13.1-trixie-slim AS node
 FROM ghcr.io/astral-sh/uv:0.11.33 AS uv
 
 # Set by BuildKit; declared here so that `FROM s6-${TARGETARCH}` can use it.
@@ -109,7 +109,7 @@ RUN mkdir /s6 && for archive in /archives/*.tar.xz; do tar -C /s6 -Jxpf "$archiv
 # --- web: the web UI, built on the build machine's platform -----------------------------------
 # The result is static files, the same for every target platform: no emulation for arm64.
 # Dependencies first, so that a change of the code alone keeps the install layer.
-FROM --platform=$BUILDPLATFORM node:24.21.0-trixie-slim AS web
+FROM --platform=$BUILDPLATFORM node:26.13.1-trixie-slim AS web
 RUN npm install --global pnpm@12.9.1
 WORKDIR /web
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
