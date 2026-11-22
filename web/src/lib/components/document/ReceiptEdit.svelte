@@ -77,10 +77,12 @@
 					granularity="minute"
 					bind:value={draft}
 					max={latest}
+					invalid={problem !== null}
+					describedby={problem ? `${id}-error` : undefined}
 				/>
 			</div>
 			{#if problem}
-				<Field.Error>{problem}</Field.Error>
+				<Field.Error id="{id}-error">{problem}</Field.Error>
 			{/if}
 			<div class="flex justify-end gap-2">
 				<Button type="button" variant="ghost" size="sm" onclick={() => (open = false)}>

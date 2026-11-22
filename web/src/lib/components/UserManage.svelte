@@ -220,8 +220,9 @@
 							autocomplete="new-password"
 							bind:value={password}
 							aria-invalid={resetError ? true : undefined}
+							aria-describedby={resetError ? 'user-password-error' : undefined}
 						/>
-						{#if resetError}<Field.Error>{resetError}</Field.Error>{:else}
+						{#if resetError}<Field.Error id="user-password-error">{resetError}</Field.Error>{:else}
 							<Field.Description>{m.password_rules()}</Field.Description>
 						{/if}
 					</Field.Field>

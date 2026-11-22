@@ -155,8 +155,10 @@
 			bind:value={form.mailboxId}
 			options={mailboxes.map((entry) => ({ value: entry.id, label: entry.name }))}
 			aria-invalid={errors.mailbox ? true : undefined}
+			aria-describedby={errors.mailbox ? 'mail-rule-mailbox-error' : undefined}
 		/>
-		{#if errors.mailbox}<Field.Error>{errors.mailbox}</Field.Error>{/if}
+		{#if errors.mailbox}<Field.Error id="mail-rule-mailbox-error">{errors.mailbox}</Field.Error
+			>{/if}
 	</Field.Field>
 
 	<section class="flex flex-col gap-3" aria-labelledby="mail-rule-conditions">

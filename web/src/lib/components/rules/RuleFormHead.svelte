@@ -33,8 +33,9 @@
 			bind:value={name}
 			maxlength={LIMITS.name}
 			aria-invalid={errors.name ? true : undefined}
+			aria-describedby={errors.name ? `${prefix}-name-error` : undefined}
 		/>
-		{#if errors.name}<Field.Error>{errors.name}</Field.Error>{/if}
+		{#if errors.name}<Field.Error id={`${prefix}-name-error`}>{errors.name}</Field.Error>{/if}
 	</Field.Field>
 	<Field.Field>
 		{#if priorityInfo}
@@ -50,8 +51,10 @@
 			step={1}
 			bind:value={priority}
 			aria-invalid={errors.priority ? true : undefined}
+			aria-describedby={errors.priority ? `${prefix}-priority-error` : undefined}
 		/>
 		<Field.Description>{m.rule_priority_hint()}</Field.Description>
-		{#if errors.priority}<Field.Error>{errors.priority}</Field.Error>{/if}
+		{#if errors.priority}<Field.Error id={`${prefix}-priority-error`}>{errors.priority}</Field.Error
+			>{/if}
 	</Field.Field>
 </div>

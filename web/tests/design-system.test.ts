@@ -846,6 +846,51 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('names its error at every field it marks as invalid', () => {
+		// "Fields": the error below a field is tied to it with `aria-describedby` (`describedby`
+		// at `DateInput` and `PeriodInput`), so that who lands on the field hears it. Not yet
+		// where the error stands at a row of a rule or is the form's own. This list may only shrink.
+		const NOT_YET = new Set([
+			'/src/lib/components/CodeDialog.svelte',
+			'/src/lib/components/ColorPicker.svelte',
+			'/src/lib/components/SearchSelect.svelte',
+			'/src/lib/components/SpaceDialog.svelte',
+			'/src/lib/components/WebhookForm.svelte',
+			'/src/lib/components/rules/ActionRow.svelte',
+			'/src/lib/components/rules/ConditionRow.svelte',
+			'/src/lib/components/rules/MailRuleForm.svelte',
+			'/src/lib/components/rules/MailValueInput.svelte',
+			'/src/lib/components/rules/ValueInput.svelte',
+			'/src/lib/components/templates/TemplateEditor.svelte',
+			'/src/lib/components/templates/TemplateInput.svelte'
+		]);
+		const FIELDS = [
+			'Input',
+			'Select',
+			'SearchSelect',
+			'DateInput',
+			'PeriodInput',
+			'CodeEditor',
+			'input',
+			'select',
+			'textarea',
+			'button'
+		];
+		const untied = (tag: string) =>
+			/\s(?:aria-)?invalid=/.test(tag) && !/\s(?:aria-)?describedby=/.test(tag);
+		expect(untied('<Input id="a" aria-invalid={error ? true : undefined} />')).toBe(true);
+		expect(untied('<DateInput invalid={!!error} describedby={errorId} />')).toBe(false);
+		const found = offenders((source, path) =>
+			NOT_YET.has(path) || path.includes('/components/ui/') || path.includes('/testing/')
+				? null
+				: (FIELDS.flatMap((name) => tags(source, name)).find(untied) ?? null)
+		);
+		expect(found).toEqual([]);
+		// And none stands in the list that needs it no longer.
+		for (const path of NOT_YET)
+			expect(FIELDS.flatMap((name) => tags(sources[path], name)).some(untied), path).toBe(true);
+	});
+
 	it('scrolls a row sideways with its fade only through lib/sideways.ts', () => {
 		// "Tabs and switches": measured, marked and faded in one place, not once per component.
 		const own = /mask-image:linear-gradient|data-more-(?:start|end)=/;

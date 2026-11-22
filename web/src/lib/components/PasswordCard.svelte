@@ -59,8 +59,11 @@
 					bind:value={current}
 					required
 					aria-invalid={errors.current_password ? true : undefined}
+					aria-describedby={errors.current_password ? 'pw-current-error' : undefined}
 				/>
-				{#if errors.current_password}<Field.Error>{errors.current_password}</Field.Error>{/if}
+				{#if errors.current_password}<Field.Error id="pw-current-error"
+						>{errors.current_password}</Field.Error
+					>{/if}
 			</Field.Field>
 			<Field.Field>
 				<Field.Label for="pw-new">{m.password_new()}</Field.Label>
@@ -71,9 +74,11 @@
 					bind:value={next}
 					required
 					aria-invalid={errors.new_password ? true : undefined}
+					aria-describedby={errors.new_password ? 'pw-new-error' : undefined}
 				/>
 				<Field.Description>{m.password_rules()}</Field.Description>
-				{#if errors.new_password}<Field.Error>{errors.new_password}</Field.Error>{/if}
+				{#if errors.new_password}<Field.Error id="pw-new-error">{errors.new_password}</Field.Error
+					>{/if}
 			</Field.Field>
 			<Choice bind:checked={revoke} class="font-medium">{m.password_revoke_tokens()}</Choice>
 			{#if problem}<p role="alert" class="text-sm text-destructive">{problem}</p>{/if}
