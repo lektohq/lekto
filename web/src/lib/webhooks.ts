@@ -7,6 +7,7 @@ import { reportError } from '#lib/errors.ts';
 import { WEBHOOK_EVENT_TYPES, type WebhookEventType } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import type { components } from '#lib/api/schema.ts';
+import { own } from '#lib/utils.ts';
 
 /** What the API takes of a webhook (`tests/api-limits.test.ts` holds them to `openapi.json`). */
 export const WEBHOOK_LIMITS = {
@@ -63,7 +64,8 @@ const LOGGED_LABELS: Record<string, () => string> = {
 
 /** The name of an event in the log of a webhook; an unknown one as it is. */
 export function eventLabel(type: string): string {
-	const label = EVENT_LABELS[type as WebhookEventType] ?? LOGGED_LABELS[type];
+	// Only the tables' own entries: `toString` is no event (WT3-04).
+	const label = own<() => string>(EVENT_LABELS, type) ?? own(LOGGED_LABELS, type);
 	return label ? label() : type;
 }
 

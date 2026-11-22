@@ -9,6 +9,7 @@ import type { Mark } from '#lib/document-view.ts';
 import { refValue } from '#lib/fact-refs.svelte.ts';
 import { type IdentifierKind, kindLabel, printed } from '#lib/identifiers.ts';
 import { m } from '#lib/paraglide/messages.js';
+import { own } from '#lib/utils.ts';
 
 export type Facts = components['schemas']['FactsOut'];
 export type FoundIdentifier = components['schemas']['FoundIdentifierOut'];
@@ -129,8 +130,9 @@ const HOLDER_SOURCES: Record<Holder['source'], () => string> = {
 /** Whose an IBAN or a creditor ID is, in words, with the name the document gives and who told
  * it ("Inhaber: Dritter · Stadtwerke · laut Sprachmodell"). */
 export function holderLabel(holder: Holder): string {
-	const kind = HOLDER_LABELS[holder.kind]();
-	const source = HOLDER_SOURCES[holder.source]();
+	// A kind or source a newer API sends stands as it is.
+	const kind = own<() => string>(HOLDER_LABELS, holder.kind)?.() ?? holder.kind;
+	const source = own<() => string>(HOLDER_SOURCES, holder.source)?.() ?? holder.source;
 	return holder.name
 		? m.facts_holder_named({ holder: kind, name: holder.name, source })
 		: m.facts_holder({ holder: kind, source });

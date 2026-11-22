@@ -663,7 +663,7 @@ function write(value: unknown, kind: ReasonKind | undefined, options: ReasonOpti
 		case 'nodes':
 			return new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(
 				items(value).map((node) => {
-					const label = NODE_LABELS[String(node) as keyof typeof NODE_LABELS];
+					const label = own<() => string>(NODE_LABELS, String(node));
 					return label ? label() : String(node);
 				})
 			);
