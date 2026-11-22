@@ -116,7 +116,7 @@ services:
   # Only for the mail channel: an IMAP and SMTP server that keeps nothing. Plain IMAP on 3143,
   # its API on 8080 (the tests make their accounts there); `lekto` is an account to try by hand.
   greenmail:
-    image: greenmail/standalone:2.1.15
+    image: greenmail/standalone:2.1.14
     environment:
       GREENMAIL_OPTS: >-
         -Dgreenmail.setup.test.imap -Dgreenmail.setup.test.smtp -Dgreenmail.hostname=0.0.0.0
