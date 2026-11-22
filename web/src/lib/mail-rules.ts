@@ -75,6 +75,8 @@ export const STEP_ACTIONS: readonly MailAction[] = [
 ];
 export const ENDING: readonly MailAction[] = ['move', 'trash'];
 export const MAX_STEPS = 10;
+/** The longest value a condition on a mail compares with (`MailConditionBody.value`). */
+export const MAIL_VALUE_MAX = 1000;
 
 export const FIELD_LABELS = MAIL_FIELD_LABELS;
 

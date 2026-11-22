@@ -380,6 +380,7 @@
 	"mail_test_no_own_keywords": "This server stores no keywords of its own.",
 	"mail_folders": "Folders",
 	"mail_folders_hint": "Lekto looks for new mails in these folders. Testing the connection lists the mailbox's folders.",
+	"mail_folders_max": "At most {max} folders.",
 	"mail_interval": "How often",
 	"mail_fallback": "Without a matching rule",
 	"mail_fallback_hint": "What happens to a mail no rule takes: nothing, or everything for one person, in their personal space.",

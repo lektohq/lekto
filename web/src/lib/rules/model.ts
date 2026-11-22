@@ -105,6 +105,8 @@ export const LIMITS = {
 	list: 100,
 	text: 500,
 	pattern: 200,
+	/** The path of a condition on a step's answer. */
+	path: 200,
 	name: 200,
 	priorityMin: 0,
 	priorityMax: 1000,

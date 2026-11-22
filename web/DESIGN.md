@@ -1095,7 +1095,9 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Neu
     line beside it (`role="status"`), and in `muted-foreground` when the server stores no
     keywords of Lekto's own ("Eigene Schlagwörter speichert dieser Server nicht."). A stored mailbox that is not paused has "Jetzt abrufen"
     (`outline`, `RefreshCw`) beside the test; a toast says the fetch is asked for.
-  - **Abruf:** the folders as a `MultiPicker` of what the test found and what is chosen; then
+  - **Abruf:** the folders as a `MultiPicker` of what the test found and what is chosen, at
+    most 20 as the API takes them: with 20 chosen, the other boxes are off and a line under the
+    chips says "Höchstens 20 Ordner." (`muted-foreground`, `text-xs`; Tobi, 22.11.2026); then
     two rows of two: how often ("Wie oft", `Select`) and what a mail without a rule brings in
     (`Select`: "Nichts übernehmen" or "Alles für" a person); which mails and the type of the mail
     text (`SearchSelect`). Which mails is one `Select` (Tobi, 05.11.2026): "Ab Einrichtung

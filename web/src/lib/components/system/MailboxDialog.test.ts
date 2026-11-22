@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ConnectionTest } from '#lib/mailboxes.ts';
+import { LIMITS, type ConnectionTest } from '#lib/mailboxes.ts';
 import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
@@ -190,6 +190,22 @@ describe('MailboxDialog', () => {
 		await user.click(screen.getByRole('button', { name: m.retry() }));
 		await vi.waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
 		expect(sent.filter((call) => call.path === '/api/v1/users')).toHaveLength(2);
+	});
+
+	it('takes at most the folders the API does, and says so (WT2-08)', async () => {
+		const user = userEvent.setup();
+		const many = Array.from({ length: LIMITS.folders }, (_, n) => `Ordner ${n + 1}`);
+		render(MailboxDialog, {
+			open: true,
+			mailbox: mailboxOf({ folders: many }),
+			onsaved: vi.fn()
+		});
+		await user.click(screen.getByText(m.mailbox_part_fetch()).closest('button')!);
+		await user.click(testButton());
+		// The test found two folders more (FOUND); with 20 chosen, they cannot be chosen.
+		const inbox = within((await screen.findByText(m.mail_folder_inbox())).closest('label')!);
+		expect((inbox.getByRole('checkbox') as HTMLInputElement).disabled).toBe(true);
+		expect(screen.getByText(m.mail_folders_max({ max: LIMITS.folders }))).toBeTruthy();
 	});
 
 	it('keeps what is typed when the page reads the same mailbox anew', async () => {

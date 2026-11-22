@@ -380,6 +380,7 @@
 	"mail_test_no_own_keywords": "Eigene Schlagwörter speichert dieser Server nicht.",
 	"mail_folders": "Ordner",
 	"mail_folders_hint": "In diesen Ordnern sucht Lekto nach neuen Mails. Der Test der Verbindung listet die Ordner des Postfachs auf.",
+	"mail_folders_max": "Höchstens {max} Ordner.",
 	"mail_interval": "Wie oft",
 	"mail_fallback": "Ohne passende Regel",
 	"mail_fallback_hint": "Was mit einer Mail geschieht, die keine Regel übernimmt: nichts, oder alles für eine Person, in ihren persönlichen Space.",
