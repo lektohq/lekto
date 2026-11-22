@@ -520,6 +520,13 @@ conditions, their rows, the actions), all are `sm`: a card inside one of its kin
 change it) in `text-md`. `Card.Description` is `text-sm text-muted-foreground`. Hand-built
 `div`s with border and radius are not used.
 
+`StatTile` is the one tile of a figure with its word below (the tabs of the system page): a
+`Card` of size `sm` with the figure (`text-figure`; `kind="value"` for a smaller value with its
+unit in `text-lg`, `kind="code"` for a technical name), the word in `text-meta` and an optional
+hint. `tone="quiet"` puts it on the surface (a tile inside a card, a figure of what is over); a
+lane's tone (`green`, `yellow`, `red`) says how the figure stands, with ground, text and edge
+from `tones.ts`. A tab of the system page draws no box of its own.
+
 ### Lists
 
 Lists of items (rules, webhooks, spaces, users, master data, mailboxes) are rows in one card, or
@@ -864,7 +871,7 @@ always `Info`); text and buttons in the body, with `class` for a row (`flex flex
 items-center`). A button in an alert is a `Button` of its variants, never coloured in the alert's
 tone (Tobi, 09.11.2026); its action is the primary one. A note that is no warning passes `role="status"` (it changes) or `role="note"`
 (it stands), since `Alert` is `role="alert"` by default. Not a hint and so no `Alert`: the
-figures of the search check, tiles in the tones of the lanes.
+figures of the search check, `StatTile`s in the tones of the lanes ("Cards").
 
 Toasts (`svelte-sonner`) confirm an action that has finished ("Gespeichert", "3 Dokumente
 eingereiht") or report an error of an action. One toast waits for the person instead: a new

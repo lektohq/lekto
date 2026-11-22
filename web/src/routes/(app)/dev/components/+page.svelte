@@ -9,6 +9,7 @@
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import Upload from '@lucide/svelte/icons/upload';
 	import { toast } from 'svelte-sonner';
+	import StatTile from '#lib/components/StatTile.svelte';
 	import AlertDot from '#lib/components/AlertDot.svelte';
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
@@ -572,6 +573,12 @@
 					</li>
 				</ul>
 			</Tile>
+		</div>
+		<!-- The stat tile of the system page's tabs, in each tone. -->
+		<div class="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
+			{#each ['plain', 'quiet', 'green', 'yellow', 'red'] as const as tone (tone)}
+				<StatTile value={formatNumber(12)} label={tone} {tone} />
+			{/each}
 		</div>
 	</section>
 

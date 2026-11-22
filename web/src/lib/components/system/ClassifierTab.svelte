@@ -8,6 +8,7 @@
 	import { ApiError } from '#lib/api/problem.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import { fieldLabel } from '#lib/describe.ts';
+	import StatTile from '#lib/components/StatTile.svelte';
 	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
@@ -225,12 +226,7 @@
 					{@const model = status.model}
 					<div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3">
 						{#each [[model.classes.contact, m.classifier_class_contacts()], [model.classes.document_type, m.classifier_class_types()], [model.classes.topic, m.classifier_class_topics()], [model.classes.tags, m.classifier_class_tags()], [model.classes.space, m.classifier_class_spaces()], [model.learned_identifiers, m.classifier_class_identifiers()]] as const as [count, label] (label)}
-							<div class="flex flex-col gap-0.5 rounded-xl bg-surface px-3.5 py-3">
-								<span class="text-figure tabular-nums">
-									{formatNumber(count)}
-								</span>
-								<span class="text-meta text-muted-foreground">{label}</span>
-							</div>
+							<StatTile value={formatNumber(count)} {label} tone="quiet" />
 						{/each}
 					</div>
 					{#if model.accuracy}

@@ -665,9 +665,7 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(box('rounded-full bg-lane-yellow px-2')).toBe(false);
 		expect(
 			offenders((source, path) => {
-				// The search check's figures are tiles in the lanes' tones, no hints.
-				if (path.includes('/components/ui/') || path.endsWith('/system/SearchTab.svelte'))
-					return null;
+				if (path.includes('/components/ui/')) return null;
 				return (
 					[...source.matchAll(classes)]
 						.map(([found]) => found)
@@ -695,6 +693,30 @@ describe('the design system (web/DESIGN.md)', () => {
 			true
 		);
 		expect(inside.test('<Badge>a</Badge> <button type="button">x</button>')).toBe(false);
+	});
+
+	it('draws no box by hand in a tab of the system page', () => {
+		// "Cards": a figure with its word is `StatTile`, every other box a `Card`.
+		const classes = /"[^"\n]*"|'[^'\n]*'/g;
+		const box = (value: string) =>
+			/\brounded-(?:lg|xl|2xl)\b/.test(value) &&
+			(/\bp-\d/.test(value) || (/\bpx-\d/.test(value) && /\bpy-\d/.test(value)));
+		expect(box('flex flex-col gap-0.5 rounded-xl bg-surface px-3.5 py-3')).toBe(true);
+		expect(box('flex flex-col gap-1 rounded-xl border p-4')).toBe(true);
+		expect(box('h-3 overflow-hidden rounded-full bg-muted')).toBe(false);
+		expect(
+			offenders((source, path) =>
+				path.includes('/components/system/')
+					? ([...source.matchAll(classes)].map(([found]) => found).find(box) ?? null)
+					: null
+			)
+		).toEqual([]);
+		// The tiles are cards: no `cardVariants` on a `div` there either.
+		expect(
+			offenders((source, path) =>
+				path.includes('/components/system/') ? line(source, /cardVariants\(/) : null
+			)
+		).toEqual([]);
 	});
 
 	it('draws a lane with LaneBadge, never with a bare badge in its tone', () => {

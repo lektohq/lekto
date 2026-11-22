@@ -8,6 +8,7 @@
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
+	import StatTile from '#lib/components/StatTile.svelte';
 	import StatusBadge from '#lib/components/StatusBadge.svelte';
 	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
@@ -40,7 +41,6 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { cn } from '#lib/utils.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import { cardVariants } from '#lib/components/ui/card/index.ts';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import type { Tone } from '#lib/tones.ts';
 	import Loading from '#lib/components/Loading.svelte';
@@ -247,22 +247,12 @@
 
 		<div class="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
 			{#each [['running', m.jobs_hint_running()], ['due', m.jobs_hint_due()], ['planned', m.jobs_hint_planned()], ['failed', m.jobs_hint_kept( { date: keptSince } )], ['done', m.jobs_hint_kept( { date: keptSince } )]] as const as [state, hint] (state)}
-				<div
-					class={cn(
-						cardVariants({ size: 'sm' }),
-						'flex flex-col gap-0.5',
-						state === 'failed' &&
-							all.failed > 0 &&
-							'border-lane-red-foreground/35 bg-lane-red text-lane-red-foreground',
-						state === 'done' && 'bg-surface'
-					)}
-				>
-					<span class="text-figure tabular-nums">
-						{formatNumber(all[state])}
-					</span>
-					<span class="text-meta font-medium">{STATE_LABELS[state]()}</span>
-					<span class="text-xs text-muted-foreground">{hint}</span>
-				</div>
+				<StatTile
+					value={formatNumber(all[state])}
+					label={STATE_LABELS[state]()}
+					{hint}
+					tone={state === 'failed' && all.failed > 0 ? 'red' : state === 'done' ? 'quiet' : 'plain'}
+				/>
 			{/each}
 		</div>
 
