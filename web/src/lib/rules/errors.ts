@@ -117,9 +117,18 @@ export function saveErrorsAt(
 			else if (last) last.message += `; ${part}`;
 			else errors.push({ path: null, message: part });
 		}
+		const reason = error.problem?.reason;
+		// A reason that names its place (`at`: a template's unknown value at "actions[0]"): in
+		// the user's language at that block.
+		const at = reason?.params.at;
+		if (reason && typeof at === 'string') {
+			const key = places.keyAt(at);
+			if (key) result.byKey[key] = describeError(error);
+			else result.general = describeError(error);
+			return result;
+		}
 		// No place, but a reason with a code: in the user's language, and a pattern's at the
 		// conditions that match by it.
-		const reason = error.problem?.reason;
 		if (reason && errors.every((part) => part.path === null)) {
 			const message = describeError(error);
 			const pattern = PATTERN_CODES.has(reason.code) ? reason.params.pattern : undefined;

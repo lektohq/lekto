@@ -2982,6 +2982,8 @@
 	"reason_title_pattern_too_long": "A title pattern has at most {max} characters.",
 	"reason_description_too_long": "The description may have at most {max} characters.",
 	"reason_title_pattern_unknown": "The title pattern uses {value}, which “{type}” does not know (fields: field.<key> of those that apply to the type).",
+	"reason_template_unknown_value": "Templates do not know the value {value}.",
+	"reason_template_unknown_value_at": "Templates do not know the value {value}. They know: {known}, field.<key> of an existing field and steps.<name> of a step before that asks.",
 	"reason_tag_own_parent": "A tag cannot be its own parent.",
 	"reason_groups_manual": "Groups are only assigned by hand.",
 	"reason_tag_wrong_scope": "“{tag}” is of the kind “{scope}”, not “{expected}”.",

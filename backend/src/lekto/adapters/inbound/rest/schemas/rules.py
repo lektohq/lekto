@@ -604,6 +604,11 @@ class TemplatePreviewOut(BaseModel):
     error: str | None = Field(
         description="Why the template is invalid (its syntax, or a value templates do not know)."
     )
+    error_reason: ReasonOut | None = Field(
+        default=None,
+        description="The code of `error` where it has one (`template_unknown_value`: a value "
+        "templates do not know); None for a message of the template engine, which is text.",
+    )
     values: dict[str, str] | None = Field(
         description="The document's values as a template writes them, by path (`contact`, "
         "`field.la_brutto`): each one it has, whatever the template. None without a document.",

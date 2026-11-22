@@ -362,6 +362,7 @@ async def preview_template(
         rendered=preview.rendered,
         missing=preview.missing,
         error=preview.error,
+        error_reason=(None if preview.error_reason is None else ReasonOut.of(preview.error_reason)),
         values=None if preview.values is None else dict(preview.values),
         read=None if preview.read is None else field_json(preview.read),
         unreadable=preview.unreadable,

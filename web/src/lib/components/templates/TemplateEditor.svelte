@@ -17,6 +17,7 @@
 	import { fieldTypeLabel } from '#lib/fields.ts';
 	import type { FieldDefinition } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
+	import { previewError } from '#lib/templates/preview.ts';
 	import type { EditorHandle } from '#lib/templates/codemirror.ts';
 	import { TEMPLATES_GUIDE } from '#lib/templates/guide.ts';
 	import { filterChipsFor, insertFilter, insertValue } from '#lib/templates/liquid.ts';
@@ -253,7 +254,7 @@
 		<Sheet.Footer class="gap-3 border-t pb-[max(1rem,env(safe-area-inset-bottom))]">
 			<div class="min-h-5 text-sm break-words" aria-live="polite">
 				{#if preview?.error}
-					<span class="text-destructive">{preview.error}</span>
+					<span class="text-destructive">{previewError(preview)}</span>
 				{:else if !reference}
 					<span class="text-muted-foreground">{m.template_preview_none()}</span>
 				{:else if preview?.missing}

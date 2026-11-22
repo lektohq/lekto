@@ -8,6 +8,7 @@
 	import { fieldTypeLabel } from '#lib/fields.ts';
 	import type { FieldDefinition } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
+	import { previewError } from '#lib/templates/preview.ts';
 	import { usableFields, type TemplatePurpose } from '#lib/templates/values.ts';
 	import IconButton from '#lib/components/IconButton.svelte';
 
@@ -105,7 +106,7 @@
 					if (!current()) return;
 					// Text that uses no value is read at once: one its field cannot take is refused.
 					error =
-						found.error ??
+						previewError(found) ??
 						(found.unreadable && field
 							? m.template_unreadable({ type: fieldTypeLabel(field.data_type) })
 							: null);

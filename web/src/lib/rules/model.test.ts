@@ -561,6 +561,29 @@ describe('errors of saving', () => {
 		// place: said in general, in the user's language all the same.
 		expect(saveErrors(invalid, model)).toEqual({ byKey: {}, general: message });
 	});
+
+	it("says a value templates do not know in the user's language, at its action (WD-11)", () => {
+		// The API's own message has a code and names its place; before, the English text stood
+		// at the block.
+		const params = { at: 'actions[0]', value: 'contct', known: ['contact', 'title'] };
+		const detail = "actions[0]: unknown value contct; templates know 'contact', 'title'";
+		const error = failed(422, detail);
+		const refused = new ApiError(
+			422,
+			{
+				...error.problem!,
+				reason: { code: 'template_unknown_value_at', params, subject: null } as never
+			},
+			null
+		);
+		const said = saveErrors(refused, model);
+		expect(said.general).toBeNull();
+		expect(Object.keys(said.byKey)).toEqual([model.actions[0].key]);
+		const message = said.byKey[model.actions[0].key];
+		expect(message).toContain('contct');
+		expect(message).not.toContain('unknown value');
+		expect(message).toContain('field.<key>');
+	});
 });
 
 describe('steps of a rule', () => {

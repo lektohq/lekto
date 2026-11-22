@@ -390,6 +390,8 @@ class ReasonCode(StrEnum):
     TITLE_PATTERN_TOO_LONG = "title_pattern_too_long"
     DESCRIPTION_TOO_LONG = "description_too_long"
     TITLE_PATTERN_UNKNOWN = "title_pattern_unknown"
+    TEMPLATE_UNKNOWN_VALUE = "template_unknown_value"
+    TEMPLATE_UNKNOWN_VALUE_AT = "template_unknown_value_at"
     TAG_OWN_PARENT = "tag_own_parent"
     GROUPS_MANUAL = "groups_manual"
     TAG_WRONG_SCOPE = "tag_wrong_scope"
@@ -957,6 +959,11 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.TITLE_PATTERN_UNKNOWN: (
         "the title pattern uses {value}, which a template of '{type}' does not know (fields: "
         "field.<key> of those that apply to the type)"
+    ),
+    ReasonCode.TEMPLATE_UNKNOWN_VALUE: "unknown value {value}",
+    ReasonCode.TEMPLATE_UNKNOWN_VALUE_AT: (
+        "{at}: unknown value {value}; templates know {known:list}, field.<key> of an existing "
+        "field and steps.<name> of a step before that asks"
     ),
     ReasonCode.TAG_OWN_PARENT: "a tag cannot be its own parent",
     ReasonCode.GROUPS_MANUAL: "groups are set by hand only (assignment 'manual')",

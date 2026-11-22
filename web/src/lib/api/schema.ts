@@ -9879,6 +9879,8 @@ export interface components {
 			| 'title_pattern_too_long'
 			| 'description_too_long'
 			| 'title_pattern_unknown'
+			| 'template_unknown_value'
+			| 'template_unknown_value_at'
 			| 'tag_own_parent'
 			| 'groups_manual'
 			| 'tag_wrong_scope'
@@ -11652,6 +11654,8 @@ export interface components {
 			 * @description Why the template is invalid (its syntax, or a value templates do not know).
 			 */
 			error: string | null;
+			/** @description The code of `error` where it has one (`template_unknown_value`: a value templates do not know); None for a message of the template engine, which is text. */
+			error_reason?: components['schemas']['ReasonOut'] | null;
 			/**
 			 * Values
 			 * @description The document's values as a template writes them, by path (`contact`, `field.la_brutto`): each one it has, whatever the template. None without a document.

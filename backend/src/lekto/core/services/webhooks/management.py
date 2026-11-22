@@ -26,7 +26,7 @@ from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import ApiTokenId, UserId, WebhookId, new_id
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.rights import Actor, TokenRight
-from lekto.core.domain.templates import WEBHOOK_NAMES, unknown_values
+from lekto.core.domain.templates import FIELD, STEPS, WEBHOOK_NAMES, unknown_values
 from lekto.core.domain.users import User
 from lekto.core.domain.webhooks import (
     DEFAULT_OPEN_TASKS,
@@ -367,7 +367,15 @@ class WebhookService:
         keys = {item.key for item in await uow.fields.list_all()}
         unknown = unknown_values(used, keys, WEBHOOK_NAMES)
         if unknown:
-            raise ValidationError(f"body_template: unknown value {unknown[0]}")
+            known = tuple(name for name in WEBHOOK_NAMES if name not in (FIELD, STEPS))
+            raise ValidationError(
+                because(
+                    ReasonCode.TEMPLATE_UNKNOWN_VALUE_AT,
+                    at="body_template",
+                    value=unknown[0],
+                    known=known,
+                )
+            )
         return template
 
     def _encrypt(self, id: WebhookId, secret: str) -> bytes:

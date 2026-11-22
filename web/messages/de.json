@@ -2982,6 +2982,8 @@
 	"reason_title_pattern_too_long": "Ein Titelmuster hat höchstens {max} Zeichen.",
 	"reason_description_too_long": "Die Beschreibung darf höchstens {max} Zeichen haben.",
 	"reason_title_pattern_unknown": "Das Titelmuster nutzt {value}, das „{type}“ nicht kennt (Felder: field.<key> der Felder, die für den Typ gelten).",
+	"reason_template_unknown_value": "Templates kennen den Wert {value} nicht.",
+	"reason_template_unknown_value_at": "Templates kennen den Wert {value} nicht. Bekannt sind: {known}, field.<key> eines Felds und steps.<name> eines Schritts davor, der fragt.",
 	"reason_tag_own_parent": "Ein Tag kann nicht sein eigener Obertag sein.",
 	"reason_groups_manual": "Gruppen werden nur von Hand vergeben.",
 	"reason_tag_wrong_scope": "„{tag}“ hat die Art „{scope}“, nicht „{expected}“.",

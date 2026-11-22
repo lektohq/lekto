@@ -422,6 +422,8 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	title_pattern_too_long: entry(m.reason_title_pattern_too_long, { max: 'number' }),
 	description_too_long: entry(m.reason_description_too_long, { max: 'number' }),
 	title_pattern_unknown: entry(m.reason_title_pattern_unknown),
+	template_unknown_value: entry(m.reason_template_unknown_value),
+	template_unknown_value_at: entry(m.reason_template_unknown_value_at, { known: 'list' }),
 	tag_own_parent: entry(m.reason_tag_own_parent),
 	groups_manual: entry(m.reason_groups_manual),
 	tag_wrong_scope: entry(m.reason_tag_wrong_scope, { scope: 'thing', expected: 'thing' }),
