@@ -28,7 +28,7 @@
 	import { phone } from '#lib/phone.svelte.ts';
 	import { descendants, isReprocessNode, pipeline, type GraphNode } from '#lib/pipeline.ts';
 	import { session } from '#lib/session.svelte.ts';
-	import { bulkDocuments, bulkResult, MODEL_CALLS, WARN_ABOVE } from '#lib/bulk.ts';
+	import { MAX_CHOSEN, MODEL_CALLS, WARN_ABOVE, bulkDocuments, bulkResult } from '#lib/bulk.ts';
 	import {
 		type BulkAction,
 		type BulkOperation,
@@ -90,6 +90,10 @@
 	} = $props();
 
 	const running = $derived(run.operation);
+	// More documents chosen one by one than an action takes by id: the bar says so and holds
+	// its actions, instead of a refusal after the click.
+	const tooMany = $derived(!all && count > MAX_CHOSEN);
+	const held = $derived(count === 0 || tooMany);
 
 	let dialog = $state<
 		'tags' | 'contact' | 'type' | 'topic' | 'move' | 'reprocess' | 'delete' | null
@@ -195,6 +199,8 @@
 		{m.bulk_all_hits()}
 	{:else if count === 0}
 		{m.bulk_tap_hint()}
+	{:else if tooMany}
+		{m.bulk_chosen_limit({ max: formatNumber(MAX_CHOSEN) })}
 	{:else if limit !== null}
 		{m.bulk_limit({ max: formatNumber(limit) })}
 	{/if}
@@ -218,20 +224,20 @@ after a few seconds, with the only way to the details (web/DESIGN.md, "Choosing 
 {/snippet}
 
 {#snippet actions()}
-	<Button variant="outline" size="sm" disabled={count === 0} onclick={open('tags')}>
+	<Button variant="outline" size="sm" disabled={held} onclick={open('tags')}>
 		<Tag aria-hidden="true" />
 		{m.field_tags()}
 	</Button>
-	<Button variant="outline" size="sm" disabled={count === 0} onclick={open('contact')}>
+	<Button variant="outline" size="sm" disabled={held} onclick={open('contact')}>
 		<Users aria-hidden="true" />
 		{m.field_contact()}
 	</Button>
-	<Button variant="outline" size="sm" disabled={count === 0} onclick={open('type')}>
+	<Button variant="outline" size="sm" disabled={held} onclick={open('type')}>
 		<Shapes aria-hidden="true" />
 		{m.bulk_type()}
 	</Button>
 	<DropdownMenu.Root>
-		<DropdownMenu.Trigger disabled={count === 0}>
+		<DropdownMenu.Trigger disabled={held}>
 			{#snippet child({ props })}
 				<Button {...props} variant="outline" size="sm">
 					<Ellipsis aria-hidden="true" />
@@ -276,7 +282,7 @@ after a few seconds, with the only way to the details (web/DESIGN.md, "Choosing 
 	trail={phone.current && !running ? chooser : undefined}
 	hint={running
 		? progressHint
-		: run.last || all || count === 0 || limit !== null
+		: run.last || all || count === 0 || tooMany || limit !== null
 			? idle
 			: undefined}
 	actions={running ? undefined : actions}

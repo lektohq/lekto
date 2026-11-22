@@ -3204,6 +3204,7 @@
 	"bulk_all_hits": "All hits of the search and filters.",
 	"bulk_all_hits_capped": "All hits of the search and filters. The search reaches at most {count} hits.",
 	"bulk_limit": "All hits at once go up to {max}: narrow the filters further.",
+	"bulk_chosen_limit": "Chosen one by one, up to {max} documents go at once: select all hits or fewer documents.",
 	"bulk_select_all": "Select all {count} hits",
 	"bulk_type": "Type",
 	"bulk_more": "More",

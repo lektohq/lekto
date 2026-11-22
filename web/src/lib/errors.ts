@@ -22,9 +22,21 @@ export function describeError(error: unknown): string {
 		}
 		if (isGatewayError(error)) return m.error_network();
 		const problem = error.problem;
+		// A refused input (422) carries its reasons by field, none of its own: the reasons in the
+		// user's language, each once, in place of the validation's English sentence.
+		const parts =
+			error.status === 422 && !problem?.reason
+				? [
+						...new Map(
+							(problem?.errors ?? []).map((part) => [JSON.stringify(part.reason), part.reason])
+						).values()
+					]
+				: [];
 		const detail = problem?.reason
 			? reasonsText([problem.reason], problem.detail)
-			: (problem?.detail ?? null);
+			: parts.length > 0
+				? reasonsText(parts, problem?.detail)
+				: (problem?.detail ?? null);
 		if (error.status === 403)
 			return detail ? `${m.error_forbidden()} ${detail}` : m.error_forbidden();
 		return detail ?? error.problem?.title ?? m.error_unexpected({ status: error.status });

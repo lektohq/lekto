@@ -3204,6 +3204,7 @@
 	"bulk_all_hits": "Alle Treffer der Suche und Filter.",
 	"bulk_all_hits_capped": "Alle Treffer der Suche und Filter. Die Suche reicht höchstens {count} Treffer weit.",
 	"bulk_limit": "Alle Treffer auf einmal gehen bis {max}: grenze die Filter weiter ein.",
+	"bulk_chosen_limit": "Einzeln gewählt gehen bis {max} Dokumente auf einmal: wähle alle Treffer oder weniger Dokumente.",
 	"bulk_select_all": "Alle {count} Treffer auswählen",
 	"bulk_type": "Typ",
 	"bulk_more": "Mehr",

@@ -78,6 +78,27 @@ describe('describeError', () => {
 		);
 	});
 
+	it('says a refused input by its reasons, not in the validation’s English (WG-04)', () => {
+		setLocale('de', { reload: false });
+		const many = {
+			field: 'document_ids',
+			message: 'List should have at most 500 items after validation, not 501',
+			reason: { code: 'input_too_many', params: { max: 500 } }
+		};
+		const refused = {
+			...problem(422, `document_ids: ${many.message}`),
+			errors: [many, { ...many, field: 'other_ids' }]
+		} as unknown as Problem;
+		// Each reason once, however many fields share it.
+		expect(describeError(new ApiError(422, refused, null))).toBe('Höchstens 500 Einträge.');
+		// A reason this UI does not know: the API's sentence, as before.
+		const unknown = {
+			...refused,
+			errors: [{ ...many, reason: { code: 'gizmo', params: {} } }]
+		} as unknown as Problem;
+		expect(describeError(new ApiError(422, unknown, null))).toBe(refused.detail);
+	});
+
 	it('names a missing right', () => {
 		expect(describeError(new ApiError(403, problem(403, 'Admins only.'), null))).toBe(
 			`${m.error_forbidden()} Admins only.`

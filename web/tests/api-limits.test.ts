@@ -14,6 +14,7 @@ import { MASTER_LIMITS } from '#lib/masterdata-api.ts';
 import { PROFILE_LIMITS } from '#lib/profile.ts';
 import { LIMITS } from '#lib/rules/model.ts';
 import { TREE_LIMITS } from '#lib/rules/tree.ts';
+import { MAX_CHOSEN } from '#lib/bulk.ts';
 import { MAX_SELECTED } from '#lib/selection.ts';
 import { TIMEOUT } from '#lib/tasks.ts';
 import { TOKEN_NAME_MAX } from '#lib/tokens.svelte.ts';
@@ -72,6 +73,7 @@ const M = MASTER_LIMITS;
 const P = PROFILE_LIMITS;
 
 const PAIRS: [label: string, ours: number, path: string, key: Key][] = [
+	['MAX_CHOSEN', MAX_CHOSEN, 'BulkRequest.document_ids', 'maxItems'],
 	['WEBHOOK_LIMITS.name', W.name, 'WebhookCreate.name', 'maxLength'],
 	['WEBHOOK_LIMITS.name', W.name, 'WebhookPatch.name', 'maxLength'],
 	['WEBHOOK_LIMITS.url', W.url, 'WebhookCreate.url', 'maxLength'],

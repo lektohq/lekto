@@ -9,6 +9,7 @@ import { forgetPipeline } from '#lib/pipeline.ts';
 import { choose } from '#lib/testing/select.ts';
 import { fakeApi } from '#lib/testing/api.ts';
 import { BulkRun } from '#lib/bulk.svelte.ts';
+import { MAX_CHOSEN } from '#lib/bulk.ts';
 import DocumentsBulkBar from './DocumentsBulkBar.svelte';
 
 const node = (name: string, requires: string[] = []) => ({ node: name, requires, waits_for: [] });
@@ -27,13 +28,14 @@ afterEach(() => {
 
 function renderBar(
 	count: number,
-	merge: { blocked: string | null; start: () => void } | null = null
+	merge: { blocked: string | null; start: () => void } | null = null,
+	all = false
 ) {
 	const run = new BulkRun(vi.fn());
 	const rendered = render(DocumentsBulkBar, {
 		merge,
 		count,
-		all: false,
+		all,
 		offerAll: null,
 		limit: null,
 		capped: null,
@@ -125,6 +127,27 @@ describe('the selection bar of the documents', () => {
 		const step = within(dialog).getByRole('combobox', { name: m.reprocess_from() });
 		await vi.waitFor(() => expect(step.textContent).toContain(NODE_LABELS.ocr()));
 		expect(dialog.textContent).not.toContain(m.bulk_reprocess_model({ calls: '6' }));
+	});
+
+	it('holds its actions above the ids one action takes, and says the way out (WG-04)', async () => {
+		vi.stubGlobal('fetch', fakeApi());
+		const actions = () =>
+			[m.field_tags(), m.field_contact(), m.bulk_type(), m.bulk_more()].map(
+				(name) => screen.getByRole('button', { name }) as HTMLButtonElement
+			);
+		const { unmount } = renderBar(MAX_CHOSEN);
+		expect(actions().every((button) => !button.disabled)).toBe(true);
+		expect(screen.queryByText(m.bulk_chosen_limit({ max: formatNumber(MAX_CHOSEN) }))).toBeNull();
+		unmount();
+
+		const one = renderBar(MAX_CHOSEN + 1);
+		expect(actions().every((button) => button.disabled)).toBe(true);
+		expect(screen.getByText(m.bulk_chosen_limit({ max: formatNumber(MAX_CHOSEN) }))).toBeTruthy();
+		one.unmount();
+
+		// Every hit goes without ids: no limit of ids holds it.
+		renderBar(MAX_CHOSEN + 1, null, true);
+		expect(actions().every((button) => !button.disabled)).toBe(true);
 	});
 
 	it('merges the chosen documents, or says why not', async () => {
