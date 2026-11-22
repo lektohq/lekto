@@ -162,7 +162,10 @@ export function relativePeriod(
 		case 'last_year':
 			return yearPeriod(year - 1);
 		case 'last_12_months': {
-			const start = new Date(year - 1, today.getMonth(), today.getDate() + 1);
+			// The day after the same day a year before, the 28th of February for the 29th: as the
+			// core reckons it (`RelativePeriod.period`), which a lens's numbers and MCP use (WT3-05).
+			const day = Math.min(today.getDate(), lastDayOfMonth(year - 1, today.getMonth() + 1));
+			const start = new Date(year - 1, today.getMonth(), day + 1);
 			return { dateFrom: isoDayLocal(start), dateTo: null };
 		}
 	}

@@ -21,6 +21,19 @@ describe('periods that move with the day', () => {
 			dateTo: '2025-12-31'
 		});
 	});
+
+	// The cases of the core (`test_a_relative_period_as_the_web_ui_reckons_it`), one day of
+	// documents apart on a leap day before (WT3-05).
+	it.each([
+		['this_year', new Date(2026, 10, 1), '2026-01-01', '2026-12-31'],
+		['last_year', new Date(2026, 0, 1), '2025-01-01', '2025-12-31'],
+		['last_12_months', new Date(2026, 10, 1), '2025-11-02', null],
+		['last_12_months', new Date(2028, 1, 29), '2027-03-01', null],
+		['last_12_months', new Date(2028, 1, 28), '2027-03-01', null],
+		['last_12_months', new Date(2028, 2, 1), '2027-03-02', null]
+	] as const)('%s as of %s is the core’s', (period, today, dateFrom, dateTo) => {
+		expect(relativePeriod(period, today)).toEqual({ dateFrom, dateTo });
+	});
 });
 
 describe('a lens in the URL', () => {
