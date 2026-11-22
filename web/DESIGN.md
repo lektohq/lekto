@@ -1669,7 +1669,8 @@ LayerChart stand here without one: no rule reaches into a shadow root or `app.cs
   pattern, a tag, a rule, a webhook, a paused mailbox, a document) and deletes it again, visits
   their pages too, and opens one of each frame: the navigation sheet and the filter sheet of the
   phone, a dialog, a form dialog, an editor, a question, a menu. A new frame gets its entry in
-  `FRAMES`, a new page in `PATHS`.
+  `FRAMES`, a new page in `PATHS`. CI runs it for every pull request that touches `web/` (Tobi,
+  21.11.2026).
 - **Living style guide:** `/dev/components` (development builds) shows every component in every
   variant and size, in light and dark. A new component or variant is added there first.
 - **Review:** every pull request that touches `web/` confirms it follows this document (the
