@@ -36,6 +36,27 @@ export function describeError(error: unknown): string {
 	return m.error_unexpected({ status: 0 });
 }
 
+/** What a page says when it could not load what its address names, and whether trying again
+ * could change it. */
+export interface LoadFailure {
+	text: string;
+	final: boolean;
+}
+
+/**
+ * Why a detail page could not load (web/DESIGN.md, "States"). The thing is not there or not the
+ * caller's to see (404), or the address holds no id the API can read (422: a load sends nothing
+ * else to check): `missing` says so in the page's own words. The caller may not (403): the
+ * API's reason. Trying again changes none of these, so they come without a retry.
+ */
+export function describeLoad(error: unknown, missing: () => string): LoadFailure {
+	if (error instanceof ApiError) {
+		if (error.status === 404 || error.status === 422) return { text: missing(), final: true };
+		if (error.status === 403) return { text: describeError(error), final: true };
+	}
+	return { text: describeError(error), final: false };
+}
+
 /** Whether a call failed because no answer came at all (no connection, the server down):
  * `fetch` rejects with a TypeError then, worded by each browser its own way. */
 export function isNetworkError(error: unknown): boolean {

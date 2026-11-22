@@ -138,7 +138,7 @@
 	</RuleHeader>
 
 	{#if problem}
-		<LoadProblem {problem} onretry={() => loader.retry()} />
+		<LoadProblem {problem} onretry={loader.onretry} />
 	{:else if !rule}
 		<Loading />
 	{:else}

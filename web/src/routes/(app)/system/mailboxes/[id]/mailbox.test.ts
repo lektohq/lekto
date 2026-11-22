@@ -174,6 +174,9 @@ describe('the page of a mailbox', () => {
 		render(Page);
 		expect(await screen.findByRole('alert')).toBeTruthy();
 		expect(screen.getAllByRole('alert')).toHaveLength(1);
+		// In the page's own words, and no "Try again": it would change nothing (WF-04).
+		expect(screen.getByText(m.mailbox_not_found())).toBeTruthy();
+		expect(screen.queryByRole('button', { name: m.retry() })).toBeNull();
 		expect(screen.queryByText(m.mailbox_log())).toBeNull();
 		expect(calls(api).filter((call) => call.includes('/mails'))).toEqual([]);
 	});

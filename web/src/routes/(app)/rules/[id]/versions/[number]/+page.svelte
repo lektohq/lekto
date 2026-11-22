@@ -19,7 +19,11 @@
 	const id = $derived(page.params.id ?? '');
 	const number = $derived(Number(page.params.number ?? '0'));
 	let version = $state<components['schemas']['RuleVersionOut'] | null>(null);
-	const loader = new RuleLoader();
+	const loader = new RuleLoader(undefined, m.rule_version_not_found);
+	// An address without a number names no version: no "Version NaN" as the title.
+	const heading = $derived(
+		Number.isInteger(number) ? m.rule_version_n({ number }) : m.thing_rule_version()
+	);
 	const lookup = $derived(loader.lookup);
 	const problem = $derived(loader.problem);
 
@@ -43,14 +47,14 @@
 </script>
 
 <svelte:head>
-	<title>{m.rule_version_n({ number })} · {m.app_name()}</title>
+	<title>{heading} · {m.app_name()}</title>
 </svelte:head>
 
 <div class="flex flex-col gap-6">
 	<PageHeader
 		title={version
 			? m.rule_version_title({ name: version.name, number: version.version })
-			: m.rule_version_n({ number })}
+			: heading}
 		back={{ href: `${BASE}/rules/${id}`, label: version?.name ?? m.nav_rules() }}
 	>
 		{#snippet below()}
@@ -65,7 +69,7 @@
 		{/snippet}
 	</PageHeader>
 	{#if problem}
-		<LoadProblem {problem} onretry={() => loader.retry()} />
+		<LoadProblem {problem} onretry={loader.onretry} />
 	{:else if !version}
 		<Loading />
 	{:else}

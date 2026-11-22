@@ -40,7 +40,7 @@
 	const id = $derived(page.params.id ?? '');
 	const saved = $derived(page.url.searchParams.has('saved'));
 	let rule = $state<MailRule | null>(null);
-	const loader = new RuleLoader<MailRuleLookup>(loadMailRuleLookup);
+	const loader = new RuleLoader<MailRuleLookup>(loadMailRuleLookup, m.mail_rule_not_found);
 	const lookup = $derived(loader.lookup);
 	let mails = $state<DryRunMail[] | null>(null);
 	let busy = $state(false);
@@ -165,13 +165,16 @@
 <div class="flex flex-col gap-6">
 	<PageHeader
 		{title}
-		back={{ href: `${BASE}/rules/mail/${id}`, label: rule?.name ?? m.nav_rules() }}
+		back={{
+			href: rule ? `${BASE}/rules/mail/${id}` : `${BASE}/rules?kind=mail`,
+			label: rule?.name ?? m.nav_rules()
+		}}
 		actions={rule ? switcher : undefined}
 		subtitle={saved ? m.mail_rule_saved_hint() : m.mail_rule_apply_hint()}
 	/>
 
 	{#if loader.problem}
-		<LoadProblem problem={loader.problem} onretry={() => loader.retry()} />
+		<LoadProblem problem={loader.problem} onretry={loader.onretry} />
 	{:else if !rule || !mails || !names}
 		<Loading />
 	{:else if mails.length === 0}

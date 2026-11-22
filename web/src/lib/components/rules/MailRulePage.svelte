@@ -10,7 +10,7 @@
 	import PageHeader from '#lib/components/page/PageHeader.svelte';
 	import MailRuleForm from '#lib/components/rules/MailRuleForm.svelte';
 	import UnsavedGuard from '#lib/components/UnsavedGuard.svelte';
-	import { describeError } from '#lib/errors.ts';
+	import { describeLoad, type LoadFailure } from '#lib/errors.ts';
 	import { loadMailRuleLookup, type MailRuleLookup } from '#lib/mail-rule-lookup.ts';
 	import {
 		createBody,
@@ -37,15 +37,18 @@
 	let form = $state<Form | null>(null);
 	let initial = '';
 	let lookup = $state<MailRuleLookup | null>(null);
-	let problem = $state<string | null>(null);
+	let failure = $state<LoadFailure | null>(null);
 	const saving = new RuleForm();
 	let leaving = $state(false);
 
 	const changed = $derived(form !== null && JSON.stringify(form) !== initial);
-	const back = $derived(id ? `${BASE}/rules/mail/${id}` : `${BASE}/rules?kind=mail`);
+	// To the rule, or to the list where there is none (a new one, one that is not there).
+	const back = $derived(
+		id && !failure?.final ? `${BASE}/rules/mail/${id}` : `${BASE}/rules?kind=mail`
+	);
 
 	async function load() {
-		problem = null;
+		failure = null;
 		try {
 			const [loaded, stored] = await Promise.all([
 				loadMailRuleLookup(),
@@ -56,8 +59,8 @@
 			const mailbox = loaded.mailboxes.find((entry) => entry.id === wanted) ?? loaded.mailboxes[0];
 			form = formOf(stored, mailbox?.id ?? '', mailbox?.body_type_id ?? '');
 			initial = JSON.stringify(form);
-		} catch (failure) {
-			problem = describeError(failure);
+		} catch (error) {
+			failure = describeLoad(error, m.mail_rule_not_found);
 		}
 	}
 
@@ -100,8 +103,8 @@
 		back={{ href: back, label: id ? (rule?.name ?? m.nav_rules()) : m.nav_rules() }}
 	/>
 
-	{#if problem}
-		<LoadProblem {problem} onretry={load} />
+	{#if failure}
+		<LoadProblem problem={failure.text} onretry={failure.final ? undefined : load} />
 	{:else if !form || !lookup}
 		<Loading />
 	{:else}

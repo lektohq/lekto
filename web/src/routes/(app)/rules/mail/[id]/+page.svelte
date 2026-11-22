@@ -25,7 +25,7 @@
 	// to read.
 	const id = $derived(page.params.id ?? '');
 	let rule = $state<MailRule | null>(null);
-	const loader = new RuleLoader<MailRuleLookup>(loadMailRuleLookup);
+	const loader = new RuleLoader<MailRuleLookup>(loadMailRuleLookup, m.mail_rule_not_found);
 	const lookup = $derived(loader.lookup);
 	let busy = $state(false);
 	let removing = $state(false);
@@ -80,7 +80,7 @@
 	</RuleHeader>
 
 	{#if loader.problem}
-		<LoadProblem problem={loader.problem} onretry={() => loader.retry()} />
+		<LoadProblem problem={loader.problem} onretry={loader.onretry} />
 	{:else if !rule || !lookup}
 		<Loading />
 	{:else}

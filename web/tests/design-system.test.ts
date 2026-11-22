@@ -695,6 +695,25 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(inside.test('<Badge>a</Badge> <button type="button">x</button>')).toBe(false);
 	});
 
+	it('says on every detail page that its address names nothing, without a retry', () => {
+		// "States": not found is a `LoadProblem` with the way back, in the page's words; trying
+		// again would change nothing. A page below a parameter loads through `describeLoad`
+		// (the rule pages through `RuleLoader`), the document's page says it itself.
+		const own = new Set(['/src/routes/(app)/documents/[id]/+page.svelte']);
+		const through = /\bdescribeLoad\(|\bnew RuleLoader\b|<MailRulePage\b/;
+		expect(
+			Object.entries(sources)
+				.filter(([path]) => /^\/src\/routes\/.*\[[^\]]+\].*\/\+page\.svelte$/.test(path))
+				.filter(([path, source]) => !own.has(path) && !through.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+		expect(sources['/src/lib/components/rules/MailRulePage.svelte']).toMatch(/\bdescribeLoad\(/);
+		// And no retry beside it that ignores what the loader found.
+		expect(offenders((source) => line(source, /onretry=\{\(\) => loader\.retry\(\)\}/))).toEqual(
+			[]
+		);
+	});
+
 	it('keeps no part of a primitive that nobody uses', () => {
 		// DESIGN.md, "Living style guide": what `ui/` offers is in use and shown there. A part is
 		// what an `index.ts` exports under its names; it counts as used when a file reaches one

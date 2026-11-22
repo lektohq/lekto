@@ -146,6 +146,9 @@ describe('the page of a webhook', () => {
 		render(Page);
 		expect(await screen.findByRole('alert')).toBeTruthy();
 		expect(screen.getAllByRole('alert')).toHaveLength(1);
+		// In the page's own words, and no "Try again": it would change nothing (WF-04).
+		expect(screen.getByText(m.webhook_not_found())).toBeTruthy();
+		expect(screen.queryByRole('button', { name: m.retry() })).toBeNull();
 		expect(screen.queryByText(m.webhook_log())).toBeNull();
 		expect(calls(api).filter((call) => call.includes('/deliveries'))).toEqual([]);
 	});

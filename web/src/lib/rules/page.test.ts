@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { ApiError, type Problem } from '#lib/api/problem.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { calls, fakeApi, json } from '#lib/testing/api.ts';
 import { RuleLoader } from './page.svelte.ts';
@@ -55,6 +56,37 @@ describe('the loader of a rule page', () => {
 		await loader.load(() => Promise.resolve('data'), then);
 		expect(loader.problem).toBeNull();
 		expect(then).toHaveBeenCalledOnce();
+	});
+
+	it('offers no retry for a rule that is not there, in the words of its kind (WF-04)', async () => {
+		vi.stubGlobal('fetch', fakeApi());
+		const gone = () =>
+			Promise.reject(new ApiError(404, { title: 'Not Found', status: 404 } as Problem, null));
+		const loader = new RuleLoader();
+		await loader.load(gone, vi.fn());
+		expect(loader.problem).toBe(m.rule_not_found());
+		expect(loader.final).toBe(true);
+		expect(loader.onretry).toBeUndefined();
+
+		const mail = new RuleLoader(undefined, m.mail_rule_not_found);
+		await mail.load(gone, vi.fn());
+		expect(mail.problem).toBe(m.mail_rule_not_found());
+
+		// The next load that works brings the retry back.
+		await loader.load(() => Promise.resolve('data'), vi.fn());
+		expect(loader.final).toBe(false);
+		expect(loader.onretry).toBeTypeOf('function');
+	});
+
+	it('refuses what is not the caller’s to use, without a retry', async () => {
+		vi.stubGlobal('fetch', fakeApi());
+		const loader = new RuleLoader();
+		await loader.load(
+			() => Promise.resolve('data'),
+			() => loader.refuse(m.error_forbidden())
+		);
+		expect(loader.problem).toBe(m.error_forbidden());
+		expect(loader.onretry).toBeUndefined();
 	});
 
 	it('takes the master data of its kind, and drops a late answer there too', async () => {

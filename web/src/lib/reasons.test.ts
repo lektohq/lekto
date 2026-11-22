@@ -115,6 +115,22 @@ describe('a reason in the user language', () => {
 		expect(reasonText(reason('name_too_long', { what: 'title', max: 300 }))).toBe(
 			'Der Titel darf höchstens 300 Zeichen haben.'
 		);
+		// The nouns of the pages and cards that name what is gone (WF-04, WH-03).
+		expect(reasonText(reason('not_found', { kind: 'mailbox', id: 'x3' }))).toBe(
+			'Postfach x3 wurde nicht gefunden.'
+		);
+		expect(reasonText(reason('not_found', { kind: 'mail rule', id: 'x3' }))).toBe(
+			'Mail-Regel x3 wurde nicht gefunden.'
+		);
+		expect(reasonText(reason('not_found', { kind: 'API token', id: 'x3' }))).toBe(
+			'API-Token x3 wurde nicht gefunden.'
+		);
+		expect(reasonText(reason('not_found', { kind: 'push device', id: 'x3' }))).toBe(
+			'Gerät x3 wurde nicht gefunden.'
+		);
+		expect(reasonText(reason('name_empty', { what: 'device name' }))).toBe(
+			'Der Name des Geräts darf nicht leer sein.'
+		);
 		expect(reasonText(reason('not_found', { kind: 'gizmo', id: 'x2' }))).toBe(
 			'gizmo x2 wurde nicht gefunden.'
 		);

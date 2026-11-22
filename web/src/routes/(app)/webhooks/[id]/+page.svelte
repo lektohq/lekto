@@ -21,7 +21,7 @@
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
 	import Select from '#lib/components/Select.svelte';
-	import { describeError } from '#lib/errors.ts';
+	import { describeLoad, type LoadFailure } from '#lib/errors.ts';
 	import { formatDate, formatNumber } from '#lib/i18n.ts';
 	import { rememberedPageSize } from '#lib/page-size.ts';
 	import { SummaryPager } from '#lib/summary-pager.svelte.ts';
@@ -51,7 +51,7 @@
 	// with its document as far as the viewer may read it.
 	const id = $derived(page.params.id ?? '');
 	let webhook = $state<Webhook | null>(null);
-	let problem = $state<string | null>(null);
+	let failure = $state<LoadFailure | null>(null);
 	let removing = $state(false);
 	let renewing = $state(false);
 	let secret = $state<string | null>(null);
@@ -132,7 +132,7 @@
 
 	/** Load the webhook; whether it is there. */
 	async function load(wanted: string): Promise<boolean> {
-		problem = null;
+		failure = null;
 		try {
 			const hook = await unwrap(
 				api.GET('/api/v1/webhooks/{id}', { params: { path: { id: wanted } } })
@@ -140,7 +140,7 @@
 			if (wanted === id) webhook = hook;
 			return wanted === id;
 		} catch (error) {
-			if (wanted === id) problem = describeError(error);
+			if (wanted === id) failure = describeLoad(error, m.webhook_not_found);
 			return false;
 		}
 	}
@@ -280,8 +280,8 @@
 		{/snippet}
 	</PageHeader>
 
-	{#if problem}
-		<LoadProblem {problem} onretry={() => open(id)} />
+	{#if failure}
+		<LoadProblem problem={failure.text} onretry={failure.final ? undefined : () => open(id)} />
 	{:else if !webhook}
 		<Loading />
 	{/if}

@@ -128,7 +128,7 @@
 					rule = found;
 					// Only who may apply the rule gets its preview (the API refuses the others).
 					if (!canApplyRule(found, session.user, loaded.spaces)) {
-						loader.problem = m.error_forbidden();
+						loader.refuse(m.error_forbidden());
 						return;
 					}
 					if (following) void resume(following);
@@ -377,13 +377,16 @@
 <div class="flex flex-col gap-6">
 	<PageHeader
 		title={rule ? m.rule_apply_title({ name: rule.name }) : m.rule_apply_generic()}
-		back={{ href: `${BASE}/rules/${id}`, label: rule?.name ?? m.nav_rules() }}
+		back={{
+			href: rule ? `${BASE}/rules/${id}` : `${BASE}/rules`,
+			label: rule?.name ?? m.nav_rules()
+		}}
 		actions={changeable ? switcher : undefined}
 		subtitle={saved ? m.rule_saved_hint() : m.rule_apply_hint()}
 	/>
 
 	{#if problem}
-		<LoadProblem {problem} onretry={() => loader.retry()} />
+		<LoadProblem {problem} onretry={loader.onretry} />
 	{:else if !rule}
 		<Loading />
 	{:else}

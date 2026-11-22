@@ -98,11 +98,14 @@
 <div class="flex flex-col gap-6">
 	<PageHeader
 		title={rule ? m.rule_edit_title({ name: rule.name }) : m.rule_edit_generic()}
-		back={{ href: `${BASE}/rules/${id}`, label: rule?.name ?? m.nav_rules() }}
+		back={{
+			href: rule ? `${BASE}/rules/${id}` : `${BASE}/rules`,
+			label: rule?.name ?? m.nav_rules()
+		}}
 	/>
 
 	{#if problem}
-		<LoadProblem {problem} onretry={() => loader.retry()} />
+		<LoadProblem {problem} onretry={loader.onretry} />
 	{:else if !rule || !model || !lookup}
 		<Loading />
 	{:else}

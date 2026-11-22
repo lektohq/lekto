@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { ApiError, type Problem } from '#lib/api/problem.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { getLocale, setLocale } from '#lib/paraglide/runtime.js';
-import { describeError, fieldErrors } from './errors.ts';
+import { describeError, describeLoad, fieldErrors } from './errors.ts';
 
 const before = getLocale();
 afterEach(() => setLocale(before, { reload: false }));
@@ -19,6 +19,37 @@ const problem = (status: number, detail: string | null = null): Problem => ({
 	second_factor_required: null,
 	reason: null,
 	errors: null
+});
+
+describe('describeLoad (WF-04)', () => {
+	const missing = () => 'This rule does not exist.';
+
+	it('says in the page’s words that the address names nothing, without a retry', () => {
+		// Not there or not the caller's to see, and an id the API cannot read.
+		for (const status of [404, 422])
+			expect(
+				describeLoad(new ApiError(status, problem(status, 'rule 12345 not found'), null), missing)
+			).toEqual({
+				text: 'This rule does not exist.',
+				final: true
+			});
+	});
+
+	it('gives the API’s reason for what the caller may not, without a retry', () => {
+		const failure = describeLoad(new ApiError(403, problem(403, 'Admins only.'), null), missing);
+		expect(failure).toEqual({ text: `${m.error_forbidden()} Admins only.`, final: true });
+	});
+
+	it('leaves the retry where trying again can help', () => {
+		expect(describeLoad(new ApiError(500, problem(500, 'Broken.'), null), missing)).toEqual({
+			text: 'Broken.',
+			final: false
+		});
+		expect(describeLoad(new TypeError('Failed to fetch'), missing)).toEqual({
+			text: m.error_network(),
+			final: false
+		});
+	});
 });
 
 describe('describeError', () => {

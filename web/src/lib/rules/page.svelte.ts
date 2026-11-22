@@ -6,22 +6,39 @@
  * dropped (another rule in the URL meanwhile, or a reload after a master data dialog saved).
  */
 import { untrack } from 'svelte';
-import { describeError } from '#lib/errors.ts';
+import { describeLoad } from '#lib/errors.ts';
 import { latest } from '#lib/latest.ts';
 import { loadRuleLookup, type Lookup } from '#lib/masterdata.svelte.ts';
+import { m } from '#lib/paraglide/messages.js';
 
 export class RuleLoader<L = Lookup> {
 	/** The master data; null until the first load succeeded. */
 	lookup = $state<L | null>(null);
 	/** Why the last load failed, as text; null after a load that worked. */
 	problem = $state<string | null>(null);
+	/** Whether trying again cannot help: the rule is not there, or not the caller's. */
+	final = $state(false);
 	#begin = latest();
 	#last: (() => Promise<void>) | null = null;
 	#loadLookup: () => Promise<L>;
+	#missing: () => string;
 
-	/** `loadLookup`: the master data the rule's kind needs; a document rule's without. */
-	constructor(loadLookup?: () => Promise<L>) {
+	/** `loadLookup`: the master data the rule's kind needs; a document rule's without.
+	 * `missing`: what the page says when its address names nothing (a document rule's without). */
+	constructor(loadLookup?: () => Promise<L>, missing: () => string = m.rule_not_found) {
 		this.#loadLookup = loadLookup ?? (loadRuleLookup as unknown as () => Promise<L>);
+		this.#missing = missing;
+	}
+
+	/** "Try again" for `LoadProblem`: none where it cannot help. */
+	get onretry(): (() => void) | undefined {
+		return this.final ? undefined : () => this.retry();
+	}
+
+	/** What was loaded is not the caller's to use here: `text` says why, without a retry. */
+	refuse(text: string): void {
+		this.problem = text;
+		this.final = true;
 	}
 
 	/**
@@ -42,9 +59,13 @@ export class RuleLoader<L = Lookup> {
 			if (!current()) return;
 			this.lookup = loaded;
 			this.problem = null;
+			this.final = false;
 			then(found, loaded);
 		} catch (error) {
-			if (current()) this.problem = describeError(error);
+			if (!current()) return;
+			const failure = describeLoad(error, this.#missing);
+			this.problem = failure.text;
+			this.final = failure.final;
 		}
 	}
 
