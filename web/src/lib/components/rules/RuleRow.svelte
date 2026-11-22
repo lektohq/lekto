@@ -4,9 +4,11 @@
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import type { Snippet } from 'svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
+	import { cardVariants } from '#lib/components/ui/card/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { moveKeepingFocus, removeKeepingFocus } from '#lib/rules/row-focus.ts';
+	import { cn } from '#lib/utils.ts';
 
 	// A row of a rule's conditions or actions, the same for document and mail rules: its label
 	// (an action names its kind), its fields, then moving it up and down where the order counts
@@ -38,7 +40,11 @@
 	} = $props();
 </script>
 
-<div class="flex flex-col gap-2 rounded-xl border bg-background p-3" data-key={key} data-rule-row>
+<div
+	class={cn(cardVariants({ size: 'sm', tone: 'inset' }), 'flex flex-col gap-2')}
+	data-key={key}
+	data-rule-row
+>
 	<div class="flex flex-wrap items-start gap-2">
 		{#if label}<span class="w-full pt-2 text-sm font-medium sm:w-44">{label}</span>{/if}
 		{@render children()}

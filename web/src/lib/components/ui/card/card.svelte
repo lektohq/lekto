@@ -11,9 +11,13 @@
 		variants: {
 			// `open`: what waits for an answer of the person (the filing question, a field to
 			// check), on the yellow of its lane (web/DESIGN.md, "Cards").
+			// `nested`: a card inside a card of its kind (a group of conditions in a group);
+			// `inset`: a row inside a card, on the page's ground (a condition, an action).
 			tone: {
 				plain: 'bg-card',
-				open: 'border-lane-yellow-foreground/25 bg-lane-yellow/25'
+				open: 'border-lane-yellow-foreground/25 bg-lane-yellow/25',
+				nested: 'bg-secondary/40',
+				inset: 'bg-background'
 			},
 			size: {
 				flush: '',

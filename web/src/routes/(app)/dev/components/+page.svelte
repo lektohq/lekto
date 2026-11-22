@@ -489,7 +489,7 @@
 				</Card.Root>
 			{/each}
 		</div>
-		{#each ['open'] as const as tone (tone)}
+		{#each ['open', 'nested', 'inset'] as const as tone (tone)}
 			<Card.Root size="sm" {tone} class="flex max-w-xl flex-col gap-1">
 				<Card.Title level={3}>{tone}</Card.Title>
 				<p class="text-sm">{m.dev_sample_text()}</p>

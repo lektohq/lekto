@@ -514,7 +514,9 @@ segmented look exists.
 [Spacing](#spacing-and-layout)); `as` picks the element (`li`, `section`, `article`, `form` …),
 `cardVariants` draws the look on an element that cannot be a `Card`. `tone="open"` puts a card on
 the yellow of its lane: what waits for an answer of the person (the open filing question, a
-field to check), and nothing else. `Card.Title` renders a heading (`<h2>` by default, `level` to
+field to check), and nothing else. Where cards stand in a card (the rule editor: groups of
+conditions, their rows, the actions), all are `sm`: a card inside one of its kind is
+`tone="nested"` (`bg-secondary/40`), a row inside a card `tone="inset"` (the page's ground). `Card.Title` renders a heading (`<h2>` by default, `level` to
 change it) in `text-md`. `Card.Description` is `text-sm text-muted-foreground`. Hand-built
 `div`s with border and radius are not used.
 

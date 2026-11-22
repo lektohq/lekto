@@ -19,6 +19,7 @@
 	import ConditionGroup from '#lib/components/rules/ConditionGroup.svelte';
 	import ModeSelect from '#lib/components/rules/ModeSelect.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
+	import { cardVariants } from '#lib/components/ui/card/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Choice } from '#lib/components/ui/choice/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
@@ -75,8 +76,8 @@
 
 <div
 	class={cn(
-		'flex flex-col gap-3 rounded-2xl border p-3',
-		own ? 'bg-card' : 'bg-secondary/40',
+		cardVariants({ size: 'sm', tone: own ? 'plain' : 'nested' }),
+		'flex flex-col gap-3',
 		top && 'border-0 p-0',
 		error && 'border-destructive'
 	)}

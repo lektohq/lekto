@@ -52,6 +52,15 @@ describe('the rows of a rule by keyboard (WD-06)', () => {
 		expect(button(m.rule_remove_of({ name: m.rule_row_action({ number: 1, kind }) }))).toBeTruthy();
 	});
 
+	it('draws groups and rows as cards of one size (WD-16)', () => {
+		builder();
+		const row = button(m.rule_remove_of({ name: condition(1) })).closest('[data-rule-row]')!;
+		const classes = row.className.split(' ');
+		// `Card` in `sm`, on the page's ground; before: `rounded-xl p-3` by hand.
+		expect(classes).toEqual(expect.arrayContaining(['rounded-2xl', 'p-3.5', 'bg-background']));
+		expect(classes).not.toContain('rounded-xl');
+	});
+
 	it('keeps the focus in the list when a row is removed', async () => {
 		const model = builder();
 		const user = userEvent.setup();
