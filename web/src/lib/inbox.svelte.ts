@@ -4,6 +4,7 @@
  * events and when the window comes back into view (seen in another tab or on another device
  * sends no event).
  */
+import { unwrap } from '#lib/api/call.ts';
 import { api } from '#lib/api/client.ts';
 import type { components } from '#lib/api/schema.ts';
 import { events, NODE_EVENTS } from '#lib/events.svelte.ts';
@@ -48,6 +49,9 @@ export function badgeText(open: number): string {
 
 class Inbox {
 	summary = $state<InboxSummary | null>(null);
+	/** Why the last fetch failed; null after one that did not. The counter says nothing of it
+	 * and keeps what it showed; the overview's tile shows it where it has nothing to show. */
+	failure = $state<unknown>(null);
 	#timer: ReturnType<typeof setTimeout> | undefined;
 	#stop: (() => void) | null = null;
 	// An answer overtaken by a later request (the scope changed meanwhile) is dropped.
@@ -62,12 +66,13 @@ class Inbox {
 	async refresh(): Promise<void> {
 		const request = ++this.#request;
 		try {
-			const { data } = await api.GET('/api/v1/inbox/summary', {
-				params: { query: { all_users: scope.query } }
-			});
-			if (data && request === this.#request) this.summary = data;
-		} catch {
-			// Offline (fetch rejects): the counter keeps what it showed until the next refresh.
+			const data = await unwrap(
+				api.GET('/api/v1/inbox/summary', { params: { query: { all_users: scope.query } } })
+			);
+			if (request === this.#request) [this.summary, this.failure] = [data, null];
+		} catch (failure) {
+			// Offline or refused: the counter keeps what it showed until the next refresh.
+			if (request === this.#request) this.failure = failure;
 		}
 	}
 
@@ -100,7 +105,7 @@ class Inbox {
 		this.#stop?.();
 		this.#stop = null;
 		this.#request++;
-		this.summary = null;
+		[this.summary, this.failure] = [null, null];
 	}
 }
 

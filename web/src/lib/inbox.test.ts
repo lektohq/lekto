@@ -75,6 +75,8 @@ describe('inbox summary', () => {
 		api.mockRejectedValue(new TypeError('Failed to fetch'));
 		await expect(inbox.refresh()).resolves.toBeUndefined();
 		expect(inbox.open).toBe(1);
+		// It remembers why, for who has nothing to show without it (the overview's tile, WE-08).
+		expect(inbox.failure).toBeInstanceOf(TypeError);
 	});
 
 	it('is fetched again when the window comes back into view', async () => {

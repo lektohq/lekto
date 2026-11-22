@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/svelte';
+import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
@@ -46,7 +46,7 @@ function routes(expected: Expected[] = [], suggested = 2) {
 }
 
 afterEach(() => {
-	inbox.summary = null;
+	inbox.stop();
 	session.clear();
 });
 
@@ -130,6 +130,28 @@ describe('Übersicht', () => {
 		expect(await within(identifiers).findByText('0')).toBeTruthy();
 		expect(identifiers.textContent).toContain(m.overview_identifiers_suggestions());
 		expect(container.querySelector('.lg\\:grid-cols-3')).toBeTruthy();
+	});
+
+	it('says that the inbox could not be read, and reads it again on request (WE-08)', async () => {
+		signIn('user');
+		const api = routes();
+		vi.stubGlobal('fetch', api);
+		// The header's counter failed and nothing was read before: the tile loaded without end.
+		inbox.failure = new TypeError('Failed to fetch');
+		render(Page);
+		const tile = screen.getByRole('region', { name: m.nav_inbox() });
+		expect(within(tile).getByRole('alert').textContent).toContain(m.error_network());
+		inbox.summary = {
+			open: 0,
+			new: 0,
+			review: 0,
+			intervene: 0,
+			processing: 0,
+			done: 0,
+			worst_lane: null
+		} as never;
+		inbox.failure = null;
+		await waitFor(() => expect(within(tile).queryByRole('alert')).toBeNull());
 	});
 
 	it('leaves the identifiers to admins', async () => {
