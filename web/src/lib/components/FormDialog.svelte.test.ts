@@ -41,6 +41,12 @@ describe('FormDialog', () => {
 		expect(save.getAttribute('aria-disabled')).toBe('true');
 		expect((save as HTMLButtonElement).disabled).toBe(false);
 		expect(document.activeElement).toBe(save);
+		// Nothing closes it while the action runs: not "Abbrechen", not the X, not Escape (WB-03).
+		await user.click(screen.getByRole('button', { name: m.cancel() }));
+		await user.click(screen.getByRole('button', { name: m.close() }));
+		await user.keyboard('{Escape}');
+		expect(props.open).toBe(true);
+		expect(screen.getByRole('dialog')).toBeTruthy();
 		finish();
 		await waitFor(() => expect(props.open).toBe(false));
 	});

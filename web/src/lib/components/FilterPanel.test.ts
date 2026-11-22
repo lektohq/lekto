@@ -154,8 +154,11 @@ describe('FilterPanel', () => {
 		expect(rows(list)).toEqual(['Nord 5', 'Süd 3']);
 		const versorger = within(contacts).getByRole('button', { name: /^Versorger/ });
 		expect(versorger.getAttribute('aria-pressed')).toBe('true');
-		// The section says what is chosen in it.
-		expect(contacts.getAttribute('aria-labelledby')).toBeTruthy();
+		// The section is named by its title, and says what is chosen in it.
+		const labels = contacts.getAttribute('aria-labelledby')!.split(' ');
+		expect(labels.map((id) => document.getElementById(id)?.textContent).join(' ')).toContain(
+			m.facet_contact()
+		);
 		expect(within(contacts).getByRole('button', { expanded: true }).textContent).toContain(
 			'Versorger'
 		);

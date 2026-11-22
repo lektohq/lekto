@@ -264,10 +264,8 @@ describe('DocumentForm', () => {
 	it('tells under a field what belongs in it', () => {
 		render(DocumentForm, props());
 		const number = screen.getByRole('group', { name: /Rechnungsnummer/ });
-		expect(number.getAttribute('aria-describedby')).toBeTruthy();
-		expect(
-			within(number).getByText('Die Nummer, unter der die Rechnung geführt wird')
-		).toBeTruthy();
+		const hint = within(number).getByText('Die Nummer, unter der die Rechnung geführt wird');
+		expect(number.getAttribute('aria-describedby')?.split(' ')).toContain(hint.id);
 		const note = screen.getByRole('group', { name: 'Notiz' });
 		expect(note.getAttribute('aria-describedby')).toBeNull();
 	});

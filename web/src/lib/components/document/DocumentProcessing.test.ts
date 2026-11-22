@@ -59,6 +59,15 @@ function documentAt(
 	return documentOf({ space_id: 's-mine', processing: { status, run, vision: false, nodes } });
 }
 
+/** The details of the step open beside the cards, once they are there. */
+function details(container: HTMLElement): Promise<HTMLElement> {
+	return waitFor(() => {
+		const panel = container.querySelector<HTMLElement>('#step-details');
+		expect(panel).not.toBeNull();
+		return panel!;
+	});
+}
+
 /** Run 2 through to the filing, every step ok; `receiving` of the receiving step. */
 function finishedRun(receiving: Partial<NodeState> = {}): Document {
 	return documentAt(2, 'completed', [
@@ -297,7 +306,7 @@ describe('DocumentProcessing', () => {
 	it('tells the tokens behind the info icon and shows the prompt', async () => {
 		const { container } = show();
 		await userEvent.click(card(container, 'signal_llm'));
-		const panel = await waitFor(() => container.querySelector('#step-details') as HTMLElement);
+		const panel = await details(container);
 		const tooltip = await openTip(
 			await within(panel).findByRole('button', { name: m.tokens_details() })
 		);
@@ -380,7 +389,9 @@ describe('DocumentProcessing', () => {
 			});
 
 		const { unmount } = show({ document: runs('red') });
-		expect(await screen.findByText(`${m.processing_steps()} · ${m.log_run({ run: 2 })}`));
+		expect(
+			await screen.findByText(`${m.processing_steps()} · ${m.log_run({ run: 2 })}`)
+		).toBeTruthy();
 		await waitFor(() => expect(first().textContent).toContain(m.outcome_failed()));
 		unmount();
 
@@ -411,7 +422,7 @@ describe('DocumentProcessing', () => {
 		const name = m.space_named_someone();
 		expect(await within(judge).findByText(m.summary_overruled_confirmed({ name }))).toBeTruthy();
 		await userEvent.click(judge);
-		const panel = await waitFor(() => container.querySelector('#step-details') as HTMLElement);
+		const panel = await details(container);
 		expect(within(panel).getByText(m.processing_overruled_confirmed({ name }))).toBeTruthy();
 		// A person's confirmation has no prompt of its own.
 		expect(within(panel).queryByRole('button', { name: m.prompt_open() })).toBeNull();

@@ -63,6 +63,6 @@ describe('FactFilter', () => {
 		expect(onchange).toHaveBeenLastCalledWith([]);
 		// A person's kinds are for admins only.
 		const kinds = screen.getByRole('combobox', { name: m.facts_add_kind() });
-		await expect(choose(user, kinds, 'tax_id')).rejects.toThrow();
+		await expect(choose(user, kinds, 'tax_id')).rejects.toThrow('no option tax_id');
 	});
 });

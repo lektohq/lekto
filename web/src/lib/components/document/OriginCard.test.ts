@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { calls, fakeApi, problem } from '#lib/testing/api.ts';
 import type { components } from '#lib/api/schema.ts';
@@ -82,14 +83,19 @@ describe('OriginCard', () => {
 	});
 
 	it('keeps a load error on the card, with a way to try again', async () => {
+		let down = true;
 		vi.stubGlobal(
 			'fetch',
 			fakeApi({
-				'GET /api/v1/documents/d4/origin': () => problem(503)
+				'GET /api/v1/documents/d4/origin': () => (down ? problem(503) : attachment)
 			})
 		);
 		render(OriginCard, { props: { documentId: 'd4' } });
 		expect(await screen.findByRole('alert')).toBeTruthy();
 		expect(screen.getByText(m.origin_title())).toBeTruthy();
+		down = false;
+		await userEvent.click(screen.getByRole('button', { name: m.retry() }));
+		expect(await screen.findByText('Haushalt')).toBeTruthy();
+		expect(screen.queryByRole('alert')).toBeNull();
 	});
 });

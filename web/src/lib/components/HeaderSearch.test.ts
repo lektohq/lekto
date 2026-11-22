@@ -89,6 +89,21 @@ describe('HeaderSearch', () => {
 		await userEvent.keyboard('/');
 		expect(document.activeElement).toBe(field);
 		expect((field as HTMLInputElement).value).toBe('');
+		// In another field the slash is typed; with a modifier it is someone else's key.
+		const other = document.body.appendChild(document.createElement('textarea'));
+		try {
+			await userEvent.click(other);
+			await userEvent.keyboard('a/b');
+			expect(document.activeElement).toBe(other);
+			expect(other.value).toBe('a/b');
+			other.blur();
+			for (const chord of ['{Control>}/{/Control}', '{Meta>}/{/Meta}', '{Alt>}/{/Alt}']) {
+				await userEvent.keyboard(chord);
+				expect(document.activeElement).not.toBe(field);
+			}
+		} finally {
+			other.remove();
+		}
 	});
 
 	it('goes the magnifier’s way on / where the header shows no field (WB-08)', async () => {
