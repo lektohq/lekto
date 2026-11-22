@@ -45,6 +45,7 @@
 		marks = [],
 		loading = false,
 		problem = null,
+		onretry,
 		note = null,
 		start = null,
 		page,
@@ -60,6 +61,8 @@
 		marks?: readonly Mark[];
 		loading?: boolean;
 		problem?: string | null;
+		/** Reads the pages again: "Erneut versuchen" below the problem. */
+		onretry?: () => void;
 		/** Said in the toolbar beside the page count. */
 		note?: string | null;
 		/** How it starts; else two pages in a row, one on a narrow screen. */
@@ -422,7 +425,7 @@
 		{#if loading}
 			<Loading class="w-full py-16 text-center" />
 		{:else if problem}
-			<div class="w-full p-6"><LoadProblem {problem} /></div>
+			<div class="w-full p-6"><LoadProblem {problem} {onretry} /></div>
 		{:else}
 			{#each sizes as size, index (index)}
 				<div

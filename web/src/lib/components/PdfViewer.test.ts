@@ -1,5 +1,7 @@
-import { render } from '@testing-library/svelte';
+import { render, screen } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { m } from '#lib/paraglide/messages.js';
 import PdfViewer from './PdfViewer.svelte';
 
 // pdf.js needs a worker and a canvas; the test watches only how a document is opened and
@@ -60,5 +62,39 @@ describe('PdfViewer', () => {
 		loading.open();
 		await settle();
 		expect(loading.destroy).toHaveBeenCalled();
+	});
+
+	it('says in the reader’s language that a file cannot be shown, and reads it again on request (WC-09)', async () => {
+		const fetchMock = vi.fn(async () => new Response(new Uint8Array([1, 2, 3])));
+		vi.stubGlobal('fetch', fetchMock);
+		// What pdf.js says of a file that is no PDF.
+		pdfjs.getDocument.mockReturnValue({
+			promise: Promise.reject(new Error('Invalid PDF structure.')),
+			destroy: vi.fn(async () => {})
+		});
+		render(PdfViewer, { sources: SOURCES, label: 'PDF' });
+		expect(await screen.findByText(m.pdf_unreadable())).toBeTruthy();
+		expect(screen.queryByText(/Invalid PDF structure/)).toBeNull();
+		await userEvent.click(screen.getByRole('button', { name: m.retry() }));
+		await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+	});
+
+	it('says that the server is not reached as everywhere, and that no file is there (WC-09)', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => {
+				throw new TypeError('Failed to fetch');
+			})
+		);
+		const lost = render(PdfViewer, { sources: SOURCES, label: 'PDF' });
+		expect(await screen.findByText(m.error_network())).toBeTruthy();
+		expect(screen.queryByText(/Failed to fetch/)).toBeNull();
+		lost.unmount();
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => new Response(null, { status: 404 }))
+		);
+		render(PdfViewer, { sources: SOURCES, label: 'PDF' });
+		expect(await screen.findByText(m.pdf_missing())).toBeTruthy();
 	});
 });

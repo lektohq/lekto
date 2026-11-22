@@ -733,6 +733,7 @@
 	"pdf_page": "Page {current} of {total}",
 	"pdf_pages": "Pages {first}–{last} of {total}",
 	"pdf_missing": "The file is not available yet.",
+	"pdf_unreadable": "The file cannot be shown.",
 	"processing_failed": "Processing stopped with an error. See the log below; you can repeat the step.",
 	"processing_review": "Some fields wait for confirmation in the inbox.",
 	"edit_title": "Details",

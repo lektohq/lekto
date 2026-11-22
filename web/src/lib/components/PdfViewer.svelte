@@ -71,6 +71,9 @@
 	// (`lib/drawn-pages.ts`); the canvas of any other is emptied, and drawn again on its return.
 	const kept = new DrawnPages<HTMLCanvasElement>();
 
+	/** No source has the file. */
+	class MissingFile extends Error {}
+
 	async function open() {
 		loading = true;
 		problem = null;
@@ -90,7 +93,7 @@
 				}
 				if (answer.status !== 404) throw await apiError(answer);
 			}
-			if (!response) throw new Error(m.pdf_missing());
+			if (!response) throw new MissingFile();
 			const data = new Uint8Array(await response.arrayBuffer());
 			const pdfjs = await loaded;
 			// The viewer may have closed while the file was on its way: then no document is opened
@@ -110,10 +113,14 @@
 			}
 			await measure();
 		} catch (error) {
+			// In the reader's language, never the words of pdf.js or of the browser: what the API or
+			// the network said as everywhere, anything else as a file that cannot be shown.
 			problem =
-				error instanceof Error && !(error instanceof ApiError)
-					? error.message
-					: describeError(error);
+				error instanceof MissingFile
+					? m.pdf_missing()
+					: error instanceof ApiError || error instanceof TypeError
+						? describeError(error)
+						: m.pdf_unreadable();
 		} finally {
 			loading = false;
 		}
@@ -204,6 +211,7 @@
 	{start}
 	{loading}
 	{problem}
+	onretry={() => void open()}
 	{end}
 	{onpage}
 	onshow={(number, node) => {

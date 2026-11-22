@@ -733,6 +733,7 @@
 	"pdf_page": "Seite {current} von {total}",
 	"pdf_pages": "Seite {first}–{last} von {total}",
 	"pdf_missing": "Die Datei ist noch nicht verfügbar.",
+	"pdf_unreadable": "Die Datei lässt sich nicht anzeigen.",
 	"processing_failed": "Die Verarbeitung ist mit einem Fehler stehen geblieben. Das Protokoll unten zeigt ihn; Du kannst den Schritt wiederholen.",
 	"processing_review": "Einige Felder warten im Posteingang auf Bestätigung.",
 	"edit_title": "Angaben",
