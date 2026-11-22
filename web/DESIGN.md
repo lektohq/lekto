@@ -1704,7 +1704,9 @@ LayerChart stand here without one: no rule reaches into a shadow root or `app.cs
   `FRAMES`, a new page in `PATHS`. CI runs it for every pull request that touches `web/` (Tobi,
   21.11.2026).
 - **Living style guide:** `/dev/components` (development builds) shows every component in every
-  variant and size, in light and dark. A new component or variant is added there first.
+  variant and size, in light and dark. A new component or variant is added there first. A
+  guard holds it: a component this document names stands on the page, or in the guard's list of
+  parts of one feature that need that feature's data; the list may only shrink.
 - **Review:** every pull request that touches `web/` confirms it follows this document (the
   checklist of `.github/pull_request_template.md`); a deviation needs a change of this document
   in the same pull request.

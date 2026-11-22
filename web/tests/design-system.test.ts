@@ -11,6 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import de from '../messages/de.json';
 import en from '../messages/en.json';
+import design from '../DESIGN.md?raw';
 
 const sources = import.meta.glob<string>('/src/**/*.svelte', {
 	query: '?raw',
@@ -141,8 +142,84 @@ const PANELS = new Set([
 const PROGRESS = new Set([
 	'/src/lib/components/DocumentsBulkBar.svelte',
 	'/src/lib/components/rules/RuleApplyBar.svelte',
-	'/src/lib/components/UploadSummary.svelte'
+	'/src/lib/components/UploadSummary.svelte',
+	// The living style guide shows every part once.
+	'/src/routes/(app)/dev/components/+page.svelte'
 ]);
+/** Components DESIGN.md names that the living style guide does not show for themselves: parts
+ * of one feature (the document view, the rule editor, the system page, the app's frame), which
+ * need that feature's data, and parts it shows inside another. This list may only shrink; a new
+ * component is added to `/dev/components` first (DESIGN.md, "Enforcement"). */
+const NOT_IN_STYLE_GUIDE = [
+	'AppShell',
+	'AssignmentList',
+	'AsyncForm',
+	'AutomationTab',
+	'BackLink',
+	'Beam',
+	'CandidateSources',
+	'CardFields',
+	'ClassifierTab',
+	'CodeThumb',
+	'ConditionGroup',
+	'ConditionTree',
+	'ConfirmFooter',
+	'CreateOffer',
+	'DocumentFiles',
+	'DocumentLink',
+	'DocumentPages',
+	'DocumentPlace',
+	'DocumentThumb',
+	'DocumentVersions',
+	'DocumentsBulkBar',
+	'FacetChips',
+	'FactFilter',
+	'FilingBox',
+	'FilterPanel',
+	'GroupChips',
+	'InboxMark',
+	'InboxRow',
+	'LanguageChoices',
+	'LensEditor',
+	'MailboxLines',
+	'Mascot',
+	'MasterPages',
+	'ModeSelect',
+	'NamesLine',
+	'OriginCard',
+	'PageEditor',
+	'PageImages',
+	'PageTitle',
+	'PageViewer',
+	'PdfViewer',
+	'PeriodFacet',
+	'PhoneEditorBar',
+	'PickerShell',
+	'ProcessingBand',
+	'ProcessingGraph',
+	'ReferencePicker',
+	'RuleApplyBar',
+	'RuleEffectChange',
+	'RuleHeader',
+	'RuleListRow',
+	'RuleRow',
+	'RuleView',
+	'SearchTab',
+	'SeparationDetails',
+	'SteadyText',
+	'StepDetails',
+	'StreamView',
+	'TagChips',
+	'TagPickerDialog',
+	'TagPickerList',
+	'TagsPanel',
+	'TemplateEditor',
+	'ThemeChoices',
+	'TitlePatternBadge',
+	'TotpCard',
+	'UnsavedGuard',
+	'VersionUpload'
+];
 /** Popovers drawn outside `ui/`: they use the component's shadow (DESIGN.md, "Radius, borders,
  * shadows"). This list may only shrink. */
 const POPOVERS = new Set([
@@ -693,6 +770,29 @@ describe('the design system (web/DESIGN.md)', () => {
 			true
 		);
 		expect(inside.test('<Badge>a</Badge> <button type="button">x</button>')).toBe(false);
+	});
+
+	it('shows in the living style guide every component DESIGN.md names', () => {
+		// "Living style guide": `/dev/components` shows every component; one DESIGN.md names in
+		// backticks and that has its file in `lib/components` is imported there, or listed.
+		const named = new Set([...design.matchAll(/`([A-Z][A-Za-z]+)`/g)].map(([, name]) => name));
+		const files = new Set(
+			Object.keys(sources)
+				.filter(
+					(path) => path.startsWith('/src/lib/components/') && !path.includes('/components/ui/')
+				)
+				.map((path) => path.slice(path.lastIndexOf('/') + 1, -'.svelte'.length))
+		);
+		const page = sources['/src/routes/(app)/dev/components/+page.svelte'];
+		const shown = new Set(
+			[...page.matchAll(/import (\w+) from '#lib\/components\/[^']+\.svelte'/g)].map(
+				([, name]) => name
+			)
+		);
+		const missing = [...named].filter((name) => files.has(name) && !shown.has(name)).sort();
+		expect(missing).toEqual(NOT_IN_STYLE_GUIDE);
+		// The primitive that fills as a run goes on stands there too.
+		expect(page).toMatch(/<Progress\b/);
 	});
 
 	it('says on every detail page that its address names nothing, without a retry', () => {

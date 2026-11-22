@@ -21,4 +21,19 @@ describe('the styleguide', () => {
 			expect(screen.getAllByRole('heading', { name: title }).length).toBeGreaterThan(0);
 		expect(screen.getAllByText(m.dev_sample_document()).length).toBeGreaterThan(1);
 	});
+
+	it('shows the parts the pages build on, each for itself (WF-08)', () => {
+		vi.stubGlobal('fetch', fakeApi());
+		render(Page);
+		// A state with its icon, a rule's switch, a progress bar, the lenses, a page with its cut.
+		const done = screen
+			.getAllByText(m.jobs_state_done())
+			.map((element) => element.closest('[data-slot="badge"]'))
+			.find((badge) => badge !== null);
+		expect(done?.querySelector('svg')).not.toBeNull();
+		expect(screen.getAllByRole('switch').length).toBeGreaterThan(0);
+		expect(screen.getAllByRole('progressbar').length).toBeGreaterThan(0);
+		expect(screen.getAllByRole('link', { name: /Haushalt/ }).length).toBeGreaterThan(0);
+		expect(screen.getByRole('button', { name: m.page_cut_after({ page: '1' }) })).toBeTruthy();
+	});
 });

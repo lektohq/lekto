@@ -1,4 +1,5 @@
 <script lang="ts">
+	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import InboxIcon from '@lucide/svelte/icons/inbox';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import List from '@lucide/svelte/icons/list';
@@ -9,6 +10,22 @@
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import Upload from '@lucide/svelte/icons/upload';
 	import { toast } from 'svelte-sonner';
+	import ChangeDialog from '#lib/components/ChangeDialog.svelte';
+	import EditButton from '#lib/components/EditButton.svelte';
+	import InfoHint from '#lib/components/InfoHint.svelte';
+	import Lenses from '#lib/components/Lenses.svelte';
+	import Logo from '#lib/components/Logo.svelte';
+	import SidewaysRow from '#lib/components/SidewaysRow.svelte';
+	import StatusBadge from '#lib/components/StatusBadge.svelte';
+	import TagChip from '#lib/components/TagChip.svelte';
+	import ToTop from '#lib/components/ToTop.svelte';
+	import GroupTitle from '#lib/components/documents/GroupTitle.svelte';
+	import PageCut from '#lib/components/pages/PageCut.svelte';
+	import PageTile from '#lib/components/pages/PageTile.svelte';
+	import DryRunGroup from '#lib/components/rules/DryRunGroup.svelte';
+	import RuleSwitch from '#lib/components/rules/RuleSwitch.svelte';
+	import { Progress } from '#lib/components/ui/progress/index.ts';
+	import type { Lens } from '#lib/lenses.ts';
 	import StatTile from '#lib/components/StatTile.svelte';
 	import AlertDot from '#lib/components/AlertDot.svelte';
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
@@ -32,6 +49,7 @@
 	import PhoneSheet from '#lib/components/PhoneSheet.svelte';
 	import SortMenu from '#lib/components/SortMenu.svelte';
 	import TagPicker from '#lib/components/TagPicker.svelte';
+	import { BASE } from '#lib/base.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import { MASTER_LIMITS } from '#lib/masterdata-api.ts';
 	import MultiPicker from '#lib/components/MultiPicker.svelte';
@@ -189,6 +207,17 @@
 		row('mandate_reference', 'HV4418720', 'rejected', null, null, 'c2')
 	]);
 	let formOpen = $state(false);
+	// The parts the pages build on, each for itself (WF-08).
+	let ruleOn = $state(true);
+	let changing = $state(false);
+	let cut = $state(true);
+	let pageChosen = $state(false);
+	let groupOpen = $state(true);
+	const LENSES = ['Haushalt', 'Steuer'].map((name, position) => ({
+		id: `lens-${position}`,
+		name,
+		position
+	})) as Lens[];
 	const options = [
 		{ value: 'one', label: `${m.dev_sample_option()} 1` },
 		{ value: 'two', label: `${m.dev_sample_option()} 2` }
@@ -209,6 +238,11 @@
 		<Eyebrow>{m.dev_sample_eyebrow()}</Eyebrow>
 		<SectionTitle level={3}>{m.dev_sample_heading()}</SectionTitle>
 		<SectionTitle level={3} size="card">{m.dev_sample_heading()}</SectionTitle>
+		<GroupTitle count={formatNumber(12)}>{m.dev_sample_heading()}</GroupTitle>
+		<GroupTitle tone="overdue">{m.dev_sample_heading()}</GroupTitle>
+		<div class="flex items-end gap-6">
+			<Logo />
+		</div>
 		<p class="max-w-prose">{m.dev_sample_text()}</p>
 		<p class="text-sm text-muted-foreground">{m.dev_sample_text()}</p>
 		<p class="text-meta text-muted-foreground">{m.dev_sample_text()}</p>
@@ -258,6 +292,11 @@
 			<LaneBadge lane="red" />
 			<LaneBadge lane={null} />
 		</div>
+		<!-- A state in its tone: with its icon, or a plain fact without one. -->
+		<div class="flex flex-wrap items-center gap-2">
+			<StatusBadge tone="green" label={m.jobs_state_done()} icon={CircleCheck} />
+			<StatusBadge tone="muted" label={m.jobs_state_due()} />
+		</div>
 		<!-- A recommendation goes without an icon: its words tell. -->
 		<div class="flex flex-wrap items-center gap-2">
 			<Badge variant="green">{m.open_advise_confirm()}</Badge>
@@ -290,6 +329,34 @@
 				<Chip {size} href="#dev-chips">{m.dev_sample_chip()}</Chip>
 			</div>
 		{/each}
+	</section>
+
+	<section class="flex flex-col gap-3" aria-labelledby="dev-tag-chips">
+		<SectionTitle id="dev-tag-chips" level={3} size="card">{m.dev_sample_chip()}</SectionTitle>
+		<div class="flex flex-wrap items-center gap-2">
+			<TagChip tag={TAGS[0]} />
+			<TagChip tag={TAGS[1]} size="sm" />
+			<TagChip tag={TAGS[2]} onremove={() => {}} removeLabel={m.dev_sample_remove()} />
+			<TagChip tag={TAGS[0]} change="added" />
+			<TagChip tag={TAGS[1]} change="removed" />
+		</div>
+		<!-- One row that scrolls sideways where it does not fit. -->
+		<div class="max-w-xs">
+			<SidewaysRow label={m.dev_sample_chip()}>
+				{#each [...TAGS, ...TAGS] as tag, index (index)}
+					<TagChip {tag} />
+				{/each}
+			</SidewaysRow>
+		</div>
+		<div class="flex flex-wrap items-center gap-3">
+			<EditButton label={m.dev_sample_button()} onclick={() => {}} />
+			<InfoHint about={m.dev_sample_info()} text={m.dev_sample_info_text()} />
+			<RuleSwitch
+				name={m.dev_sample_heading()}
+				enabled={ruleOn}
+				onswitch={(next) => (ruleOn = next)}
+			/>
+		</div>
 	</section>
 
 	<section class="flex flex-col gap-3" aria-labelledby="dev-beam">
@@ -674,6 +741,17 @@
 			<Button variant="outline" onclick={() => (editing = true)}
 				>{m.dev_sample_open_dialog()}</Button
 			>
+			<Button variant="outline" onclick={() => (changing = true)}
+				>{m.dev_sample_alternative()}</Button
+			>
+			<ChangeDialog
+				bind:open={changing}
+				description={m.dev_sample_dialog_text()}
+				submitLabel={m.dev_sample_button()}
+				action={async () => {}}
+			>
+				<p>{m.dev_sample_text()}</p>
+			</ChangeDialog>
 			<EditorShell
 				bind:open={editing}
 				title={m.dev_sample_dialog_title()}
@@ -769,6 +847,42 @@
 			<span>{formatNumber(1234567.891)}</span>
 			<span>{formatMoney('1234.50', 'EUR')}</span>
 		</div>
+		<Progress value={40} class="max-w-sm" aria-label={m.dev_sample_heading()} />
+		<div class="max-w-xs">
+			<Lenses
+				lenses={LENSES}
+				active="lens-0"
+				href={() => '#dev-data'}
+				allHref="#dev-data"
+				counts={{ all: 48, 'lens-0': 12, 'lens-1': 3 }}
+			/>
+		</div>
+		<Lenses
+			variant="chips"
+			lenses={LENSES}
+			active={null}
+			href={() => '#dev-data'}
+			allHref="#dev-data"
+		/>
+		<!-- A page of a stack with the gap after it (the page editor). -->
+		<div class="flex items-stretch">
+			<PageTile
+				image="{BASE}/icon-192.png"
+				label={m.dev_sample_document()}
+				chosen={pageChosen}
+				tabindex={0}
+				onchoose={() => (pageChosen = !pageChosen)}
+			/>
+			<PageCut after={1} {cut} ontoggle={() => (cut = !cut)} />
+		</div>
+		<DryRunGroup count={formatNumber(2)} open={groupOpen} onfold={() => (groupOpen = !groupOpen)}>
+			{#snippet head()}{m.dev_sample_text()}{/snippet}
+			{#each rows.slice(0, 2) as row (row.title)}
+				<li class="px-4 py-3">{row.title}</li>
+			{/each}
+		</DryRunGroup>
+		<!-- Comes once more than a screen lies above. -->
+		<ToTop current={1} total={3} />
 		<Card.Root size="flush">
 			<Table.Root label={m.dev_section_data()}>
 				<Table.Header>
