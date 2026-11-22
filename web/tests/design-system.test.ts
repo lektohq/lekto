@@ -661,6 +661,15 @@ describe('the design system (web/DESIGN.md)', () => {
 	const COLOUR_VALUE =
 		/#(?:[0-9a-f]{8}|[0-9a-f]{6})\b|['"[]#[0-9a-f]{3}['"\]]|\b(?:rgba?|hsla?|oklch|oklab)\(/i;
 
+	it('marks a target as small only where DESIGN.md names the exception', () => {
+		// "Touch targets": the layout spec skips what carries the mark. This list may only shrink.
+		const SMALL = new Set(['/src/lib/components/document/ProcessingBand.svelte']);
+		expect(
+			offenders((source, path) => (SMALL.has(path) ? null : line(source, /data-small-target/)))
+		).toEqual([]);
+		for (const path of SMALL) expect(sources[path]).toContain('data-small-target');
+	});
+
 	it('sets an inline style only where DESIGN.md names the file', () => {
 		// Classes carry the look; a style of its own is for a size or a place that comes from
 		// data (DESIGN.md, "Exceptions").

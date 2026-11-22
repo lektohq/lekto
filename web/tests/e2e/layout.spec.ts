@@ -94,7 +94,11 @@ async function measure(root: Locator, target: number) {
 		for (const element of controls) {
 			const box = element.getBoundingClientRect();
 			if (box.width === 0 || box.height === 0) continue;
-			if (element.closest('[aria-hidden="true"], .sr-only, [data-inline], p, dd')) continue;
+			// `data-small-target`: an exception DESIGN.md names ("Touch targets").
+			if (
+				element.closest('[aria-hidden="true"], .sr-only, [data-inline], [data-small-target], p, dd')
+			)
+				continue;
 			let [w, h] = [box.width, box.height];
 			// A field inside its label or its frame (the search box, the date input; no taller than a
 			// field) takes the pointer on the whole of it.

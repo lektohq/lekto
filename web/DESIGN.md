@@ -1459,6 +1459,11 @@ worker, and Lekto works as a website.
   `Switch`, `ChoiceBox`, `InfoTip`, `BackLink`, `InboxMark`, the rows of `ui/dropdown-menu` and
   `ui/command`, the ✕ of `ui/dialog`, `ui/sheet` and a toast). Every small size of `Button`
   (`xs`, `sm`, `icon-xs`, `icon-sm`) brings its hit area. Pages do not add sizes by hand.
+- **Exceptions** (Tobi, 22.11.2026), each marked `data-small-target` in the markup, which the
+  layout spec skips and `design-system.test.ts` allows only here:
+  - The segments of the processing band (`ProcessingBand`): 32 px tall on a phone, the stripes
+    beside them 3 px, and as narrow as their share of the run. The band is the overview; the
+    step card below each segment does the same and is a finger tall.
 
 ## Accessibility baseline
 

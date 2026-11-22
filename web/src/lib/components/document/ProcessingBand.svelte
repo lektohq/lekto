@@ -201,6 +201,7 @@
 	<button
 		type="button"
 		data-band-node={step.node}
+		data-small-target
 		data-lit={on ? '' : undefined}
 		aria-label={[title(step), reading(step.node)].filter(Boolean).join(' · ')}
 		aria-expanded={step.node === expanded}
