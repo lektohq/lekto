@@ -61,6 +61,79 @@
       "labels": [
         "dev-deps"
       ]
+    },
+    {
+      "description": "Collective PR: every non-major update of the runtime dependencies (backend, migration client, web UI, images); majors come one by one",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "groupName": "runtime dependencies",
+      "groupSlug": "runtime"
+    },
+    {
+      "description": "Collective PR: every non-major update of the development dependencies, like their label",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "matchDepTypes": [
+        "devDependencies",
+        "dependency-groups"
+      ],
+      "groupName": "development dependencies",
+      "groupSlug": "development"
+    },
+    {
+      "description": "Collective PR: the devcontainer goes with the development dependencies",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "matchFileNames": [
+        ".devcontainer/**"
+      ],
+      "groupName": "development dependencies",
+      "groupSlug": "development"
+    },
+    {
+      "description": "Collective PR: Claude Code of the dev container goes with the development dependencies",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "matchPackageNames": [
+        "@anthropic-ai/claude-code"
+      ],
+      "groupName": "development dependencies",
+      "groupSlug": "development"
+    },
+    {
+      "description": "Collective PR: every non-major update of the actions",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions",
+      "groupSlug": "actions"
     }
   ],
   "lockFileMaintenance": {

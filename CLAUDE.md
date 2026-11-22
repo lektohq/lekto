@@ -125,7 +125,10 @@ Every pull request carries exactly one category label from `.github/labels.yml` 
 `dependencies`, `dev-deps`, `breaking-change`); the Release Drafter builds the release notes from
 them. Renovate (`renovate.json`, the hosted app) labels its own: `dependencies`, `dev-deps`
 (development dependencies, the devcontainer), `ci` (actions); it suggests a version 10 days after
-its release at the earliest, a fix of a known vulnerability (OSV, `[SECURITY]`) at once.
+its release at the earliest, a fix of a known vulnerability (OSV, `[SECURITY]`) at once. The
+non-major updates come as one collective pull request per label ("runtime dependencies",
+"development dependencies", "GitHub Actions"), so each still carries one label; a major update
+and a security fix come on their own.
 The version bump follows the labels (`breaking-change` or `major`: major; `new-feature` or
 `minor`: minor; else patch). Tobi publishes and tags the release from the draft.
 A pull request a user notices fills the section `## Release notes` of its description with one
