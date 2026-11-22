@@ -335,7 +335,7 @@
 					     left the theme's buttons no room on a phone (Tobi, 27.10.2026). -->
 					<Sheet.Content
 						side="right"
-						class="gap-2 overflow-y-auto p-4 pt-[max(1rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] data-[side=right]:w-80"
+						class="gap-2 overflow-y-auto p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] data-[side=right]:w-80 data-[side=right]:pr-[max(1rem,env(safe-area-inset-right))]"
 					>
 						<Sheet.Header class="px-2">
 							<Sheet.Title><Logo class="text-lg" /></Sheet.Title>

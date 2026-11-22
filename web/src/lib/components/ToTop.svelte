@@ -27,7 +27,7 @@
 	<button
 		type="button"
 		class={cn(
-			'fixed right-7 bottom-[max(1.75rem,calc(env(safe-area-inset-bottom)+0.75rem))] z-30 inline-flex h-11 animate-in items-center gap-1.5 rounded-xl border bg-card/90 text-sm font-medium tabular-nums shadow-lg backdrop-blur duration-150 fade-in-0 motion-reduce:animate-none',
+			'fixed right-[max(1.75rem,calc(env(safe-area-inset-right)+0.75rem))] bottom-[max(1.75rem,calc(env(safe-area-inset-bottom)+0.75rem))] z-30 inline-flex h-11 animate-in items-center gap-1.5 rounded-xl border bg-card/90 text-sm font-medium tabular-nums shadow-lg backdrop-blur duration-150 fade-in-0 motion-reduce:animate-none',
 			counted ? 'px-4' : 'w-11 justify-center'
 		)}
 		aria-label={counted

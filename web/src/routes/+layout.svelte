@@ -26,10 +26,18 @@
 
 <!-- No transition-blocking <style> element: the CSP allows no inline style elements. -->
 <ModeWatcher disableHeadScriptInjection disableTransitions={false} />
-<!-- Above the home indicator of the installed app (web/DESIGN.md, "App"). -->
+<!-- Above the home indicator of the installed app and beside the notch (web/DESIGN.md,
+     "App"): the library takes `mobileOffset` up to 600 px of width only, a phone held sideways
+     is wider and takes `offset`. -->
 <Toaster
 	richColors={false}
 	closeButton
+	offset={{
+		top: 'calc(24px + env(safe-area-inset-top))',
+		right: 'calc(24px + env(safe-area-inset-right))',
+		bottom: 'calc(24px + env(safe-area-inset-bottom))',
+		left: 'calc(24px + env(safe-area-inset-left))'
+	}}
 	mobileOffset={{
 		top: 'calc(16px + env(safe-area-inset-top))',
 		right: 'calc(16px + env(safe-area-inset-right))',

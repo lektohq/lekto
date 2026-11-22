@@ -1458,7 +1458,9 @@ worker, and Lekto works as a website.
   the status bar stays opaque, `apple-mobile-web-app-status-bar-style` `default`). The shell
   keeps the side insets free; full-screen editors on the phone, bars stuck to the bottom, sheets
   from below and the menu sheet, fixed buttons and toasts keep theirs
-  (`env(safe-area-inset-*)`, at least the padding they had).
+  (`env(safe-area-inset-*)`, at least the padding they had), also at the sides of a phone held
+  sideways: `ui/sheet` pads the sides a sheet touches and sets its X off the edge, so a sheet
+  adds padding of its own at such a side only by the side (`data-[side=right]:pr-…`).
 - **Offline:** while the device has no connection, the header shows the badge "Offline" beside
   the logo (`Badge`, `muted`, `md`, `wifi-off`). `LoadProblem` says "Keine Verbindung …" in place
   of its problem and tries again by itself once the device is back online. A start without a

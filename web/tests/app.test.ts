@@ -233,6 +233,50 @@ describe('the safe areas of the installed app', () => {
 	);
 });
 
+describe('the safe areas beside the notch, a phone held sideways (WM-07)', () => {
+	const sheet = sources['/src/lib/components/ui/sheet/sheet-content.svelte'];
+
+	it('keeps a sheet clear of the sides it touches', () => {
+		// From below (and from the top) both sides, from the right the right, from the left the
+		// left; its X stands off the right edge with it.
+		for (const padding of [
+			'data-[side=bottom]:pl-[env(safe-area-inset-left)]',
+			'data-[side=bottom]:pr-[env(safe-area-inset-right)]',
+			'data-[side=top]:pl-[env(safe-area-inset-left)]',
+			'data-[side=top]:pr-[env(safe-area-inset-right)]',
+			'data-[side=right]:pr-[env(safe-area-inset-right)]',
+			'data-[side=left]:pl-[env(safe-area-inset-left)]'
+		])
+			expect(sheet).toContain(padding);
+		expect(sheet).toContain('right-[calc(0.75rem+env(safe-area-inset-right))]');
+	});
+
+	it('gives a sheet its own padding at a side only by the side, which else loses to the sheet’s', () => {
+		// `pr-4` on a sheet from the right would lose to `data-[side=right]:pr-[env(…)]`: no
+		// padding at all on a phone held upright.
+		const plain =
+			/<Sheet\.Content\b[^>]*\bside="right"[^>]*class="[^"]*(?<![\w\]:-])p[rx]?-(?:\d|\[)/;
+		expect(
+			Object.entries(sources)
+				.filter(([, source]) => plain.test(source))
+				.map(([path]) => path)
+		).toEqual(['/src/lib/components/AppShell.svelte']);
+		// The menu's sheet pads all round (`p-4`) and says its right side by the side.
+		expect(sources['/src/lib/components/AppShell.svelte']).toContain(
+			'data-[side=right]:pr-[max(1rem,env(safe-area-inset-right))]'
+		);
+	});
+
+	it('keeps the way to the top and the toasts clear of the right edge', () => {
+		expect(sources['/src/lib/components/ToTop.svelte']).toContain(
+			'right-[max(1.75rem,calc(env(safe-area-inset-right)+0.75rem))]'
+		);
+		const layout = sources['/src/routes/+layout.svelte'];
+		expect(layout).toMatch(/\boffset=\{\{[^}]*env\(safe-area-inset-right\)[^}]*\}\}/);
+		expect(layout).toMatch(/\bmobileOffset=\{\{[^}]*env\(safe-area-inset-right\)[^}]*\}\}/);
+	});
+});
+
 describe('sharing with the installed app', () => {
 	const manifest = JSON.parse(manifestText) as {
 		share_target: {
