@@ -125,6 +125,21 @@
       "groupSlug": "development"
     },
     {
+      "description": "bits-ui in a pull request of its own: its updates change the behaviour of dialogs, menus and tooltips (2.20 closes them a frame later) and need a look of their own, which would hold up the development dependencies",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "matchPackageNames": [
+        "bits-ui"
+      ],
+      "groupName": "bits-ui",
+      "groupSlug": "bits-ui"
+    },
+    {
       "description": "Collective PR: every non-major update of the actions",
       "matchUpdateTypes": [
         "minor",
