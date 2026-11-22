@@ -125,6 +125,28 @@
       "groupSlug": "development"
     },
     {
+      "description": "bits-ui in a pull request of its own: its updates change the behaviour of dialogs, menus and tooltips (2.20 closes them a frame later) and need a look of their own, which would hold up the development dependencies",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "matchPackageNames": [
+        "bits-ui"
+      ],
+      "groupName": "bits-ui",
+      "groupSlug": "bits-ui"
+    },
+    {
+      "description": "GreenMail 2.1.15 refuses a LOGIN whose password is a UTF-8 literal beyond ASCII (the contract test test_a_password_beyond_ascii fails); skip that version",
+      "matchPackageNames": [
+        "greenmail/standalone"
+      ],
+      "allowedVersions": "!/^2\\.1\\.15$/"
+    },
+    {
       "description": "Collective PR: every non-major update of the actions",
       "matchUpdateTypes": [
         "minor",
