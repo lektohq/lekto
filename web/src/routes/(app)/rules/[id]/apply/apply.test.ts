@@ -197,7 +197,10 @@ describe("a rule's dry run", () => {
 		await user.click(apply);
 
 		expect(await screen.findByText(m.rule_apply_waiting())).toBeTruthy();
-		expect(await screen.findByText(new RegExp(m.rule_apply_ahead({ count: '3' })))).toBeTruthy();
+		// Shown in the bar, and said to a screen reader in the region that stays (WD-12).
+		const ahead = await screen.findAllByText(new RegExp(m.rule_apply_ahead({ count: '3' })));
+		expect(ahead).toHaveLength(2);
+		expect(ahead.some((element) => element.getAttribute('aria-live') === 'polite')).toBe(true);
 		expect(screen.getByRole('link', { name: m.rule_apply_jobs() })).toBeTruthy();
 		expect(goto).toHaveBeenCalledWith('?application=a1', { replace: true, reset: false });
 	});
