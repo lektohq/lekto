@@ -1464,6 +1464,9 @@ worker, and Lekto works as a website.
   - The segments of the processing band (`ProcessingBand`): 32 px tall on a phone, the stripes
     beside them 3 px, and as narrow as their share of the run. The band is the overview; the
     step card below each segment does the same and is a finger tall.
+  - The months of a year in the period filter (`PeriodFacet`): twelve bars in one row, 26 px wide
+    on a phone and 20 px wider, 48 px tall. One row shows the year at a glance; two rows of six
+    would be a finger wide and lose that.
 
 ## Accessibility baseline
 

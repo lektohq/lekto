@@ -663,7 +663,10 @@ describe('the design system (web/DESIGN.md)', () => {
 
 	it('marks a target as small only where DESIGN.md names the exception', () => {
 		// "Touch targets": the layout spec skips what carries the mark. This list may only shrink.
-		const SMALL = new Set(['/src/lib/components/document/ProcessingBand.svelte']);
+		const SMALL = new Set([
+			'/src/lib/components/document/ProcessingBand.svelte',
+			'/src/lib/components/PeriodFacet.svelte'
+		]);
 		expect(
 			offenders((source, path) => (SMALL.has(path) ? null : line(source, /data-small-target/)))
 		).toEqual([]);

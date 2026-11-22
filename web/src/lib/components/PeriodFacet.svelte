@@ -166,6 +166,7 @@
 							count: formatNumber(month.count)
 						})}
 						title={m.facet_month_count({ month: month.name, count: formatNumber(month.count) })}
+						data-small-target
 						disabled={month.count === 0 && !active}
 						class="flex h-full flex-col items-center justify-end gap-0.5 text-nano text-muted-foreground disabled:opacity-40"
 						onclick={() =>

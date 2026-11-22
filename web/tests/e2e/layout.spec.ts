@@ -61,6 +61,8 @@ async function call(method: 'post' | 'patch' | 'delete', path: string, data?: ob
 function madePaths(): string[] {
 	return [
 		`/ui/documents?contact=${made.contact}`,
+		// The year of the document, which shows its months.
+		'/ui/documents?date_from=2026-01-01&date_to=2026-12-31',
 		`/ui/documents/${made.document}`,
 		`/ui/documents/${made.document}?tab=properties`,
 		`/ui/documents/${made.document}?tab=processing`,
