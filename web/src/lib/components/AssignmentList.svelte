@@ -27,7 +27,9 @@
 
 	// What belongs to an item of master data, out of many: the assigned ones as rows (name,
 	// required, remove), more added through a search, so that the list stays short however
-	// many there are. A field's document types, a document type's fields.
+	// many there are. A field's document types, a document type's fields. The rows stand in
+	// the order of `candidates`, which is the API's: fields by their position, types by name
+	// (web/DESIGN.md, "Master data tabs": never sorted by name again).
 	let {
 		assigned,
 		candidates,
@@ -49,7 +51,10 @@
 
 	const byId = $derived(new Map(candidates.map((candidate) => [candidate.id, candidate])));
 	const nameOf = (id: string) => byId.get(id)?.name ?? id;
-	const rows = $derived([...assigned].sort((a, b) => nameOf(a.id).localeCompare(nameOf(b.id))));
+	const place = $derived(new Map(candidates.map((candidate, index) => [candidate.id, index])));
+	// One that is no candidate (any more) stands last.
+	const placeOf = (id: string) => place.get(id) ?? candidates.length;
+	const rows = $derived(assigned.toSorted((a, b) => placeOf(a.id) - placeOf(b.id)));
 	const free = $derived(
 		candidates.filter((candidate) => !assigned.some((item) => item.id === candidate.id))
 	);

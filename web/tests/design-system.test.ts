@@ -523,6 +523,12 @@ describe('the design system (web/DESIGN.md)', () => {
 
 	it('keeps fields in the order the API lists them, never sorts them again', () => {
 		const sorted = /fields?\w*\]?\)?\??\.(?:sort|toSorted)\(/i;
+		// The list of what is assigned (a type's fields) sorts by the place among the candidates.
+		const byName = /\.(?:sort|toSorted)\(.*localeCompare/;
+		expect(
+			byName.test('[...assigned].sort((a, b) => nameOf(a.id).localeCompare(nameOf(b.id)))')
+		).toBe(true);
+		expect(line(sources['/src/lib/components/AssignmentList.svelte'], byName)).toBeNull();
 		const found = offenders((source) => line(source, sorted));
 		for (const [path, source] of Object.entries(scripts)) {
 			const hit = line(source, sorted);

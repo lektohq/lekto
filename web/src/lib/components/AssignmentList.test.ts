@@ -63,6 +63,26 @@ describe('AssignmentList', () => {
 		]);
 	});
 
+	it('keeps the order of the candidates, which is the API’s, not the names’ (WB-06)', () => {
+		// Fields come by their position: "Rechnung" before "Mahnung" before "Brief" here.
+		render(
+			AssignmentList,
+			props(vi.fn(), [
+				{ id: 'letter', required: false },
+				{ id: 'gone', required: false },
+				{ id: 'reminder', required: false },
+				{ id: 'invoice', required: true }
+			])
+		);
+		const names = screen
+			.getAllByRole('switch')
+			.map((row) => row.getAttribute('aria-label'))
+			.map((name) =>
+				['Rechnung', 'Mahnung', 'Brief', 'gone'].find((known) => name?.includes(known))
+			);
+		expect(names).toEqual(['Rechnung', 'Mahnung', 'Brief', 'gone']);
+	});
+
 	it('makes one optional or removes it', async () => {
 		const onchange = vi.fn();
 		render(AssignmentList, props(onchange));
