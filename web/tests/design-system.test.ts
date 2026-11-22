@@ -269,14 +269,24 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
-	it('moves only where motion is wanted: spins, pulses and turns are motion-safe', () => {
+	it('moves only where motion is wanted: spins, pulses, turns and what opens are motion-safe', () => {
 		// DESIGN.md, "Motion"; the shadcn primitives in ui/ too.
 		const spins = /(?<![\w:-])animate-(?:spin|pulse|ping|bounce)\b/;
 		// A turn may instead be stopped for reduced motion in the same string.
 		const turns = /(?<![\w:-])transition-transform\b(?![^'"\n]*motion-reduce:transition-none)/;
-		const found = offenders((source) => line(source, spins) ?? line(source, turns));
+		// What opens (a dialog, a sheet, a menu, a popover) may fade in any case; it grows or
+		// slides in only where motion is wanted.
+		const enters =
+			/(?<![\w:-])(?:data-\[[^\]\s]*\]:)*(?:zoom-(?:in|out)|slide-(?:in-from|out-to))-/;
+		expect(enters.test('data-[state=open]:zoom-in-95')).toBe(true);
+		expect(enters.test('data-[side=left]:data-[state=open]:slide-in-from-left-10')).toBe(true);
+		expect(enters.test('motion-safe:data-[state=open]:zoom-in-95')).toBe(false);
+		expect(enters.test('data-[state=open]:fade-in-0')).toBe(false);
+		const moves = (source: string) =>
+			line(source, spins) ?? line(source, turns) ?? line(source, enters);
+		const found = offenders(moves);
 		for (const [path, source] of Object.entries(scripts)) {
-			const hit = line(source, spins) ?? line(source, turns);
+			const hit = moves(source);
 			if (hit !== null) found.push(`${path}: ${hit.trim().slice(0, 120)}`);
 		}
 		expect(found).toEqual([]);

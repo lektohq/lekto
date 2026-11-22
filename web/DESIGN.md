@@ -1361,7 +1361,9 @@ The documents list keeps its tools and the group at hand (Tobi, 11.11.2026):
 Only `motion-safe`: the sliding pill of `Segmented`, the underline of `TabBar`, the row of the
 documents' tools stepping aside ("Sticky heads"), opening sheets and dialogs. Nothing moves on first show. Nothing grows over its neighbours on hover.
 A spinner, a pulse of what runs and a turning chevron are `motion-safe:` too (or stop with
-`motion-reduce:transition-none`); `tests/design-system.test.ts` refuses one without.
+`motion-reduce:transition-none`), and so is the growing or sliding of what opens (a dialog, a
+sheet, a menu, a popover): with reduced motion it only fades. `tests/design-system.test.ts`
+refuses one without.
 
 ## App
 
