@@ -6,7 +6,6 @@
  * the space whose rules ran when it arrived there.
  */
 import type { components } from '#lib/api/schema.ts';
-import { documentHref } from '#lib/candidates.ts';
 import { describeValue, fieldLabel } from '#lib/describe.ts';
 import { formatNumber, formatPercent } from '#lib/i18n.ts';
 import { labelOfKind, printed } from '#lib/identifiers.ts';
@@ -27,7 +26,6 @@ export const SIGNAL_NODES = [
 
 export interface SummaryItem {
 	text: string;
-	href?: string;
 }
 
 export interface SummaryRow {
@@ -113,7 +111,6 @@ export interface Neighbour {
 	title: string;
 	/** The document, where the caller reads it. */
 	id: string | null;
-	href: string | null;
 	/** Contact, type, topic and space of the document, by name. */
 	parts: string[];
 	/** The same in one line. */
@@ -135,7 +132,6 @@ export function neighbourList(output: Json, lookup: Lookup | null): Neighbour[] 
 		return {
 			title: m.signal_document({ number: index + 1 }),
 			id: typeof found.document_id === 'string' ? found.document_id : null,
-			href: typeof found.document_id === 'string' ? documentHref(found.document_id) : null,
 			parts,
 			about: parts.join(' · '),
 			similarity: score === null ? null : Math.min(1, Math.max(0, score)),
@@ -149,13 +145,6 @@ export function neighbourList(output: Json, lookup: Lookup | null): Neighbour[] 
 
 export function named(id: unknown, lookup: Lookup | null): string {
 	return typeof id === 'string' ? describeValue(id, lookup) : m.value_unset();
-}
-
-/** Ranked classes as `[id, probability]` pairs, at most `count`. */
-function ranked(value: unknown, lookup: Lookup | null, count = 3): SummaryItem[] {
-	return rankedPairs(value, count).map(({ id, probability }) => ({
-		text: `${named(id, lookup)} ${percent(probability)}`
-	}));
 }
 
 const WITH_STRENGTH: Record<Strength, (inputs: { name: string }) => string> = {
@@ -207,13 +196,6 @@ function judged(output: Json, lookup: Lookup | null): SummaryRow[] {
 
 function row(label: string, items: SummaryItem[]): SummaryRow {
 	return { label, items: items.length > 0 ? items : [{ text: m.signal_none() }] };
-}
-
-/** How well the OCR read each page it recognised, of all words and of the content where it
- * was counted; none where pages had text of their own. */
-function readings(output: Json): SummaryRow[] {
-	const items = pageBars(output).map(({ text }) => ({ text }));
-	return items.length === 0 ? [] : [{ label: m.log_reading(), items }];
 }
 
 const LABEL_TEXTS: Record<string, (inputs: { label: string }) => string> = {
@@ -305,10 +287,10 @@ function stepText(step: Json, lookup: Lookup | null): string {
 		: m.log_step_no_answer({ name, reason });
 }
 
-/** The rows of a signal's entry, of the OCR's, or the labels of the fields node's; none for
- * other nodes. */
+/** The rows of a signal's entry, or the labels of the fields node's; none for other nodes. The
+ * OCR, the classifier and the similar documents draw their details (`StepDetails`): of them
+ * only why one abstained stands here. */
 export function signalSummary(entry: LogEntry, lookup: Lookup | null): SummaryRow[] {
-	if (entry.node === 'ocr') return readings(object(entry.output));
 	if (entry.node === 'judge') return judged(object(entry.output), lookup);
 	if (entry.node === 'fields') return labels(object(entry.output), lookup);
 	if (entry.node === 'apply_rules') return rules(entry, lookup);
@@ -341,24 +323,6 @@ export function signalSummary(entry: LogEntry, lookup: Lookup | null): SummaryRo
 				row(m.signal_language(), value('language'))
 			];
 		}
-		case 'signal_classifier':
-			return [
-				row(m.signal_contacts(), ranked(output.contacts, lookup)),
-				row(m.signal_document_types(), ranked(output.document_types, lookup)),
-				...('topics' in output ? [row(m.signal_topics(), ranked(output.topics, lookup))] : []),
-				...('spaces' in output ? [row(m.signal_spaces(), ranked(output.spaces, lookup))] : [])
-			];
-		case 'signal_neighbours':
-			return [
-				row(
-					m.signal_neighbours(),
-					neighbourList(output, lookup).map(({ title, parts, label, href }) => {
-						const said = parts.length > 0 ? `${title}: ${parts.join(', ')}` : title;
-						const alike = label === null ? null : m.signal_similarity({ similarity: label });
-						return { text: alike ? `${said} · ${alike}` : said, href: href ?? undefined };
-					})
-				)
-			];
 		case 'signal_facts':
 			return [
 				row(

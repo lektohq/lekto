@@ -4,7 +4,7 @@ import { signIn } from '#lib/testing/session.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { signalSummary } from '#lib/signals.ts';
+import { named, neighbourList, signalSummary } from '#lib/signals.ts';
 
 type LogEntry = components['schemas']['LogEntry'];
 
@@ -25,43 +25,6 @@ const texts = (rows: ReturnType<typeof signalSummary>) =>
 	rows.map((row) => [row.label, row.items.map((item) => item.text)]);
 
 describe('signalSummary', () => {
-	it('tells how well the OCR read each page it recognised', () => {
-		const readings = [
-			{ page: 1, words: 224, unsure: 23 },
-			{ page: 2, words: 400, unsure: 8 }
-		];
-		const rows = texts(signalSummary(entry('ocr', { readings }), lookup));
-		expect(rows).toEqual([
-			[
-				m.log_reading(),
-				[
-					m.log_reading_page({ page: '1', unsure: '10%', words: '224' }),
-					m.log_reading_page({ page: '2', unsure: '2%', words: '400' })
-				]
-			]
-		]);
-		expect(signalSummary(entry('ocr', { pages: 1 }), lookup)).toEqual([]);
-	});
-
-	it('adds the content words where the OCR counted them', () => {
-		const readings = [{ page: 1, words: 237, unsure: 23, content: 200, content_unsure: 7 }];
-		const rows = texts(signalSummary(entry('ocr', { readings }), lookup));
-		expect(rows).toEqual([
-			[
-				m.log_reading(),
-				[
-					m.log_reading_page_content({
-						page: '1',
-						unsure: '10%',
-						words: '237',
-						content_unsure: '4%',
-						content: '200'
-					})
-				]
-			]
-		]);
-	});
-
 	it('tells why a signal abstained', () => {
 		const rows = signalSummary(entry('signal_classifier', { abstained: 'no model' }), lookup);
 		expect(texts(rows)).toEqual([[m.signal_abstained(), ['no model']]]);
@@ -88,36 +51,15 @@ describe('signalSummary', () => {
 		]);
 	});
 
-	it('names the classifier’s best classes, the similar documents and the facts', () => {
-		const classifier = signalSummary(
-			entry('signal_classifier', {
-				model: 2,
-				contacts: [[UTILITY, 0.91]],
-				document_types: [[INVOICE, 0.5]]
-			}),
-			lookup
-		);
-		expect(texts(classifier)).toEqual([
-			[m.signal_contacts(), ['Stadtwerke 91%']],
-			[m.signal_document_types(), ['Rechnung 50%']]
-		]);
-
-		const [similar] = signalSummary(
-			entry('signal_neighbours', {
-				neighbours: [
-					{ document_id: 'd1', contact_id: UTILITY, document_type_id: null, score: 0.8776 },
-					{ document_id: 'd2', contact_id: null, document_type_id: null }
-				]
-			}),
-			lookup
-		);
-		expect(similar.items).toEqual([
-			{
-				text: `${m.signal_document({ number: 1 })}: Stadtwerke · ${m.signal_similarity({ similarity: '0.88' })}`,
-				href: '/ui/documents/d1'
-			},
-			{ text: m.signal_document({ number: 2 }), href: '/ui/documents/d2' }
-		]);
+	it('names the facts, and leaves to the details what they draw', () => {
+		// The OCR, the classifier and the similar documents draw their details (`StepDetails`).
+		for (const [node, output] of [
+			['ocr', { readings: [{ page: 1, words: 224, unsure: 23 }] }],
+			['signal_classifier', { contacts: [[UTILITY, 0.91]], document_types: [[INVOICE, 0.5]] }],
+			['signal_neighbours', { neighbours: [{ document_id: 'd1', contact_id: UTILITY }] }]
+		] as const) {
+			expect(signalSummary(entry(node, output), lookup)).toEqual([]);
+		}
 
 		const facts = signalSummary(
 			entry('signal_facts', {
@@ -143,13 +85,10 @@ describe('the topic in the signals', () => {
 		tags: [{ id: TOPIC, name: 'Arbeit', path: ['Arbeit'], scope: 'topic' }]
 	} as unknown as Lookup;
 
-	it('shows the topic the model named, and the classifier’s best topics', () => {
+	it('shows the topic the model named', () => {
 		const proposal = { sender: { value: null, evidence: null }, topic: 'Arbeit' };
 		const llm = texts(signalSummary(entry('signal_llm', { proposal }), topics));
 		expect(llm).toContainEqual([m.field_topic(), ['Arbeit']]);
-		const output = { contacts: [], document_types: [], topics: [[TOPIC, 0.93]] };
-		const classifier = texts(signalSummary(entry('signal_classifier', output), topics));
-		expect(classifier).toContainEqual([m.signal_topics(), ['Arbeit 93%']]);
 	});
 });
 
@@ -165,7 +104,7 @@ describe('the labels in the fields node', () => {
 	} as unknown as Lookup;
 	const check = (field: string, label: unknown) => ({ field: `field:${field}`, label });
 
-	it('tells for each value whether it stands by its label, without a link', () => {
+	it('tells for each value whether it stands by its label', () => {
 		const output = {
 			fields: [
 				check(GROSS, { text: 'Gesamtbrutto', outcome: 'beside' }),
@@ -178,7 +117,6 @@ describe('the labels in the fields node', () => {
 			['Bruttolohn', [m.log_label_beside({ label: 'Gesamtbrutto' })]],
 			['Personalnummer', [m.log_label_unknown({ label: 'Pers.-Nr.' })]]
 		]);
-		expect(rows.flatMap((row) => row.items).every((item) => item.href === undefined)).toBe(true);
 	});
 
 	it('names each outcome, and a label the model did not give', () => {
@@ -225,20 +163,16 @@ describe('the space in the signals and the rules', () => {
 	const withInput = (node: string, input: Record<string, unknown>, output = {}) =>
 		({ node, input, output }) as unknown as LogEntry;
 
-	it('names the spaces of the model, the classifier and the similar documents', () => {
+	it('names the spaces of the model and of the similar documents', () => {
 		const llm = texts(signalSummary(entry('signal_llm', { proposal: { space: HOUSE } }), spaces));
 		expect(llm).toContainEqual([m.field_space(), ['Haushalt']]);
-		const output = { contacts: [], document_types: [], spaces: [[ERIKAS, 0.7]] };
-		const classifier = texts(signalSummary(entry('signal_classifier', output), spaces));
-		// Erika's personal space, which the caller is no member of, by her name.
-		expect(classifier).toContainEqual([m.signal_spaces(), ['erika 70%']]);
-		const [similar] = signalSummary(
-			entry('signal_neighbours', {
-				neighbours: [{ document_id: 'd1', contact_id: UTILITY, space_id: HOUSE }]
-			}),
+		const [similar] = neighbourList(
+			{ neighbours: [{ document_id: 'd1', contact_id: UTILITY, space_id: HOUSE }] },
 			spaces
 		);
-		expect(similar.items[0].text).toBe(`${m.signal_document({ number: 1 })}: Stadtwerke, Haushalt`);
+		expect(similar.parts).toEqual(['Stadtwerke', 'Haushalt']);
+		// Erika's personal space, which the caller is no member of, by her name.
+		expect(named(ERIKAS, spaces)).toBe('erika');
 	});
 
 	it('shows the spaces a document went through, and the rules of a space it arrived in', () => {

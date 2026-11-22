@@ -1989,7 +1989,6 @@
 	"log_tokens": "Tokens",
 	"log_tokens_sum": "Eingabe {input} · Ausgabe {output}",
 	"log_runs": "Läufe",
-	"log_reading": "Lesung",
 	"log_reading_page": "Seite {page}: {unsure} von {words} Wörtern unsicher",
 	"log_reading_page_content": "Seite {page}: {unsure} von {words} Wörtern unsicher, {content_unsure} von {content} Inhaltswörtern",
 	"log_label_beside": "Beschriftung: „{label}“ – steht beim Wert",
