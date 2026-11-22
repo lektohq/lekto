@@ -140,6 +140,13 @@
       "groupSlug": "bits-ui"
     },
     {
+      "description": "GreenMail 2.1.15 refuses a LOGIN whose password is a UTF-8 literal beyond ASCII (the contract test test_a_password_beyond_ascii fails); skip that version",
+      "matchPackageNames": [
+        "greenmail/standalone"
+      ],
+      "allowedVersions": "!/^2\\.1\\.15$/"
+    },
+    {
       "description": "Collective PR: every non-major update of the actions",
       "matchUpdateTypes": [
         "minor",
