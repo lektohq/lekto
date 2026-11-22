@@ -19,32 +19,35 @@
   ],
   "packageRules": [
     {
-      "description": "Development dependencies: the dev groups of the Python projects, the web UI's devDependencies",
+      "description": "Development dependencies: the dev groups of the Python projects, the web UI's devDependencies; its own branch prefix keeps every branch to one label (a package in files of two labels gets two pull requests)",
       "matchDepTypes": [
         "devDependencies",
         "dependency-groups"
       ],
       "labels": [
         "dev-deps"
-      ]
+      ],
+      "additionalBranchPrefix": "dev-"
     },
     {
-      "description": "The devcontainer: its features and the services of its compose file",
+      "description": "The devcontainer: its features and the services of its compose file; its own branch prefix keeps every branch to one label (a package in files of two labels gets two pull requests)",
       "matchFileNames": [
         ".devcontainer/**"
       ],
       "labels": [
         "dev-deps"
-      ]
+      ],
+      "additionalBranchPrefix": "dev-"
     },
     {
-      "description": "The actions of the workflows, pinned to their commits",
+      "description": "The actions of the workflows, pinned to their commits; its own branch prefix keeps every branch to one label (a package in files of two labels gets two pull requests)",
       "matchManagers": [
         "github-actions"
       ],
       "labels": [
         "ci"
-      ]
+      ],
+      "additionalBranchPrefix": "ci-"
     },
     {
       "description": "Lekto's own images, which the compose examples name",
@@ -54,13 +57,14 @@
       "enabled": false
     },
     {
-      "description": "Claude Code of the dev container",
+      "description": "Claude Code of the dev container; its own branch prefix keeps every branch to one label (a package in files of two labels gets two pull requests)",
       "matchPackageNames": [
         "@anthropic-ai/claude-code"
       ],
       "labels": [
         "dev-deps"
-      ]
+      ],
+      "additionalBranchPrefix": "dev-"
     },
     {
       "description": "Collective PR: every non-major update of the runtime dependencies (backend, migration client, web UI, images); majors come one by one",
