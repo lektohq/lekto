@@ -27,7 +27,7 @@ Ports 8000 (API), 5173 (Vite), 7700 (Meilisearch) and 3900 (Garage) are forwarde
 
 The tests create and remove their databases, prefixes and indexes themselves. Running
 `pytest -m integration` while the development instance is up changes nothing in `lekto_dev`,
-`lekto-dev` or `lekto-dev-documents`. The volumes (`postgres-data`, `garage-meta`,
+`lekto-dev` or `lekto-dev-documents`. The volumes (`postgres-data-18`, `garage-meta`,
 `garage-data`, `meilisearch-data`) outlive rebuilds of the devcontainer; `docker compose down -v`
 in `.devcontainer/` deletes them all, including the development instance.
 Until 21.10.2026 the Compose project was called `papiq-dev`; a devcontainer from then starts
@@ -198,6 +198,39 @@ docker run --rm --network lekto-dev_default -v "$BACKUP:/backup:ro" \
 Then **Lekto: Start** and **Lekto: Rebuild search index**. `rclone sync` makes the target equal
 to the source: a restore removes objects that are not in the backup. The Garage key above is the
 fixed development key from `compose.yml`.
+
+## Upgrading Postgres
+
+Each major version of Postgres has a volume of its own (`postgres-data-18`): from version 18 the
+image keeps its data below `/var/lib/postgresql/<major>/`, and a new major version cannot read
+the files of the one before. Raising the major version in `compose.yml` (a new image and a new
+volume name) therefore starts with an empty database; take the data along by a dump. With Lekto
+stopped (**Lekto: Stop**), before the new version starts, from the devcontainer or the host:
+
+```sh
+OLD=17.11-trixie NEW=18.6-trixie   # the versions before and after
+mkdir -p data/postgres-upgrade && cd data/postgres-upgrade
+docker run --rm --network lekto-dev_default -e PGPASSWORD=lekto postgres:$NEW \
+  pg_dumpall -h postgres -U lekto --globals-only > globals.sql
+for db in lekto_dev; do  # and any other database worth keeping
+  docker run --rm --network lekto-dev_default -e PGPASSWORD=lekto postgres:$NEW \
+    pg_dump -h postgres -U lekto -Fc $db > $db.dump
+done
+```
+
+Then start the new version (rebuild the devcontainer, or `docker compose -p lekto-dev -f
+compose.yml up -d --no-deps postgres` in `.devcontainer/`) and load the dump:
+
+```sh
+docker exec -i lekto-dev-postgres-1 psql -U lekto -d postgres -q < globals.sql  # "lekto exists" is fine
+docker exec lekto-dev-postgres-1 createdb -U lekto -O lekto lekto_dev
+docker exec -i lekto-dev-postgres-1 pg_restore -U lekto -d lekto_dev --no-owner --role=lekto < lekto_dev.dump
+```
+
+`uv run lekto --env-file ../.devcontainer/dev.local.env check-schema` in `backend/` confirms the
+schema. The old volume (`lekto-dev_postgres-data` up to Postgres 17) stays as it was until you
+remove it (`docker volume rm lekto-dev_postgres-data`). The databases of the tests
+(`lekto_test_*`) need no copy. The folder `data/` is ignored by Git.
 
 ## Without VS Code
 
