@@ -235,8 +235,11 @@ describe('DocumentHeader', () => {
 		it('moves into an edited space or hands over into another personal one', async () => {
 			const onchanged = vi.fn();
 			render(DocumentHeader, props({ lookup, onchanged }));
-			// A dialog of an earlier test may still leave the body without pointer events.
 			const user = userEvent.setup();
+			// On a phone it is its icon alone: a square a finger hits (WA-05).
+			expect(screen.getByRole('button', { name: m.move_title() }).className.split(' ')).toEqual(
+				expect.arrayContaining(['max-sm:h-11', 'max-sm:w-11'])
+			);
 			await user.click(screen.getByRole('button', { name: m.move_title() }));
 			const dialog = await screen.findByRole('dialog');
 			const field = within(dialog).getByLabelText(m.field_space());

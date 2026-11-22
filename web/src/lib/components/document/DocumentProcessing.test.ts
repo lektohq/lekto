@@ -212,6 +212,8 @@ describe('DocumentProcessing', () => {
 		).toBeTruthy();
 		const judge = card(container, 'judge');
 		expect(judge.getAttribute('aria-expanded')).toBe('true');
+		// A card without a finding is one line: still a finger tall on a phone (WA-05).
+		expect(judge.className.split(' ')).toContain('max-sm:min-h-11');
 		const panel = container.querySelector('#step-details') as HTMLElement;
 		expect(await within(panel).findByText('contact: the name is only similar')).toBeTruthy();
 		expect(card(container, 'file').textContent).toContain(m.summary_file_waits());

@@ -74,7 +74,7 @@
 	onfocus={() => onhighlight?.(true)}
 	onblur={() => onhighlight?.(false)}
 	class={cn(
-		'flex w-full min-w-0 flex-col gap-1 rounded-2xl border px-3 py-2.5 text-left transition-colors',
+		'flex w-full min-w-0 flex-col gap-1 rounded-2xl border px-3 py-2.5 text-left transition-colors max-sm:min-h-11 max-sm:justify-center',
 		cards[look.tone],
 		expanded && ['ring-2', rings[look.tone]],
 		highlighted && !expanded && lit[look.tone]

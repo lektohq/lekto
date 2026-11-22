@@ -301,13 +301,13 @@
 			{/if}
 		</div>
 		<!-- On a phone the actions are icons, so that they stand in one row; their names are read
-		     out and shown on hover. -->
+		     out and shown on hover. One with a single icon is a square of 44 px there. -->
 		<div class="flex flex-wrap gap-2">
 			{#if document.contact_id}
 				<!-- The stream of its contact (#145). -->
 				<a
 					href="{BASE}/documents?contact={document.contact_id}&layout=stream"
-					class={cn(buttonVariants({ variant: 'outline' }), 'max-sm:px-3')}
+					class={cn(buttonVariants({ variant: 'outline' }), 'max-sm:w-11 max-sm:px-0')}
 				>
 					<Waypoints aria-hidden="true" />
 					<span class="max-sm:sr-only">{m.doc_show_stream()}</span>
@@ -333,7 +333,7 @@
 			{#if manageable}
 				<Button
 					variant="outline"
-					class="max-sm:px-3"
+					class="max-sm:w-11 max-sm:px-0"
 					onclick={startMove}
 					disabled={targets.length === 0}
 				>
