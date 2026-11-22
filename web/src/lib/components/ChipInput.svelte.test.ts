@@ -22,6 +22,8 @@ describe('ChipInput', () => {
 		const props = field(['Muster AG']);
 		await user.click(screen.getByRole('button', { name: 'Schreibweise' }));
 		const input = screen.getByLabelText('Neue Schreibweise');
+		// A finger's height on a phone (WB-09).
+		expect(input.className).toContain('max-sm:h-11');
 		expect(document.activeElement).toBe(input);
 		await user.type(input, 'Muster KV{Enter}');
 		expect(props.values).toEqual(['Muster AG', 'Muster KV']);

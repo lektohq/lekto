@@ -343,7 +343,7 @@ divider.
 ### Chips
 
 `Chip` is the one chip: a pill, `md` 32 px (`h-8`) or `sm` 24 px, icon and name, optionally
-removable (`onremove`, a ✕ with a hit area of 44 px on the phone) or toggleable (`pressed`:
+removable (`onremove`, a ✕ with a hit area of 44 px on the phone; it reaches over the end of a name that is only text, never over a name that is a target itself) or toggleable (`pressed`:
 `aria-pressed`; on, the selected look and a bolder name, no check, at the width it has off, so
 that the chips beside it stay: "Steady layout"; only where each toggles on its own, see "Tabs
 and switches"), or a link (`href`, Tobi 09.11.2026): in the look of a toggle, `current` the one

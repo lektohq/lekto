@@ -277,6 +277,14 @@ describe('AppShell', () => {
 			'/ui/system',
 			'/api/v1/docs'
 		]);
+		// The rows below the navigation are a finger tall, as those above (WB-09).
+		for (const row of [
+			within(sheet).getByRole('button', { name: SETTINGS.label() }),
+			within(sheet).getByRole('link', { name: new RegExp(m.api_docs()) }),
+			within(sheet).getByRole('button', { name: m.sign_out() })
+		]) {
+			expect(row.className.split(' ')).toEqual(expect.arrayContaining(['h-11', 'text-sm']));
+		}
 		const language = within(sheet).getByRole('group', { name: m.language_label() });
 		expect(
 			within(language)

@@ -42,7 +42,7 @@
 	import type { Tag } from '#lib/masterdata.svelte.ts';
 	import { pathLabel } from '#lib/tags.ts';
 	import type { Snippet } from 'svelte';
-	import { CHIP_REMOVE } from '#lib/components/Chip.svelte';
+	import { CHIP_REMOVE, CHIP_REMOVE_BESIDE_TEXT } from '#lib/components/Chip.svelte';
 	import { steadyText } from '#lib/steady-text.ts';
 	import { TONE_FILL } from '#lib/tones.ts';
 
@@ -175,7 +175,12 @@
 			<span class={cn('min-w-0 truncate', change === 'removed' && 'line-through')}>{tag.name}</span>
 		{/if}
 		{#if onremove}
-			<button type="button" class={CHIP_REMOVE} aria-label={removeLabel} onclick={onremove}>
+			<button
+				type="button"
+				class={onpick || (interactive && nested) ? CHIP_REMOVE : CHIP_REMOVE_BESIDE_TEXT}
+				aria-label={removeLabel}
+				onclick={onremove}
+			>
 				<X class="size-3.5" aria-hidden="true" />
 			</button>
 		{/if}

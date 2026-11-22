@@ -411,7 +411,7 @@
 								<button
 									type="button"
 									onclick={() => open(SETTINGS)}
-									class="flex h-10 items-center gap-2.5 rounded-xl px-4 text-md transition-colors hover:bg-muted"
+									class="flex h-11 items-center gap-2.5 rounded-xl px-4 text-sm transition-colors hover:bg-muted"
 								>
 									<SETTINGS.icon class="size-4 text-muted-foreground" aria-hidden="true" />
 									{SETTINGS.label()}
@@ -420,7 +420,7 @@
 									href={API_DOCS}
 									target="_blank"
 									rel="noopener noreferrer"
-									class="flex h-10 items-center gap-2.5 rounded-xl px-4 text-md transition-colors hover:bg-muted"
+									class="flex h-11 items-center gap-2.5 rounded-xl px-4 text-sm transition-colors hover:bg-muted"
 								>
 									<BookOpen class="size-4 text-muted-foreground" aria-hidden="true" />
 									{m.api_docs()}
@@ -430,7 +430,7 @@
 								<button
 									type="button"
 									onclick={signOut}
-									class="flex h-10 items-center gap-2.5 rounded-xl px-4 text-md transition-colors hover:bg-muted"
+									class="flex h-11 items-center gap-2.5 rounded-xl px-4 text-sm transition-colors hover:bg-muted"
 								>
 									<LogOut class="size-4 text-muted-foreground" aria-hidden="true" />
 									{m.sign_out()}

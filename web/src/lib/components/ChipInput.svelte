@@ -88,7 +88,7 @@
 			aria-label={inputLabel}
 			placeholder={inputLabel}
 			{maxlength}
-			class="h-8 w-52 max-w-full rounded-full border border-ring bg-card px-3 text-base outline-none sm:text-sm"
+			class="h-8 w-52 max-w-full rounded-full border border-ring bg-card px-3 text-base outline-none max-sm:h-11 sm:text-sm"
 			onkeydown={keydown}
 			onpaste={paste}
 			onblur={() => {
