@@ -11,7 +11,9 @@
   "prConcurrentLimit": 5,
   "minimumReleaseAge": "10 days",
   "osvVulnerabilityAlerts": true,
-  "dependencyDashboardOSVVulnerabilitySummary": "unresolved",
+  "dependencyDashboard": {
+    "osvVulnerabilitySummary": "unresolved"
+  },
   "labels": [
     "dependencies"
   ],
