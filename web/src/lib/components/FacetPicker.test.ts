@@ -1,8 +1,12 @@
 import { render, screen, within } from '@testing-library/svelte';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { m } from '#lib/paraglide/messages.js';
+import { phone } from '#lib/phone.svelte.ts';
 import FacetPicker from './FacetPicker.svelte';
 
 const item = (id: string, label: string) => ({ id, label, count: 1 });
+
+afterEach(() => phone.override(null));
 
 describe('FacetPicker', () => {
 	it('opens with names that start with an umlaut, under the plain letter', async () => {
@@ -40,5 +44,26 @@ describe('FacetPicker', () => {
 		});
 		const dialog = await screen.findByRole('dialog', { name: 'Kontakte' });
 		expect(within(dialog).getAllByRole('checkbox')).toHaveLength(2);
+	});
+
+	it('is a sheet from the bottom on a phone, with rows a finger tall and no field in focus (WB-12)', async () => {
+		phone.override(true);
+		const onchange = vi.fn();
+		render(FacetPicker, {
+			open: true,
+			title: 'Kontakte',
+			searchLabel: 'Kontakte durchsuchen',
+			items: [item('c1', 'Apotheke Muster'), item('c2', 'Bäckerei Muster')],
+			selected: [],
+			onchange
+		});
+		const sheet = await screen.findByRole('dialog', { name: 'Kontakte' });
+		expect(sheet.getAttribute('data-side')).toBe('bottom');
+		// The keyboard waits for a tap: the search does not take the focus.
+		expect(document.activeElement).not.toBe(within(sheet).getByRole('searchbox'));
+		const row = within(sheet).getAllByRole('checkbox')[0].closest('label')!;
+		expect(row.className.split(' ')).toContain('max-sm:min-h-12');
+		// The way out stands in the head of the sheet.
+		expect(within(sheet).getByRole('button', { name: m.facet_done() })).toBeTruthy();
 	});
 });

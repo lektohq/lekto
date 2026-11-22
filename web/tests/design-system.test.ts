@@ -1045,7 +1045,8 @@ describe('the design system (web/DESIGN.md)', () => {
 			expect(picker).toMatch(new RegExp(`<DatePicker\\.${part}\\b[^>]*\\bmax-sm:size-11\\b`));
 		for (const list of ['MultiPicker', 'FacetList', 'FacetPicker'])
 			expect(sources[`/src/lib/components/${list}.svelte`]).toMatch(
-				/<label\b[^>]*\bmax-sm:min-h-11\b/
+				// 44 px, or the 48 px of a row in a sheet from the bottom.
+				/<label\b[^>]*\bmax-sm:min-h-1[12]\b/
 			);
 	});
 
