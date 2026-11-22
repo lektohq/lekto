@@ -180,6 +180,12 @@ describe('MailboxDialog', () => {
 		render(MailboxDialog, { open: true, mailbox: STORED, onsaved: vi.fn() });
 		const problem = await screen.findByRole('alert');
 		expect(problem.textContent).toContain(m.retry());
+		// In the part "Abruf", where the people and types are chosen: hidden while "Verbindung"
+		// shows, there once "Abruf" is pressed.
+		expect(problem.closest('.hidden')).not.toBeNull();
+		await user.click(screen.getByText(m.mailbox_part_fetch()).closest('button')!);
+		expect(problem.closest('.hidden')).toBeNull();
+		expect(problem.parentElement!.textContent).toContain(m.mail_folders());
 		failing.clear();
 		await user.click(screen.getByRole('button', { name: m.retry() }));
 		await vi.waitFor(() => expect(screen.queryByRole('alert')).toBeNull());

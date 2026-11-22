@@ -43,6 +43,9 @@ describe('the note of a newer Lekto', () => {
 		vi.stubGlobal('fetch', fetchMock);
 		render(UpdateNotice);
 		await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+		// Once the answer is read and drawn: asking alone shows nothing yet either way.
+		await fetchMock.mock.results[0].value;
+		await new Promise((resolve) => setTimeout(resolve, 0));
 		expect(screen.queryByRole('status')).toBeNull();
 	});
 
