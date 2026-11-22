@@ -1,6 +1,6 @@
 <script lang="ts">
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
-	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+	import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 	import type { Snippet } from 'svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import * as Card from '#lib/components/ui/card/index.ts';

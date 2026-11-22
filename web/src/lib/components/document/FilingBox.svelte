@@ -3,7 +3,7 @@
 	import ChoiceCard from '#lib/components/ChoiceCard.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import Folder from '@lucide/svelte/icons/folder';
-	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+	import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 	import type { components } from '#lib/api/schema.ts';
 	import FieldGroup from '#lib/components/document/FieldGroup.svelte';
 	import Select from '#lib/components/Select.svelte';

@@ -5,6 +5,7 @@
  */
 import type { Component } from 'svelte';
 import { curatedModule } from '#lib/icons/curated-modules.ts';
+import { currentName } from '#lib/icons/renamed.ts';
 
 const loaded = new Map<string, Promise<Component | null>>();
 
@@ -12,7 +13,7 @@ const loaded = new Map<string, Promise<Component | null>>();
 export function loadIcon(name: string): Promise<Component | null> {
 	let found = loaded.get(name);
 	if (!found) {
-		const curated = curatedModule(name);
+		const curated = curatedModule(currentName(name));
 		found = curated
 			? curated().then(
 					(module) => module.default,

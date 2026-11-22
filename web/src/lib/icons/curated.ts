@@ -1,5 +1,5 @@
 /**
- * The icons offered first, by areas of life (170; names checked against lucide 1.52): the
+ * The icons offered first, by areas of life (170; names checked against lucide 1.72): the
  * picker shows them before anything is searched, and the search finds them by the words of
  * the language too (`words.de.ts`, `words.en.ts`). Every other Lucide icon is found by its name.
  */
@@ -157,7 +157,7 @@ export const CURATED: readonly { area: IconArea; icons: readonly string[] }[] = 
 			'plane',
 			'ship',
 			'fuel',
-			'circle-parking',
+			'circle-letter-p',
 			'map-pin',
 			'luggage',
 			'tent',
@@ -176,7 +176,7 @@ export const CURATED: readonly { area: IconArea; icons: readonly string[] }[] = 
 			'cat',
 			'paw-print',
 			'camera',
-			'music',
+			'eighth-notes',
 			'gamepad-2',
 			'dumbbell',
 			'ticket',
@@ -214,8 +214,8 @@ export const CURATED: readonly { area: IconArea; icons: readonly string[] }[] = 
 		area: 'status',
 		icons: [
 			'circle-check',
-			'circle-alert',
-			'triangle-alert',
+			'circle-exclamation-point',
+			'triangle-exclamation-point',
 			'clock',
 			'hourglass',
 			'timer',

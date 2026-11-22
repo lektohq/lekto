@@ -6,7 +6,7 @@
 	import ListChecks from '@lucide/svelte/icons/list-checks';
 	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
 	import Shapes from '@lucide/svelte/icons/shapes';
-	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+	import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 	import { onDestroy, untrack, type Snippet } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';

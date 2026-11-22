@@ -30,8 +30,8 @@
 <script lang="ts">
 	import Info from '@lucide/svelte/icons/info';
 	import Lightbulb from '@lucide/svelte/icons/lightbulb';
-	import OctagonAlert from '@lucide/svelte/icons/octagon-alert';
-	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+	import OctagonAlert from '@lucide/svelte/icons/octagon-exclamation-point';
+	import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 	import { cn, type WithElementRef } from '#lib/utils.ts';
 	import type { HTMLAttributes } from 'svelte/elements';
 

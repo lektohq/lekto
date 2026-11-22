@@ -4,13 +4,14 @@ import { CURATED_MODULE_NAMES, curatedModule } from './curated-modules.ts';
 import { iconLabel } from './labels.ts';
 import { loadIcon as loadAny } from './load.ts';
 import { ICON_NAMES, isIcon, loadIcon } from './lucide.ts';
+import { RENAMED } from './renamed.ts';
 import { SEARCH_LIMIT, searchIcons } from './search.ts';
 import { WORDS as DE } from './words.de.ts';
 import { WORDS as EN } from './words.en.ts';
 
 describe('icons', () => {
 	it('come from the build, each loaded on its own', async () => {
-		expect(ICON_NAMES.length).toBe(1866);
+		expect(ICON_NAMES.length).toBe(2052);
 		expect(isIcon('house') && !isIcon('no-such-icon')).toBe(true);
 		expect(await loadIcon('house')).not.toBeNull();
 		expect(await loadIcon('no-such-icon')).toBeNull();
@@ -32,6 +33,15 @@ describe('icons', () => {
 		expect(await loadAny('piggy-bank')).toBe(await loadIcon('piggy-bank'));
 		expect(await loadAny('rocket')).toBe(await loadIcon('rocket'));
 		expect(await loadAny('no-such-icon')).toBeNull();
+	});
+
+	it('keep a name Lucide renamed: it loads the icon of the name now', async () => {
+		expect(Object.keys(RENAMED).filter((name) => ICON_NAMES.includes(name))).toEqual([]);
+		expect(Object.values(RENAMED).filter((name) => !isIcon(name))).toEqual([]);
+		expect(isIcon('music')).toBe(true);
+		expect(ICON_NAMES).not.toContain('music');
+		expect(await loadIcon('music')).toBe(await loadIcon('eighth-notes'));
+		expect(await loadAny('triangle-alert')).toBe(await loadAny('triangle-exclamation-point'));
 	});
 
 	it('are labelled by their first word, a name the map lacks by itself', () => {
