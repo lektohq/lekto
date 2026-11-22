@@ -175,7 +175,8 @@ describe('the rule model', () => {
 		expect(out.actions).toEqual([{ type: 'add_tags', tag_ids: [ID(4), ID(5)] }]);
 	});
 
-	it('mirrors the operator tables of the core', () => {
+	it('offers the comparisons of each field in this order, the first as its default', () => {
+		// Which comparisons, the core's: backend/tests/unit/test_rule_operators_web.py (WT2-09).
 		expect(CONDITION_FIELD_OPERATORS).toEqual({
 			contact: ['is', 'in', 'present', 'missing'],
 			contact_group: ['contains', 'in', 'present', 'missing'],
