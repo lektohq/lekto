@@ -132,6 +132,19 @@ describe('Übersicht', () => {
 		expect(container.querySelector('.lg\\:grid-cols-3')).toBeTruthy();
 	});
 
+	it('breaks a tile’s title with a hyphen where it is too long, never off (WE-07)', () => {
+		signIn('user');
+		vi.stubGlobal('fetch', routes());
+		render(Page);
+		const title = screen
+			.getByRole('region', { name: m.nav_inbox() })
+			.querySelector('[data-slot="card-title"]')!;
+		expect(title.className.split(' ')).toEqual(
+			expect.arrayContaining(['hyphens-auto', 'break-words'])
+		);
+		expect(title.className.split(' ')).not.toContain('truncate');
+	});
+
 	it('says that the inbox could not be read, and reads it again on request (WE-08)', async () => {
 		signIn('user');
 		const api = routes();

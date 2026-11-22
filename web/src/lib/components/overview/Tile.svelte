@@ -29,10 +29,12 @@
 	class="relative flex flex-col gap-3 max-sm:gap-2 max-sm:p-4"
 	aria-label={title}
 >
-	<div class="flex items-center gap-2 text-muted-foreground">
-		<Icon class="size-4 shrink-0" aria-hidden="true" />
-		<Card.Title class="min-w-0 truncate text-foreground">{title}</Card.Title>
-		<ChevronRight class="ms-auto size-4 shrink-0 sm:hidden" aria-hidden="true" />
+	<!-- A title too long for its tile on a phone breaks with a hyphen, never off mid-word
+	     (web/DESIGN.md, "Typography"); icon and chevron stay on its first line. -->
+	<div class="flex items-start gap-2 text-muted-foreground">
+		<Icon class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+		<Card.Title class="min-w-0 break-words hyphens-auto text-foreground">{title}</Card.Title>
+		<ChevronRight class="ms-auto mt-0.5 size-4 shrink-0 sm:hidden" aria-hidden="true" />
 	</div>
 	{@render children()}
 	<a
