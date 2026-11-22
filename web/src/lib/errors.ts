@@ -31,8 +31,9 @@ export function describeError(error: unknown): string {
 	if (error instanceof ReasonError) {
 		return reasonsText([error.reason], null) ?? m.error_unexpected({ status: 200 });
 	}
-	// fetch rejects with a TypeError when the server cannot be reached.
-	if (error instanceof TypeError) return m.error_network();
+	// fetch rejects with a TypeError when the server cannot be reached; any other TypeError is
+	// a fault in the code and no sign of the network.
+	if (isNetworkError(error)) return m.error_network();
 	return m.error_unexpected({ status: 0 });
 }
 

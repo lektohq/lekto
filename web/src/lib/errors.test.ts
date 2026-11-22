@@ -86,6 +86,15 @@ describe('describeError', () => {
 
 	it('names an unreachable server', () => {
 		expect(describeError(new TypeError('Failed to fetch'))).toBe(m.error_network());
+		// As Firefox and Safari word it.
+		expect(describeError(new TypeError('NetworkError when attempting to fetch resource.'))).toBe(
+			m.error_network()
+		);
+		expect(describeError(new TypeError('Load failed'))).toBe(m.error_network());
+		// A fault in the code is no unreachable server (WG-05).
+		expect(describeError(new TypeError("Cannot read properties of undefined (reading 'id')"))).toBe(
+			m.error_unexpected({ status: 0 })
+		);
 	});
 
 	it('falls back to the status', () => {
