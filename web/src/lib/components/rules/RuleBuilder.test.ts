@@ -1,17 +1,16 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { newAction, newModel } from '#lib/rules/model.ts';
 import RuleBuilder from './RuleBuilder.svelte';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 const PERIOD = '0199a6c4-0000-7000-8000-0000000000f3';
 
-const lookup = {
+const lookup = lookupOf({
 	contacts: [],
 	documentTypes: [],
 	tags: [],
-	topics: [],
 	fields: [
 		{
 			id: PERIOD,
@@ -25,7 +24,7 @@ const lookup = {
 	],
 	spaces: [],
 	users: []
-} as unknown as Lookup;
+});
 
 describe('RuleBuilder', () => {
 	it('does not save while a period is written in a way it cannot read', async () => {

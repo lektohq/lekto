@@ -7,11 +7,7 @@ import {
 	unblockSteps
 } from '#lib/push-device.ts';
 import { calls, fakeApi, noContent, problem } from '#lib/testing/api.ts';
-
-function agent(value: string, touchPoints = 0) {
-	vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(value);
-	Object.defineProperty(navigator, 'maxTouchPoints', { value: touchPoints, configurable: true });
-}
+import { deviceOf as agent } from '#lib/testing/browser.ts';
 
 describe('this device', () => {
 	afterEach(() => vi.restoreAllMocks());

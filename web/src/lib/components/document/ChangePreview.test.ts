@@ -1,18 +1,18 @@
 import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { formatMoney } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { documentOf } from '#lib/testing/documents.ts';
 import ChangePreview from './ChangePreview.svelte';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 type Preview = components['schemas']['DocumentPreviewOut'];
 
 const NET = 'f-net';
 const space = (id: string, name: string, members: { user_id: string; role: 'edit' | 'read' }[]) =>
 	({ id, name, personal_of: null, description: null, role: 'edit', members }) as never;
-const lookup = {
+const lookup = lookupOf({
 	contacts: [],
 	documentTypes: [],
 	tags: [
@@ -31,7 +31,7 @@ const lookup = {
 		{ id: 'u-erika', username: 'erika', display_name: 'Jane Doe' },
 		{ id: 'u-john', username: 'john', display_name: 'John Doe' }
 	]
-} as unknown as Lookup;
+});
 
 const before = documentOf({
 	space_id: 's-erika',

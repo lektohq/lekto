@@ -1,20 +1,19 @@
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { newAction, newCondition, newModel } from '#lib/rules/model.ts';
 import RuleBuilder from './RuleBuilder.svelte';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
-const lookup = {
+const lookup = lookupOf({
 	contacts: [],
 	documentTypes: [],
 	tags: [],
-	topics: [],
 	fields: [],
 	spaces: [],
 	users: []
-} as unknown as Lookup;
+});
 
 const condition = (number: number) => m.rule_row_condition({ number });
 const button = (name: string) => screen.getByRole('button', { name });

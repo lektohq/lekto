@@ -1,30 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
+import type { FieldDefinition } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { actionTemplate, describeAction, describeCondition, operatorLabel } from './describe.ts';
+import { fieldOf, lookupOf } from '#lib/testing/master-data.ts';
 
-function textField(id: string, name: string, data_type: string) {
-	return {
-		id,
-		name,
-		key: name.toLowerCase(),
-		data_type,
-		document_type_ids: null,
-		choices: [],
-		required: false,
-		required_document_type_ids: [],
-		description: null,
-		created_at: '2026-10-13T12:00:00Z'
-	};
+function textField(id: string, name: string, data_type: FieldDefinition['data_type']) {
+	return fieldOf({ id, name, key: name.toLowerCase(), data_type });
 }
 
-const lookup = {
+const lookup = lookupOf({
 	contacts: [],
 	documentTypes: [],
 	tags: [],
 	spaces: [],
 	fields: [textField('f1', 'Notiz', 'text'), textField('f2', 'Betrag', 'amount')]
-} as unknown as Lookup;
+});
 
 describe('the template of an action', () => {
 	it('is the title, the review reason and a text field value', () => {
@@ -72,7 +62,7 @@ describe('operators in the words of a relation', () => {
 });
 
 describe('conditions on groups', () => {
-	const groups = {
+	const groups = lookupOf({
 		...lookup,
 		tags: [
 			{
@@ -86,7 +76,7 @@ describe('conditions on groups', () => {
 				created_at: '2026-10-16T12:00:00Z'
 			}
 		]
-	} as unknown as Lookup;
+	});
 
 	it('read as the group with its path, in the words of tags', () => {
 		const condition = {
@@ -109,7 +99,7 @@ describe('conditions on groups', () => {
 });
 
 describe('the topic', () => {
-	const topics = {
+	const topics = lookupOf({
 		...lookup,
 		tags: [
 			{
@@ -123,7 +113,7 @@ describe('the topic', () => {
 				created_at: '2026-10-17T12:00:00Z'
 			}
 		]
-	} as unknown as Lookup;
+	});
 
 	it('reads as one value with its path, in the words of a contact', () => {
 		const condition = {
@@ -148,11 +138,11 @@ describe('the topic', () => {
 });
 
 describe('where a rule files', () => {
-	const spaces = {
+	const spaces = lookupOf({
 		...lookup,
 		spaces: [{ id: 's1', name: 'Haushalt', personal_of: null }],
 		users: [{ id: 'u2', username: 'erika', personal_space_id: 'p2' }]
-	} as unknown as Lookup;
+	});
 
 	it('names a known space, and the personal space of another user as a hand-over', () => {
 		const label = m.rule_action_set_space();

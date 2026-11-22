@@ -1194,7 +1194,12 @@ describe('the design system (web/DESIGN.md)', () => {
 				/import\('#lib\/testing\/page-state\.svelte\.ts'\)\)\.(?:testPage|fakeGoto)/,
 			'unstubGlobals (vite.config.ts)':
 				/(?:after|before)Each\((?:async )?\(\) => (?:\{[^}]*)?vi\.unstubAllGlobals\(\)/,
-			'the pointer (tests/setup.ts)': /pointerEventsCheck|body\.style\.pointerEvents = /
+			'the pointer (tests/setup.ts)': /pointerEventsCheck|body\.style\.pointerEvents = /,
+			// WT3-08: the master data, the log and the browser stood in many files anew.
+			'lookupOf (lib/testing/master-data.ts)': /as unknown as Lookup\b/,
+			'logEntry (lib/testing/pipeline.ts)': /\bpipeline_version: 'test'/,
+			'withoutStorage (lib/testing/browser.ts)': /throw new Error\('blocked'\)/,
+			'deviceOf (lib/testing/browser.ts)': /defineProperty\(navigator, 'maxTouchPoints'/
 		};
 		expect(
 			Object.entries(tests).flatMap(([path, source]) =>

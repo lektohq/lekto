@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { groupDocuments, type Grouped } from './grouping.ts';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 const TODAY = new Date(2026, 9, 20);
 
@@ -11,13 +11,13 @@ function doc(id: string, parts: Partial<Doc> = {}): Doc {
 	return { id, created_at: '2026-10-01T10:00:00Z', document_date: null, ...parts };
 }
 
-const lookup = {
+const lookup = lookupOf({
 	documentTypes: [
 		{ id: 't1', name: 'Rechnung' },
 		{ id: 't2', name: 'Brief' }
 	],
 	contacts: [{ id: 'c1', name: 'Stadtwerke' }]
-} as unknown as Lookup;
+});
 
 function grouped(
 	items: Doc[],

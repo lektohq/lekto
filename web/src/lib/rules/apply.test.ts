@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '#lib/api/problem.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import {
 	ahead,
@@ -16,6 +15,7 @@ import {
 	type Application,
 	type PreviewItem
 } from './apply.ts';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 const item = (id: string, conflict = false): PreviewItem => ({
 	document_id: id,
@@ -172,7 +172,7 @@ describe('applying a rule', () => {
 	});
 });
 
-const lookup = {
+const lookup = lookupOf({
 	contacts: [],
 	documentTypes: [],
 	tags: [{ id: 't1', name: 'Haushaltskosten' }],
@@ -184,7 +184,7 @@ const lookup = {
 		{ id: 'u1', username: 'john', role: 'user', personal_space_id: 'mine' },
 		{ id: 'u2', username: 'erika', role: 'user', personal_space_id: 'erikas' }
 	]
-} as unknown as Lookup;
+});
 
 const report = (
 	name: string,

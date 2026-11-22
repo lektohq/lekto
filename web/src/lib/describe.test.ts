@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { describeValue, fieldLabel } from './describe.ts';
-import type { Lookup } from './masterdata.svelte.ts';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
-const lookup = {
+const lookup = lookupOf({
 	contacts: [{ id: 'c1', name: 'Muster AG', created_at: '' }],
 	documentTypes: [],
 	tags: [{ id: 't1', name: 'Tax', created_at: '' }],
@@ -12,7 +12,7 @@ const lookup = {
 		{ id: 'u1', username: 'jane', personal_space_id: 's1' },
 		{ id: 'u2', username: 'john', personal_space_id: 's2' }
 	]
-} as unknown as Lookup;
+});
 
 describe('describing changes', () => {
 	it('names ids', () => {

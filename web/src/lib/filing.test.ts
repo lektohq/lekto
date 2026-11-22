@@ -11,8 +11,8 @@ import {
 	visibleText,
 	whereText
 } from '#lib/filing.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 type Check = components['schemas']['FieldCheckOut'];
 type Member = components['schemas']['SpaceOut']['members'][number];
@@ -23,14 +23,14 @@ const MINE = 's-mine';
 const ERIKAS = 's-erika';
 const HOME = 's-home';
 
-const lookup = {
+const lookup = lookupOf({
 	spaces: [
 		{
 			id: MINE,
 			name: 'Personal',
 			personal_of: JOHN,
 			role: 'edit',
-			members: [{ user_id: JOHN, role: 'edit', username: 'john' }]
+			members: [{ user_id: JOHN, role: 'edit', username: 'john', active: true }]
 		},
 		{
 			id: HOME,
@@ -38,8 +38,8 @@ const lookup = {
 			personal_of: null,
 			role: 'edit',
 			members: [
-				{ user_id: JOHN, role: 'edit', username: 'john' },
-				{ user_id: ERIKA, role: 'read', username: 'erika', display_name: 'Jane Doe' }
+				{ user_id: JOHN, role: 'edit', username: 'john', active: true },
+				{ user_id: ERIKA, role: 'read', username: 'erika', display_name: 'Jane Doe', active: true }
 			]
 		}
 	],
@@ -53,7 +53,7 @@ const lookup = {
 			personal_space_id: ERIKAS
 		}
 	]
-} as unknown as Lookup;
+});
 
 const john = { id: JOHN, admin: false };
 const choices = [{ value: HOME }, { value: ERIKAS }];
@@ -191,7 +191,7 @@ describe('filing', () => {
 
 	it('keeps two members of one display name apart', () => {
 		const twins = [
-			{ user_id: JOHN, role: 'edit', username: 'john' },
+			{ user_id: JOHN, role: 'edit', username: 'john', active: true },
 			{ user_id: 'u-erika-1', role: 'read', username: 'erika1', display_name: 'Erika' },
 			{ user_id: 'u-erika-2', role: 'read', username: 'erika2', display_name: 'Erika' }
 		] as unknown as Member[];

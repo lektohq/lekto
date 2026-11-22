@@ -13,17 +13,18 @@ import {
 	type GraphNode,
 	type Processing
 } from './pipeline.ts';
+import { graphOf } from '#lib/testing/pipeline.ts';
 
-const GRAPH: GraphNode[] = [
-	{ node: 'receive', requires: [], waits_for: [] },
-	{ node: 'ocr', requires: ['receive'], waits_for: [] },
-	{ node: 'pages', requires: ['receive'], waits_for: [] },
-	{ node: 'parse', requires: ['ocr'], waits_for: [] },
-	{ node: 'judge', requires: ['parse'], waits_for: [] },
-	{ node: 'fields', requires: ['judge'], waits_for: [] },
-	{ node: 'apply_rules', requires: ['fields'], waits_for: [] },
-	{ node: 'file', requires: ['apply_rules', 'pages'], waits_for: [] }
-];
+const GRAPH = graphOf({
+	receive: [],
+	ocr: ['receive'],
+	pages: ['receive'],
+	parse: ['ocr'],
+	judge: ['parse'],
+	fields: ['judge'],
+	apply_rules: ['fields'],
+	file: ['apply_rules', 'pages']
+});
 
 function processing(
 	status: Processing['status'],

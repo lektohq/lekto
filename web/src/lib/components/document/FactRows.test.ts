@@ -1,18 +1,18 @@
 import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import FactRows from './FactRows.svelte';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 const BAKERY = '0199a6c4-0000-7000-8000-0000000000c1';
 const ERIKA = '0199a6c4-0000-7000-8000-0000000000a1';
-const lookup = {
+const lookup = lookupOf({
 	contacts: [{ id: BAKERY, name: 'Muster Bäckerei' }],
 	documentTypes: [],
 	tags: [],
 	spaces: [],
 	users: [{ id: ERIKA, username: 'erika', display_name: 'Jane Doe' }]
-} as unknown as Lookup;
+});
 
 describe('FactRows', () => {
 	it('tells what the text names: contacts as chips, identifiers with their contact, persons in brackets', () => {

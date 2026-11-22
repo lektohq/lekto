@@ -3,12 +3,12 @@ import { createRawSnippet } from 'svelte';
 import { describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
 import { formatDate } from '#lib/i18n.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { listedOf } from '#lib/testing/documents.ts';
 import DocumentCard from './DocumentCard.svelte';
 import DocumentRow from './DocumentRow.svelte';
 import InboxMark from './InboxMark.svelte';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 type Listed = components['schemas']['ListedDocument'];
 
@@ -46,7 +46,7 @@ describe('the archive', () => {
 	});
 
 	it('shows the contact in the head, the chips on the first page, then title, type and date', () => {
-		const lookup = {
+		const lookup = lookupOf({
 			contacts: [{ id: 'c1', name: 'Stadtwerke Muster', group_ids: ['g1'] }],
 			documentTypes: [{ id: 'k1', name: 'Rechnung', group_ids: [], icon: 'receipt' }],
 			tags: [
@@ -56,7 +56,7 @@ describe('the archive', () => {
 			fields: [],
 			spaces: [],
 			users: []
-		} as unknown as Lookup;
+		});
 		const { container } = render(DocumentCard, {
 			document: listed({
 				contact_id: 'c1',

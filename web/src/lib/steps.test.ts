@@ -2,34 +2,21 @@ import { describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
 import type { Node, NodeState } from '#lib/pipeline.ts';
 import { countsOf, phaseSeconds, phasesOf, stepsOf, stuck } from './steps.ts';
+import { logEntry, nodeState } from '#lib/testing/pipeline.ts';
 
 type LogEntry = components['schemas']['LogEntry'];
 type ProcessingStatus = components['schemas']['ProcessingStatus'];
 
 function state(node: Node, outcome: NodeState['outcome'], status: NodeState['status'] = 'done') {
-	return {
-		node,
-		status,
-		outcome,
-		started_at: status === 'waiting' ? null : '2026-10-14T08:49:01Z',
-		finished_at: status === 'done' ? '2026-10-14T08:49:05Z' : null
-	};
+	return nodeState(node, outcome, status);
 }
 
 function entry(node: Node, run: number, outcome: LogEntry['outcome'] = 'ok'): LogEntry {
-	return {
-		node,
-		run,
+	return logEntry(node, run, {
 		outcome,
 		reason: outcome === 'ok' ? null : 'why',
-		confidence: null,
-		model_version: null,
-		input: {},
-		output: {},
-		pipeline_version: 'test',
-		started_at: '2026-10-14T08:49:01Z',
 		duration_ms: 4000
-	};
+	});
 }
 
 const NODES: Node[] = ['receive', 'ocr', 'signal_llm', 'judge', 'apply_rules', 'file'];

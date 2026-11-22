@@ -13,6 +13,7 @@ import { choose, optionsOf } from '#lib/testing/select.ts';
 import type { Reading } from '#lib/vision.ts';
 import { goto } from '$app/navigation';
 import DocumentHeader from './DocumentHeader.svelte';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 
@@ -190,7 +191,7 @@ describe('DocumentHeader', () => {
 	});
 
 	describe('space', () => {
-		const lookup = {
+		const lookup = lookupOf({
 			users: [
 				{ id: OWNER, username: 'john', role: 'user', personal_space_id: 'space-2' },
 				{ id: 'user-2', username: 'erika', role: 'user', personal_space_id: 'space-3' }
@@ -224,7 +225,7 @@ describe('DocumentHeader', () => {
 					]
 				}
 			]
-		} as unknown as Lookup;
+		});
 
 		it('names the space and who else sees the document: readers once it is green', () => {
 			const green = { ...document(), lane: 'green' } as Document;

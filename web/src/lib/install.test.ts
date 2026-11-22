@@ -1,11 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { appleDevice, isAndroid } from '#lib/install.svelte.ts';
-
-function device(agent: string, touchPoints = 0) {
-	vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(agent);
-	// jsdom has no touch points: set them for the test.
-	Object.defineProperty(navigator, 'maxTouchPoints', { value: touchPoints, configurable: true });
-}
+import { deviceOf as device } from '#lib/testing/browser.ts';
 
 describe('the device', () => {
 	afterEach(() => vi.restoreAllMocks());

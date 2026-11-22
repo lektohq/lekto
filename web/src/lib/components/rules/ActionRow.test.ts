@@ -8,18 +8,19 @@ import { m } from '#lib/paraglide/messages.js';
 import { newAction, newModel } from '#lib/rules/model.ts';
 import { session } from '#lib/session.svelte.ts';
 import ActionRow from './ActionRow.svelte';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 const fields = [
 	{ id: 'f1', name: 'Netto', key: 'netto', data_type: 'amount', document_type_ids: null }
 ] as unknown as FieldDefinition[];
-const lookup = {
+const lookup = lookupOf({
 	contacts: [],
 	documentTypes: [],
 	tags: [],
 	fields,
 	spaces: [],
 	users: []
-} as unknown as Lookup;
+});
 const targets = [{ value: 'house', label: 'Haushalt' }];
 
 afterEach(() => {

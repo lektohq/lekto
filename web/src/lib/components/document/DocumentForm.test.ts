@@ -16,6 +16,7 @@ import { choose, selectedValue } from '#lib/testing/select.ts';
 import { toast } from 'svelte-sonner';
 import { beforeNavigate, goto } from '$app/navigation';
 import DocumentForm from './DocumentForm.svelte';
+import { fieldOf, lookupOf, tagOf } from '#lib/testing/master-data.ts';
 
 type Document = components['schemas']['DocumentDetails'];
 
@@ -32,7 +33,7 @@ const NOTE = '0199a6c4-0000-7000-8000-0000000000f2';
 
 const named = (id: string, name: string) => ({ id, name }) as Lookup['contacts'][number];
 
-const lookup = {
+const lookup = lookupOf({
 	contacts: [named(CONTACT, 'Stadtwerke Musterstadt'), named(BANK, 'Muster Bank')],
 	documentTypes: [named(INVOICE, 'Rechnung')],
 	tags: [],
@@ -63,11 +64,11 @@ const lookup = {
 			name: 'Haushalt',
 			personal_of: null,
 			role: 'edit',
-			members: [{ user_id: OWNER, role: 'edit' }]
+			members: [{ user_id: OWNER, role: 'edit', username: 'john', active: true }]
 		}
 	],
 	users: []
-} as unknown as Lookup;
+});
 
 function documentOf(
 	status: Document['processing']['status'],
@@ -461,7 +462,7 @@ describe('DocumentForm', () => {
 
 	it('does not save while a period is written in a way it cannot read', async () => {
 		const PERIOD = '0199a6c4-0000-7000-8000-0000000000f3';
-		const withPeriod = {
+		const withPeriod = lookupOf({
 			...lookup,
 			fields: [
 				...lookup.fields,
@@ -475,7 +476,7 @@ describe('DocumentForm', () => {
 					choices: []
 				}
 			]
-		} as unknown as Lookup;
+		});
 		render(
 			DocumentForm,
 			props({
@@ -511,7 +512,7 @@ describe('DocumentForm', () => {
 		const ERIKA = '0199a6c4-0000-7000-8000-000000000002';
 		const MINE = '0199a6c4-0000-7000-8000-0000000000d3';
 		const ERIKAS = '0199a6c4-0000-7000-8000-0000000000d2';
-		const household = {
+		const household = lookupOf({
 			...lookup,
 			spaces: [
 				{
@@ -536,7 +537,7 @@ describe('DocumentForm', () => {
 				{ id: OWNER, username: 'john', role: 'user', personal_space_id: MINE },
 				{ id: ERIKA, username: 'erika', role: 'user', personal_space_id: ERIKAS }
 			]
-		} as unknown as Lookup;
+		});
 		const waitingOn = (fields: Record<string, unknown>) =>
 			({
 				document: {},
@@ -789,11 +790,11 @@ describe('DocumentForm', () => {
 
 		it('offers no move while there is nowhere to move the document', () => {
 			// The caller edits the document's space only and nobody else has a personal space.
-			const alone = {
+			const alone = lookupOf({
 				...household,
 				spaces: [household.spaces[1]],
 				users: [household.users[0]]
-			} as unknown as Lookup;
+			});
 			const decided = { ...documentOf('completed', 'green'), space_id: SPACE } as Document;
 			render(
 				DocumentForm,
@@ -887,16 +888,12 @@ describe('DocumentForm', () => {
 	it('keeps a value entered by hand when the type is corrected', async () => {
 		const OTHER = '0199a6c4-0000-7000-8000-0000000000e2';
 		const ASN = '0199a6c4-0000-7000-8000-0000000000f9';
-		const asn = {
+		const asn = fieldOf({
 			id: ASN,
 			name: 'Ablagenummer',
-			data_type: 'text',
-			document_type_ids: null,
 			required: true,
-			required_document_type_ids: [],
-			choices: [],
 			assignment: 'manual'
-		};
+		});
 		const typed = {
 			document: {},
 			open: [
@@ -909,11 +906,11 @@ describe('DocumentForm', () => {
 			],
 			nodes: []
 		} as unknown as Review;
-		const withOther = {
+		const withOther = lookupOf({
 			...lookup,
 			documentTypes: [...lookup.documentTypes, named(OTHER, 'Vertrag')],
 			fields: [...lookup.fields, asn]
-		} as unknown as Lookup;
+		});
 		render(DocumentForm, props({ review: typed, lookup: withOther, next: null }));
 		expect(screen.getByText(m.review_by_hand())).toBeTruthy();
 		await userEvent.type(document.getElementById(`field-${ASN}`) as HTMLInputElement, 'A-17');
@@ -928,24 +925,15 @@ describe('DocumentForm', () => {
 describe('the topic', () => {
 	const WORK = '0199a6c4-0000-7000-8000-0000000000b1';
 	const HEALTH = '0199a6c4-0000-7000-8000-0000000000b2';
-	const topic = (id: string, name: string) => ({
-		id,
-		name,
-		path: [name],
-		parent_id: null,
-		scope: 'topic',
-		assignment: 'auto',
-		shown: true,
-		created_at: '2026-10-17T12:00:00Z'
-	});
-	const topics = {
+	const topic = (id: string, name: string) => tagOf({ id, name, scope: 'topic' });
+	const topics = lookupOf({
 		...lookup,
 		contacts: [
 			{ ...named(CONTACT, 'Stadtwerke Musterstadt'), topic_ids: [WORK, HEALTH] },
 			{ ...named(BANK, 'Muster Bank'), topic_ids: [WORK] }
 		],
 		tags: [topic(WORK, 'Arbeit'), topic(HEALTH, 'Krankenversicherung')]
-	} as unknown as Lookup;
+	});
 	const filed = {
 		...documentOf('completed', 'green'),
 		contact_id: CONTACT,
@@ -1014,10 +1002,10 @@ describe('the topic', () => {
 
 	it('has the field only for a contact with topics, and keeps a topic the document has', async () => {
 		const PLAIN = '0199a6c4-0000-7000-8000-0000000000c3';
-		const plain = {
+		const plain = lookupOf({
 			...topics,
 			contacts: [...topics.contacts, named(PLAIN, 'Ohne Themen')]
-		} as unknown as Lookup;
+		});
 		const field = topicField;
 		const unknown = { ...filed, contact_id: null, topic_id: null } as Document;
 		const view = render(DocumentForm, props({ document: unknown, lookup: plain, review: null }));

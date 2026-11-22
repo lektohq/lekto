@@ -4,14 +4,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { json } from '#lib/testing/api.ts';
 import { listedOf } from '#lib/testing/documents.ts';
 import type { Lens } from '#lib/lenses.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { choose } from '#lib/testing/select.ts';
 import LensEditor, { type LensDraft } from './LensEditor.svelte';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 const TODAY = new Date(2026, 9, 20);
 
-const lookup = {
+const lookup = lookupOf({
 	contacts: [],
 	documentTypes: [],
 	tags: [{ id: 't1', name: 'zu bezahlen', path: ['zu bezahlen'], scope: 'document' }],
@@ -22,7 +22,7 @@ const lookup = {
 	],
 	spaces: [],
 	users: []
-} as unknown as Lookup;
+});
 
 const draft: LensDraft = {
 	filter: { tag_ids: ['t1'], document_period: 'last_12_months' },

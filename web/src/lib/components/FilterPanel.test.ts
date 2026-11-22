@@ -4,11 +4,12 @@ import { describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
 import { monthPeriod, NO_FILTERS, yearPeriod, type Filters } from '#lib/filters.ts';
 import { formatDate } from '#lib/i18n.ts';
-import type { Lookup, Tag } from '#lib/masterdata.svelte.ts';
+import type { Tag } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import ActiveFilters from './ActiveFilters.svelte';
 import FilterPanel from './FilterPanel.svelte';
 import PeriodFacet from './PeriodFacet.svelte';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 type Facets = components['schemas']['DocumentFacetsOut'];
 
@@ -30,7 +31,7 @@ function tag(
 	} as unknown as Tag;
 }
 
-const lookup = {
+const lookup = lookupOf({
 	contacts: ['Nord', 'Süd', 'Ost', 'West', 'Mitte', 'Hafen', 'Bahn', 'Post'].map((name) => ({
 		id: name.toLowerCase(),
 		name,
@@ -51,7 +52,7 @@ const lookup = {
 	fields: [],
 	spaces: [],
 	users: []
-} as unknown as Lookup;
+});
 
 const facets: Facets = {
 	total: 12,

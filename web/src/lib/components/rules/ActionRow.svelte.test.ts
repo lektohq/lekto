@@ -2,22 +2,23 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { json } from '#lib/testing/api.ts';
-import type { FieldDefinition, Lookup } from '#lib/masterdata.svelte.ts';
+import type { FieldDefinition } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { newAction, type SetFieldNode } from '#lib/rules/model.ts';
 import ActionRow from './ActionRow.svelte';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 const fields = [
 	{ id: 'n', name: 'Stunden', key: 'stunden', data_type: 'number', document_type_ids: null }
 ] as unknown as FieldDefinition[];
-const lookup = {
+const lookup = lookupOf({
 	contacts: [],
 	documentTypes: [],
 	tags: [],
 	fields,
 	spaces: [],
 	users: []
-} as unknown as Lookup;
+});
 
 describe('the switch between a fixed value and a template', () => {
 	it('stays where it is while the person types', async () => {

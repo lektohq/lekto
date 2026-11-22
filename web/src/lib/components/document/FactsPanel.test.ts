@@ -2,9 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { calls, fakeApi } from '#lib/testing/api.ts';
-import { contactOf } from '#lib/testing/master-data.ts';
+import { contactOf, lookupOf, tagOf } from '#lib/testing/master-data.ts';
 import type { Facts } from '#lib/facts.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { choose } from '#lib/testing/select.ts';
@@ -14,7 +13,7 @@ const UTILITY = 'contact-1';
 const BANK = 'contact-2';
 const FIELD = 'field-1';
 
-const lookup = {
+const lookup = lookupOf({
 	contacts: [
 		{ id: UTILITY, name: 'Stadtwerke Musterstadt GmbH' },
 		{ id: BANK, name: 'Bank Musterstadt' }
@@ -24,7 +23,7 @@ const lookup = {
 	fields: [{ id: FIELD, name: 'Rechnungsbetrag' }],
 	spaces: [],
 	users: []
-} as unknown as Lookup;
+});
 
 const FACTS: Facts = {
 	contact_id: UTILITY,
@@ -236,20 +235,12 @@ describe('FactsPanel', () => {
 	});
 
 	it("attaches an identifier with a topic of the contact, the document's at first", async () => {
-		const topic = (id: string, name: string) => ({
-			id,
-			name,
-			path: [name],
-			parent_id: null,
-			scope: 'topic',
-			icon: null,
-			color: null
-		});
-		const withTopics = {
+		const topic = (id: string, name: string) => tagOf({ id, name, scope: 'topic' });
+		const withTopics = lookupOf({
 			...lookup,
 			contacts: [{ ...lookup.contacts[0], topic_ids: ['p1', 'p2'] }, lookup.contacts[1]],
 			tags: [topic('p1', 'Arbeit'), topic('p2', 'Kranken'), topic('p3', 'Recht')]
-		} as unknown as Lookup;
+		});
 		render(FactsPanel, props({ lookup: withTopics, topicId: 'p1' }));
 		const user = userEvent.setup();
 		await user.click(screen.getAllByRole('button', { name: /^Pin .* as an identifier$/ })[0]);

@@ -11,6 +11,7 @@ import { goTo } from '#lib/testing/page-state.svelte.ts';
 import DocumentProcessing from './DocumentProcessing.svelte';
 import { fakeApi } from '#lib/testing/api.ts';
 import { documentOf, filesOf } from '#lib/testing/documents.ts';
+import { logEntry } from '#lib/testing/pipeline.ts';
 
 type Document = components['schemas']['DocumentDetails'];
 
@@ -68,14 +69,8 @@ const document = documentAt(1, 'review', [
 	state('file', null, 'waiting')
 ]);
 
-const proposed = {
-	node: 'signal_llm',
-	run: 1,
-	outcome: 'ok',
-	reason: null,
-	confidence: null,
+const proposed = logEntry('signal_llm', 1, {
 	model_version: 'qwen3:8b',
-	input: {},
 	output: {
 		proposal: {
 			sender: { value: 'Muster Bäckerei' },
@@ -86,10 +81,9 @@ const proposed = {
 			{ prompt: 2318, completion: 184, usage: { prompt_tokens: 2318, completion_tokens: 184 } }
 		]
 	},
-	pipeline_version: 'test',
 	started_at: '2026-10-13T09:14:22Z',
 	duration_ms: 6300
-};
+});
 
 const judged = {
 	...proposed,

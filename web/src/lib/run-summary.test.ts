@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
-import type { GraphNode, Node, NodeState } from '#lib/pipeline.ts';
+import type { Node, NodeState } from '#lib/pipeline.ts';
 import { changesOf, headlineOf } from './run-summary.ts';
 import { stepsOf } from './steps.ts';
+import { lookupOf } from '#lib/testing/master-data.ts';
+import { graphOf, logEntry, nodeState } from '#lib/testing/pipeline.ts';
 
 type LogEntry = components['schemas']['LogEntry'];
 type ProcessingStatus = components['schemas']['ProcessingStatus'];
@@ -16,7 +17,7 @@ const ERIKAS = 's-erika';
 const MUSTERVEREIN = 'c-musterverein';
 const BAKERY = 'c-bakery';
 
-const lookup = {
+const lookup = lookupOf({
 	contacts: [
 		{ id: MUSTERVEREIN, name: 'Jugendverein Muster e.V.' },
 		{ id: BAKERY, name: 'Muster Bäckerei' }
@@ -30,7 +31,7 @@ const lookup = {
 			name: 'Personal',
 			personal_of: JOHN,
 			role: 'edit',
-			members: [{ user_id: JOHN, role: 'edit', username: 'john' }]
+			members: [{ user_id: JOHN, role: 'edit', username: 'john', active: true }]
 		}
 	],
 	users: [
@@ -43,19 +44,19 @@ const lookup = {
 			personal_space_id: ERIKAS
 		}
 	]
-} as unknown as Lookup;
+});
 
 const john = { id: JOHN, admin: false };
 
-const graph: GraphNode[] = [
-	{ node: 'receive', requires: [], waits_for: [] },
-	{ node: 'ocr', requires: ['receive'], waits_for: [] },
-	{ node: 'signal_llm', requires: ['ocr'], waits_for: [] },
-	{ node: 'judge', requires: ['signal_llm'], waits_for: [] },
-	{ node: 'fields', requires: ['judge'], waits_for: [] },
-	{ node: 'apply_rules', requires: ['fields'], waits_for: [] },
-	{ node: 'file', requires: ['apply_rules'], waits_for: [] }
-];
+const graph = graphOf({
+	receive: [],
+	ocr: ['receive'],
+	signal_llm: ['ocr'],
+	judge: ['signal_llm'],
+	fields: ['judge'],
+	apply_rules: ['fields'],
+	file: ['apply_rules']
+});
 const NODES = graph.map((entry) => entry.node);
 
 function entry(
@@ -65,30 +66,18 @@ function entry(
 	output: Record<string, unknown> = {},
 	extra: Partial<LogEntry> = {}
 ): LogEntry {
-	return {
-		node,
-		run,
+	return logEntry(node, run, {
 		outcome,
 		reason: outcome === 'ok' ? null : 'why',
-		confidence: null,
 		model_version: 'model',
-		input: {},
 		output,
-		pipeline_version: 'test',
 		started_at: '2026-10-23T09:00:00Z',
-		duration_ms: 1000,
 		...extra
-	};
+	});
 }
 
 function state(node: Node, outcome: NodeState['outcome'], status: NodeState['status'] = 'done') {
-	return {
-		node,
-		status,
-		outcome,
-		started_at: status === 'waiting' ? null : '2026-10-23T09:00:00Z',
-		finished_at: status === 'done' ? '2026-10-23T09:00:01Z' : null
-	};
+	return nodeState(node, outcome, status);
 }
 
 function steps(states: NodeState[], log: LogEntry[], run: number, status: ProcessingStatus) {
