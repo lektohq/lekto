@@ -18,7 +18,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import type { EditorHandle } from '#lib/templates/codemirror.ts';
 	import { TEMPLATES_GUIDE } from '#lib/templates/guide.ts';
-	import { FILTERS, FILTER_CHIPS, insertFilter, insertValue } from '#lib/templates/liquid.ts';
+	import { filterChipsFor, insertFilter, insertValue } from '#lib/templates/liquid.ts';
 	import {
 		factNames,
 		LIST_NAMES,
@@ -117,7 +117,7 @@
 		return () => clearTimeout(timer);
 	});
 
-	const chips = FILTER_CHIPS.map((name) => FILTERS.find((filter) => filter.name === name)!);
+	const chips = $derived(filterChipsFor(purpose));
 
 	// The facts the reference document has, with their names (the preview gives their values).
 	const factLabels = new Map(factNames().map((fact) => [fact.name, fact.label]));

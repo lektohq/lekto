@@ -42,6 +42,8 @@ export interface Completions {
 	names: readonly { name: string; label: string }[];
 	/** The fields the template may use. */
 	fields: readonly { key: string; name: string }[];
+	/** The filters to offer after `|`; all but `json` where none are given. */
+	filters?: readonly { name: string; insert: string }[];
 }
 
 export interface EditorOptions {
@@ -156,12 +158,12 @@ export function completionSource(lists: () => Completions) {
 		const text = context.state.doc.toString();
 		const spot = completionSpot(text, context.pos);
 		if (!spot) return null;
-		const { names, fields } = lists();
+		const { names, fields, filters = FILTERS } = lists();
 		const close = spot.value && unclosed(text, context.pos) ? ' }}' : '';
 		let options: Completion[];
 		switch (spot.kind) {
 			case 'filter':
-				options = FILTERS.map((filter) => ({
+				options = filters.map((filter) => ({
 					label: filter.name,
 					apply: filter.insert,
 					detail:

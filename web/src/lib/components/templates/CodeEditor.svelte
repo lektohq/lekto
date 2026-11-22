@@ -3,6 +3,7 @@
 	import TemplateText from '#lib/components/templates/TemplateText.svelte';
 	import type { FieldDefinition } from '#lib/masterdata.svelte.ts';
 	import type { EditorHandle } from '#lib/templates/codemirror.ts';
+	import { filtersFor } from '#lib/templates/liquid.ts';
 	import { templateNames, type TemplatePurpose } from '#lib/templates/values.ts';
 	import { cn } from '#lib/utils.ts';
 
@@ -57,7 +58,8 @@
 				onchange: (next) => (value = next),
 				completions: () => ({
 					names: templateNames(purpose, steps),
-					fields: fields.map((field) => ({ key: field.key, name: field.name }))
+					fields: fields.map((field) => ({ key: field.key, name: field.name })),
+					filters: filtersFor(purpose)
 				}),
 				id,
 				label,

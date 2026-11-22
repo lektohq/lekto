@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 // The real editor here, not the text area the other tests get.
 vi.unmock('#lib/templates/codemirror.ts');
 const { completionSource, mountTemplateEditor } = await import('./codemirror.ts');
+const { filtersFor } = await import('./liquid.ts');
 
 const lists = () => ({
 	names: [
@@ -45,6 +46,13 @@ describe('completion', () => {
 		]);
 		const filters = complete('{{ contact | ');
 		expect(filters?.options.find((option) => option.label === 'date')?.apply).toBe("date: '%Y-%m'");
+		// `json` is for the body of a webhook: only where the editor says so (WD-14).
+		expect(filters?.options.map((option) => option.label)).not.toContain('json');
+		const state = EditorState.create({ doc: '{{ title | ' });
+		const body = completionSource(() => ({ ...lists(), filters: filtersFor('webhook') }))(
+			new CompletionContext(state, 11, false)
+		);
+		expect(body?.options.map((option) => option.label)).toContain('json');
 		expect(complete('{% ')?.options.map((option) => option.label)).toContain('if');
 		expect(complete('Lohn ')).toBeNull();
 	});
