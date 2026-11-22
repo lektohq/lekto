@@ -1,5 +1,6 @@
 // Smoke test of every area of the built UI against a real API: each page opens without a console
 // error (CSP violations included), and one create-and-remove round trip per kind of dialog.
+import { watch } from './watch.ts';
 import { expect, test } from '@playwright/test';
 
 const ADMIN = process.env.LEKTO_ADMIN_USERNAME ?? 'admin';
@@ -11,13 +12,7 @@ test.beforeEach(() => {
 });
 
 test('every area opens, and the dialogs create things', async ({ page }) => {
-	const problems: string[] = [];
-	page.on('console', (message) => {
-		// Missing services (search, models) answer 4xx/5xx on purpose; those are not page errors.
-		if (message.type() === 'error' && !/status of [45]\d\d/.test(message.text()))
-			problems.push(message.text());
-	});
-	page.on('pageerror', (error) => problems.push(error.message));
+	const problems = watch(page);
 
 	await page.goto('/ui/login');
 	await page.getByLabel('Username').fill(ADMIN);
@@ -40,6 +35,9 @@ test('every area opens, and the dialogs create things', async ({ page }) => {
 	for (const [path, heading] of headings) {
 		await page.goto(path);
 		await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
+		// The heading stands above a load problem too: the area loaded only without one (WT2-10).
+		await page.waitForLoadState('networkidle');
+		await expect(page.getByRole('button', { name: 'Try again' }), path).toHaveCount(0);
 	}
 
 	// Master data: a contact, deleted from its editor.
@@ -53,12 +51,16 @@ test('every area opens, and the dialogs create things', async ({ page }) => {
 	await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
 	await expect(page.getByText(NAME)).toHaveCount(0);
 
-	// Spaces: a space.
+	// Spaces: a space, deleted from its editor.
 	await page.goto('/ui/spaces');
 	await page.getByRole('button', { name: 'New space' }).click();
 	await page.getByRole('textbox', { name: 'Name' }).fill(NAME);
 	await page.getByRole('button', { name: 'Create' }).click();
 	await expect(page.getByText(NAME).first()).toBeVisible();
+	await page.getByRole('button', { name: `Edit ${NAME}` }).click();
+	await page.getByRole('button', { name: `Delete ${NAME}` }).click();
+	await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+	await expect(page.getByText(NAME)).toHaveCount(0);
 
 	// Webhooks: create on its page (secret shown once), delete from the list.
 	await page.goto('/ui/webhooks/new');
@@ -81,6 +83,8 @@ test('every area opens, and the dialogs create things', async ({ page }) => {
 	await page.getByRole('button', { name: 'Create', exact: true }).click();
 	await expect(page.getByTestId('secret')).toContainText('lekto_');
 	await page.getByRole('button', { name: 'I have stored it' }).click();
+	// Revoked from its dialog, as every row's delete stands in its editor.
+	await page.getByRole('button', { name: NAME, exact: true }).click();
 	await page.getByRole('button', { name: `Revoke ${NAME}` }).click();
 	await page.getByRole('alertdialog').getByRole('button', { name: 'Revoke' }).click();
 	await expect(page.getByText(NAME)).toHaveCount(0);

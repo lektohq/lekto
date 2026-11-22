@@ -1,5 +1,6 @@
 // The webhook pages against a real API: a webhook is created on its own page (the secret shown
 // once), opened, tested from its page, changed on its edit page and deleted from the list.
+import { watch } from './watch.ts';
 import { expect, test, type Page } from '@playwright/test';
 
 const ADMIN = process.env.LEKTO_ADMIN_USERNAME ?? 'admin';
@@ -8,6 +9,24 @@ const NAME = `e2e-webhook-${Date.now()}`;
 
 test.beforeAll(() => {
 	test.skip(!ADMIN_PASSWORD, 'LEKTO_ADMIN_PASSWORD is not set');
+});
+
+/** The webhook the test made, once it has one: deleted afterwards if the test did not. */
+let made = '';
+
+test.afterAll(async ({ playwright, baseURL }) => {
+	if (!made) return;
+	const api = await playwright.request.newContext({ baseURL });
+	const login = await api.post('/api/v1/auth/login', {
+		data: { username: ADMIN, password: ADMIN_PASSWORD }
+	});
+	const { csrf_token } = (await login.json()) as { csrf_token: string };
+	const gone = await api.delete(`/api/v1/webhooks/${made}`, {
+		headers: { 'X-CSRF-Token': csrf_token }
+	});
+	// Deleted by the test already, or now.
+	expect([204, 404]).toContain(gone.status());
+	await api.dispose();
 });
 
 async function signIn(page: Page) {
@@ -19,12 +38,7 @@ async function signIn(page: Page) {
 }
 
 test('a webhook is created, tested, changed and deleted', async ({ page }) => {
-	const problems: string[] = [];
-	page.on('console', (message) => {
-		if (message.type() === 'error' && !/status of [45]\d\d/.test(message.text()))
-			problems.push(message.text());
-	});
-	page.on('pageerror', (error) => problems.push(error.message));
+	const problems = watch(page);
 	await signIn(page);
 
 	// Created on its own page, with a header of its own; the secret is shown once.
@@ -47,6 +61,7 @@ test('a webhook is created, tested, changed and deleted', async ({ page }) => {
 	// The webhook's page: name, URL, deliveries. A test goes nowhere (port 9), its delivery shows.
 	await page.waitForURL(/\/ui\/webhooks\/(?!new$)[^/]+$/);
 	const url = page.url();
+	made = url.split('/').pop()!;
 	await expect(page.getByRole('heading', { name: NAME, level: 1 })).toBeVisible();
 	await expect(page.getByText('http://127.0.0.1:9/hook')).toBeVisible();
 	await expect(page.getByText('No deliveries yet.')).toBeVisible();

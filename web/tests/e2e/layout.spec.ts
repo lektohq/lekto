@@ -7,6 +7,7 @@
 // every frame a page opens, one of each: the navigation sheet and the filter sheet of the
 // phone, a dialog, a form dialog, an editor, a question, a menu. Signs in as the admin of the
 // environment, as `areas.spec.ts` does. CI runs it (`.github/workflows/ci.yml`, job `layout`).
+import { watch } from './watch.ts';
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 
 const ADMIN = process.env.LEKTO_ADMIN_USERNAME ?? 'admin';
@@ -281,13 +282,7 @@ for (const size of WIDTHS) {
 			hasTouch: size.name === 'phone'
 		});
 		const page = await context.newPage();
-		const problems: string[] = [];
-		page.on('console', (message) => {
-			// Missing services (search, models) answer 4xx/5xx on purpose; those are not page errors.
-			if (message.type() === 'error' && !/status of [45]\d\d/.test(message.text()))
-				problems.push(message.text());
-		});
-		page.on('pageerror', (error) => problems.push(error.message));
+		const problems = watch(page);
 
 		await page.goto('/ui/login');
 		await page.getByLabel('Username').fill(ADMIN);
