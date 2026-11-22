@@ -533,25 +533,35 @@ describe('a new tag', () => {
 	});
 });
 
+/** The API, where the contact group "Makler" (g9) is made once asked for. */
+function serveMakler() {
+	const MAKLER = tag('g9', ['Makler'], null, 'contact');
+	let made = false;
+	serve({
+		'POST /api/v1/tags': () => {
+			made = true;
+			return json(MAKLER, 201);
+		},
+		'GET /api/v1/tags': () => (made ? [...TAGS, MAKLER] : TAGS)
+	});
+}
+
+/** Opens the groups' picker with `adding` and asks there for a new group "Makler". */
+async function groupFromPicker(user: ReturnType<typeof userEvent.setup>, adding: HTMLElement) {
+	await user.click(adding);
+	const picker = await pickerNamed(m.master_contact_groups());
+	await user.type(within(picker).getByRole('searchbox', { hidden: true }), 'Makler');
+	await user.click(within(picker).getByText(m.create_named({ name: 'Makler' })));
+}
+
 describe('creating from a picker', () => {
 	it('makes a group with its details over the contact dialog, chosen there after', async () => {
 		const user = userEvent.setup();
-		const MAKLER = tag('g9', ['Makler'], null, 'contact');
-		let made = false;
-		serve({
-			'POST /api/v1/tags': () => {
-				made = true;
-				return json(MAKLER, 201);
-			},
-			'GET /api/v1/tags': () => (made ? [...TAGS, MAKLER] : TAGS)
-		});
+		serveMakler();
 		render(WithDialogs);
 		masterDataDialogs.open('contacts', CONTACT as unknown as Item);
 		expect(await screen.findByDisplayValue('Nord Muster Versicherungsgruppe')).toBeTruthy();
-		await user.click(screen.getByRole('button', { name: m.picker_add_group_label() }));
-		const picker = await pickerNamed(m.master_contact_groups());
-		await user.type(within(picker).getByRole('searchbox', { hidden: true }), 'Makler');
-		await user.click(within(picker).getByText(m.create_named({ name: 'Makler' })));
+		await groupFromPicker(user, screen.getByRole('button', { name: m.picker_add_group_label() }));
 		// The tag dialog over the contact's: its kind set, the name filled in.
 		const nested = await screen.findByRole('dialog', { name: m.master_add_contact_group() });
 		expect((within(nested).getByLabelText(m.field_name()) as HTMLInputElement).value).toBe(
@@ -609,15 +619,7 @@ describe('creating from a search', () => {
 describe('a group made in a dialog that makes something', () => {
 	it('stays chosen there, and what was typed stays too', async () => {
 		const user = userEvent.setup();
-		const MAKLER = tag('g9', ['Makler'], null, 'contact');
-		let made = false;
-		serve({
-			'POST /api/v1/tags': () => {
-				made = true;
-				return json(MAKLER, 201);
-			},
-			'GET /api/v1/tags': () => (made ? [...TAGS, MAKLER] : TAGS)
-		});
+		serveMakler();
 		render(WithDialogs);
 		// A contact made from a document's search.
 		void masterDataDialogs.create('contacts', 'N27');
@@ -625,10 +627,10 @@ describe('a group made in a dialog that makes something', () => {
 		const name = within(dialog).getByLabelText(m.field_name()) as HTMLInputElement;
 		await user.clear(name);
 		await user.type(name, 'N27 Bank');
-		await user.click(within(dialog).getByRole('button', { name: m.picker_add_group_label() }));
-		const picker = await pickerNamed(m.master_contact_groups());
-		await user.type(within(picker).getByRole('searchbox', { hidden: true }), 'Makler');
-		await user.click(within(picker).getByText(m.create_named({ name: 'Makler' })));
+		await groupFromPicker(
+			user,
+			within(dialog).getByRole('button', { name: m.picker_add_group_label() })
+		);
 		const nested = await screen.findByRole('dialog', { name: m.master_add_contact_group() });
 		await user.click(within(nested).getByRole('button', { name: m.create() }));
 		await waitFor(() =>
@@ -646,10 +648,7 @@ describe('stacked dialogs', () => {
 		render(WithDialogs);
 		masterDataDialogs.open('contacts', CONTACT as unknown as Item);
 		expect(await screen.findByDisplayValue('Nord Muster Versicherungsgruppe')).toBeTruthy();
-		await user.click(screen.getByRole('button', { name: m.picker_add_group_label() }));
-		const picker = await pickerNamed(m.master_contact_groups());
-		await user.type(within(picker).getByRole('searchbox', { hidden: true }), 'Makler');
-		await user.click(within(picker).getByText(m.create_named({ name: 'Makler' })));
+		await groupFromPicker(user, screen.getByRole('button', { name: m.picker_add_group_label() }));
 		const nested = await screen.findByRole('dialog', { name: m.master_add_contact_group() });
 		expect(within(nested).getByDisplayValue('Makler')).toBeTruthy();
 		await user.keyboard('{Escape}');

@@ -59,6 +59,16 @@ function documentAt(
 	return documentOf({ space_id: 's-mine', processing: { status, run, vision: false, nodes } });
 }
 
+/** Run 2 through to the filing, every step ok; `receiving` of the receiving step. */
+function finishedRun(receiving: Partial<NodeState> = {}): Document {
+	return documentAt(2, 'completed', [
+		{ ...state('receive', 'ok'), ...receiving },
+		...(['ocr', 'pages', 'signal_llm', 'signal_neighbours', 'judge', 'file'] as const).map((node) =>
+			state(node, 'ok')
+		)
+	]);
+}
+
 const document = documentAt(1, 'review', [
 	state('receive', 'ok'),
 	state('ocr', 'ok'),
@@ -338,15 +348,7 @@ describe('DocumentProcessing', () => {
 		const second = { ...first, run: 2, output: decided('c-bakery') };
 		const filed = { ...proposed, node: 'file', run: 2, output: {} };
 		serve([proposed, first, second, filed]);
-		const current = documentAt(2, 'completed', [
-			state('receive', 'ok'),
-			state('ocr', 'ok'),
-			state('pages', 'ok'),
-			state('signal_llm', 'ok'),
-			state('signal_neighbours', 'ok'),
-			state('judge', 'ok'),
-			state('file', 'ok')
-		]);
+		const current = finishedRun();
 		const { container } = show({ document: current });
 		expect(screen.getByRole('heading', { level: 2, name: m.run_through({ run: 2 }) })).toBeTruthy();
 		expect(await screen.findByText(new RegExp(m.run_since({ run: 1 })))).toBeTruthy();
@@ -402,15 +404,7 @@ describe('DocumentProcessing', () => {
 			}
 		};
 		serve([proposed, judged, confirmed]);
-		const current = documentAt(2, 'completed', [
-			state('receive', 'ok'),
-			state('ocr', 'ok'),
-			state('pages', 'ok'),
-			state('signal_llm', 'ok'),
-			state('signal_neighbours', 'ok'),
-			state('judge', 'ok'),
-			state('file', 'ok')
-		]);
+		const current = finishedRun();
 		current.contact_id = 'c-musterverein';
 		const { container } = show({ document: current });
 		const judge = card(container, 'judge');
@@ -429,19 +423,10 @@ describe('DocumentProcessing', () => {
 
 	it('tells no times of a later run it cannot tell apart from an earlier one', async () => {
 		// Run 2 without the log (a reader): receiving is run 1's, hours before the rest.
-		const later = documentAt(2, 'completed', [
-			{
-				...state('receive', 'ok'),
-				started_at: '2026-10-13T01:00:00Z',
-				finished_at: '2026-10-13T01:00:01Z'
-			},
-			state('ocr', 'ok'),
-			state('pages', 'ok'),
-			state('signal_llm', 'ok'),
-			state('signal_neighbours', 'ok'),
-			state('judge', 'ok'),
-			state('file', 'ok')
-		]);
+		const later = finishedRun({
+			started_at: '2026-10-13T01:00:00Z',
+			finished_at: '2026-10-13T01:00:01Z'
+		});
 		show({ document: later, manageable: false });
 		const read = screen.getByRole('heading', { name: new RegExp(m.phase_read()) });
 		expect(read.textContent).not.toMatch(/\d+(h|m|s)/);

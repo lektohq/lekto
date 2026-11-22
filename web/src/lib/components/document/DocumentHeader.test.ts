@@ -261,9 +261,10 @@ describe('DocumentHeader', () => {
 			expect(await request.json()).toEqual({ space_id: 'space-2' });
 		});
 
-		it('goes back to the documents after handing the document over', async () => {
+		/** Hands the document over into Erika's personal space; the view goes back to the list. */
+		async function handOver(seen: Lookup) {
 			const onchanged = vi.fn();
-			render(DocumentHeader, props({ lookup, onchanged }));
+			render(DocumentHeader, props({ lookup: seen, onchanged }));
 			const user = userEvent.setup();
 			await user.click(screen.getByRole('button', { name: m.move_title() }));
 			const dialog = await screen.findByRole('dialog');
@@ -277,28 +278,17 @@ describe('DocumentHeader', () => {
 			);
 			expect(await fetchMock.mock.calls[0][0].json()).toEqual({ space_id: 'space-3' });
 			expect(onchanged).not.toHaveBeenCalled();
+		}
+
+		it('goes back to the documents after handing the document over', async () => {
+			await handOver(lookup);
 		});
 
 		it('hands over to a user whose personal space the caller is no member of', async () => {
-			const strangers = {
+			await handOver({
 				...lookup,
 				spaces: lookup.spaces.filter((space) => space.id !== 'space-3')
-			} as Lookup;
-			const onchanged = vi.fn();
-			render(DocumentHeader, props({ lookup: strangers, onchanged }));
-			const user = userEvent.setup();
-			await user.click(screen.getByRole('button', { name: m.move_title() }));
-			const dialog = await screen.findByRole('dialog');
-			await choose(user, within(dialog).getByLabelText(m.field_space()), 'space-3');
-			await user.click(within(dialog).getByRole('button', { name: m.move_title() }));
-			await waitFor(() =>
-				expect(goto).toHaveBeenCalledWith('/ui/documents', {
-					state: { words: '', by: OWNER },
-					persistState: true
-				})
-			);
-			expect(await fetchMock.mock.calls[0][0].json()).toEqual({ space_id: 'space-3' });
-			expect(onchanged).not.toHaveBeenCalled();
+			});
 		});
 
 		it('offers a reader no move', () => {

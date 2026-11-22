@@ -10,6 +10,7 @@ import { session } from '#lib/session.svelte.ts';
 import WithDialogs from '#lib/testing/WithDialogs.svelte';
 import FieldsPanel from './FieldsPanel.svelte';
 import { type Routes, fakeApi, json, noContent } from '#lib/testing/api.ts';
+import { fieldOf } from '#lib/testing/master-data.ts';
 
 const INVOICE = '0199a6c4-0000-7000-8000-0000000000e1';
 const REMINDER = '0199a6c4-0000-7000-8000-0000000000e2';
@@ -17,32 +18,22 @@ const REMINDER = '0199a6c4-0000-7000-8000-0000000000e2';
 let fetchMock: ReturnType<typeof fakeApi>;
 
 const FIELDS = [
-	{
+	fieldOf({
 		id: 'f1',
 		name: 'Rechnungsnummer',
 		key: 'rechnungsnummer',
-		data_type: 'text',
 		document_type_ids: [INVOICE, REMINDER],
-		choices: [],
-		required: false,
 		required_document_type_ids: [INVOICE],
-		description: 'Die Nummer, unter der die Rechnung geführt wird',
-		position: 0,
-		created_at: '2026-10-13T12:00:00Z'
-	},
-	{
+		description: 'Die Nummer, unter der die Rechnung geführt wird'
+	}),
+	fieldOf({
 		id: 'f2',
 		name: 'Betrag',
 		key: 'betrag',
 		data_type: 'amount',
 		document_type_ids: [INVOICE],
-		choices: [],
-		required: false,
-		required_document_type_ids: [],
-		description: null,
-		position: 5,
-		created_at: '2026-10-13T12:00:00Z'
-	}
+		position: 5
+	})
 ];
 
 /** The API of the panel: the fields, the types, deleting a field; `more` before these. */
@@ -198,18 +189,7 @@ describe('FieldsPanel', () => {
 	});
 
 	it('shows the answer of the newest load, not of the slowest', async () => {
-		const field = (name: string) => ({
-			id: name,
-			name,
-			key: name.toLowerCase(),
-			data_type: 'text',
-			document_type_ids: null,
-			choices: [],
-			required: false,
-			required_document_type_ids: [],
-			description: null,
-			created_at: '2026-10-13T12:00:00Z'
-		});
+		const field = (name: string) => fieldOf({ id: name, name, key: name.toLowerCase() });
 		let slow!: (answer: Response) => void;
 		serve({
 			// The own fields take their time; those of all users, asked for later, come first.
@@ -274,19 +254,13 @@ describe('FieldsPanel', () => {
 	it('shows 25 fields a page, in their order', async () => {
 		serve({
 			'GET /api/v1/fields': () =>
-				Array.from({ length: 30 }, (_, index) => ({
-					id: `f${index}`,
-					name: `Feld ${String(index + 1).padStart(2, '0')}`,
-					key: `feld_${index}`,
-					data_type: 'text',
-					document_type_ids: null,
-					choices: [],
-					required: false,
-					required_document_type_ids: [],
-					description: null,
-					position: 0,
-					created_at: '2026-10-13T12:00:00Z'
-				}))
+				Array.from({ length: 30 }, (_, index) =>
+					fieldOf({
+						id: `f${index}`,
+						name: `Feld ${String(index + 1).padStart(2, '0')}`,
+						key: `feld_${index}`
+					})
+				)
 		});
 		render(FieldsPanel);
 		expect(await screen.findByText('Feld 25')).toBeTruthy();

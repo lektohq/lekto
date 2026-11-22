@@ -148,6 +148,15 @@ async function rows() {
 	return within(table).getAllByRole('row').slice(1);
 }
 
+/** The panel with the dialog of the open customer number 12345678. */
+async function openCustomerNumber() {
+	const user = userEvent.setup();
+	render(IdentifiersPanel);
+	await rows();
+	await user.click(screen.getByRole('button', { name: m.open_open({ value: '12345678' }) }));
+	return { user, dialog: await screen.findByRole('dialog') };
+}
+
 describe('IdentifiersPanel', () => {
 	it('lists the open identifiers with where they are open, the contact with its logo', async () => {
 		render(IdentifiersPanel);
@@ -292,11 +301,7 @@ describe('IdentifiersPanel', () => {
 	});
 
 	it('opens one with where it stands and takes it over', async () => {
-		const user = userEvent.setup();
-		render(IdentifiersPanel);
-		await rows();
-		await user.click(screen.getByRole('button', { name: m.open_open({ value: '12345678' }) }));
-		const dialog = await screen.findByRole('dialog');
+		const { user, dialog } = await openCustomerNumber();
 		expect(await within(dialog).findByText('1234 5678')).toBeTruthy();
 		expect(dialog.textContent).toContain('Rechnung Oktober');
 		await user.click(within(dialog).getByRole('button', { name: m.open_confirm() }));
@@ -308,11 +313,7 @@ describe('IdentifiersPanel', () => {
 	});
 
 	it('keeps the dialog in the history entry, and opens a place in the Beam', async () => {
-		const user = userEvent.setup();
-		render(IdentifiersPanel);
-		await rows();
-		await user.click(screen.getByRole('button', { name: m.open_open({ value: '12345678' }) }));
-		const dialog = await screen.findByRole('dialog');
+		const { user, dialog } = await openCustomerNumber();
 		// The address names nothing; the entry holds the identifier by its reference.
 		expect(testPage.url.search).toBe('?tab=identifiers');
 		expect(testPage.state.identifier).toEqual({ kind: 'customer_number', ref: CUSTOMER.ref });
