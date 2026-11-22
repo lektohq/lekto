@@ -33,8 +33,9 @@
 	// The tab "Automation" of the page "System" (Tobi, 24.10.2026): how the documents went
 	// through their first run, what became of them, how long it took, and how people judged what
 	// the automation set at their first decision on a field. For the channels and the period
-	// chosen (by default the web and the API, 12 months: migrated documents bring the metadata
-	// of the source system); the numbers are the whole system's and name no document.
+	// chosen (by default every channel but the migration, 12 months: migrated documents bring
+	// the metadata of the source system); the numbers are the whole system's and name no
+	// document.
 	type Report = components['schemas']['AutomationOut'];
 	type Channel = components['schemas']['Channel'];
 	type Period = components['schemas']['Period'];
