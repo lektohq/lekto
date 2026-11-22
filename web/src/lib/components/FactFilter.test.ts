@@ -43,6 +43,9 @@ describe('FactFilter', () => {
 		await user.type(value, 'kaputt');
 		await user.click(add);
 		expect(await screen.findByText('not one')).toBeTruthy();
+		// The error belongs to the field: who lands on it hears why (WB-13).
+		const said = globalThis.document.getElementById(value.getAttribute('aria-describedby') ?? '');
+		expect(said?.textContent).toContain('not one');
 		expect(onchange).not.toHaveBeenCalled();
 		await user.clear(value);
 		await user.type(value, 'R-1001');

@@ -132,7 +132,12 @@ describe('IdentifiersEditor', () => {
 			errors: { [refused.key]: "'DE00 1234' is not a valid IBAN" }
 		});
 		expect(screen.getByRole('alert').textContent).toContain('is not a valid IBAN');
-		expect(screen.getByLabelText(m.identifier_value()).getAttribute('aria-invalid')).toBe('true');
+		const field = screen.getByLabelText(m.identifier_value());
+		expect(field.getAttribute('aria-invalid')).toBe('true');
+		// The error belongs to the field: who lands on it hears why (WB-13).
+		expect(
+			globalThis.document.getElementById(field.getAttribute('aria-describedby') ?? '')?.textContent
+		).toContain('is not a valid IBAN');
 	});
 
 	it('says what the API refused in a closed line too, not by colour alone', () => {

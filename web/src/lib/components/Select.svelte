@@ -29,6 +29,7 @@
 		disabled = false,
 		'aria-label': ariaLabel,
 		'aria-invalid': ariaInvalid,
+		'aria-describedby': ariaDescribedby,
 		onchange
 	}: {
 		value?: string;
@@ -38,6 +39,8 @@
 		disabled?: boolean;
 		'aria-label'?: string;
 		'aria-invalid'?: boolean;
+		/** The id of what says more about it: the error below it. */
+		'aria-describedby'?: string;
 		/** Called with the new value when the user picks one. */
 		onchange?: (value: string) => void;
 	} = $props();
@@ -64,6 +67,7 @@
 		{disabled}
 		aria-label={ariaLabel}
 		aria-invalid={ariaInvalid}
+		aria-describedby={ariaDescribedby}
 		class={cn(FIELD, className, 'max-sm:h-11')}
 	>
 		{#each options as option (option.value)}
@@ -84,6 +88,7 @@
 			data-value={value}
 			aria-label={ariaLabel}
 			aria-invalid={ariaInvalid}
+			aria-describedby={ariaDescribedby}
 			class={cn(FIELD, 'flex items-center gap-2 text-left', className)}
 		>
 			<span class="min-w-0 flex-1 truncate">{shown}</span>

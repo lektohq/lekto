@@ -11,6 +11,7 @@
 		granularity = 'day',
 		disabled = false,
 		invalid = false,
+		describedby,
 		class: className,
 		onchange
 	}: {
@@ -22,6 +23,8 @@
 		granularity?: 'day' | 'minute';
 		disabled?: boolean;
 		invalid?: boolean;
+		/** The id of what says more about it: the error below it. */
+		describedby?: string;
 		class?: string;
 		onchange?: (value: string) => void;
 	} = $props();
@@ -34,6 +37,7 @@
 	type={granularity === 'minute' ? 'datetime-local' : 'date'}
 	aria-label={label}
 	aria-invalid={invalid || undefined}
+	aria-describedby={describedby}
 	{min}
 	{max}
 	{disabled}

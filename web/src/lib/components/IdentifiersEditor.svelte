@@ -356,6 +356,7 @@
 							bind:value={rows[index].value}
 							aria-label={m.identifier_value()}
 							aria-invalid={errors[item.key] ? true : undefined}
+							aria-describedby={errors[item.key] ? `${uid}-${item.key}-error` : undefined}
 							maxlength={IDENTIFIER_VALUE_MAX}
 							class="font-mono"
 							onkeydown={closeOnEnter}
@@ -388,7 +389,9 @@
 						</div>
 					{/if}
 					{#if errors[item.key]}
-						<p class="mt-2 text-sm text-destructive" role="alert">{errors[item.key]}</p>
+						<p id="{uid}-{item.key}-error" class="mt-2 text-sm text-destructive" role="alert">
+							{errors[item.key]}
+						</p>
 					{/if}
 				{:else}
 					<div class="flex flex-wrap items-center gap-x-3 gap-y-2">
