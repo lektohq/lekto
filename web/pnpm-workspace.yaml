@@ -1,9 +1,8 @@
-# Transitive packages held at releases at least two weeks old (CodeMirror, 15.10.2026).
-overrides:
-  # LayerChart's runed would take 0.38.0 (23.10.2026); held at 0.37.1 (25.10.2026).
-  'layerchart>runed': 0.37.1
-  '@codemirror/language': 6.12.4
-  '@lezer/lr': 1.4.10
+# Only releases at least 10 days old, as Renovate proposes them (`renovate.json`): pnpm keeps to
+# it at every resolution, transitive packages and Renovate's lock runs included. A security fix
+# that is younger gets an entry in `minimumReleaseAgeExclude` for its package
+# (.knowledge/process/dependencies.md).
+minimumReleaseAge: 14400
 
 # swagger-ui-dist depends on Scarf, whose install script reports the installation to scarf.sh:
 # never run it (08.11.2026).

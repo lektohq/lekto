@@ -81,9 +81,10 @@ jobs:
           read='^web/(src/routes/|src/lib/jobs\.ts$|package\.json$)|^examples/documents/(manifest\.json$|search/)'
           backend_tests="$code|^migration/|$read"
           web="^web/|^\.github/workflows/ci\.yml$"
-          # The Compose examples, the scripts and their tests, the workflows, and the Dockerfile
-          # (test_ocr_packages compares its packages with ocr-packages.sh).
-          release="^docker/|^\.github/(scripts|workflows)/|^Dockerfile$"
+          # The Compose examples, the scripts and their tests, the workflows, the Dockerfile
+          # (test_ocr_packages compares its packages with ocr-packages.sh), and the ages of a
+          # release Renovate and pnpm wait for (test_release_age).
+          release="^docker/|^\.github/(scripts|workflows)/|^Dockerfile$|^renovate\.json$|^web/pnpm-workspace\.yaml$"
           # The YAML files, yamllint's config and what tells it which files are ours.
           yaml='\.ya?ml$|^\.yamllint$|(^|/)\.gitignore$|^backend/(pyproject\.toml|uv\.lock)$'
           image="^(Dockerfile|\.dockerignore)$|^\.devcontainer/|$ci"
@@ -192,7 +193,7 @@ jobs:
   # What the release uses besides the images (pull requests only): the Compose examples in
   # docker/ with every extension (`docker compose config`, a .env with every value set), the tests
   # in .github/scripts (tag script, pinned actions, the image's packages for the integration
-  # tests), and the workflows (actionlint).
+  # tests, the age of a release pnpm and Renovate wait for), and the workflows (actionlint).
   release:
     needs: changes
     if: needs.changes.outputs.release == 'true'
