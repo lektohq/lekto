@@ -6,7 +6,7 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import Pin from '@lucide/svelte/icons/pin';
 	import ScanQrCode from '@lucide/svelte/icons/scan-qr-code';
-	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+	import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 	import UserCheck from '@lucide/svelte/icons/user-check';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import { untrack } from 'svelte';

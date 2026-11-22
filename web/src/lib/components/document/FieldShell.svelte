@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Lightbulb from '@lucide/svelte/icons/lightbulb';
 	import SearchX from '@lucide/svelte/icons/search-x';
-	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+	import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 	import { tick, type Snippet } from 'svelte';
 	import { chosen } from '#lib/candidates.ts';
 	import type { Candidate } from '#lib/candidates.ts';

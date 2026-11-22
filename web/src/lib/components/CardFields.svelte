@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Clock from '@lucide/svelte/icons/clock';
-	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+	import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 	import { dueText, type CardLine, type Due } from '#lib/card-fields.ts';
 	import { formatDate } from '#lib/i18n.ts';
 

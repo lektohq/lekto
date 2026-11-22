@@ -2,7 +2,7 @@
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import InboxIcon from '@lucide/svelte/icons/inbox';
 	import OctagonX from '@lucide/svelte/icons/octagon-x';
-	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+	import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 	import type { Component } from 'svelte';
 	import { BASE } from '#lib/base.ts';
 	import Figure from '#lib/components/overview/Figure.svelte';
