@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { createRawSnippet } from 'svelte';
 import { describe, expect, it, vi } from 'vitest';
-import Button from './button.svelte';
+import Button, { buttonVariants, type ButtonSize } from './button.svelte';
 
 const children = createRawSnippet(() => ({ render: () => `<span>Speichern</span>` }));
 const sources = import.meta.glob<string>('/src/**/*.svelte', {
@@ -53,5 +53,40 @@ describe('a button while its action runs (WZ-01)', () => {
 			.filter(([, source]) => /<Button\b[^>]*\bdisabled=\{busy\b/.test(source))
 			.map(([path]) => path);
 		expect(still).toEqual([]);
+	});
+});
+
+describe('the sizes of a button on a phone (WE-04)', () => {
+	// web/DESIGN.md, "Touch targets": 44 px for a finger, drawn or as an invisible hit area.
+	const SIZES: ButtonSize[] = [
+		'default',
+		'xs',
+		'sm',
+		'lg',
+		'icon',
+		'icon-xs',
+		'icon-sm',
+		'icon-lg',
+		'stack'
+	];
+	const TALL = /(?:^|\s)(?:max-sm:)?(?:h|size)-(?:11|12|14)(?:\s|$)/;
+	const AREA = /max-sm:after:absolute.*max-sm:after:-inset-(?:y-)?[\d.]+/;
+
+	it.each(SIZES)('%s is a finger tall, or has a hit area that is', (size) => {
+		const classes = buttonVariants({ size });
+		expect(TALL.test(classes) || AREA.test(classes)).toBe(true);
+	});
+
+	it('reaches 44 px with the hit area of each small size', () => {
+		// The size drawn plus twice the inset, in quarters of a rem.
+		const reach = (size: ButtonSize) => {
+			const classes = buttonVariants({ size });
+			const drawn = Number(/(?:^|\s)(?:h|size)-(\d+)/.exec(classes)?.[1]);
+			const inset = Number(/max-sm:after:-inset-(?:y-)?([\d.]+)/.exec(classes)?.[1]);
+			return (drawn + 2 * inset) * 4;
+		};
+		expect((['xs', 'sm', 'icon-xs', 'icon-sm'] as ButtonSize[]).map(reach)).toEqual([
+			44, 44, 44, 44
+		]);
 	});
 });

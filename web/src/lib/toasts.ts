@@ -8,6 +8,10 @@
 /** The classes of every toast: the look, and reachable above an open layer. */
 export const TOAST_CLASS = 'cn-toast pointer-events-auto';
 
+/** The ✕ of a toast, 20 px as svelte-sonner draws it: reachable as every target, 24 px with
+ * a mouse and a finger's 44 px on a phone ("Touch targets"). */
+export const TOAST_CLOSE_CLASS = 'after:absolute after:-inset-0.5 max-sm:after:-inset-3';
+
 /** Whether `target` lies in a toast. */
 export function inToast(target: EventTarget | null): boolean {
 	return target instanceof Element && target.closest('[data-sonner-toaster]') !== null;

@@ -1457,7 +1457,8 @@ worker, and Lekto works as a website.
   than 24 × 24 px.
 - The components implement this (`Button`, `IconButton`, `Chip`, `Segmented`, `TabBar`, `Select`,
   `Switch`, `ChoiceBox`, `InfoTip`, `BackLink`, `InboxMark`, the rows of `ui/dropdown-menu` and
-  `ui/command`). Pages do not add sizes by hand.
+  `ui/command`, the ✕ of `ui/dialog`, `ui/sheet` and a toast). Every small size of `Button`
+  (`xs`, `sm`, `icon-xs`, `icon-sm`) brings its hit area. Pages do not add sizes by hand.
 
 ## Accessibility baseline
 

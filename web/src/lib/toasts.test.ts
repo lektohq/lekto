@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { inToast, TOAST_CLASS } from './toasts.ts';
+import { inToast, TOAST_CLASS, TOAST_CLOSE_CLASS } from './toasts.ts';
 
 afterEach(() => document.body.replaceChildren());
 
@@ -16,5 +16,12 @@ describe('toasts above a layer', () => {
 
 	it('lets a toast take the pointer an open layer took from the page', () => {
 		expect(TOAST_CLASS.split(' ')).toContain('pointer-events-auto');
+	});
+
+	it('gives the ✕ of a toast a hit area, a finger wide on a phone (WE-04)', () => {
+		// 20 px as drawn: 2 px around it make 24, 12 px make 44.
+		expect(TOAST_CLOSE_CLASS.split(' ')).toEqual(
+			expect.arrayContaining(['after:absolute', 'after:-inset-0.5', 'max-sm:after:-inset-3'])
+		);
 	});
 });
