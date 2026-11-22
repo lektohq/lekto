@@ -714,6 +714,7 @@
 	"documents_total": "Dokumente: {count}",
 	"documents_none": "Noch keine Dokumente. Dokumente kommen über den Posteingang herein.",
 	"documents_none_filtered": "Kein Dokument passt zu diesen Filtern.",
+	"documents_none_selected": "Kein Dokument dieser Auswahl gibt es noch, oder Du darfst es nicht sehen.",
 	"documents_no_date": "Ohne Dokumentdatum",
 	"document_not_found": "Dieses Dokument gibt es nicht, oder Du darfst es nicht sehen.",
 	"document_saved": "Dokument gespeichert.",

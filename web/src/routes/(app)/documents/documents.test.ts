@@ -1027,6 +1027,19 @@ describe('the archive page', () => {
 		expect(screen.getByRole('button', { name: m.filters_expand() })).toBeTruthy();
 	});
 
+	it('says that a selection from a link found nothing, without the owl and the upload', async () => {
+		state.url = new URL('http://lekto/ui/documents?ids=9b653410,ab12cd34');
+		vi.stubGlobal(
+			'fetch',
+			fakeApi({ 'GET /api/v1/documents': () => ({ items: [], next_cursor: null }) })
+		);
+		render(Page);
+		expect(await screen.findByText(m.documents_none_selected())).toBeTruthy();
+		expect(screen.queryByText(m.documents_none())).toBeNull();
+		expect(screen.queryByRole('link', { name: m.documents_to_inbox() })).toBeNull();
+		expect(document.querySelector('[data-mascot]')).toBeNull();
+	});
+
 	it('takes no lane from an older link', async () => {
 		state.url = new URL('http://lekto/ui/documents?lane=yellow');
 		const api = fakeApi({

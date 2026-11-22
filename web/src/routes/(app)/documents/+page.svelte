@@ -1212,14 +1212,18 @@ row of filters, on a desktop narrow by the title. -->
 				</LoadProblem>
 			{:else if list.empty}
 				<!-- The owl only before the first document (web/DESIGN.md, "Logo and owl"). -->
-				<EmptyNote mascot={!isFiltered(filters) && !searching}>
+				<!-- A selection from a link that finds nothing is no empty archive either. -->
+				{@const first = !isFiltered(filters) && !searching && selected.length === 0}
+				<EmptyNote mascot={first}>
 					{isFiltered(filters)
 						? m.documents_none_filtered()
 						: searching
 							? m.search_none()
-							: m.documents_none()}
+							: selected.length > 0
+								? m.documents_none_selected()
+								: m.documents_none()}
 					{#snippet action()}
-						{#if !isFiltered(filters) && !searching}
+						{#if first}
 							<!-- Documents come in through the inbox, the one place to upload. -->
 							<a href="{BASE}/inbox" class={cn(buttonVariants({ variant: 'outline' }))}>
 								<Upload aria-hidden="true" />

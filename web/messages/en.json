@@ -714,6 +714,7 @@
 	"documents_total": "Documents: {count}",
 	"documents_none": "No documents yet. Documents come in through the inbox.",
 	"documents_none_filtered": "No document matches these filters.",
+	"documents_none_selected": "No document of this selection exists any more, or you may not see it.",
 	"documents_no_date": "No document date",
 	"document_not_found": "This document does not exist or you may not see it.",
 	"document_saved": "Document saved.",
