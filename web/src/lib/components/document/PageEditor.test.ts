@@ -19,7 +19,7 @@ type Document = components['schemas']['DocumentDetails'];
 const DOCUMENT = { id: 'doc-1', title: '2022/11', page_count: 3 } as unknown as Document;
 
 let sent: FormData | null = null;
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 
 beforeEach(() => {
 	sent = null;
@@ -29,10 +29,11 @@ beforeEach(() => {
 		}),
 		'POST /api/v1/documents/doc-1/edit': async (request) => {
 			sent = await request.formData();
-			return { documents: [], deleted: false };
+			return { documents: [], deleted: false, merged: [] };
 		},
 		'GET /api/v1/documents/doc-1/files': () => ({ versions: [{}, {}] }),
-		'GET /api/v1/documents/doc-2/files': () => ({ versions: [{}] })
+		'GET /api/v1/documents/doc-2/files': () => ({ versions: [{}] }),
+		'GET /api/v1/documents/doc-3/files': () => ({ versions: [{}] })
 	});
 	vi.stubGlobal('fetch', fetchMock);
 });

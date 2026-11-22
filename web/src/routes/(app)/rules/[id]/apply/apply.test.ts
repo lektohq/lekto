@@ -7,7 +7,7 @@ import { bulkDocuments } from '#lib/bulk.ts';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi, json, problem } from '#lib/testing/api.ts';
+import { calls, fakeApi, json, masterData, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
 
@@ -72,6 +72,7 @@ const application = (status: Application['status']): Application => ({
 function held(pages: Preview[], routes: Parameters<typeof fakeApi>[0] = {}) {
 	const waiting: (() => void)[] = [];
 	const api = fakeApi({
+		...masterData(),
 		'GET /api/v1/rules/r1': () => rule,
 		'POST /api/v1/rules/r1/apply/preview': async () => {
 			const page = pages.shift();

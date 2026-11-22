@@ -2,14 +2,15 @@ import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
+import { NODE_LABELS } from '#lib/node-labels.ts';
 import type { components } from '#lib/api/schema.ts';
 import { desktop } from '#lib/desktop.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import type { GraphNode } from '#lib/pipeline.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import DocumentProcessing from './DocumentProcessing.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
-import { documentOf } from '#lib/testing/documents.ts';
+import { fakeApi } from '#lib/testing/api.ts';
+import { documentOf, filesOf } from '#lib/testing/documents.ts';
 
 type Document = components['schemas']['DocumentDetails'];
 
@@ -21,7 +22,7 @@ vi.mock('$app/navigation', () => ({
 }));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 
 const graph: GraphNode[] = [
 	{ node: 'receive', requires: [], waits_for: [] },
@@ -113,7 +114,7 @@ const judged = {
 						value: 'c-musterverein',
 						label: 'Jugendverein Muster e.V.',
 						contradicted: false,
-						sources: [{ signal: 'signal_neighbours', names: true, votes: 4, of: 5 }]
+						sources: [{ signal: 'signal_neighbours', names: true, votes: 4, found: 5 }]
 					}
 				]
 			}
@@ -135,13 +136,22 @@ const exchange = {
 	]
 };
 
+/** The log of doc-1, the exchanges with a model of every node (none where not given), its
+ * files and how it was read. */
 function serve(log: unknown[], exchanges: Record<string, unknown[]> = {}) {
-	fetchMock.mockImplementation(async (request) => {
-		const path = new URL(request.url).pathname;
-		if (path.endsWith('/log')) return json(log);
-		const node = path.split('/exchanges/')[1];
-		return json(node ? (exchanges[node] ?? []) : []);
+	const nodes = Object.keys(NODE_LABELS);
+	fetchMock = fakeApi({
+		'GET /api/v1/documents/doc-1/log': () => log,
+		'GET /api/v1/documents/doc-1/files': () => filesOf(),
+		'GET /api/v1/documents/doc-1/reading': () => ({ vision: false, pages: [], advice: null }),
+		...Object.fromEntries(
+			nodes.map((node) => [
+				`GET /api/v1/documents/doc-1/exchanges/${node}`,
+				() => exchanges[node] ?? []
+			])
+		)
 	});
+	vi.stubGlobal('fetch', fetchMock);
 }
 
 function show(props: Partial<Parameters<typeof render<typeof DocumentProcessing>>[1]> = {}) {
@@ -170,9 +180,7 @@ async function openTip(button: HTMLElement): Promise<HTMLElement> {
 }
 
 beforeEach(() => {
-	fetchMock = fakeApi();
 	serve([proposed, judged], { signal_llm: [exchange] });
-	vi.stubGlobal('fetch', fetchMock);
 	vi.mocked(goto).mockClear();
 	goTo('/ui/documents/doc-1?tab=processing', { id: 'doc-1' });
 	desktop.override(true);

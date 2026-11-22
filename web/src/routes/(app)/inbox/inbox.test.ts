@@ -8,7 +8,7 @@ import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { session, type User } from '#lib/session.svelte.ts';
 import { inboxItem, OWNER, summaryOf } from '#lib/testing/documents.ts';
-import { calls, fakeApi, json, problem } from '#lib/testing/api.ts';
+import { calls, fakeApi, json, masterData, noContent, problem } from '#lib/testing/api.ts';
 import { uploads } from '#lib/upload.svelte.ts';
 import Page from './+page.svelte';
 
@@ -58,6 +58,7 @@ type Items = ReturnType<typeof inboxItem>[];
 
 function start(items: Items | ((tab: string | null) => Items), summary = summaryOf({ new: 1 })) {
 	const api = fakeApi({
+		...masterData(),
 		'GET /api/v1/inbox': (_, url) => ({
 			items: typeof items === 'function' ? items(url.searchParams.get('tab')) : items,
 			next_cursor: null
@@ -65,6 +66,8 @@ function start(items: Items | ((tab: string | null) => Items), summary = summary
 		'GET /api/v1/inbox/summary': () => summary,
 		'GET /api/v1/users': () => USERS,
 		'POST /api/v1/inbox/seen': () => ({ marked: 2 }),
+		'PUT /api/v1/documents/n1/seen': () => noContent(),
+		'DELETE /api/v1/documents/s1/seen': () => noContent(),
 		'POST /api/v1/documents': () => json({ id: 'doc-new' }, 202),
 		'GET /api/v1/spaces': () => SPACES
 	});
@@ -104,6 +107,7 @@ describe('the inbox comes back to the place it was left at (WF-03)', () => {
 			c2: { items: [inboxItem('new', { id: 'd3', title: 'Drei' })], next_cursor: 'c3' }
 		};
 		const api = fakeApi({
+			...masterData(),
 			'GET /api/v1/inbox': (_, url) => pages[url.searchParams.get('cursor') ?? ''],
 			'GET /api/v1/inbox/summary': () => summaryOf({ new: 1 }),
 			'GET /api/v1/users': () => USERS,
@@ -323,6 +327,7 @@ describe('inbox rows', () => {
 		state.url = new URL('http://lekto/ui/inbox?tab=done');
 		let renewed = false;
 		const api = fakeApi({
+			...masterData(),
 			'GET /api/v1/inbox': (_, url) => {
 				const cursor = url.searchParams.get('cursor');
 				if (renewed)
@@ -352,6 +357,7 @@ describe('inbox rows', () => {
 		state.url = new URL('http://lekto/ui/inbox?tab=done');
 		let pages = 0;
 		const api = fakeApi({
+			...masterData(),
 			'GET /api/v1/inbox': (_, url) => {
 				if (url.searchParams.get('cursor')) {
 					return problem(422, {

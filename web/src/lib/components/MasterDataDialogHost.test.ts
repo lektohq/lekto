@@ -9,11 +9,11 @@ import { phone } from '#lib/phone.svelte.ts';
 import { choose, optionsOf, selectedValue } from '#lib/testing/select.ts';
 import { session } from '#lib/session.svelte.ts';
 import WithDialogs from '#lib/testing/WithDialogs.svelte';
-import { fakeApi, json, problem } from '#lib/testing/api.ts';
+import { fakeApi, json, masterData, noContent, problem, type Routes } from '#lib/testing/api.ts';
 
 const PAYSLIP = '0199a6c4-0000-7000-8000-0000000000e1';
 const RULE = '0199a6c4-0000-7000-8000-0000000000f1';
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 
 function tag(id: string, path: string[], parent: string | null, scope = 'document') {
 	return {
@@ -61,35 +61,49 @@ const CONTACT = {
 	created_at: '2026-10-17T12:00:00Z'
 };
 
-beforeEach(() => {
-	signIn('admin', { id: 'admin', username: 'admin' });
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async (request) => {
-		const path = new URL(request.url).pathname;
-		if (path === `/api/v1/document-types/${PAYSLIP}`) {
-			return json({
-				id: PAYSLIP,
-				name: 'Lohnabrechnung',
-				description: null,
-				title_pattern: "{{ document_date | date: '%Y/%m' }}",
-				created_at: '2026-10-13T12:00:00Z'
-			});
-		}
-		if (path === '/api/v1/rules') {
-			return json([{ id: RULE, name: 'Lohnabrechnung', managed_by_document_type_id: PAYSLIP }]);
-		}
-		if (path === '/api/v1/fields') return json([]);
-		if (path === '/api/v1/pipeline') return json({ nodes: [], vision: null, logo_fetch: true });
-		if (path === '/api/v1/contacts/c1/logo' && request.method === 'PUT') {
-			return json({ ...CONTACT, logo: UPLOADED, logo_failure: null });
-		}
-		if (path === '/api/v1/contacts/c1/logo') return new Response(null, { status: 204 });
-		if (path === '/api/v1/contacts/c1/logo/fetch') return new Response(null, { status: 202 });
-		if (path === '/api/v1/tags') return json(TAGS);
-		if (path === '/api/v1/documents') return json({ items: [], next_cursor: null });
-		return json({ used: [], rendered: null, missing: null, error: null });
+/** The API the dialogs read: the payslip type with the rule it manages, the tags, the pipeline,
+ * the logo of c1, a template's preview; `more` before these. */
+function serve(more: Routes = {}) {
+	fetchMock = fakeApi({
+		...masterData({ tags: TAGS }),
+		[`GET /api/v1/document-types/${PAYSLIP}`]: () => ({
+			id: PAYSLIP,
+			name: 'Lohnabrechnung',
+			description: null,
+			title_pattern: "{{ document_date | date: '%Y/%m' }}",
+			created_at: '2026-10-13T12:00:00Z'
+		}),
+		'GET /api/v1/rules': () => [
+			{ id: RULE, name: 'Lohnabrechnung', managed_by_document_type_id: PAYSLIP }
+		],
+		'GET /api/v1/pipeline': () => ({
+			nodes: [],
+			vision: null,
+			logo_fetch: true,
+			meaning_search: false
+		}),
+		// Saving answers with what was saved.
+		'PATCH /api/v1/contacts/c1': () => CONTACT,
+		'PATCH /api/v1/tags/t2': () => TAGS[1],
+		'POST /api/v1/tags': () => json(tag('new', ['Neu'], null), 201),
+		'PUT /api/v1/contacts/c1/logo': () => ({ ...CONTACT, logo: UPLOADED, logo_failure: null }),
+		'DELETE /api/v1/contacts/c1/logo': () => noContent(),
+		'POST /api/v1/contacts/c1/logo/fetch': () => new Response(null, { status: 202 }),
+		'GET /api/v1/documents': () => ({ items: [], next_cursor: null }),
+		'POST /api/v1/templates/preview': () => ({
+			used: [],
+			rendered: null,
+			missing: null,
+			error: null
+		}),
+		...more
 	});
 	vi.stubGlobal('fetch', fetchMock);
+}
+
+beforeEach(() => {
+	signIn('admin', { id: 'admin', username: 'admin' });
+	serve();
 });
 
 afterEach(() => {
@@ -176,14 +190,10 @@ describe('MasterDataDialogHost', () => {
 describe('saving', () => {
 	it('creates a document type with its fields in one request', async () => {
 		// Issue #73: a type and its fields are all or nothing; no second request.
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			if (path === '/api/v1/document-types' && request.method === 'POST') {
-				return json({ id: 'new', name: 'Rechnung', created_at: '2026-10-24T12:00:00Z' }, 201);
-			}
-			if (path === '/api/v1/fields' || path === '/api/v1/rules') return json([]);
-			if (path === '/api/v1/tags') return json(TAGS);
-			return json({ used: [], rendered: null, missing: null, error: null });
+		serve({
+			'POST /api/v1/document-types': () =>
+				json({ id: 'new', name: 'Rechnung', created_at: '2026-10-24T12:00:00Z' }, 201),
+			'GET /api/v1/rules': () => []
 		});
 		const user = userEvent.setup();
 		render(WithDialogs);
@@ -250,12 +260,9 @@ describe('tabs', () => {
 
 	it('opens the tab and the line of an identifier the API refuses', async () => {
 		const user = userEvent.setup();
-		const before = fetchMock.getMockImplementation()!;
-		fetchMock.mockImplementation(async (request) =>
-			request.method === 'PATCH'
-				? problem(422, { detail: "'DE00 1234' is not a valid IBAN" })
-				: before(request)
-		);
+		serve({
+			'PATCH /api/v1/contacts/c1': () => problem(422, { detail: "'DE00 1234' is not a valid IBAN" })
+		});
 		render(WithDialogs);
 		masterDataDialogs.open('contacts', CONTACT as unknown as Item);
 		expect(await screen.findByDisplayValue('Nord Muster Versicherungsgruppe')).toBeTruthy();
@@ -531,15 +538,12 @@ describe('creating from a picker', () => {
 		const user = userEvent.setup();
 		const MAKLER = tag('g9', ['Makler'], null, 'contact');
 		let made = false;
-		const before = fetchMock.getMockImplementation()!;
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			if (path === '/api/v1/tags' && request.method === 'POST') {
+		serve({
+			'POST /api/v1/tags': () => {
 				made = true;
 				return json(MAKLER, 201);
-			}
-			if (path === '/api/v1/tags') return json(made ? [...TAGS, MAKLER] : TAGS);
-			return before(request);
+			},
+			'GET /api/v1/tags': () => (made ? [...TAGS, MAKLER] : TAGS)
 		});
 		render(WithDialogs);
 		masterDataDialogs.open('contacts', CONTACT as unknown as Item);
@@ -572,12 +576,7 @@ describe('creating from a search', () => {
 	it('makes a contact in its dialog over the page, the name filled in, and hands it back', async () => {
 		const user = userEvent.setup();
 		const BAKERY = { ...CONTACT, id: 'c9', name: 'Bäckerei Muster' };
-		const before = fetchMock.getMockImplementation()!;
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			if (path === '/api/v1/contacts' && request.method === 'POST') return json(BAKERY, 201);
-			return before(request);
-		});
+		serve({ 'POST /api/v1/contacts': () => json(BAKERY, 201) });
 		const changed = masterDataDialogs.changed;
 		render(WithDialogs);
 		const made = masterDataDialogs.create('contacts', 'Bäckerei Muster');
@@ -612,15 +611,12 @@ describe('a group made in a dialog that makes something', () => {
 		const user = userEvent.setup();
 		const MAKLER = tag('g9', ['Makler'], null, 'contact');
 		let made = false;
-		const before = fetchMock.getMockImplementation()!;
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			if (path === '/api/v1/tags' && request.method === 'POST') {
+		serve({
+			'POST /api/v1/tags': () => {
 				made = true;
 				return json(MAKLER, 201);
-			}
-			if (path === '/api/v1/tags') return json(made ? [...TAGS, MAKLER] : TAGS);
-			return before(request);
+			},
+			'GET /api/v1/tags': () => (made ? [...TAGS, MAKLER] : TAGS)
 		});
 		render(WithDialogs);
 		// A contact made from a document's search.
@@ -673,14 +669,9 @@ describe('the editor', () => {
 		const user = userEvent.setup();
 		render(WithDialogs);
 		let refuse = true;
-		const before = fetchMock.getMockImplementation()!;
-		fetchMock.mockImplementation(async (request) => {
-			if (request.method === 'DELETE') {
-				return refuse
-					? problem(409, { detail: 'the tag is in use' })
-					: new Response(null, { status: 204 });
-			}
-			return before(request);
+		serve({
+			'DELETE /api/v1/tags/t3': () =>
+				refuse ? problem(409, { detail: 'the tag is in use' }) : noContent()
 		});
 		const changed = masterDataDialogs.changed;
 		masterDataDialogs.open('tags', TAGS[2] as Item);

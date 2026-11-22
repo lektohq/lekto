@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import userEvent from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, json, type Routes } from '#lib/testing/api.ts';
 import { documentOf as documentWith } from '#lib/testing/documents.ts';
 import { signIn } from '#lib/testing/session.ts';
 import type { components } from '#lib/api/schema.ts';
@@ -146,7 +146,22 @@ const review = {
 	]
 } as unknown as Review;
 
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
+
+/** No change, as a dry run says it: the dialog shows no rows. */
+const NOTHING = { changed: [], rules: null, visibility: null, document: null };
+
+/** The API of the form for doc-1: confirming answers 202 with the document as it is then, a dry
+ * run that nothing would change, saving with the document; `more` before these. */
+function serve(more: Routes = {}) {
+	fetchMock = fakeApi({
+		'POST /api/v1/documents/doc-1/confirm': () => json(documentOf('completed', 'green'), 202),
+		'POST /api/v1/documents/doc-1/dry-run': () => NOTHING,
+		'PATCH /api/v1/documents/doc-1': () => documentOf('completed', 'green'),
+		...more
+	});
+	vi.stubGlobal('fetch', fetchMock);
+}
 
 // A popover moves the focus into itself a moment after it opened (in jsdom onto its frame, as
 // jsdom lays nothing out), and one that closed leaves a moment later, its focus trap holding the
@@ -181,8 +196,7 @@ function props(overrides: Record<string, unknown> = {}) {
 beforeEach(async () => {
 	await waitFor(() => expect(popovers()).toHaveLength(0));
 	signIn('user', { id: OWNER });
-	fetchMock = fakeApi();
-	vi.stubGlobal('fetch', fetchMock);
+	serve();
 });
 
 afterEach(() => {
@@ -420,10 +434,6 @@ describe('DocumentForm', () => {
 	});
 
 	it('confirms every open field at once and goes on to the next document', async () => {
-		// The dry run says nothing would change: the dialog shows no rows.
-		fetchMock.mockResolvedValue(
-			json({ changed: [], rules: null, visibility: null, document: null })
-		);
 		const onconfirmed = vi.fn();
 		render(DocumentForm, props({ onconfirmed }));
 		await userEvent.click(screen.getByRole('button', { name: m.review_confirm() }));
@@ -450,10 +460,6 @@ describe('DocumentForm', () => {
 	});
 
 	it('does not save while a period is written in a way it cannot read', async () => {
-		// The dry run says nothing would change: the dialog shows no rows.
-		fetchMock.mockResolvedValue(
-			json({ changed: [], rules: null, visibility: null, document: null })
-		);
 		const PERIOD = '0199a6c4-0000-7000-8000-0000000000f3';
 		const withPeriod = {
 			...lookup,
@@ -599,10 +605,7 @@ describe('DocumentForm', () => {
 			...documentOf('review', lane),
 			space_id: MINE
 		});
-		const ok = () =>
-			fetchMock.mockResolvedValue(
-				new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })
-			);
+		const ok = () => serve();
 		const radio = (name: string) => screen.getByRole('radio', { name: new RegExp(name) });
 		const confirmButton = () =>
 			screen.getByRole('button', { name: m.review_confirm() }) as HTMLButtonElement;
@@ -662,7 +665,9 @@ describe('DocumentForm', () => {
 		});
 
 		it('suggests the hand-over with what speaks for it, and warns above "Confirm"', async () => {
-			fetchMock.mockResolvedValue(json({ id: 'doc-1', access: null }, 202));
+			serve({
+				'POST /api/v1/documents/doc-1/confirm': () => json({ id: 'doc-1', access: null }, 202)
+			});
 			const success = vi.spyOn(toast, 'success');
 			render(
 				DocumentForm,
@@ -740,7 +745,9 @@ describe('DocumentForm', () => {
 		});
 
 		it('hands over through "Another space" and says whom it went to', async () => {
-			fetchMock.mockResolvedValue(json({ id: 'doc-1', access: null }, 202));
+			serve({
+				'POST /api/v1/documents/doc-1/confirm': () => json({ id: 'doc-1', access: null }, 202)
+			});
 			const success = vi.spyOn(toast, 'success');
 			const onconfirmed = vi.fn();
 			render(
@@ -848,10 +855,6 @@ describe('DocumentForm', () => {
 	});
 
 	it("after a corrected type sends no suggestion of the old type as the person's value", async () => {
-		// The dry run says nothing would change: the dialog shows no rows.
-		fetchMock.mockResolvedValue(
-			json({ changed: [], rules: null, visibility: null, document: null })
-		);
 		const OTHER = '0199a6c4-0000-7000-8000-0000000000e2';
 		const typed = {
 			document: {},
@@ -882,10 +885,6 @@ describe('DocumentForm', () => {
 	});
 
 	it('keeps a value entered by hand when the type is corrected', async () => {
-		// The dry run says nothing would change: the dialog shows no rows.
-		fetchMock.mockResolvedValue(
-			json({ changed: [], rules: null, visibility: null, document: null })
-		);
 		const OTHER = '0199a6c4-0000-7000-8000-0000000000e2';
 		const ASN = '0199a6c4-0000-7000-8000-0000000000f9';
 		const asn = {
@@ -996,12 +995,6 @@ describe('the topic', () => {
 	};
 
 	it('offers the contact’s topics and leaves one the next contact does not have', async () => {
-		fetchMock.mockResolvedValue(
-			new Response('{"changed": [], "rules": null, "visibility": null, "document": null}', {
-				status: 200,
-				headers: { 'content-type': 'application/json' }
-			})
-		);
 		render(DocumentForm, props({ document: filed, lookup: topics, review: null }));
 		expect(topicName()).toBe('Krankenversicherung');
 		expect(await topicChoices()).toEqual(['Arbeit', 'Krankenversicherung']);
@@ -1093,7 +1086,6 @@ describe('the topic', () => {
 		// Taken, it is no suggestion any more.
 		expect(within(topicCard()).queryByText('only one signal names it')).toBeNull();
 	});
-	const PREVIEW = { changed: [], rules: null, visibility: null, document: null };
 	// The dry run of the form's change: what it sends; the dialog is closed again.
 	const sentPatch = async () => {
 		const calls = fetchMock.mock.calls.length;
@@ -1105,7 +1097,6 @@ describe('the topic', () => {
 	};
 
 	it('leaves a topic the next contact does not enable to the API to clear', async () => {
-		fetchMock.mockImplementation(async () => json(PREVIEW));
 		render(DocumentForm, props({ document: filed, lookup: topics, review: null }));
 		await choose(userEvent, select(m.field_contact()), BANK);
 		expect(topicName()).toBe('');
@@ -1114,7 +1105,6 @@ describe('the topic', () => {
 	});
 
 	it('keeps a topic the next contact enables, unless the person clears it', async () => {
-		fetchMock.mockImplementation(async () => json(PREVIEW));
 		const working = { ...filed, topic_id: WORK } as Document;
 		render(DocumentForm, props({ document: working, lookup: topics, review: null }));
 		await choose(userEvent, select(m.field_contact()), BANK);
@@ -1128,9 +1118,7 @@ describe('the topic', () => {
 		signIn('admin', { id: OWNER, username: 'admin' });
 		const DENTAL = '0199a6c4-0000-7000-8000-0000000000b9';
 		const bank = { ...filed, contact_id: BANK, topic_id: null } as Document;
-		fetchMock.mockImplementation(async (request) =>
-			json(request.method === 'PATCH' ? { ...bank, topic_id: DENTAL } : PREVIEW)
-		);
+		serve({ 'PATCH /api/v1/documents/doc-1': () => ({ ...bank, topic_id: DENTAL }) });
 		const onenabled = vi.fn();
 		render(DocumentForm, props({ document: bank, lookup: topics, review: null, onenabled }));
 		await userEvent.click(topicOpener());
@@ -1152,9 +1140,7 @@ describe('the topic', () => {
 		signIn('admin', { id: OWNER, username: 'admin' });
 		const bank = { ...filed, contact_id: BANK, topic_id: null } as Document;
 		// The answer of a save that took the document away: its id, and no access.
-		fetchMock.mockImplementation(async (request) =>
-			request.method === 'PATCH' ? json({ id: bank.id, access: null }) : json(PREVIEW)
-		);
+		serve({ 'PATCH /api/v1/documents/doc-1': () => ({ id: bank.id, access: null }) });
 		const onleave = vi.fn();
 		const onsaved = vi.fn();
 		vi.mocked(goto).mockClear();
@@ -1172,7 +1158,6 @@ describe('the topic', () => {
 		signIn('admin', { id: OWNER, username: 'admin' });
 		const BAKERY = '0199a6c4-0000-7000-8000-0000000000c9';
 		const REMINDER = '0199a6c4-0000-7000-8000-0000000000e9';
-		fetchMock.mockImplementation(async () => json(PREVIEW));
 		const bank = { ...filed, contact_id: BANK, topic_id: null } as Document;
 		render(DocumentForm, props({ document: bank, lookup: topics, review: null }));
 		for (const [label, kind, name, id] of [
@@ -1201,7 +1186,6 @@ describe('the topic', () => {
 	});
 
 	it('confirms a topic the rules left open, also as none', async () => {
-		fetchMock.mockImplementation(async () => json({}));
 		const conflict = {
 			document: {},
 			open: [

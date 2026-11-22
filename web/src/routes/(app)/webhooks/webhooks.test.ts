@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { signIn } from '#lib/testing/session.ts';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi } from '#lib/testing/api.ts';
+import { calls, fakeApi, masterData } from '#lib/testing/api.ts';
 import Page from './+page.svelte';
 
 const webhook = {
@@ -41,6 +41,7 @@ describe('the list of webhooks', () => {
 	it('pauses a webhook from its row with a switch, not a badge', async () => {
 		const bodies: unknown[] = [];
 		const api = fakeApi({
+			...masterData(),
 			'GET /api/v1/webhooks': () => [webhook],
 			'PATCH /api/v1/webhooks/hook': async (request) => {
 				bodies.push(await request.json());
@@ -63,7 +64,7 @@ describe('the list of webhooks', () => {
 	});
 
 	it('leads from no webhook to a new one', async () => {
-		vi.stubGlobal('fetch', fakeApi({ 'GET /api/v1/webhooks': () => [] }));
+		vi.stubGlobal('fetch', fakeApi({ ...masterData(), 'GET /api/v1/webhooks': () => [] }));
 		render(Page);
 		expect(await screen.findByText(m.webhook_none())).toBeTruthy();
 		// One in the head of the page, one in the note.

@@ -6,7 +6,7 @@ import {
 	leaveDevice,
 	unblockSteps
 } from '#lib/push-device.ts';
-import { calls, fakeApi, problem } from '#lib/testing/api.ts';
+import { calls, fakeApi, noContent, problem } from '#lib/testing/api.ts';
 
 function agent(value: string, touchPoints = 0) {
 	vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(value);
@@ -89,7 +89,8 @@ describe('giving this device up on signing out', () => {
 			'GET /api/v1/push/devices': () => [
 				device('d-other', 'https://push.example/phone'),
 				device('d-own', ENDPOINT)
-			]
+			],
+			'DELETE /api/v1/push/devices/d-own': () => noContent()
 		});
 		vi.stubGlobal('fetch', api);
 

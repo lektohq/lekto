@@ -1,5 +1,6 @@
 import { configure } from '@testing-library/svelte';
-import { afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
+import { takeUnrouted } from '#lib/testing/api.ts';
 
 // How long `waitFor` and `find*` wait for what a test expects: a busy runner (a CI shard, a full
 // run beside the dev instance) takes longer than the default second for a dialog to close or a
@@ -13,6 +14,18 @@ configure({ asyncUtilTimeout: 10_000 });
 // dialog that does not give the pointer back.
 afterEach(() => {
 	document.body.style.pointerEvents = '';
+});
+
+// A fake API answers only what a test routes (`lib/testing/api.ts`): a request it has no route
+// for is a wrong path or method, or one the test did not expect, and fails the test (WT1-05).
+// Checked once the test finished, after every `afterEach`: a throw there skipped the cleanup.
+beforeEach(({ onTestFinished }) => {
+	takeUnrouted();
+	onTestFinished(() => {
+		const missed = takeUnrouted();
+		if (missed.length > 0)
+			throw new Error(`requests without a route in the fake: ${missed.join(', ')}`);
+	});
 });
 
 // jsdom lacks a few browser APIs the components use.

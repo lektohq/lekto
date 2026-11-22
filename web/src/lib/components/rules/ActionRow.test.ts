@@ -46,9 +46,15 @@ describe('filing into a space', () => {
 
 describe('a template of an action', () => {
 	it('names the fields of the rule without asking for them again', async () => {
-		const fetchMock = fakeApi({}, () =>
-			json({ used: [], rendered: null, missing: null, error: null, values: null })
-		);
+		const fetchMock = fakeApi({
+			'POST /api/v1/templates/preview': () => ({
+				used: [],
+				rendered: null,
+				missing: null,
+				error: null,
+				values: null
+			})
+		});
 		vi.stubGlobal('fetch', fetchMock);
 		const action = newAction('set_title');
 		render(ActionRow, { action, lookup, targets, onremove: vi.fn() });

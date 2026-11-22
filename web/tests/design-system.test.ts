@@ -1140,8 +1140,12 @@ describe('the design system (web/DESIGN.md)', () => {
 			import: 'default',
 			eager: true
 		});
-		// The fakes of a stale CSRF token, which WG-08 gives their reason.
-		const byHand = new Set(['/src/lib/session.test.ts', '/src/lib/api/fetch.test.ts']);
+		// The fakes of a stale CSRF token, which WG-08 gives their reason; the builder's own test.
+		const byHand = new Set([
+			'/src/lib/session.test.ts',
+			'/src/lib/api/fetch.test.ts',
+			'/src/lib/testing/api.test.ts'
+		]);
 		const PROBLEM =
 			/type: 'about:blank'|\btitle: '[^']*',\s*status: [45]\d\d|\bdetail: [^,}]+,\s*status: [45]\d\d|json\(\{\s*detail: [^}]*\},\s*[45]\d\d\)/;
 		expect(PROBLEM.test("json({\n\ttitle: 'Conflict',\n\tstatus: 409\n}, 409)")).toBe(true);
@@ -1150,6 +1154,26 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(
 			Object.entries(tests)
 				.filter(([path, source]) => !byHand.has(path) && PROBLEM.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
+	it('answers in a fake API only what a test routes, never everything (WT1-05)', () => {
+		// An answer to everything gave a wrong path or method a plausible answer.
+		const tests = import.meta.glob<string>('/src/**/*.test.ts', {
+			query: '?raw',
+			import: 'default',
+			eager: true
+		});
+		// The client's own tests: one call each, its answer in order.
+		const inOrder = new Set(['/src/lib/api/fetch.test.ts', '/src/lib/session.test.ts']);
+		const EVERYTHING =
+			/\bfetchMock\.mock(?:Implementation|ResolvedValue)\(|vi\.fn\(async \(\) => json\(/;
+		expect(EVERYTHING.test('fetchMock.mockImplementation(async () => json({}));')).toBe(true);
+		expect(EVERYTHING.test('fetchMock.mockResolvedValueOnce(json({}));')).toBe(false);
+		expect(
+			Object.entries(tests)
+				.filter(([path, source]) => !inOrder.has(path) && EVERYTHING.test(source))
 				.map(([path]) => path)
 		).toEqual([]);
 	});

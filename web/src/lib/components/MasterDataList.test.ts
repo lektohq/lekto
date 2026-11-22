@@ -5,7 +5,7 @@ import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import MasterDataList from './MasterDataList.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, masterData } from '#lib/testing/api.ts';
 
 const nav = vi.hoisted(() => ({
 	url: new URL('http://lekto/ui/admin/master-data?tab=contacts'),
@@ -24,7 +24,7 @@ vi.mock('$app/navigation', () => ({
 	goto: nav.goto
 }));
 
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 
 const tag = (id: string, path: string[], parent: string | null, scope: string) => ({
 	id,
@@ -69,23 +69,26 @@ const CONTACTS = [
 	contact('c3', 'Stadtwerke', { aliases: ['SWM'] })
 ];
 
-beforeEach(() => {
-	nav.url = new URL('http://lekto/ui/admin/master-data?tab=contacts');
-	nav.goto.mockReset();
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async (request) => {
-		const path = new URL(request.url).pathname;
-		if (path === '/api/v1/contacts') return json(CONTACTS);
-		if (path === '/api/v1/tags') {
-			return json([
+/** The master data the list reads: the contacts and their groups, unless `given` says other. */
+function serve(given: Parameters<typeof masterData>[0] = {}) {
+	fetchMock = fakeApi(
+		masterData({
+			contacts: CONTACTS,
+			tags: [
 				tag('g1', ['Insurer'], null, 'contact'),
 				tag('g2', ['Insurer', 'Health insurer'], 'g1', 'contact'),
 				tag('g3', ['Bank'], null, 'contact')
-			]);
-		}
-		return json([]);
-	});
+			],
+			...given
+		})
+	);
 	vi.stubGlobal('fetch', fetchMock);
+}
+
+beforeEach(() => {
+	nav.url = new URL('http://lekto/ui/admin/master-data?tab=contacts');
+	nav.goto.mockReset();
+	serve();
 });
 
 afterEach(() => {
@@ -146,15 +149,11 @@ describe('MasterDataList', () => {
 	});
 
 	it('tells a type’s description under its name, and nothing for a type without one', async () => {
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			if (path === '/api/v1/document-types') {
-				return json([
-					{ id: 't1', name: 'Rechnung', description: 'Eine Forderung', group_ids: [], icon: null },
-					{ id: 't2', name: 'Kündigung', description: null, group_ids: [], icon: null }
-				]);
-			}
-			return json([]);
+		serve({
+			'document-types': [
+				{ id: 't1', name: 'Rechnung', description: 'Eine Forderung', group_ids: [], icon: null },
+				{ id: 't2', name: 'Kündigung', description: null, group_ids: [], icon: null }
+			]
 		});
 		render(MasterDataList, { kind: 'document-types' });
 		const invoice = (await screen.findByText('Rechnung')).closest('li')!;
@@ -181,10 +180,7 @@ describe('MasterDataList', () => {
 		const many = Array.from({ length: 30 }, (_, index) =>
 			contact(`m${index}`, `Kontakt ${String(index + 1).padStart(2, '0')}`)
 		);
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			return json(path === '/api/v1/contacts' ? many : []);
-		});
+		serve({ contacts: many, tags: [] });
 		nav.url = new URL('http://lekto/ui/admin/master-data?tab=contacts&page=2');
 		const { rerender } = render(MasterDataList, { kind: 'contacts' });
 		expect(await screen.findByText('Kontakt 26')).toBeTruthy();
@@ -202,14 +198,13 @@ describe('MasterDataList', () => {
 	});
 
 	it('puts the contacts with the most documents first when sorted so', async () => {
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			if (path !== '/api/v1/contacts') return json([]);
-			return json([
+		serve({
+			tags: [],
+			contacts: [
 				contact('c1', 'Nord', { document_count: 104 }),
 				contact('c2', 'Sparkasse', { document_count: 5 }),
 				contact('c3', 'Stadtwerke', { document_count: 300 })
-			]);
+			]
 		});
 		render(MasterDataList, { kind: 'contacts', sort: 'documents' });
 		await screen.findByText('Nord');
@@ -221,31 +216,25 @@ describe('MasterDataList', () => {
 
 	it('on a desktop lines up a type’s groups and facts, the title pattern in full as tooltip', async () => {
 		desktop.override(true);
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			if (path === '/api/v1/document-types') {
-				return json([
-					{
-						id: 't1',
-						name: 'Rechnung',
-						description: 'Eine Forderung',
-						group_ids: ['g9'],
-						icon: null,
-						title_pattern: 'Rechnung {{ contact.name }}',
-						relation_target: true,
-						document_count: 3
-					}
-				]);
-			}
-			if (path === '/api/v1/tags') return json([tag('g9', ['Geld'], null, 'document_type')]);
-			if (path === '/api/v1/fields') {
-				return json([
-					{ id: 'f1', document_type_ids: ['t1'], required_document_type_ids: ['t1'] },
-					{ id: 'f2', document_type_ids: ['t1'], required_document_type_ids: [] },
-					{ id: 'f3', document_type_ids: null, required_document_type_ids: [] }
-				]);
-			}
-			return json([]);
+		serve({
+			'document-types': [
+				{
+					id: 't1',
+					name: 'Rechnung',
+					description: 'Eine Forderung',
+					group_ids: ['g9'],
+					icon: null,
+					title_pattern: 'Rechnung {{ contact.name }}',
+					relation_target: true,
+					document_count: 3
+				}
+			],
+			tags: [tag('g9', ['Geld'], null, 'document_type')],
+			fields: [
+				{ id: 'f1', document_type_ids: ['t1'], required_document_type_ids: ['t1'] },
+				{ id: 'f2', document_type_ids: ['t1'], required_document_type_ids: [] },
+				{ id: 'f3', document_type_ids: null, required_document_type_ids: [] }
+			]
 		});
 		render(MasterDataList, { kind: 'document-types' });
 		const row = (await screen.findByText('Rechnung')).closest('li')!;
@@ -266,18 +255,9 @@ describe('MasterDataList', () => {
 
 	it('on a phone tells the first group, how many more, and what the contact is', async () => {
 		phone.override(true);
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			if (path === '/api/v1/contacts') {
-				return json([contact('c9', 'Finanzamt', { group_ids: ['g1', 'g3'], aliases: ['FA'] })]);
-			}
-			if (path === '/api/v1/tags') {
-				return json([
-					tag('g1', ['Insurer'], null, 'contact'),
-					tag('g3', ['Bank'], null, 'contact')
-				]);
-			}
-			return json([]);
+		serve({
+			contacts: [contact('c9', 'Finanzamt', { group_ids: ['g1', 'g3'], aliases: ['FA'] })],
+			tags: [tag('g1', ['Insurer'], null, 'contact'), tag('g3', ['Bank'], null, 'contact')]
 		});
 		render(MasterDataList, { kind: 'contacts' });
 		const row = (await screen.findByText('Finanzamt')).closest('li')!;

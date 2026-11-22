@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { events } from '#lib/events.svelte.ts';
-import { fakeApi, json, problem } from '#lib/testing/api.ts';
+import { type Route, type Routes, fakeApi, problem } from '#lib/testing/api.ts';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { kindLabel } from '#lib/identifiers.ts';
@@ -46,15 +46,19 @@ const accepted: Relations = {
 };
 
 describe('RelationsCard', () => {
-	let fetchMock = fakeApi();
+	let fetchMock: ReturnType<typeof fakeApi>;
 
-	beforeEach(() => {
-		fetchMock = fakeApi();
-		fetchMock.mockImplementation(async (request) =>
-			json(request.method === 'POST' ? accepted : suggested)
-		);
+	/** The relations of the reminder as `relations` gives them; accepting answers `accepted`. */
+	function serve(relations: Route = () => suggested, more: Routes = {}) {
+		fetchMock = fakeApi({
+			'GET /api/v1/documents/reminder/relations': relations,
+			'POST /api/v1/documents/reminder/relations': () => accepted,
+			...more
+		});
 		vi.stubGlobal('fetch', fetchMock);
-	});
+	}
+
+	beforeEach(() => serve());
 
 	afterEach(() => {
 		events.stop();
@@ -82,7 +86,7 @@ describe('RelationsCard', () => {
 	it('reads the relations anew when they changed elsewhere (WA-04)', async () => {
 		const emit = stream();
 		let current = suggested;
-		fetchMock.mockImplementation(async () => json(current));
+		serve(() => current);
 		render(RelationsCard, { props: { documentId: 'reminder', lookup: null } });
 		expect(await screen.findByText(m.relations_suggested())).toBeTruthy();
 		current = accepted;
@@ -98,9 +102,7 @@ describe('RelationsCard', () => {
 
 	it('says on the card that it could not load, and tries again (WA-04)', async () => {
 		let down = true;
-		fetchMock.mockImplementation(async () =>
-			down ? problem(500, { detail: 'boom' }) : json(suggested)
-		);
+		serve(() => (down ? problem(500, { detail: 'boom' }) : suggested));
 		render(RelationsCard, { props: { documentId: 'reminder', lookup: null } });
 		expect((await screen.findByRole('alert')).textContent).toContain('boom');
 		down = false;
@@ -134,9 +136,7 @@ describe('RelationsCard', () => {
 
 	it('offers nothing to change to a reader', async () => {
 		const read = { ...accepted.refers_to[0], changeable: false };
-		fetchMock.mockImplementation(async () =>
-			json({ ...accepted, refers_to: [read], editable: false })
-		);
+		serve(() => ({ ...accepted, refers_to: [read], editable: false }));
 		render(RelationsCard, { props: { documentId: 'reminder', lookup: null } });
 		expect(await screen.findByText('Rechnung 4711')).toBeTruthy();
 		// Only "Ansehen" (the title), nothing to change.
@@ -148,11 +148,13 @@ describe('RelationsCard', () => {
 	it('opens both documents in the Beam, the newer first, the shared number marked', async () => {
 		goTo('/ui/documents/reminder');
 		const read = { ...accepted.refers_to[0], changeable: false };
-		fetchMock.mockImplementation(async (request) =>
-			new URL(request.url).pathname === '/api/v1/identifiers/refs'
-				? json({ kind: 'invoice_number', value: '4711', ref: 'NDcxMQ' })
-				: json({ ...accepted, refers_to: [read], editable: false })
-		);
+		serve(() => ({ ...accepted, refers_to: [read], editable: false }), {
+			'POST /api/v1/identifiers/refs': () => ({
+				kind: 'invoice_number',
+				value: '4711',
+				ref: 'NDcxMQ'
+			})
+		});
 		const user = userEvent.setup();
 		render(RelationsCard, {
 			props: { documentId: 'reminder', documentTitle: 'Mahnung', lookup: null }

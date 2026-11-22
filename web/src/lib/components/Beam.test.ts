@@ -7,7 +7,7 @@ import { fieldLabel } from '#lib/describe.ts';
 import { kindLabel } from '#lib/identifiers.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { documentOf, processingOf } from '#lib/testing/documents.ts';
-import { calls, fakeApi } from '#lib/testing/api.ts';
+import { calls, fakeApi, notFound, pdf } from '#lib/testing/api.ts';
 import { leaveBeam, openBeam, showPages } from '#lib/beam.svelte.ts';
 import { goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import Beam from './Beam.svelte';
@@ -57,8 +57,8 @@ beforeEach(() => {
 					page_count: 2,
 					processing
 				}),
-			'GET /api/v1/documents/a/archive': () => new Response(new Uint8Array([37, 80, 68, 70])),
-			'GET /api/v1/documents/b': () => new Response(null, { status: 404 }),
+			'GET /api/v1/documents/a/archive': () => pdf(),
+			'GET /api/v1/documents/b': () => notFound('document', 'b'),
 			'GET /api/v1/contacts/c1': () => ({ id: 'c1', name: 'Stadtwerke' }),
 			'GET /api/v1/documents/a/review': () => ({
 				document: {},

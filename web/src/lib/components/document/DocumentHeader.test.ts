@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, json, noContent } from '#lib/testing/api.ts';
 import { documentOf } from '#lib/testing/documents.ts';
 import { signIn } from '#lib/testing/session.ts';
 import type { components } from '#lib/api/schema.ts';
@@ -20,7 +20,7 @@ type Document = components['schemas']['DocumentDetails'];
 
 const OWNER = 'user-1';
 const VISION = { model: 'claude-sonnet', endpoint: 'chat.example' };
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 
 const graph: GraphNode[] = [
 	{ node: 'receive', requires: [], waits_for: [] },
@@ -73,8 +73,14 @@ function props(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
 	signIn('user', { id: OWNER });
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async () => json({}, 202));
+	// Reading again, processing again and running a step again answer 202 with the document;
+	// moving 204.
+	fetchMock = fakeApi({
+		'POST /api/v1/documents/doc-1/vision': () => json(document(), 202),
+		'POST /api/v1/documents/doc-1/retry': () => json(document(), 202),
+		'POST /api/v1/documents/doc-1/reprocess': () => json(document(), 202),
+		'POST /api/v1/documents/doc-1/move': () => noContent()
+	});
 	vi.stubGlobal('fetch', fetchMock);
 });
 

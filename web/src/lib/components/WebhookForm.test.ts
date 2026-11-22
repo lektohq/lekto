@@ -7,7 +7,7 @@ import { m } from '#lib/paraglide/messages.js';
 import { choose, selectedValue } from '#lib/testing/select.ts';
 import { session } from '#lib/session.svelte.ts';
 import WebhookForm from './WebhookForm.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, json, recording, type Routes, type Sent } from '#lib/testing/api.ts';
 
 type Webhook = components['schemas']['WebhookOut'];
 
@@ -35,8 +35,8 @@ async function heldBack(): Promise<boolean> {
 	return true;
 }
 
-let fetchMock = fakeApi();
-const sent: { method: string; path: string; body: unknown }[] = [];
+let fetchMock: ReturnType<typeof fakeApi>;
+const sent: Sent[] = [];
 
 const stored: Webhook = {
 	id: 'hook',
@@ -59,19 +59,24 @@ const stored: Webhook = {
 	updated_at: '2026-10-25T10:00:00Z'
 };
 
+/** The API of the form: creating and changing the webhook `hook`, each request kept in `sent`;
+ * `more` before these. */
+function serve(more: Routes = {}) {
+	const routes: Routes = {
+		'POST /api/v1/webhooks': () => json({ ...stored, secret: null, signed: false }, 201),
+		'PATCH /api/v1/webhooks/hook': () => ({ ...stored, signed: false }),
+		'DELETE /api/v1/webhooks/hook/secret': () => ({ ...stored, signed: false }),
+		'GET /api/v1/fields': () => [],
+		...more
+	};
+	fetchMock = fakeApi(recording(routes, sent));
+	vi.stubGlobal('fetch', fetchMock);
+}
+
 beforeEach(() => {
 	signIn('user', { id: 'erika', username: 'erika' });
 	sent.length = 0;
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async (request) => {
-		const path = new URL(request.url).pathname;
-		const body = request.method === 'DELETE' ? null : await request.json().catch(() => null);
-		sent.push({ method: request.method, path, body });
-		if (request.method === 'POST' && path === '/api/v1/webhooks')
-			return json({ ...stored, secret: null, signed: false }, 201);
-		return json({ ...stored, signed: false });
-	});
-	vi.stubGlobal('fetch', fetchMock);
+	serve();
 });
 
 afterEach(() => {
@@ -113,11 +118,7 @@ describe('WebhookForm', () => {
 	});
 
 	it('shows the secret of a signed webhook once, then goes on to its page', async () => {
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			sent.push({ method: request.method, path, body: await request.json().catch(() => null) });
-			return json({ ...stored, secret: 'whsec_once' }, 201);
-		});
+		serve({ 'POST /api/v1/webhooks': () => json({ ...stored, secret: 'whsec_once' }, 201) });
 		const ondone = vi.fn();
 		render(WebhookForm, { cancelHref: '/ui/webhooks', ondone });
 		await userEvent.type(screen.getByLabelText(m.field_name()), 'HA');

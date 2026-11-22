@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { calls, fakeApi } from '#lib/testing/api.ts';
+import { contactOf } from '#lib/testing/master-data.ts';
 import type { Facts } from '#lib/facts.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
@@ -109,7 +110,7 @@ const FACTS: Facts = {
 	]
 };
 
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 
 function props(overrides: Record<string, unknown> = {}) {
 	return {
@@ -126,7 +127,10 @@ function props(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
 	// Every change succeeds; the panel reloads through `onchanged`.
-	fetchMock = fakeApi();
+	fetchMock = fakeApi({
+		[`POST /api/v1/contacts/${UTILITY}/identifiers`]: () => contactOf({ id: UTILITY }),
+		'POST /api/v1/documents/doc-1/facts/decisions': () => FACTS
+	});
 	vi.stubGlobal('fetch', fetchMock);
 });
 

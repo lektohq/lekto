@@ -6,10 +6,18 @@ import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import MailboxDialog from './MailboxDialog.svelte';
-import { fakeApi, json, problem } from '#lib/testing/api.ts';
+import {
+	fakeApi,
+	json,
+	problem,
+	recording,
+	type Route,
+	type Routes,
+	type Sent
+} from '#lib/testing/api.ts';
 
-let fetchMock = fakeApi();
-const sent: { method: string; path: string; body: unknown }[] = [];
+let fetchMock: ReturnType<typeof fakeApi>;
+const sent: Sent[] = [];
 /** The routes that fail for a test, by path. */
 const failing = new Set<string>();
 
@@ -57,19 +65,28 @@ beforeEach(() => {
 	signIn('admin', { id: 'erika', username: 'erika' });
 	sent.length = 0;
 	failing.clear();
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async (request) => {
-		const path = new URL(request.url).pathname;
-		const body = request.method === 'GET' ? null : await request.json().catch(() => null);
-		sent.push({ method: request.method, path, body });
-		if (failing.has(path)) return problem(500, { detail: 'an unexpected error occurred' });
-		if (path === '/api/v1/users')
-			return json([{ id: 'erika', username: 'erika', display_name: 'Erika', active: true }]);
-		if (path === '/api/v1/document-types') return json([]);
-		if (path === '/api/v1/mailboxes/test') return json(FOUND);
-		if (request.method === 'POST' && path === '/api/v1/mailboxes') return json(STORED, 201);
-		return json(STORED);
-	});
+	// What `failing` names fails; each request is kept in `sent`.
+	const or =
+		(route: Route): Route =>
+		(request, url) =>
+			failing.has(url.pathname)
+				? problem(500, { detail: 'an unexpected error occurred' })
+				: route(request, url);
+	const routes: Routes = {
+		'GET /api/v1/users': () => [
+			{ id: 'erika', username: 'erika', display_name: 'Erika', active: true }
+		],
+		'GET /api/v1/document-types': () => [],
+		'POST /api/v1/mailboxes/test': () => FOUND,
+		'POST /api/v1/mailboxes': () => json(STORED, 201),
+		[`PATCH /api/v1/mailboxes/${STORED.id}`]: () => STORED
+	};
+	fetchMock = fakeApi(
+		recording(
+			Object.fromEntries(Object.entries(routes).map(([key, route]) => [key, or(route)])),
+			sent
+		)
+	);
 	vi.stubGlobal('fetch', fetchMock);
 });
 

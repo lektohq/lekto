@@ -30,6 +30,7 @@ const TITLES: Record<number, string> = {
 	422: 'Unprocessable Content',
 	429: 'Too Many Requests',
 	500: 'Internal Server Error',
+	501: 'Not Implemented',
 	502: 'Bad Gateway',
 	503: 'Service Unavailable'
 };
@@ -108,6 +109,18 @@ export function problem(
 	return json(sent, status, headers);
 }
 
+/** An answer without a body (204), as the API gives one to a change that returns nothing. */
+export function noContent(): Response {
+	return new Response(null, { status: 204 });
+}
+
+/** A PDF as the API sends a document's file. */
+export function pdf(): Response {
+	return new Response(new Uint8Array([37, 80, 68, 70]), {
+		headers: { 'content-type': 'application/pdf' }
+	});
+}
+
 /** What the API answers for something that is not there, or not for the caller (`NotFoundError`
  * of the core): `kind` as the core names it (`document`, `document type`, `mailbox`). */
 export function notFound(kind: string, id: string): Response {
@@ -119,18 +132,78 @@ export function notFound(kind: string, id: string): Response {
 }
 
 type Answer = unknown | Response | Promise<unknown | Response>;
-type Route = (request: Request, url: URL) => Answer;
+/** The answer of a fake API to one request: JSON of what it returns, or its response. */
+export type Route = (request: Request, url: URL) => Answer;
+/** The routes of a fake API, by `METHOD /path`. */
+export type Routes = Record<string, Route>;
+
+/** A request a test reads back: method, path, its JSON body (null without one). */
+export type Sent = { method: string; path: string; body: unknown };
+
+/** `routes`, each request kept in `sent` before it is answered. */
+export function recording(routes: Routes, sent: Sent[]): Routes {
+	return Object.fromEntries(
+		Object.entries(routes).map(([key, route]) => [
+			key,
+			async (request: Request, url: URL) => {
+				const body = await request
+					.clone()
+					.json()
+					.catch(() => null);
+				sent.push({ method: request.method, path: url.pathname, body });
+				return route(request, url);
+			}
+		])
+	);
+}
+
+/** The lists of master data a page reads (`loadLookup`, `loadRuleLookup`), by their path. */
+type MasterData =
+	'contacts' | 'document-types' | 'tags' | 'fields' | 'spaces' | 'users' | 'webhooks' | 'mailboxes';
+
+/**
+ * The routes of the master data a page reads, each list empty unless given
+ * (`fakeApi({ ...masterData({ tags: [tag] }), … })`).
+ */
+export function masterData(given: Partial<Record<MasterData, unknown[]>> = {}): Routes {
+	const lists: MasterData[] = [
+		'contacts',
+		'document-types',
+		'tags',
+		'fields',
+		'spaces',
+		'users',
+		'webhooks',
+		'mailboxes'
+	];
+	return Object.fromEntries(lists.map((list) => [`GET /api/v1/${list}`, () => given[list] ?? []]));
+}
+
+/** The requests a fake answered without a route, since `tests/setup.ts` last asked. */
+const unrouted: string[] = [];
+
+/** The requests a fake answered without a route since the last call; `tests/setup.ts` fails
+ * the test that made one. */
+export function takeUnrouted(): string[] {
+	return unrouted.splice(0);
+}
 
 /**
  * A fetch that answers by `METHOD /path` (`GET /api/v1/inbox`): JSON of what the route returns,
- * or its response. Without a route `otherwise` answers, if given; else a GET answers an empty
- * list (the master data), anything else 204. Stub it with `vi.stubGlobal('fetch', …)`.
+ * or its response. Without a route `otherwise` answers, if given; else nothing does: the
+ * request gets a 501 and fails the test (`tests/setup.ts`), so a wrong path or method never
+ * passes on a plausible answer. Stub it with `vi.stubGlobal('fetch', …)`.
  */
-export function fakeApi(routes: Record<string, Route> = {}, otherwise?: Route) {
+export function fakeApi(routes: Routes = {}, otherwise?: Route) {
 	return vi.fn(async (request: Request) => {
 		const url = new URL(request.url);
 		const route = routes[`${request.method} ${url.pathname}`] ?? otherwise;
-		if (!route) return request.method === 'GET' ? json([]) : new Response(null, { status: 204 });
+		if (!route) {
+			unrouted.push(`${request.method} ${url.pathname}`);
+			return problem(501, {
+				detail: `the fake has no route for ${request.method} ${url.pathname}`
+			});
+		}
 		const answer = await route(request, url);
 		return answer instanceof Response ? answer : json(answer);
 	});

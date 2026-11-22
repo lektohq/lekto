@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
-import { calls, fakeApi, problem } from '#lib/testing/api.ts';
+import { calls, fakeApi, masterData, problem } from '#lib/testing/api.ts';
 import { RuleLoader } from './page.svelte.ts';
 
 const lookups = (api: ReturnType<typeof fakeApi>) =>
@@ -8,7 +8,7 @@ const lookups = (api: ReturnType<typeof fakeApi>) =>
 
 describe('the loader of a rule page', () => {
 	it('loads the data beside the master data, kept until asked for anew', async () => {
-		const api = fakeApi();
+		const api = fakeApi(masterData());
 		vi.stubGlobal('fetch', api);
 		const loader = new RuleLoader();
 		const then = vi.fn();
@@ -26,7 +26,7 @@ describe('the loader of a rule page', () => {
 	});
 
 	it('drops an answer a later load overtook', async () => {
-		vi.stubGlobal('fetch', fakeApi());
+		vi.stubGlobal('fetch', fakeApi(masterData()));
 		const loader = new RuleLoader();
 		let release = () => {};
 		const slow = new Promise<string>((resolve) => (release = () => resolve('slow')));
@@ -43,6 +43,7 @@ describe('the loader of a rule page', () => {
 		vi.stubGlobal(
 			'fetch',
 			fakeApi({
+				...masterData(),
 				'GET /api/v1/users': () =>
 					problem(403, {
 						detail: 'only editors and admins make space rules',
@@ -60,7 +61,7 @@ describe('the loader of a rule page', () => {
 		);
 		expect(loader.lookup).toBeNull();
 
-		vi.stubGlobal('fetch', fakeApi());
+		vi.stubGlobal('fetch', fakeApi(masterData()));
 		await loader.load(() => Promise.resolve('data'), then);
 		expect(loader.problem).toBeNull();
 		expect(then).toHaveBeenCalledOnce();

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { calls, fakeApi } from '#lib/testing/api.ts';
+import { calls, fakeApi, noContent } from '#lib/testing/api.ts';
 import { forgetMeaningSearch, warmSearch } from './meaning-search.ts';
 
 afterEach(() => {
@@ -13,7 +13,8 @@ function stub(meaning: boolean) {
 			vision: null,
 			logo_fetch: false,
 			meaning_search: meaning
-		})
+		}),
+		'POST /api/v1/documents/search/warm': () => noContent()
 	});
 	vi.stubGlobal('fetch', api);
 	return api;

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { signIn } from '#lib/testing/session.ts';
 import { session } from '#lib/session.svelte.ts';
-import { fakeApi } from '#lib/testing/api.ts';
+import { fakeApi, masterData } from '#lib/testing/api.ts';
 import Page from './+page.svelte';
 
 const USERS = [
@@ -24,6 +24,7 @@ beforeEach(() => {
 	vi.stubGlobal(
 		'fetch',
 		fakeApi({
+			...masterData(),
 			'GET /api/v1/users': () => USERS,
 			'GET /api/v1/users/u2/profile': () => ({
 				user_id: 'u2',

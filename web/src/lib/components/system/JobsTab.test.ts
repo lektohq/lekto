@@ -58,6 +58,9 @@ const failedLogo = job({
 	retry: 'job'
 });
 
+/** No durations measured yet. */
+const noDurations = () => ({ kinds: [], since: '2026-10-17T12:00:00Z' });
+
 function routes() {
 	return fakeApi({
 		'GET /api/v1/jobs/summary': () => summary,
@@ -133,6 +136,7 @@ describe('the jobs tab', () => {
 	it('filters by kind and turns the pages', async () => {
 		const api = fakeApi({
 			'GET /api/v1/jobs/summary': () => summary,
+			'GET /api/v1/jobs/durations': noDurations,
 			'GET /api/v1/jobs': (_request, url) => ({
 				items: [job({ id: `p${url.searchParams.get('offset')}` })],
 				total: 120,
@@ -160,6 +164,7 @@ describe('the jobs tab', () => {
 		let down = false;
 		const api = fakeApi({
 			'GET /api/v1/jobs/summary': () => summary,
+			'GET /api/v1/jobs/durations': noDurations,
 			'GET /api/v1/jobs': (_request, url) =>
 				down
 					? problem(500, { detail: 'boom' })
@@ -247,6 +252,7 @@ describe('the jobs tab', () => {
 			'fetch',
 			fakeApi({
 				'GET /api/v1/jobs/summary': () => summary,
+				'GET /api/v1/jobs/durations': noDurations,
 				'GET /api/v1/jobs': () => ({
 					items: [{ ...failedLogo, error: null, retry: null }],
 					total: 1,
@@ -270,6 +276,7 @@ describe('the jobs tab', () => {
 			'fetch',
 			fakeApi({
 				'GET /api/v1/jobs/summary': () => summary,
+				'GET /api/v1/jobs/durations': noDurations,
 				'GET /api/v1/jobs': () => ({ items: [], total: 0, next_offset: null }),
 				'GET /api/v1/pipeline': () => ({
 					nodes: [],
@@ -293,6 +300,7 @@ describe('the jobs tab', () => {
 			'fetch',
 			fakeApi({
 				'GET /api/v1/jobs/summary': () => ({ ...summary, last_started_at: '2026-10-24T11:50:00Z' }),
+				'GET /api/v1/jobs/durations': noDurations,
 				'GET /api/v1/jobs': () => ({ items: [], total: 0, next_offset: null })
 			})
 		);

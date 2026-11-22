@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fakeApi } from '#lib/testing/api.ts';
+import { fakeApi, json } from '#lib/testing/api.ts';
 import type { ApiDefinition } from '#lib/rules/model.ts';
 import { changeSwitchedOff, createSwitchedOff, GLOBAL } from './save.ts';
 
@@ -13,7 +13,10 @@ const definition = {
 const rule = { id: 'r1', enabled: true, name: 'Muster Telefon' };
 
 function stub() {
-	const fetch = fakeApi({}, () => ({ ...rule, enabled: false }));
+	const fetch = fakeApi({
+		'POST /api/v1/rules': () => json({ ...rule, enabled: false }, 201),
+		'PUT /api/v1/rules/r1': () => ({ ...rule, enabled: false })
+	});
 	vi.stubGlobal('fetch', fetch);
 	return fetch;
 }

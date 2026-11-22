@@ -11,7 +11,16 @@ import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import { documentOf, inboxItem, listedOf, OWNER, summaryOf } from '#lib/testing/documents.ts';
-import { calls, fakeApi, notFound, problem } from '#lib/testing/api.ts';
+import {
+	calls,
+	fakeApi,
+	json,
+	masterData,
+	noContent,
+	notFound,
+	pdf,
+	problem
+} from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import { returnTo } from '#lib/return-to.svelte.ts';
 import Page from './+page.svelte';
@@ -54,14 +63,25 @@ function documentRoutes(id: string, current: () => Document): Parameters<typeof 
 			editable: true
 		}),
 		// The properties tab says so; the test looks at seen.
-		[`GET /api/v1/documents/${id}/files`]: () => notFound('document', id)
+		[`GET /api/v1/documents/${id}/files`]: () => notFound('document', id),
+		[`GET /api/v1/documents/${id}/archive`]: () => pdf(),
+		// Confirming answers 202 with the document as it is now.
+		[`POST /api/v1/documents/${id}/confirm`]: () => json(current(), 202),
+		[`PUT /api/v1/documents/${id}/seen`]: () => noContent(),
+		[`DELETE /api/v1/documents/${id}/seen`]: () => noContent()
 	};
 }
 
 function serve(current: () => Document, routes: Parameters<typeof fakeApi>[0] = {}) {
 	const api = fakeApi({
+		...masterData(),
 		...documentRoutes('doc-1', current),
-		'GET /api/v1/pipeline': () => ({ nodes: [], vision: null }),
+		'GET /api/v1/pipeline': () => ({
+			nodes: [],
+			vision: null,
+			logo_fetch: false,
+			meaning_search: false
+		}),
 		'GET /api/v1/inbox/summary': () => summaryOf(),
 		...routes
 	});

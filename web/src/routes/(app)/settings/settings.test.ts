@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { fakeApi, problem } from '#lib/testing/api.ts';
+import { fakeApi, masterData, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
 
@@ -49,6 +49,7 @@ describe('the settings', () => {
 		vi.stubGlobal(
 			'fetch',
 			fakeApi({
+				...masterData(),
 				'GET /api/v1/auth/me': () => ME,
 				'GET /api/v1/auth/me/profile': () => PROFILE,
 				'GET /api/v1/auth/oidc': () =>
