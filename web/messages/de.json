@@ -722,6 +722,7 @@
 	"pdf_zoom_out": "Verkleinern",
 	"pdf_toolbar": "Ansicht der Seiten",
 	"pdf_zoom_reset": "Zurück auf zwei Seiten",
+	"pdf_zoom_reset_at": "{percent}, zurück auf zwei Seiten",
 	"pdf_layouts": "Aufteilung",
 	"pdf_layout_one": "1 Seite",
 	"pdf_layout_one_hint": "Eine Seite in voller Breite",

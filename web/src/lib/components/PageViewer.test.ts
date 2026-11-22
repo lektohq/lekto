@@ -40,7 +40,17 @@ describe('PageViewer', () => {
 	it('zooms with + and − but leaves the browser its shortcuts with Ctrl, ⌘ or Alt', async () => {
 		render(PageViewer, { sizes: [{ width: 600, height: 800 }], label: 'PDF', page });
 		const view = screen.getByRole('document');
-		const zoom = () => screen.getByRole('button', { name: m.pdf_zoom_reset() }).textContent?.trim();
+		// Named by the percent it shows, then by what it does (WC-08).
+		const button = () =>
+			screen.getByRole('button', {
+				name: new RegExp(`^\\d+ %, .*${m.pdf_zoom_reset().slice(1)}$`)
+			});
+		const zoom = () => button().textContent?.trim();
+		expect(
+			button()
+				.getAttribute('aria-label')
+				?.startsWith(zoom() ?? 'none')
+		).toBe(true);
 		const before = zoom();
 		await fireEvent.keyDown(view, { key: '+', ctrlKey: true });
 		await fireEvent.keyDown(view, { key: '-', metaKey: true });

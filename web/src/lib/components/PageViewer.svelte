@@ -204,6 +204,8 @@
 		}
 	}
 
+	const percent = (factor: number) => `${Math.round(factor * 100)} %`;
+
 	function choose(next: Layout) {
 		if (next !== 'one') back = next;
 		void zoomTo(fitZoom(next, room(), widest), center(), next);
@@ -362,7 +364,8 @@
 		<IconButton onclick={() => zoomTo(zoom / 1.25, center())} label={m.pdf_zoom_out()}>
 			<Minus aria-hidden="true" />
 		</IconButton>
-		<!-- The zoom as a button that resets it: its name as tooltip, the percent as its face. -->
+		<!-- The zoom as a button that resets it: what it does as tooltip, the percent as its face
+		     and first in its name, so that who steers by voice says what they read. -->
 		<Tooltip.Root>
 			<Tooltip.Trigger>
 				{#snippet child({ props })}
@@ -370,10 +373,10 @@
 						{...props}
 						variant="ghost"
 						class="min-w-14 px-2 tabular-nums"
-						aria-label={m.pdf_zoom_reset()}
+						aria-label={m.pdf_zoom_reset_at({ percent: percent(zoom) })}
 						onclick={() => choose('two')}
 					>
-						{Math.round(zoom * 100)} %
+						{percent(zoom)}
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>

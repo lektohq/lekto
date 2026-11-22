@@ -722,6 +722,7 @@
 	"pdf_zoom_out": "Zoom out",
 	"pdf_toolbar": "Page view",
 	"pdf_zoom_reset": "Back to two pages",
+	"pdf_zoom_reset_at": "{percent}, back to two pages",
 	"pdf_layouts": "Layout",
 	"pdf_layout_one": "1 page",
 	"pdf_layout_one_hint": "One page in full width",
