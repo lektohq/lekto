@@ -24,31 +24,14 @@ import {
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import { returnTo } from '#lib/return-to.svelte.ts';
 import Page from './+page.svelte';
+import { streamEvents } from '#lib/testing/events.ts';
 
 type Document = components['schemas']['DocumentDetails'];
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
-let emit: ((type: string, data: object) => void) | null = null;
-
-function streamEvents() {
-	const listeners = new Map<string, (message: { data: string }) => void>();
-	events.useFactory(
-		() =>
-			({
-				addEventListener(type: string, handler: (message: { data: string }) => void) {
-					listeners.set(type, handler);
-				},
-				close() {}
-			}) as unknown as EventSource
-	);
-	events.start(() => {});
-	emit = (type, data) =>
-		listeners.get(type)?.({
-			data: JSON.stringify({ type, id: crypto.randomUUID(), occurred_at: '', ...data })
-		});
-}
+let emit: ((type: string, data?: object) => void) | null = null;
 
 /** The routes of one document's view. */
 function documentRoutes(id: string, current: () => Document): Parameters<typeof fakeApi>[0] {
@@ -96,7 +79,7 @@ beforeEach(() => {
 	goTo('/ui/documents/doc-1?tab=properties', { id: 'doc-1' });
 	vi.mocked(goto).mockClear();
 	signIn('user', { id: OWNER });
-	streamEvents();
+	emit = streamEvents();
 });
 
 afterEach(() => {

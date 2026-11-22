@@ -10,32 +10,14 @@ import { calls, fakeApi, notFound, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import { choose } from '#lib/testing/select.ts';
 import Page from './+page.svelte';
+import { webhookOf } from '#lib/testing/system.ts';
 
 type Delivery = components['schemas']['DeliveryOut'];
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
-const webhook = {
-	id: 'hook',
-	owner_id: 'u1',
-	name: 'Test',
-	url: 'https://node.example/lekto',
-	event_types: ['*'],
-	active: true,
-	signed: true,
-	headers: [],
-	body: 'thin',
-	body_template: null,
-	max_open_tasks: 4,
-	model_call: null,
-	disabled_reason: null,
-	disabled_reasons: [],
-	failed_streak: 0,
-	previous_secret_valid_until: null,
-	created_at: '2026-10-25T10:00:00Z',
-	updated_at: '2026-10-25T10:00:00Z'
-};
+const webhook = webhookOf();
 
 const delivery = (changes: Partial<Delivery>): Delivery => ({
 	id: 'd1',

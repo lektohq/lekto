@@ -7,27 +7,9 @@ import { signIn } from '#lib/testing/session.ts';
 import { session } from '#lib/session.svelte.ts';
 import { calls, fakeApi, masterData } from '#lib/testing/api.ts';
 import Page from './+page.svelte';
+import { webhookOf } from '#lib/testing/system.ts';
 
-const webhook = {
-	id: 'hook',
-	owner_id: 'u1',
-	name: 'Home Assistant',
-	url: 'https://node.example/lekto',
-	event_types: ['*'],
-	active: true,
-	signed: true,
-	headers: [],
-	body: 'thin',
-	body_template: null,
-	max_open_tasks: 4,
-	model_call: null,
-	disabled_reason: null,
-	disabled_reasons: [],
-	failed_streak: 0,
-	previous_secret_valid_until: null,
-	created_at: '2026-10-25T10:00:00Z',
-	updated_at: '2026-10-25T10:00:00Z'
-};
+const webhook = webhookOf({ name: 'Home Assistant' });
 
 describe('the list of webhooks', () => {
 	beforeEach(() => {

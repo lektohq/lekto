@@ -9,6 +9,7 @@ import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import Page from './ClassifierTab.svelte';
 import { fakeApi, problem, type Route, type Routes } from '#lib/testing/api.ts';
+import { streamEvents } from '#lib/testing/events.ts';
 
 let fetchMock: ReturnType<typeof fakeApi>;
 
@@ -97,17 +98,7 @@ describe('the classifier tab', () => {
 	});
 
 	it('shows the new model once a training ended', async () => {
-		let emit: ((message: { data: string }) => void) | undefined;
-		events.useFactory(
-			() =>
-				({
-					addEventListener(type: string, handler: (message: { data: string }) => void) {
-						if (type === 'classifier.trained') emit = handler;
-					},
-					close() {}
-				}) as unknown as EventSource
-		);
-		events.start(() => {});
+		const emit = streamEvents();
 		let current: unknown = trained;
 		serve(() => current);
 		render(Page);
@@ -116,9 +107,7 @@ describe('the classifier tab', () => {
 		).toBeTruthy();
 
 		current = { ...trained, model: { ...trained.model, number: 3 } };
-		emit?.({
-			data: JSON.stringify({ type: 'classifier.trained', id: 'e1', occurred_at: '', number: 3 })
-		});
+		emit('classifier.trained', { number: 3 });
 		expect(
 			await screen.findByRole('heading', { name: m.classifier_model_title({ number: 3 }) })
 		).toBeTruthy();
@@ -126,17 +115,7 @@ describe('the classifier tab', () => {
 	});
 
 	it('says so when the model could not be read anew: the one shown is the old one (WE-02)', async () => {
-		let emit: ((message: { data: string }) => void) | undefined;
-		events.useFactory(
-			() =>
-				({
-					addEventListener(type: string, handler: (message: { data: string }) => void) {
-						if (type === 'classifier.trained') emit = handler;
-					},
-					close() {}
-				}) as unknown as EventSource
-		);
-		events.start(() => {});
+		const emit = streamEvents();
 		let down = false;
 		// Down, every endpoint fails.
 		const or = (answer: unknown) => () => (down ? problem(500, { detail: 'boom' }) : answer);
@@ -149,9 +128,7 @@ describe('the classifier tab', () => {
 			screen.getByRole('heading', { name: m.classifier_model_title({ number: 2 }) });
 		await screen.findByRole('heading', { name: m.classifier_model_title({ number: 2 }) });
 		down = true;
-		emit?.({
-			data: JSON.stringify({ type: 'classifier.trained', id: 'e1', occurred_at: '', number: 3 })
-		});
+		emit('classifier.trained', { number: 3 });
 		expect((await screen.findByRole('alert')).textContent).toContain('boom');
 		expect(model()).toBeTruthy();
 		events.stop();

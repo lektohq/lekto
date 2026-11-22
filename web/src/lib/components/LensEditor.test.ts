@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { json } from '#lib/testing/api.ts';
-import { listedOf } from '#lib/testing/documents.ts';
+import { lensOf, listedOf } from '#lib/testing/documents.ts';
 import type { Lens } from '#lib/lenses.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { choose } from '#lib/testing/select.ts';
@@ -32,34 +32,7 @@ const draft: LensDraft = {
 	layout: 'list'
 };
 
-const LENS: Lens = {
-	id: 'l1',
-	name: 'Zu bezahlen',
-	position: 0,
-	filter: {
-		contact_ids: [],
-		document_type_ids: [],
-		contact_group_ids: [],
-		document_type_group_ids: [],
-		topic_ids: [],
-		tag_ids: ['t1'],
-		space_ids: [],
-		field_id: null,
-		document_date_from: null,
-		document_date_to: null,
-		document_period: null,
-		facts: []
-	},
-	query: null,
-	sort: null,
-	sort_field_id: null,
-	grouping: 'none',
-	layout: 'grid',
-	card_field_ids: ['total'],
-	due_field_id: null,
-	created_at: '2026-10-20T10:00:00Z',
-	updated_at: '2026-10-20T10:00:00Z'
-};
+const LENS = lensOf({ filter: { tag_ids: ['t1'] }, card_field_ids: ['total'] });
 
 const requests: { method: string; path: string; body: unknown }[] = [];
 

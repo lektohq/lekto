@@ -8,6 +8,7 @@ import { m } from '#lib/paraglide/messages.js';
 import { kindLabel } from '#lib/identifiers.ts';
 import { goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import RelationsCard from './RelationsCard.svelte';
+import { streamEvents } from '#lib/testing/events.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/app-navigation.ts'));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
@@ -64,27 +65,8 @@ describe('RelationsCard', () => {
 		events.stop();
 	});
 
-	/** The event stream of the app; the function sends an event of a document. */
-	function stream() {
-		const listeners = new Map<string, (message: { data: string }) => void>();
-		events.useFactory(
-			() =>
-				({
-					addEventListener(type: string, handler: (message: { data: string }) => void) {
-						listeners.set(type, handler);
-					},
-					close() {}
-				}) as unknown as EventSource
-		);
-		events.start(() => {});
-		return (type: string, data: object) =>
-			listeners.get(type)?.({
-				data: JSON.stringify({ type, id: crypto.randomUUID(), occurred_at: '', ...data })
-			});
-	}
-
 	it('reads the relations anew when they changed elsewhere (WA-04)', async () => {
-		const emit = stream();
+		const emit = streamEvents();
 		let current = suggested;
 		serve(() => current);
 		render(RelationsCard, { props: { documentId: 'reminder', lookup: null } });

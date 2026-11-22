@@ -1,52 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { NO_FILTERS, parseFilters, quickPick, relativePeriod, yearPeriod } from './filters.ts';
-import {
-	lensDiffers,
-	lensFilter,
-	lensFilters,
-	lensParams,
-	rememberLensFacts,
-	type Lens
-} from './lenses.ts';
+import { lensDiffers, lensFilter, lensFilters, lensParams, rememberLensFacts } from './lenses.ts';
 import { factFilterLabel } from './facts.ts';
+import { lensOf } from '#lib/testing/documents.ts';
 
 const TODAY = new Date(2026, 9, 20); // 20 October 2026
-const EMPTY: Lens['filter'] = {
-	contact_ids: [],
-	document_type_ids: [],
-	contact_group_ids: [],
-	document_type_group_ids: [],
-	topic_ids: [],
-	tag_ids: [],
-	space_ids: [],
-	field_id: null,
-	document_date_from: null,
-	document_date_to: null,
-	document_period: null,
-	facts: []
-};
-
-function lens(
-	parts: Omit<Partial<Lens>, 'filter'> & { filter?: Partial<Lens['filter']> } = {}
-): Lens {
-	const { filter, ...rest } = parts;
-	return {
-		id: 'l1',
-		name: 'To pay',
-		position: 0,
-		query: null,
-		sort: null,
-		sort_field_id: null,
-		grouping: 'none',
-		layout: 'grid',
-		card_field_ids: [],
-		due_field_id: null,
-		created_at: '2026-10-20T10:00:00Z',
-		updated_at: '2026-10-20T10:00:00Z',
-		...rest,
-		filter: { ...EMPTY, ...filter }
-	};
-}
 
 describe('periods that move with the day', () => {
 	it('are this year, the last twelve months up to today and last year', () => {
@@ -68,7 +26,7 @@ describe('periods that move with the day', () => {
 describe('a lens in the URL', () => {
 	it('opens with its filters and sort, a moving period by its name', () => {
 		const opened = lensParams(
-			lens({
+			lensOf({
 				filter: { tag_ids: ['t1', 't2'], document_period: 'this_year', field_id: 'f2' },
 				sort: '-field',
 				sort_field_id: 'f1'
@@ -85,9 +43,9 @@ describe('a lens in the URL', () => {
 			period: 'this_year'
 		});
 		// Its words go into the history entry, never into the URL.
-		const searched = lensParams(lens({ query: 'power bill', sort: 'relevance' }), TODAY);
+		const searched = lensParams(lensOf({ query: 'power bill', sort: 'relevance' }), TODAY);
 		expect(searched.toString()).toBe('lens=l1&sort=relevance');
-		expect(lensFilters(lens({ filter: { document_date_from: '2024-05-01' } }), TODAY)).toEqual({
+		expect(lensFilters(lensOf({ filter: { document_date_from: '2024-05-01' } }), TODAY)).toEqual({
 			...NO_FILTERS,
 			dateFrom: '2024-05-01'
 		});
@@ -119,7 +77,7 @@ describe('a lens in the URL', () => {
 			document_date_to: '2025-12-31'
 		});
 		// And a lens kept so stays so when it is opened and saved again.
-		const kept = lens({
+		const kept = lensOf({
 			filter: { document_date_from: '2025-01-01', document_date_to: '2025-12-31' }
 		});
 		const opened = lensParams(kept, TODAY);
@@ -134,7 +92,7 @@ describe('a lens in the URL', () => {
 
 describe('the facts of a lens', () => {
 	it('go to the URL and come back as the lens keeps them', () => {
-		const kept = lens({
+		const kept = lensOf({
 			filter: {
 				facts: [
 					{ kind: 'invoice_number', value: 'R1001', ref: 'Zm9v', role: null },
@@ -156,7 +114,7 @@ describe('the facts of a lens', () => {
 
 describe('a page and its lens', () => {
 	it('differ in filters, words or sort, not in the order of repeated values', () => {
-		const open = lens({ filter: { tag_ids: ['t1', 't2'] }, sort: 'title' });
+		const open = lensOf({ filter: { tag_ids: ['t1', 't2'] }, sort: 'title' });
 		const same = new URLSearchParams('lens=l1&sort=title&tag=t2&tag=t1');
 		expect(lensDiffers(open, same, '', TODAY)).toBe(false);
 		expect(lensDiffers(open, same, 'power', TODAY)).toBe(true);
@@ -172,7 +130,7 @@ describe('a page and its lens', () => {
 		expect(
 			lensDiffers(open, new URLSearchParams('lens=l1&sort=title&tag=t2&tag=t1&page=2'), '', TODAY)
 		).toBe(false);
-		const moving = lens({ filter: { document_period: 'this_year' } });
+		const moving = lensOf({ filter: { document_period: 'this_year' } });
 		expect(lensDiffers(moving, new URLSearchParams('lens=l1&period=this_year'), '', TODAY)).toBe(
 			false
 		);

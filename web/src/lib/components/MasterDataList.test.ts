@@ -6,23 +6,11 @@ import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import MasterDataList from './MasterDataList.svelte';
 import { fakeApi, masterData } from '#lib/testing/api.ts';
+import { testPage } from '#lib/testing/page-state.svelte.ts';
+import { goto } from '$app/navigation';
 
-const nav = vi.hoisted(() => ({
-	url: new URL('http://lekto/ui/admin/master-data?tab=contacts'),
-	goto: vi.fn()
-}));
-vi.mock('$app/state', () => ({
-	page: {
-		get url() {
-			return nav.url;
-		}
-	}
-}));
-vi.mock('$app/navigation', () => ({
-	afterNavigate: vi.fn(),
-	beforeNavigate: vi.fn(),
-	goto: nav.goto
-}));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 
 let fetchMock: ReturnType<typeof fakeApi>;
 
@@ -86,8 +74,8 @@ function serve(given: Parameters<typeof masterData>[0] = {}) {
 }
 
 beforeEach(() => {
-	nav.url = new URL('http://lekto/ui/admin/master-data?tab=contacts');
-	nav.goto.mockReset();
+	testPage.url = new URL('http://lekto/ui/admin/master-data?tab=contacts');
+	vi.mocked(goto).mockReset();
 	serve();
 });
 
@@ -126,7 +114,7 @@ describe('MasterDataList', () => {
 	});
 
 	it('lists the contacts of a group or one below it, as a link from the Tags tab asks', async () => {
-		nav.url = new URL('http://lekto/ui/admin/master-data?tab=contacts&group=g1');
+		testPage.url = new URL('http://lekto/ui/admin/master-data?tab=contacts&group=g1');
 		render(MasterDataList, { kind: 'contacts' });
 		expect(await screen.findByText('Nord Muster Versicherungsgruppe')).toBeTruthy();
 		expect(screen.queryByText('Sparkasse Musterstadt')).toBeNull();
@@ -134,17 +122,17 @@ describe('MasterDataList', () => {
 		await fireEvent.click(
 			screen.getByRole('button', { name: m.master_filter_remove({ name: label }) })
 		);
-		expect(nav.goto).toHaveBeenCalledWith('?tab=contacts', { reset: false });
+		expect(vi.mocked(goto)).toHaveBeenCalledWith('?tab=contacts', { reset: false });
 	});
 
 	it('ignores a filter that names no tag of its kind, and takes it out of the URL', async () => {
-		nav.url = new URL('http://lekto/ui/admin/master-data?tab=contacts&group=gone');
+		testPage.url = new URL('http://lekto/ui/admin/master-data?tab=contacts&group=gone');
 		render(MasterDataList, { kind: 'contacts' });
 		expect(await screen.findByText('Nord Muster Versicherungsgruppe')).toBeTruthy();
 		expect(screen.getByText('Sparkasse Musterstadt')).toBeTruthy();
 		expect(screen.queryByRole('button', { name: /gone/ })).toBeNull();
 		await waitFor(() =>
-			expect(nav.goto).toHaveBeenCalledWith('?tab=contacts', { replace: true, reset: false })
+			expect(vi.mocked(goto)).toHaveBeenCalledWith('?tab=contacts', { replace: true, reset: false })
 		);
 	});
 
@@ -181,7 +169,7 @@ describe('MasterDataList', () => {
 			contact(`m${index}`, `Kontakt ${String(index + 1).padStart(2, '0')}`)
 		);
 		serve({ contacts: many, tags: [] });
-		nav.url = new URL('http://lekto/ui/admin/master-data?tab=contacts&page=2');
+		testPage.url = new URL('http://lekto/ui/admin/master-data?tab=contacts&page=2');
 		const { rerender } = render(MasterDataList, { kind: 'contacts' });
 		expect(await screen.findByText('Kontakt 26')).toBeTruthy();
 		expect(screen.queryByText('Kontakt 25')).toBeNull();
@@ -189,11 +177,11 @@ describe('MasterDataList', () => {
 			screen.getByText(m.pagination_range({ from: '26', to: '30', total: '30' }))
 		).toBeTruthy();
 		await fireEvent.click(screen.getByRole('button', { name: m.pagination_page({ page: '1' }) }));
-		expect(nav.goto).toHaveBeenLastCalledWith('?tab=contacts', {});
-		nav.goto.mockReset();
+		expect(vi.mocked(goto)).toHaveBeenLastCalledWith('?tab=contacts', {});
+		vi.mocked(goto).mockReset();
 		await rerender({ query: 'Kontakt 0' });
 		await waitFor(() =>
-			expect(nav.goto).toHaveBeenCalledWith('?tab=contacts', { replace: true, reset: false })
+			expect(vi.mocked(goto)).toHaveBeenCalledWith('?tab=contacts', { replace: true, reset: false })
 		);
 	});
 

@@ -1199,7 +1199,16 @@ describe('the design system (web/DESIGN.md)', () => {
 			'lookupOf (lib/testing/master-data.ts)': /as unknown as Lookup\b/,
 			'logEntry (lib/testing/pipeline.ts)': /\bpipeline_version: 'test'/,
 			'withoutStorage (lib/testing/browser.ts)': /throw new Error\('blocked'\)/,
-			'deviceOf (lib/testing/browser.ts)': /defineProperty\(navigator, 'maxTouchPoints'/
+			'deviceOf (lib/testing/browser.ts)': /defineProperty\(navigator, 'maxTouchPoints'/,
+			// WT2-11: a mailbox, a webhook, a lens, the jobs, the event stream, the page, a user.
+			'mailboxOf (lib/testing/system.ts)': /\bstep_failed_at: null,\s*step_failed: null,/,
+			'webhookOf (lib/testing/system.ts)': /\bmax_open_tasks: \d+,\s*model_call:/,
+			'jobsSummaryOf (lib/testing/system.ts)': /\bkinds: \[\s*\{ kind: '[a-z_.]+', running:/,
+			'lensOf (lib/testing/documents.ts)': /\bsort_field_id: null,\s*grouping:/,
+			'FakeEventSource, streamEvents (lib/testing/events.ts)': /\bevents\.useFactory\(\s*\(\)/,
+			'testPage (lib/testing/app-state.ts)':
+				/vi\.mock\('\$app\/state', \(\) => \(\{\s*page: \{[^}]*\burl\b/,
+			'signIn (lib/testing/session.ts) for a user': /\bsession\.user = \{/
 		};
 		expect(
 			Object.entries(tests).flatMap(([path, source]) =>

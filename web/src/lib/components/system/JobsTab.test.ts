@@ -9,16 +9,12 @@ import { session } from '#lib/session.svelte.ts';
 import { calls, fakeApi, problem } from '#lib/testing/api.ts';
 import { choose } from '#lib/testing/select.ts';
 import JobsTab from './JobsTab.svelte';
+import { jobsSummaryOf } from '#lib/testing/system.ts';
 
-const summary = {
-	kinds: [
-		{ kind: 'contacts.logo', running: 0, due: 0, planned: 0, failed: 1, done: 41 },
-		{ kind: 'pipeline.node', running: 1, due: 3, planned: 0, failed: 1, done: 900 }
-	],
-	last_started_at: '2026-10-24T11:59:58Z',
-	now: '2026-10-24T12:00:00Z',
-	kept_since: '2026-10-17T12:00:00Z'
-};
+const summary = jobsSummaryOf({
+	'contacts.logo': { failed: 1, done: 41 },
+	'pipeline.node': { running: 1, due: 3, failed: 1, done: 900 }
+});
 
 function job(overrides: Partial<Job>): Job {
 	return {

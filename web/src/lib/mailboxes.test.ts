@@ -16,38 +16,17 @@ import {
 	summaryOf,
 	type Mailbox
 } from './mailboxes.ts';
+import { mailboxOf } from '#lib/testing/system.ts';
 
-const MAILBOX: Mailbox = {
-	id: 'm1',
+const MAILBOX = mailboxOf({
 	name: 'Household',
-	host: 'imap.example.test',
-	port: 993,
-	security: 'tls',
 	username: 'household@example.test',
 	folders: ['INBOX', 'Rechnungen'],
 	interval_minutes: 15,
-	start: 'since_setup',
-	since: null,
 	fallback: 'everything',
 	fallback_user_id: 'u1',
-	body_type_id: 't1',
-	enabled: true,
-	status: {
-		last_attempt_at: null,
-		last_success_at: null,
-		error: null,
-		mails: 0,
-		documents: 0,
-		skipped_at: null,
-		skipped: null,
-		step_failed_at: null,
-		step_failed: null,
-		keywords: [],
-		own_keywords: null
-	},
-	created_at: '2026-11-04T10:00:00Z',
-	updated_at: '2026-11-04T10:00:00Z'
-};
+	body_type_id: 't1'
+});
 
 describe('a mailbox in words', () => {
 	it('names the inbox in the language of the UI, the rest as the server does', () => {

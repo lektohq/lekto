@@ -1,15 +1,13 @@
 import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { components } from '#lib/api/schema.ts';
 import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { choose, selectedValue } from '#lib/testing/select.ts';
 import { session } from '#lib/session.svelte.ts';
 import WebhookForm from './WebhookForm.svelte';
 import { fakeApi, json, recording, type Routes, type Sent } from '#lib/testing/api.ts';
-
-type Webhook = components['schemas']['WebhookOut'];
+import { webhookOf } from '#lib/testing/system.ts';
 
 // What the form's guard asks before a navigation (`UnsavedGuard`), to try leaving.
 const guards = vi.hoisted(() => [] as ((navigation: unknown) => void)[]);
@@ -38,26 +36,12 @@ async function heldBack(): Promise<boolean> {
 let fetchMock: ReturnType<typeof fakeApi>;
 const sent: Sent[] = [];
 
-const stored: Webhook = {
-	id: 'hook',
+const stored = webhookOf({
 	owner_id: 'erika',
 	name: 'HA',
 	url: 'http://ha.lan:8123/api/webhook/lekto',
-	event_types: ['*'],
-	active: true,
-	signed: true,
-	headers: ['Authorization'],
-	body: 'thin',
-	body_template: null,
-	max_open_tasks: 4,
-	model_call: null,
-	disabled_reason: null,
-	disabled_reasons: [],
-	failed_streak: 0,
-	previous_secret_valid_until: null,
-	created_at: '2026-10-25T10:00:00Z',
-	updated_at: '2026-10-25T10:00:00Z'
-};
+	headers: ['Authorization']
+});
 
 /** The API of the form: creating and changing the webhook `hook`, each request kept in `sent`;
  * `more` before these. */

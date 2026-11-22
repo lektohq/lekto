@@ -1,17 +1,16 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
 import { apiQuery, NO_FILTERS } from '#lib/filters.ts';
 import { formatNumber } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { calls, fakeApi } from '#lib/testing/api.ts';
 import StreamView from './StreamView.svelte';
+import { goTo } from '#lib/testing/page-state.svelte.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
-vi.mock('$app/state', () => ({
-	page: { state: {}, url: new URL('http://localhost/ui/documents') }
-}));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const doc = (id: string, date: string, lane: string | null = 'green') => ({
 	id,
@@ -38,6 +37,8 @@ const series = (documents: object[], changes: object = {}) => ({
 });
 
 describe('StreamView', () => {
+	beforeEach(() => goTo('/ui/documents'));
+
 	it('shows the lanes on the months with the target and the expected document', async () => {
 		const api = fakeApi({
 			'GET /api/v1/documents/stream': () => ({

@@ -126,3 +126,44 @@ export function filesOf(overrides: Partial<Files> = {}): Files {
 		...overrides
 	};
 }
+
+type Lens = components['schemas']['LensOut'];
+
+/** A filter of a lens that filters nothing. */
+export const NO_LENS_FILTER: Lens['filter'] = {
+	contact_ids: [],
+	document_type_ids: [],
+	contact_group_ids: [],
+	document_type_group_ids: [],
+	topic_ids: [],
+	tag_ids: [],
+	space_ids: [],
+	field_id: null,
+	document_date_from: null,
+	document_date_to: null,
+	document_period: null,
+	facts: []
+};
+
+/** The lens `l1` "Zu bezahlen" in a grid, without words, sort or filter unless given. */
+export function lensOf(
+	parts: Omit<Partial<Lens>, 'filter'> & { filter?: Partial<Lens['filter']> } = {}
+): Lens {
+	const { filter, ...rest } = parts;
+	return {
+		id: 'l1',
+		name: 'Zu bezahlen',
+		position: 0,
+		query: null,
+		sort: null,
+		sort_field_id: null,
+		grouping: 'none',
+		layout: 'grid',
+		card_field_ids: [],
+		due_field_id: null,
+		created_at: '2026-10-20T10:00:00Z',
+		updated_at: '2026-10-20T10:00:00Z',
+		...rest,
+		filter: { ...NO_LENS_FILTER, ...filter }
+	};
+}

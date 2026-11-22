@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ConnectionTest, Mailbox } from '#lib/mailboxes.ts';
+import type { ConnectionTest } from '#lib/mailboxes.ts';
 import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
@@ -15,43 +15,14 @@ import {
 	type Routes,
 	type Sent
 } from '#lib/testing/api.ts';
+import { mailboxOf } from '#lib/testing/system.ts';
 
 let fetchMock: ReturnType<typeof fakeApi>;
 const sent: Sent[] = [];
 /** The routes that fail for a test, by path. */
 const failing = new Set<string>();
 
-const STORED: Mailbox = {
-	id: 'm1',
-	name: 'Haushalt',
-	host: 'imap.example.test',
-	port: 993,
-	security: 'tls',
-	username: 'haushalt@example.test',
-	folders: ['INBOX'],
-	interval_minutes: 5,
-	start: 'since_setup',
-	since: null,
-	fallback: 'nothing',
-	fallback_user_id: null,
-	body_type_id: null,
-	enabled: true,
-	status: {
-		last_attempt_at: null,
-		last_success_at: null,
-		error: null,
-		mails: 0,
-		documents: 0,
-		skipped_at: null,
-		skipped: null,
-		step_failed_at: null,
-		step_failed: null,
-		keywords: [],
-		own_keywords: null
-	},
-	created_at: '2026-11-04T10:00:00Z',
-	updated_at: '2026-11-04T10:00:00Z'
-};
+const STORED = mailboxOf();
 
 const FOUND: ConnectionTest = {
 	ok: true,

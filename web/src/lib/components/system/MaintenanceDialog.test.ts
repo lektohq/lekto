@@ -10,16 +10,12 @@ import { session } from '#lib/session.svelte.ts';
 import { calls, fakeApi } from '#lib/testing/api.ts';
 import { phone } from '#lib/phone.svelte.ts';
 import MaintenanceDialog from './MaintenanceDialog.svelte';
+import { jobsSummaryOf } from '#lib/testing/system.ts';
 
-const summary = {
-	kinds: [
-		{ kind: 'pipeline.relate', running: 1, due: 41, planned: 0, failed: 0, done: 12 },
-		{ kind: 'contacts.logo', running: 0, due: 0, planned: 0, failed: 1, done: 41 }
-	],
-	last_started_at: '2026-10-24T11:59:58Z',
-	now: '2026-10-24T12:00:00Z',
-	kept_since: '2026-10-17T12:00:00Z'
-};
+const summary = jobsSummaryOf({
+	'pipeline.relate': { running: 1, due: 41, done: 12 },
+	'contacts.logo': { failed: 1, done: 41 }
+});
 
 function routes(logoFetch = true) {
 	return fakeApi({

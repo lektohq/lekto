@@ -1,41 +1,20 @@
 import { render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeApi } from '#lib/testing/api.ts';
-import type { Mailbox } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
 import IntakeTab from './IntakeTab.svelte';
+import { mailboxOf } from '#lib/testing/system.ts';
 
-const MAILBOX: Mailbox = {
-	id: 'm1',
-	name: 'Haushalt',
-	host: 'imap.example.test',
-	port: 993,
-	security: 'tls',
-	username: 'haushalt@example.test',
-	folders: ['INBOX'],
-	interval_minutes: 5,
-	start: 'since_setup',
-	since: null,
-	fallback: 'nothing',
-	fallback_user_id: null,
-	body_type_id: null,
-	enabled: true,
+const MAILBOX = mailboxOf({
 	status: {
 		last_attempt_at: '2026-11-05T09:00:00Z',
 		last_success_at: '2026-11-05T09:00:00Z',
-		error: null,
 		mails: 3,
 		documents: 4,
 		skipped_at: '2026-11-05T09:00:00Z',
-		skipped: { code: 'mail_too_large', params: { subject: 'Fotos', size: 180, max: 134 } },
-		step_failed_at: null,
-		step_failed: null,
-		keywords: [],
-		own_keywords: null
-	},
-	created_at: '2026-11-04T10:00:00Z',
-	updated_at: '2026-11-04T10:00:00Z'
-};
+		skipped: { code: 'mail_too_large', params: { subject: 'Fotos', size: 180, max: 134 } }
+	}
+});
 
 describe('IntakeTab', () => {
 	beforeEach(() => {

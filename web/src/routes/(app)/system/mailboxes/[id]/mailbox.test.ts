@@ -5,47 +5,17 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MailItem } from '#lib/mail-log.ts';
 import { signIn } from '#lib/testing/session.ts';
-import type { Mailbox } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import { calls, fakeApi, notFound, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
+import { mailboxOf } from '#lib/testing/system.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
-const MAILBOX: Mailbox = {
-	id: 'm1',
-	name: 'Haushalt',
-	host: 'imap.example.test',
-	port: 993,
-	security: 'tls',
-	username: 'haushalt@example.test',
-	folders: ['INBOX'],
-	interval_minutes: 5,
-	start: 'since_setup',
-	since: null,
-	fallback: 'nothing',
-	fallback_user_id: null,
-	body_type_id: null,
-	enabled: true,
-	status: {
-		last_attempt_at: null,
-		last_success_at: null,
-		error: null,
-		mails: 0,
-		documents: 0,
-		skipped_at: null,
-		skipped: null,
-		step_failed_at: null,
-		step_failed: null,
-		keywords: [],
-		own_keywords: null
-	},
-	created_at: '2026-11-04T10:00:00Z',
-	updated_at: '2026-11-04T10:00:00Z'
-};
+const MAILBOX = mailboxOf();
 
 const MAIL: MailItem = {
 	id: 'mail-1',

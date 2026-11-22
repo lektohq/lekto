@@ -8,22 +8,10 @@ import { openLens } from '#lib/open-lens.svelte.ts';
 import { offerPageSearch } from '#lib/page-search.ts';
 import { session } from '#lib/session.svelte.ts';
 import HeaderSearch from './HeaderSearch.svelte';
+import { testPage } from '#lib/testing/page-state.svelte.ts';
 
-const state = vi.hoisted(() => ({
-	url: new URL('http://lekto/ui/inbox'),
-	entry: {} as App.PageState
-}));
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
-vi.mock('$app/state', () => ({
-	page: {
-		get url() {
-			return state.url;
-		},
-		get state() {
-			return state.entry;
-		}
-	}
-}));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const USER = 'u1';
 
@@ -32,8 +20,8 @@ const searching = (words: string) => ({ state: { words, by: USER }, persistState
 
 beforeEach(() => {
 	vi.mocked(goto).mockClear();
-	state.url = new URL('http://lekto/ui/inbox');
-	state.entry = {};
+	testPage.url = new URL('http://lekto/ui/inbox');
+	testPage.state = {};
 	signIn('user', { id: USER });
 });
 
@@ -48,7 +36,7 @@ describe('HeaderSearch', () => {
 	});
 
 	it('names the lens the document view has open, and keeps it', async () => {
-		state.url = new URL('http://lekto/ui/documents?lens=l1&tag=7');
+		testPage.url = new URL('http://lekto/ui/documents?lens=l1&tag=7');
 		openLens.name = 'Zu bezahlen';
 		try {
 			render(HeaderSearch);
@@ -62,8 +50,8 @@ describe('HeaderSearch', () => {
 	});
 
 	it('keeps the filters of the document view, the sort goes with the search', async () => {
-		state.url = new URL('http://lekto/ui/documents?tag=7&sort=title');
-		state.entry = { words: 'alt', by: USER };
+		testPage.url = new URL('http://lekto/ui/documents?tag=7&sort=title');
+		testPage.state = { words: 'alt', by: USER };
 		render(HeaderSearch);
 		const field = screen.getByRole('searchbox', { name: m.header_search_label() });
 		expect((field as HTMLInputElement).value).toBe('alt');
@@ -76,15 +64,15 @@ describe('HeaderSearch', () => {
 		['another user', { words: 'alt', by: 'u2' }],
 		['no one', { words: 'alt' }]
 	])('shows none of the words %s searched for in this browser', (_, entry) => {
-		state.url = new URL('http://lekto/ui/documents');
-		state.entry = entry;
+		testPage.url = new URL('http://lekto/ui/documents');
+		testPage.state = entry;
 		render(HeaderSearch);
 		const field = screen.getByRole('searchbox', { name: m.header_search_label() });
 		expect((field as HTMLInputElement).value).toBe('');
 	});
 
 	it('shows the words of a lens a plain link opened', () => {
-		state.url = new URL('http://lekto/ui/documents?lens=l1');
+		testPage.url = new URL('http://lekto/ui/documents?lens=l1');
 		openLens.query = 'Strom';
 		try {
 			render(HeaderSearch);

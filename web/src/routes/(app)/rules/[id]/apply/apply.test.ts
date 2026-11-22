@@ -10,6 +10,8 @@ import { session } from '#lib/session.svelte.ts';
 import { calls, fakeApi, json, masterData, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
+import { signIn } from '#lib/testing/session.ts';
+import { jobsSummaryOf } from '#lib/testing/system.ts';
 
 type Preview = components['schemas']['ApplyPreviewOut'];
 type Application = components['schemas']['RuleApplicationOut'];
@@ -95,11 +97,11 @@ const looked = (checked: string, count: string) =>
 
 beforeEach(() => {
 	goTo('/ui/rules/r1/apply', { id: 'r1' });
-	session.user = { id: 'u1', role: 'admin' } as typeof session.user;
+	signIn('admin');
 });
 
 afterEach(() => {
-	session.user = null;
+	session.clear();
 	vi.clearAllMocks();
 });
 
@@ -179,15 +181,11 @@ describe("a rule's dry run", () => {
 		const { release } = held([preview(['a'], null)], {
 			'POST /api/v1/rules/r1/apply': () => application('queued'),
 			'GET /api/v1/rule-applications/a1': () => application('queued'),
-			'GET /api/v1/jobs/summary': () => ({
-				kinds: [
-					{ kind: 'pipeline.node', running: 1, due: 2, planned: 0, failed: 0, done: 0 },
-					{ kind: 'rules.apply', running: 0, due: 1, planned: 0, failed: 0, done: 0 }
-				],
-				last_started_at: new Date().toISOString(),
-				now: new Date().toISOString(),
-				kept_since: '2026-10-26T12:00:00Z'
-			})
+			'GET /api/v1/jobs/summary': () =>
+				jobsSummaryOf(
+					{ 'pipeline.node': { running: 1, due: 2 }, 'rules.apply': { due: 1 } },
+					{ last_started_at: new Date().toISOString(), now: new Date().toISOString() }
+				)
 		});
 		const user = userEvent.setup();
 		render(Page);
@@ -214,12 +212,11 @@ describe("a rule's dry run", () => {
 			{
 				'POST /api/v1/rules/r1/apply': () => application('queued'),
 				'GET /api/v1/rule-applications/a1': () => application('queued'),
-				'GET /api/v1/jobs/summary': () => ({
-					kinds: [],
-					last_started_at: new Date().toISOString(),
-					now: new Date().toISOString(),
-					kept_since: '2026-10-26T12:00:00Z'
-				})
+				'GET /api/v1/jobs/summary': () =>
+					jobsSummaryOf(
+						{},
+						{ last_started_at: new Date().toISOString(), now: new Date().toISOString() }
+					)
 			}
 		);
 		const user = userEvent.setup();
