@@ -5,6 +5,7 @@ import { goto } from '$app/navigation';
 import { m } from '#lib/paraglide/messages.js';
 import { signIn } from '#lib/testing/session.ts';
 import { openLens } from '#lib/open-lens.svelte.ts';
+import { offerPageSearch } from '#lib/page-search.ts';
 import { session } from '#lib/session.svelte.ts';
 import HeaderSearch from './HeaderSearch.svelte';
 
@@ -100,5 +101,25 @@ describe('HeaderSearch', () => {
 		await userEvent.keyboard('/');
 		expect(document.activeElement).toBe(field);
 		expect((field as HTMLInputElement).value).toBe('');
+	});
+
+	it('goes the magnifier’s way on / where the header shows no field (WB-08)', async () => {
+		// A phone, and the widths at which the menu takes the field's room: the form is not drawn.
+		render(HeaderSearch, { class: 'not-drawn' });
+		const field = screen.getByRole('searchbox', { name: m.header_search_label() });
+		(field.closest('form') as HTMLElement).style.display = 'none';
+		vi.mocked(goto).mockClear();
+		// Elsewhere: the documents page, with its own field in focus.
+		await userEvent.keyboard('/');
+		expect(document.activeElement).not.toBe(field);
+		expect(goto).toHaveBeenCalledWith('/ui/documents#search');
+		// On the documents page: its field, without opening the page anew.
+		const show = vi.fn();
+		const take = offerPageSearch(show);
+		vi.mocked(goto).mockClear();
+		await userEvent.keyboard('/');
+		expect(show).toHaveBeenCalledOnce();
+		expect(goto).not.toHaveBeenCalled();
+		take();
 	});
 });
