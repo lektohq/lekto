@@ -22,7 +22,8 @@ const stale = () =>
 			type: 'about:blank',
 			title: 'Forbidden',
 			status: 403,
-			detail: `the header ${CSRF_HEADER} is missing or wrong`
+			detail: `the header ${CSRF_HEADER} is missing or wrong`,
+			reason: { code: 'csrf_missing', params: { header: CSRF_HEADER } }
 		},
 		403
 	);
