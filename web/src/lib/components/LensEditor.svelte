@@ -337,7 +337,9 @@
 		{#if sample}
 			<div class="hidden flex-col gap-2 sm:flex">
 				<span class="text-sm font-medium">{m.lens_preview()}</span>
-				<div class="pointer-events-none" aria-hidden="true">
+				<!-- A picture of a card: the card is a link, which neither the pointer nor the
+				     keyboard may reach, or Enter leaves the editor. -->
+				<div inert>
 					<DocumentCard document={sample} {lookup} fields={preview} />
 				</div>
 				<p class="text-xs text-muted-foreground">{m.lens_preview_hint()}</p>

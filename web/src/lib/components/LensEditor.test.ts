@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { json } from '#lib/testing/api.ts';
+import { listedOf } from '#lib/testing/documents.ts';
 import type { Lens } from '#lib/lenses.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -145,6 +146,23 @@ describe('the lens editor', () => {
 			body: { sort: 'field', sort_field_id: 'due', card_field_ids: ['due', 'total'] }
 		});
 		expect(requests[0].body).not.toHaveProperty('filter');
+	});
+
+	it('shows the preview as a picture no key reaches (WB-07)', () => {
+		render(LensEditor, {
+			open: true,
+			initial: null,
+			draft,
+			lookup,
+			today: TODAY,
+			sample: listedOf({ title: 'Stromrechnung' }),
+			onsaved: vi.fn(),
+			ondeleted: vi.fn()
+		});
+		// The card is a link to its document: inside `inert` it takes neither pointer nor focus.
+		const card = screen.getByText('Stromrechnung').closest('a');
+		expect(card).not.toBeNull();
+		expect(card?.closest('[inert]')).not.toBeNull();
 	});
 
 	it('deletes a lens after asking', async () => {
