@@ -12,6 +12,7 @@ import {
 	whereText
 } from '#lib/filing.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
+import { formatList } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 
 type Check = components['schemas']['FieldCheckOut'];
@@ -202,6 +203,21 @@ describe('filing', () => {
 			m.filing_member_read({ name: 'Erika' })
 		]);
 		expect(new Set(chips.map((chip) => chip.key)).size).toBe(3);
+	});
+
+	it('lists the people who see it as the language lists (WG-07)', () => {
+		const three = [
+			{ user_id: JOHN, role: 'edit', username: 'john', display_name: 'John Doe' },
+			{ user_id: 'u-jane', role: 'read', username: 'jane', display_name: 'Jane Doe' },
+			{ user_id: 'u-erika', role: 'read', username: 'erika', display_name: 'Erika Mustermann' },
+			{ user_id: 'u-max', role: 'read', username: 'max', display_name: 'Mustermann' }
+		] as unknown as Member[];
+		expect(visibleText(three, john, true)).toBe(
+			m.visible_to({ names: formatList(['Jane Doe', 'Erika Mustermann', 'Mustermann']) })
+		);
+		expect(formatList(['Jane Doe', 'Erika Mustermann', 'Mustermann'])).not.toBe(
+			'Jane Doe, Erika Mustermann, Mustermann'
+		);
 	});
 
 	it('says who sees the document now and who once it is green', () => {

@@ -41,6 +41,15 @@ export function listLocale(): string {
 	return formatLocale();
 }
 
+/** A list in the user's language: "A, B und C", or "A, B oder C" for a choice
+ * (`disjunction`). The one way to write a list (web/DESIGN.md, "Formats"). */
+export function formatList(
+	items: readonly string[],
+	type: Intl.ListFormatType = 'conjunction'
+): string {
+	return new Intl.ListFormat(listLocale(), { type }).format(items);
+}
+
 /** The browser's time zone (`Europe/Berlin`), which the API needs to count by its days. */
 export function browserZone(): string {
 	return Intl.DateTimeFormat().resolvedOptions().timeZone;

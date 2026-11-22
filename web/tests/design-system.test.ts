@@ -772,6 +772,18 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(inside.test('<Badge>a</Badge> <button type="button">x</button>')).toBe(false);
 	});
 
+	it('writes a list through formatList', () => {
+		// "Formats": one way each. A list of names is "A, B und C" in the user's language.
+		const own = /new Intl\.ListFormat\(/;
+		expect(
+			[...Object.entries(sources), ...Object.entries(scripts)]
+				.filter(([path, source]) => path !== '/src/lib/i18n.ts' && own.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+		// The texts of the filing name people: no list of them joined by hand.
+		expect(scripts['/src/lib/filing.ts']).not.toMatch(/\.join\(', '\)/);
+	});
+
 	it('shows in the living style guide every component DESIGN.md names', () => {
 		// "Living style guide": `/dev/components` shows every component; one DESIGN.md names in
 		// backticks and that has its file in `lib/components` is imported there, or listed.

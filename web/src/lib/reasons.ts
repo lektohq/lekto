@@ -8,7 +8,7 @@ import type { components } from '#lib/api/schema.ts';
 import { fieldLabel } from '#lib/describe.ts';
 import { fieldTypeLabel, isFieldType } from '#lib/fields.ts';
 import { labelOfKind } from '#lib/identifiers.ts';
-import { formatDate, formatNumber, formatPercent, listLocale, quoted } from '#lib/i18n.ts';
+import { formatDate, formatNumber, formatPercent, formatList, quoted } from '#lib/i18n.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { NODE_LABELS } from '#lib/node-labels.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -641,13 +641,12 @@ function write(value: unknown, kind: ReasonKind | undefined, options: ReasonOpti
 		case 'value':
 			return writeValue(value);
 		case 'names':
-			return new Intl.ListFormat(listLocale(), { type: 'disjunction' }).format(
-				items(value).map((name) => quoted(String(name)))
+			return formatList(
+				items(value).map((name) => quoted(String(name))),
+				'disjunction'
 			);
 		case 'fields':
-			return new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(
-				items(value).map((name) => options.field?.(String(name)) ?? String(name))
-			);
+			return formatList(items(value).map((name) => options.field?.(String(name)) ?? String(name)));
 		case 'rule_values':
 			return items(value)
 				.map((item) => {
@@ -658,9 +657,7 @@ function write(value: unknown, kind: ReasonKind | undefined, options: ReasonOpti
 		case 'path':
 			return items(value).map(String).join(' → ');
 		case 'list':
-			return new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(
-				items(value).map((name) => quoted(String(name)))
-			);
+			return formatList(items(value).map((name) => quoted(String(name))));
 		case 'thing':
 			return own(THINGS, String(value))?.() ?? String(value);
 		case 'action':
@@ -670,7 +667,7 @@ function write(value: unknown, kind: ReasonKind | undefined, options: ReasonOpti
 		case 'identifier_kind':
 			return labelOfKind(String(value));
 		case 'nodes':
-			return new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(
+			return formatList(
 				items(value).map((node) => {
 					const label = NODE_LABELS[String(node) as keyof typeof NODE_LABELS];
 					return label ? label() : String(node);

@@ -13,7 +13,7 @@
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import { formatDuration } from '#lib/duration.ts';
 	import { describeError } from '#lib/errors.ts';
-	import { browserZone, formatNumber, formatPercent, listLocale } from '#lib/i18n.ts';
+	import { browserZone, formatNumber, formatPercent, formatList } from '#lib/i18n.ts';
 	import { latest } from '#lib/latest.ts';
 	import { NODE_LABELS } from '#lib/node-labels.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -134,8 +134,7 @@
 	const percent = (part: number, whole: number) => formatPercent(whole ? part / whole : 0);
 	const duration = (ms: number | null | undefined) =>
 		ms == null ? '–' : formatDuration(ms / 1000);
-	const list = (items: string[]) =>
-		new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(items);
+	const list = (items: string[]) => formatList(items);
 
 	const total = $derived(report ? report.lanes.green + report.lanes.yellow + report.lanes.red : 0);
 	const scope = $derived.by(() => {

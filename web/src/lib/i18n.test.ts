@@ -3,6 +3,7 @@ import { getLocale, setLocale } from '#lib/paraglide/runtime.js';
 import {
 	browserZone,
 	formatDate,
+	formatList,
 	formatMoment,
 	formatMoney,
 	listLocale,
@@ -80,9 +81,11 @@ describe('one way to format', () => {
 	it('lists in the locale of dates and numbers', () => {
 		setLocale('de', { reload: false });
 		expect(listLocale()).toMatch(/^de-/);
-		expect(new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(['A', 'B', 'C'])).toBe(
-			'A, B und C'
-		);
+		expect(formatList(['A', 'B', 'C'])).toBe('A, B und C');
+		expect(formatList(['A', 'B', 'C'], 'disjunction')).toBe('A, B oder C');
+		expect(formatList(['A'])).toBe('A');
+		setLocale('en', { reload: false });
+		expect(formatList(['A', 'B'])).toBe('A and B');
 	});
 
 	it("names the browser's time zone", () => {

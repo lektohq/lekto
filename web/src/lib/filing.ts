@@ -5,7 +5,7 @@
  * the start; a disagreement chooses nothing, the person decides.
  */
 import type { components } from '#lib/api/schema.ts';
-import { formatPercent } from '#lib/i18n.ts';
+import { formatList, formatPercent } from '#lib/i18n.ts';
 import { holderOf, spaceNameFor, userLabel, type Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { knownSpace, newReaders } from '#lib/space-suggestion.ts';
@@ -147,8 +147,8 @@ function consequence(
 	const added = newReaders(target, current, lookup);
 	const lost = lostReaders(target, current, lookup);
 	const lines = [
-		...(added.length > 0 ? [m.filing_new_readers({ names: added.join(', ') })] : []),
-		...(lost.length > 0 ? [m.filing_lost_readers({ names: lost.join(', ') })] : [])
+		...(added.length > 0 ? [m.filing_new_readers({ names: formatList(added) })] : []),
+		...(lost.length > 0 ? [m.filing_lost_readers({ names: formatList(lost) })] : [])
 	];
 	return lines.length > 0 ? lines.join(' ') : m.filing_same_readers();
 }
@@ -272,7 +272,7 @@ export function visibleNames(
 /** "visible to Erika, Ben", or "visible to you only". */
 export function visibleText(members: readonly Member[], viewer: Viewer, green: boolean): string {
 	const { now } = visibleNames(members, viewer, green);
-	return now.length > 0 ? m.visible_to({ names: now.join(', ') }) : m.visible_to_you();
+	return now.length > 0 ? m.visible_to({ names: formatList(now) }) : m.visible_to_you();
 }
 
 /** "Erika reads it once it is green"; null when nobody waits for that. */
@@ -282,7 +282,7 @@ export function readersLaterText(
 	green: boolean
 ): string | null {
 	const { later } = visibleNames(members, viewer, green);
-	return later.length > 0 ? m.visible_to_readers_later({ names: later.join(', ') }) : null;
+	return later.length > 0 ? m.visible_to_readers_later({ names: formatList(later) }) : null;
 }
 
 /** "Liegt in Persönlich · nur für dich sichtbar". */
@@ -354,7 +354,7 @@ export function confirmHint(
 		};
 	}
 	const added = newReaders(target, current, lookup);
-	const names = added.join(', ');
+	const names = formatList(added);
 	const person = personOf(target, lookup, viewer);
 	if (person) {
 		return {

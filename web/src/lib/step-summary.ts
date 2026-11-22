@@ -4,7 +4,7 @@
  */
 import type { components } from '#lib/api/schema.ts';
 import { describeValue, fieldLabel } from '#lib/describe.ts';
-import { formatDate, formatNumber, listLocale } from '#lib/i18n.ts';
+import { formatDate, formatNumber, formatList } from '#lib/i18n.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { labelled, outputReasonText, reasonsText } from '#lib/reasons.ts';
@@ -160,9 +160,7 @@ function separated(output: Json): string | null {
 
 /** The separator sheets on `sheets` (pages): "2 Trennblätter (S. 4 und 8)". */
 export function summaryOfSheets(sheets: readonly number[]): string {
-	const pages = new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(
-		sheets.map((page) => formatNumber(page))
-	);
+	const pages = formatList(sheets.map((page) => formatNumber(page)));
 	return sheets.length === 1
 		? m.summary_sheets_one({ pages })
 		: m.summary_sheets({ count: formatNumber(sheets.length), pages });

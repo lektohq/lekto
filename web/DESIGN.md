@@ -1600,7 +1600,7 @@ document says where from before how it came: "Aus „…“ (dort Fassung 1) · 
 
 Dates and numbers follow the UI language (`Intl`): `26.10.2026`, `123,45 €` in German. Durations
 are short and do not wrap ("4,2s", "1m 3s"). Every format comes from `lib/i18n.ts`, one way each:
-`formatMoment` (medium in lines, `short` in table rows), `formatPercent`, `listLocale` for lists,
+`formatMoment` (medium in lines, `short` in table rows), `formatPercent`, `formatList` for lists ("A, B und C"; never `join(', ')` or an `Intl.ListFormat` of one's own),
 `browserZone`, `quoted` for a quoted name („…“, “…”); no component reads a locale or a time zone
 of its own, and no quotation mark stands in code.
 

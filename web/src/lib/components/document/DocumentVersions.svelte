@@ -9,7 +9,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import { formatMoment, listLocale, quoted } from '#lib/i18n.ts';
+	import { formatMoment, formatList, quoted } from '#lib/i18n.ts';
 	import { userName, type Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 
@@ -94,7 +94,7 @@
 				? m.version_merged_self({ version: String(number ?? '') })
 				: quoted(String(title ?? ''));
 		});
-		return new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(names);
+		return formatList(names);
 	}
 
 	function download(number: number) {
