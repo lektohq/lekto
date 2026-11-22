@@ -7,6 +7,7 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import { fieldLabel } from '#lib/describe.ts';
+	import LaneBadge from '#lib/components/LaneBadge.svelte';
 	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
@@ -26,7 +27,6 @@
 	import Chip from '#lib/components/Chip.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Separator } from '#lib/components/ui/separator/index.ts';
 	import Loading from '#lib/components/Loading.svelte';
 
@@ -323,9 +323,9 @@
 						{/each}
 					</div>
 					<div class="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-4">
-						{#each LANES as { lane, label } (lane)}
+						{#each LANES as { lane } (lane)}
 							<div class="flex flex-col gap-1">
-								<Badge variant={lane} size="md" class="self-start">{label()}</Badge>
+								<LaneBadge {lane} size="md" class="self-start" />
 								<span class="text-figure tabular-nums">
 									{percent(report.lanes[lane], total)}
 								</span>
@@ -386,7 +386,7 @@
 						{@const caption = flow.parts.map((part) => part.text).join(' · ')}
 						<div class="grid grid-cols-1 items-start gap-x-5 gap-y-2 sm:grid-cols-[170px_1fr]">
 							<div class="flex h-6 items-center gap-2">
-								<Badge variant={flow.lane} size="md">{flow.label()}</Badge>
+								<LaneBadge lane={flow.lane} size="md" />
 								<span class="font-semibold tabular-nums">{formatNumber(flow.count)}</span>
 								<ArrowRight class="size-4 text-muted-foreground" aria-hidden="true" />
 							</div>

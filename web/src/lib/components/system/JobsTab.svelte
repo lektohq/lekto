@@ -1,4 +1,6 @@
 <script lang="ts">
+	import CircleCheck from '@lucide/svelte/icons/circle-check';
+	import OctagonX from '@lucide/svelte/icons/octagon-x';
 	import RotateCw from '@lucide/svelte/icons/rotate-cw';
 	import Wrench from '@lucide/svelte/icons/wrench';
 	import { onMount } from 'svelte';
@@ -6,6 +8,7 @@
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
+	import StatusBadge from '#lib/components/StatusBadge.svelte';
 	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -40,7 +43,6 @@
 	import { cardVariants } from '#lib/components/ui/card/index.ts';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import type { Tone } from '#lib/tones.ts';
-	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import Loading from '#lib/components/Loading.svelte';
 	import MaintenanceDialog from '#lib/components/system/MaintenanceDialog.svelte';
 	import { session } from '#lib/session.svelte.ts';
@@ -205,6 +207,12 @@
 		failed: 'red',
 		done: 'green'
 	};
+	// A state in a lane's tone says it with an icon too, never by colour alone (web/DESIGN.md,
+	// "Badges"); the others are plain facts.
+	const STATE_ICONS: Partial<Record<JobState, typeof CircleCheck>> = {
+		failed: OctagonX,
+		done: CircleCheck
+	};
 	const NUMBER = 'text-right tabular-nums';
 </script>
 
@@ -337,7 +345,11 @@
 										{job.node ? NODE_LABELS[job.node]() : kindLabel(job.kind)}
 									</Table.Cell>
 									<Table.Cell>
-										<Badge variant={TONES[job.state]}>{STATE_LABELS[job.state]()}</Badge>
+										<StatusBadge
+											tone={TONES[job.state]}
+											label={STATE_LABELS[job.state]()}
+											icon={STATE_ICONS[job.state]}
+										/>
 									</Table.Cell>
 									<Table.Cell class="max-w-[22rem]">
 										{#if job.document}

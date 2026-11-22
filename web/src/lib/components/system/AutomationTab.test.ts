@@ -64,6 +64,10 @@ describe('the automation tab', () => {
 		render(AutomationTab);
 		expect(await screen.findByText(m.automation_first_green({ count: '70' }))).toBeTruthy();
 		expect(screen.getByText(/^70\s?%$/)).toBeTruthy();
+		// Every lane is LaneBadge: its icon and its word, never the colour alone.
+		const badges = [...document.querySelectorAll('[data-lane]')];
+		expect(badges.length).toBeGreaterThanOrEqual(3);
+		expect(badges.every((badge) => badge.querySelector('svg') !== null)).toBe(true);
 		expect(screen.getByText(formatDuration(52))).toBeTruthy();
 		expect(
 			screen.getByText(

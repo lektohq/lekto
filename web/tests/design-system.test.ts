@@ -697,6 +697,18 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(inside.test('<Badge>a</Badge> <button type="button">x</button>')).toBe(false);
 	});
 
+	it('draws a lane with LaneBadge, never with a bare badge in its tone', () => {
+		// "Badges": a lane is its icon and its word; `LaneBadge` alone hands a lane to `Badge`.
+		const bare = /<Badge\b[^>]*\bvariant=\{[^}]*\blane\b[^}]*\}/i;
+		expect(
+			offenders((source, path) =>
+				path.endsWith('/components/LaneBadge.svelte') ? null : (bare.exec(source)?.[0] ?? null)
+			)
+		).toEqual([]);
+		expect(bare.test('<Badge variant={flow.lane} size="md">')).toBe(true);
+		expect(bare.test('<LaneBadge lane={flow.lane} size="md" />')).toBe(false);
+	});
+
 	it('marks a target as small only where DESIGN.md names the exception', () => {
 		// "Touch targets": the layout spec skips what carries the mark. This list may only shrink.
 		const SMALL = new Set([

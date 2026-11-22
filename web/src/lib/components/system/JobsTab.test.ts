@@ -110,7 +110,9 @@ describe('the jobs tab', () => {
 			})
 		).toBeTruthy();
 		expect(within(rows[1]).queryByRole('link')).toBeNull();
-		expect(within(rows[1]).getByText(m.jobs_state_running())).toBeTruthy();
+		// A running job is a plain fact: its badge has no icon.
+		const running = within(rows[1]).getByText(m.jobs_state_running());
+		expect(running.closest('[data-slot="badge"]')?.querySelector('svg')).toBeNull();
 		expect(within(rows[2]).getByText(m.jobs_hidden_document())).toBeTruthy();
 		expect(calls(api)).toContain(
 			'GET /api/v1/jobs?state=running&state=due&state=planned&offset=0&limit=25'
@@ -235,6 +237,12 @@ describe('the jobs tab', () => {
 		const cells = within(jobs)
 			.getAllByRole('cell')
 			.map((cell) => cell.textContent?.trim());
+		// "Done" stands in a lane's tone, so an icon says it too (DESIGN.md, "Badges").
+		const done = within(jobs)
+			.getAllByText(m.jobs_state_done())
+			.map((element) => element.closest('[data-slot="badge"]'))
+			.find((badge) => badge !== null);
+		expect(done?.querySelector('svg')).not.toBeNull();
 		expect(cells).toContain('3s'); // waited
 		expect(cells).toContain('2s'); // ran
 		expect(within(kinds).getByText('900')).toBeTruthy();
