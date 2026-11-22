@@ -712,6 +712,10 @@
 										factCounts={facts ? factCounts(facts) : null}
 										factsHref={viewHref(page.url, { ...view, right: 'facts' })}
 										onmove={() => header?.startMove()}
+										onleave={() => {
+											leaving = true;
+											void leaveDocument(fromInbox);
+										}}
 										onreveal={reveal}
 										end={paneSwitch(rightSwitch)}
 									/>

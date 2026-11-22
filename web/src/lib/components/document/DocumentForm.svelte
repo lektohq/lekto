@@ -103,6 +103,7 @@
 		factCounts = null,
 		factsHref = '',
 		onmove,
+		onleave,
 		end
 	}: {
 		document: Document;
@@ -128,6 +129,9 @@
 		factsHref?: string;
 		/** "Move" in the filing box: the move dialog of the document's head. */
 		onmove?: () => void;
+		/** Saved, and the rules filed it out of the caller's reach: the page leaves the way the
+		 * person came (web/DESIGN.md, "Navigation between list and detail"). */
+		onleave?: () => void;
 		/** At the end of the head: the pane's switch. */
 		end?: Snippet;
 	} = $props();
@@ -531,7 +535,8 @@
 			else {
 				// The rules filed the document where the caller can no longer read it.
 				toast.info(m.document_moved_away());
-				await goto(`${BASE}/documents`);
+				if (onleave) onleave();
+				else await goto(`${BASE}/documents`);
 			}
 		} catch (error) {
 			preview = null;

@@ -14,7 +14,7 @@ import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import { choose, selectedValue } from '#lib/testing/select.ts';
 import { toast } from 'svelte-sonner';
-import { beforeNavigate } from '$app/navigation';
+import { beforeNavigate, goto } from '$app/navigation';
 import DocumentForm from './DocumentForm.svelte';
 
 type Document = components['schemas']['DocumentDetails'];
@@ -1146,6 +1146,26 @@ describe('the topic', () => {
 		await userEvent.click(screen.getByRole('button', { name: m.edit_review() }));
 		await userEvent.click(await screen.findByRole('button', { name: m.edit_save() }));
 		await waitFor(() => expect(onenabled).toHaveBeenCalledOnce());
+	});
+
+	it('leaves the way the page says when the rules file the document out of reach (WA-08)', async () => {
+		signIn('admin', { id: OWNER, username: 'admin' });
+		const bank = { ...filed, contact_id: BANK, topic_id: null } as Document;
+		// The answer of a save that took the document away: its id, and no access.
+		fetchMock.mockImplementation(async (request) =>
+			request.method === 'PATCH' ? json({ id: bank.id, access: null }) : json(PREVIEW)
+		);
+		const onleave = vi.fn();
+		const onsaved = vi.fn();
+		vi.mocked(goto).mockClear();
+		render(DocumentForm, props({ document: bank, lookup: topics, review: null, onleave, onsaved }));
+		await chooseTopic('Arbeit');
+		await userEvent.click(screen.getByRole('button', { name: m.edit_review() }));
+		await userEvent.click(await screen.findByRole('button', { name: m.edit_save() }));
+		await waitFor(() => expect(onleave).toHaveBeenCalledOnce());
+		// Not to the list without its place, as before.
+		expect(goto).not.toHaveBeenCalled();
+		expect(onsaved).not.toHaveBeenCalled();
 	});
 
 	it('lets an admin create a contact or type named as searched in its dialog, chosen after', async () => {
