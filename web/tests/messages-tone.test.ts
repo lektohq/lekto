@@ -86,6 +86,14 @@ describe('German texts', () => {
 		expect(matching(NUMBER, NUMBER_ALLOWED)).toEqual([]);
 	});
 
+	it('names the choice of what a condition looks at unlike any of its options (WD-15)', () => {
+		// "Bezug" is the relation (DESIGN.md, glossary), one of the options: a screen reader
+		// said "Bezug, Bezug". The choice is "Worauf" (Tobi, 22.11.2026).
+		const options = keys().filter((key) => key.startsWith('rule_field_'));
+		expect(options.length).toBeGreaterThan(5);
+		expect(options.map((key) => catalogue[key])).not.toContain(catalogue.rule_condition_subject);
+	});
+
 	it('notice a formal or lowercase address', () => {
 		expect(FORMAL.test('Melden Sie sich an.')).toBe(true);
 		expect(FORMAL.test('Ihr Konto ist verknüpft.')).toBe(true);
