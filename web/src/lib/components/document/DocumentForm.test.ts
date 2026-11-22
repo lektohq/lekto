@@ -193,9 +193,13 @@ afterEach(() => {
 describe('DocumentForm', () => {
 	it('groups the fields: basics, global ones and those of the type', () => {
 		render(DocumentForm, props());
-		expect(screen.getByRole('heading', { name: m.group_basics() })).toBeTruthy();
-		expect(screen.getByRole('heading', { name: m.group_global() })).toBeTruthy();
-		expect(screen.getByRole('heading', { name: m.group_type({ type: 'Rechnung' }) })).toBeTruthy();
+		// Below the page's h1 they are the next level, none skipped (WA-06).
+		const level = 2;
+		expect(screen.getByRole('heading', { name: m.group_basics(), level })).toBeTruthy();
+		expect(screen.getByRole('heading', { name: m.group_global(), level })).toBeTruthy();
+		expect(
+			screen.getByRole('heading', { name: m.group_type({ type: 'Rechnung' }), level })
+		).toBeTruthy();
 		const global = screen.getByRole('region', { name: m.group_global() });
 		expect(within(global).getByLabelText('Notiz', { selector: 'input' })).toBeTruthy();
 	});

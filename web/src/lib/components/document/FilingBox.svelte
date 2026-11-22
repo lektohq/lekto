@@ -90,7 +90,7 @@
 				aria-hidden="true"
 				strokeWidth={2.2}
 			/>
-			<SectionTitle size="card" level={3} id="filing-title">
+			<SectionTitle size="card" level={2} id="filing-title">
 				{m.filing_title()}
 			</SectionTitle>
 			<Badge variant="yellow" class="ml-auto">
