@@ -561,6 +561,8 @@
 	"dev_sample_table_date": "Datum",
 	"dev_sample_table_lane": "Lane",
 	"close": "Schließen",
+	"toast_region": "Meldungen",
+	"toast_close": "Meldung schließen",
 	"cancel": "Abbrechen",
 	"retry": "Erneut versuchen",
 	"load_more": "Mehr laden",
