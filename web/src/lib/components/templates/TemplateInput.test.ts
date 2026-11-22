@@ -152,6 +152,10 @@ describe('TemplateInput', () => {
 		expect(within(sheet).getByRole('button', { name: 'upcase' }).className).toContain(
 			'max-sm:after:-inset-y-1.5'
 		);
+		// Its footer is a dialog's: "Abbrechen" as a ghost before the action (WD-08).
+		const cancel = within(sheet).getByRole('button', { name: m.cancel() });
+		expect(cancel.className).toContain('hover:bg-muted');
+		expect(cancel.className).not.toContain('border-border');
 		const asked = fetchMock.mock.calls.map(([request]) => new URL(request.url).pathname);
 		expect(asked).not.toContain('/api/v1/fields');
 	});

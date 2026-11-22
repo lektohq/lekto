@@ -220,9 +220,10 @@ describe('the safe areas of the installed app', () => {
 	});
 
 	// A surface that covers the whole phone screen or stands at its bottom edge keeps the insets
-	// free: full-screen editors, bars stuck to the bottom, sheets from below, fixed buttons.
+	// free: full-screen editors, bars stuck to the bottom, sheets from below, fixed buttons, and
+	// a sheet from the right, which is the whole screen on a phone (the Beam, the template editor).
 	const EDGE =
-		/\bh-dvh max-h-dvh\b|\bsticky bottom-0\b|\bfixed\b[^'"]*\bbottom-|data-\[side=bottom\]:inset-x-0/;
+		/\bh-dvh max-h-dvh\b|\bsticky bottom-0\b|\bfixed\b[^'"]*\bbottom-|data-\[side=bottom\]:inset-x-0|data-\[side=right\]:w-full/;
 
 	it.each(Object.entries(sources).filter(([, source]) => EDGE.test(source)))(
 		'%s keeps the safe area free',

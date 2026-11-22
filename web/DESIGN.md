@@ -757,7 +757,11 @@ list pages the same way (see [Lists](#lists)).
   without an action of its own but with `ondelete` (something nobody changes, only removes: an
   API token) has a footer on desktop too: deleting at its start, "Fertig" (`default`) at its end.
 - **Dialog footer:** see [Patterns](#footers).
-- **Beam:** the one sheet from the right with content (see [Beam](#beam)).
+- **Beam:** the one sheet from the right with content (see [Beam](#beam)), with one exception
+  (Tobi, 22.11.2026): the template editor (`TemplateEditor`) opens from the right too, beside the
+  form whose field it writes, up to 672 px wide and the whole screen on a phone. Its footer is
+  a dialog's ("Abbrechen" `ghost` before "Übernehmen"), its lists are cards, and it keeps the
+  safe areas free.
 - A dialog title names its object: "„Stromrechnung Oktober“ löschen", never a bare "Löschen".
 
 ### Beam

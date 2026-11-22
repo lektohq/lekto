@@ -8,6 +8,7 @@
 		type Reference
 	} from '#lib/components/templates/ReferencePicker.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Card } from '#lib/components/ui/card/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 	import { CloseGuard } from '#lib/close-guard.svelte.ts';
@@ -146,7 +147,7 @@
 >
 	<Sheet.Content
 		side="right"
-		class="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-2xl"
+		class="gap-0 pt-[env(safe-area-inset-top)] data-[side=right]:w-full data-[side=right]:sm:max-w-2xl"
 		onOpenAutoFocus={(event) => event.preventDefault()}
 	>
 		<Sheet.Header class="border-b">
@@ -207,7 +208,7 @@
 
 			<section class="flex flex-col gap-1.5" aria-labelledby="{id}-values">
 				<SectionTitle size="card" level={3} id="{id}-values">{m.template_values()}</SectionTitle>
-				<ul class="divide-y rounded-lg border">
+				<Card as="ul" size="flush" class="divide-y overflow-hidden">
 					{#each TEMPLATE_NAMES as name (name)}
 						{@render row(name, TEMPLATE_NAME_LABELS[name]())}
 					{/each}
@@ -225,31 +226,31 @@
 							)}
 						{/each}
 					{/if}
-				</ul>
+				</Card>
 			</section>
 			<section class="flex flex-col gap-1.5" aria-labelledby="{id}-facts">
 				<SectionTitle size="card" level={3} id="{id}-facts">{m.template_facts()}</SectionTitle>
 				<!-- Those the document shows; all of them by typing `facts.` in the editor. -->
-				<ul class="divide-y rounded-lg border">
+				<Card as="ul" size="flush" class="divide-y overflow-hidden">
 					{#each shownFacts as fact (fact.name)}
 						{@render row(fact.name, fact.label)}
 					{/each}
 					<!-- A list: no value to show. -->
 					{@render row('fact_list', m.template_value_fact_list(), true)}
-				</ul>
+				</Card>
 			</section>
 			{#if fields.length > 0}
 				<section class="flex flex-col gap-1.5" aria-labelledby="{id}-fields">
 					<SectionTitle size="card" level={3} id="{id}-fields">{m.template_fields()}</SectionTitle>
-					<ul class="divide-y rounded-lg border">
+					<Card as="ul" size="flush" class="divide-y overflow-hidden">
 						{#each fields as field (field.id)}
 							{@render row(`field.${field.key}`, field.name)}
 						{/each}
-					</ul>
+					</Card>
 				</section>
 			{/if}
 		</div>
-		<Sheet.Footer class="gap-3 border-t">
+		<Sheet.Footer class="gap-3 border-t pb-[max(1rem,env(safe-area-inset-bottom))]">
 			<div class="min-h-5 text-sm break-words" aria-live="polite">
 				{#if preview?.error}
 					<span class="text-destructive">{preview.error}</span>
@@ -284,7 +285,7 @@
 				{/if}
 			</div>
 			<div class="flex justify-end gap-2">
-				<Button variant="outline" onclick={() => (open = false)}>{m.cancel()}</Button>
+				<Button variant="ghost" onclick={() => (open = false)}>{m.cancel()}</Button>
 				<Button onclick={apply}>{m.template_editor_apply()}</Button>
 			</div>
 		</Sheet.Footer>
