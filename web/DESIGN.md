@@ -1442,7 +1442,10 @@ worker, and Lekto works as a website.
 - **A notification** is worded by the service worker in the device's language
   (`lib/push-text.ts`): "3 Dokumente warten auf Dich" with up to three titles, or the name of the
   mailbox or webhook. A tap opens the document if it is one, else the inbox or the page of what
-  it names, in an open window of the app if there is one. The app's icon carries the inbox's
+  it names, in an open window of the app if there is one: the worker asks the app, which goes
+  there through its router (`lib/app-open.ts`), so nothing loads anew, uploads go on and unsaved
+  changes ask as on every way out; only a window that does not answer is loaded at the address.
+  The app's icon carries the inbox's
   count, set by a notification and kept by the open app.
 - **Signing out gives the device up:** before the session ends, the app removes this browser's
   device at the server, ends its subscription, closes the notifications it still shows and

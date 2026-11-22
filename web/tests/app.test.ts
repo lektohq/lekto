@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import css from '../src/app.css?raw';
 import html from '../src/app.html?raw';
 import themeScript from '../static/theme.js?raw';
+import workerSource from '../src/service-worker/index.ts?raw';
 import manifestText from '../static/manifest.webmanifest?raw';
 import {
 	appFiles,
@@ -274,6 +275,21 @@ describe('the safe areas beside the notch, a phone held sideways (WM-07)', () =>
 		const layout = sources['/src/routes/+layout.svelte'];
 		expect(layout).toMatch(/\boffset=\{\{[^}]*env\(safe-area-inset-right\)[^}]*\}\}/);
 		expect(layout).toMatch(/\bmobileOffset=\{\{[^}]*env\(safe-area-inset-right\)[^}]*\}\}/);
+	});
+});
+
+describe('a tap on a notification (WM-04)', () => {
+	it('asks the open app to go there before any address is loaded', () => {
+		// `navigate()` starts the app anew: only for a window that did not answer.
+		const asks = workerSource.indexOf('await askToOpen(app, url)');
+		const loads = workerSource.indexOf('app.navigate(url)');
+		expect(asks).toBeGreaterThan(-1);
+		expect(loads).toBeGreaterThan(asks);
+		expect(workerSource.match(/\.navigate\(/g)).toHaveLength(1);
+	});
+
+	it('is heard by the app from its start', () => {
+		expect(sources['/src/routes/+layout.svelte']).toMatch(/answerOpen\(BASE, /);
 	});
 });
 

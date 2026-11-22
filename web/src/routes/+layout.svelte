@@ -2,8 +2,11 @@
 	import '../app.css';
 	import { ModeWatcher, mode } from 'mode-watcher';
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { answerOpen } from '#lib/app-open.ts';
 	import { startAppUpdates } from '#lib/app-update.ts';
 	import { Toaster } from '#lib/components/ui/sonner/index.ts';
+	import { BASE } from '#lib/base.ts';
 	import { getLocale } from '#lib/i18n.ts';
 	import { install } from '#lib/install.svelte.ts';
 	import { setThemeColor } from '#lib/theme-color.ts';
@@ -21,6 +24,8 @@
 	onMount(() => {
 		install.watch();
 		startAppUpdates();
+		// A tap on a notification moves the open app through its router.
+		return answerOpen(BASE, (path) => goto(path));
 	});
 </script>
 
