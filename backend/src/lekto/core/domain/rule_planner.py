@@ -77,7 +77,7 @@ from lekto.core.domain.json_value import JsonObject, JsonValue, as_list, as_obje
 from lekto.core.domain.master_data import TagScope
 from lekto.core.domain.periods import Period
 from lekto.core.domain.pipeline import Outcome
-from lekto.core.domain.reasons import Reason, ReasonCode, because, written
+from lekto.core.domain.reasons import Reason, ReasonCode, because, typed_value, written
 from lekto.core.domain.rule_conditions import MailOf, Match, Taxonomy
 from lekto.core.domain.rules import (
     AddTags,
@@ -962,9 +962,10 @@ def _key(value: JsonValue) -> str:
 
 
 def _value_text(definition: FieldDefinition, value: JsonValue) -> JsonValue:
-    """A field's value (its JSON form) as written: text and choices quoted, numbers as they
-    are, an amount with its currency, a date and a period in ISO 8601, yes or no as true or
-    false (a reason's `value` parameter writes them)."""
+    """A field's value (its JSON form) for a reason's `value` parameter: text and choices
+    quoted, yes or no as true or false, a link as it is. What a language writes its own way
+    goes with its type (`reasons.typed_value`): a number, an amount with its currency, a date
+    and a period, each with its English text (ISO 8601 for the two last)."""
     try:
         parsed = field_from_json(definition, value)
     except ValidationError:
@@ -975,15 +976,17 @@ def _value_text(definition: FieldDefinition, value: JsonValue) -> JsonValue:
         case str():
             return f"'{parsed}'"
         case Decimal():
-            return decimal_text(parsed)
+            return typed_value("number", field_to_json(parsed), decimal_text(parsed))
         case Money():
-            return f"{decimal_text(parsed.amount)} {parsed.currency}"
+            return typed_value(
+                "amount", field_to_json(parsed), f"{decimal_text(parsed.amount)} {parsed.currency}"
+            )
         case Url():
             return parsed.value
         case Period():
-            return parsed.notation
+            return typed_value("period", field_to_json(parsed), parsed.notation)
         case date():
-            return parsed.isoformat()
+            return typed_value("date", field_to_json(parsed), parsed.isoformat())
 
 
 def _field_value(value: object) -> FieldValue | None:

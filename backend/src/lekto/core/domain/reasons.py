@@ -1279,7 +1279,9 @@ KINDS: Mapping[str, str] = {
 """The kinds a template may give a parameter (after its colon; none: text), by the name the
 catalog gives them: `number` a number, `percent` a fraction from 0 to 1, `date` a day in ISO
 8601, `value` a field's value as a reason shows it (a string, true or false for yes or no, null
-for none), `names` a list of names, `fields` a list of check fields (`contact`, `field:<id>`,
+for none; a number, an amount, a date and a period as `{"type", "value", "text"}`: the data type,
+the value in the JSON form of fields for the client to write in its language, and its English
+text), `names` a list of names, `fields` a list of check fields (`contact`, `field:<id>`,
 ...), `rule_values` a list of `{"rule": name, "value": value}` (what each rule sets), `path`
 a list of names one after the other (spaces a document went through), `reason` another reason
 (`Reason.to_json`), `list` a list of names, quoted and joined by commas, `nodes` a list of
@@ -1346,11 +1348,21 @@ def _items(value: object) -> list[object]:
     return list(value) if isinstance(value, list | tuple) else [value]
 
 
+def typed_value(type: str, value: JsonValue, text: str) -> JsonValue:
+    """A field's value for a reason's `value` parameter that a client writes in its language:
+    its data type (`number`, `amount`, `date`, `period`), the value in the JSON form of fields
+    (`fields.field_to_json`) and `text`, how the English reason writes it."""
+    return {"type": type, "value": value, "text": text}
+
+
 def _value(value: object) -> str:
     if value is None:
         return "none"
     if isinstance(value, bool):
         return "yes" if value else "no"
+    if isinstance(value, dict):
+        # A value with its type (`typed_value`): its English text.
+        return str(value.get("text"))
     return str(value)
 
 

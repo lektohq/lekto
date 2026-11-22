@@ -6,9 +6,18 @@
  */
 import type { components } from '#lib/api/schema.ts';
 import { fieldLabel } from '#lib/describe.ts';
-import { fieldTypeLabel, isFieldType } from '#lib/fields.ts';
+import { fieldTypeLabel, isFieldType, isMoney, isPeriod } from '#lib/fields.ts';
 import { labelOfKind } from '#lib/identifiers.ts';
-import { formatDate, formatNumber, formatPercent, formatList, quoted } from '#lib/i18n.ts';
+import { isIsoDay } from '#lib/dates.ts';
+import {
+	formatDate,
+	formatList,
+	formatMoney,
+	formatNumber,
+	formatPercent,
+	quoted
+} from '#lib/i18n.ts';
+import { writePeriod } from '#lib/periods.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { NODE_LABELS } from '#lib/node-labels.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -626,11 +635,25 @@ export const ACTIONS: Record<string, () => string> = {
 	manage_mailboxes: m.action_manage_mailboxes
 };
 
+/** A value the API sends with its type (`typed_value` of the core): a number, an amount, a date
+ * or a period, written as the language writes it; the API's English text where it cannot be. */
+function writeTyped(typed: { type?: unknown; value?: unknown; text?: unknown }): string {
+	const { type, value } = typed;
+	if (type === 'number' && Number.isFinite(Number(value)))
+		return formatNumber(Number(value), { maximumFractionDigits: 20 });
+	if (type === 'amount' && isMoney(value)) return formatMoney(value.amount, value.currency);
+	if (type === 'date' && isIsoDay(String(value))) return formatDate(String(value));
+	if (type === 'period' && isPeriod(value) && writePeriod(value.start, value.end))
+		return writePeriod(value.start, value.end);
+	return String(typed.text ?? '');
+}
+
 /** A field's value as a reason shows it: yes or no, not set, a name or text quoted as the
- * language quotes. */
+ * language quotes, a number, an amount, a date and a period in the formats of the UI. */
 function writeValue(value: unknown): string {
 	if (value === null || value === undefined) return m.value_unset();
 	if (typeof value === 'boolean') return value ? m.value_yes() : m.value_no();
+	if (typeof value === 'object') return writeTyped(value);
 	const text = String(value);
 	const inner = /^'(.*)'$/s.exec(text);
 	return inner ? quoted(inner[1]) : text;

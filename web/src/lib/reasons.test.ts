@@ -83,6 +83,34 @@ describe('a reason in the user language', () => {
 		expect(reasonText(reason('rules_disagree', { values }))).toBe(
 			'Regeln setzen verschiedene Werte („Bezahlt“: Ja, „Offen“: „offen“)'
 		);
+		// A value the API sends with its type is written as the language writes it (WH-07).
+		const typed = (type: string, value: unknown, text: string) => ({ type, value, text });
+		const other = (value: unknown) => reasonText(reason('model_value_other', { value }));
+		expect(other(typed('date', '2026-03-31', '2026-03-31'))).toBe(
+			'das Modell hat einen anderen Wert gesetzt (31.03.2026)'
+		);
+		expect(other(typed('amount', { amount: '84.2', currency: 'EUR' }, '84.2 EUR'))).toBe(
+			'das Modell hat einen anderen Wert gesetzt (84,20\u00a0€)'
+		);
+		expect(other(typed('number', '1234.5', '1234.5'))).toBe(
+			'das Modell hat einen anderen Wert gesetzt (1.234,5)'
+		);
+		const september = { start: '2026-09-01', end: '2026-09-30' };
+		expect(other(typed('period', september, '2026-09'))).toBe(
+			'das Modell hat einen anderen Wert gesetzt (2026-09)'
+		);
+		expect(
+			reasonText(
+				reason('rules_disagree', {
+					values: [{ rule: 'a', value: typed('date', '2026-03-31', '2026-03-31') }]
+				})
+			)
+		).toBe('Regeln setzen verschiedene Werte („a“: 31.03.2026)');
+		// A type this UI does not know, and a reason kept from before: the API's text.
+		expect(other(typed('gizmo', 'x', 'as written'))).toBe(
+			'das Modell hat einen anderen Wert gesetzt (as written)'
+		);
+		expect(other('2026-03-31')).toBe('das Modell hat einen anderen Wert gesetzt (2026-03-31)');
 		const widens = reason('space_widens_needs_confirmed', {
 			space: 'Familie',
 			fields: ['contact', 'document_type']
