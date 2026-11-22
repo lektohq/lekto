@@ -507,8 +507,9 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	mail_rule_unreadable: entry(m.reason_mail_rule_unreadable)
 };
 
-/** The nouns the API names things by (the kind `thing`), in the user's language. */
-const THINGS: Record<string, () => string> = {
+/** The nouns the API names things by (the kind `thing`, the API's `Thing`), in the user's
+ * language: every one of `x-things` (a test holds the two together). */
+export const THINGS: Record<string, () => string> = {
 	// A step of a mail rule on a mail on the server.
 	'mail_step:read': m.mail_step_read,
 	'mail_step:unread': m.mail_step_unread,
@@ -569,6 +570,15 @@ const THINGS: Record<string, () => string> = {
 	'mail record': m.thing_mail_record,
 	'push preferences': m.thing_push_preferences,
 	'device name': m.thing_device_name,
+	fact: m.thing_fact,
+	file: m.thing_file,
+	identifier: m.thing_identifier,
+	relation: m.thing_relation,
+	task: m.thing_task,
+	version: m.thing_version,
+	instance: m.thing_instance,
+	'known device': m.thing_known_device,
+	'login failures': m.thing_login_failures,
 	'document tag': m.tag_kind_document,
 	'contact group': m.tag_kind_contact,
 	'document type group': m.tag_kind_type,

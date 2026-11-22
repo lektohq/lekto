@@ -7,6 +7,7 @@ import { getLocale, setLocale } from '#lib/paraglide/runtime.js';
 import {
 	ACTIONS,
 	REASONS,
+	THINGS,
 	outputReasonText,
 	reasonText,
 	reasonsText,
@@ -27,6 +28,15 @@ describe('the actions of the API', () => {
 	it('each have a text, and no text is left without its action', () => {
 		const actions = (openapi as unknown as { 'x-actions': string[] })['x-actions'];
 		expect(Object.keys(ACTIONS).sort()).toEqual([...actions].sort());
+	});
+});
+
+describe('the things of the API', () => {
+	it('each have a word, and no word is left without its thing (WH-03)', () => {
+		// The nouns a reason names come from the core; one without a word here would stand in
+		// English in a German sentence.
+		const things = (openapi as unknown as { 'x-things': string[] })['x-things'];
+		expect(Object.keys(THINGS).sort()).toEqual([...things].sort());
 	});
 });
 

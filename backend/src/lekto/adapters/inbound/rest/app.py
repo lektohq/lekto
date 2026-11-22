@@ -71,7 +71,7 @@ from lekto.core.domain.document_facts import ROLES as FACT_ROLES
 from lekto.core.domain.identifiers import catalog as identifier_kinds
 from lekto.core.domain.links import TASK_RESULT
 from lekto.core.domain.mail_rules import OPERATORS as MAIL_OPERATORS
-from lekto.core.domain.reasons import Action
+from lekto.core.domain.reasons import Action, Thing
 from lekto.core.domain.reasons import catalog as reasons_catalog
 from lekto.core.ports.wakeup import Channel
 
@@ -296,6 +296,8 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
         schema["x-reasons"] = reasons_catalog()
         # The actions a reason of the kind `action` names (`reasons.Action`), for clients to word.
         schema["x-actions"] = sorted(action.value for action in Action)
+        # The nouns a reason of the kind `thing` names (`reasons.Thing`), for clients to word.
+        schema["x-things"] = sorted(thing.value for thing in Thing)
         # The kinds of identifiers and whose they are (clients offer them by these).
         schema["x-identifier-kinds"] = identifier_kinds()
         # The role of a fact of each kind until a source tells (`document_facts.ROLES`).
