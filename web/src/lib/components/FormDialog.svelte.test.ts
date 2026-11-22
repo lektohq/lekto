@@ -39,6 +39,20 @@ function dialog(action: () => Promise<void>) {
 }
 
 describe('FormDialog', () => {
+	it('keeps the corner free for the X and runs the footer to the edge', async () => {
+		dialog(() => Promise.resolve());
+		const title = await screen.findByRole('heading', { name: 'Space' });
+		// A title of two lines does not stick together, and ends before the X.
+		expect(title.className).toContain('leading-snug');
+		expect(title.closest('[data-slot="dialog-header"]')?.className).toContain('pr-8');
+		// The footer's band takes back the padding of the content, on every side it touches.
+		const content = document.querySelector('[data-slot="dialog-content"]');
+		const footer = document.querySelector('[data-slot="dialog-footer"]');
+		expect(content?.className).toMatch(/(?<![\w:-])p-5\b/);
+		expect(footer?.className).toMatch(/(?<![\w:])-mx-5 -mb-5\b/);
+		expect(footer?.className).toMatch(/(?<![\w:-])px-5\b/);
+	});
+
 	it('runs the action once, held while it runs, and closes when it succeeds', async () => {
 		const user = userEvent.setup();
 		let finish!: () => void;

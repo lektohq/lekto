@@ -1,4 +1,10 @@
+<script lang="ts" module>
+	/** Whether the dialog shows its X: the head keeps the corner free for it. */
+	export const CLOSE_BUTTON = Symbol('dialog close button');
+</script>
+
 <script lang="ts">
+	import { setContext } from 'svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { Dialog as DialogPrimitive } from 'bits-ui';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -26,6 +32,8 @@
 		/** The width from a phone on (web/DESIGN.md, "Dialogs"): 384, 512, 672 or 768 px. */
 		size?: 'sm' | 'md' | 'lg' | 'xl';
 	} = $props();
+
+	setContext(CLOSE_BUTTON, () => showCloseButton);
 
 	const WIDTHS = {
 		sm: 'sm:max-w-sm',
