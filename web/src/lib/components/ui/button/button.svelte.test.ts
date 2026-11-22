@@ -58,17 +58,7 @@ describe('a button while its action runs (WZ-01)', () => {
 
 describe('the sizes of a button on a phone (WE-04)', () => {
 	// web/DESIGN.md, "Touch targets": 44 px for a finger, drawn or as an invisible hit area.
-	const SIZES: ButtonSize[] = [
-		'default',
-		'xs',
-		'sm',
-		'lg',
-		'icon',
-		'icon-xs',
-		'icon-sm',
-		'icon-lg',
-		'stack'
-	];
+	const SIZES: ButtonSize[] = ['default', 'xs', 'sm', 'lg', 'icon', 'icon-sm', 'stack'];
 	const TALL = /(?:^|\s)(?:max-sm:)?(?:h|size)-(?:11|12|14)(?:\s|$)/;
 	const AREA = /max-sm:after:absolute.*max-sm:after:-inset-(?:y-)?[\d.]+/;
 
@@ -85,8 +75,6 @@ describe('the sizes of a button on a phone (WE-04)', () => {
 			const inset = Number(/max-sm:after:-inset-(?:y-)?([\d.]+)/.exec(classes)?.[1]);
 			return (drawn + 2 * inset) * 4;
 		};
-		expect((['xs', 'sm', 'icon-xs', 'icon-sm'] as ButtonSize[]).map(reach)).toEqual([
-			44, 44, 44, 44
-		]);
+		expect((['xs', 'sm', 'icon-sm'] as ButtonSize[]).map(reach)).toEqual([44, 44, 44]);
 	});
 });

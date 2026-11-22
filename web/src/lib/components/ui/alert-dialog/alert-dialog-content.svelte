@@ -8,11 +8,12 @@
 	let {
 		ref = $bindable(null),
 		class: className,
-		size = 'default',
+		size = 'md',
 		portalProps,
 		...restProps
 	}: WithoutChild<AlertDialogPrimitive.ContentProps> & {
-		size?: 'default' | 'sm' | 'md';
+		/** The one width of a question before an action (web/DESIGN.md, "Dialogs"). */
+		size?: 'md';
 		portalProps?: WithoutChildrenOrChild<ComponentProps<typeof AlertDialogPortal>>;
 	} = $props();
 </script>
@@ -24,7 +25,7 @@
 		data-slot="alert-dialog-content"
 		data-size={size}
 		class={cn(
-			'group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%_-_2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border bg-popover p-5 text-popover-foreground shadow-lg duration-100 outline-none  data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-safe:data-[state=closed]:zoom-out-95 motion-safe:data-[state=open]:zoom-in-95 data-[size=default]:sm:max-w-sm data-[size=md]:sm:max-w-lg data-[size=sm]:sm:max-w-xs',
+			'group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%_-_2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border bg-popover p-5 text-popover-foreground shadow-lg duration-100 outline-none  data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-safe:data-[state=closed]:zoom-out-95 motion-safe:data-[state=open]:zoom-in-95 data-[size=md]:sm:max-w-lg',
 			className
 		)}
 		{...restProps}

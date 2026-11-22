@@ -17,7 +17,7 @@
 	containerAriaLabel={m.toast_region()}
 	closeButtonAriaLabel={m.toast_close()}
 	theme={mode.current}
-	class="toaster group"
+	class="group"
 	style="--normal-bg: var(--color-popover); --normal-text: var(--color-popover-foreground); --normal-border: var(--color-border);"
 	toastOptions={{
 		classes: {

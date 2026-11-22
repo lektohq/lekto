@@ -695,6 +695,51 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(inside.test('<Badge>a</Badge> <button type="button">x</button>')).toBe(false);
 	});
 
+	it('keeps no part of a primitive that nobody uses', () => {
+		// DESIGN.md, "Living style guide": what `ui/` offers is in use and shown there. A part is
+		// what an `index.ts` exports under its names; it counts as used when a file reaches one
+		// of them, through the namespace (`Card.Title`) or by name (`{ Button }`).
+		const all = { ...sources, ...scripts };
+		const names = (block: string) =>
+			block
+				.split(',')
+				.map((part) => part.replace(/\/\/.*/, '').trim())
+				.filter((part) => part && !part.startsWith('type '))
+				.map((part) => /^(\w+)(?: as (\w+))?$/.exec(part))
+				.filter((hit) => hit !== null)
+				.map((hit) => ({ part: hit[1], name: hit[2] ?? hit[1] }));
+		const unused = Object.entries(scripts)
+			.filter(([path]) => /^\/src\/lib\/components\/ui\/[^/]+\/index\.ts$/.test(path))
+			.flatMap(([index, source]) => {
+				const folder = index.slice(0, index.lastIndexOf('/'));
+				const kind = folder.slice(folder.lastIndexOf('/') + 1);
+				const from = `'[^']*ui/${kind}(?:/index\\.(?:ts|js))?'`;
+				const used = new Set<string>();
+				for (const [path, text] of Object.entries(all)) {
+					if (path === index) continue;
+					const spaces = [...text.matchAll(new RegExp(`import \\* as (\\w+) from ${from}`, 'g'))];
+					if (path.startsWith(`${folder}/`))
+						spaces.push(...text.matchAll(/import \* as (\w+) from '\.\/index\.(?:ts|js)'/g));
+					for (const [, space] of spaces)
+						for (const [, name] of text.matchAll(new RegExp(`\\b${space}\\.(\\w+)`, 'g')))
+							used.add(name);
+					for (const [, block] of text.matchAll(
+						new RegExp(`import (?:type )?\\{([^}]*)\\} from ${from}`, 'g')
+					))
+						for (const part of block.split(','))
+							used.add(part.replace('type ', '').split(' as ')[0].trim());
+				}
+				const parts = new Map<string, string[]>();
+				for (const [, block] of source.matchAll(/export \{([^}]*)\}/g))
+					for (const { part, name } of names(block))
+						parts.set(part, [...(parts.get(part) ?? []), name]);
+				return [...parts]
+					.filter(([, known]) => !known.some((name) => used.has(name)))
+					.map(([part]) => `${kind}: ${part}`);
+			});
+		expect(unused).toEqual([]);
+	});
+
 	it('draws no box by hand in a tab of the system page', () => {
 		// "Cards": a figure with its word is `StatTile`, every other box a `Card`.
 		const classes = /"[^"\n]*"|'[^'\n]*'/g;

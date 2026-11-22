@@ -5,8 +5,8 @@
  * tap on it is none on the page behind the layer (`inToast`).
  */
 
-/** The classes of every toast: the look, and reachable above an open layer. */
-export const TOAST_CLASS = 'cn-toast pointer-events-auto';
+/** The class of every toast: reachable above an open layer. */
+export const TOAST_CLASS = 'pointer-events-auto';
 
 /** The ✕ of a toast, 20 px as svelte-sonner draws it: reachable as every target, 24 px with
  * a mouse and a finger's 44 px on a phone ("Touch targets"). */
