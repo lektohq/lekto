@@ -60,7 +60,12 @@ A new token needs a value for both modes and that contrast.
 **Lane tones:** a mark of a lane (badge, chip, step of the processing band, counter) has the lane's
 ground, its text in the lane's foreground, and a border in the foreground at low opacity. In light
 mode there are no dark fills. One map, `tones.ts`, turns a lane or tone into these classes. Nobody
-writes the classes by hand.
+writes the classes by hand. A mark without text (a step of the processing band, a rail, a bar) is
+`LANE_MARK`: the ground with the chip's edge, drawn inside. A small mark (a dot of the timeline,
+of the counts, of the matrix, `AlertDot`) is `TONE_DOT`: the ground in a full edge of 1.5 px,
+`border-dot`, since a hairline vanishes at that size and 2 px swallow the ground. That is the one
+width of a border around a box outside Tailwind's scale; an outline without a ground (waiting,
+skipped) takes it too. A stripe too thin for a ground is `LANE_STRIPE`.
 
 Tags have their own palette (twelve colours tuned for both modes, or an own `#rrggbb`). `chipLook()`
 in `lib/chips.ts` draws it. The text follows the contrast.

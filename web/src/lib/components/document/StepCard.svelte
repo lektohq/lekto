@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { NODE_LABELS } from '#lib/node-labels.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { stepLook, TONE_TEXT, type Tone } from '#lib/step-look.ts';
+	import { stepLook, type Tone } from '#lib/step-look.ts';
+	import { TONE_TEXT } from '#lib/tones.ts';
 	import type { Step } from '#lib/steps.ts';
 	import { cn } from '#lib/utils.ts';
 

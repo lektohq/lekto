@@ -6,7 +6,8 @@
 	import { NODE_LABELS } from '#lib/node-labels.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { Node } from '#lib/pipeline.ts';
-	import { stepLook, TONE_TEXT, type Tone } from '#lib/step-look.ts';
+	import { stepLook, type Tone } from '#lib/step-look.ts';
+	import { TONE_TEXT } from '#lib/tones.ts';
 	import { PHASE_LABELS, phaseOf, type Phase, type Step } from '#lib/steps.ts';
 	import { cn } from '#lib/utils.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';

@@ -1189,6 +1189,31 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('keeps the marks of a tone in the one map, with the one width of a dot', () => {
+		// "Colour roles", lane tones: `tones.ts` alone knows mark, dot and stripe. A file that
+		// says how a step looks (`step-look.ts`) names icon and word, no class of a lane.
+		expect(scripts['/src/lib/step-look.ts']).not.toMatch(/\b(?:bg|ring|border|text)-lane-/);
+		// A dot's ground with its edge is `TONE_DOT`, never written out again.
+		const dot = /border-dot border-(lane-\w+|note)-foreground bg-\1\b/;
+		expect(dot.test('border-dot border-lane-yellow-foreground bg-lane-yellow')).toBe(true);
+		expect(dot.test('border-dot border-dashed border-muted-foreground')).toBe(false);
+		expect(
+			Object.entries({ ...sources, ...scripts })
+				.filter(([path, source]) => path !== '/src/lib/tones.ts' && dot.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+		// No border around a box in a free width: `border-dot` is the one beyond the scale. (A
+		// line drawn with one side of a box, a rail or a legend's sample, is no such border.)
+		const free = /(?<![\w-])border-\[[\d.]+px\]/;
+		expect(free.test('size-4 rounded-full border-[1.5px] border-muted-foreground')).toBe(true);
+		expect(free.test('w-0 border-l-[3px] border-dashed')).toBe(false);
+		expect(
+			Object.entries({ ...sources, ...scripts })
+				.filter(([, source]) => free.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
 	it('draws no action on the colour of a lane', () => {
 		// "Lane colours mean state, nothing else" (DESIGN.md, "Principles"): what one presses
 		// takes a variant of `Button`. A hover on a lane's ground is the mark of such an action.
