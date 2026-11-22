@@ -5,6 +5,7 @@
 	import FormDialog from '#lib/components/FormDialog.svelte';
 	import SearchField from '#lib/components/SearchField.svelte';
 	import { Choice } from '#lib/components/ui/choice/index.ts';
+	import { searchTyped } from '#lib/document-search.ts';
 	import { formatDate } from '#lib/i18n.ts';
 	import { mergeBlock, type Candidate } from '#lib/merge.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -46,36 +47,13 @@
 		);
 	}
 
-	$effect(() => {
-		const text = query.trim();
-		found = null;
-		if (!text) return;
-		let current = true;
-		const timer = setTimeout(() => {
-			void unwrap(
-				api.POST('/api/v1/documents/search', {
-					params: { query: { limit: 20, semantic_ratio: 0 } },
-					body: { q: text }
-				})
-			).then(
-				(page) => {
-					if (current) found = page.items.map((item) => item.document);
-				},
-				() => {
-					const wanted = text.toLocaleLowerCase();
-					if (current) {
-						found = untrack(() => recent).filter((item) =>
-							item.title.toLocaleLowerCase().includes(wanted)
-						);
-					}
-				}
-			);
-		}, 250);
-		return () => {
-			current = false;
-			clearTimeout(timer);
-		};
-	});
+	$effect(() =>
+		searchTyped(query, {
+			recent: () => untrack(() => recent),
+			read: (document) => document,
+			show: (documents) => (found = documents)
+		})
+	);
 
 	const rows = $derived(
 		(found ?? recent).map((document) => ({ document, reason: mergeBlock(document, there) }))
@@ -84,10 +62,14 @@
 	const pages = (count: number | null) =>
 		count === 1 ? m.page_edit_pages_one() : m.page_edit_pages({ count: String(count ?? 0) });
 
+	// The choice counts only while its row stands there: a search may have taken it away (WA-07).
+	const choice = $derived(
+		rows.find((item) => item.document.id === picked && item.reason === null) ?? null
+	);
+
 	async function add() {
-		const row = rows.find((item) => item.document.id === picked && item.reason === null);
-		if (!row) return;
-		onpick(row.document);
+		if (!choice) return;
+		onpick(choice.document);
 		open = false;
 	}
 </script>
@@ -97,7 +79,7 @@
 	title={m.pick_document_title()}
 	description={m.pick_document_description()}
 	submitLabel={m.pick_document_add()}
-	disabled={picked === null}
+	disabled={choice === null}
 	size="md"
 	action={add}
 >
