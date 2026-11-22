@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { components } from '#lib/api/schema.ts';
 import { listedOf } from '#lib/testing/documents.ts';
 import { calls, fakeApi } from '#lib/testing/api.ts';
 import { listPlaces, SEARCH_PAGE_MAX } from './list-places.ts';
@@ -27,15 +28,21 @@ describe('the documents of the list a document was opened from', () => {
 		const page = (offset: number) =>
 			Array.from({ length: SEARCH_PAGE_MAX }, (_, n) => ({
 				document: listedOf({ id: `d${offset + n}` }),
+				score: null,
 				snippet: []
 			}));
 		const api = fakeApi({
-			'POST /api/v1/documents/search': (_, url) => ({
-				items: page(Number(url.searchParams.get('offset'))),
-				estimated_total: 5000,
-				word_total: 5000,
-				mode: 'words'
-			})
+			'POST /api/v1/documents/search': (_, url) =>
+				({
+					items: page(Number(url.searchParams.get('offset'))),
+					estimated_total: 5000,
+					word_total: 5000,
+					next_offset: null,
+					semantic: false,
+					mode: 'words',
+					reason: null,
+					meaning_pending: false
+				}) satisfies components['schemas']['SearchResultPage']
 		});
 		vi.stubGlobal('fetch', api);
 		const ids = await listPlaces('/ui/documents?tag=t1', 'Strom', false);

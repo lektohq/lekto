@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { WEBHOOK_EVENT_TYPES } from '#lib/events.svelte.ts';
+import type { Reason } from '#lib/reasons.ts';
 import { m } from '#lib/paraglide/messages.js';
 import {
 	eventLabel,
@@ -42,8 +43,8 @@ describe('how often webhook events come for one document', () => {
 
 describe('a webhook switched off', () => {
 	it('was switched off by Lekto when its reason says so, not by a person', () => {
-		const failing = { code: 'webhook_failing', params: {}, text: '' };
-		expect(switchedOffFailing({ disabled_reasons: [failing] as never })).toBe(true);
+		const failing: Reason = { code: 'webhook_failing', params: {} };
+		expect(switchedOffFailing({ disabled_reasons: [failing] })).toBe(true);
 		expect(switchedOffFailing({ disabled_reasons: [] })).toBe(false);
 	});
 });

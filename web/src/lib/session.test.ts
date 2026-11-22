@@ -2,18 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '#lib/api/client.ts';
 import { CSRF_HEADER, setSessionHooks } from '#lib/api/fetch.ts';
 import { json, problem } from '#lib/testing/api.ts';
+import { meOf } from '#lib/testing/session.ts';
 import { connectSession, recheckSession, session } from './session.svelte.ts';
 
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
 
 function me(id: string, token: string): Response {
-	return json({
-		user: { id, username: id, role: 'user' },
-		method: 'password',
-		expires_at: '2026-10-09T12:00:00Z',
-		csrf_token: token,
-		lekto_version: '0.8.0'
-	});
+	return json(meOf({ user: { id, username: id, role: 'user' }, csrf_token: token }));
 }
 
 const stale = () =>

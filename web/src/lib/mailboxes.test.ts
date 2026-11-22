@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import type { Reason } from '#lib/reasons.ts';
 import {
 	complete,
 	createBody,
@@ -142,15 +143,15 @@ describe('what a mailbox left out or could not do', () => {
 	});
 
 	it('names the step that failed and the mail left out, with when', () => {
-		const reason = { code: 'mail_server_error', text: 'x', params: { detail: 'no' } };
+		const reason: Reason = { code: 'mail_server_error', params: { detail: 'no' } };
 		const mailbox: Mailbox = {
 			...MAILBOX,
 			status: {
 				...MAILBOX.status,
 				step_failed_at: '2026-11-05T10:00:00Z',
-				step_failed: reason as unknown as Mailbox['status']['step_failed'],
+				step_failed: reason,
 				skipped_at: '2026-11-04T10:00:00Z',
-				skipped: reason as unknown as Mailbox['status']['skipped']
+				skipped: reason
 			}
 		};
 		expect(cautions(mailbox).map((item) => item.key)).toEqual(['step', 'skipped']);
