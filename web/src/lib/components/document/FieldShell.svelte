@@ -165,7 +165,10 @@
 	onfocusout={blur}
 	class={cn(
 		card
-			? 'my-1 flex flex-col gap-2.5 rounded-2xl border border-lane-yellow-foreground/25 bg-lane-yellow/25 p-3.5 transition-shadow'
+			? cn(
+					cardVariants({ size: 'sm', tone: 'open' }),
+					'my-1 flex flex-col gap-2.5 transition-shadow'
+				)
 			: calm
 				? cn(cardVariants({ size: 'sm' }), 'my-1 flex flex-col gap-2.5 transition-shadow')
 				: '-mx-2.5 flex flex-col gap-1.5 rounded-xl px-2.5 py-2 transition-colors',

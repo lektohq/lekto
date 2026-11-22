@@ -636,11 +636,17 @@ describe('the design system (web/DESIGN.md)', () => {
 	});
 
 	it('draws a box of tone only as an Alert', () => {
-		// A hint with a tone, its radius and its padding: `ui/alert` (DESIGN.md, "Alerts").
-		const classes = /\sclass=(?:"[^"]*"|\{[^}]*\})/g;
+		// A hint with a tone, its radius and its padding: `ui/alert` (DESIGN.md, "Alerts"); the
+		// yellow card of what waits for an answer is `Card tone="open"` ("Cards"). Every string
+		// of classes counts, also one inside an expression, and padding on all sides at once.
+		const classes = /"[^"\n]*"|'[^'\n]*'/g;
 		const tone = /\bbg-(?:lane-yellow|lane-red|note)\b/;
 		const box = (value: string) =>
-			/\brounded-(?:lg|xl|2xl)\b/.test(value) && /\bpx-\d/.test(value) && /\bpy-\d/.test(value);
+			/\brounded-(?:lg|xl|2xl)\b/.test(value) &&
+			(/\bp-\d/.test(value) || (/\bpx-\d/.test(value) && /\bpy-\d/.test(value)));
+		expect(box('rounded-2xl border bg-lane-yellow/25 p-4')).toBe(true);
+		expect(box('rounded-lg bg-note px-3 py-2')).toBe(true);
+		expect(box('rounded-full bg-lane-yellow px-2')).toBe(false);
 		expect(
 			offenders((source, path) => {
 				// The search check's figures are tiles in the lanes' tones, no hints.

@@ -489,6 +489,12 @@
 				</Card.Root>
 			{/each}
 		</div>
+		{#each ['open'] as const as tone (tone)}
+			<Card.Root size="sm" {tone} class="flex max-w-xl flex-col gap-1">
+				<Card.Title level={3}>{tone}</Card.Title>
+				<p class="text-sm">{m.dev_sample_text()}</p>
+			</Card.Root>
+		{/each}
 		<Card.Root size="sm" class="flex max-w-xl flex-col gap-1">
 			<p class="px-1 text-sm">{m.dev_sample_text()}</p>
 			<FoldedGroup
