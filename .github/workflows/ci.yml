@@ -318,8 +318,6 @@ jobs:
       LEKTO_ADMIN_USERNAME: admin
       LEKTO_COOKIE_SECURE: "false"
       LEKTO_UI_DIR: ${{ github.workspace }}/web/build
-      LEKTO_DB_SQLITE_PATH: ${{ runner.temp }}/lekto/lekto.db
-      LEKTO_STORAGE_PATH: ${{ runner.temp }}/lekto/objects
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
@@ -358,6 +356,9 @@ jobs:
             echo "LEKTO_ADMIN_PASSWORD=$password"
           } >> "$GITHUB_ENV"
           export LEKTO_SECRET_KEY=$secret LEKTO_ADMIN_PASSWORD=$password
+          # The `runner` context is not known where a job sets its `env`.
+          export LEKTO_DB_SQLITE_PATH="$RUNNER_TEMP/lekto/lekto.db"
+          export LEKTO_STORAGE_PATH="$RUNNER_TEMP/lekto/objects"
           uv sync --locked
           uv run --no-sync lekto migrate
           nohup uv run --no-sync lekto api > "$RUNNER_TEMP/lekto/api.log" 2>&1 &
