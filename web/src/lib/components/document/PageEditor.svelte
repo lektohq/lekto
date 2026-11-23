@@ -8,7 +8,7 @@
 	import RotateCw from '@lucide/svelte/icons/rotate-cw';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Undo2 from '@lucide/svelte/icons/undo-2';
-	import { tick, untrack } from 'svelte';
+	import { onDestroy, tick, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
 	import { apiError } from '#lib/api/problem.ts';
@@ -360,6 +360,9 @@
 		window.removeEventListener('pointerup', pointerup);
 		window.removeEventListener('pointercancel', release);
 	}
+
+	// Closed in the middle of a press: the window's listeners and the timer go with the editor.
+	onDestroy(release);
 
 	/** The click after a move or a long press is no choice. */
 	function swallowClick() {

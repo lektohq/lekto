@@ -9,12 +9,30 @@ import Hourglass from '@lucide/svelte/icons/hourglass';
 import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 import OctagonX from '@lucide/svelte/icons/octagon-x';
 import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
+import type { Snippet } from 'svelte';
 import { m } from '#lib/paraglide/messages.js';
-import type { NodeState } from '#lib/pipeline.ts';
+import type { Node, NodeState } from '#lib/pipeline.ts';
+import type { Phase, Step } from '#lib/steps.ts';
 import type { Tone as UiTone } from '#lib/tones.ts';
 
 /** The tones a step can have, of the UI's (`tones.ts`, which draws them). */
 export type Tone = Extract<UiTone, 'green' | 'yellow' | 'red' | 'running' | 'muted'>;
+
+/** What the steps of a run take, drawn in columns on a desktop (`ProcessingGraph`) or down a
+ * line (`ProcessingTimeline`). */
+export interface StepsProps {
+	groups: readonly { phase: Phase; steps: Step[] }[];
+	run: number;
+	selected: Node | null;
+	summaryOf: (step: Step) => string | null;
+	durationOf: (step: Step) => string | null;
+	phaseDuration: (steps: readonly Step[]) => string | null;
+	/** The step pointed at or focused, here or in the band. */
+	highlighted?: Node | null;
+	onhighlight: (node: Node | null) => void;
+	ontoggle: (node: Node) => void | Promise<void>;
+	details: Snippet<[Step]>;
+}
 
 export interface Look {
 	icon: typeof Circle;

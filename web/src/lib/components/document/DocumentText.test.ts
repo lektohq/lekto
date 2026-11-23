@@ -22,6 +22,15 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
+/** Page `number` of the text, once it is drawn. */
+function pageOf(number: number): Promise<HTMLElement> {
+	return vi.waitFor(() => {
+		const found = document.querySelector<HTMLElement>(`[data-page="${number}"]`);
+		expect(found).not.toBeNull();
+		return found!;
+	});
+}
+
 describe('DocumentText', () => {
 	it('reads the text again only when its node has read it again', async () => {
 		// Issue #75: of a run's events only the text's node changes the text.
@@ -29,7 +38,7 @@ describe('DocumentText', () => {
 		const completed = (node: string) =>
 			send('document.node_completed', { document_id: 'doc-1', node, run: 1, outcome: 'ok' });
 		render(DocumentText, { documentId: 'doc-1' });
-		await screen.findByRole('region', { name: m.content_page({ page: 1 }) });
+		await pageOf(1);
 		for (const node of ['ocr', 'pages', 'signal_llm', 'judge']) completed(node);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 		completed('parse');
@@ -39,8 +48,8 @@ describe('DocumentText', () => {
 
 	it('shows the text as it is set, page by page', async () => {
 		render(DocumentText, { documentId: 'doc-1' });
-		const first = await screen.findByRole('region', { name: m.content_page({ page: 1 }) });
-		const second = screen.getByRole('region', { name: m.content_page({ page: 2 }) });
+		const first = await pageOf(1);
+		const second = await pageOf(2);
 		// Columns stay where they are set: no Markdown, no collapsed spaces.
 		expect(first.querySelector('pre')?.textContent).toBe(
 			'Gesamtbrutto (EBeschV)      6.767,00\nSteuer-Brutto, EZ           3.544,50'
@@ -54,7 +63,7 @@ describe('DocumentText', () => {
 		render(DocumentText, { documentId: 'doc-1', hasText: false });
 		await new Promise((resolve) => setTimeout(resolve, 20));
 		expect(fetchMock).not.toHaveBeenCalled();
-		expect(screen.queryByRole('region', { name: m.content_page({ page: 1 }) })).toBeNull();
+		expect(document.querySelector('[data-page]')).toBeNull();
 		expect(screen.queryByText(m.loading())).toBeNull();
 	});
 
@@ -65,7 +74,7 @@ describe('DocumentText', () => {
 			documentId: 'doc-1',
 			marks: [{ start: 14, end: 21 }]
 		});
-		await screen.findByRole('region', { name: m.content_page({ page: 1 }) });
+		await pageOf(1);
 		expect(document.querySelector('mark[data-mark]')?.textContent).toBe('EBeschV');
 		await view.component.revealMark();
 		expect(scrolled).toHaveBeenCalled();
@@ -89,9 +98,33 @@ describe('DocumentText', () => {
 		};
 		const onpage = vi.fn();
 		render(DocumentText, { documentId: 'doc-1', onpage });
-		await screen.findByRole('region', { name: m.content_page({ page: 3 }) });
+		await pageOf(3);
 		window.dispatchEvent(new Event('scroll'));
 		await vi.waitFor(() => expect(onpage).toHaveBeenLastCalledWith(2, 3));
+	});
+
+	it('follows the scrolling once a frame, and not while it is hidden', async () => {
+		answer = {
+			text: 'eins\n\f\nzwei\n\f\ndrei',
+			offset: 0,
+			total_length: 17,
+			next_offset: null
+		};
+		const onpage = vi.fn();
+		render(DocumentText, { documentId: 'doc-1', onpage });
+		await pageOf(3);
+		await new Promise((resolve) => requestAnimationFrame(resolve));
+		const measured = vi.spyOn(Element.prototype, 'getBoundingClientRect');
+		for (let step = 0; step < 5; step++) window.dispatchEvent(new Event('scroll'));
+		await new Promise((resolve) => requestAnimationFrame(resolve));
+		expect(measured.mock.calls.length).toBeLessThanOrEqual(4); // the box and its three pages
+		// Hidden (another tab of the page), everything measures nothing: it is no last page.
+		Element.prototype.checkVisibility = () => false;
+		onpage.mockClear();
+		window.dispatchEvent(new Event('scroll'));
+		await new Promise((resolve) => requestAnimationFrame(resolve));
+		expect(onpage).not.toHaveBeenCalledWith(3, 3);
+		delete (Element.prototype as Partial<Element>).checkVisibility;
 	});
 
 	it('marks the quotes it is given where they stand, however their spaces fall', async () => {
@@ -100,7 +133,7 @@ describe('DocumentText', () => {
 			marks: [{ start: 14, end: 21 }],
 			quotes: ['Steuer-Brutto, EZ 3.544,50', 'nicht im Text']
 		});
-		await screen.findByRole('region', { name: m.content_page({ page: 1 }) });
+		await pageOf(1);
 		const marked = [...document.querySelectorAll('mark[data-mark]')].map(
 			(mark) => mark.textContent
 		);

@@ -133,12 +133,13 @@
 			done
 		);
 
-	// A document picked: related at once, the picker empty again.
+	// A document picked: related at once, the picker empty again; picked while another change
+	// runs, once that is done (not dropped without a word).
 	$effect(() => {
 		const picked = adding;
-		if (!picked) return;
+		if (!picked || busy) return;
 		adding = null;
-		if (!untrack(() => busy)) void relate(picked.id, m.relations_set());
+		void relate(picked.id, m.relations_set());
 	});
 
 	const typeName = (id: string | null | undefined) =>

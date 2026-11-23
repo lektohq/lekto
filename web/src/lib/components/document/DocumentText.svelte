@@ -136,7 +136,9 @@
 	// text scrolls itself on a wide screen, with the window on a narrow one.
 	let current = $state(1);
 	function follow() {
-		if (!textBox) return;
+		// Hidden (another tab of the page) everything measures nothing, which reads as the last
+		// page: then it tells nothing.
+		if (!textBox || textBox.checkVisibility?.() === false) return;
 		const box = textBox.getBoundingClientRect();
 		const top = Math.max(box.top, 0);
 		const line = top + (Math.min(box.bottom, window.innerHeight) - top) / 3;
@@ -151,6 +153,16 @@
 		void pages;
 		void tick().then(follow);
 	});
+	// Scrolling fires far more often than a frame is drawn: measured once a frame.
+	let frame = 0;
+	function followSoon() {
+		if (frame !== 0) return;
+		frame = requestAnimationFrame(() => {
+			frame = 0;
+			follow();
+		});
+	}
+	$effect(() => () => cancelAnimationFrame(frame));
 	$effect(() => onpage?.(current, text === null ? 0 : pages.length));
 
 	/** Scroll the first mark into view, once it is drawn. */
@@ -176,7 +188,7 @@
 	}
 </script>
 
-<svelte:window onscroll={follow} />
+<svelte:window onscroll={followSoon} />
 
 <Card.Root
 	as="section"
@@ -197,18 +209,15 @@
 		</Button>
 	</PaneHead>
 	<!-- As set: no wrapping, the card scrolls sideways. -->
-	<div bind:this={textBox} class="relative min-h-0 flex-1 overflow-auto" onscroll={follow}>
+	<div bind:this={textBox} class="relative min-h-0 flex-1 overflow-auto" onscroll={followSoon}>
 		{#if problem}
 			<div class="p-6"><LoadProblem {problem} onretry={loadText} /></div>
 		{:else if text === null}
 			<p class="p-6 text-sm text-muted-foreground">{loading ? m.loading() : m.text_none()}</p>
 		{:else}
 			{#each pages as page, index (index)}
-				<section
-					aria-label={m.content_page({ page: index + 1 })}
-					data-page={index + 1}
-					class="px-7 py-6"
-				>
+				<!-- No region of its own: a landmark per page would crowd the page's (WA-K06). -->
+				<div data-page={index + 1} class="px-7 py-6">
 					{#if pages.length > 1}
 						<Eyebrow class="mb-3">{m.content_page({ page: index + 1 })}</Eyebrow>
 					{/if}
@@ -218,7 +227,7 @@
 										class="rounded-sm bg-primary/20 text-inherit ring-2 ring-primary"
 										>{segment.text}</mark
 									>{:else}{segment.text}{/if}{/each}{:else}{page}{/if}</pre>
-				</section>
+				</div>
 				{#if index < pages.length - 1}<hr class="border-muted" />{/if}
 			{/each}
 		{/if}

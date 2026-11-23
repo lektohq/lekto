@@ -1,11 +1,10 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
 	import StepCard from '#lib/components/document/StepCard.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { isAtWork, type Node } from '#lib/pipeline.ts';
-	import { stepLook, type Tone } from '#lib/step-look.ts';
-	import { TONE_DOT } from '#lib/tones.ts';
-	import { PHASE_LABELS, type Phase, type Step } from '#lib/steps.ts';
+	import { stepLook, type StepsProps } from '#lib/step-look.ts';
+	import { STEP_BORDER, STEP_TINT, TONE_DOT } from '#lib/tones.ts';
+	import { PHASE_LABELS, type Step } from '#lib/steps.ts';
 	import { cn } from '#lib/utils.ts';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import Eyebrow from '#lib/components/page/Eyebrow.svelte';
@@ -25,19 +24,7 @@
 		onhighlight,
 		ontoggle,
 		details
-	}: {
-		groups: readonly { phase: Phase; steps: Step[] }[];
-		run: number;
-		selected: Node | null;
-		summaryOf: (step: Step) => string | null;
-		durationOf: (step: Step) => string | null;
-		phaseDuration: (steps: readonly Step[]) => string | null;
-		/** The step pointed at or focused, here or in the band. */
-		highlighted?: Node | null;
-		onhighlight: (node: Node | null) => void;
-		ontoggle: (node: Node) => void;
-		details: Snippet<[Step]>;
-	} = $props();
+	}: StepsProps = $props();
 
 	type Line = 'green' | 'yellow' | 'red' | 'running' | 'waiting';
 
@@ -80,20 +67,17 @@
 		running: 'bg-lane-running-foreground/50',
 		waiting: 'bg-muted-foreground/40'
 	};
-	const tints: Record<Tone, string> = {
-		green: 'border-border bg-secondary/40',
-		running: 'border-border bg-secondary/40',
-		muted: 'border-border bg-secondary/40',
-		yellow: 'border-lane-yellow-foreground/35 bg-lane-yellow/60',
-		red: 'border-lane-red-foreground/35 bg-lane-red/60'
-	};
 	const panelId = (node: Node) => `step-details-${node}`;
 </script>
 
 {#snippet panel(step: Step)}
 	<div
 		id={panelId(step.node)}
-		class={cn('rounded-2xl border p-3.5', tints[stepLook(step.state).tone])}
+		class={cn(
+			'rounded-2xl border p-3.5',
+			STEP_BORDER[stepLook(step.state).tone],
+			STEP_TINT[stepLook(step.state).tone]
+		)}
 	>
 		{@render details(step)}
 	</div>

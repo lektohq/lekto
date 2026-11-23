@@ -7,6 +7,7 @@ import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { kindLabel } from '#lib/identifiers.ts';
 import { goTo, testPage } from '#lib/testing/page-state.svelte.ts';
+import { documentOf } from '#lib/testing/documents.ts';
 import RelationsCard from './RelationsCard.svelte';
 import { streamEvents } from '#lib/testing/events.ts';
 
@@ -114,6 +115,34 @@ describe('RelationsCard', () => {
 		// The picker is named as it reads, and asks for nothing until it opens.
 		expect(screen.getByRole('button', { name: m.relations_add() })).toBeTruthy();
 		expect(fetchMock.mock.calls.some(([request]) => request.url.includes('limit=50'))).toBe(false);
+	});
+
+	it('relates a document picked while another change runs, once that is done (WA-K15)', async () => {
+		const user = userEvent.setup();
+		let finish: () => void = () => {};
+		const posted: unknown[] = [];
+		serve(() => suggested, {
+			'POST /api/v1/documents/reminder/relations': async (request) => {
+				posted.push(await request.clone().json());
+				if (posted.length === 1) await new Promise<void>((resolve) => (finish = resolve));
+				return accepted;
+			},
+			'GET /api/v1/documents': () => ({
+				items: [documentOf({ id: 'later', title: 'Mahnung 2' })],
+				total: 1
+			})
+		});
+		render(RelationsCard, { props: { documentId: 'reminder', lookup: null } });
+		await user.click(
+			await screen.findByRole('button', { name: m.relations_accept({ title: 'Rechnung 4711' }) })
+		);
+		await waitFor(() => expect(posted).toHaveLength(1));
+		await user.click(screen.getByRole('button', { name: m.relations_add() }));
+		await user.click(await screen.findByText('Mahnung 2'));
+		finish();
+		await waitFor(() =>
+			expect(posted).toEqual([{ document_id: 'invoice' }, { document_id: 'later' }])
+		);
 	});
 
 	it('offers nothing to change to a reader', async () => {

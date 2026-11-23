@@ -23,7 +23,12 @@
 		if (!drawn || !target || typeof createImageBitmap !== 'function') return;
 		let current = true;
 		void (async () => {
-			const bitmap = await createImageBitmap(await (await fetchless(src)).blob());
+			let bitmap: ImageBitmap;
+			try {
+				bitmap = await createImageBitmap(await (await fetchless(src)).blob());
+			} catch {
+				return; // not drawable: the placeholder stays
+			}
 			if (!current) return bitmap.close();
 			target.width = bitmap.width;
 			target.height = bitmap.height;

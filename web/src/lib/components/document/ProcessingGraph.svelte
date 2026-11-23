@@ -1,14 +1,14 @@
 <script lang="ts">
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import ChevronUp from '@lucide/svelte/icons/chevron-up';
-	import { tick, type Snippet } from 'svelte';
+	import { tick } from 'svelte';
 	import StepCard from '#lib/components/document/StepCard.svelte';
 	import { NODE_LABELS } from '#lib/node-labels.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { Node } from '#lib/pipeline.ts';
-	import { stepLook, type Tone } from '#lib/step-look.ts';
-	import { TONE_TEXT } from '#lib/tones.ts';
-	import { PHASE_LABELS, phaseOf, type Phase, type Step } from '#lib/steps.ts';
+	import { stepLook, type StepsProps } from '#lib/step-look.ts';
+	import { STEP_BORDER, STEP_TINT, TONE_TEXT } from '#lib/tones.ts';
+	import { PHASE_LABELS, phaseOf } from '#lib/steps.ts';
 	import { cn } from '#lib/utils.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
@@ -29,19 +29,7 @@
 		onhighlight,
 		ontoggle,
 		details
-	}: {
-		groups: readonly { phase: Phase; steps: Step[] }[];
-		run: number;
-		selected: Node | null;
-		summaryOf: (step: Step) => string | null;
-		durationOf: (step: Step) => string | null;
-		phaseDuration: (steps: readonly Step[]) => string | null;
-		/** The step pointed at or focused, here or in the band. */
-		highlighted?: Node | null;
-		onhighlight: (node: Node | null) => void;
-		ontoggle: (node: Node) => void | Promise<void>;
-		details: Snippet<[Step]>;
-	} = $props();
+	}: StepsProps = $props();
 
 	const PANEL = 'step-details';
 	let section = $state<HTMLElement | null>(null);
@@ -68,20 +56,6 @@
 		const index = groups.findIndex((group) => group.phase === phaseOf(open.node));
 		return `calc((100% - ${count - 1} * ${GAP}) * ${(2 * index + 1) / (2 * count)} + ${index} * ${GAP} - 0.4rem)`;
 	});
-	const borders: Record<Tone, string> = {
-		green: 'border-border',
-		running: 'border-border',
-		muted: 'border-border',
-		yellow: 'border-lane-yellow-foreground/35',
-		red: 'border-lane-red-foreground/35'
-	};
-	const tints: Record<Tone, string> = {
-		green: 'bg-secondary/40',
-		running: 'bg-secondary/40',
-		muted: 'bg-secondary/40',
-		yellow: 'bg-lane-yellow/60',
-		red: 'bg-lane-red/60'
-	};
 </script>
 
 <Card.Root
@@ -126,20 +100,20 @@
 			id={PANEL}
 			class={cn(
 				'relative mt-1.5 flex flex-col gap-3 rounded-2xl border p-4',
-				borders[look.tone],
-				tints[look.tone]
+				STEP_BORDER[look.tone],
+				STEP_TINT[look.tone]
 			)}
 		>
 			<!-- The point: the card's ground, tinted like the panel. -->
 			<span
 				class={cn(
 					'absolute -top-[0.45rem] size-3 rotate-45 overflow-hidden border-t border-l bg-card',
-					borders[look.tone]
+					STEP_BORDER[look.tone]
 				)}
 				style:left={point}
 				aria-hidden="true"
 			>
-				<span class={cn('absolute inset-0', tints[look.tone])}></span>
+				<span class={cn('absolute inset-0', STEP_TINT[look.tone])}></span>
 			</span>
 			<div class="flex items-center gap-2.5">
 				<look.icon

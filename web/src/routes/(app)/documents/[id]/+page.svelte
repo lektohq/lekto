@@ -746,6 +746,7 @@
 					{graph}
 					manageable={editable}
 					{lookup}
+					{reading}
 					onreprocess={() => header?.startReprocess()}
 				/>
 			</div>

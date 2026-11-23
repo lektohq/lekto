@@ -73,6 +73,28 @@ export const TONE_TEXT: Record<Tone, string> = {
 	primary: 'text-brand'
 };
 
+/** The edge of a step's card or of its details in the processing view, by the step's tone
+ * (`step-look.ts`): quiet, or the lane's. */
+export const STEP_BORDER: Record<StepTone, string> = {
+	green: 'border-border',
+	running: 'border-border',
+	muted: 'border-border',
+	yellow: 'border-lane-yellow-foreground/35',
+	red: 'border-lane-red-foreground/35'
+};
+
+/** Their ground by the step's tone. */
+export const STEP_TINT: Record<StepTone, string> = {
+	green: 'bg-secondary/40',
+	running: 'bg-secondary/40',
+	muted: 'bg-secondary/40',
+	yellow: 'bg-lane-yellow/60',
+	red: 'bg-lane-red/60'
+};
+
+/** The tones a step of the processing can have. */
+type StepTone = Extract<Tone, 'green' | 'yellow' | 'red' | 'running' | 'muted'>;
+
 /** A lane's tone; a document without a lane is still being processed. */
 export function laneTone(lane: Lane | null | undefined): Tone {
 	return lane ?? 'running';

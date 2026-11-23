@@ -440,7 +440,9 @@ describe('the document tab', () => {
 		serve(parsed, readable);
 		render(Page);
 		const facts = await screen.findByRole('complementary', { name: m.facts_title() });
-		await screen.findByRole('region', { name: m.content_page({ page: 1 }) });
+		await waitFor(() =>
+			expect(globalThis.document.querySelector('[data-page="1"]')).not.toBeNull()
+		);
 		await userEvent.click(await within(facts).findByRole('button', { name: /EBeschV/ }));
 		expect(globalThis.document.querySelector('mark[data-mark]')?.textContent).toBe('EBeschV');
 		// Nothing is remembered in the browser; a switch puts the view in the link.
@@ -491,7 +493,9 @@ describe('the document tab', () => {
 			})
 		});
 		render(Page);
-		await screen.findByRole('region', { name: m.content_page({ page: 1 }) });
+		await waitFor(() =>
+			expect(globalThis.document.querySelector('[data-page="1"]')).not.toBeNull()
+		);
 		await fireEvent.mouseEnter(await screen.findByRole('group', { name: m.field_date() }));
 		await waitFor(() =>
 			expect(globalThis.document.querySelector('mark[data-mark]')?.textContent).toBe('EBeschV 4711')
@@ -570,8 +574,12 @@ describe('the document tab', () => {
 		serve(parsed, readable);
 		render(Page);
 		const bar = await screen.findByRole('group', { name: m.view_pane() });
-		const text = () => screen.queryByRole('region', { name: m.content_page({ page: 1 }) });
-		await waitFor(() => expect(text()).not.toBeNull());
+		// The text pane as it is seen: a hidden one is no region to anybody.
+		const text = () => screen.queryByRole('region', { name: m.view_text() });
+		await waitFor(() =>
+			expect(globalThis.document.querySelector('[data-page="1"]')).not.toBeNull()
+		);
+		expect(text()).not.toBeNull();
 		// The bar of four instead of the panes' switches; the right pane hidden.
 		expect(screen.queryByRole('group', { name: m.view_left() })).toBeNull();
 		expect(screen.queryByRole('complementary', { name: m.facts_title() })).toBeNull();

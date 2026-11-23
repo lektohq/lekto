@@ -120,6 +120,21 @@ describe('PageEditor', () => {
 		expect(onedited).toHaveBeenCalled();
 	});
 
+	it('lets go of the window when it closes in the middle of a press', async () => {
+		const removed = vi.spyOn(window, 'removeEventListener');
+		const { unmount } = render(PageEditor, {
+			open: true,
+			document: DOCUMENT,
+			onedited: vi.fn()
+		});
+		const tile = page(1).closest('[data-page-tile]') as HTMLElement;
+		await fireEvent.pointerDown(tile, { button: 0, pointerType: 'touch' });
+		unmount();
+		const gone = removed.mock.calls.map(([type]) => type);
+		expect(gone).toEqual(expect.arrayContaining(['pointermove', 'pointerup', 'pointercancel']));
+		removed.mockRestore();
+	});
+
 	it('chooses all pages or none from "Auswählen", the tools staying where they are', async () => {
 		const user = userEvent.setup();
 		open();
