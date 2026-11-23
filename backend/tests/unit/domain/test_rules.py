@@ -378,7 +378,7 @@ def test_action_values() -> None:
         SetContact(CONTACT),
         SetDocumentType(TYPE),
         SetTopic(TAG),
-        SetTitle("{contact}"),
+        SetTitle("{{ contact }}"),
     ],
 )
 def test_global_rules_may_do_everything(action: Action) -> None:

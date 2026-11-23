@@ -142,7 +142,7 @@ def test_only_its_user_chooses_the_members_of_a_personal_space(editor: User, rea
 
 
 def test_moving_needs_edit_rights_on_both_spaces_or_hands_over(
-    editor: User, reader: User, other_editor: User, stranger: User, shared: Space
+    editor: User, reader: User, stranger: User, shared: Space
 ) -> None:
     document = builders.processed(editor, shared)
     own = builders.personal_space(editor)

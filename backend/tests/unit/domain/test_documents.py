@@ -27,7 +27,7 @@ from lekto.core.domain.fields import FieldDefinition, FieldType
 from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, SpaceId, TagId, new_id
 from lekto.core.domain.pipeline import Node
 from tests import builders
-from tests.builders import FAILED, NOW, OK, UNCERTAIN
+from tests.builders import FAILED, NOW, UNCERTAIN
 
 LATER = NOW + timedelta(minutes=5)
 
@@ -292,10 +292,6 @@ def test_delete_records_deleted() -> None:
     (event,) = document.pull_events()
     assert isinstance(event, DocumentDeleted)
     assert event.occurred_at == LATER
-
-
-def test_ok_result_constant_is_ok() -> None:
-    assert OK.reason is None
 
 
 def test_a_change_names_what_it_set_and_removed_in_one_order() -> None:
