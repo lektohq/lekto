@@ -6,12 +6,12 @@ import { signIn } from '#lib/testing/session.ts';
 import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import UserManage from './UserManage.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { type Routes, fakeApi, masterData, problem } from '#lib/testing/api.ts';
 import { choose, selectedValue } from '#lib/testing/select.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 
 const account = {
 	id: 'john',
@@ -36,20 +36,27 @@ const profile = {
 	]
 };
 
-beforeEach(() => {
-	signIn('admin', { id: 'erika', username: 'erika' });
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async (request) => {
-		const path = new URL(request.url).pathname;
-		if (request.method === 'PATCH') {
-			return json({ ...profile, ...(await request.json()) });
-		}
-		if (path.endsWith('/users/john')) return json(account);
-		if (path.endsWith('/profile')) return json(profile);
-		if (path.endsWith('/contacts')) return json([{ id: 'c1', name: 'Insurer', topic_ids: [] }]);
-		return json([]);
+/** The API of the dialog for john: account and profile, saving either, the questions of
+ * removal; `more` before these. */
+function serve(more: Routes = {}) {
+	fetchMock = fakeApi({
+		...masterData({ contacts: [{ id: 'c1', name: 'Insurer', topic_ids: [] }] }),
+		'GET /api/v1/users/john': () => account,
+		'GET /api/v1/users/john/profile': () => profile,
+		'PATCH /api/v1/users/john': async (request) => ({ ...account, ...(await request.json()) }),
+		'PATCH /api/v1/users/john/profile': async (request) => ({
+			...profile,
+			...(await request.json())
+		}),
+		'GET /api/v1/users/john/removal': () => ({ blocking_spaces: [] }),
+		...more
 	});
 	vi.stubGlobal('fetch', fetchMock);
+}
+
+beforeEach(() => {
+	signIn('admin', { id: 'erika', username: 'erika' });
+	serve();
 });
 
 afterEach(() => {
@@ -61,18 +68,11 @@ describe('UserManage', () => {
 	it('shows the stored role again when the API refuses another (WC-06)', async () => {
 		const user = userEvent.setup();
 		const patches: unknown[] = [];
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			if (request.method === 'PATCH') {
+		serve({
+			'PATCH /api/v1/users/john': async (request) => {
 				patches.push(await request.json());
-				return json(
-					{ type: 'about:blank', title: 'Unprocessable', status: 422, detail: 'no' },
-					422
-				);
+				return problem(422, { detail: 'no' });
 			}
-			if (path.endsWith('/users/john')) return json(account);
-			if (path.endsWith('/profile')) return json(profile);
-			return json([]);
 		});
 		render(UserManage, { open: true, userId: 'john', onchanged: vi.fn() });
 		const role = async () => (await screen.findByLabelText(m.user_role())) as HTMLElement;
@@ -121,13 +121,12 @@ describe('UserManage', () => {
 
 	it('names the user in each question, and answers with the verb (WC-10)', async () => {
 		const user = userEvent.setup();
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			if (path.endsWith('/users/john'))
-				return json({ ...account, totp_enabled: true, linked_accounts: [{ issuer: 'i' }] });
-			if (path.endsWith('/profile')) return json(profile);
-			if (path.endsWith('/removal')) return json({ blocking_spaces: [] });
-			return json([]);
+		serve({
+			'GET /api/v1/users/john': () => ({
+				...account,
+				totp_enabled: true,
+				linked_accounts: [{ issuer: 'i' }]
+			})
 		});
 		render(UserManage, { open: true, userId: 'john', onchanged: vi.fn() });
 		await user.click(await screen.findByRole('button', { name: m.user_totp_remove() }));

@@ -6,19 +6,15 @@ import type { Job } from '#lib/jobs.ts';
 import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, problem } from '#lib/testing/api.ts';
 import { choose } from '#lib/testing/select.ts';
 import JobsTab from './JobsTab.svelte';
+import { jobsSummaryOf } from '#lib/testing/system.ts';
 
-const summary = {
-	kinds: [
-		{ kind: 'contacts.logo', running: 0, due: 0, planned: 0, failed: 1, done: 41 },
-		{ kind: 'pipeline.node', running: 1, due: 3, planned: 0, failed: 1, done: 900 }
-	],
-	last_started_at: '2026-10-24T11:59:58Z',
-	now: '2026-10-24T12:00:00Z',
-	kept_since: '2026-10-17T12:00:00Z'
-};
+const summary = jobsSummaryOf({
+	'contacts.logo': { failed: 1, done: 41 },
+	'pipeline.node': { running: 1, due: 3, failed: 1, done: 900 }
+});
 
 function job(overrides: Partial<Job>): Job {
 	return {
@@ -57,6 +53,9 @@ const failedLogo = job({
 	error: 'timeout',
 	retry: 'job'
 });
+
+/** No durations measured yet. */
+const noDurations = () => ({ kinds: [], since: '2026-10-17T12:00:00Z' });
 
 function routes() {
 	return fakeApi({
@@ -135,6 +134,7 @@ describe('the jobs tab', () => {
 	it('filters by kind and turns the pages', async () => {
 		const api = fakeApi({
 			'GET /api/v1/jobs/summary': () => summary,
+			'GET /api/v1/jobs/durations': noDurations,
 			'GET /api/v1/jobs': (_request, url) => ({
 				items: [job({ id: `p${url.searchParams.get('offset')}` })],
 				total: 120,
@@ -162,9 +162,10 @@ describe('the jobs tab', () => {
 		let down = false;
 		const api = fakeApi({
 			'GET /api/v1/jobs/summary': () => summary,
+			'GET /api/v1/jobs/durations': noDurations,
 			'GET /api/v1/jobs': (_request, url) =>
 				down
-					? json({ type: 'about:blank', title: 'Error', status: 500, detail: 'boom' }, 500)
+					? problem(500, { detail: 'boom' })
 					: {
 							items: [job({ id: `p${url.searchParams.get('offset')}` })],
 							total: 120,
@@ -255,6 +256,7 @@ describe('the jobs tab', () => {
 			'fetch',
 			fakeApi({
 				'GET /api/v1/jobs/summary': () => summary,
+				'GET /api/v1/jobs/durations': noDurations,
 				'GET /api/v1/jobs': () => ({
 					items: [{ ...failedLogo, error: null, retry: null }],
 					total: 1,
@@ -278,6 +280,7 @@ describe('the jobs tab', () => {
 			'fetch',
 			fakeApi({
 				'GET /api/v1/jobs/summary': () => summary,
+				'GET /api/v1/jobs/durations': noDurations,
 				'GET /api/v1/jobs': () => ({ items: [], total: 0, next_offset: null }),
 				'GET /api/v1/pipeline': () => ({
 					nodes: [],
@@ -301,6 +304,7 @@ describe('the jobs tab', () => {
 			'fetch',
 			fakeApi({
 				'GET /api/v1/jobs/summary': () => ({ ...summary, last_started_at: '2026-10-24T11:50:00Z' }),
+				'GET /api/v1/jobs/durations': noDurations,
 				'GET /api/v1/jobs': () => ({ items: [], total: 0, next_offset: null })
 			})
 		);

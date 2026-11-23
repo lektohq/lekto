@@ -6,11 +6,11 @@ import { signIn } from '#lib/testing/session.ts';
 import type { ProfileData } from '#lib/profile.ts';
 import { session } from '#lib/session.svelte.ts';
 import ProfileForm from './ProfileForm.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, masterData } from '#lib/testing/api.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 const sent: { path: string; body: unknown }[] = [];
 
 const stored = {
@@ -55,17 +55,17 @@ const data = { profile: stored, contacts, topics: [] } as unknown as ProfileData
 beforeEach(() => {
 	signIn('user', { id: 'erika', username: 'erika' });
 	sent.length = 0;
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async (request) => {
-		const path = new URL(request.url).pathname;
-		if (request.method === 'PATCH') {
-			const body = await request.json();
-			sent.push({ path, body });
-			return json({ ...stored, ...body });
-		}
-		if (path.endsWith('/profile')) return json(stored);
-		if (path.endsWith('/contacts')) return json(contacts);
-		return json([]);
+	const save = async (request: Request, url: URL) => {
+		const body = await request.json();
+		sent.push({ path: url.pathname, body });
+		return { ...stored, ...body };
+	};
+	fetchMock = fakeApi({
+		...masterData({ contacts }),
+		'GET /api/v1/auth/me/profile': () => stored,
+		'PATCH /api/v1/auth/me/profile': save,
+		'GET /api/v1/users/john/profile': () => stored,
+		'PATCH /api/v1/users/john/profile': save
 	});
 	vi.stubGlobal('fetch', fetchMock);
 });

@@ -8,20 +8,13 @@ import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { session, type User } from '#lib/session.svelte.ts';
 import { inboxItem, OWNER, summaryOf } from '#lib/testing/documents.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, json, masterData, noContent, problem } from '#lib/testing/api.ts';
 import { uploads } from '#lib/upload.svelte.ts';
 import Page from './+page.svelte';
+import { goTo } from '#lib/testing/page-state.svelte.ts';
 
-const state = vi.hoisted(() => ({ url: new URL('http://lekto/ui/inbox') }));
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
-vi.mock('$app/state', () => ({
-	page: {
-		get url() {
-			return state.url;
-		},
-		state: {}
-	}
-}));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const USERS = [
 	{ id: OWNER, username: 'john', role: 'user', active: true },
@@ -58,6 +51,7 @@ type Items = ReturnType<typeof inboxItem>[];
 
 function start(items: Items | ((tab: string | null) => Items), summary = summaryOf({ new: 1 })) {
 	const api = fakeApi({
+		...masterData(),
 		'GET /api/v1/inbox': (_, url) => ({
 			items: typeof items === 'function' ? items(url.searchParams.get('tab')) : items,
 			next_cursor: null
@@ -65,6 +59,8 @@ function start(items: Items | ((tab: string | null) => Items), summary = summary
 		'GET /api/v1/inbox/summary': () => summary,
 		'GET /api/v1/users': () => USERS,
 		'POST /api/v1/inbox/seen': () => ({ marked: 2 }),
+		'PUT /api/v1/documents/n1/seen': () => noContent(),
+		'DELETE /api/v1/documents/s1/seen': () => noContent(),
 		'POST /api/v1/documents': () => json({ id: 'doc-new' }, 202),
 		'GET /api/v1/spaces': () => SPACES
 	});
@@ -79,7 +75,7 @@ function signedIn(role: User['role'] = 'user') {
 }
 
 beforeEach(() => {
-	state.url = new URL('http://lekto/ui/inbox');
+	goTo('/ui/inbox');
 	phone.override(false);
 	signedIn();
 });
@@ -104,6 +100,7 @@ describe('the inbox comes back to the place it was left at (WF-03)', () => {
 			c2: { items: [inboxItem('new', { id: 'd3', title: 'Drei' })], next_cursor: 'c3' }
 		};
 		const api = fakeApi({
+			...masterData(),
 			'GET /api/v1/inbox': (_, url) => pages[url.searchParams.get('cursor') ?? ''],
 			'GET /api/v1/inbox/summary': () => summaryOf({ new: 1 }),
 			'GET /api/v1/users': () => USERS,
@@ -152,7 +149,7 @@ describe('inbox tabs', () => {
 	});
 
 	it('shows the tab of the URL', async () => {
-		state.url = new URL('http://lekto/ui/inbox?tab=intervene');
+		goTo('/ui/inbox?tab=intervene');
 		const api = start([inboxItem('intervene')], summaryOf({ intervene: 1 }));
 		await screen.findByText(m.lane_red());
 		expect(calls(api)).toContain('GET /api/v1/inbox?tab=intervene');
@@ -161,7 +158,7 @@ describe('inbox tabs', () => {
 	});
 
 	it('takes an unknown tab for everything open', async () => {
-		state.url = new URL('http://lekto/ui/inbox?tab=bogus');
+		goTo('/ui/inbox?tab=bogus');
 		const api = start([]);
 		await screen.findByText(m.inbox_empty());
 		expect(calls(api)).toContain('GET /api/v1/inbox');
@@ -169,7 +166,7 @@ describe('inbox tabs', () => {
 	});
 
 	it('says per tab that it is empty', async () => {
-		state.url = new URL('http://lekto/ui/inbox?tab=done');
+		goTo('/ui/inbox?tab=done');
 		start([]);
 		expect(await screen.findByText(m.inbox_empty_done())).toBeTruthy();
 	});
@@ -288,7 +285,7 @@ describe('inbox rows', () => {
 	});
 
 	it('tells how, when and by whom a document left, and offers a seen one as new again', async () => {
-		state.url = new URL('http://lekto/ui/inbox?tab=done');
+		goTo('/ui/inbox?tab=done');
 		const api = start(
 			[
 				inboxItem('done', { id: 's1', title: 'Gesehen' }),
@@ -320,9 +317,10 @@ describe('inbox rows', () => {
 	});
 
 	it('starts done over after "mark as new", not on with the old cursor', async () => {
-		state.url = new URL('http://lekto/ui/inbox?tab=done');
+		goTo('/ui/inbox?tab=done');
 		let renewed = false;
 		const api = fakeApi({
+			...masterData(),
 			'GET /api/v1/inbox': (_, url) => {
 				const cursor = url.searchParams.get('cursor');
 				if (renewed)
@@ -349,12 +347,15 @@ describe('inbox rows', () => {
 	});
 
 	it('starts over when the next page no longer follows', async () => {
-		state.url = new URL('http://lekto/ui/inbox?tab=done');
+		goTo('/ui/inbox?tab=done');
 		let pages = 0;
 		const api = fakeApi({
+			...masterData(),
 			'GET /api/v1/inbox': (_, url) => {
 				if (url.searchParams.get('cursor')) {
-					return json({ type: 'about:blank', title: 'Unprocessable', status: 422 }, 422);
+					return problem(422, {
+						detail: 'cursor: its document is no longer done; start from the first page'
+					});
 				}
 				pages++;
 				return pages === 1

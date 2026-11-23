@@ -16,7 +16,9 @@ const spaces = [
 ] as unknown as Space[];
 const types = [{ id: 't1', name: 'E-Mail' }] as DocumentType[];
 
-function show(errors: Record<string, string> = {}, form = formOf(null, 'm1', '')) {
+/** The form of a new mail rule, held in `$state` as the page holds it. */
+function show(errors: Record<string, string> = {}, given = formOf(null, 'm1', '')) {
+	const form = $state(given);
 	render(MailRuleForm, {
 		form,
 		mailboxes,
@@ -33,9 +35,13 @@ function show(errors: Record<string, string> = {}, form = formOf(null, 'm1', '')
 describe('the editor of a mail rule', () => {
 	it('shows what is wrong under the block it belongs to', () => {
 		const form = show({ name: 'no name', user: 'no person' });
-		expect(screen.getByText('no name')).toBeTruthy();
-		expect(screen.getByText('no person')).toBeTruthy();
-		expect(screen.getByLabelText(m.field_name()).getAttribute('aria-invalid')).toBe('true');
+		// The name's error is the field's description; the person's stands in the person's row.
+		const name = screen.getByLabelText(m.field_name());
+		expect(name.getAttribute('aria-invalid')).toBe('true');
+		const described = name.getAttribute('aria-describedby')!;
+		expect(document.getElementById(described)?.textContent).toBe('no name');
+		const row = screen.getByText('no person').closest('[data-rule-row]')!;
+		expect(row.querySelector('#mail-rule-user')).not.toBeNull();
 		expect(form.conditions.items).toHaveLength(1);
 	});
 

@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { fakeApi } from '#lib/testing/api.ts';
+import { fakeApi, masterData } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import { signIn } from '#lib/testing/session.ts';
 import Page from './+page.svelte';
@@ -29,7 +29,7 @@ const rule = (changes: Record<string, unknown> = {}) => ({
 });
 
 const serve = (found: ReturnType<typeof rule>) =>
-	vi.stubGlobal('fetch', fakeApi({ 'GET /api/v1/rules/r1': () => found }));
+	vi.stubGlobal('fetch', fakeApi({ ...masterData(), 'GET /api/v1/rules/r1': () => found }));
 
 beforeEach(() => goTo('/ui/rules/r1/edit', { id: 'r1' }));
 afterEach(() => session.clear());

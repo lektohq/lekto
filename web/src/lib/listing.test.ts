@@ -14,6 +14,7 @@ import {
 	sortFieldOf,
 	sortOf
 } from './listing.ts';
+import { withoutStorage } from '#lib/testing/browser.ts';
 
 afterEach(() => localStorage.clear());
 
@@ -135,21 +136,12 @@ describe('the filters the document view remembers', () => {
 	});
 
 	it('works without storage: nothing remembered, nothing thrown', () => {
-		const storage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')!;
-		Object.defineProperty(globalThis, 'localStorage', {
-			configurable: true,
-			get() {
-				throw new Error('blocked');
-			}
-		});
-		try {
+		withoutStorage(() => {
 			expect(() => rememberFilters({ ...NO_FILTERS, contacts: ['c1'] }, 'u1')).not.toThrow();
 			expect(rememberedFilters('u1')).toBeNull();
 			expect(() => rememberFiltersCollapsed(true)).not.toThrow();
 			expect(filtersCollapsed()).toBe(false);
-		} finally {
-			Object.defineProperty(globalThis, 'localStorage', storage);
-		}
+		});
 	});
 });
 

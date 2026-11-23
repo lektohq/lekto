@@ -3,19 +3,19 @@ import { userEvent } from '@testing-library/user-event';
 import { createRawSnippet } from 'svelte';
 import { describe, expect, it, vi } from 'vitest';
 import type { FieldEvidence } from '#lib/document-view.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import FieldShell from './FieldShell.svelte';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 const input = createRawSnippet(() => ({ render: () => '<input id="field-amount" />' }));
-const lookup = {
+const lookup = lookupOf({
 	contacts: [],
 	documentTypes: [],
 	tags: [],
 	fields: [],
 	spaces: [],
 	users: []
-} as unknown as Lookup;
+});
 
 /** The evidence of a field whose quote stands on `pages`. */
 function on(pages: number[]): FieldEvidence {

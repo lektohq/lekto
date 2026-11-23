@@ -19,43 +19,60 @@ import { NO_FILTERS } from '#lib/filters.ts';
 import { formatNumber } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { listedOf, OWNER } from '#lib/testing/documents.ts';
-import { calls, fakeApi } from '#lib/testing/api.ts';
+import { OWNER, lensOf, listedOf } from '#lib/testing/documents.ts';
+import { calls, fakeApi, masterData } from '#lib/testing/api.ts';
 import Page from './+page.svelte';
+import { FakeEventSource } from '#lib/testing/events.ts';
+import { testPage } from '#lib/testing/page-state.svelte.ts';
 
-class FakeSource {
-	static last: FakeSource;
-	onopen: (() => void) | null = null;
-	onerror: (() => void) | null = null;
-	readyState = 1;
-	listeners = new Map<string, (message: { data: string }) => void>();
-	constructor(readonly url: string) {
-		FakeSource.last = this;
-	}
-	addEventListener(type: string, handler: (message: { data: string }) => void) {
-		this.listeners.set(type, handler);
-	}
-	close() {
-		this.readyState = 2;
-	}
+/** No document in any facet. */
+const NO_FACETS = {
+	total: 0,
+	contacts: [],
+	document_types: [],
+	contact_groups: [],
+	document_type_groups: [],
+	topics: [],
+	tags: [],
+	years: [],
+	undated: 0
+};
+
+/** The fake API of the archive page: the master data, the lenses, the pipeline, an empty list
+ * with its count and facets, then `routes`. */
+function archiveApi(...[routes, otherwise]: Parameters<typeof fakeApi>) {
+	return fakeApi(
+		{
+			...masterData(),
+			'GET /api/v1/documents/count': () => ({ total: 0 }),
+			'GET /api/v1/documents/facets': () => NO_FACETS,
+			'GET /api/v1/documents': () => ({ items: [], next_cursor: null }),
+			'GET /api/v1/lenses': () => [],
+			'POST /api/v1/documents/search': () => ({
+				items: [],
+				estimated_total: 0,
+				word_total: 0,
+				next_offset: null,
+				semantic: false,
+				mode: 'words',
+				reason: null,
+				meaning_pending: false
+			}),
+			'GET /api/v1/pipeline': () => ({
+				nodes: [],
+				vision: null,
+				logo_fetch: false,
+				meaning_search: false
+			}),
+			...routes
+		},
+		otherwise
+	);
 }
 
-const state = vi.hoisted(() => ({
-	url: new URL('http://lekto/ui/documents'),
-	// The history entry: the words of a search stand here, never in the URL.
-	entry: {} as App.PageState
-}));
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
-vi.mock('$app/state', () => ({
-	page: {
-		get url() {
-			return state.url;
-		},
-		get state() {
-			return state.entry;
-		}
-	}
-}));
+// The history entry (`page.state`): the words of a search stand there, never in the URL.
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 /** The options of a navigation of the list that searches for `words`. */
 const searching = (words: string, options: object = { reset: false }) => ({
@@ -66,8 +83,8 @@ const searching = (words: string, options: object = { reset: false }) => ({
 
 beforeEach(() => {
 	forgetMeaningSearch();
-	state.url = new URL('http://lekto/ui/documents');
-	state.entry = {};
+	testPage.url = new URL('http://lekto/ui/documents');
+	testPage.state = {};
 	signIn('user', { id: OWNER });
 	// Rows: their mark stands beside their link (the grid's is tested with the card).
 	rememberLayout('list');
@@ -84,21 +101,18 @@ describe('the archive page', () => {
 	it('asks for its numbers only when an event may change them (WP-03)', async () => {
 		// Every event of any document read the page, its count, the facets and a count for
 		// each lens anew: a dozen times while one document was processed.
-		const api = fakeApi({
+		const api = archiveApi({
 			'GET /api/v1/documents': () => ({
 				items: [listedOf({ id: 'd1', title: 'Eins' })],
 				next_cursor: null
 			})
 		});
 		vi.stubGlobal('fetch', api);
-		events.useFactory((url) => new FakeSource(url) as unknown as EventSource);
+		events.useFactory((url) => new FakeEventSource(url) as unknown as EventSource);
 		events.start(() => {});
 		render(Page);
 		await screen.findByText('Eins');
-		const send = (type: string, id: string) =>
-			FakeSource.last.listeners.get(type)?.({
-				data: JSON.stringify({ type, id: crypto.randomUUID(), occurred_at: '', document_id: id })
-			});
+		const send = (type: string, id: string) => FakeEventSource.last.send(type, { document_id: id });
 		const settled = () => new Promise((resolve) => setTimeout(resolve, 550));
 		const since = (from: number) =>
 			calls(api)
@@ -149,7 +163,7 @@ describe('the archive page', () => {
 			);
 			vi.stubGlobal(
 				'fetch',
-				fakeApi({
+				archiveApi({
 					'GET /api/v1/documents': () =>
 						new Promise((resolve) => (answer = () => resolve(listed())))
 				})
@@ -159,7 +173,7 @@ describe('the archive page', () => {
 
 		it('by the way back of a document: the place in its history entry', async () => {
 			const { scrolled, answer } = serve();
-			state.entry = { place: { y: 1500 } };
+			testPage.state = { place: { y: 1500 } };
 			render(Page);
 			await new Promise((resolve) => setTimeout(resolve, 20));
 			expect(scrolled).toEqual([]); // not while the list is empty
@@ -192,7 +206,7 @@ describe('the archive page', () => {
 	});
 
 	it('lists without lanes and upload, and marks what stands in the inbox', async () => {
-		const api = fakeApi({
+		const api = archiveApi({
 			'GET /api/v1/documents': () => ({
 				items: [
 					listedOf({ id: 'd1', title: 'Wartet', lane: 'red', in_inbox: true }),
@@ -219,10 +233,10 @@ describe('the archive page', () => {
 	});
 
 	it('opens a document in the Beam, paging through the documents of the page', async () => {
-		state.entry = { words: '', by: OWNER };
+		testPage.state = { words: '', by: OWNER };
 		vi.stubGlobal(
 			'fetch',
-			fakeApi({
+			archiveApi({
 				'GET /api/v1/documents': () => ({
 					items: [listedOf({ id: 'd1', title: 'Eins' }), listedOf({ id: 'd2', title: 'Zwei' })],
 					next_cursor: null
@@ -249,7 +263,7 @@ describe('the archive page', () => {
 	});
 
 	it('opens a hit of a search in the Beam with where its words stand', async () => {
-		state.entry = { words: 'Strom', by: OWNER };
+		testPage.state = { words: 'Strom', by: OWNER };
 		const hit = (id: string, title: string) => ({
 			document: listedOf({ id, title }),
 			score: 0.5,
@@ -257,7 +271,7 @@ describe('the archive page', () => {
 		});
 		vi.stubGlobal(
 			'fetch',
-			fakeApi({
+			archiveApi({
 				'POST /api/v1/documents/search': () => ({
 					items: [hit('d1', 'Eins'), hit('d2', 'Zwei')],
 					estimated_total: 2,
@@ -286,7 +300,7 @@ describe('the archive page', () => {
 	it('stands the documents by month while sorted by a date, last those without one', async () => {
 		vi.stubGlobal(
 			'fetch',
-			fakeApi({
+			archiveApi({
 				'GET /api/v1/documents': () => ({
 					items: [
 						listedOf({ id: 'd1', title: 'Strom', document_date: '2026-10-01' }),
@@ -314,8 +328,8 @@ describe('the archive page', () => {
 	});
 
 	it('shows one page of 50 at a time, the page in the link', async () => {
-		state.url = new URL('http://lekto/ui/documents?sort=title&page=2');
-		const api = fakeApi({
+		testPage.url = new URL('http://lekto/ui/documents?sort=title&page=2');
+		const api = archiveApi({
 			'GET /api/v1/documents': () => ({
 				items: [listedOf({ id: 'd51', title: 'Strom', document_date: '2026-10-01' })],
 				next_cursor: null
@@ -336,8 +350,8 @@ describe('the archive page', () => {
 	});
 
 	it('loads the page shown again after a reconnect of the event stream, not the first', async () => {
-		state.url = new URL('http://lekto/ui/documents?sort=title&page=2');
-		const api = fakeApi({
+		testPage.url = new URL('http://lekto/ui/documents?sort=title&page=2');
+		const api = archiveApi({
 			'GET /api/v1/documents': () => ({
 				items: [listedOf({ id: 'd51', title: 'Strom', document_date: '2026-10-01' })],
 				next_cursor: null
@@ -345,15 +359,15 @@ describe('the archive page', () => {
 			'GET /api/v1/documents/count': () => ({ total: 120 })
 		});
 		vi.stubGlobal('fetch', api);
-		events.useFactory((url) => new FakeSource(url) as unknown as EventSource);
+		events.useFactory((url) => new FakeEventSource(url) as unknown as EventSource);
 		events.start(() => {});
-		FakeSource.last.onopen?.();
+		FakeEventSource.last.onopen?.();
 		render(Page);
 		await screen.findByText('Strom');
 		const listed = () => calls(api).filter((call) => call.startsWith('GET /api/v1/documents?'));
 		expect(listed()).toHaveLength(1);
 		// The stream opens again after a break: the data shown may be stale.
-		FakeSource.last.onopen?.();
+		FakeEventSource.last.onopen?.();
 		await vi.waitFor(() => expect(listed()).toHaveLength(2));
 		expect(listed().at(-1)).toContain('offset=50');
 		expect(goto).not.toHaveBeenCalled();
@@ -380,7 +394,7 @@ describe('the archive page', () => {
 			created_at: '2026-10-29T12:00:00Z',
 			finished_at: null
 		};
-		const api = fakeApi({
+		const api = archiveApi({
 			'GET /api/v1/documents': () => ({
 				items: [listedOf({ id: 'd1', title: 'Strom' }), listedOf({ id: 'd2', title: 'Gas' })],
 				next_cursor: null
@@ -458,7 +472,7 @@ describe('the archive page', () => {
 
 	it('chooses a document by a tap on it, and deletes after asking with the number', async () => {
 		const sent: unknown[] = [];
-		const api = fakeApi({
+		const api = archiveApi({
 			'GET /api/v1/documents': () => ({
 				items: [listedOf({ id: 'd1', title: 'Strom' }), listedOf({ id: 'd2', title: 'Gas' })],
 				next_cursor: null
@@ -492,7 +506,7 @@ describe('the archive page', () => {
 
 	it('offers 25, 50 or 100 to a page, remembered for the documents alone', async () => {
 		localStorage.setItem('lekto.page-size.jobs', '100');
-		const api = fakeApi({
+		const api = archiveApi({
 			'GET /api/v1/documents': () => ({
 				items: [listedOf({ id: 'd1', title: 'Strom', document_date: '2026-10-01' })],
 				next_cursor: null
@@ -515,10 +529,10 @@ describe('the archive page', () => {
 	});
 
 	it('stands the documents without headings while sorted by title', async () => {
-		state.url = new URL('http://lekto/ui/documents?sort=title');
+		testPage.url = new URL('http://lekto/ui/documents?sort=title');
 		vi.stubGlobal(
 			'fetch',
-			fakeApi({
+			archiveApi({
 				'GET /api/v1/documents': () => ({
 					items: [listedOf({ id: 'd1', title: 'Strom', document_date: '2026-10-01' })],
 					next_cursor: null
@@ -533,8 +547,8 @@ describe('the archive page', () => {
 	});
 
 	it('counts the documents of the filters, and asks with each chosen contact', async () => {
-		state.url = new URL('http://lekto/ui/documents?contact=c1&contact=c2&date_from=2026-01-01');
-		const api = fakeApi({
+		testPage.url = new URL('http://lekto/ui/documents?contact=c1&contact=c2&date_from=2026-01-01');
+		const api = archiveApi({
 			'GET /api/v1/documents': () => ({
 				items: [listedOf({ id: 'd1', title: 'Strom', document_date: '2026-10-01' })],
 				next_cursor: null
@@ -562,8 +576,8 @@ describe('the archive page', () => {
 	});
 
 	it('keeps title and close of the filter sheet at the top, reset and show at the bottom', async () => {
-		state.url = new URL('http://lekto/ui/documents?contact=c1');
-		const api = fakeApi({
+		testPage.url = new URL('http://lekto/ui/documents?contact=c1');
+		const api = archiveApi({
 			'GET /api/v1/documents': () => ({ items: [], next_cursor: null }),
 			'GET /api/v1/documents/facets': () => ({
 				total: 3,
@@ -592,23 +606,9 @@ describe('the archive page', () => {
 	});
 
 	it('opens a lens: its name as title, its sort by a field asked of the API', async () => {
-		state.url = new URL('http://lekto/ui/documents?lens=l1&tag=t1&sort=field&sort_field=f1');
-		const lens = (id: string, name: string) => ({
-			id,
-			name,
-			position: 0,
-			filter: {},
-			query: null,
-			sort: null,
-			sort_field_id: null,
-			grouping: 'none',
-			layout: 'grid',
-			card_field_ids: [],
-			due_field_id: null,
-			created_at: '2026-10-20T10:00:00Z',
-			updated_at: '2026-10-20T10:00:00Z'
-		});
-		const api = fakeApi({
+		testPage.url = new URL('http://lekto/ui/documents?lens=l1&tag=t1&sort=field&sort_field=f1');
+		const lens = (id: string, name: string) => lensOf({ id, name });
+		const api = archiveApi({
 			'GET /api/v1/documents': () => ({ items: [], next_cursor: null }),
 			'GET /api/v1/lenses': () => [lens('l1', 'Zu bezahlen'), lens('l2', 'Steuer')]
 		});
@@ -628,23 +628,10 @@ describe('the archive page', () => {
 	});
 
 	it('shows how many documents each lens and all documents show', async () => {
-		state.url = new URL('http://lekto/ui/documents');
-		const lens = (id: string, name: string, query: string | null = null) => ({
-			id,
-			name,
-			position: 0,
-			filter: id === 'l1' ? { tag_ids: ['t1'] } : {},
-			query,
-			sort: null,
-			sort_field_id: null,
-			grouping: 'none',
-			layout: 'grid',
-			card_field_ids: [],
-			due_field_id: null,
-			created_at: '2026-10-20T10:00:00Z',
-			updated_at: '2026-10-20T10:00:00Z'
-		});
-		const api = fakeApi({
+		testPage.url = new URL('http://lekto/ui/documents');
+		const lens = (id: string, name: string, query: string | null = null) =>
+			lensOf({ id, name, query, filter: id === 'l1' ? { tag_ids: ['t1'] } : {} });
+		const api = archiveApi({
 			'GET /api/v1/documents': () => ({ items: [], next_cursor: null }),
 			'GET /api/v1/lenses': () => [lens('l1', 'Zu bezahlen'), lens('l2', 'Strom', 'strom')],
 			'GET /api/v1/documents/count': (_request, url) => ({
@@ -674,12 +661,12 @@ describe('the archive page', () => {
 	});
 
 	it('groups a lens by its deadline and shows its fields on the cards', async () => {
-		state.url = new URL('http://lekto/ui/documents?lens=l1');
+		testPage.url = new URL('http://lekto/ui/documents?lens=l1');
 		const yesterday = new Date(Date.now() - 86_400_000);
 		const due = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
 		vi.stubGlobal(
 			'fetch',
-			fakeApi({
+			archiveApi({
 				'GET /api/v1/documents': () => ({
 					items: [
 						listedOf({
@@ -696,21 +683,7 @@ describe('the archive page', () => {
 					{ id: 'f2', name: 'Betrag', data_type: 'amount' }
 				],
 				'GET /api/v1/lenses': () => [
-					{
-						id: 'l1',
-						name: 'Zu bezahlen',
-						position: 0,
-						filter: {},
-						query: null,
-						sort: null,
-						sort_field_id: null,
-						grouping: 'due',
-						layout: 'grid',
-						card_field_ids: ['f2', 'f1'],
-						due_field_id: 'f1',
-						created_at: '2026-10-20T10:00:00Z',
-						updated_at: '2026-10-20T10:00:00Z'
-					}
+					lensOf({ grouping: 'due', card_field_ids: ['f2', 'f1'], due_field_id: 'f1' })
 				]
 			})
 		);
@@ -724,24 +697,10 @@ describe('the archive page', () => {
 	});
 
 	it('offers to keep in the lens what the page shows beyond it, or to go back', async () => {
-		state.url = new URL('http://lekto/ui/documents?lens=l1&tag=t1&tag=t2');
-		const lens = {
-			id: 'l1',
-			name: 'Zu bezahlen',
-			position: 0,
-			filter: { tag_ids: ['t1'] },
-			query: null,
-			sort: null,
-			sort_field_id: null,
-			grouping: 'none',
-			layout: 'grid',
-			card_field_ids: [],
-			due_field_id: null,
-			created_at: '2026-10-20T10:00:00Z',
-			updated_at: '2026-10-20T10:00:00Z'
-		};
+		testPage.url = new URL('http://lekto/ui/documents?lens=l1&tag=t1&tag=t2');
+		const lens = lensOf({ filter: { tag_ids: ['t1'] } });
 		const patched: unknown[] = [];
-		const api = fakeApi({
+		const api = archiveApi({
 			'GET /api/v1/documents': () => ({ items: [], next_cursor: null }),
 			'GET /api/v1/lenses': () => [lens],
 			'PATCH /api/v1/lenses/l1': async (request) => {
@@ -765,10 +724,10 @@ describe('the archive page', () => {
 	});
 
 	it('shows the words of a search in its field, no chip beside it, their count by the title', async () => {
-		state.url = new URL('http://lekto/ui/documents?tag=t1');
-		state.entry = { words: 'Strom', by: OWNER };
+		testPage.url = new URL('http://lekto/ui/documents?tag=t1');
+		testPage.state = { words: 'Strom', by: OWNER };
 		const bodies: unknown[] = [];
-		const api = fakeApi({
+		const api = archiveApi({
 			'POST /api/v1/documents/search': async (request) => {
 				bodies.push(await request.json());
 				return { items: [], estimated_total: 4, next_offset: null, semantic: false };
@@ -795,10 +754,10 @@ describe('the archive page', () => {
 		[0, 1724, () => m.search_meaning_only()],
 		[1, 1, () => m.search_total({ count: '1' })] // the floor left nothing beside the words
 	])('counts what %i words found among %i', async (words, total, text) => {
-		state.entry = { words: 'Urlaubsgeld', by: OWNER };
+		testPage.state = { words: 'Urlaubsgeld', by: OWNER };
 		vi.stubGlobal(
 			'fetch',
-			fakeApi({
+			archiveApi({
 				'POST /api/v1/documents/search': () => ({
 					items: [{ document: listedOf({ id: 'd1', title: 'Eins' }), score: 0.8, snippet: [] }],
 					estimated_total: total,
@@ -815,9 +774,9 @@ describe('the archive page', () => {
 	});
 
 	it('says when a search went by words alone, and offers the meaning once it is ready', async () => {
-		state.entry = { words: 'Weihnachten', by: OWNER };
+		testPage.state = { words: 'Weihnachten', by: OWNER };
 		let first = true;
-		const api = fakeApi({
+		const api = archiveApi({
 			'GET /api/v1/pipeline': () => ({
 				nodes: [],
 				vision: null,
@@ -843,7 +802,7 @@ describe('the archive page', () => {
 			}
 		});
 		vi.stubGlobal('fetch', api);
-		events.useFactory((url) => new FakeSource(url) as unknown as EventSource);
+		events.useFactory((url) => new FakeEventSource(url) as unknown as EventSource);
 		events.start(() => {});
 		const user = userEvent.setup();
 		render(Page);
@@ -851,14 +810,7 @@ describe('the archive page', () => {
 			await screen.findByText(m.reason_search_embed_timeout({ seconds: '5' }), { exact: false })
 		).toBeTruthy();
 		expect(screen.getByText(m.search_meaning_pending(), { exact: false })).toBeTruthy();
-		FakeSource.last.listeners.get('search.meaning_ready')?.({
-			data: JSON.stringify({
-				type: 'search.meaning_ready',
-				id: 'e1',
-				occurred_at: '',
-				query: 'Weihnachten'
-			})
-		});
+		FakeEventSource.last.send('search.meaning_ready', { query: 'Weihnachten' });
 		await user.click(await screen.findByRole('button', { name: m.search_with_meaning() }));
 		await vi.waitFor(() =>
 			expect(
@@ -872,8 +824,8 @@ describe('the archive page', () => {
 	});
 
 	it('shows nothing of the meaning where the installation has no search by it', async () => {
-		state.entry = { words: 'Strom', by: OWNER };
-		const api = fakeApi({
+		testPage.state = { words: 'Strom', by: OWNER };
+		const api = archiveApi({
 			'GET /api/v1/pipeline': () => ({
 				nodes: [],
 				vision: null,
@@ -903,7 +855,7 @@ describe('the archive page', () => {
 
 	it('applies the filters this browser last set when opened without any', async () => {
 		rememberFilters({ ...NO_FILTERS, contacts: ['c1'], tags: ['t1'] }, OWNER);
-		vi.stubGlobal('fetch', fakeApi());
+		vi.stubGlobal('fetch', archiveApi());
 		render(Page);
 		expect(vi.mocked(goto)).toHaveBeenCalledWith(
 			'?contact=c1&tag=t1',
@@ -912,8 +864,8 @@ describe('the archive page', () => {
 	});
 
 	it('opens with a filter value a link names twice, and shows and remembers it once', async () => {
-		state.url = new URL('http://lekto/ui/documents?contact=c1&contact=c1&tag=t1&tag=t1');
-		vi.stubGlobal('fetch', fakeApi());
+		testPage.url = new URL('http://lekto/ui/documents?contact=c1&contact=c1&tag=t1&tag=t1');
+		vi.stubGlobal('fetch', archiveApi());
 		render(Page);
 		await screen.findByRole('heading', { level: 1 });
 		await vi.waitFor(() =>
@@ -922,8 +874,8 @@ describe('the archive page', () => {
 	});
 
 	it('opens with a fact of a link whose kind and role are what every object has', async () => {
-		state.url = new URL('http://lekto/ui/documents?fact=__proto__%3A%3AvalueOf');
-		vi.stubGlobal('fetch', fakeApi());
+		testPage.url = new URL('http://lekto/ui/documents?fact=__proto__%3A%3AvalueOf');
+		vi.stubGlobal('fetch', archiveApi());
 		render(Page);
 		await screen.findByRole('heading', { level: 1 });
 		expect((await screen.findAllByText(/__proto__ · valueOf/)).length).toBeGreaterThan(0);
@@ -931,15 +883,15 @@ describe('the archive page', () => {
 
 	it('applies none of the filters another user set in this browser', async () => {
 		rememberFilters({ ...NO_FILTERS, contacts: ['c1'], tags: ['t1'] }, 'the-one-before');
-		vi.stubGlobal('fetch', fakeApi());
+		vi.stubGlobal('fetch', archiveApi());
 		render(Page);
 		await screen.findByRole('heading', { level: 1 });
 		expect(vi.mocked(goto)).not.toHaveBeenCalled();
 	});
 
 	it('shows none of the words another user searched for in this browser', async () => {
-		state.entry = { words: 'Strom', by: 'the-one-before' };
-		const fetchMock = fakeApi();
+		testPage.state = { words: 'Strom', by: 'the-one-before' };
+		const fetchMock = archiveApi();
 		vi.stubGlobal('fetch', fetchMock);
 		render(Page);
 		await screen.findByRole('heading', { level: 1 });
@@ -956,11 +908,11 @@ describe('the archive page', () => {
 		['?lens=l1&tag=t2', {}, { ...NO_FILTERS, contacts: ['c1'] }]
 	])('leaves what a link brings alone (%s %o)', async (search, entry, remembered) => {
 		rememberFilters({ ...NO_FILTERS, contacts: ['c1'] }, OWNER);
-		state.url = new URL(`http://lekto/ui/documents${search}`);
-		state.entry = entry;
+		testPage.url = new URL(`http://lekto/ui/documents${search}`);
+		testPage.state = entry;
 		vi.stubGlobal(
 			'fetch',
-			fakeApi({ 'GET /api/v1/documents/stream': () => ({ lanes: [], truncated: false }) })
+			archiveApi({ 'GET /api/v1/documents/stream': () => ({ lanes: [], truncated: false }) })
 		);
 		render(Page);
 		await screen.findByRole('heading', { level: 1 });
@@ -969,8 +921,8 @@ describe('the archive page', () => {
 	});
 
 	it('remembers the filters as they change, and forgets them with a reset', async () => {
-		state.url = new URL('http://lekto/ui/documents?contact=c1&tag=t1');
-		vi.stubGlobal('fetch', fakeApi());
+		testPage.url = new URL('http://lekto/ui/documents?contact=c1&tag=t1');
+		vi.stubGlobal('fetch', archiveApi());
 		const user = userEvent.setup();
 		render(Page);
 		await user.click(
@@ -984,8 +936,8 @@ describe('the archive page', () => {
 	});
 
 	it('does not remember the filters of a lens', async () => {
-		state.url = new URL('http://lekto/ui/documents?lens=l1&tag=t1');
-		vi.stubGlobal('fetch', fakeApi());
+		testPage.url = new URL('http://lekto/ui/documents?lens=l1&tag=t1');
+		vi.stubGlobal('fetch', archiveApi());
 		const user = userEvent.setup();
 		render(Page);
 		await user.click(
@@ -996,8 +948,8 @@ describe('the archive page', () => {
 	});
 
 	it('collapses the filters beside the list, counts the active ones, and remembers it', async () => {
-		state.url = new URL('http://lekto/ui/documents?contact=c1&tag=t1');
-		vi.stubGlobal('fetch', fakeApi());
+		testPage.url = new URL('http://lekto/ui/documents?contact=c1&tag=t1');
+		vi.stubGlobal('fetch', archiveApi());
 		const user = userEvent.setup();
 		render(Page);
 		const aside = screen.getByRole('complementary', { name: m.filters_title() });
@@ -1020,7 +972,7 @@ describe('the archive page', () => {
 	});
 
 	it('has its tools after the title and the search in the document, for Tab and readers (WZ-09)', async () => {
-		vi.stubGlobal('fetch', fakeApi());
+		vi.stubGlobal('fetch', archiveApi());
 		render(Page);
 		const title = await screen.findByRole('heading', { level: 1 });
 		const follows = (element: Element) =>
@@ -1043,18 +995,15 @@ describe('the archive page', () => {
 
 	it('opens with the filters collapsed as remembered', async () => {
 		rememberFiltersCollapsed(true);
-		vi.stubGlobal('fetch', fakeApi());
+		vi.stubGlobal('fetch', archiveApi());
 		render(Page);
 		expect(screen.queryByRole('complementary', { name: m.filters_title() })).toBeNull();
 		expect(screen.getByRole('button', { name: m.filters_expand() })).toBeTruthy();
 	});
 
 	it('says that a selection from a link found nothing, without the owl and the upload', async () => {
-		state.url = new URL('http://lekto/ui/documents?ids=9b653410,ab12cd34');
-		vi.stubGlobal(
-			'fetch',
-			fakeApi({ 'GET /api/v1/documents': () => ({ items: [], next_cursor: null }) })
-		);
+		testPage.url = new URL('http://lekto/ui/documents?ids=9b653410,ab12cd34');
+		vi.stubGlobal('fetch', archiveApi());
 		render(Page);
 		expect(await screen.findByText(m.documents_none_selected())).toBeTruthy();
 		expect(screen.queryByText(m.documents_none())).toBeNull();
@@ -1063,8 +1012,8 @@ describe('the archive page', () => {
 	});
 
 	it('takes no lane from an older link', async () => {
-		state.url = new URL('http://lekto/ui/documents?lane=yellow');
-		const api = fakeApi({
+		testPage.url = new URL('http://lekto/ui/documents?lane=yellow');
+		const api = archiveApi({
 			'GET /api/v1/documents': () => ({ items: [], next_cursor: null })
 		});
 		vi.stubGlobal('fetch', api);
@@ -1078,8 +1027,8 @@ describe('the archive page', () => {
 
 describe('a selection by link', () => {
 	it('lists exactly the documents a link names, with a chip that ends it', async () => {
-		state.url = new URL('http://lekto/ui/documents?ids=9b653410,ab12cd34');
-		const api = fakeApi({
+		testPage.url = new URL('http://lekto/ui/documents?ids=9b653410,ab12cd34');
+		const api = archiveApi({
 			'GET /api/v1/documents': () => ({
 				items: [listedOf({ id: 'd1', title: 'Eins' })],
 				next_cursor: null
@@ -1107,11 +1056,11 @@ describe('a selection by link', () => {
 
 	it('leaves the remembered filters as they are', async () => {
 		rememberFilters({ ...NO_FILTERS, contacts: ['c1'] }, OWNER);
-		state.url = new URL('http://lekto/ui/documents?ids=9b653410');
+		testPage.url = new URL('http://lekto/ui/documents?ids=9b653410');
 		vi.mocked(goto).mockClear();
 		vi.stubGlobal(
 			'fetch',
-			fakeApi({ 'GET /api/v1/documents': () => ({ items: [], next_cursor: null }) })
+			archiveApi({ 'GET /api/v1/documents': () => ({ items: [], next_cursor: null }) })
 		);
 		render(Page);
 		await screen.findByText(m.selection_chip({ count: 1 }));

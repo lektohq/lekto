@@ -20,7 +20,9 @@ describe('FieldValueInput (WB-13)', () => {
 		['boolean', 'true'],
 		['choice', 'a'],
 		['date', '2026-10-01']
-	] as const)('ties the error below a %s field to the field', (type, value) => {
+	] as const)('ties the error below a %s field to the field', (type, given) => {
+		// Held in `$state` as a form holds it: an amount's parts are bound one by one.
+		const value = $state(structuredClone(given));
 		const { unmount } = render(FieldValueInput, {
 			field: field(type, ['a', 'b']),
 			value,

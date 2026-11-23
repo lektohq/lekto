@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import {
 	classifierRanks,
@@ -13,14 +12,17 @@ import {
 	pageBars,
 	pageCharacters
 } from '#lib/step-details.ts';
+import { lookupOf } from '#lib/testing/master-data.ts';
+import { logEntry } from '#lib/testing/pipeline.ts';
 
 type LogEntry = components['schemas']['LogEntry'];
+type Node = LogEntry['node'];
 
 const BAKERY = '0199a6c4-0000-7000-8000-0000000000c1';
 const MUSTERVEREIN = '0199a6c4-0000-7000-8000-0000000000c2';
 const PAYSLIP = '0199a6c4-0000-7000-8000-0000000000e1';
 const ERIKA = '0199a6c4-0000-7000-8000-0000000000a1';
-const lookup = {
+const lookup = lookupOf({
 	contacts: [
 		{ id: BAKERY, name: 'Muster Bäckerei' },
 		{ id: MUSTERVEREIN, name: 'Jugendverein Muster e.V.' }
@@ -29,10 +31,9 @@ const lookup = {
 	tags: [],
 	spaces: [],
 	users: [{ id: ERIKA, username: 'erika', display_name: 'Jane Doe' }]
-} as unknown as Lookup;
+});
 
-const entry = (node: string, output: Record<string, unknown>) =>
-	({ node, output }) as unknown as LogEntry;
+const entry = (node: Node, output: Record<string, unknown>) => logEntry(node, 1, { output });
 
 describe('step details', () => {
 	it('draws the steps a picture tells better, not a signal that abstained', () => {

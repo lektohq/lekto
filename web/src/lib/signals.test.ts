@@ -1,22 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
 import { signIn } from '#lib/testing/session.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import { named, neighbourList, signalSummary } from '#lib/signals.ts';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 type LogEntry = components['schemas']['LogEntry'];
 
 const UTILITY = '0199a6c4-0000-7000-8000-0000000000c1';
 const INVOICE = '0199a6c4-0000-7000-8000-0000000000e1';
-const lookup = {
+const lookup = lookupOf({
 	contacts: [{ id: UTILITY, name: 'Stadtwerke' }],
 	documentTypes: [{ id: INVOICE, name: 'Rechnung' }],
 	tags: [],
 	spaces: [],
 	users: []
-} as unknown as Lookup;
+});
 
 const entry = (node: string, output: Record<string, unknown>) =>
 	({ node, output }) as unknown as LogEntry;
@@ -80,10 +80,10 @@ describe('signalSummary', () => {
 
 describe('the topic in the signals', () => {
 	const TOPIC = '0199a6c4-0000-7000-8000-0000000000b1';
-	const topics = {
+	const topics = lookupOf({
 		...lookup,
 		tags: [{ id: TOPIC, name: 'Arbeit', path: ['Arbeit'], scope: 'topic' }]
-	} as unknown as Lookup;
+	});
 
 	it('shows the topic the model named', () => {
 		const proposal = { sender: { value: null, evidence: null }, topic: 'Arbeit' };
@@ -95,13 +95,13 @@ describe('the topic in the signals', () => {
 describe('the labels in the fields node', () => {
 	const GROSS = '0199a6c4-0000-7000-8000-0000000000f1';
 	const NUMBER = '0199a6c4-0000-7000-8000-0000000000f2';
-	const fields = {
+	const fields = lookupOf({
 		...lookup,
 		fields: [
 			{ id: GROSS, name: 'Bruttolohn' },
 			{ id: NUMBER, name: 'Personalnummer' }
 		]
-	} as unknown as Lookup;
+	});
 	const check = (field: string, label: unknown) => ({ field: `field:${field}`, label });
 
 	it('tells for each value whether it stands by its label', () => {
@@ -149,7 +149,7 @@ describe('the space in the signals and the rules', () => {
 	const MINE = '0199a6c4-0000-7000-8000-0000000000d1';
 	const HOUSE = '0199a6c4-0000-7000-8000-0000000000d2';
 	const ERIKAS = '0199a6c4-0000-7000-8000-0000000000d3';
-	const spaces = {
+	const spaces = lookupOf({
 		...lookup,
 		spaces: [
 			{ id: MINE, name: 'Personal', personal_of: ME, role: 'edit', members: [] },
@@ -159,7 +159,7 @@ describe('the space in the signals and the rules', () => {
 			{ id: ME, username: 'john', role: 'user', personal_space_id: MINE },
 			{ id: ERIKA, username: 'erika', role: 'user', personal_space_id: ERIKAS }
 		]
-	} as unknown as Lookup;
+	});
 	const withInput = (node: string, input: Record<string, unknown>, output = {}) =>
 		({ node, input, output }) as unknown as LogEntry;
 

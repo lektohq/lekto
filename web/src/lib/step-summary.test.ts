@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import type { Node, NodeState } from '#lib/pipeline.ts';
 import { actorOf, byPerson, confirmationOf, stepSummary } from './step-summary.ts';
+import { lookupOf } from '#lib/testing/master-data.ts';
+import { logEntry, nodeState } from '#lib/testing/pipeline.ts';
 
 type LogEntry = components['schemas']['LogEntry'];
 
@@ -12,7 +13,7 @@ const BAKERY = '0199a6c4-0000-7000-8000-0000000000c2';
 const PAYSLIP = '0199a6c4-0000-7000-8000-0000000000e1';
 const HOME = '0199a6c4-0000-7000-8000-0000000000a1';
 const ERIKA = '0199a6c4-0000-7000-8000-0000000000b1';
-const lookup = {
+const lookup = lookupOf({
 	contacts: [
 		{ id: MUSTERVEREIN, name: 'Jugendverein Muster e.V.' },
 		{ id: BAKERY, name: 'Muster Bäckerei' }
@@ -22,35 +23,16 @@ const lookup = {
 	fields: [],
 	spaces: [{ id: HOME, name: 'John', personal_of: null, members: [] }],
 	users: [{ id: ERIKA, username: 'erika', display_name: 'Jane Doe', personal_space_id: null }]
-} as unknown as Lookup;
-
-const done = (node: Node): NodeState => ({
-	node,
-	status: 'done',
-	outcome: 'ok',
-	started_at: '2026-10-14T08:49:01Z',
-	finished_at: '2026-10-14T08:49:05Z'
 });
+
+const done = (node: Node): NodeState => nodeState(node);
 
 function entry(
 	node: Node,
 	output: Record<string, unknown>,
 	extra: Partial<LogEntry> = {}
 ): LogEntry {
-	return {
-		node,
-		run: 1,
-		outcome: 'ok',
-		reason: null,
-		confidence: null,
-		model_version: 'model',
-		input: {},
-		output,
-		pipeline_version: 'test',
-		started_at: '2026-10-14T08:49:01Z',
-		duration_ms: 4000,
-		...extra
-	};
+	return logEntry(node, 1, { model_version: 'model', output, duration_ms: 4000, ...extra });
 }
 
 const summary = (node: Node, output: Record<string, unknown>, extra: Partial<LogEntry> = {}) =>

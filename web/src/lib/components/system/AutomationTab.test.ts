@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { formatDuration } from '#lib/duration.ts';
 import { m } from '#lib/paraglide/messages.js';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, problem } from '#lib/testing/api.ts';
 import AutomationTab from './AutomationTab.svelte';
 
 const lanes = (green: number, yellow: number, red: number) => ({ green, yellow, red });
@@ -124,10 +124,7 @@ describe('the automation tab', () => {
 		// The chip stood at the new choice above the old figures, without a word.
 		let down = false;
 		const api = fakeApi({
-			'GET /api/v1/automation': () =>
-				down
-					? json({ type: 'about:blank', title: 'Error', status: 500, detail: 'boom' }, 500)
-					: report
+			'GET /api/v1/automation': () => (down ? problem(500, { detail: 'boom' }) : report)
 		});
 		vi.stubGlobal('fetch', api);
 		render(AutomationTab);

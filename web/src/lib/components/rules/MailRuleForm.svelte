@@ -21,6 +21,7 @@
 		firstValue,
 		FIELDS,
 		hasValue,
+		MAIL_VALUE_MAX,
 		newCondition,
 		operatorText,
 		OPERATORS,
@@ -40,7 +41,6 @@
 		type UserName
 	} from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { LIMITS } from '#lib/rules/model.ts';
 	import { move } from '#lib/rules/tree.ts';
 
 	// The editor of a mail rule (Tobi, 04.11.2026; mock E), in the frame of the document rule's:
@@ -206,7 +206,7 @@
 							aria-label={m.rule_condition_value()}
 							aria-invalid={invalid || undefined}
 							bind:value={condition.value}
-							maxlength={LIMITS.text}
+							maxlength={MAIL_VALUE_MAX}
 						/>
 					{/if}
 				</div>

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { formatNumber } from '#lib/i18n.ts';
 import { usageLabel } from '#lib/components/UsageCount.svelte';
 import { NODE_LABELS } from '#lib/node-labels.ts';
@@ -32,6 +32,9 @@ function renderBar(
 	all = false
 ) {
 	const run = new BulkRun(vi.fn());
+	// The page stops its run when it is left; here the test ends it. Else an action a test started
+	// asks for its state a second later, in whichever test runs then.
+	onTestFinished(() => run.stop());
 	const rendered = render(DocumentsBulkBar, {
 		merge,
 		count,

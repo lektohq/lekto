@@ -11,12 +11,8 @@ import {
 	unblockSteps,
 	watchPermission
 } from '#lib/push-device.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
-
-function agent(value: string, touchPoints = 0) {
-	vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(value);
-	Object.defineProperty(navigator, 'maxTouchPoints', { value: touchPoints, configurable: true });
-}
+import { calls, fakeApi, noContent, problem } from '#lib/testing/api.ts';
+import { deviceOf as agent } from '#lib/testing/browser.ts';
 
 describe('this device', () => {
 	afterEach(() => vi.restoreAllMocks());
@@ -154,7 +150,10 @@ describe('a subscription of an earlier server key (WH-05)', () => {
 
 	it('ends it and has the server forget its device before subscribing anew', async () => {
 		const { held, made } = browserSubscribed(OLD);
-		const api = fakeApi({ 'GET /api/v1/push/devices': () => [device('d-own', ENDPOINT)] });
+		const api = fakeApi({
+			'GET /api/v1/push/devices': () => [device('d-own', ENDPOINT)],
+			'DELETE /api/v1/push/devices/d-own': () => noContent()
+		});
 		vi.stubGlobal('fetch', api);
 		expect(await subscribe(NEW)).toBe(made);
 		expect(held.unsubscribe).toHaveBeenCalledOnce();
@@ -215,7 +214,8 @@ describe('giving this device up on signing out', () => {
 			'GET /api/v1/push/devices': () => [
 				device('d-other', 'https://push.example/phone'),
 				device('d-own', ENDPOINT)
-			]
+			],
+			'DELETE /api/v1/push/devices/d-own': () => noContent()
 		});
 		vi.stubGlobal('fetch', api);
 
@@ -312,7 +312,7 @@ describe('a subscription this browser still has from someone else', () => {
 		vi.stubGlobal(
 			'fetch',
 			fakeApi({
-				'GET /api/v1/push/devices': () => json({ title: 'Unavailable', status: 503 }, 503)
+				'GET /api/v1/push/devices': () => problem(503)
 			})
 		);
 

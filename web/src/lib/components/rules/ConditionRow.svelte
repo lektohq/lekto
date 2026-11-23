@@ -29,6 +29,7 @@
 		STEP_CONDITION_FIELDS,
 		TAG_FIELDS,
 		isTagField,
+		LIMITS,
 		changeField,
 		changeConditionField,
 		changeOperator,
@@ -253,6 +254,7 @@
 			aria-invalid={invalid || undefined}
 			placeholder={steps?.length ? `${steps[0]}.` : ''}
 			value={condition.path ?? ''}
+			maxlength={LIMITS.path}
 			oninput={(event) => (condition.path = event.currentTarget.value.trim())}
 			class="w-full font-mono sm:w-44"
 		/>

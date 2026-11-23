@@ -16,6 +16,7 @@ async function signIn(request: APIRequestContext, username: string, password: st
 
 let secret = '';
 let usedStep = 0;
+let userId = '';
 
 test.beforeAll(async ({ playwright, baseURL }) => {
 	test.skip(!ADMIN_PASSWORD, 'LEKTO_ADMIN_PASSWORD is not set');
@@ -26,6 +27,7 @@ test.beforeAll(async ({ playwright, baseURL }) => {
 		data: { username: USERNAME, role: 'user', password: PASSWORD }
 	});
 	expect(created.status(), await created.text()).toBe(201);
+	userId = ((await created.json()) as { id: string }).id;
 	await admin.dispose();
 
 	const user = await playwright.request.newContext({ baseURL });
@@ -40,6 +42,22 @@ test.beforeAll(async ({ playwright, baseURL }) => {
 	});
 	expect(confirmed.ok(), await confirmed.text()).toBe(true);
 	await user.dispose();
+});
+
+// The user goes again, with an empty personal space (WT2-10: each run left one behind).
+test.afterAll(async ({ playwright, baseURL }) => {
+	if (!userId) return;
+	const admin = await playwright.request.newContext({ baseURL });
+	const token = await signIn(admin, ADMIN, ADMIN_PASSWORD);
+	const headers = { 'X-CSRF-Token': token };
+	const removal = await (await admin.get(`/api/v1/users/${userId}/removal`)).json();
+	const spaces = (removal.blocking_spaces as { space_id: string }[]).map(({ space_id }) => ({
+		space_id,
+		remove: true
+	}));
+	const removed = await admin.delete(`/api/v1/users/${userId}`, { headers, data: { spaces } });
+	expect(removed.status(), await removed.text()).toBe(204);
+	await admin.dispose();
 });
 
 /**

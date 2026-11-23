@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'svelte-sonner';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, notFound, problem } from '#lib/testing/api.ts';
 import { BulkRun, POLL } from './bulk.svelte.ts';
 
 const operation = (status: string, done = 0) => ({
@@ -55,10 +55,10 @@ describe('an action on many documents, as the page follows it', () => {
 		vi.useFakeTimers();
 		const failed = vi.spyOn(toast, 'error').mockImplementation(() => '');
 		const answers: (() => unknown)[] = [
-			() => json({ type: 'about:blank', title: 'Bad Gateway', status: 502 }, 502),
+			() => problem(502),
 			() => operation('running', 1),
 			// Gone: the API says so every time it is asked.
-			() => json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+			() => notFound('bulk operation', 'op-1')
 		];
 		let polls = 0;
 		vi.stubGlobal(

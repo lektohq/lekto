@@ -12,6 +12,8 @@ export default defineConfig({
 	reporter: 'list',
 	use: {
 		baseURL: process.env.LEKTO_E2E_URL ?? 'http://127.0.0.1:8000',
+		// The specs find the UI by its English words, whatever the machine's language.
+		locale: 'en-US',
 		// A Chromium of another Playwright version, if `playwright install` is not wanted.
 		launchOptions: { executablePath: process.env.LEKTO_E2E_CHROMIUM },
 		trace: 'retain-on-failure'

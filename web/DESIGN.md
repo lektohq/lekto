@@ -668,6 +668,13 @@ font-medium`) and below it what they are (`text-xs text-muted-foreground`); `ari
 rows inside look as elsewhere in the card, indented to the text of the button (`pl-6`). A whole
 card that folds is `FilterSection`.
 
+**The first ones of a long group** (the facts, Tobi 22.11.2026): a group of rows in a card that
+can grow to hundreds (the identifiers and numbers of a long bank statement) shows its first 20.
+Below them a `Button` (`variant="link"`, `size="inline"`, `text-meta`, at least 44 px high on a
+phone) names how many more there are and shows them ("25 weitere zeigen"), then hides them again
+("Weniger zeigen"), as the custom fields of the automation do. Each document starts with the
+first 20.
+
 **Grouped by contact** (`IdentifiersEditor` with `contacts`: the identifiers at contacts, Tobi
 02.11.2026): where the rows of a list belong to different contacts, one line per contact, a
 `button` at least 56 px tall: a `ChevronRight` (`muted-foreground`) turned down when open, the
@@ -1117,7 +1124,9 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Neu
     line beside it (`role="status"`), and in `muted-foreground` when the server stores no
     keywords of Lekto's own ("Eigene Schlagwörter speichert dieser Server nicht."). A stored mailbox that is not paused has "Jetzt abrufen"
     (`outline`, `RefreshCw`) beside the test; a toast says the fetch is asked for.
-  - **Abruf:** the folders as a `MultiPicker` of what the test found and what is chosen; then
+  - **Abruf:** the folders as a `MultiPicker` of what the test found and what is chosen, at
+    most 20 as the API takes them: with 20 chosen, the other boxes are off and a line under the
+    chips says "Höchstens 20 Ordner." (`muted-foreground`, `text-xs`; Tobi, 22.11.2026); then
     two rows of two: how often ("Wie oft", `Select`) and what a mail without a rule brings in
     (`Select`: "Nichts übernehmen" or "Alles für" a person); which mails and the type of the mail
     text (`SearchSelect`). Which mails is one `Select` (Tobi, 05.11.2026): "Ab Einrichtung

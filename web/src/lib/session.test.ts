@@ -1,19 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '#lib/api/client.ts';
 import { CSRF_HEADER, setSessionHooks } from '#lib/api/fetch.ts';
-import { json } from '#lib/testing/api.ts';
+import { json, problem } from '#lib/testing/api.ts';
+import { meOf } from '#lib/testing/session.ts';
 import { connectSession, recheckSession, session } from './session.svelte.ts';
 
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
 
 function me(id: string, token: string): Response {
-	return json({
-		user: { id, username: id, role: 'user' },
-		method: 'password',
-		expires_at: '2026-10-09T12:00:00Z',
-		csrf_token: token,
-		lekto_version: '0.8.0'
-	});
+	return json(meOf({ user: { id, username: id, role: 'user' }, csrf_token: token }));
 }
 
 const stale = () =>
@@ -86,7 +81,7 @@ describe('a proxy answering for a Lekto that is not there', () => {
 	it('ends the session only on the word of the API', async () => {
 		fetchMock.mockResolvedValueOnce(me('jane', 'one'));
 		await session.load();
-		fetchMock.mockResolvedValueOnce(json({ type: 'about:blank', title: 'x', status: 401 }, 401));
+		fetchMock.mockResolvedValueOnce(problem(401));
 
 		expect(await session.load()).toBe(false);
 
@@ -118,10 +113,7 @@ describe('a proxy answering for a Lekto that is not there', () => {
 	});
 
 	it('forgets the session once the server signed out, or says it has gone', async () => {
-		for (const answer of [
-			() => new Response(null, { status: 204 }),
-			() => json({ type: 'about:blank', title: 'x', status: 401 }, 401)
-		]) {
+		for (const answer of [() => new Response(null, { status: 204 }), () => problem(401)]) {
 			fetchMock.mockResolvedValueOnce(me('jane', 'one'));
 			await session.load();
 			fetchMock.mockResolvedValueOnce(answer());
@@ -192,7 +184,7 @@ describe('another user in the same tab', () => {
 });
 
 describe('asking anew who is signed in', () => {
-	const gone = () => json({ type: 'about:blank', title: 'Unauthorized', status: 401 }, 401);
+	const gone = () => problem(401);
 
 	async function signedInAs(id: string) {
 		fetchMock.mockResolvedValueOnce(me(id, 'one'));

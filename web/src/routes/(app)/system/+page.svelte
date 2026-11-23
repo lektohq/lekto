@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import AutomationTab from '#lib/components/system/AutomationTab.svelte';
 	import UpdateNotice from '#lib/components/system/UpdateNotice.svelte';
-	import ClassifierTab from '#lib/components/system/ClassifierTab.svelte';
 	import IntakeTab from '#lib/components/system/IntakeTab.svelte';
 	import JobsTab from '#lib/components/system/JobsTab.svelte';
+	import OnDemand from '#lib/components/OnDemand.svelte';
 	import SearchTab from '#lib/components/system/SearchTab.svelte';
 	import TabBar from '#lib/components/TabBar.svelte';
 	import { m } from '#lib/paraglide/messages.js';
@@ -41,10 +40,12 @@
 		current={tab}
 	/>
 	{#key tab}
+		<!-- The charts of these two (LayerChart, d3: some 300 KB) load when their tab is shown, not
+		     with the page, which opens on the jobs. -->
 		{#if tab === 'automation'}
-			<AutomationTab />
+			<OnDemand load={() => import('#lib/components/system/AutomationTab.svelte')} wanted />
 		{:else if tab === 'classifier'}
-			<ClassifierTab />
+			<OnDemand load={() => import('#lib/components/system/ClassifierTab.svelte')} wanted />
 		{:else if tab === 'search'}
 			<SearchTab />
 		{:else if tab === 'intake'}

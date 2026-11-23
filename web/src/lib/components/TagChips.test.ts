@@ -1,10 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
-import type { Lookup, Tag } from '#lib/masterdata.svelte.ts';
+import type { Tag } from '#lib/masterdata.svelte.ts';
 import { SEPARATOR } from '#lib/tags.ts';
 import NamesLine from './NamesLine.svelte';
 import TagChip from './TagChip.svelte';
 import TagChips from './TagChips.svelte';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 function tag(id: string, path: string[], parent: string | null, scope: string, shown: boolean) {
 	return {
@@ -19,7 +20,7 @@ function tag(id: string, path: string[], parent: string | null, scope: string, s
 	} as Tag;
 }
 
-const lookup = {
+const lookup = lookupOf({
 	contacts: [{ id: 'c1', name: 'Nord', group_ids: ['g2'] }],
 	documentTypes: [{ id: 'k1', name: 'Invoice', group_ids: ['g3'] }],
 	tags: [
@@ -35,7 +36,7 @@ const lookup = {
 	fields: [],
 	spaces: [],
 	users: []
-} as unknown as Lookup;
+});
 
 describe('TagChips', () => {
 	it('shows the shown tags by their own names, the path as tooltip', () => {

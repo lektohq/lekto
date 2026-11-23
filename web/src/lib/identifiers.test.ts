@@ -2,7 +2,8 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import IdentifiersEditor from '#lib/components/IdentifiersEditor.svelte';
-import { ApiError, type Problem } from '#lib/api/problem.ts';
+import { ApiError } from '#lib/api/problem.ts';
+import { problemOf, type ProblemParts } from '#lib/testing/api.ts';
 import openapi from '../../openapi.json';
 import {
 	changesOf,
@@ -140,24 +141,8 @@ describe('the identifier a change failed on', () => {
 		{ kind: 'iban', value: 'DE89 3704 0044 0532 0130 00' },
 		{ kind: 'customer_number', value: '4711' }
 	]);
-	const problem = (detail: string, reason: Problem['reason'] = null): ApiError =>
-		new ApiError(
-			409,
-			{
-				type: 'about:blank',
-				title: 'Conflict',
-				status: 409,
-				detail,
-				existing_document_id: null,
-				space_id: null,
-				open_fields: null,
-				blocking_spaces: null,
-				second_factor_required: null,
-				reason,
-				errors: null
-			},
-			null
-		);
+	const problem = (detail: string, reason?: Pick<ProblemParts, 'code' | 'params'>): ApiError =>
+		new ApiError(409, problemOf(409, { detail, ...reason }), null);
 
 	it('is the one its reason names, whatever the language of the text', () => {
 		const taken = problem("'DE89370400440532013000' is already an identifier of the contact 'X'", {

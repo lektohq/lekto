@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ApiError, type Problem } from '#lib/api/problem.ts';
+import { ApiError } from '#lib/api/problem.ts';
 import { m } from '#lib/paraglide/messages.js';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, masterData, problem, problemOf } from '#lib/testing/api.ts';
 import { RuleLoader } from './page.svelte.ts';
 
 const lookups = (api: ReturnType<typeof fakeApi>) =>
@@ -9,7 +9,7 @@ const lookups = (api: ReturnType<typeof fakeApi>) =>
 
 describe('the loader of a rule page', () => {
 	it('loads the data beside the master data, kept until asked for anew', async () => {
-		const api = fakeApi();
+		const api = fakeApi(masterData());
 		vi.stubGlobal('fetch', api);
 		const loader = new RuleLoader();
 		const then = vi.fn();
@@ -27,7 +27,7 @@ describe('the loader of a rule page', () => {
 	});
 
 	it('drops an answer a later load overtook', async () => {
-		vi.stubGlobal('fetch', fakeApi());
+		vi.stubGlobal('fetch', fakeApi(masterData()));
 		const loader = new RuleLoader();
 		let release = () => {};
 		const slow = new Promise<string>((resolve) => (release = () => resolve('slow')));
@@ -43,25 +43,34 @@ describe('the loader of a rule page', () => {
 	it('says what went wrong, and clears it with the next load that works', async () => {
 		vi.stubGlobal(
 			'fetch',
-			fakeApi({ 'GET /api/v1/users': () => json({ detail: 'Not allowed.', status: 403 }, 403) })
+			fakeApi({
+				...masterData(),
+				'GET /api/v1/users': () =>
+					problem(403, {
+						detail: 'only editors and admins make space rules',
+						code: 'editors_only',
+						params: { action: 'make_space_rules' }
+					})
+			})
 		);
 		const loader = new RuleLoader();
 		const then = vi.fn();
 		await loader.load(() => Promise.resolve('data'), then);
 		expect(then).not.toHaveBeenCalled();
-		expect(loader.problem).toContain(m.error_forbidden());
+		expect(loader.problem).toBe(
+			`${m.error_forbidden()} ${m.reason_editors_only({ action: m.action_make_space_rules() })}`
+		);
 		expect(loader.lookup).toBeNull();
 
-		vi.stubGlobal('fetch', fakeApi());
+		vi.stubGlobal('fetch', fakeApi(masterData()));
 		await loader.load(() => Promise.resolve('data'), then);
 		expect(loader.problem).toBeNull();
 		expect(then).toHaveBeenCalledOnce();
 	});
 
 	it('offers no retry for a rule that is not there, in the words of its kind (WF-04)', async () => {
-		vi.stubGlobal('fetch', fakeApi());
-		const gone = () =>
-			Promise.reject(new ApiError(404, { title: 'Not Found', status: 404 } as Problem, null));
+		vi.stubGlobal('fetch', fakeApi(masterData()));
+		const gone = () => Promise.reject(new ApiError(404, problemOf(404), null));
 		const loader = new RuleLoader();
 		await loader.load(gone, vi.fn());
 		expect(loader.problem).toBe(m.rule_not_found());
@@ -79,7 +88,7 @@ describe('the loader of a rule page', () => {
 	});
 
 	it('refuses what is not the caller’s to use, without a retry', async () => {
-		vi.stubGlobal('fetch', fakeApi());
+		vi.stubGlobal('fetch', fakeApi(masterData()));
 		const loader = new RuleLoader();
 		await loader.load(
 			() => Promise.resolve('data'),

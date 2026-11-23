@@ -9,7 +9,10 @@ import { INBOX_PAGE_MAX } from '#lib/document-view.ts';
 import { IDENTIFIER_VALUE_MAX } from '#lib/identifiers.ts';
 import { LENS_LIMITS } from '#lib/lenses.ts';
 import { LIMITS as MAILBOX_LIMITS } from '#lib/mailboxes.ts';
-import { MAX_STEPS } from '#lib/mail-rules.ts';
+import { MAIL_VALUE_MAX, MAX_STEPS } from '#lib/mail-rules.ts';
+import { MAX_HITS } from '#lib/bulk.ts';
+import { LIST_PAGE_MAX, SEARCH_PAGE_MAX } from '#lib/list-places.ts';
+import { MAX_MERGED } from '#lib/merge.ts';
 import { MASTER_LIMITS } from '#lib/masterdata-api.ts';
 import { PROFILE_LIMITS } from '#lib/profile.ts';
 import { LIMITS } from '#lib/rules/model.ts';
@@ -32,16 +35,23 @@ type Node = {
 const schemas = (openapi as unknown as { components: { schemas: Record<string, Node> } }).components
 	.schemas;
 
-/** A node with its reference and its nullable branch resolved. */
-function resolve(node: Node): Node {
-	if (node.$ref !== undefined) return resolve(schemas[node.$ref.split('/').pop()!]);
-	if (node.anyOf !== undefined) return resolve(node.anyOf.find((each) => each.type !== 'null')!);
+/** A node with its reference resolved, of a union the branch that has `key` (a list's
+ * `maxItems` beside a text: WT2-08), else the first that is not null. */
+function resolve(node: Node, key?: string): Node {
+	if (node.$ref !== undefined) return resolve(schemas[node.$ref.split('/').pop()!], key);
+	if (node.anyOf !== undefined) {
+		const branches = node.anyOf.map((each) => resolve(each));
+		return (
+			branches.find((each) => key !== undefined && key in each) ??
+			branches.find((each) => each.type !== 'null')!
+		);
+	}
 	return node;
 }
 
 /** `Schema.property.property[]`: `[]` steps into the items. A path that is gone throws, so a
  * rename shows here. */
-function at(path: string): Node {
+function at(path: string, key?: string): Node {
 	const [name, ...steps] = path.split('.');
 	let node = schemas[name];
 	if (node === undefined) throw new Error(`no schema ${name}`);
@@ -51,11 +61,11 @@ function at(path: string): Node {
 		if (child === undefined) throw new Error(`no ${step} in ${path}`);
 		node = items ? resolve(child).items! : child;
 	}
-	return resolve(node);
+	return resolve(node, key);
 }
 
 /** A query parameter of `method path`. */
-function param(path: string, method: 'get', name: string): Node {
+function param(path: string, method: 'get' | 'post', name: string): Node {
 	const paths = (
 		openapi as unknown as {
 			paths: Record<string, Record<string, { parameters: { name: string; schema: Node }[] }>>;
@@ -64,6 +74,27 @@ function param(path: string, method: 'get', name: string): Node {
 	const found = paths[path]?.[method]?.parameters.find((each) => each.name === name);
 	if (found === undefined) throw new Error(`no ${name} at ${method} ${path}`);
 	return resolve(found.schema);
+}
+
+/** A part of the multipart body of `POST path`, as the JSON it carries. */
+function formPart(path: string, name: string): Node {
+	const paths = (
+		openapi as unknown as {
+			paths: Record<
+				string,
+				{
+					post: {
+						requestBody: {
+							content: Record<string, { schema: { properties: Record<string, Node> } }>;
+						};
+					};
+				}
+			>;
+		}
+	).paths;
+	const part = paths[path]?.post.requestBody.content['multipart/form-data'].schema.properties[name];
+	if (part === undefined) throw new Error(`no ${name} in POST ${path}`);
+	return resolve((part.contentSchema as Node | undefined) ?? part);
 }
 
 type Key = 'maxLength' | 'maxItems' | 'minimum' | 'maximum' | 'default';
@@ -103,6 +134,10 @@ const PAIRS: [label: string, ours: number, path: string, key: Key][] = [
 	['LIMITS.actions', LIMITS.actions, 'RuleCreate.actions', 'maxItems'],
 	['LIMITS.text', LIMITS.text, 'SetTitleAction.template', 'maxLength'],
 	['LIMITS.text', LIMITS.text, 'ForceReviewAction.reason', 'maxLength'],
+	['LIMITS.list', LIMITS.list, 'ConditionSchema.value', 'maxItems'],
+	['LIMITS.list', LIMITS.list, 'AddTagsAction.tag_ids', 'maxItems'],
+	['LIMITS.path', LIMITS.path, 'ConditionSchema.path', 'maxLength'],
+	['MAIL_VALUE_MAX', MAIL_VALUE_MAX, 'MailConditionBody.value', 'maxLength'],
 	[
 		'TREE_LIMITS.conditions',
 		TREE_LIMITS.conditions,
@@ -115,6 +150,8 @@ const PAIRS: [label: string, ours: number, path: string, key: Key][] = [
 	['MAILBOX_LIMITS.username', MAILBOX_LIMITS.username, 'MailboxCreate.username', 'maxLength'],
 	['MAILBOX_LIMITS.password', MAILBOX_LIMITS.password, 'MailboxCreate.password', 'maxLength'],
 	['MAILBOX_LIMITS.folder', MAILBOX_LIMITS.folder, 'MailboxCreate.folders[]', 'maxLength'],
+	['MAILBOX_LIMITS.folders', MAILBOX_LIMITS.folders, 'MailboxCreate.folders', 'maxItems'],
+	['MAILBOX_LIMITS.folders', MAILBOX_LIMITS.folders, 'MailboxPatch.folders', 'maxItems'],
 	...(['ContactCreate', 'DocumentTypeCreate', 'TagCreate', 'FieldCreate', 'SpaceCreate'].map(
 		(schema) => ['MASTER_LIMITS.name', M.name, `${schema}.name`, 'maxLength']
 	) as [string, number, string, Key][]),
@@ -147,7 +184,7 @@ const PAIRS: [label: string, ours: number, path: string, key: Key][] = [
 	['TOKEN_NAME_MAX', TOKEN_NAME_MAX, 'TokenCreate.name', 'maxLength'],
 	['CODE_MAX', CODE_MAX, 'CodeIn.code', 'maxLength']
 	// Not in the OpenAPI document, held by the backend's code only: TREE_LIMITS.depth,
-	// LIMITS.pattern, LIMITS.list.
+	// LIMITS.pattern, MAX_DOCUMENTS (lib/bulk.ts).
 ];
 
 /** A field that is a number or a length of its own and no limit of the API (`#rrggbb`, an ISO
@@ -169,7 +206,24 @@ const components = import.meta.glob('/src/**/*.svelte', {
 describe('the limits of the forms', () => {
 	it.each(PAIRS)('%s is the API’s (%s %s)', (_, ours, path, key) => {
 		// A default stands at the property itself, before a nullable branch is resolved.
-		expect(ours).toBe(at(path)[key]);
+		expect(ours).toBe(at(path, key)[key]);
+	});
+
+	it('finds a limit in any branch of a union, not only the first', () => {
+		// `ConditionSchema.value` is a text, a number, … or a list: its `maxItems` is the list's.
+		expect(at('ConditionSchema.value', 'maxItems').maxItems).toBe(100);
+		expect(at('ConditionSchema.value').type).toBe('string');
+	});
+
+	it('reads lists and searches in pages as large as the API takes, as far as it looks', () => {
+		expect(LIST_PAGE_MAX).toBe(param('/api/v1/documents', 'get', 'limit').maximum);
+		expect(SEARCH_PAGE_MAX).toBe(param('/api/v1/documents/search', 'post', 'limit').maximum);
+		// A search by words reaches its hits up to this offset.
+		expect(MAX_HITS).toBe(param('/api/v1/documents/search', 'post', 'offset').maximum);
+	});
+
+	it('merges as many documents as an edit takes', () => {
+		expect(MAX_MERGED).toBe(formPart('/api/v1/documents/{id}/edit', 'documents').maxItems);
 	});
 
 	it('selects as many documents by id as the list takes', () => {

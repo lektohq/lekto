@@ -1,13 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { json } from '#lib/testing/api.ts';
+import { problem, problemOf } from '#lib/testing/api.ts';
 import { apiError, readProblem, retryAfterSeconds } from './problem.ts';
 
 describe('readProblem', () => {
 	it('reads problem details', async () => {
-		const response = json(
-			{ type: 'about:blank', title: 'Not Found', status: 404, detail: 'No.' },
-			404
-		);
+		const response = problem(404, { detail: 'No.' });
 		expect(await readProblem(response)).toMatchObject({ status: 404, detail: 'No.' });
 		// The body stays readable.
 		expect(response.bodyUsed).toBe(false);
@@ -47,15 +44,13 @@ describe('retryAfterSeconds', () => {
 describe('apiError', () => {
 	it('takes the body the client already read', async () => {
 		const response = new Response(null, { status: 503 });
-		const body = { type: 'about:blank', title: 'Service Unavailable', status: 503, detail: 'db' };
+		const body = problemOf(503, { detail: 'db' });
 		expect((await apiError(response, body)).problem?.detail).toBe('db');
 		expect((await apiError(response, 'not a problem')).problem).toBeNull();
 	});
 
 	it('carries status, problem and the wait', async () => {
-		const response = json({ type: 'about:blank', title: 'Too Many Requests', status: 429 }, 429, {
-			'retry-after': '5'
-		});
+		const response = problem(429, { detail: null }, { 'retry-after': '5' });
 		const error = await apiError(response);
 		expect(error.status).toBe(429);
 		expect(error.retryAfter).toBe(5);

@@ -1,18 +1,19 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
+import type { Tag } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { newCondition } from '#lib/rules/model.ts';
 import ConditionRow from './ConditionRow.svelte';
+import { lookupOf, tagOf } from '#lib/testing/master-data.ts';
 
-const lookup = {
+const lookup = lookupOf({
 	contacts: [],
 	documentTypes: [],
 	tags: [],
 	fields: [],
 	spaces: [],
 	users: []
-} as unknown as Lookup;
+});
 
 describe('a condition on the mail', () => {
 	it('names "Mail" as its subject and the part of the mail in a second choice', () => {
@@ -84,23 +85,15 @@ describe('a condition on a date', () => {
 });
 
 describe('a condition on tags, groups or the topic (WD-09)', () => {
-	const tag = (id: string, name: string, scope: string) => ({
-		id,
-		name,
-		scope,
-		path: [name],
-		parent_id: null,
-		color: null,
-		icon: null
-	});
-	const tagged = {
+	const tag = (id: string, name: string, scope: Tag['scope']) => tagOf({ id, name, scope });
+	const tagged = lookupOf({
 		...lookup,
 		tags: [
 			tag('t1', 'Steuer', 'document'),
 			tag('t2', 'Miete', 'document'),
 			tag('o1', 'Wohnen', 'topic')
 		]
-	} as unknown as Lookup;
+	});
 
 	it.each([
 		['tags', 'contains', 't1', 'Steuer'],

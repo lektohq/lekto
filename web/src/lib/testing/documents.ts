@@ -97,3 +97,73 @@ export function summaryOf(counts: Partial<Summary> = {}): Summary {
 		...counts
 	};
 }
+
+type Files = components['schemas']['DocumentFilesOut'];
+
+/** The files of a document as received: one PDF, its first version, no archive copy. */
+export function filesOf(overrides: Partial<Files> = {}): Files {
+	return {
+		added: '2026-10-15T08:00:00Z',
+		modified: '2026-10-15T08:00:00Z',
+		original_filename: 'scan.pdf',
+		media_type: 'application/pdf',
+		page_count: 1,
+		original: { size: 12345, sha256: '0'.repeat(64), metadata: null },
+		archive: null,
+		versions: [
+			{
+				number: 1,
+				current: true,
+				original_filename: 'scan.pdf',
+				media_type: 'application/pdf',
+				kind: 'received',
+				created_at: '2026-10-15T08:00:00Z',
+				created_by: null,
+				detail: {},
+				origin: null
+			}
+		],
+		...overrides
+	};
+}
+
+type Lens = components['schemas']['LensOut'];
+
+/** A filter of a lens that filters nothing. */
+export const NO_LENS_FILTER: Lens['filter'] = {
+	contact_ids: [],
+	document_type_ids: [],
+	contact_group_ids: [],
+	document_type_group_ids: [],
+	topic_ids: [],
+	tag_ids: [],
+	space_ids: [],
+	field_id: null,
+	document_date_from: null,
+	document_date_to: null,
+	document_period: null,
+	facts: []
+};
+
+/** The lens `l1` "Zu bezahlen" in a grid, without words, sort or filter unless given. */
+export function lensOf(
+	parts: Omit<Partial<Lens>, 'filter'> & { filter?: Partial<Lens['filter']> } = {}
+): Lens {
+	const { filter, ...rest } = parts;
+	return {
+		id: 'l1',
+		name: 'Zu bezahlen',
+		position: 0,
+		query: null,
+		sort: null,
+		sort_field_id: null,
+		grouping: 'none',
+		layout: 'grid',
+		card_field_ids: [],
+		due_field_id: null,
+		created_at: '2026-10-20T10:00:00Z',
+		updated_at: '2026-10-20T10:00:00Z',
+		...rest,
+		filter: { ...NO_LENS_FILTER, ...filter }
+	};
+}

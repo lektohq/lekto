@@ -53,9 +53,7 @@ describe('Segmented', () => {
 		const list = screen.getByRole('button', { name: 'List' });
 		// On hover a tooltip says it (web/DESIGN.md: no native title on a button).
 		expect(list.hasAttribute('title')).toBe(false);
-		expect(
-			list.getAttribute('data-tooltip-trigger') ?? list.getAttribute('data-state')
-		).not.toBeNull();
+		expect(list.hasAttribute('data-tooltip-trigger')).toBe(true);
 		expect(list.textContent?.trim()).toBe('');
 	});
 

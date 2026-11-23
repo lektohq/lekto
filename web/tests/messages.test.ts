@@ -62,6 +62,7 @@ const NO_SINGULAR: ReadonlySet<string> = new Set([
 	'facet_chosen',
 	'facet_month_count',
 	'facet_undated',
+	'facts_more',
 	'filters_expand_active',
 	'filters_show',
 	'holders_cases_first',

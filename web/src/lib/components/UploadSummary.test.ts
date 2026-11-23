@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { signIn } from '#lib/testing/session.ts';
 import { session } from '#lib/session.svelte.ts';
-import { json } from '#lib/testing/api.ts';
+import { fakeApi, json, problem } from '#lib/testing/api.ts';
 import { uploads } from '#lib/upload.svelte.ts';
 import UploadSummary from './UploadSummary.svelte';
 
@@ -27,10 +27,7 @@ describe('UploadSummary', () => {
 		const answers = [
 			json({ id: 'doc-1' }, 202),
 			json({ id: 'doc-2' }, 202),
-			json(
-				{ type: 'about:blank', title: 'Conflict', status: 409, existing_document_id: 'doc-old' },
-				409
-			)
+			problem(409, { existing_document_id: 'doc-old' })
 		];
 		vi.stubGlobal(
 			'fetch',
@@ -78,9 +75,7 @@ describe('UploadSummary', () => {
 	it('leads a failed shared file back to its share, to try again (WM-06)', async () => {
 		vi.stubGlobal(
 			'fetch',
-			vi.fn(async () =>
-				json({ type: 'about:blank', title: 'Unavailable', status: 503, detail: 'later' }, 503)
-			)
+			fakeApi({ 'POST /api/v1/documents': () => problem(503, { detail: 'later' }) })
 		);
 		render(UploadSummary);
 		uploads.add({ files: [pdf('shared.pdf')], skipped: [] }, { again: '/ui/share?id=12345' });

@@ -9,6 +9,7 @@ import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import { calls, fakeApi } from '#lib/testing/api.ts';
 import Page from './+page.svelte';
+import { jobsSummaryOf } from '#lib/testing/system.ts';
 
 type Expected = components['schemas']['ExpectedOut'];
 
@@ -27,15 +28,17 @@ const series = (state: Expected['state'], changes: Partial<Expected> = {}): Expe
 	...changes
 });
 
-const JOBS = {
-	kinds: [
-		{ kind: 'contacts.logo', running: 0, due: 3, planned: 0, failed: 2, done: 10 },
-		{ kind: 'documents.index', running: 1, due: 0, planned: 0, failed: 0, done: 40 }
-	],
-	last_started_at: '2026-10-27T11:59:56Z',
-	now: '2026-10-27T12:00:00Z',
-	kept_since: '2026-10-20T12:00:00Z'
-};
+const JOBS = jobsSummaryOf(
+	{
+		'contacts.logo': { due: 3, failed: 2, done: 10 },
+		'documents.index': { running: 1, done: 40 }
+	},
+	{
+		last_started_at: '2026-10-27T11:59:56Z',
+		now: '2026-10-27T12:00:00Z',
+		kept_since: '2026-10-20T12:00:00Z'
+	}
+);
 
 function routes(expected: Expected[] = [], suggested = 2) {
 	return fakeApi({
@@ -99,7 +102,7 @@ describe('Übersicht', () => {
 				'GET /api/v1/expected': () => [],
 				'GET /api/v1/jobs/summary': () => ({
 					...JOBS,
-					kinds: [{ kind: 'documents.index', running: 0, due: 0, planned: 0, failed: 0, done: 4 }]
+					kinds: jobsSummaryOf({ 'documents.index': { done: 4 } }).kinds
 				})
 			})
 		);

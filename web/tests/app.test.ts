@@ -215,6 +215,52 @@ describe('the colour of the bars', () => {
 	});
 });
 
+describe('the start without browser storage', () => {
+	/** `theme.js` run in a window whose storage is the given property, as the browser has it. */
+	function start(storage: PropertyDescriptor): Window {
+		const window = { matchMedia: () => ({ matches: false }) } as unknown as Window;
+		Object.defineProperty(window, 'localStorage', { ...storage, configurable: true });
+		const document = {
+			documentElement: { classList: { toggle: () => true }, style: {} },
+			querySelector: () => null
+		};
+		new Function('window', 'document', themeScript)(window, document);
+		return window;
+	}
+
+	const BLOCKED = {
+		get() {
+			throw new DOMException('The operation is insecure.', 'SecurityError');
+		}
+	};
+
+	// mode-watcher and Paraglide read it unguarded: without one, the page stayed white (WK-01).
+	it.each([
+		['blocked site data', BLOCKED],
+		['no DOM storage', { value: null }]
+	])('finds one in memory with %s', (_, storage) => {
+		const { localStorage } = start(storage);
+		expect(localStorage.getItem('mode-watcher-mode')).toBeNull();
+		localStorage.setItem('PARAGLIDE_LOCALE', 'de');
+		localStorage.setItem('mode-watcher-mode', 'dark');
+		expect(localStorage.getItem('PARAGLIDE_LOCALE')).toBe('de');
+		expect([localStorage.length, localStorage.key(1), localStorage.key(2)]).toEqual([
+			2,
+			'mode-watcher-mode',
+			null
+		]);
+		localStorage.removeItem('PARAGLIDE_LOCALE');
+		expect(localStorage.getItem('PARAGLIDE_LOCALE')).toBeNull();
+		localStorage.clear();
+		expect(localStorage.length).toBe(0);
+	});
+
+	it("keeps the browser's own storage", () => {
+		const own = { getItem: () => 'light' };
+		expect(start({ value: own }).localStorage).toBe(own);
+	});
+});
+
 describe('the safe areas of the installed app', () => {
 	it('reaches under the notch and the home indicator', () => {
 		expect(html).toContain('viewport-fit=cover');

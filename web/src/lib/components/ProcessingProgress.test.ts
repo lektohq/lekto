@@ -35,7 +35,9 @@ describe('ProcessingProgress', () => {
 		]);
 		expect(bar.children).toHaveLength(5);
 		expect(bar.children[1].className).toContain('animate-pulse');
-		expect(bar.getAttribute('aria-valuetext')).toBeTruthy();
+		expect(bar.getAttribute('aria-valuetext')).toBe(
+			m.doc_processing({ node: m.node_ocr(), done: 3, total: 5 })
+		);
 		expect(screen.getByRole('status').textContent).toContain('3');
 		expect(screen.getByRole('link').getAttribute('href')).toBe('/ui/documents/d?tab=processing');
 		// The bar is a few pixels tall; the link's hit area is a target's (WC-07).

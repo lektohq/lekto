@@ -340,6 +340,8 @@
 				options={folders}
 				selected={form.folders}
 				onchange={(chosen) => (form.folders = chosen)}
+				max={LIMITS.folders}
+				full={m.mail_folders_max({ max: formatNumber(LIMITS.folders) })}
 			/>
 		</Field.Field>
 		<div class="grid gap-4 sm:grid-cols-2">

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
 import { signIn } from '#lib/testing/session.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import {
@@ -14,16 +13,17 @@ import {
 	unseenHere,
 	unseenText
 } from '#lib/space-suggestion.ts';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 type OpenNode = components['schemas']['OpenNodeOut'];
 
-const member = (user_id: string, username: string, role = 'edit') => ({
+const member = (user_id: string, username: string, role: 'read' | 'edit' = 'edit') => ({
 	user_id,
 	username,
 	role,
 	active: true
 });
-const lookup = {
+const lookup = lookupOf({
 	contacts: [],
 	documentTypes: [],
 	tags: [],
@@ -47,7 +47,7 @@ const lookup = {
 		{ id: 'u1', username: 'john', role: 'user', personal_space_id: 'mine' },
 		{ id: 'u2', username: 'erika', role: 'user', personal_space_id: 'erikas' }
 	]
-} as unknown as Lookup;
+});
 
 const node = (fields: { field: string; suggestion?: unknown; unseen_by?: string[] }[]) =>
 	({ node: 'judge', outcome: 'uncertain', reason: null, fields }) as unknown as OpenNode;

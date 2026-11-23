@@ -7,6 +7,7 @@ import {
 	rememberedCollapsed,
 	searched
 } from './tag-kinds.ts';
+import { withoutStorage } from '#lib/testing/browser.ts';
 
 const tag = (id: string, path: string[], parent: string | null) =>
 	({ id, name: path.at(-1), path, parent_id: parent, scope: 'document' }) as Tag;
@@ -35,10 +36,7 @@ describe('the Tags tab', () => {
 		expect(rememberedCollapsed()).toEqual(['tags', 'topics']);
 		localStorage.setItem('lekto.master-data.tags.collapsed', '{"no": 1');
 		expect(rememberedCollapsed()).toEqual([]);
-		vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-			throw new Error('blocked');
-		});
-		expect(rememberedCollapsed()).toEqual([]);
+		withoutStorage(() => expect(rememberedCollapsed()).toEqual([]));
 	});
 
 	it('searches the paths and keeps the tags above a match', () => {

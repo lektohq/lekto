@@ -11,35 +11,27 @@ import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import { documentOf, inboxItem, listedOf, OWNER, summaryOf } from '#lib/testing/documents.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import {
+	calls,
+	fakeApi,
+	json,
+	masterData,
+	noContent,
+	notFound,
+	pdf,
+	problem
+} from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import { returnTo } from '#lib/return-to.svelte.ts';
 import Page from './+page.svelte';
+import { streamEvents } from '#lib/testing/events.ts';
 
 type Document = components['schemas']['DocumentDetails'];
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
-let emit: ((type: string, data: object) => void) | null = null;
-
-function streamEvents() {
-	const listeners = new Map<string, (message: { data: string }) => void>();
-	events.useFactory(
-		() =>
-			({
-				addEventListener(type: string, handler: (message: { data: string }) => void) {
-					listeners.set(type, handler);
-				},
-				close() {}
-			}) as unknown as EventSource
-	);
-	events.start(() => {});
-	emit = (type, data) =>
-		listeners.get(type)?.({
-			data: JSON.stringify({ type, id: crypto.randomUUID(), occurred_at: '', ...data })
-		});
-}
+let emit: ((type: string, data?: object) => void) | null = null;
 
 /** The routes of one document's view. */
 function documentRoutes(id: string, current: () => Document): Parameters<typeof fakeApi>[0] {
@@ -54,15 +46,25 @@ function documentRoutes(id: string, current: () => Document): Parameters<typeof 
 			editable: true
 		}),
 		// The properties tab says so; the test looks at seen.
-		[`GET /api/v1/documents/${id}/files`]: () =>
-			json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+		[`GET /api/v1/documents/${id}/files`]: () => notFound('document', id),
+		[`GET /api/v1/documents/${id}/archive`]: () => pdf(),
+		// Confirming answers 202 with the document as it is now.
+		[`POST /api/v1/documents/${id}/confirm`]: () => json(current(), 202),
+		[`PUT /api/v1/documents/${id}/seen`]: () => noContent(),
+		[`DELETE /api/v1/documents/${id}/seen`]: () => noContent()
 	};
 }
 
 function serve(current: () => Document, routes: Parameters<typeof fakeApi>[0] = {}) {
 	const api = fakeApi({
+		...masterData(),
 		...documentRoutes('doc-1', current),
-		'GET /api/v1/pipeline': () => ({ nodes: [], vision: null }),
+		'GET /api/v1/pipeline': () => ({
+			nodes: [],
+			vision: null,
+			logo_fetch: false,
+			meaning_search: false
+		}),
 		'GET /api/v1/inbox/summary': () => summaryOf(),
 		...routes
 	});
@@ -77,7 +79,7 @@ beforeEach(() => {
 	goTo('/ui/documents/doc-1?tab=properties', { id: 'doc-1' });
 	vi.mocked(goto).mockClear();
 	signIn('user', { id: OWNER });
-	streamEvents();
+	emit = streamEvents();
 });
 
 afterEach(() => {
@@ -117,8 +119,7 @@ describe('a short id', () => {
 describe('the frame of the page', () => {
 	it('keeps one title while the document loads and when it cannot be found', async () => {
 		serve(() => documentOf(), {
-			'GET /api/v1/documents/doc-1': () =>
-				json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+			'GET /api/v1/documents/doc-1': () => notFound('document', 'doc-1')
 		});
 		render(Page);
 		expect(screen.getByRole('heading', { level: 1, name: m.document_generic() })).toBeTruthy();
@@ -130,9 +131,7 @@ describe('the frame of the page', () => {
 		let gone = false;
 		serve(() => documentOf({ lane: 'green' }), {
 			'GET /api/v1/documents/doc-1': () =>
-				gone
-					? json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
-					: documentOf({ lane: 'green' })
+				gone ? notFound('document', 'doc-1') : documentOf({ lane: 'green' })
 		});
 		render(Page);
 		await screen.findByRole('heading', { level: 1, name: documentOf().title });
@@ -527,10 +526,7 @@ describe('the document tab', () => {
 		goTo('/ui/documents/doc-1?left=text&right=form', { id: 'doc-1' });
 		const api = serve(parsed, {
 			...readable,
-			'GET /api/v1/documents/doc-1': () =>
-				down
-					? json({ type: 'about:blank', title: 'Service Unavailable', status: 503 }, 503)
-					: parsed()
+			'GET /api/v1/documents/doc-1': () => (down ? problem(503) : parsed())
 		});
 		render(Page);
 		await waitFor(() => expect(titleField()).not.toBeNull());
@@ -699,8 +695,7 @@ describe('opened from the document list', () => {
 		returnTo.rememberDocuments({ pathname: '/ui/documents', search: '?tag=t3' }, '');
 		goTo('/ui/documents/doc-1?from=list', { id: 'doc-1' });
 		serve(() => documentOf({ lane: 'green' }), {
-			'GET /api/v1/documents/doc-2': () =>
-				json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404),
+			'GET /api/v1/documents/doc-2': () => notFound('document', 'doc-2'),
 			'GET /api/v1/documents': () => ({
 				items: ['doc-1', 'doc-2', 'doc-3'].map((id) => listedOf({ id })),
 				next_cursor: null

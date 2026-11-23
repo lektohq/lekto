@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_PAGE_SIZES, rememberedPageSize, rememberPageSize } from './page-size.ts';
+import { withoutStorage } from '#lib/testing/browser.ts';
 
 afterEach(() => localStorage.clear());
 
@@ -37,18 +38,9 @@ describe('the page size of a table', () => {
 	});
 
 	it('works without storage: nothing remembered, nothing thrown', () => {
-		const storage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')!;
-		Object.defineProperty(globalThis, 'localStorage', {
-			configurable: true,
-			get() {
-				throw new Error('blocked');
-			}
-		});
-		try {
+		withoutStorage(() => {
 			expect(() => rememberPageSize('jobs', 100)).not.toThrow();
 			expect(rememberedPageSize('jobs')).toBe(DEFAULT_PAGE_SIZES.jobs);
-		} finally {
-			Object.defineProperty(globalThis, 'localStorage', storage);
-		}
+		});
 	});
 });

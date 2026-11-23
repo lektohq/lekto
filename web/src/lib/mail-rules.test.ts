@@ -20,6 +20,7 @@ import {
 	type MailRule
 } from './mail-rules.ts';
 import { ApiError } from '#lib/api/problem.ts';
+import { problemOf } from '#lib/testing/api.ts';
 import { saveErrorsAt } from '#lib/rules/errors.ts';
 import { CONDITION_FIELD_OPERATORS } from '#lib/rules/model.ts';
 import { newGroup } from '#lib/rules/tree.ts';
@@ -191,12 +192,7 @@ describe('the form of a mail rule', () => {
 		// The editor of a mail rule saved by itself: a 422 stood as one line above the buttons,
 		// never at its block, as a document rule's does.
 		const form = formOf(RULE);
-		const refused = (detail: string, reason: unknown = null) =>
-			new ApiError(
-				422,
-				{ type: 'about:blank', title: 'Unprocessable', status: 422, detail, reason } as never,
-				null
-			);
+		const refused = (detail: string) => new ApiError(422, problemOf(422, { detail }), null);
 		const [, second] = form.conditions.items;
 		expect(
 			saveErrorsAt(

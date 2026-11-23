@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
-import type { GraphNode, Node, NodeState } from '#lib/pipeline.ts';
+import type { Node, NodeState } from '#lib/pipeline.ts';
 import {
 	bandOf,
 	CARRIED_BASIS,
@@ -16,21 +16,22 @@ import {
 	type BandPhase
 } from './band.ts';
 import { stepsOf } from './steps.ts';
+import { graphOf, logEntry, nodeState } from '#lib/testing/pipeline.ts';
 
 type LogEntry = components['schemas']['LogEntry'];
 
-const graph: GraphNode[] = [
-	{ node: 'receive', requires: [], waits_for: [] },
-	{ node: 'ocr', requires: ['receive'], waits_for: [] },
-	{ node: 'pages', requires: ['receive'], waits_for: [] },
-	{ node: 'parse', requires: ['ocr'], waits_for: [] },
-	{ node: 'signal_llm', requires: ['parse'], waits_for: [] },
-	{ node: 'signal_classifier', requires: ['parse'], waits_for: [] },
-	{ node: 'judge', requires: ['signal_llm', 'signal_classifier'], waits_for: [] },
-	{ node: 'fields', requires: ['judge'], waits_for: [] },
-	{ node: 'apply_rules', requires: ['fields'], waits_for: [] },
-	{ node: 'file', requires: ['apply_rules'], waits_for: [] }
-];
+const graph = graphOf({
+	receive: [],
+	ocr: ['receive'],
+	pages: ['receive'],
+	parse: ['ocr'],
+	signal_llm: ['parse'],
+	signal_classifier: ['parse'],
+	judge: ['signal_llm', 'signal_classifier'],
+	fields: ['judge'],
+	apply_rules: ['fields'],
+	file: ['apply_rules']
+});
 
 const base = Date.UTC(2026, 9, 23, 9, 0, 0);
 const at = (offset: number) => new Date(base + offset * 1000);
@@ -47,24 +48,11 @@ function ran(node: Node, start: number, seconds: number, outcome: NodeState['out
 }
 
 function waiting(node: Node): NodeState {
-	return { node, status: 'waiting', outcome: null, started_at: null, finished_at: null };
+	return nodeState(node, null, 'waiting');
 }
 
 function entry(node: Node, run: number, extra: Partial<LogEntry> = {}): LogEntry {
-	return {
-		node,
-		run,
-		outcome: 'ok',
-		reason: null,
-		confidence: null,
-		model_version: null,
-		input: {},
-		output: {},
-		pipeline_version: 'test',
-		started_at: '2026-10-23T09:00:00Z',
-		duration_ms: 100,
-		...extra
-	};
+	return logEntry(node, run, { started_at: '2026-10-23T09:00:00Z', duration_ms: 100, ...extra });
 }
 
 function stepsFrom(states: NodeState[], log: LogEntry[] = [], run = 1) {

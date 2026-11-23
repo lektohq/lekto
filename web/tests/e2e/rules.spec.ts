@@ -2,6 +2,7 @@
 // switched off, dry-run on an existing document, switched on and applied (the link keeps the
 // application), changed and left paused, read in an earlier version, opened and saved again
 // unchanged (no new version), and deleted.
+import { watch } from './watch.ts';
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 
 const ADMIN = process.env.LEKTO_ADMIN_USERNAME ?? 'admin';
@@ -16,10 +17,11 @@ trailer<</Root 1 0 R>>
 
 let api: APIRequestContext;
 let csrf = '';
-const created: { contact: string; tag: string; document: string } = {
+const created: { contact: string; tag: string; document: string; rule: string } = {
 	contact: '',
 	tag: '',
-	document: ''
+	document: '',
+	rule: ''
 };
 
 async function call(method: 'post' | 'patch' | 'delete', path: string, data?: object) {
@@ -63,6 +65,10 @@ test.beforeAll(async ({ playwright, baseURL }) => {
 
 test.afterAll(async () => {
 	if (!api) return;
+	// The rule too, where the test stopped before deleting it (WT2-10).
+	if (created.rule) {
+		await api.delete(`/api/v1/rules/${created.rule}`, { headers: { 'X-CSRF-Token': csrf } });
+	}
 	if (created.document) await call('delete', `/documents/${created.document}`).catch(() => {});
 	if (created.tag) await call('delete', `/tags/${created.tag}`).catch(() => {});
 	if (created.contact) await call('delete', `/contacts/${created.contact}`).catch(() => {});
@@ -96,12 +102,9 @@ async function signIn(page: Page) {
 }
 
 test('a rule is built, dry-run, applied, changed and deleted', async ({ page }) => {
-	const problems: string[] = [];
-	page.on('console', (message) => {
-		if (message.type() === 'error' && !/status of [45]\d\d/.test(message.text()))
-			problems.push(message.text());
-	});
-	page.on('pageerror', (error) => problems.push(error.message));
+	const problems = watch(page, [
+		{ url: /\/api\/v1\/rules\/[^/]+$/, why: 'the switch the test refuses (404)' }
+	]);
 	await signIn(page);
 
 	await page.goto('/ui/rules');
@@ -141,6 +144,7 @@ test('a rule is built, dry-run, applied, changed and deleted', async ({ page }) 
 	// Saved switched off; the dry run shows the document, chosen.
 	await page.waitForURL(/\/ui\/rules\/[^/]+\/apply\?saved=1$/);
 	const ruleUrl = page.url().replace(/\/apply\?saved=1$/, '');
+	created.rule = ruleUrl.split('/').pop()!;
 	await expect(page.getByRole('link', { name: `${NAME}` }).first()).toBeVisible();
 	await expect(page.getByRole('checkbox', { name: `Apply to ${NAME}` })).toBeChecked();
 	expect(previews).toBe(1);
@@ -171,18 +175,25 @@ test('a rule is built, dry-run, applied, changed and deleted', async ({ page }) 
 	await expect(page.getByRole('switch', { name: `Activate ${NAME} v2` })).not.toBeChecked();
 	await expect(page.getByRole('link', { name: 'Version 2' })).toBeVisible();
 
-	// A refused switch stays as the rule is.
+	// A refused switch stays as the rule is; the refusal reads in the user's words, as the API
+	// sends it with its reason (WT2-02).
 	await page.route('**/api/v1/rules/*', (route) =>
 		route.request().method() === 'PATCH'
 			? route.fulfill({
 					status: 404,
 					contentType: 'application/problem+json',
-					body: JSON.stringify({ title: 'Not Found', status: 404, detail: 'tag gone' })
+					body: JSON.stringify({
+						type: 'about:blank',
+						title: 'Not Found',
+						status: 404,
+						detail: `tag ${created.tag} not found`,
+						reason: { code: 'not_found', params: { kind: 'tag', id: created.tag } }
+					})
 				})
 			: route.fallback()
 	);
 	await page.getByRole('switch', { name: `Activate ${NAME} v2` }).click();
-	await expect(page.getByText('tag gone')).toBeVisible();
+	await expect(page.getByText(`Tag ${created.tag} was not found.`)).toBeVisible();
 	await expect(page.getByRole('switch', { name: `Activate ${NAME} v2` })).not.toBeChecked();
 	await page.unroute('**/api/v1/rules/*');
 

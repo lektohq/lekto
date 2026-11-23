@@ -22,7 +22,9 @@ export const LIMITS = {
 	host: 255,
 	username: 320,
 	password: 1000,
-	folder: 1000
+	folder: 1000,
+	/** The folders one mailbox looks in. */
+	folders: 20
 } as const;
 
 /** What the mailbox left out or could not do lately, as lines in the lane's yellow

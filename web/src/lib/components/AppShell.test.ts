@@ -20,7 +20,7 @@ vi.mock('#lib/push-device.ts', async (original) => ({
 	...(await original<typeof import('#lib/push-device.ts')>()),
 	leaveDevice: vi.fn(async () => {})
 }));
-vi.mock('$app/state', () => ({ page: { url: new URL('http://lekto/ui/inbox'), state: {} } }));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const children = createRawSnippet(() => ({ render: () => '<p>content</p>' }));
 

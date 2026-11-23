@@ -4,26 +4,14 @@ import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import TagsPanel from './TagsPanel.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, masterData, problem } from '#lib/testing/api.ts';
+import { testPage } from '#lib/testing/page-state.svelte.ts';
+import { goto } from '$app/navigation';
 
-const nav = vi.hoisted(() => ({
-	url: new URL('http://lekto/ui/admin/master-data?tab=tags'),
-	goto: vi.fn()
-}));
-vi.mock('$app/state', () => ({
-	page: {
-		get url() {
-			return nav.url;
-		}
-	}
-}));
-vi.mock('$app/navigation', () => ({
-	afterNavigate: vi.fn(),
-	beforeNavigate: vi.fn(),
-	goto: nav.goto
-}));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 
 function tag(id: string, path: string[], parent: string | null, scope: string, extra: object = {}) {
 	return {
@@ -54,23 +42,21 @@ const TAGS = [
 ];
 
 beforeEach(() => {
-	nav.url = new URL('http://lekto/ui/admin/master-data?tab=tags');
-	nav.goto.mockReset();
+	testPage.url = new URL('http://lekto/ui/admin/master-data?tab=tags');
+	vi.mocked(goto).mockReset();
 	localStorage.clear();
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async (request) => {
-		const url = new URL(request.url);
-		if (url.pathname === '/api/v1/tags') {
-			expect(url.searchParams.get('document_counts')).toBe('true');
-			return json(TAGS);
-		}
-		if (url.pathname === '/api/v1/document-types') {
-			return json([
+	fetchMock = fakeApi({
+		...masterData({
+			'document-types': [
 				{ id: 'd1', name: 'Invoice', group_ids: ['y1'], created_at: '2026-10-17T12:00:00Z' },
 				{ id: 'd2', name: 'Letter', group_ids: [], created_at: '2026-10-17T12:00:00Z' }
-			]);
-		}
-		return json([]);
+			]
+		}),
+		// With the counts of their documents, or without them.
+		'GET /api/v1/tags': (_, url) =>
+			url.searchParams.get('document_counts') === 'true'
+				? TAGS
+				: problem(422, { detail: 'the panel asks for the counts' })
 	});
 	vi.stubGlobal('fetch', fetchMock);
 });
@@ -131,7 +117,7 @@ describe('TagsPanel', () => {
 	});
 
 	it('shows the kind the URL names and puts another choice there', async () => {
-		nav.url = new URL('http://lekto/ui/admin/master-data?tab=tags&kind=topics');
+		testPage.url = new URL('http://lekto/ui/admin/master-data?tab=tags&kind=topics');
 		render(TagsPanel);
 		expect(await screen.findByText('Work')).toBeTruthy();
 		expect(screen.getAllByRole('heading').map((heading) => heading.textContent?.trim())).toEqual([
@@ -154,9 +140,11 @@ describe('TagsPanel', () => {
 			`${m.master_topics()} 1`
 		]);
 		await fireEvent.click(kind(m.master_contact_groups()));
-		expect(nav.goto).toHaveBeenLastCalledWith('?tab=tags&kind=contact-groups', { reset: false });
+		expect(vi.mocked(goto)).toHaveBeenLastCalledWith('?tab=tags&kind=contact-groups', {
+			reset: false
+		});
 		await fireEvent.click(kind(m.tag_kinds_all()));
-		expect(nav.goto).toHaveBeenLastCalledWith('?tab=tags', { reset: false });
+		expect(vi.mocked(goto)).toHaveBeenLastCalledWith('?tab=tags', { reset: false });
 	});
 
 	it('keeps a collapsed section collapsed in this browser', async () => {
@@ -182,7 +170,7 @@ describe('TagsPanel', () => {
 
 	it('shows a kind the URL names open, though collapsed in this browser', async () => {
 		localStorage.setItem('lekto.master-data.tags.collapsed', '["topics"]');
-		nav.url = new URL('http://lekto/ui/admin/master-data?tab=tags&kind=topics');
+		testPage.url = new URL('http://lekto/ui/admin/master-data?tab=tags&kind=topics');
 		render(TagsPanel);
 		expect(await screen.findByText('Work')).toBeTruthy();
 		// Nothing to collapse while it is the only one.

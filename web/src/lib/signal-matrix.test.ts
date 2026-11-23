@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { decidedBy, matrixOf, verdictOf } from './signal-matrix.ts';
+import { lookupOf } from '#lib/testing/master-data.ts';
+import { logEntry } from '#lib/testing/pipeline.ts';
 
 type LogEntry = components['schemas']['LogEntry'];
 
@@ -14,7 +15,7 @@ const MUSTERVEREIN = 'c-musterverein';
 const BAKERY = 'c-bakery';
 const PAYSLIP = 't-payslip';
 
-const lookup = {
+const lookup = lookupOf({
 	contacts: [
 		{ id: MUSTERVEREIN, name: 'Jugendverein Muster e.V.' },
 		{ id: BAKERY, name: 'Muster Bäckerei' }
@@ -28,7 +29,7 @@ const lookup = {
 			name: 'Personal',
 			personal_of: JOHN,
 			role: 'edit',
-			members: [{ user_id: JOHN, role: 'edit', username: 'john' }]
+			members: [{ user_id: JOHN, role: 'edit', username: 'john', active: true }]
 		}
 	],
 	users: [
@@ -41,24 +42,19 @@ const lookup = {
 			personal_space_id: ERIKAS
 		}
 	]
-} as unknown as Lookup;
+});
 
 const john = { id: JOHN, admin: false };
 
 function verdict(fields: unknown[]): LogEntry {
-	return {
-		node: 'judge',
-		run: 3,
+	return logEntry('judge', 3, {
 		outcome: 'uncertain',
 		reason: 'space: suggests another space',
 		confidence: 0.6,
 		model_version: 'model',
-		input: {},
 		output: { fields },
-		pipeline_version: 'test',
-		started_at: '2026-10-23T09:00:00Z',
-		duration_ms: 1000
-	};
+		started_at: '2026-10-23T09:00:00Z'
+	});
 }
 
 const contact = {
@@ -213,7 +209,7 @@ describe('matrixOf', () => {
 		expect([...decided]).toEqual([['space', MINE]]);
 		const rows = matrixOf(verdict([space]), false, MINE, lookup, john, decided);
 		expect(rows[0]).toMatchObject({ open: false, chip: m.matrix_chip_by_hand() });
-		expect(rows[0].value).not.toContain('Erika');
+		expect(rows[0].value).not.toContain('Jane Doe');
 	});
 });
 

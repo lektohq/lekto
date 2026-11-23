@@ -5,10 +5,10 @@ import type { FieldDefinition } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { TEMPLATES_GUIDE } from '#lib/templates/guide.ts';
 import TemplateInput from './TemplateInput.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { type Routes, fakeApi, json } from '#lib/testing/api.ts';
 
 const PAYSLIP = '0199a6c4-0000-7000-8000-0000000000e1';
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 const previews: Record<string, unknown>[] = [];
 const listed: URL[] = [];
 
@@ -27,57 +27,62 @@ function field(id: string, name: string, key: string, types: string[] | null) {
 	};
 }
 
+/** The preview of a template as the API gives it, kept in `previews`. */
+async function preview(request: Request): Promise<Response> {
+	const body = await request.json();
+	previews.push(body);
+	if (body.template.includes('netto')) {
+		return json({
+			used: [],
+			rendered: null,
+			missing: null,
+			error: 'unknown value field.netto',
+			values: null
+		});
+	}
+	if (body.field_id && body.template === 'zwölf') {
+		const unreadable = { rendered: 'zwölf', read: null, unreadable: true };
+		return json({ used: [], missing: null, error: null, values: null, ...unreadable });
+	}
+	const values = body.document_id
+		? {
+				contact: 'Stadtwerke',
+				'field.la_brutto': '3.650,00 EUR',
+				'facts.invoice_number': 'RE-2026-0412'
+			}
+		: null;
+	const rendered = body.document_id
+		? body.template.replace('{{ field.la_brutto }}', '3.650,00 EUR')
+		: null;
+	const read = body.field_id && rendered ? { amount: '3650.00', currency: 'EUR' } : null;
+	return json({ used: [], rendered, missing: null, error: null, values, read });
+}
+
+/** The API of the field: the fields, the documents to try a template on, the preview; `more`
+ * before these. */
+function serve(more: Routes = {}) {
+	fetchMock = fakeApi({
+		'GET /api/v1/fields': () => [
+			field('f1', 'LA_Brutto', 'la_brutto', [PAYSLIP]),
+			field('f2', 'Betrag', 'betrag', ['other'])
+		],
+		'GET /api/v1/documents': (_, url) => {
+			listed.push(url);
+			return {
+				items: [{ id: 'd1', title: 'Lohn März', original_filename: 'lohn-03.pdf' }],
+				next_cursor: null
+			};
+		},
+		'POST /api/v1/templates/preview': preview,
+		...more
+	});
+	vi.stubGlobal('fetch', fetchMock);
+}
+
 beforeEach(() => {
 	previews.length = 0;
 	listed.length = 0;
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async (request) => {
-		const url = new URL(request.url);
-		if (url.pathname === '/api/v1/fields') {
-			return json([
-				field('f1', 'LA_Brutto', 'la_brutto', [PAYSLIP]),
-				field('f2', 'Betrag', 'betrag', ['other'])
-			]);
-		}
-		if (url.pathname === '/api/v1/documents') {
-			listed.push(url);
-			return json({
-				items: [{ id: 'd1', title: 'Lohn März', original_filename: 'lohn-03.pdf' }],
-				next_cursor: null
-			});
-		}
-		if (url.pathname === '/api/v1/templates/preview') {
-			const body = await request.json();
-			previews.push(body);
-			if (body.template.includes('netto')) {
-				return json({
-					used: [],
-					rendered: null,
-					missing: null,
-					error: 'unknown value field.netto',
-					values: null
-				});
-			}
-			if (body.field_id && body.template === 'zwölf') {
-				const unreadable = { rendered: 'zwölf', read: null, unreadable: true };
-				return json({ used: [], missing: null, error: null, values: null, ...unreadable });
-			}
-			const values = body.document_id
-				? {
-						contact: 'Stadtwerke',
-						'field.la_brutto': '3.650,00 EUR',
-						'facts.invoice_number': 'RE-2026-0412'
-					}
-				: null;
-			const rendered = body.document_id
-				? body.template.replace('{{ field.la_brutto }}', '3.650,00 EUR')
-				: null;
-			const read = body.field_id && rendered ? { amount: '3650.00', currency: 'EUR' } : null;
-			return json({ used: [], rendered, missing: null, error: null, values, read });
-		}
-		return json({}, 404);
-	});
-	vi.stubGlobal('fetch', fetchMock);
+	serve();
 });
 
 describe('TemplateInput', () => {
@@ -101,23 +106,14 @@ describe('TemplateInput', () => {
 	it('keeps the verdict on the newest template when an older answer arrives late', async () => {
 		let answerSlow!: () => void;
 		const slow = new Promise<void>((resolve) => (answerSlow = resolve));
-		const base = fetchMock.getMockImplementation()!;
-		fetchMock.mockImplementation(async (request) => {
-			if (new URL(request.url).pathname === '/api/v1/templates/preview') {
+		serve({
+			'POST /api/v1/templates/preview': async (request) => {
 				const body = await request.clone().json();
-				if (body.template === 'slow') {
-					previews.push(body);
-					await slow;
-					return json({
-						used: [],
-						rendered: null,
-						missing: null,
-						error: 'late error',
-						values: null
-					});
-				}
+				if (body.template !== 'slow') return preview(request);
+				previews.push(body);
+				await slow;
+				return { used: [], rendered: null, missing: null, error: 'late error', values: null };
 			}
-			return base(request);
 		});
 		const props = { id: 'title', maxlength: 500, label: 'Title' };
 		const { rerender } = render(TemplateInput, { ...props, value: 'slow' });

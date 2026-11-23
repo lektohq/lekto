@@ -7,7 +7,7 @@ import { m } from '#lib/paraglide/messages.js';
 import { scope } from '#lib/scope.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import { phone } from '#lib/phone.svelte.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, problem } from '#lib/testing/api.ts';
 import { choose, selectedValue } from '#lib/testing/select.ts';
 import Page from './+page.svelte';
 
@@ -160,8 +160,7 @@ describe('spaces', () => {
 		const api = fakeApi({
 			'GET /api/v1/spaces': () => [HOUSE, JOHN],
 			'GET /api/v1/users': () => USERS,
-			'PUT /api/v1/spaces/house/members/u2': () =>
-				json({ type: 'about:blank', title: 'Unprocessable', status: 422, detail: 'no' }, 422)
+			'PUT /api/v1/spaces/house/members/u2': () => problem(422, { detail: 'no' })
 		});
 		vi.stubGlobal('fetch', api);
 		render(Page);
