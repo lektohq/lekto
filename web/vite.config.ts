@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { svelteTesting } from '@testing-library/svelte/vite';
 import { defineConfig } from 'vitest/config';
 import { BASE } from './src/lib/base.ts';
+import { codeSplitting } from './vite-chunks.js';
 import { pdfjsAssets } from './vite-pdfjs.js';
 import { swaggerAssets } from './vite-swagger.js';
 
@@ -49,6 +50,11 @@ export default defineConfig({
 		// Only under Vitest: browser builds of Svelte, cleanup after every test.
 		svelteTesting()
 	],
+	// The icons the app imports in one chunk (`vite-chunks.js`); the client only, the server build
+	// of SvelteKit keeps its own splitting.
+	environments: {
+		client: { build: { rolldownOptions: { output: { codeSplitting: codeSplitting() } } } }
+	},
 	server: {
 		port: 5173,
 		strictPort: true,
