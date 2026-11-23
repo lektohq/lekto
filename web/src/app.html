@@ -15,9 +15,10 @@
 		<meta name="theme-color" content="#ffffff" />
 		<meta name="apple-mobile-web-app-title" content="Lekto" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
-		<!-- Light or dark before the first paint; a file, not inline, for the content security policy. -->
-		<script src="%sveltekit.assets%/theme.js"></script>
 		%sveltekit.head%
+		<!-- Light or dark before the first paint; a file, not inline, for the content security
+		     policy, and after it, which then covers it too. -->
+		<script src="%sveltekit.assets%/theme.js"></script>
 	</head>
 	<body data-sveltekit-preload-data="hover">
 		<div style="display: contents">%sveltekit.body%</div>

@@ -2,9 +2,10 @@ import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
 import svelte from 'eslint-plugin-svelte';
 import globals from 'globals';
+import { defineConfig } from 'eslint/config';
 import ts from 'typescript-eslint';
 
-export default ts.config(
+export default defineConfig(
 	{
 		ignores: ['build/', '.svelte-kit/', 'src/lib/paraglide/', 'src/lib/api/schema.ts']
 	},
