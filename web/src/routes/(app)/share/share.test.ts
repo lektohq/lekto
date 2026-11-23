@@ -69,7 +69,7 @@ describe('the page of a share', () => {
 			'Rechnung.pdf',
 			'Mahnung.pdf'
 		]);
-		expect(goto).toHaveBeenCalledWith('/ui/inbox', { replaceState: true });
+		expect(goto).toHaveBeenCalledWith('/ui/inbox', { replace: true });
 		// Nothing is gone yet but what the upload does not take: its result is known.
 		expect(shared.forgetShared).not.toHaveBeenCalled();
 		expect(shared.forgetSharedFile.mock.calls).toEqual([[note]]);
@@ -89,7 +89,7 @@ describe('the page of a share', () => {
 
 		expect(add).not.toHaveBeenCalled();
 		expect(shared.forgetShared).toHaveBeenCalledWith(ID);
-		expect(goto).toHaveBeenCalledWith('/ui/inbox', { replaceState: true });
+		expect(goto).toHaveBeenCalledWith('/ui/inbox', { replace: true });
 	});
 
 	it('does not count "Hochladen" before the page was in front for a second', async () => {
@@ -139,7 +139,7 @@ describe('the page of a share', () => {
 
 		expect(screen.getByText(m.share_missing())).toBeTruthy();
 		expect(screen.queryByRole('button', { name: m.upload_title() })).toBeNull();
-		expect(goto).toHaveBeenCalledWith('/ui/share', { replaceState: true });
+		expect(goto).toHaveBeenCalledWith('/ui/share', { replace: true });
 	});
 
 	it('reads nothing for an id that is none', async () => {

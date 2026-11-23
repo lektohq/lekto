@@ -20,7 +20,7 @@ import {
 } from '#lib/app-cache.ts';
 import { askToOpen } from '#lib/app-open.ts';
 import { BASE as base } from '#lib/base.ts';
-import { type PushPayload, pushText } from '#lib/push-text.ts';
+import { pushPayload, pushText } from '#lib/push-text.ts';
 
 const CACHE = `lekto-${version}`;
 const PAGE = pageKey(base);
@@ -171,12 +171,7 @@ worker.addEventListener('push', (event) => {
 });
 
 async function show(data: PushMessageData | null): Promise<void> {
-	let payload: PushPayload;
-	try {
-		payload = data?.json() as PushPayload;
-	} catch {
-		payload = { kind: 'test', params: {}, url: `${base}/`, badge: null, tag: null, locale: 'en' };
-	}
+	const payload = pushPayload(data, base);
 	const { title, body } = pushText(payload);
 	const badge = payload.badge;
 	const navigator = worker.navigator as WorkerNavigator & {

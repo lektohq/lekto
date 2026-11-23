@@ -10,6 +10,7 @@ import type { components } from '#lib/api/schema.ts';
 
 export type User = components['schemas']['UserOut'];
 type SessionOut = components['schemas']['SessionOut'];
+type Me = components['schemas']['Me'];
 
 class Session {
 	user = $state<User | null>(null);
@@ -47,7 +48,7 @@ class Session {
 	 * session here: any other failure (a proxy answering 502 while Lekto restarts) leaves user and
 	 * token as they are and is thrown, like no answer at all.
 	 */
-	async load(): Promise<boolean> {
+	async load(): Promise<Me | null> {
 		const { data, error, response } = await api.GET('/api/v1/auth/me');
 		if (data) {
 			if (JSON.stringify(this.user) !== JSON.stringify(data.user)) this.user = data.user;
@@ -55,11 +56,11 @@ class Session {
 			this.#csrf = data.csrf_token;
 			this.version = data.lekto_version;
 			this.shortcutUrl = data.shortcut_url;
-			return true;
+			return data;
 		}
 		if (response.status !== 401) throw await apiError(response, error);
 		this.clear();
-		return false;
+		return null;
 	}
 
 	/** Take over a new session (sign-in answer). */

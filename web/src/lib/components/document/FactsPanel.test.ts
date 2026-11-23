@@ -415,7 +415,7 @@ describe('FactsPanel', () => {
 			...FACTS.identifiers[2],
 			value: 'DE17100500000123456789',
 			contact_id: BANK,
-			holder: { kind: 'third_party', name: 'Hausverwaltung Ost', source: 'rule' }
+			holder: { kind: 'third_party', name: 'Muster Hausverwaltung', source: 'rule' }
 		} as Facts['identifiers'][number];
 		render(FactsPanel, props({ facts: { ...FACTS, identifiers: [...FACTS.identifiers, payee] } }));
 		const fold = screen.getByRole('button', { name: new RegExp(m.facts_third_one()) });
@@ -428,7 +428,7 @@ describe('FactsPanel', () => {
 			screen.getByText(
 				m.facts_holder_named({
 					holder: m.fact_holder_third_party(),
-					name: 'Hausverwaltung Ost',
+					name: 'Muster Hausverwaltung',
 					source: m.fact_holder_source_rule()
 				})
 			)

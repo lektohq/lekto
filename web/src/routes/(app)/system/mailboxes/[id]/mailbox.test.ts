@@ -7,6 +7,7 @@ import type { MailItem } from '#lib/mail-log.ts';
 import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
+import { events } from '#lib/events.svelte.ts';
 import { calls, fakeApi, notFound, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
@@ -74,6 +75,26 @@ describe('the page of a mailbox', () => {
 		});
 		await userEvent.setup().click(button);
 		expect(await screen.findByText(m.mailbox_log_info({ kept: '300' }))).toBeTruthy();
+	});
+
+	it('loads once when it opens after the stream broke before (WF-K04)', async () => {
+		events.generation = 2; // two reconnects on earlier pages
+		const api = fakeApi({
+			'GET /api/v1/mailboxes/m1': () => MAILBOX,
+			'GET /api/v1/mailboxes/m1/mails': () => ({ items: [], total: 0, next_offset: null }),
+			'GET /api/v1/mailboxes/m1/mails/summary': () => ({
+				counts: {},
+				rules: [],
+				waiting: [],
+				kept: 300
+			})
+		});
+		vi.stubGlobal('fetch', api);
+		render(Page);
+		await screen.findByText(m.mailbox_log());
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(calls(api).filter((call) => call === 'GET /api/v1/mailboxes/m1')).toHaveLength(1);
+		events.generation = 0;
 	});
 
 	it('has no tip while the summary is not there', async () => {

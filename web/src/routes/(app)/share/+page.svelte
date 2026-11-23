@@ -69,7 +69,7 @@
 			files = found;
 		} else {
 			missing = true;
-			await goto(`${BASE}/share`, { replaceState: true });
+			await goto(`${BASE}/share`, { replace: true });
 		}
 	}
 
@@ -80,7 +80,7 @@
 		} catch (error) {
 			reportError(error);
 		}
-		await goto(`${BASE}/inbox`, { replaceState: true });
+		await goto(`${BASE}/inbox`, { replace: true });
 	}
 
 	/** A file's upload has a result: it leaves the device. */
@@ -99,7 +99,7 @@
 			},
 			again: `${BASE}/share?id=${id}`
 		});
-		await goto(`${BASE}/inbox`, { replaceState: true });
+		await goto(`${BASE}/inbox`, { replace: true });
 	}
 
 	async function discard() {

@@ -636,7 +636,7 @@
 			refresh();
 		});
 		const stopMeaning = events.on('search.meaning_ready', (event) =>
-			searchNote.meaningReady(String(event.query ?? ''))
+			searchNote.meaningReady(typeof event.query === 'string' ? event.query : '')
 		);
 		return () => {
 			refresh.cancel();

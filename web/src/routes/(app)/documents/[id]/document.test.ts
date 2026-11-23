@@ -127,6 +127,39 @@ describe('the frame of the page', () => {
 		expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
 	});
 
+	it('drops "not found" as soon as it goes to another document (WF-K02)', async () => {
+		let answer: (() => void) | null = null;
+		serve(() => documentOf(), {
+			'GET /api/v1/documents/doc-1': () => notFound('document', 'doc-1'),
+			'GET /api/v1/documents/doc-2': async () => {
+				await new Promise<void>((resolve) => (answer = resolve));
+				return documentOf({ id: 'doc-2', title: 'Zweites' });
+			}
+		});
+		render(Page);
+		expect(await screen.findByText(m.document_not_found())).toBeTruthy();
+		goTo('/ui/documents/doc-2', { id: 'doc-2' });
+		await waitFor(() => expect(answer).not.toBeNull());
+		expect(screen.queryByText(m.document_not_found())).toBeNull(); // while doc-2 still loads
+	});
+
+	it('asks the facts beside the review and the reading, not after them (WF-K03)', async () => {
+		let review: (() => void) | null = null;
+		// Read again: it has its text, and so facts to ask.
+		const read = documentOf({ lane: 'green', processing: { ...documentOf().processing, run: 2 } });
+		const api = serve(() => read, {
+			'GET /api/v1/documents/doc-1/review': async () => {
+				await new Promise<void>((resolve) => (review = resolve));
+				return { fields: [] };
+			},
+			'GET /api/v1/documents/doc-1/facts': () => ({ facts: [], codes: [] })
+		});
+		render(Page);
+		await waitFor(() => expect(review).not.toBeNull());
+		await waitFor(() => expect(calls(api)).toContain('GET /api/v1/documents/doc-1/facts'));
+		review!();
+	});
+
 	it('says so when the open document is gone on reading it anew', async () => {
 		let gone = false;
 		serve(() => documentOf({ lane: 'green' }), {

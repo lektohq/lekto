@@ -80,7 +80,7 @@
 	async function saved(changed: Profile) {
 		if (profile) profile.profile = changed;
 		try {
-			[me] = await Promise.all([unwrap(api.GET('/api/v1/auth/me')), session.load()]);
+			me = (await session.load()) ?? me; // one request: the session's answer is the account
 		} catch (error) {
 			reportError(error);
 		}

@@ -1,10 +1,10 @@
 // The settings: the account and its tabs; what the page loads first.
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { fakeApi, masterData, problem } from '#lib/testing/api.ts';
+import { calls, fakeApi, masterData, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
 
@@ -63,5 +63,33 @@ describe('the settings', () => {
 		expect(await screen.findByRole('navigation', { name: m.settings_tabs() })).toBeTruthy();
 		expect(screen.queryByRole('alert')).toBeNull();
 		expect(screen.queryByText('boom')).toBeNull();
+	});
+
+	it('reads the account once after the profile was saved (WF-K05)', async () => {
+		const api = fakeApi({
+			...masterData(),
+			'GET /api/v1/auth/me': () => ME,
+			'GET /api/v1/auth/me/profile': () => PROFILE,
+			'PATCH /api/v1/auth/me/profile': async (request) => ({
+				...PROFILE,
+				...((await request.json()) as object)
+			}),
+			'GET /api/v1/auth/oidc': () => ({ enabled: false, display_name: null })
+		});
+		vi.stubGlobal('fetch', api);
+		const user = userEvent.setup();
+		render(Page);
+		const name = await screen.findByLabelText(m.profile_display_name());
+		await user.clear(name);
+		await user.type(name, 'Jane M. Doe');
+		const before = api.mock.calls.length;
+		await user.click(screen.getByRole('button', { name: m.save() }));
+		await waitFor(() => expect(session.user?.display_name).toBe('Jane Doe'));
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(
+			calls(api)
+				.slice(before)
+				.filter((call) => call === 'GET /api/v1/auth/me')
+		).toHaveLength(1);
 	});
 });

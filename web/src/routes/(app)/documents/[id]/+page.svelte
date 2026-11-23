@@ -191,14 +191,16 @@
 				api.GET('/api/v1/documents/{id}', { params: { path: { id: wanted } } })
 			);
 			const params = { params: { path: { id: wanted } } };
-			const [reviewed, read] = canEdit(loaded, session.user)
-				? await Promise.all([
-						unwrap(api.GET('/api/v1/documents/{id}/review', params)),
-						unwrap(api.GET('/api/v1/documents/{id}/reading', params))
-					])
-				: [null, null];
-			// Not asked for before there is a text (in processing, or failed before it was read).
-			const found = hasText(loaded.processing) ? await loadFacts(wanted) : null;
+			const [[reviewed, read], found] = await Promise.all([
+				canEdit(loaded, session.user)
+					? Promise.all([
+							unwrap(api.GET('/api/v1/documents/{id}/review', params)),
+							unwrap(api.GET('/api/v1/documents/{id}/reading', params))
+						])
+					: ([null, null] as const),
+				// Not asked for before there is a text (in processing, or failed before it was read).
+				hasText(loaded.processing) ? loadFacts(wanted) : null
+			]);
 			if (wanted === id && request === latest) {
 				document = loaded;
 				review = reviewed;
@@ -322,6 +324,8 @@
 	$effect(() => {
 		void id;
 		untrack(() => {
+			// Another document: what was said of the one before goes too, found or not.
+			if (document?.id !== id) problem = null;
 			if (document && document.id !== id) {
 				document = null;
 				review = null;
@@ -563,7 +567,7 @@
 			onleave={() => (leaving = true)}
 			onmerged={(target) => {
 				leaving = true;
-				void goto(documentHref(target), { replaceState: true });
+				void goto(documentHref(target), { replace: true });
 			}}
 		/>
 

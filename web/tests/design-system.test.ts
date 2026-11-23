@@ -1435,7 +1435,6 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(
 			offenders((source, path) => {
 				if (!path.startsWith('/src/routes/(app)/') || !path.endsWith('/+page.svelte')) return null;
-				if (path === '/src/routes/(app)/dev/components/+page.svelte') return null;
 				const gap = frame.exec(source)?.[1];
 				if (gap === undefined) return null;
 				const wanted = path === '/src/routes/(app)/documents/[id]/+page.svelte' ? 'gap-4' : 'gap-6';

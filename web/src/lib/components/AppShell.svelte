@@ -78,7 +78,7 @@
 			reportError(error);
 			return;
 		}
-		await goto(loginHref(home()), { replaceState: true });
+		await goto(loginHref(home()), { replace: true });
 	}
 
 	const tone = $derived(badgeTone(inbox.summary));

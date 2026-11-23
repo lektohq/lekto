@@ -58,7 +58,7 @@ describe('sign-in page', () => {
 		await enterPassword();
 
 		expect(await bodyOf(0)).toMatchObject({ username: 'john', password: 'secret', code: null });
-		expect(goto).toHaveBeenCalledWith('/ui/inbox', { replaceState: true });
+		expect(goto).toHaveBeenCalledWith('/ui/inbox', { replace: true });
 		expect(session.user?.username).toBe('john');
 		expect(session.csrfToken).toBe('token');
 	});
@@ -89,7 +89,7 @@ describe('sign-in page', () => {
 
 		await enterPassword();
 
-		expect(goto).toHaveBeenCalledWith('/ui/inbox', { replaceState: true });
+		expect(goto).toHaveBeenCalledWith('/ui/inbox', { replace: true });
 		expect(replace).not.toHaveBeenCalled();
 	});
 
@@ -122,7 +122,7 @@ describe('sign-in page', () => {
 			code: '123456',
 			recovery_code: null
 		});
-		expect(goto).toHaveBeenCalledWith('/ui/', { replaceState: true });
+		expect(goto).toHaveBeenCalledWith('/ui/', { replace: true });
 	});
 
 	it('takes a recovery code instead', async () => {

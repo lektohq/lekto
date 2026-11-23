@@ -38,7 +38,7 @@
 	// takes first stand last, a yellow group per such rule. Saved, the rule is paused: the bar
 	// switches it on.
 	const id = $derived(page.params.id ?? '');
-	const saved = $derived(page.url.searchParams.has('saved'));
+	const saved = $derived(page.url.searchParams.get('saved') === '1');
 	let rule = $state<MailRule | null>(null);
 	const loader = new RuleLoader<MailRuleLookup>(loadMailRuleLookup, m.mail_rule_not_found);
 	const lookup = $derived(loader.lookup);
