@@ -11,7 +11,6 @@ device (`push_off`). Devices are settings: no events.
 import logging
 from dataclasses import replace
 from datetime import timedelta
-from uuid import UUID
 
 from lekto.core.domain.errors import ConcurrencyError, ConflictError, NotFoundError
 from lekto.core.domain.events import DomainEvent, ReviewRequired
@@ -46,7 +45,7 @@ from lekto.core.ports.clock import Clock
 from lekto.core.ports.push import PushOutcome, PushResult, PushSender
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._jobs import STORE_ATTEMPTS, JobRunner, retrying
-from lekto.core.services._push_queue import PUSH_JOB, queue_push
+from lekto.core.services._push_queue import PUSH_JOB, payload_push, queue_push
 from lekto.core.services.inbox import InboxService, in_inbox
 
 log = logging.getLogger(__name__)
@@ -135,11 +134,8 @@ class PushService:
 
     async def _run(self, job: Job) -> None:
         try:
-            user = UserId(UUID(str(job.payload["user_id"])))
-            kind = PushKind(str(job.payload["kind"]))
-            params = job.payload.get("params") or {}
-            assert isinstance(params, dict)
-        except (KeyError, ValueError, AssertionError) as error:
+            user, kind, params = payload_push(job.payload)
+        except (KeyError, ValueError) as error:
             await self._jobs.invalid(job, error)
             return
         try:

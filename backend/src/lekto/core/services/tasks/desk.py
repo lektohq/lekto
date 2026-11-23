@@ -18,11 +18,12 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Protocol
+from uuid import UUID
 
 from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import MissingValueError, ValidationError
 from lekto.core.domain.identity import hash_token, new_token
-from lekto.core.domain.ids import EventId
+from lekto.core.domain.ids import EventId, TaskId
 from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.links import TASK_RESULT, Links
 from lekto.core.domain.pipeline import Node
@@ -48,7 +49,17 @@ TASKS_LOCK = "tasks"
 """The name a unit of work locks while it counts a webhook's open tasks and sends one, so two
 nodes never take the same room."""
 EXPIRE_JOB = "tasks.expire"
-"""Job kind that ends a task at its deadline if no answer came; payload: `task_id`."""
+"""Job kind that ends a task at its deadline if no answer came; payload: `task_payload`."""
+
+
+def task_payload(id: TaskId) -> JsonObject:
+    """The payload of an `EXPIRE_JOB`."""
+    return {"task_id": str(id)}
+
+
+def payload_task(payload: JsonObject) -> TaskId:
+    """The task of a `task_payload`; KeyError or ValueError for a payload that is none."""
+    return TaskId(UUID(str(payload["task_id"])))
 
 
 def callback_url(links: Links, task: Task) -> str | None:
@@ -181,7 +192,7 @@ class TaskDesk:
         assert task.deadline is not None
         await uow.jobs.enqueue(
             EXPIRE_JOB,
-            {"task_id": str(task.id)},
+            task_payload(task.id),
             run_at=task.deadline,
             dedup_key=f"{task.id}:expire",
         )

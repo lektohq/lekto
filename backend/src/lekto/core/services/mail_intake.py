@@ -35,6 +35,7 @@ from lekto.core.domain.errors import (
 from lekto.core.domain.events import MailboxFetched
 from lekto.core.domain.ids import DocumentId, MailboxId, new_id
 from lekto.core.domain.jobs import Job
+from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.mail import (
     Fallback,
     FetchStart,
@@ -91,10 +92,20 @@ from lekto.core.services.pipeline import IncomingFile, PipelineService
 log = logging.getLogger(__name__)
 
 FETCH_JOB = "mail.fetch"
-"""Job kind of a mailbox's fetch; payload: `{"mailbox_id": ...}`."""
+"""Job kind of a mailbox's fetch; payload: `fetch_payload`."""
 LEASE = timedelta(minutes=30)
 MAX_PER_RUN = 50
 STORE_ATTEMPTS = 5
+
+
+def fetch_payload(id: MailboxId) -> JsonObject:
+    """The payload of a `FETCH_JOB`."""
+    return {"mailbox_id": str(id)}
+
+
+def payload_fetch(payload: JsonObject) -> MailboxId:
+    """The mailbox of a `fetch_payload`; KeyError or ValueError for a payload that is none."""
+    return MailboxId(UUID(str(payload["mailbox_id"])))
 
 
 def fetch_key(id: MailboxId) -> str:
@@ -107,7 +118,7 @@ async def schedule_fetch(uow: UnitOfWork, mailbox: Mailbox, run_at: datetime) ->
     if not await uow.jobs.hasten(fetch_key(mailbox.id), run_at=run_at):
         await uow.jobs.enqueue(
             FETCH_JOB,
-            {"mailbox_id": str(mailbox.id)},
+            fetch_payload(mailbox.id),
             run_at=run_at,
             dedup_key=fetch_key(mailbox.id),
         )
@@ -183,7 +194,7 @@ class MailIntakeService:
 
     async def _run(self, job: Job) -> None:
         try:
-            id = MailboxId(UUID(str(job.payload["mailbox_id"])))
+            id = payload_fetch(job.payload)
         except (KeyError, ValueError) as invalid:
             await self._jobs.invalid(job, invalid)
             return

@@ -38,7 +38,7 @@ from lekto.core.domain.errors import (
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import BulkOperationId, DocumentId
 from lekto.core.domain.jobs import Job
-from lekto.core.domain.json_value import JsonValue
+from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
 from lekto.core.domain.rights import Actor, TokenRight
@@ -56,7 +56,8 @@ from lekto.core.services.search import SearchService
 log = logging.getLogger(__name__)
 
 BULK_JOB = "documents.bulk"
-"""Job kind of a bulk operation; payload: operation id."""
+"""Job kind of a bulk operation; payload: operation id (`_enqueue`, `_operation_id`)."""
+_OPERATION = "operation_id"
 BATCH = 25
 """Documents per job; the next job continues."""
 
@@ -342,9 +343,11 @@ async def _check_action(uow: UnitOfWork, user: User, action: BulkAction) -> None
 
 
 def _operation_id(job: Job) -> BulkOperationId:
-    return BulkOperationId(UUID(str(job.payload["operation_id"])))
+    """The operation of a `BULK_JOB`'s payload (`_enqueue`); KeyError or ValueError for a
+    payload that is none."""
+    return BulkOperationId(UUID(str(job.payload[_OPERATION])))
 
 
 async def _enqueue(uow: UnitOfWork, id: BulkOperationId, now: datetime) -> None:
-    payload: dict[str, JsonValue] = {"operation_id": str(id)}
+    payload: JsonObject = {_OPERATION: str(id)}
     await uow.jobs.enqueue(BULK_JOB, payload, run_at=now, dedup_key=f"{BULK_JOB}:{id}")

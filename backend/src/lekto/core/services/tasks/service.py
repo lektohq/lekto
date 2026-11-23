@@ -20,7 +20,6 @@ import hmac
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from uuid import UUID
 
 from lekto.core.domain.errors import (
     AuthenticationError,
@@ -40,7 +39,7 @@ from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._jobs import LEASE, STORE_ATTEMPTS, JobRunner, retrying
 from lekto.core.services.classification.external import check_answer
-from lekto.core.services.tasks.desk import EXPIRE_JOB
+from lekto.core.services.tasks.desk import EXPIRE_JOB, payload_task
 from lekto.core.services.tasks.files import signed, task_file
 from lekto.core.services.tasks.settling import end_task
 
@@ -144,7 +143,7 @@ class TaskService:
 
     async def _expire(self, job: Job) -> None:
         try:
-            id = TaskId(UUID(str(job.payload["task_id"])))
+            id = payload_task(job.payload)
         except (KeyError, ValueError) as error:
             await self._jobs.invalid(job, error)
             return

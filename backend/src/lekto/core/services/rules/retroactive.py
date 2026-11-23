@@ -35,7 +35,7 @@ from lekto.core.domain.errors import (
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import DocumentId, RuleApplicationId, RuleId, SpaceId
 from lekto.core.domain.jobs import Job
-from lekto.core.domain.json_value import JsonValue
+from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.occurrences import Occurrence
 from lekto.core.domain.permissions import can_edit_document, can_file_into
 from lekto.core.domain.pipeline import (
@@ -101,7 +101,8 @@ from lekto.core.services.rules.steps import run_rules
 log = logging.getLogger(__name__)
 
 APPLY_JOB = "rules.apply"
-"""Job kind of a rule application; payload: application id."""
+"""Job kind of a rule application; payload: application id (`_enqueue`, `_application_id`)."""
+_APPLICATION = "application_id"
 BATCH = 25
 """Documents per job; the next job continues."""
 SCAN = 200
@@ -464,7 +465,7 @@ class RuleApplicationService:
         """An unexpected error: end the application, so it does not run again and again, and
         fail its job as every given up job fails, the admins told (`JobRunner.end`; SB-08). The
         payload was read before (`_run` ends an unreadable one as invalid)."""
-        id = RuleApplicationId(UUID(str(job.payload.get("application_id"))))
+        id = _application_id(job)
 
         async def stop(uow: UnitOfWork) -> None:
             application = await uow.rule_applications.find(id)
@@ -476,7 +477,7 @@ class RuleApplicationService:
 
     async def _run(self, job: Job) -> None:
         try:
-            id = RuleApplicationId(UUID(str(job.payload["application_id"])))
+            id = _application_id(job)
         except (KeyError, ValueError) as error:
             await self._jobs.invalid(job, error)
             return
@@ -706,8 +707,14 @@ async def _candidate(uow: UnitOfWork, user: User, rule: Rule, document: Document
     return can_edit_document(user, document, space)
 
 
+def _application_id(job: Job) -> RuleApplicationId:
+    """The application of an `APPLY_JOB`'s payload (`_enqueue`); KeyError or ValueError for a
+    payload that is none."""
+    return RuleApplicationId(UUID(str(job.payload[_APPLICATION])))
+
+
 async def _enqueue(uow: UnitOfWork, id: RuleApplicationId, now: datetime) -> None:
-    payload: dict[str, JsonValue] = {"application_id": str(id)}
+    payload: JsonObject = {_APPLICATION: str(id)}
     await uow.jobs.enqueue(APPLY_JOB, payload, run_at=now, dedup_key=f"{APPLY_JOB}:{id}")
 
 

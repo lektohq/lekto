@@ -22,6 +22,7 @@ from lekto.core.domain.identifiers import (
 )
 from lekto.core.domain.ids import ContactId, DocumentId, DocumentTypeId, FieldId, TagId
 from lekto.core.domain.jobs import Job, RetryPolicy
+from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.master_data import (
     MAX_ALIASES,
     Assignment,
@@ -467,7 +468,9 @@ class MasterDataService:
             # A topic needs no normalising: a document has one, a contact may enable both.
             moved = tag.parent_id != parents[0] and tag.parent_id is not None
             if moved and tag.scope is not TagScope.TOPIC:
-                await uow.jobs.enqueue(NORMALISE_JOB, {"tag_id": str(id)}, run_at=self._clock.now())
+                await uow.jobs.enqueue(
+                    NORMALISE_JOB, _normalise_payload(id, None), run_at=self._clock.now()
+                )
 
         return await self._change(
             actor,
@@ -492,9 +495,7 @@ class MasterDataService:
         """One step: the batch, completing the job and queueing the next step commit together;
         a row changed meanwhile (or a lost claim) leaves all of it to the next attempt."""
         try:
-            tag = TagId(UUID(str(job.payload["tag_id"])))
-            after = job.payload.get("after")
-            start = None if after is None else DocumentId(UUID(str(after)))
+            tag, start = _payload_normalise(job.payload)
         except (KeyError, ValueError) as error:
             await self._jobs.invalid(job, error)
             return
@@ -508,7 +509,7 @@ class MasterDataService:
                 if last is not None:
                     await uow.jobs.enqueue(
                         NORMALISE_JOB,
-                        {"tag_id": str(tag), "after": str(last)},
+                        _normalise_payload(tag, last),
                         run_at=self._clock.now(),
                     )
                 await uow.commit()
@@ -1104,6 +1105,23 @@ class MasterDataService:
         (`IndexingService`), with a search index."""
         if self._index_renames:
             await uow.jobs.enqueue(REFRESH_JOB, refresh_payload(kind, id), run_at=self._clock.now())
+
+
+def _normalise_payload(tag: TagId, after: DocumentId | None) -> JsonObject:
+    """The payload of a `NORMALISE_JOB`: its tag, and the document the step before ended at."""
+    payload: JsonObject = {"tag_id": str(tag)}
+    if after is not None:
+        payload["after"] = str(after)
+    return payload
+
+
+def _payload_normalise(payload: JsonObject) -> tuple[TagId, DocumentId | None]:
+    """What a `_normalise_payload` holds; KeyError or ValueError for a payload that is none."""
+    after = payload.get("after")
+    return (
+        TagId(UUID(str(payload["tag_id"]))),
+        None if after is None else DocumentId(UUID(str(after))),
+    )
 
 
 async def normalise_tagged(

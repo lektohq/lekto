@@ -45,6 +45,7 @@ stored.
 import json
 import logging
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from uuid import UUID
@@ -107,8 +108,60 @@ log = logging.getLogger(__name__)
 
 SUBSCRIBER = "webhooks.fanout"
 DELIVER_JOB = "webhooks.deliver"
-"""Payload: `webhook_id`, `event_id`, `type`, `occurred_at` (ISO 8601) and `document_id`; a
-rule's request (`RULE_SEND`) also `rule` (`id`, `name`), a task's request `task_id`."""
+"""Payload: a `Delivery`."""
+
+
+@dataclass(frozen=True)
+class Delivery:
+    """The payload of a `DELIVER_JOB`: the webhook, the event (its id, type and time) and its
+    document; a rule's request (`RULE_SEND`) also `rule` (`id`, `name`), a task's request
+    `task_id`, an update that relates another document `related_id`."""
+
+    webhook_id: WebhookId
+    event_id: EventId
+    type: str
+    occurred_at: datetime
+    document_id: DocumentId | None
+    rule: JsonObject | None = None
+    task_id: TaskId | None = None
+    related_id: DocumentId | None = None
+
+    def to_json(self) -> JsonObject:
+        payload: JsonObject = {
+            "webhook_id": str(self.webhook_id),
+            "event_id": str(self.event_id),
+            "type": self.type,
+            "occurred_at": self.occurred_at.isoformat(),
+            "document_id": None if self.document_id is None else str(self.document_id),
+        }
+        if self.rule is not None:
+            payload["rule"] = self.rule
+        if self.task_id is not None:
+            payload["task_id"] = str(self.task_id)
+        if self.related_id is not None:
+            payload["related_id"] = str(self.related_id)
+        return payload
+
+    @classmethod
+    def from_json(cls, payload: JsonObject) -> Delivery:
+        """KeyError, TypeError or ValueError for a payload that is none."""
+
+        def optional[T](key: str, kind: Callable[[UUID], T]) -> T | None:
+            value = payload.get(key)
+            return None if value is None else kind(UUID(str(value)))
+
+        return cls(
+            webhook_id=WebhookId(UUID(str(payload["webhook_id"]))),
+            event_id=EventId(UUID(str(payload["event_id"]))),
+            type=str(payload["type"]),
+            occurred_at=datetime.fromisoformat(str(payload["occurred_at"])),
+            document_id=optional("document_id", DocumentId),
+            rule=as_object(payload.get("rule")),
+            task_id=optional("task_id", TaskId),
+            related_id=optional("related_id", DocumentId),
+        )
+
+
 TASK_RETRY = RetryPolicy(
     max_attempts=1 << 30, delay=timedelta(seconds=15), max_delay=timedelta(minutes=5)
 )
@@ -173,18 +226,17 @@ class WebhookDeliveryService:
             for webhook in webhooks:
                 if webhook.owner_id not in owners:
                     continue
-                payload: JsonObject = {
-                    "webhook_id": str(webhook.id),
-                    "event_id": str(event.id),
-                    "type": event.type,
-                    "occurred_at": event.occurred_at.isoformat(),
-                    "document_id": str(event.document_id),
-                }
-                if isinstance(event, DocumentUpdated) and event.related is not None:
-                    payload["related_id"] = str(event.related)
+                delivery = Delivery(
+                    webhook.id,
+                    event.id,
+                    event.type,
+                    event.occurred_at,
+                    event.document_id,
+                    related_id=event.related if isinstance(event, DocumentUpdated) else None,
+                )
                 job = await uow.jobs.enqueue(
                     DELIVER_JOB,
-                    payload,
+                    delivery.to_json(),
                     run_at=self._clock.now(),
                     dedup_key=f"{webhook.id}:{event.id}",
                 )
@@ -252,26 +304,29 @@ class WebhookDeliveryService:
 
     async def _run_claimed(self, job: Job) -> None:
         try:
-            webhook_id = WebhookId(UUID(str(job.payload["webhook_id"])))
-            event_id = EventId(UUID(str(job.payload["event_id"])))
-            event_type = str(job.payload["type"])
-            occurred_at = datetime.fromisoformat(str(job.payload["occurred_at"]))
-            raw_document = job.payload.get("document_id")
-            document_id = None if raw_document is None else DocumentId(UUID(str(raw_document)))
-            rule = as_object(job.payload.get("rule"))
-            raw_task = job.payload.get("task_id")
-            task_id = None if raw_task is None else TaskId(UUID(str(raw_task)))
-            raw_related = job.payload.get("related_id")
-            related = None if raw_related is None else DocumentId(UUID(str(raw_related)))
+            delivery = Delivery.from_json(job.payload)
         except (KeyError, TypeError, ValueError) as error:
             await self._jobs.invalid(job, error)
             return
         try:
-            if task_id is not None:
-                await self._attempt_task(job, webhook_id, task_id, event_type, document_id)
+            if delivery.task_id is not None:
+                await self._attempt_task(
+                    job,
+                    delivery.webhook_id,
+                    delivery.task_id,
+                    delivery.type,
+                    delivery.document_id,
+                )
             else:
                 await self._attempt(
-                    job, webhook_id, event_id, event_type, occurred_at, document_id, rule, related
+                    job,
+                    delivery.webhook_id,
+                    delivery.event_id,
+                    delivery.type,
+                    delivery.occurred_at,
+                    delivery.document_id,
+                    delivery.rule,
+                    delivery.related_id,
                 )
         except Exception as error:
             if not await self._jobs.claim_lost(job, error):
@@ -682,28 +737,18 @@ async def queue_rule_send(
     in the unit of work that stores what the rules did: it goes only if that is committed.
     `rule`: its `id` and `name`. The rights are checked again before every attempt."""
     event_id = EventId(new_id())
-    payload: JsonObject = {
-        "webhook_id": str(webhook_id),
-        "event_id": str(event_id),
-        "type": RULE_SEND,
-        "occurred_at": now.isoformat(),
-        "document_id": str(document_id),
-        "rule": rule,
-    }
-    await uow.jobs.enqueue(DELIVER_JOB, payload, run_at=now, dedup_key=f"{webhook_id}:{event_id}")
+    delivery = Delivery(webhook_id, event_id, RULE_SEND, now, document_id, rule=rule)
+    await uow.jobs.enqueue(
+        DELIVER_JOB, delivery.to_json(), run_at=now, dedup_key=f"{webhook_id}:{event_id}"
+    )
 
 
 async def queue_task_delivery(uow: UnitOfWork, task: Task, now: datetime) -> None:
     """Queue the delivery of a task that was just sent (`TaskDesk`), in its unit of work."""
-    payload: JsonObject = {
-        "webhook_id": str(task.webhook_id),
-        "event_id": str(task.id),
-        "type": task.kind.value,
-        "occurred_at": now.isoformat(),
-        "document_id": str(task.document_id),
-        "task_id": str(task.id),
-    }
-    await uow.jobs.enqueue(DELIVER_JOB, payload, run_at=now, dedup_key=f"task:{task.id}")
+    delivery = Delivery(
+        task.webhook_id, EventId(task.id), task.kind.value, now, task.document_id, task_id=task.id
+    )
+    await uow.jobs.enqueue(DELIVER_JOB, delivery.to_json(), run_at=now, dedup_key=f"task:{task.id}")
 
 
 @dataclass(frozen=True)

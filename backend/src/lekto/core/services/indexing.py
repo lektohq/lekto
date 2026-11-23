@@ -105,6 +105,8 @@ INDEX_JOB = "search.index"
 REFRESH_JOB = "search.refresh"
 """Payload (`refresh_payload`): `kind` (`RefreshKind`) and `id` of the changed item."""
 RECONCILE_JOB = "search.reconcile"
+_ONCE = "once"
+"""A reconcile job's payload key: true for one that queues no next one."""
 REBUILD_JOB = "search.rebuild"
 
 
@@ -355,7 +357,7 @@ class IndexingService:
             # One waits at most: a worker in a loop of restarts adds no more (SA-K02).
             await uow.jobs.enqueue(
                 RECONCILE_JOB,
-                {"once": True},
+                {_ONCE: True},
                 run_at=self._clock.now(),
                 coalesce_key=f"{RECONCILE_JOB}.once",
             )
@@ -389,7 +391,7 @@ class IndexingService:
             if not await self._jobs.claim_lost(job, error):
                 await self._failed(job, error)
             return
-        recurring = job.kind == RECONCILE_JOB and job.payload.get("once") is not True
+        recurring = job.kind == RECONCILE_JOB and job.payload.get(_ONCE) is not True
         result = outcome.to_json() if isinstance(outcome, Indexed) else None
         await self._jobs.end(job, also=self._next_reconcile if recurring else None, result=result)
 
