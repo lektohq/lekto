@@ -1,0 +1,27 @@
+---
+name: Site
+
+# A published release rebuilds lekto.dev, which shows the newest release of each Lekto repository
+# (its deploy workflow listens for the `repository_dispatch` `lekto-release`). The token is the
+# organization secret `LEKTO_DEV_DISPATCH_TOKEN` (Contents: read and write on lektohq/lekto.dev).
+# Without it the site's nightly build picks the release up within a day.
+# yamllint disable-line rule:truthy
+on:
+  release:
+    types: [published]
+
+permissions: {}
+
+jobs:
+  dispatch:
+    name: 🌐 Rebuild lekto.dev
+    # Only this repository, not a fork.
+    if: github.repository == 'lektohq/lekto'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: 📣 Tell lekto.dev
+        env:
+          GH_TOKEN: ${{ secrets.LEKTO_DEV_DISPATCH_TOKEN }}
+        run: gh api repos/lektohq/lekto.dev/dispatches -f event_type=lekto-release
