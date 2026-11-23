@@ -1,6 +1,7 @@
 """`lekto [--env-file FILE] [check | migrate | check-schema | api | worker | evaluate |
 evaluate-search | reindex | render-pages | read-facts | relate | fetch-logos | reparse |
-train]`, the command line of Lekto (`[project.scripts]`; also `python -m lekto.composition`).
+train | vapid-key]`, the command line of Lekto (`[project.scripts]`; also
+`python -m lekto.composition`).
 
 The settings come from the `LEKTO_` environment variables, in the image from the container's
 environment. `--env-file FILE` takes them from a file of `KEY=value` lines instead
@@ -53,6 +54,8 @@ meant.
   search index takes up the new texts. Train the classifier afterwards (`train`).
 - `train`: train the classifier from the confirmed documents now, in the foreground, and learn
   identifiers of contacts from them (the worker does it on its own after enough confirmations).
+- `vapid-key`: print a new VAPID private key for notifications, the value of
+  `LEKTO_PUSH_VAPID_PRIVATE_KEY`; needs no configuration.
 
 Options follow their command. Exits with status 1 when the command fails: with the message on
 stderr when the configuration (or the evaluation set) does not let it work, otherwise with the
@@ -63,7 +66,7 @@ import argparse
 import asyncio
 import os
 import sys
-from collections.abc import Callable, Coroutine, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Coroutine, Mapping, Sequence
 from pathlib import Path
 
 import structlog
@@ -72,18 +75,14 @@ from lekto.adapters.inbound.evaluation import EvaluationSetError, Run
 from lekto.adapters.outbound.sql import SchemaState
 from lekto.adapters.outbound.webpush.sender import new_private_key, private_key_of, public_bytes
 from lekto.composition.api import run_api
+from lekto.composition.container import Services, build_container, build_services
 from lekto.composition.database import check_schema, migrate_database
 from lekto.composition.endpoints import external_endpoints
 from lekto.composition.env_file import apply_env_file
 from lekto.composition.errors import ConfigurationError
 from lekto.composition.evaluation import run_evaluation
-from lekto.composition.facts import run_read_facts
 from lekto.composition.logging_setup import configure_logging
-from lekto.composition.logos import run_fetch_logos
-from lekto.composition.pages import run_render_pages
 from lekto.composition.reindex import run_reindex
-from lekto.composition.relate import run_relate
-from lekto.composition.reparse import run_reparse
 from lekto.composition.search_evaluation import (
     DEFAULT_RATIOS,
     parse_ratios,
@@ -99,6 +98,8 @@ from lekto.composition.settings import (
 from lekto.composition.train import run_training
 from lekto.composition.worker import run_worker
 from lekto.core.domain.encoding import base64url
+from lekto.core.domain.errors import LogoFetchDisabledError
+from lekto.core.domain.pipeline import Node
 
 log = structlog.get_logger("lekto.composition")
 
@@ -361,12 +362,20 @@ def _train(settings: Settings, arguments: argparse.Namespace) -> int:
 
 
 def _queue(
-    run: Callable[[Settings], Coroutine[object, object, int]],
+    work: Callable[[Services], Awaitable[int]],
     *,
     counted: str,
     failed: str,
 ) -> Command:
-    """A command that queues jobs for the worker; it logs how many (as `counted`)."""
+    """A command that queues jobs for the worker through the services (`work`, returning how
+    many); it logs how many (as `counted`)."""
+
+    async def run(settings: Settings) -> int:
+        container = build_container(settings)
+        try:
+            return await work(build_services(container, settings))
+        finally:
+            await container.aclose()
 
     def command(settings: Settings, arguments: argparse.Namespace) -> int:
         name: str = arguments.command
@@ -376,15 +385,35 @@ def _queue(
     return command
 
 
+async def _fetch_logos(services: Services) -> int:
+    try:
+        return await services.logos.request_all()
+    except LogoFetchDisabledError as error:
+        raise ConfigurationError(f"{error}: set LEKTO_LOGO_FETCH=true") from None
+
+
 QUEUES: dict[str, Command] = {
+    # The page images of documents from before the pages node existed (it was skipped).
     "render-pages": _queue(
-        run_render_pages, counted="documents", failed="queueing the page images failed"
+        lambda services: services.pipeline.catch_up(Node.PAGES),
+        counted="documents",
+        failed="queueing the page images failed",
     ),
-    "read-facts": _queue(run_read_facts, counted="documents", failed="queueing the facts failed"),
-    "relate": _queue(run_relate, counted="documents", failed="queueing the relations failed"),
-    "fetch-logos": _queue(run_fetch_logos, counted="contacts", failed="queueing the logos failed"),
+    "read-facts": _queue(
+        lambda services: services.pipeline.request_facts(),
+        counted="documents",
+        failed="queueing the facts failed",
+    ),
+    "relate": _queue(
+        lambda services: services.pipeline.request_relations(),
+        counted="documents",
+        failed="queueing the relations failed",
+    ),
+    "fetch-logos": _queue(_fetch_logos, counted="contacts", failed="queueing the logos failed"),
     "reparse": _queue(
-        run_reparse, counted="documents", failed="queueing the texts to read again failed"
+        lambda services: services.pipeline.reparse(),
+        counted="documents",
+        failed="queueing the texts to read again failed",
     ),
 }
 

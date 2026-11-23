@@ -13,6 +13,7 @@ from lekto.adapters.inbound.evaluation import EvaluationSetError, Run, evaluate,
 from lekto.adapters.inbound.evaluation.cases import Case, FakeAnswer, _proposal_keys
 from lekto.adapters.inbound.evaluation.report import label_outcomes
 from lekto.adapters.outbound.memory import FakeLanguageModel
+from lekto.composition import evaluation as evaluation_module
 from lekto.composition.__main__ import main
 from lekto.composition.errors import ConfigurationError
 from lekto.composition.evaluation import (
@@ -337,3 +338,32 @@ def test_the_fixed_answer_reads_the_keys_the_prompts_ask_for() -> None:
     )
     fields = fake.respond(request)["fields"]
     assert isinstance(fields, dict) and list(fields) == ["a1", "a2", "a4"]
+
+
+class Closing:
+    """A model client that says whether it was closed."""
+
+    model = endpoint = "stand-in"
+
+    def __init__(self) -> None:
+        self.closed = False
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+async def broken(*args: object, **kwargs: object) -> None:
+    raise RuntimeError("the run failed")
+
+
+async def test_the_model_s_client_is_closed_however_the_run_ends(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Its connections are released, also after a failed run (CO-K11)."""
+    client = Closing()
+    monkeypatch.setattr(evaluation_module, "openai_language_model", lambda settings: client)
+    monkeypatch.setattr(evaluation_module, "evaluate", broken)
+    settings = Settings.model_construct(llm_base_url="http://ollama:11434/v1")
+    with pytest.raises(RuntimeError):
+        await run_evaluation(settings, cases=SET, output=tmp_path / "r.md")
+    assert client.closed

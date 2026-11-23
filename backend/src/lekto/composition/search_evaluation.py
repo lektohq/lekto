@@ -26,6 +26,7 @@ from lekto.adapters.outbound.memory import (
     BagOfWordsEmbeddings,
     MemorySearchIndex,
 )
+from lekto.adapters.outbound.openai_compat import OpenAiCompatEmbeddings
 from lekto.composition.container import (
     build_memory_container,
     indexing_policy_of,
@@ -95,7 +96,9 @@ async def run_search_evaluation(
         raise ConfigurationError("--models does not go with --fake")
     if words_only and models:
         raise ConfigurationError("--models does not go with --words-only")
-    backends, endpoint, index = _backends(settings, fake=fake, words_only=words_only, models=models)
+    backends, endpoint, index, clients = _backends(
+        settings, fake=fake, words_only=words_only, models=models
+    )
 
     def model_for(case: Case) -> LanguageModel | None:
         # The documents are classified with the fixed answers: the metadata is not what is
@@ -138,6 +141,8 @@ async def run_search_evaluation(
         )
     finally:
         await container.aclose()
+        for client in clients:
+            await client.aclose()
     info = SearchRunInfo(
         endpoint=endpoint,
         index=index,
@@ -164,8 +169,9 @@ async def run_search_evaluation(
 
 def _backends(
     settings: Settings, *, fake: bool, words_only: bool, models: Sequence[str]
-) -> tuple[list[Backend], str, str]:
-    """The backends, the endpoint and the kind of index for the report."""
+) -> tuple[list[Backend], str, str, list[OpenAiCompatEmbeddings]]:
+    """The backends, the endpoint and the kind of index for the report, and the clients of the
+    embedding models, to be closed after the run (CO-K11)."""
     if fake:
         embeddings = None if words_only else BagOfWordsEmbeddings()
 
@@ -176,7 +182,7 @@ def _backends(
             )
 
         name = WORDS if embeddings is None else embeddings.model
-        return [Backend(name, embeddings, memory)], "memory", "in memory"
+        return [Backend(name, embeddings, memory)], "memory", "in memory", []
     if settings.meilisearch_url is None:
         raise ConfigurationError("LEKTO_MEILISEARCH_URL is not set; use --fake or configure it")
     if words_only:
@@ -184,6 +190,7 @@ def _backends(
             [Backend(WORDS, None, _meilisearch(settings))],
             "none",
             f"Meilisearch at {endpoint_of(str(settings.meilisearch_url))}, a temporary index",
+            [],
         )
     if settings.embedding_base_url is None:
         raise ConfigurationError("LEKTO_EMBEDDING_BASE_URL is not set; use --fake or configure it")
@@ -193,18 +200,17 @@ def _backends(
     if not names:
         raise ConfigurationError("no model: pass --models or set LEKTO_EMBEDDING_MODEL")
     meilisearch = _meilisearch(settings)
+    clients = [
+        openai_embeddings(settings.model_copy(update={"embedding_model": name})) for name in names
+    ]
     backends = [
-        Backend(
-            name,
-            openai_embeddings(settings.model_copy(update={"embedding_model": name})),
-            meilisearch,
-        )
-        for name in names
+        Backend(name, client, meilisearch) for name, client in zip(names, clients, strict=True)
     ]
     return (
         backends,
         endpoint_of(str(settings.embedding_base_url)),
         f"Meilisearch at {endpoint_of(str(settings.meilisearch_url))}, a temporary index per model",
+        clients,
     )
 
 

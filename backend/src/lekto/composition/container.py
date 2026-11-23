@@ -396,8 +396,8 @@ def ref_cipher(settings: Settings) -> RefCipher:
 
 @dataclass(frozen=True)
 class Container:
-    """One adapter per port. Search, language model and embeddings are optional until the
-    milestones that need them (M6, M5).
+    """One adapter per port. Search, language model and embeddings are optional: None while
+    they are not configured.
 
     `aclose` releases what the adapters hold (database engine, S3 client); call it when the
     API or the worker stops.

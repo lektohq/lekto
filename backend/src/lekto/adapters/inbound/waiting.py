@@ -2,7 +2,7 @@
 of worker and API (`dispatch_events`).
 
 A loop that finds nothing asks when something is due next (`JobQueue.next_due`,
-`EventBus.next_due`) and waits until then, or until a signal says that a commit queued
+`EventBus.due_in`) and waits until then, or until a signal says that a commit queued
 something (`Wakeup`), whichever comes first. Signals can be lost, so the wait ends after
 `SAFETY_NET` at the latest and the loop looks again. Where signals from other processes do
 not arrive (SQLite; Postgres while the listening connection is down) the loop polls instead,

@@ -725,6 +725,17 @@ async def test_spaces_and_lenses_are_read_by_name(api: Api, scene: Scene) -> Non
     lenses = data(await call(api, owner, "lenses_list"))["lenses"]
     assert lenses == [{"name": "Neues", "query": "Rechnung"}]
 
+    # Every filter `documents_list lens=` applies, by name (CO-K08).
+    lens = {"space_ids": [str(scene.shared.id)], "facts": [{"kind": "iban", "role": "own"}]}
+    await post(api, "/lenses", {"name": "Geteilt", "filter": lens}, owner)
+    (shown,) = [
+        lens
+        for lens in data(await call(api, owner, "lenses_list"))["lenses"]
+        if lens["name"] == "Geteilt"
+    ]
+    assert shown["spaces"] == ["Shared"]
+    assert shown["facts"] == [{"kind": "iban", "role": "own"}]
+
 
 async def test_identifiers_find_says_where_a_number_stands(api: Api, scene: Scene) -> None:
     owner = scene.headers["owner"]

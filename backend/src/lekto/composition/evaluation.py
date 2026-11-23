@@ -11,6 +11,7 @@ from lekto.adapters.inbound.evaluation import (
     Case,
     CaseResult,
     Environment,
+    EvaluationSet,
     Run,
     RunInfo,
     evaluate,
@@ -23,6 +24,7 @@ from lekto.adapters.outbound.memory import (
     FakeLanguageModel,
     MemorySearchIndex,
 )
+from lekto.adapters.outbound.openai_compat import OpenAiCompatLanguageModel
 from lekto.adapters.outbound.sklearn import SklearnClassifier
 from lekto.composition.container import (
     Container,
@@ -166,13 +168,30 @@ async def run_evaluation(
     `output` (default: `<cases>/reports/<date>-<model>.md`). Without `fake`,
     LEKTO_LLM_BASE_URL is required."""
     evaluation = load_set(cases)
-    model: LanguageModel | None = None
+    model: OpenAiCompatLanguageModel | None = None
     if not fake:
         if settings.llm_base_url is None:
             raise ConfigurationError(
                 "LEKTO_LLM_BASE_URL is not set; configure a model or use --fake"
             )
         model = openai_language_model(settings)
+    try:
+        return await _run(evaluation, settings, model, cases, fake, output, progress, runs)
+    finally:
+        if model is not None:
+            await model.aclose()  # its connections (CO-K11)
+
+
+async def _run(
+    evaluation: EvaluationSet,
+    settings: Settings,
+    model: OpenAiCompatLanguageModel | None,
+    cases: Path,
+    fake: bool,
+    output: Path | None,
+    progress: bool,
+    runs: Sequence[Run],
+) -> Evaluation:
 
     def model_for(case: Case) -> LanguageModel | None:
         return model if not fake else fake_model_for(case)
