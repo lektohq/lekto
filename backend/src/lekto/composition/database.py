@@ -4,6 +4,7 @@ import asyncio
 import logging
 import ssl
 import time
+from datetime import timedelta
 from pathlib import Path
 
 from lekto.adapters.outbound.sql import Database, SchemaState, migrate, schema_state
@@ -11,9 +12,13 @@ from lekto.adapters.outbound.sql.database import Tls
 from lekto.composition.settings import Settings
 
 
-def open_database(settings: Settings, *, read_only: bool = False) -> Database:
+def open_database(
+    settings: Settings, *, read_only: bool = False, command_timeout: timedelta | None = None
+) -> Database:
     """The configured database; `read_only` opens a SQLite file read-only (the schema check,
-    which must not write while another process migrates)."""
+    which must not write while another process migrates). `command_timeout`: on Postgres, how
+    long a statement may take (`COMMAND_TIMEOUT` for the API, the worker and the commands;
+    none for the migration)."""
     if settings.db_type == "sqlite":
         return Database.sqlite(settings.db_sqlite_path, read_only=read_only)
     # Settings guarantee these for postgres.
@@ -25,6 +30,7 @@ def open_database(settings: Settings, *, read_only: bool = False) -> Database:
         user=settings.db_user,
         password=settings.db_password.get_secret_value(),
         tls=tls_of(settings.db_sslmode, settings.db_sslrootcert),
+        command_timeout=command_timeout,
     )
 
 

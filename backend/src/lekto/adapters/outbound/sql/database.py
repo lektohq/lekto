@@ -40,6 +40,13 @@ _SQLITE_PRAGMAS = (
     "PRAGMA foreign_keys=ON",
     _SQLITE_BUSY,
 )
+COMMAND_TIMEOUT = timedelta(minutes=5)
+"""Postgres: how long one statement of the API, the worker and the commands may take (SQ-K07).
+Without it a connection the network lost without a word waits on the TCP keepalive (hours);
+nothing of theirs runs that long, and a write waiting this long for the write lock (the
+outbox's advisory lock) waits behind something stuck. Not for `lekto migrate`: a migration of
+a large database may take longer."""
+
 # A read-only connection leaves the journal mode alone: switching a fresh file to WAL is a write.
 _SQLITE_READER_PRAGMAS = (_SQLITE_BUSY,)
 
@@ -87,11 +94,20 @@ class Database:
 
     @classmethod
     def postgres(
-        cls, *, host: str, port: int, name: str, user: str, password: str, tls: Tls = None
+        cls,
+        *,
+        host: str,
+        port: int,
+        name: str,
+        user: str,
+        password: str,
+        tls: Tls = None,
+        command_timeout: timedelta | None = None,
     ) -> Database:
         """`tls` is asyncpg's `ssl`: a mode (`prefer`, …), False, or a context that requires TLS
         and checks the server as it says; None leaves asyncpg's default (`PGSSLMODE`, else
-        `prefer`)."""
+        `prefer`). `command_timeout`: how long a statement may take (`COMMAND_TIMEOUT`); None
+        for no limit."""
         url = URL.create(
             "postgresql+asyncpg",
             username=user,
@@ -100,7 +116,12 @@ class Database:
             port=port,
             database=name,
         )
-        arguments = {} if tls is None else {"connect_args": {"ssl": tls}}
+        connect: dict[str, Any] = {}
+        if tls is not None:
+            connect["ssl"] = tls
+        if command_timeout is not None:
+            connect["command_timeout"] = command_timeout.total_seconds()
+        arguments = {"connect_args": connect} if connect else {}
         # A connection the database dropped (a restart) is replaced before it is used, not
         # handed to the first request after it (SQ-K07).
         engine = create_async_engine(url, hide_parameters=True, pool_pre_ping=True, **arguments)
