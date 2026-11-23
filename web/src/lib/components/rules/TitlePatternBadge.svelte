@@ -12,15 +12,17 @@
 		$props();
 </script>
 
-<Badge variant="note">
+<!-- A long name of a type is cut within the row (`max-w-full`, `truncate`): uncut, the badge
+     stuck out of the list at 320 px and the page scrolled sideways. -->
+<Badge variant="note" class="max-w-full">
 	{#if session.isAdmin}
 		<button
 			type="button"
-			class="relative z-10 cursor-pointer after:absolute after:-inset-x-2 after:-inset-y-3 hover:underline max-sm:after:-inset-y-3.5"
+			class="relative z-10 min-w-0 cursor-pointer after:absolute after:-inset-x-2 after:-inset-y-3 hover:underline max-sm:after:-inset-y-3.5"
 			onclick={() => masterDataDialogs.open('document-types', documentTypeId, { fromRule: ruleId })}
-			>{m.rule_title_pattern_of({ type: name })}</button
+			><span class="block truncate">{m.rule_title_pattern_of({ type: name })}</span></button
 		>
 	{:else}
-		{m.rule_title_pattern_of({ type: name })}
+		<span class="truncate">{m.rule_title_pattern_of({ type: name })}</span>
 	{/if}
 </Badge>

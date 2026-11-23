@@ -20,6 +20,18 @@ describe('the badge of a title pattern (WD-10)', () => {
 		);
 	});
 
+	it('is cut within its row, for a long name not to widen the page (WZ-11)', () => {
+		// At 320 px the badge of a type with a long name stuck out of the list of rules.
+		for (const role of ['admin', 'user'] as const) {
+			signIn(role);
+			const { unmount } = render(TitlePatternBadge, props);
+			const text = screen.getByText(words);
+			expect(text.className).toContain('truncate');
+			expect(text.closest('[data-slot="badge"]')?.className).toContain('max-w-full');
+			unmount();
+		}
+	});
+
 	it('is words alone for everyone else', () => {
 		signIn('user');
 		render(TitlePatternBadge, props);
