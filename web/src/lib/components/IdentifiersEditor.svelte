@@ -67,7 +67,8 @@
 		hint,
 		kinds: offered = IDENTIFIER_KINDS,
 		users = null,
-		contacts
+		contacts,
+		labelledby
 	}: {
 		rows: IdentifierRow[];
 		topics?: readonly Tag[];
@@ -79,6 +80,8 @@
 		/** Without the list, a number still shows whose it is by id; it only cannot be chosen. */
 		users?: readonly UserName[] | null;
 		contacts?: readonly ListedContact[];
+		/** The label that names the editor; without it, its own name. */
+		labelledby?: string;
 	} = $props();
 
 	type ListedContact = Pick<Contact, 'id' | 'name' | 'topic_ids'> & Partial<Pick<Contact, 'logo'>>;
@@ -458,7 +461,12 @@
 	</li>
 {/snippet}
 
-<div class="flex flex-col gap-1" role="group" aria-label={m.master_identifiers()}>
+<div
+	class="flex flex-col gap-1"
+	role="group"
+	aria-label={labelledby ? undefined : m.master_identifiers()}
+	aria-labelledby={labelledby}
+>
 	<div class="flex flex-wrap items-center gap-2 pb-1">
 		{#if contacts}
 			<Segmented

@@ -127,6 +127,25 @@ describe('WebhookForm', () => {
 		expect(sent[0].body).not.toHaveProperty('headers');
 	});
 
+	it('asks a value of a kept header renamed, not of one only spelt otherwise (WC-K09)', async () => {
+		const user = userEvent.setup();
+		render(WebhookForm, { webhook: stored, cancelHref: '/ui/webhooks/hook', ondone: () => {} });
+		const name = await screen.findByLabelText(m.webhook_header_name());
+		const save = () => screen.getByRole('button', { name: m.save() }) as HTMLButtonElement;
+		await user.clear(name);
+		await user.type(name, 'authorization');
+		expect(save().disabled).toBe(false); // the same header for HTTP
+		expect((screen.getByLabelText(m.webhook_header_value()) as HTMLInputElement).placeholder).toBe(
+			m.webhook_header_kept()
+		);
+		await user.clear(name);
+		await user.type(name, 'X-Token');
+		expect(save().disabled).toBe(true); // another header: no stored value to keep
+		expect((screen.getByLabelText(m.webhook_header_value()) as HTMLInputElement).placeholder).toBe(
+			''
+		);
+	});
+
 	it('sends all headers when one changes, an empty value keeping the stored one', async () => {
 		render(WebhookForm, { webhook: stored, cancelHref: '/ui/webhooks/hook', ondone: () => {} });
 		await screen.findByLabelText(m.webhook_header_value());

@@ -130,14 +130,16 @@
 	/** The size of every page at 100 %. */
 	async function measure() {
 		if (!doc) return;
-		const next: { width: number; height: number }[] = [];
-		for (let number = 1; number <= doc.numPages; number++) {
-			const page = await doc.getPage(number);
-			if (destroyed) return;
+		const pdf = doc;
+		// All at once: pdf.js's worker reads them side by side.
+		const pages = await Promise.all(
+			Array.from({ length: pdf.numPages }, (_, index) => pdf.getPage(index + 1))
+		);
+		if (destroyed) return;
+		sizes = pages.map((page) => {
 			const viewport = page.getViewport({ scale: 1 });
-			next.push({ width: viewport.width * POINT, height: viewport.height * POINT });
-		}
-		sizes = next;
+			return { width: viewport.width * POINT, height: viewport.height * POINT };
+		});
 	}
 
 	/** Draw a page for the width it stands at now; aside, then copied over at once, so a page

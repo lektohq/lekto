@@ -17,7 +17,6 @@
 		title,
 		onOpenChange,
 		class: className,
-		align = 'start',
 		trigger,
 		children
 	}: {
@@ -28,7 +27,6 @@
 		onOpenChange?: (open: boolean) => void;
 		/** The popover's width. */
 		class?: string;
-		align?: 'start' | 'center' | 'end';
 		trigger: Snippet<[Record<string, unknown>]>;
 		children: Snippet;
 	} = $props();
@@ -61,7 +59,7 @@
 				{@render trigger(props)}
 			{/snippet}
 		</Popover.Trigger>
-		<Popover.Content class={cn('p-0', className)} {align} collisionPadding={8}>
+		<Popover.Content class={cn('p-0', className)} align="start" collisionPadding={8}>
 			{@render children()}
 		</Popover.Content>
 	</Popover.Root>

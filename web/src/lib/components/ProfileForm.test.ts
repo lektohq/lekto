@@ -75,6 +75,20 @@ afterEach(() => {
 });
 
 describe('ProfileForm', () => {
+	it('lets the browser fill only the own profile, its groups named by their labels', async () => {
+		const own = render(ProfileForm, { data });
+		const name = (await screen.findByLabelText(m.profile_display_name())) as HTMLInputElement;
+		expect(name.autocomplete).toBe('name');
+		expect(screen.getByRole('group', { name: m.profile_identifiers() })).toBeTruthy();
+		expect(screen.getByRole('group', { name: m.profile_numbers() })).toBeTruthy();
+		own.unmount();
+		// An admin at another person's profile: no name or address of their own (WC-K06, K07).
+		render(ProfileForm, { data, userId: 'john' });
+		const theirs = (await screen.findByLabelText(m.profile_display_name())) as HTMLInputElement;
+		expect(theirs.autocomplete).toBe('off');
+		expect((screen.getByLabelText(m.profile_email()) as HTMLInputElement).autocomplete).toBe('off');
+	});
+
 	it('shows the own profile and saves what is in it', async () => {
 		render(ProfileForm, { data });
 		const name = await screen.findByLabelText(m.profile_display_name());

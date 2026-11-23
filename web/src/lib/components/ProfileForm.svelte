@@ -137,7 +137,7 @@
 				id="{uid}-name"
 				bind:value={displayName}
 				maxlength={PROFILE_LIMITS.displayName}
-				autocomplete="name"
+				autocomplete={userId ? 'off' : 'name'}
 				aria-describedby="{uid}-name-hint"
 			/>
 		</Field.Field>
@@ -165,12 +165,18 @@
 			</Field.Field>
 			<Field.Field>
 				<Field.Label for="{uid}-email">{m.profile_email()}</Field.Label>
-				<Input id="{uid}-email" type="email" bind:value={email} autocomplete="email" />
+				<Input
+					id="{uid}-email"
+					type="email"
+					bind:value={email}
+					autocomplete={userId ? 'off' : 'email'}
+				/>
 			</Field.Field>
 		</div>
 		<Field.Field>
-			<Field.Label>{m.profile_identifiers()}</Field.Label>
+			<Field.Label id="{uid}-identifiers-label">{m.profile_identifiers()}</Field.Label>
 			<IdentifiersEditor
+				labelledby="{uid}-identifiers-label"
 				bind:rows={identifiers}
 				bind:opened
 				kinds={PERSON_KINDS}
@@ -181,8 +187,11 @@
 	{#if atContacts}
 		<!-- In the settings their tab names them. -->
 		<Field.Field>
-			{#if part === 'all'}<Field.Label>{m.profile_numbers()}</Field.Label>{/if}
+			{#if part === 'all'}
+				<Field.Label id="{uid}-numbers-label">{m.profile_numbers()}</Field.Label>
+			{/if}
 			<IdentifiersEditor
+				labelledby={part === 'all' ? `${uid}-numbers-label` : undefined}
 				bind:rows={numbers}
 				bind:opened={openedNumber}
 				kinds={NAMING_KINDS}

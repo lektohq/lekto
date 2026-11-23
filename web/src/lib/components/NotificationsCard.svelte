@@ -162,19 +162,23 @@
 		}
 	}
 
-	// A switch takes effect at once (web/DESIGN.md, "Saving and leaving").
+	// A switch takes effect at once (web/DESIGN.md, "Saving and leaving"). Only the latest
+	// switch's answer, or its failure, sets them: an earlier one coming last changes nothing.
+	let latestSave = 0;
 	async function save(nextKinds: Kind[], nextTitles: boolean) {
 		const before = { kinds, titles };
+		const request = ++latestSave;
 		kinds = nextKinds;
 		titles = nextTitles;
 		try {
 			const saved = await unwrap(
 				api.PUT('/api/v1/push/preferences', { body: { kinds: nextKinds, titles: nextTitles } })
 			);
+			if (request !== latestSave) return;
 			kinds = saved.kinds;
 			titles = saved.titles;
 		} catch (failure) {
-			({ kinds, titles } = before);
+			if (request === latestSave) ({ kinds, titles } = before);
 			reportError(failure);
 		}
 	}

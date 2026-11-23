@@ -50,8 +50,11 @@
 			return;
 		}
 		const state = heldState(target);
-		await (state ? gotoWithState(target, state) : goto(target));
-		leaving = false;
+		try {
+			await (state ? gotoWithState(target, state) : goto(target));
+		} finally {
+			leaving = false; // also where the navigation failed: the form is still there
+		}
 	}
 </script>
 

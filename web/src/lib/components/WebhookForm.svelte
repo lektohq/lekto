@@ -14,14 +14,13 @@
 	import Segmented from '#lib/components/Segmented.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import TemplateInput from '#lib/components/templates/TemplateInput.svelte';
-	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Choice } from '#lib/components/ui/choice/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { WEBHOOK_EVENT_TYPES } from '#lib/events.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { session } from '#lib/session.svelte.ts';
-	import { cn } from '#lib/utils.ts';
 	import { TIMEOUT_MINUTES } from '#lib/tasks.ts';
 	import {
 		EVENT_LABELS,
@@ -37,9 +36,12 @@
 	type Webhook = components['schemas']['WebhookOut'];
 	type Body = components['schemas']['BodyFormat'];
 	type ModelCall = components['schemas']['ModelCallKind'];
-	// A header of the webhook's own. `kept`: it is stored already, its value hidden; left empty,
-	// the value stays as it is.
-	type Header = { name: string; value: string; kept: boolean };
+	// A header of the webhook's own. `kept`: the name it is stored under, its value hidden; left
+	// empty, the value stays as it is, while the name is that one (HTTP spells it in any case).
+	// Renamed, it is another header, which needs a value.
+	type Header = { name: string; value: string; kept: string | null };
+	const stillKept = (header: Header) =>
+		header.kept !== null && header.kept.toLowerCase() === header.name.trim().toLowerCase();
 
 	// The form of a webhook on its own page (Tobi, 26.10.2026; a dialog before): create one
 	// (`webhook` null) or change it. A new secret (creating a signed webhook, or switching
@@ -69,7 +71,7 @@
 	let types = $state<string[]>(given ? given.event_types.filter((type) => type !== '*') : []);
 	let signed = $state(given?.signed ?? true);
 	let headers = $state<Header[]>(
-		(given?.headers ?? []).map((header) => ({ name: header, value: '', kept: true }))
+		(given?.headers ?? []).map((header) => ({ name: header, value: '', kept: header }))
 	);
 	let body = $state<Body>(given?.body ?? 'thin');
 	let template = $state(given?.body_template ?? '');
@@ -124,12 +126,14 @@
 
 	// A new header needs a value; a kept one may stay empty (unchanged).
 	const headersComplete = $derived(
-		headers.every((header) => header.name.trim() !== '' && (header.kept || header.value !== ''))
+		headers.every(
+			(header) => header.name.trim() !== '' && (stillKept(header) || header.value !== '')
+		)
 	);
 	// Only changed headers go to the API: a value that cannot be read any more is not asked for
 	// when the headers were not touched.
 	const headersChanged = $derived(
-		headers.some((header) => header.value !== '' || !header.kept) ||
+		headers.some((header) => header.value !== '' || !stillKept(header)) ||
 			headers.map((header) => header.name.trim()).join('\n') !== (webhook?.headers ?? []).join('\n')
 	);
 	const incomplete = $derived(
@@ -353,7 +357,7 @@
 						type="password"
 						autocomplete="new-password"
 						class="font-mono"
-						placeholder={header.kept ? m.webhook_header_kept() : ''}
+						placeholder={stillKept(header) ? m.webhook_header_kept() : ''}
 						bind:value={header.value}
 						maxlength={WEBHOOK_LIMITS.headerValue}
 					/>
@@ -371,7 +375,7 @@
 					type="button"
 					variant="outline"
 					disabled={headers.length >= WEBHOOK_LIMITS.headers}
-					onclick={() => headers.push({ name: '', value: '', kept: false })}
+					onclick={() => headers.push({ name: '', value: '', kept: null })}
 				>
 					<Plus aria-hidden="true" />
 					{m.webhook_header_add()}
@@ -444,11 +448,9 @@
 		<div class="flex flex-col gap-3 border-t pt-4">
 			{#if error}<Field.Error>{error}</Field.Error>{/if}
 			<div class="flex flex-wrap justify-end gap-2">
-				<a
-					href={cancelHref}
-					class={cn(buttonVariants({ variant: 'ghost' }))}
-					onclick={() => (leaving = true)}>{m.cancel()}</a
-				>
+				<Button href={cancelHref} variant="ghost" onclick={() => (leaving = true)}>
+					{m.cancel()}
+				</Button>
 				<Button type="submit" {busy} disabled={incomplete}>
 					{webhook ? m.save() : m.create()}
 				</Button>

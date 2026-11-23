@@ -50,6 +50,15 @@
 	</Card.Header>
 	<Card.Content>
 		<form class="flex max-w-md flex-col gap-4" onsubmit={submit} novalidate>
+			<!-- For a password manager: whose new password it is (no field anybody sees). -->
+			<input
+				type="text"
+				name="username"
+				autocomplete="username"
+				value={session.user?.username ?? ''}
+				readonly
+				hidden
+			/>
 			<Field.Field>
 				<Field.Label for="pw-current">{m.password_current()}</Field.Label>
 				<Input

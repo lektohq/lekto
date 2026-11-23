@@ -92,6 +92,15 @@ describe('UnsavedGuard', () => {
 		expect(leave(LIST)).toBe(true);
 	});
 
+	it('guards again when the navigation it let go on fails (WC-K01)', async () => {
+		kit.goto.mockRejectedValueOnce(new Error('the page could not load'));
+		render(UnsavedGuard, { dirty: true });
+		expect(leave(LIST)).toBe(true);
+		await discard();
+		await waitFor(() => expect(kit.goto).toHaveBeenCalledTimes(1));
+		expect(leave(LIST)).toBe(true); // still on the form: asked again
+	});
+
 	it('carries on the state the held navigation had: the words of a search', async () => {
 		render(UnsavedGuard, { dirty: true });
 		const state = { words: 'Strom', by: 'u1' };

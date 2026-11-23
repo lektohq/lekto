@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { MASTER_LIMITS } from '#lib/masterdata-api.ts';
 	import FormDialog from '#lib/components/FormDialog.svelte';
 	import HintLabel from '#lib/components/HintLabel.svelte';
@@ -38,11 +39,13 @@
 	let name = $state('');
 	let description = $state('');
 
+	// Filled when it opens; what changes while it is open is the person's.
 	$effect(() => {
-		if (open) {
+		if (!open) return;
+		untrack(() => {
 			name = initialName;
 			description = initialDescription;
-		}
+		});
 	});
 </script>
 
