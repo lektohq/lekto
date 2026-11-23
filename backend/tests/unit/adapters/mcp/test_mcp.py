@@ -634,7 +634,7 @@ async def test_facts_decide_adds_and_rejects_a_fact(api: Api, scene: Scene) -> N
         kind="invoice_number",
         value="R-1001",
     )
-    assert error(reader)
+    assert "only editors and admins decide the facts" in error(reader)
 
 
 async def test_facts_show_an_identifiers_role_and_decision(api: Api, scene: Scene) -> None:
@@ -788,7 +788,7 @@ async def test_identifiers_find_says_where_a_number_stands(api: Api, scene: Scen
 
 async def test_identifiers_open_is_for_admins(api: Api, scene: Scene) -> None:
     listed = data(await call(api, scene.headers["admin"], "identifiers_open"))
-    assert listed["total"] >= 0
+    assert listed == {"total": 0}  # the scene shows no number no contact holds
     refused = await call(api, scene.headers["owner"], "identifiers_open")
     assert "only admins" in error(refused)
 
@@ -842,7 +842,8 @@ async def test_two_rules_of_one_name_are_told_apart_by_their_space(api: Api, sce
 
 async def test_system_status_names_what_is_running(api: Api, scene: Scene) -> None:
     status = data(await call(api, scene.headers["owner"], "system_status"))
-    assert isinstance(status.get("jobs", []), list)
+    jobs = {item["kind"]: item for item in status["jobs"]}
+    assert jobs["pipeline.node"]["due"] >= 1  # the scene's documents wait in the pipeline
 
 
 async def test_a_document_one_may_not_read_is_just_not_found(api: Api, scene: Scene) -> None:

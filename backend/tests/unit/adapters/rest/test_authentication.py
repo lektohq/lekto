@@ -10,6 +10,7 @@ from fastapi.routing import APIRoute, iter_route_contexts
 
 from lekto import __version__
 from lekto.adapters.inbound.rest import PREFIX
+from lekto.adapters.inbound.rest.app import DOCS_PATH
 from lekto.adapters.inbound.rest.auth import CSRF_HEADER, READS_KEY
 from lekto.adapters.inbound.rest.version import API_VERSION
 from lekto.core.domain.errors import AuthenticationError
@@ -26,6 +27,8 @@ PUBLIC = {
     ("GET", f"{PREFIX}/auth/oidc/callback"),
     ("GET", f"{PREFIX}/health"),
 }
+BESIDE = {DOCS_PATH, f"{PREFIX}/openapi.json"}
+"""The public routes beside the API's own (`add_route`, FastAPI's OpenAPI document)."""
 NEW_PASSWORD = "another long passphrase"
 PROBLEM = "application/problem+json"
 
@@ -71,6 +74,22 @@ async def test_every_other_route_needs_authentication(api: Api) -> None:
         assert response.status_code == 401, (method, path)
         checked += 1
     assert checked >= 50
+
+
+async def test_a_route_beside_the_api_is_known_or_needs_authentication(api: Api) -> None:
+    """A route added with `add_route` below the prefix is no `APIRoute` and no part of the
+    OpenAPI document: it is one of the known public ones, or it asks for authentication too
+    (TC-K01)."""
+    beside = {
+        context.path_format or ""
+        for context in iter_route_contexts(api.app.routes)
+        if not isinstance(context.original_route, APIRoute)
+        and (context.path_format or "").startswith(PREFIX)
+    }
+    assert beside >= BESIDE
+    for path in sorted(beside - BESIDE):
+        response = await api.client.get(re.sub(r"\{[^}]+\}", str(UUID(int=1)), path))
+        assert response.status_code == 401, path
 
 
 # --- sessions -----------------------------------------------------------------------------------

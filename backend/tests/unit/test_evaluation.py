@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import pytest_asyncio
 
 from lekto.adapters.inbound.evaluation import EvaluationSetError, Run, evaluate, load_set
 from lekto.adapters.inbound.evaluation.cases import Case, FakeAnswer, _proposal_keys
@@ -18,6 +19,7 @@ from lekto.composition.__main__ import main
 from lekto.composition.errors import ConfigurationError
 from lekto.composition.evaluation import (
     FAKE_MODEL,
+    Evaluation,
     build_environment,
     evaluation_container,
     run_evaluation,
@@ -42,11 +44,19 @@ from tests.builders import NOW
 SET = Path(__file__).parents[2] / "evaluation"
 
 
-async def test_the_fixed_answers_give_the_expected_lanes(tmp_path: Path) -> None:
-    report = tmp_path / "report.md"
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
+async def fake_run(tmp_path_factory: pytest.TempPathFactory) -> tuple[Evaluation, str]:
+    """One run of the set with its fixed answers, and its report: the tests that only read
+    them share it (TC-K08)."""
+    report = tmp_path_factory.mktemp("evaluation") / "report.md"
     evaluation = await run_evaluation(
         Settings.model_construct(), cases=SET, fake=True, output=report
     )
+    return evaluation, report.read_text(encoding="utf-8")
+
+
+def test_the_fixed_answers_give_the_expected_lanes(fake_run: tuple[Evaluation, str]) -> None:
+    evaluation, text = fake_run
     assert len(evaluation.results) >= 60
     assert {result.run for result in evaluation.results} == set(Run)
     for result in evaluation.results:
@@ -58,7 +68,6 @@ async def test_the_fixed_answers_give_the_expected_lanes(tmp_path: Path) -> None
     assert evaluation.green_but_wrong == 0
     assert evaluation.violations == 0
 
-    text = report.read_text(encoding="utf-8")
     assert "| False green | **0** | **0** |" in text
     assert "the trained one took over 57 documents of the training corpus first" in text
     assert "## Lanes (trained)" in text
@@ -69,14 +78,13 @@ async def test_the_fixed_answers_give_the_expected_lanes(tmp_path: Path) -> None
     assert "Holders (trained): 11 of 11 numbers with the holder expected." in text
 
 
-async def test_the_labels_are_recorded_and_counted_but_enforce_nothing(tmp_path: Path) -> None:
+def test_the_labels_are_recorded_and_counted_but_enforce_nothing(
+    fake_run: tuple[Evaluation, str],
+) -> None:
     """The cases of issue #55: the wrong line of a pay slip and a total far below a monthly
     label are apart from their labels, the values of an invoice's columns beside them. The
     wrong values pass every other check (the cases are yellow for a missing field alone)."""
-    report = tmp_path / "report.md"
-    evaluation = await run_evaluation(
-        Settings.model_construct(), cases=SET, fake=True, output=report
-    )
+    evaluation, text = fake_run
     cold = {result.case.name: result for result in evaluation.results if result.run is Run.COLD}
     assert label_outcomes(cold["43-lohnabrechnung-falsche-zeile"])["Bruttolohn"] is (
         LabelOutcome.APART
@@ -94,15 +102,14 @@ async def test_the_labels_are_recorded_and_counted_but_enforce_nothing(tmp_path:
         assert cold[name].checks[field].ok, name  # step 1 records, step 2 enforces
         assert cold[name].lane is Lane.YELLOW
     assert cold["44-rechnung-spalten"].lane is Lane.GREEN
-    text = report.read_text(encoding="utf-8")
     assert "## Labels (cold)" in text and "## Labels (trained)" in text
     assert "| 45-versicherung-jahresbeitrag | 0 | 1 | 0 | 0 | 0 | Beitrag: apart |" in text
 
 
-async def test_instructions_in_the_text_change_only_checked_fields(tmp_path: Path) -> None:
-    evaluation = await run_evaluation(
-        Settings.model_construct(), cases=SET, fake=True, output=tmp_path / "r.md"
-    )
+def test_instructions_in_the_text_change_only_checked_fields(
+    fake_run: tuple[Evaluation, str],
+) -> None:
+    evaluation, _ = fake_run
     injections = [result for result in evaluation.results if result.case.injection]
     assert len(injections) == 4
     injections = [result for result in injections if result.run is Run.COLD]
@@ -228,15 +235,13 @@ async def test_the_trained_run_learns_from_the_corpus() -> None:
     assert any(source.identifiers for source in best.sources)
 
 
-async def test_the_topic_is_set_by_an_identifier_and_a_signal_and_never_waits(
-    tmp_path: Path,
+def test_the_topic_is_set_by_an_identifier_and_a_signal_and_never_waits(
+    fake_run: tuple[Evaluation, str],
 ) -> None:
     """The insurance group is employer and insurer: its personnel number and its policy number
     point to two topics. Each with the model sets the topic; both leave it empty with both as
     candidates; under a contact only suggested the topic is only suggested."""
-    evaluation = await run_evaluation(
-        Settings.model_construct(), cases=SET, fake=True, output=tmp_path / "r.md"
-    )
+    evaluation, _ = fake_run
     by_case = {
         (result.run, result.case.name): result
         for result in evaluation.results

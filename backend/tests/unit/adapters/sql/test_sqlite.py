@@ -159,17 +159,19 @@ async def test_a_second_writing_unit_in_the_same_task_fails_at_once(
 
 async def test_other_tasks_wait_for_the_writer(uow_factory: UnitOfWorkFactory) -> None:
     order: list[str] = []
+    writing = asyncio.Event()
 
     async def write(name: str, hold: float) -> None:
         async with uow_factory() as uow:
             await uow.users.add(builders.user(name))
             order.append(f"{name} writes")
+            writing.set()
             await asyncio.sleep(hold)
             await uow.commit()
             order.append(f"{name} committed")
 
     first = asyncio.create_task(write("first", 0.2))
-    await asyncio.sleep(0.05)
+    await writing.wait()  # the first holds the write lock
     await write("second", 0)
     await first
     assert order == ["first writes", "first committed", "second writes", "second committed"]

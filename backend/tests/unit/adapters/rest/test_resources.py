@@ -764,13 +764,13 @@ async def test_field_definitions_change(api: Api) -> None:
     assert denied.status_code == 403
 
 
-# --- M4-04: request sizes ----------------------------------------------------------
+# --- identifiers, fields, aliases and descriptions ---------------------------------
 
 
 async def test_contact_identifiers(api: Api) -> None:
     a = auth(await api.admin())
-    iban = {"kind": "customer_number", "value": "k-4711"}  # the name from when it was an IBAN
-    contact = await post(api, "/contacts", {"name": "Stadtwerke", "identifiers": [iban]}, a)
+    customer = {"kind": "customer_number", "value": "k-4711"}
+    contact = await post(api, "/contacts", {"name": "Stadtwerke", "identifiers": [customer]}, a)
     assert contact["identifiers"] == [
         {
             "kind": "customer_number",
@@ -786,7 +786,7 @@ async def test_contact_identifiers(api: Api) -> None:
     assert [item["source"] for item in response.json()["identifiers"]] == ["manual", "rejected"]
     other = await post(api, "/contacts", {"name": "Bank"}, a)
     response = await api.client.patch(
-        f"{PREFIX}/contacts/{other['id']}", json={"identifiers": [iban]}, headers=a
+        f"{PREFIX}/contacts/{other['id']}", json={"identifiers": [customer]}, headers=a
     )
     assert response.status_code == 409
     for bad in (
@@ -921,6 +921,9 @@ async def test_contact_aliases_and_type_descriptions(api: Api) -> None:
         "Muster": [],
         "Nord Gruppe": ["Nord AG"],
     }
+
+
+# --- M4-04: request sizes ----------------------------------------------------------
 
 
 async def test_json_bodies_are_bounded(api: Api) -> None:

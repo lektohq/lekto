@@ -238,7 +238,8 @@ ENDPOINTS: dict[str, str | Excluded] = {
     "POST /external/tasks/{id}/result": Excluded.NOT_FOR_CLIENTS,
     "GET /external/tasks/{id}/files/{name}": Excluded.NOT_FOR_CLIENTS,
 }
-"""The pull requests of the plan that add tools; after the last, nothing is planned."""
+"""Every endpoint of the REST API (`web/openapi.json`): the MCP tool that does what it does, or
+why no tool does it."""
 
 
 def endpoints() -> set[str]:
