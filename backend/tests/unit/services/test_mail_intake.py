@@ -184,8 +184,9 @@ async def test_names_and_header_values_from_a_sender_lose_paths_and_control_char
         4,
         "Rechnung 1",
     )
-    names = [origin.filename for origin in origins if origin.role is OriginRole.ATTACHMENT]
-    assert names == ["klein.pdf", "x" * 255, "ab.pdf"]
+    # Within a letter the origins come by document id, not in the mail's order.
+    names = {origin.filename for origin in origins if origin.role is OriginRole.ATTACHMENT}
+    assert names == {"klein.pdf", "x" * 255, "ab.pdf"}
 
 
 async def test_what_apple_mail_sends_inline_becomes_a_document(world: World) -> None:
