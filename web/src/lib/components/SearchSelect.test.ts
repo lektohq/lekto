@@ -42,6 +42,18 @@ describe('SearchSelect', () => {
 		expect(trigger.textContent).toContain('Stadtwerke');
 	});
 
+	it('links the search to its list, named as the picker and not "Suggestions..." (WZ-07)', async () => {
+		const user = userEvent.setup();
+		const { trigger } = field();
+		await user.click(trigger);
+		const search = await screen.findByLabelText(m.assignment_search());
+		// The list stands in a popover that jsdom does not lay out: read from the document.
+		const list = document.querySelector('[role="listbox"]') as HTMLElement;
+		expect(list.getAttribute('aria-label')).toBe('Choose a contact');
+		expect(list.id).toBeTruthy();
+		expect(search.getAttribute('aria-controls')).toBe(list.id);
+	});
+
 	it('finds an option by its words in any order, a word of its other names among them (WH-04)', async () => {
 		phone.override(true);
 		const user = userEvent.setup();

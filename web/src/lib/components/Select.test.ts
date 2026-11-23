@@ -31,6 +31,38 @@ describe('Select', () => {
 		expect(field.textContent).toContain('Beta');
 	});
 
+	it('controls its list, which carries the field’s name (WZ-07)', async () => {
+		const user = userEvent.setup();
+		render(Select, { options: OPTIONS, value: 'a', 'aria-label': 'Pick' });
+		const field = screen.getByRole('combobox', { name: 'Pick' });
+		const controls = field.getAttribute('aria-controls');
+		expect(controls).toBeTruthy();
+		await user.click(field);
+		// The list stands in a popover that jsdom does not lay out: read from the document.
+		const list = await vi.waitFor(() => {
+			const found = document.querySelector('[role="listbox"]');
+			expect(found).not.toBeNull();
+			return found as HTMLElement;
+		});
+		expect(list.id).toBe(controls);
+		expect(list.getAttribute('aria-label')).toBe('Pick');
+	});
+
+	it('names its list after the field where a visible label names the field', async () => {
+		const user = userEvent.setup();
+		render(Select, { options: OPTIONS, value: 'a', id: 'kind' });
+		const field = screen.getByRole('combobox');
+		await user.click(field);
+		const list = await vi.waitFor(() => {
+			const found = document.querySelector('[role="listbox"]');
+			expect(found).not.toBeNull();
+			return found as HTMLElement;
+		});
+		expect(list.getAttribute('aria-labelledby')).toBe('kind');
+		expect(list.hasAttribute('aria-label')).toBe(false);
+		expect(field.getAttribute('aria-controls')).toBe(list.id);
+	});
+
 	it('is the system’s own on a phone', async () => {
 		phone.override(true);
 		const onchange = vi.fn();

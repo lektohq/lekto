@@ -146,7 +146,7 @@
 	{/snippet}
 	<Command.Root shouldFilter={false}>
 		<Command.Input bind:value={query} placeholder={searchLabel} aria-label={searchLabel} />
-		<Command.List>
+		<Command.List aria-label={title}>
 			<Command.Empty class="py-4 text-center text-sm text-muted-foreground">
 				{m.assignment_none_found()}
 			</Command.Empty>

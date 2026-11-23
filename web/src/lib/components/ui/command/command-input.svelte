@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { Command as CommandPrimitive } from 'bits-ui';
 	import SearchIcon from '@lucide/svelte/icons/search';
+	import { getContext } from 'svelte';
 	import { cn } from '#lib/utils.ts';
+	import { COMMAND_LIST } from './command.svelte';
 
 	let {
 		ref = $bindable(null),
@@ -9,6 +11,9 @@
 		value = $bindable(''),
 		...restProps
 	}: CommandPrimitive.InputProps = $props();
+
+	// The field controls the list of its command.
+	const list = getContext<string | undefined>(COMMAND_LIST);
 </script>
 
 <div
@@ -23,6 +28,7 @@
 			className
 		)}
 		bind:ref
+		aria-controls={list}
 		{...restProps}
 		bind:value
 	/>

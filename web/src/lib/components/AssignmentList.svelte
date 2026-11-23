@@ -116,7 +116,7 @@
 					placeholder={m.assignment_search()}
 					aria-label={m.assignment_search()}
 				/>
-				<Command.List>
+				<Command.List aria-label={addLabel}>
 					<Command.Empty class="py-4 text-center text-sm text-muted-foreground">
 						{m.assignment_none_found()}
 					</Command.Empty>

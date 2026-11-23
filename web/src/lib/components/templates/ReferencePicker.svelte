@@ -117,7 +117,7 @@
 			placeholder={m.template_reference_search()}
 			aria-label={m.template_reference_search()}
 		/>
-		<Command.List>
+		<Command.List aria-label={label ?? m.template_reference_choose()}>
 			<Command.Empty class="py-4 text-center text-sm text-muted-foreground">
 				{m.template_reference_empty()}
 			</Command.Empty>

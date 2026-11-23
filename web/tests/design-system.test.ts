@@ -846,6 +846,23 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('names every list of a picker, which its search field controls', () => {
+		// WCAG 4.1.2: bits-ui calls a command's list "Suggestions..." in every language and
+		// links the search to it only through a viewport nobody uses. `ui/command` links them;
+		// each list says what it offers.
+		expect(
+			offenders((source, path) =>
+				path.includes('/components/ui/')
+					? null
+					: (tags(source, 'Command.List').find((tag) => !/\saria-label=/.test(tag)) ?? null)
+			)
+		).toEqual([]);
+		expect(sources['/src/lib/components/ui/command/command-input.svelte']).toMatch(
+			/aria-controls=\{list\}/
+		);
+		expect(sources['/src/lib/components/Select.svelte']).toMatch(/aria-controls=\{listId\}/);
+	});
+
 	it('asks in one place whether a script may move things', () => {
 		// "Motion": who asked for less motion gets a place at once. A scroll that code starts
 		// takes its behavior from `lib/motion.ts`; nobody writes `smooth` or asks the system.

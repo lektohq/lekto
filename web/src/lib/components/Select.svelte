@@ -46,6 +46,11 @@
 	} = $props();
 
 	const FIELD = cn(FIELD_LOOK, FIELD_HEIGHT);
+	// The field controls its list, and the list carries the field's name: given here, or the
+	// field itself where a visible label names it (WCAG 4.1.2). bits-ui sets neither.
+	const uid = $props.id();
+	const fieldId = $derived(id ?? `${uid}-field`);
+	const listId = `${uid}-list`;
 	let system = $state<HTMLSelectElement | null>(null);
 
 	function picked(next: string) {
@@ -83,8 +88,9 @@
 	>
 		<!-- A combobox as the native select is one: named by its label, its value read out. -->
 		<SelectPrimitive.Trigger
-			{id}
+			id={fieldId}
 			role="combobox"
+			aria-controls={listId}
 			data-value={value}
 			aria-label={ariaLabel}
 			aria-invalid={ariaInvalid}
@@ -96,6 +102,9 @@
 		</SelectPrimitive.Trigger>
 		<SelectPrimitive.Portal>
 			<SelectPrimitive.Content
+				id={listId}
+				aria-label={ariaLabel}
+				aria-labelledby={ariaLabel ? undefined : fieldId}
 				sideOffset={4}
 				class="z-50 max-h-(--bits-select-content-available-height) min-w-(--bits-select-anchor-width) overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0"
 			>
