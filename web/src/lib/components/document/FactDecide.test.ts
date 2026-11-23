@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { KeptFact } from '#lib/facts.ts';
@@ -27,5 +27,22 @@ describe('FactDecide', () => {
 		// Another fact starts anew.
 		await rerender({ ...props, fact: { ...fact, value: 'M77', written: 'M-77' } });
 		expect((input as HTMLInputElement).value).toBe('M-77');
+	});
+
+	it('asks before it removes a fact only a person added (WA-K08)', async () => {
+		const user = userEvent.setup();
+		const ondecide = vi.fn();
+		const added: KeptFact = { ...fact, origins: ['person'], state: 'added' };
+		render(FactDecide, { props: { fact: added, ondecide, oncancel: vi.fn() } });
+		await user.click(screen.getByRole('button', { name: m.facts_decide_remove() }));
+		expect(ondecide).not.toHaveBeenCalled();
+		const dialog = await screen.findByRole('alertdialog');
+		expect(dialog.textContent).toContain(m.facts_remove_confirm());
+		await user.click(within(dialog).getByRole('button', { name: m.facts_decide_remove() }));
+		expect(ondecide).toHaveBeenCalledWith({
+			kind: 'invoice_number',
+			value: '4711',
+			action: 'withdraw'
+		});
 	});
 });

@@ -10,6 +10,8 @@
 	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
 	import ScanText from '@lucide/svelte/icons/scan-text';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import { mergeProps } from 'bits-ui';
+	import type { Snippet } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { page } from '$app/state';
 	import { api } from '#lib/api/client.ts';
@@ -25,6 +27,7 @@
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
+	import * as Tooltip from '#lib/components/ui/tooltip/index.ts';
 	import { documentApi, tabHref, type Neighbours } from '#lib/document-view.ts';
 	import { reportError } from '#lib/errors.ts';
 	import { readersLaterText, visibleText, type Viewer } from '#lib/filing.ts';
@@ -34,6 +37,7 @@
 	import { canEdit } from '#lib/permissions.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { isReprocessNode, progress, reprocessable, type GraphNode } from '#lib/pipeline.ts';
+	import { phone } from '#lib/phone.svelte.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import { cn } from '#lib/utils.ts';
 	import { adviceText, visionAvailable, type Reading, type Vision } from '#lib/vision.ts';
@@ -304,23 +308,38 @@
 			{/if}
 		</div>
 		<!-- On a phone the actions are icons, so that they stand in one row; their names are read
-		     out and shown on hover. One with a single icon is a square of 44 px there. -->
+		     out and shown as a tooltip there (`named`). One with a single icon is a square of 44 px
+		     there. -->
 		<div class="flex flex-wrap gap-2">
 			{#if document.contact_id}
 				<!-- The stream of its contact (#145). -->
-				<a
-					href="{BASE}/documents?contact={document.contact_id}&layout=stream"
-					class={cn(buttonVariants({ variant: 'outline' }), 'max-sm:w-11 max-sm:px-0')}
-				>
-					<Waypoints aria-hidden="true" />
-					<span class="max-sm:sr-only">{m.doc_show_stream()}</span>
-				</a>
+				{#snippet stream(props: Record<string, unknown>)}
+					<a
+						{...props}
+						href="{BASE}/documents?contact={document.contact_id}&layout=stream"
+						class={cn(buttonVariants({ variant: 'outline' }), 'max-sm:w-11 max-sm:px-0')}
+					>
+						<Waypoints aria-hidden="true" />
+						<span class="max-sm:sr-only">{m.doc_show_stream()}</span>
+					</a>
+				{/snippet}
+				{@render named(m.doc_show_stream(), stream)}
 			{/if}
 			<DropdownMenu.Root>
-				<DropdownMenu.Trigger class={cn(buttonVariants({ variant: 'outline' }), 'max-sm:px-3')}>
-					<Download aria-hidden="true" />
-					<span class="max-sm:sr-only">{m.doc_download()}</span>
-					<ChevronDown aria-hidden="true" />
+				<DropdownMenu.Trigger>
+					{#snippet child({ props: menu })}
+						{#snippet trigger(props: Record<string, unknown>)}
+							<button
+								{...mergeProps(menu, props)}
+								class={cn(buttonVariants({ variant: 'outline' }), 'max-sm:px-3')}
+							>
+								<Download aria-hidden="true" />
+								<span class="max-sm:sr-only">{m.doc_download()}</span>
+								<ChevronDown aria-hidden="true" />
+							</button>
+						{/snippet}
+						{@render named(m.doc_download(), trigger)}
+					{/snippet}
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content align="end">
 					<DropdownMenu.Item onSelect={() => download(`${base}/original`)}>
@@ -334,15 +353,18 @@
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
 			{#if manageable}
-				<Button
-					variant="outline"
-					class="max-sm:w-11 max-sm:px-0"
-					onclick={startMove}
-					disabled={targets.length === 0}
-				>
-					<FolderInput aria-hidden="true" />
-					<span class="max-sm:sr-only">{m.move_title()}</span>
-				</Button>
+				{#snippet move(props: Record<string, unknown>)}
+					<Button
+						{...mergeProps(props, { onclick: startMove })}
+						variant="outline"
+						class="max-sm:w-11 max-sm:px-0"
+						disabled={targets.length === 0}
+					>
+						<FolderInput aria-hidden="true" />
+						<span class="max-sm:sr-only">{m.move_title()}</span>
+					</Button>
+				{/snippet}
+				{@render named(m.move_title(), move)}
 			{/if}
 			{#if manageable}
 				<DropdownMenu.Root>
@@ -407,6 +429,16 @@
 	<PageEditor bind:open={editing} {document} onedited={edited} />
 	<VersionUpload bind:this={upload} documentId={document.id} title={document.title} {onchanged} />
 {/if}
+
+<!-- An action whose name the phone hides: its name as a tooltip there. -->
+{#snippet named(label: string, trigger: Snippet<[Record<string, unknown>]>)}
+	<Tooltip.Root disabled={!phone.current}>
+		<Tooltip.Trigger>
+			{#snippet child({ props })}{@render trigger(props)}{/snippet}
+		</Tooltip.Trigger>
+		<Tooltip.Content>{label}</Tooltip.Content>
+	</Tooltip.Root>
+{/snippet}
 
 <ConfirmDialog
 	bind:open={confirmDelete}

@@ -2214,6 +2214,8 @@
 	"facts_decide_restore": "Wiederherstellen",
 	"facts_decide_remove": "Entfernen",
 	"facts_decide_undo": "Korrektur zurücknehmen",
+	"facts_remove_title": "{kind} „{value}“ entfernen?",
+	"facts_remove_confirm": "Der von Hand ergänzte Fakt verschwindet aus dem Dokument.",
 	"facts_decide_rejected_hint": "Verworfen: kein Fakt des Dokuments. Wiederhergestellt zählt er wieder.",
 	"facts_decided": "Weitere Fakten",
 	"facts_decided_done": "{kind} gespeichert",

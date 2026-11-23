@@ -133,7 +133,12 @@
 			{/if}
 			<span class="text-sm text-muted-foreground">{size}</span>
 		</div>
+		<!-- It scrolls: a region the keyboard reaches, named after the part it shows. -->
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 		<pre
+			role="region"
+			tabindex="0"
+			aria-label={shown.find((entry) => entry.part === part)?.label()}
 			class="h-[min(28rem,55vh)] overflow-auto rounded-xl border bg-surface px-4 py-3.5 font-mono text-meta leading-relaxed whitespace-pre-wrap">{body}</pre>
 		<Dialog.Footer class="items-center sm:justify-between">
 			<p class="text-sm text-muted-foreground">

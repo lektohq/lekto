@@ -99,4 +99,17 @@ describe('ChangePreview', () => {
 		const john = screen.getByText(m.space_member_reads({ name: 'John Doe' }));
 		expect(john.parentElement?.textContent).toContain(m.dryrun_new());
 	});
+
+	it('names a space the person cannot see in words, not by its id (WA-K14)', () => {
+		render(ChangePreview, {
+			before,
+			lookup,
+			preview: previewOf({
+				changed: ['space'],
+				visibility: { space_id: 's-hidden', members: [] }
+			})
+		});
+		expect(screen.getAllByText(m.space_unseen()).length).toBeGreaterThan(0);
+		expect(screen.queryByText('s-hidden')).toBeNull();
+	});
 });

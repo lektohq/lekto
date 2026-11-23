@@ -1,14 +1,9 @@
 <script lang="ts">
+	import FactFields from '#lib/components/document/FactFields.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import { Input } from '#lib/components/ui/input/index.ts';
-	import {
-		FACT_ROLES,
-		KIND_ROLES,
-		roleLabel,
-		type FactDecision,
-		type FactRole
-	} from '#lib/facts.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { KIND_ROLES, type FactDecision, type FactRole } from '#lib/facts.ts';
 	import {
 		IDENTIFIER_KINDS,
 		NUMBER_KINDS,
@@ -49,8 +44,10 @@
 	}
 </script>
 
-<form
-	class="flex flex-col gap-2.5 rounded-xl border bg-card p-3"
+<Card.Root
+	as="form"
+	size="sm"
+	class="flex flex-col gap-2.5"
 	onsubmit={(event) => {
 		event.preventDefault();
 		if (value.trim()) ondecide({ action: 'add', kind, value: value.trim(), role });
@@ -66,20 +63,9 @@
 			options={kinds.map((item) => ({ value: item, label: kindLabel(item) }))}
 		/>
 	</label>
-	<label class="flex flex-col gap-1 text-sm">
-		<span class="text-xs text-muted-foreground">{m.facts_decide_value()}</span>
-		<Input class="font-mono" bind:value autocomplete="off" spellcheck="false" />
-	</label>
-	<label class="flex flex-col gap-1 text-sm">
-		<span class="text-xs text-muted-foreground">{m.facts_decide_role()}</span>
-		<Select
-			bind:value={role}
-			aria-label={m.facts_decide_role()}
-			options={FACT_ROLES.map((item) => ({ value: item, label: roleLabel(item) }))}
-		/>
-	</label>
+	<FactFields bind:value bind:role />
 	<div class="flex justify-end gap-2">
 		<Button type="button" variant="ghost" size="sm" onclick={oncancel}>{m.cancel()}</Button>
 		<Button type="submit" size="sm" {busy} disabled={!value.trim()}>{m.facts_add_save()}</Button>
 	</div>
-</form>
+</Card.Root>

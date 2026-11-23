@@ -28,7 +28,7 @@
 </script>
 
 <div
-	class="relative shrink-0 overflow-hidden rounded-lg border bg-white"
+	class="relative shrink-0 overflow-hidden rounded-md border bg-white"
 	style="width: {size}px; height: {size}px"
 	aria-hidden="true"
 >

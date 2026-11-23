@@ -2214,6 +2214,8 @@
 	"facts_decide_restore": "Restore",
 	"facts_decide_remove": "Remove",
 	"facts_decide_undo": "Undo the correction",
+	"facts_remove_title": "Remove {kind} “{value}”?",
+	"facts_remove_confirm": "The fact added by hand leaves the document.",
 	"facts_decide_rejected_hint": "Rejected: it is no fact of the document. Restored, it counts again.",
 	"facts_decided": "More facts",
 	"facts_decided_done": "{kind} saved",
