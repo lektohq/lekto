@@ -37,6 +37,7 @@ from lekto.adapters.outbound.memory import (
 )
 from lekto.adapters.outbound.memory.releases import FakeReleaseFeed
 from lekto.core.domain.errors import EmbeddingsError, LanguageModelError
+from lekto.core.domain.ids import DocumentId, UserId, new_id
 from lekto.core.domain.jobs import RetryPolicy
 from lekto.core.domain.releases import Release
 from lekto.core.ports.clock import Clock
@@ -450,3 +451,11 @@ class TestMemoryReleaseFeed(ReleaseFeedContract):
         feed = FakeReleaseFeed()
         feed.error = "offline"
         return feed
+
+
+async def test_a_closed_unit_reads_no_inbox_entry(uow_factory: UnitOfWorkFactory) -> None:
+    """Also for a document that is not there: the closed unit, not None (PM-K09)."""
+    async with uow_factory() as uow:
+        await uow.commit()
+        with pytest.raises(RuntimeError, match="closed"):
+            await uow.inbox.entry(UserId(new_id()), DocumentId(new_id()))

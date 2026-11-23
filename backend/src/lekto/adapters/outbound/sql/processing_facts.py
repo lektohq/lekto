@@ -16,7 +16,7 @@ from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.pipeline import Lane, Node
 from lekto.core.domain.validation import require_utc
-from lekto.core.ports.repository import FactsScope, LaneCount, RunTimes, SignalCount
+from lekto.core.ports.repository import MICROSECOND, FactsScope, LaneCount, RunTimes, SignalCount
 
 _runs, _verdicts, _documents = t.first_runs, t.field_verdicts, t.documents
 _SIGNALS: dict[Node, Any] = {
@@ -28,7 +28,6 @@ _SIGNALS: dict[Node, Any] = {
 
 
 _NODES = {node.value: node for node in Node}
-_MICROSECOND = timedelta(microseconds=1)
 
 
 class SqlProcessingFacts:
@@ -155,7 +154,7 @@ class SqlProcessingFacts:
         work: list[int] = []
         steps: dict[str, list[int]] = {}
         for row in await self._tx.read(query):
-            durations.append((row.stopped_at - row.started_at) // _MICROSECOND)
+            durations.append((row.stopped_at - row.started_at) // MICROSECOND)
             work.append(sum(row.steps.values()))
             for node, micros in row.steps.items():
                 if node in steps:
@@ -228,7 +227,7 @@ def _count(condition: ColumnElement[bool]) -> ColumnElement[int]:
 
 
 def _micros(step: timedelta) -> int:
-    return step // _MICROSECOND
+    return step // MICROSECOND
 
 
 def _steps(data: dict[str, int]) -> dict[Node, timedelta]:

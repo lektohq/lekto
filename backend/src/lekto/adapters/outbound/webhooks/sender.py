@@ -27,9 +27,7 @@ from lekto.adapters.outbound.http_client.resolver import (
     pinned,
     system_resolver,
 )
-from lekto.core.ports.webhook_sender import WebhookRequest, WebhookResponse
-
-REFUSED = "the target has an address in the own network, which this webhook may not reach"
+from lekto.core.ports.webhook_sender import REFUSED, WebhookRequest, WebhookResponse
 
 log = logging.getLogger(__name__)
 

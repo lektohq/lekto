@@ -1,7 +1,7 @@
 """Documents with their field values, and the processing log."""
 
 from collections.abc import Collection, Mapping, Sequence
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any
@@ -59,6 +59,7 @@ from lekto.core.domain.sorting import sort_key
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.verdict import KnownLabels, known_space
 from lekto.core.ports.repository import (
+    MICROSECOND,
     NEWEST_FIRST,
     CountBy,
     DocumentFilter,
@@ -68,9 +69,6 @@ from lekto.core.ports.repository import (
     InboxCriterion,
     SortKey,
 )
-
-MICROSECOND = timedelta(microseconds=1)
-"""The unit of the durations the processing log stores."""
 
 
 class SqlDocumentRepository(SqlRepository[DocumentId, Document]):

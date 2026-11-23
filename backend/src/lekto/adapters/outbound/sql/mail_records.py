@@ -137,15 +137,6 @@ class SqlMailRecordRepository:
         )
         return found.first() is not None
 
-    async def recent(self, mailbox: MailboxId, *, limit: int) -> list[MailRecord]:
-        rows = await self._tx.read(
-            select(_records)
-            .where(_records.c.mailbox_id == mailbox)
-            .order_by(_records.c.fetched_at.desc(), _records.c.id.desc())
-            .limit(limit)
-        )
-        return [_record(row) for row in rows]
-
     async def forget_beyond(self, mailbox: MailboxId, *, keep: int, now: datetime) -> int:
         latest = (
             select(_records.c.id)

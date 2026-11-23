@@ -118,7 +118,7 @@ class MailRuleService:
                 draft.id = rule
             draft.enabled = True
             others = [item for item in await uow.mail_rules.of_mailbox(box.id) if item.id != rule]
-            latest = await uow.mail_records.recent(box.id, limit=DRY_RUN_MAILS)
+            latest = await uow.mail_records.page(box.id, limit=DRY_RUN_MAILS)
             waiting = await uow.mail_records.waiting(box.id)
         seen = {record.id for record in latest}
         records = sorted(

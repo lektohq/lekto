@@ -293,7 +293,7 @@ async def test_cleanup_lets_old_mail_records_go_of_what_the_mail_said(world: Wor
     await service.schedule()
     assert await service.run_next_job()
     async with world.uow() as uow:
-        records = await uow.mail_records.recent(mailbox.id, limit=KEPT_RECORDS + 2)
+        records = await uow.mail_records.page(mailbox.id, limit=KEPT_RECORDS + 2)
     forgotten = [record for record in records if record.forgotten_at is not None]
     assert [record.uid for record in forgotten] == [2, 1]
     assert all(record.subject == "" for record in forgotten)

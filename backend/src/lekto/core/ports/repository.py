@@ -19,7 +19,7 @@ Common rules for every adapter:
 
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
 from typing import Protocol
@@ -789,6 +789,10 @@ class LaneCount:
     count: int
 
 
+MICROSECOND = timedelta(microseconds=1)
+"""The unit of the processing times the adapters store and `RunTimes` gives (PM-K07)."""
+
+
 @dataclass(frozen=True)
 class RunTimes:
     """The times of the first runs in microseconds, one value per document, in no particular
@@ -1004,10 +1008,6 @@ class MailRecordRepository(Protocol):
     async def has_message(self, message_id: str) -> bool:
         """Whether a mail with that Message-ID was taken (`TAKEN_OUTCOMES`), from any folder or
         mailbox: one no rule took, or that failed, does not count."""
-        ...
-
-    async def recent(self, mailbox: MailboxId, *, limit: int) -> list[MailRecord]:
-        """The mailbox's latest records, the latest first."""
         ...
 
     async def page(

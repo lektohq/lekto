@@ -4,9 +4,7 @@ from collections.abc import Callable
 from urllib.parse import urlsplit
 
 from lekto.core.domain.addresses import is_public, literal
-from lekto.core.ports.webhook_sender import WebhookRequest, WebhookResponse
-
-REFUSED = "the target has an address in the own network, which this webhook may not reach"
+from lekto.core.ports.webhook_sender import REFUSED, WebhookRequest, WebhookResponse
 
 type Answer = int | str | Exception
 """A status code, or an error text (no answer), or an exception that is turned into an error."""

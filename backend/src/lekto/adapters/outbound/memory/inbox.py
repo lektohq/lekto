@@ -54,6 +54,7 @@ class MemoryInboxRepository:
         return entries
 
     async def entry(self, viewer: UserId, document: DocumentId) -> InboxEntry | None:
+        self._uow._check_open()  # before a document that is not there says None (PM-K09)
         row = self._uow._row(DOCUMENTS, document)
         if row is None:
             return None

@@ -34,7 +34,7 @@ from lekto.core.services._access import (
 from lekto.core.services._jobs import NODE_JOB
 from lekto.core.services._kept import Kept
 
-PAGE_LIMIT = 100
+JOBS_PAGE_LIMIT = 100
 SAMPLE = 2000
 """The done jobs of a kind the durations are read from: the latest ones. A migration leaves
 more than a million done jobs within the retention; reading them all for every open page
@@ -164,7 +164,7 @@ class JobsService:
             user = await load_actor(uow, actor)
             overview = await uow.jobs.overview(now=now)
             jobs = await uow.jobs.find(
-                now=now, states=states, kind=kind, offset=offset, limit=min(limit, PAGE_LIMIT)
+                now=now, states=states, kind=kind, offset=offset, limit=min(limit, JOBS_PAGE_LIMIT)
             )
             views = await _Viewer(uow, user).views(jobs, now)
         total = sum(

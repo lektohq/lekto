@@ -11,6 +11,10 @@ from typing import Protocol
 
 from lekto.core.domain.reasons import Reason
 
+REFUSED = "the target has an address in the own network, which this webhook may not reach"
+"""The error of a request refused before it was sent (`WebhookResponse.refused`); every adapter
+says it alike."""
+
 
 @dataclass(frozen=True, kw_only=True)
 class WebhookRequest:
