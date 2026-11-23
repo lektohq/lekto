@@ -122,7 +122,9 @@
 	}
 </script>
 
-<form class="flex flex-col gap-4" onsubmit={save}>
+<!-- The API checks the address and says so in the language of the UI; the browser's own
+     message would come in the browser's language. -->
+<form class="flex flex-col gap-4" novalidate onsubmit={save}>
 	{#if person}
 		<Field.Field>
 			<HintLabel

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
+import { m } from '#lib/paraglide/messages.js';
 
 // The real picker, not the stand-in of the other component tests (`tests/setup.ts`).
 vi.unmock('#lib/components/DateInput.svelte');
@@ -52,6 +53,39 @@ describe('DateInput', () => {
 		await fireEvent.click(picked);
 		expect(onchange).toHaveBeenLastCalledWith('2026-10-20');
 		await waitFor(() => expect(day.textContent?.trim()).toBe('20'));
+	});
+
+	it('names its parts, its calendar and the month buttons in the UI’s words (WY-03)', async () => {
+		// The library names them in English whatever the locale ("day, ", "Empty", "Event …",
+		// "Previous"), and lays that over a name passed to it.
+		render(DateInput, { value: '', label: 'Geburtsdatum' });
+		const field = screen.getByRole('group', { name: 'Geburtsdatum' });
+		const part = (name: string) => field.querySelector<HTMLElement>(`[data-segment="${name}"]`)!;
+		expect(part('day').getAttribute('aria-label')).toBe(m.date_part_day());
+		expect(part('month').getAttribute('aria-label')).toBe(m.date_part_month());
+		expect(part('year').getAttribute('aria-label')).toBe(m.date_part_year());
+		expect(part('day').getAttribute('aria-valuetext')).toBe(m.date_part_empty());
+		expect(field.innerHTML).not.toMatch(/"(?:day|month|year), "|Empty/);
+
+		await fireEvent.click(screen.getByRole('button', { name: m.date_pick() }));
+		await waitFor(() =>
+			expect(screen.getByRole('button', { name: m.date_previous_month() })).toBeTruthy()
+		);
+		expect(screen.getByRole('button', { name: m.date_next_month() })).toBeTruthy();
+		expect(screen.queryByRole('button', { name: 'Previous' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Next' })).toBeNull();
+		// The calendar is named after the field, not "Event".
+		const calendar = document.querySelector('[data-calendar-root]');
+		expect(calendar?.getAttribute('aria-label') ?? '').not.toMatch(/Event/);
+		expect(document.body.innerHTML).not.toMatch(/aria-label="Event\b/);
+		expect(document.body.innerHTML).toMatch(/Geburtsdatum,? [^"<]*\d{4}/);
+	});
+
+	it('writes a typed part as its number, not as empty', () => {
+		render(DateInput, { value: '2026-10-26', label: 'Geburtsdatum' });
+		const day = document.querySelector<HTMLElement>('[data-segment="day"]')!;
+		expect(day.getAttribute('aria-valuetext')).toBe('26');
+		expect(day.className).not.toContain('text-muted-foreground');
 	});
 
 	it('stays empty without a day', () => {

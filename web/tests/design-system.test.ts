@@ -832,6 +832,20 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('leaves the checking of a form to the API, not to the browser', () => {
+		// The browser words what it refuses in its own language, not in the UI's ("Texts"): a
+		// form with a field the browser would check says `novalidate`, and the API's reason shows.
+		const checked = /\stype="(?:email|url)"|\srequired\b|\sminlength=|\spattern=/;
+		expect(
+			offenders((source) =>
+				checked.test(source)
+					? ((source.match(/<form\b[^>]*>/g) ?? []).find((tag) => !/\bnovalidate\b/.test(tag)) ??
+						null)
+					: null
+			)
+		).toEqual([]);
+	});
+
 	it('writes a moment through formatMoment', () => {
 		// "Formats": one way each. Nobody builds a date with a time of their own.
 		expect(
@@ -1418,8 +1432,13 @@ describe('the design system (web/DESIGN.md)', () => {
 
 	it("gives the date picker's arrows and days and the rows of choice lists a finger's size", () => {
 		const picker = sources['/src/lib/components/DateInput.svelte'];
-		for (const part of ['PrevButton', 'NextButton', 'Day'])
-			expect(picker).toMatch(new RegExp(`<DatePicker\\.${part}\\b[^>]*\\bmax-sm:size-11\\b`));
+		expect(picker).toMatch(/<DatePicker\.Day\b[^>]*\bmax-sm:size-11\b/);
+		// The arrows are drawn by the field itself, inside the library's part (their names, WY-03).
+		for (const part of ['PrevButton', 'NextButton']) {
+			const [, inside = ''] =
+				new RegExp(`<DatePicker\\.${part}>([\\s\\S]*?)</DatePicker\\.${part}>`).exec(picker) ?? [];
+			expect(inside).toMatch(/<button\b[^>]*\bmax-sm:size-11\b/);
+		}
 		for (const list of ['MultiPicker', 'FacetList', 'FacetPicker'])
 			expect(sources[`/src/lib/components/${list}.svelte`]).toMatch(
 				// 44 px, or the 48 px of a row in a sheet from the bottom.
