@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from lekto_migration.config import Config, ConfigError, secret
+from lekto_migration.config import Config, ConfigError, public, secret
 
 
 def load(env: dict[str, str], **changes: object) -> Config:
@@ -65,6 +65,17 @@ def test_a_key_may_come_from_a_file(tmp_path: Path) -> None:
             {"LEKTO_MIGRATION_PAPERLESS_URL": "http://p", "LEKTO_MIGRATION_PAPERLESS_TOKEN": "k"},
             {"concurrency": 0},
             "concurrency",
+        ),
+        # Not the last two cut off, nor a pipeline that is never waited for (MI-K07).
+        (
+            {"LEKTO_MIGRATION_PAPERLESS_URL": "http://p", "LEKTO_MIGRATION_PAPERLESS_TOKEN": "k"},
+            {"limit": -2},
+            "limit",
+        ),
+        (
+            {"LEKTO_MIGRATION_PAPERLESS_URL": "http://p", "LEKTO_MIGRATION_PAPERLESS_TOKEN": "k"},
+            {"pipeline_timeout": 0.0},
+            "pipeline timeout",
         ),
     ],
 )
@@ -129,3 +140,9 @@ def test_the_env_file_goes_before_or_after_the_command(
     assert main(["--env-file", missing, "check"]) == 2
     assert main(["check", "--env-file", missing]) == 2
     assert capsys.readouterr().err.count("--env-file") == 2
+
+
+def test_an_ipv6_address_keeps_its_brackets() -> None:
+    """Without them the port runs into the address (MI-K05)."""
+    assert public("http://[::1]:8000/x") == "http://[::1]:8000/x"
+    assert public("https://user:secret@[2001:db8::1]/") == "https://[2001:db8::1]/"

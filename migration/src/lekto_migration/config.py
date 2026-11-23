@@ -87,9 +87,8 @@ def public(url: str | None) -> str | None:
     if not url:
         return url
     parts = urlsplit(url)
-    host = parts.hostname or ""
-    if parts.port:
-        host += f":{parts.port}"
+    # The host as `hostname` gives it (lower case), but an IPv6 address keeps its brackets.
+    host = parts.netloc.rpartition("@")[2].lower()
     return urlunsplit((parts.scheme, host, parts.path, "", ""))
 
 
@@ -140,6 +139,10 @@ class Config:
             raise ConfigError(f"the Paperless API key is missing ({PREFIX}PAPERLESS_TOKEN)")
         if concurrency < 1:
             raise ConfigError("the concurrency is at least 1")
+        if limit is not None and limit < 1:
+            raise ConfigError("the limit is at least 1")
+        if pipeline_timeout <= 0:
+            raise ConfigError("the pipeline timeout is more than 0 seconds")
         return cls(
             paperless_url=paperless.rstrip("/"),
             lekto_url=lekto.rstrip("/") if lekto else None,

@@ -11,7 +11,7 @@ from typing import Any
 
 import httpx2
 
-from lekto_migration.lekto import DELAYS, RETRY_STATUS
+from lekto_migration.lekto import DELAYS, RETRY_STATUS, rate_limit_wait
 
 API_VERSION = "10"
 DOCUMENT_FIELDS = ",".join(
@@ -49,7 +49,29 @@ class PaperlessError(Exception):
 
 
 class _UnavailableError(PaperlessError):
-    """A failure that may pass: a server error or a dropped connection."""
+    """A failure that may pass: a server error, a dropped connection or too many requests
+    (`wait`: the seconds Paperless asks for; None: the next of the delays)."""
+
+    def __init__(self, message: str, wait: float | None = None) -> None:
+        super().__init__(message)
+        self.wait = wait
+
+
+def _refused(response: httpx2.Response, reason: str) -> PaperlessError:
+    """The error of an answer with an error status: one that may pass, or not."""
+    if response.status_code == 429:
+        return _UnavailableError(reason, rate_limit_wait(_retry_after(response)))
+    if response.status_code in RETRY_STATUS:
+        return _UnavailableError(reason)
+    return PaperlessError(reason)
+
+
+def _retry_after(response: httpx2.Response) -> float | None:
+    """`Retry-After` in seconds; None without one or with a date."""
+    try:
+        return float(response.headers["retry-after"])
+    except KeyError, ValueError:
+        return None
 
 
 _SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -117,8 +139,8 @@ class Paperless:
         for delay in self._delays:
             try:
                 return await once()
-            except _UnavailableError:
-                await self._sleep(delay)
+            except _UnavailableError as error:
+                await self._sleep(delay if error.wait is None else error.wait)
         return await once()
 
     async def _get(self, path: str, **params: Any) -> httpx2.Response:
@@ -133,10 +155,8 @@ class Paperless:
             raise PaperlessError(f"Paperless is not reachable: {type(error).__name__}") from None
         if response.status_code == 401 or response.status_code == 403:
             raise PaperlessError(f"Paperless refused the API key ({response.status_code})")
-        if response.status_code in RETRY_STATUS:
-            raise _UnavailableError(f"GET {path}: HTTP {response.status_code}")
         if response.status_code >= 400:
-            raise PaperlessError(f"GET {path}: HTTP {response.status_code}")
+            raise _refused(response, f"GET {path}: HTTP {response.status_code}")
         if response.is_redirect:  # the client follows none: another address is meant (MI-07)
             raise PaperlessError(
                 f"GET {path}: HTTP {response.status_code}, sent on to "
@@ -222,10 +242,8 @@ class Paperless:
                 "GET", f"/api/documents/{id}/download/", params={"original": "true"}
             ) as response:
                 if response.status_code >= 400:
-                    reason = f"download of document {id}: HTTP {response.status_code}"
-                    if response.status_code in RETRY_STATUS:
-                        raise _UnavailableError(reason)
-                    raise PaperlessError(reason)
+                    status = response.status_code
+                    raise _refused(response, f"download of document {id}: HTTP {status}")
                 with target.open("wb") as out:
                     async for chunk in response.aiter_bytes(1024 * 1024):
                         digest.update(chunk)

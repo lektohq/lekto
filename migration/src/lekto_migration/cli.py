@@ -27,6 +27,7 @@ from lekto_migration.masterdata import (
     PENDING,
     UPDATED,
     Action,
+    is_open,
     missing,
     needs,
     prepare,
@@ -183,17 +184,16 @@ async def execute(
     existed = config.state.exists()
     state: State | None = None
     try:
-        if command in ("prepare", "run") and target is None:
-            raise MigrationError("the Lekto URL and API key are needed (LEKTO_MIGRATION_LEKTO_*)")
-        state = State(
-            config.state if existed or command in ("prepare", "run") else Path(":memory:")
-        )
-        if existed or command in ("prepare", "run"):
-            state.bind(
-                paperless=public(config.paperless_url) or "", lekto=public(config.lekto_url) or ""
-            )
-        if command == "plan":
+        if command == "plan":  # reads Paperless and Lekto, keeps nothing
             return await _plan(config, source, target, progress, ask, today or date.today())
+        writes = command in ("prepare", "run")
+        if writes and target is None:
+            raise MigrationError("the Lekto URL and API key are needed (LEKTO_MIGRATION_LEKTO_*)")
+        state = State(config.state if existed or writes else Path(":memory:"))
+        if existed or writes:
+            # Only the addresses given: a check without Lekto reads a state a run made.
+            given = {"paperless": public(config.paperless_url), "lekto": public(config.lekto_url)}
+            state.bind(**{key: value for key, value in given.items() if value})
         loaded = await load(
             config, source, target, state, write=command != "check", progress=progress
         )
@@ -252,7 +252,11 @@ async def _plan(
                 progress(f"  new in Paperless: {name}")
             for name in changes.gone:
                 progress(f"  not in Paperless any more: {name}")
+            for name in changes.back:
+                progress(f"  in Paperless again: {name}")
             counts = f"{len(changes.added)} new, {len(changes.gone)} gone"
+            if changes.back:
+                counts += f", {len(changes.back)} back"
             if ask(f"The plan {path} changes ({counts}). Write it?"):
                 plans.dump(document, path)
                 written = True
@@ -407,7 +411,7 @@ async def _run(
     poll: tuple[float, float],
 ) -> int:
     _ready(loaded)
-    if any(a.status in OPEN for a in loaded.actions):
+    if is_open(loaded.actions):
         open_ = sum(1 for a in loaded.actions if a.status in OPEN)
         raise MigrationError(f"Lekto lacks {open_} things the plan needs: run prepare first")
     rows = {row.source_id: row for row in state.documents()}

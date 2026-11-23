@@ -5,6 +5,8 @@ import asyncio
 import json
 from typing import Any
 
+import pytest
+
 from lekto_migration.config import public
 from lekto_migration.fake_paperless import pdf
 from tests.conftest import PDF, Setup
@@ -211,6 +213,19 @@ async def test_a_duplicate_gets_its_lane_too(setup: Setup) -> None:
     assert await setup.run("run", state=other) == 0
     lanes = {d["lane"] for d in setup.report("run")["documents"] if d["status"] == "duplicate"}
     assert lanes == {"green"}
+
+
+async def test_a_state_binds_only_the_addresses_given(
+    setup: Setup, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A check without Lekto reads a state another check or run made; a plan needs no state
+    (MI-K03)."""
+    assert await setup.migrate() == 0
+    capsys.readouterr()
+    assert await setup.run("check", lekto_url=None, lekto_token=None) != 2
+    other = setup.directory / "other-plan.yaml"
+    assert await setup.run("plan", paperless_url="http://other-paperless", plan=other) == 0
+    assert "belongs to another" not in capsys.readouterr().err
 
 
 def test_addresses_lose_their_credentials() -> None:

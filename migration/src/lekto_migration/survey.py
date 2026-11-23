@@ -45,13 +45,15 @@ NEW, GONE = "new in Paperless", "not in Paperless"
 
 @dataclass
 class Changes:
-    """What `merge` changed: entries added, entries marked as gone (`section.name`)."""
+    """What `merge` changed: entries added, entries marked as gone, entries of objects back in
+    Paperless that lost that mark (`section.name`)."""
 
     added: list[str] = field(default_factory=list)
     gone: list[str] = field(default_factory=list)
+    back: list[str] = field(default_factory=list)
 
     def __bool__(self) -> bool:
-        return bool(self.added or self.gone)
+        return bool(self.added or self.gone or self.back)
 
 
 def flow(**items: Any) -> CommentedMap:
@@ -156,8 +158,8 @@ def draft(snapshot: Snapshot, directory: Directory, *, source: str, target: str)
 
 
 def merge(document: CommentedMap, snapshot: Snapshot, directory: Directory, today: date) -> Changes:
-    """Add the default entry of every Paperless object the plan lacks and mark the entries of
-    objects Paperless no longer has; everything else stays."""
+    """Add the default entry of every Paperless object the plan lacks, mark the entries of
+    objects Paperless no longer has and unmark those it has again; everything else stays."""
     changes = Changes()
     entries = defaults(snapshot, directory)
     for section in SECTIONS:
@@ -175,10 +177,15 @@ def merge(document: CommentedMap, snapshot: Snapshot, directory: Directory, toda
                 changes.added.append(f"{section}.{name}")
         present = {norm(name) for name in entries[section]}
         for name in list(block):
-            if norm(str(name)) in present or _comment(block, name).startswith(GONE):
+            marked = _comment(block, name).startswith(GONE)
+            if norm(str(name)) in present:
+                if marked:
+                    _unmark(block, name)
+                    changes.back.append(f"{section}.{name}")
                 continue
-            block.yaml_add_eol_comment(f"{GONE} ({today.isoformat()})", name)
-            changes.gone.append(f"{section}.{name}")
+            if not marked:
+                block.yaml_add_eol_comment(f"{GONE} ({today.isoformat()})", name)
+                changes.gone.append(f"{section}.{name}")
         _unsupported(snapshot, section, block)
     if ASN not in document:
         document[ASN] = asn_default(snapshot, directory)
@@ -204,6 +211,17 @@ def _comment(block: CommentedMap, key: Any) -> str:
         return ""
     texts = [token.value for token in _flat(tokens) if hasattr(token, "value")]
     return " ".join(text.strip().lstrip("#").strip() for text in texts if text.strip())
+
+
+def _unmark(block: CommentedMap, key: Any) -> None:
+    """Drop the mark of an entry whose object is back, but not the blank lines after it: the
+    comment hangs at the entry and, for a target in one line, at the target too."""
+    target = getattr(block[key], "ca", None)
+    places = [block.ca.items.get(key) or [], (target.comment if target else None) or []]
+    for token in _flat(places):
+        text = str(getattr(token, "value", ""))
+        if text.strip().lstrip("#").strip().startswith(GONE):
+            token.value = "\n" + text.partition("\n")[2]
 
 
 def _flat(items: Any) -> Iterator[Any]:

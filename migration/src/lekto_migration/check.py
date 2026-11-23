@@ -336,7 +336,8 @@ async def _files(
     that lies in Lekto already, wherever)."""
     held = {str(document.get("sha256")): str(document["id"]) for document in in_lekto.values()}
     taken = [item for item in loaded.expected.values() if item.skip is None]
-    seen: dict[str, int] = {}  # sha256 -> the first selected Paperless document with it
+    notes: dict[int, list[str]] = {}  # by Paperless id
+    fresh: dict[int, str] = {}  # sha256 by Paperless id, of the files Lekto does not hold
     gate = asyncio.Semaphore(config.concurrency)
     found: list[dict[str, Any]] = []
     documents = {int(d["id"]): d for d in loaded.selected}
@@ -354,6 +355,7 @@ async def _files(
                     head = file.read(HEAD)
                 digest = download.sha256
         entry: dict[str, Any] = {"id": item.id, "title": item.title, "sha256": digest}
+        said = notes.setdefault(item.id, [])
         kept = checksum(documents[item.id])
         if kept is not None and kept != digest:
             entry["problem"] = "the file differs from the checksum Paperless keeps"
@@ -361,17 +363,25 @@ async def _files(
         if kind is None:
             entry["problem"] = "Lekto would not take the file (not a PDF, JPEG, PNG, TIFF or mail)"
         elif kind != item.media_type:
-            entry["note"] = f"the file is {kind}, Paperless says {item.media_type}"
+            said.append(f"the file is {kind}, Paperless says {item.media_type}")
         row = rows.get(item.id)
         existing = held.get(digest)
         if existing is not None and (row is None or row.lekto_id != existing):
-            entry["note"] = f"Lekto has the file already ({existing})"
-        elif digest in seen:
-            entry["note"] = f"the same file as document {seen[digest]}"
+            said.append(f"Lekto has the file already ({existing})")
         else:
-            seen[digest] = item.id
+            fresh[item.id] = digest
         found.append(entry)
 
     await asyncio.gather(*(one(item) for item in taken))
+    # The first copy by id, not by the download that ended first.
+    seen: dict[str, int] = {}  # sha256 -> the first selected Paperless document with it
+    for id, digest in sorted(fresh.items()):
+        if digest in seen:
+            notes[id].append(f"the same file as document {seen[digest]}")
+        else:
+            seen[digest] = id
+    for entry in found:
+        if said := notes.get(entry["id"]):
+            entry["note"] = "; ".join(said)
     progress(f"{len(found)} originals downloaded and checked")
     return sorted((f for f in found if f.get("problem") or f.get("note")), key=lambda f: f["id"])

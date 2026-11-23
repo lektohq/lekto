@@ -6,7 +6,6 @@ under its name: one target, a list of targets, `drop`, or, for a custom field, a
 values. Names are compared without case, as Lekto does.
 """
 
-import io
 import os
 import re
 import tempfile
@@ -674,13 +673,6 @@ def dump(document: CommentedMap, path: Path) -> None:
         raise
 
 
-def text(document: CommentedMap) -> str:
-    """The plan as YAML text."""
-    out = io.StringIO()
-    yaml().dump(document, out)
-    return out.getvalue()
-
-
 __all__ = [
     "ASN",
     "NATURAL",
@@ -697,6 +689,5 @@ __all__ = [
     "load",
     "norm",
     "parse",
-    "text",
     "yaml",
 ]
