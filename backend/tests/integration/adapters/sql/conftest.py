@@ -5,27 +5,18 @@ not reachable; the CI checks that the Postgres run did not skip."""
 import asyncio
 import secrets
 from collections.abc import AsyncIterator, Callable, Iterator
+from contextlib import asynccontextmanager
 
 import pytest
 from sqlalchemy import text
 
-from lekto.adapters.outbound.sql import (
-    Database,
-    SqlEventBus,
-    SqlUnitOfWorkFactory,
-    SqlWakeup,
-    migrate,
-)
+from lekto.adapters.outbound.sql import Database, migrate
 from lekto.adapters.outbound.sql.tables import metadata
 from lekto.composition.settings import Settings
-from lekto.core.domain.jobs import RetryPolicy
-from lekto.core.ports.clock import Clock
-from lekto.core.ports.event_bus import EventBus
-from lekto.core.ports.unit_of_work import UnitOfWorkFactory
-from tests import builders
-from tests.contracts.event_bus import EventBusFactory
-from tests.contracts.wakeup import WakeupFactory
 from tests.integration.services import create_database, drop_database, postgres
+from tests.sql_fixtures import event_bus_factory, uow_factory, wakeup_factory
+
+__all__ = ["event_bus_factory", "uow_factory", "wakeup_factory"]
 
 
 @pytest.fixture
@@ -70,42 +61,27 @@ async def database(postgres_settings: Settings, test_database_name: str) -> Asyn
 
 
 @pytest.fixture
-def uow_factory(database: Database) -> UnitOfWorkFactory:
-    return SqlUnitOfWorkFactory(database)
-
-
-@pytest.fixture
-def event_bus_factory(database: Database) -> EventBusFactory:
-    def create(
-        *, clock: Clock | None = None, retry: RetryPolicy = builders.EVENT_RETRY
-    ) -> EventBus:
-        return SqlEventBus(database, clock=clock, retry=retry)
-
-    return create
-
-
-@pytest.fixture
-def wakeup_factory(database: Database) -> WakeupFactory:
-    return lambda: SqlWakeup(database)
-
-
-@pytest.fixture
 async def empty_database(
     postgres_settings: Settings, new_database_names: Callable[[], str]
 ) -> AsyncIterator[Database]:
-    name = new_database_names()
-    await create_database(postgres_settings, name)
-    database = postgres(postgres_settings, name)
-    yield database
-    await database.dispose()
+    async with _new_database(postgres_settings, new_database_names()) as database:
+        yield database
 
 
 @pytest.fixture
 async def model_database(
     postgres_settings: Settings, new_database_names: Callable[[], str]
 ) -> AsyncIterator[Database]:
-    name = new_database_names()
-    await create_database(postgres_settings, name)
-    database = postgres(postgres_settings, name)
-    yield database
-    await database.dispose()
+    async with _new_database(postgres_settings, new_database_names()) as database:
+        yield database
+
+
+@asynccontextmanager
+async def _new_database(settings: Settings, name: str) -> AsyncIterator[Database]:
+    """A database created empty (`new_database_names` drops it)."""
+    await create_database(settings, name)
+    database = postgres(settings, name)
+    try:
+        yield database
+    finally:
+        await database.dispose()

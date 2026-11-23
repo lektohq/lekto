@@ -211,6 +211,25 @@ def _repository_of(item: object) -> str:
     }[type(item)]
 
 
+async def all_pages(
+    uow_factory: UnitOfWorkFactory,
+    user: UserId,
+    order: DocumentOrder,
+    filter: DocumentFilter | None = None,
+) -> list[Document]:
+    """Every document `user` reads in `order`, in pages of two, each after the last one of
+    the page before (`DocumentPosition`)."""
+    found: list[Document] = []
+    after = None
+    async with uow_factory() as uow:
+        while page := await uow.documents.query_visible(
+            user, filter or DocumentFilter(), order=order, after=after, limit=2
+        ):
+            found += page
+            after = DocumentPosition.of(page[-1], order)
+    return found
+
+
 class UnitOfWorkContract:
     # --- transactions ---------------------------------------------------------------------------
 
@@ -1515,6 +1534,9 @@ class UnitOfWorkContract:
         async with uow_factory() as uow:
             # Newest first.
             assert await uow.document_relations.of_documents([invoice.id]) == [later, accepted]
+            # Of several documents: each relation once, though both its documents are asked.
+            several = [reminder.id, other.id, invoice.id]
+            assert await uow.document_relations.of_documents(several) == [later, accepted]
             await uow.document_relations.remove(other.id, invoice.id)
             await uow.document_relations.remove(other.id, reminder.id)  # none: nothing
             await uow.commit()
@@ -1581,7 +1603,12 @@ class UnitOfWorkContract:
                 for lane in (Lane.YELLOW, Lane.RED, None):
                     only = DocumentFilter(lanes=frozenset({lane}), spaces=frozenset({shared.id}))
                     found = await uow.documents.query_visible(user.id, only, limit=100)
-                    assert {d.id for d in found} <= expected, user.username
+                    wanted = {
+                        d.id
+                        for d in documents
+                        if d.id in expected and d.lane is lane and d.space_id == shared.id
+                    }
+                    assert {d.id for d in found} == wanted, (user.username, lane)
         assert len(expected) == 0  # the stranger sees nothing
         async with uow_factory() as uow:
             every = await uow.documents.query(DocumentFilter(), limit=100)
@@ -2046,14 +2073,7 @@ class UnitOfWorkContract:
         titles = {document.id: document.title for document in documents}
 
         async def paged(order: DocumentOrder, filter: DocumentFilter | None = None) -> list[str]:
-            found: list[Document] = []
-            after = None
-            async with uow_factory() as uow:
-                while page := await uow.documents.query_visible(
-                    owner.id, filter or DocumentFilter(), order=order, after=after, limit=2
-                ):
-                    found += page
-                    after = DocumentPosition.of(page[-1], order)
+            found = await all_pages(uow_factory, owner.id, order, filter or DocumentFilter())
             return [titles[document.id] for document in found]
 
         def by_id(*names: str, descending: bool = False) -> list[str]:
@@ -2152,14 +2172,7 @@ class UnitOfWorkContract:
         index = {document.id: number for number, document in enumerate(documents)}
 
         async def paged(order: DocumentOrder) -> list[int]:
-            found: list[Document] = []
-            after = None
-            async with uow_factory() as uow:
-                while page := await uow.documents.query_visible(
-                    owner.id, DocumentFilter(), order=order, after=after, limit=2
-                ):
-                    found += page
-                    after = DocumentPosition.of(page[-1], order)
+            found = await all_pages(uow_factory, owner.id, order)
             return [index[document.id] for document in found]
 
         def by_id(*numbers: int, descending: bool = False) -> list[int]:
@@ -2212,14 +2225,7 @@ class UnitOfWorkContract:
 
         async def paged(field: FieldDefinition, *, ascending: bool) -> list[str]:
             order = DocumentOrder(SortKey.FIELD, ascending=ascending, field=field.id)
-            found: list[Document] = []
-            after = None
-            async with uow_factory() as uow:
-                while page := await uow.documents.query_visible(
-                    owner.id, DocumentFilter(), order=order, after=after, limit=2
-                ):
-                    found += page
-                    after = DocumentPosition.of(page[-1], order)
+            found = await all_pages(uow_factory, owner.id, order)
             return [titles[document.id] for document in found]
 
         def by_id(*names: str, descending: bool = False) -> list[str]:
@@ -2316,7 +2322,7 @@ class UnitOfWorkContract:
                 await uow.documents.add(document)
             await uow.commit()
 
-        mine, september = documents[0], date(2026, 9, 30)
+        september = date(2026, 9, 30)
         async with uow_factory() as uow:
             grouped = uow.documents.count_grouped
             # Within the owner's reach: their own two, the stranger's space is not shared; the
@@ -2359,7 +2365,6 @@ class UnitOfWorkContract:
             assert await count(by_contact, owner.id) == 1
             assert await count(by_contact, None) == 2
             assert await count(in_september, owner.id) == 1
-            assert mine.contact_id == contact.id
 
     async def test_removing_a_document_removes_its_processing_log(
         self, uow_factory: UnitOfWorkFactory

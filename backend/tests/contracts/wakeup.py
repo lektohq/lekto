@@ -1,5 +1,6 @@
 """Contract of `Wakeup`: what a commit signals, and nothing before it."""
 
+from collections.abc import AsyncIterator
 from datetime import timedelta
 from typing import Protocol
 
@@ -37,8 +38,12 @@ class WakeupContract:
     """Needs the fixtures `uow_factory` and `wakeup_factory`."""
 
     @pytest.fixture
-    async def wakeup(self, wakeup_factory: WakeupFactory) -> Wakeup:
-        return wakeup_factory()
+    async def wakeup(self, wakeup_factory: WakeupFactory) -> AsyncIterator[Wakeup]:
+        """Closed after the test also when it fails before its own `aclose` (a Postgres
+        listener stays open otherwise); `aclose` again is nothing."""
+        wakeup = wakeup_factory()
+        yield wakeup
+        await wakeup.aclose()
 
     async def ready(self, wakeup: Wakeup, signal: Signal) -> None:
         """Wait until signals reach `signal`: an adapter that connects first overrides this.

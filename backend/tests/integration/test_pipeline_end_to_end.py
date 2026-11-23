@@ -42,7 +42,7 @@ async def object_store(
     ("sample", "media_type"), [("scan.pdf", media_types.PDF), ("photo.jpg", media_types.JPEG)]
 )
 async def test_scan_and_photo_are_processed(
-    object_store: ObjectStore, settings: Settings, sample: str, media_type: str
+    object_store: ObjectStore, sample: str, media_type: str
 ) -> None:
     container = replace(
         build_memory_container(),

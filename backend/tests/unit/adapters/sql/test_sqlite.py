@@ -8,6 +8,10 @@ from sqlalchemy import text
 
 from lekto.adapters.outbound.sql import Database, SqlUnitOfWorkFactory
 from lekto.adapters.outbound.sql import database as sql_database
+from lekto.adapters.outbound.sql import documents as sql_documents
+from lekto.adapters.outbound.sql import facts as sql_facts
+from lekto.adapters.outbound.sql import inbox as sql_inbox
+from lekto.adapters.outbound.sql import relations as sql_relations
 from lekto.core.domain.documents import DocumentChanges
 from lekto.core.domain.errors import ConcurrencyError
 from lekto.core.domain.fields import FieldDefinition, FieldType, Money
@@ -203,6 +207,29 @@ async def test_a_writer_held_up_past_the_busy_timeout_meets_a_concurrent_change(
     finally:
         await other.dispose()
         await late.dispose()
+
+
+@pytest.fixture
+def one_key_per_query(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every query that takes its keys a few at a time takes one: two keys already run the
+    second round, which no contract reaches with `KEYS_PER_QUERY` (TA-K05)."""
+    for module in (sql_documents, sql_facts, sql_inbox, sql_relations):
+        monkeypatch.setattr(module, "KEYS_PER_QUERY", 1)
+
+
+@pytest.mark.usefixtures("one_key_per_query")
+class TestSqliteUnitOfWorkOneKeyPerQuery(UnitOfWorkContract):
+    pass
+
+
+@pytest.mark.usefixtures("one_key_per_query")
+class TestSqliteInboxOneKeyPerQuery(InboxRepositoryContract):
+    pass
+
+
+@pytest.mark.usefixtures("one_key_per_query")
+class TestSqliteAdapterOneKeyPerQuery(SqlAdapterSuite):
+    pass
 
 
 class TestSqlitePushDevices(PushDeviceRepositoryContract):

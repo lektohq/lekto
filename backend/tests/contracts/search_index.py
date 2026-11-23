@@ -256,7 +256,7 @@ class SearchIndexContract:
         assert hit.score is None or 0 <= hit.score <= 1
         assert [segment.text for segment in hit.snippet if segment.match] == ["Zahlung"]
         shown = "".join(segment.text for segment in hit.snippet).strip("…")
-        assert shown in text or text in shown or "Zahlung" in shown
+        assert shown in text or text in shown
 
     async def test_matches_name_where_the_words_stand_in_the_text(
         self, search_index: SearchIndex

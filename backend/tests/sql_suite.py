@@ -51,7 +51,6 @@ from lekto.core.domain.rights import TokenRight
 from lekto.core.domain.rules import ForceReview, RuleScope
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.templates import TemplateValue
-from lekto.core.domain.users import User
 from lekto.core.ports.event_bus import EventBus
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from lekto.core.services.rules.running import provenance
@@ -5064,9 +5063,3 @@ def _table_clauses(sql: str) -> tuple[str, frozenset[str]]:
         else:
             current += char
     return head.strip(), frozenset([*clauses, current.strip()])
-
-
-async def _seed_user(uow_factory: UnitOfWorkFactory, user: User) -> None:
-    async with uow_factory() as uow:
-        await uow.users.add(user)
-        await uow.commit()

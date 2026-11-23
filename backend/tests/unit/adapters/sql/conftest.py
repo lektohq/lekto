@@ -1,23 +1,14 @@
 import shutil
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
 
-from lekto.adapters.outbound.sql import (
-    Database,
-    SqlEventBus,
-    SqlUnitOfWorkFactory,
-    SqlWakeup,
-    migrate,
-)
-from lekto.core.domain.jobs import RetryPolicy
-from lekto.core.ports.clock import Clock
-from lekto.core.ports.event_bus import EventBus
-from lekto.core.ports.unit_of_work import UnitOfWorkFactory
-from tests import builders
-from tests.contracts.event_bus import EventBusFactory
-from tests.contracts.wakeup import WakeupFactory
+from lekto.adapters.outbound.sql import Database, migrate
+from tests.sql_fixtures import event_bus_factory, uow_factory, wakeup_factory
+
+__all__ = ["event_bus_factory", "uow_factory", "wakeup_factory"]
 
 
 @pytest.fixture(scope="session")
@@ -50,34 +41,22 @@ async def database(sqlite_template: Path, tmp_path: Path) -> AsyncIterator[Datab
 
 
 @pytest.fixture
-def uow_factory(database: Database) -> UnitOfWorkFactory:
-    return SqlUnitOfWorkFactory(database)
-
-
-@pytest.fixture
-def event_bus_factory(database: Database) -> EventBusFactory:
-    def create(
-        *, clock: Clock | None = None, retry: RetryPolicy = builders.EVENT_RETRY
-    ) -> EventBus:
-        return SqlEventBus(database, clock=clock, retry=retry)
-
-    return create
-
-
-@pytest.fixture
-def wakeup_factory(database: Database) -> WakeupFactory:
-    return lambda: SqlWakeup(database)
-
-
-@pytest.fixture
 async def empty_database(tmp_path: Path) -> AsyncIterator[Database]:
-    database = Database.sqlite(tmp_path / "empty.db")
-    yield database
-    await database.dispose()
+    async with _sqlite(tmp_path / "empty.db") as database:
+        yield database
 
 
 @pytest.fixture
 async def model_database(tmp_path: Path) -> AsyncIterator[Database]:
-    database = Database.sqlite(tmp_path / "model.db")
-    yield database
-    await database.dispose()
+    async with _sqlite(tmp_path / "model.db") as database:
+        yield database
+
+
+@asynccontextmanager
+async def _sqlite(path: Path) -> AsyncIterator[Database]:
+    """A SQLite file not migrated."""
+    database = Database.sqlite(path)
+    try:
+        yield database
+    finally:
+        await database.dispose()
