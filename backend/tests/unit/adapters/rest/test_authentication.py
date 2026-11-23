@@ -225,7 +225,9 @@ async def test_second_factor_over_http(api: Api) -> None:
     user = await api.user("alice")
     async with api.sign_in(user) as session:
         client = session.client
-        setup = await client.post(f"{PREFIX}/auth/totp", headers=session.headers)
+        setup = await client.post(
+            f"{PREFIX}/auth/totp", json={"password": PASSWORD}, headers=session.headers
+        )
         assert setup.status_code == 201
         secret = setup.json()["secret"]
         code = api.container.totp.code(secret, api.clock.now())
@@ -330,7 +332,7 @@ async def test_expired_tokens_are_refused(api: Api) -> None:
         ("POST", "/auth/logout", None),
         ("POST", "/auth/password", {"current_password": PASSWORD, "new_password": NEW_PASSWORD}),
         ("DELETE", "/auth/sessions", None),
-        ("POST", "/auth/totp", None),
+        ("POST", "/auth/totp", {"password": PASSWORD}),
         ("POST", "/auth/totp/confirm", {"code": "123456"}),
         ("POST", "/auth/totp/disable", {"code": "123456"}),
         ("POST", "/auth/totp/recovery-codes", {"code": "123456"}),

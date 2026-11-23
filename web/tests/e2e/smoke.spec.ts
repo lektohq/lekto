@@ -32,7 +32,10 @@ test.beforeAll(async ({ playwright, baseURL }) => {
 
 	const user = await playwright.request.newContext({ baseURL });
 	const token = await signIn(user, USERNAME, PASSWORD);
-	const setup = await user.post('/api/v1/auth/totp', { headers: { 'X-CSRF-Token': token } });
+	const setup = await user.post('/api/v1/auth/totp', {
+		headers: { 'X-CSRF-Token': token },
+		data: { password: PASSWORD }
+	});
 	expect(setup.ok(), await setup.text()).toBe(true);
 	secret = ((await setup.json()) as { secret: string }).secret;
 	usedStep = step();

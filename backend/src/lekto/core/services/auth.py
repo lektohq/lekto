@@ -420,13 +420,28 @@ class AuthService:
 
     # --- TOTP -----------------------------------------------------------------------------------
 
-    async def begin_totp(self, actor: Actor) -> TotpSetup:
+    async def begin_totp(self, actor: Actor, password: str) -> TotpSetup:
         """Start setting up TOTP with a new secret; it takes effect when a code confirms it.
-        Replaces a setup that was not confirmed. ConflictError if TOTP is on already."""
+        Replaces a setup that was not confirmed. The caller's `password` too: who only holds a
+        session (a browser left open) sets up no factor of their own and locks the owner out
+        (XA-K03); a wrong one counts as a failed sign-in, PermissionDeniedError. ConflictError
+        if TOTP is on already, and for an account without a password: TOTP guards the sign-in
+        with the password, and a provider's (OIDC) asks for no code of Lekto's."""
+        now = self._clock.now()
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
+            stored = await uow.credentials.find(actor.id)
+        if stored is None or stored.password_hash is None:
+            raise ConflictError(because(ReasonCode.TOTP_NEEDS_PASSWORD))
+        reserved, _ = await self._reserve(_throttles(user.username, None), now)
+        if not await self._hasher.verify(stored.password_hash, normalize_password(password)):
+            _log_failure(actor.id, None)
+            raise PermissionDeniedError(because(ReasonCode.WRONG_PASSWORD))
+        async with self._uow() as uow:
+            await _release(uow, reserved)
             credential = await _credential(uow, actor.id)
             if credential.totp_enabled:
+                await uow.commit()
                 raise ConflictError(because(ReasonCode.TOTP_ALREADY_ON))
             secret = self._totp.new_secret()
             credential.totp = TotpSetting(secret=self._encrypt(actor.id, secret))

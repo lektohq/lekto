@@ -275,6 +275,7 @@ class ReasonCode(StrEnum):
     TOKEN_INVALID = "token_invalid"
     WRONG_PASSWORD = "wrong_password"
     TOTP_ALREADY_ON = "totp_already_on"
+    TOTP_NEEDS_PASSWORD = "totp_needs_password"
     NO_TOTP_SETUP = "no_totp_setup"
     TOTP_OFF = "totp_off"
     CODE_INVALID = "code_invalid"
@@ -797,6 +798,9 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.TOKEN_INVALID: "the token is invalid or has expired",
     ReasonCode.WRONG_PASSWORD: "the current password is wrong",
     ReasonCode.TOTP_ALREADY_ON: "TOTP is already on; turn it off first",
+    ReasonCode.TOTP_NEEDS_PASSWORD: (
+        "the second factor guards the sign-in with a password, which the account has not"
+    ),
     ReasonCode.NO_TOTP_SETUP: "no TOTP setup to confirm",
     ReasonCode.TOTP_OFF: "TOTP is off",
     ReasonCode.CODE_INVALID: "the code is not valid",

@@ -24,6 +24,7 @@ from lekto.core.domain.identity import (
     hash_token,
 )
 from lekto.core.domain.ids import ApiTokenId, new_id
+from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.identity import PasswordHasher
@@ -45,7 +46,7 @@ async def set_active(world: World, user: User, active: bool) -> None:
 
 
 async def enable_totp(world: World, user: User) -> tuple[str, list[str]]:
-    setup = await world.auth.begin_totp(Actor(user.id))
+    setup = await world.auth.begin_totp(Actor(user.id), PASSWORD)
     codes = await world.auth.confirm_totp(
         Actor(user.id), world.totp.code(setup.secret, world.clock.now())
     )
@@ -613,7 +614,7 @@ async def test_a_sign_in_does_not_outlive_a_reset_or_deactivation(
 
 async def test_totp_setup_is_confirmed_by_a_code(world: World) -> None:
     user = await world.account("alice")
-    setup = await world.auth.begin_totp(Actor(user.id))
+    setup = await world.auth.begin_totp(Actor(user.id), PASSWORD)
     assert setup.secret in setup.uri and "alice" in setup.uri
     async with world.uow() as uow:
         credential = await uow.credentials.get(user.id)
@@ -633,7 +634,7 @@ async def test_totp_setup_is_confirmed_by_a_code(world: World) -> None:
     assert credential.totp_enabled
     assert all(code not in str(credential.recovery_codes) for code in codes)  # only hashes
     with pytest.raises(ConflictError):
-        await world.auth.begin_totp(Actor(user.id))
+        await world.auth.begin_totp(Actor(user.id), PASSWORD)
 
 
 async def test_login_with_totp(world: World) -> None:
@@ -702,13 +703,31 @@ async def test_turning_totp_off_needs_a_code(world: World) -> None:
 
 async def test_another_setup_replaces_an_unconfirmed_one(world: World) -> None:
     user = await world.account("alice")
-    first = await world.auth.begin_totp(Actor(user.id))
-    second = await world.auth.begin_totp(Actor(user.id))
+    first = await world.auth.begin_totp(Actor(user.id), PASSWORD)
+    second = await world.auth.begin_totp(Actor(user.id), PASSWORD)
     with pytest.raises(ValidationError):
         await world.auth.confirm_totp(
             Actor(user.id), world.totp.code(first.secret, world.clock.now())
         )
     await world.auth.confirm_totp(Actor(user.id), world.totp.code(second.secret, world.clock.now()))
+
+
+async def test_totp_is_set_up_with_the_password_alone(world: World) -> None:
+    """Who only holds the session (a browser left open) sets up no factor of their own and locks
+    the owner out; a wrong password counts as a failed sign-in (XA-K03)."""
+    user = await world.account("alice")
+    with pytest.raises(PermissionDeniedError) as wrong:
+        await world.auth.begin_totp(Actor(user.id), "not the password")
+    assert wrong.value.reason == because(ReasonCode.WRONG_PASSWORD)
+    async with world.uow() as uow:
+        stored = await uow.credentials.get(user.id)
+        assert stored.totp is None
+    # An account without a password signs in through its provider, which asks for no code of
+    # Lekto's: nothing to guard.
+    linked = await world.user()
+    with pytest.raises(ConflictError) as none:
+        await world.auth.begin_totp(Actor(linked.id), PASSWORD)
+    assert none.value.reason == because(ReasonCode.TOTP_NEEDS_PASSWORD)
 
 
 # --- API tokens ---------------------------------------------------------------------------------

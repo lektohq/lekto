@@ -177,6 +177,14 @@ class Me(BaseModel):
     )
 
 
+class TotpBegin(RequestBody):
+    model_config = ConfigDict(json_schema_extra={"examples": [{"password": "********"}]})
+
+    password: Password = Field(
+        description="The caller's password: a session alone sets up no second factor."
+    )
+
+
 class PasswordChange(RequestBody):
     model_config = ConfigDict(
         json_schema_extra={

@@ -970,8 +970,18 @@
           "auth"
         ],
         "summary": "Start setting up TOTP",
-        "description": "A new secret for the authenticator app, shown only now. TOTP is on once a code confirms it (`POST /auth/totp/confirm`). Needs a session; API tokens are refused (403).",
+        "description": "A new secret for the authenticator app, shown only now. TOTP is on once a code confirms it (`POST /auth/totp/confirm`). Needs the caller's password (403 `wrong_password`, counted as a failed sign-in); 409 `totp_needs_password` for an account without one, whose sign-in through the provider asks for no code of Lekto's. Needs a session; API tokens are refused (403).",
         "operationId": "begin_totp_api_v1_auth_totp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpBegin"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "201": {
             "description": "Successful Response",
@@ -1031,6 +1041,38 @@
               }
             }
           },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": "from_node: Input should be 'ocr', 'parse', ..."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Too Many Requests",
+                  "status": 429,
+                  "detail": "too many failed attempts; try again later"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -1043,6 +1085,22 @@
                   "title": "Internal Server Error",
                   "status": 500,
                   "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Content Too Large",
+                  "status": 413,
+                  "detail": "the request body is larger than 1048576 bytes"
                 }
               }
             }
@@ -39856,6 +39914,7 @@
           "token_invalid",
           "wrong_password",
           "totp_already_on",
+          "totp_needs_password",
           "no_totp_setup",
           "totp_off",
           "code_invalid",
@@ -44025,6 +44084,30 @@
         "title": "TokenScope",
         "description": "A preset of rights for an API token (`rights`): read, read and write, or only upload\ndocuments (a shortcut on a phone that sends shared files; it reads nothing, not even what it\nuploaded). What a token may is its rights; the scope is how they were chosen, or the preset\nthey match."
       },
+      "TotpBegin": {
+        "properties": {
+          "password": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "format": "password",
+            "title": "Password",
+            "description": "The caller's password: a session alone sets up no second factor.",
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "password"
+        ],
+        "title": "TotpBegin",
+        "examples": [
+          {
+            "password": "********"
+          }
+        ]
+      },
       "TotpSetupOut": {
         "properties": {
           "secret": {
@@ -45936,6 +46019,7 @@
     "token_invalid": {},
     "wrong_password": {},
     "totp_already_on": {},
+    "totp_needs_password": {},
     "no_totp_setup": {},
     "totp_off": {},
     "code_invalid": {},

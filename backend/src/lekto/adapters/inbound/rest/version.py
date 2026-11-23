@@ -11,4 +11,4 @@ that only adds. The path stays `/api/v1` during the beta.
 """
 
 API_VERSION = "0.8"
-FINGERPRINT = "c42425ff9b3c710d40ba17898709fb5b352c3a750c72a2f49202450cff3b6a86"
+FINGERPRINT = "d704b74a6cdc97e5cb837a5911c0470d0893a3150124f9652b52ed50ee5f2730"

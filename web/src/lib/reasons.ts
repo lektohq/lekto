@@ -315,6 +315,7 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	token_invalid: entry(m.reason_token_invalid),
 	wrong_password: entry(m.reason_wrong_password),
 	totp_already_on: entry(m.reason_totp_already_on),
+	totp_needs_password: entry(m.reason_totp_needs_password),
 	no_totp_setup: entry(m.reason_no_totp_setup),
 	totp_off: entry(m.reason_totp_off),
 	code_invalid: entry(m.reason_code_invalid),

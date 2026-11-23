@@ -224,7 +224,7 @@ async def test_password_reset_by_an_admin(world: World) -> None:
 async def test_admins_turn_totp_off(world: World) -> None:
     admin = await world.account("root", Role.ADMIN)
     user = await world.account("alice")
-    setup = await world.auth.begin_totp(Actor(user.id))
+    setup = await world.auth.begin_totp(Actor(user.id), PASSWORD)
     await world.auth.confirm_totp(Actor(user.id), world.totp.code(setup.secret, world.clock.now()))
     with pytest.raises(SecondFactorRequiredError):
         await world.auth.login("alice", PASSWORD)

@@ -5,37 +5,43 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import CodeDialog from '#lib/components/CodeDialog.svelte';
+	import FormDialog from '#lib/components/FormDialog.svelte';
 	import SecretDialog from '#lib/components/SecretDialog.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import { reportError } from '#lib/errors.ts';
+	import * as Field from '#lib/components/ui/field/index.ts';
+	import { Input } from '#lib/components/ui/input/index.ts';
 	import { m } from '#lib/paraglide/messages.js';
 
 	type Setup = components['schemas']['TotpSetupOut'];
 
-	// Second factor: set up with a QR code (the secret as text next to it), confirm with a code,
-	// recovery codes shown once, new codes, turn off. The API checks every code.
-	let { enabled, onchanged }: { enabled: boolean; onchanged: () => void } = $props();
+	// Second factor: set up with the password and a QR code (the secret as text next to it),
+	// confirm with a code, recovery codes shown once, new codes, turn off. The API checks every
+	// code. The password first: a session alone sets up no factor of its own (XA-K03); an account
+	// without one signs in through its provider, which asks for no code of Lekto's.
+	let {
+		enabled,
+		hasPassword,
+		onchanged
+	}: { enabled: boolean; hasPassword: boolean; onchanged: () => void } = $props();
 
 	let setup = $state<Setup | null>(null);
 	let confirming = $state(false);
 	let disabling = $state(false);
 	let renewing = $state(false);
 	let codes = $state<string | null>(null);
-	let busy = $state(false);
+	let asking = $state(false);
+	let password = $state('');
+
+	$effect(() => {
+		if (asking) password = '';
+	});
 
 	const qr = $derived(setup ? renderSVG(setup.otpauth_uri, { border: 2 }) : '');
 
 	async function start() {
-		busy = true;
-		try {
-			setup = await unwrap(api.POST('/api/v1/auth/totp'));
-		} catch (error) {
-			reportError(error);
-		} finally {
-			busy = false;
-		}
+		setup = await unwrap(api.POST('/api/v1/auth/totp', { body: { password } }));
 	}
 
 	async function confirm(code: string) {
@@ -95,14 +101,40 @@
 				<Button variant="outline" onclick={() => (renewing = true)}>{m.totp_renew_codes()}</Button>
 				<Button variant="outline" onclick={() => (disabling = true)}>{m.totp_disable()}</Button>
 			</div>
-		{:else}
+		{:else if hasPassword}
 			<div>
-				<Button {busy} onclick={start}>{m.totp_setup()}</Button>
+				<Button onclick={() => (asking = true)}>{m.totp_setup()}</Button>
 			</div>
+		{:else}
+			<p class="text-sm text-muted-foreground">{m.totp_needs_password_hint()}</p>
 		{/if}
 	</Card.Content>
 </Card.Root>
 
+<FormDialog
+	bind:open={asking}
+	guarded={false}
+	title={m.totp_title()}
+	description={m.totp_password_hint()}
+	submitLabel={m.totp_setup()}
+	disabled={password === ''}
+	action={start}
+>
+	{#snippet children(error, errorId)}
+		<Field.Field>
+			<Field.Label for="totp-password">{m.password_current()}</Field.Label>
+			<Input
+				id="totp-password"
+				type="password"
+				autocomplete="current-password"
+				bind:value={password}
+				required
+				aria-invalid={error ? true : undefined}
+				aria-describedby={error ? errorId : undefined}
+			/>
+		</Field.Field>
+	{/snippet}
+</FormDialog>
 <CodeDialog
 	bind:open={confirming}
 	title={m.totp_confirm()}

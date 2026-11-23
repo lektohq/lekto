@@ -55,8 +55,14 @@
 		alternative?: { label: string; action: () => Promise<void> };
 		/** Ask before Escape, a click beside the dialog or its X drop what was typed. */
 		guarded?: boolean;
-		children: Snippet<[string | null]>;
+		/** The fields, told the error and the id of the text below them that says it, for a field's
+		 * `aria-describedby`. */
+		children: Snippet<[string | null, string]>;
 	} = $props();
+
+	// The error below the fields, which a field it marks invalid names (`aria-describedby`).
+	const uid = $props.id();
+	const errorId = `${uid}-error`;
 
 	let confirming = $state(false);
 	let altBusy = $state(false);
@@ -119,8 +125,8 @@ the request goes on and takes effect all the same. -->
 					/>
 					<div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4">
 						{#if description}<p class="text-sm text-muted-foreground">{description}</p>{/if}
-						{@render fields(error)}
-						{#if error ?? altError}<Field.Error>{error ?? altError}</Field.Error>{/if}
+						{@render fields(error, errorId)}
+						{#if error ?? altError}<Field.Error id={errorId}>{error ?? altError}</Field.Error>{/if}
 						{#if alternative}
 							<Button
 								type="button"
@@ -154,9 +160,9 @@ the request goes on and takes effect all the same. -->
 					<div
 						class="-mx-5 -my-1 flex min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain px-5 py-1"
 					>
-						{@render fields(error)}
+						{@render fields(error, errorId)}
 					</div>
-					{#if error ?? altError}<Field.Error>{error ?? altError}</Field.Error>{/if}
+					{#if error ?? altError}<Field.Error id={errorId}>{error ?? altError}</Field.Error>{/if}
 					<Dialog.Footer>
 						{#if alternative}
 							<Button

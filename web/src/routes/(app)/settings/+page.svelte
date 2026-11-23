@@ -169,7 +169,7 @@
 				</Card.Root>
 			{:else if tab === 'sign-in'}
 				{#if me.has_password}<PasswordCard />{/if}
-				<TotpCard enabled={me.totp_enabled} onchanged={load} />
+				<TotpCard enabled={me.totp_enabled} hasPassword={me.has_password} onchanged={load} />
 
 				{#if oidc?.enabled || me.linked_accounts.length > 0}
 					<Card.Root>
