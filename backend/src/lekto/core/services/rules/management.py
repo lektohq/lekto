@@ -233,6 +233,10 @@ class RuleService:
         limit = MAX_BODY_TEMPLATE if webhook else MAX_TEXT
         if len(template) > limit:
             return TemplatePreview(error=f"the template has more than {limit} characters")
+        # Read before the transaction; used only for a document the actor may read.
+        codes: tuple[Code, ...] = ()
+        if document is not None and self._store is not None and "fact" in template:
+            codes = await load_codes(self._store, document) or ()
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             found = None if document is None else (await readable_document(uow, user, document))[0]
@@ -242,9 +246,6 @@ class RuleService:
             fields = await uow.fields.list_all()
             applying = [item for item in fields if kind is None or item.applies_to(kind)]
             target = None if field is None or webhook else await uow.fields.get(field)
-            codes: tuple[Code, ...] = ()
-            if found is not None and self._store is not None and "fact" in template:
-                codes = await load_codes(self._store, found.id) or ()
             if found is None:
                 values = None
             elif webhook:

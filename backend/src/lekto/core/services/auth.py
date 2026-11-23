@@ -473,7 +473,7 @@ class AuthService:
 
     async def disable_totp(self, actor: Actor, code: str) -> None:
         """Turn TOTP off; needs a current code or a recovery code."""
-        await self._with_second_factor(actor, code, _turn_off_totp)
+        await self._with_second_factor(actor, code, Credential.turn_off_totp)
         log.info("TOTP turned off", extra={"user_id": str(actor.id)})
 
     async def renew_recovery_codes(self, actor: Actor, code: str) -> list[str]:
@@ -619,11 +619,6 @@ class AuthService:
                     reserved.append((key, source_rule))
             await uow.commit()
         return reserved, source_blocked
-
-
-def _turn_off_totp(credential: Credential) -> None:
-    credential.totp = None
-    credential.recovery_codes = set()
 
 
 def _throttles(

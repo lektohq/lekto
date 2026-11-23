@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from lekto.core.domain.documents import Sha256
-from lekto.core.domain.errors import ConcurrencyError, ValidationError
+from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.identity import ACCOUNT_THROTTLE, SOURCE_THROTTLE
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.inbox import DONE_PERIOD
@@ -29,7 +29,7 @@ from lekto.core.ports.clock import Clock
 from lekto.core.ports.event_bus import EventBus
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
-from lekto.core.services._jobs import LEASE, JobRunner, document_payload, lost, payload_document
+from lekto.core.services._jobs import LEASE, JobRunner, document_payload, payload_document
 from lekto.core.services.objects import derivative_keys, remove_unnamed
 
 log = logging.getLogger(__name__)
@@ -159,10 +159,9 @@ class MaintenanceService:
             async with self._uow() as uow:
                 await uow.jobs.complete(job, now=self._clock.now())
                 await uow.commit()
-        except ConcurrencyError:
-            lost(job)
-            return
         except Exception as error:
+            if await self._jobs.claim_lost(job, error):
+                return
             log.warning(
                 "removing files failed", extra={"document_id": str(document)}, exc_info=True
             )
@@ -197,10 +196,9 @@ class MaintenanceService:
                 await uow.jobs.complete(job, now=now)
                 await uow.jobs.enqueue(CLEANUP_JOB, {}, run_at=next_run, dedup_key=CLEANUP_JOB)
                 await uow.commit()
-        except ConcurrencyError:
-            lost(job)
-            return
         except Exception as error:
+            if await self._jobs.claim_lost(job, error):
+                return
             log.exception("cleanup failed")
             await self._jobs.again(job, repr(error), next_run)
             return

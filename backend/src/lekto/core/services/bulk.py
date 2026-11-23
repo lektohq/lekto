@@ -47,7 +47,7 @@ from lekto.core.ports.clock import Clock
 from lekto.core.ports.repository import PAGE_LIMIT, DocumentFilter
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import load_actor, load_lister
-from lekto.core.services._jobs import LEASE, JobRunner, lost, reason_of
+from lekto.core.services._jobs import CONFLICT_ATTEMPTS, LEASE, JobRunner, reason_of
 from lekto.core.services._moves import move_target
 from lekto.core.services.documents import DocumentService
 from lekto.core.services.pipeline import PipelineService
@@ -185,9 +185,13 @@ class BulkService:
     async def _attempt(self, job: Job) -> None:
         try:
             await self._run(job)
-        except ConcurrencyError:
-            lost(job)
         except Exception as error:
+            if await self._jobs.claim_lost(job, error):
+                return
+            if isinstance(error, ConcurrencyError) and job.tries < CONFLICT_ATTEMPTS:
+                # Only this worker changes the operation: a deadlock, gone the next time.
+                await self._jobs.again(job, reason_of(error), self._clock.now())
+                return
             log.exception("bulk operation failed", extra={"job_id": str(job.id)})
             await self._abort(job, error)
 

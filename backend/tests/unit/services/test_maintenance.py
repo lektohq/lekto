@@ -8,7 +8,7 @@ import pytest
 
 from lekto.adapters.outbound.memory import MemoryEventBus
 from lekto.adapters.outbound.memory.database import SeenMark
-from lekto.core.domain.errors import AuthenticationError
+from lekto.core.domain.errors import AuthenticationError, ConcurrencyError
 from lekto.core.domain.identity import KNOWN_DEVICE_LIFETIME, hash_token
 from lekto.core.domain.ids import DocumentId, EventId, new_id
 from lekto.core.domain.inbox import DONE_PERIOD, Confirmation
@@ -16,6 +16,7 @@ from lekto.core.domain.jobs import JobStatus
 from lekto.core.domain.mail_intake import KEPT_RECORDS
 from lekto.core.domain.rights import Actor
 from lekto.core.domain.webhooks import DeliveryOutcome, WebhookDelivery
+from lekto.core.services import maintenance
 from lekto.core.services.maintenance import CLEANUP_JOB, REMOVE_FILES_JOB
 from lekto.core.services.objects import derivative_keys, original_key
 from tests import builders
@@ -53,6 +54,23 @@ async def test_cleanup_runs_and_schedules_the_next_one(world: World) -> None:
     assert await service.run_next_job()
     assert sorted(cleanup_jobs(world)) == [JobStatus.DONE, JobStatus.QUEUED]  # old run removed
     assert len(world.database.jobs) == 2
+
+
+async def test_a_concurrent_change_while_the_cleanup_is_held_runs_it_again(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A deadlock fails the attempt like any error: the cleanup runs again, not left running
+    until its lease runs out (SC-K10)."""
+    service = world.maintenance()
+    await service.schedule()
+
+    async def deadlock(uow: object, now: datetime) -> int:
+        raise ConcurrencyError("deadlock")
+
+    monkeypatch.setattr(maintenance, "_forget_old_mails", deadlock)
+    assert await service.run_next_job()
+    (job,) = [job for job in world.database.jobs.values() if job.kind == CLEANUP_JOB]
+    assert job.status is JobStatus.QUEUED and "deadlock" in (job.last_error or "")
 
 
 async def test_delivered_events_are_purged(world: World) -> None:

@@ -51,7 +51,6 @@ from uuid import UUID
 
 from lekto.core.domain.codes import Code
 from lekto.core.domain.errors import (
-    ConcurrencyError,
     MissingValueError,
     TooManyAttemptsError,
     ValidationError,
@@ -92,7 +91,7 @@ from lekto.core.ports.templates import TemplateRenderer
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.ports.webhook_sender import WebhookRequest, WebhookResponse, WebhookSender
 from lekto.core.services._access import load_actor, may_reach
-from lekto.core.services._jobs import JobRunner, lost
+from lekto.core.services._jobs import JobRunner
 from lekto.core.services._push_queue import queue_push
 from lekto.core.services._templates import document_json, event_values, webhook_values
 from lekto.core.services.objects import load_codes
@@ -274,10 +273,9 @@ class WebhookDeliveryService:
                 await self._attempt(
                     job, webhook_id, event_id, event_type, occurred_at, document_id, rule, related
                 )
-        except ConcurrencyError:
-            lost(job)
         except Exception as error:
-            await self._jobs.failed(job, error, self._retry, "webhook job failed")
+            if not await self._jobs.claim_lost(job, error):
+                await self._jobs.failed(job, error, self._retry, "webhook job failed")
 
     async def _attempt(
         self,
@@ -290,6 +288,7 @@ class WebhookDeliveryService:
         rule: JsonObject | None = None,
         related: DocumentId | None = None,
     ) -> None:
+        codes = await self._codes(webhook_id, document_id)
         now = self._clock.now()
         async with self._uow() as uow:
             webhook = await uow.webhooks.find(webhook_id)
@@ -305,7 +304,7 @@ class WebhookDeliveryService:
                 None
                 if reason is not None
                 else await self._body(
-                    uow, webhook, event_id, event_type, occurred_at, document_id, rule
+                    uow, webhook, event_id, event_type, occurred_at, document_id, rule, codes
                 )
             )
             private = await self._private(uow, webhook)
@@ -460,6 +459,18 @@ class WebhookDeliveryService:
 
         await self._jobs.storing(job, store)
 
+    async def _codes(self, id: WebhookId, document: DocumentId | None) -> tuple[Code, ...]:
+        """The codes on the document's pages for a template that writes facts: read from the
+        store before the transaction that sends, not within it (as `running.prepare`)."""
+        if document is None or self._store is None:
+            return ()
+        async with self._uow() as uow:
+            webhook = await uow.webhooks.find(id)
+        template = None if webhook is None else webhook.body_template
+        if template is None or "fact" not in template:
+            return ()
+        return await load_codes(self._store, document) or ()
+
     def _outcome(self, response: WebhookResponse, attempt: int) -> DeliveryOutcome:
         if _is_success(response):
             return DeliveryOutcome.DELIVERED
@@ -478,10 +489,11 @@ class WebhookDeliveryService:
         occurred_at: datetime,
         document_id: DocumentId | None,
         rule: JsonObject | None = None,
+        codes: tuple[Code, ...] = (),
     ) -> bytes | WebhookResponse:
         """The body of the request, made with the document as it is now (and `rule`, the rule
-        that sends it); for a template that cannot be rendered into JSON the answer that gives
-        up (without sending), naming why."""
+        that sends it, and `codes`, those on its pages: `_codes`); for a template that cannot
+        be rendered into JSON the answer that gives up (without sending), naming why."""
         document = None
         if webhook.body is not BodyFormat.THIN and document_id is not None:
             document = await uow.documents.find(document_id)
@@ -500,9 +512,6 @@ class WebhookDeliveryService:
         assert webhook.body_template is not None
         values = event_values(event_id, event_type, occurred_at)
         if document is not None:
-            codes: tuple[Code, ...] = ()
-            if self._store is not None and "fact" in webhook.body_template:
-                codes = await load_codes(self._store, document.id) or ()
             values |= await webhook_values(uow, document, self._links, codes)
         elif document_id is not None:
             values["document_id"] = str(document_id)

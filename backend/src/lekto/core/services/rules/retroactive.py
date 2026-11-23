@@ -74,7 +74,7 @@ from lekto.core.services._access import (
     load_actor,
     readable_document,
 )
-from lekto.core.services._jobs import LEASE, JobRunner, lost, reason_of
+from lekto.core.services._jobs import CONFLICT_ATTEMPTS, LEASE, JobRunner, reason_of
 from lekto.core.services._tags import tag_tree
 from lekto.core.services.objects import load_layout, load_text
 from lekto.core.services.rules.changes import ArrivalStep, ChangeRules
@@ -450,9 +450,13 @@ class RuleApplicationService:
     async def _attempt(self, job: Job) -> None:
         try:
             await self._run(job)
-        except ConcurrencyError:
-            lost(job)
         except Exception as error:
+            if await self._jobs.claim_lost(job, error):
+                return
+            if isinstance(error, ConcurrencyError) and job.tries < CONFLICT_ATTEMPTS:
+                # Only this worker changes the application: a deadlock, gone the next time.
+                await self._jobs.again(job, reason_of(error), self._clock.now())
+                return
             log.exception("rule application failed", extra={"job_id": str(job.id)})
             await self._abort(job, error)
 

@@ -7,9 +7,15 @@ import pytest
 
 from lekto.core.domain import evidence, rule_conditions
 from lekto.core.domain.documents import DocumentChanges
-from lekto.core.domain.errors import NotFoundError, PermissionDeniedError, ValidationError
+from lekto.core.domain.errors import (
+    ConcurrencyError,
+    NotFoundError,
+    PermissionDeniedError,
+    ValidationError,
+)
 from lekto.core.domain.identifiers import IdentifierKind
-from lekto.core.domain.ids import DocumentId, new_id
+from lekto.core.domain.ids import DocumentId, RuleApplicationId, new_id
+from lekto.core.domain.jobs import JobStatus
 from lekto.core.domain.pipeline import RULES_APPLY, Lane
 from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.push import PushKind
@@ -540,6 +546,39 @@ async def test_an_unexpected_error_ends_the_application(world: World) -> None:
     assert (await r.stored(document)).tag_ids == set()
     # Given up as every job is: the admins hear of it (SB-08).
     assert failed_jobs_told(world) == [{"kind": retroactive.APPLY_JOB}]
+
+
+async def test_a_concurrent_change_while_the_job_is_held_runs_it_again_at_once(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A deadlock is gone the next time: the application goes on, not stopped and not left
+    waiting for its lease to run out (SC-K10)."""
+    r = await rule_world(world)
+    owner = await world.user()
+    tax = await r.tag("tax")
+    document = await r.arrive(owner, text="# Rechnung")
+    rule = await r.personal_rule(owner, definition("Tax", text_matches("Rech"), add_tags(tax.id)))
+    applications = r.applications  # a new service at every access
+    application = await applications.start(
+        Actor(owner.id), rule.id, version=1, documents=[document.id]
+    )
+    next_document = applications._next_document
+    conflicts = [ConcurrencyError("deadlock")]
+
+    async def once(id: RuleApplicationId) -> bool:
+        if conflicts:
+            raise conflicts.pop()
+        return await next_document(id)
+
+    monkeypatch.setattr(applications, "_next_document", once)
+    assert await applications.run_next_job()
+    (job,) = [job for job in world.database.jobs.values() if job.kind == retroactive.APPLY_JOB]
+    assert (job.status, job.run_at) == (JobStatus.QUEUED, world.clock.now())
+    assert await applications.run_next_job()
+    done = await applications.get(Actor(owner.id), application.id)
+    assert (done.status, done.error) == (ProgressStatus.DONE, None)
+    assert (await r.stored(document)).tag_ids == {tax.id}
+    assert failed_jobs_told(world) == []
 
 
 def failed_jobs_told(world: World) -> list[object]:

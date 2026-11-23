@@ -57,7 +57,6 @@ from lekto.core.domain.document_facts import (
 )
 from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import (
-    ConcurrencyError,
     EmbeddingsError,
     NotFoundError,
     SearchIndexError,
@@ -90,7 +89,6 @@ from lekto.core.services._access import load_actor, require_admin
 from lekto.core.services._jobs import (
     JobRunner,
     document_payload,
-    lost,
     payload_document,
     reason_of,
 )
@@ -387,16 +385,9 @@ class IndexingService:
             return
         try:
             outcome = await work()
-        except ConcurrencyError as error:
-            # A lost claim only if another worker owns the job now; else (a deadlock, a row
-            # changed meanwhile) it fails this attempt and runs again (SA-08).
-            if not await self._jobs.still_claimed(job):
-                lost(job)
-                return
-            await self._failed(job, error)
-            return
         except Exception as error:
-            await self._failed(job, error)
+            if not await self._jobs.claim_lost(job, error):
+                await self._failed(job, error)
             return
         recurring = job.kind == RECONCILE_JOB and job.payload.get("once") is not True
         result = outcome.to_json() if isinstance(outcome, Indexed) else None

@@ -34,9 +34,9 @@ from lekto.core.services._kept import Kept
 
 DEFAULT_CHANNELS = frozenset({Channel.WEB, Channel.API, Channel.MAIL})
 HISTORY_MONTHS = 12
+"""The months of the history, for the periods that end now; all time goes back to the first."""
 MAX_CASES = 100
 """Cases behind one number of the holders' evaluation at most."""
-"""The months of the history, for the periods that end now; all time goes back to the first."""
 ALL_MONTHS = 60
 """How far the history of all time looks back, at most: five years of months is what a chart
 still tells apart; the counts of all time are not bounded."""

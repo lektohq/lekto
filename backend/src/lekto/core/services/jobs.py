@@ -24,6 +24,7 @@ from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.statistics import median, percentile
 from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
+from lekto.core.ports.repository import PAGE_SIZE
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import (
     DocumentRef,
@@ -155,7 +156,7 @@ class JobsService:
         states: Collection[JobState],
         kind: str | None = None,
         offset: int = 0,
-        limit: int = 50,
+        limit: int = PAGE_SIZE,
     ) -> JobsPage:
         """The jobs in `states` (of `kind`) in the order of `JobQueue.find`, and how many there
         are in all."""
