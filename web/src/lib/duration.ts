@@ -16,13 +16,13 @@ export function formatDuration(seconds: number): string {
 	if (whole < 60) return m.duration_seconds({ seconds: formatNumber(whole) });
 	if (whole < 3600) {
 		return m.duration_minutes({
-			minutes: String(Math.floor(whole / 60)),
+			minutes: formatNumber(Math.floor(whole / 60)),
 			seconds: formatNumber(whole % 60)
 		});
 	}
 	const minutes = Math.round(whole / 60);
 	return m.duration_hours({
-		hours: String(Math.floor(minutes / 60)),
-		minutes: String(minutes % 60)
+		hours: formatNumber(Math.floor(minutes / 60)),
+		minutes: formatNumber(minutes % 60)
 	});
 }

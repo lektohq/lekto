@@ -10,6 +10,7 @@ import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 import OctagonX from '@lucide/svelte/icons/octagon-x';
 import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 import type { Snippet } from 'svelte';
+import { formatNumber } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import type { Node, NodeState } from '#lib/pipeline.ts';
 import type { Phase, Step } from '#lib/steps.ts';
@@ -64,5 +65,5 @@ export function stepLook(state: NodeState | null): Look {
 export function delegatedLabel(state: NodeState, now: Date = new Date()): string {
 	if (state.deadline === null || state.deadline === undefined) return m.node_status_delegated();
 	const left = (new Date(state.deadline).getTime() - now.getTime()) / 60_000;
-	return m.node_status_delegated_left({ minutes: String(Math.max(1, Math.ceil(left))) });
+	return m.node_status_delegated_left({ minutes: formatNumber(Math.max(1, Math.ceil(left))) });
 }

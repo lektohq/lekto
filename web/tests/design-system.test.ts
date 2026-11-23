@@ -785,7 +785,13 @@ describe('the design system (web/DESIGN.md)', () => {
 			'min',
 			'max',
 			'seconds',
-			'mails'
+			'mails',
+			'share',
+			'read',
+			'set',
+			'suggested',
+			'matched',
+			'minutes'
 		]);
 		/** The end of the bracket that opens before `from`, and the commas at its top level. */
 		const walk = (source: string, from: number) => {

@@ -124,9 +124,9 @@ export class Pager<T> {
 		return this.loaded && !this.loading && this.error === null && this.items.length === 0;
 	}
 
-	/** Show `page` (kept within the pages there are). */
+	/** Show `page` (kept within the pages there are; a whole one, as an address may say 1.5). */
 	async go(page: number): Promise<void> {
-		this.page = Math.max(1, page);
+		this.page = Math.max(1, Math.floor(page));
 		await this.#fetch(true);
 	}
 

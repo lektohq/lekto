@@ -17,6 +17,7 @@ import { list, object, person, text } from '#lib/signals.ts';
 import { byPerson, confirmationOf } from '#lib/step-summary.ts';
 import { stuck, type Step } from '#lib/steps.ts';
 import { viaToken } from '#lib/via-token.ts';
+import { isAtWork } from '#lib/pipeline.ts';
 
 type LogEntry = components['schemas']['LogEntry'];
 type ProcessingStatus = components['schemas']['ProcessingStatus'];
@@ -66,7 +67,7 @@ export function headlineOf(
 ): Headline {
 	switch (run.status) {
 		case 'processing': {
-			const running = steps.filter((step) => step.state?.status === 'running');
+			const running = steps.filter((step) => step.state !== null && isAtWork(step.state));
 			return {
 				tone: 'running',
 				title:

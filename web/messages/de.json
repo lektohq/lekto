@@ -3315,5 +3315,11 @@
 	"webhook_switch_on": "Webhook „{name}“ aktivieren",
 	"webhook_switch_off": "Webhook „{name}“ pausieren",
 	"webhook_switched_on": "Webhook aktiviert.",
-	"webhook_switched_off": "Webhook pausiert."
+	"webhook_switched_off": "Webhook pausiert.",
+	"device_browser": "Browser",
+	"signal_abstained_because": "Enthalten: {reason}",
+	"summary_sheets_parts": "{sheets}: {parts}",
+	"candidate_new_named": "{name} (neu)",
+	"signal_identifier_at": "{identifier}: {contact}",
+	"signal_identifier_at_topic": "{identifier}: {contact} · {topic}"
 }

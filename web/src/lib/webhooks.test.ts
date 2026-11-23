@@ -1,9 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { toast } from 'svelte-sonner';
+import { describe, expect, it, vi } from 'vitest';
+import { fakeApi } from '#lib/testing/api.ts';
+import { reasonText } from '#lib/reasons.ts';
 import { WEBHOOK_EVENT_TYPES } from '#lib/events.svelte.ts';
 import type { Reason } from '#lib/reasons.ts';
 import { m } from '#lib/paraglide/messages.js';
 import {
 	eventLabel,
+	sendTest,
 	selectionVolume,
 	switchedOffFailing,
 	volumeLevel,
@@ -46,5 +50,26 @@ describe('a webhook switched off', () => {
 		const failing: Reason = { code: 'webhook_failing', params: {} };
 		expect(switchedOffFailing({ disabled_reasons: [failing] })).toBe(true);
 		expect(switchedOffFailing({ disabled_reasons: [] })).toBe(false);
+	});
+});
+
+describe('a test request', () => {
+	it('says why Lekto did not send it in the words of the UI, as the log does (WH-K04)', async () => {
+		const reason = { code: 'delivery_secret_unusable', params: {} } as Reason;
+		vi.stubGlobal(
+			'fetch',
+			fakeApi({
+				'POST /api/v1/webhooks/hook/test': () => ({
+					outcome: 'dropped',
+					status_code: null,
+					error: 'the secret cannot be read',
+					reason
+				})
+			})
+		);
+		const said = vi.spyOn(toast, 'error');
+		await sendTest('hook');
+		expect(said).toHaveBeenCalledWith(m.webhook_test_failed({ reason: reasonText(reason) }));
+		said.mockRestore();
 	});
 });

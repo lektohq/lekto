@@ -6,7 +6,7 @@
 import type { components } from '#lib/api/schema.ts';
 import { spaceLabel } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
-import { ruleSpaces } from '#lib/permissions.ts';
+import { editableSpaces } from '#lib/permissions.ts';
 import { GLOBAL } from '#lib/rules/save.ts';
 
 type Space = components['schemas']['SpaceOut'];
@@ -46,7 +46,7 @@ export function rulePlaces(
 ): { value: string; label: string }[] {
 	const places = [
 		...(admin ? [{ value: GLOBAL, label: m.rule_scope_global() }] : []),
-		...ruleSpaces(spaces)
+		...editableSpaces(spaces)
 			.toSorted((a, b) => Number(b.personal_of === me) - Number(a.personal_of === me))
 			.map((space) => ({ value: space.id, label: spaceLabel(space, users, me) }))
 	];

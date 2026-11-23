@@ -202,7 +202,7 @@ export function spaceOptions(
 	users: readonly UserName[],
 	user: { id: string; role?: UserName['role'] } | null
 ): { value: string; label: string }[] {
-	const editable = editableSpaces(spaces, user);
+	const editable = editableSpaces(spaces);
 	const offered = editable.map((space) => space.id);
 	return [
 		...editable.map((space) => ({

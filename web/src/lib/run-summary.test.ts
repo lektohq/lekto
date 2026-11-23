@@ -120,6 +120,21 @@ describe('headlineOf', () => {
 		);
 		expect(headline).toMatchObject({ tone: 'running', action: null });
 		expect(headline.title).toBe(m.run_running_at({ run: 1, steps: m.node_ocr() }));
+		// A step waiting for the answers to its tasks is at work as well (WH-K01).
+		const asking = steps(
+			[state('receive', 'ok'), state('signal_llm', null, 'delegated')],
+			[entry('receive', 1)],
+			1,
+			'processing'
+		);
+		const waiting = headlineOf(
+			{ number: 1, current: true, status: 'processing' },
+			asking,
+			MINE,
+			lookup,
+			john
+		);
+		expect(waiting.title).toBe(m.run_running_at({ run: 1, steps: m.node_signal_llm() }));
 	});
 
 	it('tells why a run stops before filing, with the suggestion and its evidence', () => {

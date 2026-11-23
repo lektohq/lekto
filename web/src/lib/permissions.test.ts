@@ -10,8 +10,7 @@ import {
 	canManageSpace,
 	canManageWebhook,
 	editableSpaces,
-	handOverTargets,
-	ruleSpaces
+	handOverTargets
 } from './permissions.ts';
 
 const me = { id: 'u1', role: 'user' as const };
@@ -45,12 +44,11 @@ const ids = (list: readonly { id: string }[]) => list.map((space) => space.id);
 
 describe('spaces', () => {
 	it('files into the spaces the caller edits, another personal one too', () => {
-		expect(ids(editableSpaces(spaces, me))).toEqual(['mine', 'house']);
+		expect(ids(editableSpaces(spaces))).toEqual(['mine', 'house']);
 		// A personal space the caller edits stays theirs to file into, as an admin's every space.
 		const edited = spaces.map((space) => ({ ...space, role: 'edit' as const }));
-		expect(ids(editableSpaces(edited, me))).toEqual(['mine', 'house', 'tax', 'erika']);
-		expect(ids(editableSpaces(edited, admin))).toEqual(['mine', 'house', 'tax', 'erika']);
-		expect(editableSpaces(spaces, null)).toEqual([]);
+		expect(ids(editableSpaces(edited))).toEqual(['mine', 'house', 'tax', 'erika']);
+		expect(ids(editableSpaces(edited))).toEqual(['mine', 'house', 'tax', 'erika']);
 	});
 
 	it('lets a member leave a space, not the user of a personal one nor its last editor', () => {
@@ -147,9 +145,11 @@ describe('rules', () => {
 		expect(canApplyRule(tax, me, spaces)).toBe(false);
 		expect(canApplyRule(tax, admin, [])).toBe(true);
 		expect(canApplyRule(global, null, [])).toBe(false);
-	});
-
-	it('puts a rule into a space the caller edits', () => {
-		expect(ids(ruleSpaces(spaces))).toEqual(['mine', 'house']);
+		// A rule that asks a webhook runs on arrival only: no dry run for it (WH-K02).
+		const asking = { ...global, actions: [{ type: 'ask_webhook' as const }] };
+		expect(canApplyRule(asking, admin, [])).toBe(false);
+		expect(canApplyRule({ ...global, actions: [{ type: 'add_tags' as const }] }, me, [])).toBe(
+			true
+		);
 	});
 });

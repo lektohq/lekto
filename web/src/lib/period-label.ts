@@ -19,9 +19,9 @@ export function periodLabel(
 	if (period === null) return null;
 	if (period.kind === 'year') return String(period.year);
 	if (period.kind === 'month') {
-		return formatDate(new Date(`${period.month}-01T00:00:00`), { month: 'long', year: 'numeric' });
+		return formatDate(`${period.month}-01`, { month: 'long', year: 'numeric' });
 	}
-	const day = (value: string) => formatDate(new Date(`${value}T00:00:00`), { dateStyle: 'medium' });
+	const day = (value: string) => formatDate(value, { dateStyle: 'medium' });
 	if (period.from && period.to)
 		return m.period_span({ from: day(period.from), to: day(period.to) });
 	return period.from

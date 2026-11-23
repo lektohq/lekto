@@ -15,7 +15,6 @@ export type OpenCounts = components['schemas']['OpenCountsOut'];
 export type OpenDetail = components['schemas']['OpenDetailOut'];
 export type OpenDecision = components['schemas']['OpenDecisionIn'];
 export type OpenOutcome = components['schemas']['OutcomeOut'];
-export type OpenSource = OpenIdentifier['source'];
 export type OpenAction = OpenDecision['action'];
 
 /** The key that tells an open identifier apart (its kind and normalised value). */
