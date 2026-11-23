@@ -17,7 +17,7 @@
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
-	import { formatDate, getLocale } from '#lib/i18n.ts';
+	import { getLocale, formatMoment } from '#lib/i18n.ts';
 	import { appleDevice } from '#lib/install.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import {
@@ -296,10 +296,7 @@
 										device.endpoint === endpoint ? m.notifications_this_device() : null,
 										device.last_success_at
 											? m.notifications_last({
-													time: formatDate(device.last_success_at, {
-														dateStyle: 'short',
-														timeStyle: 'short'
-													})
+													time: formatMoment(device.last_success_at)
 												})
 											: m.notifications_never()
 									]

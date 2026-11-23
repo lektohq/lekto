@@ -22,7 +22,7 @@
 	import Segmented from '#lib/components/Segmented.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import { describeLoad, type LoadFailure } from '#lib/errors.ts';
-	import { formatDate, formatNumber } from '#lib/i18n.ts';
+	import { formatDate, formatNumber, formatMoment } from '#lib/i18n.ts';
 	import { rememberedPageSize } from '#lib/page-size.ts';
 	import { SummaryPager } from '#lib/summary-pager.svelte.ts';
 	import LogCard from '#lib/components/LogCard.svelte';
@@ -328,7 +328,7 @@
 			{#snippet row(delivery)}
 				<Table.Row class={cn(delivery.error && 'border-b-0')}>
 					<Table.Cell class="pl-0 text-muted-foreground tabular-nums">
-						{formatDate(delivery.started_at, { dateStyle: 'short', timeStyle: 'medium' })}
+						{formatMoment(delivery.started_at, 'short', true)}
 					</Table.Cell>
 					<Table.Cell>
 						<span class="font-medium">{eventLabel(delivery.event_type)}</span>
@@ -364,10 +364,7 @@
 						{#if delivery.next_attempt_at}
 							<span class="block text-xs text-muted-foreground">
 								{m.delivery_next({
-									time: formatDate(delivery.next_attempt_at, {
-										timeStyle: 'short',
-										dateStyle: 'short'
-									})
+									time: formatMoment(delivery.next_attempt_at, 'short')
 								})}
 							</span>
 						{/if}

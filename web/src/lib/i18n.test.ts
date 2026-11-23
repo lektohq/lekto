@@ -69,6 +69,9 @@ describe('one way to format', () => {
 			formatDate('2026-11-05T13:03:00Z', { dateStyle: 'medium', timeStyle: 'short' })
 		);
 		expect(formatMoment('2026-11-05T13:03:00Z', 'short')).toBe('05.11.26, 14:03');
+		// With seconds only where a log's entries lie seconds apart (WY-06).
+		expect(formatMoment('2026-11-05T13:03:27Z', 'medium', true)).toBe('05.11.2026, 14:03:27');
+		expect(formatMoment('2026-11-05T13:03:27Z', 'short', true)).toBe('05.11.26, 14:03:27');
 	});
 
 	it('quotes as the language quotes', () => {

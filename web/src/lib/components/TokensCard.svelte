@@ -19,7 +19,7 @@
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { isoDayLocal } from '#lib/dates.ts';
-	import { formatDate, formatNumber } from '#lib/i18n.ts';
+	import { formatDate, formatNumber, formatMoment } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import Loading from '#lib/components/Loading.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
@@ -129,9 +129,7 @@
 	};
 
 	function used(token: Token): string {
-		return token.last_used_at
-			? formatDate(token.last_used_at, { dateStyle: 'short', timeStyle: 'short' })
-			: m.token_never_used();
+		return token.last_used_at ? formatMoment(token.last_used_at) : m.token_never_used();
 	}
 	function expiry(token: Token): string {
 		return token.expires_at

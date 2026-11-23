@@ -8,7 +8,7 @@
 	import ProcessingProgress from '#lib/components/ProcessingProgress.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { inboxDocument } from '#lib/document-view.ts';
-	import { formatDate, formatNumber } from '#lib/i18n.ts';
+	import { formatNumber, formatMoment } from '#lib/i18n.ts';
 	import type { InboxItem } from '#lib/inbox-view.ts';
 	import { byId, userLabel, type Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -47,9 +47,7 @@
 		const user = lookup ? byId(lookup.users).get(done.by) : undefined;
 		return viaToken(user ? userLabel(user) : m.inbox_by_unknown(), done.via_token);
 	});
-	const when = $derived(
-		done ? formatDate(done.at, { dateStyle: 'medium', timeStyle: 'short' }) : ''
-	);
+	const when = $derived(done ? formatMoment(done.at) : '');
 	// Waiting only for the space Lekto suggests: say which, and who would see it there.
 	const suggestion = $derived(onlySpace(item.open) ? suggestedSpace(item.open) : null);
 	// Small beside the row; on a phone only the icon, as wide as a finger.

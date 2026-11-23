@@ -3,7 +3,7 @@
 	import type { components } from '#lib/api/schema.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { formatDuration } from '#lib/duration.ts';
-	import { formatDate, formatNumber } from '#lib/i18n.ts';
+	import { formatNumber, formatMoment } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { glanceSeconds, type Glance } from '#lib/runs.ts';
 	import { cn } from '#lib/utils.ts';
@@ -77,9 +77,7 @@
 						</span>
 						{#if glance.started}
 							<span class="whitespace-nowrap text-muted-foreground tabular-nums">
-								{[formatDate(glance.started, { dateStyle: 'short', timeStyle: 'short' }), took]
-									.filter(Boolean)
-									.join(' · ')}
+								{[formatMoment(glance.started), took].filter(Boolean).join(' · ')}
 							</span>
 						{/if}
 					</button>
@@ -100,7 +98,7 @@
 		{#if current.started}
 			<dt class="text-muted-foreground">{m.log_started()}</dt>
 			<dd class="tabular-nums">
-				{formatDate(current.started, { dateStyle: 'medium', timeStyle: 'medium' })}
+				{formatMoment(current.started, 'medium', true)}
 			</dd>
 		{/if}
 		{#if length(current)}

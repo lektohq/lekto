@@ -832,6 +832,15 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('writes a moment through formatMoment', () => {
+		// "Formats": one way each. Nobody builds a date with a time of their own.
+		expect(
+			[...Object.entries(sources), ...Object.entries(scripts)]
+				.filter(([path, source]) => path !== '/src/lib/i18n.ts' && /\btimeStyle\b/.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
 	it('writes a list through formatList', () => {
 		// "Formats": one way each. A list of names is "A, B und C" in the user's language.
 		const own = /new Intl\.ListFormat\(/;

@@ -6,7 +6,7 @@
 	import type { components } from '#lib/api/schema.ts';
 	import { BASE } from '#lib/base.ts';
 	import RuleView from '#lib/components/rules/RuleView.svelte';
-	import { formatDate } from '#lib/i18n.ts';
+	import { formatMoment } from '#lib/i18n.ts';
 	import { userName } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { RuleLoader } from '#lib/rules/page.svelte.ts';
@@ -61,7 +61,7 @@
 			{#if version}
 				<span class="text-sm text-muted-foreground">
 					{m.rule_version_meta({
-						date: formatDate(version.created_at, { dateStyle: 'medium', timeStyle: 'short' }),
+						date: formatMoment(version.created_at),
 						user: author
 					})} · {m.rule_priority_short({ priority: version.priority })}
 				</span>

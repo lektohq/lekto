@@ -14,7 +14,7 @@
 	import TitlePatternBadge from '#lib/components/rules/TitlePatternBadge.svelte';
 	import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import { formatDate } from '#lib/i18n.ts';
+	import { formatMoment } from '#lib/i18n.ts';
 	import { userName } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { reasonsText } from '#lib/reasons.ts';
@@ -164,7 +164,7 @@
 						{/if}
 						<span class="text-muted-foreground">
 							{m.rule_version_meta({
-								date: formatDate(version.created_at, { dateStyle: 'medium', timeStyle: 'short' }),
+								date: formatMoment(version.created_at),
 								user: userName(users, version.created_by)
 							})}
 						</span>

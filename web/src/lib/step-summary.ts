@@ -4,7 +4,7 @@
  */
 import type { components } from '#lib/api/schema.ts';
 import { describeValue, fieldLabel } from '#lib/describe.ts';
-import { formatDate, formatNumber, formatList } from '#lib/i18n.ts';
+import { formatNumber, formatList, formatMoment } from '#lib/i18n.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { labelled, outputReasonText, reasonsText } from '#lib/reasons.ts';
@@ -99,7 +99,7 @@ export function stepSummary(
 	}
 	switch (node) {
 		case 'receive':
-			return formatDate(entry.started_at, { dateStyle: 'short', timeStyle: 'short' });
+			return formatMoment(entry.started_at);
 		case 'separate':
 			return separated(output);
 		case 'ocr':
