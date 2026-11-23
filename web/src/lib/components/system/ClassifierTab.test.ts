@@ -1,6 +1,6 @@
 // The tab "Classifier": the latest model, the next training, the accuracy over the models and
 // the hit rate of each signal; training on request for admins.
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { events } from '#lib/events.svelte.ts';
@@ -114,6 +114,29 @@ describe('the classifier tab', () => {
 		events.stop();
 	});
 
+	it('keeps the newest answer when an earlier one comes last (WE-K09)', async () => {
+		const emit = streamEvents();
+		let first: (() => void) | null = null;
+		let asked = 0;
+		serve(async () => {
+			const mine = ++asked;
+			if (mine === 2) await new Promise<void>((resolve) => (first = resolve));
+			return mine === 2 ? trained : { ...trained, model: { ...trained.model, number: 3 } };
+		});
+		render(Page);
+		await screen.findByRole('heading', { name: m.classifier_model_title({ number: 3 }) });
+		emit('classifier.trained', { number: 3 }); // asked again: this answer waits
+		await waitFor(() => expect(asked).toBe(2));
+		emit('classifier.trained', { number: 3 }); // and again: this one comes first
+		await waitFor(() => expect(asked).toBe(3));
+		first!();
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(
+			screen.getByRole('heading', { name: m.classifier_model_title({ number: 3 }) })
+		).toBeTruthy();
+		events.stop();
+	});
+
 	it('says so when the model could not be read anew: the one shown is the old one (WE-02)', async () => {
 		const emit = streamEvents();
 		let down = false;
@@ -149,7 +172,8 @@ describe('the classifier tab', () => {
 		expect(llm.textContent).toContain(m.classifier_signal_best()); // the date: it alone
 		const facts = rows.find((row) => row.textContent?.includes(m.node_signal_facts()))!;
 		expect(facts.textContent).toContain(m.classifier_signal_best()); // the contact: all hits
-		expect(facts.querySelectorAll(`[aria-label="${m.classifier_signal_none()}"]`)).toHaveLength(4);
+		// A screen reader reads the words, not "–" (WE-K02).
+		expect(within(facts as HTMLElement).getAllByText(m.classifier_signal_none())).toHaveLength(4);
 	});
 
 	it('says so when there is no classifier', async () => {

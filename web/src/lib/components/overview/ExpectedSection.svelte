@@ -146,7 +146,9 @@
 							</div>
 							<div class="flex flex-col items-end gap-0.5 text-right">
 								<span
-									class="text-sm font-semibold {item.state === 'overdue' ? 'text-destructive' : ''}"
+									class="text-sm font-semibold {item.state === 'overdue'
+										? 'text-lane-red-foreground'
+										: ''}"
 									>{item.state === 'ended'
 										? m.expected_was({ date: formatDate(item.next_date) })
 										: m.expected_next({ date: formatDate(item.next_date) })}</span

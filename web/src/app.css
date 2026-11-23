@@ -54,8 +54,6 @@
 	/* Notes and tips (alerts `note` and `tip`): blue, as GitHub and Docusaurus draw notes. */
 	--note: #e7f0fb;
 	--note-foreground: #1d4f91;
-	/* The "Beta" pill at an area that is new (Tobi, 26.10.2026): pale violet with dark writing,
-	   as the chips are drawn; not the petrol, not a lane. 8.2:1 here, 8.9:1 in the dark. */
 	/* Charts (the page "System"): the lanes as solid marks, a second line, the pale band of a
 	   90th percentile. */
 	--chart-1: #4a9f66;
@@ -120,7 +118,7 @@
 
 /*
  * The type scale (web/DESIGN.md, "Typography"): Tailwind's steps plus the in-between ones the UI
- * uses. No other font size is allowed; `tests/design-tokens.test.ts` checks it.
+ * uses. No other font size is allowed; `tests/design-system.test.ts` checks it.
  */
 @theme {
 	--text-nano: 0.625rem;
