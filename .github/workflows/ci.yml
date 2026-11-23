@@ -250,7 +250,8 @@ jobs:
 
   # The web UI, in four parts side by side: lint and format; types, the generated API client
   # against web/openapi.json and the build; the unit tests (Vitest in jsdom) in two halves
-  # (`--shard`, by file). Of the Playwright specs only the layout spec runs here (job `layout`).
+  # (`--shard`, by file). Of the Playwright specs the layout spec and the texts spec run here
+  # (job `layout`).
   # The pnpm store is cached per lock file, written from main only (by `lint`).
   web:
     needs: changes
@@ -308,7 +309,8 @@ jobs:
   # worker of its own, with SQLite and the filesystem and secrets made here; the worker takes
   # the spec's document out of processing (without the OCR programs it fails, which is a state
   # as any). Chromium is the one of the Playwright version the lock file pins. Only for a pull
-  # request: main was checked in it.
+  # request: main was checked in it. With it, in the same browser, what the libraries say on a
+  # German page (web/tests/e2e/texts.spec.ts): their English defaults must not show.
   layout:
     needs: changes
     if: needs.changes.outputs.web == 'true' && github.event_name == 'pull_request'
@@ -366,7 +368,7 @@ jobs:
           timeout 60 sh -c \
             'until curl -fsS http://127.0.0.1:8000/api/v1/health > /dev/null; do sleep 1; done'
       - working-directory: web
-        run: pnpm e2e tests/e2e/layout.spec.ts --trace off
+        run: pnpm e2e tests/e2e/layout.spec.ts tests/e2e/texts.spec.ts --trace off
       - name: Show the logs of API and worker
         if: failure()
         run: tail -n 100 "$RUNNER_TEMP"/lekto/*.log

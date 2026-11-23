@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 // The specs run against a running API that serves the built UI (`pnpm build`, then the API with
 // LEKTO_UI_DIR=web/build and LEKTO_COOKIE_SECURE=false); see README.md. Locally, and the layout
-// spec in CI (`.github/workflows/ci.yml`, job `layout`).
+// spec and the texts spec in CI (`.github/workflows/ci.yml`, job `layout`).
 export default defineConfig({
 	testDir: './tests/e2e',
 	// Long enough to wait for a fresh TOTP step.
