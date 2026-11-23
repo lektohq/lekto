@@ -179,7 +179,7 @@
 		<DatePicker.Content
 			sideOffset={6}
 			collisionPadding={8}
-			class="z-50 rounded-2xl border bg-popover p-3 text-popover-foreground shadow-lg"
+			class="z-50 rounded-lg bg-popover p-3 text-popover-foreground shadow-md ring-1 ring-foreground/10"
 		>
 			<DatePicker.Calendar>
 				{#snippet children({ months, weekdays })}

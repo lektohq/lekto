@@ -7,6 +7,7 @@
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import Eyebrow from '#lib/components/page/Eyebrow.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
+	import AlertDot from '#lib/components/AlertDot.svelte';
 	import Chip from '#lib/components/Chip.svelte';
 	import { formatNumber } from '#lib/i18n.ts';
 
@@ -90,11 +91,7 @@
 							</span>
 						{/if}
 						{#if current && changed && entry.id !== null}
-							<span
-								class="size-2 shrink-0 rounded-full bg-lane-yellow-foreground"
-								title={m.lens_changed_mark()}
-							></span>
-							<span class="sr-only">{m.lens_changed_mark()}</span>
+							<AlertDot tone="yellow" label={m.lens_changed_mark()} />
 						{/if}
 					</a>
 				</li>

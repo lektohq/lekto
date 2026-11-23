@@ -1486,7 +1486,10 @@ describe('the design system (web/DESIGN.md)', () => {
 			offenders((source, path) =>
 				path.endsWith('/AlertDot.svelte')
 					? null
-					: line(source, /size-\[7px\]|size-2 (?:shrink-0 )?rounded-full bg-destructive/)
+					: line(
+							source,
+							/size-\[7px\]|size-2 (?:shrink-0 )?rounded-full bg-(?:destructive|lane-yellow)/
+						)
 			)
 		).toEqual([]);
 	});

@@ -137,7 +137,7 @@
 		{@attach slidingPill}
 		class={cn(
 			'relative flex w-max min-w-full items-center rounded-full bg-secondary',
-			size === 'sm' ? 'gap-0.5 p-[3px]' : 'h-10 gap-0.5 p-1',
+			size === 'sm' ? 'gap-0.5 p-0.5' : 'h-10 gap-0.5 p-1',
 			equal && 'grid auto-cols-fr grid-flow-col'
 		)}
 	>

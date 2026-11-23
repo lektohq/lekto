@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { FIELD_FRAME } from '#lib/components/ui/field-look.ts';
+	import { cn } from '#lib/utils.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { tick } from 'svelte';
 	import { addChips } from '#lib/chips.ts';
@@ -73,7 +75,7 @@
 	role="group"
 	aria-labelledby={labelledby}
 	aria-describedby={describedby}
-	class="flex min-h-11 min-w-0 flex-wrap items-center gap-2 rounded-xl border border-input bg-card px-1.5 py-1 dark:bg-input/30"
+	class={cn(FIELD_FRAME, 'min-h-11 flex-wrap px-1.5 py-1 text-foreground')}
 >
 	{#each values as value, index (index)}
 		<Chip

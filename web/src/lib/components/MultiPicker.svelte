@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { FIELD_FRAME } from '#lib/components/ui/field-look.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { matchesWords, searchWords, toggled } from '#lib/picking.ts';
 	import { cn } from '#lib/utils.ts';
@@ -54,7 +55,8 @@
 	role="group"
 	aria-label={label}
 	class={cn(
-		'flex min-w-0 flex-col gap-2 rounded-xl border border-input bg-card p-2 dark:bg-input/30',
+		FIELD_FRAME,
+		'flex-col items-stretch p-2 text-foreground',
 		invalid && 'border-destructive'
 	)}
 >

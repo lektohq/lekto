@@ -32,6 +32,8 @@ export function dueOf(day: string, today: Date): Due {
 	return { state: days < 0 ? 'overdue' : days <= SOON ? 'soon' : 'later', days, day };
 }
 
+const shortDay = (due: Due) => formatDate(due.day, { day: '2-digit', month: '2-digit' });
+
 /** The words for a deadline: "since 4 days", "tomorrow", "in 5 days", "due 15.11.". */
 export function dueText(due: Due): string {
 	if (due.days < -1) return m.due_overdue({ count: formatNumber(-due.days) });
@@ -39,7 +41,12 @@ export function dueText(due: Due): string {
 	if (due.days === 0) return m.due_today();
 	if (due.days === 1) return m.due_tomorrow();
 	if (due.days <= SOON) return m.due_in({ count: formatNumber(due.days) });
-	return m.due_on({ date: formatDate(due.day, { day: '2-digit', month: '2-digit' }) });
+	return m.due_on({ date: shortDay(due) });
+}
+
+/** The day of a deadline beside its words ("15.11."); null where the words name it. */
+export function dueDay(due: Due): string | null {
+	return due.days <= SOON ? shortDay(due) : null;
 }
 
 /** A value of a field as the card shows it. */

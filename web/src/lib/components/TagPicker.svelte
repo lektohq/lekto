@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { FIELD_FRAME } from '#lib/components/ui/field-look.ts';
 	import { tick } from 'svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 	import CreateOffer from '#lib/components/CreateOffer.svelte';
@@ -142,7 +143,7 @@
 	role="group"
 	aria-label={labelledby ? undefined : label}
 	aria-labelledby={labelledby}
-	class="flex min-h-11 min-w-0 flex-wrap items-center gap-2 rounded-xl border border-input bg-card px-1.5 py-1 dark:bg-input/30"
+	class={cn(FIELD_FRAME, 'min-h-11 flex-wrap px-1.5 py-1 text-foreground')}
 >
 	{#each chips as tag (tag.id)}
 		<TagChip

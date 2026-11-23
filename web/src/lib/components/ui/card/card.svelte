@@ -49,7 +49,7 @@
 	}: WithElementRef<HTMLAttributes<HTMLElement>> & {
 		size?: CardSize;
 		tone?: CardTone;
-		as?: 'div' | 'section' | 'article' | 'li' | 'ul' | 'aside' | 'form';
+		as?: 'div' | 'section' | 'article' | 'li' | 'ul' | 'ol' | 'aside' | 'form';
 	} = $props();
 </script>
 
