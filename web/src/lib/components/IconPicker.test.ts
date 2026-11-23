@@ -5,9 +5,6 @@ import { CURATED, CURATED_NAMES } from '#lib/icons/curated.ts';
 import { m } from '#lib/paraglide/messages.js';
 import IconPicker from './IconPicker.svelte';
 
-// The icon picker's panel is loaded when it opens; under a full parallel run that can take a
-// while.
-
 describe('IconPicker', () => {
 	afterEach(() => vi.restoreAllMocks());
 

@@ -113,9 +113,6 @@ afterEach(() => {
 	session.clear();
 });
 
-// The icon picker's panel is loaded when it opens; under a full parallel run that can take a
-// while.
-
 /** The choice of a tag field, wider than a phone a popover: placed by measuring, which jsdom
  * does not, it counts as hidden and has no computed name; its title names it. */
 async function pickerNamed(name: string): Promise<HTMLElement> {

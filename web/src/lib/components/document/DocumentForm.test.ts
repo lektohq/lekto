@@ -605,7 +605,8 @@ describe('DocumentForm', () => {
 			space_id: MINE
 		});
 		const ok = () => serve();
-		const radio = (name: string) => screen.getByRole('radio', { name: new RegExp(name) });
+		const radio = (name: string) =>
+			screen.getByRole('radio', { name: (text) => text.includes(name) });
 		const confirmButton = () =>
 			screen.getByRole('button', { name: m.review_confirm() }) as HTMLButtonElement;
 

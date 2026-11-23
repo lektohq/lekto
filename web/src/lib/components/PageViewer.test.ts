@@ -9,6 +9,8 @@ import PageViewer from './PageViewer.svelte';
 let clientWidth: PropertyDescriptor | undefined;
 
 beforeEach(() => {
+	// Zooming keeps its place by scrolling the window, which jsdom does not do.
+	vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
 	clientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
 	Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, value: 800 });
 	vi.spyOn(window, 'getComputedStyle').mockReturnValue({

@@ -193,7 +193,6 @@ async function openTip(button: HTMLElement): Promise<HTMLElement> {
 
 beforeEach(() => {
 	serve([proposed, judged], { signal_llm: [exchange] });
-	vi.mocked(goto).mockClear();
 	goTo('/ui/documents/doc-1?tab=processing', { id: 'doc-1' });
 	desktop.override(true);
 });

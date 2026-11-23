@@ -8,6 +8,7 @@ import {
 	rememberFilters,
 	rememberFiltersCollapsed,
 	rememberSort,
+	sortShort,
 	rememberLayout,
 	rememberedFilters,
 	rememberedLayout,
@@ -170,5 +171,15 @@ describe('the months of the document view', () => {
 			['', 3, 1]
 		]);
 		expect(byMonth(items, 'title', (item) => item)).toEqual([{ month: null, start: 0, items }]);
+	});
+});
+
+describe('the short name of a sort', () => {
+	it('names a field it sorts by, and nothing goes up or down by relevance', () => {
+		expect(sortShort('-field', { name: 'Fällig am' })).toEqual({
+			key: 'Fällig am',
+			direction: 'down'
+		});
+		expect(sortShort('relevance').direction).toBeNull();
 	});
 });

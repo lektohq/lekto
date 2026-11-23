@@ -16,7 +16,6 @@ vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 afterEach(() => {
-	vi.mocked(goto).mockClear();
 	vi.restoreAllMocks();
 	goTo('/ui/inbox');
 });

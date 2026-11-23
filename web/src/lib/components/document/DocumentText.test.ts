@@ -1,5 +1,5 @@
 import { render, screen, within } from '@testing-library/svelte';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { fakeApi } from '#lib/testing/api.ts';
 import { events } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -20,6 +20,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks();
+	events.stop();
 });
 
 /** Page `number` of the text, once it is drawn. */
@@ -43,7 +44,6 @@ describe('DocumentText', () => {
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 		completed('parse');
 		expect(fetchMock).toHaveBeenCalledTimes(2);
-		events.stop();
 	});
 
 	it('shows the text as it is set, page by page', async () => {
@@ -69,7 +69,11 @@ describe('DocumentText', () => {
 
 	it('marks what it is given, and scrolls there when asked', async () => {
 		const scrolled = vi.fn();
+		// jsdom has none: given for this test, gone after it however it ends.
 		Element.prototype.scrollIntoView = scrolled;
+		onTestFinished(() => {
+			delete (Element.prototype as Partial<Element>).scrollIntoView;
+		});
 		const view = render(DocumentText, {
 			documentId: 'doc-1',
 			marks: [{ start: 14, end: 21 }]
@@ -120,11 +124,13 @@ describe('DocumentText', () => {
 		expect(measured.mock.calls.length).toBeLessThanOrEqual(4); // the box and its three pages
 		// Hidden (another tab of the page), everything measures nothing: it is no last page.
 		Element.prototype.checkVisibility = () => false;
+		onTestFinished(() => {
+			delete (Element.prototype as Partial<Element>).checkVisibility;
+		});
 		onpage.mockClear();
 		window.dispatchEvent(new Event('scroll'));
 		await new Promise((resolve) => requestAnimationFrame(resolve));
 		expect(onpage).not.toHaveBeenCalledWith(3, 3);
-		delete (Element.prototype as Partial<Element>).checkVisibility;
 	});
 
 	it('marks the quotes it is given where they stand, however their spaces fall', async () => {
