@@ -169,6 +169,24 @@ describe('messages', () => {
 		expect(keys(de).filter((key) => !called.has(key))).toEqual([]);
 	});
 
+	it('quote the name of a thing a title deletes, in both languages (WY-07)', () => {
+		// DESIGN.md, "Dialogs": "„Stromrechnung Oktober“ löschen". What a title deletes, revokes,
+		// leaves or takes out of a relation or a filter stands in the language's quotation marks;
+		// a person stands without.
+		const PERSONS = new Set(['user_delete_named']);
+		const { de: german, en: english } = catalogues;
+		const named = keys(de).filter(
+			(key) =>
+				!PERSONS.has(key) &&
+				(/\{(?:name|title)\}.? (?:löschen|widerrufen|verlassen)\??$/.test(german[key]) ||
+					['filter_remove', 'master_filter_remove', 'relations_remove'].includes(key))
+		);
+		expect(named).toContain('rule_delete');
+		expect(named.filter((key) => !/„\{\w+\}“/.test(german[key]))).toEqual([]);
+		expect(named.filter((key) => !/“\{\w+\}”/.test(english[key]))).toEqual([]);
+		for (const key of PERSONS) expect(german[key]).not.toMatch(/[„“]/);
+	});
+
 	it('have the same keys in every language', () => {
 		expect(keys(de)).toEqual(keys(en));
 	});
