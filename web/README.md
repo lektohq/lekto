@@ -130,7 +130,9 @@ unless chosen otherwise; the last choice of each, and grid or list (grid by defa
 this browser (`lib/listing.ts`). An admin's choice to include all users is a setting of the
 user menu (`lib/scope.svelte.ts`), kept in this browser too and shown at the avatar; documents,
 search, the inbox with its counter, rules and the counts at the master data follow it. Every
-`localStorage` access is guarded: without storage the defaults hold.
+`localStorage` access is guarded: without storage the defaults hold. Where the browser has none
+(blocked site data, a WebView without DOM storage), `static/theme.js` puts one in memory in its
+place before the app starts, for mode-watcher and Paraglide, which read it unguarded.
 
 The list shows one page at a time (`Pagination`, with the page in `?page=`; 25, 50 or 100 to a
 page, 50 at first, remembered in this browser). A button beside the sort turns on a selection
