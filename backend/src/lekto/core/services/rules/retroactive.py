@@ -411,7 +411,10 @@ class RuleApplicationService:
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             rule = await _applicable_rule(uow, user, id)
-            _not_asking((await uow.rules.get_version(rule.id, version)).definition)
+            # The version applied, which may be older than the one checked (XA-K02).
+            pinned = (await uow.rules.get_version(rule.id, version)).definition
+            _not_asking(pinned)
+            check_rule_facts(user, pinned)
             application = RuleApplication.create(
                 rule_id=rule.id,
                 rule_version=version,

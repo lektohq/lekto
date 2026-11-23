@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 
 from lekto.core.domain.encoding import from_base64url
 from lekto.core.domain.errors import ValidationError
-from lekto.core.domain.ids import DocumentId, PushDeviceId, UserId
+from lekto.core.domain.ids import ApiTokenId, DocumentId, PushDeviceId, UserId
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.validation import require_name, require_utc
 
@@ -67,7 +67,8 @@ class PushDevice:
     """A browser that receives a person's notifications. `name` says which ("iPhone",
     "Mac · Safari"); `locale` the language its notifications speak (the web UI's when it
     subscribed: the service worker words them); `last_success_at` when a message last reached its
-    push service; `failures` the failed deliveries since."""
+    push service; `failures` the failed deliveries since. `api_token_id`: the API token it was
+    registered through, if any; revoking the token deletes it, as its webhooks (XA-K04)."""
 
     id: PushDeviceId
     user_id: UserId
@@ -79,6 +80,7 @@ class PushDevice:
     locale: str = "en"
     last_success_at: datetime | None = None
     failures: int = 0
+    api_token_id: ApiTokenId | None = None
     version: int = 1
 
     def __post_init__(self) -> None:

@@ -815,6 +815,14 @@ push_devices = Table(
     Column("created_at", UtcDateTime, nullable=False),
     Column("last_success_at", UtcDateTime, nullable=True),
     Column("failures", Integer, nullable=False),
+    # The API token it was registered through; revoking the token deletes it (the service does).
+    Column(
+        "api_token_id",
+        Uuid,
+        ForeignKey("api_tokens.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    ),
     Column("version", Integer, nullable=False),
 )
 

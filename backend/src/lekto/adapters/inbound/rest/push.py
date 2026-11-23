@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Response
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, area
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, Via, area
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.push import (
@@ -61,7 +61,9 @@ async def list_devices(user: CurrentUser, context: Context) -> list[PushDeviceOu
     response_model=PushDeviceOut,
     responses=problem_responses(401, 409, 422),
 )
-async def register_device(body: PushDeviceIn, user: CurrentUser, context: Context) -> PushDeviceOut:
+async def register_device(
+    body: PushDeviceIn, user: CurrentUser, via: Via, context: Context
+) -> PushDeviceOut:
     device = await context.push.register(
         user,
         endpoint=body.endpoint,
@@ -69,6 +71,7 @@ async def register_device(body: PushDeviceIn, user: CurrentUser, context: Contex
         auth=body.keys.auth,
         name=body.name,
         locale=body.locale,
+        via=via,
     )
     return PushDeviceOut.of(device)
 

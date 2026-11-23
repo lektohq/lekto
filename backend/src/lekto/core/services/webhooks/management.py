@@ -425,6 +425,16 @@ async def disable_sending_rules(
         )
 
 
+async def remove_made_through(
+    uow: UnitOfWork, tokens: Collection[ApiTokenId], now: datetime
+) -> None:
+    """What `tokens` made, in `uow`, before they are revoked: their webhooks and their push
+    devices (XA-K04); a service such as Home Assistant leaves nothing behind that nobody
+    removes."""
+    await remove_webhooks_of(uow, tokens, now)
+    await uow.push_devices.remove_for_tokens(tokens)
+
+
 async def remove_webhooks_of(
     uow: UnitOfWork, tokens: Collection[ApiTokenId], now: datetime
 ) -> None:

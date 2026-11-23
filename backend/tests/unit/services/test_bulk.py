@@ -10,6 +10,7 @@ from lekto.core.domain.errors import (
     NotFoundError,
     PermissionDeniedError,
     SearchUnavailableError,
+    SpaceWriteDeniedError,
     ValidationError,
 )
 from lekto.core.domain.ids import (
@@ -179,6 +180,20 @@ async def test_what_an_action_names_is_checked_once_when_it_starts(world: World)
     ):
         with pytest.raises(NotFoundError):
             await bulk_service.start(Actor(owner.id), ids(document), action)
+    # A space the person neither sees nor hands over to is none, one they only read is refused,
+    # as when moving one document: at the start, not skipped with every document (XA-K01).
+    stranger = await world.user()
+    theirs = await world.spaces.create(Actor(stranger.id), "Theirs")
+    with pytest.raises(NotFoundError):
+        await bulk_service.start(
+            Actor(owner.id), ids(document), BulkAction(BulkKind.MOVE, space=theirs.id)
+        )
+    read_only = await world.spaces.create(Actor(stranger.id), "Shared")
+    await world.spaces.set_member(Actor(stranger.id), read_only.id, owner.id, SpaceRole.READ)
+    with pytest.raises(SpaceWriteDeniedError):
+        await bulk_service.start(
+            Actor(owner.id), ids(document), BulkAction(BulkKind.MOVE, space=read_only.id)
+        )
     with pytest.raises(ValidationError, match="move takes no add"):
         BulkAction(BulkKind.MOVE, space=SpaceId(new_id()), add=frozenset({TagId(new_id())}))
     with pytest.raises(ValidationError, match="confirm takes no contact, node"):

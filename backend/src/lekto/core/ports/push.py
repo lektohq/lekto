@@ -4,11 +4,12 @@ First sender: `webpush` (RFC 8291 encryption and RFC 8292 VAPID on `cryptography
 httpx2). The sender only transports; what to send and when is the push service's (core) job.
 """
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
 
-from lekto.core.domain.ids import PushDeviceId, UserId
+from lekto.core.domain.ids import ApiTokenId, PushDeviceId, UserId
 from lekto.core.domain.push import PushDevice, PushMessage, PushPreferences
 
 
@@ -28,6 +29,10 @@ class PushDeviceRepository(Protocol):
     async def remove(self, id: PushDeviceId) -> None: ...
 
     async def remove_for_user(self, user: UserId) -> int: ...
+
+    async def remove_for_tokens(self, tokens: Collection[ApiTokenId]) -> int:
+        """Delete the devices registered through `tokens`; how many."""
+        ...
 
 
 class PushPreferencesRepository(Protocol):

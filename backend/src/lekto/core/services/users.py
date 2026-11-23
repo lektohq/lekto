@@ -52,7 +52,7 @@ from lekto.core.services.rules.references import (
 )
 from lekto.core.services.rules.running import Prepared
 from lekto.core.services.tasks.settling import drop_queued
-from lekto.core.services.webhooks.management import disable_sending_rules
+from lekto.core.services.webhooks.management import disable_sending_rules, remove_made_through
 
 log = logging.getLogger(__name__)
 
@@ -241,6 +241,8 @@ class UserService:
             await uow.sessions.remove_for_user(id)
             await uow.known_devices.remove_for_user(id)
             if revoke_tokens:
+                tokens = await uow.api_tokens.list_for(id)
+                await remove_made_through(uow, [token.id for token in tokens], now)
                 await uow.api_tokens.remove_for_user(id)
             await uow.commit()
         log.info("password reset", extra={"user_id": str(id), "tokens_revoked": revoke_tokens})

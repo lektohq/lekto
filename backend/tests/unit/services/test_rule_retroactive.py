@@ -7,7 +7,8 @@ import pytest
 
 from lekto.core.domain import evidence, rule_conditions
 from lekto.core.domain.documents import DocumentChanges
-from lekto.core.domain.errors import NotFoundError, ValidationError
+from lekto.core.domain.errors import NotFoundError, PermissionDeniedError, ValidationError
+from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import DocumentId, new_id
 from lekto.core.domain.pipeline import RULES_APPLY, Lane
 from lekto.core.domain.progress import ProgressStatus
@@ -288,6 +289,25 @@ async def test_a_user_rule_is_applied_by_its_owner_to_their_own_documents(world:
         await r.applications.start(Actor(owner.id), rule.id, version=1, documents=too_many)
     assert refused.value.reason == because(ReasonCode.RULE_APPLY_TOO_MANY, max=MAX_DOCUMENTS)
     assert r.applications.max_documents == MAX_DOCUMENTS
+
+
+async def test_the_version_applied_is_the_one_checked(world: World) -> None:
+    """A person's facts in the version applied, not only in the current one: an older version of
+    an admin's rule with a condition on a tax ID is the admin's to apply (XA-K02)."""
+    r = await rule_world(world)
+    owner = await world.user()
+    mine = await r.arrive(owner)
+    tax = await r.tag("tax")
+    on_tax_id = Condition(
+        field=ConditionField.FACT, op=Operator.PRESENT, fact_kind=IdentifierKind.TAX_ID
+    )
+    rule = await r.global_rule(definition("Steuer", on_tax_id, add_tags(tax.id)))
+    await r.rules.change(
+        Actor(r.admin.id), rule.id, definition("Steuer", channel_api(), add_tags(tax.id))
+    )
+    await r.applications.start(Actor(owner.id), rule.id, version=2, documents=[mine.id])
+    with pytest.raises(PermissionDeniedError):
+        await r.applications.start(Actor(owner.id), rule.id, version=1, documents=[mine.id])
 
 
 async def test_a_long_application_continues_in_a_new_job(world: World) -> None:

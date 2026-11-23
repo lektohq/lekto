@@ -1,5 +1,6 @@
 """The devices of web push in SQL."""
 
+from collections.abc import Collection
 from typing import Any
 from uuid import UUID
 
@@ -7,7 +8,7 @@ from sqlalchemy import Row, delete, select
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.repositories import SqlRepository, Values
-from lekto.core.domain.ids import DocumentId, PushDeviceId, UserId
+from lekto.core.domain.ids import ApiTokenId, DocumentId, PushDeviceId, UserId
 from lekto.core.domain.push import PushDevice, PushKind, PushPreferences
 
 
@@ -31,6 +32,14 @@ class SqlPushDeviceRepository(SqlRepository[PushDeviceId, PushDevice]):
         result = await self._tx.write(delete(self.table).where(self.table.c.user_id == user))
         return result.rowcount
 
+    async def remove_for_tokens(self, tokens: Collection[ApiTokenId]) -> int:
+        if not tokens:
+            return 0
+        result = await self._tx.write(
+            delete(self.table).where(self.table.c.api_token_id.in_(list(tokens)))
+        )
+        return result.rowcount
+
     def _values(self, entity: PushDevice) -> Values:
         return {
             "id": entity.id,
@@ -43,6 +52,7 @@ class SqlPushDeviceRepository(SqlRepository[PushDeviceId, PushDevice]):
             "created_at": entity.created_at,
             "last_success_at": entity.last_success_at,
             "failures": entity.failures,
+            "api_token_id": entity.api_token_id,
             "version": entity.version,
         }
 
@@ -58,6 +68,7 @@ class SqlPushDeviceRepository(SqlRepository[PushDeviceId, PushDevice]):
             created_at=row.created_at,
             last_success_at=row.last_success_at,
             failures=row.failures,
+            api_token_id=None if row.api_token_id is None else ApiTokenId(row.api_token_id),
             version=row.version,
         )
 

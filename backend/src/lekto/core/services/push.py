@@ -15,6 +15,7 @@ from uuid import UUID
 
 from lekto.core.domain.errors import ConcurrencyError, ConflictError, NotFoundError
 from lekto.core.domain.events import DomainEvent, ReviewRequired
+from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import PushDeviceId, UserId, new_id
 from lekto.core.domain.inbox import InboxTab
 from lekto.core.domain.jobs import Job, RetryPolicy
@@ -214,8 +215,10 @@ class PushService:
         auth: str,
         name: str,
         locale: str,
+        via: ViaToken | None = None,
     ) -> PushDevice:
-        """Take a browser's subscription for `actor`; the same address again replaces it."""
+        """Take a browser's subscription for `actor` (through the API token `via`, whose
+        revocation deletes it); the same address again replaces it."""
         self._sender_or_off()
         now = self._clock.now()
         device = PushDevice(
@@ -227,6 +230,7 @@ class PushService:
             name=name,
             locale=locale,
             created_at=now,
+            api_token_id=None if via is None else via.id,
         )
         async with self._uow() as uow:
             known = await uow.push_devices.find_by_endpoint(endpoint)

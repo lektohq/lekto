@@ -6,6 +6,7 @@ import pytest
 
 from lekto.adapters.outbound.memory.push import FAKE_PUBLIC_KEY
 from lekto.core.domain.errors import ConcurrencyError, ConflictError, NotFoundError
+from lekto.core.domain.identity import ApiToken
 from lekto.core.domain.ids import DocumentId, PushDeviceId, UserId, new_id
 from lekto.core.domain.push import PushDevice, PushKind, PushMessage, PushPreferences
 from lekto.core.ports.push import PushOutcome, PushSender
@@ -104,6 +105,28 @@ class PushDeviceRepositoryContract:
             assert await uow.push_devices.find(device.id) is None
             with pytest.raises(NotFoundError):
                 await uow.push_devices.remove(device.id)
+
+    async def test_the_devices_of_tokens_go_with_them(self, uow_factory: UnitOfWorkFactory) -> None:
+        """Those registered through the tokens; the others stay (XA-K04)."""
+        user = await a_user(uow_factory)
+        token, _ = ApiToken.issue(
+            user_id=user.id, name="Home Assistant", rights=frozenset(), now=NOW
+        )
+        through = a_device(user.id, "https://web.push.apple.com/through", api_token_id=token.id)
+        kept = a_device(user.id, "https://web.push.apple.com/kept")
+        async with uow_factory() as uow:
+            await uow.api_tokens.add(token)
+            await uow.push_devices.add(through)
+            await uow.push_devices.add(kept)
+            await uow.commit()
+        async with uow_factory() as uow:
+            found = await uow.push_devices.find(through.id)
+            assert found is not None and found.api_token_id == token.id
+            assert await uow.push_devices.remove_for_tokens([]) == 0
+            assert await uow.push_devices.remove_for_tokens([token.id]) == 1
+            await uow.commit()
+        async with uow_factory() as uow:
+            assert [device.id for device in await uow.push_devices.list_for(user.id)] == [kept.id]
 
 
 class PushPreferencesRepositoryContract:

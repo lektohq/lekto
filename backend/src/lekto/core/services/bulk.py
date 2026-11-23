@@ -42,11 +42,13 @@ from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
 from lekto.core.domain.rights import Actor, TokenRight
+from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.repository import PAGE_LIMIT, DocumentFilter
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import load_actor, load_lister
 from lekto.core.services._jobs import LEASE, JobRunner, lost, reason_of
+from lekto.core.services._moves import move_target
 from lekto.core.services.documents import DocumentService
 from lekto.core.services.pipeline import PipelineService
 from lekto.core.services.search import SearchService
@@ -111,7 +113,7 @@ class BulkService:
         documents = await self._resolve(actor, selection)
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
-            await _check_action(uow, action)
+            await _check_action(uow, user, action)
             now = self._clock.now()
             operation = BulkOperation.create(
                 user_id=user.id,
@@ -319,8 +321,10 @@ def _changes(action: BulkAction, document: Document) -> DocumentChanges:
             raise AssertionError(f"no metadata change: {action.kind}")
 
 
-async def _check_action(uow: UnitOfWork, action: BulkAction) -> None:
-    """NotFoundError for what the action names that does not exist."""
+async def _check_action(uow: UnitOfWork, user: User, action: BulkAction) -> None:
+    """NotFoundError for what the action names that does not exist; for a space, as moving one
+    document checks it (`move_target`): NotFoundError for one the person neither sees nor hands
+    over to, SpaceWriteDeniedError for one they only read (XA-K01, SB-K04)."""
     for tag in sorted(action.add | action.remove):
         await uow.tags.get(tag)
     if action.topic is not None:
@@ -330,7 +334,7 @@ async def _check_action(uow: UnitOfWork, action: BulkAction) -> None:
     if action.document_type is not None:
         await uow.document_types.get(action.document_type)
     if action.space is not None:
-        await uow.spaces.get(action.space)
+        await move_target(uow, user, action.space)
 
 
 def _operation_id(job: Job) -> BulkOperationId:

@@ -1,9 +1,9 @@
 """The devices of web push in memory, and a stand-in push service for tests."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 
 from lekto.adapters.outbound.memory.rows import MemoryRepository, _copy
-from lekto.core.domain.ids import PushDeviceId, UserId
+from lekto.core.domain.ids import ApiTokenId, PushDeviceId, UserId
 from lekto.core.domain.push import PushDevice, PushMessage, PushPreferences
 from lekto.core.ports.push import PushOutcome, PushResult
 
@@ -23,6 +23,10 @@ class MemoryPushDeviceRepository(MemoryRepository[PushDeviceId, PushDevice]):
 
     async def remove_for_user(self, user: UserId) -> int:
         return self._remove_rows([row for row in self._all() if row.user_id == user])
+
+    async def remove_for_tokens(self, tokens: Collection[ApiTokenId]) -> int:
+        chosen = set(tokens)
+        return self._remove_rows([row for row in self._all() if row.api_token_id in chosen])
 
 
 class MemoryPushPreferencesRepository(MemoryRepository[UserId, PushPreferences]):

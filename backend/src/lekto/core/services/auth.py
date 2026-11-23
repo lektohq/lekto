@@ -77,7 +77,7 @@ from lekto.core.ports.clock import Clock
 from lekto.core.ports.identity import PasswordHasher, SecretCipher, Totp
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import load_actor
-from lekto.core.services.webhooks.management import remove_webhooks_of
+from lekto.core.services.webhooks.management import remove_made_through
 
 log = logging.getLogger(__name__)
 
@@ -398,7 +398,7 @@ class AuthService:
             await uow.known_devices.remove_for_user(actor.id)
             if revoke_tokens:
                 tokens = await uow.api_tokens.list_for(actor.id)
-                await remove_webhooks_of(uow, [token.id for token in tokens], now)
+                await remove_made_through(uow, [token.id for token in tokens], now)
                 await uow.api_tokens.remove_for_user(actor.id)
             signed_in = None
             if session is not None:
@@ -544,7 +544,7 @@ class AuthService:
             api_token = await uow.api_tokens.find(id)
             if api_token is None or api_token.user_id != actor.id:
                 raise NotFoundError("API token", id)
-            await remove_webhooks_of(uow, [id], self._clock.now())
+            await remove_made_through(uow, [id], self._clock.now())
             await uow.api_tokens.remove(id)
             await uow.commit()
         log.info("API token revoked", extra={"user_id": str(actor.id), "token_id": str(id)})
