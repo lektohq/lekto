@@ -194,6 +194,57 @@ describe('FactsPanel', () => {
 		expect(onmark).toHaveBeenLastCalledWith(spans, false, m.identifier_kind_invoice_number());
 	});
 
+	// A long statement brings hundreds of facts; drawn at once they held a phone for seconds
+	// (WP-07).
+	it('shows the first 20 of a long group, the rest on request, anew for the next document', async () => {
+		const pad = (n: number) => String(n).padStart(3, '0');
+		const facts: Facts = {
+			...FACTS,
+			named: [],
+			codes: [],
+			identifiers: Array.from({ length: 45 }, (_, n) => ({
+				kind: 'iban',
+				value: `DE00123450000000000${pad(n)}`,
+				contact_id: null,
+				in_text: true,
+				in_code: false,
+				role: 'contact',
+				origins: ['pattern'],
+				state: 'found',
+				kept: true,
+				spans: [],
+				other_contacts: 0
+			})),
+			numbers: Array.from({ length: 25 }, (_, n) => ({
+				kind: 'customer_number',
+				value: `12345-${pad(n)}`,
+				written: `12345-${pad(n)}`,
+				role: 'own',
+				origins: ['pattern'],
+				state: 'found',
+				spans: []
+			}))
+		};
+		const rows = (kind: () => string) =>
+			screen.queryAllByRole('button', { name: new RegExp(`^${kind()}`) }).length;
+		const { rerender } = render(FactsPanel, props({ facts }));
+		expect([rows(m.identifier_kind_iban), rows(m.identifier_kind_customer_number)]).toEqual([
+			20, 20
+		]);
+
+		await userEvent.click(screen.getByRole('button', { name: m.facts_more({ count: '25' }) }));
+		expect([rows(m.identifier_kind_iban), rows(m.identifier_kind_customer_number)]).toEqual([
+			45, 20
+		]);
+		await userEvent.click(screen.getByRole('button', { name: m.facts_fewer() }));
+		expect(rows(m.identifier_kind_iban)).toBe(20);
+
+		await userEvent.click(screen.getByRole('button', { name: m.facts_more({ count: '5' }) }));
+		expect(rows(m.identifier_kind_customer_number)).toBe(25);
+		await rerender(props({ facts, documentId: 'doc-2' }));
+		expect(rows(m.identifier_kind_customer_number)).toBe(20);
+	});
+
 	it('marks what of a code stands in the text, and shows a code on each of its pages', async () => {
 		const onmark = vi.fn();
 		const onshowcode = vi.fn();

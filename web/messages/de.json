@@ -2535,6 +2535,8 @@
 	"facts_third_one": "1 Kennung eines Dritten",
 	"facts_third": "{count} Kennungen Dritter",
 	"facts_third_hint": "IBANs und Gläubiger-IDs anderer, etwa in Buchungen",
+	"facts_more": "{count} weitere zeigen",
+	"facts_fewer": "Weniger zeigen",
 	"facts_rejected_at": "Bei {contact} verworfen",
 	"facts_unknown_hint": "Als Kennung anheften, dann erkennt Lekto den Kontakt daran.",
 	"facts_attach_admins": "Anheften dürfen Admins (Kennungen sind Stammdaten).",

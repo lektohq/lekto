@@ -108,6 +108,25 @@
 	// the document is shown.
 	let thirdOpen = $state(false);
 	let adding = $state(false);
+	// A long statement brings hundreds of facts: each group shows its first ones, the rest on
+	// request, so that the tab opens at once however many there are.
+	const SHOWN = 20;
+	type Group = 'own' | 'others' | 'unknown' | 'third' | 'numbers' | 'decided';
+	// The groups shown in full, for this document only: the page keeps this panel when it goes
+	// on to the next one.
+	let expanded = $state<{ documentId: string; groups: Group[] }>({ documentId: '', groups: [] });
+	const showsAll = (group: Group) =>
+		expanded.documentId === documentId && expanded.groups.includes(group);
+	function toggleAll(group: Group) {
+		const groups = expanded.documentId === documentId ? expanded.groups : [];
+		expanded = {
+			documentId,
+			groups: groups.includes(group) ? groups.filter((g) => g !== group) : [...groups, group]
+		};
+	}
+	function firstOf<T>(group: Group, items: readonly T[]): readonly T[] {
+		return showsAll(group) ? items : items.slice(0, SHOWN);
+	}
 	// A click keeps a mark: the text scrolls to it (also when the entry was marked already).
 	let reveal = false;
 	let clicks = $state(0);
@@ -348,6 +367,19 @@
 	</div>
 {/snippet}
 
+{#snippet more(group: Group, total: number)}
+	{#if total > SHOWN}
+		<Button
+			variant="link"
+			size="inline"
+			class="min-h-11 px-2.5 text-meta font-normal sm:min-h-0"
+			onclick={() => toggleAll(group)}
+		>
+			{showsAll(group) ? m.facts_fewer() : m.facts_more({ count: formatNumber(total - SHOWN) })}
+		</Button>
+	{/if}
+{/snippet}
+
 {#snippet entryRow(entry: Entry, contactId: string | null)}
 	{@const id = entryId(entry)}
 	{@const identifier = 'kind' in entry ? entry : null}
@@ -546,24 +578,27 @@
 				{m.facts_own()}
 				{#if facts.contact_id}{@render contactLink(facts.contact_id)}{/if}
 			</Eyebrow>
-			{#each groups.own as entry (entryId(entry))}
+			{#each firstOf('own', groups.own) as entry (entryId(entry))}
 				{@render entryRow(entry, null)}
 			{/each}
+			{@render more('own', groups.own.length)}
 		{/if}
 		{#if groups.others.length > 0}
 			<Eyebrow as="h3" class="mt-3 px-1">{m.facts_others()}</Eyebrow>
-			{#each groups.others as entry (entryId(entry))}
+			{#each firstOf('others', groups.others) as entry (entryId(entry))}
 				{@render entryRow(entry, entry.contact_id)}
 			{/each}
+			{@render more('others', groups.others.length)}
 		{/if}
 		{#if groups.unknown.length > 0}
 			<Eyebrow as="h3" class="mt-3 px-1">{m.facts_unknown()}</Eyebrow>
 			<p class="px-1 text-xs text-muted-foreground">
 				{admin ? m.facts_unknown_hint() : m.facts_attach_admins()}
 			</p>
-			{#each groups.unknown as entry (entryId(entry))}
+			{#each firstOf('unknown', groups.unknown) as entry (entryId(entry))}
 				{@render entryRow(entry, null)}
 			{/each}
+			{@render more('unknown', groups.unknown.length)}
 		{/if}
 		{#if groups.third.length > 0}
 			<FoldedGroup
@@ -574,9 +609,10 @@
 					: m.facts_third({ count: formatNumber(groups.third.length) })}
 				hint={m.facts_third_hint()}
 			>
-				{#each groups.third as entry (entryId(entry))}
+				{#each firstOf('third', groups.third) as entry (entryId(entry))}
 					{@render entryRow(entry, entry.contact_id)}
 				{/each}
+				{@render more('third', groups.third.length)}
 			</FoldedGroup>
 		{/if}
 	</Card.Root>
@@ -589,16 +625,18 @@
 				<SectionTitle size="card" id="numbers-title">{m.facts_numbers()}</SectionTitle>
 				<span class="text-xs text-muted-foreground">{m.facts_numbers_hint()}</span>
 			</div>
-			{#each facts.numbers ?? [] as number (numberId(number))}
+			{#each firstOf('numbers', facts.numbers ?? []) as number (numberId(number))}
 				{@render keptRow(numberId(number), number, number.spans)}
 			{/each}
+			{@render more('numbers', facts.numbers?.length ?? 0)}
 			{#if facts.decided && facts.decided.length > 0}
 				<Eyebrow as="h3" class="mt-3 px-1">
 					{m.facts_decided()}
 				</Eyebrow>
-				{#each facts.decided as fact (decidedId(fact))}
+				{#each firstOf('decided', facts.decided) as fact (decidedId(fact))}
 					{@render keptRow(decidedId(fact), fact, fact.spans)}
 				{/each}
+				{@render more('decided', facts.decided.length)}
 			{/if}
 			{#if facts.editable}
 				<div class="mt-2 px-1">
