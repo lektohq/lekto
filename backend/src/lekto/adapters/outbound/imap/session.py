@@ -36,6 +36,8 @@ class ImapMailSession:
         self._run = run
         self._selected: str | None = None
         self._keywords: dict[str, tuple[tuple[str, ...], bool]] = {}
+        # As the SELECT answered: `imaplib` hands its untagged answers out once.
+        self._uidvalidity: dict[str, int] = {}
         self._raw: dict[str, bytes] | None = None  # the folders as the server lists them
         self._lock = asyncio.Lock()
 
@@ -78,9 +80,10 @@ class ImapMailSession:
         if status != "OK":
             raise MailServerError(because(ReasonCode.MAIL_FOLDER_MISSING, folder=folder))
         self._selected = folder
+        self._uidvalidity[folder] = self._answered_uidvalidity()
         self._keywords[folder] = folder_keywords(self._imap)
 
-    def _uidvalidity(self) -> int:
+    def _answered_uidvalidity(self) -> int:
         """The folder's UIDVALIDITY as the SELECT answered it; 0 where the server gave none."""
         _, answer = self._imap.response("UIDVALIDITY")
         value = answer[-1] if answer else None
@@ -91,7 +94,7 @@ class ImapMailSession:
 
     def _search(self, folder: str, search: MailSearch) -> FolderMails:
         self._select(folder)
-        uidvalidity = self._uidvalidity()
+        uidvalidity = self._uidvalidity.get(folder, 0)
         criteria = []
         if search.since is not None:
             criteria.append(f"SINCE {_day(search.since)}")

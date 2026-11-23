@@ -66,6 +66,16 @@ async def test_pages_keep_their_rotation_and_turning_adds_to_it(
     assert widths(target) == [(300, 0), (200, 0), (100, 180)]
 
 
+async def test_a_page_taken_twice_is_turned_once(
+    page_composer: PikepdfPageComposer, tmp_path: Path
+) -> None:
+    """The second copy of a page does not inherit the turn of the first (AD-K04)."""
+    source = three_pages(tmp_path / "three.pdf")
+    target = tmp_path / "part.pdf"
+    await page_composer.compose([source], [PagePick(0, 1, rotate=90), PagePick(0, 1)], target)
+    assert widths(target) == [(100, 90), (100, 0)]
+
+
 async def test_a_rotation_the_page_tree_gives_stays(
     page_composer: PikepdfPageComposer, tmp_path: Path
 ) -> None:

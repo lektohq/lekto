@@ -8,7 +8,7 @@ from types import MethodType
 
 import pytest
 
-from lekto.adapters.outbound.imap.server import ImapMailServer, _folders, _guarded
+from lekto.adapters.outbound.imap.server import ImapMailServer, _folders, _guarded, _leave
 from lekto.core.domain.mail import MailLogin, MailSecurity
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.mail_server import MailServerError
@@ -118,3 +118,21 @@ def test_a_refusal_names_the_server_s_words() -> None:
     assert caught.value.reason == because(
         ReasonCode.MAIL_SERVER_ERROR, detail="[CANNOT] Invalid flags"
     )
+
+
+class Leaving:
+    def __init__(self) -> None:
+        self.closed = False
+
+    def logout(self) -> None:
+        raise imaplib.IMAP4.abort("socket error: EOF")
+
+    def shutdown(self) -> None:
+        self.closed = True
+
+
+def test_a_failed_logout_still_closes_the_connection() -> None:
+    """`imaplib` shuts the socket only after a LOGOUT that worked (AD-K11)."""
+    imap = Leaving()
+    _leave(imap)  # type: ignore[arg-type]
+    assert imap.closed

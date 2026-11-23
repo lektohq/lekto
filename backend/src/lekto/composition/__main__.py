@@ -70,12 +70,7 @@ import structlog
 
 from lekto.adapters.inbound.evaluation import EvaluationSetError, Run
 from lekto.adapters.outbound.sql import SchemaState
-from lekto.adapters.outbound.webpush.sender import (
-    b64url,
-    new_private_key,
-    private_key_of,
-    public_bytes,
-)
+from lekto.adapters.outbound.webpush.sender import new_private_key, private_key_of, public_bytes
 from lekto.composition.api import run_api
 from lekto.composition.database import check_schema, migrate_database
 from lekto.composition.endpoints import external_endpoints
@@ -103,6 +98,7 @@ from lekto.composition.settings import (
 )
 from lekto.composition.train import run_training
 from lekto.composition.worker import run_worker
+from lekto.core.domain.encoding import base64url
 
 log = structlog.get_logger("lekto.composition")
 
@@ -152,7 +148,7 @@ def main(argv: Sequence[str] = ()) -> int:
 
 
 def public_key_of(private: str) -> str:
-    return b64url(public_bytes(private_key_of(private)))
+    return base64url(public_bytes(private_key_of(private)))
 
 
 def _vapid_key() -> int:

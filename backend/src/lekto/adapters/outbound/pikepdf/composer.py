@@ -23,7 +23,12 @@ from pathlib import Path
 import pikepdf
 from PIL import ExifTags, Image, ImageOps, ImageSequence
 
-from lekto.adapters.outbound.imaging import check_pixels, flatten_on_white, image_dpi
+from lekto.adapters.outbound.imaging import (
+    check_pixels,
+    flatten_on_white,
+    image_dpi,
+    in_plain_mode,
+)
 from lekto.core.domain import media_types
 from lekto.core.domain.editing import PagePick
 from lekto.core.domain.errors import UnprocessableDocumentError
@@ -73,8 +78,11 @@ def _compose(sources: Sequence[PageSource], pages: Sequence[PagePick], target: P
             if pick.page > len(source.pages):
                 raise ValueError(f"source {pick.source} has no page {pick.page}")
             result.pages.append(source.pages[pick.page - 1])
+        # Turned once all are in: a page taken twice is copied, and the copy of one turned
+        # before would inherit its turn (AD-K04).
+        for page, pick in zip(result.pages, pages, strict=True):
             if pick.rotate:
-                result.pages[-1].rotate(pick.rotate, relative=True)
+                page.rotate(pick.rotate, relative=True)
         result.trailer.ID = pikepdf.Array(
             [pikepdf.String(os.urandom(16)), pikepdf.String(os.urandom(16))]
         )
@@ -147,7 +155,7 @@ def _add_page(pdf: pikepdf.Pdf, frame: Image.Image, jpeg: bytes | None) -> None:
         width, height = frame.size
     else:
         turn = 0
-        upright = _embeddable(flatten_on_white(ImageOps.exif_transpose(frame)))
+        upright = in_plain_mode(flatten_on_white(ImageOps.exif_transpose(frame)))
         grey = upright.mode in ("1", "L")
         data = zlib.compress(upright.tobytes())
         bits, filter = (1 if upright.mode == "1" else 8), pikepdf.Name.FlateDecode
@@ -163,15 +171,6 @@ def _add_page(pdf: pikepdf.Pdf, frame: Image.Image, jpeg: bytes | None) -> None:
     page.Contents = pdf.make_stream(f"q {across:.4f} 0 0 {high:.4f} 0 0 cm /Im0 Do Q".encode())
     if turn:
         page.rotate(turn, relative=True)
-
-
-def _embeddable(image: Image.Image) -> Image.Image:
-    """`image` as one bit, grey or RGB, the modes a page holds it in."""
-    if image.mode in ("1", "L", "RGB"):
-        return image
-    if image.mode.startswith(("I", "F")):
-        return image.convert("L")
-    return image.convert("RGB")  # a palette, CMYK, YCbCr, LAB, HSV
 
 
 def _unreadable_image(error: Exception) -> UnprocessableDocumentError:

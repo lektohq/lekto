@@ -78,8 +78,8 @@ class Ocr(Protocol):
         answer), which may be temporary.
 
         A digitally signed original is processed anyway; the archive does not carry the
-        signature (the original is never changed) and `note` says so. If PDF/A is not possible
-        for the file, a plain PDF is written and `pdfa` is False, `note` naming the reason.
+        signature (the original is never changed) and `notes` say so. If PDF/A is not possible
+        for the file, a plain PDF is written and `pdfa` is False, `notes` naming the reason.
         `readings` tell how well each recognised page was read, `words` what Tesseract read on
         it.
 

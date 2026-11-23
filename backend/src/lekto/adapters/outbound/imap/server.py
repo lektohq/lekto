@@ -125,8 +125,11 @@ def _login_with_literal(imap: imaplib.IMAP4, login: MailLogin) -> None:
 
 
 def _leave(imap: imaplib.IMAP4) -> None:
-    with suppress(imaplib.IMAP4.error, OSError):
+    try:
         imap.logout()
+    except imaplib.IMAP4.error, OSError:
+        # `imaplib` shuts the socket only after a LOGOUT that worked (AD-K11).
+        _close(imap)
 
 
 def _guarded[T](host: str, work: Callable[..., T], *args: object) -> T:

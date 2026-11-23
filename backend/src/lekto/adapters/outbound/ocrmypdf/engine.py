@@ -14,13 +14,13 @@ Three things make OCRmyPDF refuse or downgrade a file, and each gets a further r
 
 - A digitally signed PDF (exit code 2, "digital signature"): the second run passes
   `--invalidate-digital-signatures`. The original is never changed; only the archive lacks the
-  signature, and `OcrResult.note` says so.
+  signature, and `OcrResult.notes` say so.
 - A colour space PDF/A cannot hold (exit code 1, `ColorConversionNeededError`, or exit code 10
   with a colour space as the issue): the next run has Ghostscript convert the colours to RGB
-  (`COLOUR_OPTIONS`), which makes such files PDF/A; `note` says so (`COLOUR_NOTE`). Only if
+  (`COLOUR_OPTIONS`), which makes such files PDF/A; `notes` say so (`COLOUR_NOTE`). Only if
   that fails too does the archive become a plain PDF, as below (Tobi, 22.10.2026).
 - A file whose PDF/A conversion fails outright (exit code 1): the next run writes a plain PDF
-  (`--output-type pdf`); `pdfa` is False and `note` names the reason. Exit code 10 means
+  (`--output-type pdf`); `pdfa` is False and `notes` name the reason. Exit code 10 means
   OCRmyPDF itself fell back to a plain PDF (Ghostscript refused a construct of the file); the
   reason is read from its output.
 
@@ -69,7 +69,12 @@ from time import monotonic
 from PIL import Image, ImageSequence, TiffImagePlugin
 
 from lekto.adapters.outbound.http_client import endpoint_of
-from lekto.adapters.outbound.imaging import check_pixels, flatten_on_white, image_dpi
+from lekto.adapters.outbound.imaging import (
+    check_pixels,
+    flatten_on_white,
+    image_dpi,
+    in_plain_mode,
+)
 from lekto.adapters.outbound.ocrmypdf.hocr import read_hocr
 from lekto.adapters.outbound.ocrmypdf.vision import (
     PROMPT,
@@ -220,6 +225,8 @@ class OcrmypdfEngine:
                 )
             else:
                 readings, words = await asyncio.to_thread(read_hocr, work)
+            # Before the archive takes its place: on error, `target` is not created (AD-K05).
+            engine = await self._engine_name(vision=vision)
             await asyncio.to_thread(temporary.replace, target)
         finally:
             for path in (temporary, prepared):
@@ -239,7 +246,7 @@ class OcrmypdfEngine:
             )
         return OcrResult(
             pages=pages,
-            engine=await self._engine_name(vision=vision),
+            engine=engine,
             pdfa=pdfa,
             notes=tuple(notes),
             readings=readings,
@@ -487,12 +494,7 @@ def _not_pdfa(reason: str) -> Reason:
 
 def _ocr_ready(image: Image.Image) -> Image.Image:
     """`image` itself if OCRmyPDF takes it, otherwise a converted copy."""
-    image = flatten_on_white(image)
-    if image.mode in ("1", "L", "RGB", "P"):
-        return image
-    if image.mode.startswith(("I", "F")):
-        return image.convert("L")
-    return image.convert("RGB")  # CMYK, YCbCr, LAB, HSV
+    return in_plain_mode(flatten_on_white(image), palette=True)
 
 
 def _last_line(text: str) -> str:

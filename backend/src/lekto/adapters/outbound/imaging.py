@@ -44,6 +44,18 @@ def flatten_on_white(image: Image.Image) -> Image.Image:
     return white
 
 
+def in_plain_mode(image: Image.Image, *, palette: bool = False) -> Image.Image:
+    """`image` as one bit, grey or RGB, and with `palette` also as a palette: itself if it is in
+    one of them, an image of integers or floats as grey, any other (CMYK, YCbCr, LAB, HSV, and a
+    palette without `palette`) as RGB. A PDF page holds the first three; OCRmyPDF takes a
+    palette too."""
+    if image.mode in ("1", "L", "RGB") or (palette and image.mode == "P"):
+        return image
+    if image.mode.startswith(("I", "F")):
+        return image.convert("L")
+    return image.convert("RGB")
+
+
 def image_dpi(size: tuple[int, int], stated: object) -> int:
     """The resolution for an image of `size` pixels that states `stated` (Pillow's `dpi`): the
     stated one if it gives a page within `PLAUSIBLE_PAGE`, else the one that makes its long edge
