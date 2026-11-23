@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
-	import { describeError } from '#lib/errors.ts';
+	import { tick, type Snippet } from 'svelte';
+	import { describeError, FormIncomplete } from '#lib/errors.ts';
 
 	// A form whose submit runs `action` (a request): busy meanwhile (a second submit does
 	// nothing), `ondone` once it resolves (the dialog closes), the error described when it
@@ -27,6 +27,17 @@
 	} = $props();
 
 	let error = $state<string | null>(null);
+	let form = $state<HTMLFormElement | null>(null);
+
+	// The first field marked as missing or wrong takes the focus.
+	async function toFirstMarked() {
+		await tick();
+		const marked = form?.querySelector<HTMLElement>('[aria-invalid="true"]');
+		const target = marked?.matches('input, select, textarea, button, [tabindex]')
+			? marked
+			: marked?.querySelector<HTMLElement>('input, select, textarea, button, [tabindex]');
+		target?.focus();
+	}
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
@@ -38,12 +49,20 @@
 			ondone();
 		} catch (problem) {
 			error = describeError(problem);
+			if (problem instanceof FormIncomplete) void toFirstMarked();
 		} finally {
 			busy = false;
 		}
 	}
 </script>
 
-<form class={className} onsubmit={submit} oninput={onchanged} onchange={onchanged} novalidate>
+<form
+	bind:this={form}
+	class={className}
+	onsubmit={submit}
+	oninput={onchanged}
+	onchange={onchanged}
+	novalidate
+>
 	{@render children({ busy, error })}
 </form>

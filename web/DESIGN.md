@@ -1015,6 +1015,11 @@ the phone a full-screen editor carries the same two actions in its top bar.
 
 - Forms save with "Speichern" or a verb that names the result ("Speichern und Probelauf",
   "Anlegen"). An action that takes effect at once (switch, chip) needs no save.
+- **Missing fields are marked when sent.** A form whose missing parts are not seen at a glance
+  (a rule, a webhook, a new API token) keeps its button active: sent with a field still to fill
+  or fix, it marks the field (`aria-invalid`, with words where the mark alone does not say
+  what), says "Bitte prüfe die markierten Felder." beside its buttons and gives the first
+  marked field the focus (`FormIncomplete` in `AsyncForm`).
 - **Unsaved changes are guarded.** A form with changes asks before the user leaves it: by a link,
   a tab, the back button, closing the dialog or closing the browser (`beforeNavigate`,
   `beforeunload`). The question is a `ConfirmDialog` with "Verwerfen" and "Weiter bearbeiten":

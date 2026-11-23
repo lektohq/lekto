@@ -19,6 +19,7 @@
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { WEBHOOK_EVENT_TYPES } from '#lib/events.svelte.ts';
+	import { FormIncomplete } from '#lib/errors.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { session } from '#lib/session.svelte.ts';
 	import { TIMEOUT_MINUTES } from '#lib/tasks.ts';
@@ -136,19 +137,24 @@
 		headers.some((header) => header.value !== '' || !stillKept(header)) ||
 			headers.map((header) => header.name.trim()).join('\n') !== (webhook?.headers ?? []).join('\n')
 	);
+	const openTasksValid = $derived(
+		Number.isInteger(openTasks) &&
+			openTasks >= WEBHOOK_LIMITS.openTasks.min &&
+			openTasks <= WEBHOOK_LIMITS.openTasks.max
+	);
+	const templateMissing = $derived(body === 'template' && template.trim() === '');
 	const incomplete = $derived(
 		name.trim() === '' ||
 			url.trim() === '' ||
 			eventsMissing ||
 			!headersComplete ||
-			(body === 'template' && template.trim() === '') ||
-			!(
-				Number.isInteger(openTasks) &&
-				openTasks >= WEBHOOK_LIMITS.openTasks.min &&
-				openTasks <= WEBHOOK_LIMITS.openTasks.max
-			) ||
+			templateMissing ||
+			!openTasksValid ||
 			!callMinutesValid
 	);
+	// Sent once while incomplete: from then on what is missing is marked.
+	let tried = $state(false);
+	const marked = (missing: boolean) => (tried && missing) || undefined;
 
 	function headerBody() {
 		return headers.map((header) =>
@@ -193,6 +199,10 @@
 	}
 
 	async function save() {
+		if (incomplete) {
+			tried = true;
+			throw new FormIncomplete();
+		}
 		const event_types = trigger === 'rules' ? [] : all ? ['*'] : types;
 		const content = {
 			body,
@@ -247,7 +257,13 @@
 	{#snippet children({ busy, error })}
 		<Field.Field>
 			<Field.Label for="wh-name">{m.field_name()}</Field.Label>
-			<Input id="wh-name" bind:value={name} maxlength={WEBHOOK_LIMITS.name} required />
+			<Input
+				id="wh-name"
+				bind:value={name}
+				maxlength={WEBHOOK_LIMITS.name}
+				required
+				aria-invalid={marked(name.trim() === '')}
+			/>
 		</Field.Field>
 		<Field.Field>
 			<HintLabel
@@ -262,6 +278,7 @@
 				bind:value={url}
 				maxlength={WEBHOOK_LIMITS.url}
 				required
+				aria-invalid={marked(url.trim() === '')}
 				aria-describedby="wh-url-hint"
 			/>
 		</Field.Field>
@@ -299,7 +316,10 @@
 					{/if}
 				</fieldset>
 				{#if eventsMissing}
-					<p id="wh-events-missing" class="text-sm text-muted-foreground">
+					<p
+						id="wh-events-missing"
+						class={tried ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'}
+					>
 						{m.webhook_events_missing()}
 					</p>
 				{:else}
@@ -335,6 +355,7 @@
 					label={m.webhook_body_template()}
 					purpose="webhook"
 					maxlength={WEBHOOK_LIMITS.body}
+					invalid={tried && templateMissing}
 				/>
 			{/if}
 		</div>
@@ -351,6 +372,7 @@
 						bind:value={header.name}
 						maxlength={WEBHOOK_LIMITS.headerName}
 						required
+						aria-invalid={marked(header.name.trim() === '')}
 					/>
 					<!-- A header's value is no password of the person: no manager offers to make or keep
 					     one (Tobi, 23.11.2026, WC-K08); masked all the same. -->
@@ -366,6 +388,7 @@
 						placeholder={stillKept(header) ? m.webhook_header_kept() : ''}
 						bind:value={header.value}
 						maxlength={WEBHOOK_LIMITS.headerValue}
+						aria-invalid={marked(!stillKept(header) && header.value === '')}
 					/>
 					<IconButton
 						type="button"
@@ -404,6 +427,7 @@
 				class="max-w-32"
 				bind:value={openTasks}
 				required
+				aria-invalid={!openTasksValid || undefined}
 				aria-describedby="wh-open-tasks-hint wh-open-tasks-rule"
 			/>
 			<Field.Description id="wh-open-tasks-rule"
@@ -457,7 +481,7 @@
 				<Button href={cancelHref} variant="ghost" onclick={() => (leaving = true)}>
 					{m.cancel()}
 				</Button>
-				<Button type="submit" {busy} disabled={incomplete}>
+				<Button type="submit" {busy}>
 					{webhook ? m.save() : m.create()}
 				</Button>
 			</div>

@@ -15,9 +15,10 @@
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
+	import DetailList from '#lib/components/DetailList.svelte';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
-	import { describeError } from '#lib/errors.ts';
+	import { describeError, FormIncomplete } from '#lib/errors.ts';
 	import { isoDayLocal } from '#lib/dates.ts';
 	import { formatDate, formatNumber, formatMoment } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -63,10 +64,20 @@
 		scope = 'read';
 		rights = [];
 		expires = '';
+		tried = false;
 		creating = true;
 	}
 
+	// Sent once while incomplete: from then on what is missing is marked.
+	let tried = $state(false);
+	const nameMissing = $derived(name.trim() === '');
+	const rightsMissing = $derived(scope === 'own' && rights.length === 0);
+
 	async function create() {
+		if (nameMissing || rightsMissing) {
+			tried = true;
+			throw new FormIncomplete();
+		}
 		const token = await unwrap(
 			api.POST('/api/v1/auth/tokens', {
 				body: {
@@ -186,16 +197,20 @@
 	</Card.Content>
 </Card.Root>
 
-<FormDialog
-	bind:open={creating}
-	title={m.token_new()}
-	submitLabel={m.create()}
-	disabled={name.trim() === '' || (scope === 'own' && rights.length === 0)}
-	action={create}
->
+<FormDialog bind:open={creating} title={m.token_new()} submitLabel={m.create()} action={create}>
 	<Field.Field>
 		<Field.Label for="token-name">{m.field_name()}</Field.Label>
-		<Input id="token-name" bind:value={name} maxlength={TOKEN_NAME_MAX} required />
+		<Input
+			id="token-name"
+			bind:value={name}
+			maxlength={TOKEN_NAME_MAX}
+			required
+			aria-invalid={(tried && nameMissing) || undefined}
+			aria-describedby={tried && nameMissing ? 'token-name-error' : undefined}
+		/>
+		{#if tried && nameMissing}
+			<Field.Error id="token-name-error">{m.token_name_missing()}</Field.Error>
+		{/if}
 	</Field.Field>
 	<Field.Field>
 		<Field.Label for="token-scope">{m.token_scope()}</Field.Label>
@@ -220,6 +235,9 @@
 				</fieldset>
 			{/each}
 			<p class="text-sm text-muted-foreground">{m.token_rights_hint()}</p>
+			{#if tried && rightsMissing}
+				<p class="text-sm text-destructive" role="alert">{m.token_rights_missing()}</p>
+			{/if}
 		</fieldset>
 		{#if session.isAdmin}
 			<fieldset class="flex flex-col gap-2">
@@ -260,14 +278,14 @@
 		deleteDescription={m.token_revoke_confirm()}
 		deleteLabel={m.token_revoke()}
 	>
-		<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-			<dt class="text-muted-foreground">{m.token_fact_created()}</dt>
-			<dd class="tabular-nums">{formatDate(token.created_at, { dateStyle: 'short' })}</dd>
-			<dt class="text-muted-foreground">{m.token_fact_used()}</dt>
-			<dd class="tabular-nums">{used(token)}</dd>
-			<dt class="text-muted-foreground">{m.token_fact_expiry()}</dt>
-			<dd class="tabular-nums">{expiry(token)}</dd>
-		</dl>
+		<DetailList
+			class="tabular-nums"
+			rows={[
+				[m.token_fact_created(), formatDate(token.created_at, { dateStyle: 'short' })],
+				[m.token_fact_used(), used(token)],
+				[m.token_fact_expiry(), expiry(token)]
+			]}
+		/>
 		<section class="flex flex-col gap-2" aria-labelledby="token-rights">
 			<h3 id="token-rights" class="flex items-center gap-2 text-sm font-medium">
 				{m.token_rights()}
@@ -275,7 +293,7 @@
 					{token.scope ? SCOPE_LABELS[token.scope]() : m.token_scope_own()}
 				</Badge>
 			</h3>
-			<ul class="divide-y rounded-xl border">
+			<Card.Root as="ul" size="flush" class="divide-y">
 				{#each AREAS as { area, rights: own } (area)}
 					<li class="grid gap-1 px-3 py-2 text-sm sm:grid-cols-[9.5rem_1fr] sm:gap-3">
 						<span class="text-muted-foreground">{AREA_LABELS[area]()}</span>
@@ -286,16 +304,16 @@
 						</span>
 					</li>
 				{/each}
-			</ul>
+			</Card.Root>
 		</section>
 		{#if session.isAdmin}
 			<section class="flex flex-col gap-2" aria-labelledby="token-admin-rights">
 				<h3 id="token-admin-rights" class="text-sm font-medium">{m.token_admin_rights()}</h3>
-				<ul class="flex flex-col gap-1.5 rounded-xl border px-3 py-2.5 text-sm">
+				<Card.Root as="ul" size="sm" class="flex flex-col gap-1.5 text-sm">
 					{#each ADMIN_RIGHTS as right (right)}
 						<li>{@render mark(held.has(right), ADMIN_LABELS[right]())}</li>
 					{/each}
-				</ul>
+				</Card.Root>
 				<p class="text-sm text-muted-foreground">{m.token_admin_rights_hint()}</p>
 			</section>
 		{/if}

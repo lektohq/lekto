@@ -152,6 +152,7 @@
 			/>
 			<Input
 				aria-label={m.field_currency()}
+				aria-invalid={invalid || undefined}
 				maxlength={3}
 				value={money.currency}
 				oninput={(event) =>

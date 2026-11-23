@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Check from '@lucide/svelte/icons/check';
 	import type { Snippet } from 'svelte';
 	import EditButton from '#lib/components/EditButton.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -56,6 +57,9 @@
 		<RuleSwitch {name} {enabled} {busy} {onswitch} class="relative z-10" />
 		<EditButton class="relative z-10" label={m.rule_edit_title({ name })} href={editHref} />
 	{:else}
-		<Badge variant={enabled ? 'green' : 'muted'}>{enabled ? m.rule_on() : m.rule_off()}</Badge>
+		<Badge variant={enabled ? 'green' : 'muted'}>
+			{#if enabled}<Check aria-hidden="true" />{/if}
+			{enabled ? m.rule_on() : m.rule_off()}
+		</Badge>
 	{/if}
 </Card.Root>

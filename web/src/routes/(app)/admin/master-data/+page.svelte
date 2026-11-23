@@ -9,6 +9,8 @@
 	import TagsPanel from '#lib/components/TagsPanel.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
+	import { home } from '#lib/navigation.ts';
+	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { phone } from '#lib/phone.svelte.ts';
 	import { session } from '#lib/session.svelte.ts';
@@ -29,7 +31,7 @@
 
 	// Five tabs: contacts, document types, every kind of tag, fields, and the identifiers no
 	// person has confirmed (Tobi, 27.10.2026). The tab stands in the URL (an unknown one is the
-	// first); the API refuses everyone but admins. Each tab has its own search (in this browser);
+	// first); the API refuses everyone but admins. Each tab has its own search (in the state of the page);
 	// all but the identifiers add with the button level with the title (on a phone an icon
 	// button). The contacts and the types sort beside the search (Tobi, 12.11.2026): by name or
 	// by most documents, in the URL and remembered per list.
@@ -107,7 +109,10 @@
 	</PageHeader>
 
 	{#if !session.isAdmin}
-		<p class="text-muted-foreground">{m.admin_only()}</p>
+		<!-- No retry: it stays so; the way back is the overview. -->
+		<LoadProblem problem={m.admin_only()}>
+			<Button variant="outline" href={home()}>{m.error_home()}</Button>
+		</LoadProblem>
 	{:else}
 		<div>
 			<!-- On a phone a shorter name for the types; five tabs are wider than a phone, so they

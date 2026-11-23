@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Check from '@lucide/svelte/icons/check';
 	import { renderSVG } from 'uqr';
 	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
@@ -68,6 +69,7 @@
 		<Card.Title class="flex items-center gap-2">
 			{m.totp_title()}
 			<Badge variant={enabled ? 'green' : 'muted'}>
+				{#if enabled}<Check aria-hidden="true" />{/if}
 				{enabled ? m.totp_on() : m.totp_off()}
 			</Badge>
 		</Card.Title>

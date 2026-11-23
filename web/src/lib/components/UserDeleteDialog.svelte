@@ -6,10 +6,12 @@
 	import ConfirmFooter from '#lib/components/ConfirmFooter.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
+	import { cardVariants } from '#lib/components/ui/card/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
 	import { loadLookup, type Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { session } from '#lib/session.svelte.ts';
+	import { cn } from '#lib/utils.ts';
 	import {
 		choicesOf,
 		editorOptions,
@@ -114,7 +116,7 @@
 				<p class="text-sm">{m.user_delete_spaces()}</p>
 				{#each blocking as space (space.space_id)}
 					{@const decision = decisions[space.space_id]}
-					<fieldset class="flex flex-col gap-2 rounded-xl border p-3">
+					<fieldset class={cn(cardVariants({ size: 'sm' }), 'flex flex-col gap-2')}>
 						<legend class="px-1 text-sm font-medium">{title(space)}</legend>
 						{#if choicesOf(space).length > 1}
 							<Select

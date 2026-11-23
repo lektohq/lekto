@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Check from '@lucide/svelte/icons/check';
 	import { switchRule } from '#lib/rules/switch.ts';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -123,6 +124,7 @@
 				{#if !canChangeRule(rule, session.user, spaces)}
 					<!-- The switch says it where the reader may change it. -->
 					<Badge variant={rule.enabled ? 'green' : 'muted'}>
+						{#if rule.enabled}<Check aria-hidden="true" />{/if}
 						{rule.enabled ? m.rule_on() : m.rule_off()}
 					</Badge>
 				{/if}
