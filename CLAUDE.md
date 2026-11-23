@@ -31,7 +31,7 @@ uv run lint-imports
 uv run pytest                    # all tests; integration tests skip if a service is unreachable
 uv run pytest -m unit            # no external services
 uv run pytest -m integration     # needs Postgres, Garage, Meilisearch, GreenMail, OCR programs
-uv run pytest -n auto            # in parallel (pytest-xdist), as CI does
+uv run pytest -n auto            # in parallel (pytest-xdist); CI uses -n logical
 uv run lekto                     # validate LEKTO_ configuration (= python -m lekto.composition)
 uv run lekto migrate             # bring the configured database to the newest schema
 uv run lekto check-schema        # exit 0 if the schema is at the newest revision

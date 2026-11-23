@@ -4,6 +4,7 @@
 #   base            Python and the system packages OCRmyPDF needs
 #   deps            the locked dependencies in /opt/lekto/venv, no dev group
 #   app             deps + the Lekto package
+#   pnpm            the version of pnpm web/package.json names
 #   s6              s6-overlay, unpacked (version and checksums pinned below)
 #   web             the web UI (web/), built once on the build machine: static files only
 #   dev             devcontainer: base + uv, Node.js, pnpm, Git
@@ -22,8 +23,12 @@
 FROM node:26.13.1-trixie-slim AS node
 FROM ghcr.io/astral-sh/uv:0.11.33 AS uv
 
-# Set by BuildKit; declared here so that `FROM s6-${TARGETARCH}` can use it.
-ARG TARGETARCH
+# The pnpm web/package.json names (`packageManager`, Renovate raises it there), for the stages
+# that install it. Only this line is copied on: a change of the dependencies alone keeps their
+# layers.
+FROM --platform=$BUILDPLATFORM node:26.13.1-trixie-slim AS pnpm
+COPY web/package.json /tmp/package.json
+RUN node -p "require('/tmp/package.json').packageManager" > /pnpm-version
 
 # --- base: Python and the system packages OCRmyPDF and WeasyPrint need ----------------------------
 FROM python:3.15.2-slim-trixie AS base
@@ -94,6 +99,7 @@ ADD --checksum=sha256:b17f17a82e7a515c682a91edaf2ffdabb73f891981b6c1fd712115693a
     https://github.com/just-containers/s6-overlay/releases/download/v3.2.3.2/s6-overlay-aarch64.tar.xz \
     /s6-overlay-arch.tar.xz
 
+# BuildKit sets TARGETARCH for every FROM line, without an ARG.
 FROM s6-${TARGETARCH} AS s6-arch
 
 FROM base AS s6
@@ -110,7 +116,8 @@ RUN mkdir /s6 && for archive in /archives/*.tar.xz; do tar -C /s6 -Jxpf "$archiv
 # The result is static files, the same for every target platform: no emulation for arm64.
 # Dependencies first, so that a change of the code alone keeps the install layer.
 FROM --platform=$BUILDPLATFORM node:26.13.1-trixie-slim AS web
-RUN npm install --global pnpm@12.9.1
+COPY --from=pnpm /pnpm-version /tmp/pnpm-version
+RUN npm install --global "$(cat /tmp/pnpm-version)"
 WORKDIR /web
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
@@ -138,9 +145,11 @@ COPY --from=uv /uv /uvx /usr/local/bin/
 # Node.js LTS from the official image (same Debian release, both architectures).
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=pnpm /pnpm-version /tmp/pnpm-version
 RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
-    && npm install --global pnpm@12.9.1
+    && npm install --global "$(cat /tmp/pnpm-version)" \
+    && rm /tmp/pnpm-version
 
 # The virtual environment lives outside the bind-mounted workspace: a `.venv` created on the
 # host (e.g. macOS) must not clash with it, and it stays fast on Docker Desktop. It sits in the

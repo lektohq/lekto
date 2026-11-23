@@ -46,7 +46,8 @@ safe() { # safe VARIABLE FOLDER
     */../* | */./*) fail "$1: '$2' must not contain '.' or '..' components" ;;
   esac
   case "$(printf %s "$2" | cut -d/ -f2)" in
-    bin | boot | dev | etc | lib | lib64 | opt | proc | root | run | sbin | sys | tmp | usr | var)
+    # `command` and `package`: s6-overlay's, run by PID 1 as root (OP-K02).
+    bin | boot | command | dev | etc | lib | lib64 | opt | package | proc | root | run | sbin | sys | tmp | usr | var)
       fail "$1: '$2' is a system folder; use /data or a mounted volume"
       ;;
   esac

@@ -131,6 +131,7 @@ invalid root -e PUID=0 "${secret[@]}"
 valid=("${secret[@]}" -e LEKTO_COOKIE_SECURE=false)
 invalid path -e LEKTO_DB_SQLITE_PATH=/lekto.db "${valid[@]}"
 invalid dots -e LEKTO_STORAGE_PATH=/data/../etc/objects "${valid[@]}"
+invalid system -e LEKTO_STORAGE_PATH=/command/objects "${valid[@]}"
 invalid role -e LEKTO_ROLE=proxy "${secret[@]}"
 
 step "role worker: waits for the schema, starts when the API container has migrated"
@@ -267,7 +268,9 @@ wait_for 60 "the container with a database in / stops" exited path || true
 check "a database path in the root folder is refused" grep -q 'is the root folder' <(logs path)
 wait_for 60 "the container with '..' in a path stops" exited dots || true
 check "a path with '..' is refused" grep -q "must not contain" <(logs dots)
-check "nothing in /etc was chowned" test "$(docker inspect --format '{{.State.ExitCode}}' "$prefix-dots")" -ne 0
+check "the refused folder was not made" bash -c "! docker diff $prefix-dots | grep -q '/etc/objects'"
+wait_for 60 "the container with a folder of s6-overlay stops" exited system || true
+check "a folder of s6-overlay is refused" grep -q "is a system folder" <(logs system)
 wait_for 60 "the container with an invalid role stops" exited role || true
 check "an invalid LEKTO_ROLE is refused" grep -q 'LEKTO_ROLE' <(logs role)
 

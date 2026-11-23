@@ -62,10 +62,6 @@ class ImageTagsTest(unittest.TestCase):
         self.assertEqual(image_tags("v0.6.0", released), ["0.6.0", "beta", "latest"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class PreviousReleaseTest(unittest.TestCase):
     def test_is_the_newest_release_below(self) -> None:
         released = ["v0.12.1", "v0.14.0", "v0.13.0", "v0.15.0", "nightly"]
@@ -79,3 +75,7 @@ class PreviousReleaseTest(unittest.TestCase):
 
     def test_is_none_for_the_first(self) -> None:
         self.assertIsNone(previous_release("v0.1.0", ["v0.1.0"]))
+
+
+if __name__ == "__main__":
+    unittest.main()

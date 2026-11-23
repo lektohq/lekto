@@ -50,6 +50,16 @@
       "additionalBranchPrefix": "ci-"
     },
     {
+      "description": "actionlint, run as an image in the workflows (`docker run`, tag and digest): a tool of the workflows like the actions",
+      "matchPackageNames": [
+        "rhysd/actionlint"
+      ],
+      "labels": [
+        "ci"
+      ],
+      "additionalBranchPrefix": "ci-"
+    },
+    {
       "description": "Lekto's own images, which the compose examples name",
       "matchPackageNames": [
         "ghcr.io/lektohq/**"
@@ -160,6 +170,21 @@
       ],
       "groupName": "GitHub Actions",
       "groupSlug": "actions"
+    },
+    {
+      "description": "Collective PR: actionlint goes with the actions",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "matchPackageNames": [
+        "rhysd/actionlint"
+      ],
+      "groupName": "GitHub Actions",
+      "groupSlug": "actions"
     }
   ],
   "lockFileMaintenance": {
@@ -178,6 +203,17 @@
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nARG [A-Z_]+_VERSION=(?<currentValue>\\S+)"
       ]
+    },
+    {
+      "description": "Images a workflow runs (`image:tag@sha256:…`, as in `docker run`): tag and digest",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)\\.github/workflows/[^/]+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "\\s(?<depName>[a-z0-9][a-z0-9.-]*(?:/[a-z0-9._-]+)+):(?<currentValue>[\\w.-]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ],
+      "datasourceTemplate": "docker"
     }
   ]
 }
