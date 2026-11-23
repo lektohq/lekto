@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { formatList } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import type { GraphNode, Processing } from '#lib/pipeline.ts';
 import { adviceText, visionAvailable, type Reading } from './vision.ts';
@@ -56,7 +57,7 @@ describe('adviceText', () => {
 			m.vision_advice_no_text()
 		);
 		expect(adviceText({ vision: false, pages, advice: 'poor_page' })).toBe(
-			m.vision_advice_poor_page({ pages: '2, 3' })
+			m.vision_advice_poor_page({ pages: formatList(['2', '3']) })
 		);
 	});
 

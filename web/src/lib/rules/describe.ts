@@ -1,5 +1,6 @@
 /** Texts of the rule builder: fields, operators, actions, problems; a rule as sentences. */
 import { formatNumber } from '#lib/i18n.ts';
+import { fieldText } from '#lib/card-fields.ts';
 import { describeValue } from '#lib/describe.ts';
 import { roleLabel, type FactRole } from '#lib/facts.ts';
 import { kindLabel, type IdentifierKind } from '#lib/identifiers.ts';
@@ -322,7 +323,8 @@ export function describeAction(action: ActionNode | ApiAction, lookup: Lookup | 
 			return `${label}: ${action.tag_ids.map((id) => tagName(id, lookup)).join(', ')}`;
 		case 'set_field': {
 			const field = fieldOf(action.field_id, lookup);
-			return `${label}: ${field?.name ?? m.rule_unknown()} = ${describeValue(action.value, null)}`;
+			const value = field ? fieldText(action.value, field) : describeValue(action.value, null);
+			return `${label}: ${field?.name ?? m.rule_unknown()} = ${value}`;
 		}
 		case 'force_review':
 			return `${label}: ${m.rule_quoted({ text: action.reason })}`;

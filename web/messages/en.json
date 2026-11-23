@@ -1736,7 +1736,7 @@
 	"rule_error_priority": "A whole number from 0 to 1000.",
 	"rule_error_triggers": "Choose when the rule runs.",
 	"rule_error_value": "Fill in a value.",
-	"rule_error_choose": "Please choose.",
+	"rule_error_choose": "Choose one.",
 	"rule_error_list": "Choose at least one.",
 	"rule_error_list_long": "At most {max}.",
 	"rule_error_text_long": "At most {max} characters.",

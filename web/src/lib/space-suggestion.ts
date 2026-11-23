@@ -3,6 +3,7 @@
  * name, who sees the document there that does not see it now, and whom the document names who
  * would not see it there (`unseen_by`).
  */
+import { formatList } from '#lib/i18n.ts';
 import type { components } from '#lib/api/schema.ts';
 import { describeValue } from '#lib/describe.ts';
 import { holderOf, userLabel, type Lookup } from '#lib/masterdata.svelte.ts';
@@ -100,7 +101,7 @@ export function unseenText(ids: readonly string[], lookup: Lookup | null): strin
 	});
 	const known = names.filter((name): name is string => name !== null);
 	const listed = known.length < names.length ? [...known, m.space_named_someone()] : known;
-	return m.space_named_unseen({ names: listed.join(', ') });
+	return m.space_named_unseen({ names: formatList(listed) });
 }
 
 /** "Vorschlag: Haushalt (sichtbar für erika)": the suggested space and who sees it there anew;
@@ -113,6 +114,6 @@ export function suggestionText(target: string, current: string, lookup: Lookup |
 	const space = describeValue(target, lookup);
 	const names = newReaders(target, current, lookup);
 	return names.length > 0
-		? m.space_suggestion_for({ space, names: names.join(', ') })
+		? m.space_suggestion_for({ space, names: formatList(names) })
 		: m.space_suggestion({ space });
 }

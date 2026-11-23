@@ -4,7 +4,7 @@
  */
 import type { components } from '#lib/api/schema.ts';
 import { describeValue, fieldLabel } from '#lib/describe.ts';
-import { formatNumber, formatList, formatMoment } from '#lib/i18n.ts';
+import { formatList, formatMoment, formatNumber } from '#lib/i18n.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { labelled, outputReasonText, reasonsText } from '#lib/reasons.ts';
@@ -239,9 +239,9 @@ function found(output: Json, lookup: Lookup | null): string {
 					contact: named(identifier.contact_id, lookup)
 				})
 			: names.length > 0
-				? m.summary_named({ names: names.join(', ') })
+				? m.summary_named({ names: formatList(names) })
 				: null,
-		persons.length > 0 ? m.summary_named({ names: persons.join(', ') }) : null
+		persons.length > 0 ? m.summary_named({ names: formatList(persons) }) : null
 	].filter(Boolean);
 	return parts.length > 0 ? parts.join(SEPARATOR) : m.summary_facts_none();
 }
@@ -254,7 +254,7 @@ function judged(output: Json, open: boolean, lookup: Lookup | null): string {
 		(check) => check.outcome === 'uncertain' || check.outcome === 'failed'
 	);
 	if (unsure.length > 0) {
-		const fields = unsure.map((check) => fieldLabel(String(check.field), lookup)).join(', ');
+		const fields = formatList(unsure.map((check) => fieldLabel(String(check.field), lookup)));
 		const unseen = list(checks.find((check) => check.field === 'space')?.unseen_by).map((id) =>
 			person(id, lookup)
 		);
@@ -263,7 +263,7 @@ function judged(output: Json, open: boolean, lookup: Lookup | null): string {
 			unseen.length === 1
 				? m.summary_unseen_one({ name: unseen[0] })
 				: unseen.length > 1
-					? m.summary_unseen({ names: unseen.join(', ') })
+					? m.summary_unseen({ names: formatList(unseen) })
 					: null
 		]
 			.filter(Boolean)

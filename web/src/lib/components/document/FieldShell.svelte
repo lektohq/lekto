@@ -12,7 +12,8 @@
 	import SourcesInfo from '#lib/components/document/SourcesInfo.svelte';
 	import { describeValue, fieldLabel } from '#lib/describe.ts';
 	import { byPage, provenance, type FieldEvidence, type Place } from '#lib/document-view.ts';
-	import type { Lookup } from '#lib/masterdata.svelte.ts';
+	import type { FieldDefinition, Lookup } from '#lib/masterdata.svelte.ts';
+	import { fieldText } from '#lib/card-fields.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { reasonsText } from '#lib/reasons.ts';
 	import { readAnew } from '#lib/review.ts';
@@ -43,6 +44,7 @@
 		onfocus,
 		onjump,
 		onpick,
+		field,
 		children
 	}: {
 		key: string;
@@ -69,8 +71,13 @@
 		onjump: (key: string, place: Place) => void;
 		/** Take a proposed value for the field. */
 		onpick?: (key: string, value: unknown) => void;
+		/** A field of the document's type: its values as its type shows them (a number). */
+		field?: FieldDefinition;
 		children: Snippet;
 	} = $props();
+
+	const shown = (value: unknown) =>
+		field ? fieldText(value, field) : describeValue(value, lookup);
 
 	const check = $derived(evidence?.check);
 	const reason = $derived(
@@ -200,7 +207,7 @@
 		{#if anew !== null}
 			<p class="text-sm">
 				<span class="text-muted-foreground">{m.review_read_anew()}:</span>
-				{describeValue(anew, lookup)}
+				{shown(anew)}
 			</p>
 		{/if}
 		{#if check.candidates?.length}
@@ -214,7 +221,7 @@
 		{:else if (check.suggestion ?? null) === null && (check.proposed ?? null) !== null}
 			<p class="text-sm">
 				<span class="text-muted-foreground">{m.review_proposed()}:</span>
-				{describeValue(check.proposed, lookup)}
+				{shown(check.proposed)}
 			</p>
 		{/if}
 		{#if byHand}
