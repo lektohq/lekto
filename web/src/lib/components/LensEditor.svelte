@@ -144,10 +144,11 @@
 			: []
 	);
 
-	$effect(() => {
-		// No grouping by deadline without one.
-		if (grouping === 'due' && !dueId) grouping = 'none';
-	});
+	/** The deadline field chosen; without one, no grouping by the deadline. */
+	function chooseDue(next: string) {
+		dueId = next;
+		if (!next && grouping === 'due') grouping = 'none';
+	}
 
 	function move(from: number, to: number) {
 		if (to < 0 || to >= cardIds.length || from === to) return;
@@ -235,7 +236,7 @@
 				</Field.Field>
 				<Field.Field>
 					<HintLabel for="lens-due" label={m.lens_due()} hint={m.lens_due_hint()} />
-					<Select id="lens-due" bind:value={dueId} options={dueOptions} />
+					<Select id="lens-due" bind:value={() => dueId, chooseDue} options={dueOptions} />
 				</Field.Field>
 			</div>
 

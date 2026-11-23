@@ -211,10 +211,20 @@
 		if (opened === item.key) opened = null;
 	}
 
-	/** Whether a contact's group shows its lines: opened, a search, or the line opened in it. */
+	// The groups closed by hand during a search, for that search: another one, or the search
+	// emptied, opens them again.
+	let shut = $state<{ query: string; ids: string[] }>({ query: '', ids: [] });
+	const searched = $derived(query.trim());
+	const shutNow = $derived(shut.query === searched ? shut.ids : []);
+	$effect(() => {
+		if (searched === '') shut = { query: '', ids: [] };
+	});
+
+	/** Whether a contact's group shows its lines: opened, a search (unless closed during it), or
+	 * the line opened in it. */
 	function isOpen(group: { id: string; rows: IdentifierRow[] }): boolean {
 		return (
-			query.trim() !== '' ||
+			(searched !== '' && !shutNow.includes(group.id)) ||
 			openGroups.includes(group.id) ||
 			group.rows.some((item) => item.key === opened)
 		);
@@ -224,8 +234,10 @@
 		if (isOpen(group)) {
 			openGroups = openGroups.filter((id) => id !== group.id);
 			if (group.rows.some((item) => item.key === opened)) opened = null;
+			if (searched !== '') shut = { query: searched, ids: [...shutNow, group.id] };
 		} else {
 			openGroups = [...openGroups, group.id];
+			shut = { query: searched, ids: shutNow.filter((id) => id !== group.id) };
 		}
 	}
 

@@ -206,6 +206,13 @@ describe('IdentifiersEditor, a user’s identifiers at contacts', () => {
 		expect(group('Muster Versicherung').getAttribute('aria-expanded')).toBe('true');
 		expect(line(/P3/)).toBeTruthy();
 		expect(screen.queryByRole('button', { name: /^Stadtwerke/ })).toBeNull();
+		// Closed by hand during the search, it stays closed (WB-K01); a new search opens it.
+		await user.click(group('Muster Versicherung'));
+		expect(group('Muster Versicherung').getAttribute('aria-expanded')).toBe('false');
+		expect(screen.queryByRole('button', { name: /P3/ })).toBeNull();
+		await user.clear(screen.getByLabelText(m.identifier_search()));
+		await user.type(screen.getByLabelText(m.identifier_search()), 'P3');
+		expect(group('Muster Versicherung').getAttribute('aria-expanded')).toBe('true');
 	});
 
 	it('shows them by source, with how many each has', async () => {

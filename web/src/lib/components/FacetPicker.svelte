@@ -33,6 +33,11 @@
 	} = $props();
 
 	let query = $state('');
+	/** "Fertig": closed as by the sheet's or the dialog's own way out, the search forgotten. */
+	function close() {
+		query = '';
+		open = false;
+	}
 	const sections = $derived.by(() => {
 		const words = searchWords(query);
 		return byLetter(
@@ -83,7 +88,7 @@
 {/snippet}
 
 {#snippet done()}
-	<Button variant="ghost" class={BAR_ACTION} onclick={() => (open = false)}>
+	<Button variant="ghost" class={BAR_ACTION} onclick={close}>
 		{m.facet_done()}
 	</Button>
 {/snippet}
@@ -108,7 +113,7 @@
 				{@render list()}
 			</div>
 			<Dialog.Footer>
-				<Button onclick={() => (open = false)}>{m.facet_done()}</Button>
+				<Button onclick={close}>{m.facet_done()}</Button>
 			</Dialog.Footer>
 		</Dialog.Content>
 	</Dialog.Root>

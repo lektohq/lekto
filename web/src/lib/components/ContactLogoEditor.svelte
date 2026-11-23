@@ -33,15 +33,11 @@
 		beside?: Snippet;
 	} = $props();
 
-	let logo = $state<Contact['logo']>(null);
-	let failure = $state<Contact['logo_failure']>(null);
+	// The contact's as given, replaced by what an upload or a fetch answers until it changes.
+	let logo = $derived<Contact['logo']>(contact.logo);
+	let failure = $derived<Contact['logo_failure']>(contact.logo_failure);
 	let busy = $state(false);
 	let input = $state<HTMLInputElement | null>(null);
-
-	$effect(() => {
-		logo = contact.logo;
-		failure = contact.logo_failure;
-	});
 
 	const canFetch = $derived(
 		fetching && logo?.source !== 'uploaded' && domainsOf(contact).length > 0

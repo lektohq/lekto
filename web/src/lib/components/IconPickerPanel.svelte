@@ -87,7 +87,7 @@
 		{:else}
 			{#each CURATED as group (group.area)}
 				<section class="flex flex-col gap-1.5" aria-label={AREA_LABELS[group.area]()}>
-					<Eyebrow as="h4">
+					<Eyebrow as="h3">
 						{AREA_LABELS[group.area]()}
 					</Eyebrow>
 					<div class="grid grid-cols-[repeat(auto-fill,minmax(2.75rem,1fr))] gap-1">
