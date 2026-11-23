@@ -235,7 +235,7 @@ function expression(
 }
 
 /** Where `{{` or `{%` opens the expression the cursor is in; -1 outside of one. */
-export function openAt(text: string, cursor: number): number {
+function openAt(text: string, cursor: number): number {
 	const before = text.slice(0, cursor);
 	const open = Math.max(before.lastIndexOf('{{'), before.lastIndexOf('{%'));
 	if (open < 0) return -1;
@@ -262,7 +262,11 @@ export function completionSpot(text: string, cursor: number): Spot | null {
 	if (open < 0) return null;
 	const value = text.startsWith('{{', open);
 	const inner = text.slice(open + 2, cursor);
-	const word = /\w*$/.exec(inner)![0];
+	// The word before the cursor, walked back to (a regex at the end of a long run of words
+	// takes time that grows with its square).
+	let start = inner.length;
+	while (start > 0 && /\w/.test(inner[start - 1])) start--;
+	const word = inner.slice(start);
 	const from = cursor - word.length;
 	const lead = inner.slice(0, inner.length - word.length);
 	if (/\|\s*$/.test(lead)) return { kind: 'filter', from, value };

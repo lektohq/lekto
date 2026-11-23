@@ -143,7 +143,7 @@
 		<ChoiceBox
 			class={inset}
 			checked={allChosen}
-			disabled={loaded === 0}
+			disabled={loaded - conflicts === 0}
 			aria-label={m.rule_preview_select_all()}
 			onchange={(event) => onchoose(event.currentTarget.checked)}
 		/>

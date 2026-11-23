@@ -30,7 +30,6 @@ export type ConditionField = Schemas['ConditionSchema']['field'];
 export type Operator = Schemas['Operator'];
 export type Trigger = Schemas['Trigger'];
 export type Channel = Schemas['Channel'];
-export type Scope = Schemas['RuleScope'];
 export type FieldType = Schemas['FieldType'];
 export type Money = Schemas['MoneyValue'];
 export type Period = Schemas['PeriodValue'];
@@ -529,7 +528,7 @@ export function canAddGroup(model: RuleModel, group: GroupNode): boolean {
 
 /** The field an action sets alone; two such actions contradict each other (a webhook twice
  * would send twice). */
-export function singleKey(action: ApiAction | ActionNode): string | null {
+function singleKey(action: ApiAction | ActionNode): string | null {
 	if (action.type === 'set_field') return `field:${action.field_id}`;
 	if (action.type === 'send_webhook') return `send_webhook:${action.webhook_id}`;
 	if (action.type === 'ask_webhook') return `step:${action.name}`;

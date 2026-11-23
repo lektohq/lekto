@@ -45,7 +45,7 @@
 		open = $bindable(false),
 		value,
 		label,
-		documentType = undefined,
+		documentType,
 		fields,
 		maxlength,
 		purpose = 'rule',

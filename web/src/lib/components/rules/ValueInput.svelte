@@ -28,7 +28,7 @@
 		template = false,
 		templated = false,
 		ontemplated,
-		fields = undefined,
+		fields,
 		steps = [],
 		onunreadable
 	}: {

@@ -51,6 +51,12 @@ describe('the rows of a rule by keyboard (WD-06)', () => {
 		expect(button(m.rule_remove_of({ name: m.rule_row_action({ number: 1, kind }) }))).toBeTruthy();
 	});
 
+	it('names a group by its number, as its buttons do (WD-K14)', async () => {
+		builder();
+		await userEvent.setup().click(button(m.rule_add_group()));
+		expect(screen.getByRole('group', { name: m.rule_row_group({ number: 4 }) })).toBeTruthy();
+	});
+
 	it('draws groups and rows as cards of one size (WD-16)', () => {
 		builder();
 		const row = button(m.rule_remove_of({ name: condition(1) })).closest('[data-rule-row]')!;
