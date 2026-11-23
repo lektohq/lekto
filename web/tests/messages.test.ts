@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import de from '../messages/de.json';
 import en from '../messages/en.json';
+import { m } from '#lib/paraglide/messages.js';
 
 const catalogues: Record<string, Record<string, string>> = { de, en };
 
@@ -213,5 +214,17 @@ describe('messages', () => {
 				placeholders(de[key as keyof typeof de]).join()
 		);
 		expect(differing).toEqual([]);
+	});
+});
+
+describe('the words of a hand-over', () => {
+	it('says the hand-over in the words of the move dialog, in both languages', () => {
+		for (const locale of ['de', 'en'] as const) {
+			const options = { locale };
+			expect(m.space_suggestion_hand_over({ name: 'Erika' }, options)).toContain(
+				m.move_hand_over({ name: 'Erika' }, options)
+			);
+			expect(m.move_handed_over({ name: 'Erika' }, options)).not.toMatch(/^An Erika/);
+		}
 	});
 });

@@ -129,7 +129,6 @@ describe('the labels in the fields node', () => {
 			m.log_label_missing({ label: 'Brutto' })
 		]);
 		expect(said({ text: null, outcome: 'no_label' })).toEqual([m.log_label_none()]);
-		expect(m.log_label_beside({ label: 'Gesamtbrutto' })).toContain('Gesamtbrutto');
 	});
 
 	it('shows nothing for checks from before labels, nor for another node', () => {

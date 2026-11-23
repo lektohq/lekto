@@ -6,10 +6,19 @@ let detach: () => void;
 const view = vi.fn();
 const open = vi.fn();
 
-function click(detail: number, init: MouseEventInit = {}): MouseEvent {
+/** A click on the link; whether the app kept it. One the app leaves to the link would make
+ * jsdom navigate ("Not implemented"): above the link it is noted and then stopped (WT3-K01). */
+function click(detail: number, init: MouseEventInit = {}): { defaultPrevented: boolean } {
 	const event = new MouseEvent('click', { bubbles: true, cancelable: true, detail, ...init });
+	let kept = false;
+	const above = (seen: Event) => {
+		kept = seen.defaultPrevented;
+		seen.preventDefault();
+	};
+	document.addEventListener('click', above);
 	link.dispatchEvent(event);
-	return event;
+	document.removeEventListener('click', above);
+	return { defaultPrevented: kept };
 }
 
 function pointer(type: string, pointerType: string, x = 10, y = 10) {
